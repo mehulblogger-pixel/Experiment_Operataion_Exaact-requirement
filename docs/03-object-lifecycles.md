@@ -306,3 +306,44 @@ stateDiagram-v2
 - **P4a scope:** only the `JOB_CLOSED` source is wired, populated by the sync
   pass. Inline hooks at job-close / report-issue / timesheet-approval and more
   sources are P4b.
+
+---
+
+## Connect Requirement (`cx_requirements.status`) — marketplace (K2a)
+
+A posted technical-manpower requirement in the marketplace folded into EXAACT
+(`lib/connect_market.php`, `CX_REQ_TRANSITIONS`). Additive `cx_requirements` table;
+no existing object touched.
+
+> **DRAFT → OPEN → SHORTLISTING → AWARDED → CLOSED**, plus **CANCELLED** and
+> **EXPIRED** as off-ramps.
+
+- `DRAFT → OPEN` (post) · `DRAFT → CANCELLED`
+- `OPEN → SHORTLISTING` · `OPEN → CLOSED` · `OPEN → CANCELLED` · `OPEN → EXPIRED`
+- `SHORTLISTING → AWARDED` (via `cx_requirement_award`, which also accepts the
+  chosen application) · `SHORTLISTING → OPEN` (reopen) · `SHORTLISTING → CLOSED` ·
+  `SHORTLISTING → CANCELLED`
+- `AWARDED → CLOSED`
+- Terminal: `CLOSED`, `CANCELLED`, `EXPIRED`. Transitions are enforced by
+  `cx_req_can_transition()`; an illegal move is refused, not applied.
+
+## Connect Application (`cx_applications.status`) — marketplace (K2a)
+
+A professional's application to a requirement (`CX_APP_TRANSITIONS`). Additive
+`cx_applications` table; one live application per professional per requirement.
+
+> **APPLIED → SHORTLISTED → OFFERED → ACCEPTED**, plus **DECLINED**, **WITHDRAWN**,
+> **REJECTED** as off-ramps.
+
+- `APPLIED → SHORTLISTED | REJECTED | WITHDRAWN`
+- `SHORTLISTED → OFFERED | REJECTED | WITHDRAWN`
+- `OFFERED → ACCEPTED | DECLINED | WITHDRAWN`
+- Terminal: `ACCEPTED`, `DECLINED`, `WITHDRAWN`, `REJECTED`. Enforced by
+  `cx_app_can_transition()`. Awarding a requirement drives the chosen application
+  to `ACCEPTED` via its legal path.
+
+- **Permission (K2a):** the staff desk reuses existing **coordinator/master**
+  gates (`connect_market_can()`) — **no new permission**; `docs/02-permission-matrix.md`
+  unchanged. External self-service (client-portal post, vendor/inspector-portal
+  apply) is **K2b**, where the new portal permissions will be added to the matrix
+  with the owner's sign-off.

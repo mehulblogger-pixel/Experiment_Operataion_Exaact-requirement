@@ -3176,6 +3176,10 @@ function ops_dispatch($route, $method) {
             return ops_connect_taxonomy($method);
         case $route === 'passport-share':      // Connect K1 — get/copy a professional's public passport link + QR
             return ops_connect_passport_share($method);
+        case $route === 'connect-requirements': // Connect K2a — manpower marketplace board (post + list)
+            return ops_connect_requirements($route, $method);
+        case $route === 'connect-requirement':  // Connect K2a — one requirement (applications + lifecycle)
+            return ops_connect_requirement($method);
         case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board
             return ops_command_centre($method);
         case $route === 'entity-360':          // Phase 3 §49 — uniform 360 shell for any entity

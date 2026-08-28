@@ -1,0 +1,236 @@
+<?php
+// ============================================================================
+//  CONNECT — Manpower Marketplace core  (slice K2a, additive)
+//
+//  The two-sided marketplace folded into EXAACT: a POST (a technical-manpower
+//  requirement) and an APPLY (a professional puts themselves forward), with the
+//  post→shortlist→award lifecycle. Adopted from the Inspect Connect blueprint
+//  (M7/M8/M9 intake side). See docs/connect/00-integration-program.md.
+//
+//  K2a scope = the engine + lifecycles + the STAFF desk, gated on existing
+//  internal permissions (coordinator/master). External self-service (client
+//  portal posts, vendor/inspector portal applies) is K2b, after the role→portal
+//  mapping is confirmed — so this slice invents NO new external permission.
+//
+//  ADDITIVE CONTRACT: two new cx_ tables only; new statuses documented in
+//  docs/03-object-lifecycles.md in the same commit; no existing table, route,
+//  view, permission or status touched.
+// ============================================================================
+
+// --- Lifecycles (documented in docs/03-object-lifecycles.md) ----------------
+const CX_REQ_STATUSES = ['DRAFT', 'OPEN', 'SHORTLISTING', 'AWARDED', 'CLOSED', 'CANCELLED', 'EXPIRED'];
+const CX_REQ_TRANSITIONS = [
+    'DRAFT'        => ['OPEN', 'CANCELLED'],
+    'OPEN'         => ['SHORTLISTING', 'CLOSED', 'CANCELLED', 'EXPIRED'],
+    'SHORTLISTING' => ['AWARDED', 'OPEN', 'CLOSED', 'CANCELLED'],
+    'AWARDED'      => ['CLOSED'],
+    'CLOSED'       => [], 'CANCELLED' => [], 'EXPIRED' => [],
+];
+const CX_APP_STATUSES = ['APPLIED', 'SHORTLISTED', 'OFFERED', 'ACCEPTED', 'DECLINED', 'WITHDRAWN', 'REJECTED'];
+const CX_APP_TRANSITIONS = [
+    'APPLIED'     => ['SHORTLISTED', 'REJECTED', 'WITHDRAWN'],
+    'SHORTLISTED' => ['OFFERED', 'REJECTED', 'WITHDRAWN'],
+    'OFFERED'     => ['ACCEPTED', 'DECLINED', 'WITHDRAWN'],
+    'ACCEPTED'    => [], 'DECLINED' => [], 'WITHDRAWN' => [], 'REJECTED' => [],
+];
+
+function cx_req_can_transition($from, $to) {
+    return in_array($to, CX_REQ_TRANSITIONS[strtoupper((string)$from)] ?? [], true);
+}
+function cx_app_can_transition($from, $to) {
+    return in_array($to, CX_APP_TRANSITIONS[strtoupper((string)$from)] ?? [], true);
+}
+
+/** Additive tables — requirements (the post) and applications (the apply). */
+function connect_market_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    db()->exec("CREATE TABLE IF NOT EXISTS cx_requirements (
+        id $pk, ref_code VARCHAR(24) DEFAULT '', title VARCHAR(200) DEFAULT '',
+        poster_party_id INT DEFAULT 0, poster_name VARCHAR(200) DEFAULT '',
+        sector_code VARCHAR(40) DEFAULT '', discipline_code VARCHAR(40) DEFAULT '',
+        equipment_group VARCHAR(40) DEFAULT '', material_code VARCHAR(40) DEFAULT '',
+        location VARCHAR(160) DEFAULT '', work_type VARCHAR(40) DEFAULT '',
+        start_date VARCHAR(20) DEFAULT '', end_date VARCHAR(20) DEFAULT '',
+        positions INT DEFAULT 1, rate_min REAL DEFAULT 0, rate_max REAL DEFAULT 0,
+        rate_unit VARCHAR(20) DEFAULT '', description TEXT,
+        status VARCHAR(16) DEFAULT 'DRAFT', awarded_application_id INT DEFAULT 0,
+        created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '',
+        posted_at VARCHAR(30) DEFAULT '', closed_at VARCHAR(30) DEFAULT '',
+        updated_at VARCHAR(30) DEFAULT '')");
+    db()->exec("CREATE TABLE IF NOT EXISTS cx_applications (
+        id $pk, requirement_id INT DEFAULT 0, inspector_id INT DEFAULT 0,
+        applicant_name VARCHAR(200) DEFAULT '', cover_note TEXT,
+        proposed_rate REAL DEFAULT 0, status VARCHAR(16) DEFAULT 'APPLIED',
+        created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '',
+        updated_at VARCHAR(30) DEFAULT '')");
+}
+
+/** Next requirement reference — CX-REQ-0001, monotonic on id. */
+function cx_req_next_code() {
+    $n = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM cx_requirements") + 1;
+    return 'CX-REQ-' . str_pad((string)$n, 4, '0', STR_PAD_LEFT);
+}
+
+/** Create a requirement (DRAFT), or post it straight to OPEN. Returns its id. */
+function cx_requirement_create(array $in, $post = false) {
+    connect_market_migrate();
+    $now = date('c');
+    $status = $post ? 'OPEN' : 'DRAFT';
+    db()->prepare("INSERT INTO cx_requirements
+        (ref_code,title,poster_party_id,poster_name,sector_code,discipline_code,equipment_group,material_code,
+         location,work_type,start_date,end_date,positions,rate_min,rate_max,rate_unit,description,status,
+         created_by,created_at,posted_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        ->execute([
+            cx_req_next_code(), trim((string)($in['title'] ?? '')), (int)($in['poster_party_id'] ?? 0),
+            trim((string)($in['poster_name'] ?? '')), (string)($in['sector_code'] ?? ''), (string)($in['discipline_code'] ?? ''),
+            (string)($in['equipment_group'] ?? ''), (string)($in['material_code'] ?? ''),
+            trim((string)($in['location'] ?? '')), (string)($in['work_type'] ?? ''),
+            (string)($in['start_date'] ?? ''), (string)($in['end_date'] ?? ''),
+            max(1, (int)($in['positions'] ?? 1)), (float)($in['rate_min'] ?? 0), (float)($in['rate_max'] ?? 0),
+            (string)($in['rate_unit'] ?? ''), trim((string)($in['description'] ?? '')), $status,
+            function_exists('user_name') ? user_name(current_user()) : '', $now, $post ? $now : '', $now,
+        ]);
+    return (int)db()->lastInsertId();
+}
+
+function cx_requirement_get($id) { return ops_one("SELECT * FROM cx_requirements WHERE id=?", [(int)$id]) ?: null; }
+
+/** Move a requirement to a new status if the transition is legal. */
+function cx_requirement_transition($id, $to) {
+    $r = cx_requirement_get($id); if (!$r) return false;
+    $to = strtoupper((string)$to);
+    if (!cx_req_can_transition($r['status'], $to)) return false;
+    $extra = ''; $args = [$to, date('c')];
+    if ($to === 'OPEN' && ($r['posted_at'] ?? '') === '') { $extra = ', posted_at=?'; $args[] = date('c'); }
+    if (in_array($to, ['CLOSED', 'CANCELLED', 'EXPIRED'], true)) { $extra = ', closed_at=?'; $args[] = date('c'); }
+    $args[] = (int)$id;
+    db()->prepare("UPDATE cx_requirements SET status=?, updated_at=?$extra WHERE id=?")->execute($args);
+    return true;
+}
+
+/** Record an application to a requirement (APPLIED). One per inspector per req. */
+function cx_application_add($requirementId, array $in) {
+    connect_market_migrate();
+    $requirementId = (int)$requirementId;
+    $inspectorId = (int)($in['inspector_id'] ?? 0);
+    if ($inspectorId > 0) {
+        $dupe = (int)ops_val("SELECT COUNT(*) FROM cx_applications WHERE requirement_id=? AND inspector_id=?", [$requirementId, $inspectorId]);
+        if ($dupe > 0) return 0; // already applied
+    }
+    $name = trim((string)($in['applicant_name'] ?? ''));
+    if ($name === '' && $inspectorId > 0) $name = (string)ops_val("SELECT name FROM inspectors WHERE id=?", [$inspectorId]);
+    db()->prepare("INSERT INTO cx_applications (requirement_id,inspector_id,applicant_name,cover_note,proposed_rate,status,created_by,created_at,updated_at)
+                   VALUES (?,?,?,?,?, 'APPLIED', ?,?,?)")
+        ->execute([$requirementId, $inspectorId, $name, trim((string)($in['cover_note'] ?? '')),
+                   (float)($in['proposed_rate'] ?? 0), function_exists('user_name') ? user_name(current_user()) : '', date('c'), date('c')]);
+    return (int)db()->lastInsertId();
+}
+
+function cx_application_get($id) { return ops_one("SELECT * FROM cx_applications WHERE id=?", [(int)$id]) ?: null; }
+
+function cx_application_transition($id, $to) {
+    $a = cx_application_get($id); if (!$a) return false;
+    $to = strtoupper((string)$to);
+    if (!cx_app_can_transition($a['status'], $to)) return false;
+    db()->prepare("UPDATE cx_applications SET status=?, updated_at=? WHERE id=?")->execute([$to, date('c'), (int)$id]);
+    return true;
+}
+
+/**
+ * Award a requirement to one application: the application is accepted (from
+ * SHORTLISTED or OFFERED it goes to ACCEPTED) and the requirement moves to
+ * AWARDED. A no-op unless both moves are legal.
+ */
+function cx_requirement_award($requirementId, $applicationId) {
+    $r = cx_requirement_get($requirementId); $a = cx_application_get($applicationId);
+    if (!$r || !$a || (int)$a['requirement_id'] !== (int)$r['id']) return false;
+    if (!cx_req_can_transition($r['status'], 'AWARDED')) return false;
+    // Bring the chosen application to ACCEPTED via any legal path.
+    $st = strtoupper((string)$a['status']);
+    if ($st === 'SHORTLISTED') { cx_application_transition($applicationId, 'OFFERED'); $st = 'OFFERED'; }
+    if ($st === 'OFFERED') cx_application_transition($applicationId, 'ACCEPTED');
+    if (strtoupper((string)cx_application_get($applicationId)['status']) !== 'ACCEPTED') return false;
+    db()->prepare("UPDATE cx_requirements SET status='AWARDED', awarded_application_id=?, updated_at=? WHERE id=?")
+        ->execute([(int)$applicationId, date('c'), (int)$requirementId]);
+    return true;
+}
+
+function cx_applications_for($requirementId) {
+    return ops_all("SELECT * FROM cx_applications WHERE requirement_id=? ORDER BY id", [(int)$requirementId]) ?: [];
+}
+function cx_requirements_list($status = '') {
+    if ($status !== '') return ops_all("SELECT * FROM cx_requirements WHERE status=? ORDER BY id DESC", [$status]) ?: [];
+    return ops_all("SELECT * FROM cx_requirements ORDER BY id DESC") ?: [];
+}
+function cx_market_summary() {
+    $c = function($w = '', $a = []) { try { return (int)ops_val("SELECT COUNT(*) FROM cx_requirements" . ($w ? " WHERE $w" : ''), $a); } catch (Throwable $e) { return 0; } };
+    return [
+        'total'  => $c(),
+        'open'   => $c("status IN ('OPEN','SHORTLISTING')"),
+        'draft'  => $c("status='DRAFT'"),
+        'awarded'=> $c("status='AWARDED'"),
+        'apps'   => (function(){ try { return (int)ops_val("SELECT COUNT(*) FROM cx_applications"); } catch (Throwable $e) { return 0; } })(),
+    ];
+}
+
+/** Staff gate — reuses existing helpers; introduces NO new permission. */
+function connect_market_can() {
+    if (function_exists('is_master') && is_master()) return true;
+    if (function_exists('is_coordinator_level') && is_coordinator_level()) return true;
+    return false;
+}
+
+/** Board: post a requirement + list requirements. */
+function ops_connect_requirements($route, $method) {
+    ops_require(connect_market_can(), 'The manpower marketplace desk is for coordinators, managers and admins.');
+    connect_market_migrate();
+    if ($method === 'POST') {
+        $act = (string)($_POST['action'] ?? 'create');
+        if ($act === 'create' || $act === 'create_post') {
+            if (trim((string)($_POST['title'] ?? '')) === '') { flash('Give the requirement a title.', 'error'); redirect('/connect-requirements'); }
+            $id = cx_requirement_create($_POST, $act === 'create_post');
+            flash($act === 'create_post' ? 'Requirement posted — it is now open for applications.' : 'Requirement saved as a draft.');
+            redirect('/connect-requirement?id=' . $id);
+        }
+        redirect('/connect-requirements');
+    }
+    view('ops/connect_requirements', [
+        'summary'    => cx_market_summary(),
+        'rows'       => cx_requirements_list(),
+        'sectors'    => function_exists('connect_tx_rows') ? connect_tx_rows('cx_sectors') : [],
+        'disciplines'=> function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+        'partners'   => ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) AS nm FROM business_partners WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY nm") ?: [],
+    ]);
+    return true;
+}
+
+/** Detail: a requirement, its applications, and every lifecycle action. */
+function ops_connect_requirement($method) {
+    ops_require(connect_market_can(), 'The manpower marketplace desk is for coordinators, managers and admins.');
+    $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+    if ($method === 'POST') {
+        $act = (string)($_POST['action'] ?? '');
+        if ($act === 'req_transition') {
+            cx_requirement_transition($id, $_POST['to'] ?? '') ? flash('Requirement updated.') : flash('That change is not allowed from the current status.', 'error');
+        } elseif ($act === 'apply') {
+            $newId = cx_application_add($id, $_POST);
+            flash($newId ? 'Application recorded.' : 'That professional has already applied to this requirement.', $newId ? 'success' : 'error');
+        } elseif ($act === 'app_transition') {
+            cx_application_transition((int)($_POST['application_id'] ?? 0), $_POST['to'] ?? '') ? flash('Application updated.') : flash('That change is not allowed from the current status.', 'error');
+        } elseif ($act === 'award') {
+            cx_requirement_award($id, (int)($_POST['application_id'] ?? 0)) ? flash('Requirement awarded.') : flash('Could not award — shortlist the application first.', 'error');
+        }
+        redirect('/connect-requirement?id=' . $id);
+    }
+    $req = cx_requirement_get($id);
+    if (!$req) { flash('That requirement was not found.', 'error'); redirect('/connect-requirements'); }
+    view('ops/connect_requirement', [
+        'req'          => $req,
+        'apps'         => cx_applications_for($id),
+        'inspectors'   => ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY name") ?: [],
+        'req_next'     => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
+    ]);
+    return true;
+}
