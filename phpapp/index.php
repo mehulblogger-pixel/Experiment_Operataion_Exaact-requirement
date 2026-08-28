@@ -235,6 +235,7 @@ try {
     require __DIR__ . '/lib/billable.php';          // Revamp P4 — the Billable Event ledger (operational→commercial bridge)
     require __DIR__ . '/lib/attendreview.php';     // Phase 3 §35 — attendance review (anomaly + send-back)
     require __DIR__ . '/lib/connect_taxonomy.php'; // Connect K0 — manpower-marketplace industry taxonomy (additive masters)
+    require __DIR__ . '/lib/connect_passport.php'; // Connect K1 — public professional passport (over the P1 credential vault)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
@@ -340,6 +341,7 @@ try {
     db()->query("SELECT bill_ref FROM billable_events LIMIT 1");         // Revamp P4 — Billable Event ledger (+P4c bill_ref)
     db()->query("SELECT engagement_id FROM calls LIMIT 1");              // Revamp — Engagement entity (additive engagement_id)
     db()->query("SELECT id FROM cx_sectors LIMIT 1");                    // Connect K0 — industry taxonomy masters (cx_*)
+    db()->query("SELECT passport_token FROM inspectors LIMIT 1");        // Connect K1 — public passport share key
     db()->query("SELECT id FROM agencies LIMIT 1");
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM requisitions LIMIT 1");
@@ -759,6 +761,15 @@ if ($route === 'complaints-policy') {
 // nothing confidential.
 if ($route === 'verify') {
     require __DIR__ . '/views/ops/verify.php';
+    exit;
+}
+
+// Connect K1 — a professional's PUBLIC passport, reached via an unguessable
+// share token (/p/<token>) and from the QR printed on it. Public like /verify:
+// no account, dispatched in front of require_login(). It shows only verified
+// credentials, live status and reputation — nothing confidential.
+if (strncmp($route, 'p/', 2) === 0 && function_exists('connect_passport_route')) {
+    connect_passport_route(substr($route, 2));   // renders a standalone page and exits
     exit;
 }
 
