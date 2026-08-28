@@ -5633,6 +5633,43 @@ function job_qaps($jobId) {
     return ops_all("SELECT id, job_id, po_line, file_name, mime, note, uploaded_by, uploaded_at
                     FROM job_qaps WHERE job_id=? ORDER BY id", [(int)$jobId]);
 }
+
+// ---- Field #27 (stage a) — prior inspections at the SAME client + vendor + contract ----
+// Issued reports from earlier inspections of the same vendor, for the same client,
+// under the same contract — newest first. This is the "last inspection at the same
+// vendor" the next inspector (and the coordinator) can see and, later, continue from.
+// Only ISSUED reports count — a draft is not a past inspection anyone should rely on.
+function inspection_history_for($clientId, $vendorId, $contractNumber, $exceptJobId = 0, $limit = 8) {
+    $vendorId = (int)$vendorId;
+    if (!$vendorId) return [];                       // no vendor → no vendor-history
+    return ops_all(
+        "SELECT rd.id, rd.irn, rd.type_code, rd.status, rd.finalized, rd.job_id,
+                COALESCE(NULLIF(rd.issue_date,''), NULLIF(rd.inspection_date,''), NULLIF(rd.finalized_at,''), rd.created_at) AS on_date,
+                cl.call_code, cl.contract_number, i.name AS inspector_name
+         FROM report_docs rd
+         JOIN jobs j   ON j.id = rd.job_id
+         JOIN calls cl ON cl.id = j.call_id
+         LEFT JOIN inspectors i ON i.id = rd.inspector_id
+         WHERE rd.deleted = 0 AND rd.finalized = 1
+           AND cl.client_id = CAST(? AS INTEGER)
+           AND COALESCE(cl.vendor_id,0) = CAST(? AS INTEGER)
+           AND COALESCE(cl.contract_number,'') = ?
+           AND COALESCE(rd.job_id,0) <> CAST(? AS INTEGER)
+         ORDER BY on_date DESC, rd.id DESC
+         LIMIT " . max(1, (int)$limit),
+        [(int)$clientId, $vendorId, (string)$contractNumber, (int)$exceptJobId]) ?: [];
+}
+
+// The prior inspections for a given job — resolved from its call's client / vendor /
+// contract. Empty when the job has no call, no vendor, or no earlier issued report.
+function job_prior_inspections($job, $limit = 8) {
+    $callId = (int)($job['call_id'] ?? 0);
+    if (!$callId) return [];
+    $call = ops_one("SELECT client_id, vendor_id, contract_number FROM calls WHERE id=?", [$callId]);
+    if (!$call || empty($call['vendor_id'])) return [];
+    return inspection_history_for((int)$call['client_id'], (int)$call['vendor_id'],
+        (string)($call['contract_number'] ?? ''), (int)($job['id'] ?? 0), $limit);
+}
 // Upload one or more QAP files against a job.
 // Who may attach / remove a QAP / ITP on a job: anyone who runs the job
 // (coordinators & operations via ops.job.allocate/close) or writes its report

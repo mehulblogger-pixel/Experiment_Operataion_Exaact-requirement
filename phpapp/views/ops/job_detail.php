@@ -553,6 +553,29 @@
   $srcMap = []; foreach ($appl['applicable'] as $a) $srcMap[$a['code']] = $a['source'];
   $srcLabels = $appl['source_labels'] ?? [];
 ?>
+<?php // Field #27 (stage a) — the last inspection(s) at this SAME client + vendor +
+      // contract, so the next inspector sees the history and can open the past report.
+      // Read-only here; forwarding / continuing come next. Only issued reports show. ?>
+<?php $priorInsp = function_exists('job_prior_inspections') ? job_prior_inspections($job) : []; ?>
+<?php if ($priorInsp && (is_master() || can('mod.idems.view') || can('mod.idems.edit'))): ?>
+<div class="panel" id="prior-inspections" data-tab="Reports &amp; QA">
+  <div class="ctitle" style="margin-top:0"><h3>Previous inspections at this vendor <span class="muted">(<?= count($priorInsp) ?>)</span></h3></div>
+  <p class="muted" style="margin:0 0 10px">Earlier issued reports for the <b>same <?= e(Tl('client')) ?>, vendor and contract</b> — newest first. Open the latest to carry its scope and QAP forward for this repeat inspection.</p>
+  <table class="grid"><tr><th>Report</th><th>Type</th><th>Inspector</th><th>Date</th><th></th></tr>
+    <?php foreach ($priorInsp as $pi): ?>
+      <tr>
+        <td><b><?= e($pi['irn']) ?></b></td>
+        <td><?= e($pi['type_code'] ?: '—') ?></td>
+        <td><?= e($pi['inspector_name'] ?: '—') ?></td>
+        <td><?= e(($pi['on_date'] ?? '') !== '' ? fdate(substr((string)$pi['on_date'], 0, 10)) : '—') ?></td>
+        <td class="num"><a class="btn small secondary" href="/document?id=<?= (int)$pi['id'] ?>">Open →</a>
+          <a class="btn small secondary" href="/document-pdf?id=<?= (int)$pi['id'] ?>" target="_blank" rel="noopener">PDF</a></td>
+      </tr>
+    <?php endforeach; ?>
+  </table>
+</div>
+<?php endif; ?>
+
 <?php // §R1-D — Quality Assurance Plans for this job. A PO may bring one QAP or
       // many (one per line item). They are attached as-is (usually PDF), never
       // parsed, and the inspector reads them while writing the report. ?>
