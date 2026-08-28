@@ -69,6 +69,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
           <span class="cxpill <?= $reasonCls ?>"><?= e($m['reason']) ?></span>
         </div>
         <div class="cxmeta" style="margin:8px 0">
+          <?php if (isset($m['trust'])): ?><strong>Trust <?= (int)$m['trust'] ?></strong> · <?php endif; ?>
           <?php if ($m['stars'] !== null && (int)$m['jobs'] >= 3): ?>★ <?= e(number_format((float)$m['stars'],1)) ?> · <?php endif; ?>
           <?php if ((int)$m['verified'] > 0): ?><?= (int)$m['verified'] ?> verified · <?php endif; ?>
           <span class="cxpill <?= $epCls==='p-ok'?'ok':($epCls==='p-bad'?'bad':'warn') ?>"><?= e($epLbl) ?></span>

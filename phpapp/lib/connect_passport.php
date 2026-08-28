@@ -135,6 +135,7 @@ function connect_passport_public_data($insp) {
         'live_count'     => $liveCount,
         'cred_total'     => count($creds),
         'reputation'  => $rep,
+        'trust'       => function_exists('connect_trust_score') ? connect_trust_score($id) : null,   // K5
         'token'       => (string)($insp['passport_token'] ?? ''),
     ];
 }

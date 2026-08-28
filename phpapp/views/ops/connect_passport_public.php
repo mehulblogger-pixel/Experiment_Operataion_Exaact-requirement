@@ -66,17 +66,24 @@ $qr = ($d && $url !== '' && function_exists('qr_svg')) ? qr_svg($url, 150, 'M', 
     <?php endif; ?>
   </div>
 
-  <?php if ($d['reputation'] && !$d['reputation']['limited'] && $d['reputation']['stars'] !== null): ?>
+  <?php $t = $d['trust'] ?? null; if ($t): ?>
   <div class="card">
-    <h2>Reputation</h2>
-    <div class="rep">
-      <?php $st = (float)$d['reputation']['stars']; $full = (int)floor($st); ?>
-      <div class="stars"><?= str_repeat('★', max(0,$full)) . str_repeat('☆', max(0, 5 - $full)) ?></div>
-      <div class="n"><strong><?= e(number_format($st, 1)) ?></strong> / 5 · from <?= (int)$d['reputation']['jobs'] ?> completed jobs</div>
+    <h2>Trust Score</h2>
+    <div class="rep" style="margin-bottom:12px">
+      <div class="stars" style="font-size:34px;color:var(--teal)"><?= (int)$t['score'] ?><span style="font-size:15px;color:var(--muted)"> / 1000</span></div>
+      <div class="n"><span class="pill <?= $t['band_class']==='ok'?'ok':($t['band_class']==='warn'?'warn':'bad') ?>" style="background:var(--okbg)"><?= e($t['band']) ?></span>
+        <?php if ((int)$t['jobs'] > 0): ?><div style="margin-top:4px">from <?= (int)$t['jobs'] ?> completed job<?= (int)$t['jobs']===1?'':'s' ?></div><?php endif; ?></div>
     </div>
+    <?php foreach ($t['subs'] as $s): if (!$s['counted']) continue; ?>
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0">
+        <div style="width:140px;font-size:13px;color:var(--muted)"><?= e($s['label']) ?></div>
+        <div style="flex:1;height:8px;background:var(--line);border-radius:6px;overflow:hidden">
+          <div style="height:100%;width:<?= (int)$s['value'] ?>%;background:var(--teal)"></div></div>
+        <div style="width:34px;text-align:right;font-size:12.5px;color:var(--muted)"><?= (int)$s['value'] ?></div>
+      </div>
+    <?php endforeach; ?>
+    <?php if ($t['limited']): ?><p class="empty" style="margin:10px 0 0">Limited history so far — the score sharpens as more jobs complete on the platform.</p><?php endif; ?>
   </div>
-  <?php elseif ($d['reputation']): ?>
-  <div class="card"><h2>Reputation</h2><p class="empty">Building reputation — limited job history so far on the platform.</p></div>
   <?php endif; ?>
 
   <div class="card">

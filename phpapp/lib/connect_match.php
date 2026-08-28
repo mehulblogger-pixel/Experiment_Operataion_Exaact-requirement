@@ -118,6 +118,7 @@ function connect_match_for_requirement($req, $limit = 8) {
     foreach ($pool as $insp) {
         if (!empty($applied[(int)$insp['id']])) continue;
         $m = cx_match_score($insp, $req, $reqTerms);
+        if (function_exists('connect_trust_score')) { $tt = connect_trust_score((int)$insp['id']); $m['trust'] = (int)$tt['score']; $m['trust_band'] = $tt['band']; }
         $rows[] = $insp + $m;
     }
     // Sort: BLOCKED last, then by score desc, then rating desc.
