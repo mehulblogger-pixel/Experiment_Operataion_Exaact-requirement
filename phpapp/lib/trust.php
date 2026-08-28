@@ -258,6 +258,16 @@ function site_checkin($jobId, $post, $file = null, $actorInspectorId = 0) {
             return 'You already punched out for this ' . Tl('job') . ' today at '
                  . substr((string)$st['out']['at'], 11, 5) . '. The day is closed.';
     }
+    // Field #23 — attendance may only be marked on the job's scheduled date (when the
+    // guard is on). A job with no scheduled date is not date-pinned, so it is allowed.
+    // If the visit really moved, the coordinator reschedules the job to the new day —
+    // keeping attendance honest to the schedule rather than recording the wrong date.
+    if (($kind === 'ENTRY' || $kind === 'EXIT') && function_exists('checkin_date_guard') && checkin_date_guard()) {
+        $sched = trim((string)($job['scheduled_date'] ?? ''));
+        if ($sched !== '' && substr($sched, 0, 10) !== date('Y-m-d'))
+            return 'This ' . Tl('job') . ' is scheduled for ' . (function_exists('fdate') ? fdate($sched) : substr($sched, 0, 10))
+                 . '. Attendance can only be marked on the scheduled date — ask your coordinator to move the visit to today if it has changed.';
+    }
     // A photograph may be required, and when it is, it has to be a real one.
     $bytes = ($file && ($file['tmp_name'] ?? '') !== '' && is_uploaded_file($file['tmp_name']))
         ? (string)file_get_contents($file['tmp_name']) : '';
@@ -306,6 +316,10 @@ function site_checkin($jobId, $post, $file = null, $actorInspectorId = 0) {
 
 // ---- Arriving and leaving --------------------------------------------------
 function checkin_photo_required() { return setting_get('checkin_photo_required', '0') === '1'; }
+// Field #23 — when on, attendance (Mark IN / Mark OUT) may only be marked on the
+// job's OWN scheduled date: no marking a job on the wrong day. Off by default, so
+// nothing changes for a tenant that has not enabled it.
+function checkin_date_guard() { return setting_get('checkin_date_guard', '0') === '1'; }
 function checkin_entry_exit_required() { return setting_get('checkin_entry_exit_required', '0') === '1'; }
 
 function site_visit_kinds_done($jobId) {
@@ -916,6 +930,8 @@ function ops_trust($route, $method) {
         // Geofence: only punch in/out within range of the site, photo forced on.
         setting_set('geofence_on', !empty($_POST['geofence_on']) ? '1' : '0');
         if (isset($_POST['geofence_radius_m'])) setting_set('geofence_radius_m', (string)max(20, min(20000, (int)$_POST['geofence_radius_m'])));
+        // Field #23 — attendance only on the job's scheduled date.
+        setting_set('checkin_date_guard', !empty($_POST['date_guard']) ? '1' : '0');
         flash(checkin_entry_exit_required()
             ? 'Arrival and departure are now required before a ' . Tl('job') . ' can be closed.'
             : 'Arrival and departure are no longer required.');

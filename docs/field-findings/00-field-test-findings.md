@@ -69,7 +69,7 @@ original list.
 
 | # | Type | Sev | Finding | Status |
 |---|---|---|---|---|
-| 23 | 🎯 | P2 | **Mark IN / Mark OUT must be blocked when the schedule date doesn't match** (no marking a job on the wrong date). | ☐ |
+| 23 | 🎯 | P2 | **Mark IN / Mark OUT must be blocked when the schedule date doesn't match** (no marking a job on the wrong date). **✅ DONE.** Added a date guard to `site_checkin` (the Mark IN/OUT handler): when on, **ENTRY/EXIT is refused unless today == the job's `scheduled_date`**, with a message naming the scheduled date and telling the inspector to have the coordinator **reschedule the visit** if it moved (keeping attendance honest to the schedule rather than stamping the wrong day). A job with **no scheduled date is not date-pinned** → allowed. Shipped as an **admin toggle** (`checkin_date_guard`, off by default — nothing changes for existing installs until enabled), on the same **Check-in settings** panel as the photo/geofence toggles ("Only on the scheduled date"). Non-destructive: no permission/lifecycle change; the guard sits alongside the existing one-per-day, photo, GPS and geofence checks. Test `test_field23_checkin_date_guard.php` (7 assertions). Suite **4008/0**. | ✅ |
 
 ## H. Repeat-inspection carry-forward (vendor)
 
