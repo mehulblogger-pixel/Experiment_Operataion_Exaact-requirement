@@ -73,6 +73,82 @@
   <?php if (!empty($c['notes'])): ?><div class="kv-wide"><span class="k">Notes</span><?= e($c['notes']) ?></div><?php endif; ?>
 </div></div>
 
+<?php // ---- Field #3 — Quantity sold, as line items ----------------------- ?>
+<?php $lines = $lines ?? []; ?>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">Quantity sold</h3>
+  <?php if ($lines): ?>
+    <table class="kv"><tr><th>Item</th><th class="num">Qty</th><th>Unit</th></tr>
+      <?php $tot = 0.0; foreach ($lines as $ln): $tot += (float)$ln['quantity']; ?>
+        <tr><td><?= e($ln['description'] ?: '—') ?></td>
+          <td class="num"><?= e(rtrim(rtrim(number_format((float)$ln['quantity'], 2, '.', ''), '0'), '.')) ?></td>
+          <td><?= e(lk_options_or('charge_unit', CHARGE_UNITS)[$ln['unit']] ?? $ln['unit']) ?></td></tr>
+      <?php endforeach; ?>
+      <tr><th>Total</th><th class="num"><?= e(rtrim(rtrim(number_format($tot, 2, '.', ''), '0'), '.')) ?></th><th></th></tr>
+    </table>
+  <?php elseif (($c['qty_total'] ?? null) !== null && $c['qty_total'] !== ''): ?>
+    <p class="muted" style="margin:0"><?= e(rtrim(rtrim(number_format((float)$c['qty_total'], 2, '.', ''), '0'), '.')) ?>
+      <?= e(lk_options_or('charge_unit', CHARGE_UNITS)[$c['qty_unit'] ?? ''] ?? ($c['qty_unit'] ?: 'units')) ?> — recorded as a single total.</p>
+  <?php else: ?>
+    <p class="muted" style="margin:0">Not tracked by quantity.</p>
+  <?php endif; ?>
+</div>
+
+<?php // ---- Field #3 — Edit / Delete this contract ------------------------ ?>
+<?php if (!empty($canEditContract)): ?>
+<details class="panel" style="margin-top:0">
+  <summary class="btn small secondary" style="display:inline-block">✎ Edit contract</summary>
+  <form method="post" action="/contract-edit" class="inline-add" style="margin-top:12px">
+    <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+    <div class="ff"><label>Contract number <span class="muted">— fixed, it identifies the contract</span></label>
+      <input class="form-control" value="<?= e($c['contract_number'] ?: '—') ?>" disabled></div>
+    <div class="ff"><label>Title</label><input class="form-control" name="title" value="<?= e($c['title'] ?? '') ?>"></div>
+    <div class="ff"><label><?= e(T('sbu')) ?></label><select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (string)($c['sbu'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Value</label><input class="form-control" type="number" step="0.01" name="value" value="<?= e((string)($c['value'] ?? '')) ?>"></div>
+    <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date" value="<?= e($c['start_date'] ?? '') ?>"></div>
+    <div class="ff"><label>End date</label><input class="form-control" type="date" name="end_date" value="<?= e($c['end_date'] ?? '') ?>"></div>
+    <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= e($c['notes'] ?? '') ?>"></div>
+    <div class="ff ff-wide"><label>Quantity sold <span class="muted">— one line per item; edit, add or remove</span></label>
+      <table class="grid cl-table"><thead><tr><th>Description</th><th style="width:110px">Qty</th><th style="width:160px">Unit</th><th style="width:34px"></th></tr></thead>
+        <tbody data-cl-rows="edit">
+          <?php $editRows = $lines ?: [['description'=>'','quantity'=>'','unit'=>'MANDAY']]; foreach ($editRows as $ln): ?>
+            <tr class="cl-row">
+              <td><input class="form-control" name="cl_desc[]" value="<?= e($ln['description'] ?? '') ?>" placeholder="e.g. Third-party inspection"></td>
+              <td><input class="form-control" type="number" step="0.01" min="0" name="cl_qty[]" value="<?= e((string)($ln['quantity'] ?? '')) ?: '' ?>"></td>
+              <td><select class="form-control" name="cl_unit[]"><?php foreach (lk_options_or('charge_unit', CHARGE_UNITS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (string)($ln['unit'] ?? 'MANDAY')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
+              <td><button type="button" class="btn small secondary cl-del" title="Remove line">✕</button></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody></table>
+      <button type="button" class="btn small secondary cl-add" data-cl-rows="edit">+ Add line</button>
+    </div>
+    <button class="btn small" type="submit">Save changes</button>
+  </form>
+  <form method="post" action="/contract-delete" style="margin-top:12px" onsubmit="return confirm('Delete contract <?= e($c['contract_number'] ?: '') ?>? This cannot be undone. (Only possible while no calls/jobs or POs are under it.)')">
+    <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+    <button class="btn small danger" type="submit">Delete contract</button>
+    <span class="muted" style="font-size:12px;margin-left:6px">Blocked once work or a PO is recorded under it — close it instead.</span>
+  </form>
+</details>
+<script>
+(function () {
+  document.addEventListener('click', function (e) {
+    var add = e.target.closest && e.target.closest('.cl-add');
+    if (add) {
+      var body = document.querySelector('tbody[data-cl-rows="' + add.getAttribute('data-cl-rows') + '"]');
+      if (!body) return; var last = body.querySelector('.cl-row:last-child'); if (!last) return;
+      var row = last.cloneNode(true);
+      Array.prototype.forEach.call(row.querySelectorAll('input'), function (i) { i.value = ''; });
+      body.appendChild(row); return;
+    }
+    var del = e.target.closest && e.target.closest('.cl-del');
+    if (del) { var tb = del.closest('tbody');
+      if (tb && tb.querySelectorAll('.cl-row').length > 1) del.closest('.cl-row').remove();
+      else { var r = del.closest('.cl-row'); if (r) Array.prototype.forEach.call(r.querySelectorAll('input'), function (i) { i.value = ''; }); } }
+  });
+})();
+</script>
+<?php endif; ?>
+
 <?php // ---- Source quotation ---------------------------------------------- ?>
 <?php if ($quote): ?>
 <div class="panel"><h3 class="tab-sub" style="margin-top:0">Quotation</h3>

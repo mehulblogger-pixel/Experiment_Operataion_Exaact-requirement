@@ -2903,6 +2903,10 @@ function ops_dispatch($route, $method) {
             return geofence_save_job($route, $method);
         case $route === 'contract':
             return ops_contract_360();
+        case $route === 'contract-edit' && $method === 'POST':
+            return ops_contract_edit($method);
+        case $route === 'contract-delete' && $method === 'POST':
+            return ops_contract_delete($method);
         case $route === 'address-geo' && $method === 'POST':
             return geofence_save_address($route, $method);
         case $route === 'site-geo-capture' && $method === 'POST':

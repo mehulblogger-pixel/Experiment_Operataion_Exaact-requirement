@@ -1220,6 +1220,18 @@ if ($route === 'partner-add' && $method === 'POST') {
                 flash('The registration was saved, but the document was over 8 MB and could not be attached.', 'warning');
             }
         }
+        // Field #3 — a contract's "quantity sold" is a LIST of line items (man-days /
+        // man-months / other). Seed them from the named quotation when there is one,
+        // else from the lines typed inline on the form; qty_total is set to their sum.
+        // No lines at all → the single qty_total the form posted is left untouched.
+        if ($kind === 'contract' && function_exists('contract_replace_lines')) {
+            $lines = contract_lines_from_post($b);
+            $hasTyped = false;
+            foreach ($lines as $ln) if (trim((string)$ln['description']) !== '' || (float)$ln['quantity'] > 0) { $hasTyped = true; break; }
+            if (!$hasTyped && (int)($b['quotation_id'] ?? 0) && function_exists('contract_lines_from_quote'))
+                $lines = contract_lines_from_quote((int)$b['quotation_id']);
+            if ($lines) contract_replace_lines($newId, $lines);
+        }
         // A contract recorded here against one of our own quotations is the same
         // agreement seen from the other end: write the number back onto that
         // quotation so it stops reading "contract number pending", and point the

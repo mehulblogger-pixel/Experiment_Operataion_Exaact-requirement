@@ -219,9 +219,47 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <?php // Without an end date a contract never expires, and the expiry warnings
           // and the scheduling gate have nothing to work from. It was missing here. ?>
     <div class="ff"><label>End date <span class="muted">— when cover stops</span></label><input class="form-control" type="date" name="end_date"></div>
-    <div class="ff"><label>Quantity sold <span class="muted">— optional; blank means untracked</span></label><input class="form-control" type="number" step="0.01" name="qty_total"></div>
+    <?php // Field #3 — "Quantity sold" is a LIST: one line per item (man-days / man-months
+          //   / other). Name a quotation above and its line items are carried across on save;
+          //   otherwise type them here. All blank = untracked. qty_total becomes their sum. ?>
+    <div class="ff ff-wide"><label>Quantity sold <span class="muted">— one line per item (man-days / man-months / other); leave all blank for untracked. Naming a <?= e(Tl('quote')) ?> above carries its line items across.</span></label>
+      <table class="grid cl-table"><thead><tr><th>Description</th><th style="width:110px">Qty</th><th style="width:160px">Unit</th><th style="width:34px"></th></tr></thead>
+        <tbody data-cl-rows="add">
+          <tr class="cl-row">
+            <td><input class="form-control" name="cl_desc[]" placeholder="e.g. Third-party inspection"></td>
+            <td><input class="form-control" type="number" step="0.01" min="0" name="cl_qty[]"></td>
+            <td><select class="form-control" name="cl_unit[]"><?php foreach (lk_options_or('charge_unit', CHARGE_UNITS) as $k=>$v): ?><option value="<?= e($k) ?>"<?= $k==='MANDAY'?' selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
+            <td><button type="button" class="btn small secondary cl-del" title="Remove line">✕</button></td>
+          </tr>
+        </tbody></table>
+      <button type="button" class="btn small secondary cl-add" data-cl-rows="add">+ Add line</button>
+    </div>
     <button class="btn small" type="submit">Add Contract</button>
   </form>
+  <script>
+  (function () {
+    // Field #3 — clone/remove quantity line rows (works for the add form and any edit form).
+    document.addEventListener('click', function (e) {
+      var add = e.target.closest && e.target.closest('.cl-add');
+      if (add) {
+        var key = add.getAttribute('data-cl-rows');
+        var body = document.querySelector('tbody[data-cl-rows="' + key + '"]');
+        if (!body) return;
+        var last = body.querySelector('.cl-row:last-child'); if (!last) return;
+        var row = last.cloneNode(true);
+        Array.prototype.forEach.call(row.querySelectorAll('input'), function (i) { i.value = ''; });
+        body.appendChild(row);
+        return;
+      }
+      var del = e.target.closest && e.target.closest('.cl-del');
+      if (del) {
+        var tb = del.closest('tbody');
+        if (tb && tb.querySelectorAll('.cl-row').length > 1) del.closest('.cl-row').remove();
+        else { var r = del.closest('.cl-row'); if (r) Array.prototype.forEach.call(r.querySelectorAll('input'), function (i) { i.value = ''; }); }
+      }
+    });
+  })();
+  </script>
   <script>
   (function () {
     // Naming the quotation offers its value and subject, so the two records do

@@ -65,6 +65,14 @@ function contracts_migrate() {
     ensure_column('partner_registrations', 'file_data',   'MEDIUMTEXT');
     ensure_column('partner_registrations', 'uploaded_by', "VARCHAR(150) DEFAULT ''");
     ensure_column('partner_registrations', 'uploaded_at', "VARCHAR(30) DEFAULT ''");
+    // Field #3 — "Quantity sold" as a LIST of line items (man-days / man-months /
+    // other), like a PO's lines, instead of one number. The contract's qty_total is
+    // kept as the SUM of these, so every existing quantity gate keeps working unchanged.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS contract_line_items (
+        id $pk, contract_id INT, description VARCHAR(200) DEFAULT '',
+        unit VARCHAR(30) DEFAULT 'MANDAY', quantity DECIMAL(14,2) DEFAULT 0,
+        consumed DECIMAL(14,2) DEFAULT 0, sort_order INT DEFAULT 0)");
+    if (function_exists('act_index')) act_index('contract_line_items', 'idx_cli_contract', '(contract_id)');
     // An override is a written request to schedule anyway. It carries its own
     // two-step approval, so the same row records who asked, who endorsed and
     // who finally granted it.
@@ -146,6 +154,69 @@ function quote_qty_total($quoteId) {
     }
     return $any ? $sum : null;
 }
+
+// ---- Field #3 — contract quantity as a list of line items --------------------
+// The lines on a contract (man-days / man-months / other), in order.
+function contract_lines($contractId) {
+    return ops_all("SELECT * FROM contract_line_items WHERE contract_id=? ORDER BY sort_order, id", [(int)$contractId]) ?: [];
+}
+// Keep partner_contracts.qty_total (and a dominant qty_unit label) in step with the
+// sum of the line items, so every quantity gate that reads qty_total keeps working.
+// With no line items the manually-typed qty_total is left as-is (backward compatible).
+function contract_sync_qty($contractId) {
+    $contractId = (int)$contractId;
+    $n = (int)ops_val("SELECT COUNT(*) FROM contract_line_items WHERE contract_id=?", [$contractId]);
+    if ($n === 0) return;
+    $sum  = (float) ops_val("SELECT COALESCE(SUM(quantity),0) FROM contract_line_items WHERE contract_id=?", [$contractId]);
+    $unit = (string) ops_val("SELECT unit FROM contract_line_items WHERE contract_id=? GROUP BY unit ORDER BY SUM(quantity) DESC LIMIT 1", [$contractId]);
+    db()->prepare("UPDATE partner_contracts SET qty_total=?, qty_unit=? WHERE id=?")->execute([$sum, substr($unit, 0, 30), $contractId]);
+}
+// Replace a contract's line set with $lines (each ['description','unit','quantity']);
+// blank rows are dropped. Consumed stays 0 — contract consumption is measured from the
+// jobs, unchanged. Re-syncs qty_total afterwards. Returns the number of lines kept.
+function contract_replace_lines($contractId, array $lines) {
+    $contractId = (int)$contractId;
+    db()->prepare("DELETE FROM contract_line_items WHERE contract_id=?")->execute([$contractId]);
+    $ins = db()->prepare("INSERT INTO contract_line_items (contract_id,description,unit,quantity,consumed,sort_order) VALUES (?,?,?,?,0,?)");
+    $kept = 0; $ord = 0;
+    foreach ($lines as $ln) {
+        $desc = trim((string)($ln['description'] ?? ''));
+        $qty  = (float)($ln['quantity'] ?? 0);
+        $unit = trim((string)($ln['unit'] ?? '')) ?: 'MANDAY';
+        if ($desc === '' && $qty <= 0) continue;          // skip an empty row
+        $ord += 10;
+        $ins->execute([$contractId, substr($desc, 0, 200), substr($unit, 0, 30), $qty, $ord]);
+        $kept++;
+    }
+    contract_sync_qty($contractId);
+    return $kept;
+}
+// Build a line-item array from posted parallel arrays (desc[], qty[], unit[]).
+function contract_lines_from_post(array $b) {
+    $desc = (array)($b['cl_desc']  ?? []);
+    $qty  = (array)($b['cl_qty']   ?? []);
+    $unit = (array)($b['cl_unit']  ?? []);
+    $out = [];
+    foreach ($desc as $i => $d)
+        $out[] = ['description' => (string)$d, 'quantity' => (float)($qty[$i] ?? 0), 'unit' => (string)($unit[$i] ?? 'MANDAY')];
+    return $out;
+}
+// A contract's quantity lines seeded from a quotation's countable line items.
+function contract_lines_from_quote($quoteId) {
+    $rows = ops_all("SELECT description, service_type, location, unit, qty FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [(int)$quoteId]) ?: [];
+    $out = [];
+    foreach ($rows as $r) {
+        $u = strtoupper(trim((string)($r['unit'] ?? '')));
+        if ($u === '' || in_array($u, ['LUMP', 'LUMPSUM', 'LS'], true)) continue;   // a lump sum has no quantity
+        $q = (float)($r['qty'] ?? 0);
+        if ($q <= 0) continue;
+        $d = trim((string)($r['description'] ?? '')) ?: trim((string)($r['service_type'] ?? '')) ?: 'Item';
+        if (trim((string)($r['location'] ?? '')) !== '') $d .= ' — ' . $r['location'];
+        $out[] = ['description' => $d, 'quantity' => $q, 'unit' => $u];
+    }
+    return $out;
+}
+
 // Quantity already consumed: man-days booked on jobs raised against this
 // quotation, plus man-days on jobs hanging off its calls.
 function quote_qty_used($quoteId) {
@@ -953,9 +1024,71 @@ function ops_contract_360() {
 
     view('ops/contract_detail', ['c' => $c, 'quote' => $quote, 'pos' => $pos, 'calls' => $calls,
         'jobs' => $jobs, 'reports' => $reports, 'money' => $money,
+        // Field #3 — the contract's quantity line items, and whether this user may edit/delete it.
+        'lines' => contract_lines($id),
+        'canEditContract' => can('crm.contract.register') || is_master(),
         // Module 18 — the live expiry/quantity verdict the scheduling gate already uses,
         // now shown where the contract is actually read.
         'state' => contract_state_row($c),
         'canSeeMoney' => is_master() || (function_exists('can') && (can('data.credit') || can('data.revenue') || can('finance.reconcile')))]);
     return true;
+}
+
+// ---- Field #3 — edit / delete a contract -----------------------------------
+// Edit a contract's header and its quantity line items. The contract NUMBER is
+// never changed here — it identifies the contract and every call/job join reads
+// it, so renaming would orphan the history. Accounts / back-office only.
+function ops_contract_edit($method) {
+    ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can edit a contract.');
+    if ($method !== 'POST') redirect('/');
+    $id = (int)($_POST['id'] ?? 0);
+    $c  = $id ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [$id]) : null;
+    if (!$c) { flash('That contract no longer exists.', 'error'); redirect('/'); }
+    $b = $_POST;
+    $value = ($b['value'] ?? '') !== '' ? (float)$b['value'] : null;
+    db()->prepare("UPDATE partner_contracts SET title=?, sbu=?, value=?, start_date=?, end_date=?, notes=? WHERE id=?")
+        ->execute([substr(trim((string)($b['title'] ?? '')), 0, 200), (string)($b['sbu'] ?? ''), $value,
+                   (string)($b['start_date'] ?? ''), (string)($b['end_date'] ?? ''),
+                   substr(trim((string)($b['notes'] ?? '')), 0, 255), $id]);
+    // Quantity line items — replace with what was submitted; if none but a single
+    // quantity was typed, keep that as the untracked total (backward compatible).
+    $kept = contract_replace_lines($id, contract_lines_from_post($b));
+    if ($kept === 0 && ($b['qty_total'] ?? '') !== '')
+        db()->prepare("UPDATE partner_contracts SET qty_total=? WHERE id=?")->execute([(float)$b['qty_total'], $id]);
+    if (function_exists('act_log')) act_log('PARTNER', (int)$c['partner_id'], 'SYSTEM',
+        'Contract ' . ($c['contract_number'] ?? '') . ' edited');
+    flash('Contract updated.');
+    redirect('/contract?id=' . $id);
+}
+
+// Delete a contract — only while it is safe to remove: no calls/jobs raised under
+// its number and no purchase orders linked (those make it part of the record; mark
+// it closed instead). Detaches any quotation that named it, then removes it and its
+// line items. Accounts / back-office only.
+function ops_contract_delete($method) {
+    ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can delete a contract.');
+    if ($method !== 'POST') redirect('/');
+    $id = (int)($_POST['id'] ?? 0);
+    $c  = $id ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [$id]) : null;
+    if (!$c) { flash('That contract no longer exists.', 'error'); redirect('/'); }
+    $pid = (int)$c['partner_id'];
+    $cno = (string)($c['contract_number'] ?? '');
+    if ($cno !== '') {
+        $callN = (int) ops_val("SELECT COUNT(*) FROM calls WHERE COALESCE(contract_number,'')=?", [$cno]);
+        if ($callN) {
+            flash('This contract has ' . $callN . ' call(s)/job(s) under it, so it is part of the record and cannot be deleted. Close it instead.', 'error');
+            redirect('/contract?id=' . $id);
+        }
+    }
+    $poN = (int) ops_val("SELECT COUNT(*) FROM partner_purchase_orders WHERE contract_id=?", [$id]);
+    if ($poN) {
+        flash('This contract has ' . $poN . ' purchase order(s) linked, so it cannot be deleted. Unlink them first.', 'error');
+        redirect('/contract?id=' . $id);
+    }
+    db()->prepare("UPDATE quotations SET contract_id=NULL, contract_number='' WHERE contract_id=?")->execute([$id]);
+    db()->prepare("DELETE FROM contract_line_items WHERE contract_id=?")->execute([$id]);
+    db()->prepare("DELETE FROM partner_contracts WHERE id=?")->execute([$id]);
+    if (function_exists('act_log')) act_log('PARTNER', $pid, 'SYSTEM', 'Contract ' . $cno . ' deleted');
+    flash('Contract ' . $cno . ' deleted.');
+    redirect('/partner?id=' . $pid . '&tab=contracts');
 }
