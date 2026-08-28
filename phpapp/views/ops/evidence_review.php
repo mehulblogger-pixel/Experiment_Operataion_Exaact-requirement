@@ -81,6 +81,10 @@
         An arrival <strong>and</strong> a departure check-in before a <?= e(Tl('job')) ?> can be closed</label>
       <label class="chk"><input type="checkbox" name="photo" value="1" <?= checkin_photo_required()?'checked':'' ?>>
         A photograph with every check-in</label>
+      <?php if (function_exists('checkin_date_guard')): ?>
+      <label class="chk"><input type="checkbox" name="date_guard" value="1" <?= checkin_date_guard()?'checked':'' ?>>
+        <strong>Only on the scheduled date</strong> — Mark IN / Mark OUT is refused unless today is the <?= e(Tl('job')) ?>’s scheduled date (no marking a <?= e(Tl('job')) ?> on the wrong day)</label>
+      <?php endif; ?>
       <?php if (function_exists('geofence_on')): ?>
       <label class="chk"><input type="checkbox" name="geofence_on" value="1" <?= geofence_on()?'checked':'' ?>>
         <strong>Geofence</strong> — punch in/out only within range of the site (photo is then always required)</label>

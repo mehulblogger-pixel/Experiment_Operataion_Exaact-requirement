@@ -91,6 +91,20 @@
     <h4 style="margin:14px 0 4px">What they want</h4>
     <p style="white-space:pre-wrap;margin:0"><?= e($l['requirement']) ?></p>
   <?php endif; ?>
+  <?php // Field #7 — manpower deputation, shown when this lead carries it. ?>
+  <?php if (($l['deputation_kind'] ?? '') !== ''): ?>
+    <h4 style="margin:14px 0 4px">Manpower deputation</h4>
+    <table class="grid">
+      <tr><th>Type</th><td><?= e(LEAD_DEPUTATION[$l['deputation_kind']] ?? $l['deputation_kind']) ?></td>
+          <th>How many</th><td><?= (int)($l['manpower_count'] ?? 0) ?: '—' ?></td></tr>
+      <?php if (trim((string)($l['site_location'] ?? '')) !== ''): ?>
+        <tr><th>Site</th><td colspan="3"><?= e($l['site_location']) ?></td></tr>
+      <?php endif; ?>
+      <?php if (trim((string)($l['manpower_skills'] ?? '')) !== ''): ?>
+        <tr><th>Skills / qualifications</th><td colspan="3" style="white-space:pre-wrap"><?= e($l['manpower_skills']) ?></td></tr>
+      <?php endif; ?>
+    </table>
+  <?php endif; ?>
 </div>
 
 <?php // ---- Log a contact — the main daily action --------------------------- ?>

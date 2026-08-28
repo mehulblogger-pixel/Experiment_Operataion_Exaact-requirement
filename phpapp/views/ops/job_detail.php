@@ -54,6 +54,9 @@
   $jMoney    = function_exists('job_money') ? job_money($job) : ['cross'=>false,'credit'=>0,'invoice'=>0];
   $jSched    = trim((string)($job['scheduled_date'] ?? '')) !== '';
   $jReports  = (int) ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND deleted=0", [(int)$job['id']]);
+  // Field #19 — a report that has been approved / issued (locked, no longer editable) is the
+  // signal that the job is ready to close. Offer "Close the job" plainly at that point.
+  $jLockedReport = (int) ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND deleted=0 AND (finalized=1 OR status IN ('APPROVED','ISSUED'))", [(int)$job['id']]);
   $jOnSite   = false;
   if (function_exists('site_visit_window')) { $jw = site_visit_window((int)$job['id']); $jOnSite = ($jw['minutes'] ?? null) !== null; }
   $jCanClose = !$jClosed && empty($lock['locked']);
@@ -62,6 +65,12 @@
   <?php if ($jClosed): ?>
     <div class="step">Done — this <?= e(Tl('job')) ?> is closed.</div>
     <p class="next">The report and photographs can still be uploaded if something was missed. Everything else is fixed.</p>
+  <?php elseif ($jLockedReport > 0): ?>
+    <?php // Field #19 — the report is approved/issued and locked → close the job now. ?>
+    <div class="step">🔒 The report is approved and issued.</div>
+    <p class="next"><b>Next:</b> close the <?= e(Tl('job')) ?> — the inspection is complete and the report is locked.</p>
+    <?php if ($jCanClose): ?><div class="cta"><a class="btn" href="/job-close?id=<?= (int)$job['id'] ?>">Close the <?= e(Tl('job')) ?> →</a></div>
+    <?php else: ?><p class="next muted" style="font-size:12.5px">This <?= e(Tl('job')) ?> is being edited elsewhere — the close button returns once that is done.</p><?php endif; ?>
   <?php elseif ($jReports > 0): ?>
     <div class="step">The report is written.</div>
     <p class="next"><b>Next:</b> issue it to the <?= e(Tl('client')) ?>, then close the <?= e(Tl('job')) ?>.</p>
@@ -553,6 +562,54 @@
   $srcMap = []; foreach ($appl['applicable'] as $a) $srcMap[$a['code']] = $a['source'];
   $srcLabels = $appl['source_labels'] ?? [];
 ?>
+<?php // Field #27 (stage a) — the last inspection(s) at this SAME client + vendor +
+      // contract, so the next inspector sees the history and can open the past report.
+      // Read-only here; forwarding / continuing come next. Only issued reports show. ?>
+<?php $priorInsp = function_exists('job_prior_inspections') ? job_prior_inspections($job) : []; ?>
+<?php if ($priorInsp && (is_master() || can('mod.idems.view') || can('mod.idems.edit'))):
+        $canMakeReport = can('mod.idems.edit') || is_master();
+        $canForward    = is_master() || (function_exists('is_coordinator_level') && is_coordinator_level()) || can('ops.job.allocate');
+        $fwdId         = (int)($job['prior_report_id'] ?? 0);
+        $fwdIrn        = ''; foreach ($priorInsp as $pi) if ((int)$pi['id'] === $fwdId) $fwdIrn = (string)$pi['irn']; ?>
+<div class="panel" id="prior-inspections" data-tab="Reports &amp; QA">
+  <div class="ctitle" style="margin-top:0"><h3>Previous inspections at this vendor <span class="muted">(<?= count($priorInsp) ?>)</span></h3></div>
+  <p class="muted" style="margin:0 0 10px">Earlier issued reports for the <b>same <?= e(Tl('client')) ?>, vendor and contract</b> — newest first. <b>Continue</b> starts this report from that inspection (its scope and QAP carried; hold points kept), or use <em>New report</em> for a fresh one.</p>
+  <?php if ($fwdId): ?>
+    <div class="msg msg-ok" style="margin:0 0 10px">★ The coordinator forwarded <b><?= e($fwdIrn ?: ('#'.$fwdId)) ?></b> as the basis for this inspection.</div>
+  <?php endif; ?>
+  <table class="grid"><tr><th>Report</th><th>Type</th><th>Inspector</th><th>Date</th><th></th></tr>
+    <?php foreach ($priorInsp as $pi): $isFwd = ((int)$pi['id'] === $fwdId); ?>
+      <tr>
+        <td><?php if ($isFwd): ?>★ <?php endif; ?><b><?= e($pi['irn']) ?></b></td>
+        <td><?= e($pi['type_code'] ?: '—') ?></td>
+        <td><?= e($pi['inspector_name'] ?: '—') ?></td>
+        <td><?= e(($pi['on_date'] ?? '') !== '' ? fdate(substr((string)$pi['on_date'], 0, 10)) : '—') ?></td>
+        <td class="num" style="white-space:nowrap">
+          <a class="btn small secondary" href="/document?id=<?= (int)$pi['id'] ?>">Open</a>
+          <a class="btn small secondary" href="/document-pdf?id=<?= (int)$pi['id'] ?>" target="_blank" rel="noopener">PDF</a>
+          <?php if ($canMakeReport): ?>
+            <a class="btn small" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>&continue_from=<?= (int)$pi['id'] ?>&type=<?= e($pi['type_code']) ?>" title="Start this inspection's report from this one — scope &amp; QAP carried">↩ Continue</a>
+          <?php endif; ?>
+          <?php if ($canForward && !$isFwd): ?>
+            <form method="post" action="/job-forward-report" style="display:inline">
+              <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+              <input type="hidden" name="prior_report_id" value="<?= (int)$pi['id'] ?>">
+              <button class="btn small secondary" type="submit" title="Recommend this report to the inspector as the basis">Forward</button>
+            </form>
+          <?php elseif ($canForward && $isFwd): ?>
+            <form method="post" action="/job-forward-report" style="display:inline">
+              <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+              <input type="hidden" name="prior_report_id" value="0">
+              <button class="btn small secondary" type="submit" title="Stop forwarding this report">Unforward</button>
+            </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+  </table>
+</div>
+<?php endif; ?>
+
 <?php // §R1-D — Quality Assurance Plans for this job. A PO may bring one QAP or
       // many (one per line item). They are attached as-is (usually PDF), never
       // parsed, and the inspector reads them while writing the report. ?>

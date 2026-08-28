@@ -73,16 +73,30 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   <a class="btn secondary" href="/partner-edit?id=<?= $id ?>">Edit details</a>
 
 <?php elseif ($tab === 'registration'): ?>
-  <table class="grid"><tr><th>Document</th><th>Number</th><th>Valid till</th></tr>
-    <?php foreach ($registrations as $r): ?><tr><td><?= e(lk_options_or('registration_type', REG_TYPES)[$r['doc_type']] ?? $r['doc_type']) ?></td><td><?= e($r['number'] ?: '—') ?></td><td><?= fdate($r['valid_to']) ?></td></tr><?php endforeach; ?>
-    <?php if (!$registrations): ?><tr><td colspan="3">No registrations yet.</td></tr><?php endif; ?></table>
+  <table class="grid"><tr><th>Document</th><th>Number</th><th>Valid till</th><th>File</th></tr>
+    <?php foreach ($registrations as $r): ?><tr>
+      <td><?= e(lk_options_or('registration_type', REG_TYPES)[$r['doc_type']] ?? $r['doc_type']) ?></td>
+      <td><?= e($r['number'] ?: '—') ?></td>
+      <td><?= fdate($r['valid_to']) ?></td>
+      <?php // Field #1 — the scanned document: view it if attached, else attach one. ?>
+      <td><?php if (trim((string)($r['file_name'] ?? '')) !== ''): ?>
+            <a href="/partner-reg-file?id=<?= (int)$r['id'] ?>" target="_blank" rel="noopener" title="<?= e($r['file_name']) ?>">📎 View</a>
+          <?php else: ?>
+            <form method="post" action="/partner-reg-file?id=<?= (int)$r['id'] ?>" enctype="multipart/form-data" style="display:flex;gap:4px;align-items:center;margin:0">
+              <input type="file" name="reg_file" required style="max-width:150px;font-size:12px">
+              <button class="btn small secondary" type="submit">Attach</button>
+            </form>
+          <?php endif; ?></td>
+    </tr><?php endforeach; ?>
+    <?php if (!$registrations): ?><tr><td colspan="4">No registrations yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add registration</h3>
-  <form method="post" action="/partner-add?id=<?= $id ?>&kind=registration" class="inline-add">
+  <form method="post" action="/partner-add?id=<?= $id ?>&kind=registration" enctype="multipart/form-data" class="inline-add">
     <div class="ff"><label>Document</label><select class="form-control" id="reg_doc" name="doc_type"><?php foreach (lk_options_or('registration_type', REG_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Number <span class="muted">(auto-fills GSTIN/PAN)</span></label><input class="form-control" id="reg_number" name="number"></div>
     <script>window.REGDATA = {"GSTIN": <?= json_encode($p['gstin'] ?? '') ?>, "PAN": <?= json_encode($p['pan'] ?? '') ?>, "TAN": <?= json_encode($p['tan'] ?? '') ?>, "CIN": <?= json_encode($p['cin'] ?? '') ?>, "MSME": <?= json_encode($p['msme_udyam'] ?? '') ?>};</script>
     <div class="ff"><label>Valid till</label><input class="form-control" type="date" name="valid_to"></div>
     <div class="ff"><label>Notes</label><input class="form-control" name="notes"></div>
+    <div class="ff"><label>Document file <span class="muted">(scan / PDF, up to 8 MB — optional)</span></label><input class="form-control" type="file" name="reg_file"></div>
     <button class="btn small" type="submit">Add</button>
   </form>
 
@@ -205,9 +219,47 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <?php // Without an end date a contract never expires, and the expiry warnings
           // and the scheduling gate have nothing to work from. It was missing here. ?>
     <div class="ff"><label>End date <span class="muted">— when cover stops</span></label><input class="form-control" type="date" name="end_date"></div>
-    <div class="ff"><label>Quantity sold <span class="muted">— optional; blank means untracked</span></label><input class="form-control" type="number" step="0.01" name="qty_total"></div>
+    <?php // Field #3 — "Quantity sold" is a LIST: one line per item (man-days / man-months
+          //   / other). Name a quotation above and its line items are carried across on save;
+          //   otherwise type them here. All blank = untracked. qty_total becomes their sum. ?>
+    <div class="ff ff-wide"><label>Quantity sold <span class="muted">— one line per item (man-days / man-months / other); leave all blank for untracked. Naming a <?= e(Tl('quote')) ?> above carries its line items across.</span></label>
+      <table class="grid cl-table"><thead><tr><th>Description</th><th style="width:110px">Qty</th><th style="width:160px">Unit</th><th style="width:34px"></th></tr></thead>
+        <tbody data-cl-rows="add">
+          <tr class="cl-row">
+            <td><input class="form-control" name="cl_desc[]" placeholder="e.g. Third-party inspection"></td>
+            <td><input class="form-control" type="number" step="0.01" min="0" name="cl_qty[]"></td>
+            <td><select class="form-control" name="cl_unit[]"><?php foreach (lk_options_or('charge_unit', CHARGE_UNITS) as $k=>$v): ?><option value="<?= e($k) ?>"<?= $k==='MANDAY'?' selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
+            <td><button type="button" class="btn small secondary cl-del" title="Remove line">✕</button></td>
+          </tr>
+        </tbody></table>
+      <button type="button" class="btn small secondary cl-add" data-cl-rows="add">+ Add line</button>
+    </div>
     <button class="btn small" type="submit">Add Contract</button>
   </form>
+  <script>
+  (function () {
+    // Field #3 — clone/remove quantity line rows (works for the add form and any edit form).
+    document.addEventListener('click', function (e) {
+      var add = e.target.closest && e.target.closest('.cl-add');
+      if (add) {
+        var key = add.getAttribute('data-cl-rows');
+        var body = document.querySelector('tbody[data-cl-rows="' + key + '"]');
+        if (!body) return;
+        var last = body.querySelector('.cl-row:last-child'); if (!last) return;
+        var row = last.cloneNode(true);
+        Array.prototype.forEach.call(row.querySelectorAll('input'), function (i) { i.value = ''; });
+        body.appendChild(row);
+        return;
+      }
+      var del = e.target.closest && e.target.closest('.cl-del');
+      if (del) {
+        var tb = del.closest('tbody');
+        if (tb && tb.querySelectorAll('.cl-row').length > 1) del.closest('.cl-row').remove();
+        else { var r = del.closest('.cl-row'); if (r) Array.prototype.forEach.call(r.querySelectorAll('input'), function (i) { i.value = ''; }); }
+      }
+    });
+  })();
+  </script>
   <script>
   (function () {
     // Naming the quotation offers its value and subject, so the two records do
@@ -241,9 +293,16 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   <?php $poQuotes = function_exists('quotations_for_po') ? quotations_for_po($id) : []; ?>
   <p class="muted">Pick the <?= e(Tl('quote')) ?> this order answers — the contract number, <?= e(Tl('sbu')) ?>,
     value and all its line items come across with it. For an order that arrived without a
-    <?= e(Tl('quote')) ?>, leave it blank and fill the boxes yourself.</p>
+    <?= e(Tl('quote')) ?>, leave it blank and fill the boxes yourself — or
+    <?php if (can('crm.quote.create') || can('mod.quotes.edit') || is_master()): ?><strong>raise one now</strong> with <em>+ New <?= e(Tl('quote')) ?></em> below<?php else: ?>ask sales to raise one<?php endif; ?>.</p>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=po" class="inline-add">
-    <div class="ff ff-wide"><label><?= e(T('quote')) ?> this order answers</label>
+    <div class="ff ff-wide"><label><?= e(T('quote')) ?> this order answers
+      <?php // Field #2 — no quote for this client? Raise one in-page (opens the quote form
+            //   in a popup, pre-set to this client); on save this page refreshes and the new
+            //   quote appears in the list, ready to pick. Plain href fallback for JS-off. ?>
+      <?php if (can('crm.quote.create') || can('mod.quotes.edit') || is_master()): ?>
+        <a href="/quote-new?client=<?= $id ?>" data-embed="/quote-new?client=<?= $id ?>" data-embed-title="New <?= e(Tl('quote')) ?>" class="addlink">+ New <?= e(Tl('quote')) ?></a>
+      <?php endif; ?></label>
       <select class="form-control searchable" id="po_quote" name="quotation_id">
         <option value="">— none / arrived directly —</option>
         <?php foreach ($poQuotes as $pq): ?>

@@ -1596,7 +1596,15 @@ function ops_crm_quotes($route, $method) {
                 ];
             }
         }
-        view('ops/crm/quote_form', ['q' => $q, 'lines' => $q ? crm_quote_lines($q['id']) : [], 'preInq' => $preInq, 'preLead' => $preLead,
+        // Field #2 — quoting straight for a client (e.g. from their PO tab, when they
+        // have no quotation yet): pre-select the client so the order can name it.
+        $preClient = null;
+        if (!$q && !$preLead && !$preInq && ($_GET['client'] ?? '') !== '') {
+            $pc = (int)$_GET['client'];
+            if ($pc && ops_val("SELECT id FROM business_partners WHERE id=? AND is_client=1", [$pc]))
+                $preClient = ['client_id' => $pc];
+        }
+        view('ops/crm/quote_form', ['q' => $q, 'lines' => $q ? crm_quote_lines($q['id']) : [], 'preInq' => $preInq, 'preLead' => $preLead, 'preClient' => $preClient,
             'locations' => $q ? crm_quote_locations($q['id']) : [],
             'clients' => clients_list(), 'vendors' => vendors_list(), 'offices' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
             'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES), 'unitOpts' => lk_options_or('charge_unit', CHARGE_UNITS),
