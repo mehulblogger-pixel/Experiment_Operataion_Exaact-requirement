@@ -3,6 +3,8 @@
 // lifecycle action. Staff desk (K2a); external self-service apply is K2b.
 $req = $req ?? []; $apps = $apps ?? []; $inspectors = $inspectors ?? []; $req_next = $req_next ?? []; $matches = $matches ?? [];
 $can_rate = $can_rate ?? false; $ratings = $ratings ?? []; $disputes = $disputes ?? [];
+$terms = $terms ?? null; $terms_fields = $terms_fields ?? []; $readiness = $readiness ?? [];
+$readiness_items = $readiness_items ?? []; $readiness_score = $readiness_score ?? null;
 $ratedDir = [];
 foreach ($ratings as $rr) $ratedDir[strtoupper((string)$rr['direction'])] = $rr;
 $pill = function ($s) {
@@ -231,3 +233,45 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     </form>
   </details>
 </div>
+
+<?php if ($readiness_items): ?>
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 4px">Site readiness</h3>
+  <?php if ($readiness_score): $rv = strtoupper((string)$readiness_score['verdict']); ?>
+    <p class="cxmeta" style="margin:0 0 10px">
+      <span class="cxpill <?= $rv==='READY'?'ok':'warn' ?>"><?= $rv==='READY'?'✓ Ready to mobilize':'⚠ Hold — not ready' ?></span>
+      · <?= (int)$readiness_score['done'] ?>/<?= (int)$readiness_score['total'] ?> checks · <?= (int)$readiness_score['score'] ?>%
+      <?php if (!empty($readiness_score['missing_mandatory'])): ?><br>Missing: <?= e(implode(', ', $readiness_score['missing_mandatory'])) ?><?php endif; ?>
+    </p>
+  <?php endif; ?>
+  <?php foreach ($readiness_items as $key => [$lbl, $mand]): $on = !empty($readiness[$key]); ?>
+    <form method="post" action="/connect-requirement" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line,#eee)">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
+      <input type="hidden" name="action" value="readiness_toggle">
+      <input type="hidden" name="item_key" value="<?= e($key) ?>">
+      <input type="hidden" name="checked" value="<?= $on ? '0' : '1' ?>">
+      <button type="submit" style="width:26px;height:26px;border-radius:7px;border:1px solid var(--line,#ccc);background:<?= $on?'var(--teal,#0f7d7d)':'transparent' ?>;color:#fff;cursor:pointer;font-size:15px"><?= $on?'✓':'' ?></button>
+      <span><?= e($lbl) ?><?php if ($mand): ?> <span class="cxpill bad" style="font-size:10px">required</span><?php endif; ?></span>
+    </form>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($terms_fields): ?>
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 4px">Commercial terms</h3>
+  <p class="cxmeta" style="margin:0 0 10px">Agree these before mobilization — waiting charges, travel, PPE, revisit and cancellation. <?= function_exists('cx_terms_complete') && cx_terms_complete((int)$req['id']) ? '<span class="cxpill ok">Complete</span>' : '<span class="cxpill warn">Incomplete</span>' ?></p>
+  <form method="post" action="/connect-requirement">
+    <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
+    <input type="hidden" name="action" value="terms_save">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <?php foreach ($terms_fields as $f => $lbl): ?>
+        <div><label style="font-size:12.5px;color:var(--muted);display:block;margin-bottom:3px"><?= e($lbl) ?></label>
+          <input type="text" name="<?= e($f) ?>" value="<?= e($terms[$f] ?? '') ?>" style="width:100%;padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px"></div>
+      <?php endforeach; ?>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px"><input type="checkbox" name="accepted" value="1" <?= !empty($terms['accepted'])?'checked':'' ?>> Both sides have accepted these terms</label>
+    <button class="btn secondary" type="submit" style="margin-top:8px">Save terms</button>
+  </form>
+</div>
+<?php endif; ?>

@@ -256,6 +256,11 @@ function ops_connect_requirement($method) {
             if ($dp && (int)$dp['requirement_id'] === (int)$id)
                 cx_dispute_transition((int)$dp['id'], $_POST['to'] ?? '', (string)($_POST['resolution'] ?? ''))
                     ? flash('Concern updated.') : flash('That change is not allowed from the current status.', 'error');
+        } elseif ($act === 'terms_save' && function_exists('cx_terms_save')) {   // K10 — commercial term-sheet
+            cx_terms_save($id, $_POST);
+            flash('Commercial terms saved.');
+        } elseif ($act === 'readiness_toggle' && function_exists('cx_readiness_set')) {   // K10 — site readiness
+            cx_readiness_set($id, (string)($_POST['item_key'] ?? ''), !empty($_POST['checked']));
         }
         redirect('/connect-requirement?id=' . $id);
     }
@@ -274,6 +279,12 @@ function ops_connect_requirement($method) {
         'ratings'      => function_exists('cx_ratings_for_requirement') ? cx_ratings_for_requirement($id) : [],
         // K9b — disputes raised on this engagement.
         'disputes'     => function_exists('cx_disputes_for_requirement') ? cx_disputes_for_requirement($id) : [],
+        // K10 — commercial terms (F1) + site-readiness verdict (F3).
+        'terms'        => function_exists('cx_terms_get') ? cx_terms_get($id) : null,
+        'terms_fields' => function_exists('cx_terms_fields') ? cx_terms_fields() : [],
+        'readiness'    => function_exists('cx_readiness_get') ? cx_readiness_get($id) : [],
+        'readiness_items' => function_exists('cx_readiness_items') ? cx_readiness_items() : [],
+        'readiness_score' => function_exists('cx_readiness_score') ? cx_readiness_score($id) : null,
     ]);
     return true;
 }

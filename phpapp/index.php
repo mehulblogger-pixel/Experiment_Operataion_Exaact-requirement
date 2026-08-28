@@ -242,6 +242,7 @@ try {
     require __DIR__ . '/lib/connect_concierge.php';// Connect K4 — guided requirement builder (conversation-before-forms)
     require __DIR__ . '/lib/connect_ratings.php';  // Connect K9 — two-way ratings on a marketplace engagement
     require __DIR__ . '/lib/connect_disputes.php'; // Connect K9b — disputes & mediation on a marketplace engagement
+    require __DIR__ . '/lib/connect_govern.php';   // Connect K10 — commercial terms + site-readiness (Part-F F1/F3)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
@@ -351,6 +352,7 @@ try {
     db()->query("SELECT id FROM cx_requirements LIMIT 1");               // Connect K2a — marketplace requirements/applications
     db()->query("SELECT id FROM cx_ratings LIMIT 1");                    // Connect K9 — two-way marketplace ratings
     db()->query("SELECT id FROM cx_disputes LIMIT 1");                   // Connect K9b — marketplace disputes
+    db()->query("SELECT id FROM cx_readiness LIMIT 1");                  // Connect K10 — site-readiness checklist
     db()->query("SELECT id FROM agencies LIMIT 1");
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM requisitions LIMIT 1");
