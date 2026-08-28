@@ -3180,6 +3180,8 @@ function ops_dispatch($route, $method) {
             return ops_connect_requirements($route, $method);
         case $route === 'connect-requirement':  // Connect K2a — one requirement (applications + lifecycle)
             return ops_connect_requirement($method);
+        case $route === 'connect-concierge':    // Connect K4 — guided requirement builder
+            return ops_connect_concierge($method);
         case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board
             return ops_command_centre($method);
         case $route === 'entity-360':          // Phase 3 §49 — uniform 360 shell for any entity

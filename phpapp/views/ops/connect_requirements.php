@@ -34,8 +34,10 @@ $pill = function ($s) {
   <div class="kpi"><span class="kic">🙋</span><div class="k">Applications</div><div class="v"><?= (int)($summary['apps'] ?? 0) ?></div></div>
 </div>
 
-<details class="panel" style="margin-top:12px" open>
-  <summary style="cursor:pointer;font-weight:600;font-size:16px">➕ Post a requirement</summary>
+<div style="margin-top:12px"><a class="btn" href="/connect-concierge">💬 Guided post — answer a few questions</a></div>
+
+<details class="panel" style="margin-top:12px">
+  <summary style="cursor:pointer;font-weight:600;font-size:16px">➕ Post a requirement (full form)</summary>
   <form class="cxform" method="post" action="/connect-requirements" style="margin-top:10px">
     <label>What do you need? *</label>
     <input type="text" name="title" placeholder="e.g. Welding inspector for a pressure-vessel FAT at Dahej" required>
