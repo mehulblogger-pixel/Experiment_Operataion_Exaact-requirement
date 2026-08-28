@@ -103,3 +103,20 @@ permission** — it reuses the **Lookups** gate (row 12) exactly:
   built-in list = Super Admin only"). Admin-added rows are deletable by any admin.
 
 No `ORG_ROLES` entry, object status or module gate is introduced.
+
+### Verification & moderation desk (K14 / #3)
+
+The verification desk (`/connect-verify`) adds **no new named permission** — it
+reuses the coordinator/moderation level, like other back-office review desks:
+
+- **Review** (approve / reject a pending identity or credential check, which
+  recomputes the professional's verification tier): `connect_verify_can()` =
+  `is_master()` or `is_coordinator_level()`.
+- **Submit** a check about oneself: a **professional** does this from their own
+  `/pro` portal (`pro/verify`) on their own record — the portal's own session
+  (`cxpid`), not an `ORG_ROLES` permission.
+- The tier ladder (Registered → ID-verified → Credential-verified → Proven) is
+  written to the existing `cx_professionals.verification_tier` column and is
+  elevated **only** by a genuine VERIFIED decision (human moderator now, or a
+  KYC/DigiLocker provider through the same seam later) — never by a deterministic
+  format pre-screen alone. No object status or module gate is introduced.

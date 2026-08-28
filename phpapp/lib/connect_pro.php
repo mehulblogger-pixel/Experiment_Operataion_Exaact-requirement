@@ -266,6 +266,24 @@ function connect_pro_route($route, $method) {
 
         case 'pro/applications':   // A2 — track my applications
             connect_pro_view('applications', ['me' => $me, 'rows' => connect_pro_applications((int)$me['id'])]); exit;
+
+        case 'pro/verify':   // #3 — get verified: submit identity / credential checks
+            if (!function_exists('connect_verify_submit')) { http_response_code(404); connect_pro_view('dashboard', ['me' => $me, 'pct' => connect_pro_profile_pct($me)]); exit; }
+            $msg = ''; $msgOk = true;
+            if ($method === 'POST') {
+                $ct = strtoupper((string)($_POST['check_type'] ?? ''));
+                [$msgOk, $msg] = connect_verify_submit('professional', (int)$me['id'], $ct,
+                    (string)($_POST['value'] ?? ''), (string)($_POST['evidence'] ?? ''));
+                $me = connect_pro_user(); // tier may have changed
+            }
+            $tierKey = function_exists('connect_verify_tier_for_professional') ? connect_verify_tier_for_professional((int)$me['id']) : 'registered';
+            connect_pro_view('verify', [
+                'me' => $me, 'msg' => $msg, 'msgOk' => $msgOk,
+                'tierKey' => $tierKey,
+                'ladder'  => connect_verify_tiers(),
+                'types'   => connect_verify_check_types(),
+                'checks'  => connect_verify_subject_checks('professional', (int)$me['id']),
+            ]); exit;
     }
     // Unknown /pro route.
     http_response_code(404); connect_pro_view('dashboard', ['me' => $me, 'pct' => connect_pro_profile_pct($me)]); exit;

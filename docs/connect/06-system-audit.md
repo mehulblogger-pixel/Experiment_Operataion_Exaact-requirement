@@ -146,6 +146,21 @@ open network needs. None of it fights the codebase; it's the natural next layer.
   vocabulary — and companies search across all of them.
 
 ### GAP 3 — Identity & business verification absent *(launch-blocking for "verified")*
+
+> **Progress (#3 ✅):** the **verification & moderation engine** is built.
+> `lib/connect_verify.php` adds a `cx_verifications` ledger and a real
+> **tier ladder** (Registered → ID-verified → Credential-verified → Proven) that
+> now writes `cx_professionals.verification_tier` (previously never elevated).
+> **Deterministic pre-screens** validate PAN (format), GSTIN (mod-36 checksum) and
+> Aadhaar (Verhoeff) — but **honestly**: a format pass is NOT verification, it
+> queues as PENDING; a format fail is auto-rejected; the tier moves only on a real
+> **VERIFIED** decision. A **moderation desk** at `/connect-verify` (coordinator
+> level, no new permission) approves/rejects; professionals submit their own checks
+> from `/pro/verify`. A **pluggable provider seam** (`connect_verify_provider_for`)
+> lets DigiLocker / a KYC vendor / face-liveness slot in under the same keys with
+> no other change. Only the **masked** identifier is stored (last 4). The Passport
+> surfaces the tier as an honest badge. 25 tests. **Remaining:** wire an actual KYC
+> provider, org (GSTIN/CIN) tier, and document upload/storage (follow-on slices).
 - **What's there:** an identity-**document vault** (`identity.php` — stores PAN/Aadhaar/
   passport scans, DPDP-aware, masked, access-logged) and **manual** certificate
   attestation (`competence.php` `verify_status`). `verification_tier` on `cx_professionals`
@@ -235,7 +250,7 @@ Ranked by "distance to a credible, trusted, lean launch of the ITSN".
 |---|---|---|---|---|
 | **1** | **Unify the talent pool** (one person model; point match/trust/ratings/passport/vault at it) — _match + passport done ✅; cx_person/cross-pool-trust/vault remain_ | Structural | Without it the freelancer pool is a dead end; fixes the "recommender ignores freelancers" bug | M–L |
 | **2** | **Qualification & role taxonomy** (NSQF / ITI / diploma / degree / MBA / job families; inspection as a vertical) — **✅ master data + screen done; profile/matching wiring remains** | Structural | Unlocks the ITI→MBA mission | M |
-| **3** | **Freelancer verification + moderation queue** (tier ladder; admin CRUD; DigiLocker/PAN/GST checks) | Trust | "Verified" is the promise; quality control at scale | M–L |
+| **3** | **Freelancer verification + moderation queue** (tier ladder; admin CRUD; DigiLocker/PAN/GST checks) — **✅ engine + queue + deterministic checks + tier ladder + provider seam done; real KYC provider & doc upload remain** | Trust | "Verified" is the promise; quality control at scale | M–L |
 | **4** | **In-app messaging** (per-engagement threads) | Trust/UX | Stops the WhatsApp leak; dispute evidence | M |
 | **5** | **WhatsApp + SMS channel** (behind the notification seam) | Reach | This audience lives on WhatsApp | M (blocked on template approval) |
 | **6** | **Marketplace matching/trust on the unified pool + optional AI ranking** | Intelligence | Recommend across the whole pool | M |

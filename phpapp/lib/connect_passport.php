@@ -101,13 +101,23 @@ function connect_passport_public_data($insp) {
     // history or Trust Score yet — render an honest "new professional" passport.
     if (($insp['_kind'] ?? '') === 'professional') {
         $name = trim((string)($insp['name'] ?? '')) ?: 'Technical professional';
+        // Verification tier (unify #1 + #3) — an honest green badge only when a
+        // real check has been VERIFIED; a new profile shows "Registered".
+        $tierKey = (string)($insp['verification_tier'] ?? 'registered'); if ($tierKey === '') $tierKey = 'registered';
+        $verification = null;
+        if (function_exists('connect_verify_tier_label')) {
+            $rank = function_exists('connect_verify_tier_rank') ? connect_verify_tier_rank($tierKey) : 0;
+            $verification = ['tier' => $tierKey, 'label' => connect_verify_tier_label($tierKey),
+                             'rank' => $rank, 'verified' => $rank >= 1];
+        }
         return [
             'id' => (int)($insp['id'] ?? 0), 'name' => $name,
             'designation' => (string)($insp['headline'] ?? ''),
             'kind_label' => 'Freelance professional',
             'skills' => (string)($insp['skills'] ?? ''), 'sbu' => '',
             'credentials' => [], 'verified_count' => 0, 'live_count' => 0, 'cred_total' => 0,
-            'reputation' => null, 'trust' => null, 'token' => (string)($insp['passport_token'] ?? ''),
+            'reputation' => null, 'trust' => null, 'verification' => $verification,
+            'token' => (string)($insp['passport_token'] ?? ''),
         ];
     }
     $id = (int)($insp['id'] ?? 0);

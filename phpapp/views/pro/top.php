@@ -42,6 +42,7 @@ $me = $me ?? (function_exists('connect_pro_user') ? connect_pro_user() : null);
   <a class="<?= $here==='pro/jobs'?'on':'' ?>" href="/pro/jobs">Open jobs</a>
   <a class="<?= $here==='pro/applications'?'on':'' ?>" href="/pro/applications">My applications</a>
   <a class="<?= $here==='pro/profile'?'on':'' ?>" href="/pro/profile">My profile</a>
+  <a class="<?= $here==='pro/verify'?'on':'' ?>" href="/pro/verify">Get verified</a>
 </div>
 <?php endif; ?>
 <div class="wrap">
