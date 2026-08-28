@@ -243,8 +243,13 @@ function connect_pro_route($route, $method) {
             connect_pro_view('dashboard', ['me' => $me, 'pct' => connect_pro_profile_pct($me)]); exit;
         case 'pro/profile':
             $saved = false;
-            if ($method === 'POST') { connect_pro_profile_save((int)$me['id'], $_POST); $saved = true; $me = connect_pro_user(); }
+            if ($method === 'POST') {
+                connect_pro_profile_save((int)$me['id'], $_POST);
+                if (function_exists('connect_channel_set_consent')) connect_channel_set_consent((int)$me['id'], $_POST); // #5 — channel opt-ins
+                $saved = true; $me = connect_pro_user();
+            }
             connect_pro_view('profile', ['me' => $me, 'saved' => $saved,
+                'prefs' => function_exists('connect_channel_prefs') ? connect_channel_prefs((int)$me['id']) : [],
                 'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : []]); exit;
 
         case 'pro/jobs':   // A2 — browse open requirements + apply

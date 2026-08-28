@@ -411,6 +411,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('connect_qualtax_augment_professional')) connect_qualtax_augment_professional();  // #2 — add ITI→MBA profile columns once cx_professionals exists
     if (function_exists('connect_verify_migrate')) connect_verify_migrate();                              // Connect K14 / #3 — cx_verifications + verified_at (after cx_professionals exists)
     if (function_exists('connect_msg_migrate')) connect_msg_migrate();                                    // Connect K15 / #4 — cx_messages + cx_message_reads (in-app messaging)
+    if (function_exists('connect_channels_migrate')) { connect_channels_migrate(); connect_channels_seed(); } // Connect K16 / #5 — channel templates + outbound log + consent (after cx_professionals)
     if (function_exists('connect_crew_migrate')) connect_crew_migrate();          // Connect M10 — cx_positions (crew manifest)
     if (function_exists('connect_org_migrate')) connect_org_migrate();            // Connect B0 — cx_organisations (org accounts + entitlements)
     if (function_exists('books_migrate')) books_migrate();             // ensure the books ledger tables exist before anything stamps them

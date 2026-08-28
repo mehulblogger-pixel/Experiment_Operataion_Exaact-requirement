@@ -201,6 +201,22 @@ open network needs. None of it fights the codebase; it's the natural next layer.
   the platform; the thread becomes part of the hiring record and the dispute trail.
 
 ### GAP 5 — Public-registration governance & channels *(launch-blocking at India scale)*
+
+> **Progress (#5 ✅, channel):** the **WhatsApp / SMS / Email channel** is built
+> behind the notification seam. `lib/connect_channels.php` adds
+> `cx_channel_templates` (runtime-editable, compliance-gated) + `cx_channel_messages`
+> (outbound log) + per-channel **consent** columns on `cx_professionals`. Honest by
+> **delivery mode** (setting `connect_channels_mode`): `off` (default) records
+> messages as QUEUED — nothing sent, nothing faked; `log` simulates (LOGGED);
+> `live` hands APPROVED-template messages to a **registered provider** via the
+> `connect_channel_providers` seam (WhatsApp Business / SMS gateway drop in with no
+> other change). Consent-first: professionals opt in per channel from `/pro`
+> profile (WhatsApp/SMS need a mobile); only masked contacts are stored. Templates
+> for new-message / shortlisted / awarded / job-match, editable + approvable at
+> `/connect-channels` (admin). A desk message auto-nudges an opted-in professional
+> (ties #4 → #5). 17 tests. **Note:** the moderation-queue half of this gap shipped
+> as #3; **escrow** is #10 (CA/RBI/legal). **Remaining:** wire a real BSP + approve
+> live templates; DLT registration; job-match trigger on new requirements.
 - **What's there:** self-registration for freelancers (`/pro`) and orgs (`/join`); no
   admin CRUD or moderation over `cx_professionals`; no SMS/WhatsApp; no payment rail.
 - **Gap:** at open-registration scale there is **no fraud/quality moderation queue**, the
@@ -264,7 +280,7 @@ Ranked by "distance to a credible, trusted, lean launch of the ITSN".
 | **2** | **Qualification & role taxonomy** (NSQF / ITI / diploma / degree / MBA / job families; inspection as a vertical) — **✅ master data + screen done; profile/matching wiring remains** | Structural | Unlocks the ITI→MBA mission | M |
 | **3** | **Freelancer verification + moderation queue** (tier ladder; admin CRUD; DigiLocker/PAN/GST checks) — **✅ engine + queue + deterministic checks + tier ladder + provider seam done; real KYC provider & doc upload remain** | Trust | "Verified" is the promise; quality control at scale | M–L |
 | **4** | **In-app messaging** (per-engagement threads) — **✅ engine + staff desk + professional portal done; client/vendor surfaces & nudges remain** | Trust/UX | Stops the WhatsApp leak; dispute evidence | M |
-| **5** | **WhatsApp + SMS channel** (behind the notification seam) | Reach | This audience lives on WhatsApp | M (blocked on template approval) |
+| **5** | **WhatsApp + SMS channel** (behind the notification seam) — **✅ engine + templates + consent + modes + provider seam + nudge done; real BSP + DLT/template approval remain (external)** | Reach | This audience lives on WhatsApp | M (blocked on template approval) |
 | **6** | **Marketplace matching/trust on the unified pool + optional AI ranking** | Intelligence | Recommend across the whole pool | M |
 | **7** | **Agency bench workspace** (agency adds/allocates its own people) | Supply | Agencies as fulfillers, not just applicants | M |
 | **8** | **Labour-market analytics** (supply/demand, fill rate, rate benchmarks) | Moat/Revenue | Data product; ops insight | M |

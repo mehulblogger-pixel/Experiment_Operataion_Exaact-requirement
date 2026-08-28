@@ -58,5 +58,14 @@
     </div>
   </div>
 
+  <div class="card">
+    <h2>Job alerts</h2>
+    <p class="muted" style="margin:0 0 8px">Get told about jobs, shortlists and messages where you already are. You choose the channels — turn any off anytime.</p>
+    <?php $prefs = $prefs ?? []; ?>
+    <label style="display:block;margin:6px 0"><input type="checkbox" name="notify_whatsapp" value="1" <?= !empty($prefs['whatsapp']) ? 'checked' : '' ?>> WhatsApp <span class="muted">(needs your mobile above)</span></label>
+    <label style="display:block;margin:6px 0"><input type="checkbox" name="notify_sms" value="1" <?= !empty($prefs['sms']) ? 'checked' : '' ?>> SMS <span class="muted">(needs your mobile above)</span></label>
+    <label style="display:block;margin:6px 0"><input type="checkbox" name="notify_email" value="1" <?= !empty($prefs['email']) ? 'checked' : '' ?>> Email</label>
+  </div>
+
   <button class="btn" type="submit" style="width:100%">Save profile</button>
 </form>

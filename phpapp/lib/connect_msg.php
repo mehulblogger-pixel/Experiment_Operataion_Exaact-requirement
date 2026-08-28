@@ -91,6 +91,20 @@ function connect_msg_post($applicationId, $senderKind, $senderId, $senderName, $
         ->execute([(int)$applicationId, (int)$app['requirement_id'], (string)$senderKind, (int)$senderId, (string)$senderName, $body, date('c')]);
     $id = (int)db()->lastInsertId();
     connect_msg_mark_read($applicationId, $senderKind, $senderId); // I've "read" my own message
+
+    // #5 — nudge the professional on their opted-in channels (WhatsApp/SMS/email)
+    // when the DESK writes to them. Best-effort: a channel hiccup never blocks chat.
+    if ($senderKind === 'staff' && function_exists('connect_channel_notify')) {
+        $ap = connect_msg_applicant($app);
+        if ($ap['kind'] === 'professional' && $ap['id'] > 0) {
+            try {
+                connect_channel_notify((int)$ap['id'], 'new_message', [
+                    'job'  => (string)($app['req_title'] ?? ''),
+                    'ref'  => (string)($app['ref_code'] ?? ''),
+                ], ['link' => '/pro/messages?a=' . (int)$applicationId]);
+            } catch (Throwable $e) { /* never block the message on a channel error */ }
+        }
+    }
     return [true, 'Message sent.', $id];
 }
 

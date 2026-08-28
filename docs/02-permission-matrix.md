@@ -136,3 +136,18 @@ add **no new named permission**:
 - The engine is identity-agnostic (`staff | professional | client | vendor |
   inspector`), so the client and vendor portals attach to the same threads later
   under their own portal sessions. No object status or module gate is introduced.
+
+### WhatsApp / SMS / Email channel (K16 / #5)
+
+Outbound alerts (`/connect-channels`) add **no new named permission**:
+
+- **View** the channel desk (outbound log, counts): `connect_channels_can()` =
+  `is_master()` or `is_coordinator_level()`.
+- **Configure** (set delivery mode; edit / approve / enable templates):
+  `connect_channels_manage_can()` = `is_admin_level()` — same door as Settings /
+  Lookups.
+- **Consent** is the professional's own: they opt in per channel (WhatsApp / SMS /
+  Email) from their `/pro` profile; WhatsApp/SMS need a mobile. No opt-in → no
+  message. Nothing is *sent* until an admin sets mode `live` AND a provider is
+  connected AND the template is APPROVED — until then messages are recorded, not
+  sent. No object status or module gate is introduced.
