@@ -285,6 +285,8 @@ function ops_connect_requirement($method) {
         'readiness'    => function_exists('cx_readiness_get') ? cx_readiness_get($id) : [],
         'readiness_items' => function_exists('cx_readiness_items') ? cx_readiness_items() : [],
         'readiness_score' => function_exists('cx_readiness_score') ? cx_readiness_score($id) : null,
+        // K12 — Operations Advisor verdict (delay risk + what to do).
+        'advisor'      => function_exists('connect_advisor_for_requirement') ? connect_advisor_for_requirement($req) : null,
     ]);
     return true;
 }

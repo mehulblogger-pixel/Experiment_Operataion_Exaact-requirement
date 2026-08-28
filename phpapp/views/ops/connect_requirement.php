@@ -4,7 +4,7 @@
 $req = $req ?? []; $apps = $apps ?? []; $inspectors = $inspectors ?? []; $req_next = $req_next ?? []; $matches = $matches ?? [];
 $can_rate = $can_rate ?? false; $ratings = $ratings ?? []; $disputes = $disputes ?? [];
 $terms = $terms ?? null; $terms_fields = $terms_fields ?? []; $readiness = $readiness ?? [];
-$readiness_items = $readiness_items ?? []; $readiness_score = $readiness_score ?? null;
+$readiness_items = $readiness_items ?? []; $readiness_score = $readiness_score ?? null; $advisor = $advisor ?? null;
 $ratedDir = [];
 foreach ($ratings as $rr) $ratedDir[strtoupper((string)$rr['direction'])] = $rr;
 $pill = function ($s) {
@@ -33,6 +33,22 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       <?php if (!empty($req['work_type'])): ?> · <?= e(str_replace('_',' ',$req['work_type'])) ?><?php endif; ?></p></div>
   <a class="btn secondary" href="/connect-requirements">← Marketplace</a>
 </div>
+
+<?php if ($advisor && ($advisor['actions'] || strtoupper((string)$advisor['risk']) !== 'LOW')):
+  $rk = strtoupper((string)$advisor['risk']);
+  $bg = $rk==='HIGH' ? '#f6e6e6' : ($rk==='MEDIUM' ? '#fbf3d8' : '#e7f5ef');
+  $bd = $rk==='HIGH' ? '#9a2a2a' : ($rk==='MEDIUM' ? '#8a6d0b' : '#0f7d5a');
+?>
+<div class="panel" style="margin-top:12px;background:<?= $bg ?>;border-left:4px solid <?= $bd ?>">
+  <div style="font-weight:600;color:<?= $bd ?>">🧭 Operations Advisor — Delay risk: <?= e($rk) ?> · Readiness <?= (int)$advisor['readiness_pct'] ?>%</div>
+  <div class="cxmeta" style="margin:2px 0 0;color:<?= $bd ?>"><?= e($advisor['headline']) ?></div>
+  <?php if ($advisor['actions']): ?>
+    <ul style="margin:8px 0 0;padding-left:20px">
+      <?php foreach ($advisor['actions'] as $a): ?><li style="margin:2px 0"><?= e($a) ?></li><?php endforeach; ?>
+    </ul>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <div class="panel" style="margin-top:12px">
   <div class="cxmeta" style="margin-bottom:8px">
