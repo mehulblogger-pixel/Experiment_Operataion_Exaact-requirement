@@ -73,16 +73,30 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   <a class="btn secondary" href="/partner-edit?id=<?= $id ?>">Edit details</a>
 
 <?php elseif ($tab === 'registration'): ?>
-  <table class="grid"><tr><th>Document</th><th>Number</th><th>Valid till</th></tr>
-    <?php foreach ($registrations as $r): ?><tr><td><?= e(lk_options_or('registration_type', REG_TYPES)[$r['doc_type']] ?? $r['doc_type']) ?></td><td><?= e($r['number'] ?: '—') ?></td><td><?= fdate($r['valid_to']) ?></td></tr><?php endforeach; ?>
-    <?php if (!$registrations): ?><tr><td colspan="3">No registrations yet.</td></tr><?php endif; ?></table>
+  <table class="grid"><tr><th>Document</th><th>Number</th><th>Valid till</th><th>File</th></tr>
+    <?php foreach ($registrations as $r): ?><tr>
+      <td><?= e(lk_options_or('registration_type', REG_TYPES)[$r['doc_type']] ?? $r['doc_type']) ?></td>
+      <td><?= e($r['number'] ?: '—') ?></td>
+      <td><?= fdate($r['valid_to']) ?></td>
+      <?php // Field #1 — the scanned document: view it if attached, else attach one. ?>
+      <td><?php if (trim((string)($r['file_name'] ?? '')) !== ''): ?>
+            <a href="/partner-reg-file?id=<?= (int)$r['id'] ?>" target="_blank" rel="noopener" title="<?= e($r['file_name']) ?>">📎 View</a>
+          <?php else: ?>
+            <form method="post" action="/partner-reg-file?id=<?= (int)$r['id'] ?>" enctype="multipart/form-data" style="display:flex;gap:4px;align-items:center;margin:0">
+              <input type="file" name="reg_file" required style="max-width:150px;font-size:12px">
+              <button class="btn small secondary" type="submit">Attach</button>
+            </form>
+          <?php endif; ?></td>
+    </tr><?php endforeach; ?>
+    <?php if (!$registrations): ?><tr><td colspan="4">No registrations yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add registration</h3>
-  <form method="post" action="/partner-add?id=<?= $id ?>&kind=registration" class="inline-add">
+  <form method="post" action="/partner-add?id=<?= $id ?>&kind=registration" enctype="multipart/form-data" class="inline-add">
     <div class="ff"><label>Document</label><select class="form-control" id="reg_doc" name="doc_type"><?php foreach (lk_options_or('registration_type', REG_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Number <span class="muted">(auto-fills GSTIN/PAN)</span></label><input class="form-control" id="reg_number" name="number"></div>
     <script>window.REGDATA = {"GSTIN": <?= json_encode($p['gstin'] ?? '') ?>, "PAN": <?= json_encode($p['pan'] ?? '') ?>, "TAN": <?= json_encode($p['tan'] ?? '') ?>, "CIN": <?= json_encode($p['cin'] ?? '') ?>, "MSME": <?= json_encode($p['msme_udyam'] ?? '') ?>};</script>
     <div class="ff"><label>Valid till</label><input class="form-control" type="date" name="valid_to"></div>
     <div class="ff"><label>Notes</label><input class="form-control" name="notes"></div>
+    <div class="ff"><label>Document file <span class="muted">(scan / PDF, up to 8 MB — optional)</span></label><input class="form-control" type="file" name="reg_file"></div>
     <button class="btn small" type="submit">Add</button>
   </form>
 

@@ -1205,6 +1205,21 @@ if ($route === 'partner-add' && $method === 'POST') {
         }
         $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
         $newId = (int)$pdo->lastInsertId();
+        // Field #1 — a registration may arrive with its scanned document. Store it
+        // on the new row (base64 in-row, like a lead/quote file); over 8 MB is skipped
+        // with a notice rather than failing the whole save.
+        if ($kind === 'registration' && !empty($_FILES['reg_file']['tmp_name']) && is_uploaded_file($_FILES['reg_file']['tmp_name'])) {
+            $sz = (int)($_FILES['reg_file']['size'] ?? 0);
+            if ($sz > 0 && $sz <= 8388608) {
+                $pdo->prepare("UPDATE partner_registrations SET file_name=?, mime=?, file_data=?, uploaded_by=?, uploaded_at=? WHERE id=?")
+                    ->execute([substr((string)$_FILES['reg_file']['name'], 0, 200),
+                               (string)($_FILES['reg_file']['type'] ?? ''),
+                               base64_encode((string)file_get_contents($_FILES['reg_file']['tmp_name'])),
+                               user_name(current_user()), date('c'), $newId]);
+            } else {
+                flash('The registration was saved, but the document was over 8 MB and could not be attached.', 'warning');
+            }
+        }
         // A contract recorded here against one of our own quotations is the same
         // agreement seen from the other end: write the number back onto that
         // quotation so it stops reading "contract number pending", and point the
@@ -1223,6 +1238,42 @@ if ($route === 'partner-add' && $method === 'POST') {
     redirect("/partner?id={$p['id']}");
 }
 
+// Field #1 — serve, or attach/replace, the scanned document on a registration.
+// GET streams the file (needs view rights on the client/vendor directory); POST
+// attaches or replaces it on an existing registration (needs edit rights).
+if ($route === 'partner-reg-file') {
+    $reg = ops_one("SELECT * FROM partner_registrations WHERE id=?", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
+    if (!$reg) { http_response_code(404); return view('notfound'); }
+    $p = find_partner((int)$reg['partner_id']);
+    if (!$p) { http_response_code(404); return view('notfound'); }
+    if ($method === 'POST') {
+        ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
+            || (function_exists('is_coordinator_level') && is_coordinator_level()),
+            'You do not have permission to change ' . Tl('client') . ' / ' . Tl('vendor') . ' records.');
+        if (!empty($_FILES['reg_file']['tmp_name']) && is_uploaded_file($_FILES['reg_file']['tmp_name'])) {
+            $sz = (int)($_FILES['reg_file']['size'] ?? 0);
+            if ($sz > 0 && $sz <= 8388608) {
+                $pdo->prepare("UPDATE partner_registrations SET file_name=?, mime=?, file_data=?, uploaded_by=?, uploaded_at=? WHERE id=?")
+                    ->execute([substr((string)$_FILES['reg_file']['name'], 0, 200),
+                               (string)($_FILES['reg_file']['type'] ?? ''),
+                               base64_encode((string)file_get_contents($_FILES['reg_file']['tmp_name'])),
+                               user_name(current_user()), date('c'), (int)$reg['id']]);
+                flash('Document attached.');
+            } else { flash('The document was over 8 MB and could not be attached.', 'error'); }
+        } else { flash('No file was selected.', 'error'); }
+        redirect("/partner?id={$p['id']}&tab=registration");
+    }
+    ops_require(is_master() || can('mod.clients.view') || can('mod.vendors.view')
+        || can('mod.clients.edit') || can('mod.vendors.edit')
+        || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        'You do not have permission to view this document.');
+    if (empty($reg['file_data'])) { http_response_code(404); header('Content-Type: text/plain'); echo 'No document on this registration.'; exit; }
+    $bytes = base64_decode((string)$reg['file_data']);
+    header('Content-Type: ' . ((string)$reg['mime'] ?: 'application/octet-stream'));
+    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', (string)($reg['file_name'] ?: 'registration')) . '"');
+    echo $bytes; exit;
+}
+
 if ($route === 'partner') {
     // R1 — the partner 360 (contacts, contracts, POs, commercial data) ran with no
     // permission check; require at least read on clients or vendors (finance needs it
@@ -1239,7 +1290,10 @@ if ($route === 'partner') {
         'subsidiaries' => $subs->fetchAll(),
         'addresses' => children('partner_addresses', $p['id']),
         'contacts' => children('partner_contacts', $p['id']),
-        'registrations' => children('partner_registrations', $p['id']),
+        // Field #1 — metadata only (never the base64 blob) in the list; the file is
+        // streamed on demand by /partner-reg-file so a page of registrations stays light.
+        'registrations' => ops_all("SELECT id, partner_id, doc_type, number, valid_to, notes, file_name, mime, uploaded_by, uploaded_at
+                                    FROM partner_registrations WHERE partner_id=? ORDER BY id", [$p['id']]),
         'notes' => children('partner_notes', $p['id'], 'id DESC'),
         'contracts' => children('partner_contracts', $p['id']),
         'pos' => children('partner_purchase_orders', $p['id']),

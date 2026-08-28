@@ -57,6 +57,14 @@ function contracts_migrate() {
     ensure_column('partner_contracts', 'last_activity_at',  "VARCHAR(30) DEFAULT ''");
     ensure_column('partner_contracts', 'idle_notified',     "VARCHAR(20) DEFAULT ''");
     ensure_column('partner_contracts', 'coordinator_id',    'INT NULL');   // coordinator nominated at endorsement to own the calls raised from this contract
+    // Field #1 — the registration DOCUMENT itself (the scanned GST/PAN/ISO/licence
+    // certificate), attached to its registration row under Client Registration →
+    // Registration. Stored in-row as base64, exactly like a lead/quote file.
+    ensure_column('partner_registrations', 'file_name',   "VARCHAR(200) DEFAULT ''");
+    ensure_column('partner_registrations', 'mime',        "VARCHAR(100) DEFAULT ''");
+    ensure_column('partner_registrations', 'file_data',   'MEDIUMTEXT');
+    ensure_column('partner_registrations', 'uploaded_by', "VARCHAR(150) DEFAULT ''");
+    ensure_column('partner_registrations', 'uploaded_at', "VARCHAR(30) DEFAULT ''");
     // An override is a written request to schedule anyway. It carries its own
     // two-step approval, so the same row records who asked, who endorsed and
     // who finally granted it.

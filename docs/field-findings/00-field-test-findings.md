@@ -14,7 +14,7 @@ original list.
 
 | # | Type | Sev | Finding | Status |
 |---|---|---|---|---|
-| 1 | 🎯 | P2 | **No document upload** under Client Registration → Registration tab. | ☐ |
+| 1 | 🎯 | P2 | **No document upload** under Client Registration → Registration tab. **✅ DONE.** Each registration can now carry its scanned **document** (GST/PAN/ISO/licence certificate, PDF/image up to 8 MB): a file input on the **Add registration** form, plus a per-row **Attach** for registrations recorded earlier without one, and a **📎 View** link that streams an attached file. Stored in-row as base64 (the same pattern as lead/quote files) on five new tolerant `partner_registrations` columns (`file_name`, `mime`, `file_data`, `uploaded_by`, `uploaded_at` via `ensure_column`). New route **`/partner-reg-file`**: **GET** streams the document (needs directory **view** rights), **POST** attaches/replaces it (needs **edit** rights); oversize (>8 MB) is rejected with a notice, never a failed save. The registration **list loads metadata only** — the base64 blob is fetched on demand, so the tab stays light. No permission/lifecycle change (reuses `mod.clients/vendors.view/edit`). Test `test_field01_registration_doc_upload.php` (17 assertions). Suite **3958/0**. | ✅ |
 | 6 | 🐞 | P2 | **"Find on maps" / "Pick on app"** (site location picker) **not working**. | ☐ |
 
 ## B. Lead → Opportunity → Quotation (the sales spine)
