@@ -54,6 +54,9 @@
   $jMoney    = function_exists('job_money') ? job_money($job) : ['cross'=>false,'credit'=>0,'invoice'=>0];
   $jSched    = trim((string)($job['scheduled_date'] ?? '')) !== '';
   $jReports  = (int) ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND deleted=0", [(int)$job['id']]);
+  // Field #19 — a report that has been approved / issued (locked, no longer editable) is the
+  // signal that the job is ready to close. Offer "Close the job" plainly at that point.
+  $jLockedReport = (int) ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND deleted=0 AND (finalized=1 OR status IN ('APPROVED','ISSUED'))", [(int)$job['id']]);
   $jOnSite   = false;
   if (function_exists('site_visit_window')) { $jw = site_visit_window((int)$job['id']); $jOnSite = ($jw['minutes'] ?? null) !== null; }
   $jCanClose = !$jClosed && empty($lock['locked']);
@@ -62,6 +65,12 @@
   <?php if ($jClosed): ?>
     <div class="step">Done — this <?= e(Tl('job')) ?> is closed.</div>
     <p class="next">The report and photographs can still be uploaded if something was missed. Everything else is fixed.</p>
+  <?php elseif ($jLockedReport > 0): ?>
+    <?php // Field #19 — the report is approved/issued and locked → close the job now. ?>
+    <div class="step">🔒 The report is approved and issued.</div>
+    <p class="next"><b>Next:</b> close the <?= e(Tl('job')) ?> — the inspection is complete and the report is locked.</p>
+    <?php if ($jCanClose): ?><div class="cta"><a class="btn" href="/job-close?id=<?= (int)$job['id'] ?>">Close the <?= e(Tl('job')) ?> →</a></div>
+    <?php else: ?><p class="next muted" style="font-size:12.5px">This <?= e(Tl('job')) ?> is being edited elsewhere — the close button returns once that is done.</p><?php endif; ?>
   <?php elseif ($jReports > 0): ?>
     <div class="step">The report is written.</div>
     <p class="next"><b>Next:</b> issue it to the <?= e(Tl('client')) ?>, then close the <?= e(Tl('job')) ?>.</p>
