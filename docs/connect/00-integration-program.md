@@ -86,19 +86,20 @@ in the same system, not by calling into it.
 These are the "stop and ask" items. Each is a proposal to approve or correct — not a
 built assumption.
 
-### 5a. New roles / access (open self-service)
-"Anyone can post / anyone can apply" introduces two external, self-registering
-audiences EXAACT does not fully have today (it has internal `ORG_ROLES`, a client
-portal via `pcan()`, and a vendor portal via `vendor_users`). Options:
+### 5a. New roles / access (open self-service) — RESOLVED BY ADOPTION
+The Inspect Connect code **already defines** the account types, and the owner has
+directed us to adopt them rather than invent new ones. See
+[`02-identities-and-taxonomy.md`](02-identities-and-taxonomy.md). The adopted roles:
+`inspector` · `company` (team sub-roles `owner/requester/approver/finance`) ·
+`agency` (the manpower/technical agency — posts *and* supplies) · `admin` ·
+`superadmin`. This already **is** the open two-sided marketplace: companies and
+agencies post; inspectors and agencies apply.
 
-| Option | Poster | Applicant | Trade-off |
-|---|---|---|---|
-| **A. Extend the portals** (recommended) | Client-portal account gains "post a requirement" | Inspector/vendor-portal account gains "apply" | Smallest change; reuses two working permission systems; keeps external users out of `ORG_ROLES`. |
-| **B. New marketplace roles** | New `POSTER` external role | New `APPLICANT`/`PROFESSIONAL` external role | Cleaner mental model; more new permission surface to define and guard. |
-| **C. One open "member" account** | Same account can post and apply | Same | Most Uber-like; largest authz rethink; highest abuse surface. |
-
-Whichever is chosen, the specific new permissions get written into
-`docs/02-permission-matrix.md` in the same commit.
+The only residual question is **how each role maps onto EXAACT's existing access
+systems** (`ORG_ROLES`, client portal `pcan()`, vendor portal `vendor_users`) — the
+recommended mapping is in `02-identities-and-taxonomy.md §2` and needs a yes/adjust.
+New *permissions* (post / apply / shortlist / award) get written into
+`docs/02-permission-matrix.md` as each slice lands.
 
 ### 5b. New object lifecycles (need entries in `docs/03-object-lifecycles.md`)
 - **Requirement posting:** `DRAFT → OPEN → SHORTLISTING → AWARDED → CLOSED`
@@ -129,7 +130,7 @@ new-role slices are deliberately later, behind their §5 sign-offs.
 
 | # | Slice | Verb | Gated by |
 |---|---|---|---|
-| **K0** | Taxonomy masters (sector/equipment/material/discipline/stage/standard/cert) as seed tables | CONFIGURE/EXTEND | — |
+| **K0** | Import the adopted taxonomy (`taxonomy.json`: 27 sectors / 11 equipment groups / 18 materials / 22 disciplines / 17 stages / 13 standards / 24 certs + versioning) as admin-extensible seed tables | CONFIGURE/EXTEND | — |
 | **K1** | Digital Passport — public, shareable, QR-verifiable credential page over the P1 vault | EXTEND | — |
 | **K2** | Requirement posting + application (the marketplace core) over `recruit.php` requisitions | EXTEND/BUILD | 5a, 5b |
 | **K3** | Matching & recommendation cards (Best Match / Value / Nearest) over suggestion + competence | EXTEND | K0 |

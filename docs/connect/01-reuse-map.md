@@ -15,13 +15,13 @@ All engine paths are under `phpapp/lib/` unless noted.
 
 | Blueprint | EXAACT engine | Verb | Note |
 |---|---|---|---|
-| B1–B6 sectors/equipment/material/discipline/stage/standards/certs | `industry.php`, `methods.php`, `competence.php`, `lookups.php` | EXTEND/CONFIGURE | Industry templates + methods + competence schemes exist; add the versioned taxonomy master tables as admin-extensible seed data (K0). |
+| B1–B6 sectors/equipment/material/discipline/stage/standards/certs | `industry.php`, `methods.php`, `competence.php`, `lookups.php` | EXTEND/CONFIGURE | **Already defined** in the blueprint code (`taxonomy.json`: 27 sectors / 11 equipment groups / 18 materials / 22 disciplines / 17 stages / 13 standard families / 24 certs + `taxonomy_versions`). K0 imports it wholesale as admin-extensible seed data, reconciled with the existing engines. See `02-identities-and-taxonomy.md §3`. |
 
 ## Part C — Modules M1–M19
 
 | M | Module | EXAACT engine(s) | Verb | Note |
 |---|---|---|---|---|
-| M1 | Identity & Access | `access.php`, `identity.php`, `security.php`, `portal.php`, `mghsso.php` | EXTEND | `can()`/roles/2FA/session exist; add open self-service roles per decision 5a. KYC hooks via `identity.php`. |
+| M1 | Identity & Access | `access.php`, `identity.php`, `security.php`, `portal.php`, `mghsso.php` | EXTEND | `can()`/roles/2FA/session exist; **adopt** the blueprint's role set (inspector/company/agency/admin/superadmin + company sub-roles), mapped onto the client/vendor portals — see `02-identities-and-taxonomy.md`. KYC hooks via `identity.php`. |
 | M2 | Onboarding & Verification | `competence.php` (P1 vault + `verify_status`), `customforms.php`, `datacontrol.php` | REUSE/EXTEND | Per-item verification queue, expiry reminders, tiers already largely built in the P1 credential vault. Add verification *tiers* labelling. |
 | M3 | Digital Passport | `competence.php`, `inspectorprofile.php`, `qr.php` | EXTEND | Make the vault a **public, shareable, QR-verifiable** page (K1). QR encoder already owned (`qr.php`). |
 | M4 | Preference Profile | `inspectorprofile.php`, `pdso.php`, `schedule.php` | EXTEND | Work-type / mobility / availability / commercials as structured filterable fields feeding matching. |
