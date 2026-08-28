@@ -140,7 +140,7 @@ new-role slices are deliberately later, behind their §5 sign-offs.
 | **K6** | Protocol-based job lifecycle + geo check-in/telemetry over `trust.php`/`attend.php` | EXTEND | 5b |
 | **K7** | Reports: O/D/T counterparts + QR public verification over `idems.php` + `qr.php` | EXTEND | — |
 | **K8** | Escrow hold → protocol-release over `books.php` | EXTEND/BUILD | 5c |
-| **K9** | Two-way ratings + disputes/mediation over `rating.php` + `complaints.php`/`ncr.php` | EXTEND | — |
+| **K9** ✅ (ratings) | Two-way ratings on a completed engagement. **Delivered:** additive `cx_ratings`; a rating allowed only once the requirement is AWARDED/CLOSED, one per direction (client→pro, pro→client), stars clamped 1–5, would-work-again + optional dimensions; per-professional summary (avg stars, rehire %); rating UI on the requirement detail. `lib/connect_ratings.php`; 10 tests. No new permission/status. 170 insertions, 0 deletions. **Disputes (K9b)** — over `complaints.php` — still to do. | EXTEND | — |
 | **K10** | Part-F governance: commercial term-sheet, scope freeze, site readiness, waiting-time | BUILD/EXTEND | 5b |
 | **K11** | Assessment player (M5) — the one fully-new module | BUILD | 5d (SME) |
 | **K12** | Operations Advisor readiness scoring over `advisor.php` | EXTEND | K10 |

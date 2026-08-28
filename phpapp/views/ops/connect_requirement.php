@@ -2,6 +2,9 @@
 // Connect K2a — one requirement: its details, its applications, and every legal
 // lifecycle action. Staff desk (K2a); external self-service apply is K2b.
 $req = $req ?? []; $apps = $apps ?? []; $inspectors = $inspectors ?? []; $req_next = $req_next ?? []; $matches = $matches ?? [];
+$can_rate = $can_rate ?? false; $ratings = $ratings ?? [];
+$ratedDir = [];
+foreach ($ratings as $rr) $ratedDir[strtoupper((string)$rr['direction'])] = $rr;
 $pill = function ($s) {
     $s = strtoupper((string)$s);
     $map = ['OPEN'=>'ok','SHORTLISTING'=>'ok','AWARDED'=>'info','ACCEPTED'=>'ok','OFFERED'=>'info','SHORTLISTED'=>'info',
@@ -147,3 +150,36 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   </form>
   <?php endif; ?>
 </div>
+
+<?php if ($can_rate): ?>
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 4px">Ratings</h3>
+  <p class="cxmeta" style="margin:0 0 10px">Both sides rate each other once the engagement is complete — competency, communication, punctuality, professionalism, and whether they'd work together again.</p>
+  <?php
+    $dirs = ['CLIENT_TO_PRO' => 'Client → professional', 'PRO_TO_CLIENT' => 'Professional → client'];
+    foreach ($dirs as $dir => $label):
+      $done = $ratedDir[$dir] ?? null;
+  ?>
+    <div style="border:1px solid var(--line,#eee);border-radius:12px;padding:12px;margin-bottom:10px">
+      <div style="font-weight:600;margin-bottom:6px"><?= e($label) ?></div>
+      <?php if ($done): ?>
+        <div><?= str_repeat('★', (int)$done['stars']) . str_repeat('☆', 5 - (int)$done['stars']) ?>
+          <?php if ((int)$done['would_rehire']): ?><span class="cxpill ok">Would work again</span><?php endif; ?></div>
+        <?php if (!empty($done['comment'])): ?><div class="cxmeta" style="margin-top:4px"><?= e($done['comment']) ?></div><?php endif; ?>
+      <?php else: ?>
+        <form method="post" action="/connect-requirement" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
+          <input type="hidden" name="action" value="rate">
+          <input type="hidden" name="direction" value="<?= e($dir) ?>">
+          <select name="stars" style="padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px">
+            <?php for ($s = 5; $s >= 1; $s--): ?><option value="<?= $s ?>"><?= str_repeat('★', $s) ?> (<?= $s ?>)</option><?php endfor; ?>
+          </select>
+          <label style="font-size:13px;display:flex;align-items:center;gap:4px"><input type="checkbox" name="would_rehire" value="1"> Would work again</label>
+          <input type="text" name="comment" placeholder="Optional note" style="flex:1;min-width:160px;padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px">
+          <button class="btn secondary" type="submit">Save rating</button>
+        </form>
+      <?php endif; ?>
+    </div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>

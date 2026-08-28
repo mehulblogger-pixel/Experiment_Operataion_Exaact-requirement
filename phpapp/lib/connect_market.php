@@ -245,6 +245,9 @@ function ops_connect_requirement($method) {
             cx_application_transition((int)($_POST['application_id'] ?? 0), $_POST['to'] ?? '') ? flash('Application updated.') : flash('That change is not allowed from the current status.', 'error');
         } elseif ($act === 'award') {
             cx_requirement_award($id, (int)($_POST['application_id'] ?? 0)) ? flash('Requirement awarded.') : flash('Could not award — shortlist the application first.', 'error');
+        } elseif ($act === 'rate' && function_exists('cx_rating_add')) {   // K9 — two-way rating
+            $newId = cx_rating_add($id, (string)($_POST['direction'] ?? ''), $_POST);
+            flash($newId ? 'Rating recorded.' : 'That rating could not be saved (already rated, or the engagement is not complete).', $newId ? 'success' : 'error');
         }
         redirect('/connect-requirement?id=' . $id);
     }
@@ -258,6 +261,9 @@ function ops_connect_requirement($method) {
         'req_next'     => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
         // K3 — ranked recommendations from the pool (only worth showing while open).
         'matches'      => ($open && function_exists('connect_match_for_requirement')) ? connect_match_for_requirement($req, 6) : [],
+        // K9 — two-way ratings once the engagement is awarded/closed.
+        'can_rate'     => function_exists('cx_rating_allowed') && cx_rating_allowed($req),
+        'ratings'      => function_exists('cx_ratings_for_requirement') ? cx_ratings_for_requirement($id) : [],
     ]);
     return true;
 }
