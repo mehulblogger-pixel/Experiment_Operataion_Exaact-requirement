@@ -237,6 +237,7 @@ try {
     require __DIR__ . '/lib/connect_taxonomy.php'; // Connect K0 — manpower-marketplace industry taxonomy (additive masters)
     require __DIR__ . '/lib/connect_passport.php'; // Connect K1 — public professional passport (over the P1 credential vault)
     require __DIR__ . '/lib/connect_market.php';   // Connect K2a — manpower marketplace (post a requirement / apply)
+    require __DIR__ . '/lib/connect_match.php';    // Connect K3 — matching & recommendation cards (read-only over eligibility + rating)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);

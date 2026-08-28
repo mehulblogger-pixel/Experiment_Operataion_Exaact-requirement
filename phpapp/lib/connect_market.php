@@ -250,11 +250,14 @@ function ops_connect_requirement($method) {
     }
     $req = cx_requirement_get($id);
     if (!$req) { flash('That requirement was not found.', 'error'); redirect('/connect-requirements'); }
+    $open = in_array(strtoupper((string)$req['status']), ['OPEN', 'SHORTLISTING'], true);
     view('ops/connect_requirement', [
         'req'          => $req,
         'apps'         => cx_applications_for($id),
         'inspectors'   => ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY name") ?: [],
         'req_next'     => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
+        // K3 — ranked recommendations from the pool (only worth showing while open).
+        'matches'      => ($open && function_exists('connect_match_for_requirement')) ? connect_match_for_requirement($req, 6) : [],
     ]);
     return true;
 }

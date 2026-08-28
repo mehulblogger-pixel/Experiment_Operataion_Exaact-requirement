@@ -1,7 +1,7 @@
 <?php
 // Connect K2a — one requirement: its details, its applications, and every legal
 // lifecycle action. Staff desk (K2a); external self-service apply is K2b.
-$req = $req ?? []; $apps = $apps ?? []; $inspectors = $inspectors ?? []; $req_next = $req_next ?? [];
+$req = $req ?? []; $apps = $apps ?? []; $inspectors = $inspectors ?? []; $req_next = $req_next ?? []; $matches = $matches ?? [];
 $pill = function ($s) {
     $s = strtoupper((string)$s);
     $map = ['OPEN'=>'ok','SHORTLISTING'=>'ok','AWARDED'=>'info','ACCEPTED'=>'ok','OFFERED'=>'info','SHORTLISTED'=>'info',
@@ -52,6 +52,45 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   </div>
   <?php endif; ?>
 </div>
+
+<?php if ($matches): ?>
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 4px">Recommended professionals</h3>
+  <p class="cxmeta" style="margin:0 0 10px">Ranked from your pool on skills fit, reputation, verified credentials and eligibility for this requirement. Add one to the shortlist in a tap.</p>
+  <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
+    <?php foreach ($matches as $m):
+      [$epLbl, $epCls] = function_exists('inspector_eligibility_pill') ? inspector_eligibility_pill($m['eligibility']) : ['—','p-mut'];
+      $reasonCls = $m['reason'] === 'Best match' ? 'info' : ($m['eligibility']==='BLOCKED' ? 'bad' : 'ok');
+    ?>
+      <div style="border:1px solid var(--line,#e3ebea);border-radius:12px;padding:13px">
+        <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
+          <div><strong><?= e($m['name']) ?></strong>
+            <?php if (!empty($m['designation'])): ?><div class="cxmeta"><?= e($m['designation']) ?></div><?php endif; ?></div>
+          <span class="cxpill <?= $reasonCls ?>"><?= e($m['reason']) ?></span>
+        </div>
+        <div class="cxmeta" style="margin:8px 0">
+          <?php if ($m['stars'] !== null && (int)$m['jobs'] >= 3): ?>★ <?= e(number_format((float)$m['stars'],1)) ?> · <?php endif; ?>
+          <?php if ((int)$m['verified'] > 0): ?><?= (int)$m['verified'] ?> verified · <?php endif; ?>
+          <span class="cxpill <?= $epCls==='p-ok'?'ok':($epCls==='p-bad'?'bad':'warn') ?>"><?= e($epLbl) ?></span>
+          · match <?= (int)$m['score'] ?>%
+        </div>
+        <?php if (!empty($m['skills'])): ?><div class="cxmeta" style="margin-bottom:8px"><?= e($m['skills']) ?></div><?php endif; ?>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <a class="btn secondary" href="/passport-share?id=<?= (int)$m['id'] ?>" style="font-size:13px">Passport</a>
+          <?php if ($m['eligibility'] !== 'BLOCKED'): ?>
+          <form method="post" action="/connect-requirement" class="inline">
+            <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
+            <input type="hidden" name="inspector_id" value="<?= (int)$m['id'] ?>">
+            <input type="hidden" name="action" value="apply">
+            <button class="btn" type="submit" style="font-size:13px">+ Add to shortlist</button>
+          </form>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
 
 <div class="panel" style="margin-top:12px">
   <h3 style="margin:0 0 6px">Applications (<?= count($apps) ?>)</h3>
