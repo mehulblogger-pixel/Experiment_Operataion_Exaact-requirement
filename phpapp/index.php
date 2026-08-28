@@ -245,6 +245,7 @@ try {
     require __DIR__ . '/lib/connect_govern.php';   // Connect K10 — commercial terms + site-readiness (Part-F F1/F3)
     require __DIR__ . '/lib/connect_advisor.php';  // Connect K12 — Operations Advisor (readiness + delay-risk verdict, read-only)
     require __DIR__ . '/lib/connect_pro.php';      // Connect A1/A2 — freelancer self-service pool (shared, self-registered)
+    require __DIR__ . '/lib/connect_bridge.php';   // Connect — award → engagement → invoice bridge (reuses the P4 billable ledger)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);

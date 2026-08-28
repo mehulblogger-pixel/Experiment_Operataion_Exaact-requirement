@@ -5,6 +5,7 @@ $req = $req ?? []; $apps = $apps ?? []; $inspectors = $inspectors ?? []; $req_ne
 $can_rate = $can_rate ?? false; $ratings = $ratings ?? []; $disputes = $disputes ?? [];
 $terms = $terms ?? null; $terms_fields = $terms_fields ?? []; $readiness = $readiness ?? [];
 $readiness_items = $readiness_items ?? []; $readiness_score = $readiness_score ?? null; $advisor = $advisor ?? null;
+$billable = $billable ?? null;
 $ratedDir = [];
 foreach ($ratings as $rr) $ratedDir[strtoupper((string)$rr['direction'])] = $rr;
 $pill = function ($s) {
@@ -73,6 +74,27 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   </div>
   <?php endif; ?>
 </div>
+
+<?php if (strtoupper((string)$req['status']) === 'AWARDED'): ?>
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 6px">Billing</h3>
+  <?php if ($billable): $bs = strtoupper((string)$billable['status']); ?>
+    <p class="cxmeta" style="margin:0">
+      <span class="cxpill <?= $bs==='BILLED'?'ok':($bs==='CANCELLED'?'bad':'info') ?>"><?= e(ucfirst(strtolower($bs))) ?></span>
+      This engagement is in the billing ledger — <?= (int)$billable['qty'] ?> × ₹<?= (int)$billable['rate'] ?> = <strong>₹<?= number_format((float)$billable['amount'], 0) ?></strong>.
+      <a href="/billable-events">Open the billable events board →</a>
+    </p>
+    <p class="cxmeta" style="margin:6px 0 0">Finance approves and attests the real invoice from there — the books ledger stays the single money truth.</p>
+  <?php else: ?>
+    <p class="cxmeta" style="margin:0 0 10px">Turn this awarded engagement into a billable event — it flows into your existing invoicing chain (billable events → finance → invoice).</p>
+    <form method="post" action="/connect-requirement" class="inline">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
+      <input type="hidden" name="action" value="send_to_billing">
+      <button class="btn" type="submit">💷 Send to billing</button>
+    </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php if ($matches): ?>
 <div class="panel" style="margin-top:12px">

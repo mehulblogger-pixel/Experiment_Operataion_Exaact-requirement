@@ -90,8 +90,20 @@ Delivers "freelancers build rich profiles; the pool is discoverable by agencies/
 
 **Phase A is complete** (A1 profile · A2 apply · A3 talent search): freelancers
 build rich profiles, find and apply to jobs, and are discoverable by
-organisations — the shared pool, exactly as specified. Scenarios 1 & 2 are fully
-real; Scenario 3 needs the award→invoice bridge next.
+organisations — the shared pool, exactly as specified.
+
+**Award → Engagement → Invoice bridge ✅ delivered** — an AWARDED requirement is
+turned (by an explicit "Send to billing" staff action) into a **PENDING billable
+event in the existing P4 ledger** (`source = connect/MARKETPLACE_AWARD`),
+idempotently, priced from the winning bid × positions, carrying the client to
+bill. It then flows through the invoicing chain EXAACT already has (billable
+board → finance attestation → books invoice) — no new invoicing engine; the books
+ledger stays the single money truth. 10 tests. **This closes Scenario 3's
+requirement→invoicing path** (crew/bulk M10 is the remaining refinement).
+
+All three owner scenarios are now real: **1** (TPIA finds a freelancer),
+**2** (freelancer finds jobs), **3** (staffing co: find candidates → award →
+into invoicing).
 - **A1 — Freelancer preference profile (M4).** Additive columns on the pool
   (work types: per-visit / day-rate / man-day / long deployment / shutdown;
   base + preferred locations; pan-India / overseas willingness; travel radius;

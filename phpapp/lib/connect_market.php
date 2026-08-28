@@ -278,6 +278,10 @@ function ops_connect_requirement($method) {
             flash('Commercial terms saved.');
         } elseif ($act === 'readiness_toggle' && function_exists('cx_readiness_set')) {   // K10 — site readiness
             cx_readiness_set($id, (string)($_POST['item_key'] ?? ''), !empty($_POST['checked']));
+        } elseif ($act === 'send_to_billing' && function_exists('connect_engagement_billable')) {   // Award → invoice bridge
+            $ev = connect_engagement_billable($id);
+            flash($ev ? 'Engagement sent to billing — it is now a pending billable event for finance to invoice.'
+                      : 'Could not send to billing — award the requirement and set a rate first.', $ev ? 'success' : 'error');
         }
         redirect('/connect-requirement?id=' . $id);
     }
@@ -304,6 +308,8 @@ function ops_connect_requirement($method) {
         'readiness_score' => function_exists('cx_readiness_score') ? cx_readiness_score($id) : null,
         // K12 — Operations Advisor verdict (delay risk + what to do).
         'advisor'      => function_exists('connect_advisor_for_requirement') ? connect_advisor_for_requirement($req) : null,
+        // Bridge — the billable event for this awarded engagement (if sent to billing).
+        'billable'     => function_exists('connect_engagement_billable_row') ? connect_engagement_billable_row($id) : null,
     ]);
     return true;
 }
