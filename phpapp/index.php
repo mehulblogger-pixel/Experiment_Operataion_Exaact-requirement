@@ -247,6 +247,7 @@ try {
     require __DIR__ . '/lib/connect_pro.php';      // Connect A1/A2 — freelancer self-service pool (shared, self-registered)
     require __DIR__ . '/lib/connect_bridge.php';   // Connect — award → engagement → invoice bridge (reuses the P4 billable ledger)
     require __DIR__ . '/lib/connect_crew.php';     // Connect M10 — crew/bulk booking (position manifest)
+    require __DIR__ . '/lib/connect_org.php';      // Connect B0 — organisation accounts + org-type entitlements
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
@@ -359,6 +360,7 @@ try {
     db()->query("SELECT id FROM cx_readiness LIMIT 1");                  // Connect K10 — site-readiness checklist
     db()->query("SELECT id FROM cx_professionals LIMIT 1");              // Connect A1 — self-registered freelancer pool
     db()->query("SELECT id FROM cx_positions LIMIT 1");                  // Connect M10 — crew position manifest
+    db()->query("SELECT id FROM cx_organisations LIMIT 1");             // Connect B0 — organisation accounts
     db()->query("SELECT id FROM agencies LIMIT 1");
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM requisitions LIMIT 1");

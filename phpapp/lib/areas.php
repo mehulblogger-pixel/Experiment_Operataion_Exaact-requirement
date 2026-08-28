@@ -47,7 +47,7 @@ function ops_area_def($area) {
             // area, cleanly optional.
             $title = 'Marketplace'; $icon = '🧑‍🏭';
             $sub = 'Post technical-manpower requirements, match and shortlist professionals, and their public passports.';
-            $routes = ['connect-requirements','connect-requirement','connect-concierge','connect-talent','passport-share','connect-taxonomy'];
+            $routes = ['connect-requirements','connect-requirement','connect-concierge','connect-talent','connect-orgs','passport-share','connect-taxonomy'];
             $on = $fx('connect_market_can') && connect_market_can();
             if ($on) {
                 $sec('');
@@ -58,6 +58,7 @@ function ops_area_def($area) {
                     $num(fn() => $fx('connect_pro_pool_count') ? connect_pro_pool_count() : 0));
                 $t(true, '🪪', 'Passports', '/passport-share', 'A professional\'s public, verifiable credential page.');
                 $t(true, '🏭', 'Industry taxonomy', '/connect-taxonomy', 'Sectors, equipment, materials, disciplines, standards, certifications.');
+                $t(is_master(), '🏢', 'Organisations', '/connect-orgs', 'Register organisations and their module entitlements (TPIA / agency / company).');
             }
             break;
         case 'sales':

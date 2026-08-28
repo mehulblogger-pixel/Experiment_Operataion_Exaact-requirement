@@ -128,6 +128,14 @@ Phase B can land in additive stages, each shippable and safe:
   bundle where set, else the install default. *Within a single deployment this already
   delivers "a TPIA org sees full modules, a manpower agency sees the marketplace,"
   sharing the pool naturally (one DB) — Option 1-lite, scoped to the marketplace era.*
+  > **B0 ✅ delivered** — `cx_organisations` registry + `connect_org_types()`
+  > (TPIA/MANPOWER_AGENCY/RECRUITMENT_AGENCY/ENTERPRISE/COMPANY/FREELANCER) each
+  > mapped to a module bundle derived from the existing **product packages**
+  > (`connect_org_type_modules`), a `connect_org_can_module()` gate helper, and a
+  > master-only admin screen at `/connect-orgs`. `lib/connect_org.php`; 19 tests.
+  > **This is representation + provisioning only — it does not yet change any live
+  > gate for external orgs** (that is B2, behind the topology decision + a security
+  > review). Next: **B1 onboarding**, then **B2** when true isolation is required.
 - **B1 — Onboarding per org type.** Self-service sign-up that provisions the account
   with its package (reusing `product_package_apply`).
 - **B2 — Marketplace store separation (only if/when true per-tenant isolation is

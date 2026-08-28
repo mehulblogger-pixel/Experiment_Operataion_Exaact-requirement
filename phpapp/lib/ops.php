@@ -3184,6 +3184,8 @@ function ops_dispatch($route, $method) {
             return ops_connect_concierge($method);
         case $route === 'connect-talent':       // Connect A3 — talent search over the shared professional pool
             return ops_connect_talent($method);
+        case $route === 'connect-orgs':         // Connect B0 — organisation accounts (master-only)
+            return ops_connect_orgs($method);
         case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board
             return ops_command_centre($method);
         case $route === 'entity-360':          // Phase 3 §49 — uniform 360 shell for any entity
