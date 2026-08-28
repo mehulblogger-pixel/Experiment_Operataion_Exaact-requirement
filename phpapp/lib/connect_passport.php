@@ -142,6 +142,7 @@ function connect_passport_public_data($insp) {
 
 /** Render the standalone PUBLIC passport page and exit (dispatched pre-login). */
 function connect_passport_route($token) {
+    if (function_exists('connect_enabled') && !connect_enabled()) { http_response_code(404); echo 'Not available.'; exit; }
     $insp = connect_passport_lookup($token);
     $data = $insp ? connect_passport_public_data($insp) : null;
     // Only ACTIVE professionals expose a public page.
@@ -155,6 +156,7 @@ function connect_passport_route($token) {
 
 /** Staff read-gate for the share screen — reuses existing helpers, no new perm. */
 function connect_passport_can() {
+    if (function_exists('connect_enabled') && !connect_enabled()) return false;
     if (function_exists('is_master') && is_master()) return true;
     if (function_exists('inspector_profile_can') && inspector_profile_can()) return true;
     if (function_exists('is_coordinator_level') && is_coordinator_level()) return true;

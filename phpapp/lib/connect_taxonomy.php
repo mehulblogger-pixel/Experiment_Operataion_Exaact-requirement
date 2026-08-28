@@ -147,6 +147,7 @@ function connect_taxonomy_summary() {
 
 /** Read gate — reuses existing helpers; introduces NO new permission. */
 function connect_taxonomy_can() {
+    if (function_exists('connect_enabled') && !connect_enabled()) return false;
     if (function_exists('is_master') && is_master()) return true;
     if (function_exists('is_admin_level') && is_admin_level()) return true;
     if (function_exists('is_coordinator_level') && is_coordinator_level()) return true;

@@ -886,7 +886,7 @@ function portal_route($route, $method) {
         // party (poster_party_id) so a client only ever sees its own postings.
         case 'portal/hire':
             portal_need('market.post', 'posting manpower requirements');
-            if (!function_exists('cx_requirement_create')) { http_response_code(404); portal_view('notfound'); exit; }
+            if (!function_exists('cx_requirement_create') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
             if ($method === 'POST' && trim((string)($_POST['title'] ?? '')) !== '') {
                 $in = $_POST; $in['poster_party_id'] = portal_partner_id(); $in['poster_name'] = portal_client_name();
                 cx_requirement_create($in, true); // posted straight to OPEN

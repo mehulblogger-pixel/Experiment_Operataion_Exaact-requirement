@@ -112,7 +112,7 @@ function ops_nav_index() {
 
     // ---- The seven flat areas, flattened from their gated tile lists --------
     if ($fx('ops_area_def')) {
-        foreach (['sales', 'quality', 'reporting', 'money', 'insights', 'directory', 'admin'] as $area) {
+        foreach (['sales', 'marketplace', 'quality', 'reporting', 'money', 'insights', 'directory', 'admin'] as $area) {
             $def = ops_area_def($area);
             if (!$def) continue;
             $add($def['title'], '/' . $area, $def['title'], $def['icon'] ?: '📂', $def['sub'] ?? '');

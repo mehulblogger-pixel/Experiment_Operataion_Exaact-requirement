@@ -81,6 +81,23 @@ in the same system, not by calling into it.
   existing ledger, never a second source of money truth. Anything that moves real
   figures waits for explicit sign-off (as R9/§29 did).
 
+## 4a. Packaging & navigation — how the module is layered (delivered)
+
+The marketplace is **dissolved into EXAACT** (one app, one DB, one login, reusing the
+inspector pool / rating / competence / taxonomy engines) yet **cleanly optional**:
+
+- **One switch:** `connect_enabled()` (the `connect_enabled` setting, default ON)
+  gates every entry point — the staff routes, the client-portal *Hire manpower* tab,
+  the vendor-portal *Open requirements* tab, and the public passport. Turn it off and
+  the whole marketplace disappears without touching core operations.
+- **One area:** a **Marketplace** rail item + area home (`/marketplace`, `areas.php`)
+  gathers the module's screens (Requirements, Guided post, Passports, Taxonomy) as an
+  integrated-yet-distinct area — shown only when enabled and the viewer is
+  coordinator/master.
+- **Isolated in code:** all logic is in `lib/connect_*.php` + `cx_*` tables +
+  `views/…/connect_*`; nothing existing was rewritten, so the module can be removed or
+  disabled with no effect on the ~215 core tables.
+
 ## 5. Decisions that need the owner's sign-off (before the slices they gate)
 
 These are the "stop and ask" items. Each is a proposal to approve or correct — not a

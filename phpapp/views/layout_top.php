@@ -120,6 +120,12 @@
         <a class="s-item<?= $navOn(ops_area_routes('sales')) ?>" href="/sales"><span class="s-ic">🎯</span><span>Sales</span></a>
         <?php endif; ?>
 
+        <?php // Connect — the technical-manpower marketplace, its own rail item,
+              //  shown only when the module is enabled and the viewer may use it. ?>
+        <?php if (ops_area_has('marketplace')): ?>
+        <a class="s-item<?= $navOn(ops_area_routes('marketplace')) ?>" href="/marketplace"><span class="s-ic">🧑‍🏭</span><span>Marketplace</span></a>
+        <?php endif; ?>
+
         <?php // Operations is no longer a folding group. Tapping it navigates to
               // the Operations Home, where every one of the screens that used to
               // hang under this heading is laid out on the page with its live

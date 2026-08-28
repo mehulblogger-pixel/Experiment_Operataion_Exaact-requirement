@@ -199,8 +199,20 @@ function cx_market_summary() {
     ];
 }
 
+/**
+ * The single on/off switch for the whole Connect marketplace module — dissolved
+ * into EXAACT, but cleanly optional. Default ON; an installation can turn the
+ * marketplace off in one place (`connect_enabled` setting) without touching core
+ * operations. Every Connect entry point (staff routes, portals, public passport)
+ * respects it.
+ */
+function connect_enabled() {
+    return function_exists('setting_get') ? setting_get('connect_enabled', '1') === '1' : true;
+}
+
 /** Staff gate — reuses existing helpers; introduces NO new permission. */
 function connect_market_can() {
+    if (function_exists('connect_enabled') && !connect_enabled()) return false;
     if (function_exists('is_master') && is_master()) return true;
     if (function_exists('is_coordinator_level') && is_coordinator_level()) return true;
     return false;

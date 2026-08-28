@@ -14,7 +14,7 @@ if (pcan('deputation')) $links['portal/deputations'] = 'Deputations';
 if (pcan('issues') && function_exists('cvp_issues_for')) $links['portal/issues'] = 'Nonconformities';
 if (pcan('invoices'))  $links['portal/invoices']   = 'Invoices';
 if (pcan('request'))   $links['portal/request']    = 'Request an inspection';
-if (pcan('market.post')) $links['portal/hire']     = 'Hire manpower';
+if (pcan('market.post') && (!function_exists('connect_enabled') || connect_enabled())) $links['portal/hire'] = 'Hire manpower';
 if (pcan('complaint')) $links['portal/complaints'] = 'Complaints &amp; appeals';
 if (function_exists('cvp_notify_count')) {
     $__cn = cvp_notify_count('CLIENT', portal_partner_id());

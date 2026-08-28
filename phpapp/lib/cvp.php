@@ -518,7 +518,7 @@ function cvp_vendor_route($route, $method) {
         // vendor only ever applies as itself.
         case 'vendor/opportunities':
             cvp_vendor_need('market.apply', 'the manpower marketplace');
-            if (!function_exists('cx_open_requirements')) { http_response_code(404); cvp_vendor_view('notfound'); exit; }
+            if (!function_exists('cx_open_requirements') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); cvp_vendor_view('notfound'); exit; }
             if ($method === 'POST' && (int)($_POST['requirement_id'] ?? 0) > 0) {
                 $rq = cx_requirement_get((int)$_POST['requirement_id']);
                 if ($rq && in_array(strtoupper((string)$rq['status']), ['OPEN', 'SHORTLISTING'], true)) {

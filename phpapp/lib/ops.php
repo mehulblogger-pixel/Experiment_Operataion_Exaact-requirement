@@ -3032,7 +3032,7 @@ function ops_dispatch($route, $method) {
             return ops_attend_action($route, $method);
         case $route === 'operations':
             return ops_operations_home($method);
-        case in_array($route, ['sales','quality','reporting','money','insights','directory','admin'], true):
+        case in_array($route, ['sales','marketplace','quality','reporting','money','insights','directory','admin'], true):
             return ops_area_home($route, $method);
         case $route === 'ops-desk':
             // Merged into the Operations home (Backlog & registers tab). Kept as a
