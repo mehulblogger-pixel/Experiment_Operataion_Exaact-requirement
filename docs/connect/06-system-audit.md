@@ -81,6 +81,17 @@ open network needs. None of it fights the codebase; it's the natural next layer.
 
 ## PART 2 — The gaps that matter (with the plan for each)
 
+> **Progress (#1, step 1 ✅):** the marketplace **recommender and the public
+> Passport now span both pools.** `connect_match_for_requirement` scores internal
+> inspectors *and* self-registered professionals against a requirement (inspectors
+> keep full eligibility/rating/trust scoring; professionals score on
+> skills/availability and show honestly as **New / Unverified** until verified &
+> rated); recommendation cards carry a **Freelancer** badge, the right Passport
+> link (`/p/<token>`) and the right apply field; and `connect_passport_lookup`
+> resolves a professional's token too. 12 tests; fixes the "recommender ignores
+> freelancers" bug. **Remaining:** a single `cx_person` identity + cross-pool
+> ratings/Trust Score + an entity-agnostic credential vault (follow-on slices).
+
 ### GAP 1 — Two disconnected talent pools *(structural; highest priority)*
 - **What's there:** `inspectors` (internal, fully instrumented — competence, eligibility,
   vault, rating, passport, trust, matching) **and** `cx_professionals` (public freelancer

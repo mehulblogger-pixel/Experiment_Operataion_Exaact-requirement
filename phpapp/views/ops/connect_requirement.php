@@ -136,17 +136,20 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   <p class="cxmeta" style="margin:0 0 10px">Ranked from your pool on skills fit, reputation, verified credentials and eligibility for this requirement. Add one to the shortlist in a tap.</p>
   <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
     <?php foreach ($matches as $m):
-      [$epLbl, $epCls] = function_exists('inspector_eligibility_pill') ? inspector_eligibility_pill($m['eligibility']) : ['—','p-mut'];
+      $isPro = ($m['kind'] ?? 'inspector') === 'professional';
+      if ($m['eligibility'] === 'UNVERIFIED') { $epLbl = 'Unverified'; $epCls = 'p-warn'; }
+      else [$epLbl, $epCls] = function_exists('inspector_eligibility_pill') ? inspector_eligibility_pill($m['eligibility']) : ['—','p-mut'];
       $reasonCls = $m['reason'] === 'Best match' ? 'info' : ($m['eligibility']==='BLOCKED' ? 'bad' : 'ok');
     ?>
       <div style="border:1px solid var(--line,#e3ebea);border-radius:12px;padding:13px">
         <div style="display:flex;justify-content:space-between;align-items:start;gap:8px">
           <div><strong><?= e($m['name']) ?></strong>
+            <?php if ($isPro): ?><span class="cxpill info" style="font-size:10px">Freelancer</span><?php endif; ?>
             <?php if (!empty($m['designation'])): ?><div class="cxmeta"><?= e($m['designation']) ?></div><?php endif; ?></div>
           <span class="cxpill <?= $reasonCls ?>"><?= e($m['reason']) ?></span>
         </div>
         <div class="cxmeta" style="margin:8px 0">
-          <?php if (isset($m['trust'])): ?><strong>Trust <?= (int)$m['trust'] ?></strong> · <?php endif; ?>
+          <?php if (isset($m['trust']) && !$isPro): ?><strong>Trust <?= (int)$m['trust'] ?></strong> · <?php elseif ($isPro): ?><strong>New</strong> · <?php endif; ?>
           <?php if ($m['stars'] !== null && (int)$m['jobs'] >= 3): ?>★ <?= e(number_format((float)$m['stars'],1)) ?> · <?php endif; ?>
           <?php if ((int)$m['verified'] > 0): ?><?= (int)$m['verified'] ?> verified · <?php endif; ?>
           <span class="cxpill <?= $epCls==='p-ok'?'ok':($epCls==='p-bad'?'bad':'warn') ?>"><?= e($epLbl) ?></span>
@@ -154,11 +157,15 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         </div>
         <?php if (!empty($m['skills'])): ?><div class="cxmeta" style="margin-bottom:8px"><?= e($m['skills']) ?></div><?php endif; ?>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <a class="btn secondary" href="/passport-share?id=<?= (int)$m['id'] ?>" style="font-size:13px">Passport</a>
+          <?php if ($isPro): ?>
+            <?php if (!empty($m['passport_token'])): ?><a class="btn secondary" href="/p/<?= e($m['passport_token']) ?>" target="_blank" rel="noopener" style="font-size:13px">Passport ↗</a><?php endif; ?>
+          <?php else: ?>
+            <a class="btn secondary" href="/passport-share?id=<?= (int)$m['id'] ?>" style="font-size:13px">Passport</a>
+          <?php endif; ?>
           <?php if ($m['eligibility'] !== 'BLOCKED'): ?>
           <form method="post" action="/connect-requirement" class="inline">
             <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
-            <input type="hidden" name="inspector_id" value="<?= (int)$m['id'] ?>">
+            <input type="hidden" name="<?= $isPro ? 'applicant_professional_id' : 'inspector_id' ?>" value="<?= (int)$m['id'] ?>">
             <input type="hidden" name="action" value="apply">
             <button class="btn" type="submit" style="font-size:13px">+ Add to shortlist</button>
           </form>

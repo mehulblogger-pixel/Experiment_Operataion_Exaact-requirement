@@ -48,12 +48,22 @@ function connect_passport_regenerate($inspectorId) {
     return $tok;
 }
 
-/** The inspector behind a token, or null. Empty token never matches. */
+/**
+ * The professional behind a token, or null. Spans BOTH talent pools (unify #1):
+ * an internal inspector or a self-registered professional. The row is tagged
+ * with `_kind` so the public renderer knows which shape it is.
+ */
 function connect_passport_lookup($token) {
     $token = trim((string)$token);
     if ($token === '' || !preg_match('/^[a-f0-9]{16,40}$/', $token)) return null;
     connect_passport_migrate();
-    return ops_one("SELECT * FROM inspectors WHERE passport_token=?", [$token]) ?: null;
+    $insp = ops_one("SELECT * FROM inspectors WHERE passport_token=?", [$token]);
+    if ($insp) { $insp['_kind'] = 'inspector'; return $insp; }
+    try {
+        $pro = ops_one("SELECT * FROM cx_professionals WHERE passport_token=?", [$token]);
+        if ($pro) { $pro['_kind'] = 'professional'; return $pro; }
+    } catch (Throwable $e) {}
+    return null;
 }
 
 /** Absolute base URL, built defensively from the request. */
@@ -87,6 +97,19 @@ function connect_passport_kind_label($kind) {
  */
 function connect_passport_public_data($insp) {
     if (!is_array($insp)) return null;
+    // A self-registered professional (unify #1) has no credential vault, job
+    // history or Trust Score yet — render an honest "new professional" passport.
+    if (($insp['_kind'] ?? '') === 'professional') {
+        $name = trim((string)($insp['name'] ?? '')) ?: 'Technical professional';
+        return [
+            'id' => (int)($insp['id'] ?? 0), 'name' => $name,
+            'designation' => (string)($insp['headline'] ?? ''),
+            'kind_label' => 'Freelance professional',
+            'skills' => (string)($insp['skills'] ?? ''), 'sbu' => '',
+            'credentials' => [], 'verified_count' => 0, 'live_count' => 0, 'cred_total' => 0,
+            'reputation' => null, 'trust' => null, 'token' => (string)($insp['passport_token'] ?? ''),
+        ];
+    }
     $id = (int)($insp['id'] ?? 0);
 
     // Verified credentials, live status via the P1 vault vocabulary.
@@ -145,8 +168,14 @@ function connect_passport_route($token) {
     if (function_exists('connect_enabled') && !connect_enabled()) { http_response_code(404); echo 'Not available.'; exit; }
     $insp = connect_passport_lookup($token);
     $data = $insp ? connect_passport_public_data($insp) : null;
-    // Only ACTIVE professionals expose a public page.
-    if ($data && strtoupper((string)($insp['status'] ?? 'ACTIVE')) !== 'ACTIVE') $data = null;
+    // Only ACTIVE professionals expose a public page (inspectors use `status`,
+    // self-registered professionals use `is_active`).
+    if ($insp && $data) {
+        $active = ($insp['_kind'] ?? '') === 'professional'
+            ? (int)($insp['is_active'] ?? 1) === 1
+            : strtoupper((string)($insp['status'] ?? 'ACTIVE')) === 'ACTIVE';
+        if (!$active) $data = null;
+    }
     http_response_code($data ? 200 : 404);
     $GLOBALS['__passport'] = $data;
     $GLOBALS['__passport_url'] = $data ? connect_passport_url($token) : '';
