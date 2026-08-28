@@ -267,6 +267,29 @@ function connect_pro_route($route, $method) {
         case 'pro/applications':   // A2 — track my applications
             connect_pro_view('applications', ['me' => $me, 'rows' => connect_pro_applications((int)$me['id'])]); exit;
 
+        case 'pro/messages':   // #4 — two-way messaging on my own engagements
+            if (!function_exists('connect_msg_post')) { http_response_code(404); connect_pro_view('dashboard', ['me' => $me, 'pct' => connect_pro_profile_pct($me)]); exit; }
+            $pid = (int)$me['id'];
+            if ($method === 'POST') {
+                $aid = (int)($_POST['application_id'] ?? 0);
+                if (connect_msg_pro_owns($aid, $pid)) {
+                    connect_msg_post($aid, 'professional', $pid, (string)$me['name'], (string)($_POST['body'] ?? ''));
+                }
+                redirect('/pro/messages?a=' . $aid);
+            }
+            $openId = (int)($_GET['a'] ?? 0);
+            $open = null;
+            if ($openId > 0 && connect_msg_pro_owns($openId, $pid)) {
+                connect_msg_mark_read($openId, 'professional', $pid);
+                $app = connect_msg_app($openId);
+                $open = ['app' => $app, 'thread' => connect_msg_thread($openId)];
+            }
+            connect_pro_view('messages', [
+                'me' => $me,
+                'summaries' => connect_msg_summaries(connect_msg_professional_apps($pid), 'professional', $pid),
+                'open' => $open, 'openId' => $openId,
+            ]); exit;
+
         case 'pro/verify':   // #3 — get verified: submit identity / credential checks
             if (!function_exists('connect_verify_submit')) { http_response_code(404); connect_pro_view('dashboard', ['me' => $me, 'pct' => connect_pro_profile_pct($me)]); exit; }
             $msg = ''; $msgOk = true;

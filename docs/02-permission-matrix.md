@@ -120,3 +120,19 @@ reuses the coordinator/moderation level, like other back-office review desks:
   elevated **only** by a genuine VERIFIED decision (human moderator now, or a
   KYC/DigiLocker provider through the same seam later) — never by a deterministic
   format pre-screen alone. No object status or module gate is introduced.
+
+### In-app messaging (K15 / #4)
+
+Per-engagement two-way threads (`cx_messages`, keyed to a `cx_applications` row)
+add **no new named permission**:
+
+- **Staff desk** (`/connect-messages`): read/post on any marketplace thread —
+  `connect_msg_staff_can()` = `is_master()` or `is_coordinator_level()` (same as
+  the rest of the marketplace desk).
+- **Professional** (`/pro/messages`): read/post **only on their own engagements**
+  (`applicant_professional_id` = the logged-in `cxpid`), enforced by
+  `connect_msg_pro_owns()`; their own `/pro` portal session, not an `ORG_ROLES`
+  permission.
+- The engine is identity-agnostic (`staff | professional | client | vendor |
+  inspector`), so the client and vendor portals attach to the same threads later
+  under their own portal sessions. No object status or module gate is introduced.

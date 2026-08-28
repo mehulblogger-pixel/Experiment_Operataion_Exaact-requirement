@@ -3178,6 +3178,8 @@ function ops_dispatch($route, $method) {
             return ops_connect_qualifications($method);
         case $route === 'connect-verify':       // Connect K14 / #3 — verification & moderation desk
             return ops_connect_verify($method);
+        case $route === 'connect-messages':     // Connect K15 / #4 — in-app messaging (staff desk)
+            return ops_connect_messages($method);
         case $route === 'passport-share':      // Connect K1 — get/copy a professional's public passport link + QR
             return ops_connect_passport_share($method);
         case $route === 'connect-requirements': // Connect K2a — manpower marketplace board (post + list)

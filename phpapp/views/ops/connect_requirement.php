@@ -194,6 +194,10 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <div class="cxmeta"><?php if (($a['proposed_rate'] ?? 0)): ?>Proposed ₹<?= (int)$a['proposed_rate'] ?> · <?php endif; ?><?= e($a['cover_note']) ?></div>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <?php if (function_exists('connect_msg_staff_can') && connect_msg_staff_can()):
+          $mUnread = function_exists('connect_msg_thread_unread') ? connect_msg_thread_unread((int)$a['id'], 'staff', (int)(function_exists('current_user') ? (current_user()['id'] ?? 0) : 0)) : 0; ?>
+          <a class="btn secondary" href="/connect-messages?a=<?= (int)$a['id'] ?>">💬 Message<?php if ($mUnread > 0): ?> (<?= (int)$mUnread ?>)<?php endif; ?></a>
+        <?php endif; ?>
         <?php foreach ($next as $to=>$lbl): ?>
           <form method="post" action="/connect-requirement" class="inline">
             <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">

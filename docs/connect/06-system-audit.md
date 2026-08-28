@@ -178,6 +178,18 @@ open network needs. None of it fights the codebase; it's the natural next layer.
   differentiator competitors (job boards) don't have.
 
 ### GAP 4 — No in-app messaging / chat *(launch-blocking)*
+
+> **Progress (#4 ✅):** **two-way in-app messaging** is built.
+> `lib/connect_msg.php` adds `cx_messages` + `cx_message_reads` — a thread per
+> **engagement** (keyed to a `cx_applications` row). The **staff desk** chats at
+> `/connect-messages` (inbox + thread + reply; coordinator level, no new
+> permission) and each applicant row on a requirement has a 💬 Message link; the
+> **professional** has their own inbox at `/pro/messages`, scoped to their own
+> engagements. Per-reader unread cursors (never counting your own messages) drive
+> nav badges on both sides. The thread is retained as the hiring + dispute record
+> (blueprint M15). The engine is identity-agnostic (staff/professional/client/
+> vendor/inspector). 22 tests. **Remaining:** attach the client & vendor portal
+> surfaces to the same threads, and email/WhatsApp nudges (folds into #5).
 - **What's there:** one-way notification feeds (`portal_notifications`, `cvp_notify_*`),
   SMTP email, and a "conversation-before-forms" concierge (not user-to-user).
 - **Gap:** no **two-way messaging** between client ↔ professional ↔ agency, per
@@ -251,7 +263,7 @@ Ranked by "distance to a credible, trusted, lean launch of the ITSN".
 | **1** | **Unify the talent pool** (one person model; point match/trust/ratings/passport/vault at it) — _match + passport done ✅; cx_person/cross-pool-trust/vault remain_ | Structural | Without it the freelancer pool is a dead end; fixes the "recommender ignores freelancers" bug | M–L |
 | **2** | **Qualification & role taxonomy** (NSQF / ITI / diploma / degree / MBA / job families; inspection as a vertical) — **✅ master data + screen done; profile/matching wiring remains** | Structural | Unlocks the ITI→MBA mission | M |
 | **3** | **Freelancer verification + moderation queue** (tier ladder; admin CRUD; DigiLocker/PAN/GST checks) — **✅ engine + queue + deterministic checks + tier ladder + provider seam done; real KYC provider & doc upload remain** | Trust | "Verified" is the promise; quality control at scale | M–L |
-| **4** | **In-app messaging** (per-engagement threads) | Trust/UX | Stops the WhatsApp leak; dispute evidence | M |
+| **4** | **In-app messaging** (per-engagement threads) — **✅ engine + staff desk + professional portal done; client/vendor surfaces & nudges remain** | Trust/UX | Stops the WhatsApp leak; dispute evidence | M |
 | **5** | **WhatsApp + SMS channel** (behind the notification seam) | Reach | This audience lives on WhatsApp | M (blocked on template approval) |
 | **6** | **Marketplace matching/trust on the unified pool + optional AI ranking** | Intelligence | Recommend across the whole pool | M |
 | **7** | **Agency bench workspace** (agency adds/allocates its own people) | Supply | Agencies as fulfillers, not just applicants | M |

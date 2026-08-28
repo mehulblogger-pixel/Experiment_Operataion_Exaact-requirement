@@ -47,7 +47,7 @@ function ops_area_def($area) {
             // area, cleanly optional.
             $title = 'Marketplace'; $icon = '🧑‍🏭';
             $sub = 'Post technical-manpower requirements, match and shortlist professionals, and their public passports.';
-            $routes = ['connect-requirements','connect-requirement','connect-concierge','connect-talent','connect-orgs','passport-share','connect-taxonomy','connect-qualifications','connect-verify'];
+            $routes = ['connect-requirements','connect-requirement','connect-concierge','connect-talent','connect-orgs','passport-share','connect-taxonomy','connect-qualifications','connect-verify','connect-messages'];
             $on = $fx('connect_market_can') && connect_market_can();
             if ($on) {
                 $sec('');
@@ -61,6 +61,8 @@ function ops_area_def($area) {
                 $t(true, '🎓', 'Qualification taxonomy', '/connect-qualifications', 'ITI → diploma → engineer → MBA ladder, job families, roles and certifications.');
                 $t(true, '✅', 'Verification desk', '/connect-verify', 'Confirm identity & credential checks; move professionals up the trust ladder.',
                     $num(fn() => $fx('connect_verify_pending_count') ? connect_verify_pending_count() : 0), 'amber');
+                $t(true, '💬', 'Messages', '/connect-messages', 'Two-way chat with applicants, tied to each requirement.',
+                    $num(fn() => $fx('connect_msg_staff_unread') ? connect_msg_staff_unread() : 0));
                 $t(is_master(), '🏢', 'Organisations', '/connect-orgs', 'Register organisations and their module entitlements (TPIA / agency / company).',
                     $num(fn() => $fx('connect_org_pending_count') ? connect_org_pending_count() : 0), 'amber');
             }
