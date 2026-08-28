@@ -64,6 +64,10 @@ function connect_market_migrate() {
         proposed_rate REAL DEFAULT 0, status VARCHAR(16) DEFAULT 'APPLIED',
         created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '',
         updated_at VARCHAR(30) DEFAULT '')");
+    // K2b — an external applicant (an agency/vendor applying via its portal) is
+    // a party, not a pool inspector. Additive column so those applications
+    // dedupe correctly on the applying party.
+    if (function_exists('ensure_column')) ensure_column('cx_applications', 'applicant_party_id', 'INT DEFAULT 0');
 }
 
 /** Next requirement reference — CX-REQ-0001, monotonic on id. */
@@ -115,15 +119,19 @@ function cx_application_add($requirementId, array $in) {
     connect_market_migrate();
     $requirementId = (int)$requirementId;
     $inspectorId = (int)($in['inspector_id'] ?? 0);
+    $partyId = (int)($in['applicant_party_id'] ?? 0);
+    // One live application per applicant per requirement — keyed on the pool
+    // inspector, or (for an external agency/vendor) on the applying party.
     if ($inspectorId > 0) {
-        $dupe = (int)ops_val("SELECT COUNT(*) FROM cx_applications WHERE requirement_id=? AND inspector_id=?", [$requirementId, $inspectorId]);
-        if ($dupe > 0) return 0; // already applied
+        if ((int)ops_val("SELECT COUNT(*) FROM cx_applications WHERE requirement_id=? AND inspector_id=?", [$requirementId, $inspectorId]) > 0) return 0;
+    } elseif ($partyId > 0) {
+        if ((int)ops_val("SELECT COUNT(*) FROM cx_applications WHERE requirement_id=? AND applicant_party_id=?", [$requirementId, $partyId]) > 0) return 0;
     }
     $name = trim((string)($in['applicant_name'] ?? ''));
     if ($name === '' && $inspectorId > 0) $name = (string)ops_val("SELECT name FROM inspectors WHERE id=?", [$inspectorId]);
-    db()->prepare("INSERT INTO cx_applications (requirement_id,inspector_id,applicant_name,cover_note,proposed_rate,status,created_by,created_at,updated_at)
-                   VALUES (?,?,?,?,?, 'APPLIED', ?,?,?)")
-        ->execute([$requirementId, $inspectorId, $name, trim((string)($in['cover_note'] ?? '')),
+    db()->prepare("INSERT INTO cx_applications (requirement_id,inspector_id,applicant_party_id,applicant_name,cover_note,proposed_rate,status,created_by,created_at,updated_at)
+                   VALUES (?,?,?,?,?,?, 'APPLIED', ?,?,?)")
+        ->execute([$requirementId, $inspectorId, $partyId, $name, trim((string)($in['cover_note'] ?? '')),
                    (float)($in['proposed_rate'] ?? 0), function_exists('user_name') ? user_name(current_user()) : '', date('c'), date('c')]);
     return (int)db()->lastInsertId();
 }
@@ -163,6 +171,22 @@ function cx_applications_for($requirementId) {
 function cx_requirements_list($status = '') {
     if ($status !== '') return ops_all("SELECT * FROM cx_requirements WHERE status=? ORDER BY id DESC", [$status]) ?: [];
     return ops_all("SELECT * FROM cx_requirements ORDER BY id DESC") ?: [];
+}
+/** K2b — a poster party's own requirements (client portal / agency portal). */
+function cx_requirements_for_party($partyId) {
+    return ops_all("SELECT * FROM cx_requirements WHERE poster_party_id=? ORDER BY id DESC", [(int)$partyId]) ?: [];
+}
+/** K2b — the open board a supplier browses to apply. */
+function cx_open_requirements($limit = 200) {
+    return ops_all("SELECT * FROM cx_requirements WHERE status IN ('OPEN','SHORTLISTING') ORDER BY id DESC LIMIT " . max(1, (int)$limit)) ?: [];
+}
+/** K2b — has an applying party already applied to this requirement? */
+function cx_party_applied($requirementId, $partyId) {
+    return (int)ops_val("SELECT COUNT(*) FROM cx_applications WHERE requirement_id=? AND applicant_party_id=?", [(int)$requirementId, (int)$partyId]) > 0;
+}
+/** K2b — count of applications on a requirement (poster's list badge). */
+function cx_applications_count($requirementId) {
+    return (int)ops_val("SELECT COUNT(*) FROM cx_applications WHERE requirement_id=?", [(int)$requirementId]);
 }
 function cx_market_summary() {
     $c = function($w = '', $a = []) { try { return (int)ops_val("SELECT COUNT(*) FROM cx_requirements" . ($w ? " WHERE $w" : ''), $a); } catch (Throwable $e) { return 0; } };

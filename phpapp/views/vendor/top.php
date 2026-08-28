@@ -9,6 +9,7 @@ $links = ['vendor' => 'Overview'];
 if (vcan('reports')) $links['vendor/reports'] = 'Reports';
 if (vcan('issues') && function_exists('cvp_vendor_issue_links')) $links['vendor/issues'] = 'Nonconformities';
 if (vcan('qualification')) $links['vendor/qualification'] = 'Qualification';
+if (vcan('market.apply')) $links['vendor/opportunities'] = 'Open requirements';
 if (function_exists('cvp_notify_count')) {
     $__vn = cvp_notify_count('VENDOR', cvp_vendor_id());
     $links['vendor/alerts'] = 'Alerts' . ($__vn ? ' (' . $__vn . ')' : '');

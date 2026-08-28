@@ -118,7 +118,8 @@ function cvp_access_live_sql($col = 'access_expires') {
 // Minimal, extensible permission set. Blank perms = everything (so an existing
 // vendor account is never locked out by a new key). Slice 3 adds 'issues'.
 const VENDOR_PERMS = ['reports' => 'Their reports', 'issues' => 'Nonconformities raised to them',
-    'qualification' => 'Their own approval / qualification status'];
+    'qualification' => 'Their own approval / qualification status',
+    'market.apply' => 'Browse open manpower requirements and apply'];
 
 function cvp_vendor_enabled() { return setting_get('vendor_portal_enabled', '0') === '1'; }
 
@@ -509,6 +510,33 @@ function cvp_vendor_route($route, $method) {
                 'q' => cvp_vendor_qualification(),
                 'events' => cvp_vendor_qualification_events(),
             ]);
+            exit;
+
+        // Connect K2b — the supply side: an agency/vendor browses open manpower
+        // requirements and applies. Over the same cx_requirements engine; the
+        // applying party is the vendor (applicant_party_id), so it dedupes and a
+        // vendor only ever applies as itself.
+        case 'vendor/opportunities':
+            cvp_vendor_need('market.apply', 'the manpower marketplace');
+            if (!function_exists('cx_open_requirements')) { http_response_code(404); cvp_vendor_view('notfound'); exit; }
+            if ($method === 'POST' && (int)($_POST['requirement_id'] ?? 0) > 0) {
+                $rq = cx_requirement_get((int)$_POST['requirement_id']);
+                if ($rq && in_array(strtoupper((string)$rq['status']), ['OPEN', 'SHORTLISTING'], true)) {
+                    cx_application_add((int)$rq['id'], [
+                        'applicant_party_id' => cvp_vendor_id(),
+                        'applicant_name'     => cvp_vendor_name(),
+                        'proposed_rate'      => (float)($_POST['proposed_rate'] ?? 0),
+                        'cover_note'         => (string)($_POST['cover_note'] ?? ''),
+                    ]);
+                    cvp_vendor_log('MARKET_APPLY', (string)$rq['ref_code']);
+                }
+                redirect('/vendor/opportunities');
+            }
+            $vid = cvp_vendor_id();
+            $rows = cx_open_requirements();
+            $applied = [];
+            foreach ($rows as $r) if (cx_party_applied((int)$r['id'], $vid)) $applied[(int)$r['id']] = true;
+            cvp_vendor_view('opportunities', ['rows' => $rows, 'applied' => $applied]);
             exit;
 
         case 'vendor/assistant':

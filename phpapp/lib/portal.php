@@ -880,6 +880,48 @@ function portal_route($route, $method) {
             portal_view('request', ['rows' => portal_requests_mine(), 'err' => $err]);
             exit;
 
+        // Connect K2b — the client posts a technical-manpower requirement to the
+        // marketplace and manages who applies. External self-service over the same
+        // cx_requirements engine the staff desk uses; scoped to this client's own
+        // party (poster_party_id) so a client only ever sees its own postings.
+        case 'portal/hire':
+            portal_need('market.post', 'posting manpower requirements');
+            if (!function_exists('cx_requirement_create')) { http_response_code(404); portal_view('notfound'); exit; }
+            if ($method === 'POST' && trim((string)($_POST['title'] ?? '')) !== '') {
+                $in = $_POST; $in['poster_party_id'] = portal_partner_id(); $in['poster_name'] = portal_client_name();
+                cx_requirement_create($in, true); // posted straight to OPEN
+                $_SESSION['portal_flash'] = 'Your requirement is posted and open for applications.';
+                redirect('/portal/hire');
+            }
+            portal_view('hire', [
+                'rows'        => cx_requirements_for_party(portal_partner_id()),
+                'sectors'     => function_exists('connect_tx_rows') ? connect_tx_rows('cx_sectors') : [],
+                'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+            ]);
+            exit;
+
+        case 'portal/hire-req':
+            portal_need('market.post', 'posting manpower requirements');
+            if (!function_exists('cx_requirement_get')) { http_response_code(404); portal_view('notfound'); exit; }
+            $req = cx_requirement_get((int)($_GET['id'] ?? $_POST['id'] ?? 0));
+            if (!$req || (int)$req['poster_party_id'] !== (int)portal_partner_id()) { http_response_code(404); portal_view('notfound'); exit; }
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'req_transition') cx_requirement_transition((int)$req['id'], $_POST['to'] ?? '');
+                elseif ($act === 'app_transition') {
+                    $ap = cx_application_get((int)($_POST['application_id'] ?? 0));
+                    if ($ap && (int)$ap['requirement_id'] === (int)$req['id']) cx_application_transition((int)$ap['id'], $_POST['to'] ?? '');
+                } elseif ($act === 'award') {
+                    $ap = cx_application_get((int)($_POST['application_id'] ?? 0));
+                    if ($ap && (int)$ap['requirement_id'] === (int)$req['id']) cx_requirement_award((int)$req['id'], (int)$ap['id']);
+                }
+                $_SESSION['portal_flash'] = 'Updated.';
+                redirect('/portal/hire-req?id=' . (int)$req['id']);
+            }
+            portal_view('hire_req', ['req' => $req, 'apps' => cx_applications_for((int)$req['id']),
+                'req_next' => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? []]);
+            exit;
+
         // Phase 10 (CVP) Slice 3: the client sees nonconformities raised to them
         // (marked client-visible) and responds — the same engine loop the vendor
         // portal uses. cvp_issue*/cvp_issues_for are the shared, gated engine.
@@ -1134,6 +1176,7 @@ const PORTAL_PERMS = [
     'deputation'         => 'See deputed personnel, attendance and site reports',
     'deputation.approve' => 'Approve or return attendance / timesheet periods',
     'issues'             => 'See nonconformities raised to them and respond',
+    'market.post'        => 'Post technical-manpower requirements to the marketplace and manage applications',
 ];
 
 // A constant cannot call T(), so the labels that name a business noun are
