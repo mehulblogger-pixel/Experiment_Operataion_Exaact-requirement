@@ -3172,6 +3172,8 @@ function ops_dispatch($route, $method) {
             return ops_tasks($method);
         case $route === 'billable-events' || strncmp($route, 'billable-', 9) === 0:   // Revamp P4 — Billable Event ledger
             return ops_billable($route, $method);
+        case $route === 'connect-taxonomy':    // Connect K0 — marketplace industry taxonomy (read-only)
+            return ops_connect_taxonomy($method);
         case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board
             return ops_command_centre($method);
         case $route === 'entity-360':          // Phase 3 §49 — uniform 360 shell for any entity

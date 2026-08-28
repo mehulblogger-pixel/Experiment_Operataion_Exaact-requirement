@@ -400,6 +400,7 @@ function run_schema($withSeeds = true) {
     widen_file_columns();                                            // uploads need LONGTEXT, not MEDIUMTEXT
     if (function_exists('bills_migrate')) bills_migrate();             // chargeable expenses + their bills
     if (function_exists('billable_migrate')) billable_migrate();       // Revamp P4 — Billable Event ledger (operational→commercial bridge)
+    if (function_exists('connect_taxonomy_migrate')) { connect_taxonomy_migrate(); connect_taxonomy_seed(); }  // Connect K0 — marketplace industry taxonomy (idempotent, insert-if-empty)
     if (function_exists('books_migrate')) books_migrate();             // ensure the books ledger tables exist before anything stamps them
     if (function_exists('engagement_migrate')) engagement_migrate();   // Revamp — first-class Engagement entity (additive; dual-read with contract_number)
     if (function_exists('competence_migrate')) competence_migrate();   // required certificates gate allocation

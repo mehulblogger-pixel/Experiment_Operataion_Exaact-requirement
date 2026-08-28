@@ -234,6 +234,7 @@ try {
     require __DIR__ . '/lib/entity360.php';        // Phase 3 §49 — uniform Entity-360 shell
     require __DIR__ . '/lib/billable.php';          // Revamp P4 — the Billable Event ledger (operational→commercial bridge)
     require __DIR__ . '/lib/attendreview.php';     // Phase 3 §35 — attendance review (anomaly + send-back)
+    require __DIR__ . '/lib/connect_taxonomy.php'; // Connect K0 — manpower-marketplace industry taxonomy (additive masters)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
@@ -338,6 +339,7 @@ try {
     db()->query("SELECT verify_status FROM inspector_certs LIMIT 1");   // Slice P1 — Credential Vault
     db()->query("SELECT bill_ref FROM billable_events LIMIT 1");         // Revamp P4 — Billable Event ledger (+P4c bill_ref)
     db()->query("SELECT engagement_id FROM calls LIMIT 1");              // Revamp — Engagement entity (additive engagement_id)
+    db()->query("SELECT id FROM cx_sectors LIMIT 1");                    // Connect K0 — industry taxonomy masters (cx_*)
     db()->query("SELECT id FROM agencies LIMIT 1");
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM requisitions LIMIT 1");

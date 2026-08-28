@@ -130,7 +130,7 @@ new-role slices are deliberately later, behind their §5 sign-offs.
 
 | # | Slice | Verb | Gated by |
 |---|---|---|---|
-| **K0** | Import the adopted taxonomy (`taxonomy.json`: 27 sectors / 11 equipment groups / 18 materials / 22 disciplines / 17 stages / 13 standards / 24 certs + versioning) as admin-extensible seed tables | CONFIGURE/EXTEND | — |
+| **K0** ✅ | Import the adopted taxonomy (`taxonomy.json`: 27 sectors / 11 equipment groups / 18 materials / 22 disciplines / 17 stages / 13 standards / 24 certs + versioning) as admin-extensible seed tables. **Delivered:** additive `cx_*` masters, idempotent insert-if-empty seed, read-only screen at `/connect-taxonomy`, `lib/connect_taxonomy.php` + `data/connect_taxonomy.json`; 15 tests. Existing files: +5 lines, 0 deletions. | CONFIGURE/EXTEND | — |
 | **K1** | Digital Passport — public, shareable, QR-verifiable credential page over the P1 vault | EXTEND | — |
 | **K2** | Requirement posting + application (the marketplace core) over `recruit.php` requisitions | EXTEND/BUILD | 5a, 5b |
 | **K3** | Matching & recommendation cards (Best Match / Value / Nearest) over suggestion + competence | EXTEND | K0 |
