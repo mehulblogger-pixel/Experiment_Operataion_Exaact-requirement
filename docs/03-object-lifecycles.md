@@ -347,3 +347,21 @@ A professional's application to a requirement (`CX_APP_TRANSITIONS`). Additive
   unchanged. External self-service (client-portal post, vendor/inspector-portal
   apply) is **K2b**, where the new portal permissions will be added to the matrix
   with the owner's sign-off.
+
+## Connect Dispute (`cx_disputes.status`) — marketplace (K9b)
+
+A concern raised on a marketplace engagement (`lib/connect_disputes.php`,
+`CX_DISPUTE_TRANSITIONS`). Additive `cx_disputes` table; no existing object touched.
+
+> **OPEN → UNDER_REVIEW → RESOLVED**, plus **WITHDRAWN** as an off-ramp.
+
+- `OPEN → UNDER_REVIEW | RESOLVED | WITHDRAWN`
+- `UNDER_REVIEW → RESOLVED | WITHDRAWN`
+- Terminal: `RESOLVED` (records a resolution note + who/when), `WITHDRAWN`.
+  Enforced by `cx_dispute_can_transition()`.
+
+Categories: `PROCESS`, `COMMERCIAL`, `CONDUCT`, `FINDING`. **The M14 rule is
+encoded:** a `FINDING` dispute (about whether the material passed or was rejected)
+has `affects_fee = 0` — it is settled by review and **never** by withholding the
+professional's fee (`cx_dispute_affects_fee()`). Staff gate reuses
+coordinator/master (`connect_market_can`) — **no new permission**.

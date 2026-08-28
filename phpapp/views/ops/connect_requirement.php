@@ -2,7 +2,7 @@
 // Connect K2a — one requirement: its details, its applications, and every legal
 // lifecycle action. Staff desk (K2a); external self-service apply is K2b.
 $req = $req ?? []; $apps = $apps ?? []; $inspectors = $inspectors ?? []; $req_next = $req_next ?? []; $matches = $matches ?? [];
-$can_rate = $can_rate ?? false; $ratings = $ratings ?? [];
+$can_rate = $can_rate ?? false; $ratings = $ratings ?? []; $disputes = $disputes ?? [];
 $ratedDir = [];
 foreach ($ratings as $rr) $ratedDir[strtoupper((string)$rr['direction'])] = $rr;
 $pill = function ($s) {
@@ -183,3 +183,51 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   <?php endforeach; ?>
 </div>
 <?php endif; ?>
+
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 6px">Concerns &amp; disputes<?= $disputes ? ' ('.count($disputes).')' : '' ?></h3>
+  <?php $dpill = ['OPEN'=>'warn','UNDER_REVIEW'=>'info','RESOLVED'=>'ok','WITHDRAWN'=>'muted'];
+    $dnext = ['OPEN'=>['UNDER_REVIEW'=>'Start review','RESOLVED'=>'Resolve','WITHDRAWN'=>'Withdraw'],
+              'UNDER_REVIEW'=>['RESOLVED'=>'Resolve','WITHDRAWN'=>'Withdraw']];
+  ?>
+  <?php foreach ($disputes as $d): $st = strtoupper((string)$d['status']); ?>
+    <div style="border:1px solid var(--line,#eee);border-radius:12px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div><strong><?= e($d['subject']) ?></strong>
+          <span class="cxpill <?= $dpill[$st] ?? 'muted' ?>"><?= e(ucfirst(strtolower(str_replace('_',' ',$st)))) ?></span>
+          <span class="cxpill muted"><?= e(ucfirst(strtolower($d['category']))) ?></span>
+          <?php if (!(int)$d['affects_fee']): ?><span class="cxpill ok">Fee protected</span><?php endif; ?>
+          <div class="cxmeta"><?= e($d['ref_code']) ?> · raised by <?= e(strtolower($d['raised_by_side'])==='pro'?'the professional':'the client') ?><?php if (!empty($d['detail'])): ?> — <?= e($d['detail']) ?><?php endif; ?></div>
+          <?php if (!empty($d['resolution'])): ?><div class="cxmeta" style="margin-top:4px"><strong>Resolution:</strong> <?= e($d['resolution']) ?></div><?php endif; ?>
+        </div>
+      </div>
+      <?php $opts = $dnext[$st] ?? []; if ($opts): ?>
+      <form method="post" action="/connect-requirement" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
+        <input type="hidden" name="dispute_id" value="<?= (int)$d['id'] ?>">
+        <input type="hidden" name="action" value="dispute_transition">
+        <input type="text" name="resolution" placeholder="Resolution note (for Resolve)" style="flex:1;min-width:180px;padding:8px;border:1px solid var(--line,#dde3e2);border-radius:9px">
+        <?php foreach ($opts as $to=>$lbl): ?>
+          <button class="btn secondary" type="submit" name="to" value="<?= e($to) ?>"><?= e($lbl) ?></button>
+        <?php endforeach; ?>
+      </form>
+      <?php endif; ?>
+    </div>
+  <?php endforeach; ?>
+
+  <details style="margin-top:6px"><summary style="cursor:pointer;font-weight:600">Raise a concern</summary>
+    <form method="post" action="/connect-requirement" style="margin-top:8px">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
+      <input type="hidden" name="action" value="dispute_raise">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select name="raised_by_side" style="padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px"><option value="CLIENT">From the client</option><option value="PRO">From the professional</option></select>
+        <select name="category" style="padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px">
+          <option value="PROCESS">Process</option><option value="COMMERCIAL">Commercial</option><option value="CONDUCT">Conduct</option><option value="FINDING">Finding (fee protected)</option>
+        </select>
+      </div>
+      <input type="text" name="subject" placeholder="Subject" style="width:100%;padding:10px;border:1px solid var(--line,#dde3e2);border-radius:10px;margin-top:8px">
+      <textarea name="detail" rows="2" placeholder="What happened?" style="width:100%;padding:10px;border:1px solid var(--line,#dde3e2);border-radius:10px;margin-top:8px"></textarea>
+      <button class="btn secondary" type="submit" style="margin-top:8px">Raise concern</button>
+    </form>
+  </details>
+</div>

@@ -404,6 +404,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('connect_passport_migrate')) connect_passport_migrate();  // Connect K1 — inspectors.passport_token (public passport share key)
     if (function_exists('connect_market_migrate')) connect_market_migrate();      // Connect K2a — cx_requirements + cx_applications (marketplace)
     if (function_exists('connect_ratings_migrate')) connect_ratings_migrate();    // Connect K9 — cx_ratings (two-way marketplace ratings)
+    if (function_exists('connect_disputes_migrate')) connect_disputes_migrate();  // Connect K9b — cx_disputes (marketplace disputes)
     if (function_exists('books_migrate')) books_migrate();             // ensure the books ledger tables exist before anything stamps them
     if (function_exists('engagement_migrate')) engagement_migrate();   // Revamp — first-class Engagement entity (additive; dual-read with contract_number)
     if (function_exists('competence_migrate')) competence_migrate();   // required certificates gate allocation

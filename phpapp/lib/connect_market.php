@@ -248,6 +248,14 @@ function ops_connect_requirement($method) {
         } elseif ($act === 'rate' && function_exists('cx_rating_add')) {   // K9 — two-way rating
             $newId = cx_rating_add($id, (string)($_POST['direction'] ?? ''), $_POST);
             flash($newId ? 'Rating recorded.' : 'That rating could not be saved (already rated, or the engagement is not complete).', $newId ? 'success' : 'error');
+        } elseif ($act === 'dispute_raise' && function_exists('cx_dispute_raise')) {   // K9b — raise a concern
+            $newId = cx_dispute_raise($id, $_POST);
+            flash($newId ? 'Concern raised.' : 'Give the concern a subject first.', $newId ? 'success' : 'error');
+        } elseif ($act === 'dispute_transition' && function_exists('cx_dispute_transition')) {
+            $dp = cx_dispute_get((int)($_POST['dispute_id'] ?? 0));
+            if ($dp && (int)$dp['requirement_id'] === (int)$id)
+                cx_dispute_transition((int)$dp['id'], $_POST['to'] ?? '', (string)($_POST['resolution'] ?? ''))
+                    ? flash('Concern updated.') : flash('That change is not allowed from the current status.', 'error');
         }
         redirect('/connect-requirement?id=' . $id);
     }
@@ -264,6 +272,8 @@ function ops_connect_requirement($method) {
         // K9 — two-way ratings once the engagement is awarded/closed.
         'can_rate'     => function_exists('cx_rating_allowed') && cx_rating_allowed($req),
         'ratings'      => function_exists('cx_ratings_for_requirement') ? cx_ratings_for_requirement($id) : [],
+        // K9b — disputes raised on this engagement.
+        'disputes'     => function_exists('cx_disputes_for_requirement') ? cx_disputes_for_requirement($id) : [],
     ]);
     return true;
 }
