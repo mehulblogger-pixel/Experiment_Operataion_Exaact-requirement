@@ -67,6 +67,13 @@ inside a shared app, and **no shared pool across organisations**.
 
 ### Phase A — additive, no architectural change (on-mission, buildable now)
 Delivers "freelancers build rich profiles; the pool is discoverable by agencies/TPIAs."
+
+> **Progress:** **A1 ✅ delivered** — the self-registered freelancer pool
+> (`cx_professionals`, a *distinct* entity from the org's `inspectors` staff) with
+> its own **fourth-audience portal** at `/pro` (register, sign in, M4 profile:
+> disciplines, work types, locations/pan-India/overseas, availability, rate bands,
+> languages) + a passport token. 13 tests, incl. proof a professional is never
+> written into an org's staff roster. **A2 (browse jobs + apply)** next.
 - **A1 — Freelancer preference profile (M4).** Additive columns on the pool
   (work types: per-visit / day-rate / man-day / long deployment / shutdown;
   base + preferred locations; pan-India / overseas willingness; travel radius;

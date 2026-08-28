@@ -244,6 +244,7 @@ try {
     require __DIR__ . '/lib/connect_disputes.php'; // Connect K9b — disputes & mediation on a marketplace engagement
     require __DIR__ . '/lib/connect_govern.php';   // Connect K10 — commercial terms + site-readiness (Part-F F1/F3)
     require __DIR__ . '/lib/connect_advisor.php';  // Connect K12 — Operations Advisor (readiness + delay-risk verdict, read-only)
+    require __DIR__ . '/lib/connect_pro.php';      // Connect A1/A2 — freelancer self-service pool (shared, self-registered)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
@@ -354,6 +355,7 @@ try {
     db()->query("SELECT id FROM cx_ratings LIMIT 1");                    // Connect K9 — two-way marketplace ratings
     db()->query("SELECT id FROM cx_disputes LIMIT 1");                   // Connect K9b — marketplace disputes
     db()->query("SELECT id FROM cx_readiness LIMIT 1");                  // Connect K10 — site-readiness checklist
+    db()->query("SELECT id FROM cx_professionals LIMIT 1");              // Connect A1 — self-registered freelancer pool
     db()->query("SELECT id FROM agencies LIMIT 1");
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM requisitions LIMIT 1");
@@ -820,6 +822,16 @@ if ($route === 'portal' || strncmp($route, 'portal/', 7) === 0) {
 // never be pushed towards one. cvp_vendor_route() always exits.
 if (function_exists('cvp_vendor_route') && ($route === 'vendor' || strncmp($route, 'vendor/', 7) === 0)) {
     cvp_vendor_route($route, $method);
+    exit;
+}
+
+// The freelancer portal — a FOURTH audience: an individual technical
+// professional who listed THEMSELVES on the shared pool. Its own table
+// (cx_professionals), its own session key (cxpid) and its own /pro addresses.
+// Dispatched here, in front of require_login(), because a freelancer has no
+// staff account. connect_pro_route() always exits.
+if (function_exists('connect_pro_route') && ($route === 'pro' || strncmp($route, 'pro/', 4) === 0)) {
+    connect_pro_route($route, $method);
     exit;
 }
 
