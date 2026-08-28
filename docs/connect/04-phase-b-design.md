@@ -138,6 +138,12 @@ Phase B can land in additive stages, each shippable and safe:
   > review). Next: **B1 onboarding**, then **B2** when true isolation is required.
 - **B1 — Onboarding per org type.** Self-service sign-up that provisions the account
   with its package (reusing `product_package_apply`).
+  > **B1 ✅ delivered** — a public onboarding page at **`/join`** (dispatched
+  > pre-login) where an organisation applies (name, type — with a live preview of
+  > the modules it will get — and contact), landing **PENDING**; a platform admin
+  > approves it to **ACTIVE** on `/connect-orgs` (pending badge on the tile).
+  > `connect_org_apply` / `connect_org_approve`; 11 tests. Still representation +
+  > an approval queue — no live gate change (B2).
 - **B2 — Marketplace store separation (only if/when true per-tenant isolation is
   required).** Move the `cx_*` layer to a shared store and point each workspace at it
   (Option 2). This is the infra step; do it when multi-deployment isolation is actually

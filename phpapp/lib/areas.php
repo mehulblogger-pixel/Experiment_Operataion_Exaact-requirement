@@ -58,7 +58,8 @@ function ops_area_def($area) {
                     $num(fn() => $fx('connect_pro_pool_count') ? connect_pro_pool_count() : 0));
                 $t(true, '🪪', 'Passports', '/passport-share', 'A professional\'s public, verifiable credential page.');
                 $t(true, '🏭', 'Industry taxonomy', '/connect-taxonomy', 'Sectors, equipment, materials, disciplines, standards, certifications.');
-                $t(is_master(), '🏢', 'Organisations', '/connect-orgs', 'Register organisations and their module entitlements (TPIA / agency / company).');
+                $t(is_master(), '🏢', 'Organisations', '/connect-orgs', 'Register organisations and their module entitlements (TPIA / agency / company).',
+                    $num(fn() => $fx('connect_org_pending_count') ? connect_org_pending_count() : 0), 'amber');
             }
             break;
         case 'sales':

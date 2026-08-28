@@ -840,6 +840,14 @@ if (function_exists('connect_pro_route') && ($route === 'pro' || strncmp($route,
     exit;
 }
 
+// Connect B1 — public organisation onboarding. An organisation applies for
+// itself and lands as PENDING for a platform admin to approve. Public, in front
+// of require_login(). connect_org_join_route() always exits.
+if ($route === 'join' && function_exists('connect_org_join_route')) {
+    connect_org_join_route($method);
+    exit;
+}
+
 // A signed handoff from a sibling MGH application (Books, BlogPro, Ads Pro).
 // It sits HERE, in front of require_login(), because its whole job is to satisfy
 // that gate — and behind the portal dispatch, because a client is not a staff

@@ -59,6 +59,59 @@ function connect_org_migrate() {
         package_key VARCHAR(20) DEFAULT '', party_id INT DEFAULT 0,
         status VARCHAR(16) DEFAULT 'ACTIVE', notes VARCHAR(300) DEFAULT '',
         created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // B1 — self-service onboarding captures the applying contact. Additive.
+    if (function_exists('ensure_column')) {
+        ensure_column('cx_organisations', 'contact_name',  "VARCHAR(150) DEFAULT ''");
+        ensure_column('cx_organisations', 'contact_email', "VARCHAR(200) DEFAULT ''");
+        ensure_column('cx_organisations', 'contact_mobile', "VARCHAR(40) DEFAULT ''");
+        ensure_column('cx_organisations', 'approved_by',   "VARCHAR(150) DEFAULT ''");
+        ensure_column('cx_organisations', 'approved_at',   "VARCHAR(30) DEFAULT ''");
+    }
+}
+
+/**
+ * B1 — an organisation applies for itself (public onboarding). Lands as PENDING
+ * for a platform admin to approve. Returns the id, or 0 on bad input.
+ */
+function connect_org_apply(array $in) {
+    connect_org_migrate();
+    $name = trim((string)($in['name'] ?? '')); $orgType = strtoupper((string)($in['org_type'] ?? ''));
+    $email = strtolower(trim((string)($in['contact_email'] ?? '')));
+    if ($name === '' || !isset(connect_org_types()[$orgType])) return 0;
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return 0;
+    $pkg = connect_org_types()[$orgType]['package'];
+    db()->prepare("INSERT INTO cx_organisations (name,org_type,package_key,status,contact_name,contact_email,contact_mobile,created_at)
+                   VALUES (?,?,?, 'PENDING', ?,?,?,?)")
+        ->execute([$name, $orgType, $pkg, trim((string)($in['contact_name'] ?? '')), $email, trim((string)($in['contact_mobile'] ?? '')), date('c')]);
+    return (int)db()->lastInsertId();
+}
+
+/** A platform admin approves a pending organisation → ACTIVE. */
+function connect_org_approve($id) {
+    connect_org_migrate();
+    db()->prepare("UPDATE cx_organisations SET status='ACTIVE', approved_by=?, approved_at=? WHERE id=? AND status='PENDING'")
+        ->execute([function_exists('user_name') ? user_name(current_user()) : '', date('c'), (int)$id]);
+    return true;
+}
+
+function connect_org_pending_count() {
+    connect_org_migrate();
+    try { return (int)ops_val("SELECT COUNT(*) FROM cx_organisations WHERE status='PENDING'"); } catch (Throwable $e) { return 0; }
+}
+
+/** The public onboarding page (dispatched before require_login). Always exits. */
+function connect_org_join_route($method) {
+    if (function_exists('connect_enabled') && !connect_enabled()) { http_response_code(404); echo 'Not available.'; exit; }
+    connect_org_migrate();
+    $done = false; $err = '';
+    if ($method === 'POST') {
+        $id = connect_org_apply($_POST);
+        if ($id > 0) $done = true; else $err = 'Please give your organisation a name, a type, and a valid e-mail.';
+    }
+    $GLOBALS['__join_done'] = $done; $GLOBALS['__join_err'] = $err;
+    $GLOBALS['__join_types'] = connect_org_types();
+    require __DIR__ . '/../views/ops/connect_join.php';
+    exit;
 }
 
 /** Register an organisation. Returns its id, or 0 on bad input. */
@@ -105,6 +158,8 @@ function ops_connect_orgs($method) {
                 ? flash('Organisation registered.') : flash('Give the organisation a name and a type.', 'error');
         } elseif ($act === 'set_type') {
             connect_org_set_type((int)($_POST['id'] ?? 0), (string)($_POST['org_type'] ?? '')) ? flash('Organisation updated.') : flash('Unknown type.', 'error');
+        } elseif ($act === 'approve') {
+            connect_org_approve((int)($_POST['id'] ?? 0)); flash('Organisation approved.');
         }
         redirect('/connect-orgs');
     }
