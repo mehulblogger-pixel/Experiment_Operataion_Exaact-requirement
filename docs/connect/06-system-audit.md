@@ -92,6 +92,22 @@ open network needs. None of it fights the codebase; it's the natural next layer.
 > freelancers" bug. **Remaining:** a single `cx_person` identity + cross-pool
 > ratings/Trust Score + an entity-agnostic credential vault (follow-on slices).
 
+> **Progress (#2 ✅):** the **qualification & role taxonomy** is built — the
+> ITI→MBA answer to the mission. `lib/connect_qualtax.php` seeds five additive
+> `cx_*` master tables from `data/connect_qualifications.json`: an **NSQF-anchored
+> qualification ladder** (20 levels: school → ITI/apprentice → vocational →
+> diploma → degree → PG/MBA → doctorate → professional), **20 job families** with
+> **52 roles** nested under them (each with its minimum entry band, blue-collar to
+> manager), **28 ITI trades** and **30 professional certifications** (welding, NDT,
+> API, PMP, Six Sigma, NEBOSH, ISO LA, …). **Inspection is now just one vertical**
+> (family `INSP`), not the whole ontology. A read-only Zero-Training screen at
+> `/connect-qualifications`, and six additive, optional columns on
+> `cx_professionals` (`job_family_code`, `role_code`, `qual_level_code`,
+> `iti_trade_code`, `cert_codes`, `years_experience`) so a person can state where
+> they sit on the ladder. 33 tests; idempotent seed; no new permission or status.
+> **Remaining:** wire the columns into the `/pro` register/edit form and the
+> requirement builder, and let matching use family/role/level (follow-on slices).
+
 ### GAP 1 — Two disconnected talent pools *(structural; highest priority)*
 - **What's there:** `inspectors` (internal, fully instrumented — competence, eligibility,
   vault, rating, passport, trust, matching) **and** `cx_professionals` (public freelancer
@@ -211,8 +227,8 @@ Ranked by "distance to a credible, trusted, lean launch of the ITSN".
 
 | # | Item | Type | Why now | Effort |
 |---|---|---|---|---|
-| **1** | **Unify the talent pool** (one person model; point match/trust/ratings/passport/vault at it) | Structural | Without it the freelancer pool is a dead end; fixes the "recommender ignores freelancers" bug | M–L |
-| **2** | **Qualification & role taxonomy** (NSQF / ITI / diploma / degree / MBA / job families; inspection as a vertical) | Structural | Unlocks the ITI→MBA mission | M |
+| **1** | **Unify the talent pool** (one person model; point match/trust/ratings/passport/vault at it) — _match + passport done ✅; cx_person/cross-pool-trust/vault remain_ | Structural | Without it the freelancer pool is a dead end; fixes the "recommender ignores freelancers" bug | M–L |
+| **2** | **Qualification & role taxonomy** (NSQF / ITI / diploma / degree / MBA / job families; inspection as a vertical) — **✅ master data + screen done; profile/matching wiring remains** | Structural | Unlocks the ITI→MBA mission | M |
 | **3** | **Freelancer verification + moderation queue** (tier ladder; admin CRUD; DigiLocker/PAN/GST checks) | Trust | "Verified" is the promise; quality control at scale | M–L |
 | **4** | **In-app messaging** (per-engagement threads) | Trust/UX | Stops the WhatsApp leak; dispute evidence | M |
 | **5** | **WhatsApp + SMS channel** (behind the notification seam) | Reach | This audience lives on WhatsApp | M (blocked on template approval) |

@@ -401,12 +401,14 @@ function run_schema($withSeeds = true) {
     if (function_exists('bills_migrate')) bills_migrate();             // chargeable expenses + their bills
     if (function_exists('billable_migrate')) billable_migrate();       // Revamp P4 — Billable Event ledger (operational→commercial bridge)
     if (function_exists('connect_taxonomy_migrate')) { connect_taxonomy_migrate(); connect_taxonomy_seed(); }  // Connect K0 — marketplace industry taxonomy (idempotent, insert-if-empty)
+    if (function_exists('connect_qualtax_migrate')) { connect_qualtax_migrate(); connect_qualtax_seed(); }     // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA ladder; idempotent, insert-if-empty)
     if (function_exists('connect_passport_migrate')) connect_passport_migrate();  // Connect K1 — inspectors.passport_token (public passport share key)
     if (function_exists('connect_market_migrate')) connect_market_migrate();      // Connect K2a — cx_requirements + cx_applications (marketplace)
     if (function_exists('connect_ratings_migrate')) connect_ratings_migrate();    // Connect K9 — cx_ratings (two-way marketplace ratings)
     if (function_exists('connect_disputes_migrate')) connect_disputes_migrate();  // Connect K9b — cx_disputes (marketplace disputes)
     if (function_exists('connect_govern_migrate')) connect_govern_migrate();      // Connect K10 — cx_terms + cx_readiness (Part-F F1/F3)
     if (function_exists('connect_pro_migrate')) connect_pro_migrate();            // Connect A1 — cx_professionals (self-registered freelancer pool)
+    if (function_exists('connect_qualtax_augment_professional')) connect_qualtax_augment_professional();  // #2 — add ITI→MBA profile columns once cx_professionals exists
     if (function_exists('connect_crew_migrate')) connect_crew_migrate();          // Connect M10 — cx_positions (crew manifest)
     if (function_exists('connect_org_migrate')) connect_org_migrate();            // Connect B0 — cx_organisations (org accounts + entitlements)
     if (function_exists('books_migrate')) books_migrate();             // ensure the books ledger tables exist before anything stamps them

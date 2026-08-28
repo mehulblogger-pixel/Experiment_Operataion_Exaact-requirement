@@ -3174,6 +3174,8 @@ function ops_dispatch($route, $method) {
             return ops_billable($route, $method);
         case $route === 'connect-taxonomy':    // Connect K0 — marketplace industry taxonomy (read-only)
             return ops_connect_taxonomy($method);
+        case $route === 'connect-qualifications': // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA, read-only)
+            return ops_connect_qualifications($method);
         case $route === 'passport-share':      // Connect K1 — get/copy a professional's public passport link + QR
             return ops_connect_passport_share($method);
         case $route === 'connect-requirements': // Connect K2a — manpower marketplace board (post + list)

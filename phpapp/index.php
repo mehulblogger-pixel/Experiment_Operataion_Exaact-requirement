@@ -235,6 +235,7 @@ try {
     require __DIR__ . '/lib/billable.php';          // Revamp P4 — the Billable Event ledger (operational→commercial bridge)
     require __DIR__ . '/lib/attendreview.php';     // Phase 3 §35 — attendance review (anomaly + send-back)
     require __DIR__ . '/lib/connect_taxonomy.php'; // Connect K0 — manpower-marketplace industry taxonomy (additive masters)
+    require __DIR__ . '/lib/connect_qualtax.php';  // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA ladder, additive masters)
     require __DIR__ . '/lib/connect_passport.php'; // Connect K1 — public professional passport (over the P1 credential vault)
     require __DIR__ . '/lib/connect_market.php';   // Connect K2a — manpower marketplace (post a requirement / apply)
     require __DIR__ . '/lib/connect_match.php';    // Connect K3 — matching & recommendation cards (read-only over eligibility + rating)
