@@ -104,9 +104,15 @@ open network needs. None of it fights the codebase; it's the natural next layer.
 > `/connect-qualifications`, and six additive, optional columns on
 > `cx_professionals` (`job_family_code`, `role_code`, `qual_level_code`,
 > `iti_trade_code`, `cert_codes`, `years_experience`) so a person can state where
-> they sit on the ladder. 33 tests; idempotent seed; no new permission or status.
-> **Remaining:** wire the columns into the `/pro` register/edit form and the
-> requirement builder, and let matching use family/role/level (follow-on slices).
+> they sit on the ladder. Idempotent seed; no new permission or status.
+> **Fully configurable — nothing hard-coded:** every family, role, level, ITI
+> trade and certification is runtime data with an admin **Configure** editor
+> (add / edit / switch on–off / delete), gated exactly like Lookups
+> (`is_admin_level()` to manage; `is_master()` to hard-delete a built-in row).
+> Seeded rows are marked `is_system=1`; switching one off hides it from the
+> marketplace without breaking references. 50 tests. **Remaining:** wire the
+> columns into the `/pro` register/edit form and the requirement builder, and let
+> matching use family/role/level (follow-on slices).
 
 ### GAP 1 — Two disconnected talent pools *(structural; highest priority)*
 - **What's there:** `inspectors` (internal, fully instrumented — competence, eligibility,

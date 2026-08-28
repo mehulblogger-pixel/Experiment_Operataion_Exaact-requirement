@@ -69,3 +69,62 @@ foreach (['job_family_code', 'role_code', 'qual_level_code', 'iti_trade_code', '
 $opt = connect_qualtax_options();
 t_ok(!empty($opt['families']) && !empty($opt['roles']) && !empty($opt['levels'])
      && !empty($opt['iti_trades']) && !empty($opt['certs']), 'options helper returns all five layers');
+
+// --- Configurability: the taxonomy is runtime data, not hard-coded -----------
+$own = !db()->inTransaction();
+if ($own) db()->beginTransaction();
+try {
+    // Seeded rows are marked built-in (is_system=1), so only Super Admin deletes them.
+    $sys = (int)db()->query("SELECT is_system FROM cx_job_families WHERE code='INSP'")->fetchColumn();
+    t_eq(1, $sys, 'a seeded job family is marked built-in (is_system=1)');
+
+    // Add a brand-new family (admin-created → is_system=0, freely deletable).
+    [$ok, $msg] = connect_qualtax_save('family', 0, ['code' => 'robotics', 'name' => 'Robotics & Automation', 'detail' => 'Industrial robots', 'nsqf_min' => 5, 'nsqf_max' => 8]);
+    t_ok($ok, 'an admin can add a new job family');
+    $newId = (int)db()->query("SELECT id FROM cx_job_families WHERE code='ROBOTICS'")->fetchColumn();
+    t_ok($newId > 0, 'the new family is stored with a normalised UPPER_SNAKE code');
+    t_eq(0, (int)db()->query("SELECT is_system FROM cx_job_families WHERE id=$newId")->fetchColumn(), 'an admin-added family is not built-in');
+
+    // Duplicate code is rejected.
+    [$dup] = connect_qualtax_save('family', 0, ['code' => 'ROBOTICS', 'name' => 'Dupe']);
+    t_ok(!$dup, 'a duplicate code is rejected');
+
+    // Missing required field is rejected.
+    [$bad, $badmsg] = connect_qualtax_save('family', 0, ['code' => '', 'name' => '']);
+    t_ok(!$bad, 'a missing required field is rejected');
+
+    // Edit the new family.
+    [$eok] = connect_qualtax_save('family', $newId, ['code' => 'ROBOTICS', 'name' => 'Robotics, Automation & Mechatronics', 'detail' => '', 'nsqf_min' => 5, 'nsqf_max' => 8]);
+    t_ok($eok, 'an admin can edit a family');
+    t_eq('Robotics, Automation & Mechatronics', (string)db()->query("SELECT name FROM cx_job_families WHERE id=$newId")->fetchColumn(), 'the edit persisted');
+
+    // Add a role under the new family; unknown family is rejected.
+    [$rok] = connect_qualtax_save('role', 0, ['code' => 'robo_tech', 'family_code' => 'ROBOTICS', 'name' => 'Robotics Technician', 'min_qual_band' => 'ITI']);
+    t_ok($rok, 'an admin can add a role under a family');
+    [$rbad] = connect_qualtax_save('role', 0, ['code' => 'ghost', 'family_code' => 'NOPE', 'name' => 'Ghost']);
+    t_ok(!$rbad, 'a role pointing at a non-existent family is rejected');
+
+    // Switch off (soft) — drops from the live options but stays in the table.
+    $beforeActive = count(connect_qtx_rows('cx_job_families'));
+    [$tok, $tmsg] = connect_qualtax_toggle('family', $newId);
+    t_ok($tok, 'an admin can switch a family off');
+    t_eq(0, (int)db()->query("SELECT is_active FROM cx_job_families WHERE id=$newId")->fetchColumn(), 'the family is now inactive');
+    $afterActive = count(connect_qtx_rows('cx_job_families'));
+    t_eq($beforeActive - 1, $afterActive, 'a switched-off family drops from the live (active-only) list');
+    t_ok(count(connect_qtx_rows('cx_job_families', 'sort_order, id', false)) > $afterActive, 'but it is still present for the admin editor (all rows)');
+
+    // A family with roles is switched off rather than deleted (no orphans).
+    connect_qualtax_toggle('family', $newId); // back on
+    [$dok, $dmsg] = connect_qualtax_delete('family', $newId);
+    t_ok($dok && stripos($dmsg, 'switched off') !== false, 'deleting a family that still has roles switches it off instead');
+
+    // Remove the role, then the family truly deletes (it is admin-created, not built-in).
+    $roleId = (int)db()->query("SELECT id FROM cx_roles WHERE code='ROBO_TECH'")->fetchColumn();
+    connect_qualtax_delete('role', $roleId);
+    connect_qualtax_toggle('family', $newId); // ensure active again
+    [$d2] = connect_qualtax_delete('family', $newId);
+    t_ok($d2, 'an admin-created family with no roles can be deleted');
+    t_eq(0, (int)db()->query("SELECT COUNT(*) FROM cx_job_families WHERE id=$newId")->fetchColumn(), 'the family is gone');
+} finally {
+    if ($own && db()->inTransaction()) db()->rollBack();
+}

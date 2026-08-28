@@ -86,3 +86,20 @@ permissions, in the portals' own permission systems — separate from `ORG_ROLES
 Neither touches `ORG_ROLES` or any staff permission; the staff desk lifecycle
 (K2a) and these external capabilities operate on the same additive
 `cx_requirements` / `cx_applications` tables.
+
+### Qualification & role taxonomy — configuration (K13 / #2)
+
+The ITI→MBA qualification taxonomy (`/connect-qualifications`) adds **no new
+permission** — it reuses the **Lookups** gate (row 12) exactly:
+
+- **View** (read-only, at a glance): `connect_qualtax_can()` — master, admin-level
+  or coordinator-level (same readers as the K0 industry taxonomy).
+- **Configure** (add / edit / switch on–off every job family, role, qualification
+  level, ITI trade, certification): `connect_qualtax_manage_can()` = `is_admin_level()`
+  — the same door as Lookups & custom fields. The masters are runtime data, not
+  hard-coded; a seeded row is marked **built-in** (`is_system=1`) and can be edited
+  or switched off by an admin.
+- **Hard-delete a built-in row**: `is_master()` only (mirrors Lookups' "delete
+  built-in list = Super Admin only"). Admin-added rows are deletable by any admin.
+
+No `ORG_ROLES` entry, object status or module gate is introduced.
