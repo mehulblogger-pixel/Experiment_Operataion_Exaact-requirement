@@ -80,6 +80,62 @@ function geo_valid($lat, $lon) {
     return [round($lat, 7), round($lon, 7)];
 }
 
+// Field #6 — the picker "not working" is almost always this: the Google Maps app's
+// Share button gives a SHORTLINK (maps.app.goo.gl / goo.gl/maps) that carries NO
+// coordinates — it only redirects to the full URL that does — so geo_extract() reads
+// nothing from it. geo_extract_deep() follows an allowlisted map link server-side and
+// extracts the coordinates from where it lands. Everything geo_extract already handles
+// (plain "lat, lon", full /@lat,lon URLs, ?q=…) still resolves with no network at all.
+
+// Only these hosts are ever fetched — a hard allowlist so a pasted link cannot make
+// the server reach into the local network (SSRF). Google's own shorteners only ever
+// redirect to Google Maps, so resolving them is safe.
+function geo_map_host_ok($host) {
+    $host = strtolower((string)$host);
+    static $ok = ['maps.app.goo.gl', 'goo.gl', 'g.co',
+                  'google.com', 'www.google.com', 'google.co.in', 'www.google.co.in',
+                  'maps.google.com', 'openstreetmap.org', 'www.openstreetmap.org', 'osm.org'];
+    if (in_array($host, $ok, true)) return true;
+    return (bool) preg_match('/^maps\.google\.[a-z.]{2,7}$/', $host);   // maps.google.<tld>
+}
+
+// Follow a map link's redirects (host-restricted, http/https only, short timeout) and
+// return "<final-url> <first bytes of the page>" for geo_extract to mine. Best-effort:
+// no cURL, a blocked network, or a non-allowlisted host all return '' rather than throw.
+function geo_resolve_url($url) {
+    if (!function_exists('curl_init')) return '';
+    $host = parse_url(trim((string)$url), PHP_URL_HOST);
+    if (!$host || !geo_map_host_ok($host)) return '';
+    $ch = curl_init(trim((string)$url));
+    if ($ch === false) return '';
+    curl_setopt_array($ch, [
+        CURLOPT_FOLLOWLOCATION  => true,
+        CURLOPT_MAXREDIRS       => 6,
+        CURLOPT_TIMEOUT         => 6,
+        CURLOPT_CONNECTTIMEOUT  => 4,
+        CURLOPT_RETURNTRANSFER  => true,
+        CURLOPT_PROTOCOLS       => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+        CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+        CURLOPT_USERAGENT       => 'Mozilla/5.0 (compatible; Exaact-geo/1.0)',
+        CURLOPT_SSL_VERIFYPEER  => true,
+    ]);
+    $body = curl_exec($ch);
+    $eff  = (string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+    curl_close($ch);
+    return trim($eff . ' ' . (is_string($body) ? substr($body, 0, 200000) : ''));
+}
+
+// geo_extract, then — only if that read nothing AND the input is a map URL — resolve
+// the link and try again. This is what the save handlers call.
+function geo_extract_deep($raw) {
+    $direct = geo_extract($raw);
+    if ($direct !== null) return $direct;
+    $raw = trim((string)$raw);
+    if (stripos($raw, 'http://') !== 0 && stripos($raw, 'https://') !== 0) return null;
+    $resolved = geo_resolve_url($raw);
+    return $resolved === '' ? null : geo_extract($resolved);
+}
+
 // The party (customer/vendor) whose location a job's site defaults from: the
 // vendor/manufacturer being inspected if there is one, else the client.
 function geofence_job_party($job) {
@@ -174,17 +230,19 @@ function geofence_editor($action, $id, $cur, $withLabel = false) {
       <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$id ?>">
       <label class="form-label">Site location</label>
       <input class="form-control" id="<?= $uid ?>c" name="coords" value="<?= $e($coords) ?>"
-             placeholder="Paste a Google Maps link, or type: 19.0760, 72.8777">
+             placeholder="Paste a Google Maps link (incl. the app's Share link), or type: 19.0760, 72.8777">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
-        <button class="btn small secondary" type="button" onclick="gfLoc('<?= $uid ?>c')">📍 Use my current location</button>
-        <?php if ($has): ?><a class="btn small secondary" href="https://www.google.com/maps?q=<?= $e($lat) ?>,<?= $e($lon) ?>" target="_blank">View on map ↗</a><?php endif; ?>
+        <button class="btn small secondary" type="button" onclick="gfLoc('<?= $uid ?>c', this)">📍 Use my current location</button>
+        <a class="btn small secondary" href="https://www.google.com/maps/search/?api=1&amp;query=<?= $has ? $e($lat) . ',' . $e($lon) : '' ?>" target="_blank" rel="noopener">🔎 Find on maps ↗</a>
+        <?php if ($has): ?><a class="btn small secondary" href="https://www.google.com/maps?q=<?= $e($lat) ?>,<?= $e($lon) ?>" target="_blank" rel="noopener">View on map ↗</a><?php endif; ?>
         <label style="font-size:12.5px" class="muted">Allowed distance
           <input class="form-control" type="number" name="geofence_m" value="<?= (int)($cur['rad'] ?? 0) ?>" min="0" max="20000" style="width:90px;display:inline-block" placeholder="default"> m</label>
       </div>
+      <p class="muted" style="font-size:11.5px;margin:6px 0 0">On the Google Maps app: open the place → <b>Share</b> → copy the link, and paste it here. The app reads the coordinates out of it.</p>
       <?php if ($withLabel): ?><input class="form-control" name="site_label" value="<?= $e($cur['label'] ?? '') ?>" placeholder="Site name (optional)" style="margin-top:6px"><?php endif; ?>
       <button class="btn small" type="submit" style="margin-top:8px">Save location</button>
     </form>
-    <script>function gfLoc(id){var b=event.target;b.textContent='Locating…';navigator.geolocation.getCurrentPosition(function(p){document.getElementById(id).value=p.coords.latitude.toFixed(7)+', '+p.coords.longitude.toFixed(7);b.textContent='📍 Got it';},function(){b.textContent='📍 Use my current location';alert('Could not get your location. Allow location access and try again.');},{enableHighAccuracy:true,timeout:10000});}</script>
+    <script>function gfLoc(id, btn){var b=btn||(typeof event!=='undefined'&&event&&event.target);if(!navigator.geolocation){if(b)b.textContent='📍 Not supported';alert('This browser cannot provide a location. On a laptop, type the coordinates or paste a Google Maps link instead.');return;}if(b)b.textContent='Locating…';navigator.geolocation.getCurrentPosition(function(p){document.getElementById(id).value=p.coords.latitude.toFixed(7)+', '+p.coords.longitude.toFixed(7);if(b)b.textContent='📍 Got it';},function(){if(b)b.textContent='📍 Use my current location';alert('Could not get your location. Allow location access (needs HTTPS), or paste a Google Maps link instead.');},{enableHighAccuracy:true,timeout:10000});}</script>
     <?php return ob_get_clean();
 }
 
@@ -195,8 +253,8 @@ function geofence_save_party($route, $method) {
     $pid = (int)($_POST['id'] ?? 0);
     $p = $pid ? ops_one("SELECT id FROM business_partners WHERE id=?", [$pid]) : null;
     if (!$p) { flash('Party not found.', 'error'); redirect('/'); }
-    $c = geo_extract((string)($_POST['coords'] ?? ''));
-    if ($c === null && trim((string)($_POST['coords'] ?? '')) !== '') { flash('Could not read a location from that. Paste a Google Maps link, or type "lat, long".', 'error'); redirect('/customer?id=' . $pid); }
+    $c = geo_extract_deep((string)($_POST['coords'] ?? ''));
+    if ($c === null && trim((string)($_POST['coords'] ?? '')) !== '') { flash('Could not read a location from that. Paste a Google Maps link (the app’s Share link works too), or type "lat, long".', 'error'); redirect('/customer?id=' . $pid); }
     $rad = max(0, (int)($_POST['geofence_m'] ?? 0));
     if ($c === null) { db()->prepare("UPDATE business_partners SET site_lat=NULL, site_lon=NULL, geofence_m=? WHERE id=?")->execute([$rad, $pid]); flash('Location cleared.'); }
     else { db()->prepare("UPDATE business_partners SET site_lat=?, site_lon=?, geofence_m=? WHERE id=?")->execute([$c[0], $c[1], $rad, $pid]); flash('Site location saved.'); }
@@ -209,8 +267,8 @@ function geofence_save_job($route, $method) {
     $jid = (int)($_POST['id'] ?? 0);
     $job = $jid ? ops_one("SELECT id FROM jobs WHERE id=?", [$jid]) : null;
     if (!$job) { flash('Job not found.', 'error'); redirect('/'); }
-    $c = geo_extract((string)($_POST['coords'] ?? ''));
-    if ($c === null && trim((string)($_POST['coords'] ?? '')) !== '') { flash('Could not read a location. Paste a Google Maps link, or type "lat, long".', 'error'); redirect('/job?id=' . $jid); }
+    $c = geo_extract_deep((string)($_POST['coords'] ?? ''));
+    if ($c === null && trim((string)($_POST['coords'] ?? '')) !== '') { flash('Could not read a location. Paste a Google Maps link (the app’s Share link works too), or type "lat, long".', 'error'); redirect('/job?id=' . $jid); }
     $rad = max(0, (int)($_POST['geofence_m'] ?? 0));
     $label = substr(trim((string)($_POST['site_label'] ?? '')), 0, 160);
     if ($c === null) { db()->prepare("UPDATE jobs SET site_lat=NULL, site_lon=NULL, site_geofence_m=?, site_label=? WHERE id=?")->execute([$rad, $label, $jid]); flash('Job site cleared — it will use the site / party location.'); }
@@ -228,8 +286,8 @@ function geofence_save_address($route, $method) {
     $a = $aid ? ops_one("SELECT id, partner_id FROM partner_addresses WHERE id=?", [$aid]) : null;
     if (!$a) { flash('Address not found.', 'error'); redirect('/'); }
     $back = '/partner?id=' . (int)$a['partner_id'] . '&tab=addresses';
-    $c = geo_extract((string)($_POST['coords'] ?? ''));
-    if ($c === null && trim((string)($_POST['coords'] ?? '')) !== '') { flash('Could not read a location. Paste a Google Maps link, or type "lat, long".', 'error'); redirect($back); }
+    $c = geo_extract_deep((string)($_POST['coords'] ?? ''));
+    if ($c === null && trim((string)($_POST['coords'] ?? '')) !== '') { flash('Could not read a location. Paste a Google Maps link (the app’s Share link works too), or type "lat, long".', 'error'); redirect($back); }
     $rad = max(0, (int)($_POST['geofence_m'] ?? 0));
     if ($c === null) { db()->prepare("UPDATE partner_addresses SET site_lat=NULL, site_lon=NULL, geofence_m=? WHERE id=?")->execute([$rad, $aid]); flash('Site location cleared.'); }
     else { db()->prepare("UPDATE partner_addresses SET site_lat=?, site_lon=?, geofence_m=? WHERE id=?")->execute([$c[0], $c[1], $rad, $aid]); flash('Site location saved.'); }
@@ -247,7 +305,7 @@ function geofence_capture_site($route, $method) {
     if (!$job) { flash('Job not found.', 'error'); redirect('/'); }
     ops_require(is_master() || is_coordinator_level() || (function_exists('job_owned_by_me') && job_owned_by_me($jid)),
         'You cannot set this site location.');
-    $c = geo_extract((string)($_POST['coords'] ?? ''));
+    $c = geo_extract_deep((string)($_POST['coords'] ?? ''));
     if ($c === null) { flash('No location was captured — allow location access and try again.', 'error'); redirect('/job?id=' . $jid); }
     $addrId = (int) ops_val("SELECT site_address_id FROM calls WHERE id=?", [(int)$job['call_id']]);
     if ($addrId) {
