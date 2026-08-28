@@ -73,7 +73,14 @@ Delivers "freelancers build rich profiles; the pool is discoverable by agencies/
 > its own **fourth-audience portal** at `/pro` (register, sign in, M4 profile:
 > disciplines, work types, locations/pan-India/overseas, availability, rate bands,
 > languages) + a passport token. 13 tests, incl. proof a professional is never
-> written into an org's staff roster. **A2 (browse jobs + apply)** next.
+> written into an org's staff roster.
+>
+> **A2 ✅ delivered** — the freelancer **browses open requirements and applies**
+> as themselves (`/pro/jobs`, one application per job, deduped on
+> `applicant_professional_id`) and **tracks their applications** with live status
+> (`/pro/applications`); those applications reach the client/staff side on the
+> requirement. 8 tests. **A3 (talent search over the pool for orgs)** next, then
+> the **award → engagement → invoice bridge** (Scenario 3).
 - **A1 — Freelancer preference profile (M4).** Additive columns on the pool
   (work types: per-visit / day-rate / man-day / long deployment / shutdown;
   base + preferred locations; pan-India / overseas willingness; travel radius;

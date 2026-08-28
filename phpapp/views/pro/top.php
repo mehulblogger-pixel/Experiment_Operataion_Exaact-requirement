@@ -39,6 +39,8 @@ $me = $me ?? (function_exists('connect_pro_user') ? connect_pro_user() : null);
 <?php if ($me): $here = trim((string)($_SERVER['REQUEST_URI'] ?? ''), '/'); $here = strtok($here, '?'); ?>
 <div class="nav">
   <a class="<?= $here==='pro'?'on':'' ?>" href="/pro">Home</a>
+  <a class="<?= $here==='pro/jobs'?'on':'' ?>" href="/pro/jobs">Open jobs</a>
+  <a class="<?= $here==='pro/applications'?'on':'' ?>" href="/pro/applications">My applications</a>
   <a class="<?= $here==='pro/profile'?'on':'' ?>" href="/pro/profile">My profile</a>
 </div>
 <?php endif; ?>

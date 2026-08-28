@@ -120,18 +120,23 @@ function cx_application_add($requirementId, array $in) {
     $requirementId = (int)$requirementId;
     $inspectorId = (int)($in['inspector_id'] ?? 0);
     $partyId = (int)($in['applicant_party_id'] ?? 0);
+    $proId = (int)($in['applicant_professional_id'] ?? 0);
     // One live application per applicant per requirement — keyed on the pool
-    // inspector, or (for an external agency/vendor) on the applying party.
+    // inspector, the applying party (agency/vendor), or the self-listed
+    // professional (a freelancer applying as themselves).
     if ($inspectorId > 0) {
         if ((int)ops_val("SELECT COUNT(*) FROM cx_applications WHERE requirement_id=? AND inspector_id=?", [$requirementId, $inspectorId]) > 0) return 0;
+    } elseif ($proId > 0) {
+        if ((int)ops_val("SELECT COUNT(*) FROM cx_applications WHERE requirement_id=? AND applicant_professional_id=?", [$requirementId, $proId]) > 0) return 0;
     } elseif ($partyId > 0) {
         if ((int)ops_val("SELECT COUNT(*) FROM cx_applications WHERE requirement_id=? AND applicant_party_id=?", [$requirementId, $partyId]) > 0) return 0;
     }
     $name = trim((string)($in['applicant_name'] ?? ''));
     if ($name === '' && $inspectorId > 0) $name = (string)ops_val("SELECT name FROM inspectors WHERE id=?", [$inspectorId]);
-    db()->prepare("INSERT INTO cx_applications (requirement_id,inspector_id,applicant_party_id,applicant_name,cover_note,proposed_rate,status,created_by,created_at,updated_at)
-                   VALUES (?,?,?,?,?,?, 'APPLIED', ?,?,?)")
-        ->execute([$requirementId, $inspectorId, $partyId, $name, trim((string)($in['cover_note'] ?? '')),
+    if ($name === '' && $proId > 0) $name = (string)ops_val("SELECT name FROM cx_professionals WHERE id=?", [$proId]);
+    db()->prepare("INSERT INTO cx_applications (requirement_id,inspector_id,applicant_party_id,applicant_professional_id,applicant_name,cover_note,proposed_rate,status,created_by,created_at,updated_at)
+                   VALUES (?,?,?,?,?,?,?, 'APPLIED', ?,?,?)")
+        ->execute([$requirementId, $inspectorId, $partyId, $proId, $name, trim((string)($in['cover_note'] ?? '')),
                    (float)($in['proposed_rate'] ?? 0), function_exists('user_name') ? user_name(current_user()) : '', date('c'), date('c')]);
     return (int)db()->lastInsertId();
 }

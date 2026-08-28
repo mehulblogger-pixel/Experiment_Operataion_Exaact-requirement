@@ -128,6 +128,26 @@ function connect_pro_profile_pct($u) {
     return (int)round($done / count($keys) * 100);
 }
 
+/** requirement_id => true for the requirements this professional already applied to. */
+function connect_pro_applied_map($proId) {
+    $out = [];
+    try {
+        foreach (ops_all("SELECT requirement_id FROM cx_applications WHERE applicant_professional_id=?", [(int)$proId]) ?: [] as $r)
+            $out[(int)$r['requirement_id']] = true;
+    } catch (Throwable $e) {}
+    return $out;
+}
+
+/** A professional's own applications, newest first, with the requirement joined. */
+function connect_pro_applications($proId) {
+    try {
+        return ops_all(
+            "SELECT a.*, r.ref_code, r.title, r.location, r.status AS req_status
+             FROM cx_applications a JOIN cx_requirements r ON r.id = a.requirement_id
+             WHERE a.applicant_professional_id=? ORDER BY a.id DESC", [(int)$proId]) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
 function connect_pro_view($name, $vars = []) {
     extract($vars);
     $u = connect_pro_user();
@@ -166,7 +186,26 @@ function connect_pro_route($route, $method) {
             if ($method === 'POST') { connect_pro_profile_save((int)$me['id'], $_POST); $saved = true; $me = connect_pro_user(); }
             connect_pro_view('profile', ['me' => $me, 'saved' => $saved,
                 'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : []]); exit;
-        // A2 routes (jobs / apply / applications) are added in the next slice.
+
+        case 'pro/jobs':   // A2 — browse open requirements + apply
+            if ($method === 'POST' && (int)($_POST['requirement_id'] ?? 0) > 0 && function_exists('cx_requirement_get')) {
+                $rq = cx_requirement_get((int)$_POST['requirement_id']);
+                if ($rq && in_array(strtoupper((string)$rq['status']), ['OPEN', 'SHORTLISTING'], true)) {
+                    cx_application_add((int)$rq['id'], [
+                        'applicant_professional_id' => (int)$me['id'],
+                        'applicant_name' => (string)$me['name'],
+                        'proposed_rate'  => (float)($_POST['proposed_rate'] ?? 0),
+                        'cover_note'     => (string)($_POST['cover_note'] ?? ''),
+                    ]);
+                }
+                redirect('/pro/jobs');
+            }
+            $rows = function_exists('cx_open_requirements') ? cx_open_requirements() : [];
+            $applied = connect_pro_applied_map((int)$me['id']);
+            connect_pro_view('jobs', ['me' => $me, 'rows' => $rows, 'applied' => $applied]); exit;
+
+        case 'pro/applications':   // A2 — track my applications
+            connect_pro_view('applications', ['me' => $me, 'rows' => connect_pro_applications((int)$me['id'])]); exit;
     }
     // Unknown /pro route.
     http_response_code(404); connect_pro_view('dashboard', ['me' => $me, 'pct' => connect_pro_profile_pct($me)]); exit;
