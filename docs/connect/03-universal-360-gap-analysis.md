@@ -99,7 +99,13 @@ idempotently, priced from the winning bid × positions, carrying the client to
 bill. It then flows through the invoicing chain EXAACT already has (billable
 board → finance attestation → books invoice) — no new invoicing engine; the books
 ledger stays the single money truth. 10 tests. **This closes Scenario 3's
-requirement→invoicing path** (crew/bulk M10 is the remaining refinement).
+requirement→invoicing path.**
+
+**M10 crew booking ✅ delivered** — a requirement can carry a **position manifest**
+(`cx_positions`: role × discipline × quantity × rate × shift) for shutdown/
+turnaround-scale hiring; a crew rollup sums headcount + value, and the
+award→invoice bridge **bills the whole crew** (else the single-role figure). A
+single-role job needs none of it. 11 tests.
 
 All three owner scenarios are now real: **1** (TPIA finds a freelancer),
 **2** (freelancer finds jobs), **3** (staffing co: find candidates → award →

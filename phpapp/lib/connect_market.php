@@ -282,6 +282,10 @@ function ops_connect_requirement($method) {
             $ev = connect_engagement_billable($id);
             flash($ev ? 'Engagement sent to billing — it is now a pending billable event for finance to invoice.'
                       : 'Could not send to billing — award the requirement and set a rate first.', $ev ? 'success' : 'error');
+        } elseif ($act === 'position_add' && function_exists('cx_position_add')) {   // M10 — crew manifest
+            cx_position_add($id, $_POST) ? flash('Position added to the crew.') : flash('Give the position a role.', 'error');
+        } elseif ($act === 'position_delete' && function_exists('cx_position_delete')) {
+            cx_position_delete((int)($_POST['position_id'] ?? 0), $id); flash('Position removed.');
         }
         redirect('/connect-requirement?id=' . $id);
     }
@@ -310,6 +314,10 @@ function ops_connect_requirement($method) {
         'advisor'      => function_exists('connect_advisor_for_requirement') ? connect_advisor_for_requirement($req) : null,
         // Bridge — the billable event for this awarded engagement (if sent to billing).
         'billable'     => function_exists('connect_engagement_billable_row') ? connect_engagement_billable_row($id) : null,
+        // M10 — crew manifest (positions) + rollup.
+        'positions'    => function_exists('cx_positions_for') ? cx_positions_for($id) : [],
+        'crew'         => function_exists('cx_crew_summary') ? cx_crew_summary($id) : null,
+        'disciplines'  => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
     ]);
     return true;
 }

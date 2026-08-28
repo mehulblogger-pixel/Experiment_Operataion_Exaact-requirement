@@ -43,6 +43,22 @@ function connect_engagement_billable($requirementId) {
     if (!function_exists('billable_event_upsert') || !function_exists('cx_requirement_get')) return 0;
     $req = cx_requirement_get($requirementId);
     if (!$req || strtoupper((string)$req['status']) !== 'AWARDED') return 0;
+    // A CREW requirement (M10) bills the whole position manifest; a single-role
+    // requirement bills the winning bid × positions.
+    if (function_exists('cx_is_crew') && cx_is_crew((int)$req['id'])) {
+        $c = cx_crew_summary((int)$req['id']);
+        if (($c['value'] ?? 0) <= 0) return 0;
+        return billable_event_upsert('connect', 'MARKETPLACE_AWARD', (int)$req['id'], [
+            'party_id'        => (int)($req['poster_party_id'] ?? 0),
+            'contract_number' => (string)($req['ref_code'] ?? ''),
+            'service_type'    => trim((string)($req['title'] ?? 'Crew engagement')),
+            'qty'             => (int)$c['headcount'],
+            'unit'            => 'crew',
+            'rate'            => $c['headcount'] > 0 ? round($c['value'] / $c['headcount'], 2) : 0,
+            'amount'          => (float)$c['value'],
+            'calc_rule'       => 'Marketplace crew award ' . (string)($req['ref_code'] ?? '') . ' — ' . (int)$c['positions'] . ' positions, ' . (int)$c['headcount'] . ' people (estimate; finance attests)',
+        ]);
+    }
     $app = function_exists('cx_application_get') ? cx_application_get((int)($req['awarded_application_id'] ?? 0)) : null;
     $rate = connect_bridge_rate($req, $app ?: []);
     if ($rate <= 0) return 0;

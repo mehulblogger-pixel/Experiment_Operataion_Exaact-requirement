@@ -5,7 +5,7 @@ $req = $req ?? []; $apps = $apps ?? []; $inspectors = $inspectors ?? []; $req_ne
 $can_rate = $can_rate ?? false; $ratings = $ratings ?? []; $disputes = $disputes ?? [];
 $terms = $terms ?? null; $terms_fields = $terms_fields ?? []; $readiness = $readiness ?? [];
 $readiness_items = $readiness_items ?? []; $readiness_score = $readiness_score ?? null; $advisor = $advisor ?? null;
-$billable = $billable ?? null;
+$billable = $billable ?? null; $positions = $positions ?? []; $crew = $crew ?? null; $disciplines = $disciplines ?? [];
 $ratedDir = [];
 foreach ($ratings as $rr) $ratedDir[strtoupper((string)$rr['direction'])] = $rr;
 $pill = function ($s) {
@@ -73,6 +73,40 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     <?php endforeach; ?>
   </div>
   <?php endif; ?>
+</div>
+
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 4px">Crew manifest<?php if ($crew && (int)$crew['positions']>0): ?> — <?= (int)$crew['positions'] ?> position<?= (int)$crew['positions']===1?'':'s' ?>, <?= (int)$crew['headcount'] ?> people<?php endif; ?></h3>
+  <p class="cxmeta" style="margin:0 0 10px">For a shutdown / turnaround, build the crew as positions (role × quantity × rate). A single-role job needs none of this.</p>
+  <?php if ($positions): ?>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>#</th><th>Role</th><th>Discipline</th><th>Qty</th><th>Rate</th><th>Shift</th><th>Line ₹</th><th></th></tr></thead>
+      <tbody>
+      <?php foreach ($positions as $p): ?>
+        <tr>
+          <td><?= (int)$p['seq'] ?></td><td><?= e($p['role']) ?></td><td><?= e($p['discipline_code']) ?></td>
+          <td><?= (int)$p['quantity'] ?></td><td>₹<?= (int)$p['rate'] ?>/<?= e($p['unit']) ?></td><td><?= e($p['shift_pattern']) ?></td>
+          <td>₹<?= number_format((int)$p['quantity']*(float)$p['rate'],0) ?></td>
+          <td><form method="post" action="/connect-requirement" onsubmit="return confirm('Remove this position?');">
+            <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="position_id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="action" value="position_delete">
+            <button class="btn secondary" type="submit" style="font-size:12px">Remove</button></form></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+      <?php if ($crew): ?><tfoot><tr><th colspan="6" style="text-align:right">Crew total</th><th>₹<?= number_format((float)$crew['value'],0) ?></th><th></th></tr></tfoot><?php endif; ?>
+    </table></div>
+  <?php endif; ?>
+  <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">➕ Add a position</summary>
+    <form method="post" action="/connect-requirement" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:8px;margin-top:8px">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="position_add">
+      <input type="text" name="role" placeholder="Role (e.g. UT technician)" style="padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px">
+      <select name="discipline_code" style="padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px"><option value="">Discipline</option><?php foreach ($disciplines as $d): ?><option value="<?= e($d['code']) ?>"><?= e($d['name']) ?></option><?php endforeach; ?></select>
+      <input type="number" name="quantity" value="1" min="1" placeholder="Qty" style="padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px">
+      <input type="number" name="rate" placeholder="Rate ₹/day" style="padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px">
+      <button class="btn" type="submit">Add</button>
+      <input type="text" name="shift_pattern" placeholder="Shift (e.g. 12h day)" style="grid-column:1/3;padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px">
+    </form>
+  </details>
 </div>
 
 <?php if (strtoupper((string)$req['status']) === 'AWARDED'): ?>
