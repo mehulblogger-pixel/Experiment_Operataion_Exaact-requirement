@@ -78,6 +78,9 @@
           </div>
         <?php endforeach; endif; ?>
       </div>
+      <?php if (function_exists('connect_msg_contacts_revealed') && !connect_msg_contacts_revealed((int)$openId)): ?>
+        <div style="padding:6px 14px;font-size:12px;color:var(--muted,#888)">🔒 Until this requirement is awarded to this applicant, phone numbers and emails you type are hidden from them (you still see the full text). They unlock automatically on award.</div>
+      <?php endif; ?>
       <form class="mx-reply" method="post" action="/connect-messages">
         <input type="hidden" name="application_id" value="<?= (int)$openId ?>">
         <textarea name="body" placeholder="Write a message…" required></textarea>

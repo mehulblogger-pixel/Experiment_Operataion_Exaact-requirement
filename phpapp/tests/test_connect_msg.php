@@ -65,6 +65,26 @@ try {
 
     // Staff inbox unread total reflects the open thread.
     t_ok(connect_msg_unread_total('staff', 7, [$aid]) >= 1, 'the staff unread total counts the pending reply');
+
+    // --- anti-circumvention: contact details are redacted before award --------
+    $leaky = 'Call me on +91 98765 43210 or email me at rakesh.welder@gmail.com to settle directly.';
+    $masked = connect_msg_redact($leaky);
+    t_ok(strpos($masked, '98765') === false, 'a phone number is masked by the redactor');
+    t_ok(strpos($masked, '@gmail.com') === false, 'an email is masked by the redactor');
+
+    // Before award: the professional sees the masked body; staff sees the raw text.
+    connect_msg_post($aid, 'staff', 7, 'Coordinator Ravi', $leaky);
+    t_ok(!connect_msg_contacts_revealed($aid), 'contacts are NOT revealed before award');
+    $proSees = connect_msg_display_body($leaky, $aid, 'professional');
+    t_ok(strpos($proSees, '98765') === false && strpos($proSees, '@gmail.com') === false, 'the applicant sees contact details masked pre-award');
+    $staffSees = connect_msg_display_body($leaky, $aid, 'staff');
+    t_ok(strpos($staffSees, '98765') !== false, 'staff (us) still see the raw text, for moderation & evidence');
+
+    // After the engagement is awarded to this applicant, contacts unlock.
+    db()->prepare("UPDATE cx_requirements SET status='AWARDED', awarded_application_id=? WHERE id=?")->execute([$aid, $rid]);
+    t_ok(connect_msg_contacts_revealed($aid), 'contacts are revealed once the requirement is awarded to this applicant');
+    $proSees2 = connect_msg_display_body($leaky, $aid, 'professional');
+    t_ok(strpos($proSees2, '98765') !== false, 'the applicant sees full contact details after they are hired');
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }

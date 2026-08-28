@@ -48,7 +48,7 @@ function connect_msg_app($applicationId) {
     $applicationId = (int)$applicationId; if ($applicationId <= 0) return null;
     try {
         return ops_one("SELECT a.*, r.ref_code, r.title AS req_title, r.status AS req_status,
-                               r.poster_party_id, r.poster_name
+                               r.awarded_application_id, r.poster_party_id, r.poster_name
                         FROM cx_applications a JOIN cx_requirements r ON r.id = a.requirement_id
                         WHERE a.id=?", [$applicationId]) ?: null;
     } catch (Throwable $e) { return null; }
@@ -173,6 +173,47 @@ function connect_msg_summaries($appIds, $readerKind, $readerId) {
     }
     usort($out, fn($a, $b) => strcmp((string)$b['last_at'], (string)$a['last_at']));
     return $out;
+}
+
+// ---- Anti-circumvention (keep the deal on-platform) -------------------------
+//
+//  Chat is necessary — its absence just pushes everyone to WhatsApp. The defence
+//  against disintermediation is to redact contact details in the thread UNTIL the
+//  engagement is AWARDED (our fee-bearing event), then reveal them so the parties
+//  can coordinate on-site. We store the raw text (so we retain evidence of any
+//  circumvention attempt) but SHOW a masked version to the parties before award.
+
+/** Mask phone numbers, emails and messaging handles in a message body. */
+function connect_msg_redact($text) {
+    $text = (string)$text;
+    $hidden = '••• (shared after hire)';
+    // e-mail addresses
+    $text = preg_replace('/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/i', $hidden, $text);
+    // phone-like runs: an optional +91/0, then 10+ digits possibly split by spaces/dashes/dots
+    $text = preg_replace('/(?:\+?91[\-\s]?|0)?(?:\d[\-\s.]?){9,}\d/', $hidden, $text);
+    // obvious "reach me on whatsapp/telegram/signal" handles
+    $text = preg_replace('/\b(whats\s?app|telegram|signal|insta(?:gram)?)\b\s*[:\-]?\s*\S+/i', $hidden, $text);
+    return $text;
+}
+
+/** True once contact details may be revealed on a thread — i.e. it is AWARDED to
+ *  this very applicant (deal locked, platform fee captured). */
+function connect_msg_contacts_revealed($applicationId) {
+    $app = connect_msg_app($applicationId);
+    if (!$app) return false;
+    return strtoupper((string)($app['req_status'] ?? '')) === 'AWARDED'
+        && (int)($app['awarded_application_id'] ?? 0) === (int)$applicationId;
+}
+
+/**
+ * The body to SHOW a given viewer. The staff desk (us) always sees the raw text —
+ * we need it to moderate and to keep it as evidence. The applicant-side parties
+ * see contact details only after award. Retains the record; blocks the leak.
+ */
+function connect_msg_display_body($body, $applicationId, $viewerKind) {
+    if ($viewerKind === 'staff') return (string)$body;                 // we see everything (moderation/evidence)
+    if (connect_msg_contacts_revealed($applicationId)) return (string)$body;
+    return connect_msg_redact($body);
 }
 
 // ---- Staff desk -------------------------------------------------------------

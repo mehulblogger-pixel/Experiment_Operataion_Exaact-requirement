@@ -32,12 +32,16 @@
     <div id="pmbody" style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column">
       <?php if (!$open['thread']): ?>
         <p class="muted">No messages yet — send the first one below.</p>
-      <?php else: foreach ($open['thread'] as $m): $mine = ($m['sender_kind'] === 'professional'); ?>
+      <?php else: foreach ($open['thread'] as $m): $mine = ($m['sender_kind'] === 'professional');
+        $shown = function_exists('connect_msg_display_body') ? connect_msg_display_body((string)$m['body'], (int)$openId, 'professional') : (string)$m['body']; ?>
         <div class="bub <?= $mine ? 'me' : 'them' ?>">
-          <?= nl2br(e((string)$m['body'])) ?>
+          <?= nl2br(e($shown)) ?>
           <div class="meta"><?= e($mine ? 'You' : ($m['sender_name'] !== '' ? $m['sender_name'] : 'Desk')) ?> · <?= $when($m['created_at']) ?></div>
         </div>
       <?php endforeach; endif; ?>
+      <?php if (function_exists('connect_msg_contacts_revealed') && !connect_msg_contacts_revealed((int)$openId)): ?>
+        <p class="muted" style="font-size:12px;margin:6px 0 0">🔒 Phone numbers and emails stay hidden until you're hired for this job — then they're shared so you can coordinate. Keeping the deal here gets you paid on time, with dispute cover.</p>
+      <?php endif; ?>
     </div>
     <form class="pm-reply" method="post" action="/pro/messages">
       <input type="hidden" name="application_id" value="<?= (int)$openId ?>">
