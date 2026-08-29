@@ -261,6 +261,19 @@ open network needs. None of it fights the codebase; it's the natural next layer.
   reasoned shortlist drawn from the whole pool, blending rules + AI.
 
 ### GAP 7 — No labour-market analytics *(strategic moat)*
+
+> **Progress (#8 ✅):** the **labour-market analytics** layer is built.
+> `lib/connect_analytics.php` is a pure read-only aggregation over the cx_*
+> tables — no new schema, no new permission. It gives the desk: headline KPIs
+> (fill rate, avg days-to-award, talent supply), **supply vs demand by
+> discipline** with an honest gap (demand = open requirements, supply =
+> available professionals + available agency-bench people), the **hiring funnel**
+> (posted → applicants → shortlisted → awarded → closed), **rate benchmarks**
+> (requirement ask band vs pool day-rate range), **pool growth** by month, the
+> **verification/trust mix** (ties in #3), demand-by-location, and a
+> plain-language insight naming the tightest market. Read-only dashboard at
+> `/connect-analytics` (coordinator level). 24 tests. **Remaining:** time-series
+> trends, anonymised external market-intelligence product (M17), CSV export.
 - **What's there:** deep inspection/CRM/finance MIS + the money-ranked Advisor; only a
   thin `cx_market_summary` for the marketplace.
 - **Gap:** no **talent supply-vs-demand, fill-rate, time-to-fill, rate-benchmark, pool-
@@ -301,7 +314,7 @@ Ranked by "distance to a credible, trusted, lean launch of the ITSN".
 | **5** | **WhatsApp + SMS channel** (behind the notification seam) — **✅ engine + templates + consent + modes + provider seam + nudge done; real BSP + DLT/template approval remain (external)** | Reach | This audience lives on WhatsApp | M (blocked on template approval) |
 | **6** | **Marketplace matching/trust on the unified pool + optional AI ranking** — **✅ cross-pool Trust Score + AI re-ranking overlay done; semantic embeddings & pro job-history buckets remain** | Intelligence | Recommend across the whole pool | M |
 | **7** | **Agency bench workspace** (agency adds/allocates its own people) — **✅ private roster + allocation + utilisation done; vendor-portal self-service surface remains** | Supply | Agencies as fulfillers, not just applicants | M |
-| **8** | **Labour-market analytics** (supply/demand, fill rate, rate benchmarks) | Moat/Revenue | Data product; ops insight | M |
+| **8** | **Labour-market analytics** (supply/demand, fill rate, rate benchmarks) — **✅ read-only dashboard done; time-series & anonymised external product remain** | Moat/Revenue | Data product; ops insight | M |
 | **9** | **Phase-B2 per-org gating + isolation** (topology decision + security review) | Architecture | Enforce org entitlements across orgs | L (needs sign-off) |
 | **10** | **Escrow / payment rail** (Phase 6) | Money | Only after PMF + CA/RBI/legal | L (external blockers) |
 | — | **Phase-0 market research / PRD / customer interviews** | Business | Founder/market work, not code | — |

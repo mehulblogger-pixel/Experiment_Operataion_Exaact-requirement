@@ -146,6 +146,13 @@ optional **"Rank with AI"** toggle simply reuses the existing `ai.php` seam
 AI may only reorder/annotate the rule-provided shortlist — it can never change
 eligibility, invent a candidate, or bypass any gate.
 
+### Labour-market analytics (K19 / #8)
+
+The analytics dashboard (`/connect-analytics`) is **read-only** and adds **no new
+permission**: `connect_analytics_can()` = `is_master()` or `is_coordinator_level()`
+(the marketplace/reporting desk). Every figure is a live aggregation over the
+existing cx_* tables — no new table, status or module gate is introduced.
+
 ### Agency bench workspace (K18 / #7)
 
 The agency bench (`/connect-bench`) adds **no new named permission** and enforces

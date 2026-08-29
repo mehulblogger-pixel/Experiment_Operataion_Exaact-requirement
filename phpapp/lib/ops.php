@@ -3184,6 +3184,8 @@ function ops_dispatch($route, $method) {
             return ops_connect_channels($method);
         case $route === 'connect-bench':        // Connect K18 / #7 — agency bench workspace
             return ops_connect_bench($method);
+        case $route === 'connect-analytics':    // Connect K19 / #8 — labour-market analytics (read-only)
+            return ops_connect_analytics($method);
         case $route === 'passport-share':      // Connect K1 — get/copy a professional's public passport link + QR
             return ops_connect_passport_share($method);
         case $route === 'connect-requirements': // Connect K2a — manpower marketplace board (post + list)
