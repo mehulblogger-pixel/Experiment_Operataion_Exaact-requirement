@@ -78,22 +78,73 @@ possible isolation. This is how the *operations* app (P1–P6) is multi-tenanted
 
 **Not yet isolated (the gap #9 closes):** the Connect marketplace `cx_*` tables
 live in **one shared store** so the pool can be shared. Within that store, isolation
-today is **per-feature, application-level**:
+today is **per-feature, application-level** — real and tested for what exists, but
+hand-applied in each handler rather than enforced by one guard.
 
-- `cx_bench` / `cx_bench_alloc` — scoped by `org_id` (good, tested).
-- `cx_requirements` — carries `poster_party_id`; the client portal filters on it
-  (`portal.php` — "a client only ever sees its own postings").
-- `cx_applications` — a professional sees only their own (`connect_msg_pro_owns`,
-  `connect_pro_applications`); a vendor applies as its party.
-- `cx_messages` — scoped by engagement ownership (`connect_msg_pro_owns`,
-  staff-gated).
-- `cx_verifications` — subject-scoped; only the moderation desk reviews.
+### 3a. How each actor is scoped today — in the real code
 
-The weakness is that this scoping is **hand-applied in each handler**. There is no
-single, audited guard that *forces* every query to be scoped, so a future careless
-query is a latent cross-org leak (I5 is not structurally guaranteed).
+The session identity is resolved once, from the session cookie, never from request
+input:
 
-### 3a. Data classification (every `cx_*` table)
+| Actor | Resolver (file:line) | Owner value |
+|---|---|---|
+| Client | `portal_user()` → `portal_partner_id()` (`portal.php:138,163`) | `partner_id` (from `$_SESSION['cuid']`) |
+| Vendor / agency | `cvp_vendor_user()` → `cvp_vendor_id()` (`cvp.php:126,149`) | `vendor_id` (from `$_SESSION['vuid']`) |
+| Professional | `connect_pro_user()` → `connect_pro_id()` (`connect_pro.php`) | `cx_professionals.id` (from `$_SESSION['cxpid']`) |
+| Staff | `current_user()` + `can()` / `is_*_level()` | host operator |
+
+The ownership predicates that exist today (the ones #9 consolidates and makes
+mandatory):
+
+- **Requirement, client-owned** — the client portal never trusts an id alone; it
+  re-checks the poster on every private access (`portal.php:907`):
+  ```php
+  if (!$req || (int)$req['poster_party_id'] !== (int)portal_partner_id()) {
+      http_response_code(404); portal_view('notfound'); exit;
+  }
+  ```
+  and a post stamps the owner from the session, not the request (`portal.php:891`):
+  `$in['poster_party_id'] = portal_partner_id();`
+- **Application, professional-owned** — `connect_pro_applications()` reads only the
+  caller's own rows (`connect_pro.php:207`):
+  `... WHERE a.applicant_professional_id=? ...`  (bound to `$me['id']`).
+- **Message thread, engagement-owned** — `connect_msg_pro_owns()`
+  (`connect_msg.php`) gates every professional read/post:
+  ```php
+  function connect_msg_pro_owns($applicationId, $proId) {
+      $app = connect_msg_app($applicationId);
+      return $app && (int)($app['applicant_professional_id'] ?? 0) === (int)$proId;
+  }
+  ```
+- **Bench, agency-owned** — `connect_bench_get($id, $orgId)` scopes by owner
+  (`connect_bench.php`): `... WHERE id=? AND org_id=?`, and `connect_bench_allocate()`
+  refuses a member that is not this org's. Asserted end-to-end by
+  `test_connect_bench.php` ("a different agency sees an empty bench").
+- **Verification, subject-owned** — `connect_verify_subject_checks($kind, $id)`
+  (`connect_verify.php:292`): `... WHERE subject_kind=? AND subject_id=? ...`.
+
+### 3b. The structural weakness (why a guard is needed)
+
+The scoping above is correct, but the **owner value is passed in by each caller**,
+not enforced by a single layer. The clearest illustration is in our own code:
+`ops_connect_bench()` resolves the org from the request —
+
+```php
+// connect_bench.php:217,219 — SAFE here, because the whole handler is
+// staff-gated by connect_bench_can() (a coordinator may view ANY agency):
+ops_require(connect_bench_can(), '…');
+$orgId = (int)($_GET['org'] ?? $_POST['org_id'] ?? 0);
+```
+
+This is safe *because staff are allowed to see any agency*. But the exact same
+pattern copied into a **portal** handler — deriving the owner from `$_GET`/`$_POST`
+instead of the session — would be an instant cross-org leak. Nothing structural
+stops that mistake today: **I5 (deny-by-default) is not guaranteed** — a new,
+un-scoped `SELECT * FROM cx_bench` in some future handler would return every
+agency's roster. #9 exists to make that class of mistake impossible, not merely
+absent.
+
+### 3c. Data classification (every `cx_*` table)
 
 | Table | Class | Owner key | Notes |
 |---|---|---|---|
@@ -156,30 +207,50 @@ reach the shared store under Option B, so the work is not thrown away.
 
 **Principle: deny-by-default, owner-scoped, in one place.**
 
-1. **A resolved caller context** per request: `{actor_kind, actor_id, org_id?,
-   party_id?, is_staff}` derived once from the session (staff / `cuid` / `vuid` /
-   `cxpid`). Never taken from request input.
-2. **A private-table access contract.** Reads/writes to a PRIVATE table go through a
-   small set of helpers that take the caller context and apply the owner filter for
-   that table (from the §3a classification). A private-table access with no owner
-   scope throws — it never silently returns all rows (I5).
-3. **Ownership predicates**, one per private table, expressing "may this caller
-   touch this row?" (e.g. a `cx_bench` row: `row.org_id == ctx.org_id || is_staff`).
-   These already exist ad hoc (`connect_msg_pro_owns`, the bench `org_id` checks) —
-   #9 consolidates them and makes them mandatory.
-4. **Staff override is explicit**, logged, and confined to the host operator role —
-   never inherited by a portal actor.
-5. **The shared layer** keeps its own rule: read-open, write-owned (a professional
-   edits only their profile; a poster edits only their requirement).
+1. **A resolved caller context** per request — one function, built from the
+   session resolvers that already exist (`portal_partner_id()`, `cvp_vendor_id()`,
+   `connect_pro_id()`, `current_user()`): `{actor_kind, actor_id, org_id?,
+   party_id?, is_staff}`. **Never** taken from `$_GET`/`$_POST` (the anti-pattern
+   flagged in §3b). This replaces the per-handler `$_SESSION['…']` reads.
+2. **A private-table access contract.** Reads/writes to a table classed PRIVATE in
+   §3c go through a small set of helpers that take the caller context and apply the
+   owner filter for that table. A private-table access with no owner scope **throws**
+   — it never silently returns all rows (I5). The taxonomy/shared masters and the
+   open-requirement pool are exempt (they are read-shared by design).
+3. **Ownership predicates**, one per private table, promoted from today's ad-hoc
+   checks into one place and made mandatory. They already exist and are correct —
+   #9 unifies them:
+   - `cx_bench` / `cx_bench_alloc` → `row.org_id === ctx.org_id || ctx.is_staff`
+     (today: `connect_bench_get($id,$orgId)`'s `WHERE id=? AND org_id=?`).
+   - `cx_requirements` (private facets) → `row.poster_party_id === ctx.party_id ||
+     ctx.is_staff` (today: `portal.php:907`).
+   - `cx_applications` / `cx_messages` → engagement ownership (today:
+     `connect_msg_pro_owns()`, `connect_pro_applications()`'s
+     `WHERE applicant_professional_id=?`).
+   - `cx_verifications` → `subject_kind`+`subject_id` (today:
+     `connect_verify_subject_checks()`).
+4. **Staff override is explicit** (`ctx.is_staff`), logged, and confined to the host
+   operator role via the existing `can()` / `is_*_level()` gates — never inherited by
+   a portal actor. The current staff-only handlers that read across all rows
+   (e.g. `connect_msg_all_thread_apps()`, `ops_connect_bench()`'s request-supplied
+   `org`) stay valid *only* under `ctx.is_staff` and must be re-expressed through the
+   guard so that assumption is checked, not assumed.
+5. **The shared layer** keeps its own rule: read-open, write-owned — a professional
+   edits only their own `cx_professionals` row; a poster edits only their own
+   `cx_requirements` row. The shared *read* path (the recommender
+   `connect_match_for_requirement()`, talent search) is unchanged.
 
-Deliverable of implementation (later): one reviewed module the handlers must use,
-plus tests that *attempt* every cross-org read/write and assert denial.
+Deliverable of implementation (later): one reviewed module (`connect_scope.php`) the
+handlers must call, the predicates above moved into it, every current caller
+migrated to it, and a `test_connect_isolation.php` that *attempts* every cross-org
+read/write (client↔client, agency↔agency, pro↔pro) and asserts denial — the same
+shape as the passing cross-agency assertions already in `test_connect_bench.php`.
 
 ---
 
 ## 6. Migration & rollout (when approved)
 
-1. **Freeze the classification** (§3a) with the owner.
+1. **Freeze the classification** (§3c) with the owner.
 2. **Backfill owner columns** where missing; verify every existing private row has a
    valid owner (no orphans that would fail closed).
 3. **Introduce the guard behind a flag**, in *audit mode* first: it logs any query
@@ -199,11 +270,17 @@ No destructive step; additive columns + a guard; the flag makes it reversible.
 Implementation may begin only after this is agreed, and must ship only after every
 item passes:
 
-- [ ] **Cross-tenant read** — as client A, attempt to read client B's requirement,
-      application, messages, verification: **denied** for each private table.
-- [ ] **Cross-tenant write** — as agency A, attempt to allocate/modify agency B's
-      bench member, or change B's requirement status: **denied**.
-- [ ] **IDOR / enumeration** — sequential-id probing of every private route returns
+- [ ] **Cross-tenant read** — as client A, attempt to read client B's requirement
+      (`/portal/hire-req?id=B`), application, messages, verification: **denied** for
+      each private table. (Extends the existing `portal.php:907` poster check to a
+      guard-enforced predicate.)
+- [ ] **Cross-tenant write** — as agency A, attempt `connect_bench_allocate()` /
+      `connect_bench_update()` on agency B's member, or change B's requirement
+      status: **denied**. (Today `connect_bench_get($id,$orgId)` already blocks this;
+      the test must prove the guard blocks it even if a handler forgets to pass
+      `$orgId`.)
+- [ ] **IDOR / enumeration** — sequential-id probing of every private route
+      (`connect-requirement?id=`, `pro/messages?a=`, `connect-verify`) returns
       nothing for non-owners (I4).
 - [ ] **Deny-by-default** — a deliberately un-scoped private query fails closed (I5).
 - [ ] **Portal boundaries** — `cuid` / `vuid` / `cxpid` sessions cannot reach staff
@@ -224,7 +301,7 @@ item passes:
 - **Guard too strict** (false denials break a legit flow): caught in audit mode
   before enforce; the flag rolls enforcement back instantly without data change.
 - **Guard too loose** (a private table not classified PRIVATE): prevented by the
-  frozen §3a contract + the cross-org test suite; a missing classification is a
+  frozen §3c contract + the cross-org test suite; a missing classification is a
   test failure, not a silent leak.
 - **Option B access-path outage** (workspace can't reach the shared store): the
   marketplace degrades to read-only for that tenant; private ops are unaffected.
@@ -251,7 +328,7 @@ item passes:
 
 ## 10. Recommendation
 
-Approve **§3a (data classification)** and the **staged topology (Option A now,
+Approve **§3c (data classification)** and the **staged topology (Option A now,
 Option B later)**, commission the **security review of the scoping-layer design**,
 then implement in audit-mode → enforce. Until that sign-off, **#9 stays design-only**
 and the marketplace continues on the current single shared store with per-feature
