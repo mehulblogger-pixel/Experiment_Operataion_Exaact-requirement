@@ -41,6 +41,7 @@ $me = $me ?? (function_exists('connect_pro_user') ? connect_pro_user() : null);
   <a class="<?= $here==='pro'?'on':'' ?>" href="/pro">Home</a>
   <a class="<?= $here==='pro/jobs'?'on':'' ?>" href="/pro/jobs">Open jobs</a>
   <a class="<?= $here==='pro/applications'?'on':'' ?>" href="/pro/applications">My applications</a>
+  <a class="<?= $here==='pro/bookings'?'on':'' ?>" href="/pro/bookings">My bookings</a>
   <a class="<?= $here==='pro/profile'?'on':'' ?>" href="/pro/profile">My profile</a>
   <?php $mUn = (function_exists('connect_msg_pro_unread') && $me) ? connect_msg_pro_unread((int)$me['id']) : 0; ?>
   <a class="<?= $here==='pro/messages'?'on':'' ?>" href="/pro/messages">Messages<?= $mUn > 0 ? ' (' . (int)$mUn . ')' : '' ?></a>

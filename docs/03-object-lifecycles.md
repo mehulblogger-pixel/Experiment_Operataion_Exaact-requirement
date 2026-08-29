@@ -348,6 +348,28 @@ A professional's application to a requirement (`CX_APP_TRANSITIONS`). Additive
   apply) is **K2b**, where the new portal permissions will be added to the matrix
   with the owner's sign-off.
 
+## Connect Engagement / Booking (`cx_engagements.status`) — marketplace (K20)
+
+The booking created once a requirement is **AWARDED** — it captures the *basis* on
+which the person is engaged (`lib/connect_engage.php`). Additive `cx_engagements`
+table; one engagement per requirement (upsert). The **basis** is one of
+`MAN_DAYS · MAN_MONTHS · DEPUTATION · CONTINUOUS · FREQUENCY` (a descriptor, not a
+status). The **status** is the engagement's own lifecycle:
+
+> **BOOKED → ACTIVE → COMPLETED**, plus **CANCELLED** as an off-ramp.
+
+- `BOOKED → ACTIVE | CANCELLED`
+- `ACTIVE → COMPLETED | CANCELLED`
+- Terminal: `COMPLETED`, `CANCELLED`. Set via `connect_engage_set_status()`.
+- Recorded/edited only after the requirement is `AWARDED`
+  (`connect_engage_save_for_requirement()`); the subject is derived from the awarded
+  application (professional / inspector / agency-bench). It does not replace the P4
+  **billable event** — it enriches the award with the basis finance bills on.
+- **Permission (K20):** the staff desk reuses **coordinator/master**
+  (`connect_market_can()`) — **no new permission**; a professional sees only their
+  own bookings (`/pro/bookings`, subject-scoped) and withdraws only their own live
+  application. `docs/02-permission-matrix.md` records this.
+
 ## Connect Dispute (`cx_disputes.status`) — marketplace (K9b)
 
 A concern raised on a marketplace engagement (`lib/connect_disputes.php`,

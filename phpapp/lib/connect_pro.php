@@ -208,6 +208,24 @@ function connect_pro_applications($proId) {
     } catch (Throwable $e) { return []; }
 }
 
+/**
+ * A professional withdraws their OWN application — only while it is still in
+ * play (APPLIED / SHORTLISTED / OFFERED). Scoped to the caller so no one can
+ * withdraw another person's application. Returns [ok, message].
+ */
+function connect_pro_withdraw($proId, $applicationId) {
+    $proId = (int)$proId; $applicationId = (int)$applicationId;
+    try { $a = ops_one("SELECT * FROM cx_applications WHERE id=? AND applicant_professional_id=?", [$applicationId, $proId]); }
+    catch (Throwable $e) { $a = null; }
+    if (!$a) return [false, 'That application is not yours.'];
+    $st = strtoupper((string)$a['status']);
+    if (!in_array($st, ['APPLIED', 'SHORTLISTED', 'OFFERED'], true))
+        return [false, 'This application can no longer be withdrawn.'];
+    db()->prepare("UPDATE cx_applications SET status='WITHDRAWN', updated_at=? WHERE id=? AND applicant_professional_id=?")
+        ->execute([date('c'), $applicationId, $proId]);
+    return [true, 'Application withdrawn.'];
+}
+
 function connect_pro_view($name, $vars = []) {
     extract($vars);
     $u = connect_pro_user();
@@ -240,7 +258,19 @@ function connect_pro_route($route, $method) {
 
     switch ($route) {
         case 'pro':
-            connect_pro_view('dashboard', ['me' => $me, 'pct' => connect_pro_profile_pct($me)]); exit;
+            connect_pro_view('dashboard', [
+                'me'    => $me,
+                'pct'   => connect_pro_profile_pct($me),
+                'tier'  => function_exists('connect_verify_tier_for_professional') ? connect_verify_tier_for_professional((int)$me['id']) : 'registered',
+                'trust' => function_exists('connect_trust_score_pro') ? connect_trust_score_pro((int)$me['id']) : null,
+                'apps'  => connect_pro_applications((int)$me['id']),
+                'unread'=> function_exists('connect_msg_pro_unread') ? connect_msg_pro_unread((int)$me['id']) : 0,
+                'openjobs' => function_exists('cx_open_requirements') ? count(cx_open_requirements()) : 0,
+                'bookings' => function_exists('connect_engage_summary_pro') ? connect_engage_summary_pro((int)$me['id']) : ['total' => 0],
+                'prefs' => function_exists('connect_channel_prefs') ? connect_channel_prefs((int)$me['id']) : [],
+                'passport_url' => (function_exists('connect_passport_url') && !empty($me['passport_token']))
+                    ? connect_passport_url((string)$me['passport_token']) : '',
+            ]); exit;
         case 'pro/profile':
             $saved = false;
             if ($method === 'POST') {
@@ -269,8 +299,18 @@ function connect_pro_route($route, $method) {
             $applied = connect_pro_applied_map((int)$me['id']);
             connect_pro_view('jobs', ['me' => $me, 'rows' => $rows, 'applied' => $applied]); exit;
 
-        case 'pro/applications':   // A2 — track my applications
+        case 'pro/applications':   // A2 — track my applications (+ withdraw)
+            if ($method === 'POST' && ($_POST['action'] ?? '') === 'withdraw') {
+                connect_pro_withdraw((int)$me['id'], (int)($_POST['application_id'] ?? 0));
+                redirect('/pro/applications');
+            }
             connect_pro_view('applications', ['me' => $me, 'rows' => connect_pro_applications((int)$me['id'])]); exit;
+
+        case 'pro/bookings':   // K20 — my engagements once a job is booked
+            connect_pro_view('bookings', [
+                'me'   => $me,
+                'rows' => function_exists('connect_engage_for_professional') ? connect_engage_for_professional((int)$me['id']) : [],
+            ]); exit;
 
         case 'pro/messages':   // #4 — two-way messaging on my own engagements
             if (!function_exists('connect_msg_post')) { http_response_code(404); connect_pro_view('dashboard', ['me' => $me, 'pct' => connect_pro_profile_pct($me)]); exit; }

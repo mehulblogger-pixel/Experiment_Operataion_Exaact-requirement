@@ -240,6 +240,7 @@ try {
     require __DIR__ . '/lib/connect_msg.php';      // Connect K15 / #4 — in-app messaging (per-engagement two-way threads)
     require __DIR__ . '/lib/connect_channels.php'; // Connect K16 / #5 — WhatsApp/SMS/email channel (behind the notification seam)
     require __DIR__ . '/lib/connect_bench.php';    // Connect K18 / #7 — agency bench workspace (private roster + allocation)
+    require __DIR__ . '/lib/connect_engage.php';   // Connect K20 — engagements/bookings (man-days / months / deputation / continuous / frequency)
     require __DIR__ . '/lib/connect_analytics.php';// Connect K19 / #8 — labour-market analytics (read-only aggregations over cx_*)
     require __DIR__ . '/lib/connect_passport.php'; // Connect K1 — public professional passport (over the P1 credential vault)
     require __DIR__ . '/lib/connect_market.php';   // Connect K2a — manpower marketplace (post a requirement / apply)

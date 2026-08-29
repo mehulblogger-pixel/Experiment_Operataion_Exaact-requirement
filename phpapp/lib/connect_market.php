@@ -286,6 +286,12 @@ function ops_connect_requirement($method) {
             cx_position_add($id, $_POST) ? flash('Position added to the crew.') : flash('Give the position a role.', 'error');
         } elseif ($act === 'position_delete' && function_exists('cx_position_delete')) {
             cx_position_delete((int)($_POST['position_id'] ?? 0), $id); flash('Position removed.');
+        } elseif ($act === 'book_engagement' && function_exists('connect_engage_save_for_requirement')) {   // K20 — booking basis
+            [$eok, $emsg] = connect_engage_save_for_requirement($id, $_POST);
+            flash($emsg, $eok ? 'success' : 'error');
+        } elseif ($act === 'engagement_status' && function_exists('connect_engage_set_status')) {
+            [$eok, $emsg] = connect_engage_set_status((int)($_POST['engagement_id'] ?? 0), (string)($_POST['status'] ?? ''));
+            flash($emsg, $eok ? 'success' : 'error');
         }
         redirect('/connect-requirement?id=' . $id);
     }
@@ -312,6 +318,9 @@ function ops_connect_requirement($method) {
         'ai_used'      => $GLOBALS['__cx_ai_used'] ?? false,
         // #7 — agency bench people allocated to this requirement (fulfilment view).
         'bench_allocs' => function_exists('connect_bench_allocs_for_requirement') ? connect_bench_allocs_for_requirement($id) : [],
+        // K20 — the booking/engagement basis once awarded (man-days / months / …).
+        'engagement'   => function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement($id) : null,
+        'engage_bases' => function_exists('connect_engage_bases') ? connect_engage_bases() : [],
         // K9 — two-way ratings once the engagement is awarded/closed.
         'can_rate'     => function_exists('cx_rating_allowed') && cx_rating_allowed($req),
         'ratings'      => function_exists('cx_ratings_for_requirement') ? cx_ratings_for_requirement($id) : [],

@@ -189,6 +189,72 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
 </div>
 <?php endif; ?>
 
+<?php
+  // K20 — Booking / engagement basis (man-days / months / deputation / continuous /
+  // frequency). Shown once the requirement is awarded — the day is booked, on what basis?
+  $engagement = $engagement ?? null; $engage_bases = $engage_bases ?? [];
+  $isAwarded = strtoupper((string)($req['status'] ?? '')) === 'AWARDED';
+  if ($isAwarded && $engage_bases):
+    $eg = $engagement ?: [];
+    $curBasis = strtoupper((string)($eg['basis'] ?? 'MAN_DAYS'));
+?>
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 4px">📅 Booking / engagement</h3>
+  <p class="cxmeta" style="margin:0 0 10px">On what basis is this person booked? This is what they see under "My bookings" and what finance bills.</p>
+  <?php if ($engagement): $d = function_exists('connect_engage_describe') ? connect_engage_describe($engagement) : ['commitment'=>'','rate'=>'','total'=>null]; ?>
+    <div class="approw"><div>
+      <strong><?= e(function_exists('connect_engage_basis_label') ? connect_engage_basis_label($engagement['basis']) : $engagement['basis']) ?></strong>
+      · <?= e($d['commitment']) ?><?php if ($d['rate']): ?> · <?= e($d['rate']) ?><?php endif; ?>
+      <?php if ($d['total'] !== null): ?> · est. ₹<?= number_format((int)$d['total']) ?><?php endif; ?>
+      <div class="cxmeta">Status: <?= e(ucfirst(strtolower((string)$engagement['status']))) ?><?php if (!empty($engagement['subject_name'])): ?> · <?= e($engagement['subject_name']) ?><?php endif; ?></div>
+    </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <?php foreach (['ACTIVE'=>'Mark active','COMPLETED'=>'Mark completed','CANCELLED'=>'Cancel'] as $s=>$lbl): if (strtoupper((string)$engagement['status'])===$s) continue; ?>
+          <form method="post" action="/connect-requirement" class="inline">
+            <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engagement_status">
+            <input type="hidden" name="engagement_id" value="<?= (int)$engagement['id'] ?>"><input type="hidden" name="status" value="<?= e($s) ?>">
+            <button class="btn secondary" type="submit"><?= e($lbl) ?></button>
+          </form>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+  <details<?= $engagement ? '' : ' open' ?> style="margin-top:8px">
+    <summary style="cursor:pointer;font-weight:600;font-size:14px"><?= $engagement ? 'Edit booking' : 'Record the booking' ?></summary>
+    <form method="post" action="/connect-requirement" style="margin-top:10px">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="book_engagement">
+      <label style="font-size:13px;font-weight:600">Basis</label>
+      <select name="basis" id="egBasis" onchange="egSync()" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px;margin:4px 0 10px">
+        <?php foreach ($engage_bases as $code=>$b): ?><option value="<?= e($code) ?>" <?= $curBasis===$code?'selected':'' ?>><?= e($b['label']) ?></option><?php endforeach; ?>
+      </select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label style="font-size:13px;font-weight:600">Rate ₹</label><input type="number" name="rate" value="<?= (int)($eg['rate'] ?? 0) ?: '' ?>" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px"></div>
+        <div><label style="font-size:13px;font-weight:600">Per</label>
+          <select name="rate_unit" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px">
+            <?php foreach (['day'=>'day','month'=>'month','visit'=>'visit'] as $u=>$ul): ?><option value="<?= $u ?>" <?= ($eg['rate_unit'] ?? '')===$u?'selected':'' ?>><?= e($ul) ?></option><?php endforeach; ?>
+          </select></div>
+        <div id="egQtyWrap"><label style="font-size:13px;font-weight:600" id="egQtyLabel">Quantity</label><input type="number" step="0.5" name="quantity" value="<?= ($eg['quantity'] ?? 0) ? rtrim(rtrim((string)$eg['quantity'],'0'),'.') : '' ?>" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px"></div>
+        <div id="egFreqWrap"><label style="font-size:13px;font-weight:600">Frequency</label><input type="text" name="frequency_note" value="<?= e($eg['frequency_note'] ?? '') ?>" placeholder="e.g. 2 days / week" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px"></div>
+        <div><label style="font-size:13px;font-weight:600">Start date</label><input type="date" name="start_date" value="<?= e(substr((string)($eg['start_date'] ?? ''),0,10)) ?>" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px"></div>
+        <div id="egEndWrap"><label style="font-size:13px;font-weight:600">End date</label><input type="date" name="end_date" value="<?= e(substr((string)($eg['end_date'] ?? ''),0,10)) ?>" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px"></div>
+      </div>
+      <label style="font-size:13px;font-weight:600;margin-top:8px;display:block">Notes</label>
+      <input type="text" name="notes" value="<?= e($eg['notes'] ?? '') ?>" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px;margin-bottom:10px">
+      <button class="btn" type="submit"><?= $engagement ? 'Update booking' : 'Record booking' ?></button>
+    </form>
+  </details>
+</div>
+<script>
+  var EGB = <?= json_encode(array_map(fn($b)=>['q'=>!empty($b['needs_qty']),'f'=>!empty($b['needs_freq']),'e'=>!empty($b['needs_end']),'ql'=>$b['qty_label']],$engage_bases)) ?>;
+  function egSync(){ var v=document.getElementById('egBasis').value, c=EGB[v]||{};
+    document.getElementById('egQtyWrap').style.display=c.q?'':'none';
+    document.getElementById('egFreqWrap').style.display=c.f?'':'none';
+    document.getElementById('egEndWrap').style.display=c.e?'':'none';
+    if(c.ql) document.getElementById('egQtyLabel').textContent=c.ql; }
+  egSync();
+</script>
+<?php endif; ?>
+
 <?php $bench_allocs = $bench_allocs ?? []; if ($bench_allocs): ?>
 <div class="panel" style="margin-top:12px">
   <h3 style="margin:0 0 6px">🏗️ Agency crew allocated (<?= count($bench_allocs) ?>)</h3>

@@ -137,6 +137,24 @@ add **no new named permission**:
   inspector`), so the client and vendor portals attach to the same threads later
   under their own portal sessions. No object status or module gate is introduced.
 
+### Engagements / bookings + freelancer self-service (K20)
+
+The booking model (`cx_engagements`) and the freelancer gap-fill add **no new
+permission**:
+
+- **Record / edit a booking basis** (man-days / man-months / long-term deputation /
+  continuous / regular frequency), rate, dates and lifecycle status: on the
+  requirement desk, which is already coordinator/master-gated (K2a). A booking can
+  be recorded only **after** the requirement is AWARDED, and its subject is derived
+  from the awarded application (professional / inspector / bench).
+- **Withdraw an application**: a professional withdraws only their **own** live
+  application (APPLIED / SHORTLISTED / OFFERED → WITHDRAWN) via their `/pro`
+  session (`connect_pro_withdraw`, scoped to `cxpid`); never someone else's.
+- **My bookings** (`/pro/bookings`): a professional sees only engagements where they
+  are the subject (subject-scoped). No object status beyond the documented
+  application/requirement lifecycles is introduced; `cx_engagements.status`
+  (BOOKED / ACTIVE / COMPLETED / CANCELLED) is the engagement's own lifecycle.
+
 ### Matching, cross-pool trust & AI re-ranking (K17 / #6)
 
 Adds **no new permission**. The recommender and its cross-pool Trust Score render
