@@ -350,6 +350,38 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <?php endif; ?>
       </div>
       <?php endif; ?>
+
+      <?php // K21 — supporting documents (receipts) the approver verifies
+        $engv_files = $engv_files ?? [];
+        $vfiles = $engv_files[(int)$vv['id']] ?? [];
+        $vCanAttach = in_array(strtoupper((string)$vv['status']), ['DRAFT','SUBMITTED'], true);
+        $vkb = fn($n) => $n >= 1048576 ? round($n/1048576,1).' MB' : max(1,(int)round($n/1024)).' KB';
+      ?>
+      <?php if ($vfiles || $vCanAttach): ?>
+      <div style="margin-top:8px;border-top:1px dashed var(--line,#e3ebea);padding-top:8px">
+        <div class="cxmeta" style="font-weight:600;margin-bottom:6px">📎 Supporting documents<?= $vfiles ? ' (' . count($vfiles) . ')' : '' ?></div>
+        <?php foreach ($vfiles as $f): ?>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:3px 0">
+            <a href="/connect-voucher-file?id=<?= (int)$f['id'] ?>" target="_blank" rel="noopener"><?= e($f['file_name']) ?></a>
+            <span class="cxmeta"><?= e($vkb((int)$f['size'])) ?><?php if (!empty($f['uploaded_name'])): ?> · <?= e($f['uploaded_name']) ?><?php endif; ?>
+            <?php if ($vCanAttach): ?>
+              <form method="post" action="/connect-requirement" style="display:inline;margin:0">
+                <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engv_del_file"><input type="hidden" name="voucher_id" value="<?= (int)$vv['id'] ?>"><input type="hidden" name="file_id" value="<?= (int)$f['id'] ?>">
+                <button class="btn sec" type="submit" style="padding:1px 7px;font-size:11px">✕</button>
+              </form>
+            <?php endif; ?></span>
+          </div>
+        <?php endforeach; ?>
+        <?php if (!$vfiles): ?><p class="cxmeta" style="margin:0 0 6px">None attached yet.</p><?php endif; ?>
+        <?php if ($vCanAttach): ?>
+        <form method="post" action="/connect-requirement" enctype="multipart/form-data" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+          <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engv_add_file"><input type="hidden" name="voucher_id" value="<?= (int)$vv['id'] ?>">
+          <input type="file" name="file" required style="font-size:12px">
+          <button class="btn sec" type="submit" style="font-size:12px">Upload</button>
+        </form>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
     </div>
   <?php endforeach; endif; ?>
 </div>

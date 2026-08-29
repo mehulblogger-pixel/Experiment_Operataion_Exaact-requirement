@@ -397,6 +397,15 @@ Cadence (`PER_DAY | PER_DEPLOYMENT`) is inherited from the engagement.
 - Terminal: `PAID`. Transitions via `connect_engv_set_status()`; only a `DRAFT`
   accepts new/removed lines. On an `INCLUSIVE` engagement every expense head is
   forced to 0 (the rate already covers them).
+- **Supporting documents** (receipts / bills): a voucher carries an additive
+  `cx_engagement_voucher_files` set — the claimant attaches receipts to back the
+  claim and the approver sees them with the voucher. Attachments may be added or
+  removed only while the voucher is **DRAFT or SUBMITTED** (`connect_engv_can_attach`);
+  once `APPROVED`/`PAID` the set is frozen with the decision. Uploads go through the
+  shared `upload_reject_reason()` guard; a document may optionally be pinned to one
+  day line. No new status and **no new permission** — the freelancer serves their own
+  via `/pro/voucher-file`, the desk via `/connect-voucher-file` on the same
+  marketplace gate.
 - **New object lifecycle** (this table did not exist before K21); documented here in
   the same commit as the code. Additive `cx_engagement_vouchers` +
   `cx_engagement_voucher_lines`; **no new named permission** — a professional owns

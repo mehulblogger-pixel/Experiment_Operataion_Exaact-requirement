@@ -1,10 +1,12 @@
 <?php
   // Connect K21 — one engagement voucher. Add days; when the rate is EXCLUSIVE,
   // also add travel/hotel/conveyance/allowances against receipts; then submit.
-  $me = $me ?? []; $v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? [];
+  $me = $me ?? []; $v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? []; $files = $files ?? [];
   if (!$v) { echo '<div class="card"><p class="muted">Voucher not found. <a href="/pro/vouchers">Back to my vouchers</a></p></div>'; return; }
   $exclusive = strtoupper((string)$v['rate_inclusive']) === 'EXCLUSIVE';
   $isDraft   = strtoupper((string)$v['status']) === 'DRAFT';
+  $canAttach = in_array(strtoupper((string)$v['status']), ['DRAFT', 'SUBMITTED'], true);
+  $kb = fn($n) => $n >= 1048576 ? round($n/1048576, 1) . ' MB' : max(1, (int)round($n/1024)) . ' KB';
   $unit      = (string)($v['rate_unit'] ?? 'day');
   $rate      = (float)($v['rate'] ?? 0);
   $inr = fn($n) => '₹' . number_format((int)round((float)$n));
@@ -74,6 +76,58 @@
     </tbody>
   </table>
   </div>
+  <?php endif; ?>
+</div>
+
+<?php // Supporting documents — receipts / bills backing the claim ?>
+<div class="card">
+  <h2>Supporting documents</h2>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">
+    <?= $exclusive
+        ? 'Attach receipts and bills for the expenses you claimed — travel tickets, hotel folio, cab bills. The approver sees them with your voucher.'
+        : 'Attach any supporting paperwork for this claim — the approver sees it with your voucher.' ?>
+  </p>
+  <?php if (!$files): ?>
+    <p class="muted" style="margin:0 0 <?= $canAttach ? '12px' : '0' ?>">No documents attached yet.</p>
+  <?php else: ?>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:<?= $canAttach ? '14px' : '0' ?>">
+      <?php foreach ($files as $f): ?>
+        <?php $forDate = ''; if ((int)$f['line_id'] > 0) { foreach ($lines as $ln) if ((int)$ln['id'] === (int)$f['line_id']) $forDate = substr((string)$ln['work_date'], 0, 10); } ?>
+        <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:9px 12px">
+          <div style="min-width:0">
+            <a href="/pro/voucher-file?id=<?= (int)$f['id'] ?>" target="_blank" rel="noopener" style="font-weight:600;word-break:break-word">📎 <?= e($f['file_name']) ?></a>
+            <div class="muted" style="font-size:12px"><?= e($kb((int)$f['size'])) ?><?php if ($forDate): ?> · for <?= e($forDate) ?><?php endif; ?></div>
+          </div>
+          <?php if ($canAttach): ?>
+          <form method="post" action="/pro/voucher" style="margin:0">
+            <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>">
+            <input type="hidden" name="action" value="del_file"><input type="hidden" name="file_id" value="<?= (int)$f['id'] ?>">
+            <button class="btn sec" type="submit" style="padding:4px 10px;font-size:12px">Remove</button>
+          </form>
+          <?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+  <?php if ($canAttach): ?>
+  <form method="post" action="/pro/voucher" enctype="multipart/form-data">
+    <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>">
+    <input type="hidden" name="action" value="add_file">
+    <div class="grid2">
+      <div><label>Choose a file</label><input type="file" name="file" required></div>
+      <?php if ($lines): ?>
+      <div><label>For which day? (optional)</label>
+        <select name="line_id">
+          <option value="0">— whole voucher —</option>
+          <?php foreach ($lines as $ln): ?>
+            <option value="<?= (int)$ln['id'] ?>"><?= e(substr((string)$ln['work_date'], 0, 10) ?: ('Day #' . (int)$ln['id'])) ?><?php if (!empty($ln['receipt_ref'])): ?> · <?= e($ln['receipt_ref']) ?><?php endif; ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <?php endif; ?>
+    </div>
+    <button class="btn" type="submit" style="margin-top:12px">Upload document</button>
+  </form>
   <?php endif; ?>
 </div>
 

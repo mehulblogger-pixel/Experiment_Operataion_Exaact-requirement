@@ -50,9 +50,18 @@ function connect_engv_migrate() {
         travel REAL DEFAULT 0, lodging REAL DEFAULT 0, conveyance REAL DEFAULT 0, allowance REAL DEFAULT 0, misc REAL DEFAULT 0,
         receipt_ref VARCHAR(120) DEFAULT '', note VARCHAR(300) DEFAULT '',
         created_at VARCHAR(30) DEFAULT '')");
+    // Supporting documents — receipts / bills / boarding passes a claimant
+    // attaches to back a voucher (and, optionally, one day line). Lightweight
+    // base64 storage, mirroring the professional's own file vault. ADDITIVE.
+    db()->exec("CREATE TABLE IF NOT EXISTS cx_engagement_voucher_files (
+        id $pk, voucher_id INT DEFAULT 0, line_id INT DEFAULT 0,
+        file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '', size INT DEFAULT 0, file_data LONGTEXT,
+        uploaded_kind VARCHAR(20) DEFAULT '', uploaded_id INT DEFAULT 0, uploaded_name VARCHAR(150) DEFAULT '',
+        created_at VARCHAR(30) DEFAULT '')");
     try { db()->exec("CREATE INDEX ix_cx_engv_subject ON cx_engagement_vouchers (subject_kind, subject_id)"); } catch (Throwable $e) {}
     try { db()->exec("CREATE INDEX ix_cx_engv_eng ON cx_engagement_vouchers (engagement_id)"); } catch (Throwable $e) {}
     try { db()->exec("CREATE INDEX ix_cx_engvl_v ON cx_engagement_voucher_lines (voucher_id)"); } catch (Throwable $e) {}
+    try { db()->exec("CREATE INDEX ix_cx_engvf_v ON cx_engagement_voucher_files (voucher_id)"); } catch (Throwable $e) {}
 }
 
 /** Reimbursable expense heads — claimable ONLY on an EXCLUSIVE engagement. */
@@ -239,6 +248,74 @@ function connect_engv_summary_for_subject($kind, $id) {
         elseif ($s === 'PAID') { $out['paid']++; $out['paid_value'] += (float)$v['grand_total']; }
     }
     return $out;
+}
+
+// ---------------------------------------------------------------------------
+//  Supporting documents (receipts / bills) on a voucher.
+// ---------------------------------------------------------------------------
+
+/** Supporting docs may be added/removed while the voucher is still open for
+ *  change — DRAFT (being built) or SUBMITTED (under review). Once APPROVED or
+ *  PAID the attachment set is frozen with the decision. */
+function connect_engv_can_attach($v) {
+    return in_array(strtoupper((string)($v['status'] ?? '')), ['DRAFT', 'SUBMITTED'], true);
+}
+
+/** Attach a supporting document to a voucher (optionally to one day line).
+ *  Reuses the shared upload guard. Returns [ok, msg, id]. */
+function connect_engv_file_add($voucherId, $lineId, $file, $byKind = '', $byId = 0, $byName = '') {
+    connect_engv_migrate();
+    $v = connect_engv_get($voucherId);
+    if (!$v) return [false, 'Voucher not found.', 0];
+    if (!connect_engv_can_attach($v)) return [false, 'Documents can be added only while the voucher is a draft or under review.', 0];
+    if (!$file || ($file['tmp_name'] ?? '') === '' || !is_uploaded_file($file['tmp_name']))
+        return [false, 'Choose a file to upload.', 0];
+    $bytes = (string)@file_get_contents($file['tmp_name']);
+    if ($bytes === '') return [false, 'That file looks empty.', 0];
+    if (function_exists('upload_reject_reason')) {
+        $why = upload_reject_reason($bytes, (string)($file['name'] ?? ''), (string)($file['type'] ?? ''));
+        if ($why !== '') return [false, $why, 0];
+    }
+    // If a line is named, it must belong to this voucher.
+    $lineId = (int)$lineId;
+    if ($lineId > 0 && !ops_val("SELECT COUNT(*) FROM cx_engagement_voucher_lines WHERE id=? AND voucher_id=?", [$lineId, (int)$voucherId]))
+        $lineId = 0;
+    db()->prepare("INSERT INTO cx_engagement_voucher_files
+        (voucher_id,line_id,file_name,mime,size,file_data,uploaded_kind,uploaded_id,uploaded_name,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?)")
+        ->execute([(int)$voucherId, $lineId, substr((string)($file['name'] ?? 'file'), 0, 255),
+                   (string)($file['type'] ?? ''), strlen($bytes), base64_encode($bytes),
+                   (string)$byKind, (int)$byId, substr((string)$byName, 0, 150), date('c')]);
+    return [true, 'Supporting document uploaded.', (int)db()->lastInsertId()];
+}
+
+/** All supporting docs for a voucher (metadata only — no bytes), newest first. */
+function connect_engv_files($voucherId) {
+    connect_engv_migrate();
+    return ops_all("SELECT id,voucher_id,line_id,file_name,mime,size,uploaded_kind,uploaded_name,created_at
+                    FROM cx_engagement_voucher_files WHERE voucher_id=? ORDER BY id DESC", [(int)$voucherId]) ?: [];
+}
+/** How many supporting docs a voucher carries. */
+function connect_engv_file_count($voucherId) {
+    connect_engv_migrate();
+    return (int)ops_val("SELECT COUNT(*) FROM cx_engagement_voucher_files WHERE voucher_id=?", [(int)$voucherId]);
+}
+/** One file row WITH bytes, for serving. When $voucherId is given it must match
+ *  (ownership scoping by the caller). */
+function connect_engv_file_row($fileId, $voucherId = 0) {
+    connect_engv_migrate();
+    $row = ops_one("SELECT * FROM cx_engagement_voucher_files WHERE id=?", [(int)$fileId]);
+    if (!$row) return null;
+    if ($voucherId > 0 && (int)$row['voucher_id'] !== (int)$voucherId) return null;
+    return $row;
+}
+/** Remove a supporting doc while the voucher is still open for change. */
+function connect_engv_file_delete($fileId, $voucherId) {
+    connect_engv_migrate();
+    $v = connect_engv_get($voucherId);
+    if (!$v || !connect_engv_can_attach($v)) return false;
+    db()->prepare("DELETE FROM cx_engagement_voucher_files WHERE id=? AND voucher_id=?")->execute([(int)$fileId, (int)$voucherId]);
+    return true;
 }
 
 /** Plain-language one-liner for a voucher header. */

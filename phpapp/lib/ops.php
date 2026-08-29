@@ -3192,6 +3192,8 @@ function ops_dispatch($route, $method) {
             return ops_connect_requirements($route, $method);
         case $route === 'connect-requirement':  // Connect K2a — one requirement (applications + lifecycle)
             return ops_connect_requirement($method);
+        case $route === 'connect-voucher-file': // Connect K21 — serve a voucher's supporting document (desk)
+            return ops_connect_voucher_file();
         case $route === 'connect-concierge':    // Connect K4 — guided requirement builder
             return ops_connect_concierge($method);
         case $route === 'connect-talent':       // Connect A3 — talent search over the shared professional pool

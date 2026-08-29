@@ -218,6 +218,12 @@ named permission**; it reuses the identities already in place:
   (`DRAFT → SUBMITTED → APPROVED → PAID`, `REJECTED` return path) is recorded in
   `docs/03-object-lifecycles.md`. Every money figure stays scoped to the person who
   earned it; nothing here widens who can see billing or profitability.
+- **Supporting documents (receipts / bills)**: the raiser attaches receipts to back
+  the claim; the approver sees them with the voucher. Allowed only while the voucher
+  is DRAFT or SUBMITTED, frozen once approved/paid. A professional serves and manages
+  only their own (`/pro/voucher-file`, subject-scoped); the desk views/uploads on the
+  same coordinator/master marketplace gate (`/connect-voucher-file`). Additive
+  `cx_engagement_voucher_files`; **no new permission**.
 
 ### Matching, cross-pool trust & AI re-ranking (K17 / #6)
 

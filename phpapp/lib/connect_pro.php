@@ -481,6 +481,10 @@ function connect_pro_route($route, $method) {
                 if ($act === 'add_line')      connect_engv_add_line($vid, $_POST);
                 elseif ($act === 'del_line')  connect_engv_delete_line((int)($_POST['line_id'] ?? 0), $vid);
                 elseif ($act === 'submit')    connect_engv_set_status($vid, 'SUBMITTED');
+                elseif ($act === 'add_file' && function_exists('connect_engv_file_add'))
+                    connect_engv_file_add($vid, (int)($_POST['line_id'] ?? 0), $_FILES['file'] ?? null, 'professional', (int)$me['id'], (string)$me['name']);
+                elseif ($act === 'del_file' && function_exists('connect_engv_file_delete'))
+                    connect_engv_file_delete((int)($_POST['file_id'] ?? 0), $vid);
                 redirect('/pro/voucher?id=' . $vid);
             }
             connect_pro_view('voucher', [
@@ -488,7 +492,20 @@ function connect_pro_route($route, $method) {
                 'v'     => connect_engv_get($vid),
                 'lines' => connect_engv_lines($vid),
                 'heads' => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
+                'files' => function_exists('connect_engv_files') ? connect_engv_files($vid) : [],
             ]); exit;
+
+        case 'pro/voucher-file':   // K21 — serve one of my voucher's supporting docs
+            $fid = (int)($_GET['id'] ?? 0);
+            $row = function_exists('connect_engv_file_row') ? connect_engv_file_row($fid) : null;
+            if ($row) { $vv = connect_engv_get((int)$row['voucher_id']);
+                if (!$vv || strtoupper((string)$vv['subject_kind']) !== 'PROFESSIONAL' || (int)$vv['subject_id'] !== (int)$me['id']) $row = null; }
+            if (!$row) { http_response_code(404); echo 'Not found.'; exit; }
+            $bytes = base64_decode((string)$row['file_data']);
+            if (function_exists('send_uploaded_file')) { send_uploaded_file($bytes, (string)$row['file_name'], (string)$row['mime']); exit; }
+            header('Content-Type: ' . ((string)$row['mime'] ?: 'application/octet-stream'));
+            header('Content-Disposition: inline; filename="' . rawurlencode((string)$row['file_name']) . '"');
+            echo $bytes; exit;
 
         case 'pro/documents':   // photo / CV / certificates
             if ($method === 'POST') {

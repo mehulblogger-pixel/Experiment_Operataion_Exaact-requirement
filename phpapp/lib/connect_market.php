@@ -272,6 +272,18 @@ function ops_connect_requirements($route, $method) {
 }
 
 /** Detail: a requirement, its applications, and every lifecycle action. */
+/** K21 — serve one voucher supporting document to the desk (gated). */
+function ops_connect_voucher_file() {
+    ops_require(connect_market_can(), 'The manpower marketplace desk is for coordinators, managers and admins.');
+    $row = function_exists('connect_engv_file_row') ? connect_engv_file_row((int)($_GET['id'] ?? 0)) : null;
+    if (!$row) { http_response_code(404); echo 'Not found.'; return; }
+    $bytes = base64_decode((string)$row['file_data']);
+    if (function_exists('send_uploaded_file')) { send_uploaded_file($bytes, (string)$row['file_name'], (string)$row['mime']); return; }
+    header('Content-Type: ' . ((string)$row['mime'] ?: 'application/octet-stream'));
+    header('Content-Disposition: inline; filename="' . rawurlencode((string)$row['file_name']) . '"');
+    echo $bytes;
+}
+
 function ops_connect_requirement($method) {
     ops_require(connect_market_can(), 'The manpower marketplace desk is for coordinators, managers and admins.');
     $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
@@ -325,6 +337,11 @@ function ops_connect_requirement($method) {
         } elseif ($act === 'engv_status' && function_exists('connect_engv_set_status')) {            // K21 — approve / reject / mark paid
             [$vok, $vmsg] = connect_engv_set_status((int)($_POST['voucher_id'] ?? 0), (string)($_POST['status'] ?? ''), function_exists('user_name') ? user_name(current_user()) : '');
             flash($vmsg, $vok ? 'success' : 'error');
+        } elseif ($act === 'engv_add_file' && function_exists('connect_engv_file_add')) {            // K21 — attach a supporting document (desk-raised voucher)
+            [$vok, $vmsg] = connect_engv_file_add((int)($_POST['voucher_id'] ?? 0), (int)($_POST['line_id'] ?? 0), $_FILES['file'] ?? null, 'staff', 0, function_exists('user_name') ? user_name(current_user()) : '');
+            flash($vmsg, $vok ? 'success' : 'error');
+        } elseif ($act === 'engv_del_file' && function_exists('connect_engv_file_delete')) {
+            connect_engv_file_delete((int)($_POST['file_id'] ?? 0), (int)($_POST['voucher_id'] ?? 0)) ? flash('Document removed.') : flash('Could not remove that document.', 'error');
         }
         redirect('/connect-requirement?id=' . $id);
     }
@@ -357,6 +374,10 @@ function ops_connect_requirement($method) {
         // K21 — the vouchers raised against that engagement (desk approve/pay + on-roll raise).
         'engv_vouchers' => ($eng && function_exists('connect_engv_for_engagement')) ? connect_engv_for_engagement((int)$eng['id']) : [],
         'engv_heads'    => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
+        // K21 — supporting documents per voucher, so the approver can verify receipts.
+        'engv_files'    => ($eng && function_exists('connect_engv_files'))
+            ? array_reduce(connect_engv_for_engagement((int)$eng['id']), function ($m, $vv) { $m[(int)$vv['id']] = connect_engv_files((int)$vv['id']); return $m; }, [])
+            : [],
         // K9 — two-way ratings once the engagement is awarded/closed.
         'can_rate'     => function_exists('cx_rating_allowed') && cx_rating_allowed($req),
         'ratings'      => function_exists('cx_ratings_for_requirement') ? cx_ratings_for_requirement($id) : [],
