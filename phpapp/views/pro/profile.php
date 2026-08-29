@@ -15,6 +15,7 @@
     <label>Mobile</label><input name="mobile" value="<?= e($me['mobile'] ?? '') ?>">
     <label>Skills</label><input name="skills" value="<?= e($me['skills'] ?? '') ?>" placeholder="e.g. Welding inspection, NDT (UT/RT), painting">
     <label>Languages</label><input name="languages" value="<?= e($me['languages'] ?? '') ?>" placeholder="e.g. English, Hindi, Gujarati">
+    <p style="margin:12px 0 0"><a href="/pro/documents" class="btn sec" style="width:100%;text-align:center">📎 Manage photo, CV &amp; certificates →</a></p>
   </div>
 
   <div class="card">

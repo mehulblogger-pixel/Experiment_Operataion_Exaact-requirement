@@ -3,7 +3,7 @@
   // by functions that already exist (#1–#8 + K20 bookings). Phone-first tiles.
   $me = $me ?? []; $pct = (int)($pct ?? 0);
   $tier = $tier ?? 'registered'; $trust = $trust ?? null; $apps = $apps ?? []; $unread = (int)($unread ?? 0);
-  $openjobs = (int)($openjobs ?? 0); $bookings = $bookings ?? ['total' => 0]; $prefs = $prefs ?? []; $passport_url = (string)($passport_url ?? '');
+  $openjobs = (int)($openjobs ?? 0); $bookings = $bookings ?? ['total' => 0]; $prefs = $prefs ?? []; $passport_url = (string)($passport_url ?? ''); $avatar_id = (int)($avatar_id ?? 0);
   $tierLbl = function_exists('connect_verify_tier_label') ? connect_verify_tier_label($tier) : ucfirst((string)$tier);
   $tierRank = function_exists('connect_verify_tier_rank') ? connect_verify_tier_rank($tier) : 0;
   // Application pipeline counts.
@@ -11,8 +11,17 @@
   foreach ($apps as $a) { $s = strtoupper((string)$a['status']); if (isset($pipe[$s])) $pipe[$s]++; }
   $liveApps = $pipe['APPLIED'] + $pipe['SHORTLISTED'] + $pipe['OFFERED'];
 ?>
-<h1>Hello, <?= e($me['name'] ?: 'there') ?></h1>
-<p class="muted" style="margin:0 0 16px">Your professional profile on the pool.</p>
+<div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+  <?php if ($avatar_id): ?>
+    <img src="/pro/file?id=<?= $avatar_id ?>" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:1px solid var(--line);flex:0 0 auto">
+  <?php else: ?>
+    <a href="/pro/documents" title="Add a photo" style="width:56px;height:56px;border-radius:50%;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:20px;color:var(--muted);text-decoration:none">＋</a>
+  <?php endif; ?>
+  <div>
+    <h1 style="margin:0">Hello, <?= e($me['name'] ?: 'there') ?></h1>
+    <p class="muted" style="margin:2px 0 0">Your professional profile on the pool.</p>
+  </div>
+</div>
 
 <style>
   .dtiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -85,10 +94,16 @@
 <div class="card" style="margin-top:14px">
   <h2>Share your Passport</h2>
   <p class="muted" style="margin:0 0 8px">Your public, verifiable page — send it to anyone. It shows your verified credentials and trust, never your contact details.</p>
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <input id="ppurl" value="<?= e($passport_url) ?>" readonly onclick="this.select()" style="flex:1;min-width:180px;font-size:13px">
-    <button class="btn" type="button" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('ppurl').value);this.textContent='Copied ✓'">Copy link</button>
-    <a class="btn sec" href="<?= e($passport_url) ?>" target="_blank" rel="noopener">Open ↗</a>
+  <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+    <?php if (function_exists('qr_svg')): ?>
+      <div style="width:104px;height:104px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;flex:0 0 auto"><?= qr_svg($passport_url, 92) ?></div>
+    <?php endif; ?>
+    <div style="flex:1;min-width:180px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input id="ppurl" value="<?= e($passport_url) ?>" readonly onclick="this.select()" style="flex:1;min-width:160px;font-size:13px">
+      <button class="btn" type="button" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('ppurl').value);this.textContent='Copied ✓'">Copy link</button>
+      <a class="btn sec" href="<?= e($passport_url) ?>" target="_blank" rel="noopener">Open ↗</a>
+      <div class="muted" style="font-size:12px;flex-basis:100%">Scan the QR to open your public Passport — print it on a card or CV.</div>
+    </div>
   </div>
 </div>
 <?php endif; ?>
