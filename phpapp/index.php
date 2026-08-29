@@ -200,6 +200,7 @@ try {
     require __DIR__ . '/lib/hwpoints.php';
     require __DIR__ . '/lib/seed_demo.php';
     require __DIR__ . '/lib/seed_demo_c.php';
+    require __DIR__ . '/lib/seed_connect.php';
     require __DIR__ . '/lib/seed_recruit_cc.php';
     require __DIR__ . '/lib/seed_costing.php';
     require __DIR__ . '/lib/trace_seed.php';
