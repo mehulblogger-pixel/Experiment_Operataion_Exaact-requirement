@@ -23,6 +23,11 @@
   </div>
 </div>
 
+<?php // Shared KPI board — the SAME engine that powers the ops "concern" board and
+      // the client portal, scoped to this freelancer (assignments, booked value,
+      // applications, ratings, verification). No duplicate metric code. ?>
+<?php if (!empty($kpi) && function_exists('connect_kpi_render')) connect_kpi_render($kpi); ?>
+
 <style>
   .dtiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .dtile{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;text-decoration:none;color:inherit;display:block}
@@ -37,6 +42,10 @@
   .cta{display:inline-block;margin-top:8px;font-weight:700;color:var(--teal);font-size:13px}
 </style>
 
+<?php // The KPI board above is the metrics cockpit (assignments, booked value,
+      // applications, ratings, verification). These tiles carry only what the board
+      // does NOT — the profile-completion nudge, messages, and jobs to browse — so
+      // no number is shown twice. ?>
 <div class="dtiles">
   <!-- Profile strength -->
   <a class="dtile wide" href="/pro/profile">
@@ -45,40 +54,11 @@
     <div class="d"><strong style="color:var(--ink)"><?= $pct ?>%</strong> — <?= $pct < 100 ? 'complete it so the right jobs find you →' : 'complete; you\'re visible to clients and agencies.' ?></div>
   </a>
 
-  <!-- Verification tier -->
-  <a class="dtile" href="/pro/verify">
-    <div class="lab">Verification</div>
-    <div class="v" style="font-size:19px"><span class="badge <?= $tierRank >= 1 ? 'b-ver' : 'b-reg' ?>"><?= e($tierLbl) ?></span></div>
-    <div class="d"><?= $tierRank >= 1 ? 'Verified — clients hire with confidence.' : 'Get verified to win more work.' ?></div>
-    <span class="cta">Get verified →</span>
-  </a>
-
-  <!-- Trust score -->
-  <a class="dtile" href="/pro/verify">
-    <div class="lab">Trust Score</div>
-    <div class="v"><?= $trust ? (int)$trust['score'] : 0 ?></div>
-    <div class="d"><?= $trust ? e($trust['band']) : 'New' ?> · out of 1000</div>
-  </a>
-
-  <!-- Applications pipeline -->
-  <a class="dtile" href="/pro/applications">
-    <div class="lab">Applications</div>
-    <div class="v"><?= $liveApps ?></div>
-    <div class="d"><?= (int)$pipe['SHORTLISTED'] ?> shortlisted · <?= (int)$pipe['OFFERED'] ?> offered</div>
-  </a>
-
   <!-- Messages -->
   <a class="dtile" href="/pro/messages">
     <div class="lab">Messages</div>
     <div class="v"><?= $unread ?></div>
     <div class="d"><?= $unread > 0 ? 'unread from the hiring desk' : 'no new messages' ?></div>
-  </a>
-
-  <!-- Bookings -->
-  <a class="dtile" href="/pro/bookings">
-    <div class="lab">My bookings</div>
-    <div class="v"><?= (int)($bookings['active'] ?? 0) + (int)($bookings['booked'] ?? 0) ?></div>
-    <div class="d"><?= (int)($bookings['active'] ?? 0) ?> active · <?= (int)($bookings['booked'] ?? 0) ?> booked</div>
   </a>
 
   <!-- Jobs for you -->

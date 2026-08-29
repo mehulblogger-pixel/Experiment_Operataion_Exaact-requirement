@@ -137,21 +137,32 @@ add **no new named permission**:
   inspector`), so the client and vendor portals attach to the same threads later
   under their own portal sessions. No object status or module gate is introduced.
 
-### Reusable KPI board (ops "concern" + client dashboards)
+### Reusable KPI board (ops "concern" + client + freelancer dashboards)
 
 `connect_kpi_board($scope)` + `connect_kpi_render()` (`lib/connect_kpi.php`) are
 **read-only** and add **no new permission, table or status**. One engine powers
-both dashboards; the difference is only the **audience + scope**:
+all three dashboards; the difference is only the **audience + scope**:
 
 - **Ops dashboard** (`views/dashboard.php`, managers/coordinators branch): staff
   scope — aggregates across all clients. Shown only when `connect_enabled()`.
 - **Client portal dashboard** (`views/portal/dashboard.php`): client scope —
   `party_id = portal_partner_id()`, so a client sees only their own figures.
+- **Freelancer dashboard** (`views/pro/dashboard.php`, `audience = 'pro'`): the
+  professional's own scope — `party_id = cx_professionals.id` from the `/pro`
+  session (`$_SESSION['cxpid']`). The freelancer sees only **their own** cockpit:
+  assignments (`connect_engage_summary_pro`), booked value (deterministic
+  man-days/months × rate from `connect_engage_describe` — never a payout), their
+  applications (`cx_applications.applicant_professional_id`), client ratings on
+  their own awards (`cx_ratings` ⋈ `cx_applications`), and verification tier/trust
+  (`connect_verify_*` / `connect_trust_score_pro`). Escrow/earnings stay out of
+  scope (gated slice #10).
 - Every metric **reuses an existing engine** — `financial_rollup(['partner_id'])`
   (revenue), `complaints.partner_id` (concerns), `report_docs.client_id` (reports
   pending), `jobs↔calls.client_id` (inspections), `cx_ratings`/`rating_all`
-  (ratings) — so no metric is re-implemented. Each figure is only ever as visible
-  as the register behind it (client scoping is enforced by `portal_partner_id()`).
+  (ratings), plus the professional-side engines above — so no metric is
+  re-implemented. Each figure is only ever as visible as the register behind it
+  (client scoping via `portal_partner_id()`; freelancer scoping via the `/pro`
+  session identity).
 
 ### Engagements / bookings + freelancer self-service (K20)
 

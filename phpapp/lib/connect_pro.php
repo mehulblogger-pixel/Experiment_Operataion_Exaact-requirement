@@ -404,6 +404,9 @@ function connect_pro_route($route, $method) {
                 'passport_url' => (function_exists('connect_passport_url') && !empty($me['passport_token']))
                     ? connect_passport_url((string)$me['passport_token']) : '',
                 'avatar_id' => function_exists('connect_pro_avatar_id') ? connect_pro_avatar_id((int)$me['id']) : 0,
+                // Same KPI engine as the ops "concern" and client dashboards, at
+                // the freelancer's own scope — no duplicate metric code.
+                'kpi' => function_exists('connect_kpi_board') ? connect_kpi_board(['audience' => 'pro', 'party_id' => (int)$me['id']]) : null,
             ]); exit;
         case 'pro/profile':
             $saved = false;

@@ -72,6 +72,54 @@ try {
     ob_start(); connect_kpi_render($b); $html = ob_get_clean();
     t_ok(strpos($html, 'kpiq-row') !== false, 'the shared renderer emits the KPI board markup');
     t_ok(strpos($html, 'Inspections') !== false, 'the rendered board shows the Inspections tile');
+
+    // --- the SAME engine at 'pro' scope builds a freelancer cockpit -----------
+    // A professional with a completed man-days booking, an offered application,
+    // and a client rating on that booking.
+    db()->prepare("INSERT INTO cx_professionals (name, email, created_at) VALUES ('KPI Pro', 'kpipro@example.test', ?)")->execute([date('c')]);
+    $proId = (int)db()->lastInsertId();
+    // a requirement + awarded application belonging to this pro
+    db()->prepare("INSERT INTO cx_requirements (ref_code, title, status, created_at) VALUES ('R-KPI','Weld QA','AWARDED',?)")->execute([date('c')]);
+    $rid = (int)db()->lastInsertId();
+    db()->prepare("INSERT INTO cx_applications (requirement_id, applicant_professional_id, applicant_name, status) VALUES (?,?,'KPI Pro','AWARDED')")->execute([$rid, $proId]);
+    $aid = (int)db()->lastInsertId();
+    // a second, still-open OFFERED application (attention item)
+    db()->prepare("INSERT INTO cx_requirements (ref_code, title, status, created_at) VALUES ('R-KP2','NDT','OPEN',?)")->execute([date('c')]);
+    $rid2 = (int)db()->lastInsertId();
+    db()->prepare("INSERT INTO cx_applications (requirement_id, applicant_professional_id, applicant_name, status) VALUES (?,?,'KPI Pro','OFFERED')")->execute([$rid2, $proId]);
+    // a completed man-days engagement: 10 days × ₹4000 = ₹40,000 booked value
+    db()->prepare("INSERT INTO cx_engagements (requirement_id, application_id, subject_kind, subject_id, basis, rate, rate_unit, quantity, status, created_at)
+                   VALUES (?,?, 'professional', ?, 'MAN_DAYS', 4000, 'day', 10, 'COMPLETED', ?)")->execute([$rid, $aid, $proId, date('c')]);
+    // a CONTINUOUS engagement contributes NO deterministic value (open-ended)
+    db()->prepare("INSERT INTO cx_engagements (requirement_id, application_id, subject_kind, subject_id, basis, rate, rate_unit, status, created_at)
+                   VALUES (?,?, 'professional', ?, 'CONTINUOUS', 90000, 'month', 'ACTIVE', ?)")->execute([$rid, $aid, $proId, date('c')]);
+    // a client-to-pro rating on the awarded booking
+    db()->prepare("INSERT INTO cx_ratings (requirement_id, application_id, direction, stars, created_at) VALUES (?,?, 'CLIENT_TO_PRO', 5, ?)")->execute([$rid, $aid, date('c')]);
+
+    $p = connect_kpi_board(['audience' => 'pro', 'party_id' => $proId]);
+    t_eq($p['audience'], 'pro', 'the pro board knows its audience');
+    t_eq($p['raw']['assignments_done'], 1, 'pro assignments done counts completed engagements');
+    t_eq($p['raw']['assignments_active'], 1, 'pro assignments active counts active engagements');
+    t_eq($p['raw']['booked_value'], 40000.0, 'booked value sums only deterministic man-days/months totals');
+    t_eq($p['raw']['apps_offered'], 1, 'pro applications counts the offered application');
+    t_ok($p['raw']['apps_live'] >= 1, 'pro live applications includes the offer');
+    t_eq($p['raw']['rating_avg'], 5.0, 'pro rating averages client-to-pro ratings on its own awards');
+    t_eq(count($p['tiles']), 5, 'the pro board has five tiles');
+    $pkeys = array_map(fn($t) => $t['key'], $p['tiles']);
+    foreach (['assignments', 'value', 'applications', 'ratings', 'verification'] as $k)
+        t_ok(in_array($k, $pkeys, true), "the pro board has the $k tile");
+    $palabels = array_map(fn($a) => $a['label'], $p['actions']);
+    t_ok(in_array('Offers to respond', $palabels, true), 'the pro board surfaces offers to respond');
+    // A stranger pro with nothing sees an honest, empty board — no invented value.
+    db()->prepare("INSERT INTO cx_professionals (name, email, created_at) VALUES ('Empty Pro', 'emptypro@example.test', ?)")->execute([date('c')]);
+    $proId2 = (int)db()->lastInsertId();
+    $p2 = connect_kpi_board(['audience' => 'pro', 'party_id' => $proId2]);
+    t_eq($p2['raw']['assignments_done'], 0, 'an empty pro shows zero assignments');
+    t_eq($p2['raw']['booked_value'], 0.0, 'an empty pro shows zero booked value');
+    t_ok($p2['raw']['rating_avg'] === null, 'an empty pro has no rating average');
+    // The shared renderer handles the pro board too.
+    ob_start(); connect_kpi_render($p); $phtml = ob_get_clean();
+    t_ok(strpos($phtml, 'Booked value') !== false, 'the rendered pro board shows the Booked value tile');
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }
