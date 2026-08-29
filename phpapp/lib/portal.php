@@ -919,9 +919,51 @@ function portal_route($route, $method) {
                 $_SESSION['portal_flash'] = 'Updated.';
                 redirect('/portal/hire-req?id=' . (int)$req['id']);
             }
+            // K21 — vouchers raised against this posted job's engagement, so the
+            // client can review receipts, return for clarification, or approve.
+            $engRow = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement((int)$req['id']) : null;
             portal_view('hire_req', ['req' => $req, 'apps' => cx_applications_for((int)$req['id']),
-                'req_next' => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? []]);
+                'req_next' => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
+                'vouchers' => ($engRow && function_exists('connect_engv_for_engagement')) ? connect_engv_for_engagement((int)$engRow['id']) : []]);
             exit;
+
+        case 'portal/voucher':   // K21 — the client reviews one voucher on its own posted job
+            portal_need('market.vouchers', 'reviewing vouchers');
+            if (!function_exists('connect_engv_get')) { http_response_code(404); portal_view('notfound'); exit; }
+            $vid = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+            $v = connect_engv_get($vid);
+            if (!$v || !connect_engv_owned_by_party($v, portal_partner_id())) { http_response_code(404); portal_view('notfound'); exit; }
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                $who = 'Client · ' . portal_client_name();
+                if ($act === 'approve') {
+                    [$ok, $msg] = connect_engv_set_status($vid, 'APPROVED', $who);
+                    $_SESSION['portal_flash'] = $ok ? 'Voucher approved.' : $msg;
+                } elseif ($act === 'return') {
+                    [$ok, $msg] = connect_engv_set_status($vid, 'REJECTED', $who, (string)($_POST['note'] ?? ''));
+                    $_SESSION['portal_flash'] = $ok ? 'Returned to the inspector for clarification.' : $msg;
+                }
+                redirect('/portal/voucher?id=' . $vid);
+            }
+            portal_view('voucher', [
+                'v'     => $v,
+                'lines' => function_exists('connect_engv_lines') ? connect_engv_lines($vid) : [],
+                'heads' => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
+                'files' => function_exists('connect_engv_files') ? connect_engv_files($vid) : [],
+            ]);
+            exit;
+
+        case 'portal/voucher-file':   // K21 — serve a receipt on the client's own posted-job voucher
+            portal_need('market.vouchers', 'reviewing vouchers');
+            $row = function_exists('connect_engv_file_row') ? connect_engv_file_row((int)($_GET['id'] ?? 0)) : null;
+            if ($row) { $vv = connect_engv_get((int)$row['voucher_id']);
+                if (!$vv || !connect_engv_owned_by_party($vv, portal_partner_id())) $row = null; }
+            if (!$row) { http_response_code(404); echo 'Not found.'; exit; }
+            $bytes = base64_decode((string)$row['file_data']);
+            if (function_exists('send_uploaded_file')) { send_uploaded_file($bytes, (string)$row['file_name'], (string)$row['mime']); exit; }
+            header('Content-Type: ' . ((string)$row['mime'] ?: 'application/octet-stream'));
+            header('Content-Disposition: inline; filename="' . rawurlencode((string)$row['file_name']) . '"');
+            echo $bytes; exit;
 
         // Phase 10 (CVP) Slice 3: the client sees nonconformities raised to them
         // (marked client-visible) and responds — the same engine loop the vendor
@@ -1178,6 +1220,7 @@ const PORTAL_PERMS = [
     'deputation.approve' => 'Approve or return attendance / timesheet periods',
     'issues'             => 'See nonconformities raised to them and respond',
     'market.post'        => 'Post technical-manpower requirements to the marketplace and manage applications',
+    'market.vouchers'    => 'Review vouchers on your own posted jobs — see receipts, return for clarification, approve',
 ];
 
 // A constant cannot call T(), so the labels that name a business noun are

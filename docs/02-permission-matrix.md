@@ -218,6 +218,14 @@ named permission**; it reuses the identities already in place:
   (`DRAFT → SUBMITTED → APPROVED → PAID`, `REJECTED` return path) is recorded in
   `docs/03-object-lifecycles.md`. Every money figure stays scoped to the person who
   earned it; nothing here widens who can see billing or profitability.
+- **Client review of a posted-job voucher** (marketplace matchmaker model): the
+  client who posted the job reviews the professional's claim in its portal — sees the
+  fee, day lines and **receipts**, then **returns for clarification** (with a note) or
+  **approves**. Gated by a **new client-portal permission `market.vouchers`** (portal
+  permission system, not the staff `can()` matrix — doc 02's staff matrix does not
+  govern portals); ownership is by the voucher's `poster_party_id`, so a client sees
+  only its own posted-job vouchers. The professional reopens a returned voucher and
+  resubmits. No new voucher status.
 - **Supporting documents (receipts / bills)**: the raiser attaches receipts to back
   the claim; the approver sees them with the voucher. Allowed only while the voucher
   is DRAFT or SUBMITTED, frozen once approved/paid. A professional serves and manages

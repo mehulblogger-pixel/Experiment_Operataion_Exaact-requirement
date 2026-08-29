@@ -397,6 +397,15 @@ Cadence (`PER_DAY | PER_DEPLOYMENT`) is inherited from the engagement.
 - Terminal: `PAID`. Transitions via `connect_engv_set_status()`; only a `DRAFT`
   accepts new/removed lines. On an `INCLUSIVE` engagement every expense head is
   forced to 0 (the rate already covers them).
+- **Who reviews / approves**: for a **client-posted** marketplace engagement the
+  **client** who posted the job is the reviewer — the platform is a matchmaker, not a
+  paymaster. The client **returns for clarification** (`SUBMITTED → REJECTED`, with a
+  note in `decided_note`) or **approves** (`SUBMITTED → APPROVED`); the professional
+  reopens a returned voucher (`REJECTED → DRAFT`, which clears the note), revises and
+  resubmits. For an **on-roll / bench** engagement the internal desk plays that role
+  on the existing coordinator/master gate. Same states, no new status — only who is
+  allowed to move them (client, via the `market.vouchers` portal permission, scoped
+  to their own `poster_party_id`).
 - **Supporting documents** (receipts / bills): a voucher carries an additive
   `cx_engagement_voucher_files` set — the claimant attaches receipts to back the
   claim and the approver sees them with the voucher. Attachments may be added or

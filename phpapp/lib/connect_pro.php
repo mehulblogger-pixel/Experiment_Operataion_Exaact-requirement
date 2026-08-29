@@ -481,6 +481,7 @@ function connect_pro_route($route, $method) {
                 if ($act === 'add_line')      connect_engv_add_line($vid, $_POST);
                 elseif ($act === 'del_line')  connect_engv_delete_line((int)($_POST['line_id'] ?? 0), $vid);
                 elseif ($act === 'submit')    connect_engv_set_status($vid, 'SUBMITTED');
+                elseif ($act === 'reopen')    connect_engv_set_status($vid, 'DRAFT');   // revise a returned voucher
                 elseif ($act === 'add_file' && function_exists('connect_engv_file_add'))
                     connect_engv_file_add($vid, (int)($_POST['line_id'] ?? 0), $_FILES['file'] ?? null, 'professional', (int)$me['id'], (string)$me['name']);
                 elseif ($act === 'del_file' && function_exists('connect_engv_file_delete'))

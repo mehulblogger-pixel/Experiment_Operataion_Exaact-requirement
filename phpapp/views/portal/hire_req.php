@@ -1,7 +1,9 @@
 <?php
 // Connect K2b — the client manages one of its own requirements: who applied, and
 // shortlist / offer / award / reject. Ownership is enforced in the route.
-$req = $req ?? []; $apps = $apps ?? []; $req_next = $req_next ?? [];
+$req = $req ?? []; $apps = $apps ?? []; $req_next = $req_next ?? []; $vouchers = $vouchers ?? [];
+$vinr = fn($n) => '₹' . number_format((int)round((float)$n));
+$vlabel = ['DRAFT'=>['Draft','muted'],'SUBMITTED'=>['Awaiting your review','warn'],'APPROVED'=>['Approved','ok'],'PAID'=>['Paid','ok'],'REJECTED'=>['Returned','err']];
 $pill = function ($s) {
     $s = strtoupper((string)$s);
     $map = ['OPEN'=>'ok','SHORTLISTING'=>'ok','AWARDED'=>'ok','ACCEPTED'=>'ok','OFFERED'=>'ok','SHORTLISTED'=>'ok',
@@ -64,4 +66,20 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
       </div>
     <?php endforeach; ?>
   </div>
+<?php endif; ?>
+
+<?php if ($vouchers): ?>
+<h3 class="ptitle" style="font-size:16px;margin-top:24px">Vouchers</h3>
+<p class="plead" style="margin:-4px 0 10px">Claims raised by the professional against this job — review the receipts, return for clarification, or approve.</p>
+<div class="pcard" style="max-width:680px">
+  <?php foreach ($vouchers as $vv): [$vl,$vc] = $vlabel[strtoupper((string)$vv['status'])] ?? $vlabel['DRAFT']; ?>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line,#eee)">
+      <div>
+        <a href="/portal/voucher?id=<?= (int)$vv['id'] ?>"><strong><?= e($vv['period_label'] ?: 'Voucher') ?></strong></a>
+        <div style="font-size:12.5px;color:var(--muted)">Fee <?= e($vinr($vv['fee_total'])) ?><?php if (strtoupper((string)$vv['rate_inclusive'])==='EXCLUSIVE'): ?> · Expenses <?= e($vinr($vv['reimb_total'])) ?><?php endif; ?> · Total <?= e($vinr($vv['grand_total'])) ?></div>
+      </div>
+      <span class="ppill <?= $vc ?>"><?= e($vl) ?></span>
+    </div>
+  <?php endforeach; ?>
+</div>
 <?php endif; ?>

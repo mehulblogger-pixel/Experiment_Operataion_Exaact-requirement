@@ -22,6 +22,18 @@ listed as follow-up work in `99-gaps-and-risks.md`.
   the voucher model (K21) is fixed from the moment the client posts. The client then
   shortlists and awards its own applicants (`views/portal/hire_req.php`). This uses
   the existing `market.post` permission only — no new right is introduced.
+- **Review vouchers (Connect marketplace):** the platform is a **matchmaker**, not a
+  paymaster — the professional claims their fee + **actual** expenses (with receipts,
+  after the inspection; no advances), and the **client who posted the job** reviews
+  the claim. On the awarded job (`portal/hire-req`) and the voucher page
+  (`views/portal/voucher.php`) the client sees the fee, the day lines, the expense
+  heads and the **receipts** (served ownership-scoped via `portal/voucher-file`), and
+  either **returns it for clarification** with a note (→ the voucher's `REJECTED`
+  state, note recorded; the professional reopens, revises and resubmits) or
+  **approves** it (→ `APPROVED`). Gated by a new client-portal permission
+  `market.vouchers`; ownership is by the voucher's `poster_party_id`, so a client
+  only ever sees vouchers on its **own** posted jobs. No new voucher status — the
+  client is simply the reviewer for a client-posted engagement.
 - **Boundary:** a client sees only their own records — never other clients', never
   internal money/cost figures. Marketplace postings are scoped to the poster party
   (`cx_requirements_for_party`).

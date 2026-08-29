@@ -198,8 +198,10 @@ function connect_engv_recompute($voucherId) {
         ->execute([$fee, $reimb, round($fee + $reimb, 2), date('c'), (int)$voucherId]);
 }
 
-/** Move a voucher along its lifecycle. Returns [ok, msg]. */
-function connect_engv_set_status($voucherId, $to, $by = '') {
+/** Move a voucher along its lifecycle. Returns [ok, msg]. The optional $note is
+ *  recorded as the decision note — used e.g. when a client returns a voucher to
+ *  the inspector for clarification (SUBMITTED → REJECTED). */
+function connect_engv_set_status($voucherId, $to, $by = '', $note = '') {
     connect_engv_migrate();
     $v = connect_engv_get($voucherId); if (!$v) return [false, 'Voucher not found.'];
     $to = strtoupper((string)$to);
@@ -209,10 +211,25 @@ function connect_engv_set_status($voucherId, $to, $by = '') {
 
     $now = date('c'); $sets = "status=?, updated_at=?"; $args = [$to, $now];
     if ($to === 'SUBMITTED') { $sets .= ", submitted_at=?"; $args[] = $now; }
-    if (in_array($to, ['APPROVED', 'REJECTED', 'PAID'], true)) { $sets .= ", decided_at=?, decided_by=?"; $args[] = $now; $args[] = (string)$by; }
+    if (in_array($to, ['APPROVED', 'REJECTED', 'PAID'], true)) {
+        $sets .= ", decided_at=?, decided_by=?, decided_note=?"; $args[] = $now; $args[] = (string)$by; $args[] = substr((string)$note, 0, 300);
+    }
+    // Re-opening a returned voucher to revise it clears the prior decision note.
+    if ($to === 'DRAFT') { $sets .= ", decided_note=?"; $args[] = ''; }
     $args[] = (int)$voucherId;
     db()->prepare("UPDATE cx_engagement_vouchers SET $sets WHERE id=?")->execute($args);
     return [true, 'Voucher ' . strtolower(connect_engv_status_label($to)) . '.'];
+}
+
+/** True when this poster party (a client) owns the voucher's requirement — i.e.
+ *  the voucher is a claim against a job THAT client posted. Gates client review. */
+function connect_engv_owned_by_party($voucher, $partyId) {
+    return (int)($voucher['poster_party_id'] ?? 0) === (int)$partyId && (int)$partyId > 0;
+}
+/** All vouchers a poster party may review (their own posted jobs), newest first. */
+function connect_engv_for_poster_party($partyId) {
+    connect_engv_migrate();
+    return ops_all("SELECT * FROM cx_engagement_vouchers WHERE poster_party_id=? ORDER BY id DESC", [(int)$partyId]) ?: [];
 }
 
 /** All vouchers for one engagement, newest first. */

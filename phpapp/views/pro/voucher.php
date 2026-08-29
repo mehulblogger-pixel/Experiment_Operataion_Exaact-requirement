@@ -35,6 +35,22 @@
       : 'Your rate is all-inclusive — add each ' . e($unit) . ' worked. Travel, hotel and allowances are already covered, so no expense claim is needed.' ?>
 </p>
 
+<?php // Returned for clarification — show the client's note and a way to revise ?>
+<?php if (strtoupper((string)$v['status']) === 'REJECTED'): ?>
+<div class="card" style="border-left:4px solid #9a2a2a">
+  <h2 style="margin:0 0 6px">Returned for clarification</h2>
+  <?php if (!empty($v['decided_note'])): ?>
+    <p style="margin:0 0 10px">The client asked: <em>“<?= e($v['decided_note']) ?>”</em></p>
+  <?php else: ?>
+    <p class="muted" style="margin:0 0 10px">The client returned this voucher. Revise it and resubmit.</p>
+  <?php endif; ?>
+  <form method="post" action="/pro/voucher" style="margin:0">
+    <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="reopen">
+    <button class="btn" type="submit">Revise this voucher</button>
+  </form>
+</div>
+<?php endif; ?>
+
 <?php // Totals ?>
 <div class="card" style="display:flex;gap:18px;flex-wrap:wrap">
   <div><div class="muted" style="font-size:12px">Fee</div><div style="font-size:22px;font-weight:800"><?= e($inr($v['fee_total'])) ?></div></div>
