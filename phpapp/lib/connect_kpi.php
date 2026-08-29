@@ -44,6 +44,11 @@ function connect_kpi_board($scope = []) {
     // ratings, verification) rather than the org registers. Delegated so the
     // client/staff path below is untouched.
     if (($scope['audience'] ?? '') === 'pro') return connect_kpi_board_pro((int)($scope['party_id'] ?? 0));
+    // The field inspector sees THEIR OWN cockpit — same engine, same renderer,
+    // fed by the core jobs register (own inspector_id) and the inspector rating
+    // summary. No money figure (least-privilege), delegated so the client/staff
+    // path below is untouched.
+    if (($scope['audience'] ?? '') === 'inspector') return connect_kpi_board_inspector((int)($scope['party_id'] ?? 0));
 
     $isClient = (($scope['audience'] ?? 'staff') === 'client');
     $pid = (int)($scope['party_id'] ?? 0);
@@ -241,6 +246,64 @@ function connect_kpi_board_pro($proId) {
 }
 
 /**
+ * The field inspector's own KPI board (audience 'inspector'). Every figure
+ * REUSES the core jobs register scoped to the inspector's own `inspector_id`
+ * (exactly the counts the inspector dashboard already ran) plus the existing
+ * inspector rating summary — no new query surface, no new table. Least-
+ * privilege: NO money figure (billing / profitability is never the inspector's).
+ */
+function connect_kpi_board_inspector($inspectorId) {
+    $inspectorId = (int)$inspectorId;
+    $today = date('Y-m-d');
+    $c = function ($sql, $extra = []) use ($inspectorId) {
+        if ($inspectorId <= 0) return 0;
+        return connect_kpi_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$inspectorId], $extra));
+    };
+    $open    = $c("closed_flag=0");
+    $done    = $c("closed_flag=1");
+    $overdue = $c("closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
+    $reports = $c("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
+
+    // Ratings — reuse the inspector rating summary (marketplace two-way ratings).
+    $ratingAvg = null; $ratingN = 0;
+    if (function_exists('cx_rating_summary_for_inspector')) {
+        try {
+            $rs = cx_rating_summary_for_inspector($inspectorId);
+            if ((int)($rs['count'] ?? 0) > 0 && ($rs['avg_stars'] ?? null) !== null) {
+                $ratingN = (int)$rs['count']; $ratingAvg = round((float)$rs['avg_stars'], 1);
+            }
+        } catch (Throwable $e) {}
+    }
+
+    $tiles = [
+        ['key' => 'active', 'icon' => '🗂', 'label' => 'Active jobs', 'value' => (string)$open,
+         'sub' => $open > 0 ? 'assigned to you' : 'nothing open', 'tone' => 'info', 'url' => '/my-jobs?f=open'],
+        ['key' => 'reports', 'icon' => '📄', 'label' => 'Reports pending', 'value' => (string)$reports,
+         'sub' => $reports > 0 ? 'to write & submit' : 'up to date', 'tone' => $reports > 0 ? 'warn' : 'ok', 'url' => '/my-jobs?f=reports'],
+        ['key' => 'overdue', 'icon' => '⏰', 'label' => 'Overdue', 'value' => (string)$overdue,
+         'sub' => $overdue > 0 ? 'past due date' : 'on track', 'tone' => $overdue > 0 ? 'bad' : 'ok', 'url' => '/my-jobs?f=overdue'],
+        ['key' => 'ratings', 'icon' => '⭐', 'label' => 'Ratings', 'value' => $ratingAvg !== null ? number_format($ratingAvg, 1) : '—',
+         'sub' => $ratingN > 0 ? ($ratingN . ' rated') : 'no ratings yet', 'tone' => ($ratingAvg !== null && $ratingAvg >= 4) ? 'ok' : '', 'url' => ''],
+        ['key' => 'completed', 'icon' => '✅', 'label' => 'Completed', 'value' => (string)$done,
+         'sub' => $done > 0 ? 'jobs closed' : 'none yet', 'tone' => '', 'url' => '/my-jobs'],
+    ];
+
+    $actions = [];
+    if ($reports > 0) $actions[] = ['label' => 'Reports pending', 'n' => $reports, 'url' => '/my-jobs?f=reports', 'tone' => 'warn'];
+    if ($overdue > 0) $actions[] = ['label' => 'Overdue jobs', 'n' => $overdue, 'url' => '/my-jobs?f=overdue', 'tone' => 'bad'];
+
+    return [
+        'audience' => 'inspector',
+        'tiles'    => $tiles,
+        'actions'  => $actions,
+        'raw'      => [
+            'active' => $open, 'completed' => $done, 'overdue' => $overdue, 'reports_pending' => $reports,
+            'rating_avg' => $ratingAvg, 'rating_n' => $ratingN,
+        ],
+    ];
+}
+
+/**
  * Render the board using the app's ONE universal KPI-card design.
  *
  * The markup carries the design-system class names — `.kpi-row`, `.kpi`
@@ -249,12 +312,12 @@ function connect_kpi_board_pro($proId) {
  * board IS the universal component: no second definition, and any future
  * tweak to `.kpi` in the design system flows straight through.
  *
- * The client and freelancer portals are self-contained (their own tokens, no
- * app.css), so a single zero-specificity `:where()` fallback reproduces the
- * SAME card spec from each portal's own variables (with design-system hex
- * fallbacks). Because `:where()` has zero specificity, the real component
- * always wins wherever app.css is present, and the fallback only fills in
- * where it is absent — one look everywhere, no override, no drift.
+ * The client, freelancer and inspector-portal contexts that are self-contained
+ * (their own tokens, no app.css) get a single zero-specificity `:where()`
+ * fallback reproducing the SAME card spec from each context's own variables
+ * (with design-system hex fallbacks). Because `:where()` has zero specificity,
+ * the real component always wins wherever app.css is present, and the fallback
+ * only fills in where it is absent — one look everywhere, no override, no drift.
  */
 function connect_kpi_render($board) {
     if (!is_array($board) || empty($board['tiles'])) return;

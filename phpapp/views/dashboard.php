@@ -28,12 +28,21 @@
     $myReports = $mc("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
     $myDone    = $mc("closed_flag=1");
   ?>
-  <div class="qcards" style="margin-top:18px">
-    <a class="qcard tone-info" href="/my-jobs?f=open"><div class="qic">🗂</div><div class="qn"><?= $myOpen ?></div><div class="ql">Open jobs to do</div></a>
-    <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports pending</div></a>
-    <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Overdue</div></a>
-    <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn"><?= e(cur_sym()) ?></div><div class="ql">This month's voucher</div></a>
-  </div>
+  <?php // My cockpit — the SAME universal KPI board that powers the client and
+        // freelancer dashboards, here at the inspector's own scope (own jobs +
+        // ratings). One engine, one card design, no duplicate metric code. ?>
+  <?php if (function_exists('connect_kpi_render') && function_exists('connect_kpi_board')): ?>
+    <div style="margin-top:18px"><?php connect_kpi_render(connect_kpi_board(['audience' => 'inspector', 'party_id' => (int)$myId])); ?></div>
+  <?php else: ?>
+    <div class="qcards" style="margin-top:18px">
+      <a class="qcard tone-info" href="/my-jobs?f=open"><div class="qic">🗂</div><div class="qn"><?= $myOpen ?></div><div class="ql">Open jobs to do</div></a>
+      <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports pending</div></a>
+      <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Overdue</div></a>
+      <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn"><?= e(cur_sym()) ?></div><div class="ql">This month's voucher</div></a>
+    </div>
+  <?php endif; ?>
+  <?php // Quick actions the metric board does not carry — jump to the full job
+        // list, and the monthly voucher (their timesheet + expense claim). ?>
   <div class="qcards" style="grid-template-columns:repeat(2,1fr)">
     <a class="qcard" href="/my-jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">All my jobs</div><div class="ql"><?= $myOpen ?> open · <?= $myDone ?> completed</div></a>
     <a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">My Voucher</div><div class="ql">Enter km &amp; expenses</div></a>

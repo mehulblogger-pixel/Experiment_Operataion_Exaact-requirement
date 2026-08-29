@@ -125,6 +125,36 @@ try {
     // The shared renderer handles the pro board too.
     ob_start(); connect_kpi_render($p); $phtml = ob_get_clean();
     t_ok(strpos($phtml, 'Booked value') !== false, 'the rendered pro board shows the Booked value tile');
+
+    // --- the SAME engine at 'inspector' scope builds a field cockpit ----------
+    // Jobs are scoped by the inspector's own inspector_id; ratings via the
+    // inspector rating summary. No money figure appears (least-privilege).
+    $insp = 90177; $yst = date('Y-m-d', strtotime('-1 day'));
+    // open + report pending (has a report frequency, not yet uploaded)
+    db()->prepare("INSERT INTO jobs (inspector_id, closed_flag, reporting_frequency, report_upload_date, created_at) VALUES (?,0,'PERIODIC','',?)")->execute([$insp, date('c')]);
+    // open + overdue (end date in the past) + NOREPORT (so not a pending report)
+    db()->prepare("INSERT INTO jobs (inspector_id, closed_flag, inspection_end_date, reporting_frequency, created_at) VALUES (?,0,?, 'NOREPORT', ?)")->execute([$insp, $yst, date('c')]);
+    // completed
+    db()->prepare("INSERT INTO jobs (inspector_id, closed_flag, created_at) VALUES (?,1,?)")->execute([$insp, date('c')]);
+    // two client→inspector ratings: avg 4.5
+    db()->prepare("INSERT INTO cx_ratings (ratee_inspector_id, direction, stars, created_at) VALUES (?, 'CLIENT_TO_PRO', 4, ?)")->execute([$insp, date('c')]);
+    db()->prepare("INSERT INTO cx_ratings (ratee_inspector_id, direction, stars, created_at) VALUES (?, 'CLIENT_TO_PRO', 5, ?)")->execute([$insp, date('c')]);
+
+    $ins = connect_kpi_board(['audience' => 'inspector', 'party_id' => $insp]);
+    t_eq($ins['audience'], 'inspector', 'the inspector board knows its audience');
+    t_eq($ins['raw']['active'], 2, 'inspector active jobs counts this inspector\'s open jobs only');
+    t_eq($ins['raw']['completed'], 1, 'inspector completed counts this inspector\'s closed jobs');
+    t_eq($ins['raw']['overdue'], 1, 'inspector overdue counts past-due open jobs');
+    t_eq($ins['raw']['reports_pending'], 1, 'inspector reports-pending excludes NOREPORT jobs');
+    t_eq($ins['raw']['rating_avg'], 4.5, 'inspector rating averages client-to-inspector ratings');
+    t_eq(count($ins['tiles']), 5, 'the inspector board has five tiles');
+    $ikeys = array_map(fn($t) => $t['key'], $ins['tiles']);
+    foreach (['active', 'reports', 'overdue', 'ratings', 'completed'] as $k)
+        t_ok(in_array($k, $ikeys, true), "the inspector board has the $k tile");
+    // No money key is ever exposed to the inspector.
+    t_ok(!isset($ins['raw']['billed']) && !isset($ins['raw']['booked_value']), 'the inspector board carries no money figure');
+    ob_start(); connect_kpi_render($ins); $ihtml = ob_get_clean();
+    t_ok(strpos($ihtml, 'Overdue') !== false, 'the rendered inspector board shows the Overdue tile');
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }

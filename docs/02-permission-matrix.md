@@ -137,11 +137,11 @@ add **no new named permission**:
   inspector`), so the client and vendor portals attach to the same threads later
   under their own portal sessions. No object status or module gate is introduced.
 
-### Reusable KPI board (ops "concern" + client + freelancer dashboards)
+### Reusable KPI board (ops "concern" + client + freelancer + inspector dashboards)
 
 `connect_kpi_board($scope)` + `connect_kpi_render()` (`lib/connect_kpi.php`) are
 **read-only** and add **no new permission, table or status**. One engine powers
-all three dashboards; the difference is only the **audience + scope**:
+all four dashboards; the difference is only the **audience + scope**:
 
 - **Ops dashboard** (`views/dashboard.php`, managers/coordinators branch): staff
   scope — aggregates across all clients. Shown only when `connect_enabled()`.
@@ -156,6 +156,14 @@ all three dashboards; the difference is only the **audience + scope**:
   their own awards (`cx_ratings` ⋈ `cx_applications`), and verification tier/trust
   (`connect_verify_*` / `connect_trust_score_pro`). Escrow/earnings stay out of
   scope (gated slice #10).
+- **Inspector dashboard** (`views/dashboard.php`, `is_field_inspector()` branch,
+  `audience = 'inspector'`): the field engineer's own scope — `party_id =`
+  the user's `inspector_id`. Reuses **only** the core `jobs` register scoped to
+  their own `inspector_id` (active / completed / overdue / reports-pending — the
+  same counts the inspector dashboard already ran) plus the inspector rating
+  summary (`cx_rating_summary_for_inspector`). **Least-privilege: the board
+  carries NO money figure** — billing and profitability are never the
+  inspector's — so it adds no visibility the role did not already have.
 - Every metric **reuses an existing engine** — `financial_rollup(['partner_id'])`
   (revenue), `complaints.partner_id` (concerns), `report_docs.client_id` (reports
   pending), `jobs↔calls.client_id` (inspections), `cx_ratings`/`rating_all`
