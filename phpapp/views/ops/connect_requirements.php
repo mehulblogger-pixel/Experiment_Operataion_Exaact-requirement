@@ -34,6 +34,31 @@ $pill = function ($s) {
   <div class="kpi"><span class="kic">🙋</span><div class="k">Applications</div><div class="v"><?= (int)($summary['apps'] ?? 0) ?></div></div>
 </div>
 
+<?php // K21 — platform commission: the matchmaker's revenue + the rate control ?>
+<?php $commission = $commission ?? null; $is_master = $is_master ?? false;
+  if ($commission): $cinr = fn($n) => '₹' . number_format((int)round((float)$n));
+  $crate = rtrim(rtrim(number_format((float)($commission['rate'] ?? 0), 2), '0'), '.'); ?>
+<div class="panel" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:18px 26px;align-items:center;justify-content:space-between">
+  <div style="display:flex;flex-wrap:wrap;gap:18px 26px;align-items:baseline">
+    <div><div class="sub" style="font-size:12px">Commission rate</div><div style="font-size:22px;font-weight:800"><?= e($crate) ?>%</div><div class="sub" style="font-size:11px">on the fee, split 50/50</div></div>
+    <div><div class="sub" style="font-size:12px">Earned (accepted)</div><div style="font-size:22px;font-weight:800;color:#0f7d5a"><?= e($cinr($commission['earned'] ?? 0)) ?></div></div>
+    <div><div class="sub" style="font-size:12px">Settled</div><div style="font-size:22px;font-weight:800"><?= e($cinr($commission['settled'] ?? 0)) ?></div></div>
+    <div><div class="sub" style="font-size:12px">In review</div><div style="font-size:22px;font-weight:800;color:#8a6d0b"><?= e($cinr($commission['pipeline'] ?? 0)) ?></div></div>
+  </div>
+  <?php if ($is_master): ?>
+  <form method="post" action="/connect-requirements" style="display:flex;gap:8px;align-items:center;margin:0">
+    <input type="hidden" name="action" value="set_commission">
+    <label style="font-size:13px;color:var(--muted,#5b6b6a)">Set rate
+      <input type="number" name="commission_pct" value="<?= e($crate) ?>" min="0" max="100" step="0.25" style="width:80px;padding:8px;border:1px solid var(--line,#dde3e2);border-radius:8px;margin-left:6px">%
+    </label>
+    <button class="btn secondary" type="submit">Save</button>
+  </form>
+  <?php else: ?>
+    <div class="sub" style="font-size:12px">The platform is a matchmaker — it only takes this commission for the match.</div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div style="margin-top:12px"><a class="btn" href="/connect-concierge">💬 Guided post — answer a few questions</a></div>
 
 <details class="panel" style="margin-top:12px">

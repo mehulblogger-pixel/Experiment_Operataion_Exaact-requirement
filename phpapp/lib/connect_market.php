@@ -253,6 +253,17 @@ function ops_connect_requirements($route, $method) {
     connect_market_migrate();
     if ($method === 'POST') {
         $act = (string)($_POST['action'] ?? 'create');
+        if ($act === 'set_commission') {   // K21 — the platform's commission rate (master only)
+            if (function_exists('is_master') && is_master() && function_exists('setting_set')) {
+                $pct = (float)($_POST['commission_pct'] ?? 5);
+                if ($pct < 0) $pct = 0; if ($pct > 100) $pct = 100;
+                setting_set('connect_commission_pct', $pct);
+                flash('Platform commission set to ' . rtrim(rtrim(number_format($pct, 2), '0'), '.') . '%.');
+            } else {
+                flash('Only an administrator can change the platform commission.', 'error');
+            }
+            redirect('/connect-requirements');
+        }
         if ($act === 'create' || $act === 'create_post') {
             if (trim((string)($_POST['title'] ?? '')) === '') { flash('Give the requirement a title.', 'error'); redirect('/connect-requirements'); }
             $id = cx_requirement_create($_POST, $act === 'create_post');
@@ -267,11 +278,23 @@ function ops_connect_requirements($route, $method) {
         'sectors'    => function_exists('connect_tx_rows') ? connect_tx_rows('cx_sectors') : [],
         'disciplines'=> function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
         'partners'   => ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) AS nm FROM business_partners WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY nm") ?: [],
+        'commission' => function_exists('connect_commission_summary') ? connect_commission_summary() : null,
+        'is_master'  => function_exists('is_master') && is_master(),
     ]);
     return true;
 }
 
 /** Detail: a requirement, its applications, and every lifecycle action. */
+/** K21 — was this requirement posted by a CLIENT (vs an internal/agency job)?
+ *  For a client-posted job the client reviews and approves the voucher in its
+ *  portal, so the desk does not approve/pay it. */
+function connect_requirement_client_posted($req) {
+    $pid = (int)($req['poster_party_id'] ?? 0);
+    if ($pid <= 0) return false;
+    try { return (int)ops_val("SELECT COALESCE(is_client,0) FROM business_partners WHERE id=?", [$pid]) === 1; }
+    catch (Throwable $e) { return false; }
+}
+
 /** K21 — serve one voucher supporting document to the desk (gated). */
 function ops_connect_voucher_file() {
     ops_require(connect_market_can(), 'The manpower marketplace desk is for coordinators, managers and admins.');
@@ -368,6 +391,9 @@ function ops_connect_requirement($method) {
         'ai_used'      => $GLOBALS['__cx_ai_used'] ?? false,
         // #7 — agency bench people allocated to this requirement (fulfilment view).
         'bench_allocs' => function_exists('connect_bench_allocs_for_requirement') ? connect_bench_allocs_for_requirement($id) : [],
+        // K21 — a client-posted job is reviewed/approved by the CLIENT in its
+        // portal, so the desk shows the vouchers read-only (no approve/pay here).
+        'client_posted' => connect_requirement_client_posted($req),
         // K20 — the booking/engagement basis once awarded (man-days / months / …).
         'engagement'   => ($eng = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement($id) : null),
         'engage_bases' => function_exists('connect_engage_bases') ? connect_engage_bases() : [],

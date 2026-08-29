@@ -228,6 +228,13 @@ named permission**; it reuses the identities already in place:
   route (`portal/report-file`) enforces this (HTTP 402 until cleared). **No new
   permission** — the client uses `market.vouchers`, the professional their own `/pro`
   session; commission and settlement are recorded, not gated by a new right.
+  The **commission rate** is set on the marketplace board (`/connect-requirements`)
+  by a **master** only (`setting connect_commission_pct`), which also shows the
+  platform's earned / settled / in-review commission rollup. On a **client-posted**
+  job the ops desk shows the vouchers **read-only** — the approve / send-back /
+  mark-paid and raise actions are hidden (the client drives them in its portal);
+  `connect_requirement_client_posted()` decides this from the poster being a client
+  party.
 - **Client review of a posted-job voucher** (marketplace matchmaker model): the
   client who posted the job reviews the professional's claim in its portal — sees the
   fee, day lines and **receipts**, then **returns for clarification** (with a note) or

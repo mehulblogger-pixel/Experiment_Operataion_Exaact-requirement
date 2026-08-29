@@ -275,7 +275,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       // for an on-roll inspector or agency-bench person (who have no portal). A
       // marketplace freelancer raises their own in /pro; the desk still approves. ?>
 <?php if ($engagement):
-  $engv_vouchers = $engv_vouchers ?? []; $engv_heads = $engv_heads ?? [];
+  $engv_vouchers = $engv_vouchers ?? []; $engv_heads = $engv_heads ?? []; $client_posted = $client_posted ?? false;
   $exclusiveEng = strtoupper((string)($engagement['rate_inclusive'] ?? 'INCLUSIVE')) === 'EXCLUSIVE';
   $engUnit = (string)($engagement['rate_unit'] ?? 'day');
   $vpill = function ($s) {
@@ -290,14 +290,18 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   <h3 style="margin:0 0 4px">🧾 Engagement vouchers</h3>
   <p class="cxmeta" style="margin:0 0 10px">
     <?= $exclusiveEng ? 'Fee-only (exclusive) rate — claims carry travel / hotel / conveyance / allowances against receipts.' : 'All-inclusive rate — claims carry the fee only.' ?>
-    A marketplace freelancer raises their own in the portal; here the desk approves and pays, and can raise one for an on-roll inspector or bench person.
+    <?= $client_posted
+        ? 'This job was posted by the client, who reviews and approves the voucher in their own portal — the desk sees it here read-only.'
+        : 'A marketplace freelancer raises their own in the portal; here the desk approves and pays, and can raise one for an on-roll inspector or bench person.' ?>
   </p>
 
+  <?php if (!$client_posted): ?>
   <form method="post" action="/connect-requirement" style="margin:0 0 12px">
     <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engv_raise">
     <input type="hidden" name="engagement_id" value="<?= (int)$engagement['id'] ?>">
     <button class="btn sec" type="submit">+ Raise a voucher</button>
   </form>
+  <?php endif; ?>
 
   <?php if (!$engv_vouchers): ?>
     <p class="cxmeta" style="margin:0">No vouchers yet.</p>
@@ -314,7 +318,9 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <?= $vpill($vv['status']) ?>
       </div>
 
-      <?php if ($vdraft): ?>
+      <?php if ($client_posted): ?>
+        <p class="cxmeta" style="margin:8px 0 0">🔒 The client reviews &amp; approves this voucher in their portal.</p>
+      <?php elseif ($vdraft): ?>
       <details style="margin-top:8px">
         <summary style="cursor:pointer;font-size:13px;font-weight:600">Add a <?= e($engUnit) ?></summary>
         <form method="post" action="/connect-requirement" style="margin-top:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
