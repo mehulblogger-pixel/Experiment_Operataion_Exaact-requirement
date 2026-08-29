@@ -315,7 +315,7 @@ Ranked by "distance to a credible, trusted, lean launch of the ITSN".
 | **6** | **Marketplace matching/trust on the unified pool + optional AI ranking** — **✅ cross-pool Trust Score + AI re-ranking overlay done; semantic embeddings & pro job-history buckets remain** | Intelligence | Recommend across the whole pool | M |
 | **7** | **Agency bench workspace** (agency adds/allocates its own people) — **✅ private roster + allocation + utilisation done; vendor-portal self-service surface remains** | Supply | Agencies as fulfillers, not just applicants | M |
 | **8** | **Labour-market analytics** (supply/demand, fill rate, rate benchmarks) — **✅ read-only dashboard done; time-series & anonymised external product remain** | Moat/Revenue | Data product; ops insight | M |
-| **9** | **Phase-B2 per-org gating + isolation** (topology decision + security review) | Architecture | Enforce org entitlements across orgs | L (needs sign-off) |
+| **9** | **Phase-B2 per-org gating + isolation** (topology decision + security review) — **📄 design written for review: `docs/connect/07-per-org-isolation-design.md` (no code until sign-off)** | Architecture | Enforce org entitlements across orgs | L (needs sign-off) |
 | **10** | **Escrow / payment rail** (Phase 6) | Money | Only after PMF + CA/RBI/legal | L (external blockers) |
 | — | **Phase-0 market research / PRD / customer interviews** | Business | Founder/market work, not code | — |
 
