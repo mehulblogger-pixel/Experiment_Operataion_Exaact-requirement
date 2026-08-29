@@ -68,6 +68,26 @@ function connect_market_migrate() {
     // a party, not a pool inspector. Additive column so those applications
     // dedupe correctly on the applying party.
     if (function_exists('ensure_column')) ensure_column('cx_applications', 'applicant_party_id', 'INT DEFAULT 0');
+    // Deputation & rate terms chosen at posting — the preferred engagement basis,
+    // the rate model (all-inclusive vs fee-only), and the voucher cadence. These
+    // seed the booking (cx_engagements) and are additive/defaulted.
+    if (function_exists('ensure_column')) {
+        ensure_column('cx_requirements', 'deputation_basis', "VARCHAR(20) DEFAULT ''");      // '' = any; else a connect_engage basis
+        ensure_column('cx_requirements', 'rate_inclusive', "VARCHAR(12) DEFAULT 'INCLUSIVE'"); // INCLUSIVE | EXCLUSIVE
+        ensure_column('cx_requirements', 'voucher_cadence', "VARCHAR(14) DEFAULT 'PER_DEPLOYMENT'"); // PER_DAY | PER_DEPLOYMENT
+    }
+}
+
+/** Persist the posting-time deputation/rate terms on a requirement (additive). */
+function cx_requirement_save_terms($id, array $in) {
+    connect_market_migrate();
+    $basis = strtoupper((string)($in['deputation_basis'] ?? ''));
+    if ($basis !== '' && function_exists('connect_engage_bases') && !isset(connect_engage_bases()[$basis])) $basis = '';
+    $rate = function_exists('connect_engage_norm_rate_model') ? connect_engage_norm_rate_model($in['rate_inclusive'] ?? 'INCLUSIVE') : 'INCLUSIVE';
+    $cad  = function_exists('connect_engage_norm_cadence') ? connect_engage_norm_cadence($in['voucher_cadence'] ?? 'PER_DEPLOYMENT') : 'PER_DEPLOYMENT';
+    db()->prepare("UPDATE cx_requirements SET deputation_basis=?, rate_inclusive=?, voucher_cadence=?, updated_at=? WHERE id=?")
+        ->execute([$basis, $rate, $cad, date('c'), (int)$id]);
+    return true;
 }
 
 /** Next requirement reference — CX-REQ-0001, monotonic on id. */
@@ -96,7 +116,11 @@ function cx_requirement_create(array $in, $post = false) {
             (string)($in['rate_unit'] ?? ''), trim((string)($in['description'] ?? '')), $status,
             function_exists('user_name') ? user_name(current_user()) : '', $now, $post ? $now : '', $now,
         ]);
-    return (int)db()->lastInsertId();
+    $id = (int)db()->lastInsertId();
+    // Deputation / rate terms, when the posting form supplied them.
+    if (isset($in['deputation_basis']) || isset($in['rate_inclusive']) || isset($in['voucher_cadence']))
+        cx_requirement_save_terms($id, $in);
+    return $id;
 }
 
 function cx_requirement_get($id) { return ops_one("SELECT * FROM cx_requirements WHERE id=?", [(int)$id]) ?: null; }

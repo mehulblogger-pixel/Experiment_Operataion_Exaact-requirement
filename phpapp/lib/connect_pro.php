@@ -458,6 +458,38 @@ function connect_pro_route($route, $method) {
                 'rows' => function_exists('connect_engage_for_professional') ? connect_engage_for_professional((int)$me['id']) : [],
             ]); exit;
 
+        case 'pro/vouchers':   // K21 — my engagement vouchers (inclusive/exclusive)
+            if ($method === 'POST' && ($_POST['action'] ?? '') === 'raise' && function_exists('connect_engv_open_for_engagement')) {
+                $engId = (int)($_POST['engagement_id'] ?? 0);
+                // Ownership: the engagement must be THIS professional's.
+                $eng = ops_one("SELECT id FROM cx_engagements WHERE id=? AND subject_kind='professional' AND subject_id=?", [$engId, (int)$me['id']]);
+                if ($eng) { [$ok, , $vid] = connect_engv_open_for_engagement($engId, []); if ($ok && $vid) redirect('/pro/voucher?id=' . $vid); }
+                redirect('/pro/vouchers');
+            }
+            connect_pro_view('vouchers', [
+                'me'          => $me,
+                'rows'        => function_exists('connect_engv_for_professional') ? connect_engv_for_professional((int)$me['id']) : [],
+                'engagements' => function_exists('connect_engage_for_professional') ? connect_engage_for_professional((int)$me['id']) : [],
+            ]); exit;
+
+        case 'pro/voucher':    // K21 — one voucher: add days/expenses, submit
+            $vid = (int)($_GET['id'] ?? ($_POST['voucher_id'] ?? 0));
+            $v = function_exists('connect_engv_get') ? connect_engv_get($vid) : null;
+            if (!$v || strtoupper((string)$v['subject_kind']) !== 'PROFESSIONAL' || (int)$v['subject_id'] !== (int)$me['id']) { redirect('/pro/vouchers'); }
+            if ($method === 'POST') {
+                $act = $_POST['action'] ?? '';
+                if ($act === 'add_line')      connect_engv_add_line($vid, $_POST);
+                elseif ($act === 'del_line')  connect_engv_delete_line((int)($_POST['line_id'] ?? 0), $vid);
+                elseif ($act === 'submit')    connect_engv_set_status($vid, 'SUBMITTED');
+                redirect('/pro/voucher?id=' . $vid);
+            }
+            connect_pro_view('voucher', [
+                'me'    => $me,
+                'v'     => connect_engv_get($vid),
+                'lines' => connect_engv_lines($vid),
+                'heads' => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
+            ]); exit;
+
         case 'pro/documents':   // photo / CV / certificates
             if ($method === 'POST') {
                 if (($_POST['action'] ?? '') === 'delete') connect_pro_file_delete((int)($_POST['file_id'] ?? 0), (int)$me['id']);

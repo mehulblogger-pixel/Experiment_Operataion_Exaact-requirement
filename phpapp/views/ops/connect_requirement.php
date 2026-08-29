@@ -205,8 +205,10 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     <div class="approw"><div>
       <strong><?= e(function_exists('connect_engage_basis_label') ? connect_engage_basis_label($engagement['basis']) : $engagement['basis']) ?></strong>
       · <?= e($d['commitment']) ?><?php if ($d['rate']): ?> · <?= e($d['rate']) ?><?php endif; ?>
+      <?php $exM = strtoupper((string)($engagement['rate_inclusive'] ?? 'INCLUSIVE')) === 'EXCLUSIVE'; ?>
+      · <?= $exM ? 'Fee + expenses' : 'All-inclusive' ?>
       <?php if ($d['total'] !== null): ?> · est. ₹<?= number_format((int)$d['total']) ?><?php endif; ?>
-      <div class="cxmeta">Status: <?= e(ucfirst(strtolower((string)$engagement['status']))) ?><?php if (!empty($engagement['subject_name'])): ?> · <?= e($engagement['subject_name']) ?><?php endif; ?></div>
+      <div class="cxmeta">Status: <?= e(ucfirst(strtolower((string)$engagement['status']))) ?><?php if (!empty($engagement['subject_name'])): ?> · <?= e($engagement['subject_name']) ?><?php endif; ?><?php if (function_exists('connect_engv_summary_for_subject') && !empty($engagement['subject_kind'])): $vs = connect_engv_summary_for_subject($engagement['subject_kind'], (int)$engagement['subject_id']); if ($vs['total'] > 0): ?> · <?= (int)$vs['total'] ?> voucher<?= $vs['total']===1?'':'s' ?> (<?= (int)$vs['submitted']+(int)$vs['approved'] ?> pending)<?php endif; endif; ?></div>
     </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <?php foreach (['ACTIVE'=>'Mark active','COMPLETED'=>'Mark completed','CANCELLED'=>'Cancel'] as $s=>$lbl): if (strtoupper((string)$engagement['status'])===$s) continue; ?>
@@ -237,7 +239,22 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <div id="egFreqWrap"><label style="font-size:13px;font-weight:600">Frequency</label><input type="text" name="frequency_note" value="<?= e($eg['frequency_note'] ?? '') ?>" placeholder="e.g. 2 days / week" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px"></div>
         <div><label style="font-size:13px;font-weight:600">Start date</label><input type="date" name="start_date" value="<?= e(substr((string)($eg['start_date'] ?? ''),0,10)) ?>" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px"></div>
         <div id="egEndWrap"><label style="font-size:13px;font-weight:600">End date</label><input type="date" name="end_date" value="<?= e(substr((string)($eg['end_date'] ?? ''),0,10)) ?>" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px"></div>
+        <?php
+          $curModel = strtoupper((string)($eg['rate_inclusive'] ?? ($req['rate_inclusive'] ?? 'INCLUSIVE')));
+          $curCad   = strtoupper((string)($eg['voucher_cadence'] ?? ($req['voucher_cadence'] ?? 'PER_DEPLOYMENT')));
+          $rateModels = function_exists('connect_engage_rate_models') ? connect_engage_rate_models() : [];
+          $cadences   = function_exists('connect_engage_voucher_cadences') ? connect_engage_voucher_cadences() : [];
+        ?>
+        <div><label style="font-size:13px;font-weight:600">Rate model</label>
+          <select name="rate_inclusive" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px">
+            <?php foreach ($rateModels as $mk=>$mv): ?><option value="<?= e($mk) ?>" <?= $curModel===$mk?'selected':'' ?>><?= e($mv['label']) ?></option><?php endforeach; ?>
+          </select></div>
+        <div><label style="font-size:13px;font-weight:600">Voucher cadence</label>
+          <select name="voucher_cadence" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px">
+            <?php foreach ($cadences as $ck=>$cv): ?><option value="<?= e($ck) ?>" <?= $curCad===$ck?'selected':'' ?>><?= e($cv['label']) ?></option><?php endforeach; ?>
+          </select></div>
       </div>
+      <p class="cxmeta" style="margin:6px 0 0"><strong>All-inclusive</strong> = the rate covers travel, hotel, conveyance &amp; allowances. <strong>Fee only</strong> = those are reimbursed on the person's voucher against receipts.</p>
       <label style="font-size:13px;font-weight:600;margin-top:8px;display:block">Notes</label>
       <input type="text" name="notes" value="<?= e($eg['notes'] ?? '') ?>" style="width:100%;padding:9px;border:1px solid var(--line,#ddd);border-radius:9px;margin-bottom:10px">
       <button class="btn" type="submit"><?= $engagement ? 'Update booking' : 'Record booking' ?></button>

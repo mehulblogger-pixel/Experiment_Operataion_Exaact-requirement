@@ -241,6 +241,7 @@ try {
     require __DIR__ . '/lib/connect_channels.php'; // Connect K16 / #5 — WhatsApp/SMS/email channel (behind the notification seam)
     require __DIR__ . '/lib/connect_bench.php';    // Connect K18 / #7 — agency bench workspace (private roster + allocation)
     require __DIR__ . '/lib/connect_engage.php';   // Connect K20 — engagements/bookings (man-days / months / deputation / continuous / frequency)
+    require __DIR__ . '/lib/connect_engvoucher.php';// Connect K21 — engagement vouchers (inclusive/exclusive, per-day/per-deployment; freelancer + on-roll)
     require __DIR__ . '/lib/connect_kpi.php';      // Connect — reusable KPI board (one engine + renderer for ops "concern" + client dashboards)
     require __DIR__ . '/lib/connect_analytics.php';// Connect K19 / #8 — labour-market analytics (read-only aggregations over cx_*)
     require __DIR__ . '/lib/connect_passport.php'; // Connect K1 — public professional passport (over the P1 credential vault)

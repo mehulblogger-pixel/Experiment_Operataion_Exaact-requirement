@@ -197,6 +197,28 @@ permission**:
   application/requirement lifecycles is introduced; `cx_engagements.status`
   (BOOKED / ACTIVE / COMPLETED / CANCELLED) is the engagement's own lifecycle.
 
+### Engagement vouchers — inclusive / exclusive, per-day / per-deployment (K21)
+
+The claim raised against a booking (`lib/connect_engvoucher.php`). Adds **no new
+named permission**; it reuses the identities already in place:
+
+- **Rate model chosen at posting.** The client sets `rate_inclusive`
+  (all-inclusive vs fee-only) and `voucher_cadence` (per-day vs per-deployment) on
+  the requirement when posting; the booking inherits them, and the desk can adjust
+  them on the booking form (coordinator/master gate, K2a). This decides whether the
+  voucher may claim reimbursable heads (travel / hotel / local conveyance /
+  allowances) — an INCLUSIVE rate claims none.
+- **Raise / edit / submit a voucher**: the subject owns only their **own** vouchers.
+  A marketplace professional does this in their `/pro` session (`/pro/vouchers`,
+  scoped to `cxpid`); the same engine serves an **inspector on a company/agency
+  roll** and an **agency-bench** person (subject-scoped, `connect_engv_for_subject`).
+  A draft is editable; once **SUBMITTED** it is locked to the raiser.
+- **Approve / mark paid**: on the marketplace desk's existing coordinator/master
+  gate — **no new permission**. The voucher lifecycle
+  (`DRAFT → SUBMITTED → APPROVED → PAID`, `REJECTED` return path) is recorded in
+  `docs/03-object-lifecycles.md`. Every money figure stays scoped to the person who
+  earned it; nothing here widens who can see billing or profitability.
+
 ### Matching, cross-pool trust & AI re-ranking (K17 / #6)
 
 Adds **no new permission**. The recommender and its cross-pool Trust Score render

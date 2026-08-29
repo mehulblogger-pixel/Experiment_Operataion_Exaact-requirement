@@ -369,6 +369,39 @@ status). The **status** is the engagement's own lifecycle:
   (`connect_market_can()`) — **no new permission**; a professional sees only their
   own bookings (`/pro/bookings`, subject-scoped) and withdraws only their own live
   application. `docs/02-permission-matrix.md` records this.
+- **Rate model & voucher cadence (K21):** the booking also carries how the rate is
+  quoted — `rate_inclusive` = `INCLUSIVE` (the rate covers fee + travel / hotel /
+  local conveyance / allowances) or `EXCLUSIVE` (fee only; those are reimbursed) —
+  and `voucher_cadence` = `PER_DAY | PER_DEPLOYMENT`. Both are chosen by the client
+  at posting (`cx_requirements.rate_inclusive / voucher_cadence`, via
+  `cx_requirement_save_terms()`) and inherited by the booking. Descriptors, not
+  statuses.
+
+## Connect Engagement Voucher (`cx_engagement_vouchers.status`) — marketplace + on-roll (K21)
+
+A claim the engaged person raises against their booking (`lib/connect_engvoucher.php`).
+**ONE** model serves every case because the engagement's subject is already
+`professional | inspector | bench`: a marketplace freelancer, an inspector on a
+company/agency roll, or an agency-bench person all raise the same voucher. A voucher
+= header + day/period lines; **fee = Σ(units × rate)**; **reimbursable = Σ(expense
+heads)** *only* when the engagement is `EXCLUSIVE`; **grand = fee + reimbursable**.
+Cadence (`PER_DAY | PER_DEPLOYMENT`) is inherited from the engagement.
+
+> **DRAFT → SUBMITTED → APPROVED → PAID**, with **REJECTED** ("sent back") as a
+> return path.
+
+- `DRAFT → SUBMITTED` (needs at least one line)
+- `SUBMITTED → APPROVED | REJECTED | DRAFT`
+- `APPROVED → PAID | REJECTED`
+- `REJECTED → DRAFT | SUBMITTED`
+- Terminal: `PAID`. Transitions via `connect_engv_set_status()`; only a `DRAFT`
+  accepts new/removed lines. On an `INCLUSIVE` engagement every expense head is
+  forced to 0 (the rate already covers them).
+- **New object lifecycle** (this table did not exist before K21); documented here in
+  the same commit as the code. Additive `cx_engagement_vouchers` +
+  `cx_engagement_voucher_lines`; **no new named permission** — a professional owns
+  only their own vouchers (`/pro/vouchers`, subject-scoped), and the desk
+  approves/pays on the same coordinator/master gate used for the marketplace.
 
 ## Connect Dispute (`cx_disputes.status`) — marketplace (K9b)
 

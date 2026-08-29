@@ -1,0 +1,251 @@
+<?php
+// ============================================================================
+//  CONNECT — Engagement Vouchers  (marketplace + on-roll, inclusive/exclusive)
+//
+//  Once a person is booked (cx_engagements), they claim their days and — when
+//  the rate is quoted EXCLUSIVE of expenses — their reimbursables. ONE voucher
+//  model covers every case, because the subject of an engagement is already
+//  one of professional | inspector | bench:
+//
+//    WHO        — a marketplace freelancer, an inspector on a company/agency
+//                 roll, or an agency-bench person (engagement.subject_kind).
+//    BASIS      — man-days · man-months · deputation · continuous · frequency
+//                 (engagement.basis; the rate_unit is day | month | visit).
+//    RATE MODEL — INCLUSIVE  → the rate covers fee + travel/hotel/conveyance/
+//                              allowances; the voucher claims NO expense head.
+//                 EXCLUSIVE  → the rate is the fee; travel, hotel/lodging, local
+//                              conveyance and allowances are claimed against
+//                              receipts on the voucher.
+//    CADENCE    — PER_DAY (same client, day after day) or PER_DEPLOYMENT
+//                 (one claim per deployment / per month).
+//
+//  A voucher = header (cx_engagement_vouchers) + day/period lines
+//  (cx_engagement_voucher_lines). fee = Σ(units × rate); reimbursable = Σ(heads)
+//  ONLY when the engagement is EXCLUSIVE; grand = fee + reimbursable.
+//
+//  ADDITIVE: two new cx_* tables; no existing route/status changed. The status
+//  lifecycle is a NEW object lifecycle (documented in 03-object-lifecycles.md).
+// ============================================================================
+
+function connect_engv_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    db()->exec("CREATE TABLE IF NOT EXISTS cx_engagement_vouchers (
+        id $pk,
+        engagement_id INT DEFAULT 0, requirement_id INT DEFAULT 0,
+        subject_kind VARCHAR(20) DEFAULT 'professional', subject_id INT DEFAULT 0, subject_name VARCHAR(200) DEFAULT '',
+        poster_party_id INT DEFAULT 0, poster_name VARCHAR(200) DEFAULT '',
+        basis VARCHAR(20) DEFAULT 'MAN_DAYS', rate REAL DEFAULT 0, rate_unit VARCHAR(10) DEFAULT 'day',
+        rate_inclusive VARCHAR(12) DEFAULT 'INCLUSIVE', cadence VARCHAR(14) DEFAULT 'PER_DEPLOYMENT',
+        period_label VARCHAR(40) DEFAULT '', period_start VARCHAR(20) DEFAULT '', period_end VARCHAR(20) DEFAULT '',
+        fee_total REAL DEFAULT 0, reimb_total REAL DEFAULT 0, grand_total REAL DEFAULT 0,
+        status VARCHAR(12) DEFAULT 'DRAFT',               -- DRAFT | SUBMITTED | APPROVED | PAID | REJECTED
+        note VARCHAR(400) DEFAULT '', decided_by VARCHAR(150) DEFAULT '', decided_note VARCHAR(300) DEFAULT '',
+        created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '',
+        submitted_at VARCHAR(30) DEFAULT '', decided_at VARCHAR(30) DEFAULT '')");
+    db()->exec("CREATE TABLE IF NOT EXISTS cx_engagement_voucher_lines (
+        id $pk, voucher_id INT DEFAULT 0,
+        work_date VARCHAR(20) DEFAULT '', units REAL DEFAULT 1,
+        fee REAL DEFAULT 0,
+        travel REAL DEFAULT 0, lodging REAL DEFAULT 0, conveyance REAL DEFAULT 0, allowance REAL DEFAULT 0, misc REAL DEFAULT 0,
+        receipt_ref VARCHAR(120) DEFAULT '', note VARCHAR(300) DEFAULT '',
+        created_at VARCHAR(30) DEFAULT '')");
+    try { db()->exec("CREATE INDEX ix_cx_engv_subject ON cx_engagement_vouchers (subject_kind, subject_id)"); } catch (Throwable $e) {}
+    try { db()->exec("CREATE INDEX ix_cx_engv_eng ON cx_engagement_vouchers (engagement_id)"); } catch (Throwable $e) {}
+    try { db()->exec("CREATE INDEX ix_cx_engvl_v ON cx_engagement_voucher_lines (voucher_id)"); } catch (Throwable $e) {}
+}
+
+/** Reimbursable expense heads — claimable ONLY on an EXCLUSIVE engagement. */
+function connect_engv_expense_heads() {
+    return [
+        'travel'     => 'Travel',
+        'lodging'    => 'Hotel / lodging',
+        'conveyance' => 'Local conveyance',
+        'allowance'  => 'Allowances',
+        'misc'       => 'Other',
+    ];
+}
+
+/** The voucher status lifecycle. */
+function connect_engv_statuses() { return ['DRAFT', 'SUBMITTED', 'APPROVED', 'PAID', 'REJECTED']; }
+function connect_engv_status_label($s) {
+    return ['DRAFT'=>'Draft','SUBMITTED'=>'Submitted','APPROVED'=>'Approved','PAID'=>'Paid','REJECTED'=>'Sent back'][strtoupper((string)$s)] ?? (string)$s;
+}
+/** Legal transitions (a new object lifecycle — see 03-object-lifecycles.md). */
+function connect_engv_can_transition($from, $to) {
+    $from = strtoupper((string)$from); $to = strtoupper((string)$to);
+    $ok = [
+        'DRAFT'     => ['SUBMITTED'],
+        'SUBMITTED' => ['APPROVED', 'REJECTED', 'DRAFT'],
+        'APPROVED'  => ['PAID', 'REJECTED'],
+        'REJECTED'  => ['DRAFT', 'SUBMITTED'],
+        'PAID'      => [],
+    ];
+    return in_array($to, $ok[$from] ?? [], true);
+}
+
+function connect_engv_get($id) {
+    connect_engv_migrate();
+    return ops_one("SELECT * FROM cx_engagement_vouchers WHERE id=?", [(int)$id]) ?: null;
+}
+function connect_engv_lines($voucherId) {
+    connect_engv_migrate();
+    return ops_all("SELECT * FROM cx_engagement_voucher_lines WHERE voucher_id=? ORDER BY (work_date=''), work_date, id", [(int)$voucherId]) ?: [];
+}
+
+/** Is this engagement's rate quoted exclusive of expenses (heads claimable)? */
+function connect_engv_is_exclusive($voucherOrEng) {
+    $m = strtoupper((string)($voucherOrEng['rate_inclusive'] ?? 'INCLUSIVE'));
+    return $m === 'EXCLUSIVE';
+}
+
+/**
+ * Open (or reuse a DRAFT) voucher for an engagement. Copies the rate model,
+ * basis and cadence off the engagement so the voucher is self-describing.
+ * Returns [ok, msg, id].
+ */
+function connect_engv_open_for_engagement($engagementId, array $in = []) {
+    connect_engv_migrate();
+    $eng = function_exists('connect_engage_get_by_id') ? connect_engage_get_by_id($engagementId)
+         : ops_one("SELECT * FROM cx_engagements WHERE id=?", [(int)$engagementId]);
+    if (!$eng) return [false, 'Engagement not found.', 0];
+
+    $cadence = strtoupper((string)($eng['voucher_cadence'] ?? 'PER_DEPLOYMENT'));
+    $label   = trim((string)($in['period_label'] ?? ''));
+    if ($label === '') $label = $cadence === 'PER_DAY' ? date('Y-m-d') : date('Y-m');
+
+    // Reuse an existing DRAFT for the same engagement + period label (idempotent).
+    $ex = ops_one("SELECT * FROM cx_engagement_vouchers WHERE engagement_id=? AND period_label=? AND status='DRAFT' ORDER BY id DESC", [(int)$engagementId, $label]);
+    if ($ex) return [true, 'Voucher reopened.', (int)$ex['id']];
+
+    $now = date('c');
+    db()->prepare("INSERT INTO cx_engagement_vouchers
+        (engagement_id,requirement_id,subject_kind,subject_id,subject_name,poster_party_id,poster_name,
+         basis,rate,rate_unit,rate_inclusive,cadence,period_label,period_start,period_end,status,note,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?,?)")
+        ->execute([(int)$engagementId, (int)($eng['requirement_id'] ?? 0), (string)($eng['subject_kind'] ?? 'professional'),
+                   (int)($eng['subject_id'] ?? 0), (string)($eng['subject_name'] ?? ''), (int)($eng['poster_party_id'] ?? 0),
+                   (string)($eng['poster_name'] ?? ''), (string)($eng['basis'] ?? 'MAN_DAYS'), (float)($eng['rate'] ?? 0),
+                   (string)($eng['rate_unit'] ?? 'day'), connect_engage_norm_rate_model($eng['rate_inclusive'] ?? 'INCLUSIVE'),
+                   connect_engage_norm_cadence($cadence), $label, trim((string)($in['period_start'] ?? '')),
+                   trim((string)($in['period_end'] ?? '')), trim((string)($in['note'] ?? '')), $now, $now]);
+    return [true, 'Voucher opened.', (int)db()->lastInsertId()];
+}
+
+/** Fee for a line = units × the engagement's rate (day/month/visit). */
+function connect_engv_line_fee($voucher, $units) {
+    return round(max(0, (float)$units) * (float)($voucher['rate'] ?? 0), 2);
+}
+
+/**
+ * Add a day/period line to a DRAFT voucher. On an INCLUSIVE engagement every
+ * expense head is forced to 0 (the rate already covers them). Returns [ok,msg,id].
+ */
+function connect_engv_add_line($voucherId, array $in) {
+    connect_engv_migrate();
+    $v = connect_engv_get($voucherId);
+    if (!$v) return [false, 'Voucher not found.', 0];
+    if (strtoupper((string)$v['status']) !== 'DRAFT') return [false, 'Add lines only while the voucher is a draft.', 0];
+
+    $units = max(0, (float)($in['units'] ?? 1));
+    if ($units <= 0) $units = 1;
+    $fee = connect_engv_line_fee($v, $units);
+
+    $exclusive = connect_engv_is_exclusive($v);
+    $head = function ($k) use ($in, $exclusive) { return $exclusive ? max(0, (float)($in[$k] ?? 0)) : 0.0; };
+    db()->prepare("INSERT INTO cx_engagement_voucher_lines
+        (voucher_id,work_date,units,fee,travel,lodging,conveyance,allowance,misc,receipt_ref,note,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+        ->execute([(int)$voucherId, trim((string)($in['work_date'] ?? '')), $units, $fee,
+                   $head('travel'), $head('lodging'), $head('conveyance'), $head('allowance'), $head('misc'),
+                   trim((string)($in['receipt_ref'] ?? '')), trim((string)($in['note'] ?? '')), date('c')]);
+    $id = (int)db()->lastInsertId();
+    connect_engv_recompute($voucherId);
+    return [true, 'Day added.', $id];
+}
+
+/** Remove a line from a DRAFT voucher and recompute. */
+function connect_engv_delete_line($lineId, $voucherId) {
+    connect_engv_migrate();
+    $v = connect_engv_get($voucherId);
+    if (!$v || strtoupper((string)$v['status']) !== 'DRAFT') return false;
+    db()->prepare("DELETE FROM cx_engagement_voucher_lines WHERE id=? AND voucher_id=?")->execute([(int)$lineId, (int)$voucherId]);
+    connect_engv_recompute($voucherId);
+    return true;
+}
+
+/** Recompute fee / reimbursable / grand totals from the lines. */
+function connect_engv_recompute($voucherId) {
+    connect_engv_migrate();
+    $v = connect_engv_get($voucherId); if (!$v) return;
+    $exclusive = connect_engv_is_exclusive($v);
+    $fee = 0.0; $reimb = 0.0;
+    foreach (connect_engv_lines($voucherId) as $l) {
+        $fee += (float)$l['fee'];
+        if ($exclusive) $reimb += (float)$l['travel'] + (float)$l['lodging'] + (float)$l['conveyance'] + (float)$l['allowance'] + (float)$l['misc'];
+    }
+    $fee = round($fee, 2); $reimb = round($reimb, 2);
+    db()->prepare("UPDATE cx_engagement_vouchers SET fee_total=?, reimb_total=?, grand_total=?, updated_at=? WHERE id=?")
+        ->execute([$fee, $reimb, round($fee + $reimb, 2), date('c'), (int)$voucherId]);
+}
+
+/** Move a voucher along its lifecycle. Returns [ok, msg]. */
+function connect_engv_set_status($voucherId, $to, $by = '') {
+    connect_engv_migrate();
+    $v = connect_engv_get($voucherId); if (!$v) return [false, 'Voucher not found.'];
+    $to = strtoupper((string)$to);
+    if (!in_array($to, connect_engv_statuses(), true)) return [false, 'Invalid status.'];
+    if (!connect_engv_can_transition($v['status'], $to)) return [false, 'That change is not allowed from ' . connect_engv_status_label($v['status']) . '.'];
+    if ($to === 'SUBMITTED' && !connect_engv_lines($voucherId)) return [false, 'Add at least one day before submitting.'];
+
+    $now = date('c'); $sets = "status=?, updated_at=?"; $args = [$to, $now];
+    if ($to === 'SUBMITTED') { $sets .= ", submitted_at=?"; $args[] = $now; }
+    if (in_array($to, ['APPROVED', 'REJECTED', 'PAID'], true)) { $sets .= ", decided_at=?, decided_by=?"; $args[] = $now; $args[] = (string)$by; }
+    $args[] = (int)$voucherId;
+    db()->prepare("UPDATE cx_engagement_vouchers SET $sets WHERE id=?")->execute($args);
+    return [true, 'Voucher ' . strtolower(connect_engv_status_label($to)) . '.'];
+}
+
+/** All vouchers for one engagement, newest first. */
+function connect_engv_for_engagement($engagementId) {
+    connect_engv_migrate();
+    return ops_all("SELECT * FROM cx_engagement_vouchers WHERE engagement_id=? ORDER BY id DESC", [(int)$engagementId]) ?: [];
+}
+/** All vouchers for one subject (professional | inspector | bench). */
+function connect_engv_for_subject($kind, $id) {
+    connect_engv_migrate();
+    return ops_all("SELECT * FROM cx_engagement_vouchers WHERE subject_kind=? AND subject_id=? ORDER BY id DESC", [(string)$kind, (int)$id]) ?: [];
+}
+/** Convenience: a professional's own vouchers, with the engagement title. */
+function connect_engv_for_professional($proId) {
+    connect_engv_migrate();
+    try {
+        $st = db()->prepare("SELECT ev.*, r.ref_code, r.title AS req_title
+                             FROM cx_engagement_vouchers ev LEFT JOIN cx_requirements r ON r.id=ev.requirement_id
+                             WHERE ev.subject_kind='professional' AND ev.subject_id=? ORDER BY ev.id DESC");
+        $st->execute([(int)$proId]);
+        return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
+/** A short summary for a subject: counts by status + total submitted/paid value. */
+function connect_engv_summary_for_subject($kind, $id) {
+    $out = ['draft' => 0, 'submitted' => 0, 'approved' => 0, 'paid' => 0, 'total' => 0, 'paid_value' => 0.0, 'pending_value' => 0.0];
+    foreach (connect_engv_for_subject($kind, $id) as $v) {
+        $s = strtoupper((string)$v['status']); $out['total']++;
+        if ($s === 'DRAFT') $out['draft']++;
+        elseif ($s === 'SUBMITTED') { $out['submitted']++; $out['pending_value'] += (float)$v['grand_total']; }
+        elseif ($s === 'APPROVED') { $out['approved']++; $out['pending_value'] += (float)$v['grand_total']; }
+        elseif ($s === 'PAID') { $out['paid']++; $out['paid_value'] += (float)$v['grand_total']; }
+    }
+    return $out;
+}
+
+/** Plain-language one-liner for a voucher header. */
+function connect_engv_describe($v) {
+    $model = connect_engv_is_exclusive($v) ? 'Fee + expenses' : 'All-inclusive';
+    $unit  = (string)($v['rate_unit'] ?? 'day');
+    $rate  = (float)($v['rate'] ?? 0) > 0 ? '₹' . number_format((int)$v['rate']) . '/' . $unit : '';
+    return ['model' => $model, 'rate' => $rate,
+            'fee' => (float)($v['fee_total'] ?? 0), 'reimb' => (float)($v['reimb_total'] ?? 0), 'grand' => (float)($v['grand_total'] ?? 0)];
+}

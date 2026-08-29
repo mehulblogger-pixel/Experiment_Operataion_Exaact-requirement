@@ -40,7 +40,48 @@ function connect_engage_migrate() {
         created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
     try { db()->exec("CREATE INDEX ix_cx_eng_subject ON cx_engagements (subject_kind, subject_id)"); } catch (Throwable $e) {}
     try { db()->exec("CREATE INDEX ix_cx_eng_req ON cx_engagements (requirement_id)"); } catch (Throwable $e) {}
+    // Rate model + voucher cadence — how the rate is quoted and how the person
+    // claims. Additive so existing bookings keep working (default all-inclusive,
+    // per-deployment).
+    if (function_exists('ensure_column')) {
+        ensure_column('cx_engagements', 'rate_inclusive', "VARCHAR(12) DEFAULT 'INCLUSIVE'"); // INCLUSIVE | EXCLUSIVE
+        ensure_column('cx_engagements', 'voucher_cadence', "VARCHAR(14) DEFAULT 'PER_DEPLOYMENT'"); // PER_DAY | PER_DEPLOYMENT
+    }
 }
+
+/**
+ * The rate model — is the quoted rate all-inclusive, or is the professional fee
+ * quoted exclusive of reimbursables (travel, hotel/lodging, local conveyance,
+ * allowances)? Set by the client at job posting; carried onto the booking; it
+ * decides whether the engagement voucher can claim expense heads.
+ */
+function connect_engage_rate_models() {
+    return [
+        'INCLUSIVE' => ['label' => 'All-inclusive', 'reimbursable' => false,
+            'hint' => 'One rate covers the fee AND travel, hotel stay, local conveyance and allowances. Nothing extra is claimed.'],
+        'EXCLUSIVE' => ['label' => 'Fee only (expenses extra)', 'reimbursable' => true,
+            'hint' => 'The rate is the professional fee only. Travel, hotel/lodging, local conveyance and allowances are claimed on the voucher against receipts.'],
+    ];
+}
+function connect_engage_rate_model_label($m) { return connect_engage_rate_models()[strtoupper((string)$m)]['label'] ?? (string)$m; }
+function connect_engage_rate_is_reimbursable($m) { return !empty(connect_engage_rate_models()[strtoupper((string)$m)]['reimbursable']); }
+
+/**
+ * Voucher cadence — how often the person raises a claim. A freelancer serving
+ * the same client every day may raise a voucher per day; a deputation or a
+ * man-months posting raises one per deployment (or per month).
+ */
+function connect_engage_voucher_cadences() {
+    return [
+        'PER_DAY'        => ['label' => 'Per day', 'hint' => 'A claim for each working day (same client, day after day).'],
+        'PER_DEPLOYMENT' => ['label' => 'Per deployment / month', 'hint' => 'One consolidated claim for the deployment (or per calendar month).'],
+    ];
+}
+function connect_engage_voucher_cadence_label($c) { return connect_engage_voucher_cadences()[strtoupper((string)$c)]['label'] ?? (string)$c; }
+
+/** Normalise a rate-model / cadence input to a legal value (with defaults). */
+function connect_engage_norm_rate_model($v) { $v = strtoupper((string)$v); return isset(connect_engage_rate_models()[$v]) ? $v : 'INCLUSIVE'; }
+function connect_engage_norm_cadence($v) { $v = strtoupper((string)$v); return isset(connect_engage_voucher_cadences()[$v]) ? $v : 'PER_DEPLOYMENT'; }
 
 /** The engagement bases, with what each one needs. */
 function connect_engage_bases() {
@@ -104,21 +145,27 @@ function connect_engage_save_for_requirement($requirementId, array $in) {
     $status = strtoupper((string)($in['status'] ?? 'BOOKED'));
     if (!in_array($status, connect_engage_statuses(), true)) $status = 'BOOKED';
 
+    // Rate model + cadence — taken from the booking form, else inherited from
+    // what the client chose when posting the requirement (default all-inclusive,
+    // per-deployment).
+    $rateModel = connect_engage_norm_rate_model($in['rate_inclusive'] ?? ($req['rate_inclusive'] ?? 'INCLUSIVE'));
+    $cadence   = connect_engage_norm_cadence($in['voucher_cadence'] ?? ($req['voucher_cadence'] ?? 'PER_DEPLOYMENT'));
+
     if (!empty($cfg['needs_qty']) && $qty <= 0) return [false, $cfg['qty_label'] . ' is required for ' . $cfg['label'] . '.', 0];
     if (!empty($cfg['needs_freq']) && $freq === '') return [false, 'Describe the frequency (e.g. "2 days a week").', 0];
 
     $existing = connect_engage_for_requirement($requirementId);
     if ($existing) {
-        db()->prepare("UPDATE cx_engagements SET basis=?, rate=?, rate_unit=?, quantity=?, frequency_note=?, start_date=?, end_date=?, status=?, notes=?, updated_at=? WHERE id=?")
-            ->execute([$basis, $rate, $unit, $qty, $freq, $start, $end, $status, trim((string)($in['notes'] ?? '')), date('c'), (int)$existing['id']]);
+        db()->prepare("UPDATE cx_engagements SET basis=?, rate=?, rate_unit=?, quantity=?, frequency_note=?, start_date=?, end_date=?, status=?, rate_inclusive=?, voucher_cadence=?, notes=?, updated_at=? WHERE id=?")
+            ->execute([$basis, $rate, $unit, $qty, $freq, $start, $end, $status, $rateModel, $cadence, trim((string)($in['notes'] ?? '')), date('c'), (int)$existing['id']]);
         return [true, 'Booking updated.', (int)$existing['id']];
     }
     db()->prepare("INSERT INTO cx_engagements
-        (requirement_id,application_id,subject_kind,subject_id,subject_name,poster_party_id,poster_name,basis,rate,rate_unit,quantity,frequency_note,start_date,end_date,status,notes,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        (requirement_id,application_id,subject_kind,subject_id,subject_name,poster_party_id,poster_name,basis,rate,rate_unit,quantity,frequency_note,start_date,end_date,status,rate_inclusive,voucher_cadence,notes,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
         ->execute([(int)$requirementId, (int)$subj['application_id'], $subj['kind'], (int)$subj['id'], $subj['name'],
                    (int)($req['poster_party_id'] ?? 0), (string)($req['poster_name'] ?? ''), $basis, $rate, $unit, $qty, $freq,
-                   $start, $end, $status, trim((string)($in['notes'] ?? '')), date('c'), date('c')]);
+                   $start, $end, $status, $rateModel, $cadence, trim((string)($in['notes'] ?? '')), date('c'), date('c')]);
     return [true, 'Booking recorded.', (int)db()->lastInsertId()];
 }
 

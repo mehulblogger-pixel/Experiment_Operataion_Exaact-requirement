@@ -36,13 +36,18 @@
       </div>
       <?= $statusPill($e['status']) ?>
     </div>
+    <?php $exclusive = strtoupper((string)($e['rate_inclusive'] ?? 'INCLUSIVE')) === 'EXCLUSIVE'; ?>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
       <span class="chip" style="border-color:var(--teal);color:var(--teal)"><?= e(function_exists('connect_engage_basis_label') ? connect_engage_basis_label($e['basis']) : $e['basis']) ?></span>
+      <span class="chip" style="<?= $exclusive ? 'border-color:var(--gold);color:var(--gold)' : '' ?>"><?= $exclusive ? 'Fee + expenses' : 'All-inclusive' ?></span>
       <?php if (!empty($d['commitment'])): ?><span class="chip"><?= e($d['commitment']) ?></span><?php endif; ?>
       <?php if (!empty($d['rate'])): ?><span class="chip"><?= e($d['rate']) ?></span><?php endif; ?>
       <?php if ($dt !== ''): ?><span class="chip">📅 <?= e($dt) ?></span><?php endif; ?>
     </div>
     <?php if ($d['total'] !== null): ?><div class="muted" style="font-size:13px;margin-top:8px">Estimated value: <strong style="color:var(--ink)">₹<?= number_format((int)$d['total']) ?></strong></div><?php endif; ?>
     <?php if (!empty($e['notes'])): ?><div class="muted" style="font-size:13px;margin-top:6px"><?= e($e['notes']) ?></div><?php endif; ?>
+    <?php if (strtoupper((string)$e['status']) !== 'CANCELLED'): ?>
+      <div style="margin-top:10px"><a class="btn sec" href="/pro/vouchers" style="font-size:13px">🧾 Raise / track voucher →</a></div>
+    <?php endif; ?>
   </div>
 <?php endforeach; endif; ?>
