@@ -1,10 +1,14 @@
 <?php
   // Connect K21 — one engagement voucher. Add days; when the rate is EXCLUSIVE,
   // also add travel/hotel/conveyance/allowances against receipts; then submit.
-  $me = $me ?? []; $v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? []; $files = $files ?? [];
+  $me = $me ?? []; $v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? []; $files = $files ?? []; $reports = $reports ?? [];
   if (!$v) { echo '<div class="card"><p class="muted">Voucher not found. <a href="/pro/vouchers">Back to my vouchers</a></p></div>'; return; }
   $exclusive = strtoupper((string)$v['rate_inclusive']) === 'EXCLUSIVE';
   $isDraft   = strtoupper((string)$v['status']) === 'DRAFT';
+  $money     = function_exists('connect_engv_money') ? connect_engv_money($v) : [];
+  $approved  = in_array(strtoupper((string)$v['status']), ['APPROVED','PAID'], true);
+  $proConfirmed = trim((string)($v['pro_received_at'] ?? '')) !== '';
+  $settled   = function_exists('connect_engv_is_settled') && connect_engv_is_settled($v);
   $canAttach = in_array(strtoupper((string)$v['status']), ['DRAFT', 'SUBMITTED'], true);
   $kb = fn($n) => $n >= 1048576 ? round($n/1048576, 1) . ' MB' : max(1, (int)round($n/1024)) . ' KB';
   $unit      = (string)($v['rate_unit'] ?? 'day');
@@ -57,6 +61,61 @@
   <?php if ($exclusive): ?><div><div class="muted" style="font-size:12px">Expenses</div><div style="font-size:22px;font-weight:800"><?= e($inr($v['reimb_total'])) ?></div></div><?php endif; ?>
   <div><div class="muted" style="font-size:12px">Total</div><div style="font-size:22px;font-weight:800;color:var(--teal)"><?= e($inr($v['grand_total'])) ?></div></div>
 </div>
+
+<?php // Payout — what you receive after the platform's commission (your half) ?>
+<?php if (!empty($money) && ($money['commission'] ?? 0) > 0): ?>
+<div class="card">
+  <h2>Your payout</h2>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">The platform charges a <?= e(rtrim(rtrim(number_format((float)$money['commission_pct'],2),'0'),'.')) ?>% commission on the fee, split with the client. Your half is deducted from your payout; reimbursed expenses pass through in full.</p>
+  <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:baseline">
+    <div><div class="muted" style="font-size:12px">Voucher total</div><div style="font-size:18px;font-weight:700"><?= e($inr($money['grand'])) ?></div></div>
+    <div><div class="muted" style="font-size:12px">− Your commission</div><div style="font-size:18px;font-weight:700">−<?= e($inr($money['commission_pro'])) ?></div></div>
+    <div><div class="muted" style="font-size:12px">You receive</div><div style="font-size:22px;font-weight:800;color:var(--teal)"><?= e($inr($money['pro_net'])) ?></div></div>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php // Settlement — confirm you received payment; report releases when both sides confirm ?>
+<?php if ($approved): ?>
+<div class="card">
+  <h2>Payment &amp; report release</h2>
+  <?php if ($settled): ?>
+    <p style="margin:0">✓ Both sides confirmed — settled. The client can now download your inspection report.</p>
+  <?php elseif ($proConfirmed): ?>
+    <p style="margin:0">You confirmed receipt. Waiting for the client to confirm payment — the report releases to them once both sides confirm.</p>
+  <?php else: ?>
+    <p class="muted" style="margin:0 0 10px;font-size:13px">Once the client has paid you, confirm it here. The client's inspection report is released to them only when <strong>both</strong> sides confirm payment.</p>
+    <form method="post" action="/pro/voucher" style="margin:0">
+      <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="confirm_received">
+      <button class="btn" type="submit">I have received payment</button>
+    </form>
+  <?php endif; ?>
+</div>
+
+<?php // Inspection report deliverable — the freelancer uploads it; the client gets it on settlement ?>
+<div class="card">
+  <h2>Inspection report</h2>
+  <?php if ($reports): ?>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+      <?php foreach ($reports as $r): ?>
+        <div style="display:flex;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:9px 12px">
+          <a href="/pro/report-file?id=<?= (int)$r['id'] ?>" target="_blank" rel="noopener" style="font-weight:600">📄 <?= e($r['title'] ?: $r['file_name']) ?></a>
+          <span class="muted" style="font-size:12px"><?= e($kb((int)$r['size'])) ?></span>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <p class="muted" style="margin:0;font-size:13px"><?= $settled ? 'The client can now download this.' : 'Held from the client until payment is confirmed by both sides.' ?></p>
+  <?php else: ?>
+    <p class="muted" style="margin:0 0 10px;font-size:13px">Upload the inspection report for the client. It stays locked to them until the payment is settled.</p>
+    <form method="post" action="/pro/voucher" enctype="multipart/form-data">
+      <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="report_upload">
+      <label>Title</label><input type="text" name="title" placeholder="e.g. RT film review report — Dahej FAT">
+      <label>File</label><input type="file" name="file" required>
+      <button class="btn" type="submit" style="margin-top:10px">Upload report</button>
+    </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php // Lines ?>
 <div class="card">

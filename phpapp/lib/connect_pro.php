@@ -486,15 +486,33 @@ function connect_pro_route($route, $method) {
                     connect_engv_file_add($vid, (int)($_POST['line_id'] ?? 0), $_FILES['file'] ?? null, 'professional', (int)$me['id'], (string)$me['name']);
                 elseif ($act === 'del_file' && function_exists('connect_engv_file_delete'))
                     connect_engv_file_delete((int)($_POST['file_id'] ?? 0), $vid);
+                elseif ($act === 'confirm_received' && function_exists('connect_engv_confirm'))
+                    connect_engv_confirm($vid, 'pro', (string)$me['name']);
+                elseif ($act === 'report_upload' && function_exists('connect_engv_report_add')) {
+                    $vv = connect_engv_get($vid);
+                    if ($vv) connect_engv_report_add((int)$vv['engagement_id'], $_FILES['file'] ?? null, (string)($_POST['title'] ?? ''), 'professional', (int)$me['id'], (string)$me['name']);
+                }
                 redirect('/pro/voucher?id=' . $vid);
             }
+            $vRow = connect_engv_get($vid);
             connect_pro_view('voucher', [
-                'me'    => $me,
-                'v'     => connect_engv_get($vid),
-                'lines' => connect_engv_lines($vid),
-                'heads' => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
-                'files' => function_exists('connect_engv_files') ? connect_engv_files($vid) : [],
+                'me'      => $me,
+                'v'       => $vRow,
+                'lines'   => connect_engv_lines($vid),
+                'heads'   => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
+                'files'   => function_exists('connect_engv_files') ? connect_engv_files($vid) : [],
+                'reports' => ($vRow && function_exists('connect_engv_reports')) ? connect_engv_reports((int)$vRow['engagement_id']) : [],
             ]); exit;
+
+        case 'pro/report-file':   // K21 — serve one of my own engagement's report deliverables
+            $rid = (int)($_GET['id'] ?? 0);
+            $row = function_exists('connect_engv_report_row') ? connect_engv_report_row($rid) : null;
+            if (!$row || strtoupper((string)$row['subject_kind']) !== 'PROFESSIONAL' || (int)$row['subject_id'] !== (int)$me['id']) { http_response_code(404); echo 'Not found.'; exit; }
+            $bytes = base64_decode((string)$row['file_data']);
+            if (function_exists('send_uploaded_file')) { send_uploaded_file($bytes, (string)$row['file_name'], (string)$row['mime']); exit; }
+            header('Content-Type: ' . ((string)$row['mime'] ?: 'application/octet-stream'));
+            header('Content-Disposition: inline; filename="' . rawurlencode((string)$row['file_name']) . '"');
+            echo $bytes; exit;
 
         case 'pro/voucher-file':   // K21 — serve one of my voucher's supporting docs
             $fid = (int)($_GET['id'] ?? 0);

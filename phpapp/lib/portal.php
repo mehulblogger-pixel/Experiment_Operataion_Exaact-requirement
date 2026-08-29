@@ -942,16 +942,35 @@ function portal_route($route, $method) {
                 } elseif ($act === 'return') {
                     [$ok, $msg] = connect_engv_set_status($vid, 'REJECTED', $who, (string)($_POST['note'] ?? ''));
                     $_SESSION['portal_flash'] = $ok ? 'Returned to the inspector for clarification.' : $msg;
+                } elseif ($act === 'confirm_paid' && function_exists('connect_engv_confirm')) {
+                    [$ok, $msg] = connect_engv_confirm($vid, 'client', $who);
+                    $_SESSION['portal_flash'] = $ok ? 'Payment confirmed. The report unlocks once the professional also confirms receipt.' : $msg;
                 }
                 redirect('/portal/voucher?id=' . $vid);
             }
+            $engId = (int)($v['engagement_id'] ?? 0);
             portal_view('voucher', [
-                'v'     => $v,
-                'lines' => function_exists('connect_engv_lines') ? connect_engv_lines($vid) : [],
-                'heads' => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
-                'files' => function_exists('connect_engv_files') ? connect_engv_files($vid) : [],
+                'v'       => $v,
+                'lines'   => function_exists('connect_engv_lines') ? connect_engv_lines($vid) : [],
+                'heads'   => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
+                'files'   => function_exists('connect_engv_files') ? connect_engv_files($vid) : [],
+                'reports' => function_exists('connect_engv_reports') ? connect_engv_reports($engId) : [],
+                'cleared' => function_exists('connect_engv_engagement_cleared') ? connect_engv_engagement_cleared($engId) : false,
             ]);
             exit;
+
+        case 'portal/report-file':   // K21 — serve the inspection report, ONLY once payment is cleared
+            portal_need('market.vouchers', 'reviewing vouchers');
+            $row = function_exists('connect_engv_report_row') ? connect_engv_report_row((int)($_GET['id'] ?? 0)) : null;
+            if (!$row || (int)$row['poster_party_id'] !== (int)portal_partner_id()) { http_response_code(404); echo 'Not found.'; exit; }
+            if (!function_exists('connect_engv_engagement_cleared') || !connect_engv_engagement_cleared((int)$row['engagement_id'])) {
+                http_response_code(402); echo 'This report is released once the payment is confirmed by both sides.'; exit;
+            }
+            $bytes = base64_decode((string)$row['file_data']);
+            if (function_exists('send_uploaded_file')) { send_uploaded_file($bytes, (string)$row['file_name'], (string)$row['mime']); exit; }
+            header('Content-Type: ' . ((string)$row['mime'] ?: 'application/octet-stream'));
+            header('Content-Disposition: inline; filename="' . rawurlencode((string)$row['file_name']) . '"');
+            echo $bytes; exit;
 
         case 'portal/voucher-file':   // K21 — serve a receipt on the client's own posted-job voucher
             portal_need('market.vouchers', 'reviewing vouchers');

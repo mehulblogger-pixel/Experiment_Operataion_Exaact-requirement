@@ -406,6 +406,23 @@ Cadence (`PER_DAY | PER_DEPLOYMENT`) is inherited from the engagement.
   on the existing coordinator/master gate. Same states, no new status — only who is
   allowed to move them (client, via the `market.vouchers` portal permission, scoped
   to their own `poster_party_id`).
+- **Platform commission** (matchmaker model): the platform charges a nominal
+  commission on the **fee only** (never on reimbursed expenses), **split 50/50**
+  between client and professional. Rate is the admin setting `connect_commission_pct`
+  (default 5%). `connect_engv_recompute()` stores `commission_total`,
+  `commission_client`, `commission_pro`, `client_payable` (= grand + client half) and
+  `pro_net` (= grand − pro half) on the voucher. The platform takes no responsibility
+  for the settlement — it only records it.
+- **Settlement** (both sides confirm): after the client APPROVES, each side confirms
+  payment — the client that it has paid (`client_paid_at`), the professional that it
+  has received (`pro_received_at`). When **both** confirm, `settled_at` is stamped and
+  the voucher moves to **PAID** (`connect_engv_confirm()`). A voucher already PAID by
+  any path counts as settled (`connect_engv_is_settled()`).
+- **Report release gate**: the professional uploads the inspection report deliverable
+  (`cx_engagement_reports`); the **client can download it only once the engagement is
+  cleared** — every APPROVED/PAID voucher on it is settled
+  (`connect_engv_engagement_cleared()`). Until then the client portal serves HTTP 402
+  and shows a locked state. No new permission.
 - **Supporting documents** (receipts / bills): a voucher carries an additive
   `cx_engagement_voucher_files` set — the claimant attaches receipts to back the
   claim and the approver sees them with the voucher. Attachments may be added or

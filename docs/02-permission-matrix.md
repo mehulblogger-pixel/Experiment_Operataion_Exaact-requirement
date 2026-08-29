@@ -218,6 +218,16 @@ named permission**; it reuses the identities already in place:
   (`DRAFT → SUBMITTED → APPROVED → PAID`, `REJECTED` return path) is recorded in
   `docs/03-object-lifecycles.md`. Every money figure stays scoped to the person who
   earned it; nothing here widens who can see billing or profitability.
+- **Platform commission + settlement + report gate** (matchmaker model — the
+  platform is not a paymaster and carries no liability): a nominal commission on the
+  **fee only**, split 50/50 (rate = admin setting `connect_commission_pct`, default
+  5%). Neither side "pays" through the platform — **both confirm** payment (client
+  paid / professional received), and only when both confirm does the voucher settle
+  (→ PAID). The professional's **inspection report** (`cx_engagement_reports`) is
+  withheld from the client until the engagement is cleared; the client report-serve
+  route (`portal/report-file`) enforces this (HTTP 402 until cleared). **No new
+  permission** — the client uses `market.vouchers`, the professional their own `/pro`
+  session; commission and settlement are recorded, not gated by a new right.
 - **Client review of a posted-job voucher** (marketplace matchmaker model): the
   client who posted the job reviews the professional's claim in its portal — sees the
   fee, day lines and **receipts**, then **returns for clarification** (with a note) or

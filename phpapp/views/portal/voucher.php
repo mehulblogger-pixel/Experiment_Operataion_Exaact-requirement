@@ -3,10 +3,14 @@
 // They see the fee, the actual expenses and the receipts, and either return it
 // to the inspector for clarification or approve it. Read-only on the numbers —
 // the client never edits the claim, only accepts or returns it.
-$v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? []; $files = $files ?? [];
+$v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? []; $files = $files ?? []; $reports = $reports ?? []; $cleared = $cleared ?? false;
 if (!$v) { echo '<p class="pempty">Voucher not found. <a href="/portal/hire">Back</a></p>'; return; }
 $exclusive = strtoupper((string)$v['rate_inclusive']) === 'EXCLUSIVE';
 $status    = strtoupper((string)$v['status']);
+$money     = function_exists('connect_engv_money') ? connect_engv_money($v) : [];
+$approved  = in_array($status, ['APPROVED','PAID'], true);
+$clientConfirmed = trim((string)($v['client_paid_at'] ?? '')) !== '';
+$settled   = function_exists('connect_engv_is_settled') && connect_engv_is_settled($v);
 $inr = fn($n) => '₹' . number_format((int)round((float)$n));
 $kb  = fn($n) => $n >= 1048576 ? round($n/1048576, 1) . ' MB' : max(1, (int)round($n/1024)) . ' KB';
 $pill = function ($s) {
@@ -46,6 +50,50 @@ $canReview = $status === 'SUBMITTED';
     <div><div class="k">Total</div><div class="val" style="color:#0f7d5a"><?= e($inr($v['grand_total'])) ?></div></div>
   </div>
 </div>
+
+<?php // What you pay — voucher + your half of the platform commission ?>
+<?php if (!empty($money) && ($money['commission'] ?? 0) > 0): ?>
+<div class="pcard" style="max-width:720px">
+  <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline">
+    <div><div class="k" style="font-size:12px;color:var(--muted)">Voucher total</div><div style="font-size:18px;font-weight:700"><?= e($inr($money['grand'])) ?></div></div>
+    <div><div class="k" style="font-size:12px;color:var(--muted)">+ Platform fee (your half)</div><div style="font-size:18px;font-weight:700">+<?= e($inr($money['commission_client'])) ?></div></div>
+    <div><div class="k" style="font-size:12px;color:var(--muted)">You pay</div><div style="font-size:22px;font-weight:800;color:#0f7d5a"><?= e($inr($money['client_payable'])) ?></div></div>
+  </div>
+  <p class="plead" style="margin:8px 0 0;font-size:12.5px">A <?= e(rtrim(rtrim(number_format((float)$money['commission_pct'],2),'0'),'.')) ?>% platform commission on the fee is split with the professional — you settle directly with them; the platform only makes the match.</p>
+</div>
+<?php endif; ?>
+
+<?php // Settlement + report release ?>
+<?php if ($approved): ?>
+<div class="pcard" style="max-width:720px">
+  <h3 class="ptitle" style="font-size:16px;margin:0 0 6px">Payment &amp; report</h3>
+  <?php if ($settled): ?>
+    <p style="margin:0 0 10px">✓ Payment confirmed by both sides. Your inspection report is unlocked below.</p>
+  <?php elseif ($clientConfirmed): ?>
+    <p style="margin:0 0 10px">You confirmed payment. The report unlocks once <?= e($v['subject_name'] ?: 'the professional') ?> also confirms they received it.</p>
+  <?php else: ?>
+    <p class="plead" style="margin:0 0 12px">Once you have paid <?= e($v['subject_name'] ?: 'the professional') ?>, confirm it here. Your inspection report is released only when <strong>both</strong> sides confirm payment.</p>
+    <form method="post" action="/portal/voucher" style="margin:0">
+      <input type="hidden" name="id" value="<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="confirm_paid">
+      <button class="btn" type="submit">I have paid — <?= e($inr($money['client_payable'] ?? $v['grand_total'])) ?></button>
+    </form>
+  <?php endif; ?>
+  <?php if ($reports): ?>
+    <div style="margin-top:12px;border-top:1px solid var(--line,#eee);padding-top:12px">
+      <?php foreach ($reports as $r): ?>
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0">
+          <div>📄 <?= e($r['title'] ?: $r['file_name']) ?></div>
+          <?php if ($cleared): ?>
+            <a href="/portal/report-file?id=<?= (int)$r['id'] ?>" target="_blank" rel="noopener">Download</a>
+          <?php else: ?>
+            <span style="color:var(--muted);font-size:12.5px">🔒 Released after payment</span>
+          <?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php if ($status === 'REJECTED' && !empty($v['decided_note'])): ?>
 <div class="pcard" style="max-width:720px;border-left:4px solid #9a2a2a">

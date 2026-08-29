@@ -58,10 +58,43 @@ function connect_engv_migrate() {
         file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '', size INT DEFAULT 0, file_data LONGTEXT,
         uploaded_kind VARCHAR(20) DEFAULT '', uploaded_id INT DEFAULT 0, uploaded_name VARCHAR(150) DEFAULT '',
         created_at VARCHAR(30) DEFAULT '')");
+    // Platform commission + settlement (marketplace matchmaker model). Additive
+    // columns so an existing voucher keeps working; recompute fills them in.
+    if (function_exists('ensure_column')) {
+        ensure_column('cx_engagement_vouchers', 'commission_pct',    'REAL DEFAULT 0');
+        ensure_column('cx_engagement_vouchers', 'commission_total',  'REAL DEFAULT 0');
+        ensure_column('cx_engagement_vouchers', 'commission_client', 'REAL DEFAULT 0');
+        ensure_column('cx_engagement_vouchers', 'commission_pro',    'REAL DEFAULT 0');
+        ensure_column('cx_engagement_vouchers', 'client_payable',    'REAL DEFAULT 0');
+        ensure_column('cx_engagement_vouchers', 'pro_net',           'REAL DEFAULT 0');
+        ensure_column('cx_engagement_vouchers', 'client_paid_at',    "VARCHAR(30) DEFAULT ''");
+        ensure_column('cx_engagement_vouchers', 'pro_received_at',   "VARCHAR(30) DEFAULT ''");
+        ensure_column('cx_engagement_vouchers', 'settled_at',        "VARCHAR(30) DEFAULT ''");
+    }
+    // The inspection report deliverable the professional produces for the client.
+    // Held until the transaction is cleared (both sides confirmed payment) — the
+    // client cannot download it before then. ADDITIVE.
+    db()->exec("CREATE TABLE IF NOT EXISTS cx_engagement_reports (
+        id $pk, engagement_id INT DEFAULT 0, requirement_id INT DEFAULT 0, poster_party_id INT DEFAULT 0,
+        subject_kind VARCHAR(20) DEFAULT '', subject_id INT DEFAULT 0,
+        title VARCHAR(200) DEFAULT '', file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '', size INT DEFAULT 0, file_data LONGTEXT,
+        uploaded_kind VARCHAR(20) DEFAULT '', uploaded_id INT DEFAULT 0, uploaded_name VARCHAR(150) DEFAULT '',
+        created_at VARCHAR(30) DEFAULT '')");
     try { db()->exec("CREATE INDEX ix_cx_engv_subject ON cx_engagement_vouchers (subject_kind, subject_id)"); } catch (Throwable $e) {}
     try { db()->exec("CREATE INDEX ix_cx_engv_eng ON cx_engagement_vouchers (engagement_id)"); } catch (Throwable $e) {}
     try { db()->exec("CREATE INDEX ix_cx_engvl_v ON cx_engagement_voucher_lines (voucher_id)"); } catch (Throwable $e) {}
     try { db()->exec("CREATE INDEX ix_cx_engvf_v ON cx_engagement_voucher_files (voucher_id)"); } catch (Throwable $e) {}
+    try { db()->exec("CREATE INDEX ix_cx_engr_eng ON cx_engagement_reports (engagement_id)"); } catch (Throwable $e) {}
+}
+
+/** The platform's commission rate (percent), admin-configurable. The platform
+ *  is a matchmaker: it charges a nominal commission on the FEE (not on pass-through
+ *  reimbursed expenses) and takes no responsibility for the settlement itself. */
+function connect_commission_pct() {
+    $v = function_exists('setting_get') ? setting_get('connect_commission_pct', 5.0) : 5.0;
+    $v = (float)$v;
+    if ($v < 0) $v = 0.0; if ($v > 100) $v = 100.0;
+    return $v;
 }
 
 /** Reimbursable expense heads — claimable ONLY on an EXCLUSIVE engagement. */
@@ -193,9 +226,39 @@ function connect_engv_recompute($voucherId) {
         $fee += (float)$l['fee'];
         if ($exclusive) $reimb += (float)$l['travel'] + (float)$l['lodging'] + (float)$l['conveyance'] + (float)$l['allowance'] + (float)$l['misc'];
     }
-    $fee = round($fee, 2); $reimb = round($reimb, 2);
-    db()->prepare("UPDATE cx_engagement_vouchers SET fee_total=?, reimb_total=?, grand_total=?, updated_at=? WHERE id=?")
-        ->execute([$fee, $reimb, round($fee + $reimb, 2), date('c'), (int)$voucherId]);
+    $fee = round($fee, 2); $reimb = round($reimb, 2); $grand = round($fee + $reimb, 2);
+
+    // Platform commission — on the FEE only, split 50/50 between the two sides.
+    // The client pays (grand + its half); the professional nets (grand − its half);
+    // reimbursed expenses pass through untouched. The platform earns the whole
+    // commission for making the match.
+    $pct    = connect_commission_pct();
+    $commTot = round($fee * $pct / 100, 2);
+    $commCl  = round($commTot / 2, 2);
+    $commPro = round($commTot - $commCl, 2);           // keep the two halves summing exactly
+    $clientPayable = round($grand + $commCl, 2);
+    $proNet        = round($grand - $commPro, 2);
+
+    db()->prepare("UPDATE cx_engagement_vouchers
+        SET fee_total=?, reimb_total=?, grand_total=?,
+            commission_pct=?, commission_total=?, commission_client=?, commission_pro=?, client_payable=?, pro_net=?,
+            updated_at=? WHERE id=?")
+        ->execute([$fee, $reimb, $grand, $pct, $commTot, $commCl, $commPro, $clientPayable, $proNet, date('c'), (int)$voucherId]);
+}
+
+/** The commission / payable breakdown for a voucher, as plain numbers for a view. */
+function connect_engv_money($v) {
+    return [
+        'fee'            => (float)($v['fee_total'] ?? 0),
+        'reimb'          => (float)($v['reimb_total'] ?? 0),
+        'grand'          => (float)($v['grand_total'] ?? 0),
+        'commission_pct' => (float)($v['commission_pct'] ?? 0),
+        'commission'     => (float)($v['commission_total'] ?? 0),
+        'commission_client' => (float)($v['commission_client'] ?? 0),
+        'commission_pro'    => (float)($v['commission_pro'] ?? 0),
+        'client_payable' => (float)($v['client_payable'] ?? 0),
+        'pro_net'        => (float)($v['pro_net'] ?? 0),
+    ];
 }
 
 /** Move a voucher along its lifecycle. Returns [ok, msg]. The optional $note is
@@ -230,6 +293,69 @@ function connect_engv_owned_by_party($voucher, $partyId) {
 function connect_engv_for_poster_party($partyId) {
     connect_engv_migrate();
     return ops_all("SELECT * FROM cx_engagement_vouchers WHERE poster_party_id=? ORDER BY id DESC", [(int)$partyId]) ?: [];
+}
+
+// ---------------------------------------------------------------------------
+//  Settlement (matchmaker model) — the platform is not the paymaster, so BOTH
+//  sides confirm: the client that it has paid, the professional that it has been
+//  received. Only when both confirm is the transaction "cleared" — which is what
+//  releases the inspection report to the client. Meaningful once the client has
+//  APPROVED the voucher.
+// ---------------------------------------------------------------------------
+
+/** Settled = the money is done. Reached either the marketplace way (BOTH sides
+ *  confirmed) or by any path that already marked the voucher PAID (e.g. the desk
+ *  marking an on-roll voucher paid). */
+function connect_engv_is_settled($v) {
+    if (strtoupper((string)($v['status'] ?? '')) === 'PAID') return true;
+    return trim((string)($v['client_paid_at'] ?? '')) !== '' && trim((string)($v['pro_received_at'] ?? '')) !== '';
+}
+/** Record a payment confirmation from one side. $side = 'client' | 'pro'.
+ *  Allowed only after the client has approved the voucher. Returns [ok, msg]. */
+function connect_engv_confirm($voucherId, $side, $by = '') {
+    connect_engv_migrate();
+    $v = connect_engv_get($voucherId); if (!$v) return [false, 'Voucher not found.'];
+    if (!in_array(strtoupper((string)$v['status']), ['APPROVED', 'PAID'], true))
+        return [false, 'The voucher must be approved before payment is confirmed.'];
+    $col = $side === 'client' ? 'client_paid_at' : ($side === 'pro' ? 'pro_received_at' : '');
+    if ($col === '') return [false, 'Unknown party.'];
+    if (trim((string)$v[$col]) !== '') return [true, 'Already confirmed.'];
+    $now = date('c');
+    db()->prepare("UPDATE cx_engagement_vouchers SET $col=?, updated_at=? WHERE id=?")->execute([$now, $now, (int)$voucherId]);
+    // If both sides are now confirmed, stamp the settlement + move to PAID.
+    $v = connect_engv_get($voucherId);
+    if (connect_engv_is_settled($v) && trim((string)$v['settled_at']) === '') {
+        db()->prepare("UPDATE cx_engagement_vouchers SET settled_at=?, updated_at=? WHERE id=?")->execute([$now, $now, (int)$voucherId]);
+        if (strtoupper((string)$v['status']) === 'APPROVED') connect_engv_set_status($voucherId, 'PAID', $by);
+    }
+    return [true, 'Payment confirmed.'];
+}
+
+/** Has this engagement been fully cleared? True when it has at least one approved
+ *  voucher and every approved voucher on it is settled (both sides confirmed).
+ *  This is the gate that releases the inspection report to the client. */
+function connect_engv_engagement_cleared($engagementId) {
+    connect_engv_migrate();
+    $rows = ops_all("SELECT status, client_paid_at, pro_received_at FROM cx_engagement_vouchers
+                     WHERE engagement_id=? AND status IN ('APPROVED','PAID')", [(int)$engagementId]) ?: [];
+    if (!$rows) return false;
+    foreach ($rows as $r) if (!connect_engv_is_settled($r)) return false;
+    return true;
+}
+
+/** Platform commission rollup — what the matchmaker has earned / is in pipeline. */
+function connect_commission_summary() {
+    connect_engv_migrate();
+    $sum = function ($where) {
+        try { return (float)ops_val("SELECT COALESCE(SUM(commission_total),0) FROM cx_engagement_vouchers WHERE $where"); }
+        catch (Throwable $e) { return 0.0; }
+    };
+    return [
+        'earned'   => round($sum("status IN ('APPROVED','PAID')"), 2),   // client has accepted the claim
+        'settled'  => round($sum("settled_at <> ''"), 2),                // both sides cleared
+        'pipeline' => round($sum("status='SUBMITTED'"), 2),              // awaiting client review
+        'rate'     => connect_commission_pct(),
+    ];
 }
 
 /** All vouchers for one engagement, newest first. */
@@ -332,6 +458,52 @@ function connect_engv_file_delete($fileId, $voucherId) {
     $v = connect_engv_get($voucherId);
     if (!$v || !connect_engv_can_attach($v)) return false;
     db()->prepare("DELETE FROM cx_engagement_voucher_files WHERE id=? AND voucher_id=?")->execute([(int)$fileId, (int)$voucherId]);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+//  Inspection report deliverable (held until the transaction is cleared).
+// ---------------------------------------------------------------------------
+
+/** The professional uploads the inspection report for an engagement. Reuses the
+ *  shared upload guard. Returns [ok, msg, id]. */
+function connect_engv_report_add($engagementId, $file, $title = '', $byKind = '', $byId = 0, $byName = '') {
+    connect_engv_migrate();
+    $eng = ops_one("SELECT * FROM cx_engagements WHERE id=?", [(int)$engagementId]);
+    if (!$eng) return [false, 'Engagement not found.', 0];
+    if (!$file || ($file['tmp_name'] ?? '') === '' || !is_uploaded_file($file['tmp_name']))
+        return [false, 'Choose a file to upload.', 0];
+    $bytes = (string)@file_get_contents($file['tmp_name']);
+    if ($bytes === '') return [false, 'That file looks empty.', 0];
+    if (function_exists('upload_reject_reason')) {
+        $why = upload_reject_reason($bytes, (string)($file['name'] ?? ''), (string)($file['type'] ?? ''));
+        if ($why !== '') return [false, $why, 0];
+    }
+    db()->prepare("INSERT INTO cx_engagement_reports
+        (engagement_id,requirement_id,poster_party_id,subject_kind,subject_id,title,file_name,mime,size,file_data,uploaded_kind,uploaded_id,uploaded_name,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        ->execute([(int)$engagementId, (int)($eng['requirement_id'] ?? 0), (int)($eng['poster_party_id'] ?? 0),
+                   (string)($eng['subject_kind'] ?? ''), (int)($eng['subject_id'] ?? 0),
+                   substr(trim((string)$title), 0, 200) ?: 'Inspection report',
+                   substr((string)($file['name'] ?? 'report'), 0, 255), (string)($file['type'] ?? ''), strlen($bytes),
+                   base64_encode($bytes), (string)$byKind, (int)$byId, substr((string)$byName, 0, 150), date('c')]);
+    return [true, 'Report uploaded.', (int)db()->lastInsertId()];
+}
+/** Report deliverables for an engagement (metadata only). */
+function connect_engv_reports($engagementId) {
+    connect_engv_migrate();
+    return ops_all("SELECT id,engagement_id,requirement_id,poster_party_id,title,file_name,mime,size,uploaded_name,created_at
+                    FROM cx_engagement_reports WHERE engagement_id=? ORDER BY id DESC", [(int)$engagementId]) ?: [];
+}
+/** One report row WITH bytes, for serving. */
+function connect_engv_report_row($id) {
+    connect_engv_migrate();
+    return ops_one("SELECT * FROM cx_engagement_reports WHERE id=?", [(int)$id]) ?: null;
+}
+/** Remove a report deliverable (uploader / desk). */
+function connect_engv_report_delete($id, $engagementId) {
+    connect_engv_migrate();
+    db()->prepare("DELETE FROM cx_engagement_reports WHERE id=? AND engagement_id=?")->execute([(int)$id, (int)$engagementId]);
     return true;
 }
 
