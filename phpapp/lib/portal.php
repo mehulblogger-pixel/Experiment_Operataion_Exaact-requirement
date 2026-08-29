@@ -743,7 +743,8 @@ function portal_route($route, $method) {
         case 'portal':
             portal_log('DASHBOARD');
             if (function_exists('cvp_notify_sync')) cvp_notify_sync('CLIENT', portal_partner_id());
-            portal_view('dashboard', ['d' => portal_dashboard()]);
+            portal_view('dashboard', ['d' => portal_dashboard(),
+                'kpi' => function_exists('connect_kpi_board') ? connect_kpi_board(['audience' => 'client', 'party_id' => portal_partner_id()]) : null]);
             exit;
 
         // Phase 10 (CVP) Slice 4 — the client's notification feed.

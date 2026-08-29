@@ -43,6 +43,13 @@
   <?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
 
 <?php else: ?>
+  <?php // Reusable KPI board — the SAME engine that scopes the client portal, here
+        // at staff/global scope: inspections, revenue, open concerns, ratings and
+        // reports pending, with one-tap actions. No duplicate metric code. ?>
+  <?php if (function_exists('connect_enabled') && connect_enabled() && function_exists('connect_kpi_render')): ?>
+    <h2 style="font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#777);margin:18px 0 2px">Service &amp; marketplace KPIs</h2>
+    <?php connect_kpi_render(connect_kpi_board(['audience' => 'staff'])); ?>
+  <?php endif; ?>
   <?php // Module 36 — ambient licence/subscription health, so an admin sees a lapse or
         // seat-limit BEFORE it forces the app read-only or refuses the next user. Shown
         // only to someone who can act on it; hidden when nothing needs attention.

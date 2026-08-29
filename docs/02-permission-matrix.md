@@ -137,6 +137,22 @@ add **no new named permission**:
   inspector`), so the client and vendor portals attach to the same threads later
   under their own portal sessions. No object status or module gate is introduced.
 
+### Reusable KPI board (ops "concern" + client dashboards)
+
+`connect_kpi_board($scope)` + `connect_kpi_render()` (`lib/connect_kpi.php`) are
+**read-only** and add **no new permission, table or status**. One engine powers
+both dashboards; the difference is only the **audience + scope**:
+
+- **Ops dashboard** (`views/dashboard.php`, managers/coordinators branch): staff
+  scope — aggregates across all clients. Shown only when `connect_enabled()`.
+- **Client portal dashboard** (`views/portal/dashboard.php`): client scope —
+  `party_id = portal_partner_id()`, so a client sees only their own figures.
+- Every metric **reuses an existing engine** — `financial_rollup(['partner_id'])`
+  (revenue), `complaints.partner_id` (concerns), `report_docs.client_id` (reports
+  pending), `jobs↔calls.client_id` (inspections), `cx_ratings`/`rating_all`
+  (ratings) — so no metric is re-implemented. Each figure is only ever as visible
+  as the register behind it (client scoping is enforced by `portal_partner_id()`).
+
 ### Engagements / bookings + freelancer self-service (K20)
 
 The booking model (`cx_engagements`) and the freelancer gap-fill add **no new

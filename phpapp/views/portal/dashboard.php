@@ -2,6 +2,11 @@
 <p class="plead">Everything <?= e(app_name()) ?> is doing for <?= e(portal_client_name()) ?>, at a glance.
   Reports appear here the moment they are issued — you do not have to ask for them.</p>
 
+<?php // Shared KPI board — the SAME engine that powers the ops "concern" dashboard,
+      // scoped to this client. Reuses financial_rollup / complaints / report_docs /
+      // jobs, so there is no duplicate metric code. ?>
+<?php if (!empty($kpi) && function_exists('connect_kpi_render')) connect_kpi_render($kpi); ?>
+
 <?php if (!empty($d['actions'])): ?>
 <div class="pcard" style="border-left:5px solid var(--warn)">
   <div style="font-weight:600;margin-bottom:8px">Awaiting you</div>
