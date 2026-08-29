@@ -316,6 +316,15 @@ function ops_connect_requirement($method) {
         } elseif ($act === 'engagement_status' && function_exists('connect_engage_set_status')) {
             [$eok, $emsg] = connect_engage_set_status((int)($_POST['engagement_id'] ?? 0), (string)($_POST['status'] ?? ''));
             flash($emsg, $eok ? 'success' : 'error');
+        } elseif ($act === 'engv_raise' && function_exists('connect_engv_open_for_engagement')) {   // K21 — desk raises a voucher (on-roll inspector / bench, no portal)
+            [$vok, $vmsg] = connect_engv_open_for_engagement((int)($_POST['engagement_id'] ?? 0), $_POST);
+            flash($vmsg, $vok ? 'success' : 'error');
+        } elseif ($act === 'engv_add_line' && function_exists('connect_engv_add_line')) {            // K21 — add a day/period to a desk voucher
+            [$vok, $vmsg] = connect_engv_add_line((int)($_POST['voucher_id'] ?? 0), $_POST);
+            flash($vmsg, $vok ? 'success' : 'error');
+        } elseif ($act === 'engv_status' && function_exists('connect_engv_set_status')) {            // K21 — approve / reject / mark paid
+            [$vok, $vmsg] = connect_engv_set_status((int)($_POST['voucher_id'] ?? 0), (string)($_POST['status'] ?? ''), function_exists('user_name') ? user_name(current_user()) : '');
+            flash($vmsg, $vok ? 'success' : 'error');
         }
         redirect('/connect-requirement?id=' . $id);
     }
@@ -343,8 +352,11 @@ function ops_connect_requirement($method) {
         // #7 — agency bench people allocated to this requirement (fulfilment view).
         'bench_allocs' => function_exists('connect_bench_allocs_for_requirement') ? connect_bench_allocs_for_requirement($id) : [],
         // K20 — the booking/engagement basis once awarded (man-days / months / …).
-        'engagement'   => function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement($id) : null,
+        'engagement'   => ($eng = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement($id) : null),
         'engage_bases' => function_exists('connect_engage_bases') ? connect_engage_bases() : [],
+        // K21 — the vouchers raised against that engagement (desk approve/pay + on-roll raise).
+        'engv_vouchers' => ($eng && function_exists('connect_engv_for_engagement')) ? connect_engv_for_engagement((int)$eng['id']) : [],
+        'engv_heads'    => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
         // K9 — two-way ratings once the engagement is awarded/closed.
         'can_rate'     => function_exists('cx_rating_allowed') && cx_rating_allowed($req),
         'ratings'      => function_exists('cx_ratings_for_requirement') ? cx_ratings_for_requirement($id) : [],

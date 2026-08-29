@@ -270,6 +270,90 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     if(c.ql) document.getElementById('egQtyLabel').textContent=c.ql; }
   egSync();
 </script>
+
+<?php // K21 — Engagement vouchers: the desk approves/pays claims, and raises one
+      // for an on-roll inspector or agency-bench person (who have no portal). A
+      // marketplace freelancer raises their own in /pro; the desk still approves. ?>
+<?php if ($engagement):
+  $engv_vouchers = $engv_vouchers ?? []; $engv_heads = $engv_heads ?? [];
+  $exclusiveEng = strtoupper((string)($engagement['rate_inclusive'] ?? 'INCLUSIVE')) === 'EXCLUSIVE';
+  $engUnit = (string)($engagement['rate_unit'] ?? 'day');
+  $vpill = function ($s) {
+    $s = strtoupper((string)$s);
+    $m = ['DRAFT'=>['Draft','#5b6b6a'],'SUBMITTED'=>['Submitted','#1858a8'],'APPROVED'=>['Approved','#0f7d5a'],'PAID'=>['Paid','#0f7d5a'],'REJECTED'=>['Sent back','#9a2a2a']];
+    [$l,$c] = $m[$s] ?? $m['DRAFT'];
+    return '<span style="display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;color:'.$c.';background:'.$c.'1a">'.e($l).'</span>';
+  };
+  $vinr = fn($n) => '₹'.number_format((int)round((float)$n));
+?>
+<div class="panel" style="margin-top:14px">
+  <h3 style="margin:0 0 4px">🧾 Engagement vouchers</h3>
+  <p class="cxmeta" style="margin:0 0 10px">
+    <?= $exclusiveEng ? 'Fee-only (exclusive) rate — claims carry travel / hotel / conveyance / allowances against receipts.' : 'All-inclusive rate — claims carry the fee only.' ?>
+    A marketplace freelancer raises their own in the portal; here the desk approves and pays, and can raise one for an on-roll inspector or bench person.
+  </p>
+
+  <form method="post" action="/connect-requirement" style="margin:0 0 12px">
+    <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engv_raise">
+    <input type="hidden" name="engagement_id" value="<?= (int)$engagement['id'] ?>">
+    <button class="btn sec" type="submit">+ Raise a voucher</button>
+  </form>
+
+  <?php if (!$engv_vouchers): ?>
+    <p class="cxmeta" style="margin:0">No vouchers yet.</p>
+  <?php else: foreach ($engv_vouchers as $vv):
+    $vex = strtoupper((string)$vv['rate_inclusive']) === 'EXCLUSIVE';
+    $vdraft = strtoupper((string)$vv['status']) === 'DRAFT';
+    $vsub = strtoupper((string)$vv['status']) === 'SUBMITTED';
+    $vapp = strtoupper((string)$vv['status']) === 'APPROVED';
+  ?>
+    <div style="border:1px solid var(--line,#e3ebea);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
+        <div><strong><?= e($vv['period_label'] ?: 'Voucher') ?></strong>
+          <span class="cxmeta">· Fee <?= e($vinr($vv['fee_total'])) ?><?php if ($vex): ?> · Exp <?= e($vinr($vv['reimb_total'])) ?><?php endif; ?> · <strong>Total <?= e($vinr($vv['grand_total'])) ?></strong></span></div>
+        <?= $vpill($vv['status']) ?>
+      </div>
+
+      <?php if ($vdraft): ?>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;font-size:13px;font-weight:600">Add a <?= e($engUnit) ?></summary>
+        <form method="post" action="/connect-requirement" style="margin-top:8px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+          <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engv_add_line"><input type="hidden" name="voucher_id" value="<?= (int)$vv['id'] ?>">
+          <label style="font-size:12px">Date<input type="date" name="work_date" style="width:100%;padding:7px;border:1px solid var(--line,#ddd);border-radius:8px"></label>
+          <label style="font-size:12px"><?= e(ucfirst($engUnit)) ?>s<input type="number" name="units" value="1" min="0.5" step="0.5" style="width:100%;padding:7px;border:1px solid var(--line,#ddd);border-radius:8px"></label>
+          <?php if ($vex) foreach ($engv_heads as $hk=>$hl): ?>
+            <label style="font-size:12px"><?= e($hl) ?><input type="number" name="<?= e($hk) ?>" value="0" min="0" style="width:100%;padding:7px;border:1px solid var(--line,#ddd);border-radius:8px"></label>
+          <?php endforeach; ?>
+          <div style="grid-column:1/-1"><button class="btn" type="submit">Add <?= e($engUnit) ?></button></div>
+        </form>
+      </details>
+      <form method="post" action="/connect-requirement" style="margin-top:8px" onsubmit="return confirm('Submit this voucher for approval?');">
+        <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engv_status"><input type="hidden" name="voucher_id" value="<?= (int)$vv['id'] ?>"><input type="hidden" name="status" value="SUBMITTED">
+        <button class="btn" type="submit" style="font-size:13px">Submit for approval</button>
+      </form>
+      <?php elseif ($vsub || $vapp): ?>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <?php if ($vsub): ?>
+          <?php foreach (['APPROVED'=>'Approve','REJECTED'=>'Send back'] as $st=>$lbl): ?>
+          <form method="post" action="/connect-requirement" style="margin:0">
+            <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engv_status"><input type="hidden" name="voucher_id" value="<?= (int)$vv['id'] ?>"><input type="hidden" name="status" value="<?= $st ?>">
+            <button class="btn <?= $st==='REJECTED'?'sec':'' ?>" type="submit" style="font-size:13px"><?= $lbl ?></button>
+          </form>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <?php foreach (['PAID'=>'Mark paid','REJECTED'=>'Send back'] as $st=>$lbl): ?>
+          <form method="post" action="/connect-requirement" style="margin:0">
+            <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engv_status"><input type="hidden" name="voucher_id" value="<?= (int)$vv['id'] ?>"><input type="hidden" name="status" value="<?= $st ?>">
+            <button class="btn <?= $st==='REJECTED'?'sec':'' ?>" type="submit" style="font-size:13px"><?= $lbl ?></button>
+          </form>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
+    </div>
+  <?php endforeach; endif; ?>
+</div>
+<?php endif; ?>
 <?php endif; ?>
 
 <?php $bench_allocs = $bench_allocs ?? []; if ($bench_allocs): ?>
