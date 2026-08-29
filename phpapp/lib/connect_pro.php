@@ -296,8 +296,17 @@ function connect_pro_route($route, $method) {
                 redirect('/pro/jobs');
             }
             $rows = function_exists('cx_open_requirements') ? cx_open_requirements() : [];
+            // A search filter over the open board — title / description / discipline / location.
+            $q = trim((string)($_GET['q'] ?? ''));
+            if ($q !== '') {
+                $needle = mb_strtolower($q);
+                $rows = array_values(array_filter($rows, function ($r) use ($needle) {
+                    $hay = mb_strtolower(implode(' ', [$r['title'] ?? '', $r['description'] ?? '', $r['discipline_code'] ?? '', $r['location'] ?? '', $r['ref_code'] ?? '']));
+                    return strpos($hay, $needle) !== false;
+                }));
+            }
             $applied = connect_pro_applied_map((int)$me['id']);
-            connect_pro_view('jobs', ['me' => $me, 'rows' => $rows, 'applied' => $applied]); exit;
+            connect_pro_view('jobs', ['me' => $me, 'rows' => $rows, 'applied' => $applied, 'q' => $q]); exit;
 
         case 'pro/applications':   // A2 — track my applications (+ withdraw)
             if ($method === 'POST' && ($_POST['action'] ?? '') === 'withdraw') {
