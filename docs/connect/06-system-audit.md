@@ -231,6 +231,24 @@ open network needs. None of it fights the codebase; it's the natural next layer.
   WhatsApp without opening the app; payments (later) flow safely through the platform.
 
 ### GAP 6 — Matching/Trust don't reach freelancers; no AI ranking *(coherence + differentiation)*
+
+> **Progress (#6 ✅):** matching + trust now span the **unified pool**, plus an
+> optional AI overlay. `connect_trust_score_pro()` gives a self-registered
+> professional a real cross-pool **Trust Score** on the same 0-1000 scale,
+> driven by the #3 verification tier (registered 0 → id 550 → credential 800 →
+> proven 1000) — no inflated "clean-conduct" prior, so an unverified newcomer is
+> an honest 0/New; `connect_trust_score_for($kind,$id)` dispatches by pool. The
+> recommender (`connect_match_for_requirement`) already spanned both pools (#1);
+> it now carries that professional trust instead of a flat zero. **Optional AI
+> re-ranking** (`connect_match_ai_rerank`, over the existing `ai.php` seam) lets a
+> coordinator ask a configured provider to re-order + annotate the rule shortlist
+> for real-world fit — with hard guarantees: AI may only reorder/annotate the
+> rule-provided set (never invent a candidate, un-block a BLOCKED one, or lose
+> anyone), and any failure / disabled provider / unparseable reply falls straight
+> back to the deterministic order. Surfaced as a "✨ Rank with AI" toggle on the
+> requirement page, shown only when a provider is configured. 17 tests.
+> **Remaining:** semantic embeddings over profiles (vs. the current token overlap),
+> and pro job/rating history feeding the trust buckets once engagements complete.
 - **What's there:** deterministic, explainable matching (`connect_match.php`) and Trust
   (`connect_trust.php`) — both **inspector-keyed**; a mature **AI provider layer**
   (`ai.php`) wired only to document extraction, **never to matching**.
@@ -281,7 +299,7 @@ Ranked by "distance to a credible, trusted, lean launch of the ITSN".
 | **3** | **Freelancer verification + moderation queue** (tier ladder; admin CRUD; DigiLocker/PAN/GST checks) — **✅ engine + queue + deterministic checks + tier ladder + provider seam done; real KYC provider & doc upload remain** | Trust | "Verified" is the promise; quality control at scale | M–L |
 | **4** | **In-app messaging** (per-engagement threads) — **✅ engine + staff desk + professional portal done; client/vendor surfaces & nudges remain** | Trust/UX | Stops the WhatsApp leak; dispute evidence | M |
 | **5** | **WhatsApp + SMS channel** (behind the notification seam) — **✅ engine + templates + consent + modes + provider seam + nudge done; real BSP + DLT/template approval remain (external)** | Reach | This audience lives on WhatsApp | M (blocked on template approval) |
-| **6** | **Marketplace matching/trust on the unified pool + optional AI ranking** | Intelligence | Recommend across the whole pool | M |
+| **6** | **Marketplace matching/trust on the unified pool + optional AI ranking** — **✅ cross-pool Trust Score + AI re-ranking overlay done; semantic embeddings & pro job-history buckets remain** | Intelligence | Recommend across the whole pool | M |
 | **7** | **Agency bench workspace** (agency adds/allocates its own people) | Supply | Agencies as fulfillers, not just applicants | M |
 | **8** | **Labour-market analytics** (supply/demand, fill rate, rate benchmarks) | Moat/Revenue | Data product; ops insight | M |
 | **9** | **Phase-B2 per-org gating + isolation** (topology decision + security review) | Architecture | Enforce org entitlements across orgs | L (needs sign-off) |

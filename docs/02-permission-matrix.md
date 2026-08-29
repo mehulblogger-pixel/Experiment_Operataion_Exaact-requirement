@@ -137,6 +137,15 @@ add **no new named permission**:
   inspector`), so the client and vendor portals attach to the same threads later
   under their own portal sessions. No object status or module gate is introduced.
 
+### Matching, cross-pool trust & AI re-ranking (K17 / #6)
+
+Adds **no new permission**. The recommender and its cross-pool Trust Score render
+on the requirement desk, which is already coordinator/master-gated (K2a). The
+optional **"Rank with AI"** toggle simply reuses the existing `ai.php` seam
+(`ai_enabled()`) plus a `connect_ai_match` on/off setting (admin, via Settings);
+AI may only reorder/annotate the rule-provided shortlist — it can never change
+eligibility, invent a candidate, or bypass any gate.
+
 ### WhatsApp / SMS / Email channel (K16 / #5)
 
 Outbound alerts (`/connect-channels`) add **no new named permission**:

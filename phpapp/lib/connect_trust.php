@@ -71,6 +71,59 @@ function connect_trust_score($inspectorId) {
     ];
 }
 
+/**
+ * Cross-pool Trust Score (#6) — the SAME 0-1000 shape for a self-registered
+ * professional as for an internal inspector, so the unified pool is scored on one
+ * scale. A professional has no inspector_certs vault or job history yet, so its
+ * verification bucket is driven by the #3 verification tier and the count of
+ * VERIFIED checks; buckets with no data drop out and the band honestly says
+ * "New" until they have a track record. No new table, no new permission.
+ */
+function connect_trust_score_pro($proId) {
+    $proId = (int)$proId;
+    // Verification tier → the verification bucket value (0-100). Honest: a
+    // registered-but-unverified professional scores 0 here.
+    $tier = function_exists('connect_verify_tier_for_professional') ? connect_verify_tier_for_professional($proId) : 'registered';
+    $tierVal = ['registered' => 0, 'id_verified' => 55, 'credential_verified' => 80, 'proven' => 100][$tier] ?? 0;
+
+    // The count of genuinely VERIFIED checks — the "verified" figure the badge and
+    // confidence logic use (parallels an inspector's live-credential count).
+    $verified = 0;
+    try { $verified = (int)ops_val("SELECT COUNT(*) FROM cx_verifications WHERE subject_kind='professional' AND subject_id=? AND status='VERIFIED'", [$proId]); }
+    catch (Throwable $e) {}
+
+    // Professionals have no marketplace job/rating history wired yet → those
+    // buckets are null (drop out), exactly like a brand-new inspector.
+    $jobs = 0;
+    // Unlike an internal inspector, a self-registered stranger gets NO "clean by
+    // default" conduct prior — trust tracks verification only until they have a
+    // real track record, so an unverified newcomer is an honest 0, not inflated.
+    $subs = [
+        ['verification', 'Verification',       20, (int)$tierVal],
+        ['client',       'Client performance', 25, null],
+        ['reliability',  'Reliability',        15, null],
+        ['report',       'Report quality',     10, null],
+        ['conduct',      'Conduct',            15, null],
+        ['endorsements', 'Peer endorsements',  15, null],
+    ];
+    $wSum = 0; $acc = 0; $out = [];
+    foreach ($subs as $s) {
+        [$key, $label, $w, $val] = $s;
+        $counted = $val !== null;
+        if ($counted) { $wSum += $w; $acc += $w * $val; }
+        $out[] = ['key' => $key, 'label' => $label, 'weight' => $w, 'value' => $val, 'counted' => $counted];
+    }
+    $score = $wSum > 0 ? max(0, min(1000, (int)round($acc / $wSum * 10))) : 0;
+    [$band, $bandClass] = connect_trust_band($score, $jobs);
+    return ['score' => $score, 'band' => $band, 'band_class' => $bandClass,
+            'jobs' => $jobs, 'verified' => $verified, 'limited' => true, 'tier' => $tier, 'subs' => $out];
+}
+
+/** Trust Score for either pool member — 'inspector' or 'professional'. */
+function connect_trust_score_for($kind, $id) {
+    return ($kind === 'professional') ? connect_trust_score_pro($id) : connect_trust_score((int)$id);
+}
+
 /** Band label + class from score and history depth (confidence banding). */
 function connect_trust_band($score, $jobs) {
     if ($jobs < 3)  return ['New', 'mut'];

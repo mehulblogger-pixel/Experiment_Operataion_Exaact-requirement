@@ -298,7 +298,18 @@ function ops_connect_requirement($method) {
         'inspectors'   => ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY name") ?: [],
         'req_next'     => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
         // K3 — ranked recommendations from the pool (only worth showing while open).
-        'matches'      => ($open && function_exists('connect_match_for_requirement')) ? connect_match_for_requirement($req, 6) : [],
+        // #6 — optional AI re-ranking when a provider is configured and ?ai=1 asked.
+        'matches'      => ($open && function_exists('connect_match_for_requirement'))
+                            ? (function () use ($req) {
+                                $wantAi = ($_GET['ai'] ?? '') === '1' && function_exists('connect_match_ai_available') && connect_match_ai_available();
+                                if ($wantAi && function_exists('connect_match_for_requirement_ranked')) {
+                                    [$rows, $used] = connect_match_for_requirement_ranked($req, 6, true);
+                                    $GLOBALS['__cx_ai_used'] = $used; return $rows;
+                                }
+                                return connect_match_for_requirement($req, 6);
+                              })() : [],
+        'ai_available' => function_exists('connect_match_ai_available') && connect_match_ai_available(),
+        'ai_used'      => $GLOBALS['__cx_ai_used'] ?? false,
         // K9 — two-way ratings once the engagement is awarded/closed.
         'can_rate'     => function_exists('cx_rating_allowed') && cx_rating_allowed($req),
         'ratings'      => function_exists('cx_ratings_for_requirement') ? cx_ratings_for_requirement($id) : [],

@@ -132,8 +132,19 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
 
 <?php if ($matches): ?>
 <div class="panel" style="margin-top:12px">
-  <h3 style="margin:0 0 4px">Recommended professionals</h3>
-  <p class="cxmeta" style="margin:0 0 10px">Ranked from your pool on skills fit, reputation, verified credentials and eligibility for this requirement. Add one to the shortlist in a tap.</p>
+  <?php $ai_available = $ai_available ?? false; $ai_used = $ai_used ?? false; ?>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+    <h3 style="margin:0 0 4px">Recommended professionals
+      <?php if ($ai_used): ?><span class="cxpill info" style="font-size:10px">✨ AI-ranked</span><?php endif; ?></h3>
+    <?php if ($ai_available): ?>
+      <?php if ($ai_used): ?>
+        <a class="btn secondary" href="/connect-requirement?id=<?= (int)$req['id'] ?>" style="font-size:13px">↺ Back to rule order</a>
+      <?php else: ?>
+        <a class="btn secondary" href="/connect-requirement?id=<?= (int)$req['id'] ?>&amp;ai=1" style="font-size:13px">✨ Rank with AI</a>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+  <p class="cxmeta" style="margin:0 0 10px">Ranked from your pool on skills fit, reputation, verified credentials and eligibility for this requirement<?php if ($ai_used): ?>, then re-ordered by AI for real-world fit (the rule score and eligibility are unchanged)<?php endif; ?>. Add one to the shortlist in a tap.</p>
   <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">
     <?php foreach ($matches as $m):
       $isPro = ($m['kind'] ?? 'inspector') === 'professional';
@@ -149,12 +160,13 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
           <span class="cxpill <?= $reasonCls ?>"><?= e($m['reason']) ?></span>
         </div>
         <div class="cxmeta" style="margin:8px 0">
-          <?php if (isset($m['trust']) && !$isPro): ?><strong>Trust <?= (int)$m['trust'] ?></strong> · <?php elseif ($isPro): ?><strong>New</strong> · <?php endif; ?>
+          <?php if (isset($m['trust']) && (int)$m['trust'] > 0): ?><strong>Trust <?= (int)$m['trust'] ?></strong><?php if (!empty($m['trust_band'])): ?> · <?= e($m['trust_band']) ?><?php endif; ?> · <?php elseif ($isPro): ?><strong><?= e($m['trust_band'] ?? 'New') ?></strong> · <?php endif; ?>
           <?php if ($m['stars'] !== null && (int)$m['jobs'] >= 3): ?>★ <?= e(number_format((float)$m['stars'],1)) ?> · <?php endif; ?>
           <?php if ((int)$m['verified'] > 0): ?><?= (int)$m['verified'] ?> verified · <?php endif; ?>
           <span class="cxpill <?= $epCls==='p-ok'?'ok':($epCls==='p-bad'?'bad':'warn') ?>"><?= e($epLbl) ?></span>
           · match <?= (int)$m['score'] ?>%
         </div>
+        <?php if (!empty($m['ai_reason'])): ?><div class="cxmeta" style="margin:2px 0 6px"><span class="cxpill info" style="font-size:10px">✨ AI</span> <?= e($m['ai_reason']) ?></div><?php endif; ?>
         <?php if (!empty($m['skills'])): ?><div class="cxmeta" style="margin-bottom:8px"><?= e($m['skills']) ?></div><?php endif; ?>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <?php if ($isPro): ?>

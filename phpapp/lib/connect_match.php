@@ -144,7 +144,10 @@ function connect_match_for_requirement($req, $limit = 8) {
                      'skills' => (string)$pro['skills'], 'disciplines' => (string)$pro['disciplines'],
                      'designation' => (string)($pro['headline'] ?? ''), 'passport_token' => (string)($pro['passport_token'] ?? '')];
             $m = cx_match_score($cand, $req, $reqTerms);
-            $m['trust'] = 0; $m['trust_band'] = 'New';
+            // Cross-pool Trust Score (#6) — professionals scored on the same scale
+            // (verification tier + honest "New" band until they have history).
+            if (function_exists('connect_trust_score_pro')) { $tt = connect_trust_score_pro((int)$pro['id']); $m['trust'] = (int)$tt['score']; $m['trust_band'] = $tt['band']; }
+            else { $m['trust'] = 0; $m['trust_band'] = 'New'; }
             $rows[] = $cand + $m;
         }
     } catch (Throwable $e) {}
@@ -157,4 +160,116 @@ function connect_match_for_requirement($req, $limit = 8) {
         return (float)($b['stars'] ?? 0) <=> (float)($a['stars'] ?? 0);
     });
     return array_slice($rows, 0, max(1, (int)$limit));
+}
+
+// ============================================================================
+//  OPTIONAL AI RE-RANKING (#6) — complements the rules, never replaces them.
+//
+//  The deterministic matcher above is the source of truth and the explanation.
+//  When an AI provider is configured, a coordinator can ask it to RE-ORDER and
+//  annotate the rule-provided shortlist for nuance the rules miss (e.g. matching
+//  "pressure-vessel FAT witness" to a profile that says "ASME VIII stage
+//  inspection"). Hard guarantees:
+//    - AI may only reorder / annotate the candidates the rules already returned —
+//      it can never introduce a candidate or un-block a BLOCKED one.
+//    - Any AI failure, disabled provider, or unparseable reply falls straight
+//      back to the deterministic order. AI is additive, never load-bearing.
+// ============================================================================
+
+/** Is AI ranking available and switched on? (Reuses the ai.php seam; a setting
+ *  lets an admin turn the feature off even when a provider is configured.) */
+function connect_match_ai_available() {
+    if (!function_exists('ai_enabled') || !ai_enabled()) return false;
+    if (function_exists('setting_get') && (string)setting_get('connect_ai_match', '1') === '0') return false;
+    return true;
+}
+
+/** The compact candidate line the model ranks on (no confidential fields). */
+function connect_match_ai_candidate_brief($r) {
+    return [
+        'id'    => (int)($r['id'] ?? 0),
+        'kind'  => (string)($r['kind'] ?? 'inspector'),
+        'name'  => (string)($r['name'] ?? ''),
+        'skills'=> (string)($r['skills'] ?? ''),
+        'designation' => (string)($r['designation'] ?? ''),
+        'availability' => (string)($r['availability'] ?? ''),
+        'rule_score'   => (int)($r['score'] ?? 0),
+        'eligibility'  => (string)($r['eligibility'] ?? ''),
+        'trust'        => (int)($r['trust'] ?? 0),
+        'verified'     => (int)($r['verified'] ?? 0),
+    ];
+}
+
+/**
+ * Re-rank a rule-provided shortlist with AI. $chat is an injectable callable
+ * ($system,$user)=>[$text,$err] (defaults to ai_chat) so this is testable without
+ * a network. Returns [rows, used] — `used` is false whenever AI did not safely
+ * apply, and then `rows` is the untouched deterministic order.
+ */
+function connect_match_ai_rerank($req, array $rows, $chat = null) {
+    if (!$rows) return [$rows, false];
+    $chat = is_callable($chat) ? $chat : (function_exists('ai_chat') ? 'ai_chat' : null);
+    if (!$chat) return [$rows, false];
+
+    // Only the non-blocked candidates are offered to the model; BLOCKED stay put.
+    $rankable = array_values(array_filter($rows, fn($r) => ($r['eligibility'] ?? '') !== 'BLOCKED'));
+    $blocked  = array_values(array_filter($rows, fn($r) => ($r['eligibility'] ?? '') === 'BLOCKED'));
+    if (count($rankable) < 2) return [$rows, false];
+
+    $byId = [];
+    foreach ($rankable as $r) $byId[(string)$r['kind'] . ':' . (int)$r['id']] = $r;
+
+    $cands = array_map('connect_match_ai_candidate_brief', $rankable);
+    $system = "You rank technical-services candidates for a job. You are given the requirement and a shortlist "
+        . "already filtered and scored by deterministic rules. Re-order ONLY these candidates by real-world fit and "
+        . "add a short reason (max 12 words) each. You must not invent candidates or change eligibility. "
+        . "Reply with ONLY a JSON array like "
+        . '[{"kind":"professional","id":3,"reason":"ASME VIII stage match"}], best first. Include every candidate exactly once.';
+    $user = "REQUIREMENT: " . json_encode([
+        'title' => (string)($req['title'] ?? ''), 'discipline' => cx_discipline_name($req['discipline_code'] ?? ''),
+        'location' => (string)($req['location'] ?? ''), 'detail' => (string)($req['description'] ?? ''),
+    ]) . "\n\nCANDIDATES: " . json_encode($cands);
+
+    try { [$text, $err] = $chat($system, $user, 800); }
+    catch (Throwable $e) { return [$rows, false]; }
+    if (!empty($err) || !is_string($text) || trim($text) === '') return [$rows, false];
+
+    // Parse the model's JSON (tolerate a code-fence or surrounding prose).
+    if (preg_match('/\[.*\]/s', $text, $mm)) $text = $mm[0];
+    $order = json_decode($text, true);
+    if (!is_array($order) || !$order) return [$rows, false];
+
+    $ranked = []; $seen = []; $valid = 0;
+    foreach ($order as $o) {
+        if (!is_array($o)) continue;
+        $key = (string)($o['kind'] ?? '') . ':' . (int)($o['id'] ?? 0);
+        if (!isset($byId[$key]) || isset($seen[$key])) continue;   // ignore invented / duplicate ids
+        $row = $byId[$key];
+        $reason = trim((string)($o['reason'] ?? ''));
+        if ($reason !== '') $row['ai_reason'] = mb_substr($reason, 0, 120);
+        $row['ai_ranked'] = true;
+        $ranked[] = $row; $seen[$key] = true; $valid++;
+    }
+    if ($valid === 0) return [$rows, false];   // the reply named no real candidate — fall back
+    // Any candidate the model dropped is appended in its deterministic position,
+    // so nobody silently disappears.
+    foreach ($rankable as $r) {
+        $key = (string)$r['kind'] . ':' . (int)$r['id'];
+        if (!isset($seen[$key])) $ranked[] = $r;
+    }
+    if (count($ranked) !== count($rankable)) return [$rows, false];   // safety: never lose anyone
+
+    return [array_merge($ranked, $blocked), true];
+}
+
+/**
+ * Recommendations, optionally AI-ranked. Always returns the deterministic set;
+ * when $useAi and a provider is available, it overlays the AI order + reasons.
+ * Returns [rows, ai_used].
+ */
+function connect_match_for_requirement_ranked($req, $limit = 8, $useAi = false, $chat = null) {
+    $rows = connect_match_for_requirement($req, $limit);
+    if (!$useAi || !$rows) return [$rows, false];
+    if (!$chat && !connect_match_ai_available()) return [$rows, false];
+    return connect_match_ai_rerank($req, $rows, $chat);
 }
