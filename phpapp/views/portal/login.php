@@ -15,8 +15,9 @@
 </form>
 
 <p class="pnote" style="max-width:430px;margin:22px auto 0;text-align:center">
-  Access is by invitation from your contact here. We never choose a password for you and never send one by
-  e-mail — an invitation link lets you set your own.</p>
+  <strong>New here?</strong> A company or agency can <a href="/join">create an account →</a>.
+  An individual professional can <a href="/pro/register">list themselves →</a>.
+  If your contact here invited you, the link they sent lets you set your own password.</p>
 
 <p class="pnote" style="max-width:430px;margin:14px auto 0;text-align:center">
   Holding a report and only want to check it is genuine? You do not need an account —

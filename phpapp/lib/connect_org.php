@@ -86,6 +86,54 @@ function connect_org_apply(array $in) {
     return (int)db()->lastInsertId();
 }
 
+/**
+ * B1 (self-service) — an organisation registers ITSELF and gets a WORKING login
+ * immediately (auto-approve, verify later). Creates: a business-partner party, an
+ * ACTIVE cx_organisations record, and a client-portal login the person can sign
+ * in with right away. Returns [ok, msg, ['email'=>.., 'login_url'=>..]].
+ *
+ *   COMPANY / TPIA / ENTERPRISE  → party is a client (can hire)
+ *   MANPOWER_AGENCY / RECRUITMENT_AGENCY → party is a subcontractor (supplies people)
+ * Every type gets a marketplace portal login (post work, review vouchers); the
+ * full operations workspace for a TPIA/enterprise stays a controlled step.
+ */
+function connect_org_register(array $in) {
+    connect_org_migrate();
+    $name    = trim((string)($in['name'] ?? ''));
+    $orgType = strtoupper((string)($in['org_type'] ?? ''));
+    $email   = strtolower(trim((string)($in['contact_email'] ?? '')));
+    $person  = trim((string)($in['contact_name'] ?? '')) ?: $name;
+    $pass    = (string)($in['password'] ?? '');
+    if ($name === '' || !isset(connect_org_types()[$orgType])) return [false, 'Please give your organisation a name and pick a type.', null];
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return [false, 'Enter a valid work e-mail.', null];
+    if (strlen($pass) < 8) return [false, 'Choose a password of at least 8 characters.', null];
+    // A login is one per e-mail across the client-portal world.
+    if (function_exists('portal_migrate')) portal_migrate();
+    if ((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(email)=?", [$email]) > 0)
+        return [false, 'That e-mail is already registered — sign in instead.', null];
+
+    $isAgency = in_array($orgType, ['MANPOWER_AGENCY', 'RECRUITMENT_AGENCY'], true);
+    $now = date('c');
+
+    // 1) Party
+    db()->prepare("INSERT INTO business_partners (legal_name,display_name,is_client,is_vendor,is_subcontractor,status,created_at) VALUES (?,?,?,?,?, 'ACTIVE',?)")
+        ->execute([$name, $name, $isAgency ? 0 : 1, 0, $isAgency ? 1 : 0, $now]);
+    $partyId = (int)db()->lastInsertId();
+
+    // 2) ACTIVE organisation (auto-approved — verify later)
+    $pkg = connect_org_types()[$orgType]['package'];
+    db()->prepare("INSERT INTO cx_organisations (name,org_type,package_key,party_id,status,contact_name,contact_email,contact_mobile,approved_by,approved_at,created_at)
+                   VALUES (?,?,?,?, 'ACTIVE', ?,?,?, 'self-service', ?, ?)")
+        ->execute([$name, $orgType, $pkg, $partyId, $person, $email, trim((string)($in['contact_mobile'] ?? '')), $now, $now]);
+
+    // 3) A working client-portal login (blank perms = full marketplace access)
+    db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,perms,created_by,created_at)
+                   VALUES (?,?,?,?,1,0,'', 'self-service', ?)")
+        ->execute([$partyId, $email, $person, password_hash($pass, PASSWORD_DEFAULT), $now]);
+
+    return [true, 'Your account is ready.', ['email' => $email, 'login_url' => '/portal/login', 'is_agency' => $isAgency]];
+}
+
 /** A platform admin approves a pending organisation → ACTIVE. */
 function connect_org_approve($id) {
     connect_org_migrate();
@@ -103,12 +151,12 @@ function connect_org_pending_count() {
 function connect_org_join_route($method) {
     if (function_exists('connect_enabled') && !connect_enabled()) { http_response_code(404); echo 'Not available.'; exit; }
     connect_org_migrate();
-    $done = false; $err = '';
+    $done = false; $err = ''; $acct = null;
     if ($method === 'POST') {
-        $id = connect_org_apply($_POST);
-        if ($id > 0) $done = true; else $err = 'Please give your organisation a name, a type, and a valid e-mail.';
+        [$ok, $msg, $acct] = connect_org_register($_POST);
+        if ($ok) $done = true; else $err = $msg;
     }
-    $GLOBALS['__join_done'] = $done; $GLOBALS['__join_err'] = $err;
+    $GLOBALS['__join_done'] = $done; $GLOBALS['__join_err'] = $err; $GLOBALS['__join_acct'] = $acct;
     $GLOBALS['__join_types'] = connect_org_types();
     require __DIR__ . '/../views/ops/connect_join.php';
     exit;

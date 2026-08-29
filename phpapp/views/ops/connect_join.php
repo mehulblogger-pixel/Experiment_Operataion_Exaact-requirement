@@ -2,6 +2,7 @@
 // Connect B1 — public organisation onboarding. An organisation applies for
 // itself and sees the modules it will get. Standalone page (pre-login).
 $done = $GLOBALS['__join_done'] ?? false; $err = $GLOBALS['__join_err'] ?? '';
+$acct = $GLOBALS['__join_acct'] ?? null;
 $types = $GLOBALS['__join_types'] ?? [];
 $appName = function_exists('app_name') ? app_name() : 'MGH Inspect Connect';
 $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','reporting'=>'Reporting','money'=>'Money','hr'=>'People/Hiring','connect'=>'Marketplace','pro'=>'Self-service'];
@@ -32,9 +33,16 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
 <div class="wrap">
 <?php if ($done): ?>
   <div class="card" style="text-align:center;padding:40px 22px">
-    <div style="font-size:44px">🎉</div>
-    <h1 style="margin:12px 0 6px">You're on the list</h1>
-    <p class="muted">Thanks — your organisation has been registered and is awaiting approval. We'll be in touch at the e-mail you gave to finish setting you up.</p>
+    <div style="font-size:44px">✅</div>
+    <h1 style="margin:12px 0 6px">Your account is ready</h1>
+    <p class="muted" style="margin:0 0 4px">You can sign in now with</p>
+    <p style="font-size:17px;font-weight:600;margin:0 0 18px"><?= e($acct['email'] ?? '') ?></p>
+    <a class="btn" href="<?= e($acct['login_url'] ?? '/portal/login') ?>" style="max-width:280px;margin:0 auto">Sign in →</a>
+    <p class="muted" style="margin:16px 0 0;font-size:13px">
+      <?= !empty($acct['is_agency'])
+          ? 'As an agency you can post requirements, apply to open jobs and review vouchers. Your bench workspace is enabled by our team shortly.'
+          : 'Post work, shortlist and award people, and review their vouchers — all from your portal.' ?>
+    </p>
   </div>
 <?php else: ?>
   <h1>Join as an organisation</h1>
@@ -60,8 +68,9 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
       <label>Your name</label><input name="contact_name">
       <label>Work e-mail</label><input type="email" name="contact_email" required>
       <label>Mobile</label><input name="contact_mobile">
+      <label>Choose a password</label><input type="password" name="password" minlength="8" required placeholder="at least 8 characters">
     </div>
-    <button class="btn" type="submit">Register my organisation</button>
+    <button class="btn" type="submit">Create my account</button>
     <p class="muted" style="text-align:center;margin-top:14px;font-size:13.5px">An individual professional? <a href="/pro/register">List yourself here →</a></p>
   </form>
 <?php endif; ?>

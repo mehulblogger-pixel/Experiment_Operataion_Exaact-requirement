@@ -7,7 +7,13 @@ listed as follow-up work in `99-gaps-and-risks.md`.
 ## Client portal
 - **Engine:** `lib/portal.php`; screens `views/portal/*`; permission check `pcan()`;
   per-user rights managed at `views/ops/portal_users.php` / `portal_user_perms.php`.
-- **Who:** a client's own staff, invited by the branch.
+- **Who:** a client's own staff. Two ways in — (1) **self-service**: a company or
+  agency registers itself at the public **`/join`** page (`connect_org_register`),
+  which **auto-approves** and immediately provisions a business-partner party, an
+  ACTIVE `cx_organisations` record and a working portal login (no admin step —
+  verify later); or (2) **invited** by the branch (`portal_invite`, the invitee
+  sets their own password from the link). Individual freelancers use `/pro/register`
+  instead. All three are marketplace-facing logins scoped to their own data.
 - **Typical journey:** log in → dashboard → see **their own** calls, reports and
   invoices; raise a complaint; where enabled, **decide report acceptance**
   (`views/portal/report_decide.php`).
