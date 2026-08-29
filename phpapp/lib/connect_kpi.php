@@ -240,44 +240,83 @@ function connect_kpi_board_pro($proId) {
     ];
 }
 
-/** Render the board (self-styled so it works in ops AND portal contexts). */
+/**
+ * Render the board using the app's ONE universal KPI-card design.
+ *
+ * The markup carries the design-system class names — `.kpi-row`, `.kpi`
+ * (`.kic`/`.k`/`.v`/`.d`), the `.tone-*` semantic rail, and `.pill` badges —
+ * so on any screen that loads `assets/css/app.css` (the ops dashboards) the
+ * board IS the universal component: no second definition, and any future
+ * tweak to `.kpi` in the design system flows straight through.
+ *
+ * The client and freelancer portals are self-contained (their own tokens, no
+ * app.css), so a single zero-specificity `:where()` fallback reproduces the
+ * SAME card spec from each portal's own variables (with design-system hex
+ * fallbacks). Because `:where()` has zero specificity, the real component
+ * always wins wherever app.css is present, and the fallback only fills in
+ * where it is absent — one look everywhere, no override, no drift.
+ */
 function connect_kpi_render($board) {
     if (!is_array($board) || empty($board['tiles'])) return;
-    $tones = ['ok' => '#0f7d5a', 'warn' => '#8a6d12', 'bad' => '#b91c1c', '' => 'inherit'];
+    // board tone → design-system tone/pill suffix.
+    $tone = ['ok' => 'ok', 'warn' => 'warn', 'bad' => 'bad', 'info' => 'info', '' => ''];
+
     static $styled = false;
     if (!$styled) {
         $styled = true;
-        echo '<style>
-        .kpiq-row{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
-        .kpiq{flex:1 1 150px;min-width:140px;background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:13px;padding:13px 15px}
-        .kpiq .kic{font-size:16px}
-        .kpiq .lab{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted,#777);margin-top:2px}
-        .kpiq .val{font-size:24px;font-weight:800;letter-spacing:-.01em;line-height:1.1}
-        .kpiq .val a{text-decoration:none;color:inherit}
-        .kpiq .sub{font-size:12px;color:var(--muted,#888);margin-top:1px}
-        .kpiq-actions{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 6px}
-        .kpiq-act{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;border:1px solid var(--line,#e5e7eb);background:var(--card,#fff);text-decoration:none;color:inherit;font-size:13px;font-weight:600}
-        .kpiq-act .b{display:inline-block;min-width:18px;height:18px;line-height:18px;text-align:center;border-radius:999px;font-size:11px;font-weight:800;padding:0 5px}
-        </style>';
+        // Fallback ONLY — every selector is wrapped in :where() (specificity 0)
+        // so app.css's real .kpi/.pill win on the ops dashboards, while the
+        // self-contained portals still get the identical universal card.
+        echo '<style>'
+           . ':where(.kpi-row){display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:12px 0}'
+           . ':where(.kpi){position:relative;background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:var(--radius,14px);padding:16px 18px;box-shadow:var(--shadow-sm,0 1px 2px rgba(18,32,60,.06));overflow:hidden}'
+           . ':where(a.kpi){text-decoration:none;color:var(--ink,#12201f);transition:transform .12s,box-shadow .16s}'
+           . ':where(a.kpi:hover){transform:translateY(-2px);box-shadow:var(--shadow,0 10px 30px rgba(18,32,60,.12))}'
+           . ':where(.kpi .kic){position:absolute;right:16px;top:14px;font-size:17px;opacity:.55;line-height:1}'
+           . ':where(.kpi .k){display:block;font-size:11.5px;font-weight:700;color:var(--muted,#5b6b6a);text-transform:uppercase;letter-spacing:.4px;line-height:1.35;padding-right:26px}'
+           . ':where(.kpi .v){display:block;font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.1;margin:6px 0 3px;color:var(--ink,#12201f);font-variant-numeric:tabular-nums}'
+           . ':where(.kpi .d){display:block;font-size:12.5px;font-weight:600;color:var(--muted,#5b6b6a);line-height:1.35}'
+           . ':where(.kpi.tone-ok,.kpi.tone-warn,.kpi.tone-bad,.kpi.tone-info){padding-left:21px}'
+           . ':where(.kpi.tone-ok,.kpi.tone-warn,.kpi.tone-bad,.kpi.tone-info)::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}'
+           . ':where(.kpi.tone-ok)::before{background:var(--ok,#15803d)}:where(.kpi.tone-ok .v){color:var(--ok,#15803d)}'
+           . ':where(.kpi.tone-warn)::before{background:var(--warn,#b45309)}:where(.kpi.tone-warn .v){color:var(--warn,#b45309)}'
+           . ':where(.kpi.tone-bad)::before{background:var(--bad,#b91c1c)}:where(.kpi.tone-bad .v){color:var(--bad,#b91c1c)}'
+           . ':where(.kpi.tone-info)::before{background:var(--info,#0369a1)}:where(.kpi.tone-info .v){color:var(--info,#0369a1)}'
+           . ':where(.pill){display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap}'
+           . ':where(.pill.p-ok){background:color-mix(in srgb,var(--ok,#15803d) 14%,transparent);color:var(--ok,#15803d)}'
+           . ':where(.pill.p-warn){background:color-mix(in srgb,var(--warn,#b45309) 14%,transparent);color:var(--warn,#b45309)}'
+           . ':where(.pill.p-bad){background:color-mix(in srgb,var(--bad,#b91c1c) 14%,transparent);color:var(--bad,#b91c1c)}'
+           . ':where(.pill.p-mut){background:var(--soft,#f1f5f9);color:var(--muted,#5b6b6a)}'
+           . ':where(.kpi-acts){display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}'
+           . ':where(.kpi-act){display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;border:1px solid var(--line,#e5e7eb);background:var(--card,#fff);text-decoration:none;color:var(--ink,#12201f);font-size:12.5px;font-weight:600}'
+           . ':where(a.kpi-act:hover){border-color:var(--muted,#5b6b6a)}'
+           . '</style>';
     }
-    echo '<div class="kpiq-row">';
+
+    echo '<div class="kpi-row">';
     foreach ($board['tiles'] as $t) {
-        $col = $tones[$t['tone'] ?? ''] ?? 'inherit';
-        $val = e($t['value']);
-        if (!empty($t['url'])) $val = '<a href="' . e($t['url']) . '">' . $val . '</a>';
-        echo '<div class="kpiq"><span class="kic">' . e($t['icon']) . '</span>'
-           . '<div class="lab">' . e($t['label']) . '</div>'
-           . '<div class="val" style="color:' . $col . '">' . $val . '</div>'
-           . '<div class="sub">' . e($t['sub']) . '</div></div>';
+        $tc = $tone[$t['tone'] ?? ''] ?? '';
+        $cls = 'kpi' . ($tc ? ' tone-' . $tc : '');
+        $url = (string)($t['url'] ?? '');
+        $open  = $url !== '' ? '<a class="' . $cls . '" href="' . e($url) . '">' : '<div class="' . $cls . '">';
+        $close = $url !== '' ? '</a>' : '</div>';
+        echo $open
+           . '<span class="kic">' . e($t['icon']) . '</span>'
+           . '<span class="k">' . e($t['label']) . '</span>'
+           . '<span class="v">' . e($t['value']) . '</span>'
+           . '<span class="d">' . e($t['sub']) . '</span>'
+           . $close;
     }
     echo '</div>';
+
     if (!empty($board['actions'])) {
-        echo '<div class="kpiq-actions">';
+        echo '<div class="kpi-acts">';
         foreach ($board['actions'] as $a) {
-            $col = $tones[$a['tone'] ?? ''] ?? '#516260';
-            $badge = !empty($a['value']) ? e($a['value']) : (int)($a['n'] ?? 0);
-            echo '<a class="kpiq-act" href="' . e($a['url'] ?? '#') . '">'
-               . '<span class="b" style="background:' . $col . '22;color:' . $col . '">' . $badge . '</span>'
+            $tc = $tone[$a['tone'] ?? ''] ?? '';
+            $pill = 'pill p-' . ($tc ?: 'mut');
+            $badge = !empty($a['value']) ? e($a['value']) : (string)(int)($a['n'] ?? 0);
+            echo '<a class="kpi-act" href="' . e($a['url'] ?? '#') . '">'
+               . '<span class="' . $pill . '">' . $badge . '</span>'
                . e($a['label']) . '</a>';
         }
         echo '</div>';

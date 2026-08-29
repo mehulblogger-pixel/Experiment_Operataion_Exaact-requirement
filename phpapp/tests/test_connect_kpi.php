@@ -70,7 +70,12 @@ try {
 
     // The renderer runs without error and emits the board markup.
     ob_start(); connect_kpi_render($b); $html = ob_get_clean();
-    t_ok(strpos($html, 'kpiq-row') !== false, 'the shared renderer emits the KPI board markup');
+    // The renderer uses the app's ONE universal KPI-card design (.kpi-row / .kpi
+    // / .tone-* / .pill) so it IS the design-system component wherever app.css
+    // is loaded, and an identical :where() fallback covers the self-contained portals.
+    t_ok(strpos($html, 'class="kpi-row"') !== false, 'the shared renderer emits the universal .kpi-row');
+    t_ok(strpos($html, 'class="kpi') !== false, 'the shared renderer emits the universal .kpi card');
+    t_ok(strpos($html, 'tone-') !== false, 'the board applies a semantic .tone-* rail');
     t_ok(strpos($html, 'Inspections') !== false, 'the rendered board shows the Inspections tile');
 
     // --- the SAME engine at 'pro' scope builds a freelancer cockpit -----------

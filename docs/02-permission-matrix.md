@@ -163,6 +163,13 @@ all three dashboards; the difference is only the **audience + scope**:
   re-implemented. Each figure is only ever as visible as the register behind it
   (client scoping via `portal_partner_id()`; freelancer scoping via the `/pro`
   session identity).
+- **One card design.** `connect_kpi_render()` emits the design-system's universal
+  KPI card markup (`.kpi-row` / `.kpi` / `.tone-*` / `.pill`, per
+  `docs/DESIGN-SYSTEM.md`), so on any screen that loads `assets/css/app.css` the
+  board **is** the shared component. The self-contained client/freelancer portals
+  get an identical look from a single zero-specificity `:where()` fallback that
+  reads each portal's own tokens — the real component always wins where present,
+  so there is one look and no style drift.
 
 ### Engagements / bookings + freelancer self-service (K20)
 
