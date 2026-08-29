@@ -310,6 +310,8 @@ function ops_connect_requirement($method) {
                               })() : [],
         'ai_available' => function_exists('connect_match_ai_available') && connect_match_ai_available(),
         'ai_used'      => $GLOBALS['__cx_ai_used'] ?? false,
+        // #7 — agency bench people allocated to this requirement (fulfilment view).
+        'bench_allocs' => function_exists('connect_bench_allocs_for_requirement') ? connect_bench_allocs_for_requirement($id) : [],
         // K9 — two-way ratings once the engagement is awarded/closed.
         'can_rate'     => function_exists('cx_rating_allowed') && cx_rating_allowed($req),
         'ratings'      => function_exists('cx_ratings_for_requirement') ? cx_ratings_for_requirement($id) : [],

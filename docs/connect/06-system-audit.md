@@ -300,7 +300,7 @@ Ranked by "distance to a credible, trusted, lean launch of the ITSN".
 | **4** | **In-app messaging** (per-engagement threads) — **✅ engine + staff desk + professional portal done; client/vendor surfaces & nudges remain** | Trust/UX | Stops the WhatsApp leak; dispute evidence | M |
 | **5** | **WhatsApp + SMS channel** (behind the notification seam) — **✅ engine + templates + consent + modes + provider seam + nudge done; real BSP + DLT/template approval remain (external)** | Reach | This audience lives on WhatsApp | M (blocked on template approval) |
 | **6** | **Marketplace matching/trust on the unified pool + optional AI ranking** — **✅ cross-pool Trust Score + AI re-ranking overlay done; semantic embeddings & pro job-history buckets remain** | Intelligence | Recommend across the whole pool | M |
-| **7** | **Agency bench workspace** (agency adds/allocates its own people) | Supply | Agencies as fulfillers, not just applicants | M |
+| **7** | **Agency bench workspace** (agency adds/allocates its own people) — **✅ private roster + allocation + utilisation done; vendor-portal self-service surface remains** | Supply | Agencies as fulfillers, not just applicants | M |
 | **8** | **Labour-market analytics** (supply/demand, fill rate, rate benchmarks) | Moat/Revenue | Data product; ops insight | M |
 | **9** | **Phase-B2 per-org gating + isolation** (topology decision + security review) | Architecture | Enforce org entitlements across orgs | L (needs sign-off) |
 | **10** | **Escrow / payment rail** (Phase 6) | Money | Only after PMF + CA/RBI/legal | L (external blockers) |

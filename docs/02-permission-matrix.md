@@ -146,6 +146,22 @@ optional **"Rank with AI"** toggle simply reuses the existing `ai.php` seam
 AI may only reorder/annotate the rule-provided shortlist — it can never change
 eligibility, invent a candidate, or bypass any gate.
 
+### Agency bench workspace (K18 / #7)
+
+The agency bench (`/connect-bench`) adds **no new named permission** and enforces
+the **privacy invariant**:
+
+- **Manage** an agency's private roster + allocations: `connect_bench_can()` =
+  `is_master()` or `is_coordinator_level()` (the marketplace desk).
+- **Privacy**: bench people live in their own `cx_bench` table, scoped by
+  `org_id`, and are **never** written into the shared self-registered pool
+  (`cx_professionals`) or surfaced in public search / the shared recommender — an
+  agency's employees stay private to that agency (an invariant asserted by
+  `test_connect_bench.php`). Every bench read/allocation is org-scoped, so one
+  agency can never see or allocate another's people.
+- Only orgs of type `MANPOWER_AGENCY` / `RECRUITMENT_AGENCY` may hold a bench.
+  No object status or module gate is introduced.
+
 ### WhatsApp / SMS / Email channel (K16 / #5)
 
 Outbound alerts (`/connect-channels`) add **no new named permission**:

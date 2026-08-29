@@ -189,6 +189,18 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
 </div>
 <?php endif; ?>
 
+<?php $bench_allocs = $bench_allocs ?? []; if ($bench_allocs): ?>
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 6px">🏗️ Agency crew allocated (<?= count($bench_allocs) ?>)</h3>
+  <p class="cxmeta" style="margin:0 0 8px">People an agency has put forward from its own bench to fulfil this requirement.</p>
+  <?php foreach ($bench_allocs as $ba): ?>
+    <div class="approw"><div><strong><?= e($ba['bench_name']) ?></strong>
+      <?php if (!empty($ba['job_title'])): ?><span class="cxmeta"> · <?= e($ba['job_title']) ?></span><?php endif; ?>
+      <div class="cxmeta"><?= e($ba['agency_name'] ?? 'Agency') ?> · <?= e(ucfirst(strtolower((string)$ba['status']))) ?></div></div></div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <div class="panel" style="margin-top:12px">
   <h3 style="margin:0 0 6px">Applications (<?= count($apps) ?>)</h3>
   <?php if (!$apps): ?>
