@@ -107,8 +107,14 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
    desk recommendation cards. Token scoring stays as the floor; the graph/location
    are additive bonuses. Tests: `tests/test_connect_match_passport.php`.
 
-### Still open (next tested slices)
-   Taxonomy **admin CRUD** (add/edit/retire/relate/alias), **CV-first prefill**
-   (extract→map→confirm), structured **certifications / project experience**,
-   **verification & privacy** states, and the client **advanced-search + result
-   cards + contact-reveal**.
+8. **Taxonomy admin CRUD** — *shipped*: `/connect-taxonomy-admin` (master/admin
+   gate), engine `connect_tax_node_update` / `_set_status` / `_alias_delete` /
+   `_edge_delete` / `_admin_nodes`. Add/rename/retire nodes (status-based, so
+   history never breaks), manage synonyms and RELATED/SUGGESTS relations, reparent,
+   filter by kind + text. A rename keeps the old name as a synonym; a colliding
+   rename is refused. Tests: `tests/test_connect_tax_admin.php` (11).
+
+### Still open (next tested slices, one at a time)
+   **CV-first prefill** (extract→map→confirm), structured **certifications /
+   project experience**, **verification & privacy** states, and the client
+   **advanced-search + result cards + contact-reveal**.

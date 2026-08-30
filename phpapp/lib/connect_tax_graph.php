@@ -126,6 +126,63 @@ function connect_tax_all($kind) {
     return ops_all("SELECT * FROM cx_tax_nodes WHERE kind=? AND status='ACTIVE' ORDER BY sort_order, name", [strtoupper($kind)]) ?: [];
 }
 
+// ---- Admin CRUD (add / edit / retire / relate / alias — no code changes) ----
+
+/** Rename / recode / reparent / reorder a node. Refuses a rename that would
+ *  collide with another node of the same kind. Keeps the old name as a synonym. */
+function connect_tax_node_update($id, array $f) {
+    connect_tax_graph_migrate();
+    $n = connect_tax_node_get($id); if (!$n) return [false, 'Node not found.'];
+    $name = trim((string)($f['name'] ?? $n['name'])); if ($name === '') return [false, 'A name is required.'];
+    $slug = tax_norm($name);
+    if ((int)ops_val("SELECT id FROM cx_tax_nodes WHERE kind=? AND slug=? AND id<>?", [$n['kind'], $slug, (int)$id]))
+        return [false, 'Another ' . strtolower((string)$n['kind']) . ' already has that name.'];
+    $parent = array_key_exists('parent_id', $f) ? (int)$f['parent_id'] : (int)$n['parent_id'];
+    if ($parent === (int)$id) $parent = 0;   // never its own parent
+    db()->prepare("UPDATE cx_tax_nodes SET name=?, slug=?, code=?, parent_id=?, sort_order=?, updated_at=? WHERE id=?")
+        ->execute([$name, $slug, (string)($f['code'] ?? $n['code']), $parent, (int)($f['sort_order'] ?? $n['sort_order']), date('c'), (int)$id]);
+    if ($name !== (string)$n['name']) connect_tax_alias_add($id, $name);   // old name lives on as a synonym
+    return [true, 'Saved.'];
+}
+/** Retire / reactivate a node — status-based so history never breaks. */
+function connect_tax_node_set_status($id, $status) {
+    connect_tax_graph_migrate();
+    $status = strtoupper($status) === 'RETIRED' ? 'RETIRED' : 'ACTIVE';
+    db()->prepare("UPDATE cx_tax_nodes SET status=?, updated_at=? WHERE id=?")->execute([$status, date('c'), (int)$id]);
+    return [true, $status === 'RETIRED' ? 'Retired.' : 'Reactivated.'];
+}
+function connect_tax_alias_delete($id) { connect_tax_graph_migrate(); db()->prepare("DELETE FROM cx_tax_aliases WHERE id=?")->execute([(int)$id]); return true; }
+/** Delete an edge (both directions of a RELATED pair). */
+function connect_tax_edge_delete($id) {
+    connect_tax_graph_migrate();
+    $e = ops_one("SELECT * FROM cx_tax_edges WHERE id=?", [(int)$id]); if (!$e) return false;
+    db()->prepare("DELETE FROM cx_tax_edges WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?)")
+        ->execute([(int)$e['from_id'], (int)$e['to_id'], (int)$e['to_id'], (int)$e['from_id']]);
+    return true;
+}
+function connect_tax_aliases_for($nodeId) { connect_tax_graph_migrate(); return ops_all("SELECT * FROM cx_tax_aliases WHERE node_id=? ORDER BY alias", [(int)$nodeId]) ?: []; }
+function connect_tax_edges_for($nodeId) {
+    connect_tax_graph_migrate();
+    return ops_all("SELECT e.*, n.name AS to_name, n.kind AS to_kind FROM cx_tax_edges e JOIN cx_tax_nodes n ON n.id=e.to_id WHERE e.from_id=? ORDER BY e.rel, n.name", [(int)$nodeId]) ?: [];
+}
+/** Admin listing — any status, filter by kind + free text. */
+function connect_tax_admin_nodes($kind = '', $q = '', $limit = 200) {
+    connect_tax_graph_migrate();
+    $w = ['1=1']; $a = [];
+    if ($kind !== '') { $w[] = 'kind=?'; $a[] = strtoupper($kind); }
+    if (trim($q) !== '') { $w[] = 'slug LIKE ?'; $a[] = '%' . tax_norm($q) . '%'; }
+    return ops_all("SELECT n.*, (SELECT COUNT(*) FROM cx_tax_aliases al WHERE al.node_id=n.id) AS alias_count,
+                           (SELECT name FROM cx_tax_nodes p WHERE p.id=n.parent_id) AS parent_name
+                    FROM cx_tax_nodes n WHERE " . implode(' AND ', $w) . " ORDER BY n.kind, n.name LIMIT " . max(1, (int)$limit), $a) ?: [];
+}
+function connect_tax_admin_summary() {
+    connect_tax_graph_migrate();
+    return ['nodes' => (int)ops_val("SELECT COUNT(*) FROM cx_tax_nodes WHERE status='ACTIVE'"),
+            'retired' => (int)ops_val("SELECT COUNT(*) FROM cx_tax_nodes WHERE status='RETIRED'"),
+            'aliases' => (int)ops_val("SELECT COUNT(*) FROM cx_tax_aliases"),
+            'edges' => (int)ops_val("SELECT COUNT(*) FROM cx_tax_edges")];
+}
+
 // ---- Aliases + relationships ------------------------------------------------
 
 function connect_tax_alias_add($nodeId, $alias) {
@@ -455,4 +512,60 @@ function connect_profile_tax_backfill($proId) {
         }
     }
     return $n;
+}
+
+// ---- Admin screen (master / admin only) -------------------------------------
+
+/** Who may manage the taxonomy graph — stricter than the read-only view. */
+function connect_taxonomy_admin_can() {
+    if (function_exists('connect_enabled') && !connect_enabled()) return false;
+    if (function_exists('is_master') && is_master()) return true;
+    if (function_exists('is_admin_level') && is_admin_level()) return true;
+    return false;
+}
+
+/** The taxonomy graph admin workspace — add/edit/retire nodes, aliases, relations. */
+function ops_connect_taxonomy_admin($method) {
+    ops_require(connect_taxonomy_admin_can(), 'Managing the taxonomy is for administrators.');
+    connect_tax_graph_migrate();
+    $kind = strtoupper((string)($_GET['kind'] ?? $_POST['kind'] ?? ''));
+    $q    = (string)($_GET['q'] ?? '');
+    $sel  = (int)($_GET['node'] ?? $_POST['node'] ?? 0);
+    $back = function ($extra = []) use ($kind, $sel) {
+        $qs = array_filter(array_merge(['kind' => $kind, 'node' => $sel ?: null], $extra));
+        redirect('/connect-taxonomy-admin' . ($qs ? '?' . http_build_query($qs) : ''));
+    };
+    if ($method === 'POST') {
+        $act = (string)($_POST['action'] ?? '');
+        if ($act === 'node_add') {
+            $id = connect_tax_node_add((string)($_POST['kind_new'] ?? ''), (string)($_POST['name'] ?? ''), (int)($_POST['parent_id'] ?? 0), ['code' => (string)($_POST['code'] ?? '')]);
+            flash($id ? 'Node added.' : 'Give it a name and a valid kind.', $id ? 'success' : 'error'); $sel = $id ?: $sel;
+        } elseif ($act === 'node_update') {
+            [$ok, $msg] = connect_tax_node_update((int)$_POST['id'], $_POST); flash($msg, $ok ? 'success' : 'error');
+        } elseif ($act === 'node_status') {
+            connect_tax_node_set_status((int)$_POST['id'], (string)($_POST['status'] ?? 'ACTIVE')); flash('Updated.');
+        } elseif ($act === 'alias_add') {
+            connect_tax_alias_add((int)$_POST['node_id'], (string)($_POST['alias'] ?? '')); flash('Alias added.');
+        } elseif ($act === 'alias_del') {
+            connect_tax_alias_delete((int)$_POST['alias_id']); flash('Alias removed.');
+        } elseif ($act === 'relate') {
+            connect_tax_relate((int)$_POST['from_id'], (int)$_POST['to_id'], (string)($_POST['rel'] ?? 'RELATED')); flash('Related.');
+        } elseif ($act === 'edge_del') {
+            connect_tax_edge_delete((int)$_POST['edge_id']); flash('Relation removed.');
+        }
+        $back();
+    }
+    $node = $sel ? connect_tax_node_get($sel) : null;
+    view('ops/connect_taxonomy_admin', [
+        'summary' => connect_tax_admin_summary(),
+        'kinds'   => connect_tax_kinds(),
+        'kind'    => $kind, 'q' => $q,
+        'nodes'   => connect_tax_admin_nodes($kind, $q),
+        'node'    => $node,
+        'aliases' => $node ? connect_tax_aliases_for($sel) : [],
+        'edges'   => $node ? connect_tax_edges_for($sel) : [],
+        // a compact pick-list for parent / relate targets (active only)
+        'picker'  => ops_all("SELECT id, name, kind FROM cx_tax_nodes WHERE status='ACTIVE' ORDER BY kind, name") ?: [],
+    ]);
+    return true;
 }

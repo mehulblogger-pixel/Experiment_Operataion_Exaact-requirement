@@ -3174,6 +3174,8 @@ function ops_dispatch($route, $method) {
             return ops_billable($route, $method);
         case $route === 'connect-taxonomy':    // Connect K0 — marketplace industry taxonomy (read-only)
             return ops_connect_taxonomy($method);
+        case $route === 'connect-taxonomy-admin': // Connect K0+ — universal taxonomy graph admin (CRUD)
+            return ops_connect_taxonomy_admin($method);
         case $route === 'connect-qualifications': // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA, read-only)
             return ops_connect_qualifications($method);
         case $route === 'connect-verify':       // Connect K14 / #3 — verification & moderation desk

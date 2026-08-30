@@ -10,6 +10,9 @@
 ?>
 <div class="crumbs"><a href="/">Home</a> › Industry taxonomy</div>
 <div class="master-head">
+  <?php if (function_exists('connect_taxonomy_admin_can') && connect_taxonomy_admin_can()): ?>
+    <a class="btn" href="/connect-taxonomy-admin" style="float:right">⚙ Manage graph →</a>
+  <?php endif; ?>
   <div><h1>Industry taxonomy</h1>
     <p class="sub" style="margin:2px 0 0">The shared vocabulary the manpower marketplace matches on —
       sector, equipment, material, discipline, stage, standard, certification. Read-only reference.
