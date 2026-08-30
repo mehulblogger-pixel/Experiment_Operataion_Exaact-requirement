@@ -134,6 +134,28 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
     certificate document upload. Linked from the passport. Tests:
     `tests/test_connect_credentials.php` (16).
 
-### Still open (next tested slices, one at a time)
-   **Verification & privacy** states, and the client **advanced-search + result
-   cards + contact-reveal**.
+11. **Verification & privacy states** — *shipped* (`lib/connect_privacy.php`,
+    extended `lib/connect_credentials.php`, route `/pro/privacy`). Two honest
+    guarantees:
+    - **Verification is never self-declared.** A certificate's badge no longer
+      comes from a caller flag; `connect_cred_cert_request_verify` files a
+      `CREDENTIAL` check in the shared moderation ledger (`cx_verifications`,
+      requires an uploaded document), and `connect_cred_reconcile` flips the
+      cert (and its `cx_profile_tax` mirror) to Verified only after a moderator
+      decides. Badges read Unverified / Pending / Verified / Not-verified.
+    - **A per-professional privacy model** the whole marketplace reads through
+      ONE resolver (`connect_privacy_resolve`): contact (hidden / on_request /
+      public), rate (hidden / band / public), identity (full / first-initial),
+      and a discovery `listed` switch — all with defaults that preserve prior
+      behaviour. Contact is revealed only by an explicit, logged grant
+      (`cx_pro_contact_reveals`) or an existing engagement — never because a
+      client asked. Phone-first `/pro/privacy` screen with a live "what a client
+      sees" preview. No permission-matrix change (a pro governs their own data;
+      client screens *consume* the reveal). Tests:
+      `tests/test_connect_privacy.php` (29) + verification assertions in
+      `tests/test_connect_credentials.php` (25).
+
+### Still open (next tested slice)
+   The client **advanced-search + result cards + contact-reveal** — the buyer
+   side that consumes `connect_privacy_resolve` (masked cards, a reveal-request
+   button that writes a grant) and `connect_tax_find_professionals`.

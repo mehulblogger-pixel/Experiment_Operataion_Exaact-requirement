@@ -26,9 +26,17 @@
   <h2>Certifications</h2>
   <?php if (!$certs): ?><p class="muted" style="margin:0 0 12px">None added yet.</p>
   <?php else: foreach ($certs as $c): ?>
+    <?php
+      $vs = strtoupper((string)($c['verify_status'] ?? ''));
+      $verified = (int)$c['verified'] === 1;
+    ?>
     <div class="crow">
       <div class="h">
-        <div><strong><?= e($c['name']) ?></strong> <?= $stPill($c['status']) ?><?php if ((int)$c['verified']): ?> <span class="cpill info">Verified</span><?php endif; ?>
+        <div><strong><?= e($c['name']) ?></strong> <?= $stPill($c['status']) ?>
+          <?php if ($verified): ?> <span class="cpill info">✓ Verified</span>
+          <?php elseif ($vs === 'PENDING'): ?> <span class="cpill warn">Verification pending</span>
+          <?php elseif ($vs === 'REJECTED'): ?> <span class="cpill err">Not verified</span>
+          <?php else: ?> <span class="cpill" style="background:#eef1f4;color:#556">Unverified</span><?php endif; ?>
           <div class="m">
             <?php if ($c['authority']): ?><?= e($c['authority']) ?> · <?php endif; ?>
             <?php if ($c['cert_number']): ?>No. <?= e($c['cert_number']) ?> · <?php endif; ?>
@@ -39,7 +47,16 @@
             <?php if ((int)$c['file_id']): ?> · <a href="/pro/file?id=<?= (int)$c['file_id'] ?>" target="_blank" rel="noopener">📎 document</a><?php endif; ?>
           </div>
         </div>
-        <form method="post" action="/pro/credentials" style="margin:0"><input type="hidden" name="action" value="cert_del"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><button class="btn sec" type="submit" style="padding:4px 10px;font-size:12px">Remove</button></form>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <?php if (!$verified && $vs !== 'PENDING'): ?>
+            <?php if ((int)$c['file_id'] > 0): ?>
+              <form method="post" action="/pro/credentials" style="margin:0"><input type="hidden" name="action" value="cert_verify"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><button class="btn" type="submit" style="padding:4px 10px;font-size:12px" title="Our team will review your certificate">Request verification</button></form>
+            <?php else: ?>
+              <span class="muted" style="font-size:11.5px;max-width:150px;text-align:right">Attach the document (edit below) to request verification</span>
+            <?php endif; ?>
+          <?php endif; ?>
+          <form method="post" action="/pro/credentials" style="margin:0"><input type="hidden" name="action" value="cert_del"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><button class="btn sec" type="submit" style="padding:4px 10px;font-size:12px">Remove</button></form>
+        </div>
       </div>
     </div>
   <?php endforeach; endif; ?>

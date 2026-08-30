@@ -22,6 +22,12 @@ function connect_cred_migrate() {
         level VARCHAR(60) DEFAULT '', discipline VARCHAR(80) DEFAULT '',
         issue_date VARCHAR(20) DEFAULT '', expiry_date VARCHAR(20) DEFAULT '',
         file_id INT DEFAULT 0, verified INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')");
+    // Verification is NEVER self-declared — it flows through the moderation ledger
+    // (cx_verifications). These two columns link a cert to its pending/decided check.
+    if (function_exists('ensure_column')) {
+        try { ensure_column('cx_pro_certs', 'verify_status',   "VARCHAR(16) DEFAULT ''"); } catch (Throwable $e) {}
+        try { ensure_column('cx_pro_certs', 'verify_check_id', "INT DEFAULT 0"); }          catch (Throwable $e) {}
+    }
     db()->exec("CREATE TABLE IF NOT EXISTS cx_pro_projects (
         id $pk, pro_id INT DEFAULT 0,
         title VARCHAR(200) DEFAULT '', role VARCHAR(160) DEFAULT '', client VARCHAR(160) DEFAULT '',
@@ -51,23 +57,74 @@ function connect_cred_cert_save($proId, array $in) {
     if ($nodeId <= 0 && function_exists('connect_tax_resolve')) {
         $hit = connect_tax_resolve($name, ['CERTIFICATION'])[0] ?? null; $nodeId = $hit ? (int)$hit['id'] : 0;
     }
-    $verified = !empty($in['verified']) ? 1 : 0;
+    // NOTE: 'verified' is intentionally NOT taken from caller input. A cert becomes
+    // verified only through connect_cred_cert_request_verify + a moderator decision
+    // in the cx_verifications ledger (reconciled by connect_cred_reconcile).
     $cols = [$nodeId, $name, trim((string)($in['authority'] ?? '')), trim((string)($in['cert_number'] ?? '')),
              trim((string)($in['level'] ?? '')), trim((string)($in['discipline'] ?? '')),
-             trim((string)($in['issue_date'] ?? '')), trim((string)($in['expiry_date'] ?? '')), (int)($in['file_id'] ?? 0), $verified];
+             trim((string)($in['issue_date'] ?? '')), trim((string)($in['expiry_date'] ?? '')), (int)($in['file_id'] ?? 0)];
     $id = (int)($in['id'] ?? 0);
     if ($id > 0 && (int)ops_val("SELECT COUNT(*) FROM cx_pro_certs WHERE id=? AND pro_id=?", [$id, $proId])) {
-        db()->prepare("UPDATE cx_pro_certs SET node_id=?, name=?, authority=?, cert_number=?, level=?, discipline=?, issue_date=?, expiry_date=?, file_id=?, verified=? WHERE id=? AND pro_id=?")
+        // Editing a cert's details never grants verification, but keeps any existing badge.
+        db()->prepare("UPDATE cx_pro_certs SET node_id=?, name=?, authority=?, cert_number=?, level=?, discipline=?, issue_date=?, expiry_date=?, file_id=? WHERE id=? AND pro_id=?")
             ->execute(array_merge($cols, [$id, $proId]));
     } else {
-        db()->prepare("INSERT INTO cx_pro_certs (node_id,name,authority,cert_number,level,discipline,issue_date,expiry_date,file_id,verified,pro_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+        db()->prepare("INSERT INTO cx_pro_certs (node_id,name,authority,cert_number,level,discipline,issue_date,expiry_date,file_id,verified,pro_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,0,?,?)")
             ->execute(array_merge($cols, [$proId, date('c')]));
         $id = (int)db()->lastInsertId();
     }
     // Mirror into the taxonomy link so the one-keyword search + matching find it.
-    if ($nodeId > 0 && function_exists('connect_profile_tax_attach'))
-        connect_profile_tax_attach($proId, $nodeId, 'CERTIFICATION', ['verified' => $verified, 'source' => 'cert']);
+    // The mirror carries the cert's ACTUAL verified state (0 until a moderator confirms).
+    if ($nodeId > 0 && function_exists('connect_profile_tax_attach')) {
+        $vf = (int)ops_val("SELECT verified FROM cx_pro_certs WHERE id=?", [$id]);
+        connect_profile_tax_attach($proId, $nodeId, 'CERTIFICATION', ['verified' => $vf, 'source' => 'cert']);
+    }
     return [true, 'Saved.', $id];
+}
+
+/**
+ * Submit a certification for verification. Requires an uploaded document (a claim
+ * without evidence is not reviewable). Files a CREDENTIAL check in the shared
+ * moderation ledger and links it back to this cert; the badge stays "pending"
+ * until a moderator decides. Never elevates the cert itself.
+ */
+function connect_cred_cert_request_verify($proId, $id) {
+    connect_cred_migrate();
+    $proId = (int)$proId; $id = (int)$id;
+    $c = ops_one("SELECT * FROM cx_pro_certs WHERE id=? AND pro_id=?", [$id, $proId]);
+    if (!$c) return [false, 'Certificate not found.'];
+    if ((int)$c['file_id'] <= 0) return [false, 'Attach the certificate document first — verification needs evidence.'];
+    if (($c['verify_status'] ?? '') === 'PENDING') return [false, 'This certificate is already awaiting review.'];
+    if (!function_exists('connect_verify_submit')) return [false, 'Verification is unavailable.'];
+    $ev = 'Certificate: ' . $c['name'] . ($c['authority'] ? ' — ' . $c['authority'] : '') . ' (cert #' . $id . ')';
+    [$ok, $msg, $checkId] = connect_verify_submit('professional', $proId, 'CREDENTIAL', '', $ev);
+    if (!$ok) return [false, $msg];
+    // Link the ledger check to this cert so a decision can be reconciled back.
+    if (function_exists('ensure_column')) { try { ensure_column('cx_verifications', 'cert_id', "INT DEFAULT 0"); } catch (Throwable $e) {} }
+    try { db()->prepare("UPDATE cx_verifications SET cert_id=? WHERE id=?")->execute([$id, (int)$checkId]); } catch (Throwable $e) {}
+    db()->prepare("UPDATE cx_pro_certs SET verify_status='PENDING', verify_check_id=? WHERE id=? AND pro_id=?")
+        ->execute([(int)$checkId, $id, $proId]);
+    return [true, 'Submitted for verification — our team will review your certificate.'];
+}
+
+/**
+ * Reconcile each cert's badge from its linked ledger check. Idempotent, cheap,
+ * called on every read so a moderator's decision surfaces without a write path
+ * into this module. VERIFIED -> verified=1; REJECTED/PENDING -> verified=0.
+ */
+function connect_cred_reconcile($proId) {
+    $rows = ops_all("SELECT id, node_id, verify_check_id, verify_status, verified FROM cx_pro_certs WHERE pro_id=? AND verify_check_id>0", [(int)$proId]) ?: [];
+    foreach ($rows as $r) {
+        $chk = ops_one("SELECT status FROM cx_verifications WHERE id=?", [(int)$r['verify_check_id']]);
+        if (!$chk) continue;
+        $st  = strtoupper((string)$chk['status']);         // PENDING | VERIFIED | REJECTED
+        $vf  = ($st === 'VERIFIED') ? 1 : 0;
+        if ($st !== (string)$r['verify_status'] || (int)$vf !== (int)$r['verified']) {
+            db()->prepare("UPDATE cx_pro_certs SET verify_status=?, verified=? WHERE id=?")->execute([$st, $vf, (int)$r['id']]);
+            if ((int)$r['node_id'] > 0 && function_exists('connect_profile_tax_attach'))
+                connect_profile_tax_attach((int)$proId, (int)$r['node_id'], 'CERTIFICATION', ['verified' => $vf, 'source' => 'cert']);
+        }
+    }
 }
 function connect_cred_cert_delete($id, $proId) {
     connect_cred_migrate();
@@ -77,6 +134,7 @@ function connect_cred_cert_delete($id, $proId) {
 /** A professional's certifications, newest expiry-relevant first, with status. */
 function connect_cred_certs($proId) {
     connect_cred_migrate();
+    connect_cred_reconcile($proId);
     $rows = ops_all("SELECT * FROM cx_pro_certs WHERE pro_id=? ORDER BY (expiry_date=''), expiry_date, name", [(int)$proId]) ?: [];
     foreach ($rows as &$r) $r['status'] = connect_cred_cert_status($r['expiry_date']); unset($r);
     return $rows;

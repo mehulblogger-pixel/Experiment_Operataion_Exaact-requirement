@@ -27,6 +27,30 @@ try {
     t_eq(connect_cred_certs($pid)[0]['authority'],'TWI UK','cert edit updates in place');
     t_eq(count(connect_cred_certs($pid)),1,'edit did not create a duplicate');
 
+    // --- Verification is NEVER self-declared; it flows through the ledger -----
+    connect_verify_migrate();
+    // a self-declared 'verified' in the save payload must be ignored
+    [$vok,,$vcid] = connect_cred_cert_save($pid, ['name'=>'NEBOSH IGC','authority'=>'NEBOSH','verified'=>1]);
+    t_eq((int)connect_cred_certs($pid)[0]['verified'] ?? 0, (int)ops_val("SELECT verified FROM cx_pro_certs WHERE id=?", [$vcid]), 'read is consistent');
+    t_eq((int)ops_val("SELECT verified FROM cx_pro_certs WHERE id=?", [$vcid]), 0, 'caller cannot self-declare a cert verified');
+    // requesting verification with no document is refused
+    [$rok,$rmsg] = connect_cred_cert_request_verify($pid, $vcid);
+    t_ok(!$rok, 'verification refused without an evidence document');
+    // attach a doc → request → goes PENDING and files a ledger check
+    db()->prepare("UPDATE cx_pro_certs SET file_id=777 WHERE id=?")->execute([$vcid]);
+    [$rok2] = connect_cred_cert_request_verify($pid, $vcid);
+    t_ok($rok2, 'verification requested once a document is attached');
+    $vc = ops_one("SELECT * FROM cx_pro_certs WHERE id=?", [$vcid]);
+    t_eq($vc['verify_status'], 'PENDING', 'cert badge is Pending after request');
+    t_eq((int)$vc['verified'], 0, 'still not verified while pending');
+    $checkId = (int)$vc['verify_check_id']; t_ok($checkId > 0, 'a moderation ledger check was filed and linked');
+    // a moderator VERIFIES the check → reconcile flips the cert badge + the tax mirror
+    connect_verify_review($checkId, 'VERIFIED');
+    $vc2 = connect_cred_certs($pid); $me2 = null; foreach ($vc2 as $r) if ((int)$r['id']===$vcid) $me2=$r;
+    t_eq($me2['verify_status'], 'VERIFIED', 'moderator decision reconciles to Verified on read');
+    t_eq((int)$me2['verified'], 1, 'cert is verified only after a real decision');
+    connect_cred_cert_delete($vcid, $pid);
+
     // project experience
     [$pok,,$prid] = connect_cred_project_save($pid, ['title'=>'Refinery shutdown 2025','role'=>'NDT Technician','industry'=>'Oil & Gas','location'=>'Dahej','equipment'=>'Pressure piping','scope'=>'RT/UT','start_date'=>'2025-03-01','end_date'=>'2025-04-15']);
     t_ok($pok && $prid>0,'project saved');

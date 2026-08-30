@@ -484,6 +484,8 @@ function connect_pro_route($route, $method) {
                         if ($fok) $in['file_id'] = (int)ops_val("SELECT id FROM cx_pro_files WHERE pro_id=? AND kind='CERT' ORDER BY id DESC LIMIT 1", [(int)$me['id']]);
                     }
                     connect_cred_cert_save((int)$me['id'], $in);
+                } elseif ($act === 'cert_verify' && function_exists('connect_cred_cert_request_verify')) {
+                    connect_cred_cert_request_verify((int)$me['id'], (int)($_POST['id'] ?? 0));
                 } elseif ($act === 'cert_del' && function_exists('connect_cred_cert_delete')) {
                     connect_cred_cert_delete((int)($_POST['id'] ?? 0), (int)$me['id']);
                 } elseif ($act === 'project_save' && function_exists('connect_cred_project_save')) {
@@ -497,6 +499,19 @@ function connect_pro_route($route, $method) {
                 'me'       => $me,
                 'certs'    => function_exists('connect_cred_certs') ? connect_cred_certs((int)$me['id']) : [],
                 'projects' => function_exists('connect_cred_projects') ? connect_cred_projects((int)$me['id']) : [],
+            ]); exit;
+
+        case 'pro/privacy':   // K0+ — the professional's own privacy states (contact / rate / identity)
+            if ($method === 'POST') {
+                if (function_exists('connect_privacy_save')) connect_privacy_save((int)$me['id'], $_POST);
+                redirect('/pro/privacy');
+            }
+            $settings = function_exists('connect_privacy_get') ? connect_privacy_get((int)$me['id']) : [];
+            // A live "what a client sees" preview from the pro's own record + settings.
+            $preview  = function_exists('connect_privacy_resolve') ? connect_privacy_resolve($me, ['party_id' => 0]) : [];
+            connect_pro_view('privacy', [
+                'me' => $me, 'settings' => $settings, 'preview' => $preview,
+                'labels' => function_exists('connect_privacy_labels') ? connect_privacy_labels() : [],
             ]); exit;
 
         case 'pro/cv':   // K0+ — CV-assisted prefill: paste/scan → review → confirm
