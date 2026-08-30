@@ -92,5 +92,6 @@ function connect_hiring_home($clientPartyId) {
         'saved_searches'   => connect_hiring_saved_searches($party),
         'contact_requests' => function_exists('connect_privacy_reveal_status_for_client') ? connect_privacy_reveal_status_for_client($party) : [],
         'pool_size'        => function_exists('connect_pro_pool_count') ? connect_pro_pool_count() : 0,
+        'bench_count'      => function_exists('connect_client_bench_count') ? connect_client_bench_count($party) : 0,
     ];
 }

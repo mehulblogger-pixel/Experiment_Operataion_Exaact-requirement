@@ -100,5 +100,6 @@ function connect_client_card(array $r, $clientPartyId) {
         'mobile'         => (string)($view['mobile'] ?? ''),
         'email'          => (string)($view['email'] ?? ''),
         'engaged'        => $engaged,
+        'on_bench'       => function_exists('connect_client_bench_has') ? connect_client_bench_has((int)$clientPartyId, $proId) : false,
     ];
 }

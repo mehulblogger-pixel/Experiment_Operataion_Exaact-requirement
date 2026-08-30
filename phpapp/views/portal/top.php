@@ -12,7 +12,7 @@ $canHire  = pcan('market.post') && (!function_exists('connect_enabled') || conne
 $links = ['portal' => $mktFirst ? 'Hiring home' : 'Overview'];
 // A marketplace-first client leads with hiring and is spared the inspection menu
 // (which carries nothing for them); an established inspection client keeps both.
-if ($canHire) { $links['portal/find'] = 'Find manpower'; $links['portal/hire'] = 'Hire manpower'; }
+if ($canHire) { $links['portal/find'] = 'Find manpower'; $links['portal/hire'] = 'Hire manpower'; $links['portal/roster'] = 'My bench'; }
 if (!$mktFirst) {
     if (pcan('calls'))     $links['portal/calls']      = TP('call');
     if (pcan('reports'))   $links['portal/reports']    = 'Reports';

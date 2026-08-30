@@ -207,6 +207,17 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
     existing coordinator right (no new permission). Tests:
     `tests/test_connect_identity.php` (19).
 
+15. **Client private bench + rehire** — *shipped* (`lib/connect_client_bench.php`,
+    `/portal/roster`). The demand-side bench: `cx_client_bench` is a relationship
+    over `cx_professionals` (one row per client+professional — the same person on
+    many benches, no duplicate record). Add from the marketplace (`Add to bench`
+    on a search card), from previous applicants/engagements, or by hand (linkable
+    to a real profile later). Private note, client rating, preferred flag and
+    preferred rate are client-only. Rehire invites a bench person onto an open
+    requirement. Reuses `connect_client_card` for privacy-safe rendering and the
+    `market.post` right (no new permission). Tests:
+    `tests/test_connect_client_bench.php` (19). See `connect-integration-map.md`.
+
 ### Program status
    The passport programme (Phases 1–12) is shipped and tested: universal taxonomy
    graph, location engine, passport UX, CV prefill, structured credentials,

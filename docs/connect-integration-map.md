@@ -21,7 +21,7 @@ integrate with and extend it; we never build a parallel one.
 | 2 | Award → billing → invoice | **DONE (pre-existing)** | `connect_bridge.php` → `billable_events` → commercial board |
 | 3 | Audit / event log | **DONE — reused** | `act_log()` / `activities` |
 | 4 | Award → scheduling / allocation / deputation | **OPEN** | reuse `pdso.php` (no second scheduler) |
-| 5 | Client private bench / roster + rehire | **OPEN** | clone the `cx_bench` pattern, client-scoped |
+| 5 | Client private bench / roster + rehire | **CONNECTED (phase 15)** | `cx_client_bench`, `connect_client_bench.php` |
 | 6 | Inspection request → manpower sourcing | **OPEN** | bridge `calls`/`jobs` ↔ pool via the matcher |
 | 7 | Requirement duplicate / template | **OPEN** | extend `connect_market.php` |
 | 8 | Configurable matching weights | **OPEN** | lift `connect_match.php` literals to settings |
@@ -70,15 +70,29 @@ records keep working exactly as before.
 
 Tests: `tests/test_connect_identity.php` (19).
 
+### Phase 15 — client private bench + rehire (shipped, additive)
+
+`lib/connect_client_bench.php` adds the **demand-side** bench (distinct from the
+agency/supply bench). `cx_client_bench` is a **relationship over
+`cx_professionals`** — one row per (client, professional), so the same person sits
+on many clients' benches with **no duplicated person record** (§18, §48). Three
+sources (§16): a marketplace professional (`Add to bench` on a search card), a
+**previous** professional (`connect_client_bench_previous` — applied to / engaged
+on this client's requirements), or a **manual** off-platform entry that can later
+be **linked** to a real profile (`connect_client_bench_link`, never a duplicate).
+Private note, the client's own rating, preferred flag and preferred rate live on
+the relationship and are **client-only** (§17) — a separate `client_party_id`-scoped
+table no professional-facing read ever touches. **Rehire** (§49) invites a bench
+person straight onto one of the client's own open requirements. Screen
+`/portal/roster` ("My bench" in the marketplace nav); gated by the existing
+`market.post` right. Tests: `tests/test_connect_client_bench.php` (19).
+
 ## Sequenced plan for the remaining seams
 
 Each will follow the same discipline (audit → extend the existing engine → tests
 → screenshot → no breakage), one at a time:
 
-1. **Client private bench + rehire** (seam 5) — a client-scoped clone of the
-   agency-bench pattern: add from marketplace / previous work / manual, private
-   notes & ratings, one-tap rehire; kept private from the marketplace.
-2. **Award → schedule → deploy** (seam 4) — copy the proven award→billing bridge
+1. **Award → schedule → deploy** (seam 4) — copy the proven award→billing bridge
    pattern to hand a marketplace award (resolved through the identity link and
    `subject_kind`) into the existing PDSO deputation, so hire → deploy → report →
    invoice is one flow with no re-entry.

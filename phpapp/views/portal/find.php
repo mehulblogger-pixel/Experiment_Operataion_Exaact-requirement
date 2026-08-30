@@ -104,6 +104,11 @@ $rateLbl = ['public'=>'Rate on card','band'=>'Rate range on request','hidden'=>'
         <?php if ($c['contact_state']==='request'): ?>
           <form method="post" action="/portal/find" style="margin:0"><input type="hidden" name="action" value="reveal_request"><input type="hidden" name="pro_id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="qs" value="<?= e($qs) ?>"><button class="btn sec" type="submit" style="padding:5px 12px;font-size:12.5px">Request contact</button></form>
         <?php endif; ?>
+        <?php if (!empty($c['on_bench'])): ?>
+          <span class="fc-chip cert" style="margin:0">★ On your bench</span>
+        <?php else: ?>
+          <form method="post" action="/portal/find" style="margin:0"><input type="hidden" name="action" value="bench_add"><input type="hidden" name="pro_id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="qs" value="<?= e($qs) ?>"><button class="btn sec" type="submit" style="padding:5px 12px;font-size:12.5px" title="Save to your private bench to reuse later">☆ Add to bench</button></form>
+        <?php endif; ?>
         <?php if ($open_reqs): ?>
           <form method="post" action="/portal/find" style="margin:0;display:flex;gap:5px;align-items:center">
             <input type="hidden" name="action" value="invite"><input type="hidden" name="pro_id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="qs" value="<?= e($qs) ?>">

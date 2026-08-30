@@ -36,6 +36,7 @@ $reqs = $home['contact_requests'] ?? []; $pool = (int)($home['pool_size'] ?? 0);
   <div class="hh-btns">
     <a class="hh-btn p" href="/portal/find">🔍 Search the pool</a>
     <a class="hh-btn g" href="/portal/hire">➕ Post a requirement</a>
+    <a class="hh-btn g" href="/portal/roster">★ My bench<?= (int)($home['bench_count'] ?? 0) > 0 ? ' ('.(int)$home['bench_count'].')' : '' ?></a>
   </div>
 </div>
 

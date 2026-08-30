@@ -987,6 +987,9 @@ function portal_route($route, $method) {
                 } elseif ($act === 'save_search' && function_exists('connect_hiring_saved_search_save')) {
                     [, $smsg] = connect_hiring_saved_search_save($party, (string)($_POST['label'] ?? ''), (string)($_POST['qs'] ?? ''));
                     $_SESSION['portal_flash'] = $smsg;
+                } elseif ($act === 'bench_add' && function_exists('connect_client_bench_add')) {
+                    [, $bmsg] = connect_client_bench_add($party, ['professional_id' => (int)($_POST['pro_id'] ?? 0), 'source' => 'marketplace'], portal_client_name());
+                    $_SESSION['portal_flash'] = $bmsg;
                 } elseif ($act === 'invite' && function_exists('cx_application_add')) {
                     $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['pro_id'] ?? 0);
                     $req = function_exists('cx_requirement_get') ? cx_requirement_get($rid) : null;
@@ -1013,6 +1016,40 @@ function portal_route($route, $method) {
                 'open_reqs'   => function_exists('cx_requirements_for_party')
                                     ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
                                     : [],
+            ]);
+            exit;
+
+        // Connect K0+ — the client's PRIVATE bench / roster (demand-side). Add from
+        // the marketplace / previous work / by hand, keep private notes & ratings,
+        // rehire onto an open requirement. Scoped to this client's own party.
+        case 'portal/roster':
+            portal_need('market.post', 'your private bench');
+            if (!function_exists('connect_client_bench_list') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            $party = portal_partner_id();
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'add')          [, $m] = connect_client_bench_add($party, $_POST, portal_client_name());
+                elseif ($act === 'update')   [, $m] = connect_client_bench_update((int)($_POST['id'] ?? 0), $party, $_POST);
+                elseif ($act === 'remove')   { connect_client_bench_remove((int)($_POST['id'] ?? 0), $party); $m = 'Removed from your bench.'; }
+                elseif ($act === 'link')     [, $m] = connect_client_bench_link((int)($_POST['id'] ?? 0), $party, (int)($_POST['professional_id'] ?? 0));
+                elseif ($act === 'invite' && function_exists('cx_application_add')) {
+                    $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['pro_id'] ?? 0);
+                    $req = function_exists('cx_requirement_get') ? cx_requirement_get($rid) : null;
+                    if ($req && (int)$req['poster_party_id'] === (int)$party && $pid) {
+                        $nm = (string)ops_val("SELECT name FROM cx_professionals WHERE id=?", [$pid]);
+                        $newId = cx_application_add($rid, ['applicant_professional_id' => $pid, 'applicant_name' => $nm]);
+                        $m = $newId ? ($nm . ' invited to ' . $req['ref_code'] . '.') : ($nm . ' is already on that requirement.');
+                    } else { $m = 'Pick one of your own open requirements.'; }
+                } else { $m = ''; }
+                if ($m !== '') $_SESSION['portal_flash'] = $m;
+                redirect('/portal/roster');
+            }
+            portal_view('roster', [
+                'bench'     => connect_client_bench_list($party),
+                'previous'  => function_exists('connect_client_bench_previous') ? connect_client_bench_previous($party) : [],
+                'open_reqs' => function_exists('cx_requirements_for_party')
+                                  ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
+                                  : [],
             ]);
             exit;
 

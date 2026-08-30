@@ -245,6 +245,7 @@ try {
     require __DIR__ . '/lib/connect_client_search.php'; // Connect K0+ — client-facing talent search & privacy-safe result cards
     require __DIR__ . '/lib/connect_hiring.php'; // Connect K0+ — hiring home for marketplace clients (saved searches + home aggregate)
     require __DIR__ . '/lib/connect_identity.php'; // Connect K0+ — unified professional identity (link inspector ↔ marketplace pro, no merge)
+    require __DIR__ . '/lib/connect_client_bench.php'; // Connect K0+ — client private bench / roster (demand-side, relationship over cx_professionals)
     require __DIR__ . '/lib/connect_verify.php';   // Connect K14 / #3 — verification & moderation (tier ladder + deterministic checks + queue)
     require __DIR__ . '/lib/connect_msg.php';      // Connect K15 / #4 — in-app messaging (per-engagement two-way threads)
     require __DIR__ . '/lib/connect_channels.php'; // Connect K16 / #5 — WhatsApp/SMS/email channel (behind the notification seam)

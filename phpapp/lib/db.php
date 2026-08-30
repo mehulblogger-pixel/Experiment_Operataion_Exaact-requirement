@@ -417,6 +417,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('connect_privacy_migrate')) connect_privacy_migrate();                            // Connect K0+ — professional privacy columns + contact-reveal grants (after cx_professionals)
     if (function_exists('connect_hiring_migrate')) connect_hiring_migrate();                              // Connect K0+ — client saved-search table for the hiring home
     if (function_exists('connect_identity_migrate')) connect_identity_migrate();                          // Connect K0+ — professional↔inspector identity link ledger (after both person tables)
+    if (function_exists('connect_client_bench_migrate')) connect_client_bench_migrate();                  // Connect K0+ — client private bench / roster (demand-side)
     if (function_exists('connect_msg_migrate')) connect_msg_migrate();                                    // Connect K15 / #4 — cx_messages + cx_message_reads (in-app messaging)
     if (function_exists('connect_channels_migrate')) { connect_channels_migrate(); connect_channels_seed(); } // Connect K16 / #5 — channel templates + outbound log + consent (after cx_professionals)
     if (function_exists('connect_bench_migrate')) connect_bench_migrate();                                    // Connect K18 / #7 — cx_bench + cx_bench_alloc (agency private roster)
