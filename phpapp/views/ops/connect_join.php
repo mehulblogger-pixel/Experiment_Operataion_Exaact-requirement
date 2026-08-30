@@ -40,7 +40,7 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
     <a class="btn" href="<?= e($acct['login_url'] ?? '/portal/login') ?>" style="max-width:280px;margin:0 auto">Sign in →</a>
     <p class="muted" style="margin:16px 0 0;font-size:13px">
       <?= !empty($acct['is_agency'])
-          ? 'As an agency you can post requirements, apply to open jobs and review vouchers. Your bench workspace is enabled by our team shortly.'
+          ? 'As an agency you can manage your own bench under “My bench”, put your people forward to open jobs, and review vouchers — all from your portal.'
           : 'Post work, shortlist and award people, and review their vouchers — all from your portal.' ?>
     </p>
   </div>

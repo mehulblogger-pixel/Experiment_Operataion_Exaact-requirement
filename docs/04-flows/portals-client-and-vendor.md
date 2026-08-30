@@ -40,9 +40,20 @@ listed as follow-up work in `99-gaps-and-risks.md`.
   `market.vouchers`; ownership is by the voucher's `poster_party_id`, so a client
   only ever sees vouchers on its **own** posted jobs. No new voucher status — the
   client is simply the reviewer for a client-posted engagement.
+- **Agency bench (Connect marketplace, self-service):** when the signed-in portal
+  user's party is an **ACTIVE manpower/recruitment agency org** (`portal_agency_org`),
+  a **“My bench”** tab appears (`views/portal/bench.php`, route `portal/bench`). The
+  agency manages its **own private roster** (`cx_bench`, org-scoped), puts people
+  forward to open requirements (`cx_bench_alloc`), and confirms/releases those
+  allocations — reusing the same `connect_bench_*` engine the coordinator desk uses,
+  scoped to the agency's own org id. A plain client never sees the tab (the route
+  404s); one agency can never see another's roster. **No new permission** — the tab
+  is gated by the data (being an agency), not a right. The **bench is private**: these
+  people are never written to the shared self-listed pool (`cx_professionals`).
 - **Boundary:** a client sees only their own records — never other clients', never
   internal money/cost figures. Marketplace postings are scoped to the poster party
-  (`cx_requirements_for_party`).
+  (`cx_requirements_for_party`); an agency's bench and allocations are scoped to its
+  org id.
 
 ## Vendor portal
 - **Engine:** `lib/cvp.php`; screens `views/vendor/*`; logins in `vendor_users`.

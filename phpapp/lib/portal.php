@@ -165,6 +165,21 @@ function portal_partner_id() {
     return $u ? (int)$u['partner_id'] : 0;
 }
 
+/** K18 — the ACTIVE manpower/recruitment agency organisation this portal user
+ *  belongs to (its party is the login's party), or null. Gates the agency bench
+ *  workspace: only a signed-in agency sees / uses it. */
+function portal_agency_org() {
+    static $cache = false;
+    if ($cache !== false) return $cache;
+    $pid = portal_partner_id();
+    if ($pid <= 0) return $cache = null;
+    try {
+        return $cache = ops_one("SELECT * FROM cx_organisations
+            WHERE party_id=? AND org_type IN ('MANPOWER_AGENCY','RECRUITMENT_AGENCY') AND COALESCE(status,'ACTIVE')='ACTIVE'
+            ORDER BY id LIMIT 1", [$pid]) ?: null;
+    } catch (Throwable $e) { return $cache = null; }
+}
+
 function portal_off() {
     http_response_code(404);
     require __DIR__ . '/../views/portal/off.php';
@@ -925,6 +940,35 @@ function portal_route($route, $method) {
             portal_view('hire_req', ['req' => $req, 'apps' => cx_applications_for((int)$req['id']),
                 'req_next' => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
                 'vouchers' => ($engRow && function_exists('connect_engv_for_engagement')) ? connect_engv_for_engagement((int)$engRow['id']) : []]);
+            exit;
+
+        case 'portal/bench':   // K18 — the agency manages its OWN bench and supplies people
+            $org = function_exists('portal_agency_org') ? portal_agency_org() : null;
+            if (!$org || !function_exists('connect_bench_list')) { http_response_code(404); portal_view('notfound'); exit; }
+            $orgId = (int)$org['id'];
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'add')           [$ok, $msg] = connect_bench_add($orgId, $_POST);
+                elseif ($act === 'update')    [$ok, $msg] = connect_bench_update((int)($_POST['id'] ?? 0), $orgId, $_POST);
+                elseif ($act === 'toggle')    [$ok, $msg] = connect_bench_toggle((int)($_POST['id'] ?? 0), $orgId);
+                elseif ($act === 'allocate')  [$ok, $msg] = connect_bench_allocate((int)($_POST['bench_id'] ?? 0), $orgId, (int)($_POST['requirement_id'] ?? 0), 0, (string)($_POST['note'] ?? ''));
+                elseif ($act === 'alloc_set') [$ok, $msg] = connect_bench_alloc_set((int)($_POST['alloc_id'] ?? 0), $orgId, (string)($_POST['status'] ?? ''));
+                else { $ok = false; $msg = 'Unknown action.'; }
+                $_SESSION['portal_flash'] = $msg;
+                redirect('/portal/bench');
+            }
+            $openReqs = [];
+            try { $openReqs = ops_all("SELECT id, ref_code, title, status, location FROM cx_requirements
+                                       WHERE status IN ('OPEN','SHORTLISTING') ORDER BY id DESC LIMIT 60") ?: []; }
+            catch (Throwable $e) {}
+            portal_view('bench', [
+                'org'     => $org,
+                'bench'   => connect_bench_list($orgId, false),
+                'summary' => function_exists('connect_bench_summary') ? connect_bench_summary($orgId) : [],
+                'allocs'  => function_exists('connect_bench_allocs_for_org') ? connect_bench_allocs_for_org($orgId, false) : [],
+                'reqs'    => $openReqs,
+                'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+            ]);
             exit;
 
         case 'portal/voucher':   // K21 — the client reviews one voucher on its own posted job
