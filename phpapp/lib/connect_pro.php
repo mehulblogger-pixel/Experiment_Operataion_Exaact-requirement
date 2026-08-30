@@ -232,6 +232,10 @@ function connect_pro_profile_save($id, array $in) {
             (float)($in['day_rate_min'] ?? 0), (float)($in['day_rate_max'] ?? 0), (float)($in['per_visit_rate'] ?? 0),
             trim((string)($in['languages'] ?? '')), $id,
         ]);
+    // Keep the taxonomy graph in step so this person is discoverable by the
+    // one-keyword search (single source of truth: the CSV stays authoritative,
+    // the graph mirrors it). Additive; never fatal.
+    if (function_exists('connect_profile_tax_backfill')) { try { connect_profile_tax_backfill($id); } catch (Throwable $e) {} }
     return true;
 }
 
@@ -265,6 +269,37 @@ function connect_pro_search(array $f = [], $limit = 60) {
     try { return ops_all($sql, $a) ?: []; } catch (Throwable $e) { return []; }
 }
 
+/**
+ * Taxonomy-aware pool search. With a keyword, resolves it through the universal
+ * taxonomy graph (synonyms, roles, skills, equipment, certs, related concepts)
+ * and ranks people by how strongly they match — so "pressure vessel inspector"
+ * finds people tagged Mechanical/Welding/NDT/PV-equipment too. Falls back to the
+ * plain LIKE search when the graph has nothing to say. Non-keyword filters
+ * (discipline / work_type / location / availability) still apply. Each row is
+ * annotated with `_match_hits` (the concepts that matched) and `_match_score`.
+ */
+function connect_pro_search_smart(array $f = [], $limit = 60) {
+    $q = trim((string)($f['q'] ?? ''));
+    if ($q === '' || !function_exists('connect_tax_find_professionals')) return connect_pro_search($f, $limit);
+    if (function_exists('connect_tax_backfill_pending')) connect_tax_backfill_pending();  // self-heal existing profiles
+    $hits = connect_tax_find_professionals($q, [], 300);
+    if (!$hits) return connect_pro_search($f, $limit);   // graph knows nothing → LIKE fallback
+
+    $order = []; $ann = [];
+    foreach ($hits as $h) { $order[(int)$h['pro_id']] = (int)$h['score']; $ann[(int)$h['pro_id']] = $h['hits']; }
+    $ids = array_keys($order); if (!$ids) return [];
+    $w = ['is_active=1', 'id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')']; $a = $ids;
+    $disc = trim((string)($f['discipline'] ?? '')); if ($disc !== '') { $w[] = 'disciplines LIKE ?'; $a[] = '%' . $disc . '%'; }
+    $wt = trim((string)($f['work_type'] ?? '')); if ($wt !== '') { $w[] = 'work_types LIKE ?'; $a[] = '%' . $wt . '%'; }
+    $loc = trim((string)($f['location'] ?? '')); if ($loc !== '') { $w[] = '(base_city LIKE ? OR preferred_locations LIKE ? OR pan_india=1)'; $a[] = '%' . $loc . '%'; $a[] = '%' . $loc . '%'; }
+    if (!empty($f['available_only'])) $w[] = "availability='AVAILABLE'";
+    $rows = ops_all("SELECT * FROM cx_professionals WHERE " . implode(' AND ', $w), $a) ?: [];
+    usort($rows, fn($x, $y) => ($order[(int)$y['id']] ?? 0) <=> ($order[(int)$x['id']] ?? 0));
+    foreach ($rows as &$r) { $r['_match_hits'] = $ann[(int)$r['id']] ?? []; $r['_match_score'] = $order[(int)$r['id']] ?? 0; }
+    unset($r);
+    return array_slice($rows, 0, max(1, (int)$limit));
+}
+
 /** Count of active professionals in the shared pool. */
 function connect_pro_pool_count() {
     connect_pro_migrate();
@@ -294,7 +329,7 @@ function ops_connect_talent($method) {
     }
     view('ops/connect_talent', [
         'f'           => $f,
-        'rows'        => connect_pro_search($f),
+        'rows'        => connect_pro_search_smart($f),
         'pool'        => connect_pro_pool_count(),
         'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
         'work_types'  => cx_pro_work_types(),

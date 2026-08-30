@@ -23,7 +23,7 @@ $wtLabel = fn($k) => $work_types[$k] ?? ucfirst(str_replace('_', ' ', $k));
 </div>
 
 <form class="panel tsearch" method="get" action="/connect-talent" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-  <input type="text" name="q" value="<?= e($f['q'] ?? '') ?>" placeholder="Name, skill, headline" style="flex:2;min-width:180px">
+  <input type="text" name="q" value="<?= e($f['q'] ?? '') ?>" placeholder="One keyword — e.g. pressure vessel inspector, transmission technician, CSWIP, NDT" style="flex:2;min-width:180px">
   <select name="discipline"><option value="">Any discipline</option>
     <?php foreach ($disciplines as $d): ?><option value="<?= e($d['code']) ?>" <?= ($f['discipline']??'')===$d['code']?'selected':'' ?>><?= e($d['name']) ?></option><?php endforeach; ?></select>
   <select name="work_type"><option value="">Any work type</option>
@@ -49,6 +49,13 @@ $wtLabel = fn($k) => $work_types[$k] ?? ucfirst(str_replace('_', ' ', $k));
             <?php if (!empty($p['headline'])): ?><div class="muted" style="font-size:13px"><?= e($p['headline']) ?></div><?php endif; ?></div>
           <span class="avail <?= $avail?'on':'off' ?>"><?= $avail?'Available':'Busy' ?></span>
         </div>
+        <?php if (!empty($p['_match_hits'])): ?>
+          <div style="margin:7px 0 2px;display:flex;flex-wrap:wrap;gap:5px">
+            <?php foreach (array_slice($p['_match_hits'], 0, 6) as $hit): ?>
+              <span class="tchip" style="background:#e7f5ef;color:#0f7d5a;border-color:#bfe6d5">✓ <?= e($hit) ?></span>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
         <div style="margin:8px 0">
           <?php if (!empty($p['skills'])): ?><div class="muted" style="font-size:13px;margin-bottom:6px"><?= e($p['skills']) ?></div><?php endif; ?>
           <?php foreach ($wt as $k) echo '<span class="tchip">' . e($wtLabel($k)) . '</span>'; ?>

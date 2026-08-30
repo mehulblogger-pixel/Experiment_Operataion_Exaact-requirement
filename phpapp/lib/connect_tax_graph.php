@@ -405,10 +405,36 @@ function connect_tax_generalize($force = false) {
     $civStruct = $N('SPECIALIZATION', 'Structural Works', $dom['Civil']);
     $roleCivQA = $N('ROLE', 'Civil QA/QC Engineer', $civStruct); $AL($roleCivQA, 'civil inspector');
 
+    // --- (3) link the SAME concept expressed in different kinds --------------
+    // The flat masters and the curated tree can name the same thing as a
+    // DISCIPLINE and a DOMAIN (e.g. "Welding"); relate them so a role search
+    // reaches a discipline-tagged professional and vice-versa.
+    foreach (ops_all("SELECT slug FROM cx_tax_nodes WHERE status='ACTIVE' GROUP BY slug HAVING COUNT(*) > 1") ?: [] as $g) {
+        $peers = ops_all("SELECT id FROM cx_tax_nodes WHERE slug=? AND status='ACTIVE'", [$g['slug']]) ?: [];
+        for ($i = 0; $i < count($peers); $i++)
+            for ($j = $i + 1; $j < count($peers); $j++)
+                $RE((int)$peers[$i]['id'], (int)$peers[$j]['id']);
+    }
+
     if (function_exists('setting_set')) setting_set('tax_graph_v1', date('c'));
     return ['skipped' => false, 'nodes' => (int)ops_val("SELECT COUNT(*) FROM cx_tax_nodes"),
             'aliases' => (int)ops_val("SELECT COUNT(*) FROM cx_tax_aliases"),
             'edges' => (int)ops_val("SELECT COUNT(*) FROM cx_tax_edges")];
+}
+
+/** Self-healing: backfill professionals that carry CSV disciplines/skills but have
+ *  no graph rows yet (created before the graph, or by an old code path). Bounded
+ *  so a search never pays an unbounded cost. Returns how many were backfilled. */
+function connect_tax_backfill_pending($limit = 200) {
+    connect_tax_graph_migrate();
+    try {
+        $ids = ops_all("SELECT p.id FROM cx_professionals p
+                        WHERE (COALESCE(p.disciplines,'')<>'' OR COALESCE(p.skills,'')<>'')
+                          AND NOT EXISTS (SELECT 1 FROM cx_profile_tax pt WHERE pt.pro_id=p.id)
+                        LIMIT " . max(1, (int)$limit)) ?: [];
+    } catch (Throwable $e) { return 0; }
+    $n = 0; foreach ($ids as $r) { connect_profile_tax_backfill((int)$r['id']); $n++; }
+    return $n;
 }
 
 /** Backfill: map a professional's existing CSV disciplines/skills into the graph
