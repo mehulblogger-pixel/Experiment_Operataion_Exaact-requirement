@@ -474,6 +474,39 @@ function connect_pro_route($route, $method) {
                 'kpi' => function_exists('connect_kpi_board') ? connect_kpi_board(['audience' => 'pro', 'party_id' => (int)$me['id']]) : null,
             ]); exit;
         // K0+ / K-GEO — live JSON endpoints for the passport drill-down + autocomplete.
+        case 'pro/cv':   // K0+ — CV-assisted prefill: paste/scan → review → confirm
+            $scan = null; $text = '';
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'scan') {
+                    $text = trim((string)($_POST['cv_text'] ?? ''));
+                    if ($text === '' && function_exists('connect_cv_extract_text')) {   // fall back to the latest uploaded CV
+                        foreach (connect_pro_files((int)$me['id']) as $f) if (strtoupper((string)$f['kind']) === 'CV') {
+                            $row = connect_pro_file_row((int)$f['id'], (int)$me['id']);
+                            if ($row) $text = connect_cv_extract_text(base64_decode((string)$row['file_data']), (string)$row['mime'], (string)$row['file_name']);
+                            break;
+                        }
+                    }
+                    $scan = function_exists('connect_cv_scan') ? connect_cv_scan($text) : null;
+                } elseif ($act === 'apply') {
+                    foreach ((array)($_POST['node'] ?? []) as $nid) {
+                        $nid = (int)$nid; if ($nid <= 0) continue;
+                        connect_profile_tax_attach((int)$me['id'], $nid, (string)($_POST['rel_' . $nid] ?? 'SKILL'), ['source' => 'cv']);
+                    }
+                    if ((int)($_POST['base_place_id'] ?? 0) > 0 && function_exists('connect_geo_place_get')) {
+                        $pl = connect_geo_place_get((int)$_POST['base_place_id']);
+                        if ($pl && function_exists('connect_geo_augment_professional')) {
+                            connect_geo_augment_professional();
+                            db()->prepare("UPDATE cx_professionals SET base_place_id=?, base_city=?, base_state=?, base_country=?, base_lat=?, base_lng=? WHERE id=?")
+                                ->execute([(int)$pl['id'], (string)$pl['name'], (string)$pl['state_name'], (string)$pl['country_code'], (float)$pl['lat'], (float)$pl['lng'], (int)$me['id']]);
+                        }
+                    }
+                    redirect('/pro/profile#expertise');
+                }
+            }
+            connect_pro_view('cv', ['me' => $me, 'scan' => $scan, 'text' => $text,
+                'relations' => function_exists('connect_tax_relations') ? connect_tax_relations() : []]); exit;
+
         case 'pro/tax-roots':
             connect_pro_json(array_map('connect_pro_node_lite', function_exists('connect_tax_roots') ? connect_tax_roots((string)($_GET['kind'] ?? 'DOMAIN')) : []));
         case 'pro/tax-children':

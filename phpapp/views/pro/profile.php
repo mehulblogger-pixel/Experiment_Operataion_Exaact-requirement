@@ -84,7 +84,7 @@
 <?php // ---- 2. EXPERTISE — taxonomy drill-down + suggestions (multi) ---- ?>
 <div class="card" id="expertise">
   <h2>Technical expertise</h2>
-  <p class="muted" style="margin:0 0 10px;font-size:13px">Choose broadly, then drill down. Add as many as apply — a person can be Mechanical, Welding and NDT at once.</p>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">Choose broadly, then drill down. Add as many as apply — a person can be Mechanical, Welding and NDT at once. &nbsp;<a href="/pro/cv" style="font-weight:600">✨ Prefill from your CV →</a></p>
 
   <?php if ($expertise): foreach ($tax_relations as $rel): if (empty($byRel[$rel])) continue; ?>
     <div class="relgrp"><div class="rl"><?= e($relLabel[$rel] ?? $rel) ?></div>

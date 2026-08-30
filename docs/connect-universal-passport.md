@@ -114,7 +114,15 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
    filter by kind + text. A rename keeps the old name as a synonym; a colliding
    rename is refused. Tests: `tests/test_connect_tax_admin.php` (11).
 
+9. **CV-first prefill** — *shipped*: `/pro/cv` (`lib/connect_cv.php`). Paste CV text
+   (or scan the uploaded CV — txt/docx robust, pdf best-effort) → `connect_cv_scan`
+   maps it against the taxonomy's alias vocabulary and the geo place names by
+   in-memory n-gram scan (exact alias hits only, so high precision) → the
+   professional **confirms** which detected roles/skills/certs/equipment to add
+   (each with a relation) and whether to set the base city. Nothing is saved until
+   confirmed; never overwrites existing data. An LLM extractor is a future seam.
+   Tests: `tests/test_connect_cv.php` (8).
+
 ### Still open (next tested slices, one at a time)
-   **CV-first prefill** (extract→map→confirm), structured **certifications /
-   project experience**, **verification & privacy** states, and the client
-   **advanced-search + result cards + contact-reveal**.
+   Structured **certifications / project experience**, **verification & privacy**
+   states, and the client **advanced-search + result cards + contact-reveal**.

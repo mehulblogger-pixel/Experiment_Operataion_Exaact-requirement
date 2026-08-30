@@ -239,6 +239,7 @@ try {
     require __DIR__ . '/lib/connect_qualtax.php';  // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA ladder, additive masters)
     require __DIR__ . '/lib/connect_tax_graph.php'; // Connect K0+ — universal taxonomy GRAPH unifying the flat masters (nodes/edges/aliases + profile links)
     require __DIR__ . '/lib/connect_geo.php'; // Connect K-GEO — universal location & mobility engine (structured geo + distance-priority matching)
+    require __DIR__ . '/lib/connect_cv.php'; // Connect K0+ — CV-assisted passport prefill (extract → map to taxonomy → confirm)
     require __DIR__ . '/lib/connect_verify.php';   // Connect K14 / #3 — verification & moderation (tier ladder + deterministic checks + queue)
     require __DIR__ . '/lib/connect_msg.php';      // Connect K15 / #4 — in-app messaging (per-engagement two-way threads)
     require __DIR__ . '/lib/connect_channels.php'; // Connect K16 / #5 — WhatsApp/SMS/email channel (behind the notification seam)
