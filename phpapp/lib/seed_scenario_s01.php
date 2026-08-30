@@ -67,7 +67,7 @@ function seed_s01_remove() {
     foreach ($jobIds as $jid) { $del("DELETE FROM job_visits WHERE job_id=?", [$jid]); $del("DELETE FROM jobs WHERE id=?", [$jid]); }
     $del("DELETE FROM inspectors WHERE emp_code LIKE 'DEMO-S01%'");
     $del("DELETE FROM client_users WHERE email LIKE '%s01@demo.test'");
-    $del("DELETE FROM users WHERE username LIKE 'demo.s01%'");
+    $del("DELETE FROM users WHERE email LIKE '%s01@demo.test' OR username LIKE 'demo.s01%'");
     if ($party) {
         foreach (array_map(fn($r) => (int)$r['id'], ops_all("SELECT id FROM calls WHERE client_id=?", [$party]) ?: []) as $cid) { $del("DELETE FROM jobs WHERE call_id=?", [$cid]); $del("DELETE FROM calls WHERE id=?", [$cid]); }
         $del("DELETE FROM cx_req_templates WHERE owner_party_id=?", [$party]);
@@ -171,10 +171,11 @@ function seed_s01_load() {
         db()->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active) VALUES (?,?,?,?,?,?,?,1)")
             ->execute([$username, s01_pw(), $parts[0], $parts[1] ?? '', $email, $role, in_array($role, ['MASTER_ADMIN','ADMIN'], true) ? 1 : 0]);
     };
-    $mkUser('demo.s01.admin', 'DEMO-S01 Marketplace Admin', 'MASTER_ADMIN', 'admin.s01@demo.test');
-    $mkUser('demo.s01.coord', 'DEMO-S01 Operations Coordinator', 'COORDINATOR', 'coord.s01@demo.test');
-    $mkUser('demo.s01.reviewer', 'DEMO-S01 Technical Reviewer', 'COORDINATOR', 'reviewer.s01@demo.test');
-    $mkUser('demo.s01.approver', 'DEMO-S01 Report Approver', 'MASTER_ADMIN', 'approver.s01@demo.test');
+    // Username == e-mail so every DEMO-S01 login is a consistent "@"-style ID.
+    $mkUser('admin.s01@demo.test', 'DEMO-S01 Marketplace Admin', 'MASTER_ADMIN', 'admin.s01@demo.test');
+    $mkUser('coord.s01@demo.test', 'DEMO-S01 Operations Coordinator', 'COORDINATOR', 'coord.s01@demo.test');
+    $mkUser('reviewer.s01@demo.test', 'DEMO-S01 Technical Reviewer', 'COORDINATOR', 'reviewer.s01@demo.test');
+    $mkUser('approver.s01@demo.test', 'DEMO-S01 Report Approver', 'MASTER_ADMIN', 'approver.s01@demo.test');
     $say('Client party #' . $party . ' + 5 logins');
 
     // ---- PHASE 3 — requirement + matching snapshot ------------------------

@@ -25,10 +25,10 @@ re-running purges DEMO-S02 first (no duplicates).
 
 | Role | Login | URL |
 |---|---|---|
-| Org Admin (Rajesh Shah) | `demo.s02.admin` | `/login` |
-| Resource Manager (Priya Nair) | `demo.s02.rm` | `/login` |
-| Operations Manager (Vikram Patel) | `demo.s02.ops` | `/login` |
-| Quality Manager (Kavita Menon) | `demo.s02.qa` | `/login` |
+| Org Admin (Rajesh Shah) | `rajesh.s02@demo.test` | `/login` |
+| Resource Manager (Priya Nair) | `priya.s02@demo.test` | `/login` |
+| Operations Manager (Vikram Patel) | `vikram.s02@demo.test` | `/login` |
+| Quality Manager (Kavita Menon) | `kavita.s02@demo.test` | `/login` |
 | Agency portal (bench) | `agency.s02@demo.test` | `/portal/login` |
 | Client (Northern Grid EPC) | `client.s02@demo.test` | `/portal/login` |
 

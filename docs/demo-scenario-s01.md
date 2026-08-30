@@ -48,12 +48,12 @@ Password for every demo account: **`demo12345`**.
 |---|---|---|---|
 | Marketplace Professional | `arjun.s01@demo.test` | `/pro/login` | Passport, skills, certs (expiry states), the opportunity, apply, assignment, credentials |
 | Client User | `client.s01@demo.test` | `/portal/login` | Requirement, matches, shortlist/select, **Reports** (DEMO-S01-RPT-001), deputations, bench, invoices |
-| Marketplace Administrator | `demo.s01.admin` | `/login` | Taxonomy admin, identity console, match weights, verification desk |
-| Operations Coordinator | `demo.s01.coord` | `/login` | Requirement desk, source manpower, DEMO-S01-JOB-001, scheduling/allocation |
-| Technical Reviewer | `demo.s01.reviewer` | `/login` | Report review/vetting, findings |
-| Report Approver / Issuer | `demo.s01.approver` | `/login` | Report approve + issue |
+| Marketplace Administrator | `admin.s01@demo.test` | `/login` | Taxonomy admin, identity console, match weights, verification desk |
+| Operations Coordinator | `coord.s01@demo.test` | `/login` | Requirement desk, source manpower, DEMO-S01-JOB-001, scheduling/allocation |
+| Technical Reviewer | `reviewer.s01@demo.test` | `/login` | Report review/vetting, findings |
+| Report Approver / Issuer | `approver.s01@demo.test` | `/login` | Report approve + issue |
 
-*(Staff usernames are the login; the four `demo.s01.*` accounts sign in at `/login`.)*
+*(Every login is an `@`-style ID; the four staff accounts sign in at `/login` with the e-mail shown as the username.)*
 
 ## C. Scenario record map (all linked, no duplicates)
 

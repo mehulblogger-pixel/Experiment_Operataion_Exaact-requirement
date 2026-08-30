@@ -77,7 +77,7 @@ function seed_s02_remove() {
     try { $del("DELETE FROM inspector_certs WHERE inspector_id IN (SELECT id FROM inspectors WHERE emp_code LIKE 'DEMO-S02%')"); } catch (Throwable $e) {}
     $del("DELETE FROM inspectors WHERE emp_code LIKE 'DEMO-S02%'");
     $del("DELETE FROM client_users WHERE email LIKE '%s02@demo.test'");
-    $del("DELETE FROM users WHERE username LIKE 'demo.s02%'");
+    $del("DELETE FROM users WHERE email LIKE '%s02@demo.test' OR username LIKE 'demo.s02%'");
     if ($client) $del("DELETE FROM business_partners WHERE id=?", [$client]);
     if ($apex) $del("DELETE FROM business_partners WHERE id=?", [$apex]);
     if (function_exists('setting_set')) setting_set('demo_s02_seed', '');
@@ -115,10 +115,11 @@ function seed_s02_load() {
     db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,perms,created_by,created_at) VALUES (?,?,?,?,1,0,'', 'demo-seed', ?)")->execute([$client, 'client.s02@demo.test', 'Northern Grid EPC (client)', s01_pw(), date('c')]);
     // Apex staff (operator side)
     $mkUser = function ($u, $name, $role, $email) { if ((int)ops_val("SELECT COUNT(*) FROM users WHERE username=?", [$u])) return; $p = explode(' ', trim($name), 2); db()->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active) VALUES (?,?,?,?,?,?,?,1)")->execute([$u, s01_pw(), $p[0], $p[1] ?? '', $email, $role, in_array($role, ['MASTER_ADMIN','ADMIN'], true) ? 1 : 0]); };
-    $mkUser('demo.s02.admin', 'Rajesh Shah', 'MASTER_ADMIN', 'rajesh.s02@demo.test');
-    $mkUser('demo.s02.rm', 'Priya Nair', 'COORDINATOR', 'priya.s02@demo.test');
-    $mkUser('demo.s02.ops', 'Vikram Patel', 'COORDINATOR', 'vikram.s02@demo.test');
-    $mkUser('demo.s02.qa', 'Kavita Menon', 'MASTER_ADMIN', 'kavita.s02@demo.test');
+    // Username == e-mail so every DEMO-S02 login is a consistent "@"-style ID.
+    $mkUser('rajesh.s02@demo.test', 'Rajesh Shah', 'MASTER_ADMIN', 'rajesh.s02@demo.test');
+    $mkUser('priya.s02@demo.test', 'Priya Nair', 'COORDINATOR', 'priya.s02@demo.test');
+    $mkUser('vikram.s02@demo.test', 'Vikram Patel', 'COORDINATOR', 'vikram.s02@demo.test');
+    $mkUser('kavita.s02@demo.test', 'Kavita Menon', 'MASTER_ADMIN', 'kavita.s02@demo.test');
     $say('Apex org #' . $apexOrg . ' + client Northern Grid #' . $client . ' + 4 staff + 2 portal logins');
 
     // ---- PHASE B — the 6-person bench (passport-linked) -------------------

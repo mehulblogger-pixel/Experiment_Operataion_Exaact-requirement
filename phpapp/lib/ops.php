@@ -2749,7 +2749,7 @@ function ops_dispatch($route, $method) {
                     $r = seed_s01_load();
                     $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
                     flash('DEMO-S01 scenario loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
-                        . ' Log in: professional arjun.s01@demo.test (/pro/login), client client.s01@demo.test (/portal/login), staff demo.s01.coord (/login) — password demo12345.',
+                        . ' Log in: professional arjun.s01@demo.test (/pro/login), client client.s01@demo.test (/portal/login), staff coord.s01@demo.test / admin.s01@demo.test / reviewer.s01@demo.test / approver.s01@demo.test (/login) — password demo12345.',
                         $r['allpass'] ? 'success' : 'warning');
                 } catch (Throwable $e) { flash('Could not load DEMO-S01: ' . $e->getMessage(), 'error'); }
             }
@@ -2768,7 +2768,7 @@ function ops_dispatch($route, $method) {
                     $r = seed_s02_load();
                     $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
                     flash('DEMO-S02 scenario loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
-                        . ' Logins (demo12345): Apex staff demo.s02.admin / demo.s02.rm / demo.s02.ops / demo.s02.qa (/login), agency portal agency.s02@demo.test + client client.s02@demo.test (/portal/login).',
+                        . ' Logins (demo12345): Apex staff rajesh.s02@demo.test / priya.s02@demo.test / vikram.s02@demo.test / kavita.s02@demo.test (/login), agency portal agency.s02@demo.test + client client.s02@demo.test (/portal/login).',
                         $r['allpass'] ? 'success' : 'warning');
                 } catch (Throwable $e) { flash('Could not load DEMO-S02: ' . $e->getMessage(), 'error'); }
             }
