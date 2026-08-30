@@ -37,6 +37,24 @@ function connect_bench_migrate() {
         note VARCHAR(300) DEFAULT '', created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
     try { db()->exec("CREATE INDEX ix_cx_bench_org ON cx_bench (org_id, is_active)"); } catch (Throwable $e) {}
     try { db()->exec("CREATE INDEX ix_cx_bench_alloc ON cx_bench_alloc (org_id, requirement_id)"); } catch (Throwable $e) {}
+    // Additive: a bench entry may be linked to a full professional passport
+    // (cx_professionals) so the agency's roster is taxonomy-searchable and shares
+    // one identity with the marketplace; plus an internal cost rate (for margin,
+    // staff-only) and the association type. All optional; the flat roster still works.
+    if (function_exists('ensure_column')) {
+        try { ensure_column('cx_bench', 'professional_id', "INT DEFAULT 0"); }       catch (Throwable $e) {}
+        try { ensure_column('cx_bench', 'association', "VARCHAR(24) DEFAULT ''"); }   catch (Throwable $e) {}
+        try { ensure_column('cx_bench', 'cost_rate', "REAL DEFAULT 0"); }            catch (Throwable $e) {}
+        try { ensure_column('cx_bench', 'available_from', "VARCHAR(20) DEFAULT ''"); } catch (Throwable $e) {}
+        try { ensure_column('cx_bench_alloc', 'client_rate', "REAL DEFAULT 0"); }      catch (Throwable $e) {}
+        try { ensure_column('cx_bench_alloc', 'professional_id', "INT DEFAULT 0"); }   catch (Throwable $e) {}
+    }
+}
+
+/** Resolve a bench entry to its linked professional passport (or 0). */
+function connect_bench_professional($benchId) {
+    connect_bench_migrate();
+    return (int)ops_val("SELECT professional_id FROM cx_bench WHERE id=?", [(int)$benchId]);
 }
 
 /** The active manpower/staffing agencies that can hold a bench. */

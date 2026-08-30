@@ -2761,6 +2761,22 @@ function ops_dispatch($route, $method) {
                 flash('DEMO-S01 scenario removed — ' . (int)$n . ' records deleted.');
             }
             redirect('/settings'); return true;
+        case $route === 'seed-scenario-s02':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S02 scenario.');
+            if ($method === 'POST' && function_exists('seed_s02_load')) {
+                try {
+                    $r = seed_s02_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S02 scenario loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' Logins (demo12345): Apex staff demo.s02.admin / demo.s02.rm / demo.s02.ops / demo.s02.qa (/login), agency portal agency.s02@demo.test + client client.s02@demo.test (/portal/login).',
+                        $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S02: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s02-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S02 scenario.');
+            if ($method === 'POST' && function_exists('seed_s02_remove')) flash('DEMO-S02 scenario removed — ' . (int)seed_s02_remove() . ' records deleted.');
+            redirect('/settings'); return true;
         case $route === 'trace-thread':
             ops_require(is_master(), 'Only the Master Admin can build the traceability thread.');
             if ($method === 'POST' && function_exists('trace_seed')) {
