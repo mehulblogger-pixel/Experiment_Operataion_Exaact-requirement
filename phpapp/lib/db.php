@@ -402,6 +402,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('billable_migrate')) billable_migrate();       // Revamp P4 — Billable Event ledger (operational→commercial bridge)
     if (function_exists('connect_taxonomy_migrate')) { connect_taxonomy_migrate(); connect_taxonomy_seed(); }  // Connect K0 — marketplace industry taxonomy (idempotent, insert-if-empty)
     if (function_exists('connect_qualtax_migrate')) { connect_qualtax_migrate(); connect_qualtax_seed(); }     // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA ladder; idempotent, insert-if-empty)
+    if (function_exists('connect_tax_graph_migrate')) { connect_tax_graph_migrate(); if (function_exists('connect_tax_generalize')) connect_tax_generalize(); }  // Connect K0+ — build the unified taxonomy graph from the flat masters (idempotent, marker-guarded)
     if (function_exists('connect_passport_migrate')) connect_passport_migrate();  // Connect K1 — inspectors.passport_token (public passport share key)
     if (function_exists('connect_market_migrate')) connect_market_migrate();      // Connect K2a — cx_requirements + cx_applications (marketplace)
     if (function_exists('connect_ratings_migrate')) connect_ratings_migrate();    // Connect K9 — cx_ratings (two-way marketplace ratings)
