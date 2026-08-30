@@ -224,6 +224,10 @@ function connect_match_for_requirement($req, $limit = 8) {
         }
     } catch (Throwable $e) {}
 
+    // One person, once: collapse a candidate who is linked as BOTH an internal
+    // inspector and a self-registered professional (keeps the stronger row).
+    if (function_exists('connect_identity_dedupe_rows')) $rows = connect_identity_dedupe_rows($rows);
+
     // Sort: BLOCKED last, then by score desc, then rating desc.
     usort($rows, function ($a, $b) {
         $ab = $a['eligibility'] === 'BLOCKED' ? 1 : 0; $bb = $b['eligibility'] === 'BLOCKED' ? 1 : 0;

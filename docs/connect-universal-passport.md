@@ -193,6 +193,20 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
     privacy engines; no new permission (the hire right, `market.post`, already
     covers it). Tests: `tests/test_connect_hiring.php` (15).
 
+14. **Unified professional identity** — *shipped* (`lib/connect_identity.php`,
+    console `/connect-identity`). The first Operations↔Connect *connection* slice
+    (see `connect-integration-map.md`). The same human could exist twice — an
+    internal `inspectors` row and a marketplace `cx_professionals` row — bridged
+    only per application. `cx_identity_link` now records that the two records are
+    the same person — **a relationship, never a merge** (nothing renamed/moved/
+    deleted). Resolvers (`connect_identity_of_professional/_of_inspector/_roles`)
+    give one master identity with many roles; `connect_identity_suggestions`
+    proposes links from a shared e-mail/mobile (confirmed, never auto-linked);
+    `connect_identity_dedupe_rows` collapses a dual-role person to one matcher row;
+    every link/unlink is logged via `act_log()`. Staff console gated by the
+    existing coordinator right (no new permission). Tests:
+    `tests/test_connect_identity.php` (19).
+
 ### Program status
    The passport programme (Phases 1–12) is shipped and tested: universal taxonomy
    graph, location engine, passport UX, CV prefill, structured credentials,
