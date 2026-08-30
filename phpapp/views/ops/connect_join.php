@@ -53,9 +53,13 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
       <label>Organisation name</label><input name="name" required autofocus>
       <label>What kind of organisation?</label>
       <div class="types">
-        <?php $first=true; foreach ($types as $k=>$t): if ($k==='FREELANCER') continue; /* freelancers use /pro */ ?>
+        <?php
+          $want = strtoupper((string)($_GET['type'] ?? ''));
+          if (!isset($types[$want]) || $want === 'FREELANCER') $want = '';
+          $first=true; foreach ($types as $k=>$t): if ($k==='FREELANCER') continue; /* freelancers use /pro */
+          $checked = $want !== '' ? ($k === $want) : $first; ?>
           <label>
-            <input type="radio" name="org_type" value="<?= e($k) ?>" <?= $first?'checked':'' ?>>
+            <input type="radio" name="org_type" value="<?= e($k) ?>" <?= $checked?'checked':'' ?>>
             <span><strong><?= e($t['label']) ?></strong>
               <?php $mods = function_exists('connect_org_type_modules') ? connect_org_type_modules($k) : []; ?>
               <div style="margin-top:4px"><?php foreach ($mods as $m) echo '<span class="chip">'.e($modLabel[$m]??$m).'</span>'; ?></div>
@@ -71,7 +75,7 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
       <label>Choose a password</label><input type="password" name="password" minlength="8" required placeholder="at least 8 characters">
     </div>
     <button class="btn" type="submit">Create my account</button>
-    <p class="muted" style="text-align:center;margin-top:14px;font-size:13.5px">An individual professional? <a href="/pro/register">List yourself here →</a></p>
+    <p class="muted" style="text-align:center;margin-top:14px;font-size:13.5px">An individual professional? <a href="/pro/register">List yourself here →</a> &nbsp;·&nbsp; <a href="/connect">All options</a></p>
   </form>
 <?php endif; ?>
 </div>

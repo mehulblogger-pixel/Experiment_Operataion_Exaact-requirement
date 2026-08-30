@@ -4,6 +4,17 @@ These are **separate login worlds** with their own permission systems, **not** i
 `ORG_ROLES`. This pass (Option A) summarises them; a full role-by-role treatment is
 listed as follow-up work in `99-gaps-and-risks.md`.
 
+## Connect — one public front door (`/connect`)
+
+The single URL to share for the marketplace. `connect_front_route()` (dispatched in
+`index.php` before `require_login`, view `views/ops/connect_front.php`) renders one
+page with three "create account" paths — **professional** (`/pro/register`),
+**hiring** (`/join?type=COMPANY`), **agency** (`/join?type=MANPOWER_AGENCY`) — and two
+labelled sign-in buttons: **professional** (`/pro/login`) and **company/agency**
+(`/portal/login`). The individual login/register pages cross-link back to it and to
+each other, so nobody lands in the wrong world. It's a thin unifying door over the
+existing engines — no auth or data model changed.
+
 ## Client portal
 - **Engine:** `lib/portal.php`; screens `views/portal/*`; permission check `pcan()`;
   per-user rights managed at `views/ops/portal_users.php` / `portal_user_perms.php`.

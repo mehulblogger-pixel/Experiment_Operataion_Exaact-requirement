@@ -10,3 +10,4 @@
   <button class="btn" type="submit" style="margin-top:16px;width:100%">Create my profile</button>
 </form>
 <p class="muted">Already registered? <a href="/pro/login">Sign in →</a></p>
+<p class="muted" style="font-size:13.5px">Hiring, or an agency? <a href="/connect">See all options →</a></p>

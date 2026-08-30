@@ -858,6 +858,14 @@ if ($route === 'join' && function_exists('connect_org_join_route')) {
     exit;
 }
 
+// Connect — the ONE public front door for the marketplace. A single page where a
+// professional, a company, or an agency creates an account or signs in. Public,
+// in front of require_login(). connect_front_route() always exits.
+if ($route === 'connect' && function_exists('connect_front_route')) {
+    connect_front_route($method);
+    exit;
+}
+
 // A signed handoff from a sibling MGH application (Books, BlogPro, Ads Pro).
 // It sits HERE, in front of require_login(), because its whole job is to satisfy
 // that gate — and behind the portal dispatch, because a client is not a staff

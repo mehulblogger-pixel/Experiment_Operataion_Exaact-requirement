@@ -9,3 +9,4 @@
   <p style="margin:12px 0 0;text-align:center"><a href="/pro/forgot" style="font-size:14px">Forgot your password?</a></p>
 </form>
 <p class="muted">New here? <a href="/pro/register">Create your professional profile →</a></p>
+<p class="muted" style="font-size:13.5px">A company or agency? <a href="/portal/login">Sign in here →</a> &nbsp;·&nbsp; <a href="/connect">All options</a></p>

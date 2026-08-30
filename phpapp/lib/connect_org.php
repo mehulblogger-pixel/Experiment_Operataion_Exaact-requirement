@@ -147,6 +147,14 @@ function connect_org_pending_count() {
     try { return (int)ops_val("SELECT COUNT(*) FROM cx_organisations WHERE status='PENDING'"); } catch (Throwable $e) { return 0; }
 }
 
+/** The ONE public front door (dispatched before require_login). One page where a
+ *  professional, a company or an agency creates an account or signs in. Always exits. */
+function connect_front_route($method) {
+    if (function_exists('connect_enabled') && !connect_enabled()) { http_response_code(404); echo 'Not available.'; exit; }
+    require __DIR__ . '/../views/ops/connect_front.php';
+    exit;
+}
+
 /** The public onboarding page (dispatched before require_login). Always exits. */
 function connect_org_join_route($method) {
     if (function_exists('connect_enabled') && !connect_enabled()) { http_response_code(404); echo 'Not available.'; exit; }
