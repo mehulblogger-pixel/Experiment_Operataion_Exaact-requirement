@@ -300,6 +300,17 @@ function connect_pro_search_smart(array $f = [], $limit = 60) {
     return array_slice($rows, 0, max(1, (int)$limit));
 }
 
+/** JSON response for the passport drill-down endpoints (always exits). */
+function connect_pro_json($data) {
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+/** Trim a taxonomy node to what the drill-down UI needs. */
+function connect_pro_node_lite($n) {
+    return ['id' => (int)$n['id'], 'name' => (string)$n['name'], 'kind' => (string)$n['kind'], 'code' => (string)($n['code'] ?? '')];
+}
+
 /** Count of active professionals in the shared pool. */
 function connect_pro_pool_count() {
     connect_pro_migrate();
@@ -443,16 +454,51 @@ function connect_pro_route($route, $method) {
                 // the freelancer's own scope — no duplicate metric code.
                 'kpi' => function_exists('connect_kpi_board') ? connect_kpi_board(['audience' => 'pro', 'party_id' => (int)$me['id']]) : null,
             ]); exit;
+        // K0+ / K-GEO — live JSON endpoints for the passport drill-down + autocomplete.
+        case 'pro/tax-roots':
+            connect_pro_json(array_map('connect_pro_node_lite', function_exists('connect_tax_roots') ? connect_tax_roots((string)($_GET['kind'] ?? 'DOMAIN')) : []));
+        case 'pro/tax-children':
+            connect_pro_json(array_map('connect_pro_node_lite', function_exists('connect_tax_children') ? connect_tax_children((int)($_GET['parent'] ?? 0), (string)($_GET['kind'] ?? '')) : []));
+        case 'pro/tax-suggest':
+            connect_pro_json(array_map('connect_pro_node_lite', function_exists('connect_tax_suggest') ? connect_tax_suggest((int)($_GET['node'] ?? 0)) : []));
+        case 'pro/tax-resolve':
+            connect_pro_json(function_exists('connect_tax_resolve') ? connect_tax_resolve((string)($_GET['q'] ?? ''), array_filter(explode(',', (string)($_GET['kinds'] ?? '')))) : []);
+        case 'pro/geo':
+            connect_pro_json(array_map(function ($p) { return ['id' => (int)$p['id'], 'name' => $p['name'], 'kind' => $p['kind'], 'state' => $p['state_name'], 'country' => $p['country_code']]; },
+                function_exists('connect_geo_search') ? connect_geo_search((string)($_GET['q'] ?? ''), ['CITY', 'STATE']) : []));
+
         case 'pro/profile':
             $saved = false;
             if ($method === 'POST') {
-                connect_pro_profile_save((int)$me['id'], $_POST);
-                if (function_exists('connect_channel_set_consent')) connect_channel_set_consent((int)$me['id'], $_POST); // #5 — channel opt-ins
-                $saved = true; $me = connect_pro_user();
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'attach_node' && function_exists('connect_profile_tax_attach')) {
+                    connect_profile_tax_attach((int)$me['id'], (int)($_POST['node_id'] ?? 0), (string)($_POST['relation'] ?? 'SKILL'),
+                        ['competency' => (string)($_POST['competency'] ?? ''), 'years' => (float)($_POST['years'] ?? 0), 'source' => 'passport']);
+                    redirect('/pro/profile#expertise');
+                } elseif ($act === 'detach_node' && function_exists('connect_profile_tax_detach')) {
+                    connect_profile_tax_detach((int)($_POST['ptax_id'] ?? 0), (int)$me['id']);
+                    redirect('/pro/profile#expertise');
+                } elseif ($act === 'save_mobility' && function_exists('connect_geo_save_mobility')) {
+                    connect_geo_save_mobility((int)$me['id'], $_POST);
+                    redirect('/pro/profile#mobility');
+                } else {
+                    connect_pro_profile_save((int)$me['id'], $_POST);
+                    if (function_exists('connect_channel_set_consent')) connect_channel_set_consent((int)$me['id'], $_POST); // #5 — channel opt-ins
+                    $saved = true; $me = connect_pro_user();
+                }
             }
             connect_pro_view('profile', ['me' => $me, 'saved' => $saved,
                 'prefs' => function_exists('connect_channel_prefs') ? connect_channel_prefs((int)$me['id']) : [],
-                'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : []]); exit;
+                'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+                // K0+ passport expertise (the professional's taxonomy nodes) + drill-down roots
+                'expertise'   => function_exists('connect_profile_tax_for') ? connect_profile_tax_for((int)$me['id']) : [],
+                'tax_domains' => function_exists('connect_tax_roots') ? connect_tax_roots('DOMAIN') : [],
+                'tax_relations' => function_exists('connect_tax_relations') ? connect_tax_relations() : [],
+                // K-GEO mobility
+                'geo_regions' => function_exists('connect_geo_regions') ? connect_geo_regions() : [],
+                'geo_presets' => function_exists('connect_geo_radius_presets') ? connect_geo_radius_presets() : [],
+                'sel_places'  => function_exists('connect_geo_migrate') ? (ops_all("SELECT p.* FROM cx_profile_places pp JOIN cx_geo_places p ON p.id=pp.place_id WHERE pp.pro_id=?", [(int)$me['id']]) ?: []) : [],
+            ]); exit;
 
         case 'pro/jobs':   // A2 — browse open requirements + apply
             if ($method === 'POST' && (int)($_POST['requirement_id'] ?? 0) > 0 && function_exists('cx_requirement_get')) {
