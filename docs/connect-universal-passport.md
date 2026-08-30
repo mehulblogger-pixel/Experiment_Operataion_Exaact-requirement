@@ -61,6 +61,31 @@ professional's existing CSV into graph nodes (single source of truth; CSV stays)
 Guarantees: strictly additive; the flat masters, CSV columns, matching, search and
 every screen keep working; tests in `tests/test_connect_tax_graph.php` (26).
 
+## Location & Mobility Engine (K-GEO, shipped backbone)
+
+`lib/connect_geo.php` — one universal, reusable location engine (every profile type,
+every matching workflow), additive:
+
+- **`cx_geo_places`** — structured Country → State → City with coordinates (India +
+  ~44 industrial cities seeded, states, international regions + GCC countries),
+  admin/seed-extensible; `cx_profile_places` for a professional's SELECTED working
+  places. Structured base + mobility columns added to `cx_professionals`
+  (`base_place_id/state/country/lat/lng/pincode`, `mobility_mode`, `intl_regions`),
+  **alongside** the legacy `base_city/pan_india/overseas/travel_radius_km` (kept).
+- **`geo_haversine`** — great-circle distance; a missing coordinate returns INF, never
+  a false "0 km".
+- **`connect_location_match($pro, $job)`** — the priority-tier matcher the whole
+  marketplace consumes: **1** exact city · **2** within travel radius (haversine) ·
+  **3** selected region/city · **4** Pan-India · **5** international (region) · **0**
+  outside. Lower tier = stronger.
+- **`connect_geo_save_mobility`** — enforces the strict conditional rules server-side:
+  Pan-India clears the travel radius and selected places; overseas gates the regions.
+  The conditional profile UI (radius disabled when Pan-India, etc.) mirrors this and
+  is part of the profile-experience phase.
+
+Tests: `tests/test_connect_geo.php` (17) — distance, all five tiers, Pan-India-disables-
+radius. The engine is built to be reused for inspectors/engineers/PMs, not per-role.
+
 ## Phases 4–7 — roadmap (next tested slices)
 
 4. **Passport profile experience** — replace the long form with Identify → Select →

@@ -403,6 +403,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('connect_taxonomy_migrate')) { connect_taxonomy_migrate(); connect_taxonomy_seed(); }  // Connect K0 — marketplace industry taxonomy (idempotent, insert-if-empty)
     if (function_exists('connect_qualtax_migrate')) { connect_qualtax_migrate(); connect_qualtax_seed(); }     // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA ladder; idempotent, insert-if-empty)
     if (function_exists('connect_tax_graph_migrate')) { connect_tax_graph_migrate(); if (function_exists('connect_tax_generalize')) connect_tax_generalize(); }  // Connect K0+ — build the unified taxonomy graph from the flat masters (idempotent, marker-guarded)
+    if (function_exists('connect_geo_migrate')) { connect_geo_migrate(); if (function_exists('connect_geo_seed')) connect_geo_seed(); }  // Connect K-GEO — structured location master + mobility columns (idempotent)
     if (function_exists('connect_passport_migrate')) connect_passport_migrate();  // Connect K1 — inspectors.passport_token (public passport share key)
     if (function_exists('connect_market_migrate')) connect_market_migrate();      // Connect K2a — cx_requirements + cx_applications (marketplace)
     if (function_exists('connect_ratings_migrate')) connect_ratings_migrate();    // Connect K9 — cx_ratings (two-way marketplace ratings)
@@ -410,6 +411,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('connect_govern_migrate')) connect_govern_migrate();      // Connect K10 — cx_terms + cx_readiness (Part-F F1/F3)
     if (function_exists('connect_pro_migrate')) connect_pro_migrate();            // Connect A1 — cx_professionals (self-registered freelancer pool)
     if (function_exists('connect_qualtax_augment_professional')) connect_qualtax_augment_professional();  // #2 — add ITI→MBA profile columns once cx_professionals exists
+    if (function_exists('connect_geo_augment_professional')) connect_geo_augment_professional();  // Connect K-GEO — structured base/mobility columns on cx_professionals (after the table exists)
     if (function_exists('connect_verify_migrate')) connect_verify_migrate();                              // Connect K14 / #3 — cx_verifications + verified_at (after cx_professionals exists)
     if (function_exists('connect_msg_migrate')) connect_msg_migrate();                                    // Connect K15 / #4 — cx_messages + cx_message_reads (in-app messaging)
     if (function_exists('connect_channels_migrate')) { connect_channels_migrate(); connect_channels_seed(); } // Connect K16 / #5 — channel templates + outbound log + consent (after cx_professionals)
