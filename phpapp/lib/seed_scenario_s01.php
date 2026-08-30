@@ -21,7 +21,7 @@ function s01_pro(array $a) {
     db()->prepare("INSERT INTO cx_professionals (email,name,mobile,headline,disciplines,skills,work_types,availability,is_active,verification_tier,passport_token,password_hash,created_at)
                    VALUES (?,?,?,?,?,?,?,?,1,'registered',?,?,?)")
         ->execute([$a['email'], $a['name'], $a['mobile'] ?? '', $a['headline'] ?? '', $a['disciplines'] ?? '', $a['skills'] ?? '',
-                   $a['work_types'] ?? 'FREELANCE', $a['availability'] ?? 'AVAILABLE', substr(md5($a['email']), 0, 20), s01_pw()]);
+                   $a['work_types'] ?? 'FREELANCE', $a['availability'] ?? 'AVAILABLE', substr(md5($a['email']), 0, 20), s01_pw(), date('c')]);
     return (int)db()->lastInsertId();
 }
 
@@ -84,6 +84,10 @@ function seed_s01_remove() {
  */
 function seed_s01_load() {
     seed_s01_remove();
+    // Relax MySQL strict mode for this seed connection, exactly as the app's own
+    // demo seeder does (lib/seed_demo.php) — so a blank date/int in a demo row is
+    // tolerated. Harmless on SQLite.
+    try { db()->exec("SET SESSION sql_mode=''"); } catch (Throwable $e) {}
     $log = []; $say = function ($s) use (&$log) { $log[] = $s; };
 
     // ---- PHASE 1 — passport + candidates ----------------------------------
