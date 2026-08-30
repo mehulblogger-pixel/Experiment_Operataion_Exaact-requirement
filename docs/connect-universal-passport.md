@@ -123,6 +123,17 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
    confirmed; never overwrites existing data. An LLM extractor is a future seam.
    Tests: `tests/test_connect_cv.php` (8).
 
+10. **Structured certifications & project experience** — *shipped*
+    (`lib/connect_credentials.php`, route `/pro/credentials`). `cx_pro_certs`
+    (name/authority/number/level/discipline/issue+expiry/document/verified) with an
+    automatic expiry status (VALID / EXPIRING ≤60d / EXPIRED) — a cert links to a
+    CERTIFICATION taxonomy node and **mirrors into `cx_profile_tax`** so the
+    one-keyword search + matching find it. `cx_pro_projects` (title/role/client/
+    industry/location/equipment/scope/dates) as first-class experience. Add/edit/
+    remove, ownership-scoped; cert-name autocomplete against the taxonomy; optional
+    certificate document upload. Linked from the passport. Tests:
+    `tests/test_connect_credentials.php` (16).
+
 ### Still open (next tested slices, one at a time)
-   Structured **certifications / project experience**, **verification & privacy**
-   states, and the client **advanced-search + result cards + contact-reveal**.
+   **Verification & privacy** states, and the client **advanced-search + result
+   cards + contact-reveal**.

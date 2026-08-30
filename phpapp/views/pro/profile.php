@@ -43,6 +43,7 @@
     <label>Skills (free text — the structured ones are below)</label><input name="skills" value="<?= e($me['skills'] ?? '') ?>" placeholder="e.g. Welding inspection, NDT (UT/RT)">
     <label>Languages</label><input name="languages" value="<?= e($me['languages'] ?? '') ?>" placeholder="e.g. English, Hindi, Gujarati">
     <p style="margin:12px 0 0"><a href="/pro/documents" class="btn sec" style="width:100%;text-align:center">📎 Manage photo, CV &amp; certificates →</a></p>
+    <p style="margin:8px 0 0"><a href="/pro/credentials" class="btn sec" style="width:100%;text-align:center">🎖 Certifications &amp; project experience →</a></p>
   </div>
   <div class="card">
     <h2>How you want to work</h2>

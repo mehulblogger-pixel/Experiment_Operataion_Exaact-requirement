@@ -474,6 +474,31 @@ function connect_pro_route($route, $method) {
                 'kpi' => function_exists('connect_kpi_board') ? connect_kpi_board(['audience' => 'pro', 'party_id' => (int)$me['id']]) : null,
             ]); exit;
         // K0+ / K-GEO — live JSON endpoints for the passport drill-down + autocomplete.
+        case 'pro/credentials':   // K0+ — structured certifications + project experience
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'cert_save' && function_exists('connect_cred_cert_save')) {
+                    $in = $_POST;
+                    if (!empty($_FILES['cert_file']['name']) && function_exists('connect_pro_file_add')) {
+                        [$fok] = connect_pro_file_add((int)$me['id'], 'CERT', $_FILES['cert_file']);
+                        if ($fok) $in['file_id'] = (int)ops_val("SELECT id FROM cx_pro_files WHERE pro_id=? AND kind='CERT' ORDER BY id DESC LIMIT 1", [(int)$me['id']]);
+                    }
+                    connect_cred_cert_save((int)$me['id'], $in);
+                } elseif ($act === 'cert_del' && function_exists('connect_cred_cert_delete')) {
+                    connect_cred_cert_delete((int)($_POST['id'] ?? 0), (int)$me['id']);
+                } elseif ($act === 'project_save' && function_exists('connect_cred_project_save')) {
+                    connect_cred_project_save((int)$me['id'], $_POST);
+                } elseif ($act === 'project_del' && function_exists('connect_cred_project_delete')) {
+                    connect_cred_project_delete((int)($_POST['id'] ?? 0), (int)$me['id']);
+                }
+                redirect('/pro/credentials');
+            }
+            connect_pro_view('credentials', [
+                'me'       => $me,
+                'certs'    => function_exists('connect_cred_certs') ? connect_cred_certs((int)$me['id']) : [],
+                'projects' => function_exists('connect_cred_projects') ? connect_cred_projects((int)$me['id']) : [],
+            ]); exit;
+
         case 'pro/cv':   // K0+ — CV-assisted prefill: paste/scan → review → confirm
             $scan = null; $text = '';
             if ($method === 'POST') {
