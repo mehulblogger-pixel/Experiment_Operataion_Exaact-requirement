@@ -43,16 +43,75 @@ function cx_requirement_terms($req) {
  * Score one professional against a requirement. Returns
  * [score 0-100, parts, reason, eligibility, stars, verified].
  */
+/**
+ * Configurable scoring weights (§23). Admin-tunable via settings; the DEFAULTS
+ * are exactly the values the scorer has always used, so behaviour is unchanged
+ * until someone deliberately re-weights. One JSON setting, clamped on read.
+ */
+function connect_match_weights_defaults() {
+    return [
+        'skills'      => 40,   // max points for skill/discipline overlap
+        'reputation'  => 30,   // max points for rating/job history (inspectors)
+        'credentials' => 15,   // max points for verified live credentials
+        'cred_each'   => 6,    // points per verified credential (up to the cap)
+        'elig_eligible'   => 15, 'elig_expiring' => 10, 'elig_check' => 6,
+        'elig_unverified' => 9,  'elig_blocked'  => 0,
+        'tax_bonus'   => 25,   // max taxonomy-graph bonus (professionals)
+        'location'    => 10,   // max location-fit bonus
+    ];
+}
+function connect_match_weights() {
+    if (isset($GLOBALS['__cx_match_w']) && is_array($GLOBALS['__cx_match_w'])) return $GLOBALS['__cx_match_w'];
+    $d = connect_match_weights_defaults();
+    $raw = function_exists('setting_get') ? setting_get('connect_match_weights', '') : '';
+    $saved = $raw ? (json_decode((string)$raw, true) ?: []) : [];
+    $w = [];
+    foreach ($d as $k => $dv) {
+        $v = isset($saved[$k]) && is_numeric($saved[$k]) ? (int)$saved[$k] : $dv;
+        $w[$k] = max(0, min(100, $v));   // clamp: no negative, no runaway weight
+    }
+    return $GLOBALS['__cx_match_w'] = $w;
+}
+function connect_match_weights_save(array $in) {
+    $d = connect_match_weights_defaults(); $out = [];
+    foreach ($d as $k => $dv) $out[$k] = isset($in[$k]) && is_numeric($in[$k]) ? max(0, min(100, (int)$in[$k])) : $dv;
+    if (function_exists('setting_set')) setting_set('connect_match_weights', json_encode($out));
+    connect_match_weights_reset_cache();
+    return [true, 'Matching weights saved.'];
+}
+/** Reset the per-request memo (after a save, and for tests). */
+function connect_match_weights_reset_cache() { unset($GLOBALS['__cx_match_w']); }
+
+/** Who may tune the matching weights — master/admin only. */
+function connect_match_weights_can() {
+    if (function_exists('connect_enabled') && !connect_enabled()) return false;
+    if (function_exists('is_master') && is_master()) return true;
+    return function_exists('is_admin_level') && is_admin_level();
+}
+/** Admin screen: view/tune the matching weights, or reset to defaults. */
+function ops_connect_match_weights($method) {
+    ops_require(connect_match_weights_can(), 'Tuning the matching weights is for administrators.');
+    if ($method === 'POST') {
+        if (($_POST['action'] ?? '') === 'reset') { if (function_exists('setting_set')) setting_set('connect_match_weights', ''); connect_match_weights_reset_cache(); flash('Matching weights reset to defaults.'); }
+        else { [, $m] = connect_match_weights_save($_POST); flash($m); }
+        redirect('/connect-match-weights');
+    }
+    view('ops/connect_match_weights', ['weights' => connect_match_weights(), 'defaults' => connect_match_weights_defaults()]);
+    return true;
+}
+
 function cx_match_score($cand, $req, $reqTerms = null) {
     $id = (int)($cand['id'] ?? 0);
     $kind = (string)($cand['kind'] ?? 'inspector');   // 'inspector' | 'professional'
     $reqTerms = $reqTerms ?? cx_requirement_terms($req);
+    $W = connect_match_weights();
 
-    // 1. Skills/discipline overlap (0-40) — the professional's skills vs the ask.
+    // 1. Skills/discipline overlap (0-W.skills) — the professional's skills vs the ask.
     //    Both pools carry a free-text skills field, so this works for either kind.
+    $skillMax = (int)$W['skills'];
     $skillTokens = cx_match_tokens((string)($cand['skills'] ?? '') . ' ' . (string)($cand['disciplines'] ?? ''));
     $overlap = $reqTerms ? count(array_intersect($reqTerms, $skillTokens)) : 0;
-    $skillPts = $reqTerms ? min(40, (int)round($overlap / max(1, count($reqTerms)) * 40) + ($overlap > 0 ? 8 : 0)) : 12;
+    $skillPts = $reqTerms ? min($skillMax, (int)round($overlap / max(1, count($reqTerms)) * $skillMax) + ($overlap > 0 ? (int)round($skillMax * 0.2) : 0)) : (int)round($skillMax * 0.3);
 
     // 2. Reputation (0-30) — internal inspectors have a job/rating history; a
     //    self-registered professional has none yet (honest zero until they work).
@@ -60,7 +119,7 @@ function cx_match_score($cand, $req, $reqTerms = null) {
     if ($kind === 'inspector' && function_exists('rating_for')) {
         $r = rating_for($id);
         $stars = $r['stars'] ?? null; $jobs = (int)($r['done'] ?? 0);
-        $repPts = (int)round(((int)($r['overall'] ?? 0)) / 100 * 30);
+        $repPts = (int)round(((int)($r['overall'] ?? 0)) / 100 * (int)$W['reputation']);
     }
 
     // 3. Verified live credentials (0-15) — from the P1 vault (inspectors only;
@@ -75,7 +134,7 @@ function cx_match_score($cand, $req, $reqTerms = null) {
             }
         } catch (Throwable $e) {}
     }
-    $credPts = min(15, $verified * 6);
+    $credPts = min((int)$W['credentials'], $verified * (int)$W['cred_each']);
 
     // 4. Eligibility (0-15) — the competence gate applies to internal inspectors;
     //    a self-registered professional is not gated (no lapsed-cert block), shown
@@ -85,7 +144,8 @@ function cx_match_score($cand, $req, $reqTerms = null) {
     } else {
         $elig = ['status' => 'UNVERIFIED', 'reasons' => []];
     }
-    $eligPts = ['ELIGIBLE' => 15, 'EXPIRING' => 10, 'CHECK' => 6, 'UNVERIFIED' => 9, 'BLOCKED' => 0][$elig['status']] ?? 6;
+    $eligPts = ['ELIGIBLE' => (int)$W['elig_eligible'], 'EXPIRING' => (int)$W['elig_expiring'], 'CHECK' => (int)$W['elig_check'],
+                'UNVERIFIED' => (int)$W['elig_unverified'], 'BLOCKED' => (int)$W['elig_blocked']][$elig['status']] ?? (int)$W['elig_check'];
 
     $score = $skillPts + $repPts + $credPts + $eligPts;
 
@@ -153,14 +213,17 @@ function connect_match_tax_bonus($proId, $weights) {
         $raw += ($weights[(int)$r['node_id']] ?? 1) * ($relW[strtoupper((string)$r['relation'])] ?? 1);
         if (count($reasons) < 4) $reasons['✓ ' . $r['name']] = true;
     }
-    return [min(25, (int)round($raw)), array_keys($reasons)];
+    $cap = function_exists('connect_match_weights') ? (int)connect_match_weights()['tax_bonus'] : 25;
+    return [min($cap, (int)round($raw)), array_keys($reasons)];
 }
 
 /** Location bonus (0-10) + the match detail for a professional vs a job place. */
 function connect_match_location_bonus($cand, $job) {
     if (!$job || !function_exists('connect_location_match')) return [0, null];
     $m = connect_location_match($cand, $job);
-    return [[1 => 10, 2 => 8, 3 => 6, 4 => 4, 5 => 2, 0 => 0][(int)$m['tier']] ?? 0, $m];
+    $lmax = function_exists('connect_match_weights') ? (int)connect_match_weights()['location'] : 10;
+    $tierPts = [1 => $lmax, 2 => (int)round($lmax*0.8), 3 => (int)round($lmax*0.6), 4 => (int)round($lmax*0.4), 5 => (int)round($lmax*0.2), 0 => 0];
+    return [$tierPts[(int)$m['tier']] ?? 0, $m];
 }
 
 /**

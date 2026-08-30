@@ -344,6 +344,10 @@ function ops_connect_requirement($method) {
         } elseif ($act === 'deploy_to_ops' && function_exists('connect_deploy_from_engagement')) {   // Award → deployment bridge (PDSO)
             [$dok, $dmsg] = connect_deploy_from_engagement($id);
             flash($dmsg, $dok ? 'success' : 'error');
+        } elseif ($act === 'duplicate' && function_exists('connect_requirement_duplicate')) {   // §49 — reuse a requirement's shape
+            $nid = connect_requirement_duplicate($id);
+            if ($nid) { flash('Duplicated as a new draft.'); redirect('/connect-requirement?id=' . (int)$nid); }
+            flash('Could not duplicate.', 'error');
         } elseif ($act === 'position_add' && function_exists('cx_position_add')) {   // M10 — crew manifest
             cx_position_add($id, $_POST) ? flash('Position added to the crew.') : flash('Give the position a role.', 'error');
         } elseif ($act === 'position_delete' && function_exists('cx_position_delete')) {

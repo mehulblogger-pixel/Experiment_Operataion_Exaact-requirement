@@ -957,14 +957,38 @@ function portal_route($route, $method) {
         case 'portal/hire':
             portal_need('market.post', 'posting manpower requirements');
             if (!function_exists('cx_requirement_create') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
-            if ($method === 'POST' && trim((string)($_POST['title'] ?? '')) !== '') {
-                $in = $_POST; $in['poster_party_id'] = portal_partner_id(); $in['poster_name'] = portal_client_name();
-                cx_requirement_create($in, true); // posted straight to OPEN
-                $_SESSION['portal_flash'] = 'Your requirement is posted and open for applications.';
-                redirect('/portal/hire');
+            if ($method === 'POST') {
+                $party = portal_partner_id();
+                $act = (string)($_POST['action'] ?? '');
+                // Requirement reuse (§49) — duplicate a previous one, or save/use a template.
+                if ($act === 'duplicate' && function_exists('connect_requirement_duplicate')) {
+                    $src = function_exists('cx_requirement_get') ? cx_requirement_get((int)($_POST['id'] ?? 0)) : null;
+                    if ($src && (int)$src['poster_party_id'] === (int)$party) {
+                        $nid = connect_requirement_duplicate((int)$src['id'], $party); // new DRAFT
+                        $_SESSION['portal_flash'] = $nid ? 'Duplicated as a draft — edit and post it below.' : 'Could not duplicate.';
+                    } else $_SESSION['portal_flash'] = 'That requirement is not yours.';
+                    redirect('/portal/hire');
+                } elseif ($act === 'save_template' && function_exists('connect_reqtemplate_save_from_requirement')) {
+                    $src = function_exists('cx_requirement_get') ? cx_requirement_get((int)($_POST['id'] ?? 0)) : null;
+                    if ($src && (int)$src['poster_party_id'] === (int)$party) { [, $tm] = connect_reqtemplate_save_from_requirement($party, (int)$src['id'], (string)($_POST['label'] ?? ''), portal_client_name()); $_SESSION['portal_flash'] = $tm; }
+                    redirect('/portal/hire');
+                } elseif ($act === 'template_delete' && function_exists('connect_reqtemplate_delete')) {
+                    connect_reqtemplate_delete((int)($_POST['id'] ?? 0), $party); $_SESSION['portal_flash'] = 'Template removed.';
+                    redirect('/portal/hire');
+                } elseif ($act === 'from_template' && function_exists('connect_reqtemplate_create_requirement')) {
+                    $nid = connect_reqtemplate_create_requirement((int)($_POST['template_id'] ?? 0), $party, [], true); // post to OPEN
+                    $_SESSION['portal_flash'] = $nid ? 'Requirement created from your template and posted.' : 'Could not use that template.';
+                    redirect('/portal/hire');
+                } elseif (trim((string)($_POST['title'] ?? '')) !== '') {
+                    $in = $_POST; $in['poster_party_id'] = $party; $in['poster_name'] = portal_client_name();
+                    cx_requirement_create($in, true); // posted straight to OPEN
+                    $_SESSION['portal_flash'] = 'Your requirement is posted and open for applications.';
+                    redirect('/portal/hire');
+                }
             }
             portal_view('hire', [
                 'rows'        => cx_requirements_for_party(portal_partner_id()),
+                'templates'   => function_exists('connect_reqtemplates_for') ? connect_reqtemplates_for(portal_partner_id()) : [],
                 'sectors'     => function_exists('connect_tx_rows') ? connect_tx_rows('cx_sectors') : [],
                 'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
             ]);

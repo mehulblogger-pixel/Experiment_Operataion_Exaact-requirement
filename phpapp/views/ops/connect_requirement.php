@@ -32,7 +32,10 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     <p class="sub" style="margin:2px 0 0"><?= e($req['ref_code']) ?><?php if (!empty($req['location'])): ?> · <?= e($req['location']) ?><?php endif; ?>
       · <?= (int)$req['positions'] ?> position<?= (int)$req['positions']===1?'':'s' ?>
       <?php if (!empty($req['work_type'])): ?> · <?= e(str_replace('_',' ',$req['work_type'])) ?><?php endif; ?></p></div>
-  <a class="btn secondary" href="/connect-requirements">← Marketplace</a>
+  <div class="row-actions" style="display:flex;gap:8px;align-items:center">
+    <form method="post" action="/connect-requirement" class="inline" style="margin:0"><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="duplicate"><button class="btn secondary" type="submit" title="Copy this requirement's shape into a new draft">⧉ Duplicate</button></form>
+    <a class="btn secondary" href="/connect-requirements">← Marketplace</a>
+  </div>
 </div>
 
 <?php if ($advisor && ($advisor['actions'] || strtoupper((string)$advisor['risk']) !== 'LOW')):

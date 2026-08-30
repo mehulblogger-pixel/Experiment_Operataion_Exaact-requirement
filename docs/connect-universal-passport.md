@@ -244,6 +244,17 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
     One guarded write (`jobs.inspector_id`), logged; no new permission/table.
     Tests: `tests/test_connect_source.php` (16). See `connect-integration-map.md`.
 
+18. **Requirement reuse + configurable match weights** — *shipped*
+    (`lib/connect_reqtools.php`, `connect_match_weights()`,
+    `/connect-match-weights`). §49: duplicate any requirement into a fresh DRAFT
+    (shape + crew copied, not the award) and save/reuse named templates
+    (`cx_req_templates`) — both on the existing `cx_requirement_create`, wired into
+    the client hire screen and the staff desk. §23: matching weights are now an
+    admin-tunable JSON setting whose defaults equal the historical literals
+    (behaviour unchanged until re-weighted, clamped 0–100), with a master/admin
+    screen. Tests: `tests/test_connect_reqtools.php` (26). See
+    `connect-integration-map.md`.
+
 ### Program status
    The passport programme (Phases 1–12) is shipped and tested: universal taxonomy
    graph, location engine, passport UX, CV prefill, structured credentials,

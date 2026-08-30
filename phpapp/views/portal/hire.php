@@ -131,7 +131,27 @@ $pill = function ($s) {
           ?>
           <?php if ($bits): ?><div style="font-size:11.5px;color:var(--muted);margin-top:2px"><?= e(implode(' · ', $bits)) ?></div><?php endif; ?>
         </div>
-        <?= $pill($r['status']) ?>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          <?= $pill($r['status']) ?>
+          <form method="post" action="/portal/hire" style="margin:0"><input type="hidden" name="action" value="duplicate"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn sec" type="submit" style="padding:4px 9px;font-size:11.5px" title="Copy into a new draft you can edit and post">Duplicate</button></form>
+          <form method="post" action="/portal/hire" style="margin:0" onsubmit="this.label.value=prompt('Name this template:', <?= htmlspecialchars(json_encode((string)$r['title']), ENT_QUOTES) ?>)||''; return this.label.value!=='';"><input type="hidden" name="action" value="save_template"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="label" value=""><button class="btn sec" type="submit" style="padding:4px 9px;font-size:11.5px" title="Save this shape as a reusable template">★ Template</button></form>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+
+<?php // ---- Start from a saved template (§49) ---- ?>
+<?php $templates = $templates ?? []; if ($templates): ?>
+  <h3 class="ptitle" style="font-size:16px;margin-top:26px">Start from a template</h3>
+  <div class="pcard" style="max-width:680px">
+    <?php foreach ($templates as $t): ?>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line,#eee)">
+        <div><strong><?= e($t['label']) ?></strong></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <form method="post" action="/portal/hire" style="margin:0"><input type="hidden" name="action" value="from_template"><input type="hidden" name="template_id" value="<?= (int)$t['id'] ?>"><button class="btn" type="submit" style="padding:5px 12px;font-size:12.5px">Post from template</button></form>
+          <form method="post" action="/portal/hire" style="margin:0" onsubmit="return confirm('Delete this template?');"><input type="hidden" name="action" value="template_delete"><input type="hidden" name="id" value="<?= (int)$t['id'] ?>"><button class="btn sec" type="submit" style="padding:5px 9px;font-size:12px">×</button></form>
+        </div>
       </div>
     <?php endforeach; ?>
   </div>

@@ -3184,6 +3184,8 @@ function ops_dispatch($route, $method) {
             return ops_connect_identity($method);
         case $route === 'connect-source':       // Connect K0+ — inspection request → unified manpower sourcing (rank + controlled assign)
             return ops_connect_source($method);
+        case $route === 'connect-match-weights': // Connect K0+ — admin-tunable matching weights (§23)
+            return ops_connect_match_weights($method);
         case $route === 'connect-messages':     // Connect K15 / #4 — in-app messaging (staff desk)
             return ops_connect_messages($method);
         case $route === 'connect-channels':     // Connect K16 / #5 — WhatsApp/SMS/email channel desk

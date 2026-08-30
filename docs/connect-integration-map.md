@@ -23,8 +23,8 @@ integrate with and extend it; we never build a parallel one.
 | 4 | Award → scheduling / allocation / deputation | **CONNECTED (phase 16)** | `connect_deploy.php` → a PDSO `jobs` deputation |
 | 5 | Client private bench / roster + rehire | **CONNECTED (phase 15)** | `cx_client_bench`, `connect_client_bench.php` |
 | 6 | Inspection request → manpower sourcing | **CONNECTED (phase 17)** | `connect_source.php` — job ↔ pool via the matcher |
-| 7 | Requirement duplicate / template | **OPEN** | extend `connect_market.php` |
-| 8 | Configurable matching weights | **OPEN** | lift `connect_match.php` literals to settings |
+| 7 | Requirement duplicate / template | **CONNECTED (phase 18)** | `connect_reqtools.php` |
+| 8 | Configurable matching weights | **CONNECTED (phase 18)** | `connect_match_weights()` + admin |
 
 Most of the passport/marketplace vision (taxonomy graph, passport, CV prefill,
 credentials, verification, privacy, client search, hiring home, location +
@@ -123,9 +123,29 @@ the job detail), gated by the coordinator/master talent right; the one write is 
 guarded `jobs.inspector_id` assignment (the field job-edit already sets), logged.
 Tests: `tests/test_connect_source.php` (16).
 
-## Sequenced plan for the remaining seams
+### Phase 18 — requirement reuse + configurable match weights (shipped, additive)
 
-Each will follow the same discipline (audit → extend the existing engine → tests
-→ screenshot → no breakage), one at a time:
-1. **Requirement templates / duplicate** (seam 7) and **configurable match
-   weights** (seam 8) — a smaller cleanup slice.
+Two cleanups, both built on the existing engines. **Reuse (§49, seam 7):**
+`lib/connect_reqtools.php` — `connect_requirement_duplicate()` clones any
+requirement into a fresh DRAFT (shape + crew positions copied; award/applications/
+status deliberately not), and `cx_req_templates` saves a requirement's shape under
+a name to start new ones from. Both call the existing `cx_requirement_create` —
+no parallel posting flow. Wired into the client `portal/hire` (Duplicate · ★
+Template · Start-from-a-template) and the staff requirement desk (Duplicate).
+**Weights (§23, seam 8):** `connect_match_weights()` reads one JSON setting whose
+DEFAULTS equal the scorer's historical literals (so behaviour is unchanged until
+someone re-weights), clamped 0–100; the scorer (`cx_match_score`,
+`connect_match_tax_bonus`, `connect_match_location_bonus`) reads it. Admin screen
+`/connect-match-weights` (master/admin) tunes skills / reputation / credentials /
+taxonomy / location / eligibility, with a reset. Tests:
+`tests/test_connect_reqtools.php` (26).
+
+## Program status — the ecosystem is connected
+
+All eight integration seams are now CONNECTED or pre-existing/reused. The thread
+runs end to end in both directions: **marketplace award → deploy → billing →
+invoice**, and **inspection job → source from the pool**, over one unified
+professional identity, with client-private benches and reusable requirements. Any
+further work (recruitment-candidate sourcing, an Engagement entity to replace the
+`contract_number` string, financial dual-truth convergence) is a deliberate future
+slice, not a gap in the connection.
