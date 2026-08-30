@@ -1,7 +1,15 @@
+<?php $forHire = ($_GET['for'] ?? '') === 'hire'; ?>
+<?php if ($forHire): ?>
+<h2 class="ptitle" style="text-align:center;margin-top:30px">Sign in to hire technical manpower</h2>
+<p class="plead" style="text-align:center;margin-left:auto;margin-right:auto">
+  Search the professional pool, post what you need and review who applies — inspectors, welders, NDT
+  technicians, site engineers. You only ever see your own requirements and shortlists.</p>
+<?php else: ?>
 <h2 class="ptitle" style="text-align:center;margin-top:30px">Sign in</h2>
 <p class="plead" style="text-align:center;margin-left:auto;margin-right:auto">
   For clients of <?= e(app_name()) ?>. You will see your own inspection requests, the reports we have issued to
   you, and your invoices — nothing belonging to anybody else.</p>
+<?php endif; ?>
 
 <?php if (!empty($err)): ?><div class="pmsg err" style="max-width:430px;margin:0 auto"><?= e($err) ?></div><?php endif; ?>
 

@@ -155,6 +155,19 @@ function connect_privacy_reveal_request($proId, $clientPartyId, $clientName = ''
     return [true, 'Request sent — the professional will be asked to share their contact with you.'];
 }
 
+/** The contact requests/grants a CLIENT has, with the professional's name and
+ *  current state — for the client's own "contact requests" panel. */
+function connect_privacy_reveal_status_for_client($clientPartyId) {
+    connect_privacy_migrate();
+    $rows = ops_all(
+        "SELECT r.pro_id, r.status, r.requested_at, r.granted_at, p.name AS pro_name, p.headline
+           FROM cx_pro_contact_reveals r LEFT JOIN cx_professionals p ON p.id = r.pro_id
+          WHERE r.client_party_id=? AND r.revoked_at='' AND r.status IN ('REQUESTED','GRANTED')
+          ORDER BY (r.status='REQUESTED') DESC, COALESCE(r.granted_at, r.requested_at) DESC",
+        [(int)$clientPartyId]) ?: [];
+    return $rows;
+}
+
 /** Pending contact requests awaiting THIS professional's approval (their inbox). */
 function connect_privacy_requests_for_pro($proId) {
     connect_privacy_migrate();

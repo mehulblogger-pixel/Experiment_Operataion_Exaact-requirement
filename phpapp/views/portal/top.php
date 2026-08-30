@@ -7,17 +7,22 @@ $nav = isset($nav) ? (bool)$nav : true;
 $here = trim((string)parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH), '/');
 // Only what this person actually holds. The routes refuse independently —
 // hiding a link is presentation, not access control.
-$links = ['portal' => 'Overview'];
-if (pcan('calls'))     $links['portal/calls']      = TP('call');
-if (pcan('reports'))   $links['portal/reports']    = 'Reports';
-if (pcan('deputation')) $links['portal/deputations'] = 'Deputations';
-if (pcan('issues') && function_exists('cvp_issues_for')) $links['portal/issues'] = 'Nonconformities';
-if (pcan('invoices'))  $links['portal/invoices']   = 'Invoices';
-if (pcan('request'))   $links['portal/request']    = 'Request an inspection';
-if (pcan('market.post') && (!function_exists('connect_enabled') || connect_enabled())) $links['portal/find'] = 'Find manpower';
-if (pcan('market.post') && (!function_exists('connect_enabled') || connect_enabled())) $links['portal/hire'] = 'Hire manpower';
+$mktFirst = function_exists('portal_marketplace_first') && portal_marketplace_first();
+$canHire  = pcan('market.post') && (!function_exists('connect_enabled') || connect_enabled());
+$links = ['portal' => $mktFirst ? 'Hiring home' : 'Overview'];
+// A marketplace-first client leads with hiring and is spared the inspection menu
+// (which carries nothing for them); an established inspection client keeps both.
+if ($canHire) { $links['portal/find'] = 'Find manpower'; $links['portal/hire'] = 'Hire manpower'; }
+if (!$mktFirst) {
+    if (pcan('calls'))     $links['portal/calls']      = TP('call');
+    if (pcan('reports'))   $links['portal/reports']    = 'Reports';
+    if (pcan('deputation')) $links['portal/deputations'] = 'Deputations';
+    if (pcan('issues') && function_exists('cvp_issues_for')) $links['portal/issues'] = 'Nonconformities';
+    if (pcan('invoices'))  $links['portal/invoices']   = 'Invoices';
+    if (pcan('request'))   $links['portal/request']    = 'Request an inspection';
+}
 if (function_exists('portal_agency_org') && portal_agency_org()) $links['portal/bench'] = 'My bench';
-if (pcan('complaint')) $links['portal/complaints'] = 'Complaints &amp; appeals';
+if (pcan('complaint') && !$mktFirst) $links['portal/complaints'] = 'Complaints &amp; appeals';
 if (function_exists('cvp_notify_count')) {
     $__cn = cvp_notify_count('CLIENT', portal_partner_id());
     $links['portal/alerts'] = 'Alerts' . ($__cn ? ' (' . $__cn . ')' : '');
@@ -66,7 +71,7 @@ if (function_exists('cvp_client_is_admin') && cvp_client_is_admin()) $links['por
 </head><body>
 <div class="pwrap">
   <div class="phead">
-    <h1><?= e(app_name()) ?> · Client portal</h1>
+    <h1><?= e(app_name()) ?> · <?= $mktFirst ? 'Hiring' : 'Client portal' ?></h1>
     <?php if ($nav && $u): ?>
       <div class="who"><?= e($u['name'] ?: $u['email']) ?> · <?= e(portal_client_name()) ?>
         · <a href="/portal/logout">Sign out</a></div>

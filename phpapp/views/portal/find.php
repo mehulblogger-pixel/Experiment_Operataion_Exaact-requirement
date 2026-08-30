@@ -40,8 +40,17 @@ $rateLbl = ['public'=>'Rate on card','band'=>'Rate range on request','hidden'=>'
     <div style="display:flex;align-items:flex-end"><label style="font-size:13px;display:flex;align-items:center;gap:7px;padding-bottom:9px">
       <input type="checkbox" name="available_only" value="1"<?= !empty($f['available_only'])?' checked':'' ?>> Available now</label></div>
   </div>
-  <button class="btn" type="submit" style="margin-top:12px">Search the pool</button>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+    <button class="btn" type="submit">Search the pool</button>
+    <?php if ($qs !== ''): ?>
+      <span style="color:var(--muted);font-size:13px">·</span>
+      <span class="fc-save"><a href="#" onclick="document.getElementById('saveSearchForm').submit();return false;" style="font-size:13.5px;font-weight:600;color:#0f7d5a;text-decoration:none">☆ Save this search</a></span>
+    <?php endif; ?>
+  </div>
 </form>
+<?php if ($qs !== ''): ?>
+<form id="saveSearchForm" method="post" action="/portal/find" style="display:none"><input type="hidden" name="action" value="save_search"><input type="hidden" name="qs" value="<?= e($qs) ?>"><input type="hidden" name="label" value=""></form>
+<?php endif; ?>
 
 <p class="muted" style="margin:16px 0 10px"><strong><?= count($cards) ?></strong> professional<?= count($cards)===1?'':'s' ?><?= ($f['q']??'')!=='' ? ' matching “'.e($f['q']).'”' : '' ?><?= ($f['location']??'')!=='' ? ' near '.e($f['location']) : '' ?>.</p>
 

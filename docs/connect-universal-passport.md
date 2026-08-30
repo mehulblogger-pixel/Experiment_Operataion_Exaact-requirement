@@ -175,6 +175,24 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
     of its own open requirements. Only `privacy_listed=1` professionals appear.
     Tests: `tests/test_connect_client_search.php` (23).
 
+13. **Hiring home for marketplace clients** — *shipped* (`lib/connect_hiring.php`,
+    route `/portal/hiring`, `views/portal/hiring.php`, intent-aware
+    `views/portal/login.php`). The buyer counterpart to the passport. A company
+    that self-registers to hire (`connect_org_register`) now gets a purpose-built
+    experience instead of the inspection dashboard: `/portal/login?for=hire` speaks
+    to hiring; `portal_marketplace_first()` (a `cx_organisations` signup with no
+    inspection footprint, agencies excluded) routes them to `/portal/hiring` and
+    drops the inspection menu from their nav (header reads "· Hiring"). The home
+    (`connect_hiring_home`) leads with **Search the pool** / **Post a requirement**,
+    then shows live counts (open requirements, applicants awaiting a decision,
+    awarded), **saved searches** (`cx_client_saved_search`, saved from the Find
+    screen, one-tap re-run), the client's **open requirements** with per-job
+    applicant/needs-review counts, and **contact requests** they have sent with
+    live status (awaiting / shared). An established inspection client keeps its
+    dashboard and gains a hiring shortcut card. Read-only over the marketplace +
+    privacy engines; no new permission (the hire right, `market.post`, already
+    covers it). Tests: `tests/test_connect_hiring.php` (15).
+
 ### Program status
    The passport programme (Phases 1–12) is shipped and tested: universal taxonomy
    graph, location engine, passport UX, CV prefill, structured credentials,

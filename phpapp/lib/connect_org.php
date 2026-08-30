@@ -131,7 +131,7 @@ function connect_org_register(array $in) {
                    VALUES (?,?,?,?,1,0,'', 'self-service', ?)")
         ->execute([$partyId, $email, $person, password_hash($pass, PASSWORD_DEFAULT), $now]);
 
-    return [true, 'Your account is ready.', ['email' => $email, 'login_url' => '/portal/login', 'is_agency' => $isAgency]];
+    return [true, 'Your account is ready.', ['email' => $email, 'login_url' => $isAgency ? '/portal/login' : '/portal/login?for=hire', 'is_agency' => $isAgency]];
 }
 
 /** A platform admin approves a pending organisation → ACTIVE. */

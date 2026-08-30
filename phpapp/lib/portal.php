@@ -180,6 +180,36 @@ function portal_agency_org() {
     } catch (Throwable $e) { return $cache = null; }
 }
 
+/** True when this client can hire on the marketplace (the discovery/hire right). */
+function portal_can_hire() {
+    return (!function_exists('connect_enabled') || connect_enabled()) && function_exists('pcan') && pcan('market.post');
+}
+
+/**
+ * True when this client is marketplace-FIRST — they signed up to hire technical
+ * manpower (a self-service 'connect'-package organisation) and carry no live
+ * inspection footprint. Such a client lands on the hiring home instead of the
+ * inspection dashboard. An established inspection client (calls/reports on file)
+ * keeps their dashboard and merely gains a hiring shortcut. Cached per request.
+ */
+function portal_marketplace_first() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    if (!portal_can_hire()) return $cache = false;
+    // Supply-side agencies get the bench workspace, not the buyer home.
+    if (function_exists('portal_agency_org') && portal_agency_org()) return $cache = false;
+    $pid = portal_partner_id();
+    if ($pid <= 0) return $cache = false;
+    try {
+        // Registered through the marketplace door (has a cx_organisations record)…
+        $isMarketOrg = (int)ops_val("SELECT COUNT(*) FROM cx_organisations WHERE party_id=?", [$pid]) > 0;
+        if (!$isMarketOrg) return $cache = false;
+        // …and carries no inspection footprint → the marketplace is their home.
+        $hasCalls = (int)ops_val("SELECT COUNT(*) FROM calls WHERE client_id=?", [$pid]) > 0;
+        return $cache = !$hasCalls;
+    } catch (Throwable $e) { return $cache = false; }
+}
+
 function portal_off() {
     http_response_code(404);
     require __DIR__ . '/../views/portal/off.php';
@@ -757,9 +787,33 @@ function portal_route($route, $method) {
     switch ($route) {
         case 'portal':
             portal_log('DASHBOARD');
+            // A marketplace-first client's home IS the hiring home.
+            if (function_exists('portal_marketplace_first') && portal_marketplace_first()) redirect('/portal/hiring');
             if (function_exists('cvp_notify_sync')) cvp_notify_sync('CLIENT', portal_partner_id());
             portal_view('dashboard', ['d' => portal_dashboard(),
+                'canHire' => function_exists('portal_can_hire') && portal_can_hire(),
                 'kpi' => function_exists('connect_kpi_board') ? connect_kpi_board(['audience' => 'client', 'party_id' => portal_partner_id()]) : null]);
+            exit;
+
+        // Connect K0+ — the buyer home: search & post at the top, then the live
+        // state of this client's hiring (open requirements + who's waiting, contact
+        // requests, saved searches). Read-only over the marketplace engines.
+        case 'portal/hiring':
+            portal_need('market.post', 'the hiring home');
+            if (!function_exists('connect_hiring_home') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            $party = portal_partner_id();
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'save_search' && function_exists('connect_hiring_saved_search_save')) {
+                    [, $msg] = connect_hiring_saved_search_save($party, (string)($_POST['label'] ?? ''), (string)($_POST['qs'] ?? ''));
+                    $_SESSION['portal_flash'] = $msg;
+                } elseif ($act === 'del_search' && function_exists('connect_hiring_saved_search_delete')) {
+                    connect_hiring_saved_search_delete((int)($_POST['id'] ?? 0), $party);
+                    $_SESSION['portal_flash'] = 'Saved search removed.';
+                }
+                redirect('/portal/hiring');
+            }
+            portal_view('hiring', ['home' => connect_hiring_home($party), 'client' => portal_client_name()]);
             exit;
 
         // Phase 10 (CVP) Slice 4 — the client's notification feed.
@@ -930,6 +984,9 @@ function portal_route($route, $method) {
                     [$rok, $rmsg] = connect_privacy_reveal_request((int)($_POST['pro_id'] ?? 0), $party, portal_client_name());
                     $_SESSION['portal_flash'] = $rmsg;
                     portal_log('CONNECT_REVEAL_REQ', (string)($_POST['pro_id'] ?? ''));
+                } elseif ($act === 'save_search' && function_exists('connect_hiring_saved_search_save')) {
+                    [, $smsg] = connect_hiring_saved_search_save($party, (string)($_POST['label'] ?? ''), (string)($_POST['qs'] ?? ''));
+                    $_SESSION['portal_flash'] = $smsg;
                 } elseif ($act === 'invite' && function_exists('cx_application_add')) {
                     $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['pro_id'] ?? 0);
                     $req = function_exists('cx_requirement_get') ? cx_requirement_get($rid) : null;

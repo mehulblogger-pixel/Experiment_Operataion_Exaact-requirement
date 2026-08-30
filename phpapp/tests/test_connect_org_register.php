@@ -16,7 +16,7 @@ try {
     // A company signs up → ACTIVE org + party(client) + working portal login
     [$ok, $msg, $acct] = connect_org_register(['name'=>'Zephyr Fab','org_type'=>'COMPANY','contact_name'=>'Ravi','contact_email'=>'ravi@zephyr.test','password'=>'Zephyr@2026']);
     t_ok($ok, 'a company self-registers ('.$msg.')');
-    t_eq($acct['login_url'], '/portal/login', 'the account points at the portal login');
+    t_eq($acct['login_url'], '/portal/login?for=hire', 'a hiring company is pointed at the hiring-aware login');
     $u = ops_one("SELECT * FROM client_users WHERE LOWER(email)='ravi@zephyr.test'");
     t_ok($u && (int)$u['is_active'] === 1, 'a working, active login is created');
     t_ok($u && password_verify('Zephyr@2026', (string)$u['password_hash']), 'the chosen password signs in');
