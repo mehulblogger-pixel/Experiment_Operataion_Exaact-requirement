@@ -40,12 +40,22 @@ function connect_privacy_migrate() {
         try { ensure_column('cx_professionals', 'privacy_listed',   "INT DEFAULT 1"); }                    catch (Throwable $e) {}
     }
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
-    // Explicit, logged contact-reveal grants: one row per (pro, client party).
+    // Explicit, logged contact grants/requests: one row per (pro, client party).
+    // A row is a REQUEST until the professional grants it (granted_at set). The
+    // resolver treats "revealed" as granted_at<>'' AND revoked_at='' — so a mere
+    // request never exposes contact.
     db()->exec("CREATE TABLE IF NOT EXISTS cx_pro_contact_reveals (
         id $pk, pro_id INT DEFAULT 0, client_party_id INT DEFAULT 0,
         via VARCHAR(24) DEFAULT '', note VARCHAR(200) DEFAULT '',
+        status VARCHAR(16) DEFAULT 'GRANTED', client_name VARCHAR(200) DEFAULT '',
+        requested_at VARCHAR(30) DEFAULT '',
         granted_at VARCHAR(30) DEFAULT '', revoked_at VARCHAR(30) DEFAULT '')");
     try { db()->exec("CREATE UNIQUE INDEX ux_cx_reveal ON cx_pro_contact_reveals (pro_id, client_party_id)"); } catch (Throwable $e) {}
+    if (function_exists('ensure_column')) {   // for tables created before these columns existed
+        try { ensure_column('cx_pro_contact_reveals', 'status', "VARCHAR(16) DEFAULT 'GRANTED'"); } catch (Throwable $e) {}
+        try { ensure_column('cx_pro_contact_reveals', 'client_name', "VARCHAR(200) DEFAULT ''"); }  catch (Throwable $e) {}
+        try { ensure_column('cx_pro_contact_reveals', 'requested_at', "VARCHAR(30) DEFAULT ''"); }   catch (Throwable $e) {}
+    }
 }
 
 // ---- The professional's own settings ---------------------------------------
@@ -97,20 +107,92 @@ function connect_privacy_save($proId, array $in) {
 function connect_privacy_contact_revealed($proId, $clientPartyId) {
     connect_privacy_migrate();
     if ((int)$clientPartyId <= 0) return false;
+    // A row counts as revealed only once it is GRANTED (granted_at set) and not
+    // revoked — a mere REQUEST (granted_at='') never exposes contact.
     return (bool)ops_val(
-        "SELECT COUNT(*) FROM cx_pro_contact_reveals WHERE pro_id=? AND client_party_id=? AND revoked_at=''",
+        "SELECT COUNT(*) FROM cx_pro_contact_reveals WHERE pro_id=? AND client_party_id=? AND granted_at<>'' AND revoked_at=''",
         [(int)$proId, (int)$clientPartyId]);
 }
 
-/** Record a contact-reveal grant (idempotent). `via` explains how it was earned. */
+/** Record a contact-reveal grant (idempotent). `via` explains how it was earned.
+ *  Upgrades an existing REQUEST row in place, or inserts a fresh grant. */
 function connect_privacy_reveal_grant($proId, $clientPartyId, $via = 'engagement', $note = '') {
     connect_privacy_migrate();
     $proId = (int)$proId; $clientPartyId = (int)$clientPartyId;
     if ($proId <= 0 || $clientPartyId <= 0) return false;
     if (connect_privacy_contact_revealed($proId, $clientPartyId)) return true;
-    db()->prepare("INSERT INTO cx_pro_contact_reveals (pro_id, client_party_id, via, note, granted_at) VALUES (?,?,?,?,?)")
-        ->execute([$proId, $clientPartyId, substr((string)$via, 0, 24), substr((string)$note, 0, 200), date('c')]);
+    $exists = ops_val("SELECT id FROM cx_pro_contact_reveals WHERE pro_id=? AND client_party_id=?", [$proId, $clientPartyId]);
+    if ($exists) {
+        db()->prepare("UPDATE cx_pro_contact_reveals SET status='GRANTED', via=?, granted_at=?, revoked_at='' WHERE id=?")
+            ->execute([substr((string)$via, 0, 24), date('c'), (int)$exists]);
+    } else {
+        db()->prepare("INSERT INTO cx_pro_contact_reveals (pro_id, client_party_id, via, note, status, granted_at) VALUES (?,?,?,?,'GRANTED',?)")
+            ->execute([$proId, $clientPartyId, substr((string)$via, 0, 24), substr((string)$note, 0, 200), date('c')]);
+    }
     return true;
+}
+
+/**
+ * A client asks a professional to unlock their contact. Records a REQUEST (never
+ * a grant — the professional must approve). Idempotent per (pro, client). If the
+ * pro's contact is already 'public' or already revealed, this is a harmless no-op
+ * the caller can treat as instantly satisfied.
+ */
+function connect_privacy_reveal_request($proId, $clientPartyId, $clientName = '', $note = '') {
+    connect_privacy_migrate();
+    $proId = (int)$proId; $clientPartyId = (int)$clientPartyId;
+    if ($proId <= 0 || $clientPartyId <= 0) return [false, 'Sign in as a client to request contact.'];
+    if (connect_privacy_contact_revealed($proId, $clientPartyId)) return [true, 'You already have this professional’s contact.'];
+    $row = ops_one("SELECT id, status FROM cx_pro_contact_reveals WHERE pro_id=? AND client_party_id=?", [$proId, $clientPartyId]);
+    if ($row && strtoupper((string)$row['status']) === 'REQUESTED') return [true, 'Your request is already awaiting this professional’s approval.'];
+    if ($row) {
+        db()->prepare("UPDATE cx_pro_contact_reveals SET status='REQUESTED', requested_at=?, client_name=?, note=?, revoked_at='' WHERE id=?")
+            ->execute([date('c'), substr((string)$clientName, 0, 200), substr((string)$note, 0, 200), (int)$row['id']]);
+    } else {
+        db()->prepare("INSERT INTO cx_pro_contact_reveals (pro_id, client_party_id, via, note, status, client_name, requested_at) VALUES (?,?,?,?,'REQUESTED',?,?)")
+            ->execute([$proId, $clientPartyId, 'reveal_request', substr((string)$note, 0, 200), substr((string)$clientName, 0, 200), date('c')]);
+    }
+    return [true, 'Request sent — the professional will be asked to share their contact with you.'];
+}
+
+/** Pending contact requests awaiting THIS professional's approval (their inbox). */
+function connect_privacy_requests_for_pro($proId) {
+    connect_privacy_migrate();
+    return ops_all("SELECT * FROM cx_pro_contact_reveals WHERE pro_id=? AND status='REQUESTED' AND revoked_at='' ORDER BY requested_at DESC", [(int)$proId]) ?: [];
+}
+
+/** The professional approves one pending request → becomes a grant. Ownership-scoped. */
+function connect_privacy_reveal_approve($proId, $clientPartyId) {
+    connect_privacy_migrate();
+    $r = ops_one("SELECT id FROM cx_pro_contact_reveals WHERE pro_id=? AND client_party_id=? AND status='REQUESTED'", [(int)$proId, (int)$clientPartyId]);
+    if (!$r) return [false, 'No such request.'];
+    connect_privacy_reveal_grant((int)$proId, (int)$clientPartyId, 'approved');
+    return [true, 'Contact shared with the client.'];
+}
+
+/** The professional declines a pending request (removes it). */
+function connect_privacy_reveal_decline($proId, $clientPartyId) {
+    connect_privacy_migrate();
+    db()->prepare("UPDATE cx_pro_contact_reveals SET status='DECLINED', revoked_at=? WHERE pro_id=? AND client_party_id=? AND status='REQUESTED'")
+        ->execute([date('c'), (int)$proId, (int)$clientPartyId]);
+    return [true, 'Request declined.'];
+}
+
+/**
+ * Is there a real working relationship between this professional and this client
+ * party — i.e. a requirement the client posted that was AWARDED to this pro? That
+ * is the honest, automatic basis on which contact unlocks without an approval.
+ */
+function connect_privacy_engaged($proId, $clientPartyId) {
+    $proId = (int)$proId; $clientPartyId = (int)$clientPartyId;
+    if ($proId <= 0 || $clientPartyId <= 0) return false;
+    try {
+        return (int)ops_val(
+            "SELECT COUNT(*) FROM cx_requirements r
+               JOIN cx_applications a ON a.id = r.awarded_application_id
+              WHERE r.poster_party_id=? AND a.applicant_professional_id=?
+                AND UPPER(r.status) IN ('AWARDED','CLOSED')", [$clientPartyId, $proId]) > 0;
+    } catch (Throwable $e) { return false; }
 }
 
 function connect_privacy_reveal_revoke($proId, $clientPartyId) {

@@ -25,6 +25,25 @@
 <h1>Privacy &amp; who sees what</h1>
 <p class="muted" style="margin:0 0 14px">You decide what a client sees <strong>before</strong> a job. Your skills and experience are always discoverable — your phone, e-mail, exact rate and full name follow the rules you set here.</p>
 
+<?php // ---- Incoming contact requests from clients (approve / decline) ---- ?>
+<?php $requests = $requests ?? []; if ($requests): ?>
+<div class="pv-card" style="border-color:#0f7d5a">
+  <div class="grp-h">📨 Contact requests <span class="cpill warn" style="margin-left:4px"><?= count($requests) ?></span></div>
+  <div class="grp-s">A client wants your phone and e-mail. You decide — nothing is shared until you approve.</div>
+  <?php foreach ($requests as $rq): ?>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line,#e3ebea);border-radius:11px;padding:10px 12px;margin-bottom:8px">
+      <div><strong><?= e($rq['client_name'] ?: 'A client') ?></strong>
+        <div class="muted" style="font-size:12px">Requested <?= e(substr((string)$rq['requested_at'],0,10)) ?></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <form method="post" action="/pro/privacy" style="margin:0"><input type="hidden" name="action" value="reveal_approve"><input type="hidden" name="client_party_id" value="<?= (int)$rq['client_party_id'] ?>"><button class="btn" type="submit" style="padding:5px 12px;font-size:12.5px">Approve</button></form>
+        <form method="post" action="/pro/privacy" style="margin:0"><input type="hidden" name="action" value="reveal_decline"><input type="hidden" name="client_party_id" value="<?= (int)$rq['client_party_id'] ?>"><button class="btn sec" type="submit" style="padding:5px 12px;font-size:12.5px">Decline</button></form>
+      </div>
+    </div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <?php // ---- Live preview of a client's search card ---- ?>
 <div class="pv-preview" id="pvPreview">
   <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9fe3cf;margin-bottom:6px">What a new client sees</div>

@@ -916,6 +916,49 @@ function portal_route($route, $method) {
             ]);
             exit;
 
+        // Connect K0+ — the client SEARCHES the shared professional pool directly
+        // (one keyword + filters), sees privacy-safe ranked cards, requests contact
+        // (the pro approves) and invites a professional onto one of its OWN open
+        // requirements. Gated by the same market.post right that lets a client hire.
+        case 'portal/find':
+            portal_need('market.post', 'searching the technical-manpower pool');
+            if (!function_exists('connect_client_search') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            $party = portal_partner_id();
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'reveal_request' && function_exists('connect_privacy_reveal_request')) {
+                    [$rok, $rmsg] = connect_privacy_reveal_request((int)($_POST['pro_id'] ?? 0), $party, portal_client_name());
+                    $_SESSION['portal_flash'] = $rmsg;
+                    portal_log('CONNECT_REVEAL_REQ', (string)($_POST['pro_id'] ?? ''));
+                } elseif ($act === 'invite' && function_exists('cx_application_add')) {
+                    $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['pro_id'] ?? 0);
+                    $req = function_exists('cx_requirement_get') ? cx_requirement_get($rid) : null;
+                    if ($req && (int)$req['poster_party_id'] === (int)$party && $pid) {   // only onto the client's OWN job
+                        $nm = (string)ops_val("SELECT name FROM cx_professionals WHERE id=?", [$pid]);
+                        $newId = cx_application_add($rid, ['applicant_professional_id' => $pid, 'applicant_name' => $nm]);
+                        $_SESSION['portal_flash'] = $newId ? ($nm . ' invited to ' . $req['ref_code'] . '.') : ($nm . ' is already on that requirement.');
+                    } else { $_SESSION['portal_flash'] = 'Pick one of your own open requirements to invite to.'; }
+                }
+                redirect('/portal/find' . (($_POST['qs'] ?? '') !== '' ? '?' . $_POST['qs'] : ''));
+            }
+            $f = [
+                'q'              => (string)($_GET['q'] ?? ''),
+                'discipline'     => (string)($_GET['discipline'] ?? ''),
+                'work_type'      => (string)($_GET['work_type'] ?? ''),
+                'location'       => (string)($_GET['location'] ?? ''),
+                'available_only' => !empty($_GET['available_only']),
+            ];
+            portal_view('find', [
+                'f'           => $f,
+                'cards'       => connect_client_search($party, $f),
+                'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+                'work_types'  => function_exists('cx_pro_work_types') ? cx_pro_work_types() : [],
+                'open_reqs'   => function_exists('cx_requirements_for_party')
+                                    ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
+                                    : [],
+            ]);
+            exit;
+
         case 'portal/hire-req':
             portal_need('market.post', 'posting manpower requirements');
             if (!function_exists('cx_requirement_get')) { http_response_code(404); portal_view('notfound'); exit; }

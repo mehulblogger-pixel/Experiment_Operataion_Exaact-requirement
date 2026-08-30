@@ -155,7 +155,29 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
       `tests/test_connect_privacy.php` (29) + verification assertions in
       `tests/test_connect_credentials.php` (25).
 
-### Still open (next tested slice)
-   The client **advanced-search + result cards + contact-reveal** — the buyer
-   side that consumes `connect_privacy_resolve` (masked cards, a reveal-request
-   button that writes a grant) and `connect_tax_find_professionals`.
+12. **Client advanced-search + result cards + contact-reveal** — *shipped*
+    (`lib/connect_client_search.php`, route `/portal/find`, `views/portal/find.php`).
+    The buyer side that consumes everything above. A client searches the shared
+    pool by ONE keyword + structured filters (discipline / work-type / location /
+    available-now); ranking reuses `connect_pro_search_smart` (taxonomy graph +
+    location tiers). Each result is a **privacy-safe card** built by
+    `connect_client_card` through `connect_privacy_resolve`: masked name where the
+    pro chose first-initial, a verification-tier badge (ID / Credential / Proven),
+    **verified** certification chips (VERIFIED only), taxonomy match reasons,
+    location fit, rate mode, and a contact block that is either shown (engaged /
+    public / approved), a **Request contact** button (on_request), a pending
+    notice, or "platform messages only" (hidden). The reveal loop:
+    `connect_privacy_reveal_request` records a REQUEST → the professional sees it
+    in a **Contact requests** inbox on `/pro/privacy` and
+    `connect_privacy_reveal_approve` / `_decline` decides →
+    `connect_privacy_engaged` auto-reveals for an awarded requirement with no
+    approval needed. A client can also **Invite** a professional straight onto one
+    of its own open requirements. Only `privacy_listed=1` professionals appear.
+    Tests: `tests/test_connect_client_search.php` (23).
+
+### Program status
+   The passport programme (Phases 1–12) is shipped and tested: universal taxonomy
+   graph, location engine, passport UX, CV prefill, structured credentials,
+   taxonomy admin, matching, verification, privacy, and the client search. All
+   additive; full suite green. Future seams noted inline (LLM CV extractor, org/
+   inspector verification tiers, a real KYC provider).

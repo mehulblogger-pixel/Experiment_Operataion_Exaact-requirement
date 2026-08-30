@@ -503,7 +503,14 @@ function connect_pro_route($route, $method) {
 
         case 'pro/privacy':   // K0+ — the professional's own privacy states (contact / rate / identity)
             if ($method === 'POST') {
-                if (function_exists('connect_privacy_save')) connect_privacy_save((int)$me['id'], $_POST);
+                $act = (string)($_POST['action'] ?? 'save');
+                if ($act === 'reveal_approve' && function_exists('connect_privacy_reveal_approve')) {
+                    connect_privacy_reveal_approve((int)$me['id'], (int)($_POST['client_party_id'] ?? 0));
+                } elseif ($act === 'reveal_decline' && function_exists('connect_privacy_reveal_decline')) {
+                    connect_privacy_reveal_decline((int)$me['id'], (int)($_POST['client_party_id'] ?? 0));
+                } elseif (function_exists('connect_privacy_save')) {
+                    connect_privacy_save((int)$me['id'], $_POST);
+                }
                 redirect('/pro/privacy');
             }
             $settings = function_exists('connect_privacy_get') ? connect_privacy_get((int)$me['id']) : [];
@@ -511,6 +518,7 @@ function connect_pro_route($route, $method) {
             $preview  = function_exists('connect_privacy_resolve') ? connect_privacy_resolve($me, ['party_id' => 0]) : [];
             connect_pro_view('privacy', [
                 'me' => $me, 'settings' => $settings, 'preview' => $preview,
+                'requests' => function_exists('connect_privacy_requests_for_pro') ? connect_privacy_requests_for_pro((int)$me['id']) : [],
                 'labels' => function_exists('connect_privacy_labels') ? connect_privacy_labels() : [],
             ]); exit;
 
