@@ -548,6 +548,25 @@
 </div>
 
 <div class="panel settings-card">
+  <?php $s01 = function_exists('seed_s01_status') ? seed_s01_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S01 — marketplace scenario</h3>
+  <p class="sub" style="margin-bottom:8px">A complete, interconnected <strong>test scenario</strong>: a transmission-technician professional (Arjun Mehta) is discovered on the marketplace, selected by a client, linked to an internal inspector, deployed on a 220&nbsp;kV substation job, inspects, raises a finding, and the client receives an issued report — the whole journey through the <strong>existing</strong> engines, nothing duplicated.</p>
+  <p class="muted" style="margin:0 0 10px">Everything is tagged <code>DEMO-S01</code> and removes cleanly. Logins (password <code>demo12345</code>): professional <code>arjun.s01@demo.test</code> (/pro/login), client <code>client.s01@demo.test</code> (/portal/login), staff <code>demo.s01.coord</code> / <code>demo.s01.admin</code> / <code>demo.s01.reviewer</code> / <code>demo.s01.approver</code> (/login).</p>
+  <?php if (!empty($s01['loaded']) || (int)($s01['pros'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s01['pros'] ?? 0) ?> professionals · <?= (int)($s01['report'] ?? 0) ?> report. Re-load to refresh, or remove.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s01" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S01</button></form>
+      <form method="post" action="/seed-scenario-s01-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S01 scenario data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S01</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s01" onsubmit="return confirm('Load the DEMO-S01 marketplace scenario now? It adds namespaced demo records and can be removed in one click.')">
+      <button class="btn" type="submit">Load DEMO-S01 scenario</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line (no time limit): <code>php tools/seed-scenario-s01.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s01.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Traceability check</h3>
   <p class="sub" style="margin-bottom:8px">Builds <strong>one</strong> record and follows it the whole way through — customer, lead, contact, deal, quotation, accept, contract number, work-order, job, site check-in, report, invoice, money-in — then reads the database back and shows you, place by place, that every link was saved and every figure is right.</p>
   <p class="muted" style="margin:0 0 10px">Safe to run on a live system: everything it writes is one demo customer (<code><?= e(defined('TRACE_CLIENT_CODE') ? TRACE_CLIENT_CODE : 'GT-CLIENT') ?></code>) and can be removed again in one click on the results page. Use it to prove the flow end-to-end, or after any change to check nothing broke.</p>
