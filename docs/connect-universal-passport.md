@@ -231,6 +231,19 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
     `jobs` columns only. Tests: `tests/test_connect_deploy.php` (14). See
     `connect-integration-map.md`.
 
+17. **Inspection request → unified sourcing** — *shipped* (`lib/connect_source.php`,
+    `/connect-source?job=ID`, linked from the job detail). Staff resource an
+    existing Operations inspection job from every pool at once: the job becomes a
+    requirement-shaped view fed to the existing matcher, ranking internal
+    inspectors + marketplace professionals (deduped by identity, with
+    reasons/eligibility/location) and pinning anyone on this client's private
+    bench (resolved through the identity link). Assignment is controlled: an
+    internal inspector is placed directly; a marketplace professional staffs the
+    job only once linked to an inspector record (else "Link to assign") — ISO
+    17020 competence/authorization keeps running through the existing controls.
+    One guarded write (`jobs.inspector_id`), logged; no new permission/table.
+    Tests: `tests/test_connect_source.php` (16). See `connect-integration-map.md`.
+
 ### Program status
    The passport programme (Phases 1–12) is shipped and tested: universal taxonomy
    graph, location engine, passport UX, CV prefill, structured credentials,

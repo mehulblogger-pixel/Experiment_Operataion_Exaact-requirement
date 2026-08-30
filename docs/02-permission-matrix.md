@@ -86,7 +86,14 @@ the awarded requirement desk, which creates a PDSO `jobs` deputation from a
 marketplace award — assigning the internal inspector the awarded person is linked
 to) runs inside that same coordinator/master requirement desk and adds **no new
 permission**; final operational authorization continues through the existing
-competence/PDSO controls (ISO 17020 §41). The **external self-service** side (K2b) adds two named portal
+competence/PDSO controls (ISO 17020 §41). The **unified sourcing screen**
+(`/connect-source?job=ID`, linked from the job detail) ranks internal inspectors,
+marketplace professionals and the client's bench for an inspection job and lets
+staff assign the awarded person onto `jobs.inspector_id`; it reuses the same
+coordinator/master talent right (`connect_source_can` → `connect_market_can`),
+adds **no new permission**, and refuses to place a marketplace professional until
+they are linked to an inspector record — so competence/authorization is not
+bypassed (§41). The **external self-service** side (K2b) adds two named portal
 permissions, in the portals' own permission systems — separate from `ORG_ROLES`:
 
 20. **Client portal — post a requirement + search the pool** — `pcan('market.post')` (`portal.php` `PORTAL_PERMS`; routes `portal/hire`, `portal/hire-req`, `portal/find`). A logged-in **client (company)** posts a technical-manpower requirement (posted to its own `poster_party_id`) and manages **its own** requirements' applications (shortlist / offer / award / reject) — ownership enforced in the route. The **same** permission also gates `portal/find` and `portal/hiring`: the client searches the shared professional pool (one keyword + filters), sees privacy-safe cards, **requests contact** (the professional approves — no contact is exposed by the search itself; enforced by `connect_privacy_resolve`), **invites** a professional onto one of **its own** open requirements (ownership re-checked in the route), and — on `portal/hiring`, the **buyer home** for a marketplace-first client — sees its own open requirements, applicants awaiting a decision, sent contact requests and saved searches (all scoped to `portal_partner_id()`). A marketplace-first client (a self-service `cx_organisations` signup with no inspection footprint) is routed to `portal/hiring` as its home and its nav drops the inspection menu; an established inspection client keeps its dashboard and merely gains a hiring shortcut. The same right also gates `portal/roster` — the client's **private bench**: a relationship over `cx_professionals` (add from marketplace/previous/manual, private notes & ratings, rehire onto its own open requirement), with the private relationship data scoped to `client_party_id` and never exposed to the professional or other clients. No new permission — browsing/inviting/the buyer home/the private bench are the discovery half of the same hire right. Granted by default to a full-access client user; removable per client user via the portal team editor. Maps `company` → client portal (adopted role→portal mapping).

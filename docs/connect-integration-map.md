@@ -22,7 +22,7 @@ integrate with and extend it; we never build a parallel one.
 | 3 | Audit / event log | **DONE — reused** | `act_log()` / `activities` |
 | 4 | Award → scheduling / allocation / deputation | **CONNECTED (phase 16)** | `connect_deploy.php` → a PDSO `jobs` deputation |
 | 5 | Client private bench / roster + rehire | **CONNECTED (phase 15)** | `cx_client_bench`, `connect_client_bench.php` |
-| 6 | Inspection request → manpower sourcing | **OPEN** | bridge `calls`/`jobs` ↔ pool via the matcher |
+| 6 | Inspection request → manpower sourcing | **CONNECTED (phase 17)** | `connect_source.php` — job ↔ pool via the matcher |
 | 7 | Requirement duplicate / template | **OPEN** | extend `connect_market.php` |
 | 8 | Configurable matching weights | **OPEN** | lift `connect_match.php` literals to settings |
 
@@ -105,12 +105,27 @@ deployment" / "Sync deployment" action on the awarded requirement desk (beside
 conflict detection) then applies unchanged. Tests:
 `tests/test_connect_deploy.php` (14).
 
+### Phase 17 — inspection request → unified sourcing (shipped, additive)
+
+`lib/connect_source.php` lets staff resource an EXISTING Operations inspection job
+from every pool at once. It builds a requirement-shaped view of the job
+(`connect_source_pseudo_req`) and reuses `connect_match_for_requirement` to rank
+internal inspectors + marketplace professionals (deduped by identity, with
+reasons/eligibility/location), then annotates each with a source, whether it can
+be assigned now, and whether it sits on THIS client's private bench (resolved
+through the identity link too, so a client-known person surfaces first even when
+shown as their inspector). Assignment is CONTROLLED (`connect_source_assign`): an
+internal inspector is placed directly; a marketplace professional can staff an
+inspection job ONLY once linked to an inspector record (Connection #1) — else
+"Link to assign", so ISO 17020 competence/authorization keeps running through the
+existing inspector controls (§41). Screen `/connect-source?job=ID` (linked from
+the job detail), gated by the coordinator/master talent right; the one write is a
+guarded `jobs.inspector_id` assignment (the field job-edit already sets), logged.
+Tests: `tests/test_connect_source.php` (16).
+
 ## Sequenced plan for the remaining seams
 
 Each will follow the same discipline (audit → extend the existing engine → tests
 → screenshot → no breakage), one at a time:
-3. **Inspection request → sourcing** (seam 6) — let a `call`/`job` source people
-   from internal staff / approved inspectors / marketplace / bench through
-   controlled rules, respecting ISO 17020 competence/impartiality controls.
-4. **Requirement templates / duplicate** (seam 7) and **configurable match
-   weights** (seam 8).
+1. **Requirement templates / duplicate** (seam 7) and **configurable match
+   weights** (seam 8) — a smaller cleanup slice.

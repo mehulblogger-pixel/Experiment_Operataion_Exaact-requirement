@@ -3182,6 +3182,8 @@ function ops_dispatch($route, $method) {
             return ops_connect_verify($method);
         case $route === 'connect-identity':     // Connect K0+ — unified professional identity (link inspector ↔ marketplace pro)
             return ops_connect_identity($method);
+        case $route === 'connect-source':       // Connect K0+ — inspection request → unified manpower sourcing (rank + controlled assign)
+            return ops_connect_source($method);
         case $route === 'connect-messages':     // Connect K15 / #4 — in-app messaging (staff desk)
             return ops_connect_messages($method);
         case $route === 'connect-channels':     // Connect K16 / #5 — WhatsApp/SMS/email channel desk
