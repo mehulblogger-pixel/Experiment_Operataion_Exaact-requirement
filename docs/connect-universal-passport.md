@@ -218,6 +218,19 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
     `market.post` right (no new permission). Tests:
     `tests/test_connect_client_bench.php` (19). See `connect-integration-map.md`.
 
+16. **Award → deployment** — *shipped* (`lib/connect_deploy.php`). The second
+    Operations↔Connect connection: a marketplace award becomes a real **PDSO
+    deputation** (`jobs` row, `job_type='DEPUTATION'`) via a "Create deployment"
+    action on the awarded requirement desk — copying the proven award→billing
+    bridge. Idempotent (one per requirement). WHO deploys resolves through the
+    unified identity (phase 14): an inspector goes straight on; a linked
+    professional goes on their inspector record; an unlinked one deploys
+    UNASSIGNED with a prompt to link — so ISO 17020 competence/authorization
+    keeps running through the existing controls. PDSO (mobilization, attendance,
+    site register, conflict detection) then applies unchanged. Two additive
+    `jobs` columns only. Tests: `tests/test_connect_deploy.php` (14). See
+    `connect-integration-map.md`.
+
 ### Program status
    The passport programme (Phases 1–12) is shipped and tested: universal taxonomy
    graph, location engine, passport UX, CV prefill, structured credentials,

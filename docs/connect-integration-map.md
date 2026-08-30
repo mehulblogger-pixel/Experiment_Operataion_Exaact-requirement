@@ -20,7 +20,7 @@ integrate with and extend it; we never build a parallel one.
 | 1 | **Professional identity** (inspector ↔ marketplace pro) | **CONNECTED (phase 14)** | `cx_identity_link`, `connect_identity.php` |
 | 2 | Award → billing → invoice | **DONE (pre-existing)** | `connect_bridge.php` → `billable_events` → commercial board |
 | 3 | Audit / event log | **DONE — reused** | `act_log()` / `activities` |
-| 4 | Award → scheduling / allocation / deputation | **OPEN** | reuse `pdso.php` (no second scheduler) |
+| 4 | Award → scheduling / allocation / deputation | **CONNECTED (phase 16)** | `connect_deploy.php` → a PDSO `jobs` deputation |
 | 5 | Client private bench / roster + rehire | **CONNECTED (phase 15)** | `cx_client_bench`, `connect_client_bench.php` |
 | 6 | Inspection request → manpower sourcing | **OPEN** | bridge `calls`/`jobs` ↔ pool via the matcher |
 | 7 | Requirement duplicate / template | **OPEN** | extend `connect_market.php` |
@@ -87,15 +87,28 @@ person straight onto one of the client's own open requirements. Screen
 `/portal/roster` ("My bench" in the marketplace nav); gated by the existing
 `market.post` right. Tests: `tests/test_connect_client_bench.php` (19).
 
+### Phase 16 — award → deployment (shipped, additive)
+
+`lib/connect_deploy.php` copies the award→billing bridge pattern to make a
+marketplace award an actual Operations **deployment**. A PDSO deployment *is* a
+`jobs` row with `job_type='DEPUTATION'` + `dep_status` + `dep_site`, so
+`connect_deploy_from_engagement($requirementId)` creates exactly that (idempotent
+— one per requirement, keyed by two additive `jobs` columns `source_module` +
+`source_requirement_id`). WHO is deployed resolves through the unified identity
+(Connection #1): an awarded internal inspector goes straight onto
+`jobs.inspector_id`; an awarded marketplace professional goes onto the inspector
+it is **linked** to, and if not linked the deployment is created **UNASSIGNED**
+with a message to link them — so ISO 17020 competence/authorization still runs
+through the existing inspector controls (§41), nothing bypassed. A "Create
+deployment" / "Sync deployment" action on the awarded requirement desk (beside
+"Send to billing") drives it; PDSO (mobilization, attendance, site register,
+conflict detection) then applies unchanged. Tests:
+`tests/test_connect_deploy.php` (14).
+
 ## Sequenced plan for the remaining seams
 
 Each will follow the same discipline (audit → extend the existing engine → tests
 → screenshot → no breakage), one at a time:
-
-1. **Award → schedule → deploy** (seam 4) — copy the proven award→billing bridge
-   pattern to hand a marketplace award (resolved through the identity link and
-   `subject_kind`) into the existing PDSO deputation, so hire → deploy → report →
-   invoice is one flow with no re-entry.
 3. **Inspection request → sourcing** (seam 6) — let a `call`/`job` source people
    from internal staff / approved inspectors / marketplace / bench through
    controlled rules, respecting ISO 17020 competence/impartiality controls.

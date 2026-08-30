@@ -128,6 +128,32 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     </form>
   <?php endif; ?>
 </div>
+
+<?php $deploy = $deploy ?? null; ?>
+<div class="panel" style="margin-top:12px">
+  <h3 style="margin:0 0 6px">Deployment</h3>
+  <?php if ($deploy): $assigned = (int)($deploy['inspector_id'] ?? 0) > 0;
+        $dsName = $assigned ? (string)ops_val("SELECT name FROM inspectors WHERE id=?", [(int)$deploy['inspector_id']]) : ''; ?>
+    <p class="cxmeta" style="margin:0">
+      <span class="cxpill <?= $assigned?'ok':'warn' ?>"><?= e($assigned ? 'Assigned' : 'Unassigned') ?></span>
+      This award is deployed in Operations as deputation <strong><?= e($deploy['job_code']) ?></strong>
+      <?php if ($deploy['dep_site']): ?> at <?= e($deploy['dep_site']) ?><?php endif; ?>
+      <?php if ($assigned): ?> — <?= e($dsName) ?><?php endif; ?>.
+      <a href="/job?id=<?= (int)$deploy['id'] ?>">Open the deployment →</a>
+    </p>
+    <?php if (!$assigned): ?><p class="cxmeta" style="margin:6px 0 0">No internal inspector is on it yet — link the awarded professional to an inspector (<a href="/connect-identity">Professional identity</a>) and press Sync, so competence checks and the schedule apply.</p><?php endif; ?>
+    <form method="post" action="/connect-requirement" class="inline" style="margin-top:8px">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="deploy_to_ops">
+      <button class="btn secondary" type="submit">↻ Sync deployment</button>
+    </form>
+  <?php else: ?>
+    <p class="cxmeta" style="margin:0 0 10px">Hand this awarded person to Operations as a deputation — it becomes a PDSO deployment (mobilization, attendance, site register) in your existing scheduler, with no re-entry.</p>
+    <form method="post" action="/connect-requirement" class="inline">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="deploy_to_ops">
+      <button class="btn" type="submit">🚀 Create deployment</button>
+    </form>
+  <?php endif; ?>
+</div>
 <?php endif; ?>
 
 <?php if ($matches): ?>
