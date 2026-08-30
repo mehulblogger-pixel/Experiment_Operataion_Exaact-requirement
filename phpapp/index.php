@@ -879,6 +879,16 @@ if (function_exists('sso_accept') && isset($_GET['sso']) && $_GET['sso'] !== '')
     redirect('/login');
 }
 
+// The marketplace is the public face: an unauthenticated visitor landing on the
+// bare root is sent to the Connect front door rather than the staff sign-in.
+// Guarded by connect_enabled() so a fresh install / staff-only instance is
+// unaffected; staff reach their own sign-in at /login (linked from Connect).
+if ($route === '' && function_exists('current_user') && !current_user()
+    && function_exists('connect_enabled') && connect_enabled()
+    && function_exists('connect_front_route')) {
+    redirect('/connect');
+}
+
 // --- Everything below requires login ---
 require_login();
 

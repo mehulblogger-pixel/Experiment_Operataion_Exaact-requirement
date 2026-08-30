@@ -13,7 +13,11 @@ page with three "create account" paths — **professional** (`/pro/register`),
 labelled sign-in buttons: **professional** (`/pro/login`) and **company/agency**
 (`/portal/login`). The individual login/register pages cross-link back to it and to
 each other, so nobody lands in the wrong world. It's a thin unifying door over the
-existing engines — no auth or data model changed.
+existing engines — no auth or data model changed. When Connect is enabled, an
+**unauthenticated visitor to the site root is sent to `/connect`** (the marketplace
+is the public face); signed-in staff still get their dashboard at `/`, and reach
+their own sign-in at `/login` (linked from Connect's footer). The redirect is
+guarded by `connect_enabled()`, so a staff-only / fresh install is unaffected.
 
 ## Client portal
 - **Engine:** `lib/portal.php`; screens `views/portal/*`; permission check `pcan()`;

@@ -74,6 +74,6 @@ $appName = function_exists('app_name') ? app_name() : 'Connect';
     </div>
   </div>
 
-  <p class="foot">Powered by <?= e($appName) ?>. One account, your own private data.</p>
+  <p class="foot">Powered by <?= e($appName) ?>. One account, your own private data. &nbsp;·&nbsp; <a href="/login" style="color:var(--muted)">Staff sign-in</a></p>
 </div>
 </body></html>
