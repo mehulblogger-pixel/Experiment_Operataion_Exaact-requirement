@@ -106,6 +106,63 @@ function cx_match_score($cand, $req, $reqTerms = null) {
     ];
 }
 
+/** Weighted taxonomy-node set a requirement reaches (title + discipline), cached
+ *  per requirement. Reuses the universal graph so matching is concept-level, not
+ *  substring. Empty when the graph is unavailable (degrades to token scoring). */
+function connect_match_req_nodes($req) {
+    static $cache = [];
+    $key = (int)($req['id'] ?? 0) ?: md5(json_encode($req));
+    if (isset($cache[$key])) return $cache[$key];
+    $weights = [];
+    if (function_exists('connect_tax_resolve') && function_exists('connect_tax_expand')) {
+        // Candidate phrases: the discipline name, and every 1–3 word n-gram of the
+        // title tokens — so "pressure vessel inspector" is found inside a longer
+        // title like "Pressure vessel inspector for FAT at Dahej".
+        $phrases = array_filter([cx_discipline_name($req['discipline_code'] ?? '')]);
+        // Tokenise with tax_norm (NOT cx_match_tokens — that drops domain words like
+        // "inspector" as stopwords, which would prevent the role phrase forming).
+        $toks = function_exists('tax_norm') ? array_values(array_filter(explode(' ', tax_norm((string)($req['title'] ?? ''))), fn($w) => strlen($w) >= 2))
+                                            : cx_match_tokens((string)($req['title'] ?? ''));
+        $n = count($toks);
+        for ($i = 0; $i < $n; $i++) for ($len = 1; $len <= 3 && $i + $len <= $n; $len++)
+            $phrases[] = implode(' ', array_slice($toks, $i, $len));
+        $phrases = array_slice(array_values(array_unique($phrases)), 0, 40);
+        foreach ($phrases as $t) {
+            foreach (connect_tax_resolve($t) as $h) {
+                if ((int)$h['score'] < 4) continue;   // only confident (exact-ish) hits, avoids title noise
+                $w0 = (int)$h['score'];
+                foreach (connect_tax_expand((int)$h['id']) as $nid) {
+                    $w = $nid === (int)$h['id'] ? $w0 : max(1, $w0 - 1);
+                    $weights[$nid] = max($weights[$nid] ?? 0, $w);
+                }
+            }
+        }
+    }
+    return $cache[$key] = $weights;
+}
+
+/** Taxonomy-graph bonus (0-25) + the matched-concept reasons for a professional. */
+function connect_match_tax_bonus($proId, $weights) {
+    if (!$weights || (int)$proId <= 0) return [0, []];
+    $ids = array_keys($weights); $in = implode(',', array_fill(0, count($ids), '?'));
+    try { $rows = ops_all("SELECT pt.relation, pt.node_id, n.name FROM cx_profile_tax pt JOIN cx_tax_nodes n ON n.id=pt.node_id WHERE pt.pro_id=? AND pt.node_id IN ($in)", array_merge([(int)$proId], $ids)) ?: []; }
+    catch (Throwable $e) { return [0, []]; }
+    $relW = ['PRIMARY_ROLE' => 3, 'SPECIALIZATION' => 2, 'ADDITIONAL_ROLE' => 2, 'CERTIFICATION' => 2, 'SKILL' => 1, 'EQUIPMENT' => 1, 'INDUSTRY' => 1];
+    $raw = 0; $reasons = [];
+    foreach ($rows as $r) {
+        $raw += ($weights[(int)$r['node_id']] ?? 1) * ($relW[strtoupper((string)$r['relation'])] ?? 1);
+        if (count($reasons) < 4) $reasons['✓ ' . $r['name']] = true;
+    }
+    return [min(25, (int)round($raw)), array_keys($reasons)];
+}
+
+/** Location bonus (0-10) + the match detail for a professional vs a job place. */
+function connect_match_location_bonus($cand, $job) {
+    if (!$job || !function_exists('connect_location_match')) return [0, null];
+    $m = connect_location_match($cand, $job);
+    return [[1 => 10, 2 => 8, 3 => 6, 4 => 4, 5 => 2, 0 => 0][(int)$m['tier']] ?? 0, $m];
+}
+
 /**
  * Ranked recommendations for a requirement — the card list. Eligible-and-strong
  * float to the top; BLOCKED professionals sink to the bottom (shown, not hidden,
@@ -124,6 +181,9 @@ function connect_match_for_requirement($req, $limit = 8) {
     } catch (Throwable $e) {}
 
     $reqTerms = cx_requirement_terms($req);
+    // Concept-level (graph) + geographic enrichment for the professional pool.
+    $reqNodes = connect_match_req_nodes($req);
+    $job = (function_exists('connect_geo_resolve') && trim((string)($req['location'] ?? '')) !== '') ? connect_geo_resolve((string)$req['location']) : null;
     $rows = [];
 
     // Pool A — internal inspectors (full scoring: eligibility + rating + trust).
@@ -138,12 +198,24 @@ function connect_match_for_requirement($req, $limit = 8) {
     // Pool B — self-registered professionals (the shared pool). Same requirement,
     // scored on skills/availability; honest "New" trust until they are verified/rated.
     try {
-        foreach (ops_all("SELECT id, name, headline, skills, disciplines, base_city, availability, passport_token FROM cx_professionals WHERE is_active=1") ?: [] as $pro) {
+        foreach (ops_all("SELECT id, name, headline, skills, disciplines, base_city, availability, passport_token,
+                                 base_place_id, base_country, base_lat, base_lng, travel_radius_km, pan_india, overseas, intl_regions
+                          FROM cx_professionals WHERE is_active=1") ?: [] as $pro) {
             if (!empty($appliedPro[(int)$pro['id']])) continue;
             $cand = ['id' => (int)$pro['id'], 'kind' => 'professional', 'name' => (string)$pro['name'],
                      'skills' => (string)$pro['skills'], 'disciplines' => (string)$pro['disciplines'],
                      'designation' => (string)($pro['headline'] ?? ''), 'passport_token' => (string)($pro['passport_token'] ?? '')];
             $m = cx_match_score($cand, $req, $reqTerms);
+            // Concept-level (graph) + geographic bonuses with plain-language reasons.
+            [$taxBonus, $taxReasons] = connect_match_tax_bonus((int)$pro['id'], $reqNodes);
+            [$locBonus, $locMatch]  = connect_match_location_bonus($pro, $job);
+            $m['score'] = min(100, (int)$m['score'] + $taxBonus + $locBonus);
+            $m['reasons'] = array_merge($taxReasons,
+                $locMatch && (int)$locMatch['tier'] > 0 ? ['✓ ' . $locMatch['label'] . (isset($locMatch['km']) && $locMatch['km'] !== null ? ' (' . (int)$locMatch['km'] . ' km)' : '')]
+                    : ($job ? ['⚠ Outside declared area'] : []));
+            $m['loc'] = $locMatch;
+            if ($taxBonus >= 14) $m['reason'] = 'Strong role & skill match';
+            elseif ($taxBonus >= 6 && $m['reason'] === 'New — skills fit') $m['reason'] = 'Relevant expertise';
             // Cross-pool Trust Score (#6) — professionals scored on the same scale
             // (verification tier + honest "New" band until they have history).
             if (function_exists('connect_trust_score_pro')) { $tt = connect_trust_score_pro((int)$pro['id']); $m['trust'] = (int)$tt['score']; $m['trust_band'] = $tt['band']; }

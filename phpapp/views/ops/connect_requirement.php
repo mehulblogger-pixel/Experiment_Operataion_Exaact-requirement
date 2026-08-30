@@ -166,6 +166,15 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
           <span class="cxpill <?= $epCls==='p-ok'?'ok':($epCls==='p-bad'?'bad':'warn') ?>"><?= e($epLbl) ?></span>
           · match <?= (int)$m['score'] ?>%
         </div>
+        <?php // K0+/K-GEO — concept + location match explanation ("why 87%") ?>
+        <?php if (!empty($m['reasons'])): ?>
+          <div style="margin:2px 0 6px;display:flex;flex-wrap:wrap;gap:4px">
+            <?php foreach (array_slice($m['reasons'], 0, 5) as $why):
+              $bad = strpos($why, '⚠') === 0; ?>
+              <span class="cxpill <?= $bad?'warn':'ok' ?>" style="font-size:11px"><?= e($why) ?></span>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
         <?php if (!empty($m['ai_reason'])): ?><div class="cxmeta" style="margin:2px 0 6px"><span class="cxpill info" style="font-size:10px">✨ AI</span> <?= e($m['ai_reason']) ?></div><?php endif; ?>
         <?php if (!empty($m['skills'])): ?><div class="cxmeta" style="margin-bottom:8px"><?= e($m['skills']) ?></div><?php endif; ?>
         <div style="display:flex;gap:6px;flex-wrap:wrap">

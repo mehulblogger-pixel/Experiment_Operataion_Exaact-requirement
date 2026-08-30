@@ -174,8 +174,9 @@ function connect_tax_resolve($term, array $kinds = [], $limit = 40) {
         if (!isset($best[$id]) || $best[$id]['score'] < $score)
             $best[$id] = ['id' => $id, 'kind' => $r['kind'], 'name' => $r['name'], 'score' => $score];
     }
-    // Also catch codes stored on the node itself (e.g. "RT", "UT").
-    foreach (ops_all("SELECT id,kind,name FROM cx_tax_nodes WHERE status='ACTIVE' AND LOWER(code)=?" . $kw,
+    // Also catch codes stored on the node itself (e.g. "RT", "UT"). Aliased as n
+    // so the kind filter ($kw uses n.kind) is valid here too.
+    foreach (ops_all("SELECT n.id, n.kind, n.name FROM cx_tax_nodes n WHERE n.status='ACTIVE' AND LOWER(n.code)=?" . $kw,
              array_merge([strtolower(trim((string)$term))], $ka)) ?: [] as $r) {
         $id = (int)$r['id']; if (!isset($best[$id])) $best[$id] = ['id' => $id, 'kind' => $r['kind'], 'name' => $r['name'], 'score' => 3];
     }

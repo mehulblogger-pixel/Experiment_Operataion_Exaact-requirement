@@ -98,7 +98,17 @@ radius. The engine is built to be reused for inspectors/engineers/PMs, not per-r
 6. **Taxonomy-aware search & discovery** — wire `connect_tax_find_professionals`
    into the talent desk + client search (one-keyword + advanced filters + ranked
    result cards + privacy-aware contact reveal).
-7. **Matching foundation** — extend `connect_match` to score against the graph
-   (mandatory/preferred/advantage), with match explanations, reused by jobs,
-   requirements, inspector selection and deployment. Plus taxonomy admin CRUD
-   (add/edit/retire/relate/alias) and verification/privacy states.
+7. **Matching foundation** — *shipped (additive)*: `connect_match_for_requirement`
+   now enriches the professional pool with a **taxonomy-graph bonus** (resolve the
+   requirement title n-grams + discipline to nodes, expand, overlap the candidate's
+   `cx_profile_tax`, weighted by relation) and a **location bonus** (the K-GEO
+   priority tier), producing plain-language **reasons** ("✓ Pressure Vessel
+   Inspector", "✓ Within 300 km (208 km)", "⚠ Outside declared area") shown on the
+   desk recommendation cards. Token scoring stays as the floor; the graph/location
+   are additive bonuses. Tests: `tests/test_connect_match_passport.php`.
+
+### Still open (next tested slices)
+   Taxonomy **admin CRUD** (add/edit/retire/relate/alias), **CV-first prefill**
+   (extract→map→confirm), structured **certifications / project experience**,
+   **verification & privacy** states, and the client **advanced-search + result
+   cards + contact-reveal**.
