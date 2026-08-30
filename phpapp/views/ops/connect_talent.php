@@ -56,6 +56,11 @@ $wtLabel = fn($k) => $work_types[$k] ?? ucfirst(str_replace('_', ' ', $k));
             <?php endforeach; ?>
           </div>
         <?php endif; ?>
+        <?php if (!empty($p['_loc']['tier'])):
+          $lt = (int)$p['_loc']['tier']; $lc = $lt <= 2 ? '#0f7d5a' : ($lt <= 3 ? '#1858a8' : '#8a6d0b');
+          $km = isset($p['_loc']['km']) && $p['_loc']['km'] !== null ? ' (' . (int)$p['_loc']['km'] . ' km)' : ''; ?>
+          <div style="margin:6px 0"><span class="tchip" style="background:#eef5f4;color:<?= $lc ?>;border-color:#cfe6df">📍 <?= e($p['_loc']['label']) ?><?= e($km) ?></span></div>
+        <?php endif; ?>
         <div style="margin:8px 0">
           <?php if (!empty($p['skills'])): ?><div class="muted" style="font-size:13px;margin-bottom:6px"><?= e($p['skills']) ?></div><?php endif; ?>
           <?php foreach ($wt as $k) echo '<span class="tchip">' . e($wtLabel($k)) . '</span>'; ?>

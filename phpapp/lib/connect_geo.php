@@ -163,9 +163,9 @@ function connect_geo_save_mobility($proId, array $in) {
     connect_geo_migrate(); connect_geo_augment_professional();
     $proId = (int)$proId; if ($proId <= 0) return false;
     $place = (int)($in['base_place_id'] ?? 0) > 0 ? connect_geo_place_get((int)$in['base_place_id']) : connect_geo_resolve((string)($in['base_city'] ?? ''));
-    $panIndia = !empty($in['pan_india']) ? 1 : 0;
-    $overseas = !empty($in['overseas']) ? 1 : 0;
     $mode = strtoupper((string)($in['mobility_mode'] ?? ''));
+    $panIndia = (!empty($in['pan_india']) || $mode === 'PAN_INDIA') ? 1 : 0;
+    $overseas = !empty($in['overseas']) ? 1 : 0;
     // STRICT conditional logic: Pan-India disables radius + selected places.
     $radius = $panIndia ? 0 : max(0, (int)($in['travel_radius_km'] ?? 0));
     $regions = $overseas ? implode(',', array_values(array_intersect(array_keys(connect_geo_regions()), array_map('strtoupper', (array)($in['intl_regions'] ?? []))))) : '';

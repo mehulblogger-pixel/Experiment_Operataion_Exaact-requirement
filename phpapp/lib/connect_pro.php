@@ -280,23 +280,42 @@ function connect_pro_search(array $f = [], $limit = 60) {
  */
 function connect_pro_search_smart(array $f = [], $limit = 60) {
     $q = trim((string)($f['q'] ?? ''));
-    if ($q === '' || !function_exists('connect_tax_find_professionals')) return connect_pro_search($f, $limit);
-    if (function_exists('connect_tax_backfill_pending')) connect_tax_backfill_pending();  // self-heal existing profiles
-    $hits = connect_tax_find_professionals($q, [], 300);
-    if (!$hits) return connect_pro_search($f, $limit);   // graph knows nothing → LIKE fallback
+    $locTerm = trim((string)($f['location'] ?? ''));
+    // Resolve the job location to a real place so we can rank by the location engine.
+    $job = ($locTerm !== '' && function_exists('connect_geo_resolve')) ? connect_geo_resolve($locTerm) : null;
+    if (function_exists('connect_tax_backfill_pending')) connect_tax_backfill_pending();
 
     $order = []; $ann = [];
-    foreach ($hits as $h) { $order[(int)$h['pro_id']] = (int)$h['score']; $ann[(int)$h['pro_id']] = $h['hits']; }
-    $ids = array_keys($order); if (!$ids) return [];
-    $w = ['is_active=1', 'id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')']; $a = $ids;
+    if ($q !== '' && function_exists('connect_tax_find_professionals')) {
+        foreach (connect_tax_find_professionals($q, [], 300) as $h) { $order[(int)$h['pro_id']] = (int)$h['score']; $ann[(int)$h['pro_id']] = $h['hits']; }
+    }
+
+    // Base filters (no LIKE location when we can rank geographically instead).
+    $w = ['is_active=1']; $a = [];
+    if ($order) { $ids = array_keys($order); $w[] = 'id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')'; $a = array_merge($a, $ids); }
+    elseif ($q !== '') { // keyword given but graph silent → LIKE fallback on the keyword
+        $w[] = '(name LIKE ? OR headline LIKE ? OR skills LIKE ?)'; array_push($a, "%$q%", "%$q%", "%$q%");
+    }
     $disc = trim((string)($f['discipline'] ?? '')); if ($disc !== '') { $w[] = 'disciplines LIKE ?'; $a[] = '%' . $disc . '%'; }
-    $wt = trim((string)($f['work_type'] ?? '')); if ($wt !== '') { $w[] = 'work_types LIKE ?'; $a[] = '%' . $wt . '%'; }
-    $loc = trim((string)($f['location'] ?? '')); if ($loc !== '') { $w[] = '(base_city LIKE ? OR preferred_locations LIKE ? OR pan_india=1)'; $a[] = '%' . $loc . '%'; $a[] = '%' . $loc . '%'; }
+    $wtF = trim((string)($f['work_type'] ?? '')); if ($wtF !== '') { $w[] = 'work_types LIKE ?'; $a[] = '%' . $wtF . '%'; }
+    if ($locTerm !== '' && !$job) { $w[] = '(base_city LIKE ? OR preferred_locations LIKE ? OR pan_india=1)'; $a[] = '%' . $locTerm . '%'; $a[] = '%' . $locTerm . '%'; }
     if (!empty($f['available_only'])) $w[] = "availability='AVAILABLE'";
-    $rows = ops_all("SELECT * FROM cx_professionals WHERE " . implode(' AND ', $w), $a) ?: [];
-    usort($rows, fn($x, $y) => ($order[(int)$y['id']] ?? 0) <=> ($order[(int)$x['id']] ?? 0));
-    foreach ($rows as &$r) { $r['_match_hits'] = $ann[(int)$r['id']] ?? []; $r['_match_score'] = $order[(int)$r['id']] ?? 0; }
+    $rows = ops_all("SELECT * FROM cx_professionals WHERE " . implode(' AND ', $w) . " LIMIT " . max(1, (int)$limit * 4), $a) ?: [];
+
+    // Annotate keyword-match hits + location tier; filter out-of-area when a
+    // resolvable location was given; rank by (keyword score, then location tier).
+    foreach ($rows as &$r) {
+        $r['_match_hits'] = $ann[(int)$r['id']] ?? [];
+        $r['_match_score'] = $order[(int)$r['id']] ?? 0;
+        if ($job && function_exists('connect_location_match')) { $r['_loc'] = connect_location_match($r, $job); }
+    }
     unset($r);
+    if ($job) $rows = array_values(array_filter($rows, fn($r) => (int)($r['_loc']['tier'] ?? 0) > 0));
+    usort($rows, function ($x, $y) {
+        $s = ($y['_match_score'] ?? 0) <=> ($x['_match_score'] ?? 0); if ($s !== 0) return $s;
+        $tx = ($x['_loc']['tier'] ?? 9) ?: 9; $ty = ($y['_loc']['tier'] ?? 9) ?: 9; // lower tier = stronger
+        return $tx <=> $ty;
+    });
     return array_slice($rows, 0, max(1, (int)$limit));
 }
 
