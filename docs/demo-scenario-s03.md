@@ -45,6 +45,34 @@ Five role types via the existing portal presets/permissions:
 Lifecycle states seeded: **Invited** (`epc.invited.s03@demo.test`, `power.invited.s03@demo.test`),
 **Active** (most), **Suspended** (`energy.suspended.s03@demo.test` — login denied, history retained).
 
+## Role-based portal dashboards (live-computed, never hard-coded)
+
+Each portal user sees a dashboard for their role, every tile computed **live** from
+that client's own data via `connect_client_dash()` (`lib/connect_client_dash.php`),
+strictly scoped to the signed-in party so no client sees another's figures. The
+render is wired into `views/portal/dashboard.php` and `views/portal/hiring.php`.
+The showcase client **EPC (C1)** is seeded so its three role dashboards render these
+exact values:
+
+| Technical Manager (`epc.tech.s03`) | Project Manager (`epc.project.s03`) | Commercial (`epc.commercial.s03`) |
+|---|---|---|
+| Open Requirements **4** | Active Projects **3** | Pending Commercial Review **3** |
+| Matching in Progress **2** | Resources Deployed **18** | Draft Engagements **2** |
+| Shortlisted **2** | Upcoming Deployments **6** | Pending Client Approval **4** |
+| Resource Requests **3** | Pending Mobilizations **4** | Invoices Awaiting Review **3** |
+| Pending Technical Reviews **2** | Schedule Conflicts **2** | Approved Invoice Value **₹12,50,000** |
+| Expiring Credentials **4** | Pending Site Actions **3** | |
+
+The dashboard asserts each value from the seeded records (`cx_requirements`,
+`cx_applications`, `cx_pro_certs`, `jobs`/`calls`/`job_visits`, `dep_att_approval`,
+`cx_engagements`, `billable_events`, `report_docs`) — change the data and the tiles
+change. Money is rendered in Indian lakh grouping (`connect_inr_group`).
+
+Contacts are **named** people (e.g. Rajesh Sharma — Technical Manager, Quality
+Assurance), each with designation + department, and every major client carries an
+**activity timeline** (requirement created → searched → shortlisted → invited →
+reviewed → engaged → report) rendered under its dashboard.
+
 ## Requirements seeded (reused by Prompt 04 matching)
 
 5 active (OPEN) · 2 draft · 2 completed (CLOSED) · 1 cancelled:
@@ -60,14 +88,16 @@ Lifecycle states seeded: **Invited** (`epc.invited.s03@demo.test`, `power.invite
 | EPC / Energy | Coating Inspector · Turnaround Inspector | CLOSED |
 | Heavy Eng | Dimensional Inspector | CANCELLED |
 
-## Acceptance test — 15/15 PASS
+## Acceptance test — 12/12 PASS
 
 Verified against the database, not asserted: 6 client orgs (each also a
 `cx_organisations`), branch hierarchy (`parent_id`), ≥12 locations, ≥20 distinct
-departments, ≥30 contacts, ≥20 portal users, all 5 role presets present, the
+departments, ≥30 **named** contacts, ≥20 portal users, all 5 role presets present, the
 invited/active/suspended lifecycle, the 5/2/2/1 requirement status spread,
-multi-client isolation (requirements scoped by `poster_party_id`), and the named
-requirements present for reuse.
+multi-client isolation (requirements scoped by `poster_party_id`), activity timeline
+present, and — computed through the same `connect_client_dash()` the portal renders —
+the Technical (**4/2/2/3/2/4**), Project (**3/18/6/4/2/3**) and Commercial
+(**3/2/4/3 + ₹12,50,000**) role dashboards all landing on their exact target values.
 
 ## Reuse contract for later prompts
 
@@ -83,6 +113,10 @@ requirements present for reuse.
 No existing workflow broken; no duplicate client master or portal created. Uses
 `business_partners` (+ `parent_id` branches, `client_type`, `industry`),
 `cx_organisations`, `partner_addresses`, `partner_contacts` (with `department`),
-`client_users` (`role_preset` / `perms` / `invite_token` / `must_change`) and
-`cx_requirements` — all pre-existing. Every DEMO-S03 record is namespaced and
-removed by `--remove`. App test suite unchanged at 5213 passing.
+`client_users` (`role_preset` / `perms` / `invite_token` / `must_change`),
+`cx_requirements`, `cx_applications`, `cx_pro_certs`, `jobs`/`calls`/`job_visits`,
+`dep_att_approval`, `cx_engagements`, `billable_events`, `report_docs` and
+`activities` — all pre-existing. The only new file is `lib/connect_client_dash.php`
+(additive render engine); no route, permission or lifecycle was changed. Every
+DEMO-S03 record is namespaced and removed by `--remove`. App test suite unchanged at
+5213 passing.

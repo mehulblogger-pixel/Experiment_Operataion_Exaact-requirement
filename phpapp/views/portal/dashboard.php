@@ -2,6 +2,10 @@
 <p class="plead">Everything <?= e(app_name()) ?> is doing for <?= e(portal_client_name()) ?>, at a glance.
   Reports appear here the moment they are issued — you do not have to ask for them.</p>
 
+<?php // Role-based client dashboard tiles (live-computed, scoped to this client).
+      if (function_exists('connect_client_dash_render') && function_exists('pcan') && pcan('market.post') && function_exists('portal_user') && portal_user())
+          connect_client_dash_render(portal_partner_id(), portal_user()); ?>
+
 <?php if (!empty($canHire)): ?>
 <div class="pcard" style="background:linear-gradient(135deg,#0f7d7d,#0a5c5c);color:#fff;border:0">
   <div style="font-weight:700;font-size:17px;margin-bottom:3px">Need technical manpower?</div>

@@ -30,6 +30,7 @@ $reqs = $home['contact_requests'] ?? []; $pool = (int)($home['pool_size'] ?? 0);
   .hh-pill.ok{background:#e7f5ef;color:#0f7d5a}.hh-pill.warn{background:#fbf3d8;color:#8a6d0b}.hh-pill.muted{background:#eceff1;color:#5b6b6a}
 </style>
 
+<?php if (function_exists('connect_client_dash_render') && function_exists('portal_user') && portal_user()) connect_client_dash_render(portal_partner_id(), portal_user()); ?>
 <div class="hh-hero">
   <h2>Find &amp; hire technical manpower</h2>
   <p>Search <?= number_format($pool) ?> verified professionals across the pool — by role, skill, certificate or equipment — or post exactly what you need and let qualified people apply.</p>

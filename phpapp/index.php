@@ -251,6 +251,7 @@ try {
     require __DIR__ . '/lib/connect_reqtools.php'; // Connect K0+ — requirement reuse: duplicate + named templates
     require __DIR__ . '/lib/seed_scenario_s01.php'; // DEMO-S01 — scenario seed engine (CLI + admin button)
     require __DIR__ . '/lib/seed_scenario_s02.php'; // DEMO-S02 — agency bench scenario seed engine (CLI + admin button)
+    require __DIR__ . '/lib/connect_client_dash.php'; // Connect K0+ — role-based client-portal dashboard tiles (live-computed)
     require __DIR__ . '/lib/seed_scenario_s03.php'; // DEMO-S03 — client + client-portal foundation seed engine
     require __DIR__ . '/lib/connect_verify.php';   // Connect K14 / #3 — verification & moderation (tier ladder + deterministic checks + queue)
     require __DIR__ . '/lib/connect_msg.php';      // Connect K15 / #4 — in-app messaging (per-engagement two-way threads)
