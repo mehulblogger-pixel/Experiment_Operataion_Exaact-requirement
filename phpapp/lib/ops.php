@@ -2777,6 +2777,22 @@ function ops_dispatch($route, $method) {
             ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S02 scenario.');
             if ($method === 'POST' && function_exists('seed_s02_remove')) flash('DEMO-S02 scenario removed — ' . (int)seed_s02_remove() . ' records deleted.');
             redirect('/settings'); return true;
+        case $route === 'seed-scenario-s03':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S03 scenario.');
+            if ($method === 'POST' && function_exists('seed_s03_load')) {
+                try {
+                    $r = seed_s03_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S03 client foundation loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' 6 clients + portal users (password demo12345), e.g. epc.admin.s03@demo.test / epc.tech.s03@demo.test / power.tech.s03@demo.test (/portal/login).',
+                        $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S03: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s03-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S03 scenario.');
+            if ($method === 'POST' && function_exists('seed_s03_remove')) flash('DEMO-S03 client foundation removed — ' . (int)seed_s03_remove() . ' records deleted.');
+            redirect('/settings'); return true;
         case $route === 'trace-thread':
             ops_require(is_master(), 'Only the Master Admin can build the traceability thread.');
             if ($method === 'POST' && function_exists('trace_seed')) {

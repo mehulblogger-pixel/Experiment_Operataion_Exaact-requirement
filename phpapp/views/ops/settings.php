@@ -586,6 +586,25 @@
 </div>
 
 <div class="panel settings-card">
+  <?php $s03 = function_exists('seed_s03_status') ? seed_s03_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S03 — client &amp; client-portal foundation</h3>
+  <p class="sub" style="margin-bottom:8px">The <strong>client-side foundation</strong> reused by later scenarios: 6 client organisations (EPC, refinery, manufacturing, power/transmission, renewable, small) — each a single master that is also marketplace-enabled — with branches, 12 locations, 30 contacts across 20+ departments, 20 portal users in five role types (admin / technical / project / commercial / site) with invited/active/suspended lifecycle, and a spread of requirements (5 active · 2 draft · 2 completed · 1 cancelled) for the next prompts to match against.</p>
+  <p class="muted" style="margin:0 0 10px">Tagged <code>DEMO-S03</code>, removes cleanly. Portal logins (password <code>demo12345</code>, /portal/login): e.g. <code>epc.admin.s03@demo.test</code>, <code>epc.tech.s03@demo.test</code>, <code>power.tech.s03@demo.test</code>, <code>epc.commercial.s03@demo.test</code>.</p>
+  <?php if (!empty($s03['loaded']) || (int)($s03['clients'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s03['clients'] ?? 0) ?> clients · <?= (int)($s03['users'] ?? 0) ?> portal users.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s03" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S03</button></form>
+      <form method="post" action="/seed-scenario-s03-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S03 client foundation data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S03</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s03" onsubmit="return confirm('Load the DEMO-S03 client foundation now? Adds namespaced demo clients; removable in one click.')">
+      <button class="btn" type="submit">Load DEMO-S03 client foundation</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s03.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s03.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Traceability check</h3>
   <p class="sub" style="margin-bottom:8px">Builds <strong>one</strong> record and follows it the whole way through — customer, lead, contact, deal, quotation, accept, contract number, work-order, job, site check-in, report, invoice, money-in — then reads the database back and shows you, place by place, that every link was saved and every figure is right.</p>
   <p class="muted" style="margin:0 0 10px">Safe to run on a live system: everything it writes is one demo customer (<code><?= e(defined('TRACE_CLIENT_CODE') ? TRACE_CLIENT_CODE : 'GT-CLIENT') ?></code>) and can be removed again in one click on the results page. Use it to prove the flow end-to-end, or after any change to check nothing broke.</p>
