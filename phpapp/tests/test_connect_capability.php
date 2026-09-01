@@ -86,6 +86,17 @@ try {
     t_ok(connect_cap_owner_shows('reporting'), 'a TPIA sees the Reporting area');
     // Money stays universal — never gated by capabilities
     t_ok(connect_cap_owner_shows('money'), 'the Money area is universal (never gated by capabilities)');
+
+    // Operations + Recruitment (hr) gating
+    connect_org_cap_bulk_set($party, ['PERMANENT_PLACEMENT', 'EXECUTIVE_SEARCH'], 'tester'); // pure recruiter
+    t_ok(!connect_cap_owner_shows('operations'), 'a pure recruiter hides field Operations (no operational work)');
+    t_ok(connect_cap_owner_shows('hr'), 'a recruiter still sees Recruitment (hr module)');
+    connect_org_cap_bulk_set($party, ['TPIA', 'SITE_INSPECTION'], 'tester'); // pure TPIA, no staffing/recruitment
+    t_ok(connect_cap_owner_shows('operations'), 'a TPIA sees Operations (inspection is operational work)');
+    t_ok(!connect_cap_owner_shows('hr'), 'a pure inspection body without staffing/recruitment hides Recruitment');
+    connect_org_cap_bulk_set($party, ['TECHNICAL_MANPOWER'], 'tester');
+    t_ok(connect_cap_owner_shows('operations') && connect_cap_owner_shows('hr'),
+        'a manpower supplier sees both Operations and Recruitment');
     // clearing the operating company returns to fully permissive
     connect_cap_owner_set(0);
     t_ok(connect_cap_owner_party() === 0 && connect_cap_owner_does_inspection(),
