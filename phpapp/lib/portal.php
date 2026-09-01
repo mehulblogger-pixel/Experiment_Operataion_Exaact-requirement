@@ -859,6 +859,17 @@ function portal_route($route, $method) {
             ]);
             exit;
 
+        case 'portal/dep-gate':
+            portal_need('deputation', 'gate passes');
+            $jid = (int)($_POST['job_id'] ?? 0); $party = portal_partner_id();
+            $owns = $jid > 0 && (int)ops_val("SELECT COUNT(*) FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.id=? AND c.client_id=?", [$jid, $party]) > 0;
+            if ($method === 'POST' && $owns && function_exists('mobilization_gate_issue')) {
+                if ((string)($_POST['action'] ?? '') === 'revoke') [, $gmsg] = mobilization_gate_revoke($jid, (string)(portal_user()['name'] ?? 'Client'));
+                else [, $gmsg] = mobilization_gate_issue($jid, (string)(portal_user()['name'] ?? 'Client'), (string)($_POST['note'] ?? ''));
+                $_SESSION['portal_flash'] = $gmsg; portal_log('DEP_GATE', $jid);
+            } elseif (!$owns) { $_SESSION['portal_flash'] = 'That deployment is not yours.'; }
+            redirect('/portal/deputations');
+
         case 'portal/dep-approve':
             portal_need('deputation.approve', 'approving attendance');
             $ap = pdso_portal_approval((int)($_POST['id'] ?? $_GET['id'] ?? 0), portal_partner_id());

@@ -346,6 +346,54 @@ function mobilization_readiness($jobId) {
             'checklist' => $chk];
 }
 
+// ---------------------------------------------------------------------------
+//  Gate pass (Stage 7). The final mobilization step (§26): the resource is
+//  cleared for SITE ENTRY. The enforceable rule — a gate pass CANNOT be issued
+//  while any required readiness item is still open (mobilization_readiness).
+//  Minimal additive record; composes the readiness read-model, changes no
+//  existing status. Once cleared, the job is "cleared to deploy".
+// ---------------------------------------------------------------------------
+function pdso_gate_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    db()->exec("CREATE TABLE IF NOT EXISTS dep_gate_pass (
+        id $pk, job_id INT DEFAULT 0, status VARCHAR(12) DEFAULT 'ISSUED',
+        issued_by VARCHAR(150) DEFAULT '', issued_at VARCHAR(30) DEFAULT '', note VARCHAR(300) DEFAULT '',
+        revoked_by VARCHAR(150) DEFAULT '', revoked_at VARCHAR(30) DEFAULT '')");
+    try { db()->exec("CREATE INDEX ix_dep_gate_job ON dep_gate_pass (job_id)"); } catch (Throwable $e) {}
+}
+
+/** The gate verdict for a deployment: readiness + whether a live gate pass exists. */
+function mobilization_gate($jobId) {
+    pdso_gate_migrate(); $jobId = (int)$jobId;
+    $rd = function_exists('mobilization_readiness') ? mobilization_readiness($jobId) : null;
+    $ready = $rd ? !empty($rd['ready']) : true;
+    $gp = null;
+    try { $gp = ops_one("SELECT * FROM dep_gate_pass WHERE job_id=? AND status='ISSUED' AND COALESCE(revoked_at,'')='' ORDER BY id DESC LIMIT 1", [$jobId]) ?: null; } catch (Throwable $e) {}
+    return ['job_id' => $jobId, 'ready' => $ready, 'cleared' => (bool)$gp,
+            'blockers' => $rd['blockers'] ?? [], 'warnings' => $rd['warnings'] ?? [], 'gate_pass' => $gp];
+}
+
+/** Issue a gate pass — REFUSED while any required readiness item is open. */
+function mobilization_gate_issue($jobId, $who = '', $note = '') {
+    pdso_gate_migrate(); $jobId = (int)$jobId;
+    if ($jobId <= 0) return [false, 'Unknown deployment.'];
+    $g = mobilization_gate($jobId);
+    if (!$g['ready']) return [false, 'Not cleared to deploy — ' . count($g['blockers']) . ' required item(s) still open. Resolve them before issuing a gate pass.'];
+    if ($g['cleared']) return [true, 'A gate pass is already in force.'];
+    db()->prepare("INSERT INTO dep_gate_pass (job_id,status,issued_by,issued_at,note) VALUES (?, 'ISSUED', ?, ?, ?)")->execute([$jobId, (string)$who, date('c'), trim((string)$note)]);
+    if (function_exists('act_log')) { try { act_log('job', $jobId, 'GATE_PASS_ISSUED', 'Gate pass issued — cleared for site entry', ['auto' => 1]); } catch (Throwable $e) {} }
+    return [true, 'Gate pass issued — the resource is cleared for site entry.'];
+}
+
+/** Revoke the live gate pass for a job. */
+function mobilization_gate_revoke($jobId, $who = '') {
+    pdso_gate_migrate(); $jobId = (int)$jobId;
+    db()->prepare("UPDATE dep_gate_pass SET status='REVOKED', revoked_by=?, revoked_at=? WHERE job_id=? AND status='ISSUED'")->execute([(string)$who, date('c'), $jobId]);
+    if (function_exists('act_log')) { try { act_log('job', $jobId, 'GATE_PASS_REVOKED', 'Gate pass revoked', ['auto' => 1]); } catch (Throwable $e) {} }
+    return [true, 'Gate pass revoked.'];
+}
+
 // A compact badge for a board row: ✓ Ready, or "n blocker(s)".
 function mobilization_readiness_badge($jobId) {
     $r = mobilization_readiness($jobId);
