@@ -62,7 +62,7 @@ $rateLbl = ['public'=>'Rate on card','band'=>'Rate range on request','hidden'=>'
   <div class="fc-card">
     <div class="top">
       <div>
-        <span class="fc-name"><?= e($c['display_name']) ?></span>
+        <a class="fc-name" href="/portal/talent?id=<?= (int)($c['id'] ?? 0) ?>" style="text-decoration:none;color:inherit"><?= e($c['display_name']) ?> <span style="font-size:12px;color:#0f7d5a">View profile →</span></a>
         <?php if ($c['identity_masked']): ?> <span title="This professional shows their full name once you’re engaged">🔒</span><?php endif; ?>
         <?php $tr=(int)$c['tier_rank']; ?>
         <span class="fc-tier t<?= $tr>=3?3:$tr ?>" title="<?= e($c['tier_label']) ?>"><?= $tr>=3?'✓ Proven':($tr>=2?'✓ Credential-verified':($tr>=1?'✓ ID-verified':'Registered')) ?></span>

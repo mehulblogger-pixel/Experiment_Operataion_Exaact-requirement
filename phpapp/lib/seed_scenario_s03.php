@@ -158,6 +158,9 @@ function seed_s03_load() {
         db()->prepare("INSERT INTO cx_professionals (email,name,mobile,headline,skills,availability,is_active,verification_tier,passport_token,password_hash,created_at) VALUES (?,?,?,?,?, 'AVAILABLE',1,'registered',?,?,?)")
             ->execute(['applicant' . $i . '.s03pro@demo.test', 'Applicant ' . $i . ' (S03)', '98' . rand(10000000, 99999999), 'QA/QC / mechanical inspector', 'QA/QC, mechanical inspection, piping, welding', substr(md5('app' . $i), 0, 20), s01_pw(), $now]);
         $apps[$i] = (int)db()->lastInsertId();
+        // Marketplace privacy-first: a client browsing the pool sees a masked name
+        // and no contact until the professional approves or is engaged.
+        if (function_exists('connect_privacy_save')) connect_privacy_save($apps[$i], ['identity' => 'first_initial', 'contact' => 'on_request', 'rate' => 'band', 'listed' => 1]);
         if ($i <= 4 && function_exists('connect_cred_cert_save')) connect_cred_cert_save($apps[$i], ['name' => 'ASNT NDT Level II', 'authority' => 'ASNT', 'cert_number' => 'DEMO-S03-CERT-' . $i, 'discipline' => 'NDT', 'issue_date' => s01_d(-300), 'expiry_date' => s01_d(45)]);   // expiring ≤60d
     }
     // applications: rA gets 2 APPLIED + 1 SHORTLISTED ; rB gets 1 APPLIED + 1 SHORTLISTED  → APPLIED=3, SHORTLISTED=2, reqs-with-apps=2

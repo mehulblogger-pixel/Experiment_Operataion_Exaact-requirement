@@ -1043,6 +1043,45 @@ function portal_route($route, $method) {
             ]);
             exit;
 
+        // Connect — a professional's FULL profile, identity-masked. The client sees
+        // the whole competence picture (skills, taxonomy, verified certs, projects,
+        // verification tier, availability) while name / phone / e-mail stay hidden
+        // until the professional approves a contact request or the client engages
+        // them. Reuses connect_privacy_resolve; scoped read-only to the pool.
+        case 'portal/talent':
+            portal_need('market.post', 'viewing a professional profile');
+            if (!function_exists('connect_privacy_resolve') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            $party = portal_partner_id();
+            $proId = (int)($_GET['id'] ?? ($_POST['pro_id'] ?? 0));
+            if ($method === 'POST') {
+                if ((string)($_POST['action'] ?? '') === 'reveal_request' && function_exists('connect_privacy_reveal_request')) {
+                    [, $rmsg] = connect_privacy_reveal_request($proId, $party, portal_client_name());
+                    $_SESSION['portal_flash'] = $rmsg; portal_log('CONNECT_REVEAL_REQ', (string)$proId);
+                } elseif ((string)($_POST['action'] ?? '') === 'bench_add' && function_exists('connect_client_bench_add')) {
+                    [, $bmsg] = connect_client_bench_add($party, ['professional_id' => $proId, 'source' => 'marketplace'], portal_client_name());
+                    $_SESSION['portal_flash'] = $bmsg;
+                }
+                redirect('/portal/talent?id=' . $proId);
+            }
+            $pro = $proId ? ops_one("SELECT * FROM cx_professionals WHERE id=? AND is_active=1", [$proId]) : null;
+            if (!$pro) { http_response_code(404); portal_view('notfound'); exit; }
+            $engaged = function_exists('connect_privacy_engaged') && connect_privacy_engaged($proId, $party);
+            $view = connect_privacy_resolve($pro, ['party_id' => $party, 'engaged' => $engaged]);
+            $pending = (bool)ops_val("SELECT COUNT(*) FROM cx_pro_contact_reveals WHERE pro_id=? AND client_party_id=? AND status='REQUESTED' AND revoked_at=''", [$proId, $party]);
+            portal_view('talent', [
+                'pro'      => $pro,
+                'view'     => $view,
+                'pending'  => $pending,
+                'certs'    => function_exists('connect_cred_certs') ? connect_cred_certs($proId) : [],
+                'projects' => function_exists('connect_cred_projects') ? connect_cred_projects($proId) : [],
+                'tier'     => function_exists('connect_verify_tier_label') ? connect_verify_tier_label(function_exists('connect_verify_tier_for_professional') ? connect_verify_tier_for_professional($proId) : 'registered') : 'Registered',
+                'avail'    => function_exists('connect_availability_status') ? connect_availability_status($proId) : null,
+                'open_reqs'=> function_exists('cx_requirements_for_party')
+                                  ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
+                                  : [],
+            ]);
+            exit;
+
         // Connect K0+ — the client's PRIVATE bench / roster (demand-side). Add from
         // the marketplace / previous work / by hand, keep private notes & ratings,
         // rehire onto an open requirement. Scoped to this client's own party.

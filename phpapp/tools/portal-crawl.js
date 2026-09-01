@@ -25,7 +25,7 @@ const PERSONAS = [
              '/pro/jobs', '/pro/applications', '/pro/bookings', '/pro/documents',
              '/pro/messages', '/pro/vouchers'] },
   { who: 'Client client.s01', login: '/portal/login', user: 'client.s01@demo.test',
-    routes: ['/portal', '/portal/dashboard', '/portal/hire', '/portal/hiring', '/portal/find',
+    routes: ['/portal', '/portal/dashboard', '/portal/hire', '/portal/hiring', '/portal/find', '/portal/talent?id=1',
              '/portal/roster', '/portal/reports', '/portal/deputations', '/portal/invoices',
              '/portal/request', '/portal/complaints', '/portal/team'] },
   { who: 'Client Technical epc.tech.s03', login: '/portal/login', user: 'epc.tech.s03@demo.test',
