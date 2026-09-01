@@ -18,7 +18,7 @@ Legend — **KEEP / EXTEND / CONNECT / CONFIGURE / BUILD** (verbs from
 | 3 | Universal Technical Passport & taxonomy | EXTEND | ▶ (passport + `cx_tax_*` exist; deepen) |
 | 4 | Marketplace integration | EXTEND | ▶ (post/apply/match/deploy exist; supplier types) |
 | 5 | Operations integration | CONNECT | ▶ (award→job bridge exists) |
-| 6 | UX contextualization (Combination Engine nav gating) | CONFIGURE | ▶ (Operations, Recruitment, Reporting + Quality gated; onboarding + 10-archetype matrix done) |
+| 6 | UX contextualization (Combination Engine nav gating) | CONFIGURE | ✅ (nav gating for Operations/Recruitment/Reporting/Quality + capability-appropriate dashboard; onboarding + 10-archetype matrix) |
 | 7 | Conflict & edge-case engine | EXTEND/BUILD | ⬜ |
 | 8 | Full regression testing | — | ♻ continuous (auto-walk + suite) |
 | 9 | Final acceptance validation (10-company matrix) | — | ⬜ |

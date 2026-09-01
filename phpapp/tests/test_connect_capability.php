@@ -97,6 +97,21 @@ try {
     connect_org_cap_bulk_set($party, ['TECHNICAL_MANPOWER'], 'tester');
     t_ok(connect_cap_owner_shows('operations') && connect_cap_owner_shows('hr'),
         'a manpower supplier sees both Operations and Recruitment');
+
+    // capability-appropriate landing: a non-reporting operating company's staff
+    // KPI board drops the inspection-specific tiles (Stage 6 completion)
+    if (function_exists('connect_kpi_board')) {
+        connect_cap_owner_set(0);
+        $keysDefault = array_column(connect_kpi_board(['audience' => 'staff'])['tiles'], 'key');
+        t_ok(in_array('inspections', $keysDefault, true) && in_array('reports', $keysDefault, true),
+            'with no operating company the staff board keeps inspection KPIs (backward compatible)');
+        connect_org_cap_bulk_set($party, ['PERMANENT_PLACEMENT'], 'tester'); connect_cap_owner_set($party);
+        $keysRec = array_column(connect_kpi_board(['audience' => 'staff'])['tiles'], 'key');
+        t_ok(!in_array('inspections', $keysRec, true) && !in_array('reports', $keysRec, true),
+            'a pure recruiter operating company drops inspection KPIs from the staff dashboard');
+        t_ok(in_array('revenue', $keysRec, true) && in_array('ratings', $keysRec, true),
+            'universal KPIs (revenue, ratings) remain for every company');
+    }
     // clearing the operating company returns to fully permissive
     connect_cap_owner_set(0);
     t_ok(connect_cap_owner_party() === 0 && connect_cap_owner_does_inspection(),

@@ -131,6 +131,15 @@ function connect_kpi_board($scope = []) {
     if ($outstanding > 0)    $actions[] = ['label' => $isClient ? 'Invoices outstanding' : 'Receivables outstanding', 'n' => 0, 'value' => $inr($outstanding), 'url' => $isClient ? '/portal/invoices' : '/billable-events', 'tone' => 'warn'];
     if ($inspOpen > 0)       $actions[] = ['label' => 'Inspections in progress', 'n' => $inspOpen, 'url' => $isClient ? '/portal/calls' : '/jobs', 'tone' => ''];
 
+    // Stage 6 — capability-appropriate landing. A staff workspace whose operating
+    // company does no inspection / reporting work should not lead with inspection
+    // KPIs; drop those tiles/actions and keep revenue, concerns and ratings.
+    // Visibility only, permissive until an operating company is designated.
+    if (!$isClient && function_exists('connect_cap_owner_shows') && !connect_cap_owner_shows('reporting')) {
+        $tiles   = array_values(array_filter($tiles, fn($t) => !in_array($t['key'], ['inspections', 'reports'], true)));
+        $actions = array_values(array_filter($actions, fn($a) => !in_array($a['label'] ?? '', ['Reports pending', 'Inspections in progress'], true)));
+    }
+
     return [
         'audience' => $isClient ? 'client' : 'staff',
         'tiles'    => $tiles,
