@@ -1068,7 +1068,19 @@ function portal_route($route, $method) {
             $engaged = function_exists('connect_privacy_engaged') && connect_privacy_engaged($proId, $party);
             $view = connect_privacy_resolve($pro, ['party_id' => $party, 'engaged' => $engaged]);
             $pending = (bool)ops_val("SELECT COUNT(*) FROM cx_pro_contact_reveals WHERE pro_id=? AND client_party_id=? AND status='REQUESTED' AND revoked_at=''", [$proId, $party]);
+            // Requirement context — when the client arrived from reviewing a
+            // requirement's applicants, offer a back link and a direct shortlist
+            // (only onto their own requirement, only for this pro's application).
+            $ctxReq = null; $ctxApp = null;
+            if ((string)($_GET['from'] ?? '') === 'req' && (int)($_GET['rid'] ?? 0) > 0 && function_exists('cx_requirement_get')) {
+                $rq = cx_requirement_get((int)$_GET['rid']);
+                if ($rq && (int)$rq['poster_party_id'] === (int)$party) {
+                    $ctxReq = $rq;
+                    $ctxApp = ops_one("SELECT id, status FROM cx_applications WHERE requirement_id=? AND applicant_professional_id=? ORDER BY id DESC LIMIT 1", [(int)$rq['id'], $proId]) ?: null;
+                }
+            }
             portal_view('talent', [
+                'ctx_req' => $ctxReq, 'ctx_app' => $ctxApp,
                 'pro'      => $pro,
                 'view'     => $view,
                 'pending'  => $pending,

@@ -46,7 +46,9 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
                'SHORTLISTED'=>['OFFERED'=>'Make offer','REJECTED'=>'Reject'],
                'OFFERED'=>['ACCEPTED'=>'Mark accepted']][$st] ?? []; ?>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line,#eee);flex-wrap:wrap">
-        <div><strong><?= e($a['applicant_name'] !== '' ? $a['applicant_name'] : 'Applicant #'.$a['id']) ?></strong> <?= $pill($a['status']) ?>
+        <div><?php $apid = (int)($a['applicant_professional_id'] ?? 0); $anm = $a['applicant_name'] !== '' ? $a['applicant_name'] : 'Applicant #'.$a['id']; ?>
+          <?php if ($apid > 0): ?><a href="/portal/talent?id=<?= $apid ?>&from=req&rid=<?= (int)$req['id'] ?>" style="text-decoration:none;color:inherit"><strong><?= e($anm) ?></strong> <span style="font-size:12px;color:#0f7d5a">View profile →</span></a><?php else: ?><strong><?= e($anm) ?></strong><?php endif; ?>
+          <?= $pill($a['status']) ?>
           <?php if ($awardedId === (int)$a['id']): ?><span class="ppill ok">Awarded</span><?php endif; ?>
           <?php // Stage 7 — flag a scheduling clash or a lapsed credential before this
                 //          person is shortlisted / offered / awarded (against the

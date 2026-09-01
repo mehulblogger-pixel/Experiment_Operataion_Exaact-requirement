@@ -11,8 +11,35 @@ $contactVisible = !empty($view['contact_visible']);
 $setting = $view['settings']['contact'] ?? 'on_request';
 $name = (string)($view['display_name'] ?? 'Technical professional');
 $certStatusTone = ['VALID' => ['✓ valid', '#0f7d5a', '#e7f5ef'], 'EXPIRING' => ['⚠ expiring', '#a9720a', '#fbf3df'], 'EXPIRED' => ['⛔ expired', '#9a2a2a', '#fbeceb']];
+$ctxReq = $ctx_req ?? null; $ctxApp = $ctx_app ?? null;
 ?>
-<p class="pnote" style="margin-bottom:8px"><a href="/portal/find">← Back to search</a></p>
+<?php if ($ctxReq): ?>
+  <p class="pnote" style="margin-bottom:8px"><a href="/portal/hire-req?id=<?= (int)$ctxReq['id'] ?>">← Back to <?= e($ctxReq['ref_code'] ?? 'requirement') ?> applicants</a></p>
+<?php else: ?>
+  <p class="pnote" style="margin-bottom:8px"><a href="/portal/find">← Back to search</a></p>
+<?php endif; ?>
+
+<?php if ($ctxReq): $ast = strtoupper((string)($ctxApp['status'] ?? '')); ?>
+<div class="pcard" style="background:#eef6f4;border:1px solid #cfe6e2;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+  <div style="font-size:13.5px">Reviewing this professional for <strong><?= e($ctxReq['ref_code'] ?? 'your requirement') ?></strong> — <?= e($ctxReq['title'] ?? '') ?></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <?php if ($ast === 'APPLIED'): ?>
+      <form method="post" action="/portal/hire-req" class="inl">
+        <input type="hidden" name="id" value="<?= (int)$ctxReq['id'] ?>"><input type="hidden" name="application_id" value="<?= (int)$ctxApp['id'] ?>"><input type="hidden" name="action" value="app_transition"><input type="hidden" name="to" value="SHORTLISTED">
+        <button class="btn" type="submit">✓ Shortlist</button>
+      </form>
+    <?php elseif ($ast === 'SHORTLISTED'): ?>
+      <span class="ppill ok">✓ Shortlisted</span>
+      <form method="post" action="/portal/hire-req" class="inl">
+        <input type="hidden" name="id" value="<?= (int)$ctxReq['id'] ?>"><input type="hidden" name="application_id" value="<?= (int)$ctxApp['id'] ?>"><input type="hidden" name="action" value="app_transition"><input type="hidden" name="to" value="OFFERED">
+        <button class="btn secondary" type="submit">Make offer</button>
+      </form>
+    <?php elseif ($ast !== ''): ?>
+      <span class="ppill"><?= e(ucfirst(strtolower($ast))) ?></span>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
 
 <div class="pcard" style="border:1px solid var(--line,#e3ebea)">
   <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start">
