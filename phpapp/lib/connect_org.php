@@ -131,6 +131,14 @@ function connect_org_register(array $in) {
                    VALUES (?,?,?,?,1,0,'', 'self-service', ?)")
         ->execute([$partyId, $email, $person, password_hash($pass, PASSWORD_DEFAULT), $now]);
 
+    // 4) Multi-capability onboarding — persist the business capabilities the
+    //    company ticked (additive; the single org_type above stays the primary
+    //    audience). Optional: none ticked → behaves exactly as before.
+    if (function_exists('connect_org_cap_bulk_set')) {
+        $caps = array_values(array_filter(array_map('strval', (array)($in['caps'] ?? []))));
+        if ($caps) connect_org_cap_bulk_set($partyId, $caps, 'self-service');
+    }
+
     return [true, 'Your account is ready.', ['email' => $email, 'login_url' => $isAgency ? '/portal/login' : '/portal/login?for=hire', 'is_agency' => $isAgency]];
 }
 
@@ -166,6 +174,10 @@ function connect_org_join_route($method) {
     }
     $GLOBALS['__join_done'] = $done; $GLOBALS['__join_err'] = $err; $GLOBALS['__join_acct'] = $acct;
     $GLOBALS['__join_types'] = connect_org_types();
+    // Multi-capability onboarding: a company declares the full mix of what it does.
+    $GLOBALS['__join_cap_catalog'] = function_exists('connect_cap_catalog') ? connect_cap_catalog() : [];
+    $GLOBALS['__join_cap_groups']  = function_exists('connect_cap_groups')  ? connect_cap_groups()  : [];
+    $GLOBALS['__join_caps_posted'] = array_map('strval', (array)($_POST['caps'] ?? []));
     require __DIR__ . '/../views/ops/connect_join.php';
     exit;
 }

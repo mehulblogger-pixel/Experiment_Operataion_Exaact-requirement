@@ -28,6 +28,11 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
   .types{display:grid;gap:8px;margin-top:6px}
   .types label{display:flex;gap:8px;align-items:start;border:1px solid var(--line);border-radius:11px;padding:11px;cursor:pointer;margin:0}
   .types input{width:auto;margin-top:3px}
+  .caps{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  @media(max-width:520px){.caps{grid-template-columns:1fr}}
+  .caps .cap{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;margin:0;font-size:13.5px}
+  .caps .cap input{width:auto;margin:0}
+  .caps .cap span{color:var(--ink)}
 </style></head><body>
 <div class="top"><?= e($appName) ?></div>
 <div class="wrap">
@@ -68,6 +73,21 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
         <?php $first=false; endforeach; ?>
       </div>
     </div>
+    <?php $capCat = $GLOBALS['__join_cap_catalog'] ?? []; $capGroups = $GLOBALS['__join_cap_groups'] ?? []; $capsOn = $GLOBALS['__join_caps_posted'] ?? []; if ($capCat): ?>
+    <div class="card">
+      <label style="font-size:15px;color:var(--ink);font-weight:600;margin-top:0">What does your organisation do?</label>
+      <p class="muted" style="margin:0 0 6px;font-size:13px">Tick everything you deliver — a company can do several. This tailors your workspace to your real business mix. You can change it later. (Optional.)</p>
+      <?php foreach ($capGroups as $g): ?>
+        <div style="margin-top:10px"><div class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:5px"><?= e($g) ?></div>
+          <div class="caps">
+          <?php foreach ($capCat as $code=>$c): if ($c['group']!==$g) continue; $on=in_array($code,$capsOn,true); ?>
+            <label class="cap"><input type="checkbox" name="caps[]" value="<?= e($code) ?>" <?= $on?'checked':'' ?>><span><?= e($c['label']) ?></span></label>
+          <?php endforeach; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
     <div class="card">
       <label>Your name</label><input name="contact_name">
       <label>Work e-mail</label><input type="email" name="contact_email" required>

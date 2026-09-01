@@ -82,6 +82,21 @@ try {
     connect_cap_owner_set(0);
     t_ok(connect_cap_owner_party() === 0 && connect_cap_owner_does_inspection(),
         'clearing the operating company returns the workspace to permissive');
+
+    // ---- Multi-capability self-onboarding via /join ----
+    if (function_exists('connect_org_register')) {
+        [$ok, $msg, $acct] = connect_org_register([
+            'name' => 'Multi-Cap Onboard Co', 'org_type' => 'ENTERPRISE',
+            'contact_name' => 'Owner', 'contact_email' => 'multicap.onboard@demo.test',
+            'contact_mobile' => '9800000000', 'password' => 'onboard12345',
+            'caps' => ['TPIA', 'FREELANCE_INSPECTOR_SUPPLY', 'TECHNICAL_MANPOWER'],
+        ]);
+        t_ok($ok, 'a company can self-onboard through connect_org_register()');
+        $newParty = (int)ops_val("SELECT id FROM business_partners WHERE legal_name='Multi-Cap Onboard Co' ORDER BY id DESC LIMIT 1");
+        $onboardCaps = $newParty ? connect_org_caps($newParty) : [];
+        t_ok(in_array('TPIA', $onboardCaps, true) && in_array('FREELANCE_INSPECTOR_SUPPLY', $onboardCaps, true) && in_array('TECHNICAL_MANPOWER', $onboardCaps, true),
+            'onboarding persists the MULTIPLE capabilities the company ticked at /join');
+    }
 } finally {
     connect_cap_owner_set(0); // never leak the operating-company setting out of the test
     if ($own && db()->inTransaction()) db()->rollBack();
