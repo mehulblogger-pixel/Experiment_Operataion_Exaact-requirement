@@ -46,6 +46,27 @@ function connect_cred_cert_status($expiry) {
     return 'VALID';
 }
 
+/**
+ * The §15 verification-state ladder for one credential, derived from what the
+ * data already carries (verified flag, a supporting file, expiry). Highest wins:
+ *   EXPIRED    — valid-to has passed (whatever its verification was)
+ *   VERIFIED   — checked by the platform/an authority (verified=1)
+ *   DOCUMENTED — a supporting document is attached but not yet verified
+ *   DECLARED   — self-declared, no document yet
+ * Returns ['code','label','tone']. tone: ok | info | warn | bad.
+ */
+function connect_cred_verify_state($cert) {
+    $expiry = trim((string)($cert['expiry_date'] ?? ''));
+    if ($expiry !== '' && (strtotime($expiry) - time()) < 0) return ['code' => 'EXPIRED', 'label' => 'Expired', 'tone' => 'bad'];
+    if ((int)($cert['verified'] ?? 0) === 1) {
+        $soon = $expiry !== '' && (strtotime($expiry) - time()) / 86400 <= 60;
+        return $soon ? ['code' => 'VERIFIED', 'label' => 'Verified · expiring', 'tone' => 'warn']
+                     : ['code' => 'VERIFIED', 'label' => 'Verified', 'tone' => 'ok'];
+    }
+    if ((int)($cert['file_id'] ?? 0) > 0) return ['code' => 'DOCUMENTED', 'label' => 'Document attached', 'tone' => 'info'];
+    return ['code' => 'DECLARED', 'label' => 'Self-declared', 'tone' => 'warn'];
+}
+
 // ---- Certifications ---------------------------------------------------------
 
 /** Add/update a certification. Links to a CERTIFICATION taxonomy node (given or

@@ -100,12 +100,15 @@ $ctxReq = $ctx_req ?? null; $ctxApp = $ctx_app ?? null;
     <div class="pscroll"><table class="ptable">
       <thead><tr><th>Certificate</th><th>Authority</th><th>Valid to</th><th>Status</th></tr></thead>
       <tbody>
-      <?php foreach ($certs as $c): [$lbl,$fg,$bg] = $certStatusTone[strtoupper((string)($c['status'] ?? 'VALID'))] ?? $certStatusTone['VALID']; ?>
+      <?php $vTone = ['ok'=>['#0f7d5a','#e7f5ef'],'info'=>['#1858a8','#e6effb'],'warn'=>['#a9720a','#fbf3df'],'bad'=>['#9a2a2a','#fbeceb']];
+            foreach ($certs as $c):
+              $vs = function_exists('connect_cred_verify_state') ? connect_cred_verify_state($c) : ['label'=>'—','tone'=>'warn'];
+              [$fg,$bg] = $vTone[$vs['tone']] ?? $vTone['warn']; ?>
         <tr>
           <td><strong><?= e($c['name'] ?? '') ?></strong><?php if (!empty($c['cert_number'])): ?> <span class="muted" style="font-size:12px">#<?= e($c['cert_number']) ?></span><?php endif; ?></td>
           <td><?= e($c['authority'] ?? '—') ?></td>
           <td><?= e($c['expiry_date'] ?: '—') ?></td>
-          <td><span style="font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;color:<?= $fg ?>;background:<?= $bg ?>"><?= e($lbl) ?><?= ((int)($c['verified'] ?? 0)===1 ? ' · verified' : '') ?></span></td>
+          <td><span style="font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;color:<?= $fg ?>;background:<?= $bg ?>"><?= e($vs['label']) ?></span></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
