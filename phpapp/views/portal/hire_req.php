@@ -48,6 +48,16 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line,#eee);flex-wrap:wrap">
         <div><strong><?= e($a['applicant_name'] !== '' ? $a['applicant_name'] : 'Applicant #'.$a['id']) ?></strong> <?= $pill($a['status']) ?>
           <?php if ($awardedId === (int)$a['id']): ?><span class="ppill ok">Awarded</span><?php endif; ?>
+          <?php // Stage 7 — flag a scheduling clash or a lapsed credential before this
+                //          person is shortlisted / offered / awarded (against the
+                //          requirement's own dates). Only shown when not clear.
+                if (function_exists('connect_conflict_check') && (int)($a['applicant_professional_id'] ?? 0) > 0):
+                  $cv = connect_conflict_check((int)$a['applicant_professional_id'], (string)($req['start_date'] ?? ''), (string)($req['end_date'] ?? ''));
+                  if (($cv['status'] ?? 'CLEAR') !== 'CLEAR'):
+                    $cb = connect_conflict_badge($cv);
+                    $rz = implode(' · ', array_map(fn($r) => $r['text'], array_slice($cv['reasons'], 0, 3))); ?>
+              <span style="display:inline-block;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;<?= $cb['tone']==='bad'?'background:#fbeceb;color:#9a2a2a':'background:#fbf3df;color:#a9720a' ?>" title="<?= e($rz) ?>"><?= $cb['tone']==='bad'?'⛔ ':'⚠ ' ?><?= e($cb['label']) ?></span>
+          <?php endif; endif; ?>
           <?php if (($a['proposed_rate'] ?? 0)): ?><div style="font-size:12.5px;color:var(--muted)">Proposed ₹<?= (int)$a['proposed_rate'] ?></div><?php endif; ?></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <?php foreach ($next as $to=>$lbl): ?>
