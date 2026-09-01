@@ -5,6 +5,12 @@ Verbs: **View**, **Create**, **Edit**, **Delete**, **Approve**, **Close**, **Iss
 **Reopen**, **Export**, **—** (none). **⚠ implicit** = allowed only because no check
 blocks it (see `99-gaps-and-risks.md`). Paths relative to `phpapp/`.
 
+> **Company Business Capabilities are NOT permissions.** `lib/connect_capability.php`
+> (Combination Engine) gates only *module visibility* per company and never grants or
+> removes a `can()` right — this matrix remains the sole authority on who-can-do-what.
+> The `/connect-capabilities` admin screen is MASTER_ADMIN-only. See
+> `00-master-revamp-prompt.md` Part II.2.
+
 **Column keys:** MA=MASTER_ADMIN, AD=ADMIN, BD=BUSINESS_DIRECTOR, SBU=SBU_HEAD,
 BM=BRANCH_MANAGER, BAM=BRANCH_APP_MANAGER, OM=OPERATION_MANAGER, CO=COORDINATOR,
 AM=ASST_MANAGER, FIN=FINANCE, INS=INSPECTOR. (SR_INSPECTOR = INSPECTOR + `idems.finalize`;

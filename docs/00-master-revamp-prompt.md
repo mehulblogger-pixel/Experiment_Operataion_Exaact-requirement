@@ -599,6 +599,113 @@ A slice is **not** done because screens exist. It is done when **all** of these 
 
 ---
 
+# PART II — Company Capability & Supplier Architecture (refined master prompt)
+
+The sections above (A–W) stand. This part records the refinements that make
+**multi-capability companies** and the **freelance-supplier operating model**
+first-class, framed as two connected worlds. It supersedes nothing above — it
+sharpens it.
+
+## II.1 Two connected worlds (master-prompt §5)
+
+- **World A — Company Operations System:** a company runs its own clients,
+  requirements, employees, freelancers, competence, projects, scheduling,
+  mobilization, inspection, reporting, quality, finance. This is the **backbone**.
+- **World B — EXAACT Marketplace:** connects *demand* (clients needing freelance
+  inspectors / technical experts / manpower / TPIA / QA-QC / NDT / project services)
+  with *supply* (individuals, freelance-supplier companies, manpower suppliers,
+  TPIAs, technical-services companies).
+- The two are **deeply connected, logically separated**: a marketplace match
+  becomes operational work with **no re-keying** (`connect_deploy` award→job).
+
+## II.2 Company Capability Engine — a company is multi-capability (§7, §9) — **BUILT**
+
+**Company type is NOT a single-select restriction.** A company enables one, several
+or all business capabilities, and the interface adapts to the combination
+(company + capabilities + business units + role + permissions + context). A pure
+recruiter never sees QAP/ITP/IRN unless activated; the architecture underneath
+stays unified.
+
+**Status: shipped, additive.** `lib/connect_capability.php` layers a multi-select
+capability set on top of the existing single `org_type` model (`connect_org.php`)
+without replacing it:
+
+- Catalogue (grouped, §7): **Inspection & Technical Services** (TPIA, TIC, Vendor/
+  Shop/Resident/Site Inspection, Expediting, Vendor Surveillance, QA/QC, NDT) ·
+  **Resource Supply** (Technical Manpower, Contract/Project/Shutdown/Turnaround
+  Staffing, **Freelance Supply**, **Freelance Inspector Supply**, Technical
+  Specialist Supply) · **Recruitment** (Technical/Permanent/Executive/Contract) ·
+  **Project Services** (Project Management/Engineering, Commissioning, Construction,
+  Consultancy).
+- Additive table `cx_org_capabilities` (UNIQUE org+capability); master-only admin
+  screen `/connect-capabilities`; boot-migrated; covered by 21 tests.
+- **Combination Engine** `connect_cap_modules()` / `connect_cap_shows()` — derives
+  which modules are relevant. **Visibility only — grants no permission** (the
+  matrix still governs who-can-do-what). A company with nothing enabled stays
+  **fully permissive (sees everything)**, so every existing company is unchanged.
+- **Deliberately deferred (Stage 6):** applying `connect_cap_shows()` to gate the
+  live sidebar item-by-item. The engine and data are in place; the sweeping nav
+  gating is its own carefully-tested slice so it can never hide a screen a company
+  still needs.
+
+## II.3 Freelance Technical Resource Supplier — first-class capability (§8, §19, §23)
+
+A company supplying freelance technical resources is its own operating model, not
+an afterthought under staffing. It maintains three pools — **Internal** (directly
+managed), **Associated** (independent freelancers linked to it), **Marketplace-
+sourced** (found via EXAACT) — surfaced read-only by `connect_supplier_pools()`
+over the existing bench/sourcing engines (`connect_bench`, `connect_client_bench`,
+`connect_source`). The company may act as **direct employer / coordinator /
+intermediary / technical-service provider / primary contractor / sub-supplier**
+per engagement. Flow: *client need → supplier company → internal search →
+associated search → marketplace search → match → shortlist → client selection →
+commercial agreement → assignment → execution → approval → commercial closure*,
+all terminating in the operational spine.
+
+## II.4 Marketplace supplier types (§19)
+
+Individual Supplier · Freelance Supplier Company · Technical Manpower Supplier ·
+TPIA Supplier · Technical Services Company — distinguished in the marketplace so a
+client can search for the right kind of supply.
+
+## II.5 CV-assisted profile creation (§15)
+
+*Upload CV → extract → map to profile → suggest → user review → confirm → create.*
+Reuse the existing parser (`connect_cv.php`, `cvp.php`). Never treat extracted data
+as verified — carry states **Extracted → User-confirmed → Document-verified →
+Company-verified → Client-verified → Expired**.
+
+## II.6 Location & travel engine (§16)
+
+Base city + travel preference (local / selected locations / radius-km / state-wide /
+Pan-India / international). **Pan-India selected → radius controls disabled and
+local restrictions dropped from active matching**, base city kept for reference.
+Reuse `connect_geo.php`.
+
+## II.7 Company configuration acceptance matrix (§38)
+
+The platform must behave correctly for each archetype — this is an acceptance gate:
+
+| # | Company | Capabilities enabled |
+|---|---|---|
+| A | Pure TPIA | TPIA (+ inspection group) |
+| B | Technical Manpower Supplier | Technical Manpower + staffing |
+| C | **Freelance Technical Resource Supplier** | Freelance Supply + Freelance Inspector Supply |
+| D | Technical Recruitment Company | Recruitment group |
+| E | Project Management Company | Project Services group |
+| F | TPIA + Technical Staffing | TPIA + Manpower |
+| G | TPIA + Freelance Supplier | TPIA + Freelance Supply |
+| H | Technical Staffing + Recruitment | Manpower + Recruitment |
+| I | TPIA + Staffing + Project Management | three groups |
+| J | Full multi-capability technical services | all groups |
+
+## II.8 Execution sequence
+
+The staged execution plan (Stage 0–9) lives in
+[`docs/revamp/10-execution-stages.md`](revamp/10-execution-stages.md).
+
+---
+
 *This master prompt is the capstone. Where it summarises, the linked `docs/revamp/`,
 `docs/connect/`, `docs/phase-2/3/`, `docs/edge-cases/`, `docs/02-permission-matrix.md`
 and `docs/03-object-lifecycles.md` carry the detail. On any conflict, `CLAUDE.md` and
