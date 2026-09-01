@@ -21,7 +21,7 @@ Legend — **KEEP / EXTEND / CONNECT / CONFIGURE / BUILD** (verbs from
 | 6 | UX contextualization (Combination Engine nav gating) | CONFIGURE | ✅ (nav gating for Operations/Recruitment/Reporting/Quality + capability-appropriate dashboard; onboarding + 10-archetype matrix) |
 | 7 | Conflict & edge-case engine | EXTEND/BUILD | ✅ (conflict/availability, availability status, masked profiles, cancel/no-show, duplicate prevention, gate pass, report-rejection, billing-mismatch) |
 | 8 | Full regression testing | — | ♻ continuous (auto-walk + suite) |
-| 9 | Final acceptance validation (10-company matrix) | — | ⬜ |
+| 9 | Final acceptance validation (10-company matrix) | — | ✅ (tools/acceptance-10co.php — 10/10 archetypes + invariants ALL PASS; docs/revamp/11) |
 
 ---
 
