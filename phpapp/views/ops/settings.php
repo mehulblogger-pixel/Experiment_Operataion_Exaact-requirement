@@ -605,6 +605,25 @@
 </div>
 
 <div class="panel settings-card">
+  <?php $s04 = function_exists('seed_s04_status') ? seed_s04_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S04 — marketplace lifecycle (new engines)</h3>
+  <p class="sub" style="margin-bottom:8px">One walkable thread that lights up every capability from this revamp: a multi-capability <strong>supplier agency</strong> with a bench (so applicants show their <em>supplier type</em>), a requirement whose applicants carry a <em>schedule-conflict</em> flag, an awarded requirement <em>deployed to operations</em> (no re-keying), a job that is <em>not cleared for site entry</em> vs one with a <em>gate pass</em>, a <em>no-show</em> engagement that needs cover, a <em>credential verification ladder</em>, and a <em>billing-mismatch</em> flag. Prints a real 10-point PASS/FAIL dashboard.</p>
+  <p class="muted" style="margin:0 0 10px">Tagged <code>DEMO-S04</code>, removes cleanly. Client login (password <code>demo12345</code>, /portal/login): <code>s04.tech@demo.test</code>.</p>
+  <?php if (!empty($s04['loaded']) || (int)($s04['pros'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s04['pros'] ?? 0) ?> applicants · <?= (int)($s04['reqs'] ?? 0) ?> requirements.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s04" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S04</button></form>
+      <form method="post" action="/seed-scenario-s04-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S04 marketplace data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S04</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s04" onsubmit="return confirm('Load the DEMO-S04 marketplace lifecycle now? Adds namespaced demo data; removable in one click.')">
+      <button class="btn" type="submit">Load DEMO-S04 marketplace lifecycle</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s04.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s04.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Traceability check</h3>
   <p class="sub" style="margin-bottom:8px">Builds <strong>one</strong> record and follows it the whole way through — customer, lead, contact, deal, quotation, accept, contract number, work-order, job, site check-in, report, invoice, money-in — then reads the database back and shows you, place by place, that every link was saved and every figure is right.</p>
   <p class="muted" style="margin:0 0 10px">Safe to run on a live system: everything it writes is one demo customer (<code><?= e(defined('TRACE_CLIENT_CODE') ? TRACE_CLIENT_CODE : 'GT-CLIENT') ?></code>) and can be removed again in one click on the results page. Use it to prove the flow end-to-end, or after any change to check nothing broke.</p>
