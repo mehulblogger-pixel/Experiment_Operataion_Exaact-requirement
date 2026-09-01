@@ -22,7 +22,9 @@
       <td><?php
             $dec = $r['client_decision'] ?? '';
             if ($dec === 'ACCEPTED') echo '<b style="color:var(--ok)">Accepted</b>';
-            elseif ($dec === 'REJECTED') echo '<b style="color:var(--bad)">Rejected</b>';
+            // Stage 7 — a rejection is an active loop, not a dead end: it is returned
+            // to our team (an NCR is opened) and a revised report will follow.
+            elseif ($dec === 'REJECTED') echo '<b style="color:var(--bad)">Rejected</b><br><span style="font-size:11.5px;color:var(--muted,#888)">↩ returned to our team for rework</span>';
             else echo '<a href="/portal/report-decision?id=' . (int)$r['id'] . '">Accept or reject →</a>';
           ?></td>
       <td><?php if (!empty($r['verify_code'])): ?>
