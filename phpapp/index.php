@@ -275,6 +275,7 @@ try {
     require __DIR__ . '/lib/connect_crew.php';     // Connect M10 — crew/bulk booking (position manifest)
     require __DIR__ . '/lib/connect_org.php';      // Connect B0 — organisation accounts + org-type entitlements
     require __DIR__ . '/lib/connect_capability.php'; // Connect — multi-select company business capabilities (Combination Engine)
+    require __DIR__ . '/lib/connect_conflict.php';   // Connect — resource conflict & availability (Stage 7)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
