@@ -1041,11 +1041,13 @@ function portal_route($route, $method) {
                 'discipline'     => (string)($_GET['discipline'] ?? ''),
                 'work_type'      => (string)($_GET['work_type'] ?? ''),
                 'location'       => (string)($_GET['location'] ?? ''),
+                'supplier'       => (string)($_GET['supplier'] ?? ''),
                 'available_only' => !empty($_GET['available_only']),
             ];
             portal_view('find', [
                 'f'           => $f,
                 'cards'       => connect_client_search($party, $f),
+                'supplier_options' => function_exists('connect_supplier_filter_options') ? connect_supplier_filter_options() : [],
                 'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
                 'work_types'  => function_exists('cx_pro_work_types') ? cx_pro_work_types() : [],
                 'open_reqs'   => function_exists('cx_requirements_for_party')

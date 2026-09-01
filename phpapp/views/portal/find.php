@@ -37,6 +37,13 @@ $rateLbl = ['public'=>'Rate on card','band'=>'Rate range on request','hidden'=>'
         <?php foreach ($work_types as $wt): $v=is_array($wt)?($wt['code']??$wt['name']??''):$wt; $l=is_array($wt)?($wt['name']??$v):$wt; ?><option value="<?= e($v) ?>"<?= ($f['work_type']??'')===$v?' selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
     <div><label style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Near</label>
       <input class="form-control" name="location" value="<?= e($f['location'] ?? '') ?>" placeholder="e.g. Dahej, Gujarat"></div>
+    <?php // Stage 4 — supplier-type filter (§17/§19): individuals vs supplier companies.
+          $supOpts = $supplier_options ?? []; if ($supOpts): ?>
+    <div><label style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Supplied by</label>
+      <select class="form-control" name="supplier">
+        <?php foreach ($supOpts as $code => $label): ?><option value="<?= e($code) ?>"<?= ($f['supplier']??'')===$code?' selected':'' ?>><?= e($label) ?></option><?php endforeach; ?>
+      </select></div>
+    <?php endif; ?>
     <div style="display:flex;align-items:flex-end"><label style="font-size:13px;display:flex;align-items:center;gap:7px;padding-bottom:9px">
       <input type="checkbox" name="available_only" value="1"<?= !empty($f['available_only'])?' checked':'' ?>> Available now</label></div>
   </div>

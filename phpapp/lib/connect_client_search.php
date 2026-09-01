@@ -26,11 +26,15 @@ function connect_client_loc_label($tier) {
  */
 function connect_client_search($clientPartyId, array $f = [], $limit = 40) {
     $rows = function_exists('connect_pro_search_smart') ? connect_pro_search_smart($f, $limit * 2) : [];
+    $supFilter = strtoupper(trim((string)($f['supplier'] ?? '')));   // §19 supplier-type filter
     $out = [];
     foreach ($rows as $r) {
         $s = function_exists('connect_privacy_get') ? connect_privacy_get((int)$r['id']) : ['listed' => 1];
         if (empty($s['listed'])) continue;                 // the pro has paused discovery
-        $out[] = connect_client_card($r, $clientPartyId);
+        $card = connect_client_card($r, $clientPartyId);
+        if ($supFilter !== '' && function_exists('connect_supplier_filter_match')
+            && !connect_supplier_filter_match($card['supplier'] ?? [], $supFilter)) continue;
+        $out[] = $card;
         if (count($out) >= $limit) break;
     }
     return $out;

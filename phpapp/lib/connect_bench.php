@@ -310,3 +310,31 @@ function connect_supplier_type($proId) {
     }
     return ['channel' => 'ORG', 'type' => $type, 'org_id' => (int)$org['id'], 'org_name' => (string)$org['name']];
 }
+
+/** The supplier-filter options a client can narrow the pool by (§17/§19). */
+function connect_supplier_filter_options() {
+    return [
+        ''           => 'Any supplier',
+        'INDIVIDUAL' => 'Individuals only',
+        'ORG'        => 'Through a supplier company',
+        'FREELANCE'  => 'Freelance Resource Supplier',
+        'MANPOWER'   => 'Technical Manpower Supplier',
+        'TPIA'       => 'TPIA Supplier',
+    ];
+}
+
+/** Does a card's supplier classification match a filter code? */
+function connect_supplier_filter_match($sup, $code) {
+    $code = strtoupper(trim((string)$code));
+    if ($code === '') return true;
+    $channel = strtoupper((string)($sup['channel'] ?? 'INDIVIDUAL'));
+    $type    = (string)($sup['type'] ?? '');
+    switch ($code) {
+        case 'INDIVIDUAL': return $channel === 'INDIVIDUAL';
+        case 'ORG':        return $channel === 'ORG';
+        case 'FREELANCE':  return $type === 'Freelance Resource Supplier';
+        case 'MANPOWER':   return $type === 'Technical Manpower Supplier';
+        case 'TPIA':       return $type === 'TPIA Supplier';
+    }
+    return true;
+}
