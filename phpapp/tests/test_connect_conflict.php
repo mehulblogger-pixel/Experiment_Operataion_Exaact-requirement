@@ -50,6 +50,28 @@ try {
 
     // empty / unknown professional never errors
     t_ok(connect_conflict_check(0, '2026-10-15', '2026-10-18')['available'], 'an unknown professional degrades to available (no error)');
+
+    // ---- availability status model (§24) ----
+    t_ok(count(connect_availability_states()) === 10, 'the availability vocabulary has all ten states');
+    // fresh professional with nothing on → AVAILABLE
+    db()->prepare("INSERT INTO cx_professionals (email,name,availability,is_active,created_at) VALUES ('avail.pro@demo.test','Avail Pro','AVAILABLE',1,?)")->execute([date('c')]);
+    $ap = (int)db()->lastInsertId();
+    t_eq(connect_availability_status($ap, '2026-10-10')['code'], 'AVAILABLE', 'a free professional is AVAILABLE');
+    // a BOOKED engagement covering the date → BOOKED
+    db()->prepare("INSERT INTO cx_engagements (subject_kind,subject_id,start_date,end_date,status,created_at) VALUES ('professional',?,'2026-10-05','2026-10-15','BOOKED',?)")->execute([$ap, date('c')]);
+    t_eq(connect_availability_status($ap, '2026-10-10')['code'], 'BOOKED', 'a booked engagement on the date reads BOOKED');
+    t_eq(connect_availability_status($ap, '2026-10-20')['code'], 'AVAILABLE', 'outside the engagement the professional is AVAILABLE again');
+    // an ACTIVE engagement wins as IN_PROGRESS
+    db()->prepare("UPDATE cx_engagements SET status='ACTIVE' WHERE subject_id=? AND subject_kind='professional'")->execute([$ap]);
+    t_eq(connect_availability_status($ap, '2026-10-10')['code'], 'IN_PROGRESS', 'an active engagement reads IN_PROGRESS');
+    // the professional's own OFF flag → UNAVAILABLE (on a date with no engagement)
+    db()->prepare("UPDATE cx_professionals SET availability='OFF' WHERE id=?")->execute([$ap]);
+    t_eq(connect_availability_status($ap, '2026-10-20')['code'], 'UNAVAILABLE', 'an OFF availability flag reads UNAVAILABLE');
+    // a shortlisted application (no engagement/flag) → SHORTLISTED
+    db()->prepare("UPDATE cx_professionals SET availability='AVAILABLE' WHERE id=?")->execute([$ap]);
+    db()->prepare("INSERT INTO cx_applications (requirement_id,applicant_professional_id,applicant_name,status,created_at) VALUES (0,?,'Avail Pro','SHORTLISTED',?)")->execute([$ap, date('c')]);
+    t_eq(connect_availability_status($ap, '2026-10-25')['code'], 'SHORTLISTED', 'a live shortlisting reads SHORTLISTED');
+    t_eq(connect_availability_status(0)['code'], 'AVAILABLE', 'an unknown professional is AVAILABLE (no error)');
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }

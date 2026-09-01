@@ -68,8 +68,18 @@ $rateLbl = ['public'=>'Rate on card','band'=>'Rate range on request','hidden'=>'
         <span class="fc-tier t<?= $tr>=3?3:$tr ?>" title="<?= e($c['tier_label']) ?>"><?= $tr>=3?'✓ Proven':($tr>=2?'✓ Credential-verified':($tr>=1?'✓ ID-verified':'Registered')) ?></span>
         <?php if ($c['headline']): ?><div class="muted" style="font-size:13px;margin-top:3px"><?= e($c['headline']) ?></div><?php endif; ?>
       </div>
-      <?php $on = strtoupper((string)$c['availability'])==='AVAILABLE'; ?>
-      <span class="fc-avail <?= $on?'on':'off' ?>"><?= $on?'Available':'Busy' ?></span>
+      <?php // Stage 7 — the derived availability status (Available / Booked / In
+            //          progress / On leave / Shortlisted …), computed from real
+            //          engagements + calendar, not just the raw flag. Falls back
+            //          to the simple flag when the id isn't available.
+            $avId = (int)($c['id'] ?? 0);
+            if (function_exists('connect_availability_status') && $avId > 0) {
+                $av = connect_availability_status($avId); $lbl = $av['label']; $tone = $av['tone'];
+            } else {
+                $on = strtoupper((string)$c['availability'])==='AVAILABLE'; $lbl = $on?'Available':'Busy'; $tone = $on?'ok':'bad';
+            }
+            $avStyle = $tone==='ok' ? 'background:#e7f5ef;color:#0f7d5a' : ($tone==='bad' ? 'background:#fbeceb;color:#9a2a2a' : 'background:#fbf3df;color:#a9720a'); ?>
+      <span class="fc-avail" style="<?= $avStyle ?>"><?= e($lbl) ?></span>
     </div>
 
     <?php if ($c['match_hits']): ?>

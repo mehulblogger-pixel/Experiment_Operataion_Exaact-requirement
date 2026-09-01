@@ -120,6 +120,85 @@ function connect_conflict_check($professionalId, $from, $to, $ctx = []) {
     return ['status' => $status, 'available' => $status === 'CLEAR', 'conflicts' => $conflicts, 'reasons' => $reasons];
 }
 
+// ---------------------------------------------------------------------------
+//  Availability status model (§24). A single DERIVED status for a professional
+//  on a date — never stored, always computed from the records that already
+//  exist (like person_state). The vocabulary is the master-prompt's; the ones
+//  with a data source are derived, the rest remain available for later sources.
+// ---------------------------------------------------------------------------
+
+/** The status vocabulary → [label, tone]. tone: ok | info | warn | bad. */
+function connect_availability_states() {
+    return [
+        'AVAILABLE'        => ['Available', 'ok'],
+        'TENTATIVELY_HELD' => ['Tentatively held', 'warn'],
+        'PROPOSED'         => ['Proposed', 'warn'],
+        'SHORTLISTED'      => ['Shortlisted', 'warn'],
+        'BOOKED'           => ['Booked', 'info'],
+        'ASSIGNED'         => ['Assigned', 'info'],
+        'IN_PROGRESS'      => ['In progress', 'info'],
+        'UNAVAILABLE'      => ['Unavailable', 'bad'],
+        'ON_LEAVE'         => ['On leave', 'bad'],
+        'RESTRICTED'       => ['Restricted', 'bad'],
+    ];
+}
+
+/**
+ * The professional's derived availability status on a date (default today).
+ * First match wins, most-committing / least-available first. Returns
+ * ['code','label','tone','detail']. Never throws.
+ */
+function connect_availability_status($professionalId, $onDate = '') {
+    $professionalId = (int)$professionalId;
+    $onDate = substr(trim((string)$onDate), 0, 10) ?: date('Y-m-d');
+    $states = connect_availability_states();
+    $mk = function ($code, $detail = '') use ($states) {
+        [$label, $tone] = $states[$code] ?? ['Available', 'ok'];
+        return ['code' => $code, 'label' => $label, 'tone' => $tone, 'detail' => $detail];
+    };
+    if (!$professionalId) return $mk('AVAILABLE');
+    $val = function ($sql, $args = []) { try { return ops_val($sql, $args); } catch (Throwable $e) { return null; } };
+
+    if (function_exists('connect_engage_migrate')) { try { connect_engage_migrate(); } catch (Throwable $e) {} }
+    $insp = connect_conflict_inspector_of($professionalId);
+
+    // 1) A date-bound engagement covering today — professional or linked inspector.
+    $subj = $insp > 0 ? "(subject_kind='professional' AND subject_id=$professionalId) OR (subject_kind='inspector' AND subject_id=$insp)"
+                      : "subject_kind='professional' AND subject_id=$professionalId";
+    $engStatus = $val("SELECT status FROM cx_engagements WHERE ($subj)
+                         AND status IN ('ACTIVE','BOOKED')
+                         AND COALESCE(NULLIF(start_date,''),'0000-00-00') <= ?
+                         AND COALESCE(NULLIF(end_date,''),'9999-12-31')  >= ?
+                       ORDER BY CASE status WHEN 'ACTIVE' THEN 0 ELSE 1 END LIMIT 1", [$onDate, $onDate]);
+    if ($engStatus === 'ACTIVE') return $mk('IN_PROGRESS', 'active engagement');
+    if ($engStatus === 'BOOKED') return $mk('BOOKED', 'booked engagement');
+
+    // 2) The operational calendar (leave vs a job today), via the linked inspector.
+    if ($insp > 0 && function_exists('inspector_busy_on')) {
+        try {
+            $r = inspector_busy_on($insp, $onDate);
+            if ($r !== '') {
+                if (preg_match('/leave|training|off|holiday|sick/i', $r)) return $mk('ON_LEAVE', $r);
+                return $mk('ASSIGNED', $r);
+            }
+        } catch (Throwable $e) {}
+    }
+
+    // 3) The professional's own availability flag.
+    $flag = strtoupper((string)$val("SELECT availability FROM cx_professionals WHERE id=?", [$professionalId]));
+    if ($flag === 'OFF') return $mk('UNAVAILABLE', 'marked unavailable');
+    if ($flag === 'BUSY' || $flag === 'ALLOCATED') return $mk('BOOKED', 'marked busy');
+
+    // 4) Pipeline signals — the strongest live application state.
+    $appStatus = $val("SELECT status FROM cx_applications WHERE applicant_professional_id=?
+                         AND status IN ('SHORTLISTED','OFFERED')
+                       ORDER BY CASE status WHEN 'OFFERED' THEN 0 ELSE 1 END LIMIT 1", [$professionalId]);
+    if ($appStatus === 'OFFERED')     return $mk('PROPOSED', 'has a live offer');
+    if ($appStatus === 'SHORTLISTED') return $mk('SHORTLISTED', 'shortlisted somewhere');
+
+    return $mk('AVAILABLE');
+}
+
 /** A compact one-line badge for a verdict — for a shortlist row or an offer button. */
 function connect_conflict_badge($verdict) {
     $s = is_array($verdict) ? ($verdict['status'] ?? 'CLEAR') : (string)$verdict;
