@@ -30,6 +30,22 @@
     <div class="v"><?= e($m($roll['disputed_amt'] ?? 0)) ?></div><div class="d"><?= (int)($roll['disputed'] ?? 0) ?> open</div></div>
 </div>
 
+<?php // Stage 7 — billing-mismatch flag. A billed event whose invoiced amount
+      // drifted from what the work earned (derived_amount) is surfaced, not erased,
+      // so finance can reconcile it. The books ledger stays the money truth.
+      $mismatch = function_exists('billable_mismatch') ? billable_mismatch() : [];
+      if ($mismatch): ?>
+  <div class="panel" style="margin:10px 0;background:#fbeceb;border:1px solid #e6b3ae;border-radius:11px;padding:12px 15px">
+    <strong style="color:#9a2a2a">⚠ <?= count($mismatch) ?> billed event(s) disagree with their invoice.</strong>
+    <span style="font-size:13px;color:#7a2420"> The invoiced figure differs from what the operation earned — reconcile before it becomes revenue leakage.</span>
+    <div style="margin-top:6px;font-size:12.5px;color:#7a2420">
+      <?php foreach (array_slice($mismatch, 0, 4) as $mm): ?>
+        <div><?= e($mm['service_type'] ?: 'Event') ?> #<?= (int)$mm['source_id'] ?> — earned <?= e($m($mm['earned'])) ?>, billed <?= e($m($mm['billed'])) ?> (<?= $mm['variance'] > 0 ? '+' : '' ?><?= e($m($mm['variance'])) ?>)</div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+<?php endif; ?>
+
 <div class="panel" style="margin-top:12px">
   <form method="get" action="/billable-events" style="margin:0 0 10px">
     <label>Status
@@ -59,7 +75,11 @@
             <td><?= e($r['service_type'] ?: '—') ?></td>
             <td style="text-align:right;font-variant-numeric:tabular-nums"><?= e($m($r['amount'])) ?>
               <?php if ($st === 'BILLED' && (int)$r['invoice_id']): ?><a href="/invoice?id=<?= (int)$r['invoice_id'] ?>" class="muted" style="font-size:11px">· inv</a>
-              <?php elseif ($st === 'BILLED' && !empty($r['bill_ref'])): ?><span class="muted" style="font-size:11px">· <?= e($r['bill_ref']) ?></span><?php endif; ?></td>
+              <?php elseif ($st === 'BILLED' && !empty($r['bill_ref'])): ?><span class="muted" style="font-size:11px">· <?= e($r['bill_ref']) ?></span><?php endif; ?>
+              <?php // billing-mismatch flag on the row itself
+                    if ($st === 'BILLED' && (float)($r['derived_amount'] ?? 0) > 0 && abs((float)$r['amount'] - (float)$r['derived_amount']) > 1): ?>
+                <span style="font-size:11px;font-weight:600;color:#9a2a2a" title="Earned <?= e($m($r['derived_amount'])) ?>, billed <?= e($m($r['amount'])) ?>">⚠ differs</span>
+              <?php endif; ?></td>
             <td><span class="pill <?= $tone[$st] ?? 'p-mut' ?>"><?= e($statuses[$st] ?? $st) ?></span>
               <?php if (!empty($r['status_reason'])): ?><span class="muted" style="font-size:11px" title="<?= e($r['status_reason']) ?>">ⓘ</span><?php endif; ?></td>
             <?php if ($canManage): ?>

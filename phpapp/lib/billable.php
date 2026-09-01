@@ -59,7 +59,34 @@ function billable_migrate() {
     // P4c — the invoice reference for an event billed by finance's attestation
     // (non-job sources have no auto invoice linkage). Additive for existing DBs.
     if (function_exists('ensure_column')) ensure_column('billable_events', 'bill_ref', "VARCHAR(80) DEFAULT ''");
+    // Stage 7 — the operationally-EARNED amount at derivation, preserved so that
+    // reconciling `amount` to the invoice total (which the sync does) can be
+    // compared against it and any drift flagged instead of silently erased.
+    if (function_exists('ensure_column')) ensure_column('billable_events', 'derived_amount', "REAL DEFAULT 0");
 }
+
+/**
+ * BILLED events whose invoiced amount drifted from the amount the work earned
+ * (derived_amount vs amount). $tol is the ₹ tolerance below which rounding is
+ * ignored. Read-only — surfaces the mismatch for finance to reconcile; never
+ * changes a figure. Returns rows with earned / billed / variance.
+ */
+function billable_mismatch($tol = 1.0) {
+    billable_migrate();
+    try {
+        $rows = ops_all("SELECT * FROM billable_events WHERE status='BILLED' AND COALESCE(derived_amount,0) > 0") ?: [];
+    } catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($rows as $r) {
+        $earned = (float)$r['derived_amount']; $billed = (float)$r['amount'];
+        $var = round($billed - $earned, 2);
+        if (abs($var) > (float)$tol) { $r['earned'] = $earned; $r['billed'] = $billed; $r['variance'] = $var; $out[] = $r; }
+    }
+    return $out;
+}
+
+/** How many BILLED events disagree with what the work earned. */
+function billable_mismatch_count($tol = 1.0) { return count(billable_mismatch($tol)); }
 
 // ---- Access (reuses finance rights — no new permission, D1) ----------------
 function billable_can()        { return function_exists('can') && (can('finance.reconcile') || can('data.credit') || is_master()); }
@@ -137,19 +164,19 @@ function billable_event_upsert($module, $kind, $sourceId, array $d) {
     $existing = ops_one("SELECT * FROM billable_events WHERE source_module=? AND source_kind=? AND source_id=?", [$module, $kind, $sourceId]);
     if ($existing) {
         if (($existing['status'] ?? 'PENDING') === 'PENDING') {
-            db()->prepare("UPDATE billable_events SET party_id=?, contract_number=?, office_id=?, sbu=?, service_type=?, qty=?, unit=?, rate=?, amount=?, calc_rule=?, updated_at=? WHERE id=?")
+            db()->prepare("UPDATE billable_events SET party_id=?, contract_number=?, office_id=?, sbu=?, service_type=?, qty=?, unit=?, rate=?, amount=?, derived_amount=?, calc_rule=?, updated_at=? WHERE id=?")
                 ->execute([(int)($d['party_id'] ?? 0), (string)($d['contract_number'] ?? ''), (int)($d['office_id'] ?? 0), (string)($d['sbu'] ?? ''),
                            (string)($d['service_type'] ?? ''), (float)($d['qty'] ?? 0), (string)($d['unit'] ?? ''), (float)($d['rate'] ?? 0),
-                           (float)($d['amount'] ?? 0), (string)($d['calc_rule'] ?? ''), date('c'), (int)$existing['id']]);
+                           (float)($d['amount'] ?? 0), (float)($d['amount'] ?? 0), (string)($d['calc_rule'] ?? ''), date('c'), (int)$existing['id']]);
         }
         return (int)$existing['id'];
     }
     db()->prepare("INSERT INTO billable_events
-        (source_module,source_kind,source_id,party_id,contract_number,office_id,sbu,service_type,qty,unit,rate,amount,calc_rule,status,created_at,created_by,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', ?,?,?)")
+        (source_module,source_kind,source_id,party_id,contract_number,office_id,sbu,service_type,qty,unit,rate,amount,derived_amount,calc_rule,status,created_at,created_by,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', ?,?,?)")
         ->execute([$module, $kind, $sourceId, (int)($d['party_id'] ?? 0), (string)($d['contract_number'] ?? ''), (int)($d['office_id'] ?? 0),
                    (string)($d['sbu'] ?? ''), (string)($d['service_type'] ?? ''), (float)($d['qty'] ?? 0), (string)($d['unit'] ?? ''),
-                   (float)($d['rate'] ?? 0), (float)($d['amount'] ?? 0), (string)($d['calc_rule'] ?? ''),
+                   (float)($d['rate'] ?? 0), (float)($d['amount'] ?? 0), (float)($d['amount'] ?? 0), (string)($d['calc_rule'] ?? ''),
                    date('c'), billable_actor(), date('c')]);
     return (int)db()->lastInsertId();
 }
