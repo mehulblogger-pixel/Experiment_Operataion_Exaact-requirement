@@ -1,0 +1,72 @@
+<?php
+// Company Business Capabilities — a company enables a MIX of capabilities, the
+// Combination Engine derives which modules are relevant, and the whole thing is
+// additive + backward-compatible (an unconfigured company sees everything).
+t_section('company business capabilities (multi-select + combination engine)');
+
+$own = !db()->inTransaction();
+if ($own) db()->beginTransaction();
+try {
+    connect_cap_migrate();
+    connect_cap_migrate(); // idempotent — running twice must not throw
+    t_ok(true, 'connect_cap_migrate() is idempotent');
+
+    // catalogue
+    $cat = connect_cap_catalog();
+    t_ok(count($cat) >= 20, 'the capability catalogue is populated');
+    t_ok(isset($cat['TPIA']) && isset($cat['TECHNICAL_MANPOWER']), 'core capabilities (TPIA, manpower) are present');
+    t_ok(isset($cat['FREELANCE_SUPPLY']) && isset($cat['FREELANCE_INSPECTOR_SUPPLY']),
+        'Freelance Technical Resource Supplier is a first-class capability');
+    t_ok(count(connect_cap_groups()) >= 4, 'capabilities are grouped (Inspection / Supply / Recruitment / Project)');
+
+    // a company master to hang capabilities on
+    db()->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,status,created_at) VALUES (?,?,?,1,'ACTIVE',?)")
+        ->execute(['TEST-CAP-CO', 'Test Capability Co', 'Test Capability Co', date('c')]);
+    $party = (int)db()->lastInsertId();
+    t_ok($party > 0, 'a company master exists to carry capabilities');
+
+    // BACKWARD COMPATIBLE: unconfigured company sees everything
+    t_ok(!connect_cap_configured($party), 'a new company starts unconfigured');
+    t_ok(connect_cap_shows($party, 'operations') && connect_cap_shows($party, 'reporting') && connect_cap_shows($party, 'money'),
+        'an unconfigured company sees every module (nothing hidden — backward compatible)');
+
+    // enable a mix
+    connect_org_cap_bulk_set($party, ['TPIA', 'TECHNICAL_MANPOWER', 'FREELANCE_INSPECTOR_SUPPLY'], 'tester');
+    t_ok(connect_cap_configured($party), 'the company is now configured');
+    $caps = connect_org_caps($party);
+    t_ok(in_array('TPIA', $caps, true) && in_array('TECHNICAL_MANPOWER', $caps, true), 'a company can hold MULTIPLE capabilities at once');
+    t_ok(connect_org_has_cap($party, 'FREELANCE_INSPECTOR_SUPPLY'), 'connect_org_has_cap() reports an enabled capability');
+    t_ok(!connect_org_has_cap($party, 'NDT'), 'a capability not enabled reports false');
+
+    // combination engine derives modules from the enabled mix
+    $mods = connect_cap_modules($party);
+    t_ok(in_array('operations', $mods, true) && in_array('reporting', $mods, true) && in_array('hr', $mods, true),
+        'the Combination Engine unions the modules of every enabled capability');
+
+    // gating is now selective but 'connect' and 'admin' always show
+    t_ok(connect_cap_shows($party, 'operations'), 'a configured company still sees modules its capabilities unlock');
+    t_ok(connect_cap_shows($party, 'connect') && connect_cap_shows($party, 'admin'), 'marketplace + admin are always visible');
+
+    // toggling one capability off updates the set (no duplicate rows)
+    connect_org_cap_set($party, 'TPIA', false, 'tester');
+    t_ok(!connect_org_has_cap($party, 'TPIA'), 'a capability can be switched off');
+    $rowcount = (int)ops_val("SELECT COUNT(*) FROM cx_org_capabilities WHERE org_party_id=? AND capability_code='TPIA'", [$party]);
+    t_eq($rowcount, 1, 'toggling never creates duplicate rows (one row per company+capability)');
+
+    // resetting to empty returns to "sees everything"
+    connect_org_cap_bulk_set($party, [], 'tester');
+    t_ok(!connect_cap_configured($party), 'a company reset to no capabilities counts as unconfigured');
+    t_ok(connect_cap_shows($party, 'operations') && connect_cap_shows($party, 'money'),
+        'after reset the gate is permissive again (all modules visible)');
+
+    // freelance supplier pools reader never fatals
+    $pools = connect_supplier_pools($party);
+    t_ok(isset($pools['internal']) && isset($pools['associated']) && isset($pools['marketplace']),
+        'connect_supplier_pools() returns the three sourcing pools without error');
+
+    // capabilities NEVER grant a permission — they are visibility only
+    t_ok(!function_exists('connect_cap_grant') && !function_exists('connect_cap_permission'),
+        'the engine exposes no permission-granting function (visibility only)');
+} finally {
+    if ($own && db()->inTransaction()) db()->rollBack();
+}

@@ -2481,6 +2481,7 @@ function ops_module_gate($route) {
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls','contract-open'=>'quotes',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
+        'connect-capabilities'=>'settings',
         'service-scope'=>'settings','service-formats'=>'settings',
         'deputations'=>'jobs',
         'billable-events'=>'invoicing','billable-sync'=>'invoicing','billable-approve'=>'invoicing',
@@ -3259,6 +3260,8 @@ function ops_dispatch($route, $method) {
             return ops_connect_talent($method);
         case $route === 'connect-orgs':         // Connect B0 — organisation accounts (master-only)
             return ops_connect_orgs($method);
+        case $route === 'connect-capabilities': // Connect — company business capabilities (master-only)
+            return ops_connect_capabilities($method);
         case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board
             return ops_command_centre($method);
         case $route === 'entity-360':          // Phase 3 §49 — uniform 360 shell for any entity

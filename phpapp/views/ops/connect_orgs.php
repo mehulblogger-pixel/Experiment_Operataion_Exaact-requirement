@@ -8,7 +8,8 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
 <div class="master-head">
   <div><h1>Organisations</h1>
     <p class="sub" style="margin:2px 0 0">Each organisation on the platform carries a type, and the type sets which modules it gets — a TPIA gets the full operations platform, a manpower agency the marketplace. Everyone shares the professional pool; private data stays private (Phase B design).
-      Organisations can self-register at <a href="/join" target="_blank" rel="noopener">/join</a> — those applications appear here as <em>Pending</em> for you to approve.</p></div>
+      Organisations can self-register at <a href="/join" target="_blank" rel="noopener">/join</a> — those applications appear here as <em>Pending</em> for you to approve.</p>
+    <p class="sub" style="margin:6px 0 0">A company is not one fixed type — set the full mix of what it delivers on the <a href="/connect-capabilities"><strong>Company capabilities</strong></a> screen (TPIA, manpower, freelance supply, recruitment, project services).</p></div>
 </div>
 
 <details class="panel" style="margin-top:12px" open>

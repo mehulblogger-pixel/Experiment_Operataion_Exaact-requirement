@@ -427,6 +427,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('connect_engv_migrate')) connect_engv_migrate();                                      // Connect K21 — cx_engagement_vouchers + lines (inclusive/exclusive claims)
     if (function_exists('connect_crew_migrate')) connect_crew_migrate();          // Connect M10 — cx_positions (crew manifest)
     if (function_exists('connect_org_migrate')) connect_org_migrate();            // Connect B0 — cx_organisations (org accounts + entitlements)
+    if (function_exists('connect_cap_migrate')) connect_cap_migrate();            // Connect — cx_org_capabilities (multi-select company capabilities)
     if (function_exists('books_migrate')) books_migrate();             // ensure the books ledger tables exist before anything stamps them
     if (function_exists('engagement_migrate')) engagement_migrate();   // Revamp — first-class Engagement entity (additive; dual-read with contract_number)
     if (function_exists('competence_migrate')) competence_migrate();   // required certificates gate allocation
