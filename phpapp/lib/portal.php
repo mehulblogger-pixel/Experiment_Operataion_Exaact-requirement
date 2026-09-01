@@ -1142,6 +1142,15 @@ function portal_route($route, $method) {
                 } elseif ($act === 'award') {
                     $ap = cx_application_get((int)($_POST['application_id'] ?? 0));
                     if ($ap && (int)$ap['requirement_id'] === (int)$req['id']) cx_requirement_award((int)$req['id'], (int)$ap['id']);
+                } elseif ($act === 'engage_cancel' && function_exists('connect_engage_cancel')) {
+                    // Stage 7 — end the booking early (cancel / no-show) with a reason;
+                    // the resource frees up and the work surfaces as needing cover.
+                    $eng = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement((int)$req['id']) : null;
+                    if ($eng && (int)$eng['id'] === (int)($_POST['engagement_id'] ?? 0)) {
+                        [, $emsg] = connect_engage_cancel((int)$eng['id'], (string)($_POST['kind'] ?? 'CANCELLED'), (string)($_POST['reason'] ?? ''), portal_client_name());
+                        $_SESSION['portal_flash'] = $emsg;
+                    }
+                    redirect('/portal/hire-req?id=' . (int)$req['id']);
                 }
                 $_SESSION['portal_flash'] = 'Updated.';
                 redirect('/portal/hire-req?id=' . (int)$req['id']);
@@ -1151,6 +1160,8 @@ function portal_route($route, $method) {
             $engRow = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement((int)$req['id']) : null;
             portal_view('hire_req', ['req' => $req, 'apps' => cx_applications_for((int)$req['id']),
                 'req_next' => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
+                'eng'      => $engRow,
+                'eng_kinds'=> function_exists('connect_engage_cancel_kinds') ? connect_engage_cancel_kinds() : [],
                 'vouchers' => ($engRow && function_exists('connect_engv_for_engagement')) ? connect_engv_for_engagement((int)$engRow['id']) : []]);
             exit;
 

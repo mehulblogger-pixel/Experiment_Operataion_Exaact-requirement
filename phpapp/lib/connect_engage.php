@@ -46,7 +46,72 @@ function connect_engage_migrate() {
     if (function_exists('ensure_column')) {
         ensure_column('cx_engagements', 'rate_inclusive', "VARCHAR(12) DEFAULT 'INCLUSIVE'"); // INCLUSIVE | EXCLUSIVE
         ensure_column('cx_engagements', 'voucher_cadence', "VARCHAR(14) DEFAULT 'PER_DEPLOYMENT'"); // PER_DAY | PER_DEPLOYMENT
+        // Stage 7 — cancellation / no-show / emergency replacement. Additive: the
+        // status stays CANCELLED (no new lifecycle status); the KIND records WHY,
+        // and replaces_engagement_id links a cover booking to the one it replaces.
+        ensure_column('cx_engagements', 'cancel_kind',   "VARCHAR(16) DEFAULT ''");  // CANCELLED | NO_SHOW
+        ensure_column('cx_engagements', 'cancel_reason', "VARCHAR(400) DEFAULT ''");
+        ensure_column('cx_engagements', 'cancelled_at',  "VARCHAR(30) DEFAULT ''");
+        ensure_column('cx_engagements', 'cancelled_by',  "VARCHAR(150) DEFAULT ''");
+        ensure_column('cx_engagements', 'replaces_engagement_id', "INT DEFAULT 0");
     }
+}
+
+/** The reasons a booking ends early. Kind stays a small vocabulary; the status
+ *  it maps to is always CANCELLED (so no object-lifecycle status is added). */
+function connect_engage_cancel_kinds() {
+    return [
+        'CANCELLED' => 'Cancelled (client / scope change)',
+        'NO_SHOW'   => 'No-show (resource did not turn up)',
+        'WITHDRAWN' => 'Withdrawn by the resource',
+    ];
+}
+
+/**
+ * End a booking early with a recorded reason and kind, freeing the resource.
+ * Status → CANCELLED; the conflict/availability engine already ignores cancelled
+ * bookings, so the person is immediately free to be re-booked. Idempotent-ish:
+ * re-cancelling only refreshes the reason. Returns [ok, message].
+ */
+function connect_engage_cancel($id, $kind, $reason = '', $who = '') {
+    connect_engage_migrate();
+    $id = (int)$id; if ($id <= 0) return [false, 'Unknown engagement.'];
+    $kind = strtoupper((string)$kind); if (!isset(connect_engage_cancel_kinds()[$kind])) $kind = 'CANCELLED';
+    $row = ops_one("SELECT id, subject_name, requirement_id FROM cx_engagements WHERE id=?", [$id]);
+    if (!$row) return [false, 'Unknown engagement.'];
+    db()->prepare("UPDATE cx_engagements SET status='CANCELLED', cancel_kind=?, cancel_reason=?, cancelled_at=?, cancelled_by=?, updated_at=? WHERE id=?")
+        ->execute([$kind, trim((string)$reason), date('c'), (string)$who, date('c'), $id]);
+    if (function_exists('act_log')) { try { act_log('engagement', $id, 'ENGAGEMENT_' . $kind, (string)$row['subject_name'] . ' — ' . (connect_engage_cancel_kinds()[$kind] ?? $kind), ['auto' => 1]); } catch (Throwable $e) {} }
+    return [true, 'Booking ended (' . strtolower(str_replace('_', '-', $kind)) . '). The resource is free again' . ((int)$row['requirement_id'] > 0 ? ' — the requirement can be re-sourced for a replacement.' : '.')];
+}
+
+/**
+ * Bookings that ended in a cancellation / no-show and have NOT yet been covered
+ * by a live replacement engagement — i.e. work that still needs someone.
+ * Optional $party scopes to one client. Read-only.
+ */
+function connect_engage_needs_cover($party = 0) {
+    connect_engage_migrate();
+    $args = []; $scope = '';
+    if ((int)$party > 0) { $scope = ' AND e.poster_party_id=?'; $args[] = (int)$party; }
+    try {
+        return ops_all(
+            "SELECT e.* FROM cx_engagements e
+              WHERE e.status='CANCELLED' AND COALESCE(e.cancel_kind,'')<>''
+                AND NOT EXISTS (SELECT 1 FROM cx_engagements r
+                                 WHERE r.replaces_engagement_id=e.id AND r.status IN ('BOOKED','ACTIVE','COMPLETED'))
+                $scope
+              ORDER BY e.cancelled_at DESC", $args
+        ) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
+/** Mark a (new) engagement as the cover for a cancelled one. Additive link. */
+function connect_engage_mark_replacement($newId, $cancelledId) {
+    connect_engage_migrate();
+    if ((int)$newId <= 0 || (int)$cancelledId <= 0) return false;
+    db()->prepare("UPDATE cx_engagements SET replaces_engagement_id=?, updated_at=? WHERE id=?")->execute([(int)$cancelledId, date('c'), (int)$newId]);
+    return true;
 }
 
 /**

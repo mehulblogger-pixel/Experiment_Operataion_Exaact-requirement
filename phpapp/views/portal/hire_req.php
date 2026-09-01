@@ -80,6 +80,48 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
   </div>
 <?php endif; ?>
 
+<?php // Stage 7 — the awarded engagement: end it early (cancel / no-show) with a
+      //          reason, or, if already ended, a "needs cover" prompt to re-source.
+      $eng = $eng ?? null; $eng_kinds = $eng_kinds ?? [];
+      if ($eng): $es = strtoupper((string)($eng['status'] ?? '')); $ck = strtoupper((string)($eng['cancel_kind'] ?? '')); ?>
+<h3 class="ptitle" style="font-size:16px;margin-top:24px">Engagement</h3>
+<div class="pcard" style="max-width:680px">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+    <div><strong><?= e($eng['subject_name'] ?: 'Awarded resource') ?></strong>
+      <div class="muted" style="font-size:12.5px"><?= e(($eng['start_date'] ?? '') . (!empty($eng['end_date']) ? ' → ' . $eng['end_date'] : '')) ?></div></div>
+    <?php if ($es === 'CANCELLED' && $ck !== ''): ?>
+      <span class="ppill" style="background:#fbeceb;color:#9a2a2a"><?= $ck === 'NO_SHOW' ? '⛔ No-show' : '✕ Cancelled' ?></span>
+    <?php else: ?>
+      <span class="ppill ok"><?= e(ucfirst(strtolower($es ?: 'booked'))) ?></span>
+    <?php endif; ?>
+  </div>
+
+  <?php if ($es === 'CANCELLED' && $ck !== ''): ?>
+    <div style="margin-top:10px;padding:11px 13px;border-radius:11px;background:#fff7ea;border:1px solid #efd9a3">
+      <strong style="color:#8a6d0b">⚠ Needs cover</strong>
+      <div style="font-size:13px;margin-top:2px">Ended as <em><?= e($ck === 'NO_SHOW' ? 'a no-show' : 'cancelled') ?></em><?= !empty($eng['cancel_reason']) ? ' — ' . e($eng['cancel_reason']) : '' ?>. The resource is free; source a replacement.</div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn" href="/portal/find">🔎 Find a replacement</a>
+        <?php if (in_array('SHORTLISTING', $req_next, true)): ?>
+          <form method="post" action="/portal/hire-req" class="inl"><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="req_transition"><input type="hidden" name="to" value="SHORTLISTING"><button class="btn secondary" type="submit">Re-open shortlisting</button></form>
+        <?php endif; ?>
+      </div>
+    </div>
+  <?php elseif (in_array($es, ['BOOKED', 'ACTIVE'], true)): ?>
+    <form method="post" action="/portal/hire-req" style="margin-top:10px" onsubmit="return confirm('End this booking early?');">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engage_cancel"><input type="hidden" name="engagement_id" value="<?= (int)$eng['id'] ?>">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select name="kind" class="form-control" style="max-width:230px">
+          <?php foreach ($eng_kinds as $k => $lbl): ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?>
+        </select>
+        <input name="reason" class="form-control" style="flex:1;min-width:180px" placeholder="Reason (optional)">
+        <button class="btn secondary" type="submit">End booking</button>
+      </div>
+    </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if ($vouchers): ?>
 <h3 class="ptitle" style="font-size:16px;margin-top:24px">Vouchers</h3>
 <p class="plead" style="margin:-4px 0 10px">Claims raised by the professional against this job — review the receipts, return for clarification, or approve.</p>
