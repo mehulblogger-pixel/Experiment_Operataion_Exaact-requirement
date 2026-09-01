@@ -19,7 +19,7 @@ Legend — **KEEP / EXTEND / CONNECT / CONFIGURE / BUILD** (verbs from
 | 4 | Marketplace integration | EXTEND | ▶ (post/apply/match/deploy exist; supplier types) |
 | 5 | Operations integration | CONNECT | ▶ (award→job bridge exists) |
 | 6 | UX contextualization (Combination Engine nav gating) | CONFIGURE | ✅ (nav gating for Operations/Recruitment/Reporting/Quality + capability-appropriate dashboard; onboarding + 10-archetype matrix) |
-| 7 | Conflict & edge-case engine | EXTEND/BUILD | ⬜ |
+| 7 | Conflict & edge-case engine | EXTEND/BUILD | ▶ (conflict/availability engine + applicant flag + status model done) |
 | 8 | Full regression testing | — | ♻ continuous (auto-walk + suite) |
 | 9 | Final acceptance validation (10-company matrix) | — | ⬜ |
 
@@ -78,11 +78,28 @@ companies.
 each re-crawled (auto-walk), so no company ever loses a screen it needs.
 **Exit:** each of the 10 archetypes (A–J) sees a coherent, capability-appropriate app.
 
-## Stage 7 — Conflict & edge-case engine (EXTEND/BUILD)
-**Do:** the negative paths (master-prompt §24, §37) — availability/double-booking,
-expired credentials blocking assignment, mobilization/gate-pass blocks, offline
-sync recovery, report rejection loop, billing mismatch reconciliation, duplicate
-prevention — extending `docs/edge-cases/`.
+## Stage 7 — Conflict & edge-case engine (EXTEND/BUILD) — ▶ in progress
+Built as its own slices, one at a time (nothing simultaneously):
+- **pt.1 — conflict/availability engine** (`lib/connect_conflict.php`): CONNECTS
+  `cx_engagements` (booking date ranges) + `cx_identity_link` (→ inspector) +
+  `schedule.php inspector_busy_on` (job calendar) + `competence.php
+  inspector_eligibility` (lapsed-credential block). `connect_conflict_check()` →
+  CLEAR | CONFLICT | BLOCKED. Read-only, no new table.
+- **pt.2 — applicant flag**: `/portal/hire-req` shows ⚠ Schedule conflict / ⛔
+  Blocked on each applicant against the requirement's dates, before shortlist/
+  offer/award.
+- **pt.3 — availability-status model** (§24): `connect_availability_status()`
+  derives one status per professional (AVAILABLE → BOOKED → ASSIGNED → ON_LEAVE …)
+  read-only, surfaced as a chip on the talent search.
+
+**Already existing (reused, not rebuilt):** the inspector-side double-booking
+(`inspector_busy_on`/`sched_availability`) and the hard credential gate
+(`inspector_eligibility`) on the operations side.
+
+**Remaining pieces (each its own slice):** mobilization/gate-pass block wiring
+(P2 readiness), cancellation / no-show / emergency-replacement handling, report
+rejection loop surfacing, billing-mismatch reconciliation, duplicate prevention
+(`dedupe.php`) — extending `docs/edge-cases/`.
 **Exit:** every listed failure has a defined, tested behaviour.
 
 ## Stage 8 — Full regression testing (continuous)
