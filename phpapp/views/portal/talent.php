@@ -51,6 +51,13 @@ $ctxReq = $ctx_req ?? null; $ctxApp = $ctx_app ?? null;
       <?php if (!empty($pro['headline'])): ?><div class="muted" style="font-size:14px"><?= e($pro['headline']) ?></div><?php endif; ?>
       <div style="margin-top:7px;display:flex;gap:7px;flex-wrap:wrap;align-items:center">
         <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:#eef5f4;color:#0a5c5c">🛡 <?= e($tier) ?></span>
+        <?php // Stage 4 — supplier type (§19)
+              $sup = function_exists('connect_supplier_type') ? connect_supplier_type((int)$pro['id']) : ['channel'=>'INDIVIDUAL','type'=>'Individual'];
+              if (($sup['channel'] ?? '') === 'ORG'): ?>
+          <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:#eef0fb;color:#33409a" title="Supplied through <?= e($sup['org_name'] ?? '') ?>">🏢 <?= e($sup['type']) ?><?= !empty($sup['org_name']) ? ' · '.e($sup['org_name']) : '' ?></span>
+        <?php else: ?>
+          <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:#eef5f4;color:#0a5c5c">👤 Individual</span>
+        <?php endif; ?>
         <?php if ($avail): $t=$avail['tone']; $st=$t==='ok'?'background:#e7f5ef;color:#0f7d5a':($t==='bad'?'background:#fbeceb;color:#9a2a2a':'background:#fbf3df;color:#a9720a'); ?>
           <span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;<?= $st ?>"><?= e($avail['label']) ?></span>
         <?php endif; ?>

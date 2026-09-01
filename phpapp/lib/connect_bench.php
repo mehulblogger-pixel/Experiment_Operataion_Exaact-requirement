@@ -269,3 +269,44 @@ function ops_connect_bench($method) {
     ]);
     return true;
 }
+
+// ---------------------------------------------------------------------------
+//  Marketplace supplier type (§19). How a professional reaches the market:
+//  directly (an Individual Supplier) or through a supplier ORGANISATION whose
+//  kind — TPIA / Technical Manpower / Freelance Resource / Recruitment /
+//  Technical Services — the client should see. Read-only; reuses the agency
+//  bench link (cx_bench.professional_id → cx_organisations) and, where set, the
+//  company-capability engine to name a Freelance Resource Supplier precisely.
+// ---------------------------------------------------------------------------
+function connect_supplier_type_labels() {
+    return [
+        'TPIA'               => 'TPIA Supplier',
+        'MANPOWER_AGENCY'    => 'Technical Manpower Supplier',
+        'RECRUITMENT_AGENCY' => 'Recruitment Agency',
+        'ENTERPRISE'         => 'Technical Services Company',
+        'COMPANY'            => 'Company',
+        'FREELANCER'         => 'Individual',
+    ];
+}
+
+/** The supplier classification for a professional. Returns
+ *  ['channel'=>'INDIVIDUAL'|'ORG', 'type'=>label, 'org_id'=>int, 'org_name'=>str]. */
+function connect_supplier_type($proId) {
+    $proId = (int)$proId;
+    $indiv = ['channel' => 'INDIVIDUAL', 'type' => 'Individual', 'org_id' => 0, 'org_name' => ''];
+    if (!$proId) return $indiv;
+    try {
+        $org = ops_one("SELECT o.id, o.name, o.org_type, o.party_id
+                          FROM cx_bench b JOIN cx_organisations o ON o.id=b.org_id
+                         WHERE b.professional_id=? AND COALESCE(b.is_active,1)=1 AND o.status='ACTIVE'
+                         ORDER BY b.id DESC LIMIT 1", [$proId]);
+    } catch (Throwable $e) { $org = null; }
+    if (!$org) return $indiv;
+    $type = connect_supplier_type_labels()[strtoupper((string)$org['org_type'])] ?? 'Supplier';
+    // Refine to a Freelance Resource Supplier when the org's capabilities say so.
+    if (function_exists('connect_org_has_cap') && (int)($org['party_id'] ?? 0) > 0) {
+        foreach (['FREELANCE_SUPPLY', 'FREELANCE_INSPECTOR_SUPPLY'] as $cap)
+            if (connect_org_has_cap((int)$org['party_id'], $cap)) { $type = 'Freelance Resource Supplier'; break; }
+    }
+    return ['channel' => 'ORG', 'type' => $type, 'org_id' => (int)$org['id'], 'org_name' => (string)$org['name']];
+}

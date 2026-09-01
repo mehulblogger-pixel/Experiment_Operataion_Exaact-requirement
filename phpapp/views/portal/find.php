@@ -66,6 +66,13 @@ $rateLbl = ['public'=>'Rate on card','band'=>'Rate range on request','hidden'=>'
         <?php if ($c['identity_masked']): ?> <span title="This professional shows their full name once you’re engaged">🔒</span><?php endif; ?>
         <?php $tr=(int)$c['tier_rank']; ?>
         <span class="fc-tier t<?= $tr>=3?3:$tr ?>" title="<?= e($c['tier_label']) ?>"><?= $tr>=3?'✓ Proven':($tr>=2?'✓ Credential-verified':($tr>=1?'✓ ID-verified':'Registered')) ?></span>
+        <?php // Stage 4 — supplier type (§19): how this person reaches the market.
+              $sup = $c['supplier'] ?? ['channel'=>'INDIVIDUAL','type'=>'Individual'];
+              if (($sup['channel'] ?? '') === 'ORG'): ?>
+          <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:#eef0fb;color:#33409a" title="Supplied through <?= e($sup['org_name'] ?? '') ?>">🏢 <?= e($sup['type']) ?><?= !empty($sup['org_name']) ? ' · '.e($sup['org_name']) : '' ?></span>
+        <?php else: ?>
+          <span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:#eef5f4;color:#0a5c5c">👤 Individual</span>
+        <?php endif; ?>
         <?php if ($c['headline']): ?><div class="muted" style="font-size:13px;margin-top:3px"><?= e($c['headline']) ?></div><?php endif; ?>
       </div>
       <?php // Stage 7 — the derived availability status (Available / Booked / In
