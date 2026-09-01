@@ -149,6 +149,32 @@ function engagement_backfill($limit = 2000) {
     return ['engagements' => $made, 'stamped' => $stamped];
 }
 
+/**
+ * Reconciliation check (the gate before any reader switches from the
+ * contract_number STRING to the engagement_id). For calls/jobs/quotations/
+ * invoices it counts, per table:
+ *   threaded   — rows carrying a contract_number,
+ *   unstamped  — those with no engagement_id yet (backfill not run / new rows),
+ *   mismatched — engagement_id set but its engagement_key <> the row's number.
+ * in_parity is true only when nothing is unstamped or mismatched. Read-only;
+ * every probe is guarded so a DB missing the additive column degrades to 0.
+ */
+function engagement_parity() {
+    engagement_migrate();
+    $val = function ($sql, $args = []) { try { return (int)ops_val($sql, $args); } catch (Throwable $e) { return 0; } };
+    $threaded = 0; $unstamped = 0; $mismatched = 0; $by = [];
+    foreach (['calls', 'jobs', 'quotations', 'invoices'] as $t) {
+        $th = $val("SELECT COUNT(*) FROM $t WHERE COALESCE(contract_number,'')<>''");
+        $u  = $val("SELECT COUNT(*) FROM $t WHERE COALESCE(contract_number,'')<>'' AND (engagement_id IS NULL OR engagement_id=0)");
+        $m  = $val("SELECT COUNT(*) FROM $t x JOIN engagements e ON e.id=x.engagement_id
+                     WHERE COALESCE(x.engagement_id,0)>0 AND e.engagement_key <> COALESCE(x.contract_number,'')");
+        $by[$t] = ['threaded' => $th, 'unstamped' => $u, 'mismatched' => $m];
+        $threaded += $th; $unstamped += $u; $mismatched += $m;
+    }
+    return ['threaded' => $threaded, 'unstamped' => $unstamped, 'mismatched' => $mismatched,
+            'in_parity' => ($unstamped === 0 && $mismatched === 0), 'by_table' => $by];
+}
+
 // A drop-in "Engagement" panel for the contract detail — the whole spine under this contract_number,
 // grouped by kind, each row a link into its own module. Read-only; renders nothing without a number.
 function engagement_render($contractNumber, $partnerId = 0) {
