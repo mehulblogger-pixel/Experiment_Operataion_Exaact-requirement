@@ -91,10 +91,15 @@ function ops_area_def($area) {
             $t($fx('roi_available') && roi_available() && $fx('roi_can') && roi_can(), '💸', 'Advertising return', '/ads-roi', 'Spend against leads produced.');
             break;
 
+        // Stage 6 Combination Engine: the quality area's ISO/inspection registers
+        // ($inspPack tiles) show only when the operating company does inspection —
+        // a pure recruiter/staffer never sees them. Permissive until an operating
+        // company is designated. (connect_cap_owner_does_inspection, connect_capability.php)
         case 'quality':
             $title = 'Quality & Accreditation'; $icon = '🛡️';
             $sub = 'Two halves: the everyday quality work you touch during jobs, and the accreditation registers an assessor asks for.';
             $routes = ['quality','equipment','samples','sample','methods','method','drules','drule','cdocs','cdoc','risks','risk','retention','disclosure','competence','impartiality','complaints','complaint','satisfaction','confidentiality','conf-breach','site-docs','report-reviews','ncr','issues','departures','hold-points','capa','internal-audits','internal-audit','management-reviews','management-review','evidence-review','data-control','identity','sla-targets'];
+            if (function_exists('connect_cap_owner_does_inspection')) $inspPack = $inspPack && connect_cap_owner_does_inspection();
 
             // ── Everyday quality — the things you touch during live jobs. ──
             $sec('Everyday quality');

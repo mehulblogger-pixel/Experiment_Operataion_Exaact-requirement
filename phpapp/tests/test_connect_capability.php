@@ -67,6 +67,22 @@ try {
     // capabilities NEVER grant a permission — they are visibility only
     t_ok(!function_exists('connect_cap_grant') && !function_exists('connect_cap_permission'),
         'the engine exposes no permission-granting function (visibility only)');
+
+    // ---- Stage 6 — operating company drives nav visibility ----
+    t_ok(connect_cap_owner_does_inspection(), 'no operating company set → inspection visible (permissive default)');
+    // a pure recruiter operating company hides the inspection registers
+    connect_org_cap_bulk_set($party, ['TECH_RECRUITMENT', 'PERMANENT_PLACEMENT'], 'tester');
+    connect_cap_owner_set($party);
+    t_ok(connect_cap_owner_party() === $party, 'the operating company can be designated');
+    t_ok(!connect_cap_owner_does_inspection(), 'a pure recruiter operating company hides inspection/ISO registers');
+    // switch it to a TPIA and inspection returns
+    connect_org_cap_bulk_set($party, ['TPIA', 'QAQC'], 'tester');
+    t_ok(connect_cap_owner_does_inspection(), 'a TPIA/QA-QC operating company sees inspection registers again');
+    // clearing the operating company returns to fully permissive
+    connect_cap_owner_set(0);
+    t_ok(connect_cap_owner_party() === 0 && connect_cap_owner_does_inspection(),
+        'clearing the operating company returns the workspace to permissive');
 } finally {
+    connect_cap_owner_set(0); // never leak the operating-company setting out of the test
     if ($own && db()->inTransaction()) db()->rollBack();
 }

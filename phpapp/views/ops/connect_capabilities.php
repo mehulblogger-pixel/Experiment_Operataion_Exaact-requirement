@@ -6,6 +6,7 @@ $companies = $companies ?? []; $sel = (int)($sel ?? 0);
 $catalog = $catalog ?? []; $groups = $groups ?? []; $enabled = $enabled ?? [];
 $configured = !empty($configured); $pools = $pools ?? ['internal'=>0,'associated'=>0,'marketplace'=>0];
 $is_supplier = !empty($is_supplier);
+$owner = (int)($owner ?? 0); $is_owner = !empty($is_owner); $does_inspection = !empty($does_inspection);
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Company capabilities</div>
 <div class="master-head">
@@ -38,6 +39,16 @@ $is_supplier = !empty($is_supplier);
         <strong><?= (int)$pools['associated'] ?></strong> associated ·
         <strong><?= (int)$pools['marketplace'] ?></strong> marketplace</span>
     <?php endif; ?>
+  </div>
+  <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line,#eef1f0);display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <?php if ($is_owner): ?>
+      <span class="pill ok" style="padding:4px 11px;border-radius:999px;font-size:12px;font-weight:600;background:#e6f5ee">★ This is the operating company — the workspace follows its capabilities</span>
+      <form method="post" action="/connect-capabilities" style="margin:0"><input type="hidden" name="action" value="set_owner"><input type="hidden" name="party_id" value="0"><button class="btn sec" type="submit" style="padding:6px 12px;font-size:12.5px">Clear</button></form>
+    <?php else: ?>
+      <form method="post" action="/connect-capabilities" style="margin:0"><input type="hidden" name="action" value="set_owner"><input type="hidden" name="party_id" value="<?= $sel ?>"><button class="btn" type="submit" style="padding:7px 13px">Make this the operating company</button></form>
+      <span class="muted" style="font-size:12.5px">Tailors this workspace’s navigation to what this company actually does (e.g. hides ISO/inspection registers from a pure recruiter).</span>
+    <?php endif; ?>
+    <span class="muted" style="font-size:12px">Operating company currently <?= $owner ? 'set' : 'not set — workspace shows everything' ?>; inspection registers <?= $does_inspection ? 'visible' : 'hidden' ?>.</span>
   </div>
 </div>
 

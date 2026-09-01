@@ -152,6 +152,47 @@ function connect_supplier_pools($party) {
 }
 
 // ---------------------------------------------------------------------------
+//  Stage 6 — the operating company drives the workspace navigation.
+//  In this (single-tenant) install one company owns the workspace; its
+//  capabilities tailor which specialist areas the staff nav shows. Until an
+//  operating company is designated the engine stays fully permissive, so the
+//  nav is unchanged for every existing install.
+// ---------------------------------------------------------------------------
+
+/** The operating company's party id (0 = not designated → permissive). */
+function connect_cap_owner_party() {
+    $p = function_exists('setting_get') ? (int)setting_get('cap_owner_party') : 0;
+    return $p > 0 ? $p : 0;
+}
+
+/** Designate (or clear, with 0) the operating company. */
+function connect_cap_owner_set($party) {
+    if (function_exists('setting_set')) setting_set('cap_owner_party', (string)(int)$party);
+}
+
+/** The capability codes in one catalogue group. */
+function connect_cap_group_codes($group) {
+    $codes = [];
+    foreach (connect_cap_catalog() as $code => $c) if ($c['group'] === $group) $codes[] = $code;
+    return $codes;
+}
+
+/** Does the OPERATING company have any capability in this group? Permissive
+ *  (true) when no operating company is set or it is unconfigured — so the nav
+ *  only ever narrows once an admin has deliberately tailored the workspace. */
+function connect_cap_owner_has_group($group) {
+    $owner = connect_cap_owner_party();
+    if (!$owner || !connect_cap_configured($owner)) return true;
+    return (bool)array_intersect(connect_cap_group_codes($group), connect_org_caps($owner));
+}
+
+/** Whether the operating company does any inspection / technical-services work
+ *  (gates the Quality & Accreditation area — a pure recruiter never sees it). */
+function connect_cap_owner_does_inspection() {
+    return connect_cap_owner_has_group('Inspection & Technical Services');
+}
+
+// ---------------------------------------------------------------------------
 //  Master-admin screen — set each company's business capabilities.
 // ---------------------------------------------------------------------------
 function ops_connect_capabilities($method) {
@@ -159,12 +200,18 @@ function ops_connect_capabilities($method) {
     connect_cap_migrate();
     if ($method === 'POST') {
         $party = (int)($_POST['party_id'] ?? 0);
+        $act = (string)($_POST['action'] ?? 'save');
+        if ($act === 'set_owner') {
+            connect_cap_owner_set($party);
+            flash($party > 0 ? 'Operating company set — the workspace now follows its capabilities.' : 'Operating company cleared — the workspace shows everything again.');
+            redirect('/connect-capabilities' . ($party > 0 ? '?party=' . $party : ''));
+        }
         if ($party > 0) {
             $codes = array_map('strval', (array)($_POST['caps'] ?? []));
             connect_org_cap_bulk_set($party, $codes, function_exists('user_name') ? user_name(current_user()) : 'admin');
             flash('Capabilities saved for the company.');
         } else flash('Pick a company first.', 'error');
-        redirect('/connect-capabilities');
+        redirect('/connect-capabilities' . ($party > 0 ? '?party=' . $party : ''));
     }
     // Companies = the client/vendor/agency masters, plus any registered orgs.
     // Agencies are represented as vendors in business_partners (there is no
@@ -180,6 +227,8 @@ function ops_connect_capabilities($method) {
         'configured' => $sel ? connect_cap_configured($sel) : false,
         'pools' => $sel ? connect_supplier_pools($sel) : ['internal' => 0, 'associated' => 0, 'marketplace' => 0],
         'is_supplier' => $sel ? (bool)array_intersect(connect_cap_freelance_supplier_codes(), connect_org_caps($sel)) : false,
+        'owner' => connect_cap_owner_party(), 'is_owner' => ($sel && $sel === connect_cap_owner_party()),
+        'does_inspection' => connect_cap_owner_does_inspection(),
     ]);
     return true;
 }
