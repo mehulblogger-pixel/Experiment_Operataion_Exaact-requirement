@@ -132,6 +132,33 @@ function connect_pro_require() {
 }
 
 /** Self-registration. Returns '' on success (and logs in), else an error. */
+/** Digits-only phone key for matching (last 10, so +91 / 0-prefix agree). */
+function connect_pro_phone_key($num) {
+    $d = preg_replace('/[^0-9]/', '', (string)$num);
+    return strlen($d) >= 10 ? substr($d, -10) : $d;
+}
+
+/**
+ * Likely-duplicate marketplace professionals for a (name, email, mobile). Read-
+ * only; reuses the dedupe name key. Returns [ ['id','name','reason'] … ] where
+ * reason is 'email' | 'mobile' | 'name'. $exceptId excludes one id (self).
+ * Flags for review — it never merges or penalises anything (directive F10).
+ */
+function connect_pro_duplicates($name, $email, $mobile, $exceptId = 0) {
+    connect_pro_migrate();
+    $out = []; $seen = [];
+    $add = function ($id, $nm, $reason) use (&$out, &$seen) { $id = (int)$id; if ($id <= 0 || isset($seen[$id])) return; $seen[$id] = 1; $out[] = ['id' => $id, 'name' => (string)$nm, 'reason' => $reason]; };
+    $email = strtolower(trim((string)$email)); $exceptId = (int)$exceptId;
+    try {
+        if ($email !== '') foreach (ops_all("SELECT id, name FROM cx_professionals WHERE LOWER(email)=? AND id<>?", [$email, $exceptId]) ?: [] as $r) $add($r['id'], $r['name'], 'email');
+        $pk = connect_pro_phone_key($mobile);
+        if (strlen($pk) >= 10) foreach (ops_all("SELECT id, name, mobile FROM cx_professionals WHERE id<>?", [$exceptId]) ?: [] as $r) if (connect_pro_phone_key($r['mobile']) === $pk) $add($r['id'], $r['name'], 'mobile');
+        $nm = trim((string)$name);
+        if ($nm !== '' && function_exists('dd_key')) { $k = dd_key($nm); if ($k !== '') foreach (ops_all("SELECT id, name FROM cx_professionals WHERE id<>?", [$exceptId]) ?: [] as $r) if (dd_key((string)$r['name']) === $k) $add($r['id'], $r['name'], 'name'); }
+    } catch (Throwable $e) {}
+    return $out;
+}
+
 function connect_pro_register(array $in) {
     connect_pro_migrate();
     $email = strtolower(trim((string)($in['email'] ?? '')));
@@ -141,6 +168,14 @@ function connect_pro_register(array $in) {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return 'Enter a valid e-mail address.';
     if (strlen($pw) < 8) return 'Choose a password of at least 8 characters.';
     if (ops_val("SELECT id FROM cx_professionals WHERE email=?", [$email])) return 'That e-mail is already registered — sign in instead.';
+    // Duplicate prevention: the same person re-registering with a new e-mail but
+    // the same mobile is the common duplicate — block it at source and send them
+    // to sign in. (A near-name match is only a soft flag, not a block.)
+    $mobile = trim((string)($in['mobile'] ?? ''));
+    if (connect_pro_phone_key($mobile) !== '' && strlen(connect_pro_phone_key($mobile)) >= 10) {
+        foreach (connect_pro_duplicates('', '', $mobile) as $dup) if ($dup['reason'] === 'mobile')
+            return 'A profile already uses this mobile number — sign in to that account instead of creating a duplicate.';
+    }
     $tok = bin2hex(random_bytes(16));
     db()->prepare("INSERT INTO cx_professionals (email,name,mobile,password_hash,is_active,verification_tier,passport_token,created_at)
                    VALUES (?,?,?,?,1,'registered',?,?)")
