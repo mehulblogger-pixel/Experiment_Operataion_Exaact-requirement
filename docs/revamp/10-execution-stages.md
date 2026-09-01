@@ -18,7 +18,7 @@ Legend — **KEEP / EXTEND / CONNECT / CONFIGURE / BUILD** (verbs from
 | 3 | Universal Technical Passport & taxonomy | EXTEND | ▶ (passport + `cx_tax_*` exist; deepen) |
 | 4 | Marketplace integration | EXTEND | ▶ (post/apply/match/deploy exist; supplier types) |
 | 5 | Operations integration | CONNECT | ▶ (award→job bridge exists) |
-| 6 | UX contextualization (Combination Engine nav gating) | CONFIGURE | ⬜ (engine ready; apply to nav) |
+| 6 | UX contextualization (Combination Engine nav gating) | CONFIGURE | ▶ (Quality + Reporting areas gated; multi-capability onboarding live) |
 | 7 | Conflict & edge-case engine | EXTEND/BUILD | ⬜ |
 | 8 | Full regression testing | — | ♻ continuous (auto-walk + suite) |
 | 9 | Final acceptance validation (10-company matrix) | — | ⬜ |
@@ -65,11 +65,17 @@ TPIA / technical-services co) on `connect_market`/`connect_hiring`; demand flow
 re-keying (`connect_deploy` award→job), through mobilization readiness + scheduling.
 **Exit:** no marketplace outcome dead-ends; the spine carries it to execution.
 
-## Stage 6 — UX contextualization (CONFIGURE) — the next build
-**Do:** apply `connect_cap_shows()` to gate the live navigation per company +
-capabilities + role + context, so a pure recruiter doesn't see inspection modules.
-**Guardrail:** default-permissive stays the floor; gating is added screen-group by
-screen-group, each re-crawled, so no company ever loses a screen it needs.
+## Stage 6 — UX contextualization (CONFIGURE) — ▶ in progress
+**Done so far:** multi-capability onboarding at `/join` (a company declares its full
+mix at sign-up); `connect_cap_owner_*` designates the operating company; the
+**Quality & Accreditation** area's ISO/inspection registers and the whole
+**Reporting** area are gated on the operating company doing inspection / producing
+reports. Money and Sales are universal (never gated).
+**Remaining:** extend to Operations (deputation vs placement), and per-archetype
+review of the other areas; add capability-appropriate defaults for staffing/project
+companies.
+**Guardrail:** default-permissive stays the floor; gating is added area by area,
+each re-crawled (auto-walk), so no company ever loses a screen it needs.
 **Exit:** each of the 10 archetypes (A–J) sees a coherent, capability-appropriate app.
 
 ## Stage 7 — Conflict & edge-case engine (EXTEND/BUILD)
