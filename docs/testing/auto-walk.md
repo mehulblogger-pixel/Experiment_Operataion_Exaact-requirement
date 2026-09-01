@@ -16,20 +16,28 @@ render; `1` = at least one is broken, with the URL and the error text.
 
 ## How to run it
 
+**One command** does the whole loop (seed → boot → crawl both surfaces → tear down):
+
+```bash
+cd phpapp && bash tools/auto-walk.sh
+```
+
+Exit 0 = every screen renders; exit 1 = the broken URLs and their error text are
+printed above the summary. It uses a throwaway `/tmp` database and never touches
+the real data, the default branch, or any app code.
+
+<details><summary>Or the individual steps</summary>
+
 ```bash
 cd phpapp
-# 1. throwaway seeded DB (never the real one)
 export DB_DRIVER=sqlite SQLITE_PATH=/tmp/walk.sqlite ADMIN_PASSWORD=admin12345
 rm -f /tmp/walk.sqlite
 php tools/seed-scenario-s01.php && php tools/seed-scenario-s02.php && php tools/seed-scenario-s03.php
-
-# 2. boot the app on that DB
 php -S 127.0.0.1:8811 tools/smoke-router.php &
-
-# 3. crawl both surfaces
 NODE_PATH=<node_modules> node tools/smoke.js        http://127.0.0.1:8811 admin admin12345
 NODE_PATH=<node_modules> node tools/portal-crawl.js http://127.0.0.1:8811
 ```
+</details>
 
 ## The safe auto-fix loop
 
