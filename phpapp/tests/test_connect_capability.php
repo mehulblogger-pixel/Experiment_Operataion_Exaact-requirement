@@ -75,9 +75,17 @@ try {
     connect_cap_owner_set($party);
     t_ok(connect_cap_owner_party() === $party, 'the operating company can be designated');
     t_ok(!connect_cap_owner_does_inspection(), 'a pure recruiter operating company hides inspection/ISO registers');
+    // reporting area gating (Stage 6, extended): a recruiter produces no reports
+    t_ok(!connect_cap_owner_shows('reporting'), 'a pure recruiter operating company hides the inspection Reporting area');
+    // a freelance-inspector supplier DOES produce reports → Reporting visible
+    connect_org_cap_bulk_set($party, ['FREELANCE_INSPECTOR_SUPPLY'], 'tester');
+    t_ok(connect_cap_owner_shows('reporting'), 'a freelance-inspector supplier sees the Reporting area');
     // switch it to a TPIA and inspection returns
     connect_org_cap_bulk_set($party, ['TPIA', 'QAQC'], 'tester');
     t_ok(connect_cap_owner_does_inspection(), 'a TPIA/QA-QC operating company sees inspection registers again');
+    t_ok(connect_cap_owner_shows('reporting'), 'a TPIA sees the Reporting area');
+    // Money stays universal — never gated by capabilities
+    t_ok(connect_cap_owner_shows('money'), 'the Money area is universal (never gated by capabilities)');
     // clearing the operating company returns to fully permissive
     connect_cap_owner_set(0);
     t_ok(connect_cap_owner_party() === 0 && connect_cap_owner_does_inspection(),

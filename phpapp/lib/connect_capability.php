@@ -133,7 +133,10 @@ function connect_cap_modules($party) {
  *  are always visible. */
 function connect_cap_shows($party, $moduleKey) {
     $moduleKey = (string)$moduleKey;
-    if (in_array($moduleKey, ['connect', 'admin'], true)) return true;
+    // Universal modules every business needs — never gated by capabilities.
+    // (Marketplace, Admin, Money/billing and Sales/CRM.) Only the specialist
+    // modules — operations, reporting, hr — follow the capability mix.
+    if (in_array($moduleKey, ['connect', 'admin', 'money', 'sales'], true)) return true;
     if (!connect_cap_configured($party)) return true;      // not configured → show everything (backward compatible)
     return in_array($moduleKey, connect_cap_modules($party), true);
 }
@@ -190,6 +193,16 @@ function connect_cap_owner_has_group($group) {
  *  (gates the Quality & Accreditation area — a pure recruiter never sees it). */
 function connect_cap_owner_does_inspection() {
     return connect_cap_owner_has_group('Inspection & Technical Services');
+}
+
+/** Should the operating company see a module area? Reads connect_cap_shows for the
+ *  operating company, permissive when none is designated. Drives area-level nav
+ *  gating (e.g. Reporting shows only when the company's mix produces reports —
+ *  inspection work or freelance-inspector supply). */
+function connect_cap_owner_shows($moduleKey) {
+    $owner = connect_cap_owner_party();
+    if (!$owner) return true;
+    return connect_cap_shows($owner, $moduleKey);
 }
 
 // ---------------------------------------------------------------------------

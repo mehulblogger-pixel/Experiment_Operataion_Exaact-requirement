@@ -154,11 +154,14 @@ function ops_area_def($area) {
             // the duplicate that was here is parked in Admin.
             break;
 
+        // Stage 6 Combination Engine: the inspection Reporting area shows only when
+        // the operating company's capabilities produce reports (inspection work or
+        // freelance-inspector supply). Permissive until an operating company is set.
         case 'reporting':
             $title = 'Reporting'; $icon = '📑';
             $sub = 'Where inspection reports are written, endorsed, expedited and the formats that govern them.';
             $routes = ['reporting','documents','document','endorsements','endorsement','vendors','vendor-profile','expediting','expediting-projects','writing-assistant','phrase-library','learning','compliance'];
-            if (can('mod.idems.view')) {
+            if ((!function_exists('connect_cap_owner_shows') || connect_cap_owner_shows('reporting')) && can('mod.idems.view')) {
                 $sec('Reports');
                 $t(true, '📑', T_REG('report'), '/documents', 'The report register.');
                 $t(can('mod.idems.edit') || is_master_of('idems'), '➕', ucfirst(T_NEW('report')), '/document-new', 'Start a new report.');
