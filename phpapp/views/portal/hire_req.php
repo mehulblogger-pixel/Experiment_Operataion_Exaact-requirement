@@ -80,6 +80,26 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
   </div>
 <?php endif; ?>
 
+<?php // Stage 5 — marketplace → operations bridge (§20). Once awarded and mobilized
+      //          by our team, the same engagement IS an operational deployment — no
+      //          re-keying. Show the client that link (the operational job).
+      if ($awardedId > 0):
+        $deploy = function_exists('connect_deploy_row_for_requirement') ? connect_deploy_row_for_requirement((int)$req['id']) : null; ?>
+<h3 class="ptitle" style="font-size:16px;margin-top:24px">Deployment</h3>
+<div class="pcard" style="max-width:680px">
+  <?php if ($deploy): ?>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+      <div><span class="ppill ok">✓ Deployed to operations</span>
+        <div class="muted" style="font-size:12.5px;margin-top:3px">Reference <strong><?= e($deploy['job_code'] ?: ('JOB-'.$deploy['id'])) ?></strong><?= !empty($deploy['dep_site']) ? ' · '.e($deploy['dep_site']) : '' ?><?= !empty($deploy['dep_status']) ? ' · '.e(ucfirst(strtolower(str_replace('_',' ',$deploy['dep_status'])))) : '' ?></div></div>
+      <a class="btn secondary" href="/portal/deputations">Track deployment →</a>
+    </div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">This is the same person you awarded — the marketplace engagement became operational work directly, with no re-entry.</p>
+  <?php else: ?>
+    <div class="muted" style="font-size:13.5px">Awarded — our operations team is mobilizing the resource. The deployment reference will appear here.</div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php // Stage 7 — the awarded engagement: end it early (cancel / no-show) with a
       //          reason, or, if already ended, a "needs cover" prompt to re-source.
       $eng = $eng ?? null; $eng_kinds = $eng_kinds ?? [];

@@ -17,7 +17,7 @@ Legend — **KEEP / EXTEND / CONNECT / CONFIGURE / BUILD** (verbs from
 | 2 | Company Capability engine | BUILD | ✅ (`connect_capability.php`) |
 | 3 | Universal Technical Passport & taxonomy | EXTEND | ▶ (passport + `cx_tax_*` exist; deepen) |
 | 4 | Marketplace integration | EXTEND | ▶ (post/apply/match/deploy exist; supplier types) |
-| 5 | Operations integration | CONNECT | ▶ (award→job bridge exists) |
+| 5 | Operations integration | CONNECT | ✅ (award→deploy bridge + client-visible marketplace→operations link, no re-keying) |
 | 6 | UX contextualization (Combination Engine nav gating) | CONFIGURE | ✅ (nav gating for Operations/Recruitment/Reporting/Quality + capability-appropriate dashboard; onboarding + 10-archetype matrix) |
 | 7 | Conflict & edge-case engine | EXTEND/BUILD | ✅ (conflict/availability, availability status, masked profiles, cancel/no-show, duplicate prevention, gate pass, report-rejection, billing-mismatch) |
 | 8 | Full regression testing | — | ♻ continuous (auto-walk + suite) |
