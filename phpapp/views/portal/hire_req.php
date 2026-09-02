@@ -50,9 +50,13 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:2px 0;color:var(--muted)"><span>Fee (<?= e($vinr($est['rate'])) ?> × <?= (float)$est['qty'] ?>)</span><span style="font-variant-numeric:tabular-nums"><?= e($vinr($est['fee_total'])) ?></span></div>
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:700;padding:4px 0;border-top:1px solid var(--line,#eee);margin-top:4px"><span>Subtotal</span><span style="font-variant-numeric:tabular-nums"><?= e($vinr($est['subtotal'])) ?></span></div>
     <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:2px 0;color:var(--muted)"><span>GST @ <?= (float)$est['tax_pct'] ?>%</span><span style="font-variant-numeric:tabular-nums"><?= e($vinr($est['tax'])) ?></span></div>
-    <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-top:6px;border-top:1px solid var(--line,#eee);margin-top:4px"><span style="font-weight:700">Grand total</span><span style="font-weight:800;font-size:17px;color:#0a5c5c;font-variant-numeric:tabular-nums"><?= e($vinr($est['grand'])) ?></span></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-top:6px;border-top:1px solid var(--line,#eee);margin-top:4px"><span style="font-weight:700">Invoice total (incl. GST)</span><span style="font-weight:800;font-size:17px;color:#0a5c5c;font-variant-numeric:tabular-nums"><?= e($vinr($est['invoice_total'])) ?></span></div>
+    <?php if ((float)$est['tds_pct'] > 0): ?>
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:4px 0 2px;color:var(--muted)"><span>Less: TDS @ <?= (float)$est['tds_pct'] ?>% (on <?= e($vinr($est['subtotal'])) ?>, pre-GST)</span><span style="font-variant-numeric:tabular-nums">− <?= e($vinr($est['tds'])) ?></span></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-top:4px;border-top:1px dashed var(--line,#eee)"><span style="font-weight:700">Net payable to supplier</span><span style="font-weight:700;font-size:15px;font-variant-numeric:tabular-nums"><?= e($vinr($est['net_receivable'])) ?></span></div>
+    <?php endif; ?>
     <?php if ($est['has_actuals']): ?><div style="font-size:11.5px;color:#8a6d0b;margin-top:6px">＋ items marked “at actuals” are claimed on receipts on top of this estimate.</div><?php endif; ?>
-    <div style="font-size:11px;color:var(--muted);margin-top:6px">An estimate — the agreed rate is settled at award.</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px"><?php if (!empty($est['sac'])): ?>SAC/HSN <?= e($est['sac']) ?> · <?php endif; ?>An estimate — the agreed rate is settled at award.</div>
   <?php endif; ?>
 </div>
 <?php endif; ?>

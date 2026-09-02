@@ -83,8 +83,29 @@ function connect_market_migrate() {
         ensure_column('cx_requirements', 'est_rate',    "REAL DEFAULT 0");      // base fee per unit (day/month/visit)
         ensure_column('cx_requirements', 'est_qty',     "REAL DEFAULT 0");      // estimated quantity in that unit
         ensure_column('cx_requirements', 'est_tax_pct', "REAL DEFAULT 18");     // GST %, charged on top of the subtotal
+        ensure_column('cx_requirements', 'est_tds_pct', "REAL DEFAULT 0");      // TDS %, withheld by the client on the pre-GST value
+        ensure_column('cx_requirements', 'est_sac',     "VARCHAR(20) DEFAULT ''"); // SAC / HSN code (manpower supply = 998519)
         ensure_column('cx_requirements', 'reimb_terms', "TEXT DEFAULT ''");     // JSON: {head:{mode,ceiling,per}}
     }
+}
+
+/** Is a reimbursable head claimable on a voucher, given how the client set it?
+ *  ACTUALS / CEILING → yes (a ceiling is guidance, not a block). IN_RATE (it's in
+ *  the fee) and PROVIDED (the client arranges it directly) → NO amount is claimable. */
+function connect_reqterms_head_claimable($mode) {
+    return in_array(strtoupper((string)$mode), ['ACTUALS', 'CEILING'], true);
+}
+
+/** The set of expense heads a professional MAY claim on a voucher for this
+ *  engagement/requirement row. Backward-compatible: if no reimbursement terms were
+ *  set (empty), EVERY head stays claimable exactly as before — nothing is blocked. */
+function connect_reqterms_claimable_heads($row) {
+    $raw = is_array($row) ? (string)($row['reimb_terms'] ?? '') : (string)$row;
+    $all = array_keys(connect_reqterms_heads());
+    if (trim($raw) === '') return $all;                 // legacy / no terms → all claimable
+    $terms = connect_reqterms_parse($row); $out = [];
+    foreach ($all as $k) if (connect_reqterms_head_claimable($terms[$k]['mode'] ?? 'IN_RATE')) $out[] = $k;
+    return $out;
 }
 
 /** The five reimbursable heads a client can define at posting. Keyed to the
@@ -166,10 +187,19 @@ function connect_reqterms_estimate($req) {
     }
     $subtotal = $feeTotal + $reimbTotal;
     $tax = $subtotal * $taxPct / 100.0;
+    $invoice = $subtotal + $tax;                       // what is billed (incl. GST)
+    // TDS is deducted by the client on the value EXCLUDING GST (CBDT Circular 23/2017),
+    // i.e. on the subtotal, not the GST-inclusive invoice. It is withheld from the
+    // payout, not added to the bill. The rate is the client's to set (194C 1%/2% or
+    // 194J 10%), so it is read straight from the posting — never assumed by code.
+    $tdsPct = (float)($req['est_tds_pct'] ?? 0); if ($tdsPct < 0) $tdsPct = 0;
+    $tds = $subtotal * $tdsPct / 100.0;
     return [
         'inclusive' => $inclusive, 'rate' => $rate, 'qty' => $qty,
         'fee_total' => $feeTotal, 'reimb_total' => $reimbTotal, 'subtotal' => $subtotal,
-        'tax_pct' => $taxPct, 'tax' => $tax, 'grand' => $subtotal + $tax,
+        'tax_pct' => $taxPct, 'tax' => $tax, 'grand' => $invoice, 'invoice_total' => $invoice,
+        'tds_pct' => $tdsPct, 'tds' => $tds, 'net_receivable' => $invoice - $tds,
+        'sac' => (string)($req['est_sac'] ?? ''),
         'has_actuals' => $hasActuals, 'lines' => $lines,
         'has_estimate' => ($rate > 0 && $qty > 0),
     ];
@@ -187,9 +217,11 @@ function cx_requirement_save_terms($id, array $in) {
     $estRate = max(0, (float)($in['est_rate'] ?? 0));
     $estQty  = max(0, (float)($in['est_qty']  ?? 0));
     $taxPct  = array_key_exists('est_tax_pct', $in) ? max(0, (float)$in['est_tax_pct']) : 18.0;
+    $tdsPct  = array_key_exists('est_tds_pct', $in) ? max(0, (float)$in['est_tds_pct']) : 0.0;
+    $sac     = trim((string)($in['est_sac'] ?? ''));
     $reimb   = connect_reqterms_from_input($in);
-    db()->prepare("UPDATE cx_requirements SET deputation_basis=?, rate_inclusive=?, voucher_cadence=?, est_rate=?, est_qty=?, est_tax_pct=?, reimb_terms=?, updated_at=? WHERE id=?")
-        ->execute([$basis, $rate, $cad, $estRate, $estQty, $taxPct, $reimb, date('c'), (int)$id]);
+    db()->prepare("UPDATE cx_requirements SET deputation_basis=?, rate_inclusive=?, voucher_cadence=?, est_rate=?, est_qty=?, est_tax_pct=?, est_tds_pct=?, est_sac=?, reimb_terms=?, updated_at=? WHERE id=?")
+        ->execute([$basis, $rate, $cad, $estRate, $estQty, $taxPct, $tdsPct, $sac, $reimb, date('c'), (int)$id]);
     return true;
 }
 

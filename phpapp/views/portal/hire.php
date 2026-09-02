@@ -106,6 +106,16 @@ $pill = function ($s) {
         <input class="form-control" name="est_tax_pct" id="est_tax" type="number" min="0" step="0.5" value="18">
         <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Charged on top (extra).</div>
       </div>
+      <div>
+        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">TDS %</label>
+        <input class="form-control" name="est_tds_pct" id="est_tds" type="number" min="0" step="0.5" value="2">
+        <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Withheld by client on the pre-GST value (194C 1–2% · 194J 10%).</div>
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">SAC / HSN</label>
+        <input class="form-control" name="est_sac" id="est_sac" type="text" maxlength="20" value="998519">
+        <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Manpower supply = 998519.</div>
+      </div>
     </div>
 
     <?php // --- Fee-only (EXCLUSIVE): what is covered, and the ceiling YOU set --- ?>
@@ -151,8 +161,15 @@ $pill = function ($s) {
       <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--muted);margin-bottom:8px">Estimated cost</div>
       <div id="est_rows" style="font-size:13px"></div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px;padding-top:9px;border-top:1px solid var(--line,#e3ebea)">
-        <span style="font-weight:700;font-size:14px;color:var(--ink,#12201f)">Grand total (incl. GST)</span>
+        <span style="font-weight:700;font-size:14px;color:var(--ink,#12201f)">Invoice total (incl. GST)</span>
         <span id="est_grand" style="font-weight:800;font-size:19px;color:#0a5c5c;font-variant-numeric:tabular-nums">₹0</span>
+      </div>
+      <div id="est_net_wrap" style="display:none;margin-top:6px">
+        <div id="est_tds_row" style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--muted)"></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px;padding-top:6px;border-top:1px dashed var(--line,#e3ebea)">
+          <span style="font-weight:700;font-size:13px;color:var(--ink,#12201f)">Net payable to supplier</span>
+          <span id="est_net" style="font-weight:700;font-size:15px;color:var(--ink,#12201f);font-variant-numeric:tabular-nums">₹0</span>
+        </div>
       </div>
       <div id="est_actuals" style="font-size:11.5px;color:#8a6d0b;margin-top:6px;display:none">＋ items marked “at actuals” are claimed on receipts on top of this estimate.</div>
       <div style="font-size:11px;color:var(--muted);margin-top:6px">An estimate to guide you — the agreed rate is settled when you award someone.</div>
@@ -167,10 +184,14 @@ $pill = function ($s) {
           estRate = document.getElementById('est_rate'),
           estQty = document.getElementById('est_qty'),
           estTax = document.getElementById('est_tax'),
+          estTds = document.getElementById('est_tds'),
           reimbBlock = document.getElementById('reimb_block'),
           panel = document.getElementById('est_panel'),
           rowsBox = document.getElementById('est_rows'),
           grandBox = document.getElementById('est_grand'),
+          netWrap = document.getElementById('est_net_wrap'),
+          tdsRow = document.getElementById('est_tds_row'),
+          netBox = document.getElementById('est_net'),
           actualsNote = document.getElementById('est_actuals');
       var HEADS = <?= json_encode(array_keys($rHeads), JSON_UNESCAPED_UNICODE) ?>;
       var HLABEL = <?= json_encode($rHeads, JSON_UNESCAPED_UNICODE) ?>;
@@ -209,14 +230,20 @@ $pill = function ($s) {
           });
           if (reimb > 0) rows.push(['— reimbursables subtotal', reimb, true]);
         }
-        var subtotal = fee + reimb, tax = subtotal * taxPct / 100;
+        var subtotal = fee + reimb, tax = subtotal * taxPct / 100, invoice = subtotal + tax;
+        var tdsPct = Math.max(0, parseFloat(estTds && estTds.value) || 0), tds = subtotal * tdsPct / 100;
         rows.push(['Subtotal', subtotal, true]);
         rows.push(['GST @ ' + (taxPct||0) + '%', tax]);
         rowsBox.innerHTML = rows.map(function(r){
           return '<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0;'+(r[2]?'font-weight:700;color:var(--ink,#12201f)':'color:var(--muted)')+'">'
             + '<span>'+r[0]+'</span><span style="font-variant-numeric:tabular-nums">'+inr(r[1])+'</span></div>';
         }).join('');
-        grandBox.textContent = inr(subtotal + tax);
+        grandBox.textContent = inr(invoice);
+        if (tds > 0) {
+          tdsRow.innerHTML = '<span>Less: TDS @ ' + tdsPct + '% (on ' + inr(subtotal) + ', pre-GST)</span><span style="font-variant-numeric:tabular-nums">− ' + inr(tds) + '</span>';
+          netBox.textContent = inr(invoice - tds);
+          netWrap.style.display = 'block';
+        } else { netWrap.style.display = 'none'; }
         actualsNote.style.display = hasActuals ? 'block' : 'none';
         panel.style.display = (rate > 0 && qty > 0) ? 'block' : 'none';
       }
@@ -224,7 +251,7 @@ $pill = function ($s) {
 
       if (basis) basis.addEventListener('change', function(){ syncUnitWords(); compute(); });
       if (rateModel) rateModel.addEventListener('change', syncModel);
-      [estRate, estQty, estTax].forEach(function(el){ if(el){ el.addEventListener('input', compute); } });
+      [estRate, estQty, estTax, estTds].forEach(function(el){ if(el){ el.addEventListener('input', compute); } });
       document.querySelectorAll('.reimb-mode').forEach(function(el){ el.addEventListener('change', function(){ syncReimbRows(); compute(); }); });
       document.querySelectorAll('.reimb-ceiling, .reimb-per').forEach(function(el){ el.addEventListener('input', compute); el.addEventListener('change', compute); });
       syncUnitWords(); syncModel();

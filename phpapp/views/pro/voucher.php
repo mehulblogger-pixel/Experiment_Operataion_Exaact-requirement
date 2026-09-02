@@ -3,6 +3,10 @@
   // also add travel/hotel/conveyance/allowances against receipts; then submit.
   $me = $me ?? []; $v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? []; $files = $files ?? []; $reports = $reports ?? [];
   $terms = $terms ?? []; $termLabels = $termLabels ?? []; $termModes = $termModes ?? [];
+  // Only the heads the client left claimable (ACTUALS / CEILING) get an input column.
+  // Heads marked "we provide it" or "in the rate" are dropped — nothing to claim.
+  $claimHeads = $claimHeads ?? array_keys($heads);
+  $claimHeadCols = array_intersect_key($heads, array_flip($claimHeads));
   if (!$v) { echo '<div class="card"><p class="muted">Voucher not found. <a href="/pro/vouchers">Back to my vouchers</a></p></div>'; return; }
   $exclusive = strtoupper((string)$v['rate_inclusive']) === 'EXCLUSIVE';
   $isDraft   = strtoupper((string)$v['status']) === 'DRAFT';
@@ -153,7 +157,7 @@
   <table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="text-align:left;color:var(--muted);font-size:12px">
       <th style="padding:6px 8px">Date</th><th style="padding:6px 8px"><?= e(ucfirst($unit)) ?>s</th><th style="padding:6px 8px">Fee</th>
-      <?php if ($exclusive): foreach ($heads as $hk => $hl): ?><th style="padding:6px 8px"><?= e($hl) ?></th><?php endforeach; endif; ?>
+      <?php if ($exclusive): foreach ($claimHeadCols as $hk => $hl): ?><th style="padding:6px 8px"><?= e($hl) ?></th><?php endforeach; endif; ?>
       <?php if ($isDraft): ?><th></th><?php endif; ?>
     </tr></thead>
     <tbody>
@@ -162,7 +166,7 @@
         <td style="padding:6px 8px"><?= e(substr((string)$l['work_date'], 0, 10) ?: '—') ?></td>
         <td style="padding:6px 8px"><?= e(rtrim(rtrim((string)$l['units'], '0'), '.')) ?></td>
         <td style="padding:6px 8px"><?= e($inr($l['fee'])) ?></td>
-        <?php if ($exclusive): foreach ($heads as $hk => $hl): ?><td style="padding:6px 8px"><?= (float)$l[$hk] > 0 ? e($inr($l[$hk])) : '—' ?></td><?php endforeach; endif; ?>
+        <?php if ($exclusive): foreach ($claimHeadCols as $hk => $hl): ?><td style="padding:6px 8px"><?= (float)$l[$hk] > 0 ? e($inr($l[$hk])) : '—' ?></td><?php endforeach; endif; ?>
         <?php if ($isDraft): ?>
         <td style="padding:6px 8px;text-align:right">
           <form method="post" action="/pro/voucher" style="margin:0;display:inline">
@@ -244,13 +248,17 @@
       <div><label><?= e(ucfirst($unit)) ?>s</label><input type="number" name="units" value="1" min="0.5" step="0.5"></div>
     </div>
     <?php if ($exclusive): ?>
-      <p class="muted" style="margin:12px 0 4px;font-size:12px">Reimbursable expenses (against receipts)</p>
-      <div class="grid2">
-        <?php foreach ($heads as $hk => $hl): ?>
-          <div><label><?= e($hl) ?></label><input type="number" name="<?= e($hk) ?>" value="0" min="0" step="1"></div>
-        <?php endforeach; ?>
-      </div>
-      <label>Receipt reference</label><input type="text" name="receipt_ref" placeholder="e.g. cab bill #, hotel folio">
+      <?php if ($claimHeadCols): ?>
+        <p class="muted" style="margin:12px 0 4px;font-size:12px">Reimbursable expenses (against receipts)<?= count($claimHeadCols) < 5 ? ' — only what your client agreed to reimburse' : '' ?></p>
+        <div class="grid2">
+          <?php foreach ($claimHeadCols as $hk => $hl): ?>
+            <div><label><?= e($hl) ?></label><input type="number" name="<?= e($hk) ?>" value="0" min="0" step="1"></div>
+          <?php endforeach; ?>
+        </div>
+        <label>Receipt reference</label><input type="text" name="receipt_ref" placeholder="e.g. cab bill #, hotel folio">
+      <?php else: ?>
+        <p class="muted" style="margin:12px 0 4px;font-size:12px">Your client covers all expenses directly (or they're in your rate) — just add your <?= e($unit) ?>s, no expense claim needed.</p>
+      <?php endif; ?>
     <?php endif; ?>
     <label>Note</label><input type="text" name="note" placeholder="optional">
     <button class="btn" type="submit" style="margin-top:14px">Add <?= e($unit) ?></button>

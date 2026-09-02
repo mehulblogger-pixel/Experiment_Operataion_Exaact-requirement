@@ -194,7 +194,20 @@ function connect_engv_add_line($voucherId, array $in) {
     $fee = connect_engv_line_fee($v, $units);
 
     $exclusive = connect_engv_is_exclusive($v);
-    $head = function ($k) use ($in, $exclusive) { return $exclusive ? max(0, (float)($in[$k] ?? 0)) : 0.0; };
+    // Which heads may be claimed at all is driven by the engagement's reimbursement
+    // terms: a head the client marked "we provide it" or "in the rate" is NOT
+    // claimable — its amount is forced to 0 no matter what is posted. If no terms were
+    // set (legacy engagement), every head stays claimable exactly as before.
+    $claimable = null;
+    if ($exclusive && function_exists('connect_reqterms_claimable_heads')) {
+        $eng = ops_one("SELECT reimb_terms FROM cx_engagements WHERE id=?", [(int)($v['engagement_id'] ?? 0)]);
+        $claimable = array_flip(connect_reqterms_claimable_heads($eng ?: ''));
+    }
+    $head = function ($k) use ($in, $exclusive, $claimable) {
+        if (!$exclusive) return 0.0;
+        if ($claimable !== null && !isset($claimable[$k])) return 0.0; // client covers this itself
+        return max(0, (float)($in[$k] ?? 0));
+    };
     db()->prepare("INSERT INTO cx_engagement_voucher_lines
         (voucher_id,work_date,units,fee,travel,lodging,conveyance,allowance,misc,receipt_ref,note,created_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")

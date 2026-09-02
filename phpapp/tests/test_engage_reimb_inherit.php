@@ -51,6 +51,26 @@ try {
     // A re-book (upsert) keeps the terms too.
     connect_engage_save_for_requirement($rid, ['basis' => 'MAN_DAYS', 'quantity' => 12, 'rate' => 6000, 'rate_unit' => 'day', 'start_date' => '2026-09-01']);
     t_ok(trim((string)(connect_engage_for_requirement($rid)['reimb_terms'] ?? '')) !== '', 're-booking keeps the terms');
+
+    // --- ENFORCEMENT: a head the client "provides" / put "in the rate" cannot be
+    //     claimed on the voucher, however hard the professional tries. misc is IN_RATE. ---
+    [$vok, , $vid] = connect_engv_open_for_engagement($eid, ['period_label' => 'TEST']);
+    t_ok($vok && $vid > 0, 'a voucher opens for the fee-only engagement');
+    connect_engv_add_line($vid, ['work_date' => '2026-09-01', 'units' => 1,
+        'travel' => 500, 'lodging' => 2500, 'conveyance' => 300, 'allowance' => 800, 'misc' => 999]);
+    $ln = connect_engv_lines($vid)[0] ?? [];
+    t_eq((int)($ln['allowance'] ?? -1), 800,  'a ceiling head (food) is claimable — kept');
+    t_eq((int)($ln['lodging'] ?? -1),  2500, 'a ceiling head (hotel) is claimable — kept');
+    t_eq((int)($ln['conveyance'] ?? -1), 300, 'an at-actuals head (conveyance) is claimable — kept');
+    t_eq((int)($ln['misc'] ?? -1), 0, 'an IN_RATE head (misc) is NOT claimable — forced to 0 despite a 999 attempt');
+    // claim set matches: exactly the four non-in-rate heads
+    $claim = connect_reqterms_claimable_heads(ops_one("SELECT reimb_terms FROM cx_engagements WHERE id=?", [$eid]) ?: []);
+    t_ok(!in_array('misc', $claim, true) && count($claim) === 4, 'the voucher offers exactly the four claimable heads');
+
+    // LEGACY SAFETY: an engagement with NO terms keeps every head claimable (unchanged).
+    $rid2 = (int)cx_requirement_create(['title'=>'Legacy excl','poster_name'=>'X','rate_inclusive'=>'EXCLUSIVE'], true);
+    db()->prepare("UPDATE cx_engagements SET reimb_terms='' WHERE id=?")->execute([$eid]); // simulate legacy
+    t_eq(count(connect_reqterms_claimable_heads(ops_one("SELECT reimb_terms FROM cx_engagements WHERE id=?", [$eid]) ?: [])), 5, 'no terms → all five heads stay claimable (no break for existing data)');
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }

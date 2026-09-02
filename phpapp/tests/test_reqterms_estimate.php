@@ -33,6 +33,16 @@ t_ok($x['has_actuals'] === true, 'at-actuals head raises the actuals flag');
 t_ok((int)$x['lines']['conveyance']['amount'] === 0, 'an at-actuals head contributes 0 to the number');
 t_ok((int)$x['lines']['travel']['amount'] === 5000, 'a per-deployment ceiling counts once, not per day');
 
+// --- TDS: withheld by the client on the PRE-GST value, not on the GST-inclusive bill ---
+$td = connect_reqterms_estimate(['rate_inclusive'=>'INCLUSIVE','est_rate'=>6000,'est_qty'=>10,'est_tax_pct'=>18,'est_tds_pct'=>2,'est_sac'=>'998519']);
+t_eq((int)$td['invoice_total'], 70800, 'invoice total = subtotal + GST (unchanged by TDS)');
+t_eq((int)$td['tds'], 1200, 'TDS 2% is on the ₹60000 subtotal (pre-GST), = 1200 — NOT on 70800');
+t_eq((int)$td['net_receivable'], 69600, 'net payable to supplier = invoice 70800 − TDS 1200');
+t_eq((string)$td['sac'], '998519', 'SAC/HSN carried on the estimate');
+$td0 = connect_reqterms_estimate(['rate_inclusive'=>'INCLUSIVE','est_rate'=>6000,'est_qty'=>10,'est_tax_pct'=>18]);
+t_eq((int)$td0['tds'], 0, 'no TDS % → no TDS withheld (net = invoice)');
+t_eq((int)$td0['net_receivable'], (int)$td0['invoice_total'], 'net equals invoice when TDS is zero');
+
 // --- a ceiling is NEVER auto-capped: a huge client number flows straight through ---
 $big = connect_reqterms_estimate(['rate_inclusive'=>'EXCLUSIVE','est_rate'=>1,'est_qty'=>1,'est_tax_pct'=>0,
     'reimb_terms'=>json_encode(['lodging'=>['mode'=>'CEILING','ceiling'=>999999,'per'=>'DEPLOYMENT']])]);
@@ -54,7 +64,7 @@ try {
         'discipline_code'=>'ELEC','location'=>'Khavda, Kutch','work_type'=>'FREELANCE','positions'=>1,
         'start_date'=>date('Y-m-d'),'rate_unit'=>'day',
         'deputation_basis'=>'MAN_DAYS','rate_inclusive'=>'EXCLUSIVE','voucher_cadence'=>'PER_DAY',
-        'est_rate'=>6000,'est_qty'=>10,'est_tax_pct'=>18,
+        'est_rate'=>6000,'est_qty'=>10,'est_tax_pct'=>18,'est_tds_pct'=>2,'est_sac'=>'998519',
         'reimb'=>[
             'allowance'=>['mode'=>'CEILING','ceiling'=>800,'per'=>'DAY'],
             'lodging'  =>['mode'=>'CEILING','ceiling'=>3000,'per'=>'DAY'],
@@ -68,8 +78,16 @@ try {
     t_eq((string)$row['rate_inclusive'], 'EXCLUSIVE', 'rate model stored');
     t_eq((int)$row['est_rate'], 6000, 'base fee stored');
     t_eq((int)$row['est_qty'], 10, 'estimated qty stored');
+    t_eq((int)$row['est_tds_pct'], 2, 'TDS % stored');
+    t_eq((string)$row['est_sac'], '998519', 'SAC/HSN stored');
     $back = connect_reqterms_estimate($row);
-    t_eq((int)$back['grand'], 121540, 'the stored posting reproduces the same grand total end-to-end');
+    t_eq((int)$back['invoice_total'], 121540, 'the stored posting reproduces the same invoice total end-to-end');
+    t_eq((int)$back['tds'], 2060, 'TDS 2% on the ₹103000 pre-GST subtotal = 2060');
+    t_eq((int)$back['net_receivable'], 119480, 'net payable = 121540 − 2060');
+    // claimability: PROVIDED / IN_RATE heads cannot be claimed; ACTUALS / CEILING can.
+    $claim = connect_reqterms_claimable_heads($row);
+    t_ok(in_array('lodging', $claim, true) && in_array('travel', $claim, true) && in_array('conveyance', $claim, true), 'ceiling & actuals heads are claimable');
+    t_ok(!in_array('misc', $claim, true), 'an in-rate head is NOT claimable');
     $p = connect_reqterms_parse($row);
     t_eq((string)$p['lodging']['mode'], 'CEILING', 'lodging term round-tripped');
     t_eq((int)$p['lodging']['ceiling'], 3000, 'lodging ceiling round-tripped');

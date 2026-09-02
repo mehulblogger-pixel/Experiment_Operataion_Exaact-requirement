@@ -4,6 +4,7 @@
 // to the inspector for clarification or approve it. Read-only on the numbers —
 // the client never edits the claim, only accepts or returns it.
 $v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? []; $files = $files ?? []; $reports = $reports ?? []; $cleared = $cleared ?? false;
+$terms = $terms ?? []; $termLabels = $termLabels ?? []; $engQty = (float)($engQty ?? 0);
 if (!$v) { echo '<p class="pempty">Voucher not found. <a href="/portal/hire">Back</a></p>'; return; }
 $exclusive = strtoupper((string)$v['rate_inclusive']) === 'EXCLUSIVE';
 $status    = strtoupper((string)$v['status']);
@@ -123,6 +124,44 @@ $canReview = $status === 'SUBMITTED';
   </table>
   <?php endif; ?>
 </div>
+
+<?php
+  // Claim vs the ceiling the client agreed at posting — side by side, so the
+  // approver sees at a glance whether any head is over its agreed limit before
+  // approving. Guidance only; nothing is blocked. Shown only for a fee-only
+  // voucher that actually carries ceilings.
+  if ($exclusive && $termLabels && $lines):
+      $claimed = []; foreach ($termLabels as $hk => $hl) { $s = 0.0; foreach ($lines as $l) $s += (float)($l[$hk] ?? 0); $claimed[$hk] = $s; }
+      $rowsC = [];
+      foreach ($termLabels as $hk => $hl) {
+          $t = $terms[$hk] ?? null; if (!is_array($t)) continue;
+          $mode = strtoupper((string)($t['mode'] ?? 'IN_RATE'));
+          if ($mode !== 'CEILING') continue;               // only ceiling heads have a limit to compare
+          $per = ($t['per'] ?? 'DAY') === 'DAY' ? 'DAY' : 'DEPLOYMENT';
+          $limit = (float)($t['ceiling'] ?? 0) * ($per === 'DAY' ? max(1, $engQty) : 1);
+          $rowsC[] = ['label' => $hl, 'claimed' => $claimed[$hk] ?? 0, 'limit' => $limit,
+                      'per' => $per, 'unit' => (float)($t['ceiling'] ?? 0), 'over' => ($limit > 0 && ($claimed[$hk] ?? 0) > $limit)];
+      }
+      if ($rowsC):
+?>
+<h3 class="ptitle" style="font-size:16px;margin-top:24px">Claim vs agreed ceiling</h3>
+<div class="pcard" style="max-width:720px;overflow-x:auto">
+  <table class="vt">
+    <thead><tr><th>Expense</th><th style="text-align:right">Claimed</th><th style="text-align:right">Agreed ceiling</th><th>Status</th></tr></thead>
+    <tbody>
+    <?php foreach ($rowsC as $r): ?>
+      <tr>
+        <td><?= e($r['label']) ?></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums"><?= e($inr($r['claimed'])) ?></td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums"><?= e($inr($r['limit'])) ?> <span style="color:var(--muted);font-size:11px">(<?= e($inr($r['unit'])) ?><?= $r['per']==='DAY'?'/day':'/dep' ?>)</span></td>
+        <td><?php if ($r['over']): ?><span class="ppill" style="background:#f6e6e6;color:#9a2a2a">Over by <?= e($inr($r['claimed'] - $r['limit'])) ?></span><?php else: ?><span class="ppill" style="background:#e7f5ef;color:#0f7d5a">Within</span><?php endif; ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <p class="plead" style="margin:10px 0 0;font-size:12px">The ceiling is a guide the client set at posting — an “over” claim is not blocked; use your judgement and the receipts when approving.</p>
+</div>
+<?php endif; endif; ?>
 
 <h3 class="ptitle" style="font-size:16px;margin-top:24px">Supporting documents</h3>
 <div class="pcard" style="max-width:720px">

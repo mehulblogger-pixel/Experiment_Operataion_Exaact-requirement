@@ -1229,6 +1229,7 @@ function portal_route($route, $method) {
                 redirect('/portal/voucher?id=' . $vid);
             }
             $engId = (int)($v['engagement_id'] ?? 0);
+            $engTermsRow = $engId ? (ops_one("SELECT reimb_terms, quantity FROM cx_engagements WHERE id=?", [$engId]) ?: []) : [];
             portal_view('voucher', [
                 'v'       => $v,
                 'lines'   => function_exists('connect_engv_lines') ? connect_engv_lines($vid) : [],
@@ -1236,6 +1237,11 @@ function portal_route($route, $method) {
                 'files'   => function_exists('connect_engv_files') ? connect_engv_files($vid) : [],
                 'reports' => function_exists('connect_engv_reports') ? connect_engv_reports($engId) : [],
                 'cleared' => function_exists('connect_engv_engagement_cleared') ? connect_engv_engagement_cleared($engId) : false,
+                // The ceilings the client agreed at posting, so the approver checks
+                // each claimed head against its limit side by side (guidance, not a block).
+                'terms'      => ($engTermsRow && function_exists('connect_reqterms_parse')) ? connect_reqterms_parse($engTermsRow) : [],
+                'termLabels' => function_exists('connect_reqterms_heads') ? connect_reqterms_heads() : [],
+                'engQty'     => (float)($engTermsRow['quantity'] ?? 0),
             ]);
             exit;
 

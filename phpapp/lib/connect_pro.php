@@ -711,6 +711,7 @@ function connect_pro_route($route, $method) {
                 redirect('/pro/voucher?id=' . $vid);
             }
             $vRow = connect_engv_get($vid);
+            $engTermsRow = $vRow ? (ops_one("SELECT reimb_terms FROM cx_engagements WHERE id=?", [(int)$vRow['engagement_id']]) ?: []) : [];
             connect_pro_view('voucher', [
                 'me'      => $me,
                 'v'       => $vRow,
@@ -720,7 +721,11 @@ function connect_pro_route($route, $method) {
                 'reports' => ($vRow && function_exists('connect_engv_reports')) ? connect_engv_reports((int)$vRow['engagement_id']) : [],
                 // Reimbursement ceilings the client set at posting — carried onto the
                 // engagement — shown as guidance so the professional knows their limits.
-                'terms'      => ($vRow && function_exists('connect_reqterms_parse')) ? connect_reqterms_parse(ops_one("SELECT reimb_terms FROM cx_engagements WHERE id=?", [(int)$vRow['engagement_id']]) ?: []) : [],
+                // claimHeads: which expense heads may actually be claimed (a head the
+                // client "provides" or put "in the rate" is dropped; legacy engagements
+                // with no terms keep all heads claimable).
+                'terms'      => $engTermsRow && function_exists('connect_reqterms_parse') ? connect_reqterms_parse($engTermsRow) : [],
+                'claimHeads' => $engTermsRow && function_exists('connect_reqterms_claimable_heads') ? connect_reqterms_claimable_heads($engTermsRow) : array_keys(function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : []),
                 'termLabels' => function_exists('connect_reqterms_heads') ? connect_reqterms_heads() : [],
                 'termModes'  => function_exists('connect_reqterms_cover_modes') ? connect_reqterms_cover_modes() : [],
             ]); exit;
