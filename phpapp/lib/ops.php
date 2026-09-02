@@ -2428,7 +2428,7 @@ function ops_module_gate($route) {
         // to this person. One module gate here would either hide the whole screen
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
-        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring',
+        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring','candidate-link-pro'=>'hiring','candidate-unlink-pro'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
@@ -2667,7 +2667,7 @@ function ops_dispatch($route, $method) {
         // Bills backing the expenses the client is being charged for.
         case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
             return ops_job_bill($route, $method);
-        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial' || $route === 'candidate-link-person':
+        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial' || $route === 'candidate-link-person' || $route === 'candidate-link-pro' || $route === 'candidate-unlink-pro':
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit' || $route === 'inquiry-delete':
             ops_crm_inquiries($route, $method); return true;
@@ -5066,6 +5066,29 @@ function ops_candidates($route, $method) {
         redirect('/candidate?id=' . $id);
     }
 
+    // P11 — confirm a candidate and a marketplace professional are the same person
+    // (additive, reversible; nothing merged). Coordinator-gated like the person link.
+    if ($route === 'candidate-link-pro') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can confirm a marketplace match.');
+        $id  = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        $pro = (int)($_POST['pro_id'] ?? 0);
+        if ($method === 'POST' && $id && $pro && function_exists('connect_identity_candidate_link_create')) {
+            [$ok, $msg] = connect_identity_candidate_link_create($id, $pro, 'manual');
+            flash($msg, $ok ? 'success' : 'error');
+        }
+        redirect('/candidate?id=' . $id);
+    }
+    if ($route === 'candidate-unlink-pro') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can remove a marketplace match.');
+        $id   = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        $link = (int)($_POST['link_id'] ?? 0);
+        if ($method === 'POST' && $link && function_exists('connect_identity_unlink')) {
+            [$ok, $msg] = connect_identity_unlink($link);
+            flash($msg, $ok ? 'success' : 'error');
+        }
+        redirect('/candidate?id=' . $id);
+    }
+
     if ($route === 'candidate') {
         ops_require(is_coordinator_level());
         $cand = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp,
@@ -5097,9 +5120,11 @@ function ops_candidates($route, $method) {
         $personApps = function_exists('person_applications') ? person_applications($cand) : [];
         // P11 — is this person also a marketplace professional? (read-only convergence)
         $proMatches = function_exists('candpool_pro_matches') ? candpool_pro_matches($cand) : [];
+        // P11 — has a coordinator already confirmed this candidate IS one of those professionals?
+        $proLink = function_exists('connect_identity_of_candidate') ? connect_identity_of_candidate((int)$cand['id']) : null;
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
             'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket,
-            'personApps' => $personApps, 'proMatches' => $proMatches,
+            'personApps' => $personApps, 'proMatches' => $proMatches, 'proLink' => $proLink,
             'rccDropPoints' => function_exists('rcc_drop_points') ? rcc_drop_points() : [], 'rccDropReasons' => function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : []]);
         return;
     }

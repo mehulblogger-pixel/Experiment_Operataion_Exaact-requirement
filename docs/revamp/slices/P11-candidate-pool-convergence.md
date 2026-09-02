@@ -1,8 +1,8 @@
 # Slice P11 — Candidate Pool Convergence
 
-**Change-control record (directive Part 25). Classification: REFACTOR / detector
-(read-only, additive, non-destructive). Status: DELIVERED (detector). Merge
-deliberately NOT done.**
+**Change-control record (directive Part 25). Classification: REFACTOR / detector +
+confirm-link (additive, reversible, non-destructive). Status: DELIVERED (detector +
+confirm/link). Physical record merge deliberately NOT done.**
 
 The identity-side twin of the reconciliation detectors (P9 revenue, P10 cost) and
 the direct cross-pool extension of `recruit.php`'s `person_applications()` — which
@@ -81,11 +81,29 @@ own record; a soft *same-name* match is labelled as such for a human to confirm.
 Remove the route + view + `lib/candpool.php` + the recruitment-home button + the
 candidate-detail panel + the CLI. No data touched.
 
-## Staged — the identity merge (needs a decision, deliberately NOT done)
+## Confirm / link — DELIVERED (the safe, reversible step)
 
-Making the two pools *one* identity (a shared person record, or stamping
-`candidates.person_ref` / a `cx_professionals` link from a confirmed match) changes
-how both modules resolve a person and must be chosen deliberately — a mismatched
-auto-merge is destructive. The detector is the safe first step and the gate that
-makes any later merge reviewable, exactly as the reconciliation worklists gate the
-reader switches.
+The detector's matches can now be **confirmed** into a persisted candidate↔professional
+link, additively and reversibly — nothing is merged and neither record is touched:
+
+- The link reuses the existing identity ledger `cx_identity_link` (which already links a
+  professional ↔ an operations inspector) via an additive nullable `candidate_id` column;
+  a candidate-axis row carries `inspector_id=0`. `connect_identity_candidate_link_create()`
+  creates it (refusing a second professional for an already-linked candidate, validating
+  both ids), `connect_identity_of_candidate()` resolves it, and the existing
+  `connect_identity_unlink()` reverses it.
+- Surfaced on the candidate detail *"Also on the marketplace"* panel — a **Confirm same
+  person** button per match, a **✓ Confirmed / Unlink** state once linked (coordinator-gated,
+  mirroring the existing *"same person"* application link). The `/candidate-pool` worklist
+  shows a **✓ confirmed** pill on linked rows.
+- `tests/test_candidate_pro_link.php` (15/15): create, idempotent re-confirm, refusal of a
+  second professional, id validation, the worklist mark, unlink, and the invariant that
+  **neither the candidate nor the professional row is ever mutated or deleted**.
+
+## Staged — the physical record merge (needs a decision, deliberately NOT done)
+
+Collapsing the two pools into *one* physical record (one shared person row, or rewriting
+one module to resolve through the other) changes how both modules resolve a person and
+remains deliberately deferred — a mismatched merge is destructive. The confirmed link above
+is the safe, reversible foundation and the reviewable gate that any later merge would build
+on, exactly as the reconciliation worklists gate the reader switches.

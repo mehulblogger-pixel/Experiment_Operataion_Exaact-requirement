@@ -109,6 +109,10 @@ function candpool_scan($limit = 200) {
                             LEFT JOIN business_partners bp ON bp.id=c.client_id
                             ORDER BY c.id DESC LIMIT 2000") ?: []; }
     catch (Throwable $e) { $cands = []; }
+    // Confirmed candidate↔professional links (P11), read once → {candidate_id => professional_id}.
+    $confirmed = [];
+    try { foreach (ops_all("SELECT candidate_id, professional_id FROM cx_identity_link WHERE status='LINKED' AND COALESCE(candidate_id,0) > 0") ?: [] as $l) $confirmed[(int)$l['candidate_id']] = (int)$l['professional_id']; }
+    catch (Throwable $e) {}
     $rank = ['mobile' => 3, 'email' => 2, 'name' => 1];
     $out = [];
     foreach ($cands as $c) {
@@ -117,6 +121,7 @@ function candpool_scan($limit = 200) {
         // best (strongest) match for the headline row
         usort($m, fn($a, $b) => $rank[$b['reason']] <=> $rank[$a['reason']]);
         $best = $m[0];
+        $linkedPro = $confirmed[(int)$c['id']] ?? 0;
         $out[] = [
             'cand_id' => (int)$c['id'], 'cand_code' => (string)($c['cand_code'] ?: ('#' . $c['id'])),
             'cand_name' => trim(((string)($c['first_name'] ?? '')) . ' ' . ((string)($c['last_name'] ?? ''))),
@@ -125,6 +130,7 @@ function candpool_scan($limit = 200) {
             'pro_id' => (int)$best['pro_id'], 'pro_name' => (string)$best['name'],
             'verification_tier' => (string)$best['verification_tier'], 'availability' => (string)$best['availability'],
             'reason' => (string)$best['reason'], 'match_count' => count($m),
+            'confirmed' => $linkedPro > 0,
         ];
         if (count($out) >= $limit) break;
     }

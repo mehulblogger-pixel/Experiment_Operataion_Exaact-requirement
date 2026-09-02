@@ -36,6 +36,11 @@ function connect_identity_migrate() {
         unlinked_at VARCHAR(30) DEFAULT '')");
     foreach (["CREATE INDEX ix_cx_idlink_pro ON cx_identity_link (professional_id)",
               "CREATE INDEX ix_cx_idlink_insp ON cx_identity_link (inspector_id)"] as $ix) { try { db()->exec($ix); } catch (Throwable $e) {} }
+    // P11 — the same person can also be a recruitment candidate. A candidate↔professional
+    // link is the same "one person across identities" concept, so it reuses this ledger
+    // (additive column; a candidate-axis row carries inspector_id=0).
+    if (function_exists('ensure_column')) ensure_column('cx_identity_link', 'candidate_id', 'INT DEFAULT 0');
+    try { db()->exec("CREATE INDEX ix_cx_idlink_cand ON cx_identity_link (candidate_id)"); } catch (Throwable $e) {}
 }
 
 // ---- Resolvers — "who is this, really?" ------------------------------------
@@ -119,8 +124,42 @@ function connect_identity_unlink($linkId, $by = '') {
     if (!$row) return [false, 'No such active link.'];
     if ($by === '' && function_exists('current_user')) { $u = current_user(); $by = (string)($u['name'] ?? $u['username'] ?? ''); }
     db()->prepare("UPDATE cx_identity_link SET status='UNLINKED', unlinked_at=? WHERE id=?")->execute([date('c'), (int)$linkId]);
-    if (function_exists('act_log')) { try { act_log('cx_identity_link', (int)$linkId, 'IDENTITY_UNLINKED', 'Unlinked pro #' . (int)$row['professional_id'] . ' ↔ inspector #' . (int)$row['inspector_id'], ['auto' => 0]); } catch (Throwable $e) {} }
+    if (function_exists('act_log')) {
+        $other = (int)($row['candidate_id'] ?? 0) > 0 ? 'candidate #' . (int)$row['candidate_id'] : 'inspector #' . (int)$row['inspector_id'];
+        try { act_log('cx_identity_link', (int)$linkId, 'IDENTITY_UNLINKED', 'Unlinked pro #' . (int)$row['professional_id'] . ' ↔ ' . $other, ['auto' => 0]); } catch (Throwable $e) {}
+    }
     return [true, 'Unlinked.'];
+}
+
+// ---- Candidate ↔ professional (P11) — the same person across the two pools -----
+
+/** The active candidate↔professional link row for a candidate (→ professional_id), or null. */
+function connect_identity_of_candidate($candId) {
+    connect_identity_migrate();
+    return ops_one("SELECT * FROM cx_identity_link WHERE candidate_id=? AND status='LINKED' ORDER BY id DESC LIMIT 1", [(int)$candId]) ?: null;
+}
+
+/**
+ * Confirm that a recruitment candidate and a marketplace professional are the same
+ * person, recording it as an additive, reversible link. It NEVER merges or deletes
+ * either record — each pool keeps its own row; this only stamps the fact that they
+ * are one person, so it can be unlinked with no data loss (P11's safe first step).
+ */
+function connect_identity_candidate_link_create($candId, $proId, $method = 'manual', $by = '', $note = '') {
+    connect_identity_migrate();
+    $candId = (int)$candId; $proId = (int)$proId;
+    if ($candId <= 0 || $proId <= 0) return [false, 'A candidate and a professional are both required.', 0];
+    if ((int)ops_val("SELECT COUNT(*) FROM candidates WHERE id=?", [$candId]) === 0) return [false, 'That candidate record does not exist.', 0];
+    if ((int)ops_val("SELECT COUNT(*) FROM cx_professionals WHERE id=?", [$proId]) === 0) return [false, 'That professional record does not exist.', 0];
+    $ex = connect_identity_of_candidate($candId);
+    if ($ex && (int)$ex['professional_id'] === $proId) return [true, 'Already confirmed as the same person.', (int)$ex['id']];
+    if ($ex) return [false, 'This candidate is already linked to another professional — unlink it first.', 0];
+    if ($by === '' && function_exists('current_user')) { $u = current_user(); $by = (string)($u['name'] ?? $u['username'] ?? ''); }
+    db()->prepare("INSERT INTO cx_identity_link (professional_id,inspector_id,candidate_id,method,status,note,linked_by,linked_at) VALUES (?,0,?,?,'LINKED',?,?,?)")
+        ->execute([$proId, $candId, substr((string)$method, 0, 20), substr((string)$note, 0, 200), substr((string)$by, 0, 120), date('c')]);
+    $id = (int)db()->lastInsertId();
+    if (function_exists('act_log')) { try { act_log('cx_identity_link', $id, 'IDENTITY_LINKED', 'Linked candidate #' . $candId . ' ↔ professional #' . $proId . ' (same person)', ['auto' => ($method !== 'manual') ? 1 : 0]); } catch (Throwable $e) {} }
+    return [true, 'Confirmed — this candidate and marketplace professional are recorded as one person (nothing merged; you can unlink any time).', $id];
 }
 
 // ---- Suggestions — the same person, not yet linked -------------------------

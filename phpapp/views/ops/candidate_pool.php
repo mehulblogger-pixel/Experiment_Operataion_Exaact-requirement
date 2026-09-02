@@ -53,7 +53,8 @@
               <?php if ($r['match_count'] > 1): ?><span class="muted" style="font-size:11px"> +<?= (int)$r['match_count'] - 1 ?> more</span><?php endif; ?></td>
             <td><span class="pill <?= $tierTone($r['verification_tier']) ?>" style="font-size:11px"><?= e($r['verification_tier'] ?: '—') ?></span></td>
             <td style="font-size:12px"><?= e($r['availability'] ?: '—') ?></td>
-            <td><span class="pill <?= $reasonTone[$r['reason']] ?? 'p-mut' ?>" style="font-size:11px"><?= e($reasonLabel[$r['reason']] ?? $r['reason']) ?></span></td>
+            <td><span class="pill <?= $reasonTone[$r['reason']] ?? 'p-mut' ?>" style="font-size:11px"><?= e($reasonLabel[$r['reason']] ?? $r['reason']) ?></span>
+              <?php if (!empty($r['confirmed'])): ?><span class="pill p-ok" style="font-size:11px;margin-left:4px">✓ confirmed</span><?php endif; ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
