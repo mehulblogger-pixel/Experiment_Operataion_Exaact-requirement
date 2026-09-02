@@ -82,6 +82,7 @@ $grp = function ($icon, $title, $n) use ($e) {
       <a class="btn secondary" href="/candidate-new">＋ Add candidate</a>
       <a class="btn secondary" href="/requisitions">Requirements</a>
       <a class="btn secondary" href="/candidates">Candidates</a>
+      <a class="btn secondary" href="/candidate-pool">🔗 Candidate pool</a>
     <?php endif; ?>
   </div>
 </div>

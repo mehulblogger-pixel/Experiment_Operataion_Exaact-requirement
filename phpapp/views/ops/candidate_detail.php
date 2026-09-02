@@ -94,6 +94,35 @@ if ($personApps):
 </div>
 <?php endif; ?>
 
+<?php // P11 — this person is also a marketplace professional (read-only convergence; nothing merged).
+$proMatches = $proMatches ?? [];
+if ($proMatches):
+  $rLabel = ['mobile' => 'same mobile', 'email' => 'same e-mail', 'name' => 'same name'];
+  $rTone  = ['mobile' => 'p-ok', 'email' => 'p-ok', 'name' => 'p-warn'];
+?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Also on the marketplace
+    <span class="pill p-info" style="font-size:11px;margin-left:4px"><?= count($proMatches) ?></span>
+  </h3>
+  <p class="muted" style="font-size:12px;margin:0 0 8px">This candidate matches a known <strong>marketplace professional</strong> — the same person is already on the bench / passport. Matched by mobile / e-mail / name. Read-only: each pool keeps its own record.</p>
+  <div style="overflow-x:auto">
+  <table class="grid" style="min-width:520px">
+    <thead><tr><th>Professional</th><th>Verification</th><th>Availability</th><th>Matched by</th></tr></thead>
+    <tbody>
+      <?php foreach ($proMatches as $pm): ?>
+      <tr>
+        <td><?= e($pm['name'] ?: ('#' . $pm['pro_id'])) ?></td>
+        <td><span class="pill <?= in_array(strtolower((string)$pm['verification_tier']), ['verified','id_verified','engaged'], true) ? 'p-ok' : 'p-mut' ?>" style="font-size:11px"><?= e($pm['verification_tier'] ?: '—') ?></span></td>
+        <td class="muted" style="font-size:12px"><?= e($pm['availability'] ?: '—') ?></td>
+        <td><span class="pill <?= $rTone[$pm['reason']] ?? 'p-mut' ?>" style="font-size:11px"><?= e($rLabel[$pm['reason']] ?? $pm['reason']) ?></span></td>
+      </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php // §16 — explainable workforce fit against the linked requirement.
 $fit = $fit ?? null; $readiness = $readiness ?? null; $linkReq = $linkReq ?? null;
 if (!empty($fit) && !empty($linkReq)): [$fl, $ftone] = recruit_fit_band($fit['score']); ?>

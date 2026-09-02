@@ -2427,7 +2427,7 @@ function ops_module_gate($route) {
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring',
-        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
@@ -2683,6 +2683,8 @@ function ops_dispatch($route, $method) {
             ops_requisitions($route, $method); return true;
         case $route === 'recruitment':
             return ops_recruitment_home($method);
+        case $route === 'candidate-pool':   // Revamp P11 — candidate pool convergence (read-only)
+            return ops_candpool($method);
         case $route === 'recruitment-cc':
             return ops_recruitment_cc($method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
@@ -5076,9 +5078,11 @@ function ops_candidates($route, $method) {
         }
         // Phase 6 — this person's other application rows (same person, kept distinct).
         $personApps = function_exists('person_applications') ? person_applications($cand) : [];
+        // P11 — is this person also a marketplace professional? (read-only convergence)
+        $proMatches = function_exists('candpool_pro_matches') ? candpool_pro_matches($cand) : [];
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
             'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket,
-            'personApps' => $personApps,
+            'personApps' => $personApps, 'proMatches' => $proMatches,
             'rccDropPoints' => function_exists('rcc_drop_points') ? rcc_drop_points() : [], 'rccDropReasons' => function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : []]);
         return;
     }

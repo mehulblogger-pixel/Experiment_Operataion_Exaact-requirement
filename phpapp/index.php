@@ -217,6 +217,7 @@ try {
     require __DIR__ . '/lib/inspectorprofile.php';
     require __DIR__ . '/lib/recruit.php';
     require __DIR__ . '/lib/recruit_cc.php';
+    require __DIR__ . '/lib/candpool.php';         // Revamp P11 — candidate pool convergence (read-only)
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
     require __DIR__ . '/lib/qualitycase.php';     // Phase 2 §39 — quality-case umbrella (read-only)
