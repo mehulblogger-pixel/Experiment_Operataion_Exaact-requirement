@@ -879,8 +879,11 @@ function credential_vault_render($kind, $id, array $opts = []) {
            . ($editable ? '<th>Verification</th>' : '') . '</tr></thead><tbody>';
         foreach ($certs as $c) {
             $st = credential_status($c, $today); [$lbl, $cls] = credential_status_pill($st);
+            // Gap-5 — the same 4-rung marketplace verification ladder, now shown on the inspector vault too.
+            $lad = function_exists('connect_cred_verify_state') ? connect_cred_verify_state($c) : null;
+            $ladPill = $lad ? ' <span class="pill p-' . $e($lad['tone']) . '" title="Verification ladder">' . $e($lad['label']) . '</span>' : '';
             echo '<tr><td>' . $e($c['name']) . '</td><td>' . $e($c['number'] ?: '—') . '</td><td>' . $e($c['valid_to'] ?: '—')
-               . '</td><td><span class="pill ' . $cls . '">' . $e($lbl) . '</span></td>'
+               . '</td><td><span class="pill ' . $cls . '">' . $e($lbl) . '</span>' . $ladPill . '</td>'
                . '<td>' . (!empty($c['is_mandatory']) ? 'Required' : '—') . '</td>';
             if ($editable) {
                 echo '<td><form method="post" action="/cert-verify" style="display:flex;gap:4px;align-items:center;margin:0">'

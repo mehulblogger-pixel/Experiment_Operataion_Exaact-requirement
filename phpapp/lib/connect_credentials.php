@@ -56,14 +56,22 @@ function connect_cred_cert_status($expiry) {
  * Returns ['code','label','tone']. tone: ok | info | warn | bad.
  */
 function connect_cred_verify_state($cert) {
-    $expiry = trim((string)($cert['expiry_date'] ?? ''));
+    // Gap-5 — the ONE verification ladder, read across BOTH pools: a marketplace cert
+    // (expiry_date / verified / file_id) OR an internal inspector cert (valid_to /
+    // verify_status / file_name). A marketplace cert carries none of the inspector fields,
+    // so its behaviour is exactly as before — the extension only adds inspector support.
+    $vs = strtoupper(trim((string)($cert['verify_status'] ?? '')));
+    if ($vs === 'REJECTED')   return ['code' => 'REJECTED',   'label' => 'Rejected',   'tone' => 'bad'];
+    if ($vs === 'SUPERSEDED') return ['code' => 'SUPERSEDED', 'label' => 'Superseded', 'tone' => 'mut'];
+    $expiry = trim((string)($cert['expiry_date'] ?? '')); if ($expiry === '') $expiry = trim((string)($cert['valid_to'] ?? ''));
     if ($expiry !== '' && (strtotime($expiry) - time()) < 0) return ['code' => 'EXPIRED', 'label' => 'Expired', 'tone' => 'bad'];
-    if ((int)($cert['verified'] ?? 0) === 1) {
+    if ((int)($cert['verified'] ?? 0) === 1 || $vs === 'VERIFIED') {
         $soon = $expiry !== '' && (strtotime($expiry) - time()) / 86400 <= 60;
         return $soon ? ['code' => 'VERIFIED', 'label' => 'Verified · expiring', 'tone' => 'warn']
                      : ['code' => 'VERIFIED', 'label' => 'Verified', 'tone' => 'ok'];
     }
-    if ((int)($cert['file_id'] ?? 0) > 0) return ['code' => 'DOCUMENTED', 'label' => 'Document attached', 'tone' => 'info'];
+    if ((int)($cert['file_id'] ?? 0) > 0 || trim((string)($cert['file_name'] ?? '')) !== '' || $vs === 'UNDER_VERIFICATION')
+        return ['code' => 'DOCUMENTED', 'label' => 'Document attached', 'tone' => 'info'];
     return ['code' => 'DECLARED', 'label' => 'Self-declared', 'tone' => 'warn'];
 }
 
