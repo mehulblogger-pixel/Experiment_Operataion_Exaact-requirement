@@ -125,14 +125,87 @@ function costrecon_list($limit = 200) {
 
 // The read-only worklist screen. Gated the same way as revenue reconciliation —
 // only figure-holders (finance / salary-visible / master) may open it.
+// ---------------------------------------------------------------------------
+//  The cost reader switch (P10) — the exact twin of P9's revenue_reader_mode().
+//  One setting decides which figure the cost readers use for a job's
+//  sub-contractor cost as the committed cost ledger becomes the source of truth,
+//  so the move is deliberate and reversible and the legacy field is never destroyed.
+//
+//    'legacy'     — the per-job field (jobs.subcon_cost). Pre-switch behaviour.
+//    'reconciled' — (DEFAULT) the committed cost-ledger figure WHERE it agrees with
+//                   the field within tolerance, else the field. Moves no unproven
+//                   figure, so it ships on without changing a number on screen.
+//    'ledger'     — the committed cost-run figure wherever a run has committed the
+//                   job, else the field (a job never cost-run keeps its field, so
+//                   cost is never silently zeroed). The full switch — turn on once
+//                   the cost reconciliation reads green.
+// ---------------------------------------------------------------------------
+function cost_reader_modes() {
+    return [
+        'legacy'     => 'Legacy job field (pre-switch)',
+        'reconciled' => 'Ledger where it reconciles (safe default)',
+        'ledger'     => 'Committed cost ledger (full switch)',
+    ];
+}
+function cost_reader_mode() {
+    $m = strtolower((string)setting_get('cost_reader_mode', 'reconciled'));
+    return isset(cost_reader_modes()[$m]) ? $m : 'reconciled';
+}
+function cost_reader_set_mode($mode) {
+    $mode = strtolower((string)$mode);
+    if (!isset(cost_reader_modes()[$mode])) return false;
+    if (function_exists('setting_set')) setting_set('cost_reader_mode', $mode);
+    return true;
+}
+
+// The committed SUBCON cost ledger for EVERY job, in one query, cached for the
+// request (pass $rebuild=true after the ledger changes — used by tests). job_profit
+// is called per-job in tight loops, so this keeps the per-job reader O(1) with a
+// single query for the whole page rather than one query per job.
+function costrecon_ledger_all($rebuild = false) {
+    static $map = null;
+    if ($map !== null && !$rebuild) return $map;
+    $map = [];
+    try {
+        foreach (ops_all("SELECT job_id, COALESCE(SUM(amount),0) c FROM cost_allocations
+                          WHERE source_kind='SUBCON' AND COALESCE(job_id,0) > 0 GROUP BY job_id") ?: [] as $r)
+            $map[(int)$r['job_id']] = (float)$r['c'];
+    } catch (Throwable $e) {}
+    return $map;
+}
+function costrecon_ledger($jobId) { $m = costrecon_ledger_all(); return (float)($m[(int)$jobId] ?? 0); }
+
+// The canonical sub-contractor-cost figure for a job, honouring cost_reader_mode().
+// $ledger may be passed precomputed; else it is read from the request-cached map.
+// NEVER destroys the legacy field — it only chooses which agreeing source to show.
+function job_subcon_cost($job, $ledger = null) {
+    $legacy = (float)($job['subcon_cost'] ?? 0);
+    $mode = cost_reader_mode();
+    if ($mode === 'legacy') return $legacy;
+    if ($ledger === null) $ledger = costrecon_ledger((int)($job['id'] ?? 0));
+    $ledger = (float)$ledger;
+    if ($mode === 'ledger') return $ledger != 0.0 ? $ledger : $legacy; // committed run where it exists
+    // 'reconciled' (default): trust the ledger only where it agrees with the field.
+    $tol = function_exists('costrecon_tolerance') ? costrecon_tolerance() : 1.0;
+    return (abs($legacy - $ledger) <= $tol) ? $ledger : $legacy;
+}
+
 function ops_costrecon($method) {
     ops_require((function_exists('can_see_salary') && can_see_salary())
         || (function_exists('can') && (can('finance.reconcile') || can('data.revenue'))) || is_master(),
         'You cannot open the cost reconciliation.');
+    if ($method === 'POST' && isset($_POST['cost_reader_mode'])) {
+        if (cost_reader_set_mode($_POST['cost_reader_mode']))
+            flash('Cost reader mode set to “' . (cost_reader_modes()[cost_reader_mode()] ?? cost_reader_mode()) . '”.');
+        else flash('That is not a valid cost reader mode.', 'error');
+        redirect('/cost-reconciliation'); return true;
+    }
     view('ops/cost_reconciliation', [
         'summary' => costrecon_summary(),
         'rows'    => costrecon_list(200),
         'tol'     => costrecon_tolerance(),
+        'mode'    => cost_reader_mode(),
+        'modes'   => cost_reader_modes(),
     ]);
     return true;
 }

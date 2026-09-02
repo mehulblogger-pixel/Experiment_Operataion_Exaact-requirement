@@ -6,6 +6,7 @@
   $summary = $summary ?? []; $rows = $rows ?? []; $tol = $tol ?? 1;
   $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n, 2);
   $green = !empty($summary['green']);
+  $mode = $mode ?? 'reconciled'; $modes = $modes ?? [];
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/money">Money</a> › Cost reconciliation</div>
 <div class="master-head">
@@ -29,6 +30,24 @@
   <div class="kpi"><span class="kic">↔</span><div class="k">One-sided</div>
     <div class="v"><?= (int)($summary['legacy_only'] ?? 0) ?> · <?= (int)($summary['ledger_only'] ?? 0) ?></div>
     <div class="d">legacy-only · ledger-only</div></div>
+</div>
+
+<?php // §28 (P10) — the cost reader switch. Changing this moves the profit engine onto the
+      // committed cost ledger; the safe default ("reconciled") changes no proven figure. ?>
+<div class="panel" style="margin-top:12px">
+  <h3 class="tab-sub" style="margin-top:0">Cost reader <span class="pill <?= $mode === 'ledger' ? 'p-ok' : ($mode === 'legacy' ? 'p-mut' : 'p-info') ?>" style="font-size:11px"><?= e($modes[$mode] ?? $mode) ?></span></h3>
+  <p class="muted" style="font-size:12.5px;margin:0 0 10px">Which figure the profit engine uses for a <?= e(Tl('job')) ?>&rsquo;s sub-contractor cost.
+    <strong>Reconciled</strong> (default) uses the committed cost-run figure only where it already agrees with the legacy field — it changes no number that has not been proven.
+    Move to <strong>ledger</strong> for the full switch once this page reads <strong>green</strong>. The legacy field is never destroyed; you can switch back any time.</p>
+  <form method="post" action="/cost-reconciliation" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <?php foreach ($modes as $k => $label): ?>
+      <label style="display:inline-flex;align-items:center;gap:5px;font-size:13px;<?= $k === $mode ? 'font-weight:600' : '' ?>">
+        <input type="radio" name="cost_reader_mode" value="<?= e($k) ?>" <?= $k === $mode ? 'checked' : '' ?>> <?= e($label) ?>
+      </label>
+    <?php endforeach; ?>
+    <button class="btn secondary" type="submit" style="padding:4px 12px">Apply</button>
+    <?php if (!$green): ?><span class="pill p-warn" style="font-size:11px">Full ledger is best turned on once green</span><?php endif; ?>
+  </form>
 </div>
 
 <div class="panel" style="margin-top:12px">

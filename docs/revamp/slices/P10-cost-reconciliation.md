@@ -1,8 +1,8 @@
 # Slice P10 — Cost Reconciliation Worklist
 
 **Change-control record (directive Part 25). Classification: REFACTOR / detector
-(read-only, additive, non-destructive). Status: DELIVERED (detector). Convergence
-staged.**
+(read-only, additive, non-destructive). Status: DELIVERED (detector + §28 reader
+switch, safe default). The profit engine now honours the cost reader mode.**
 
 The cost-side twin of **P9 (revenue reconciliation)**. P9 gave finance a worklist
 for where a job's *legacy invoice* figure disagrees with the *books ledger*. This
@@ -84,10 +84,33 @@ It **changes no figure** and switches no reader.
 Remove the route + view + `lib/costrecon.php` + the Money tile + the attention
 signal + the CLI. No data touched.
 
-## Staged — the reader switch (needs a decision, deliberately NOT done)
+## The reader switch (§28) — DELIVERED with a safe default + a mode control
 
-Once `costrecon_summary()['green']` holds across the real dataset, the cost readers
-could be pointed at the ledger as the single truth, one at a time, each validated
-against the §30 frozen-cost snapshots. That *changes displayed cost/profit*, so it
-is a deliberate step per reader — not part of this diagnostic slice. The worklist
-is the gate that makes it safe.
+The exact twin of P9's revenue switch. One setting, `cost_reader_mode`, decides which
+figure the cost readers use for a job's sub-contractor cost, and the **legacy field is
+never destroyed**:
+
+- `cost_reader_mode()` / `cost_reader_set_mode()` / `cost_reader_modes()` — set from a
+  control on the `/cost-reconciliation` screen (finance-gated).
+- `job_subcon_cost($job, $ledger=null)` — the canonical reader.
+- `costrecon_ledger_all($rebuild=false)` — the committed SUBCON ledger for **every** job
+  in one query, cached for the request; `costrecon_ledger($jobId)` serves from it.
+
+Modes: **`legacy`** (the job field; rollback) · **`reconciled`** (DEFAULT — the committed
+cost-run figure only where it agrees with the field within tolerance, else the field;
+moves no unproven number, ships on) · **`ledger`** (full switch — the committed run where
+it exists, field otherwise, so cost is never zeroed; turn on once green).
+
+**Switched through the one engine:** `job_profit()` (`ops.php`) — the single canonical cost
+engine — now reads sub-contractor cost through `job_subcon_cost()`, so **every** cost/profit
+reader that goes through it (management dashboard, SBU P&L, owner/boss profitability,
+contract profit) moves together, consistently, the moment the mode changes. The legacy
+non-unified branch of `boss_profit()` is switched too. Because `job_profit()` is called
+per-job in tight loops, the ledger is loaded **once per page** via the request-cached
+`costrecon_ledger_all()` — no per-job query, so no performance regression.
+
+Validated by `tests/test_cost_reader_switch.php` (15/15): the reader under all three modes,
+the parity property (`legacy` == `reconciled` for every diverging job), that `job_profit`'s
+`subcon` actually moves (legacy field vs committed ledger), the request-cache behaviour, and
+that the field is never mutated. Auto-walk: all profit/cost screens render cleanly under the
+default.

@@ -1698,7 +1698,9 @@ function job_profit($job, $officeId = null) {
     // job — travel, lodging, food. Real money out of the branch, and it was
     // missing from this sum entirely.
     $voucher  = $bearsCost ? job_voucher_total($job['id']) : 0;
-    $subcon   = $bearsCost ? (float)($job['subcon_cost'] ?? 0) : 0;
+    // §28 (P10) — the sub-contractor cost honours the cost reader switch. The ledger
+    // map is request-cached, so this stays O(1) even when job_profit loops all jobs.
+    $subcon   = $bearsCost ? (function_exists('job_subcon_cost') ? job_subcon_cost($job) : (float)($job['subcon_cost'] ?? 0)) : 0;
     $other    = $bearsCost ? (float)($job['other_cost'] ?? 0) : 0;
 
     // What the client agreed to pay back on top of the fee — the bills filed
@@ -6611,7 +6613,7 @@ function boss_profit($bossId) {
         // The order is judged on what the client is charged for it, whichever
         // branch of ours did the work.
         $revenue += job_money($j)['invoice'];
-        $jSub = (float)($j['subcon_cost'] ?? 0); $subcon += $jSub;
+        $jSub = function_exists('job_subcon_cost') ? job_subcon_cost($j) : (float)($j['subcon_cost'] ?? 0); $subcon += $jSub;
         $jLab = 0;
         if ($seeSal) {
             $sal = $j['inspector_id'] ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$j['inspector_id']]) : 0;
