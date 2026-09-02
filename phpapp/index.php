@@ -247,6 +247,7 @@ try {
     require __DIR__ . '/lib/connect_client_search.php'; // Connect K0+ — client-facing talent search & privacy-safe result cards
     require __DIR__ . '/lib/connect_hiring.php'; // Connect K0+ — hiring home for marketplace clients (saved searches + home aggregate)
     require __DIR__ . '/lib/connect_identity.php'; // Connect K0+ — unified professional identity (link inspector ↔ marketplace pro, no merge)
+    require __DIR__ . '/lib/connect_person.php';   // Gap-8 — unified person resolver across the linked identity pools (read-view, no merge)
     require __DIR__ . '/lib/connect_client_bench.php'; // Connect K0+ — client private bench / roster (demand-side, relationship over cx_professionals)
     require __DIR__ . '/lib/connect_deploy.php'; // Connect K0+ — award → deployment bridge (marketplace award becomes a PDSO deputation job)
     require __DIR__ . '/lib/connect_source.php'; // Connect K0+ — inspection request → unified manpower sourcing (rank + controlled assign across pools)

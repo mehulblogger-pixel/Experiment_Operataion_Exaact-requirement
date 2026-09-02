@@ -108,6 +108,17 @@ if ($proMatches || $proLink):
     <?php if ($proLink): ?><span class="pill p-ok" style="font-size:11px;margin-left:4px">✓ confirmed same person</span><?php endif; ?>
   </h3>
   <p class="muted" style="font-size:12px;margin:0 0 8px">This candidate matches a known <strong>marketplace professional</strong> — the same person is already on the bench / passport. Matched by mobile / e-mail / name. <strong>Confirming</strong> records them as one person; nothing is merged and each pool keeps its own record, so it can be unlinked any time.</p>
+  <?php // Gap-8 — once linked, show the ONE person resolved across every pool (read-view, no merge).
+  $person = $person ?? null;
+  if ($person && !empty($person['linked'])):
+    $pl = []; if (($person['pools']['professional'] ?? 0) > 0) $pl[] = 'marketplace'; if (($person['pools']['inspector'] ?? 0) > 0) $pl[] = 'operations inspector'; if (($person['pools']['candidate'] ?? 0) > 0) $pl[] = 'recruitment'; ?>
+  <p class="msg" style="margin:0 0 8px;font-size:12.5px;background:var(--panel-2,#eef1f3);border-radius:6px;padding:8px 12px">
+    <strong>🔗 One person across the platform.</strong>
+    <?= e($person['name'] ?: 'This person') ?> is present in <?= e(implode(' + ', $pl)) ?>.
+    <strong><?= (int)$person['credentials'] ?></strong> credential<?= (int)$person['credentials'] === 1 ? '' : 's' ?> across all pools<?= (int)$person['verified'] > 0 ? ' · <strong>' . (int)$person['verified'] . '</strong> verified' : '' ?>,
+    read on the one verification ladder. Nothing is merged.
+  </p>
+  <?php endif; ?>
   <div style="overflow-x:auto">
   <table class="grid" style="min-width:600px">
     <thead><tr><th>Professional</th><th>Verification</th><th>Availability</th><th>Matched by</th><th></th></tr></thead>

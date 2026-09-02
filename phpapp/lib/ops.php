@@ -5131,9 +5131,11 @@ function ops_candidates($route, $method) {
         $proMatches = function_exists('candpool_pro_matches') ? candpool_pro_matches($cand) : [];
         // P11 — has a coordinator already confirmed this candidate IS one of those professionals?
         $proLink = function_exists('connect_identity_of_candidate') ? connect_identity_of_candidate((int)$cand['id']) : null;
+        // Gap-8 — the unified person across every linked pool (resolve-view, no merge).
+        $person = function_exists('connect_person_summary') ? connect_person_summary('candidate', (int)$cand['id']) : null;
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
             'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket,
-            'personApps' => $personApps, 'proMatches' => $proMatches, 'proLink' => $proLink,
+            'personApps' => $personApps, 'proMatches' => $proMatches, 'proLink' => $proLink, 'person' => $person,
             'rccDropPoints' => function_exists('rcc_drop_points') ? rcc_drop_points() : [], 'rccDropReasons' => function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : []]);
         return;
     }
