@@ -150,8 +150,12 @@ function mis_summary(array $F) {
     // (default) they are the historical partial formula, unchanged. Only the two derived totals move —
     // the labour/expenses/subcon component columns stay the direct figures either way.
     $unified = function_exists('finance_truth_unified') ? finance_truth_unified() : false;
+    // §28 (P9) — the invoiced figure honours the revenue reader switch. Ledger nets
+    // for all these jobs are read once here so the per-job reader stays arithmetic.
+    $ledgerMap = function_exists('revrecon_ledger_net_map') ? revrecon_ledger_net_map(array_map(fn($j) => (int)$j['id'], $jobs)) : [];
+    $invOf = fn($j) => function_exists('job_invoiced_amount') ? job_invoiced_amount($j, $ledgerMap[(int)$j['id']] ?? 0) : (float)($j['invoice_amount'] ?? 0);
 
-    $add = function (&$bucket, $key, $label, $j, $p, $delay) use ($blank, $unified) {
+    $add = function (&$bucket, $key, $label, $j, $p, $delay) use ($blank, $unified, $invOf) {
         if ($key === '' || $key === null) { $key = '—'; $label = $label ?: '—'; }
         if (!isset($bucket[$key])) $bucket[$key] = $blank + ['label' => $label];
         $b = &$bucket[$key];
@@ -164,7 +168,7 @@ function mis_summary(array $F) {
         $b['subcon']   += $p['subcon'];
         $b['cost']     += $unified ? $p['cost']   : ($p['labour'] + $p['expenses'] + $p['subcon']);
         $b['profit']   += $unified ? $p['profit'] : ($p['credit'] - $p['labour'] - $p['expenses'] - $p['subcon']);
-        $b['invoiced'] += (float)($j['invoice_amount'] ?? 0);
+        $b['invoiced'] += $invOf($j);
         $b['paid']     += (float)($j['payment_amount'] ?? 0);
         if ($delay !== null) { $b['delayCounted']++; $b['delayDays'] += $delay; if ($delay > 0) $b['late']++; }
     };
@@ -186,7 +190,7 @@ function mis_summary(array $F) {
         $tot['subcon']   += $p['subcon'];
         $tot['cost']     += $unified ? $p['cost']   : ($p['labour'] + $p['expenses'] + $p['subcon']);
         $tot['profit']   += $unified ? $p['profit'] : ($p['credit'] - $p['labour'] - $p['expenses'] - $p['subcon']);
-        $tot['invoiced'] += (float)($j['invoice_amount'] ?? 0);
+        $tot['invoiced'] += $invOf($j);
         $tot['paid']     += (float)($j['payment_amount'] ?? 0);
         if ($delay !== null) { $tot['delayCounted']++; $tot['delayDays'] += $delay; if ($delay > 0) $tot['late']++; }
 

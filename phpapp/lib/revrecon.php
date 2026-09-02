@@ -119,15 +119,101 @@ function revrecon_list($limit = 200) {
     return $rows;
 }
 
-// The read-only worklist screen. Gated to finance / figure-holders.
+// ---------------------------------------------------------------------------
+//  §28 — the revenue reader switch (P9). Mirrors finance_truth_unified() for the
+//  cost side: one setting decides which figure the revenue readers show for a
+//  job's invoiced amount, so the move onto the books ledger is a deliberate,
+//  reversible step — never a table change, never a destroyed legacy figure.
+//
+//    'legacy'     — the per-job snapshot (jobs.invoice_amount). Pre-switch behaviour.
+//    'reconciled' — (DEFAULT) the books-ledger net WHERE it agrees with the snapshot
+//                   within tolerance, else the snapshot. Guaranteed to move no figure
+//                   that has not been proven equal — the safe switch, so it can ship
+//                   on by default without changing a single number on screen.
+//    'ledger'     — the books-ledger net wherever the books carry the job, else the
+//                   snapshot (a job not yet invoiced in the books keeps its snapshot,
+//                   so revenue is never silently zeroed). The full switch — turn it on
+//                   once the reconciliation worklist reads green.
+// ---------------------------------------------------------------------------
+function revenue_reader_modes() {
+    return [
+        'legacy'     => 'Legacy snapshot (pre-switch)',
+        'reconciled' => 'Ledger where it reconciles (safe default)',
+        'ledger'     => 'Books ledger (full switch)',
+    ];
+}
+function revenue_reader_mode() {
+    $m = strtolower((string)setting_get('revenue_reader_mode', 'reconciled'));
+    return isset(revenue_reader_modes()[$m]) ? $m : 'reconciled';
+}
+function revenue_reader_set_mode($mode) {
+    $mode = strtolower((string)$mode);
+    if (!isset(revenue_reader_modes()[$mode])) return false;
+    if (function_exists('setting_set')) setting_set('revenue_reader_mode', $mode);
+    return true;
+}
+
+// The books-ledger net for one job (non-cancelled invoices). Cheap single read.
+function revrecon_ledger_net($jobId) {
+    try {
+        $r = ops_one("SELECT COALESCE(SUM(il.amount),0) net FROM invoice_lines il
+                      JOIN invoices i ON i.id = il.invoice_id
+                      WHERE il.job_id=? AND COALESCE(i.status,'') <> 'CANCELLED'", [(int)$jobId]);
+    } catch (Throwable $e) { return 0.0; }
+    return (float)($r['net'] ?? 0);
+}
+
+// A bulk {job_id => ledger_net} map in ONE query, for readers that loop many jobs.
+function revrecon_ledger_net_map(array $jobIds) {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $jobIds))));
+    $out = array_fill_keys($ids, 0.0);
+    if (!$ids) return $out;
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    try {
+        foreach (ops_all("SELECT il.job_id, COALESCE(SUM(il.amount),0) net FROM invoice_lines il
+                          JOIN invoices i ON i.id = il.invoice_id
+                          WHERE il.job_id IN ($ph) AND COALESCE(i.status,'') <> 'CANCELLED'
+                          GROUP BY il.job_id", $ids) ?: [] as $r)
+            $out[(int)$r['job_id']] = (float)$r['net'];
+    } catch (Throwable $e) {}
+    return $out;
+}
+
+// The canonical invoiced-revenue figure for a job, honouring revenue_reader_mode().
+// $ledgerNet may be passed precomputed (bulk readers, via revrecon_ledger_net_map)
+// to avoid a per-row query; pass null to read it on demand. NEVER destroys the
+// legacy figure — it only chooses which of the two agreeing sources to show.
+function job_invoiced_amount($job, $ledgerNet = null) {
+    $legacy = (float)($job['invoice_amount'] ?? 0);
+    $mode = revenue_reader_mode();
+    if ($mode === 'legacy') return $legacy;
+    if ($ledgerNet === null) $ledgerNet = revrecon_ledger_net((int)($job['id'] ?? 0));
+    $ledgerNet = (float)$ledgerNet;
+    if ($mode === 'ledger') return $ledgerNet != 0.0 ? $ledgerNet : $legacy; // books where they carry it
+    // 'reconciled' (default): trust the ledger only where it agrees with the snapshot.
+    $tol = function_exists('revrecon_tolerance') ? revrecon_tolerance() : 1.0;
+    return (abs($legacy - $ledgerNet) <= $tol) ? $ledgerNet : $legacy;
+}
+
+// The read-only worklist screen (+ the §28 mode control). Gated to finance / figure-holders.
 function ops_revrecon($method) {
     ops_require((function_exists('can_see_salary') && can_see_salary())
         || (function_exists('can') && (can('finance.reconcile') || can('data.revenue'))) || is_master(),
         'You cannot open the revenue reconciliation.');
+    // Setting the reader mode is a deliberate finance action; only when green may it
+    // safely go to full 'ledger', but the control never blocks — the mode itself is safe.
+    if ($method === 'POST' && isset($_POST['revenue_reader_mode'])) {
+        if (revenue_reader_set_mode($_POST['revenue_reader_mode']))
+            flash('Revenue reader mode set to “' . (revenue_reader_modes()[revenue_reader_mode()] ?? revenue_reader_mode()) . '”.');
+        else flash('That is not a valid revenue reader mode.', 'error');
+        redirect('/revenue-reconciliation'); return true;
+    }
     view('ops/revenue_reconciliation', [
         'summary' => revrecon_summary(),
         'rows'    => revrecon_list(200),
         'tol'     => revrecon_tolerance(),
+        'mode'    => revenue_reader_mode(),
+        'modes'   => revenue_reader_modes(),
     ]);
     return true;
 }

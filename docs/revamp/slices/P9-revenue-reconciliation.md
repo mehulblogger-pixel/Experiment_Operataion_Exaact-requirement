@@ -1,8 +1,9 @@
 # Slice P9 — Revenue Reconciliation Worklist (§29)
 
 **Change-control record (directive Part 25). Classification: REFACTOR / diagnostic
-(read-only, additive, non-destructive). Status: DELIVERED (worklist). Reader
-switch (§28) staged.**
+(read-only, additive, non-destructive). Status: DELIVERED (worklist + §28 reader
+switch, safe default). First reader (management dashboard) switched; remaining
+readers staged.**
 
 `02-gap-and-reuse-map.md` §3 / canonical §29/§80. Diagnostic-first, as agreed — the
 tool that lets finance reach "green" before any revenue reader is switched.
@@ -55,11 +56,32 @@ the divergence to zero.
 Remove the route + view + the three `revrecon.php` functions + the Money tile. No
 data touched.
 
-## Staged — the reader switch (§28, needs a decision, deliberately NOT done)
+## The reader switch (§28) — DELIVERED with a safe default + a mode control
 
-Once `revrecon_summary()['green']` holds across the real dataset, switch the
-remaining legacy revenue readers onto the ledger, one at a time, each validated:
-`mis.php` (invoiced/paid), `contracts.php` (contract-360 invoiced/received),
-`crm.php` (order-jobs), `ops.php` money dashboard (outstanding). This *changes
-displayed revenue figures*, so it is a deliberate §28 step per reader — not part
-of this diagnostic slice. The worklist is the gate that makes it safe.
+The switch mechanism is now built, mirroring `finance_truth_unified()` (the §28 cost
+switch). One setting, `revenue_reader_mode`, decides which figure the revenue readers
+show for a job's invoiced amount, and the **legacy snapshot is never destroyed**:
+
+- `revenue_reader_mode()` + `revenue_reader_set_mode()` — the three modes, set from a
+  control on the `/revenue-reconciliation` screen (finance-gated).
+- `job_invoiced_amount($job, $ledgerNet=null)` — the canonical reader.
+- `revrecon_ledger_net()` / `revrecon_ledger_net_map()` — the per-job / bulk ledger reads.
+
+Modes:
+- **`legacy`** — the per-job snapshot (pre-switch behaviour; the rollback).
+- **`reconciled`** (DEFAULT) — the books-ledger net **only where it agrees with the
+  snapshot within tolerance**, else the snapshot. Guaranteed to change no unproven
+  figure, so it ships on by default without moving a single number on screen. As
+  finance drives the worklist to green, more jobs are on the ledger automatically.
+- **`ledger`** — the full switch: books-ledger net wherever the books carry the job,
+  snapshot otherwise (revenue is never silently zeroed). Turn on once green.
+
+**First reader switched:** the **management dashboard** (`mis.php`, invoiced/paid) reads
+through `job_invoiced_amount()` (ledger nets pre-loaded once per request via
+`revrecon_ledger_net_map()`). Validated by `tests/test_revenue_reader_switch.php` (14/14,
+including the parity property: `legacy` == `reconciled` for every diverging job).
+
+**Remaining readers (staged, next per-reader steps):** `contracts.php` (contract-360
+invoiced/received) and `crm.php` (order-jobs) read the snapshot via SQL sub-select
+aggregates; switching each to honour the mode is its own validated step and is the
+natural follow-on. Until then the mode governs the management dashboard.
