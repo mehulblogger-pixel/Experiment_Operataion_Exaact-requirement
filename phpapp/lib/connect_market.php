@@ -268,6 +268,15 @@ function ops_connect_requirements($route, $method) {
             if (trim((string)($_POST['title'] ?? '')) === '') { flash('Give the requirement a title.', 'error'); redirect('/connect-requirements'); }
             $id = cx_requirement_create($_POST, $act === 'create_post');
             flash($act === 'create_post' ? 'Requirement posted — it is now open for applications.' : 'Requirement saved as a draft.');
+            // Gap-6 — non-blocking near-duplicate warning: this client may already have an
+            // open requirement just like this one. Advisory only; the post still succeeds.
+            if (function_exists('connect_requirement_duplicates')) {
+                $dupes = connect_requirement_duplicates($_POST, $id);
+                if ($dupes) {
+                    $names = array_map(fn($d) => $d['ref_code'] . ($d['reasons'] ? ' (' . implode(', ', $d['reasons']) . ')' : ''), array_slice($dupes, 0, 3));
+                    flash('Heads up — this looks like a near-duplicate of ' . implode('; ', $names) . '. Review before working both.', 'warning');
+                }
+            }
             redirect('/connect-requirement?id=' . $id);
         }
         redirect('/connect-requirements');

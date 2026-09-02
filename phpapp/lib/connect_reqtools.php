@@ -98,3 +98,46 @@ function connect_reqtemplate_create_requirement($templateId, $party, array $over
     foreach ($overrides as $k => $v) $in[$k] = $v;
     return (int)cx_requirement_create($in, (bool)$post);
 }
+
+// ---------------------------------------------------------------------------
+//  Gap-6 — near-duplicate requirement detection. The clone action above reuses a
+//  requirement deliberately; this warns when a NEW requirement looks like one the
+//  same client already has open — same discipline, location, similar title,
+//  overlapping dates — so a double-post is caught, not silently created. Read-only,
+//  non-blocking (an advisory list, never a hard stop).
+// ---------------------------------------------------------------------------
+function connect_requirement_duplicates($in, $exceptId = 0, $limit = 5) {
+    $poster = (int)($in['poster_party_id'] ?? 0);
+    if ($poster <= 0) return [];
+    $disc = strtoupper(trim((string)($in['discipline_code'] ?? '')));
+    $loc  = strtolower(trim((string)($in['location'] ?? '')));
+    $titleToks = function_exists('cx_match_tokens') ? cx_match_tokens((string)($in['title'] ?? '')) : [];
+    $start = trim((string)($in['start_date'] ?? '')); $end = trim((string)($in['end_date'] ?? '')) ?: $start;
+    try {
+        $rows = ops_all("SELECT id, ref_code, title, discipline_code, location, start_date, end_date
+                           FROM cx_requirements
+                          WHERE poster_party_id=? AND id<>? AND status IN ('OPEN','DRAFT')
+                          ORDER BY id DESC LIMIT 200", [$poster, (int)$exceptId]) ?: [];
+    } catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($rows as $r) {
+        $score = 0; $reasons = [];
+        if ($disc !== '' && strtoupper(trim((string)$r['discipline_code'])) === $disc) { $score += 2; $reasons[] = 'same discipline'; }
+        $rloc = strtolower(trim((string)$r['location']));
+        if ($loc !== '' && $rloc !== '' && ($loc === $rloc || strpos($rloc, $loc) !== false || strpos($loc, $rloc) !== false)) { $score += 2; $reasons[] = 'same location'; }
+        if ($titleToks) {
+            $rt = function_exists('cx_match_tokens') ? cx_match_tokens((string)$r['title']) : [];
+            $ov = count($titleToks) ? count(array_intersect($titleToks, $rt)) / count($titleToks) : 0;
+            if ($ov >= 0.6) { $score += 2; $reasons[] = 'similar title'; }
+            elseif ($ov >= 0.3) { $score += 1; $reasons[] = 'overlapping title'; }
+        }
+        if ($start !== '') {
+            $rs = trim((string)$r['start_date']); $re = trim((string)$r['end_date']) ?: $rs;
+            if ($rs !== '' && $rs <= $end && $re >= $start) { $score += 1; $reasons[] = 'overlapping dates'; }
+        }
+        // Two strong signals (score >= 3) is the "near-duplicate" bar.
+        if ($score >= 3) $out[] = ['id' => (int)$r['id'], 'ref_code' => (string)$r['ref_code'], 'title' => (string)$r['title'], 'score' => $score, 'reasons' => $reasons];
+    }
+    usort($out, fn($a, $b) => $b['score'] <=> $a['score']);
+    return array_slice($out, 0, $limit);
+}
