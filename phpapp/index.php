@@ -102,6 +102,7 @@ try {
     require __DIR__ . '/lib/db.php';
     require __DIR__ . '/lib/indexes.php';
     require __DIR__ . '/lib/helpers.php';
+    require __DIR__ . '/lib/install_mode.php';   // Cloud vs Licence deployment posture (onboarding adapts)
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';

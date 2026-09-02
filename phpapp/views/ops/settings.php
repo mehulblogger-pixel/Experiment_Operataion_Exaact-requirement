@@ -604,6 +604,24 @@
   <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s03.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s03.md</code>.</p>
 </div>
 
+<?php if (function_exists('install_mode') && is_master()): $im = install_mode(); $imo = install_mode_options(); ?>
+<div class="panel settings-card">
+  <h3 class="tab-sub" style="margin-top:0;">Install mode <span class="pill <?= $im === 'licence' ? 'p-info' : 'p-ok' ?>" style="font-size:11px"><?= e($imo[$im] ?? $im) ?></span></h3>
+  <p class="sub" style="margin-bottom:8px">Is this the <strong>hosted cloud platform</strong> (companies join a shared marketplace) or a <strong>private licence copy</strong> a customer runs on their own server or laptop (their own operations only, no external marketplace)? Onboarding and the marketplace adapt to this. Set once at install; rarely changed.</p>
+  <form method="post" action="/install-mode-set" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <?php foreach ($imo as $k => $label): ?>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:13.5px;<?= $k === $im ? 'font-weight:600' : '' ?>">
+        <input type="radio" name="install_mode" value="<?= e($k) ?>" <?= $k === $im ? 'checked' : '' ?>> <?= e($label) ?>
+      </label>
+    <?php endforeach; ?>
+    <button class="btn secondary" type="submit" style="padding:4px 12px">Apply</button>
+  </form>
+  <p class="muted" style="margin-top:8px;font-size:12px"><?= $im === 'licence'
+      ? 'Local-only: this copy manages this company’s own people, clients and work. The shared marketplace is off (a future “Marketplace Connect” add-on can bridge to the cloud pool).'
+      : 'Cloud: companies self-register and meet in the shared marketplace.' ?></p>
+</div>
+<?php endif; ?>
+
 <div class="panel settings-card">
   <?php $s04 = function_exists('seed_s04_status') ? seed_s04_status() : ['loaded'=>false]; ?>
   <h3 class="tab-sub" style="margin-top:0;">DEMO-S04 — marketplace lifecycle (new engines)</h3>

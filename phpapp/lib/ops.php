@@ -2833,6 +2833,13 @@ function ops_dispatch($route, $method) {
             ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S05 scenario.');
             if ($method === 'POST' && function_exists('seed_s05_remove')) flash('DEMO-S05 convergence & reconciliation removed — ' . (int)seed_s05_remove() . ' records deleted.');
             redirect('/settings'); return true;
+        case $route === 'install-mode-set':
+            ops_require(is_master(), 'Only the Master Admin can change the install mode.');
+            if ($method === 'POST' && function_exists('install_mode_set')) {
+                if (install_mode_set($_POST['install_mode'] ?? '')) flash('Install mode set to “' . install_mode_label() . '”.');
+                else flash('That is not a valid install mode.', 'error');
+            }
+            redirect('/settings'); return true;
         case $route === 'seed-scenario-s06':
             ops_require(is_master(), 'Only the Master Admin can load the DEMO-S06 scenario.');
             if ($method === 'POST' && function_exists('seed_s06_load')) {
