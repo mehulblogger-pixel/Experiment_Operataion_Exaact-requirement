@@ -4993,8 +4993,27 @@ function ops_candidates($route, $method) {
             $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int)($_GET['id'] ?? 0)]);
             if (!$cand) { http_response_code(404); view('notfound'); return; }
         }
-        $dupBlock = []; $prefill = null;
-        if ($method === 'POST') {
+        $dupBlock = []; $prefill = null; $cvBanner = null;
+        if ($method === 'POST' && ($_POST['action'] ?? '') === 'cv_prefill' && !$cand) {
+            // RÉSUMÉ AUTO-EXTRACT — read the pasted text or uploaded file, prefill the
+            // blank fields, and re-render the form for the recruiter to review & Save.
+            // Never creates a candidate; only fills the form.
+            $b = $_POST;
+            $cvText = trim((string)($b['cv_text'] ?? ''));
+            if (!empty($_FILES['cv_file']['tmp_name']) && (int)$_FILES['cv_file']['error'] === 0) {
+                $bytes = @file_get_contents($_FILES['cv_file']['tmp_name']);
+                if ($bytes !== false && function_exists('connect_cv_extract_text'))
+                    $cvText = connect_cv_extract_text($bytes, (string)($_FILES['cv_file']['type'] ?? ''), (string)($_FILES['cv_file']['name'] ?? ''));
+            }
+            $auto = function_exists('recruit_cv_autofill') ? recruit_cv_autofill($cvText) : [];
+            $prefill = $b;                                   // keep whatever the recruiter already typed…
+            foreach ($auto as $k => $v) { if ($v !== '' && $v !== null && trim((string)($prefill[$k] ?? '')) === '') $prefill[$k] = $v; } // …fill only the blanks
+            $prefill['cv_text'] = $cvText;
+            $sum = function_exists('recruit_cv_autofill_summary') ? recruit_cv_autofill_summary($auto) : '';
+            $cvBanner = $cvText === '' ? 'Paste some résumé text (or choose a file) first, then press “Extract”.'
+                      : ($sum !== '' ? 'Filled from the résumé: ' . $sum . '. Check everything, add the requisition, and Save.'
+                                     : 'Could not read much from that file — type the details in, or paste the résumé text instead.');
+        } elseif ($method === 'POST') {
             $b = $_POST;
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
@@ -5024,6 +5043,13 @@ function ops_candidates($route, $method) {
                 $pdo->prepare("INSERT INTO candidates (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
                 if (function_exists('custom_save')) custom_save('candidate', (int)$id, $b);
+                // If the résumé text was carried through the prefill, save it and its
+                // search keywords too, so the CV is on file from the moment of intake.
+                $cvText = trim((string)($b['cv_text'] ?? ''));
+                if ($cvText !== '') {
+                    $kw = function_exists('cv_extract_keywords') ? cv_extract_keywords($cvText) : '';
+                    try { $pdo->prepare("UPDATE candidates SET cv_text=?, cv_keywords=?, cv_analyzed_at=? WHERE id=?")->execute([$cvText, $kw, date('c'), $id]); } catch (Throwable $e) {}
+                }
                 $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                     ->execute([$id, '', 'RECEIVED', 'CV received', user_name(current_user()), date('c')]);
                 flash("$code added to the hiring pipeline.");
@@ -5054,7 +5080,7 @@ function ops_candidates($route, $method) {
         view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls, 'agencies' => $agencies,
             'requisitions' => requisitions_list(true), 'preReq' => $preReq, 'reqLocations' => $reqLocations, 'reqGroups' => $reqGroups,
             'cfvals' => $cand ? custom_values_map('candidate', $cand['id']) : [],
-            'dupes' => $dupBlock ?? [], 'prefill' => $prefill ?? null,
+            'dupes' => $dupBlock ?? [], 'prefill' => $prefill ?? null, 'cvBanner' => $cvBanner ?? null,
             'rccUsers' => function_exists('rcc_users') ? rcc_users() : [], 'rccDepts' => function_exists('rcc_departments') ? rcc_departments() : [],
             'rccDropReasons' => function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : [], 'rccDropPoints' => function_exists('rcc_drop_points') ? rcc_drop_points() : [],
             'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'skillsByTrade' => skills_by_trade()]);

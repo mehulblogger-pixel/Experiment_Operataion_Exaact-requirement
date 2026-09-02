@@ -559,6 +559,73 @@ function recruit_deploy_readiness($cand, $req = null) {
     return ['pct' => $pct, 'done' => $done, 'total' => count($reqItems), 'ready' => $pct === 100, 'items' => $items];
 }
 
+// ---------------------------------------------------------------------------
+//  RÉSUMÉ AUTO-EXTRACT for candidate intake. Reuses the marketplace CV engine
+//  (connect_cv_extract_text + connect_cv_scan) that already reads txt/docx/pdf and
+//  maps text to the skills/role taxonomy — we do NOT build a second parser. From a
+//  résumé we prefill the reliable fields (name, e-mail, mobile, experience) and a
+//  role/skills summary; the recruiter always reviews and saves. Nothing auto-creates.
+// ---------------------------------------------------------------------------
+function recruit_cv_autofill($text) {
+    $text = (string)$text;
+    $out = ['first_name'=>'','middle_name'=>'','last_name'=>'','email'=>'','mobile'=>'',
+            'experience_years'=>'','remarks'=>'','cv_keywords'=>''];
+    if (trim($text) === '') return $out;
+
+    // E-mail (first match).
+    if (preg_match('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $text, $m)) $out['email'] = strtolower($m[0]);
+    // Mobile — an Indian 10-digit number, optional +91 / 0 prefix. First join digit
+    // groups split by spaces or dashes ("98123 45678" → "9812345678") so a formatted
+    // number still matches, then read the 10-digit core.
+    $numNorm = preg_replace('/(?<=\d)[\s\-]+(?=\d)/', '', $text);
+    if (preg_match('/(?:\+?91|\b0)?([6-9]\d{9})\b/', $numNorm, $m)) $out['mobile'] = $m[1];
+    // Experience — the largest "N years / yrs" mentioned.
+    if (preg_match_all('/(\d{1,2})\s*\+?\s*(?:years|yrs|year)\b/i', $text, $mm) && $mm[1]) $out['experience_years'] = (string)max(array_map('intval', $mm[1]));
+    // Name — the first line that reads like a person's name (2–4 words, letters only).
+    foreach (preg_split('/\r\n|\r|\n/', $text) as $line) {
+        $line = trim($line); if ($line === '' || strlen($line) > 40) continue;
+        if (stripos($line, 'resume') !== false || stripos($line, 'curriculum') !== false || stripos($line, 'vitae') !== false) continue;
+        if (preg_match("/^[A-Za-z][A-Za-z.'\\-]+(?:\\s+[A-Za-z.'\\-]+){1,3}$/", $line)) {
+            $parts = preg_split('/\s+/', $line);
+            $out['first_name'] = $parts[0];
+            $out['last_name']  = count($parts) > 1 ? $parts[count($parts)-1] : '';
+            if (count($parts) > 2) $out['middle_name'] = implode(' ', array_slice($parts, 1, -1));
+            break;
+        }
+    }
+    // Taxonomy scan → primary role + skills + base city (the real, existing engine).
+    $role = ''; $skills = []; $base = '';
+    if (function_exists('connect_cv_scan')) {
+        $scan = connect_cv_scan($text);
+        foreach (($scan['expertise'] ?? []) as $node) {
+            $kind = strtoupper((string)($node['kind'] ?? ''));
+            if (($node['relation'] ?? '') === 'PRIMARY_ROLE' && $role === '') $role = (string)$node['name'];
+            elseif ($kind === 'ROLE' && $role === '') $role = (string)$node['name'];
+            if (in_array($kind, ['SKILL','METHOD','EQUIPMENT','CERTIFICATION','ACTIVITY','SYSTEM','SPECIALIZATION'], true)) $skills[] = (string)$node['name'];
+        }
+        if (!empty($scan['base_place']['name'])) $base = (string)$scan['base_place']['name'];
+    }
+    $skills = array_values(array_unique(array_filter($skills)));
+    $bits = [];
+    if ($role)   $bits[] = 'Role: ' . $role;
+    if ($skills) $bits[] = 'Skills: ' . implode(', ', array_slice($skills, 0, 20));
+    if ($base)   $bits[] = 'Base: ' . $base;
+    if ($bits)   $out['remarks'] = 'From résumé — ' . implode(' · ', $bits);
+    $out['cv_keywords'] = function_exists('cv_extract_keywords') ? cv_extract_keywords($text) : '';
+    return $out;
+}
+
+/** A short human line saying what the résumé extract filled in (for the banner). */
+function recruit_cv_autofill_summary($a) {
+    $got = [];
+    if (!empty($a['first_name']))      $got[] = 'name';
+    if (!empty($a['email']))           $got[] = 'e-mail';
+    if (!empty($a['mobile']))          $got[] = 'mobile';
+    if (!empty($a['experience_years']))$got[] = $a['experience_years'] . ' yrs experience';
+    if (!empty($a['remarks']))         $got[] = 'role & skills';
+    return $got ? implode(', ', $got) : '';
+}
+
 // §15 — AI extraction of a requirement from a pasted email / JD / WhatsApp.
 // Returns JSON {ok, fields:{…}} for the form to fill in — the user always
 // reviews and saves; the AI never creates a requirement itself.

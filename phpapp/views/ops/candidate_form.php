@@ -4,6 +4,7 @@
   $isEdit = !empty($cand);
   $cand = $cand ?: ($prefill ?? null);
   $dupes = $dupes ?? [];
+  $cvBanner = $cvBanner ?? null;
   $curTrade = $cand['trade_id'] ?? '';
   $curSkills = ($curTrade && isset($skillsByTrade[$curTrade])) ? $skillsByTrade[$curTrade] : [];
 ?>
@@ -13,6 +14,20 @@
     <p class="sub">Submit a candidate for project work. You can move them through Submitted → Shortlisted → Interview → Accept / Hold / Reject afterwards.</p></div>
   <a class="btn secondary" href="/candidates">← Back</a>
 </div>
+
+<?php if (!$isEdit): ?>
+<div class="panel" style="border-left:4px solid var(--teal,#0f7d7d);background:var(--soft,#f6faf9)">
+  <h3 class="tab-sub" style="margin-top:0">📄 Prefill from a résumé <span class="muted" style="font-weight:400;font-size:12.5px">— optional, saves typing</span></h3>
+  <p class="sub" style="margin:0 0 10px">Upload a CV (PDF / Word / text) or paste the text, and we’ll read the name, e-mail, mobile, experience and skills into the form below. You review and Save — nothing is created automatically.</p>
+  <?php if ($cvBanner): ?><div class="pill p-ok" style="display:block;margin:0 0 10px;padding:8px 12px;font-weight:500"><?= e($cvBanner) ?></div><?php endif; ?>
+  <form method="post" action="/candidate-new" enctype="multipart/form-data" class="form-grid" style="align-items:end">
+    <input type="hidden" name="action" value="cv_prefill">
+    <div class="ff"><label>Résumé file</label><input class="form-control" type="file" name="cv_file" accept=".pdf,.doc,.docx,.txt"></div>
+    <div class="ff ff-wide"><label>…or paste résumé text</label><textarea class="form-control" name="cv_text" rows="3" placeholder="Paste the CV text here"><?= e($cand['cv_text'] ?? '') ?></textarea></div>
+    <div class="ff"><button class="btn" type="submit">Extract →</button></div>
+  </form>
+</div>
+<?php endif; ?>
 
 <?php if ($dupes): ?>
 <div class="panel" style="border-left:4px solid var(--amber,#d97706);background:#fffdf5">
@@ -38,6 +53,7 @@
 
 <form method="post" action="/<?= $isEdit ? 'candidate-edit?id=' . (int)$cand['id'] : 'candidate-new' ?>" class="panel">
 <?php if ($dupes): ?><input type="hidden" name="dup_ack" value="1"><?php endif; ?>
+<?php if (!$isEdit && !empty($cand['cv_text'])): ?><input type="hidden" name="cv_text" value="<?= e($cand['cv_text']) ?>"><?php endif; ?>
   <div class="ff ff-wide" style="background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
     <label>Against requisition (management approval) *</label>
     <select class="form-control searchable" name="requisition_id" id="cand_req" required>
