@@ -2,8 +2,8 @@
 
 **Change-control record (directive Part 25). Classification: REFACTOR / diagnostic
 (read-only, additive, non-destructive). Status: DELIVERED (worklist + §28 reader
-switch, safe default). First reader (management dashboard) switched; remaining
-readers staged.**
+switch, safe default). All three revenue readers — management dashboard,
+contract-360, order-360 — now honour the mode.**
 
 `02-gap-and-reuse-map.md` §3 / canonical §29/§80. Diagnostic-first, as agreed — the
 tool that lets finance reach "green" before any revenue reader is switched.
@@ -76,12 +76,21 @@ Modes:
 - **`ledger`** — the full switch: books-ledger net wherever the books carry the job,
   snapshot otherwise (revenue is never silently zeroed). Turn on once green.
 
-**First reader switched:** the **management dashboard** (`mis.php`, invoiced/paid) reads
-through `job_invoiced_amount()` (ledger nets pre-loaded once per request via
-`revrecon_ledger_net_map()`). Validated by `tests/test_revenue_reader_switch.php` (14/14,
-including the parity property: `legacy` == `reconciled` for every diverging job).
+**All three revenue readers now honour the mode:**
+- **management dashboard** (`mis.php`, invoiced/paid) — reads through `job_invoiced_amount()`.
+- **contract-360** (`contracts.php`) — the money box (invoiced / outstanding / remaining)
+  reads through `job_invoiced_amount()`; the per-call line reads through `call_invoiced_map()`.
+- **order-360** (`crm.php` quote detail) — order-jobs read through `job_invoiced_amount()`
+  (each row stamped `_invoiced`); the per-call line reads through `call_invoiced_map()`.
 
-**Remaining readers (staged, next per-reader steps):** `contracts.php` (contract-360
-invoiced/received) and `crm.php` (order-jobs) read the snapshot via SQL sub-select
-aggregates; switching each to honour the mode is its own validated step and is the
-natural follow-on. Until then the mode governs the management dashboard.
+`call_invoiced_map()` is the per-call helper for the two 360 screens whose legacy figure
+was a `SUM(invoice_amount) WHERE invoice_raised=1` sub-select — it preserves that same
+`invoice_raised` gate, so under `legacy`/`reconciled` it reproduces the old figure exactly
+and only under `ledger` does it move onto the books. Ledger nets are pre-loaded once per
+screen (`revrecon_ledger_net_map()`), so no reader adds a per-row query.
+
+Validated by `tests/test_revenue_reader_switch.php` (18/18): the job-level and per-call
+readers under all three modes, the parity property (`legacy` == `reconciled` for every
+diverging job), the `invoice_raised` gate preservation, and that the snapshot column is
+never mutated. Both `/quote` and `/contract` dispatch through the switched handlers with
+no error under every mode.

@@ -67,6 +67,21 @@ try {
     // the legacy figure on the row is never mutated by any read
     t_eq((float)ops_val("SELECT invoice_amount FROM jobs WHERE id=?", [$bad]), 5000.0, 'the legacy snapshot column is never destroyed');
 
+    // --- the per-call reader (contract-360 / order-360) honours the same modes ---
+    // All three jobs sit on $callId with invoice_raised=1 (legacy 1000 + 5000 + 800).
+    revenue_reader_set_mode('legacy');
+    t_eq(call_invoiced_map([$callId])[$callId], 6800.0, 'per-call legacy = the raised-invoice snapshot sum (6800)');
+    revenue_reader_set_mode('reconciled');
+    t_eq(call_invoiced_map([$callId])[$callId], 6800.0, 'per-call reconciled = identical (no proven figure moved)');
+    revenue_reader_set_mode('ledger');
+    // OK 1000 (ledger=legacy) + BAD 2000 (ledger net) + LEG 800 (no ledger, snapshot kept) = 3800
+    t_eq(call_invoiced_map([$callId])[$callId], 3800.0, 'per-call ledger = books where they carry the job (3800)');
+    // the invoice_raised gate is preserved: a not-raised job is excluded from the per-call sum
+    db()->prepare("INSERT INTO jobs (call_id, job_code, closed_flag, invoice_raised, invoice_amount, created_at) VALUES (?,?,?,?,?,?)")
+        ->execute([$callId, 'J-RRS-DRAFT', 1, 0, 9999, date('c')]);
+    revenue_reader_set_mode('legacy');
+    t_eq(call_invoiced_map([$callId])[$callId], 6800.0, 'a job with invoice_raised=0 is excluded from the per-call figure (gate preserved)');
+
     revenue_reader_set_mode($mode0);  // restore
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();

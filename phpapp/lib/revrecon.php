@@ -195,6 +195,26 @@ function job_invoiced_amount($job, $ledgerNet = null) {
     return (abs($legacy - $ledgerNet) <= $tol) ? $ledgerNet : $legacy;
 }
 
+// Mode-aware invoiced total PER CALL, for the contract-360 and order-360 readers
+// whose legacy form was a `SUM(invoice_amount) WHERE invoice_raised=1` sub-select.
+// It preserves that same invoice_raised gate, so under 'legacy'/'reconciled' it
+// reproduces the old figure and under 'ledger' it moves onto the books. One pair of
+// queries for the whole set → {call_id => invoiced}.
+function call_invoiced_map(array $callIds) {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $callIds))));
+    $out = array_fill_keys($ids, 0.0);
+    if (!$ids) return $out;
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    try {
+        $jobs = ops_all("SELECT id, call_id, invoice_amount FROM jobs
+                         WHERE call_id IN ($ph) AND COALESCE(invoice_raised,0)=1", $ids) ?: [];
+    } catch (Throwable $e) { return $out; }
+    $ledger = revrecon_ledger_net_map(array_map(fn($j) => (int)$j['id'], $jobs));
+    foreach ($jobs as $j)
+        $out[(int)$j['call_id']] = ($out[(int)$j['call_id']] ?? 0) + job_invoiced_amount($j, $ledger[(int)$j['id']] ?? 0);
+    return $out;
+}
+
 // The read-only worklist screen (+ the §28 mode control). Gated to finance / figure-holders.
 function ops_revrecon($method) {
     ops_require((function_exists('can_see_salary') && can_see_salary())

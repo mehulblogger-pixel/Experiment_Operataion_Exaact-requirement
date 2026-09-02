@@ -449,7 +449,7 @@
 <?php endif; ?>
 
 <?php if (!empty($orderJobs)):
-  $oInv=0;$oPaid=0; foreach($orderJobs as $oj){ $oInv+=(float)$oj['invoice_amount']; $oPaid+= !empty($oj['payment_received'])?(float)$oj['payment_amount']:0; } ?>
+  $oInv=0;$oPaid=0; foreach($orderJobs as $oj){ $oInv+=(float)($oj['_invoiced'] ?? $oj['invoice_amount']); $oPaid+= !empty($oj['payment_received'])?(float)$oj['payment_amount']:0; } ?>
 <div class="panel" data-tab="Jobs &amp; order">
   <h3 class="tab-sub" style="margin-top:0">Jobs &amp; revenue against this order</h3>
   <div class="chip-row" style="margin-bottom:8px">
@@ -463,7 +463,7 @@
     <tr><td><a href="/job?id=<?= (int)$oj['id'] ?>"><?= e($oj['job_code']) ?></a></td>
       <td><?= e($oj['inspector_name'] ?: '—') ?></td>
       <td><?= $oj['closed_flag']?'Closed':'Open' ?></td>
-      <td class="num"><?= (float)$oj['invoice_amount']>0?cur_sym().number_format((float)$oj['invoice_amount'],0):'—' ?></td>
+      <td class="num"><?php $ojInv=(float)($oj['_invoiced'] ?? $oj['invoice_amount']); ?><?= $ojInv>0?cur_sym().number_format($ojInv,0):'—' ?></td>
       <td class="num"><?= !empty($oj['payment_received'])?cur_sym().number_format((float)$oj['payment_amount'],0):'—' ?></td></tr>
     <?php endforeach; ?>
   </table>
