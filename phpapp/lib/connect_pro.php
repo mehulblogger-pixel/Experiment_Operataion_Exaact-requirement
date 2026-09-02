@@ -718,6 +718,11 @@ function connect_pro_route($route, $method) {
                 'heads'   => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
                 'files'   => function_exists('connect_engv_files') ? connect_engv_files($vid) : [],
                 'reports' => ($vRow && function_exists('connect_engv_reports')) ? connect_engv_reports((int)$vRow['engagement_id']) : [],
+                // Reimbursement ceilings the client set at posting — carried onto the
+                // engagement — shown as guidance so the professional knows their limits.
+                'terms'      => ($vRow && function_exists('connect_reqterms_parse')) ? connect_reqterms_parse(ops_one("SELECT reimb_terms FROM cx_engagements WHERE id=?", [(int)$vRow['engagement_id']]) ?: []) : [],
+                'termLabels' => function_exists('connect_reqterms_heads') ? connect_reqterms_heads() : [],
+                'termModes'  => function_exists('connect_reqterms_cover_modes') ? connect_reqterms_cover_modes() : [],
             ]); exit;
 
         case 'pro/report-file':   // K21 — serve one of my own engagement's report deliverables

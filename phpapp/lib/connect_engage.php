@@ -46,6 +46,7 @@ function connect_engage_migrate() {
     if (function_exists('ensure_column')) {
         ensure_column('cx_engagements', 'rate_inclusive', "VARCHAR(12) DEFAULT 'INCLUSIVE'"); // INCLUSIVE | EXCLUSIVE
         ensure_column('cx_engagements', 'voucher_cadence', "VARCHAR(14) DEFAULT 'PER_DEPLOYMENT'"); // PER_DAY | PER_DEPLOYMENT
+        ensure_column('cx_engagements', 'reimb_terms', "TEXT DEFAULT ''"); // JSON reimbursement terms inherited from the posting (guidance, never enforced)
         // Gap-4 — shift / time-of-day, so same-day different-shift bookings don't false-conflict.
         // '' = full-day (default; conflicts with any shift, i.e. today's behaviour).
         ensure_column('cx_engagements', 'shift', "VARCHAR(16) DEFAULT ''"); // '' (full day) | DAY | NIGHT | GENERAL | a named shift
@@ -237,6 +238,11 @@ function connect_engage_save_for_requirement($requirementId, array $in) {
     // per-deployment).
     $rateModel = connect_engage_norm_rate_model($in['rate_inclusive'] ?? ($req['rate_inclusive'] ?? 'INCLUSIVE'));
     $cadence   = connect_engage_norm_cadence($in['voucher_cadence'] ?? ($req['voucher_cadence'] ?? 'PER_DEPLOYMENT'));
+    // Reimbursement terms (ceilings the client set at posting) ride along to the
+    // engagement, so the voucher screen can show the professional their limits.
+    // Guidance only — never enforced. Inherited from the requirement unless the
+    // booking overrides it.
+    $reimbTerms = (string)($in['reimb_terms'] ?? ($req['reimb_terms'] ?? ''));
 
     if (!empty($cfg['needs_qty']) && $qty <= 0) return [false, $cfg['qty_label'] . ' is required for ' . $cfg['label'] . '.', 0];
     if (!empty($cfg['needs_freq']) && $freq === '') return [false, 'Describe the frequency (e.g. "2 days a week").', 0];
@@ -244,16 +250,16 @@ function connect_engage_save_for_requirement($requirementId, array $in) {
     $shift = strtoupper(trim((string)($in['shift'] ?? '')));  // Gap-4 — '' = full day
     $existing = connect_engage_for_requirement($requirementId);
     if ($existing) {
-        db()->prepare("UPDATE cx_engagements SET basis=?, rate=?, rate_unit=?, quantity=?, frequency_note=?, start_date=?, end_date=?, status=?, rate_inclusive=?, voucher_cadence=?, shift=?, notes=?, updated_at=? WHERE id=?")
-            ->execute([$basis, $rate, $unit, $qty, $freq, $start, $end, $status, $rateModel, $cadence, $shift, trim((string)($in['notes'] ?? '')), date('c'), (int)$existing['id']]);
+        db()->prepare("UPDATE cx_engagements SET basis=?, rate=?, rate_unit=?, quantity=?, frequency_note=?, start_date=?, end_date=?, status=?, rate_inclusive=?, voucher_cadence=?, reimb_terms=?, shift=?, notes=?, updated_at=? WHERE id=?")
+            ->execute([$basis, $rate, $unit, $qty, $freq, $start, $end, $status, $rateModel, $cadence, $reimbTerms, $shift, trim((string)($in['notes'] ?? '')), date('c'), (int)$existing['id']]);
         return [true, 'Booking updated.', (int)$existing['id']];
     }
     db()->prepare("INSERT INTO cx_engagements
-        (requirement_id,application_id,subject_kind,subject_id,subject_name,poster_party_id,poster_name,basis,rate,rate_unit,quantity,frequency_note,start_date,end_date,status,rate_inclusive,voucher_cadence,shift,notes,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        (requirement_id,application_id,subject_kind,subject_id,subject_name,poster_party_id,poster_name,basis,rate,rate_unit,quantity,frequency_note,start_date,end_date,status,rate_inclusive,voucher_cadence,reimb_terms,shift,notes,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
         ->execute([(int)$requirementId, (int)$subj['application_id'], $subj['kind'], (int)$subj['id'], $subj['name'],
                    (int)($req['poster_party_id'] ?? 0), (string)($req['poster_name'] ?? ''), $basis, $rate, $unit, $qty, $freq,
-                   $start, $end, $status, $rateModel, $cadence, $shift, trim((string)($in['notes'] ?? '')), date('c'), date('c')]);
+                   $start, $end, $status, $rateModel, $cadence, $reimbTerms, $shift, trim((string)($in['notes'] ?? '')), date('c'), date('c')]);
     return [true, 'Booking recorded.', (int)db()->lastInsertId()];
 }
 

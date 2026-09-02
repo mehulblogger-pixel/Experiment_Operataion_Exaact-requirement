@@ -2,6 +2,7 @@
   // Connect K21 — one engagement voucher. Add days; when the rate is EXCLUSIVE,
   // also add travel/hotel/conveyance/allowances against receipts; then submit.
   $me = $me ?? []; $v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? []; $files = $files ?? []; $reports = $reports ?? [];
+  $terms = $terms ?? []; $termLabels = $termLabels ?? []; $termModes = $termModes ?? [];
   if (!$v) { echo '<div class="card"><p class="muted">Voucher not found. <a href="/pro/vouchers">Back to my vouchers</a></p></div>'; return; }
   $exclusive = strtoupper((string)$v['rate_inclusive']) === 'EXCLUSIVE';
   $isDraft   = strtoupper((string)$v['status']) === 'DRAFT';
@@ -38,6 +39,31 @@
       ? 'Your rate is the professional fee only — add each ' . e($unit) . ' worked, plus travel, hotel, conveyance and allowances against receipts.'
       : 'Your rate is all-inclusive — add each ' . e($unit) . ' worked. Travel, hotel and allowances are already covered, so no expense claim is needed.' ?>
 </p>
+
+<?php
+  // What the client agreed to cover, with the ceilings THEY set at posting. Shown
+  // as guidance only — nothing is auto-blocked; the approver checks claims against it.
+  if ($exclusive && $termLabels):
+      $shown = [];
+      foreach ($termLabels as $hk => $hl) {
+          $t = $terms[$hk] ?? null; if (!is_array($t)) continue;
+          $mode = strtoupper((string)($t['mode'] ?? 'IN_RATE'));
+          if ($mode === 'IN_RATE') continue; // nothing to say — it's inside the fee
+          $line = e($hl) . ' — ';
+          if ($mode === 'CEILING' && (float)($t['ceiling'] ?? 0) > 0) $line .= 'up to ' . e($inr($t['ceiling'])) . ((($t['per'] ?? 'DAY') === 'DAY') ? '/day' : '/deployment');
+          else $line .= e($termModes[$mode] ?? $mode);
+          $shown[] = $line;
+      }
+      if ($shown):
+?>
+<div class="card" style="border-left:4px solid var(--gold);padding:12px 14px">
+  <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--muted);margin-bottom:6px">What your client will cover</div>
+  <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.7">
+    <?php foreach ($shown as $s): ?><li><?= $s ?></li><?php endforeach; ?>
+  </ul>
+  <p class="muted" style="font-size:11.5px;margin:8px 0 0">A guide to your limits — claim against receipts; the approver reviews each claim.</p>
+</div>
+<?php endif; endif; ?>
 
 <?php // Returned for clarification — show the client's note and a way to revise ?>
 <?php if (strtoupper((string)$v['status']) === 'REJECTED'): ?>
