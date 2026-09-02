@@ -169,6 +169,18 @@ function books_migrate() {
     // so a daily sweep does not re-nag the same one every morning.
     if (function_exists('ensure_column')) ensure_column('invoices', 'reminded_at', "VARCHAR(30) DEFAULT ''");
 
+    // TDS the customer will withhold — captured on the invoice so the bill can show
+    // the net payable, not only at receipt time. Additive & defaulted to 0, so every
+    // existing invoice is unchanged (no TDS shown, totals identical). tds_amount is
+    // computed by books_recalc on the pre-GST subtotal (CBDT Circular 23/2017).
+    // voucher_id ties an invoice back to the marketplace voucher that raised it, so a
+    // voucher is never invoiced twice.
+    if (function_exists('ensure_column')) {
+        ensure_column('invoices', 'tds_pct',    "DECIMAL(6,2) DEFAULT 0");
+        ensure_column('invoices', 'tds_amount', "DECIMAL(16,2) DEFAULT 0");
+        ensure_column('invoices', 'voucher_id', "INT DEFAULT 0");
+    }
+
     if (function_exists('act_index')) {
         act_index('invoices', 'idx_inv_partner', '(partner_id, status)');
         act_index('invoices', 'idx_inv_date',    '(invoice_date)');
@@ -338,8 +350,19 @@ function books_recalc($invoiceId) {
     // difference has to be a real figure in the books rather than a silent shave.
     $rounded = round($gross);
     $round   = round($rounded - $gross, 2);
-    db()->prepare("UPDATE invoices SET subtotal=?, cgst=?, sgst=?, igst=?, round_off=?, total=?, updated_at=? WHERE id=?")
-       ->execute([$sub, $c, $s, $i, $round, $rounded, date('c'), (int)$invoiceId]);
+    // TDS the customer withholds — on the pre-GST value (the subtotal), per CBDT
+    // Circular 23/2017. It does not change the invoice total (what is billed); it is
+    // the deduction that produces the net payable. Zero tds_pct → zero, so nothing
+    // changes for an ordinary invoice.
+    $tdsPct = (float)($inv['tds_pct'] ?? 0);
+    $tds = $tdsPct > 0 ? round($sub * $tdsPct / 100, 2) : 0.0;
+    db()->prepare("UPDATE invoices SET subtotal=?, cgst=?, sgst=?, igst=?, round_off=?, total=?, tds_amount=?, updated_at=? WHERE id=?")
+       ->execute([$sub, $c, $s, $i, $round, $rounded, $tds, date('c'), (int)$invoiceId]);
+}
+
+/** Net the customer actually pays after withholding TDS (total − TDS). */
+function books_net_payable($inv) {
+    return round((float)($inv['total'] ?? 0) - (float)($inv['tds_amount'] ?? 0), 2);
 }
 
 // ---- Reading ----------------------------------------------------------------
@@ -513,8 +536,23 @@ function books_invoice_create(array $b) {
         (int)($b['quotation_id'] ?? 0) ?: null,
         (string)($b['notes'] ?? ''), $u ? user_name($u) : '', date('c'), date('c')]);
     $id = (int)db()->lastInsertId();
+    // Optional TDS rate (the customer's withholding) and marketplace-voucher
+    // provenance — additive columns, set here so callers need not touch the header
+    // INSERT. Both default to 0/unset for an ordinary manual invoice.
+    $tdsPct = max(0, (float)($b['tds_pct'] ?? 0));
+    $vId    = (int)($b['voucher_id'] ?? 0);
+    if ($tdsPct > 0 || $vId > 0) {
+        db()->prepare("UPDATE invoices SET tds_pct=?, voucher_id=? WHERE id=?")->execute([$tdsPct, $vId, $id]);
+        if ($tdsPct > 0) books_recalc($id);   // stamp tds_amount even before any line
+    }
     if (function_exists('act_log')) act_log('INVOICE', $id, 'CREATED', 'Draft invoice started for ' . ($p['display_name'] ?: $p['legal_name']));
     return ['id' => $id];
+}
+
+/** The invoice already raised from a marketplace voucher, if any (idempotency). */
+function books_invoice_for_voucher($voucherId) {
+    books_migrate();
+    return (int)books_try(fn() => ops_val("SELECT id FROM invoices WHERE voucher_id=? ORDER BY id LIMIT 1", [(int)$voucherId]), 0);
 }
 
 // Set (or change) the billing branch on a DRAFT invoice. This is what clears

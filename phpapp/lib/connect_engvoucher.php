@@ -294,6 +294,12 @@ function connect_engv_set_status($voucherId, $to, $by = '', $note = '') {
     if ($to === 'DRAFT') { $sets .= ", decided_note=?"; $args[] = ''; }
     $args[] = (int)$voucherId;
     db()->prepare("UPDATE cx_engagement_vouchers SET $sets WHERE id=?")->execute($args);
+    // On approval, raise the client's DRAFT tax invoice in the books engine (fee +
+    // reimbursables, with the posting's SAC/GST/TDS). Best-effort and idempotent —
+    // it never blocks the approval, and finance reviews/issues the draft.
+    if ($to === 'APPROVED' && function_exists('connect_voucher_invoice')) {
+        try { connect_voucher_invoice((int)$voucherId); } catch (Throwable $e) { /* billing setup incomplete — leave it to finance */ }
+    }
     return [true, 'Voucher ' . strtolower(connect_engv_status_label($to)) . '.'];
 }
 

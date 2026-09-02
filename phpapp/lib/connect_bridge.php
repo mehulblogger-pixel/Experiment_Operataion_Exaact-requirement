@@ -81,3 +81,67 @@ function connect_engagement_billable_row($requirementId) {
     try { return ops_one("SELECT * FROM billable_events WHERE source_module='connect' AND source_kind='MARKETPLACE_AWARD' AND source_id=?", [(int)$requirementId]) ?: null; }
     catch (Throwable $e) { return null; }
 }
+
+/**
+ * VOUCHER → INVOICE. Turn an approved engagement voucher into a DRAFT tax invoice
+ * in the books engine EXAACT already has — fee and reimbursables as lines, the
+ * client's SAC, GST% and TDS% carried across from the posting. We do NOT build a
+ * new invoice: we call books_invoice_create + books_line_add, so the books ledger
+ * stays the single money truth and finance still reviews/issues the draft.
+ *
+ * Idempotent (one invoice per voucher, keyed by invoices.voucher_id) and
+ * best-effort: any failure returns 0 without throwing, so approving a voucher can
+ * never break because billing is mid-setup. Returns the invoice id, or 0.
+ */
+function connect_voucher_invoice($voucherId) {
+    if (!function_exists('connect_engv_get') || !function_exists('books_invoice_create')) return 0;
+    try {
+        $existing = function_exists('books_invoice_for_voucher') ? books_invoice_for_voucher($voucherId) : 0;
+        if ($existing) return $existing;
+
+        $v = connect_engv_get((int)$voucherId);
+        if (!$v) return 0;
+        if (!in_array(strtoupper((string)$v['status']), ['APPROVED', 'PAID'], true)) return 0; // only a settled voucher bills
+
+        $eng = ops_one("SELECT * FROM cx_engagements WHERE id=?", [(int)($v['engagement_id'] ?? 0)]);
+        $req = ($eng && function_exists('cx_requirement_get')) ? cx_requirement_get((int)($eng['requirement_id'] ?? 0)) : null;
+        $party = (int)($eng['poster_party_id'] ?? ($req['poster_party_id'] ?? 0));
+        if ($party <= 0) return 0;                       // no client to bill
+
+        $fee   = round((float)($v['fee_total'] ?? 0), 2);
+        $reimb = round((float)($v['reimb_total'] ?? 0), 2);
+        if ($fee <= 0 && $reimb <= 0) return 0;          // nothing to invoice
+
+        $gst = (float)($req['est_tax_pct'] ?? 0); if ($gst <= 0) $gst = function_exists('books_default_gst') ? books_default_gst() : 18.0;
+        $tds = (float)($req['est_tds_pct'] ?? 0);
+        $sac = trim((string)($req['est_sac'] ?? '')); if ($sac === '') $sac = (function_exists('books_default_sac') ? books_default_sac() : '') ?: '998519';
+        $who = trim((string)($v['subject_name'] ?? ($eng['subject_name'] ?? 'professional')));
+        $ref = trim((string)($req['ref_code'] ?? ''));
+        $period = trim((string)($v['period_label'] ?? ''));
+
+        $res = books_invoice_create([
+            'partner_id'      => $party,
+            'contract_number' => $ref,
+            'tds_pct'         => $tds,
+            'voucher_id'      => (int)$voucherId,
+            'notes'           => 'Raised from marketplace voucher #' . (int)$voucherId . ($ref ? ' · ' . $ref : ''),
+        ]);
+        if (!is_array($res) || empty($res['id'])) return 0;
+        $invId = (int)$res['id'];
+
+        if ($fee > 0) books_line_add($invId, [
+            'description' => 'Technical manpower — ' . $who . ($period ? ' · ' . $period : ''),
+            'hsn_sac' => $sac, 'qty' => 1, 'unit' => 'lot', 'rate' => $fee, 'gst_pct' => $gst, 'contract_number' => $ref,
+        ]);
+        if ($reimb > 0) books_line_add($invId, [
+            'description' => 'Reimbursable expenses (as per approved voucher)',
+            'hsn_sac' => $sac, 'qty' => 1, 'unit' => 'lot', 'rate' => $reimb, 'gst_pct' => $gst, 'contract_number' => $ref,
+        ]);
+        return $invId;
+    } catch (Throwable $e) { return 0; }
+}
+
+/** The invoice id raised from a voucher, or 0 — for showing a link on the voucher. */
+function connect_voucher_invoice_id($voucherId) {
+    return function_exists('books_invoice_for_voucher') ? books_invoice_for_voucher((int)$voucherId) : 0;
+}

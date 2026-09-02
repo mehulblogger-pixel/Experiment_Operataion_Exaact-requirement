@@ -192,7 +192,12 @@ $canReview = $status === 'SUBMITTED';
   </form>
 </div>
 <?php elseif ($status === 'APPROVED' || $status === 'PAID'): ?>
-<div class="pcard" style="max-width:720px;margin-top:20px"><p style="margin:0">You approved this voucher<?php if (!empty($v['decided_at'])): ?> on <?= e(substr((string)$v['decided_at'],0,10)) ?><?php endif; ?>.</p></div>
+<div class="pcard" style="max-width:720px;margin-top:20px">
+  <p style="margin:0">You approved this voucher<?php if (!empty($v['decided_at'])): ?> on <?= e(substr((string)$v['decided_at'],0,10)) ?><?php endif; ?>.</p>
+  <?php if (function_exists('connect_voucher_invoice_id') && connect_voucher_invoice_id((int)$v['id'])): ?>
+    <p class="plead" style="margin:8px 0 0;font-size:13px">📄 A tax invoice has been raised for this voucher (fee + reimbursables, with GST<?= (float)($v['tds_pct'] ?? 0) > 0 ? ' and TDS' : '' ?>). Your accounts team will receive it.</p>
+  <?php endif; ?>
+</div>
 <?php elseif ($status === 'REJECTED'): ?>
 <div class="pcard" style="max-width:720px;margin-top:20px"><p style="margin:0">Returned to <?= e($v['subject_name'] ?: 'the professional') ?>. You will be able to review it again once it is resubmitted.</p></div>
 <?php endif; ?>
