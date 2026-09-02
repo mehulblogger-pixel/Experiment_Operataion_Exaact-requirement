@@ -63,6 +63,55 @@ function billable_migrate() {
     // reconciling `amount` to the invoice total (which the sync does) can be
     // compared against it and any drift flagged instead of silently erased.
     if (function_exists('ensure_column')) ensure_column('billable_events', 'derived_amount', "REAL DEFAULT 0");
+    // Gap-7 — partial / progress billing. `billed_amount` is the cumulative amount billed
+    // so far; the event is fully BILLED only once it reaches `amount`. Additive: existing
+    // events start at 0 and behave exactly as before (a single full bill sets it to amount).
+    if (function_exists('ensure_column')) ensure_column('billable_events', 'billed_amount', "REAL DEFAULT 0");
+    // The per-milestone bill log — each partial (or full) bill against an event, for audit.
+    db()->exec("CREATE TABLE IF NOT EXISTS billable_bills (
+        id $pk, event_id INT DEFAULT 0, amount REAL DEFAULT 0, bill_ref VARCHAR(80) DEFAULT '',
+        billed_at VARCHAR(30) DEFAULT '', billed_by VARCHAR(150) DEFAULT '')");
+    try { db()->exec("CREATE INDEX ix_billable_bills_event ON billable_bills (event_id)"); } catch (Throwable $e) {}
+}
+
+// Gap-7 — how much of a billable event is still to bill (never negative).
+function billable_remaining($e) {
+    return max(0.0, round((float)($e['amount'] ?? 0) - (float)($e['billed_amount'] ?? 0), 2));
+}
+// The bill log (partial + full) for one event, newest first.
+function billable_bills_for($eventId) {
+    billable_migrate();
+    try { return ops_all("SELECT * FROM billable_bills WHERE event_id=? ORDER BY id DESC", [(int)$eventId]) ?: []; }
+    catch (Throwable $e) { return []; }
+}
+
+// Record a PARTIAL (progress / milestone) bill against an approved event. Adds to
+// billed_amount and logs the bill; when the cumulative reaches the event amount the
+// status flips to BILLED. Same guard as billable_mark_billed: attestation is only for
+// sources with no automatic invoice linkage (a job-source event reconciles via its books
+// invoice). Never over-bills the remaining. Returns [ok, message].
+function billable_bill_partial($id, $amount, $ref, $tol = 1.0) {
+    billable_migrate();
+    $id = (int)$id; $amount = round((float)$amount, 2); $ref = trim((string)$ref);
+    if (!$id || $ref === '') return [false, 'A bill reference is required.'];
+    if ($amount <= 0) return [false, 'Enter a bill amount greater than zero.'];
+    $e = ops_one("SELECT * FROM billable_events WHERE id=?", [$id]);
+    if (!$e) return [false, 'Billable event not found.'];
+    if (($e['status'] ?? '') !== 'APPROVED') return [false, 'Only an approved event can be part-billed.'];
+    if (($e['source_module'] ?? '') === 'job') return [false, 'A closed-job event reconciles via its books invoice, not attestation.'];
+    $remaining = billable_remaining($e);
+    if ($amount > $remaining + $tol) return [false, 'That exceeds the ' . number_format($remaining, 2) . ' still to bill.'];
+    $newBilled = round((float)($e['billed_amount'] ?? 0) + $amount, 2);
+    db()->prepare("INSERT INTO billable_bills (event_id, amount, bill_ref, billed_at, billed_by) VALUES (?,?,?,?,?)")
+        ->execute([$id, $amount, substr($ref, 0, 80), date('c'), billable_actor()]);
+    $full = $newBilled >= ((float)($e['amount'] ?? 0) - $tol);
+    if ($full) {
+        db()->prepare("UPDATE billable_events SET billed_amount=?, status='BILLED', bill_ref=?, updated_at=? WHERE id=?")
+            ->execute([$newBilled, substr($ref, 0, 80), date('c'), $id]);
+        return [true, 'Final bill recorded — event fully billed.'];
+    }
+    db()->prepare("UPDATE billable_events SET billed_amount=?, updated_at=? WHERE id=?")->execute([$newBilled, date('c'), $id]);
+    return [true, 'Partial bill of ' . number_format($amount, 2) . ' recorded — ' . number_format(round((float)$e['amount'] - $newBilled, 2), 2) . ' still to bill.'];
 }
 
 /**
@@ -148,8 +197,16 @@ function billable_mark_billed($id, $ref) {
     // (books_invoices_for_job), so it stays on the unbilled board until an invoice
     // actually exists — never billed on a typed reference alone.
     if (($e['source_module'] ?? '') === 'job') return false;
-    db()->prepare("UPDATE billable_events SET status='BILLED', bill_ref=?, updated_at=? WHERE id=?")
-        ->execute([substr($ref, 0, 80), date('c'), $id]);
+    // Gap-7 — a full bill also settles billed_amount to the whole amount and logs the bill,
+    // so the partial-bill ledger and the "fully billed" path stay consistent.
+    $amount = round((float)($e['amount'] ?? 0), 2);
+    $already = round((float)($e['billed_amount'] ?? 0), 2);
+    if ($amount - $already > 0.005) {
+        db()->prepare("INSERT INTO billable_bills (event_id, amount, bill_ref, billed_at, billed_by) VALUES (?,?,?,?,?)")
+            ->execute([$id, round($amount - $already, 2), substr($ref, 0, 80), date('c'), billable_actor()]);
+    }
+    db()->prepare("UPDATE billable_events SET status='BILLED', bill_ref=?, billed_amount=?, updated_at=? WHERE id=?")
+        ->execute([substr($ref, 0, 80), $amount, date('c'), $id]);
     return true;
 }
 
@@ -387,6 +444,12 @@ function ops_billable($route, $method) {
         if ($ref === '') { flash('Enter the invoice number this was billed on.', 'error'); redirect('/billable-events'); }
         if (billable_mark_billed($id, $ref)) flash('Billable event marked billed against ' . $ref . '.');
         else flash('Only an approved event can be marked billed.', 'error');
+        redirect('/billable-events');
+    }
+    if ($route === 'billable-bill-partial' && $method === 'POST') {   // Gap-7 — progress / milestone bill
+        ops_require(billable_can_manage(), 'You cannot bill a billable event.');
+        [$ok, $msg] = billable_bill_partial((int)($_POST['id'] ?? 0), (float)($_POST['amount'] ?? 0), trim((string)($_POST['invoice_ref'] ?? '')));
+        flash($msg, $ok ? 'success' : 'error');
         redirect('/billable-events');
     }
     if (in_array($route, ['billable-approve', 'billable-cancel', 'billable-dispute'], true) && $method === 'POST') {

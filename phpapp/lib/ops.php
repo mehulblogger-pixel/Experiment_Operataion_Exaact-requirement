@@ -2492,7 +2492,7 @@ function ops_module_gate($route) {
         'service-scope'=>'settings','service-formats'=>'settings',
         'deputations'=>'jobs',
         'billable-events'=>'invoicing','billable-sync'=>'invoicing','billable-approve'=>'invoicing',
-        'billable-cancel'=>'invoicing','billable-dispute'=>'invoicing','billable-bill'=>'invoicing',
+        'billable-cancel'=>'invoicing','billable-dispute'=>'invoicing','billable-bill'=>'invoicing','billable-bill-partial'=>'invoicing',
         'call-status'=>'calls','call-attrs'=>'calls','call-override'=>'calls',
         'call-clar-new'=>'calls','call-clar-respond'=>'calls','call-clar-status'=>'calls',
         'assign-hold'=>'jobs','assign-accept'=>'jobs','assign-reassign'=>'jobs',
