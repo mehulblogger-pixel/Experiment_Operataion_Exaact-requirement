@@ -256,6 +256,7 @@ try {
     require __DIR__ . '/lib/connect_client_dash.php'; // Connect K0+ — role-based client-portal dashboard tiles (live-computed)
     require __DIR__ . '/lib/seed_scenario_s03.php'; // DEMO-S03 — client + client-portal foundation seed engine
     require __DIR__ . '/lib/seed_scenario_s04.php'; // DEMO-S04 — marketplace lifecycle (new engines) seed engine
+    require __DIR__ . '/lib/seed_scenario_s05.php'; // DEMO-S05 — convergence & reconciliation (read-only detectors) seed engine
     require __DIR__ . '/lib/connect_verify.php';   // Connect K14 / #3 — verification & moderation (tier ladder + deterministic checks + queue)
     require __DIR__ . '/lib/connect_msg.php';      // Connect K15 / #4 — in-app messaging (per-engagement two-way threads)
     require __DIR__ . '/lib/connect_channels.php'; // Connect K16 / #5 — WhatsApp/SMS/email channel (behind the notification seam)

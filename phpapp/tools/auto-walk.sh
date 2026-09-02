@@ -39,6 +39,7 @@ php tools/seed-scenario-s01.php >/dev/null 2>&1 && echo "  S01 loaded"
 php tools/seed-scenario-s02.php >/dev/null 2>&1 && echo "  S02 loaded"
 php tools/seed-scenario-s03.php >/dev/null 2>&1 && echo "  S03 loaded"
 php tools/seed-scenario-s04.php >/dev/null 2>&1 && echo "  S04 loaded"
+php tools/seed-scenario-s05.php >/dev/null 2>&1 && echo "  S05 loaded"
 
 say "2/4  Booting app on ${BASE}"
 php -S 127.0.0.1:"$PORT" tools/smoke-router.php >/tmp/auto-walk-server.log 2>&1 &

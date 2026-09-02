@@ -624,6 +624,25 @@
 </div>
 
 <div class="panel settings-card">
+  <?php $s05 = function_exists('seed_s05_status') ? seed_s05_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S05 — convergence &amp; reconciliation (read-only detectors)</h3>
+  <p class="sub" style="margin-bottom:8px">One walkable thread that lights up every <strong>read-only dual-truth detector</strong> from this revamp, with live drifting data: a <em>revenue-reconciliation</em> job whose legacy invoice disagrees with the ledger, a <em>cost-reconciliation</em> job whose sub-contractor cost disagrees with the committed cost ledger, and a recruitment candidate who is also a marketplace professional on the <em>candidate pool</em> — each seeded alongside a reconciled control row, so the detectors prove they flag the drift and leave the matching rows alone. Prints a real 10-point PASS/FAIL dashboard.</p>
+  <p class="muted" style="margin:0 0 10px">Tagged <code>DEMO-S05</code>, removes cleanly. See it at <code>/revenue-reconciliation</code>, <code>/cost-reconciliation</code> and <code>/candidate-pool</code>.</p>
+  <?php if (!empty($s05['loaded']) || (int)($s05['jobs'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s05['jobs'] ?? 0) ?> jobs · <?= (int)($s05['cands'] ?? 0) ?> candidates · <?= (int)($s05['pros'] ?? 0) ?> professional.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s05" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S05</button></form>
+      <form method="post" action="/seed-scenario-s05-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S05 data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S05</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s05" onsubmit="return confirm('Load the DEMO-S05 convergence scenario now? Adds namespaced demo data; removable in one click.')">
+      <button class="btn" type="submit">Load DEMO-S05 convergence &amp; reconciliation</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s05.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s05.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Traceability check</h3>
   <p class="sub" style="margin-bottom:8px">Builds <strong>one</strong> record and follows it the whole way through — customer, lead, contact, deal, quotation, accept, contract number, work-order, job, site check-in, report, invoice, money-in — then reads the database back and shows you, place by place, that every link was saved and every figure is right.</p>
   <p class="muted" style="margin:0 0 10px">Safe to run on a live system: everything it writes is one demo customer (<code><?= e(defined('TRACE_CLIENT_CODE') ? TRACE_CLIENT_CODE : 'GT-CLIENT') ?></code>) and can be removed again in one click on the results page. Use it to prove the flow end-to-end, or after any change to check nothing broke.</p>

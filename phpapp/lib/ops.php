@@ -2811,6 +2811,21 @@ function ops_dispatch($route, $method) {
             ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S04 scenario.');
             if ($method === 'POST' && function_exists('seed_s04_remove')) flash('DEMO-S04 marketplace lifecycle removed — ' . (int)seed_s04_remove() . ' records deleted.');
             redirect('/settings'); return true;
+        case $route === 'seed-scenario-s05':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S05 scenario.');
+            if ($method === 'POST' && function_exists('seed_s05_load')) {
+                try {
+                    $r = seed_s05_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S05 convergence & reconciliation loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' See it at /revenue-reconciliation, /cost-reconciliation and /candidate-pool.', $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S05: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s05-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S05 scenario.');
+            if ($method === 'POST' && function_exists('seed_s05_remove')) flash('DEMO-S05 convergence & reconciliation removed — ' . (int)seed_s05_remove() . ' records deleted.');
+            redirect('/settings'); return true;
         case $route === 'trace-thread':
             ops_require(is_master(), 'Only the Master Admin can build the traceability thread.');
             if ($method === 'POST' && function_exists('trace_seed')) {
