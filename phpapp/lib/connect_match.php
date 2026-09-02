@@ -171,7 +171,9 @@ function cx_match_score($cand, $req, $reqTerms = null) {
  *  substring. Empty when the graph is unavailable (degrades to token scoring). */
 function connect_match_req_nodes($req) {
     static $cache = [];
-    $key = (int)($req['id'] ?? 0) ?: md5(json_encode($req));
+    // Key on the resolved CONTENT (id + title + discipline), not the id alone — otherwise a
+    // requirement edited within a request, or a reused id, would serve a stale node set.
+    $key = (int)($req['id'] ?? 0) . '|' . md5(((string)($req['title'] ?? '')) . '|' . ((string)($req['discipline_code'] ?? '')));
     if (isset($cache[$key])) return $cache[$key];
     $weights = [];
     if (function_exists('connect_tax_resolve') && function_exists('connect_tax_expand')) {
@@ -217,6 +219,38 @@ function connect_match_tax_bonus($proId, $weights) {
     return [min($cap, (int)round($raw)), array_keys($reasons)];
 }
 
+/**
+ * Gap-2 — the SAME graph-taxonomy bonus as connect_match_tax_bonus(), but sourced from
+ * FREE TEXT (an inspector's skills / role words) instead of stored cx_profile_tax rows.
+ * Internal inspectors carry no profile-tax rows, so without this their concept/synonym/
+ * hierarchical match silently degrades to plain substring tokens. Resolves the text to
+ * taxonomy nodes exactly as connect_match_req_nodes() resolves the requirement, then
+ * scores the overlap against the requirement's weighted nodes. Read-only.
+ */
+function connect_match_tax_bonus_text($text, $weights) {
+    $text = trim((string)$text);
+    if (!$weights || $text === '' || !function_exists('connect_tax_resolve') || !function_exists('connect_tax_expand')) return [0, []];
+    $toks = function_exists('tax_norm')
+        ? array_values(array_filter(explode(' ', tax_norm($text)), fn($w) => strlen($w) >= 2))
+        : cx_match_tokens($text);
+    $n = count($toks); $phrases = [];
+    for ($i = 0; $i < $n; $i++) for ($len = 1; $len <= 3 && $i + $len <= $n; $len++) $phrases[] = implode(' ', array_slice($toks, $i, $len));
+    $phrases = array_slice(array_values(array_unique(array_filter($phrases))), 0, 40);
+    $have = [];  // node_id => confidence, the concepts this text demonstrably covers
+    foreach ($phrases as $t) foreach (connect_tax_resolve($t) as $h) {
+        if ((int)$h['score'] < 4) continue;   // only confident hits, same threshold as the requirement side
+        foreach (connect_tax_expand((int)$h['id']) as $nid) $have[$nid] = max($have[$nid] ?? 0, (int)$h['score']);
+    }
+    $raw = 0; $reasons = [];
+    foreach ($weights as $nid => $w) {
+        if (!isset($have[(int)$nid])) continue;
+        $raw += (int)$w;   // relation-agnostic (skill-level) credit for a demonstrated concept
+        if (count($reasons) < 4) { try { $nm = (string)ops_val("SELECT name FROM cx_tax_nodes WHERE id=?", [(int)$nid]); if ($nm !== '') $reasons['✓ ' . $nm] = true; } catch (Throwable $e) {} }
+    }
+    $cap = function_exists('connect_match_weights') ? (int)connect_match_weights()['tax_bonus'] : 25;
+    return [min($cap, (int)round($raw)), array_keys($reasons)];
+}
+
 /** Location bonus (0-10) + the match detail for a professional vs a job place. */
 function connect_match_location_bonus($cand, $job) {
     if (!$job || !function_exists('connect_location_match')) return [0, null];
@@ -254,6 +288,12 @@ function connect_match_for_requirement($req, $limit = 8) {
         if (!empty($appliedInsp[(int)$insp['id']])) continue;
         $insp['kind'] = 'inspector';
         $m = cx_match_score($insp, $req, $reqTerms);
+        // Gap-2 — the inspector pool gets the same concept/synonym/hierarchical taxonomy
+        // bonus as the professional pool, resolved from the inspector's skills + role text.
+        [$iTax, $iTaxR] = function_exists('connect_match_tax_bonus_text')
+            ? connect_match_tax_bonus_text(trim(((string)($insp['skills'] ?? '')) . ' ' . ((string)($insp['designation'] ?? ''))), $reqNodes)
+            : [0, []];
+        if ($iTax > 0) { $m['score'] = min(100, (int)$m['score'] + $iTax); $m['reasons'] = array_merge($m['reasons'] ?? [], $iTaxR); }
         if (function_exists('connect_trust_score')) { $tt = connect_trust_score((int)$insp['id']); $m['trust'] = (int)$tt['score']; $m['trust_band'] = $tt['band']; }
         $rows[] = $insp + $m;
     }
