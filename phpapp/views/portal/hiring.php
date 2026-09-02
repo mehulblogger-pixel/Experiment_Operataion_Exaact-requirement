@@ -28,9 +28,30 @@ $reqs = $home['contact_requests'] ?? []; $pool = (int)($home['pool_size'] ?? 0);
   .hh-chip:hover{background:#e2efee}
   .hh-pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600}
   .hh-pill.ok{background:#e7f5ef;color:#0f7d5a}.hh-pill.warn{background:#fbf3d8;color:#8a6d0b}.hh-pill.muted{background:#eceff1;color:#5b6b6a}
+  .hh-welcome{background:var(--card,#fff);border:1px solid var(--line,#e3ebea);border-left:4px solid #0f7d7d;border-radius:13px;padding:16px 18px;margin:6px 0 16px}
+  .hh-welcome h3{margin:0 0 3px;font-size:17px}
+  .hh-welcome p{margin:0 0 12px;color:var(--muted,#5b6b6a);font-size:13.5px}
+  .hh-steps{display:grid;gap:10px;grid-template-columns:repeat(3,1fr)}
+  @media(max-width:620px){.hh-steps{grid-template-columns:1fr}}
+  .hh-step{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line,#eef1f0);border-radius:11px;padding:11px 12px;text-decoration:none;color:inherit}
+  .hh-step .num{width:24px;height:24px;border-radius:999px;background:#0f7d7d;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none}
+  .hh-step b{display:block;font-size:13.5px}.hh-step small{color:var(--muted,#5b6b6a);font-size:12px}
 </style>
 
 <?php if (function_exists('connect_client_dash_render') && function_exists('portal_user') && portal_user()) connect_client_dash_render(portal_partner_id(), portal_user()); ?>
+<?php // A brand-new company (nothing posted yet) gets a plain-language "first three steps" welcome,
+      // so landing here is a guided start, not an unexplained screen. It steps aside once they act.
+      if ((int)($c['total_reqs'] ?? 0) === 0): ?>
+<div class="hh-welcome">
+  <h3>👋 Welcome<?= $client ? ', ' . e($client) : '' ?> — you're all set up</h3>
+  <p>You're ready to hire technical manpower. Here's all there is to it — each is one click, nothing to remember.</p>
+  <div class="hh-steps">
+    <a class="hh-step" href="/portal/find"><span class="num">1</span><span><b>Search the pool</b><small>Find people by role, skill or certificate.</small></span></a>
+    <a class="hh-step" href="/portal/hire"><span class="num">2</span><span><b>Post what you need</b><small>Qualified people apply to you.</small></span></a>
+    <a class="hh-step" href="/portal/roster"><span class="num">3</span><span><b>Shortlist &amp; award</b><small>Pick people and track them to invoicing.</small></span></a>
+  </div>
+</div>
+<?php endif; ?>
 <div class="hh-hero">
   <h2>Find &amp; hire technical manpower</h2>
   <p>Search <?= number_format($pool) ?> verified professionals across the pool — by role, skill, certificate or equipment — or post exactly what you need and let qualified people apply.</p>
