@@ -92,17 +92,27 @@ function connect_deploy_from_engagement($requirementId) {
     $firstStatus = function_exists('pdso_statuses') ? array_key_first(pdso_statuses()) : 'PLANNED';
     $by = function_exists('user_name') && function_exists('current_user') ? user_name(current_user()) : 'connect';
 
+    // Gap-1 (CONNECT) — thread this marketplace deployment into the engagement/finance spine.
+    // The requirement's marketplace ref becomes the engagement key (contract_number), and a
+    // first-class engagement row is ensured, so the deployment reaches the contract_number-keyed
+    // readers, the engagement entity and the reconciliation gates instead of dangling unlinked.
+    $contractNo = trim((string)($req['ref_code'] ?? '')) !== '' ? (string)$req['ref_code'] : ('CXR-' . $requirementId);
+    $engId = function_exists('engagement_ensure')
+        ? (int)engagement_ensure($contractNo, (int)($req['poster_party_id'] ?? 0), (string)($req['title'] ?? ''))
+        : 0;
+
     if ($existing) {
-        // Keep the deployment; refresh the person + dates + site (e.g. after a link).
-        db()->prepare("UPDATE jobs SET inspector_id=?, dep_site=?, scheduled_date=?, inspection_start_date=?, inspection_end_date=?, updated_at=? WHERE id=?")
-            ->execute([$inspectorId ?: null, $site, $start, $start, $end, date('c'), (int)$existing['id']]);
+        // Keep the deployment; refresh the person + dates + site (e.g. after a link) and, additively,
+        // the engagement thread for deployments created before this connection existed.
+        db()->prepare("UPDATE jobs SET inspector_id=?, dep_site=?, scheduled_date=?, inspection_start_date=?, inspection_end_date=?, contract_number=?, engagement_id=?, updated_at=? WHERE id=?")
+            ->execute([$inspectorId ?: null, $site, $start, $start, $end, $contractNo, $engId ?: null, date('c'), (int)$existing['id']]);
         $jobId = (int)$existing['id'];
         $msg = 'Deployment updated (' . $existing['job_code'] . ').';
     } else {
         $code = function_exists('ops_next_code') ? ops_next_code('jobs', 'job_code', 'JOB') : ('JOB-' . $requirementId);
-        db()->prepare("INSERT INTO jobs (job_code, call_id, inspector_id, job_type, dep_status, dep_site, scheduled_date, inspection_start_date, inspection_end_date, reporting_frequency, sbu, mandays, source_module, source_requirement_id, created_by, created_at)
-                       VALUES (?, NULL, ?, 'DEPUTATION', ?, ?, ?, ?, ?, 'NOREPORT', ?, ?, 'connect', ?, ?, ?)")
-            ->execute([$code, $inspectorId ?: null, $firstStatus, $site, $start, $start, $end, $sbu, $mandays, $requirementId, $by, date('c')]);
+        db()->prepare("INSERT INTO jobs (job_code, call_id, inspector_id, job_type, dep_status, dep_site, scheduled_date, inspection_start_date, inspection_end_date, reporting_frequency, sbu, mandays, source_module, source_requirement_id, contract_number, engagement_id, created_by, created_at)
+                       VALUES (?, NULL, ?, 'DEPUTATION', ?, ?, ?, ?, ?, 'NOREPORT', ?, ?, 'connect', ?, ?, ?, ?, ?)")
+            ->execute([$code, $inspectorId ?: null, $firstStatus, $site, $start, $start, $end, $sbu, $mandays, $requirementId, $contractNo, $engId ?: null, $by, date('c')]);
         $jobId = (int)db()->lastInsertId();
         $msg = 'Deployment ' . $code . ' created in Operations (PDSO).';
         if (function_exists('act_log')) { try { act_log('job', $jobId, 'CONNECT_DEPLOYED', 'Deployment ' . $code . ' from marketplace requirement ' . ($req['ref_code'] ?? ('#'.$requirementId)), ['auto' => 0]); } catch (Throwable $e) {} }
