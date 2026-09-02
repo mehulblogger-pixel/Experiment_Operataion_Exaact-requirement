@@ -60,4 +60,4 @@ values, confusing labels, a button that does the wrong thing).
 ## Baseline (last run)
 
 203 screens across all personas (incl. DEMO-S04 marketplace features) — **all render cleanly**; the client Request form
-submits cleanly end-to-end; test suite **5368 passed, 0 failed**.
+submits cleanly end-to-end; test suite **5381 passed, 0 failed**.

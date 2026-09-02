@@ -2957,6 +2957,8 @@ function ops_dispatch($route, $method) {
             return ops_product_package($route, $method);
         case $route === 'revenue-reconciliation':   // Revamp §29 — revenue reconciliation worklist (read-only)
             return ops_revrecon($method);
+        case $route === 'cost-reconciliation':   // Revamp P8 — sub-contractor cost reconciliation worklist (read-only)
+            return ops_costrecon($method);
         case $route === 'vendor' || $route === 'signing-setup':
             ops_vendor($route, $method); return true;
         case $route === 'agreement':
@@ -7287,6 +7289,16 @@ function system_status() {
                  $rc > 0 ? $rc . ' job(s) disagree' : 'Ledger reconciled',
                  $rc > 0 ? 'The legacy per-job invoice figure differs from the books ledger — review before it is trusted.'
                          : 'Every job\'s legacy invoice figure matches the books ledger.', '/data-control');
+        } catch (Throwable $e) {}
+    }
+    // P8 — cost-side twin: where a job's legacy sub-contractor cost differs from the
+    // committed cost ledger. Advisory only; changes no number.
+    if (function_exists('costrecon_count') && function_exists('can_see_salary') && can_see_salary()) {
+        try { $cc = costrecon_count();
+            $add('cost_recon', 'Cost reconciliation', $cc > 0 ? 'warn' : 'ok',
+                 $cc > 0 ? $cc . ' job(s) disagree' : 'Costs reconciled',
+                 $cc > 0 ? 'A job\'s legacy sub-contractor cost differs from what a committed cost run put in the ledger — review before it is trusted.'
+                         : 'Every job\'s sub-contractor cost matches the committed cost ledger.', '/cost-reconciliation');
         } catch (Throwable $e) {}
     }
     return $out;

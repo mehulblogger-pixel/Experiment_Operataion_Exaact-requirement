@@ -224,6 +224,7 @@ try {
     require __DIR__ . '/lib/engagement.php';       // Phase 2 §25 — engagement grouping (read-only view over contract_number)
     require __DIR__ . '/lib/bulk.php';             // Phase 2 §48 — server-side preview/dry-run for bulk actions
     require __DIR__ . '/lib/revrecon.php';         // Phase 2 §29 — recognised-revenue reconciliation (read-only)
+    require __DIR__ . '/lib/costrecon.php';        // Revamp P8 — sub-contractor cost reconciliation (read-only)
     require __DIR__ . '/lib/settingmeta.php';      // Phase 2 §47 — settings governance registry (read-only)
     require __DIR__ . '/lib/settlement.php';       // Phase 2 §32 — inter-office settlement matrix (read-only)
     require __DIR__ . '/lib/invready.php';         // Phase 2 §33 — invoice readiness (advisory; strict-gated)

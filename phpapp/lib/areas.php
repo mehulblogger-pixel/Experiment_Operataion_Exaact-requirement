@@ -187,7 +187,7 @@ function ops_area_def($area) {
         case 'money':
             $title = 'Money'; $icon = '💰';
             $sub = 'From what is waiting to be billed, through invoices and money in, to the profit each ' . strtolower(Tl('sbu')) . ' makes.';
-            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit','billable-events','revenue-reconciliation'];
+            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit','billable-events','revenue-reconciliation','cost-reconciliation'];
             $sec('Billing');
             // Revamp P4 — the operational→commercial bridge: approved work on its
             // way to an invoice, so nothing done is lost before it is billed.
@@ -214,6 +214,9 @@ function ops_area_def($area) {
             $t(can('mod.profitability.view'), '💹', T_REG('boss'), '/profitability', 'Profit and margin by job.');
             $t(can('mod.overheads.view'), '📐', TH('office') . ' costs & overheads', '/office-finance', 'Per-office cost model.');
             $t(can('mod.overheads.view'), '🧮', 'Month-end cost run', '/cost-run', 'Roll up costs for the month.');
+            // Revamp P8 — where a job's legacy sub-contractor cost disagrees with what a committed cost run put in the ledger.
+            $t(($fx('can_see_salary') && can_see_salary()) || can('finance.reconcile') || is_master(), '⚖️', 'Cost reconciliation', '/cost-reconciliation', 'Where a job’s legacy sub-contractor cost disagrees with the committed cost ledger.',
+                $num(fn() => $fx('costrecon_count') ? costrecon_count() : 0), 'amber');
             $t(can('mod.profitability.view'), '📊', T('sbu') . ' profit & loss', '/sbu-pl', 'P&L by business unit.');
             $t(can('mod.profitability.view'), '🧾', 'Profit by ' . strtolower(Tl('call')), '/call-profit', 'What each inspection made.');
             break;
