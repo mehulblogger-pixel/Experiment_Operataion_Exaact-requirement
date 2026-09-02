@@ -46,6 +46,9 @@ function connect_engage_migrate() {
     if (function_exists('ensure_column')) {
         ensure_column('cx_engagements', 'rate_inclusive', "VARCHAR(12) DEFAULT 'INCLUSIVE'"); // INCLUSIVE | EXCLUSIVE
         ensure_column('cx_engagements', 'voucher_cadence', "VARCHAR(14) DEFAULT 'PER_DEPLOYMENT'"); // PER_DAY | PER_DEPLOYMENT
+        // Gap-4 — shift / time-of-day, so same-day different-shift bookings don't false-conflict.
+        // '' = full-day (default; conflicts with any shift, i.e. today's behaviour).
+        ensure_column('cx_engagements', 'shift', "VARCHAR(16) DEFAULT ''"); // '' (full day) | DAY | NIGHT | GENERAL | a named shift
         // Stage 7 — cancellation / no-show / emergency replacement. Additive: the
         // status stays CANCELLED (no new lifecycle status); the KIND records WHY,
         // and replaces_engagement_id links a cover booking to the one it replaces.
@@ -238,18 +241,19 @@ function connect_engage_save_for_requirement($requirementId, array $in) {
     if (!empty($cfg['needs_qty']) && $qty <= 0) return [false, $cfg['qty_label'] . ' is required for ' . $cfg['label'] . '.', 0];
     if (!empty($cfg['needs_freq']) && $freq === '') return [false, 'Describe the frequency (e.g. "2 days a week").', 0];
 
+    $shift = strtoupper(trim((string)($in['shift'] ?? '')));  // Gap-4 — '' = full day
     $existing = connect_engage_for_requirement($requirementId);
     if ($existing) {
-        db()->prepare("UPDATE cx_engagements SET basis=?, rate=?, rate_unit=?, quantity=?, frequency_note=?, start_date=?, end_date=?, status=?, rate_inclusive=?, voucher_cadence=?, notes=?, updated_at=? WHERE id=?")
-            ->execute([$basis, $rate, $unit, $qty, $freq, $start, $end, $status, $rateModel, $cadence, trim((string)($in['notes'] ?? '')), date('c'), (int)$existing['id']]);
+        db()->prepare("UPDATE cx_engagements SET basis=?, rate=?, rate_unit=?, quantity=?, frequency_note=?, start_date=?, end_date=?, status=?, rate_inclusive=?, voucher_cadence=?, shift=?, notes=?, updated_at=? WHERE id=?")
+            ->execute([$basis, $rate, $unit, $qty, $freq, $start, $end, $status, $rateModel, $cadence, $shift, trim((string)($in['notes'] ?? '')), date('c'), (int)$existing['id']]);
         return [true, 'Booking updated.', (int)$existing['id']];
     }
     db()->prepare("INSERT INTO cx_engagements
-        (requirement_id,application_id,subject_kind,subject_id,subject_name,poster_party_id,poster_name,basis,rate,rate_unit,quantity,frequency_note,start_date,end_date,status,rate_inclusive,voucher_cadence,notes,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        (requirement_id,application_id,subject_kind,subject_id,subject_name,poster_party_id,poster_name,basis,rate,rate_unit,quantity,frequency_note,start_date,end_date,status,rate_inclusive,voucher_cadence,shift,notes,created_at,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
         ->execute([(int)$requirementId, (int)$subj['application_id'], $subj['kind'], (int)$subj['id'], $subj['name'],
                    (int)($req['poster_party_id'] ?? 0), (string)($req['poster_name'] ?? ''), $basis, $rate, $unit, $qty, $freq,
-                   $start, $end, $status, $rateModel, $cadence, trim((string)($in['notes'] ?? '')), date('c'), date('c')]);
+                   $start, $end, $status, $rateModel, $cadence, $shift, trim((string)($in['notes'] ?? '')), date('c'), date('c')]);
     return [true, 'Booking recorded.', (int)db()->lastInsertId()];
 }
 

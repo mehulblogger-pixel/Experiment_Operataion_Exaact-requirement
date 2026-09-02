@@ -31,17 +31,28 @@ function connect_conflict_days($from, $to, $cap = 62) {
     return $out;
 }
 
+/** Gap-4 — do two shifts occupy the same time of day? '' (full-day / unspecified)
+ *  occupies everything, so it clashes with any shift; two NAMED shifts clash only
+ *  when equal, so DAY vs NIGHT on the same date is NOT a conflict. */
+function connect_conflict_shift_overlap($a, $b) {
+    $a = strtoupper(trim((string)$a)); $b = strtoupper(trim((string)$b));
+    if ($a === '' || $b === '') return true;
+    return $a === $b;
+}
+
 /** Overlapping bookings for one engagement subject (professional | inspector |
  *  bench) in [from,to]. status BOOKED/ACTIVE only; open-ended dates handled.
- *  $exceptId excludes a booking being edited. */
-function connect_conflict_engagements($subjectKind, $subjectId, $from, $to, $exceptId = 0) {
+ *  $exceptId excludes a booking being edited. $shift narrows a date overlap to a
+ *  time-of-day overlap: with a named shift, a same-date booking on a DIFFERENT
+ *  named shift is not returned. '' (the default) preserves the whole-day behaviour. */
+function connect_conflict_engagements($subjectKind, $subjectId, $from, $to, $exceptId = 0, $shift = '') {
     $subjectId = (int)$subjectId; if (!$subjectId) return [];
     $from = trim((string)$from); $to = trim((string)$to) ?: $from;
     if ($from === '') return [];
     if (function_exists('connect_engage_migrate')) { try { connect_engage_migrate(); } catch (Throwable $e) {} }
     try {
-        return ops_all(
-            "SELECT id, requirement_id, subject_name, start_date, end_date, status, poster_name
+        $rows = ops_all(
+            "SELECT id, requirement_id, subject_name, start_date, end_date, status, poster_name, COALESCE(shift,'') shift
                FROM cx_engagements
               WHERE subject_kind=? AND subject_id=? AND id<>?
                 AND status IN ('BOOKED','ACTIVE')
@@ -51,6 +62,8 @@ function connect_conflict_engagements($subjectKind, $subjectId, $from, $to, $exc
             [(string)$subjectKind, $subjectId, (int)$exceptId, $to, $from]
         ) ?: [];
     } catch (Throwable $e) { return []; }
+    if (trim((string)$shift) === '') return $rows;  // a full-day query clashes with everything (legacy behaviour)
+    return array_values(array_filter($rows, fn($r) => connect_conflict_shift_overlap($shift, (string)($r['shift'] ?? ''))));
 }
 
 /** The professional's linked operational inspector id (0 if none). */
@@ -79,8 +92,10 @@ function connect_conflict_check($professionalId, $from, $to, $ctx = []) {
     $bump = function ($s) use (&$status, $rank) { if (($rank[$s] ?? 0) > ($rank[$status] ?? 0)) $status = $s; };
     if (!$professionalId || $from === '') return ['status' => 'CLEAR', 'available' => true, 'conflicts' => [], 'reasons' => []];
 
+    // Gap-4 — the shift being booked (if any); a named shift only clashes with the same shift.
+    $shift = (string)($ctx['shift'] ?? '');
     // 1) Marketplace engagement overlaps for the professional themself.
-    foreach (connect_conflict_engagements('professional', $professionalId, $from, $to, (int)($ctx['except_engagement_id'] ?? 0)) as $e) {
+    foreach (connect_conflict_engagements('professional', $professionalId, $from, $to, (int)($ctx['except_engagement_id'] ?? 0), $shift) as $e) {
         $conflicts[] = ['kind' => 'engagement', 'ref' => (int)$e['id'], 'from' => (string)$e['start_date'], 'to' => (string)$e['end_date'],
             'label' => 'Already ' . strtolower((string)$e['status']) . ' with ' . ((string)$e['poster_name'] ?: 'a client') . ' (' . (string)$e['start_date'] . ' → ' . ((string)$e['end_date'] ?: 'open') . ')'];
         $bump('CONFLICT');
@@ -90,7 +105,7 @@ function connect_conflict_check($professionalId, $from, $to, $ctx = []) {
     $insp = connect_conflict_inspector_of($professionalId);
     if ($insp > 0) {
         // 2a) overlapping engagements booked against the inspector identity
-        foreach (connect_conflict_engagements('inspector', $insp, $from, $to) as $e) {
+        foreach (connect_conflict_engagements('inspector', $insp, $from, $to, 0, $shift) as $e) {
             $conflicts[] = ['kind' => 'engagement', 'ref' => (int)$e['id'], 'from' => (string)$e['start_date'], 'to' => (string)$e['end_date'],
                 'label' => 'Deployment overlap (' . (string)$e['start_date'] . ' → ' . ((string)$e['end_date'] ?: 'open') . ')'];
             $bump('CONFLICT');
