@@ -9,7 +9,7 @@
 //    NODE_PATH=/path/to/node_modules node tools/portal-crawl.js http://127.0.0.1:8811
 //
 //  Exit 0 = every portal/pro screen renders. Exit 1 = at least one is broken.
-//  Load DEMO-S01/S02/S03 into the DB first, or the logins below won't exist.
+//  Load DEMO-S01/S02/S03/S04 into the DB first, or the logins below won't exist.
 const { chromium } = require('playwright');
 
 const BASE = process.argv[2] || 'http://127.0.0.1:8811';
@@ -37,6 +37,11 @@ const PERSONAS = [
   { who: 'Agency agency.s02', login: '/portal/login', user: 'agency.s02@demo.test',
     routes: ['/portal', '/portal/dashboard', '/portal/roster', '/portal/hiring',
              '/portal/deputations', '/portal/invoices'] },
+  // DEMO-S04 marketplace lifecycle — the new engines (supplier types, conflict
+  // flag, deployment bridge, gate pass). Load DEMO-S04 into the DB first.
+  { who: 'Client S04 s04.tech', login: '/portal/login', user: 's04.tech@demo.test',
+    routes: ['/portal/dashboard', '/portal/find', '/portal/find?supplier=ORG',
+             '/portal/hiring', '/portal/deputations', '/portal/reports'] },
 ];
 
 (async () => {

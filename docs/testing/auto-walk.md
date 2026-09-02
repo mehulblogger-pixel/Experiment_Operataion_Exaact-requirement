@@ -9,9 +9,9 @@ the automated companion to the manual [Test Walkthrough](../../README.md) checkl
 | Tool | Surface | Signs in as |
 |---|---|---|
 | `phpapp/tools/smoke.js` | Internal ops app (`/`, `/jobs`, `/invoices`, registers…) | Master Admin |
-| `phpapp/tools/portal-crawl.js` | Client/agency **portal** (`/portal/*`) + professional **passport** (`/pro/*`) | Every seeded demo user (freelancer, client, 3 client roles, agency) |
+| `phpapp/tools/portal-crawl.js` | Client/agency **portal** (`/portal/*`) + professional **passport** (`/pro/*`) | Every seeded demo user (freelancer, client, 3 client roles, agency, DEMO-S04 marketplace client) |
 
-Together they open ~**194 screens** across every persona. Exit code `0` = all
+Together they open ~**203 screens** across every persona. Exit code `0` = all
 render; `1` = at least one is broken, with the URL and the error text.
 
 ## How to run it
@@ -59,5 +59,5 @@ values, confusing labels, a button that does the wrong thing).
 
 ## Baseline (last run)
 
-194 screens across all personas — **all render cleanly**; the client Request form
-submits cleanly end-to-end; test suite **5213 passed, 0 failed**.
+203 screens across all personas (incl. DEMO-S04 marketplace features) — **all render cleanly**; the client Request form
+submits cleanly end-to-end; test suite **5368 passed, 0 failed**.
