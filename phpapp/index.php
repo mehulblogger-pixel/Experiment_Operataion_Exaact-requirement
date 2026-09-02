@@ -103,6 +103,7 @@ try {
     require __DIR__ . '/lib/indexes.php';
     require __DIR__ . '/lib/helpers.php';
     require __DIR__ . '/lib/install_mode.php';   // Cloud vs Licence deployment posture (onboarding adapts)
+    require __DIR__ . '/lib/onboarding.php';      // Guided getting-started welcome (mode-aware)
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';
@@ -1021,6 +1022,14 @@ if ($method === 'POST' && isset($_POST['_ft'])) {
 }
 
 if ($route === '') {
+    // A brand-new company is guided to the welcome / getting-started once, instead of
+    // landing on a deep module with no orientation. Only while setup is incomplete, only
+    // for signed-in staff, and only once per session (so it never loops and an established
+    // company never sees it — its steps are already done).
+    if (function_exists('current_user') && current_user() && empty($_SESSION['onb_seen'])
+        && function_exists('onboarding_incomplete') && onboarding_incomplete()) {
+        redirect('/welcome');
+    }
     $clients = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_client=1")->fetchColumn();
     $vendors = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_vendor=1")->fetchColumn();
     return view('dashboard', ['clients' => $clients, 'vendors' => $vendors]);

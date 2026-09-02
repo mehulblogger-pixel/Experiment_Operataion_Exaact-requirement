@@ -2833,6 +2833,8 @@ function ops_dispatch($route, $method) {
             ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S05 scenario.');
             if ($method === 'POST' && function_exists('seed_s05_remove')) flash('DEMO-S05 convergence & reconciliation removed — ' . (int)seed_s05_remove() . ' records deleted.');
             redirect('/settings'); return true;
+        case $route === 'welcome':               // Guided getting-started welcome (mode-aware)
+            return ops_welcome($method);
         case $route === 'install-mode-set':
             ops_require(is_master(), 'Only the Master Admin can change the install mode.');
             if ($method === 'POST' && function_exists('install_mode_set')) {
