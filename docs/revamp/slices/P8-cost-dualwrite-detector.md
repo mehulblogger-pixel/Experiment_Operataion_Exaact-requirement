@@ -1,8 +1,9 @@
 # Slice P8 — Cost Dual-Write Detector (R9)
 
-**Change-control record (directive Part 25). Classification: REFACTOR / detector
-(read-only, additive, non-destructive). Status: DELIVERED (detector). Convergence
-staged.**
+**Change-control record (directive Part 25). Classification: REFACTOR / detector +
+worklist + estimate toggle (additive; the toggle is off by default and reversible).
+Status: DELIVERED (detector + Option C worklist + Option B netting toggle). The
+authoritative-door policy (Option A) deliberately deferred.**
 
 `02-gap-and-reuse-map.md` §3 / gaps register R9. Detector-first, as agreed — the
 safe step before any risky data-model convergence.
@@ -47,14 +48,35 @@ It **changes no figure** — it only surfaces jobs a human should reconcile.
 
 Remove the one view line + the `costing.php` functions. No data touched.
 
-## Staged — convergence (needs a decision, deliberately NOT done)
+## Convergence — DECIDED "C + B" and DELIVERED (owner's call)
 
-Making the cost single-truth is the risky part and remains open:
-- **Option A — one authoritative door:** treat the voucher as the system of record
-  for the engineer's own reimbursables and stop counting closure `expenses` for
-  the same category (or vice-versa); migrate readers after a reconciliation pass
-  proves the totals.
-- **Option B — net the overlap:** keep both doors but subtract a detected
-  duplicate at read time in `job_profit()`.
-Either changes displayed profit, so it must be chosen deliberately and validated
-against the §30 frozen-cost snapshots — its own slice.
+The owner chose **C as the standing rule, with B available as an off-by-default
+estimate** (the decision brief laid out A/B/C). Both are now built:
+
+- **Option C — reconcile per job (the rule):** a finance worklist screen,
+  `ops_reimbursable_dedup()` at `/reimbursable-dedup` (route + Money → Costs &
+  margins tile + system-status signal), lists every both-sided closed job largest
+  overlap first, each linking to the job so a coordinator removes the duplicate at
+  source. `cost_dualwrite_count()` / `cost_dualwrite_summary()` drive the tile and
+  the KPIs. This is the accurate path — no figure is ever silently wrong.
+- **Option B — net the overlap (off-by-default estimate):** `reimbursable_dedupe_mode()`
+  / `_set_mode()` (setting `reimbursable_dedupe`, default `off`), and
+  `reimbursable_dedupe_amount($expenses,$voucher)`. When set to `net`, `job_profit()`
+  subtracts `min(expenses,voucher)` for a both-sided job (`$dedupe`, exposed in the
+  return; no extra query — it uses the figures already computed). Mirrors the P9/P10
+  reader switches: it changes displayed profit only when a human turns it on, and it
+  is reversible. It is **not** the default because the overlap is an estimate and
+  over-removes when the two doors hold genuinely different trips — the worklist banner
+  and the toggle both say so.
+
+**Option A — one authoritative door** remains deferred: its category dimension and
+migration are a large separate slice that only pays off once C shows how many jobs
+truly need it.
+
+Validated by `tests/test_reimbursable_dedupe.php` (15/15): default `off` nets
+nothing; `net` nets `min(expenses,voucher)` and one-sided jobs net nothing;
+`job_profit`'s `dedupe` is 0 under off and the overlap under net, and the cost drop
+equals the overlap plus its contingency; the worklist lists the both-sided job and
+excludes the one-sided one; an invalid mode is rejected; and the toggle **never
+mutates the source expense or voucher rows**. Full suite 5478 passed, 0 failed;
+auto-walk 207 screens render cleanly under the default.

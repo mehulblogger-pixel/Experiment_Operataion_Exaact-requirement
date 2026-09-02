@@ -1714,7 +1714,12 @@ function job_profit($job, $officeId = null) {
     $recovered = ($bearsCost && function_exists('job_recovered_total'))
         ? min(job_recovered_total($job), $expenses + $voucher) : 0;
 
-    $direct = $labour + $overhead + $expenses + $voucher + $subcon + $other - $recovered;
+    // P8 Option B — when reimbursable de-duplication is switched on (off by default),
+    // subtract the detected overlap between the two reimbursable doors for a both-sided
+    // job. Uses the already-computed figures, so it adds no query. An estimate, by design.
+    $dedupe = ($bearsCost && function_exists('reimbursable_dedupe_amount'))
+        ? (float)reimbursable_dedupe_amount($expenses, $voucher) : 0.0;
+    $direct = $labour + $overhead + $expenses + $voucher + $subcon + $other - $recovered - $dedupe;
     $contingency = round($direct * $contPct / 100, 2);
     $cost = round($direct + $contingency, 2);
     $profit = round($revenue - $cost, 2);
@@ -1723,7 +1728,7 @@ function job_profit($job, $officeId = null) {
         'mandays' => $mandays, 'daily_cost' => $daily, 'daily_base' => $dailyBase,
         'labour' => $labour, 'overhead' => $overhead, 'overhead_pct' => $ohPct,
         'expenses' => $expenses, 'voucher' => $voucher, 'subcon' => $subcon, 'other' => $other,
-        'recovered' => $recovered,
+        'recovered' => $recovered, 'dedupe' => $dedupe,
         'chargeable' => function_exists('chargeable_head_labels') ? chargeable_head_labels($job) : [],
         'contingency' => $contingency, 'contingency_pct' => $contPct,
         'cost' => $cost,
@@ -2978,6 +2983,8 @@ function ops_dispatch($route, $method) {
             return ops_revrecon($method);
         case $route === 'cost-reconciliation':   // Revamp P8 — sub-contractor cost reconciliation worklist (read-only)
             return ops_costrecon($method);
+        case $route === 'reimbursable-dedup':   // Revamp P8 — reimbursable double-count worklist + de-dup toggle
+            return ops_reimbursable_dedup($method);
         case $route === 'vendor' || $route === 'signing-setup':
             ops_vendor($route, $method); return true;
         case $route === 'agreement':
@@ -7347,6 +7354,17 @@ function system_status() {
                  $cc > 0 ? $cc . ' job(s) disagree' : 'Costs reconciled',
                  $cc > 0 ? 'A job\'s legacy sub-contractor cost differs from what a committed cost run put in the ledger — review before it is trusted.'
                          : 'Every job\'s sub-contractor cost matches the committed cost ledger.', '/cost-reconciliation');
+        } catch (Throwable $e) {}
+    }
+    // P8 — reimbursables recorded on both doors (closure expenses + inspector voucher).
+    // Advisory: profit sums both, so each flagged job needs a human to confirm they are
+    // different trips, not the same one twice.
+    if (function_exists('cost_dualwrite_count') && function_exists('can_see_salary') && can_see_salary()) {
+        try { $dw = cost_dualwrite_count();
+            $add('reimb_dedup', 'Reimbursable duplication', $dw > 0 ? 'warn' : 'ok',
+                 $dw > 0 ? $dw . ' job(s) both-sided' : 'No duplication',
+                 $dw > 0 ? 'Reimbursables sit on both the closure expenses and the voucher for these jobs — reconcile each before its profit is trusted.'
+                         : 'No job records reimbursables on both doors.', '/reimbursable-dedup');
         } catch (Throwable $e) {}
     }
     return $out;
