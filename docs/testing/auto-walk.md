@@ -59,6 +59,6 @@ values, confusing labels, a button that does the wrong thing).
 
 ## Baseline (last run)
 
-207 screens across all personas (incl. DEMO-S04 marketplace features and the DEMO-S05 convergence
-detectors) — **all render cleanly**; the client Request form submits cleanly end-to-end; test suite
-**5403 passed, 0 failed**.
+207 screens across all personas (incl. the DEMO-S04 marketplace lifecycle, DEMO-S05 convergence
+detectors and the DEMO-S06 gap-closure showcase) — **all render cleanly**; the client Request form
+submits cleanly end-to-end; test suite **5596 passed, 0 failed**.

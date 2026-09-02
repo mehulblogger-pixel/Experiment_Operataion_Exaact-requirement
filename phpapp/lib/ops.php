@@ -2833,6 +2833,21 @@ function ops_dispatch($route, $method) {
             ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S05 scenario.');
             if ($method === 'POST' && function_exists('seed_s05_remove')) flash('DEMO-S05 convergence & reconciliation removed — ' . (int)seed_s05_remove() . ' records deleted.');
             redirect('/settings'); return true;
+        case $route === 'seed-scenario-s06':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S06 scenario.');
+            if ($method === 'POST' && function_exists('seed_s06_load')) {
+                try {
+                    $r = seed_s06_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S06 gap-closure showcase loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' See it at /candidate (the linked person), /connect-requirements, /billable-events.', $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S06: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s06-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S06 scenario.');
+            if ($method === 'POST' && function_exists('seed_s06_remove')) flash('DEMO-S06 gap-closure showcase removed — ' . (int)seed_s06_remove() . ' records deleted.');
+            redirect('/settings'); return true;
         case $route === 'trace-thread':
             ops_require(is_master(), 'Only the Master Admin can build the traceability thread.');
             if ($method === 'POST' && function_exists('trace_seed')) {

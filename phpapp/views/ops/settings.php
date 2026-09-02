@@ -643,6 +643,25 @@
 </div>
 
 <div class="panel settings-card">
+  <?php $s06 = function_exists('seed_s06_status') ? seed_s06_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S06 — gap-closure showcase (the eight residual gaps)</h3>
+  <p class="sub" style="margin-bottom:8px">One walkable thread that lights up every gap closed in the controlled gap-closure program: a marketplace deployment <em>threaded into the engagement &amp; finance spine</em>, the <em>taxonomy counting in inspector matching</em>, an <em>engagement status transition machine</em>, <em>shift-aware conflict</em> (day vs night), the <em>one credential ladder</em> across pools, <em>near-duplicate requirement</em> detection, a <em>part-billed</em> event, and <em>one person resolved across all three identity pools</em>. Prints a real 10-point PASS/FAIL dashboard.</p>
+  <p class="muted" style="margin:0 0 10px">Tagged <code>DEMO-S06</code>, removes cleanly. See it at <code>/candidate</code> (the linked person), <code>/connect-requirements</code>, <code>/billable-events</code>.</p>
+  <?php if (!empty($s06['loaded']) || (int)($s06['reqs'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s06['reqs'] ?? 0) ?> requirements · <?= (int)($s06['pros'] ?? 0) ?> professionals · <?= (int)($s06['jobs'] ?? 0) ?> jobs.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s06" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S06</button></form>
+      <form method="post" action="/seed-scenario-s06-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S06 data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S06</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s06" onsubmit="return confirm('Load the DEMO-S06 gap-closure showcase now? Adds namespaced demo data; removable in one click.')">
+      <button class="btn" type="submit">Load DEMO-S06 gap-closure showcase</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s06.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s06.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Traceability check</h3>
   <p class="sub" style="margin-bottom:8px">Builds <strong>one</strong> record and follows it the whole way through — customer, lead, contact, deal, quotation, accept, contract number, work-order, job, site check-in, report, invoice, money-in — then reads the database back and shows you, place by place, that every link was saved and every figure is right.</p>
   <p class="muted" style="margin:0 0 10px">Safe to run on a live system: everything it writes is one demo customer (<code><?= e(defined('TRACE_CLIENT_CODE') ? TRACE_CLIENT_CODE : 'GT-CLIENT') ?></code>) and can be removed again in one click on the results page. Use it to prove the flow end-to-end, or after any change to check nothing broke.</p>
