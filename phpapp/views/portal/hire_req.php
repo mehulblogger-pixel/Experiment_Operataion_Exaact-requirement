@@ -23,6 +23,40 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
 <h2 class="ptitle"><?= e($req['title']) ?> <?= $pill($req['status']) ?></h2>
 <p class="plead"><?= e($req['ref_code']) ?><?php if (!empty($req['location'])): ?> · <?= e($req['location']) ?><?php endif; ?> · <?= (int)$req['positions'] ?> position<?= (int)$req['positions']===1?'':'s' ?></p>
 
+<?php
+  // Terms & estimate — the deputation shape, rate model and (for a fee-only
+  // posting) what is covered on top of the fee, with the client's own ceilings
+  // and a plain estimate. Read-only; the professional sees the same before applying.
+  $est = function_exists('connect_reqterms_estimate') ? connect_reqterms_estimate($req) : null;
+  $rmLabel = function_exists('connect_engage_rate_model_label') ? connect_engage_rate_model_label($req['rate_inclusive'] ?? 'INCLUSIVE') : '';
+  $depLabel = (!empty($req['deputation_basis']) && function_exists('connect_engage_basis_label')) ? connect_engage_basis_label($req['deputation_basis']) : '';
+  $modeLabels = function_exists('connect_reqterms_cover_modes') ? connect_reqterms_cover_modes() : [];
+  if ($est):
+?>
+<div class="pcard" style="max-width:680px">
+  <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--muted);margin-bottom:8px">Terms &amp; estimate</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:<?= $est['has_estimate'] ? '12px' : '0' ?>">
+    <?php $bits = array_filter([$depLabel, $rmLabel]); echo e(implode(' · ', $bits)); ?>
+  </div>
+  <?php if (!$est['inclusive'] && $est['has_estimate']): ?>
+    <?php foreach ($est['lines'] as $ln): if ($ln['mode']==='IN_RATE') continue; ?>
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:2px 0;color:var(--muted)">
+        <span><?= e($ln['label']) ?> — <?= e($modeLabels[$ln['mode']] ?? $ln['mode']) ?><?php if ($ln['mode']==='CEILING' && $ln['ceiling']>0): ?> <?= e($vinr($ln['ceiling'])) ?><?= $ln['per']==='DAY'?'/day':'/deployment' ?><?php endif; ?></span>
+        <span style="font-variant-numeric:tabular-nums"><?= $ln['amount']>0 ? e($vinr($ln['amount'])) : '' ?></span>
+      </div>
+    <?php endforeach; ?>
+  <?php endif; ?>
+  <?php if ($est['has_estimate']): ?>
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:2px 0;color:var(--muted)"><span>Fee (<?= e($vinr($est['rate'])) ?> × <?= (float)$est['qty'] ?>)</span><span style="font-variant-numeric:tabular-nums"><?= e($vinr($est['fee_total'])) ?></span></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:700;padding:4px 0;border-top:1px solid var(--line,#eee);margin-top:4px"><span>Subtotal</span><span style="font-variant-numeric:tabular-nums"><?= e($vinr($est['subtotal'])) ?></span></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:2px 0;color:var(--muted)"><span>GST @ <?= (float)$est['tax_pct'] ?>%</span><span style="font-variant-numeric:tabular-nums"><?= e($vinr($est['tax'])) ?></span></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-top:6px;border-top:1px solid var(--line,#eee);margin-top:4px"><span style="font-weight:700">Grand total</span><span style="font-weight:800;font-size:17px;color:#0a5c5c;font-variant-numeric:tabular-nums"><?= e($vinr($est['grand'])) ?></span></div>
+    <?php if ($est['has_actuals']): ?><div style="font-size:11.5px;color:#8a6d0b;margin-top:6px">＋ items marked “at actuals” are claimed on receipts on top of this estimate.</div><?php endif; ?>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">An estimate — the agreed rate is settled at award.</div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if ($req_next): ?>
 <div class="pcard" style="max-width:680px">
   <div style="display:flex;gap:8px;flex-wrap:wrap">

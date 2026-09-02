@@ -75,7 +75,104 @@ function connect_market_migrate() {
         ensure_column('cx_requirements', 'deputation_basis', "VARCHAR(20) DEFAULT ''");      // '' = any; else a connect_engage basis
         ensure_column('cx_requirements', 'rate_inclusive', "VARCHAR(12) DEFAULT 'INCLUSIVE'"); // INCLUSIVE | EXCLUSIVE
         ensure_column('cx_requirements', 'voucher_cadence', "VARCHAR(14) DEFAULT 'PER_DEPLOYMENT'"); // PER_DAY | PER_DEPLOYMENT
+        // Posting-time cost estimate & reimbursement terms (additive; all defaulted so
+        // an old posting reads as "no estimate given"). The client types the base fee,
+        // an estimated quantity, and — for a fee-only (EXCLUSIVE) posting — how each
+        // reimbursable head is covered and its ceiling. No cap is enforced anywhere;
+        // a ceiling is a number the client enters, shown as guidance to the professional.
+        ensure_column('cx_requirements', 'est_rate',    "REAL DEFAULT 0");      // base fee per unit (day/month/visit)
+        ensure_column('cx_requirements', 'est_qty',     "REAL DEFAULT 0");      // estimated quantity in that unit
+        ensure_column('cx_requirements', 'est_tax_pct', "REAL DEFAULT 18");     // GST %, charged on top of the subtotal
+        ensure_column('cx_requirements', 'reimb_terms', "TEXT DEFAULT ''");     // JSON: {head:{mode,ceiling,per}}
     }
+}
+
+/** The five reimbursable heads a client can define at posting. Keyed to the
+ *  voucher expense heads (connect_engv_expense_heads) so posting terms and the
+ *  later claim lines line up 1:1 — what was promised is what gets claimed. */
+function connect_reqterms_heads() {
+    return [
+        'allowance'  => 'Food / per-diem',
+        'lodging'    => 'Accommodation',
+        'travel'     => 'Travel & mobilisation',
+        'conveyance' => 'Local conveyance',
+        'misc'       => 'Miscellaneous',
+    ];
+}
+
+/** How each reimbursable head is covered. IMPORTANT: a CEILING is never enforced
+ *  by code — it is a number the client types, carried through as guidance only. */
+function connect_reqterms_cover_modes() {
+    return [
+        'IN_RATE'  => 'In the rate',
+        'PROVIDED' => 'We provide it',
+        'ACTUALS'  => 'Reimbursed at actuals',
+        'CEILING'  => 'Reimbursed up to a ceiling',
+    ];
+}
+
+/** Normalise one head's terms to legal values. */
+function _reqterms_norm_head(array $h) {
+    $mode = strtoupper((string)($h['mode'] ?? 'IN_RATE'));
+    if (!isset(connect_reqterms_cover_modes()[$mode])) $mode = 'IN_RATE';
+    $per = strtoupper((string)($h['per'] ?? 'DAY')) === 'DEPLOYMENT' ? 'DEPLOYMENT' : 'DAY';
+    return ['mode' => $mode, 'ceiling' => max(0, (float)($h['ceiling'] ?? 0)), 'per' => $per];
+}
+
+/** Read the stored reimbursement-terms JSON off a requirement row into a clean,
+ *  fully-populated array (every head present, defaulted to IN_RATE). */
+function connect_reqterms_parse($req) {
+    $raw = is_array($req) ? (string)($req['reimb_terms'] ?? '') : (string)$req;
+    $t = []; if ($raw !== '') { $d = json_decode($raw, true); if (is_array($d)) $t = $d; }
+    $out = [];
+    foreach (connect_reqterms_heads() as $k => $lbl) $out[$k] = _reqterms_norm_head(is_array($t[$k] ?? null) ? $t[$k] : []);
+    return $out;
+}
+
+/** Build the terms JSON from posted form fields shaped reimb[head][mode|ceiling|per]. */
+function connect_reqterms_from_input(array $in) {
+    $src = is_array($in['reimb'] ?? null) ? $in['reimb'] : [];
+    $t = [];
+    foreach (connect_reqterms_heads() as $k => $lbl) $t[$k] = _reqterms_norm_head(is_array($src[$k] ?? null) ? $src[$k] : []);
+    return json_encode($t);
+}
+
+/**
+ * The posting-time cost estimate. Pure arithmetic — it NEVER enforces a cap; it
+ * only sums the numbers the client entered so they (and the professional) see the
+ * likely cost before anyone commits.
+ *   INCLUSIVE → subtotal = fee × qty (reimbursables are inside the rate).
+ *   EXCLUSIVE → subtotal = fee × qty + Σ(ceilings); heads set to "at actuals" are
+ *               flagged (excluded from the number, shown as "+ actuals").
+ * GST is added on top at est_tax_pct.
+ */
+function connect_reqterms_estimate($req) {
+    $rate = max(0, (float)($req['est_rate'] ?? 0));
+    $qty  = max(0, (float)($req['est_qty'] ?? 0));
+    $taxPct = (float)($req['est_tax_pct'] ?? 18); if ($taxPct < 0) $taxPct = 0;
+    $inclusive = strtoupper((string)($req['rate_inclusive'] ?? 'INCLUSIVE')) !== 'EXCLUSIVE';
+    $feeTotal = $rate * $qty;
+    $reimbTotal = 0.0; $hasActuals = false; $lines = [];
+    if (!$inclusive) {
+        $terms = connect_reqterms_parse($req);
+        foreach (connect_reqterms_heads() as $k => $lbl) {
+            $h = $terms[$k]; $amt = 0.0;
+            if ($h['mode'] === 'CEILING' && $h['ceiling'] > 0) {
+                $amt = $h['ceiling'] * ($h['per'] === 'DAY' ? max(1, $qty) : 1);
+                $reimbTotal += $amt;
+            } elseif ($h['mode'] === 'ACTUALS') { $hasActuals = true; }
+            $lines[$k] = ['label' => $lbl, 'mode' => $h['mode'], 'ceiling' => $h['ceiling'], 'per' => $h['per'], 'amount' => $amt];
+        }
+    }
+    $subtotal = $feeTotal + $reimbTotal;
+    $tax = $subtotal * $taxPct / 100.0;
+    return [
+        'inclusive' => $inclusive, 'rate' => $rate, 'qty' => $qty,
+        'fee_total' => $feeTotal, 'reimb_total' => $reimbTotal, 'subtotal' => $subtotal,
+        'tax_pct' => $taxPct, 'tax' => $tax, 'grand' => $subtotal + $tax,
+        'has_actuals' => $hasActuals, 'lines' => $lines,
+        'has_estimate' => ($rate > 0 && $qty > 0),
+    ];
 }
 
 /** Persist the posting-time deputation/rate terms on a requirement (additive). */
@@ -85,8 +182,14 @@ function cx_requirement_save_terms($id, array $in) {
     if ($basis !== '' && function_exists('connect_engage_bases') && !isset(connect_engage_bases()[$basis])) $basis = '';
     $rate = function_exists('connect_engage_norm_rate_model') ? connect_engage_norm_rate_model($in['rate_inclusive'] ?? 'INCLUSIVE') : 'INCLUSIVE';
     $cad  = function_exists('connect_engage_norm_cadence') ? connect_engage_norm_cadence($in['voucher_cadence'] ?? 'PER_DEPLOYMENT') : 'PER_DEPLOYMENT';
-    db()->prepare("UPDATE cx_requirements SET deputation_basis=?, rate_inclusive=?, voucher_cadence=?, updated_at=? WHERE id=?")
-        ->execute([$basis, $rate, $cad, date('c'), (int)$id]);
+    // Posting-time estimate & reimbursement terms (additive). Only written when the
+    // form supplied them; a form without these keys leaves the columns at default.
+    $estRate = max(0, (float)($in['est_rate'] ?? 0));
+    $estQty  = max(0, (float)($in['est_qty']  ?? 0));
+    $taxPct  = array_key_exists('est_tax_pct', $in) ? max(0, (float)$in['est_tax_pct']) : 18.0;
+    $reimb   = connect_reqterms_from_input($in);
+    db()->prepare("UPDATE cx_requirements SET deputation_basis=?, rate_inclusive=?, voucher_cadence=?, est_rate=?, est_qty=?, est_tax_pct=?, reimb_terms=?, updated_at=? WHERE id=?")
+        ->execute([$basis, $rate, $cad, $estRate, $estQty, $taxPct, $reimb, date('c'), (int)$id]);
     return true;
 }
 
