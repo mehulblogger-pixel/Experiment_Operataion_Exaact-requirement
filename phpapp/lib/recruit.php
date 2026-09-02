@@ -420,6 +420,80 @@ function recruit_fit_score($cand, $req) {
 }
 function recruit_fit_band($s) { return $s >= 80 ? ['Strong', 'p-ok'] : ($s >= 55 ? ['Fair', 'p-warn'] : ['Weak', 'p-bad']); }
 
+// P1b — the same explainable Workforce-Fit, but for a MARKETPLACE PROFESSIONAL
+// (cx_professionals) against a recruitment requisition. So a recruiter filling a
+// requisition automatically sees benched / verified people from the marketplace who
+// fit — not only existing candidate rows. Same ['score','factors'] shape as
+// recruit_fit_score(), so recruit_fit_band() and the fit UI render it unchanged.
+function recruit_pro_fit_score($pro, $req) {
+    $F = [];
+    $add = function ($label, $state, $note, $wt) use (&$F) { $F[] = ['label' => $label, 'state' => $state, 'note' => $note, 'wt' => $wt]; };
+    $proText = strtolower(trim(($pro['disciplines'] ?? '') . ' ' . ($pro['skills'] ?? '') . ' ' . ($pro['headline'] ?? '') . ' ' . ($pro['work_types'] ?? '')));
+
+    // Discipline (25)
+    $disc = trim((string)($req['discipline'] ?? ''));
+    if ($disc !== '') $add('Discipline', _rk_hit($proText, _rk_tokens($disc)) ? 'ok' : 'no', $disc, 25);
+    else $add('Discipline', 'part', 'any', 25);
+
+    // Skills (20)
+    $sk = _rk_tokens($req['skills'] ?? '');
+    if ($sk) { $hit = array_filter($sk, fn($t) => strpos($proText, $t) !== false);
+        $add('Skills', count($hit) === count($sk) ? 'ok' : (count($hit) ? 'part' : 'no'), count($hit) . '/' . count($sk) . ' matched', 20); }
+    else $add('Skills', 'part', 'none required', 20);
+
+    // Role / designation (15) — matched against the professional's headline/disciplines
+    $rd = trim((string)($req['designation'] ?? ''));
+    if ($rd !== '') $add('Role', _rk_hit($proText, _rk_tokens($rd)) ? 'ok' : 'no', $rd, 15);
+    else $add('Role', 'part', 'not specified', 15);
+
+    // Location (15) — pan-India pros fit anywhere; else match base city / preferred locations
+    $loc = trim((string)($req['deploy_location'] ?? '') . ' ' . (string)($req['project_site'] ?? ''));
+    $proLoc = trim((string)($pro['base_city'] ?? '') . ' ' . (string)($pro['preferred_locations'] ?? ''));
+    if (!empty($pro['pan_india'])) $add('Location', 'ok', 'pan-India', 15);
+    elseif (trim($loc) !== '' && $proLoc !== '')
+        $add('Location', _rk_hit($loc, _rk_tokens($proLoc)) || _rk_hit($proLoc, _rk_tokens($loc)) ? 'ok' : 'no', 'base vs site', 15);
+    else $add('Location', 'part', 'flexible', 15);
+
+    // Availability (15)
+    $av = strtoupper(trim((string)($pro['availability'] ?? '')));
+    if ($av === 'AVAILABLE') $add('Availability', 'ok', 'available', 15);
+    elseif (in_array($av, ['AVAILABLE_SOON', 'OPEN', 'BUSY'], true)) $add('Availability', 'part', strtolower($av), 15);
+    elseif ($av === '') $add('Availability', 'part', 'unknown', 15);
+    else $add('Availability', 'no', strtolower($av), 15);
+
+    // Verification (10) — a proven professional is worth more confidence
+    $vt = strtolower(trim((string)($pro['verification_tier'] ?? '')));
+    if (in_array($vt, ['verified', 'id_verified', 'engaged'], true)) $add('Verification', 'ok', $vt, 10);
+    elseif (in_array($vt, ['documented', 'document'], true)) $add('Verification', 'part', $vt, 10);
+    else $add('Verification', 'part', $vt ?: 'registered', 10);
+
+    // Rate (10) — the professional's floor day-rate vs the requisition's billing rate
+    $rate = (float)($pro['day_rate_min'] ?? 0); $bill = (float)($req['billing_rate'] ?? 0);
+    if ($rate > 0 && $bill > 0) $add('Rate', $rate <= $bill ? 'ok' : ($rate <= $bill * 1.1 ? 'part' : 'no'), 'floor vs bill rate', 10);
+    else $add('Rate', 'part', 'not priced', 10);
+
+    $score = 0; $max = 0;
+    foreach ($F as $f) { $max += $f['wt']; $score += $f['wt'] * ($f['state'] === 'ok' ? 1 : ($f['state'] === 'part' ? 0.5 : 0)); }
+    return ['score' => $max ? (int)round($score / $max * 100) : 0, 'factors' => $F];
+}
+
+// The ranked marketplace-professional shortlist for a requisition: active pros
+// scored against it, kept at or above $min, strongest first, capped at $limit.
+// Read-only; scores in memory (one pool read, no per-pro query).
+function recruit_pro_pool($req, $limit = 5, $min = 55) {
+    try { $pros = ops_all("SELECT id, name, headline, disciplines, skills, work_types, base_city, preferred_locations,
+                                  pan_india, verification_tier, availability, day_rate_min, day_rate_max
+                           FROM cx_professionals WHERE COALESCE(is_active,1)=1") ?: []; }
+    catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($pros as $p) {
+        $f = recruit_pro_fit_score($p, $req);
+        if ($f['score'] >= $min) { $p['fit'] = $f; $out[] = $p; }
+    }
+    usort($out, fn($a, $b) => $b['fit']['score'] <=> $a['fit']['score']);
+    return array_slice($out, 0, $limit);
+}
+
 // §18 — Requirement Health: is this vacancy on track to fill in time?
 function recruit_req_health($req) {
     $id = (int)($req['id'] ?? 0);

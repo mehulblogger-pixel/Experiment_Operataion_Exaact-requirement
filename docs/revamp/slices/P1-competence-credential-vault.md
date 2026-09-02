@@ -277,6 +277,21 @@ set's required categories; the customforms fields are admin-defined, so structur
 matching needs that small additive column first. P1a delivers the register and
 surfaces defined sets; P1b adds the category + the matcher.
 
+**P1b — marketplace matcher DELIVERED (later commit).** The automated
+person↔requirement matcher now spans BOTH pools. The recruitment side already ranked
+existing candidates against a requisition (`recruit_fit_score` + the "Best matches from
+the pool" panel). This adds the **marketplace bench**: `recruit_pro_fit_score($pro, $req)`
+scores a `cx_professionals` record against a recruitment requisition (discipline, skills,
+role, location, availability, verification, rate) in the same explainable
+`['score','factors']` shape, and `recruit_pro_pool($req)` returns the ranked, filtered
+(≥55), capped shortlist. Surfaced as a **"Best matches from the marketplace"** panel on the
+requisition detail (`views/ops/requisition_detail.php`), so a recruiter automatically sees
+benched / verified professionals who fit — the same people a client can hire, reached first
+by recruiting. Read-only (`tests/test_recruit_pro_match.php`, 12/12: a strong fit scores
+86% and a weak fit 11%, the pool ranks strongest-first, filters the weak one and excludes
+inactive pros, and no professional row is mutated). The credential-**category** dimension
+above remains the open sub-item.
+
 **RT1 re-check (per `00-program.md` §9):** *Does the operational→commercial gap now
 dominate?* — **No.** P1a closed real competence-vault gaps and is a prerequisite
 source for P4 (competence-gated billing). The gap remains open but is addressed by

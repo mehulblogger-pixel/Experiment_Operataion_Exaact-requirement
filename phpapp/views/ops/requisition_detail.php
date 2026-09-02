@@ -232,3 +232,23 @@ if (!empty($pool)): ?>
   <p class="muted" style="font-size:12px;margin:6px 2px 0">Scored on discipline, skills, experience, designation, business unit, location and cost — reuse a fit person before sourcing externally.</p>
 </div>
 <?php endif; ?>
+
+<?php // P1b — the same ranked shortlist, but from the MARKETPLACE professional bench.
+$proPool = $proPool ?? [];
+if (!empty($proPool)): ?>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">🧑‍🔧 Best matches from the marketplace <span class="muted">— benched / verified professionals who fit this requirement</span></h3>
+  <table class="dt"><thead><tr><th>Professional</th><th>Verification</th><th>Availability</th><th>Fit</th><th>Why</th></tr></thead><tbody>
+    <?php foreach ($proPool as $pp): [$fl, $ftone] = recruit_fit_band($pp['fit']['score']);
+      $why = implode(' · ', array_map(fn($x) => $x['label'], array_filter($pp['fit']['factors'], fn($x) => $x['state'] === 'ok'))); ?>
+    <tr>
+      <td><b><?= e($pp['name'] ?: ('#' . $pp['id'])) ?></b><?php if (!empty($pp['base_city'])): ?> <span class="muted"><?= e($pp['base_city']) ?></span><?php endif; ?></td>
+      <td><span class="pill <?= in_array(strtolower((string)$pp['verification_tier']), ['verified','id_verified','engaged'], true) ? 'p-ok' : 'p-mut' ?>" style="font-size:11px"><?= e($pp['verification_tier'] ?: '—') ?></span></td>
+      <td class="muted" style="font-size:12px"><?= e($pp['availability'] ?: '—') ?></td>
+      <td><span class="pill <?= e($ftone) ?>"><?= (int)$pp['fit']['score'] ?>% <?= e($fl) ?></span></td>
+      <td class="muted" style="font-size:12px"><?= e($why ?: '—') ?></td>
+    </tr>
+    <?php endforeach; ?>
+  </tbody></table>
+  <p class="muted" style="font-size:12px;margin:6px 2px 0">The marketplace bench, scored against this requirement — the same people your clients can hire, surfaced here so recruiting can reach them first. Read-only.</p>
+</div>
+<?php endif; ?>

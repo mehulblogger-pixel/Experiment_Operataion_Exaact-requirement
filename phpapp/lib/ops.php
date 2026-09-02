@@ -4812,13 +4812,15 @@ function ops_requisitions($route, $method) {
             foreach ($others as $o) { $f = recruit_fit_score($o, $req); if ($f['score'] >= 55) { $o['fit'] = $f; $pool[] = $o; } }
             usort($pool, fn($a, $b) => $b['fit']['score'] <=> $a['fit']['score']); $pool = array_slice($pool, 0, 5);
         }
+        // P1b — the same ranked shortlist, but from the MARKETPLACE professional bench.
+        $proPool = function_exists('recruit_pro_pool') ? recruit_pro_pool($req) : [];
         // Phase 5 — commercial rollup across hires (planned vs approved vs actual) + per-candidate commercials for the table.
         $rollup = function_exists('recruit_req_commercial_rollup') ? recruit_req_commercial_rollup($req) : null;
         $candComm = [];
         if (function_exists('assignment_commercials')) {
             foreach ($cands as $c) if (($c['stage'] ?? '') === 'ACCEPTED' || !empty($c['inspector_id'])) $candComm[$c['id']] = assignment_commercials($c, $req);
         }
-        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands, 'health' => $health, 'pool' => $pool, 'rollup' => $rollup, 'candComm' => $candComm,
+        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands, 'health' => $health, 'pool' => $pool, 'proPool' => $proPool, 'rollup' => $rollup, 'candComm' => $candComm,
             'groups' => function_exists('req_groups') ? req_groups((int)$req['id']) : []]); return;
     }
 }
