@@ -161,6 +161,25 @@ function connect_engage_bases() {
 function connect_engage_basis_label($basis) { return connect_engage_bases()[strtoupper((string)$basis)]['label'] ?? (string)$basis; }
 function connect_engage_statuses() { return ['BOOKED', 'ACTIVE', 'COMPLETED', 'CANCELLED']; }
 
+// Gap-3 (CONFIGURE) — the engagement status transition machine, mirroring
+// billable_allowed_next(). Before this, connect_engage_set_status() accepted any status
+// in the set with no from→to check, so an engagement could jump COMPLETED→BOOKED or be
+// revived from CANCELLED silently. These are the only valid moves; the terminal states
+// (COMPLETED, CANCELLED) have none. Re-setting the same status is a harmless no-op.
+function connect_engage_allowed_next($from) {
+    return [
+        'BOOKED'    => ['ACTIVE', 'COMPLETED', 'CANCELLED'],
+        'ACTIVE'    => ['COMPLETED', 'CANCELLED'],
+        'COMPLETED' => [],
+        'CANCELLED' => [],
+    ][strtoupper((string)$from)] ?? [];
+}
+function connect_engage_can_transition($from, $to) {
+    $from = strtoupper((string)$from); $to = strtoupper((string)$to);
+    if ($from === $to) return true;                       // idempotent no-op
+    return in_array($to, connect_engage_allowed_next($from), true);
+}
+
 /** The subject (who is booked) for a requirement's awarded application. */
 function connect_engage_subject_for_award($req) {
     $aid = (int)($req['awarded_application_id'] ?? 0);
@@ -241,6 +260,14 @@ function connect_engage_set_status($id, $status) {
     if (!in_array($status, connect_engage_statuses(), true)) return [false, 'Invalid status.'];
     $e = ops_one("SELECT * FROM cx_engagements WHERE id=?", [(int)$id]);
     if (!$e) return [false, 'Engagement not found.'];
+    // Gap-3 — no silent invalid transition. The move must be one the machine allows.
+    $from = strtoupper((string)($e['status'] ?? 'BOOKED'));
+    if (!connect_engage_can_transition($from, $status)) {
+        $allowed = connect_engage_allowed_next($from);
+        return [false, 'A ' . strtolower($from) . ' engagement cannot move to ' . strtolower($status)
+            . ($allowed ? ' — allowed: ' . strtolower(implode(', ', $allowed)) . '.' : ' (it is a final state).')];
+    }
+    if ($from === $status) return [true, 'Engagement already ' . strtolower($status) . '.'];
     db()->prepare("UPDATE cx_engagements SET status=?, updated_at=? WHERE id=?")->execute([$status, date('c'), (int)$id]);
     return [true, 'Engagement ' . strtolower($status) . '.'];
 }
