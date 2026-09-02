@@ -16,7 +16,8 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
   *{box-sizing:border-box} body{margin:0;font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
   .top{background:linear-gradient(135deg,var(--teal),var(--teal-d));color:#fff;padding:16px 20px;font-weight:700}
   .wrap{max-width:620px;margin:0 auto;padding:24px 18px 60px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px}
+  .card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:14px}
+  .step{position:absolute;top:-11px;left:16px;width:24px;height:24px;border-radius:999px;background:var(--teal);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.15)}
   h1{font-size:25px;letter-spacing:-.02em;margin:0 0 4px}
   label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
   input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;font-size:16px;background:var(--card);color:inherit}
@@ -30,8 +31,10 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
   .types input{width:auto;margin-top:3px}
   .caps{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   @media(max-width:520px){.caps{grid-template-columns:1fr}}
-  .caps .cap{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;margin:0;font-size:13.5px}
-  .caps .cap input{width:auto;margin:0}
+  .caps .cap{display:flex;gap:9px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:11px 12px;cursor:pointer;margin:0;font-size:14px;transition:border-color .12s,background .12s}
+  .caps .cap:hover{border-color:var(--teal)}
+  .caps .cap input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--teal)}
+  .caps .cap:has(input:checked){border-color:var(--teal);background:rgba(15,125,125,.06)}
   .caps .cap span{color:var(--ink)}
 </style></head><body>
 <div class="top"><?= e($appName) ?></div>
@@ -50,35 +53,23 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
     </p>
   </div>
 <?php else: ?>
-  <h1>Join as an organisation</h1>
-  <p class="muted" style="margin:0 0 16px">One platform for the whole technical-manpower flow — post work, find people, run it to invoicing. Tell us who you are and we'll set you up with the right tools.</p>
+  <h1>Set up your organisation</h1>
+  <p class="muted" style="margin:0 0 16px">Three quick things and you're in — no jargon, no forms to hunt for. Just tell us what you do and we'll switch on the right tools for you.</p>
   <?php if ($err): ?><div class="msg err"><?= e($err) ?></div><?php endif; ?>
   <form method="post" action="/join">
     <div class="card">
-      <label>Organisation name</label><input name="name" required autofocus>
-      <label>What kind of organisation?</label>
-      <div class="types">
-        <?php
-          $want = strtoupper((string)($_GET['type'] ?? ''));
-          if (!isset($types[$want]) || $want === 'FREELANCER') $want = '';
-          $first=true; foreach ($types as $k=>$t): if ($k==='FREELANCER') continue; /* freelancers use /pro */
-          $checked = $want !== '' ? ($k === $want) : $first; ?>
-          <label>
-            <input type="radio" name="org_type" value="<?= e($k) ?>" <?= $checked?'checked':'' ?>>
-            <span><strong><?= e($t['label']) ?></strong>
-              <?php $mods = function_exists('connect_org_type_modules') ? connect_org_type_modules($k) : []; ?>
-              <div style="margin-top:4px"><?php foreach ($mods as $m) echo '<span class="chip">'.e($modLabel[$m]??$m).'</span>'; ?></div>
-            </span>
-          </label>
-        <?php $first=false; endforeach; ?>
-      </div>
+      <div class="step">1</div>
+      <label style="margin-top:0">Your organisation's name</label>
+      <input name="name" required autofocus placeholder="e.g. Zephyr Inspection Services">
     </div>
+
     <?php $capCat = $GLOBALS['__join_cap_catalog'] ?? []; $capGroups = $GLOBALS['__join_cap_groups'] ?? []; $capsOn = $GLOBALS['__join_caps_posted'] ?? []; if ($capCat): ?>
     <div class="card">
-      <label style="font-size:15px;color:var(--ink);font-weight:600;margin-top:0">What does your organisation do?</label>
-      <p class="muted" style="margin:0 0 6px;font-size:13px">Tick everything you deliver — a company can do several. This tailors your workspace to your real business mix. You can change it later. (Optional.)</p>
+      <div class="step">2</div>
+      <label style="font-size:16px;color:var(--ink);font-weight:700;margin-top:0">What does your organisation do?</label>
+      <p class="muted" style="margin:0 0 4px;font-size:13.5px"><strong>Tick everything that fits — most companies do more than one.</strong> This is all we need to set you up; you can change it any time.</p>
       <?php foreach ($capGroups as $g): ?>
-        <div style="margin-top:10px"><div class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:5px"><?= e($g) ?></div>
+        <div style="margin-top:12px"><div class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:6px"><?= e($g) ?></div>
           <div class="caps">
           <?php foreach ($capCat as $code=>$c): if ($c['group']!==$g) continue; $on=in_array($code,$capsOn,true); ?>
             <label class="cap"><input type="checkbox" name="caps[]" value="<?= e($code) ?>" <?= $on?'checked':'' ?>><span><?= e($c['label']) ?></span></label>
@@ -86,15 +77,39 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
           </div>
         </div>
       <?php endforeach; ?>
+      <details style="margin-top:14px">
+        <summary class="muted" style="cursor:pointer;font-size:13px">Prefer to pick a single main type instead? (optional)</summary>
+        <div class="types" style="margin-top:8px">
+          <?php
+            $want = strtoupper((string)($_GET['type'] ?? ''));
+            if (!isset($types[$want]) || $want === 'FREELANCER') $want = '';
+          ?>
+          <label>
+            <input type="radio" name="org_type" value="" <?= $want===''?'checked':'' ?>>
+            <span><strong>Set me up automatically</strong> <span class="muted">— based on what I ticked above (recommended)</span></span>
+          </label>
+          <?php foreach ($types as $k=>$t): if ($k==='FREELANCER') continue; ?>
+          <label>
+            <input type="radio" name="org_type" value="<?= e($k) ?>" <?= $k===$want?'checked':'' ?>>
+            <span><strong><?= e($t['label']) ?></strong>
+              <?php $mods = function_exists('connect_org_type_modules') ? connect_org_type_modules($k) : []; ?>
+              <div style="margin-top:4px"><?php foreach ($mods as $m) echo '<span class="chip">'.e($modLabel[$m]??$m).'</span>'; ?></div>
+            </span>
+          </label>
+          <?php endforeach; ?>
+        </div>
+      </details>
     </div>
     <?php endif; ?>
+
     <div class="card">
-      <label>Your name</label><input name="contact_name">
-      <label>Work e-mail</label><input type="email" name="contact_email" required>
+      <div class="step">3</div>
+      <label style="margin-top:0">Your name</label><input name="contact_name">
+      <label>Work e-mail</label><input type="email" name="contact_email" required placeholder="you@company.com">
       <label>Mobile</label><input name="contact_mobile">
       <label>Choose a password</label><input type="password" name="password" minlength="8" required placeholder="at least 8 characters">
     </div>
-    <button class="btn" type="submit">Create my account</button>
+    <button class="btn" type="submit">Create my account →</button>
     <p class="muted" style="text-align:center;margin-top:14px;font-size:13.5px">An individual professional? <a href="/pro/register">List yourself here →</a> &nbsp;·&nbsp; <a href="/connect">All options</a></p>
   </form>
 <?php endif; ?>

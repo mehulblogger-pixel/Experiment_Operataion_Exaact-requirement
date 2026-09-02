@@ -33,6 +33,29 @@ function connect_org_types() {
 }
 
 /**
+ * Derive a sensible primary org_type from the business capabilities a company
+ * ticked, so a newcomer never has to decode a jargon radio — they just say what
+ * they do and we set them up right. Additive: used only when no explicit type is
+ * chosen; an explicit choice always wins (full back-compat). Falls back to COMPANY.
+ */
+function connect_org_type_from_caps(array $codes) {
+    $codes = array_values(array_filter(array_map('strval', $codes)));
+    if (!$codes) return 'COMPANY';
+    $cat = function_exists('connect_cap_catalog') ? connect_cap_catalog() : [];
+    $g = [];
+    foreach ($codes as $c) if (isset($cat[$c])) $g[$cat[$c]['group']] = true;
+    $insp   = isset($g['Inspection & Technical Services']);
+    $supply = isset($g['Resource Supply']);
+    $recr   = isset($g['Recruitment']);
+    $proj   = isset($g['Project Services']);
+    if ($supply && ($insp || $recr || $proj)) return 'ENTERPRISE';        // does work AND supplies people
+    if ($supply)                              return 'MANPOWER_AGENCY';    // supplies people
+    if ($recr && !$insp && !$proj)            return 'RECRUITMENT_AGENCY'; // places people
+    if ($insp || $proj)                       return 'TPIA';              // runs operations/inspection
+    return 'COMPANY';
+}
+
+/**
  * The module bundle an org type is entitled to. Full-package types get
  * (all modules − the package's 'off' list) plus the marketplace ('connect');
  * a company gets the marketplace only; a freelancer gets self-service ('pro').
@@ -104,7 +127,13 @@ function connect_org_register(array $in) {
     $email   = strtolower(trim((string)($in['contact_email'] ?? '')));
     $person  = trim((string)($in['contact_name'] ?? '')) ?: $name;
     $pass    = (string)($in['password'] ?? '');
-    if ($name === '' || !isset(connect_org_types()[$orgType])) return [false, 'Please give your organisation a name and pick a type.', null];
+    // Capabilities lead the flow now: a company simply ticks what it does, and we
+    // set up the right primary type from that. An explicit org_type still wins (so
+    // deep links and the old form keep working); otherwise we derive it, and a bare
+    // sign-up with nothing ticked lands as a plain hire-only COMPANY.
+    $capsIn = array_values(array_filter(array_map('strval', (array)($in['caps'] ?? []))));
+    if (!isset(connect_org_types()[$orgType]) || $orgType === 'FREELANCER') $orgType = connect_org_type_from_caps($capsIn);
+    if ($name === '') return [false, 'Please give your organisation a name.', null];
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return [false, 'Enter a valid work e-mail.', null];
     if (strlen($pass) < 8) return [false, 'Choose a password of at least 8 characters.', null];
     // A login is one per e-mail across the client-portal world.
