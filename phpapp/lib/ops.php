@@ -2922,6 +2922,8 @@ function ops_dispatch($route, $method) {
             ops_consents($route, $method); return true;
         case $route === 'super-admin' || $route === 'control-panel':
             return ops_super_admin($method);
+        case $route === 'marketplace-plans':   // Super-Admin: marketplace subscription plans & limits
+            return ops_mkt_plans($method);
         case $route === 'tenants' || $route === 'tenant-enable' || $route === 'tenant-add'
              || $route === 'tenant-status' || $route === 'tenant-remove'
              || $route === 'cpanel-save' || $route === 'cpanel-test':
