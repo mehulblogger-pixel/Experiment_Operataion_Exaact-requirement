@@ -648,8 +648,14 @@ function connect_pro_route($route, $method) {
                 }
                 redirect('/pro/jobs');
             }
-            $rows = function_exists('cx_open_requirements') ? cx_open_requirements() : [];
-            // A search filter over the open board — title / description / discipline / location.
+            // By default the board is AUTO-MATCHED to this professional's profile
+            // (discipline + skills) — a mechanical pro sees mechanical work, a CSWIP
+            // welder sees welding/inspection work. "?all=1" shows every open job.
+            $showAll = ($_GET['all'] ?? '') === '1';
+            $rows = function_exists('connect_match_requirements_for_pro')
+                ? connect_match_requirements_for_pro((int)$me['id'], !$showAll)
+                : (function_exists('cx_open_requirements') ? cx_open_requirements() : []);
+            // A search filter over the board — title / description / discipline / location.
             $q = trim((string)($_GET['q'] ?? ''));
             if ($q !== '') {
                 $needle = mb_strtolower($q);
@@ -659,7 +665,7 @@ function connect_pro_route($route, $method) {
                 }));
             }
             $applied = connect_pro_applied_map((int)$me['id']);
-            connect_pro_view('jobs', ['me' => $me, 'rows' => $rows, 'applied' => $applied, 'q' => $q]); exit;
+            connect_pro_view('jobs', ['me' => $me, 'rows' => $rows, 'applied' => $applied, 'q' => $q, 'showAll' => $showAll]); exit;
 
         case 'pro/applications':   // A2 — track my applications (+ withdraw)
             if ($method === 'POST' && ($_POST['action'] ?? '') === 'withdraw') {

@@ -166,6 +166,48 @@ function cx_match_score($cand, $req, $reqTerms = null) {
     ];
 }
 
+/**
+ * The personalised job board for ONE professional: rank the open requirements
+ * against THEIR profile (discipline + skills), reusing cx_match_score so a
+ * mechanical professional sees mechanical work and a CSWIP welder sees welding /
+ * inspection work — automatically, no manual filtering. Each returned requirement
+ * carries _match (score), _reason (one-line why) and _fit (does it match me at all).
+ *
+ * $onlyMatches = true → return only requirements that actually fit the professional;
+ * if NONE fit (e.g. a brand-new profile with no skills yet), it falls back to the
+ * full open board so the person is never shown an empty screen.
+ */
+function connect_match_requirements_for_pro($proId, $onlyMatches = true, $limit = 200) {
+    $pro = function_exists('connect_pro_get') ? connect_pro_get((int)$proId)
+         : ops_one("SELECT * FROM cx_professionals WHERE id=?", [(int)$proId]);
+    if (!$pro) return function_exists('cx_open_requirements') ? cx_open_requirements($limit) : [];
+    $cand = ['id' => (int)$pro['id'], 'kind' => 'professional',
+             'skills' => (string)($pro['skills'] ?? ''), 'disciplines' => (string)($pro['disciplines'] ?? '')];
+    // The professional's own disciplines — the primary "does this fit me" signal, so
+    // a mechanical pro isn't shown electrical work just because both say "inspection".
+    $proDiscs = array_values(array_filter(array_map('trim', explode(',', strtoupper((string)($pro['disciplines'] ?? ''))))));
+    $skillMax = (int)connect_match_weights()['skills'];
+    $rows = function_exists('cx_open_requirements') ? cx_open_requirements($limit) : [];
+    $out = [];
+    foreach ($rows as $r) {
+        $m = cx_match_score($cand, $r);
+        $skillPts = (int)($m['parts']['skills'] ?? 0);
+        $reqDisc = strtoupper(trim((string)($r['discipline_code'] ?? '')));
+        $discMatch   = ($reqDisc !== '' && in_array($reqDisc, $proDiscs, true)); // same discipline
+        $strongSkill = $skillPts >= (int)round($skillMax * 0.5);                 // meaningful skill overlap (not one common word)
+        $r['_match']  = (int)$m['score'];
+        $r['_reason'] = (string)$m['reason'];
+        $r['_fit']    = ($discMatch || $strongSkill);
+        $out[] = $r;
+    }
+    usort($out, fn($a, $b) => ($b['_match'] <=> $a['_match']) ?: ((int)$b['id'] <=> (int)$a['id']));
+    if ($onlyMatches) {
+        $fit = array_values(array_filter($out, fn($r) => !empty($r['_fit'])));
+        if ($fit) return $fit;                       // matched board
+    }
+    return $out;                                     // fallback: everything (new/empty profile)
+}
+
 /** Weighted taxonomy-node set a requirement reaches (title + discipline), cached
  *  per requirement. Reuses the universal graph so matching is concept-level, not
  *  substring. Empty when the graph is unavailable (degrades to token scoring). */
