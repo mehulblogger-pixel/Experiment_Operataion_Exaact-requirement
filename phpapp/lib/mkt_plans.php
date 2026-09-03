@@ -129,6 +129,9 @@ function mkt_settings_save(array $in) {
         setting_set('mkt_pro_free_until', $d);
     }
     if (array_key_exists('mkt_currency', $in)) setting_set('mkt_currency', trim((string)$in['mkt_currency']));
+    // Master enforcement switch — only saved when the settings form was submitted
+    // (the checkbox is absent when unticked, so a dedicated marker carries intent).
+    if (array_key_exists('mkt_settings_form', $in)) setting_set('mkt_enforce', !empty($in['mkt_enforce']) ? 1 : 0);
     return true;
 }
 
@@ -153,6 +156,7 @@ function ops_mkt_plans($method) {
         'annualMonths'=> mkt_annual_months(),
         'proFreeUntil'=> mkt_pro_free_until(),
         'currency'    => mkt_currency(),
+        'enforce'     => function_exists('mkt_enforce_on') ? mkt_enforce_on() : false,
     ]);
     return true;
 }

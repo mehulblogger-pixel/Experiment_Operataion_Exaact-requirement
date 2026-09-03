@@ -105,6 +105,7 @@ try {
     require __DIR__ . '/lib/install_mode.php';   // Cloud vs Licence deployment posture (onboarding adapts)
     require __DIR__ . '/lib/onboarding.php';      // Guided getting-started welcome (mode-aware)
     require __DIR__ . '/lib/mkt_plans.php';        // Marketplace subscription plans & limits (Super-Admin owned)
+    require __DIR__ . '/lib/mkt_subs.php';         // Marketplace subscriptions, access & usage limits
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';

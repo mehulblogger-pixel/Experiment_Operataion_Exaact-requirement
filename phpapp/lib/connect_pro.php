@@ -637,6 +637,15 @@ function connect_pro_route($route, $method) {
 
         case 'pro/jobs':   // A2 — browse open requirements + apply
             if ($method === 'POST' && (int)($_POST['requirement_id'] ?? 0) > 0 && function_exists('cx_requirement_get')) {
+                // Marketplace gate — a no-op while enforcement is OFF; freelancers are
+                // free during the launch promo. Only blocks once paid access is on and
+                // this professional has used up their monthly applications.
+                if (function_exists('mkt_can_use') && !mkt_can_use('PRO', (int)$me['id'], 'applications')) {
+                    $_SESSION['pro_flash'] = (function_exists('mkt_has_access') && !mkt_has_access('PRO', (int)$me['id']))
+                        ? 'A membership is needed to apply — see Plans.'
+                        : 'You have used all your applications this month — upgrade your plan or add a credit pack.';
+                    redirect('/pro/jobs');
+                }
                 $rq = cx_requirement_get((int)$_POST['requirement_id']);
                 if ($rq && in_array(strtoupper((string)$rq['status']), ['OPEN', 'SHORTLISTING'], true)) {
                     cx_application_add((int)$rq['id'], [
@@ -645,6 +654,7 @@ function connect_pro_route($route, $method) {
                         'proposed_rate'  => (float)($_POST['proposed_rate'] ?? 0),
                         'cover_note'     => (string)($_POST['cover_note'] ?? ''),
                     ]);
+                    if (function_exists('mkt_usage_add')) mkt_usage_add('PRO', (int)$me['id'], 'applications');
                 }
                 redirect('/pro/jobs');
             }
@@ -666,6 +676,23 @@ function connect_pro_route($route, $method) {
             }
             $applied = connect_pro_applied_map((int)$me['id']);
             connect_pro_view('jobs', ['me' => $me, 'rows' => $rows, 'applied' => $applied, 'q' => $q, 'showAll' => $showAll]); exit;
+
+        case 'pro/plans':   // Slice 3 — the professional's marketplace membership & plan
+            if ($method === 'POST' && function_exists('mkt_subscribe')) {
+                [$ok, $msg] = mkt_subscribe('PRO', (int)$me['id'], (int)($_POST['plan_id'] ?? 0), (string)($_POST['period'] ?? 'MONTH'), (string)$me['name']);
+                $_SESSION['pro_flash'] = $msg;
+                redirect('/pro/plans');
+            }
+            connect_pro_view('plans', [
+                'me'           => $me,
+                'plans'        => function_exists('mkt_plans_all') ? mkt_plans_all('PRO') : [],
+                'current'      => function_exists('mkt_current_plan') ? mkt_current_plan('PRO', (int)$me['id']) : null,
+                'free'         => function_exists('mkt_pro_is_free') && mkt_pro_is_free(),
+                'freeUntil'    => function_exists('mkt_pro_free_until') ? mkt_pro_free_until() : '',
+                'enforce'      => function_exists('mkt_enforce_on') && mkt_enforce_on(),
+                'currency'     => function_exists('mkt_currency') ? mkt_currency() : '₹',
+                'annualMonths' => function_exists('mkt_annual_months') ? mkt_annual_months() : 10,
+            ]); exit;
 
         case 'pro/applications':   // A2 — track my applications (+ withdraw)
             if ($method === 'POST' && ($_POST['action'] ?? '') === 'withdraw') {

@@ -785,6 +785,22 @@ function portal_route($route, $method) {
     $u = portal_user();
 
     switch ($route) {
+        case 'portal/plans':   // Slice 3 — the client's marketplace subscription & plan
+            if ($method === 'POST' && function_exists('mkt_subscribe')) {
+                [$ok, $msg] = mkt_subscribe('CLIENT', portal_partner_id(), (int)($_POST['plan_id'] ?? 0), (string)($_POST['period'] ?? 'MONTH'), portal_client_name());
+                $_SESSION['portal_flash'] = $msg;
+                redirect('/portal/plans');
+            }
+            portal_view('plans', [
+                'plans'        => function_exists('mkt_plans_all') ? mkt_plans_all('CLIENT') : [],
+                'current'      => function_exists('mkt_current_plan') ? mkt_current_plan('CLIENT', portal_partner_id()) : null,
+                'enforce'      => function_exists('mkt_enforce_on') && mkt_enforce_on(),
+                'currency'     => function_exists('mkt_currency') ? mkt_currency() : '₹',
+                'annualMonths' => function_exists('mkt_annual_months') ? mkt_annual_months() : 10,
+                'party'        => portal_partner_id(),
+            ]);
+            exit;
+
         case 'portal':
             portal_log('DASHBOARD');
             // A marketplace-first client's home IS the hiring home.
@@ -991,8 +1007,16 @@ function portal_route($route, $method) {
                     $_SESSION['portal_flash'] = $nid ? 'Requirement created from your template and posted.' : 'Could not use that template.';
                     redirect('/portal/hire');
                 } elseif (trim((string)($_POST['title'] ?? '')) !== '') {
+                    // Marketplace gate — a no-op while enforcement is OFF (open marketplace).
+                    if (function_exists('mkt_can_use') && !mkt_can_use('CLIENT', $party, 'posts')) {
+                        $_SESSION['portal_flash'] = (function_exists('mkt_has_access') && !mkt_has_access('CLIENT', $party))
+                            ? 'A marketplace plan is needed to post a requirement — see Plans.'
+                            : 'You have used all the job posts in your plan this month — upgrade your plan or add a credit pack.';
+                        redirect('/portal/hire');
+                    }
                     $in = $_POST; $in['poster_party_id'] = $party; $in['poster_name'] = portal_client_name();
                     cx_requirement_create($in, true); // posted straight to OPEN
+                    if (function_exists('mkt_usage_add')) mkt_usage_add('CLIENT', $party, 'posts');
                     $_SESSION['portal_flash'] = 'Your requirement is posted and open for applications.';
                     redirect('/portal/hire');
                 }

@@ -34,6 +34,14 @@
   <h3 class="tab-sub" style="margin-top:0">Global settings</h3>
   <form method="post" action="/marketplace-plans" class="form-grid" style="align-items:end">
     <input type="hidden" name="action" value="save_settings">
+    <input type="hidden" name="mkt_settings_form" value="1">
+    <div class="ff" style="grid-column:1/-1">
+      <label style="display:flex;gap:10px;align-items:center;background:var(--soft,#f6faf9);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+        <input type="checkbox" name="mkt_enforce" value="1" <?= !empty($enforce) ? 'checked' : '' ?>>
+        <span><b>Charge for the marketplace</b> — enforce subscriptions &amp; limits.
+          <span class="muted" style="display:block;font-size:12px"><?= !empty($enforce) ? 'ON — a plan is required to post/apply (freelancers free during the promo).' : 'OFF — the marketplace is open &amp; free for everyone right now. Turn this on when you launch paid access.' ?></span></span>
+      </label>
+    </div>
     <div class="ff"><label>Annual = how many months?</label>
       <input class="form-control" name="mkt_annual_months" type="number" min="1" max="12" value="<?= $annualMonths ?>">
       <small class="muted">Pay this many months for a full year (e.g. 10 = 2 months free).</small></div>
