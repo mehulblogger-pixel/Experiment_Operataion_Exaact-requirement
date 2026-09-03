@@ -284,6 +284,20 @@ function ops_customer360($route, $method) {
         redirect('/customer?id=' . $pid);
     }
 
+    // Set this client's billing branch — the office every new invoice for them is
+    // raised from, so nobody hits "No branch is set". Additive; clearing is allowed.
+    if ($route === 'customer' && $method === 'POST' && ($_POST['action'] ?? '') === 'set_branch') {
+        ops_require(can('mod.clients.edit') || is_master_of('clients'), 'You cannot change customer records.');
+        $pid = (int)($_POST['id'] ?? 0);
+        if (!c360_one("SELECT id FROM business_partners WHERE id=?", [$pid])) { flash('That customer no longer exists.', 'error'); redirect('/clients'); }
+        $br = (int)($_POST['home_branch_id'] ?? 0);
+        if ($br && !c360_one("SELECT id FROM offices WHERE id=? AND is_active=1", [$br])) { flash('Pick an active branch.', 'error'); redirect('/customer?id=' . $pid); }
+        db()->prepare("UPDATE business_partners SET home_branch_id=? WHERE id=?")->execute([$br ?: null, $pid]);
+        if (function_exists('act_log')) act_log('PARTNER', $pid, 'SYSTEM', $br ? 'Billing branch set.' : 'Billing branch cleared.', ['auto' => 1]);
+        flash($br ? 'Billing branch saved — new invoices for this client now use it automatically.' : 'Billing branch cleared.');
+        redirect('/customer?id=' . $pid);
+    }
+
     $pid = (int)($_GET['id'] ?? 0);
     $d = $pid ? c360_load($pid) : null;
     if (!$d) { http_response_code(404); view('notfound'); return true; }

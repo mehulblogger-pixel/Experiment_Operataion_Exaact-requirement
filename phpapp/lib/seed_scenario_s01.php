@@ -59,9 +59,15 @@ function seed_s01_remove() {
         try { $del("DELETE FROM cx_verifications WHERE subject_kind='professional' AND subject_id=?", [$pid]); } catch (Throwable $e) {}
         $del("DELETE FROM cx_professionals WHERE id=?", [$pid]);
     }
-    // reports / findings / evidence for the DEMO-S01 job
-    $rpt = (int)ops_val("SELECT id FROM report_docs WHERE irn='DEMO-S01-RPT-001'");
-    if ($rpt) { $del("DELETE FROM report_files WHERE report_doc_id=?", [$rpt]); try { $del("DELETE FROM nonconformities WHERE report_doc_id=?", [$rpt]); } catch (Throwable $e) {} $del("DELETE FROM report_docs WHERE id=?", [$rpt]); }
+    // reports / findings / evidence for the DEMO-S01 job (both the issued report and
+    // the one left pending approval)
+    foreach (ops_all("SELECT id FROM report_docs WHERE irn LIKE 'DEMO-S01-RPT-%'") ?: [] as $rr) {
+        $rid = (int)$rr['id'];
+        $del("DELETE FROM report_files WHERE report_doc_id=?", [$rid]);
+        try { $del("DELETE FROM nonconformities WHERE report_doc_id=?", [$rid]); } catch (Throwable $e) {}
+        try { $del("DELETE FROM report_approvals WHERE report_doc_id=?", [$rid]); } catch (Throwable $e) {}
+        $del("DELETE FROM report_docs WHERE id=?", [$rid]);
+    }
     try { $del("DELETE FROM nonconformities WHERE ref='DEMO-S01-F-001'"); } catch (Throwable $e) {}
     $jobIds = array_map(fn($r) => (int)$r['id'], ops_all("SELECT id FROM jobs WHERE job_code LIKE 'DEMO-S01-%'") ?: []);
     foreach ($jobIds as $jid) { $del("DELETE FROM job_visits WHERE job_id=?", [$jid]); $del("DELETE FROM jobs WHERE id=?", [$jid]); }
@@ -161,6 +167,9 @@ function seed_s01_load() {
     // ---- PHASE 2 — client + logins ----------------------------------------
     db()->prepare("INSERT INTO business_partners (legal_name,display_name,is_client,status,created_at) VALUES ('DEMO-S01 POWER PROJECTS PRIVATE LIMITED','DEMO-S01 Power Projects',1,'ACTIVE',?)")->execute([date('c')]);
     $party = (int)db()->lastInsertId();
+    // Give the demo client a billing branch, so its invoices are raised from a
+    // branch automatically (no "No branch is set") — demonstrates the client-branch feature.
+    try { db()->prepare("UPDATE business_partners SET home_branch_id=? WHERE id=?")->execute([s01_office_id(), $party]); } catch (Throwable $e) {}
     if (function_exists('connect_org_migrate')) { connect_org_migrate(); try { db()->prepare("INSERT INTO cx_organisations (name,org_type,package_key,party_id,status,contact_name,contact_email,approved_by,approved_at,created_at) VALUES ('DEMO-S01 Power Projects','COMPANY','connect',?, 'ACTIVE','Priya Client','client.s01@demo.test','demo-seed',?,?)")->execute([$party, date('c'), date('c')]); } catch (Throwable $e) {} }
     if (function_exists('portal_migrate')) portal_migrate();
     db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,perms,created_by,created_at) VALUES (?,?,?,?,1,0,'', 'demo-seed', ?)")->execute([$party, 'client.s01@demo.test', 'Priya Client (DEMO-S01)', s01_pw(), date('c')]);
@@ -245,6 +254,20 @@ function seed_s01_load() {
             ->execute(['DEMO-S01-RPT-001', $rtId, $rtCode, '220 kV Substation Inspection Report', $party, $callId, $jobId, s01_office_id(), $arjunInsp, s01_d(15), s01_d(16), $reportData, s01_d(15), $approver, s01_d(15), s01_d(16), $approver, $reviewer, s01_d(15), s01_d(16)]);
         $rptId = (int)db()->lastInsertId();
         if (function_exists('verify_code_for')) { try { verify_code_for(ops_one("SELECT * FROM report_docs WHERE id=?", [$rptId])); } catch (Throwable $e) {} }
+
+        // A SECOND report left UNDER_REVIEW awaiting an approver, so a reviewer/approver
+        // signing in sees the "Reports waiting for your approval" card actually populated.
+        // Fully wrapped — a schema mismatch can never break the rest of the seed.
+        try {
+            db()->prepare("INSERT INTO report_docs (irn,report_type_id,type_code,title,client_id,call_id,job_id,office_id,sbu,location,inspector_id,inspection_date,result,release_status,status,data,rev,finalized,finalized_at,submitted_at,vet_status,deleted,created_by,created_at)
+                           VALUES (?,?,?,?,?,?,?,?, 'IND', 'Ahmedabad, Gujarat', ?, ?, '', '', 'UNDER_REVIEW', ?, 1, 0, ?, ?, '', 0, 'demo-seed', ?)")
+                ->execute(['DEMO-S01-RPT-002', $rtId, $rtCode, '400 kV Bay Extension Inspection — awaiting approval', $party, $callId, $jobId, s01_office_id(), $arjunInsp, s01_d(17), $reportData, s01_d(18), s01_d(18), date('c')]);
+            $rpt2 = (int)db()->lastInsertId();
+            // An open "any approver" step at level 1 — matches whoever can finalise reports
+            // (the demo approver / master), so it shows on their dashboard queue.
+            db()->prepare("INSERT INTO report_approvals (report_doc_id,level,approver_kind,approver_role,approver_user_id,resolved_user_id,status,sla_due,created_at)
+                           VALUES (?,1,'ANY','',0,0,'PENDING',?,?)")->execute([$rpt2, s01_d(21), date('c')]);
+        } catch (Throwable $e) { /* demo extra only — ignore */ }
 
         if (function_exists('ncr_create')) {
             $findingId = (int)ncr_create(['job_id' => $jobId, 'report_doc_id' => $rptId, 'partner_id' => $party, 'office_id' => s01_office_id(), 'sbu' => 'IND', 'title' => 'Protection panel identification marking incomplete', 'description' => 'Required identification marking on the protection panel is incomplete at time of inspection.', 'severity' => 'MINOR', 'detected_on' => s01_d(13), 'detected_by' => 'Arjun Mehta', 'owner' => 'DEMO-S01 Power Projects', 'due_on' => s01_d(20), 'source' => 'INTERNAL']);

@@ -24,9 +24,16 @@ try {
 
     // Two active offices → do NOT guess; leave it for the user to choose.
     db()->prepare("INSERT INTO offices (code,name,city,is_active) VALUES ('T2','Test Branch Two','Surat',1)")->execute();
+    $two = (int)db()->lastInsertId();
     $r2 = books_invoice_create(['partner_id' => $party]);
     $inv2 = books_invoice((int)$r2['id']);
-    t_ok((int)($inv2['office_id'] ?? 0) === 0, 'multi-branch install leaves the branch unset (user chooses)');
+    t_ok((int)($inv2['office_id'] ?? 0) === 0, 'multi-branch install with no client branch leaves it unset (user chooses)');
+
+    // …UNLESS the client has a billing branch set — then every invoice inherits it,
+    // even on a multi-branch install. This is the real fix for "no office is set".
+    db()->prepare("UPDATE business_partners SET home_branch_id=? WHERE id=?")->execute([$two, $party]);
+    $r2b = books_invoice_create(['partner_id' => $party]);
+    t_eq((int)books_invoice((int)$r2b['id'])['office_id'], $two, 'invoice inherits the client\'s billing branch automatically');
 
     // An explicit office is always honoured.
     $r3 = books_invoice_create(['partner_id' => $party, 'office_id' => $only]);

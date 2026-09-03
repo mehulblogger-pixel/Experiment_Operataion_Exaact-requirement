@@ -513,6 +513,13 @@ function books_invoice_create(array $b) {
         if ($home && books_try(fn() => ops_val("SELECT id FROM offices WHERE id=? AND is_active=1", [$home]), 0)) $off = $home;
     }
     if (!$off) {
+        // The client's own billing branch — set on the customer profile — so every
+        // invoice for that client is raised from the right branch automatically.
+        // Queried directly (the partner row is fetched a few lines below).
+        $cb = (int)books_try(fn() => ops_val("SELECT home_branch_id FROM business_partners WHERE id=?", [$pid]), 0);
+        if ($cb && books_try(fn() => ops_val("SELECT id FROM offices WHERE id=? AND is_active=1", [$cb]), 0)) $off = $cb;
+    }
+    if (!$off) {
         // Single-branch install (or a caller with no branch context — a marketplace
         // voucher, a portal approval, a user whose home office isn't set): default to
         // the one active office, so a draft is never stranded on "No branch is set".

@@ -130,6 +130,27 @@
 </div>
 <?php endif; ?>
 
+<?php // Billing branch — attach this client to an office, so every invoice for them
+      // is raised from the right branch and never lands on "No branch is set". ?>
+<?php if (!empty($canWrite)): ?>
+<div class="panel" style="margin-top:16px">
+  <h3 style="margin-top:0">Billing branch</h3>
+  <p class="muted" style="font-size:12.5px;margin:0 0 10px">The office every new invoice for this client is raised from — so their invoices are never stuck on “No branch is set”. You can change it any time.</p>
+  <form method="post" action="/customer" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+    <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+    <input type="hidden" name="action" value="set_branch">
+    <div class="ff" style="min-width:260px;margin:0"><label for="hb">Billing branch</label>
+      <select class="form-control searchable" id="hb" name="home_branch_id">
+        <option value="">— not set —</option>
+        <?php foreach (ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name") as $o): ?>
+          <option value="<?= (int)$o['id'] ?>" <?= (int)($p['home_branch_id'] ?? 0) === (int)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <button class="btn small">Save branch</button>
+  </form>
+</div>
+<?php endif; ?>
+
 <div class="panel-split" style="margin-top:16px">
   <div>
     <?php // ---- Money ---------------------------------------------------- ?>
