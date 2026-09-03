@@ -20,6 +20,19 @@
       // In-office / On-site; the mark flows to availability + links to the report.
       if (function_exists('attend_render_widget')) attend_render_widget($u); ?>
 
+<?php // Reports waiting on ME to review / approve — surfaced on EVERY staff dashboard
+      // so a reviewer or approver sees their queue the moment they sign in, instead of
+      // hunting for it. Shows only when something is actually waiting on this person.
+      $awApprove = function_exists('idems_awaiting_my_approval_count') ? idems_awaiting_my_approval_count() : 0;
+      if ($awApprove > 0): ?>
+  <div class="qcards" style="margin-top:16px;grid-template-columns:1fr">
+    <a class="qcard tone-warn" href="/documents?mine=approve" style="border-color:var(--brand)">
+      <div class="qic">✅</div><div class="qn"><?= (int)$awApprove ?></div>
+      <div class="ql">Report<?= $awApprove === 1 ? '' : 's' ?> waiting for your review / approval →</div>
+    </a>
+  </div>
+<?php endif; ?>
+
 <?php if (function_exists('is_field_inspector') ? is_field_inspector() : is_inspector()): ?>
   <?php $myId = $u['inspector_id'] ?? 0;
     $mc = fn($sql, $extra = []) => $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$myId], $extra)) : 0;

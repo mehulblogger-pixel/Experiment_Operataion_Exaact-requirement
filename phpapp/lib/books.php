@@ -512,6 +512,15 @@ function books_invoice_create(array $b) {
         $home = (int)(current_user()['home_office_id'] ?? 0);
         if ($home && books_try(fn() => ops_val("SELECT id FROM offices WHERE id=? AND is_active=1", [$home]), 0)) $off = $home;
     }
+    if (!$off) {
+        // Single-branch install (or a caller with no branch context — a marketplace
+        // voucher, a portal approval, a user whose home office isn't set): default to
+        // the one active office, so a draft is never stranded on "No branch is set".
+        // Only when there is EXACTLY one active office; a multi-branch company still
+        // chooses its billing branch on the invoice screen.
+        $active = books_try(fn() => ops_all("SELECT id FROM offices WHERE is_active=1 ORDER BY id"), []);
+        if (is_array($active) && count($active) === 1) $off = (int)$active[0]['id'];
+    }
     $p = ops_one("SELECT * FROM business_partners WHERE id=?", [$pid]);
     if (!$p) return ['err' => 'That customer no longer exists.'];
 
