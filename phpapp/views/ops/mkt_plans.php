@@ -115,3 +115,70 @@
     <p class="muted" style="font-size:12px;margin:10px 4px 0">These plans and limits are read by the marketplace at subscribe/enforce time (next build slices). Editing them here changes what customers can buy and use.</p>
   </div>
 </div>
+
+<?php // ---- Credit packs (top-ups when a plan limit runs out) ---- ?>
+<?php
+  $creditPacks = $creditPacks ?? []; $editPack = $editPack ?? null;
+  $eMetric = (string)($editPack['metric'] ?? '');
+?>
+<div class="master-head" style="margin-top:22px">
+  <div><h1 style="font-size:20px">Credit packs</h1>
+    <p class="sub">Optional top-ups a customer buys when they run out of a plan limit. Credits are a wallet — they don't reset monthly and are only used after the plan quota is spent.</p></div>
+</div>
+<div class="panel-split">
+  <div>
+    <div class="panel">
+      <h3 style="margin-top:0">🎟️ Packs on sale</h3>
+      <?php if ($creditPacks): ?>
+        <table class="grid" style="margin:0"><thead><tr><th>Pack</th><th>For</th><th>Adds</th><th>Price</th><th></th></tr></thead>
+          <tbody>
+          <?php foreach ($creditPacks as $p): $lbl = $limitKeys[$p['metric']] ?? $p['metric']; ?>
+            <tr<?= empty($p['is_active']) ? ' style="opacity:.55"' : '' ?>>
+              <td><b><?= e($p['name']) ?></b><br><span class="muted" style="font-size:11.5px"><?= e($p['code']) ?><?= empty($p['is_active']) ? ' · inactive' : '' ?></span></td>
+              <td class="muted" style="font-size:12.5px"><?= e(($audiences[$p['audience']] ?? $p['audience'])) ?></td>
+              <td class="muted" style="font-size:12.5px"><b style="color:var(--ink)"><?= (int)$p['credits'] ?></b> <?= e(strtolower(explode(' /', $lbl)[0])) ?></td>
+              <td><?= $money($p['price']) ?></td>
+              <td style="white-space:nowrap;text-align:right">
+                <a class="btn small secondary" href="/marketplace-plans?edit_pack=<?= (int)$p['id'] ?>">Edit</a>
+                <form method="post" action="/marketplace-plans" style="display:inline" onsubmit="return confirm('Remove this credit pack?')">
+                  <input type="hidden" name="action" value="delete_pack"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                  <button class="btn small" style="background:#9a2a2a" type="submit">×</button></form>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody></table>
+      <?php else: ?><p class="muted">No credit packs yet.</p><?php endif; ?>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <h3 style="margin-top:0"><?= $editPack ? 'Edit credit pack' : 'Add a credit pack' ?></h3>
+      <form method="post" action="/marketplace-plans">
+        <input type="hidden" name="action" value="save_pack">
+        <?php if ($editPack): ?><input type="hidden" name="id" value="<?= (int)$editPack['id'] ?>"><?php endif; ?>
+        <div class="ff"><label>Who is it for?</label>
+          <select class="form-control" name="audience">
+            <?php foreach ($audiences as $k => $lbl): ?><option value="<?= e($k) ?>" <?= (($editPack['audience'] ?? 'CLIENT') === $k) ? 'selected' : '' ?>><?= e($lbl) ?></option><?php endforeach; ?>
+          </select></div>
+        <div class="ff"><label>Pack name *</label><input class="form-control" name="name" required value="<?= e($editPack['name'] ?? '') ?>" placeholder="e.g. +10 job posts"></div>
+        <div class="ff"><label>Tops up which limit? *</label>
+          <select class="form-control" name="metric" required>
+            <option value="">— choose —</option>
+            <?php foreach ($limitKeys as $k => $lbl): ?><option value="<?= e($k) ?>" <?= ($eMetric === $k) ? 'selected' : '' ?>><?= e($lbl) ?></option><?php endforeach; ?>
+          </select></div>
+        <div class="form-grid">
+          <div class="ff"><label>Credits added *</label><input class="form-control" name="credits" type="number" min="1" step="1" required value="<?= e($editPack['credits'] ?? '') ?>"></div>
+          <div class="ff"><label>Price (<?= e($cur) ?>)</label><input class="form-control" name="price" type="number" min="0" step="1" value="<?= e($editPack['price'] ?? '') ?>"></div>
+        </div>
+        <div class="form-grid">
+          <div class="ff"><label>Sort order</label><input class="form-control" name="sort" type="number" value="<?= e($editPack['sort'] ?? 0) ?>"></div>
+          <div class="ff"><label>Active?</label><label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" name="is_active" value="1" <?= (!$editPack || !empty($editPack['is_active'])) ? 'checked' : '' ?>> On sale</label></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn" type="submit"><?= $editPack ? 'Save pack' : 'Add pack' ?></button>
+          <?php if ($editPack): ?><a class="btn secondary" href="/marketplace-plans">Cancel</a><?php endif; ?>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

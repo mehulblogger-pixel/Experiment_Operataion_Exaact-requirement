@@ -125,10 +125,30 @@ function mkt_usage_left($kind, $subId, $metric) {
 /**
  * The gate the app calls before letting a subscriber do a limited action. When
  * enforcement is OFF this is always true, so existing flows never change. When ON:
- * they must have access AND have quota left (plus a credit-pack top-up in Slice 4).
+ * they must have access AND have either plan quota left OR credit-pack top-ups.
  */
 function mkt_can_use($kind, $subId, $metric) {
     if (!mkt_enforce_on()) return true;
     if (!mkt_has_access($kind, $subId)) return false;
-    return mkt_usage_left($kind, $subId, $metric) > 0;
+    if (mkt_usage_left($kind, $subId, $metric) > 0) return true;
+    // Plan quota is spent — a purchased credit pack (Slice 4) can still cover it.
+    return function_exists('mkt_credits_balance') && mkt_credits_balance($kind, $subId, $metric) > 0;
+}
+
+/**
+ * Book one unit of a limited action AFTER it has succeeded. This is the accounting
+ * call the app makes in place of raw mkt_usage_add: it draws from the plan's monthly
+ * quota first, and only when that is exhausted does it consume a credit-pack top-up.
+ * While enforcement is OFF it simply tracks usage (nothing is ever blocked or drawn).
+ */
+function mkt_consume($kind, $subId, $metric, $n = 1) {
+    $kind = _mkt_kind($kind); $subId = (int)$subId; $n = max(1, (int)$n);
+    if (!mkt_enforce_on()) { mkt_usage_add($kind, $subId, $metric, $n); return; }
+    $lim = mkt_limit($kind, $subId, $metric);
+    if ($lim < 0) { mkt_usage_add($kind, $subId, $metric, $n); return; }   // unlimited plan — just track
+    $planLeft = max(0, $lim - mkt_usage_used($kind, $subId, $metric));
+    $fromPlan = min($n, $planLeft);
+    if ($fromPlan > 0) mkt_usage_add($kind, $subId, $metric, $fromPlan);
+    $rem = $n - $fromPlan;
+    if ($rem > 0 && function_exists('mkt_credits_consume')) mkt_credits_consume($kind, $subId, $metric, $rem);
 }

@@ -785,15 +785,22 @@ function portal_route($route, $method) {
     $u = portal_user();
 
     switch ($route) {
-        case 'portal/plans':   // Slice 3 — the client's marketplace subscription & plan
-            if ($method === 'POST' && function_exists('mkt_subscribe')) {
-                [$ok, $msg] = mkt_subscribe('CLIENT', portal_partner_id(), (int)($_POST['plan_id'] ?? 0), (string)($_POST['period'] ?? 'MONTH'), portal_client_name());
-                $_SESSION['portal_flash'] = $msg;
+        case 'portal/plans':   // Slice 3/4 — the client's marketplace subscription, plan & credit top-ups
+            if ($method === 'POST') {
+                $pact = (string)($_POST['action'] ?? '');
+                if ($pact === 'buy_pack' && function_exists('mkt_credit_buy')) {
+                    [$bok, $bmsg] = mkt_credit_buy('CLIENT', portal_partner_id(), (int)($_POST['pack_id'] ?? 0), portal_client_name());
+                    $_SESSION['portal_flash'] = $bmsg;
+                } elseif (function_exists('mkt_subscribe')) {
+                    [$ok, $msg] = mkt_subscribe('CLIENT', portal_partner_id(), (int)($_POST['plan_id'] ?? 0), (string)($_POST['period'] ?? 'MONTH'), portal_client_name());
+                    $_SESSION['portal_flash'] = $msg;
+                }
                 redirect('/portal/plans');
             }
             portal_view('plans', [
                 'plans'        => function_exists('mkt_plans_all') ? mkt_plans_all('CLIENT') : [],
                 'current'      => function_exists('mkt_current_plan') ? mkt_current_plan('CLIENT', portal_partner_id()) : null,
+                'packs'        => function_exists('mkt_credit_packs_all') ? mkt_credit_packs_all('CLIENT', true) : [],
                 'enforce'      => function_exists('mkt_enforce_on') && mkt_enforce_on(),
                 'currency'     => function_exists('mkt_currency') ? mkt_currency() : '₹',
                 'annualMonths' => function_exists('mkt_annual_months') ? mkt_annual_months() : 10,
@@ -1016,7 +1023,7 @@ function portal_route($route, $method) {
                     }
                     $in = $_POST; $in['poster_party_id'] = $party; $in['poster_name'] = portal_client_name();
                     cx_requirement_create($in, true); // posted straight to OPEN
-                    if (function_exists('mkt_usage_add')) mkt_usage_add('CLIENT', $party, 'posts');
+                    if (function_exists('mkt_consume')) mkt_consume('CLIENT', $party, 'posts');
                     $_SESSION['portal_flash'] = 'Your requirement is posted and open for applications.';
                     redirect('/portal/hire');
                 }

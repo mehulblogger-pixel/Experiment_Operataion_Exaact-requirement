@@ -1,6 +1,8 @@
 <?php
-  // Slice 3 — the client's marketplace subscription. Pick a plan (monthly or annual).
+  // Slice 3/4 — the client's marketplace subscription. Pick a plan (monthly or annual),
+  // and top up with credit packs when a monthly limit runs out.
   $plans = $plans ?? []; $current = $current ?? null; $enforce = !empty($enforce);
+  $packs = $packs ?? [];
   $cur = $currency ?? '₹'; $am = (int)($annualMonths ?? 10); $party = (int)($party ?? 0);
   $money = fn($n) => e($cur) . number_format((float)$n);
   $limLabel = function_exists('mkt_limit_keys') ? mkt_limit_keys() : [];
@@ -46,4 +48,23 @@
     </div>
   <?php endforeach; ?>
 </div>
-<p class="muted" style="font-size:12px;margin-top:14px;max-width:760px">Subscribing records your plan and its period. (Online payment capture is being added — for now this activates the plan.)</p>
+<?php if ($packs): ?>
+  <h3 class="ptitle" style="margin-top:26px">Top-up credits</h3>
+  <p class="plead" style="margin:0 0 12px">Run out of a monthly limit? Add a credit pack — the credits sit in your wallet and are used automatically after your plan's monthly quota, and they don't expire at month-end.</p>
+  <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));max-width:900px">
+    <?php foreach ($packs as $p): $mk = (string)$p['metric']; $lbl = strtolower(explode(' /', $limLabel[$mk] ?? $mk)[0]);
+            $bal = function_exists('mkt_credits_balance') ? mkt_credits_balance('CLIENT',$party,$mk) : 0; ?>
+      <div class="pcard">
+        <div style="font-weight:700;font-size:16px"><?= e($p['name']) ?></div>
+        <div style="font-size:20px;font-weight:800;color:#0a5c5c;margin:6px 0"><?= $money($p['price']) ?></div>
+        <div class="muted" style="font-size:13px;margin-bottom:8px">Adds <b style="color:var(--ink)"><?= (int)$p['credits'] ?></b> <?= e($lbl) ?>.<?php if ($bal>0): ?><br>Wallet now: <b style="color:var(--ink)"><?= (int)$bal ?></b> <?= e($lbl) ?>.<?php endif; ?></div>
+        <form method="post" action="/portal/plans">
+          <input type="hidden" name="action" value="buy_pack"><input type="hidden" name="pack_id" value="<?= (int)$p['id'] ?>">
+          <button class="btn" type="submit">Buy pack</button>
+        </form>
+      </div>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+
+<p class="muted" style="font-size:12px;margin-top:14px;max-width:760px">Subscribing and buying credits records your plan/purchase and its period. (Online payment capture is being added — for now this activates it.)</p>

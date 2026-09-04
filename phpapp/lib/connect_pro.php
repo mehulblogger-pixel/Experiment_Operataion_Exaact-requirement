@@ -654,7 +654,7 @@ function connect_pro_route($route, $method) {
                         'proposed_rate'  => (float)($_POST['proposed_rate'] ?? 0),
                         'cover_note'     => (string)($_POST['cover_note'] ?? ''),
                     ]);
-                    if (function_exists('mkt_usage_add')) mkt_usage_add('PRO', (int)$me['id'], 'applications');
+                    if (function_exists('mkt_consume')) mkt_consume('PRO', (int)$me['id'], 'applications');
                 }
                 redirect('/pro/jobs');
             }
@@ -677,16 +677,23 @@ function connect_pro_route($route, $method) {
             $applied = connect_pro_applied_map((int)$me['id']);
             connect_pro_view('jobs', ['me' => $me, 'rows' => $rows, 'applied' => $applied, 'q' => $q, 'showAll' => $showAll]); exit;
 
-        case 'pro/plans':   // Slice 3 — the professional's marketplace membership & plan
-            if ($method === 'POST' && function_exists('mkt_subscribe')) {
-                [$ok, $msg] = mkt_subscribe('PRO', (int)$me['id'], (int)($_POST['plan_id'] ?? 0), (string)($_POST['period'] ?? 'MONTH'), (string)$me['name']);
-                $_SESSION['pro_flash'] = $msg;
+        case 'pro/plans':   // Slice 3/4 — the professional's marketplace membership, plan & credit top-ups
+            if ($method === 'POST') {
+                $pact = (string)($_POST['action'] ?? '');
+                if ($pact === 'buy_pack' && function_exists('mkt_credit_buy')) {
+                    [$bok, $bmsg] = mkt_credit_buy('PRO', (int)$me['id'], (int)($_POST['pack_id'] ?? 0), (string)$me['name']);
+                    $_SESSION['pro_flash'] = $bmsg;
+                } elseif (function_exists('mkt_subscribe')) {
+                    [$ok, $msg] = mkt_subscribe('PRO', (int)$me['id'], (int)($_POST['plan_id'] ?? 0), (string)($_POST['period'] ?? 'MONTH'), (string)$me['name']);
+                    $_SESSION['pro_flash'] = $msg;
+                }
                 redirect('/pro/plans');
             }
             connect_pro_view('plans', [
                 'me'           => $me,
                 'plans'        => function_exists('mkt_plans_all') ? mkt_plans_all('PRO') : [],
                 'current'      => function_exists('mkt_current_plan') ? mkt_current_plan('PRO', (int)$me['id']) : null,
+                'packs'        => function_exists('mkt_credit_packs_all') ? mkt_credit_packs_all('PRO', true) : [],
                 'free'         => function_exists('mkt_pro_is_free') && mkt_pro_is_free(),
                 'freeUntil'    => function_exists('mkt_pro_free_until') ? mkt_pro_free_until() : '',
                 'enforce'      => function_exists('mkt_enforce_on') && mkt_enforce_on(),

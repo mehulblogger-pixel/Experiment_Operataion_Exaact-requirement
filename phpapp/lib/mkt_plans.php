@@ -144,12 +144,17 @@ function ops_mkt_plans($method) {
         if ($act === 'save_plan')       { [$ok, $msg] = mkt_plan_save($_POST); flash($msg, $ok ? 'success' : 'error'); }
         elseif ($act === 'delete_plan') { mkt_plan_delete((int)($_POST['id'] ?? 0)); flash('Plan removed.'); }
         elseif ($act === 'save_settings') { mkt_settings_save($_POST); flash('Marketplace settings saved.'); }
+        elseif ($act === 'save_pack' && function_exists('mkt_credit_pack_save'))   { [$ok, $msg] = mkt_credit_pack_save($_POST); flash($msg, $ok ? 'success' : 'error'); }
+        elseif ($act === 'delete_pack' && function_exists('mkt_credit_pack_delete')) { mkt_credit_pack_delete((int)($_POST['id'] ?? 0)); flash('Credit pack removed.'); }
         redirect('/marketplace-plans');
     }
     $edit = ($_GET['edit'] ?? '') !== '' ? mkt_plan_get((int)$_GET['edit']) : null;
+    $editPack = ($_GET['edit_pack'] ?? '') !== '' && function_exists('mkt_credit_pack_get') ? mkt_credit_pack_get((int)$_GET['edit_pack']) : null;
     view('ops/mkt_plans', [
         'clientPlans' => mkt_plans_all('CLIENT'),
         'proPlans'    => mkt_plans_all('PRO'),
+        'creditPacks' => function_exists('mkt_credit_packs_all') ? mkt_credit_packs_all() : [],
+        'editPack'    => $editPack,
         'edit'        => $edit,
         'limitKeys'   => mkt_limit_keys(),
         'audiences'   => mkt_audiences(),
