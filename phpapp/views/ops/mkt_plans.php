@@ -35,6 +35,15 @@
   <form method="post" action="/marketplace-plans" class="form-grid" style="align-items:end">
     <input type="hidden" name="action" value="save_settings">
     <input type="hidden" name="mkt_settings_form" value="1">
+    <?php $isLicence = !empty($isLicence); $addonOn = !empty($addonOn); ?>
+    <div class="ff" style="grid-column:1/-1">
+      <label style="display:flex;gap:10px;align-items:center;background:var(--soft,#f6faf9);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+        <input type="checkbox" name="marketplace_addon" value="1" <?= $addonOn ? 'checked' : '' ?>>
+        <span><b>Marketplace add-on (Connect)</b> — is the Connect marketplace available on this install?
+          <span class="muted" style="display:block;font-size:12px">This install is <b><?= e($installMode ?? '') ?></b>.
+            <?php if ($isLicence): ?>Connect is a paid upsell for a licence copy — turn it on for a customer who has bought it. When off, this stays a private operations copy and opens on the staff sign-in.<?php else: ?>On the hosted cloud this is normally on — it is the public marketplace face.<?php endif; ?></span></span>
+      </label>
+    </div>
     <div class="ff" style="grid-column:1/-1">
       <label style="display:flex;gap:10px;align-items:center;background:var(--soft,#f6faf9);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
         <input type="checkbox" name="mkt_enforce" value="1" <?= !empty($enforce) ? 'checked' : '' ?>>

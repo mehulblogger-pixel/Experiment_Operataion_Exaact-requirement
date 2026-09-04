@@ -187,14 +187,24 @@ function connect_org_pending_count() {
 /** The ONE public front door (dispatched before require_login). One page where a
  *  professional, a company or an agency creates an account or signs in. Always exits. */
 function connect_front_route($method) {
-    if (function_exists('connect_enabled') && !connect_enabled()) { http_response_code(404); echo 'Not available.'; exit; }
+    // Public marketplace door — only where the Connect add-on is entitled (both cloud
+    // and a licence that bought it). A private operations copy without it has no door.
+    if (function_exists('install_marketplace_enabled') ? !install_marketplace_enabled()
+        : (function_exists('connect_enabled') && !connect_enabled())) {
+        if (function_exists('current_user') && !current_user()) redirect('/login');
+        http_response_code(404); echo 'Not available.'; exit;
+    }
     require __DIR__ . '/../views/ops/connect_front.php';
     exit;
 }
 
 /** The public onboarding page (dispatched before require_login). Always exits. */
 function connect_org_join_route($method) {
-    if (function_exists('connect_enabled') && !connect_enabled()) { http_response_code(404); echo 'Not available.'; exit; }
+    if (function_exists('install_marketplace_enabled') ? !install_marketplace_enabled()
+        : (function_exists('connect_enabled') && !connect_enabled())) {
+        if (function_exists('current_user') && !current_user()) redirect('/login');
+        http_response_code(404); echo 'Not available.'; exit;
+    }
     connect_org_migrate();
     $done = false; $err = ''; $acct = null;
     if ($method === 'POST') {

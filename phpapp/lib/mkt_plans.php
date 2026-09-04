@@ -131,7 +131,11 @@ function mkt_settings_save(array $in) {
     if (array_key_exists('mkt_currency', $in)) setting_set('mkt_currency', trim((string)$in['mkt_currency']));
     // Master enforcement switch — only saved when the settings form was submitted
     // (the checkbox is absent when unticked, so a dedicated marker carries intent).
-    if (array_key_exists('mkt_settings_form', $in)) setting_set('mkt_enforce', !empty($in['mkt_enforce']) ? 1 : 0);
+    if (array_key_exists('mkt_settings_form', $in)) {
+        setting_set('mkt_enforce', !empty($in['mkt_enforce']) ? 1 : 0);
+        // The paid marketplace add-on entitlement (Connect available at all on this install).
+        if (function_exists('marketplace_addon_set')) marketplace_addon_set(!empty($in['marketplace_addon']));
+    }
     return true;
 }
 
@@ -162,6 +166,9 @@ function ops_mkt_plans($method) {
         'proFreeUntil'=> mkt_pro_free_until(),
         'currency'    => mkt_currency(),
         'enforce'     => function_exists('mkt_enforce_on') ? mkt_enforce_on() : false,
+        'addonOn'     => function_exists('marketplace_addon_on') ? marketplace_addon_on() : true,
+        'installMode' => function_exists('install_mode_label') ? install_mode_label() : '',
+        'isLicence'   => function_exists('install_is_licence') && install_is_licence(),
     ]);
     return true;
 }
