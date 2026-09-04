@@ -103,7 +103,16 @@ function mkt_pay_verify($orderId, $paymentId, $signature) {
     db()->prepare("UPDATE mkt_orders SET status='PAID', payment_id=?, paid_at=? WHERE id=?")->execute([(string)$paymentId, date('c'), (int)$row['id']]);
 
     $kind = (string)$row['subscriber_kind']; $subId = (int)$row['subscriber_id']; $by = (string)$row['created_by'];
-    if ((string)$row['purpose'] === 'PACK') {
+    $isPack = (string)$row['purpose'] === 'PACK';
+    // Phase 2 — record the payment as Connect revenue (its own stream), never as GMV.
+    if (function_exists('mkt_ledger_post') && (float)$row['amount'] > 0) {
+        mkt_ledger_post('CONNECT_REVENUE', (float)$row['amount'], [
+            'subtype' => $isPack ? 'CREDIT_PACK' : 'SUBSCRIPTION', 'context' => 'ORDER', 'ref_id' => (int)$row['id'],
+            'client_party_id' => $kind === 'CLIENT' ? $subId : 0, 'pro_id' => $kind === 'PRO' ? $subId : 0,
+            'currency' => (string)$row['currency'], 'note' => $isPack ? 'Credit pack purchase' : 'Subscription payment', 'by' => $by,
+        ]);
+    }
+    if ($isPack) {
         [$ok, $msg] = function_exists('mkt_credit_buy') ? mkt_credit_buy($kind, $subId, (int)$row['ref_id'], $by) : [true, 'Credits added.'];
         return [true, 'Payment received. ' . $msg];
     }

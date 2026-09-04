@@ -125,6 +125,13 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
         <div class="kv"><span class="k">Nature</span><span>Config only · no hard-coded tax · history immutable</span></div>
       </div>
     </div>
+    <div class="panel" style="border-left:3px solid var(--brand)"><div class="ph"><h3>Financial control</h3><span class="note"><a href="/financial-control">Open ›</a></span></div>
+      <div class="pb">
+        <div class="kv"><span class="k">What it is</span><span>GMV vs Connect revenue vs provider cost — kept strictly separate</span></div>
+        <div class="kv"><span class="k">This month GMV</span><span class="tnum"><?= function_exists('mkt_ledger_totals') ? e(($currency ?? '₹')) . number_format((float)(mkt_ledger_totals(date('Y-m-01'))['GMV'] ?? 0)) : '—' ?></span></div>
+        <div class="kv"><span class="k">Take rate</span><span class="tnum"><?= function_exists('mkt_take_rate') ? mkt_take_rate(date('Y-m-01')) . '%' : '—' ?></span></div>
+      </div>
+    </div>
     <div class="panel"><div class="ph"><h3>Subscription &amp; billing</h3><span class="note"><a href="/billing">Manage ›</a></span></div>
       <div class="pb">
         <div class="kv"><span class="k">Gateway</span><span><?= !empty($bill['enabled']) ? '<span class="pill p-ok">Razorpay set</span>' : '<span class="pill p-warn">Not configured</span>' ?></span></div>

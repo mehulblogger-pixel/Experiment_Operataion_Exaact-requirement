@@ -2928,6 +2928,8 @@ function ops_dispatch($route, $method) {
             return ops_mkt_escrow($method);
         case $route === 'compliance-rules':    // Super-Admin: versioned tax rules + fee-rule engine
             return ops_mkt_rules($method);
+        case $route === 'financial-control':   // Marketplace desk: GMV vs revenue vs provider-cost dashboard
+            return ops_mkt_ledger($method);
         case $route === 'tenants' || $route === 'tenant-enable' || $route === 'tenant-add'
              || $route === 'tenant-status' || $route === 'tenant-remove'
              || $route === 'cpanel-save' || $route === 'cpanel-test':

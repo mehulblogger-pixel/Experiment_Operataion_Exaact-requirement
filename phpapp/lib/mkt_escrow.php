@@ -114,7 +114,20 @@ function _mkt_escrow_transition($id, $to, array $set = []) {
 
 /** Release the held funds to the professional (job proven done). HELD/DISPUTED → RELEASED. */
 function mkt_escrow_release($id, $by = '', $note = '') {
-    return _mkt_escrow_transition($id, 'RELEASED', ['released_at' => date('c'), 'created_by' => (string)$by === '' ? (mkt_escrow_get($id)['created_by'] ?? '') : $by, 'notes' => (string)$note]);
+    $row = mkt_escrow_get($id);
+    $res = _mkt_escrow_transition($id, 'RELEASED', ['released_at' => date('c'), 'created_by' => (string)$by === '' ? ($row['created_by'] ?? '') : $by, 'notes' => (string)$note]);
+    // Phase 2 — book the three DIFFERENT monies separately (never conflate them):
+    // GMV = the facilitated service value; Connect revenue = only our commission;
+    // PRO_PAYABLE = what the professional is owed; CLIENT_RECEIPT = cash in.
+    if (!empty($res[0]) && $row && function_exists('mkt_ledger_post')) {
+        $opts = ['context' => 'ESCROW', 'ref_id' => (int)$row['id'], 'currency' => (string)$row['currency'],
+                 'client_party_id' => (int)$row['client_party_id'], 'pro_id' => (int)$row['pro_id'], 'by' => (string)$by];
+        mkt_ledger_post('GMV',            (float)$row['amount'],     $opts + ['note' => 'Facilitated service value']);
+        mkt_ledger_post('CLIENT_RECEIPT', (float)$row['amount'],     $opts + ['note' => 'Client funds settled']);
+        mkt_ledger_post('CONNECT_REVENUE',(float)$row['commission'], $opts + ['subtype' => 'TXN_FEE', 'note' => 'Marketplace fee']);
+        mkt_ledger_post('PRO_PAYABLE',    (float)$row['net_to_pro'], $opts + ['note' => 'Payable to professional']);
+    }
+    return $res;
 }
 /** Refund the held funds to the client (job cancelled / dispute upheld). HELD/DISPUTED → REFUNDED. */
 function mkt_escrow_refund($id, $by = '', $reason = '') {
