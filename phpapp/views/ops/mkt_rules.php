@@ -91,3 +91,17 @@
   </form>
 </div>
 <p class="muted" style="font-size:12px;max-width:960px;margin-top:10px">Computing a fee here moves no money — it is read at settlement time (Phase 5). Every computed fee stores the exact base and rule version used, so a settlement can always be reproduced.</p>
+
+<?php // ---- Tax-admin role (master only) ---- ?>
+<?php if (!empty($isMaster)): ?>
+<div class="panel" style="max-width:960px;margin-top:16px">
+  <h3 style="margin-top:0">Who may edit these rules</h3>
+  <p class="muted" style="font-size:13px;margin:0 0 10px">Statutory rules are restricted. The Master always has access; add <b>Tax admins</b> here by e-mail. Commercial admins never qualify — this keeps tax config separate from pricing config.</p>
+  <form method="post" action="/compliance-rules" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+    <input type="hidden" name="action" value="save_taxadmins">
+    <div class="ff" style="flex:1;min-width:280px"><label>Tax-admin e-mails (comma-separated)</label>
+      <input class="form-control" name="tax_admin_emails" value="<?= e($taxAdmins ?? '') ?>" placeholder="tax@yourco.com, ca@firm.com"></div>
+    <button class="btn" type="submit">Save tax admins</button>
+  </form>
+</div>
+<?php endif; ?>

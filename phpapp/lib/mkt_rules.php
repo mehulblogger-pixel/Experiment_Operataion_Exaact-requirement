@@ -152,13 +152,34 @@ function mkt_snapshot_get($context, $refId) {
     return $row ? (json_decode((string)$row['snapshot'], true) ?: null) : null;
 }
 
-/** Route handler — the compliance rules & fees screen (master only; statutory config). */
+/**
+ * Tax-admin role (spec §42) — a dedicated set of people allowed to edit STATUTORY rules,
+ * separate from commercial admins. The Master is always allowed; additional tax admins are
+ * an allow-list of e-mails the Master maintains. Commercial admins never qualify.
+ */
+function mkt_tax_admins() {
+    $raw = (string) setting_get('tax_admin_emails', '');
+    return array_values(array_filter(array_map(fn($s) => strtolower(trim($s)), explode(',', $raw))));
+}
+function mkt_tax_admin_can() {
+    if (function_exists('is_master') && is_master()) return true;
+    if (!function_exists('current_user')) return false;
+    $u = current_user(); $email = strtolower(trim((string)($u['email'] ?? '')));
+    return $email !== '' && in_array($email, mkt_tax_admins(), true);
+}
+
+/** Route handler — the compliance rules & fees screen (Master or Tax-admin; statutory config). */
 function ops_mkt_rules($method) {
-    ops_require(function_exists('is_master') && is_master(), 'Only the Super Admin (tax config) can manage compliance rules.');
+    ops_require(mkt_tax_admin_can(), 'Only the Super Admin or a designated Tax admin can manage compliance rules.');
     mkt_rules_migrate(); if (function_exists('mkt_fees_migrate')) mkt_fees_migrate();
     if ($method === 'POST') {
         $act = (string)($_POST['action'] ?? '');
         $by  = function_exists('user_name') && function_exists('current_user') ? (string)user_name(current_user()) : '';
+        if ($act === 'save_taxadmins') {
+            ops_require(function_exists('is_master') && is_master(), 'Only the Master can change who the Tax admins are.');
+            setting_set('tax_admin_emails', trim((string)($_POST['tax_admin_emails'] ?? '')));
+            flash('Tax-admin list saved.'); redirect('/compliance-rules');
+        }
         if ($act === 'save_rule') {
             $type = (string)($_POST['rule_type'] ?? 'GST'); $code = trim((string)($_POST['code'] ?? ''));
             if ($code === '') flash('Give the rule a code.', 'error');
@@ -179,6 +200,8 @@ function ops_mkt_rules($method) {
         'feePayers' => function_exists('mkt_fee_payers') ? mkt_fee_payers() : [],
         'feeBases'  => function_exists('mkt_fee_bases') ? mkt_fee_bases() : [],
         'currency'  => function_exists('mkt_currency') ? mkt_currency() : '₹',
+        'taxAdmins' => implode(', ', mkt_tax_admins()),
+        'isMaster'  => function_exists('is_master') && is_master(),
     ]);
     return true;
 }

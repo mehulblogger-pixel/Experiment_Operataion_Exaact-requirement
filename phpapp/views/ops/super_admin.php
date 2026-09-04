@@ -132,6 +132,12 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
         <div class="kv"><span class="k">Take rate</span><span class="tnum"><?= function_exists('mkt_take_rate') ? mkt_take_rate(date('Y-m-01')) . '%' : '—' ?></span></div>
       </div>
     </div>
+    <div class="panel" style="border-left:3px solid var(--brand)"><div class="ph"><h3>Feature gates</h3><span class="note"><a href="/feature-gates">Manage ›</a></span></div>
+      <div class="pb">
+        <div class="kv"><span class="k">What it is</span><span>Roll out each money feature Off → Test → Live</span></div>
+        <div class="kv"><span class="k">Default</span><span>Everything Off — turning on is deliberate</span></div>
+      </div>
+    </div>
     <div class="panel"><div class="ph"><h3>Subscription &amp; billing</h3><span class="note"><a href="/billing">Manage ›</a></span></div>
       <div class="pb">
         <div class="kv"><span class="k">Gateway</span><span><?= !empty($bill['enabled']) ? '<span class="pill p-ok">Razorpay set</span>' : '<span class="pill p-warn">Not configured</span>' ?></span></div>

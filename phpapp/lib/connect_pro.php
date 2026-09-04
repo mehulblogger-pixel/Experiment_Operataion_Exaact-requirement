@@ -730,17 +730,23 @@ function connect_pro_route($route, $method) {
         case 'pro/plans':   // Slice 3/4/6 — the professional's membership, credit top-ups & payment
             if ($method === 'POST') {
                 $meId = (int)$me['id']; $who = (string)$me['name'];
-                $pack = (string)($_POST['action'] ?? '') === 'buy_pack';
+                $pAct = (string)($_POST['action'] ?? '');
+                if ($pAct === 'cancel_sub' && function_exists('mkt_sub_cancel')) {
+                    [$cok, $cmsg] = mkt_sub_cancel('PRO', $meId, (string)($_POST['mode'] ?? 'END'));
+                    $_SESSION['pro_flash'] = $cmsg; redirect('/pro/plans');
+                }
+                $pack = $pAct === 'buy_pack';
                 $purpose = $pack ? 'PACK' : 'SUB';
                 $refId   = $pack ? (int)($_POST['pack_id'] ?? 0) : (int)($_POST['plan_id'] ?? 0);
                 $period  = (string)($_POST['period'] ?? 'MONTH');
+                $coupon  = (string)($_POST['coupon'] ?? '');
                 // Slice 6 — collect payment first when Razorpay is configured and there is a
                 // price; otherwise (no keys, or a free/promo price) activate immediately.
                 $start = function_exists('mkt_pay_start') ? mkt_pay_start('PRO', $meId, $purpose, $refId, $period, $who) : ['mode' => 'unconfigured'];
                 if (($start['mode'] ?? '') === 'pay')   redirect('/pro/pay?o=' . (int)$start['row_id']);
                 if (($start['mode'] ?? '') === 'error') { $_SESSION['pro_flash'] = $start['msg']; redirect('/pro/plans'); }
                 if ($pack && function_exists('mkt_credit_buy'))     { [$bok, $bmsg] = mkt_credit_buy('PRO', $meId, $refId, $who); $_SESSION['pro_flash'] = $bmsg; }
-                elseif (!$pack && function_exists('mkt_subscribe')) { [$ok, $msg]  = mkt_subscribe('PRO', $meId, $refId, $period, $who); $_SESSION['pro_flash'] = $msg; }
+                elseif (!$pack && function_exists('mkt_subscribe')) { [$ok, $msg]  = mkt_subscribe('PRO', $meId, $refId, $period, $who, $coupon); $_SESSION['pro_flash'] = $msg; }
                 redirect('/pro/plans');
             }
             connect_pro_view('plans', [

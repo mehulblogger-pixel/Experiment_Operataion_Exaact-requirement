@@ -26,6 +26,10 @@
     <?php if (function_exists('mkt_limit')): $lim = mkt_limit('PRO',$meId,'applications'); $used = function_exists('mkt_usage_used') ? mkt_usage_used('PRO',$meId,'applications') : 0; if ($lim !== 0): ?>
       <div style="font-size:13px;color:var(--muted)">Applications: <b style="color:var(--ink)"><?= (int)$used ?></b> / <?= $lim < 0 ? '∞' : (int)$lim ?> this month</div>
     <?php endif; endif; ?>
+    <form method="post" action="/pro/plans" style="margin-top:8px" onsubmit="return confirm('Cancel — keep access until the period ends?')">
+      <input type="hidden" name="action" value="cancel_sub"><input type="hidden" name="mode" value="END">
+      <button class="btn sec" type="submit" style="font-size:12.5px">Cancel plan (at period end)</button>
+    </form>
   </div>
 <?php endif; ?>
 
@@ -41,6 +45,7 @@
       </ul>
       <form method="post" action="/pro/plans" style="display:flex;gap:6px;flex-wrap:wrap">
         <input type="hidden" name="plan_id" value="<?= (int)$p['id'] ?>">
+        <?php if (!$isFreePlan): ?><input name="coupon" placeholder="Coupon (optional)" style="flex:1;min-width:110px;padding:6px 8px;border:1px solid var(--line,#ddd);border-radius:8px;font-size:12.5px;text-transform:uppercase"><?php endif; ?>
         <button class="btn" name="period" value="MONTH" type="submit"><?= $isFreePlan ? 'Choose Free' : 'Monthly' ?></button>
         <?php if (!$isFreePlan): ?><button class="btn sec" name="period" value="YEAR" type="submit">Yearly</button><?php endif; ?>
       </form>

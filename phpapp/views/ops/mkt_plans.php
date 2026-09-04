@@ -191,3 +191,60 @@
     </div>
   </div>
 </div>
+
+<?php // ---- Coupons + grace (subscription lifecycle) ---- ?>
+<?php $coupons = $coupons ?? []; $graceDays = (int)($graceDays ?? 0); ?>
+<div class="master-head" style="margin-top:22px">
+  <div><h1 style="font-size:20px">Coupons &amp; renewal grace</h1>
+    <p class="sub">Discount codes customers can apply when subscribing, and how many days of grace a lapsed subscription keeps access before it’s cut off.</p></div>
+</div>
+<div class="panel-split">
+  <div>
+    <div class="panel" style="margin-bottom:14px">
+      <h3 style="margin-top:0">🏷️ Coupons</h3>
+      <?php if ($coupons): ?>
+        <table class="grid" style="margin:0"><thead><tr><th>Code</th><th>Discount</th><th>For</th><th>Valid</th><th>Used</th></tr></thead><tbody>
+          <?php foreach ($coupons as $c): ?>
+            <tr<?= empty($c['is_active']) ? ' style="opacity:.5"' : '' ?>>
+              <td><b><?= e($c['code']) ?></b><?php if ($c['label']): ?><br><span class="muted" style="font-size:11px"><?= e($c['label']) ?></span><?php endif; ?></td>
+              <td><?= strtoupper((string)$c['kind'])==='FIXED' ? $money($c['value']) : rtrim(rtrim(number_format((float)$c['value'],2),'0'),'.').'%' ?></td>
+              <td class="muted" style="font-size:12.5px"><?= e($c['audience'] ?: 'Any') ?></td>
+              <td class="muted" style="font-size:12px"><?= e($c['valid_from'] ?: '—') ?> → <?= e($c['valid_until'] ?: '—') ?></td>
+              <td class="muted"><?= (int)$c['used'] ?><?= (int)$c['max_uses']>0 ? '/'.(int)$c['max_uses'] : '' ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody></table>
+      <?php else: ?><p class="muted">No coupons yet.</p><?php endif; ?>
+    </div>
+    <div class="panel">
+      <h3 style="margin-top:0">Renewal grace</h3>
+      <form method="post" action="/marketplace-plans" style="display:flex;gap:8px;align-items:end">
+        <input type="hidden" name="action" value="save_grace">
+        <div class="ff"><label>Grace days after expiry</label><input class="form-control" name="sub_grace_days" type="number" min="0" max="90" value="<?= $graceDays ?>"><small class="muted">Access continues this many days after a subscription lapses. 0 = cut off immediately.</small></div>
+        <button class="btn" type="submit">Save</button>
+      </form>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <h3 style="margin-top:0">Add a coupon</h3>
+      <form method="post" action="/marketplace-plans">
+        <input type="hidden" name="action" value="save_coupon">
+        <div class="ff"><label>Code *</label><input class="form-control" name="code" required placeholder="e.g. LAUNCH20" style="text-transform:uppercase"></div>
+        <div class="ff"><label>Label</label><input class="form-control" name="label" placeholder="Internal description"></div>
+        <div class="form-grid">
+          <div class="ff"><label>Type</label><select class="form-control" name="kind"><option value="PERCENT">Percentage</option><option value="FIXED">Fixed amount</option></select></div>
+          <div class="ff"><label>Value</label><input class="form-control" name="value" type="number" step="0.01" min="0" value="0"></div>
+        </div>
+        <div class="ff"><label>Who for?</label><select class="form-control" name="audience"><option value="">Anyone</option><?php foreach ($audiences as $k=>$lbl): ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?></select></div>
+        <div class="form-grid">
+          <div class="ff"><label>Valid from</label><input class="form-control" name="valid_from" type="date"></div>
+          <div class="ff"><label>Valid until</label><input class="form-control" name="valid_until" type="date"></div>
+        </div>
+        <div class="ff"><label>Max uses (0 = unlimited)</label><input class="form-control" name="max_uses" type="number" min="0" value="0"></div>
+        <label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" name="is_active" value="1" checked> Active</label>
+        <button class="btn" type="submit">Add coupon</button>
+      </form>
+    </div>
+  </div>
+</div>

@@ -112,6 +112,8 @@ try {
     require __DIR__ . '/lib/mkt_rules.php';         // Compliance rule master (versioned, effective-dated tax/SAC/RCM/TDS/TCS)
     require __DIR__ . '/lib/mkt_fees.php';          // Marketplace fee-rule engine (configurable transaction fees)
     require __DIR__ . '/lib/mkt_ledger.php';        // Financial ledger + state machine (GMV vs revenue vs provider cost)
+    require __DIR__ . '/lib/mkt_gates.php';         // Feature gates (OFF/TEST/LIVE per monetisation feature)
+    require __DIR__ . '/lib/mkt_billing.php';       // Subscription lifecycle (cancel, grace, proration, coupons)
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';

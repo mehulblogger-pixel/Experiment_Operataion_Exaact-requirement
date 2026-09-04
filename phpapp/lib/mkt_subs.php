@@ -32,6 +32,14 @@ function mkt_subs_migrate() {
         act_index('mkt_subscriptions', 'ix_sub_who', '(subscriber_kind, subscriber_id, status)');
         act_index('mkt_usage', 'ix_use_who', '(subscriber_kind, subscriber_id, ym, metric)');
     }
+    // Phase 3 — subscription lifecycle columns (additive).
+    if (function_exists('ensure_column')) {
+        ensure_column('mkt_subscriptions', 'auto_renew', 'INT DEFAULT 1');
+        ensure_column('mkt_subscriptions', 'cancel_at', "VARCHAR(20) DEFAULT ''");
+        ensure_column('mkt_subscriptions', 'coupon_code', "VARCHAR(40) DEFAULT ''");
+        ensure_column('mkt_subscriptions', 'discount', 'REAL DEFAULT 0');
+        ensure_column('mkt_subscriptions', 'proration_credit', 'REAL DEFAULT 0');
+    }
 }
 
 /** Master switch — is subscription/limit enforcement ON? Default OFF (open marketplace). */
@@ -45,21 +53,27 @@ function _mkt_kind($k) { return strtoupper((string)$k) === 'PRO' ? 'PRO' : 'CLIE
  * subscription for the same subscriber is closed. Payment capture is handled
  * separately (this records the paid period). Returns [ok, message, id].
  */
-function mkt_subscribe($kind, $subId, $planId, $period = 'MONTH', $by = '') {
+function mkt_subscribe($kind, $subId, $planId, $period = 'MONTH', $by = '', $couponCode = '') {
     mkt_subs_migrate();
     $kind = _mkt_kind($kind); $subId = (int)$subId;
     $plan = function_exists('mkt_plan_get') ? mkt_plan_get($planId) : null;
     if (!$plan) return [false, 'Choose a valid plan.', 0];
     if ($subId <= 0) return [false, 'Unknown subscriber.', 0];
     $period = strtoupper($period) === 'YEAR' ? 'YEAR' : 'MONTH';
-    $amount = $period === 'YEAR' ? (float)$plan['price_annual'] : (float)$plan['price_month'];
+    $listAmount = $period === 'YEAR' ? (float)$plan['price_annual'] : (float)$plan['price_month'];
+    // Phase 3 — apply a coupon if one is given and valid (discount off the list price).
+    $discount = 0.0; $couponCode = trim((string)$couponCode);
+    if ($couponCode !== '' && function_exists('mkt_coupon_apply')) {
+        [$net, $discount] = mkt_coupon_apply($couponCode, $listAmount, $kind === 'PRO' ? 'PRO' : 'CLIENT');
+        $amount = $net;
+    } else { $amount = $listAmount; $couponCode = ''; }
     $now = date('Y-m-d');
     $exp = $period === 'YEAR' ? date('Y-m-d', strtotime('+1 year')) : date('Y-m-d', strtotime('+1 month'));
     // Close any current active subscription for this subscriber.
     db()->prepare("UPDATE mkt_subscriptions SET status='CANCELLED' WHERE subscriber_kind=? AND subscriber_id=? AND status='ACTIVE'")->execute([$kind, $subId]);
-    db()->prepare("INSERT INTO mkt_subscriptions (subscriber_kind,subscriber_id,plan_id,plan_code,period,amount,started_at,expires_at,status,created_by,created_at)
-                   VALUES (?,?,?,?,?,?,?,?, 'ACTIVE', ?, ?)")
-        ->execute([$kind, $subId, (int)$plan['id'], (string)$plan['code'], $period, $amount, $now, $exp, (string)$by, date('c')]);
+    db()->prepare("INSERT INTO mkt_subscriptions (subscriber_kind,subscriber_id,plan_id,plan_code,period,amount,started_at,expires_at,status,coupon_code,discount,auto_renew,created_by,created_at)
+                   VALUES (?,?,?,?,?,?,?,?, 'ACTIVE', ?,?, 1, ?, ?)")
+        ->execute([$kind, $subId, (int)$plan['id'], (string)$plan['code'], $period, $amount, $now, $exp, $couponCode, round($discount, 2), (string)$by, date('c')]);
     return [true, 'Subscribed to ' . $plan['name'] . ' until ' . $exp . '.', (int)db()->lastInsertId()];
 }
 
@@ -87,7 +101,9 @@ function mkt_has_access($kind, $subId) {
     if (!mkt_enforce_on()) return true;
     $kind = _mkt_kind($kind);
     if ($kind === 'PRO' && function_exists('mkt_pro_is_free') && mkt_pro_is_free()) return true;
-    return (bool) mkt_active_sub($kind, $subId);
+    if (mkt_active_sub($kind, $subId)) return true;
+    // Phase 3 — a lapsed subscriber keeps access during the configured grace window.
+    return function_exists('mkt_sub_in_grace') && (bool) mkt_sub_in_grace($kind, $subId);
 }
 
 /** The plan limit for a usage metric. Returns -1 for "unlimited / not limited". */

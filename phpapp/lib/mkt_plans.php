@@ -150,6 +150,8 @@ function ops_mkt_plans($method) {
         elseif ($act === 'save_settings') { mkt_settings_save($_POST); flash('Marketplace settings saved.'); }
         elseif ($act === 'save_pack' && function_exists('mkt_credit_pack_save'))   { [$ok, $msg] = mkt_credit_pack_save($_POST); flash($msg, $ok ? 'success' : 'error'); }
         elseif ($act === 'delete_pack' && function_exists('mkt_credit_pack_delete')) { mkt_credit_pack_delete((int)($_POST['id'] ?? 0)); flash('Credit pack removed.'); }
+        elseif ($act === 'save_coupon' && function_exists('mkt_coupon_save'))       { [$ok, $msg] = mkt_coupon_save($_POST); flash($msg, $ok ? 'success' : 'error'); }
+        elseif ($act === 'save_grace')                                             { setting_set('sub_grace_days', max(0, (int)($_POST['sub_grace_days'] ?? 0))); flash('Grace period saved.'); }
         redirect('/marketplace-plans');
     }
     $edit = ($_GET['edit'] ?? '') !== '' ? mkt_plan_get((int)$_GET['edit']) : null;
@@ -169,6 +171,8 @@ function ops_mkt_plans($method) {
         'addonOn'     => function_exists('marketplace_addon_on') ? marketplace_addon_on() : true,
         'installMode' => function_exists('install_mode_label') ? install_mode_label() : '',
         'isLicence'   => function_exists('install_is_licence') && install_is_licence(),
+        'coupons'     => function_exists('mkt_coupons_all') ? mkt_coupons_all() : [],
+        'graceDays'   => function_exists('mkt_sub_grace_days') ? mkt_sub_grace_days() : 0,
     ]);
     return true;
 }

@@ -788,17 +788,24 @@ function portal_route($route, $method) {
         case 'portal/plans':   // Slice 3/4/6 — the client's subscription, credit top-ups & payment
             if ($method === 'POST') {
                 $party = portal_partner_id(); $who = portal_client_name();
-                $pack  = (string)($_POST['action'] ?? '') === 'buy_pack';
+                $pAct = (string)($_POST['action'] ?? '');
+                // Phase 3 — cancel my subscription (at period end, or immediately).
+                if ($pAct === 'cancel_sub' && function_exists('mkt_sub_cancel')) {
+                    [$cok, $cmsg] = mkt_sub_cancel('CLIENT', $party, (string)($_POST['mode'] ?? 'END'));
+                    $_SESSION['portal_flash'] = $cmsg; redirect('/portal/plans');
+                }
+                $pack  = $pAct === 'buy_pack';
                 $purpose = $pack ? 'PACK' : 'SUB';
                 $refId   = $pack ? (int)($_POST['pack_id'] ?? 0) : (int)($_POST['plan_id'] ?? 0);
                 $period  = (string)($_POST['period'] ?? 'MONTH');
+                $coupon  = (string)($_POST['coupon'] ?? '');
                 // Slice 6 — take the money first when Razorpay is configured and there is a
                 // price to charge; otherwise (no keys, or a free/promo price) activate now.
                 $start = function_exists('mkt_pay_start') ? mkt_pay_start('CLIENT', $party, $purpose, $refId, $period, $who) : ['mode' => 'unconfigured'];
                 if (($start['mode'] ?? '') === 'pay')   redirect('/portal/pay?o=' . (int)$start['row_id']);
                 if (($start['mode'] ?? '') === 'error') { $_SESSION['portal_flash'] = $start['msg']; redirect('/portal/plans'); }
                 if ($pack && function_exists('mkt_credit_buy'))      { [$bok, $bmsg] = mkt_credit_buy('CLIENT', $party, $refId, $who); $_SESSION['portal_flash'] = $bmsg; }
-                elseif (!$pack && function_exists('mkt_subscribe'))  { [$ok, $msg]  = mkt_subscribe('CLIENT', $party, $refId, $period, $who); $_SESSION['portal_flash'] = $msg; }
+                elseif (!$pack && function_exists('mkt_subscribe'))  { [$ok, $msg]  = mkt_subscribe('CLIENT', $party, $refId, $period, $who, $coupon); $_SESSION['portal_flash'] = $msg; }
                 redirect('/portal/plans');
             }
             portal_view('plans', [
