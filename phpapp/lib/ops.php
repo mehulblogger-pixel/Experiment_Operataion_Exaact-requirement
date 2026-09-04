@@ -2926,6 +2926,8 @@ function ops_dispatch($route, $method) {
             return ops_mkt_plans($method);
         case $route === 'marketplace-escrow':  // Marketplace desk: escrow holds (hold → release/refund)
             return ops_mkt_escrow($method);
+        case $route === 'compliance-rules':    // Super-Admin: versioned tax rules + fee-rule engine
+            return ops_mkt_rules($method);
         case $route === 'tenants' || $route === 'tenant-enable' || $route === 'tenant-add'
              || $route === 'tenant-status' || $route === 'tenant-remove'
              || $route === 'cpanel-save' || $route === 'cpanel-test':

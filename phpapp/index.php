@@ -109,6 +109,8 @@ try {
     require __DIR__ . '/lib/mkt_credits.php';       // Marketplace credit packs (top-ups when limits exhaust)
     require __DIR__ . '/lib/mkt_pay.php';           // Marketplace payment capture (Razorpay for subscriptions & packs)
     require __DIR__ . '/lib/mkt_escrow.php';        // Marketplace escrow lifecycle (hold → release/refund; gateway-off)
+    require __DIR__ . '/lib/mkt_rules.php';         // Compliance rule master (versioned, effective-dated tax/SAC/RCM/TDS/TCS)
+    require __DIR__ . '/lib/mkt_fees.php';          // Marketplace fee-rule engine (configurable transaction fees)
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';

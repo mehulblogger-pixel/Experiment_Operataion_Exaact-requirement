@@ -118,6 +118,13 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
         <div class="kv"><span class="k">Held now</span><span class="tnum"><?= function_exists('mkt_escrow_totals') ? e(($currency ?? '₹')) . number_format((float)(mkt_escrow_totals()['HELD'] ?? 0)) : '—' ?></span></div>
       </div>
     </div>
+    <div class="panel" style="border-left:3px solid var(--brand)"><div class="ph"><h3>Compliance rules &amp; fees</h3><span class="note"><a href="/compliance-rules">Manage ›</a></span></div>
+      <div class="pb">
+        <div class="kv"><span class="k">What it is</span><span>Versioned, effective-dated GST / SAC / RCM / TDS / TCS rules + the marketplace fee engine</span></div>
+        <div class="kv"><span class="k">Live rules</span><span class="tnum"><?= function_exists('mkt_rules_current') ? count(mkt_rules_current()) : 0 ?> in force</span></div>
+        <div class="kv"><span class="k">Nature</span><span>Config only · no hard-coded tax · history immutable</span></div>
+      </div>
+    </div>
     <div class="panel"><div class="ph"><h3>Subscription &amp; billing</h3><span class="note"><a href="/billing">Manage ›</a></span></div>
       <div class="pb">
         <div class="kv"><span class="k">Gateway</span><span><?= !empty($bill['enabled']) ? '<span class="pill p-ok">Razorpay set</span>' : '<span class="pill p-warn">Not configured</span>' ?></span></div>
