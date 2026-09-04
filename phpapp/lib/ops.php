@@ -2924,6 +2924,8 @@ function ops_dispatch($route, $method) {
             return ops_super_admin($method);
         case $route === 'marketplace-plans':   // Super-Admin: marketplace subscription plans & limits
             return ops_mkt_plans($method);
+        case $route === 'marketplace-escrow':  // Marketplace desk: escrow holds (hold → release/refund)
+            return ops_mkt_escrow($method);
         case $route === 'tenants' || $route === 'tenant-enable' || $route === 'tenant-add'
              || $route === 'tenant-status' || $route === 'tenant-remove'
              || $route === 'cpanel-save' || $route === 'cpanel-test':

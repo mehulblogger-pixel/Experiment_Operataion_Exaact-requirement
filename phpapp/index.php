@@ -108,6 +108,7 @@ try {
     require __DIR__ . '/lib/mkt_subs.php';         // Marketplace subscriptions, access & usage limits
     require __DIR__ . '/lib/mkt_credits.php';       // Marketplace credit packs (top-ups when limits exhaust)
     require __DIR__ . '/lib/mkt_pay.php';           // Marketplace payment capture (Razorpay for subscriptions & packs)
+    require __DIR__ . '/lib/mkt_escrow.php';        // Marketplace escrow lifecycle (hold → release/refund; gateway-off)
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';
