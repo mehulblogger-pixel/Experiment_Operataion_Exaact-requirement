@@ -55,7 +55,53 @@ function connect_pro_migrate() {
         // Forgot-password: a short-lived reset token (mirrors the client-portal invite pattern).
         ensure_column('cx_professionals', 'reset_token', "VARCHAR(64) DEFAULT ''");
         ensure_column('cx_professionals', 'reset_expires', "VARCHAR(30) DEFAULT ''");
+        // Tax identity — captured so a freelancer's OWN invoice (issued by them, not the
+        // platform) carries the right details. The platform is a facilitator/tool: each
+        // supplier owns their GST. Default UNREGISTERED (below the threshold) — the honest
+        // starting point for most individual professionals.
+        ensure_column('cx_professionals', 'gst_status', "VARCHAR(14) DEFAULT 'UNREGISTERED'");
+        ensure_column('cx_professionals', 'gstin', "VARCHAR(20) DEFAULT ''");
+        ensure_column('cx_professionals', 'pan', "VARCHAR(12) DEFAULT ''");
     }
+}
+
+/**
+ * Validate the FORMAT of a GSTIN (15 chars: 2-digit state + 10-char PAN + entity digit +
+ * 'Z' + checksum). This is a format check, not a live government lookup — enough to stop
+ * a typo becoming a wrong number on an invoice. Empty is treated as "not provided".
+ */
+function connect_pro_gstin_valid($gstin) {
+    $g = strtoupper(trim((string)$gstin));
+    return $g !== '' && (bool)preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/', $g);
+}
+/** Validate the FORMAT of a PAN (AAAAA9999A). Empty = not provided. */
+function connect_pro_pan_valid($pan) {
+    $p = strtoupper(trim((string)$pan));
+    return $p !== '' && (bool)preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $p);
+}
+
+/**
+ * Save a professional's tax identity (GST status + GSTIN + PAN), with validation.
+ * Returns [ok, message]. A registered professional must give a well-formed GSTIN; an
+ * unregistered one carries no GSTIN (it is cleared). PAN is optional but, if given,
+ * must be well-formed. The platform never invents a number on anyone's behalf.
+ */
+function connect_pro_tax_save($id, array $in) {
+    connect_pro_migrate();
+    $id = (int)$id; if ($id <= 0) return [false, 'Unknown professional.'];
+    $status = strtoupper(trim((string)($in['gst_status'] ?? 'UNREGISTERED'))) === 'REGISTERED' ? 'REGISTERED' : 'UNREGISTERED';
+    $gstin = strtoupper(trim((string)($in['gstin'] ?? '')));
+    $pan   = strtoupper(trim((string)($in['pan'] ?? '')));
+    if ($pan !== '' && !connect_pro_pan_valid($pan)) return [false, 'That PAN does not look right — it should be like AAAAA9999A.'];
+    if ($status === 'REGISTERED') {
+        if (!connect_pro_gstin_valid($gstin)) return [false, 'A registered professional needs a valid 15-character GSTIN (e.g. 24ABCDE1234F1Z5).'];
+        // The PAN sits inside the GSTIN (chars 3–12); offer it back if not separately given.
+        if ($pan === '') $pan = substr($gstin, 2, 10);
+    } else {
+        $gstin = ''; // unregistered → no GSTIN on their invoice
+    }
+    db()->prepare("UPDATE cx_professionals SET gst_status=?, gstin=?, pan=? WHERE id=?")->execute([$status, $gstin, $pan, $id]);
+    return [true, $status === 'REGISTERED' ? 'GST details saved — your invoices will show your GSTIN.' : 'Saved — you are marked as not registered under GST.'];
 }
 
 /**
@@ -616,6 +662,10 @@ function connect_pro_route($route, $method) {
                 } elseif ($act === 'save_mobility' && function_exists('connect_geo_save_mobility')) {
                     connect_geo_save_mobility((int)$me['id'], $_POST);
                     redirect('/pro/profile#mobility');
+                } elseif ($act === 'save_tax' && function_exists('connect_pro_tax_save')) {
+                    [$tok, $tmsg] = connect_pro_tax_save((int)$me['id'], $_POST);
+                    $_SESSION['pro_flash'] = $tmsg;
+                    redirect('/pro/profile#tax');
                 } else {
                     connect_pro_profile_save((int)$me['id'], $_POST);
                     if (function_exists('connect_channel_set_consent')) connect_channel_set_consent((int)$me['id'], $_POST); // #5 — channel opt-ins

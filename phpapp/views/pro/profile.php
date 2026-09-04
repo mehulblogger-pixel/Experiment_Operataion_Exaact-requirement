@@ -83,6 +83,32 @@
   <button class="btn" type="submit" style="width:100%">Save identity</button>
 </form>
 
+<?php // ---- Tax & invoicing — the professional's OWN GST identity ---- ?>
+<?php $gstReg = strtoupper((string)($me['gst_status'] ?? 'UNREGISTERED')) === 'REGISTERED'; ?>
+<div class="card" id="tax">
+  <h2>Tax &amp; invoicing details</h2>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">When you invoice a client, the invoice is <b>your own</b> — issued in your name. This platform is only the tool that produces it. Tell us your GST position so your invoices are correct.</p>
+  <form method="post" action="/pro/profile">
+    <input type="hidden" name="action" value="save_tax">
+    <label style="display:flex;gap:9px;align-items:flex-start;margin:8px 0;padding:9px 11px;border:1px solid var(--line,#e3e3e3);border-radius:9px">
+      <input type="radio" name="gst_status" value="UNREGISTERED" <?= $gstReg ? '' : 'checked' ?> onclick="document.getElementById('gstinBlk').classList.add('hide')">
+      <span><b>I am not registered under GST</b><span class="muted" style="display:block;font-size:12.5px">Most individual freelancers below the turnover threshold. Your invoices carry no GST.</span></span>
+    </label>
+    <label style="display:flex;gap:9px;align-items:flex-start;margin:8px 0;padding:9px 11px;border:1px solid var(--line,#e3e3e3);border-radius:9px">
+      <input type="radio" name="gst_status" value="REGISTERED" <?= $gstReg ? 'checked' : '' ?> onclick="document.getElementById('gstinBlk').classList.remove('hide')">
+      <span><b>I am registered under GST</b><span class="muted" style="display:block;font-size:12.5px">You have a GSTIN and charge GST. Your invoices will show it, and you file &amp; pay your own GST.</span></span>
+    </label>
+    <div id="gstinBlk" class="<?= $gstReg ? '' : 'hide' ?>">
+      <label>Your GSTIN</label>
+      <input name="gstin" value="<?= e($me['gstin'] ?? '') ?>" placeholder="e.g. 24ABCDE1234F1Z5" maxlength="15" style="text-transform:uppercase">
+    </div>
+    <label>PAN <span class="muted" style="font-weight:400">(optional — used for TDS)</span></label>
+    <input name="pan" value="<?= e($me['pan'] ?? '') ?>" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform:uppercase">
+    <button class="btn" type="submit" style="width:100%;margin-top:12px">Save tax details</button>
+  </form>
+  <p class="muted" style="margin:10px 0 0;font-size:12px">You are solely responsible for the correctness, filing and payment of your own taxes. The platform is a facilitator and is not the supplier of your services.</p>
+</div>
+
 <?php // ---- 2. EXPERTISE — taxonomy drill-down + suggestions (multi) ---- ?>
 <div class="card" id="expertise">
   <h2>Technical expertise</h2>
