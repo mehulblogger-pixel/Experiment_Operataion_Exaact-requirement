@@ -785,16 +785,20 @@ function portal_route($route, $method) {
     $u = portal_user();
 
     switch ($route) {
-        case 'portal/plans':   // Slice 3/4 — the client's marketplace subscription, plan & credit top-ups
+        case 'portal/plans':   // Slice 3/4/6 — the client's subscription, credit top-ups & payment
             if ($method === 'POST') {
-                $pact = (string)($_POST['action'] ?? '');
-                if ($pact === 'buy_pack' && function_exists('mkt_credit_buy')) {
-                    [$bok, $bmsg] = mkt_credit_buy('CLIENT', portal_partner_id(), (int)($_POST['pack_id'] ?? 0), portal_client_name());
-                    $_SESSION['portal_flash'] = $bmsg;
-                } elseif (function_exists('mkt_subscribe')) {
-                    [$ok, $msg] = mkt_subscribe('CLIENT', portal_partner_id(), (int)($_POST['plan_id'] ?? 0), (string)($_POST['period'] ?? 'MONTH'), portal_client_name());
-                    $_SESSION['portal_flash'] = $msg;
-                }
+                $party = portal_partner_id(); $who = portal_client_name();
+                $pack  = (string)($_POST['action'] ?? '') === 'buy_pack';
+                $purpose = $pack ? 'PACK' : 'SUB';
+                $refId   = $pack ? (int)($_POST['pack_id'] ?? 0) : (int)($_POST['plan_id'] ?? 0);
+                $period  = (string)($_POST['period'] ?? 'MONTH');
+                // Slice 6 — take the money first when Razorpay is configured and there is a
+                // price to charge; otherwise (no keys, or a free/promo price) activate now.
+                $start = function_exists('mkt_pay_start') ? mkt_pay_start('CLIENT', $party, $purpose, $refId, $period, $who) : ['mode' => 'unconfigured'];
+                if (($start['mode'] ?? '') === 'pay')   redirect('/portal/pay?o=' . (int)$start['row_id']);
+                if (($start['mode'] ?? '') === 'error') { $_SESSION['portal_flash'] = $start['msg']; redirect('/portal/plans'); }
+                if ($pack && function_exists('mkt_credit_buy'))      { [$bok, $bmsg] = mkt_credit_buy('CLIENT', $party, $refId, $who); $_SESSION['portal_flash'] = $bmsg; }
+                elseif (!$pack && function_exists('mkt_subscribe'))  { [$ok, $msg]  = mkt_subscribe('CLIENT', $party, $refId, $period, $who); $_SESSION['portal_flash'] = $msg; }
                 redirect('/portal/plans');
             }
             portal_view('plans', [
@@ -805,7 +809,22 @@ function portal_route($route, $method) {
                 'currency'     => function_exists('mkt_currency') ? mkt_currency() : '₹',
                 'annualMonths' => function_exists('mkt_annual_months') ? mkt_annual_months() : 10,
                 'party'        => portal_partner_id(),
+                'payOn'        => function_exists('mkt_pay_configured') && mkt_pay_configured(),
             ]);
+            exit;
+
+        case 'portal/pay':   // Slice 6 — Razorpay checkout for a subscription / credit pack
+            $party = portal_partner_id();
+            if ($method === 'POST') {
+                [$ok, $msg] = function_exists('mkt_pay_verify')
+                    ? mkt_pay_verify((string)($_POST['razorpay_order_id'] ?? ''), (string)($_POST['razorpay_payment_id'] ?? ''), (string)($_POST['razorpay_signature'] ?? ''))
+                    : [false, 'Payment is not available.'];
+                $_SESSION['portal_flash'] = $msg;
+                redirect('/portal/plans');
+            }
+            $row = function_exists('mkt_pay_order') ? mkt_pay_order((int)($_GET['o'] ?? 0), 'CLIENT', $party) : null;
+            if (!$row || (string)$row['status'] !== 'PENDING') { $_SESSION['portal_flash'] = 'That payment is no longer available.'; redirect('/portal/plans'); }
+            mkt_pay_render_checkout($row, '/portal/pay', '/portal/plans', mkt_pay_label((string)$row['purpose'], (int)$row['ref_id'], (string)$row['period']));
             exit;
 
         case 'portal':

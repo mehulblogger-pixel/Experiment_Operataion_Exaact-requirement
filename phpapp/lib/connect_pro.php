@@ -677,16 +677,20 @@ function connect_pro_route($route, $method) {
             $applied = connect_pro_applied_map((int)$me['id']);
             connect_pro_view('jobs', ['me' => $me, 'rows' => $rows, 'applied' => $applied, 'q' => $q, 'showAll' => $showAll]); exit;
 
-        case 'pro/plans':   // Slice 3/4 — the professional's marketplace membership, plan & credit top-ups
+        case 'pro/plans':   // Slice 3/4/6 — the professional's membership, credit top-ups & payment
             if ($method === 'POST') {
-                $pact = (string)($_POST['action'] ?? '');
-                if ($pact === 'buy_pack' && function_exists('mkt_credit_buy')) {
-                    [$bok, $bmsg] = mkt_credit_buy('PRO', (int)$me['id'], (int)($_POST['pack_id'] ?? 0), (string)$me['name']);
-                    $_SESSION['pro_flash'] = $bmsg;
-                } elseif (function_exists('mkt_subscribe')) {
-                    [$ok, $msg] = mkt_subscribe('PRO', (int)$me['id'], (int)($_POST['plan_id'] ?? 0), (string)($_POST['period'] ?? 'MONTH'), (string)$me['name']);
-                    $_SESSION['pro_flash'] = $msg;
-                }
+                $meId = (int)$me['id']; $who = (string)$me['name'];
+                $pack = (string)($_POST['action'] ?? '') === 'buy_pack';
+                $purpose = $pack ? 'PACK' : 'SUB';
+                $refId   = $pack ? (int)($_POST['pack_id'] ?? 0) : (int)($_POST['plan_id'] ?? 0);
+                $period  = (string)($_POST['period'] ?? 'MONTH');
+                // Slice 6 — collect payment first when Razorpay is configured and there is a
+                // price; otherwise (no keys, or a free/promo price) activate immediately.
+                $start = function_exists('mkt_pay_start') ? mkt_pay_start('PRO', $meId, $purpose, $refId, $period, $who) : ['mode' => 'unconfigured'];
+                if (($start['mode'] ?? '') === 'pay')   redirect('/pro/pay?o=' . (int)$start['row_id']);
+                if (($start['mode'] ?? '') === 'error') { $_SESSION['pro_flash'] = $start['msg']; redirect('/pro/plans'); }
+                if ($pack && function_exists('mkt_credit_buy'))     { [$bok, $bmsg] = mkt_credit_buy('PRO', $meId, $refId, $who); $_SESSION['pro_flash'] = $bmsg; }
+                elseif (!$pack && function_exists('mkt_subscribe')) { [$ok, $msg]  = mkt_subscribe('PRO', $meId, $refId, $period, $who); $_SESSION['pro_flash'] = $msg; }
                 redirect('/pro/plans');
             }
             connect_pro_view('plans', [
@@ -699,7 +703,22 @@ function connect_pro_route($route, $method) {
                 'enforce'      => function_exists('mkt_enforce_on') && mkt_enforce_on(),
                 'currency'     => function_exists('mkt_currency') ? mkt_currency() : '₹',
                 'annualMonths' => function_exists('mkt_annual_months') ? mkt_annual_months() : 10,
+                'payOn'        => function_exists('mkt_pay_configured') && mkt_pay_configured(),
             ]); exit;
+
+        case 'pro/pay':   // Slice 6 — Razorpay checkout for a membership / credit pack
+            $meId = (int)$me['id'];
+            if ($method === 'POST') {
+                [$ok, $msg] = function_exists('mkt_pay_verify')
+                    ? mkt_pay_verify((string)($_POST['razorpay_order_id'] ?? ''), (string)($_POST['razorpay_payment_id'] ?? ''), (string)($_POST['razorpay_signature'] ?? ''))
+                    : [false, 'Payment is not available.'];
+                $_SESSION['pro_flash'] = $msg;
+                redirect('/pro/plans');
+            }
+            $row = function_exists('mkt_pay_order') ? mkt_pay_order((int)($_GET['o'] ?? 0), 'PRO', $meId) : null;
+            if (!$row || (string)$row['status'] !== 'PENDING') { $_SESSION['pro_flash'] = 'That payment is no longer available.'; redirect('/pro/plans'); }
+            mkt_pay_render_checkout($row, '/pro/pay', '/pro/plans', mkt_pay_label((string)$row['purpose'], (int)$row['ref_id'], (string)$row['period']));
+            exit;
 
         case 'pro/applications':   // A2 — track my applications (+ withdraw)
             if ($method === 'POST' && ($_POST['action'] ?? '') === 'withdraw') {

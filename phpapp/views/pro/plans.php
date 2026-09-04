@@ -2,7 +2,7 @@
   // Slice 3 — the professional's marketplace membership. Free during the launch promo,
   // then a plan (Free / Plus / Top-Rank).
   $me = $me ?? []; $plans = $plans ?? []; $current = $current ?? null; $packs = $packs ?? [];
-  $free = !empty($free); $freeUntil = (string)($freeUntil ?? ''); $enforce = !empty($enforce);
+  $free = !empty($free); $freeUntil = (string)($freeUntil ?? ''); $enforce = !empty($enforce); $payOn = !empty($payOn);
   $cur = $currency ?? '₹'; $am = (int)($annualMonths ?? 10); $meId = (int)($me['id'] ?? 0);
   $money = fn($n) => e($cur) . number_format((float)$n);
   $limLabel = function_exists('mkt_limit_keys') ? mkt_limit_keys() : [];
@@ -66,4 +66,4 @@
   </div>
 <?php endif; ?>
 
-<p class="muted" style="font-size:12px;margin-top:14px">Subscribing and buying credits records your plan/purchase and its period. (Online payment capture is being added — for now this activates it.)</p>
+<p class="muted" style="font-size:12px;margin-top:14px"><?php if ($payOn): ?>Payment is by secure Razorpay checkout — your plan or credits activate the moment the payment is confirmed.<?php else: ?>Subscribing and buying credits records your plan/purchase and its period. (Online payment is not switched on yet — for now this activates it directly.)<?php endif; ?></p>

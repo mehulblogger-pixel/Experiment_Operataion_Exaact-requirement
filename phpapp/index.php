@@ -33,7 +33,7 @@ header('Permissions-Policy: geolocation=(self), camera=(self), microphone=(), pa
 // Razorpay's checkout runs from its own domain in an iframe, so the payment
 // page (and only that page) has to be allowed to load and talk to it. Every
 // other page keeps the tight policy.
-$onPay = (bool)preg_match('#^/(billing-order|buy)(\?|$)#', (string)($_SERVER['REQUEST_URI'] ?? ''));
+$onPay = (bool)preg_match('#^/(billing-order|buy|portal/pay|pro/pay)(\?|$)#', (string)($_SERVER['REQUEST_URI'] ?? ''));
 $rzpScript = $onPay ? ' https://checkout.razorpay.com' : '';
 $rzpFrame  = $onPay ? ' https://api.razorpay.com https://checkout.razorpay.com' : '';
 $rzpConn   = $onPay ? ' https://api.razorpay.com https://lumberjack.razorpay.com' : '';
@@ -107,6 +107,7 @@ try {
     require __DIR__ . '/lib/mkt_plans.php';        // Marketplace subscription plans & limits (Super-Admin owned)
     require __DIR__ . '/lib/mkt_subs.php';         // Marketplace subscriptions, access & usage limits
     require __DIR__ . '/lib/mkt_credits.php';       // Marketplace credit packs (top-ups when limits exhaust)
+    require __DIR__ . '/lib/mkt_pay.php';           // Marketplace payment capture (Razorpay for subscriptions & packs)
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';

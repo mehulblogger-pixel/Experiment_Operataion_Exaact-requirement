@@ -431,6 +431,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('mkt_plans_migrate')) mkt_plans_migrate();                // Marketplace subscription plans & limits (Super-Admin owned)
     if (function_exists('mkt_subs_migrate')) mkt_subs_migrate();                  // Marketplace subscriptions, access & usage
     if (function_exists('mkt_credits_migrate')) mkt_credits_migrate();            // Marketplace credit packs (top-ups when limits exhaust)
+    if (function_exists('mkt_pay_migrate')) mkt_pay_migrate();                    // Marketplace payment capture (Razorpay orders)
     if (function_exists('pdso_gate_migrate')) pdso_gate_migrate();                // Stage 7 — dep_gate_pass (mobilization gate pass)
     if (function_exists('books_migrate')) books_migrate();             // ensure the books ledger tables exist before anything stamps them
     if (function_exists('engagement_migrate')) engagement_migrate();   // Revamp — first-class Engagement entity (additive; dual-read with contract_number)

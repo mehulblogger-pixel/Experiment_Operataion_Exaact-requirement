@@ -2,7 +2,7 @@
   // Slice 3/4 — the client's marketplace subscription. Pick a plan (monthly or annual),
   // and top up with credit packs when a monthly limit runs out.
   $plans = $plans ?? []; $current = $current ?? null; $enforce = !empty($enforce);
-  $packs = $packs ?? [];
+  $packs = $packs ?? []; $payOn = !empty($payOn);
   $cur = $currency ?? '₹'; $am = (int)($annualMonths ?? 10); $party = (int)($party ?? 0);
   $money = fn($n) => e($cur) . number_format((float)$n);
   $limLabel = function_exists('mkt_limit_keys') ? mkt_limit_keys() : [];
@@ -67,4 +67,4 @@
   </div>
 <?php endif; ?>
 
-<p class="muted" style="font-size:12px;margin-top:14px;max-width:760px">Subscribing and buying credits records your plan/purchase and its period. (Online payment capture is being added — for now this activates it.)</p>
+<p class="muted" style="font-size:12px;margin-top:14px;max-width:760px"><?php if ($payOn): ?>Payment is by secure Razorpay checkout — your plan or credits activate the moment the payment is confirmed.<?php else: ?>Subscribing and buying credits records your plan/purchase and its period. (Online payment is not switched on yet — for now this activates it directly.)<?php endif; ?></p>
