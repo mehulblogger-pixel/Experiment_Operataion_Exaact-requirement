@@ -820,6 +820,29 @@ function portal_route($route, $method) {
             ]);
             exit;
 
+        case 'portal/reputation':   // Review & Reputation — our payer reputation + report an unfair rating
+            $party = portal_partner_id();
+            if ($method === 'POST' && (string)($_POST['action'] ?? '') === 'report_rating' && function_exists('cx_rating_dispute_raise')) {
+                $rid = (int)($_POST['rating_id'] ?? 0);
+                $rt  = function_exists('cx_rating_get') ? cx_rating_get($rid) : null;
+                if ($rt && (int)$rt['ratee_party_id'] === (int)$party && strtoupper((string)$rt['direction']) === 'PRO_TO_CLIENT') {
+                    $nid = cx_rating_dispute_raise($rid, ['category' => (string)($_POST['category'] ?? 'UNFAIR'), 'detail' => (string)($_POST['detail'] ?? ''),
+                        'raised_by_kind' => 'CLIENT', 'raised_by_id' => (int)$party, 'raised_by_name' => portal_client_name(), 'subject' => 'Client reports a professional rating']);
+                    $_SESSION['portal_flash'] = $nid ? 'Reported — the moderation desk will review this rating.' : 'That rating already has an open report.';
+                } else $_SESSION['portal_flash'] = 'That rating could not be reported.';
+                redirect('/portal/reputation');
+            }
+            $about = ops_all("SELECT * FROM cx_ratings WHERE ratee_party_id=? AND direction='PRO_TO_CLIENT' ORDER BY id DESC", [(int)$party]) ?: [];
+            foreach ($about as &$rr) { $rr['_disputed'] = (bool) ops_val("SELECT id FROM cx_rating_disputes WHERE rating_id=? AND status IN ('OPEN','UNDER_REVIEW') LIMIT 1", [(int)$rr['id']]); }
+            unset($rr);
+            portal_view('reputation', [
+                'summary'    => function_exists('cx_rating_summary_for_client') ? cx_rating_summary_for_client($party) : [],
+                'ratings'    => $about,
+                'payLabels'  => function_exists('cx_rating_payment_statuses') ? cx_rating_payment_statuses() : [],
+                'categories' => function_exists('cx_rating_dispute_categories') ? cx_rating_dispute_categories() : [],
+            ]);
+            exit;
+
         case 'portal/pay':   // Slice 6 — Razorpay checkout for a subscription / credit pack
             $party = portal_partner_id();
             if ($method === 'POST') {

@@ -34,6 +34,16 @@
       <?php if (!empty($r['work_type'])): ?> · <?= e(str_replace('_',' ',$r['work_type'])) ?><?php endif; ?>
     </div>
     <?php if (($r['rate_min'] ?? 0) || ($r['rate_max'] ?? 0)): ?><div style="font-weight:600">₹<?= (int)$r['rate_min'] ?>–<?= (int)$r['rate_max'] ?> <?= e($r['rate_unit']) ?></div><?php endif; ?>
+    <?php // Client payer reputation — so you know how this client pays before you apply.
+      if (!empty($r['poster_party_id']) && function_exists('cx_rating_summary_for_client')):
+        $crep = cx_rating_summary_for_client((int)$r['poster_party_id']);
+        if (($crep['count'] ?? 0) > 0): ?>
+      <div style="margin-top:6px;font-size:12.5px;color:var(--muted)">Client:
+        <b style="color:var(--ink)"><?= number_format((float)$crep['avg_stars'], 1) ?>★</b>
+        <?php if (($crep['paid_fair_pct'] ?? null) !== null): ?> · <b style="color:<?= (int)$crep['paid_fair_pct'] >= 70 ? 'var(--teal)' : '#8a5a00' ?>"><?= (int)$crep['paid_fair_pct'] ?>% pay on time</b><?php endif; ?>
+        <span class="muted">(<?= (int)$crep['count'] ?> review<?= (int)$crep['count']===1?'':'s' ?>)</span>
+      </div>
+    <?php endif; endif; ?>
     <?php if (!empty($r['description'])): ?><p class="muted" style="font-size:13.5px;margin:8px 0 0;white-space:pre-line"><?= e($r['description']) ?></p><?php endif; ?>
     <?php if ($done): ?>
       <p style="color:var(--ok);font-weight:600;margin:10px 0 0">✓ You have applied</p>

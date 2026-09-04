@@ -455,3 +455,29 @@ encoded:** a `FINDING` dispute (about whether the material passed or was rejecte
 has `affects_fee = 0` — it is settled by review and **never** by withholding the
 professional's fee (`cx_dispute_affects_fee()`). Staff gate reuses
 coordinator/master (`connect_market_can`) — **no new permission**.
+
+## Connect Rating-Integrity Dispute (`cx_rating_disputes.status`) — Review & Reputation
+
+A concern raised about a **rating itself** (not the job): a party believes a rating
+about them is unfair, factually wrong, retaliatory or fraudulent. Distinct from the
+work/fee dispute above. `lib/connect_rating_disputes.php`,
+`CX_RDISPUTE_TRANSITIONS`. Additive `cx_rating_disputes` table; the only existing
+object touched is `cx_ratings`, gaining additive `hidden` / `moderation_note` columns
+(a removed rating is **hidden, never deleted** — the record is kept for audit).
+
+> **OPEN → UNDER_REVIEW → RESOLVED**, plus **WITHDRAWN** as an off-ramp.
+
+- `OPEN → UNDER_REVIEW | RESOLVED | WITHDRAWN`
+- `UNDER_REVIEW → RESOLVED | WITHDRAWN`
+- Terminal: `RESOLVED` (records an **outcome** + note + who/when), `WITHDRAWN`.
+  Enforced by `cx_rating_dispute_can_transition()`.
+
+Categories: `UNFAIR`, `FACTUAL`, `RETALIATORY`, `FRAUDULENT`, `OTHER`. On `RESOLVED`
+the desk records one outcome: **`UPHELD`** (the rating stands), **`ANNOTATED`** (a
+public note is attached to the rating), or **`REMOVED`** (the rating's `hidden=1`, so
+every reputation summary excludes it). Raising is done by the affected party
+(professional via `/pro/reputation`, client via `/portal/reputation`, each scoped to
+ratings **about themselves**) or by staff on their behalf — **no new permission** on
+either side. The investigation desk (`/rating-disputes`) reuses the marketplace
+moderation gate (`connect_market_can`) — **no new permission**, exactly like the K9b
+dispute and the verification desk.

@@ -409,6 +409,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('connect_market_migrate')) connect_market_migrate();      // Connect K2a — cx_requirements + cx_applications (marketplace)
     if (function_exists('connect_ratings_migrate')) connect_ratings_migrate();    // Connect K9 — cx_ratings (two-way marketplace ratings)
     if (function_exists('connect_disputes_migrate')) connect_disputes_migrate();  // Connect K9b — cx_disputes (marketplace disputes)
+    if (function_exists('connect_rating_disputes_migrate')) connect_rating_disputes_migrate(); // Review & Reputation — cx_rating_disputes
     if (function_exists('connect_govern_migrate')) connect_govern_migrate();      // Connect K10 — cx_terms + cx_readiness (Part-F F1/F3)
     if (function_exists('connect_pro_migrate')) connect_pro_migrate();            // Connect A1 — cx_professionals (self-registered freelancer pool)
     if (function_exists('connect_qualtax_augment_professional')) connect_qualtax_augment_professional();  // #2 — add ITI→MBA profile columns once cx_professionals exists

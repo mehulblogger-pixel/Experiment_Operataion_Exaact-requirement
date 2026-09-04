@@ -61,6 +61,8 @@ function ops_area_def($area) {
                 $t(true, '🎓', 'Qualification taxonomy', '/connect-qualifications', 'ITI → diploma → engineer → MBA ladder, job families, roles and certifications.');
                 $t(true, '✅', 'Verification desk', '/connect-verify', 'Confirm identity & credential checks; move professionals up the trust ladder.',
                     $num(fn() => $fx('connect_verify_pending_count') ? connect_verify_pending_count() : 0), 'amber');
+                $t(true, '⚖️', 'Rating-integrity desk', '/rating-disputes', 'Investigate reported ratings; uphold, annotate or remove them from scores.',
+                    $num(fn() => $fx('cx_rating_disputes_open_count') ? cx_rating_disputes_open_count() : 0), 'amber');
                 $t(true, '💬', 'Messages', '/connect-messages', 'Two-way chat with applicants, tied to each requirement.',
                     $num(fn() => $fx('connect_msg_staff_unread') ? connect_msg_staff_unread() : 0));
                 $t(true, '📲', 'Channels', '/connect-channels', 'WhatsApp / SMS / email alerts, templates and delivery log.');

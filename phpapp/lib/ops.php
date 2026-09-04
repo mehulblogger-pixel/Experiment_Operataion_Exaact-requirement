@@ -3060,6 +3060,8 @@ function ops_dispatch($route, $method) {
             return ops_timesheet($route, $method);
         case $route === 'ratings' || $route === 'ratings-config':
             return ops_ratings($route, $method);
+        case $route === 'rating-disputes':     // Review & Reputation — rating-integrity moderation desk
+            return ops_rating_disputes($method);
         case $route === 'inspector-profile':
             return ops_inspector_profile($route, $method);
         case $route === 'sso':

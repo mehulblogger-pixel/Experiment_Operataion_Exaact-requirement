@@ -286,6 +286,7 @@ try {
     require __DIR__ . '/lib/connect_concierge.php';// Connect K4 — guided requirement builder (conversation-before-forms)
     require __DIR__ . '/lib/connect_ratings.php';  // Connect K9 — two-way ratings on a marketplace engagement
     require __DIR__ . '/lib/connect_disputes.php'; // Connect K9b — disputes & mediation on a marketplace engagement
+    require __DIR__ . '/lib/connect_rating_disputes.php'; // Review & Reputation — rating-integrity disputes (report an unfair rating → investigate)
     require __DIR__ . '/lib/connect_govern.php';   // Connect K10 — commercial terms + site-readiness (Part-F F1/F3)
     require __DIR__ . '/lib/connect_advisor.php';  // Connect K12 — Operations Advisor (readiness + delay-risk verdict, read-only)
     require __DIR__ . '/lib/connect_pro.php';      // Connect A1/A2 — freelancer self-service pool (shared, self-registered)

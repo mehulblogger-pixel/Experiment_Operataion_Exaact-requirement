@@ -783,6 +783,26 @@ function connect_pro_route($route, $method) {
             }
             connect_pro_view('applications', ['me' => $me, 'rows' => connect_pro_applications((int)$me['id'])]); exit;
 
+        case 'pro/reputation':   // Review & Reputation — my rating summary + report an unfair rating
+            if ($method === 'POST' && (string)($_POST['action'] ?? '') === 'report_rating' && function_exists('cx_rating_dispute_raise')) {
+                $rid = (int)($_POST['rating_id'] ?? 0);
+                $rt  = function_exists('cx_rating_get') ? cx_rating_get($rid) : null;
+                if ($rt && (int)$rt['ratee_inspector_id'] === (int)$me['id'] && strtoupper((string)$rt['direction']) === 'CLIENT_TO_PRO') {
+                    $nid = cx_rating_dispute_raise($rid, ['category' => (string)($_POST['category'] ?? 'UNFAIR'), 'detail' => (string)($_POST['detail'] ?? ''),
+                        'raised_by_kind' => 'PRO', 'raised_by_id' => (int)$me['id'], 'raised_by_name' => (string)$me['name'], 'subject' => 'Professional reports a client rating']);
+                    $_SESSION['pro_flash'] = $nid ? 'Reported — the moderation desk will review this rating.' : 'That rating already has an open report.';
+                } else $_SESSION['pro_flash'] = 'That rating could not be reported.';
+                redirect('/pro/reputation');
+            }
+            $mine = ops_all("SELECT * FROM cx_ratings WHERE ratee_inspector_id=? AND direction='CLIENT_TO_PRO' ORDER BY id DESC", [(int)$me['id']]) ?: [];
+            foreach ($mine as &$rr) { $rr['_disputed'] = (bool) ops_val("SELECT id FROM cx_rating_disputes WHERE rating_id=? AND status IN ('OPEN','UNDER_REVIEW') LIMIT 1", [(int)$rr['id']]); }
+            unset($rr);
+            connect_pro_view('reputation', ['me' => $me,
+                'summary'    => function_exists('cx_rating_summary_for_inspector') ? cx_rating_summary_for_inspector((int)$me['id']) : [],
+                'ratings'    => $mine,
+                'categories' => function_exists('cx_rating_dispute_categories') ? cx_rating_dispute_categories() : [],
+            ]); exit;
+
         case 'pro/bookings':   // K20 — my engagements once a job is booked
             connect_pro_view('bookings', [
                 'me'   => $me,

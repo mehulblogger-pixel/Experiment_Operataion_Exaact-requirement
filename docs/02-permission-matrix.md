@@ -148,6 +148,24 @@ reuses the coordinator/moderation level, like other back-office review desks:
   KYC/DigiLocker provider through the same seam later) — never by a deterministic
   format pre-screen alone. No object status or module gate is introduced.
 
+### Rating-integrity desk (Review & Reputation)
+
+Two-way ratings (`cx_ratings`, K9) gain a **payer-reputation** view (a professional
+records how a client paid — on-time / late / partial / unpaid — so a freelancer sees
+a client's reputation before accepting) and a **rating-integrity dispute**
+(`cx_rating_disputes`, lifecycle in `03-object-lifecycles.md`). Adds **no new named
+permission**:
+
+- **Raise a report** on a rating **about oneself**: a **professional** from their own
+  `/pro/reputation` (portal session `cxpid`), a **client** from `/portal/reputation`
+  (scoped to `portal_partner_id()`). Ownership is re-checked in the route — a party can
+  only report a rating whose ratee is themselves.
+- **Investigate & decide** (`/rating-disputes`): reuses the coordinator/moderation
+  level — `connect_market_can()` — like the K9b dispute and the verification desk.
+  Outcome `UPHELD` / `ANNOTATED` / `REMOVED`; a removed rating is hidden from scores,
+  never deleted. No object status (beyond the new object's own) or module gate is
+  introduced.
+
 ### In-app messaging (K15 / #4)
 
 Per-engagement two-way threads (`cx_messages`, keyed to a `cx_applications` row)
