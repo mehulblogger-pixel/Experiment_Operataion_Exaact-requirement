@@ -44,6 +44,11 @@ Charts → … The pending-tasks panel shows "contracts to register" (`ops.php:6
 - **Sales → Finance:** accepted quotes without a contract number surface as "contracts to register" (`ops.php:6306`).
 - **Finance → Operations:** registering + opening the contract floats the order back for calls (see the Branch Manager flow).
 
+**Reconciliation worklists (read-only — change no figure):**
+- **Revenue reconciliation** — `/revenue-reconciliation` (`revrecon.php`, Money → Billing): where a job's legacy invoice figure (`jobs.invoice_amount`) matches neither the net nor gross books-ledger total. Gated to `can_see_salary` / `finance.reconcile` / master.
+- **Cost reconciliation** — `/cost-reconciliation` (`costrecon.php`, Money → Costs & margins): where a job's legacy sub-contractor cost (`jobs.subcon_cost`) disagrees with what a committed month-end cost run put in the ledger (`cost_allocations` `SUBCON`). Same gate. CLI: `php tools/cost-reconciliation.php --list`.
+- Both surface a live count on the system-status attention band. Driving each to **green** is the gate before any legacy reader is switched onto the ledger (a deliberate, separately-validated step — never part of the detector).
+
 **Click-count — most common task:**
 - **Issue an invoice:** `/to-bill` (1) → tick job(s) (1) → "Draft invoice" (1) → **Issue** (1) = **~4 clicks** for a single-job invoice.
 - **Record a receipt:** `/receipts` (1) → New receipt (1) → fill + Save (1) → Allocate (1) = **~4 clicks**.

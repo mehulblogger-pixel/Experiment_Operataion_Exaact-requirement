@@ -399,6 +399,40 @@ function run_schema($withSeeds = true) {
     if (function_exists('po_migrate')) po_migrate();                 // an order remembers its quotation
     widen_file_columns();                                            // uploads need LONGTEXT, not MEDIUMTEXT
     if (function_exists('bills_migrate')) bills_migrate();             // chargeable expenses + their bills
+    if (function_exists('billable_migrate')) billable_migrate();       // Revamp P4 — Billable Event ledger (operational→commercial bridge)
+    if (function_exists('connect_taxonomy_migrate')) { connect_taxonomy_migrate(); connect_taxonomy_seed(); }  // Connect K0 — marketplace industry taxonomy (idempotent, insert-if-empty)
+    if (function_exists('connect_qualtax_migrate')) { connect_qualtax_migrate(); connect_qualtax_seed(); }     // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA ladder; idempotent, insert-if-empty)
+    if (function_exists('connect_tax_graph_migrate')) { connect_tax_graph_migrate(); if (function_exists('connect_tax_generalize')) connect_tax_generalize(); }  // Connect K0+ — build the unified taxonomy graph from the flat masters (idempotent, marker-guarded)
+    if (function_exists('connect_geo_migrate')) { connect_geo_migrate(); if (function_exists('connect_geo_seed')) connect_geo_seed(); }  // Connect K-GEO — structured location master + mobility columns (idempotent)
+    if (function_exists('connect_cred_migrate')) connect_cred_migrate();  // Connect K0+ — passport certifications & project experience (idempotent)
+    if (function_exists('connect_passport_migrate')) connect_passport_migrate();  // Connect K1 — inspectors.passport_token (public passport share key)
+    if (function_exists('connect_market_migrate')) connect_market_migrate();      // Connect K2a — cx_requirements + cx_applications (marketplace)
+    if (function_exists('connect_ratings_migrate')) connect_ratings_migrate();    // Connect K9 — cx_ratings (two-way marketplace ratings)
+    if (function_exists('connect_disputes_migrate')) connect_disputes_migrate();  // Connect K9b — cx_disputes (marketplace disputes)
+    if (function_exists('connect_govern_migrate')) connect_govern_migrate();      // Connect K10 — cx_terms + cx_readiness (Part-F F1/F3)
+    if (function_exists('connect_pro_migrate')) connect_pro_migrate();            // Connect A1 — cx_professionals (self-registered freelancer pool)
+    if (function_exists('connect_qualtax_augment_professional')) connect_qualtax_augment_professional();  // #2 — add ITI→MBA profile columns once cx_professionals exists
+    if (function_exists('connect_geo_augment_professional')) connect_geo_augment_professional();  // Connect K-GEO — structured base/mobility columns on cx_professionals (after the table exists)
+    if (function_exists('connect_verify_migrate')) connect_verify_migrate();                              // Connect K14 / #3 — cx_verifications + verified_at (after cx_professionals exists)
+    if (function_exists('connect_privacy_migrate')) connect_privacy_migrate();                            // Connect K0+ — professional privacy columns + contact-reveal grants (after cx_professionals)
+    if (function_exists('connect_hiring_migrate')) connect_hiring_migrate();                              // Connect K0+ — client saved-search table for the hiring home
+    if (function_exists('connect_identity_migrate')) connect_identity_migrate();                          // Connect K0+ — professional↔inspector identity link ledger (after both person tables)
+    if (function_exists('connect_client_bench_migrate')) connect_client_bench_migrate();                  // Connect K0+ — client private bench / roster (demand-side)
+    if (function_exists('connect_deploy_migrate')) connect_deploy_migrate();                              // Connect K0+ — award→deployment bridge columns on jobs (after jobs + pdso)
+    if (function_exists('connect_reqtemplates_migrate')) connect_reqtemplates_migrate();                  // Connect K0+ — saved requirement templates (client reuse)
+    if (function_exists('connect_msg_migrate')) connect_msg_migrate();                                    // Connect K15 / #4 — cx_messages + cx_message_reads (in-app messaging)
+    if (function_exists('connect_channels_migrate')) { connect_channels_migrate(); connect_channels_seed(); } // Connect K16 / #5 — channel templates + outbound log + consent (after cx_professionals)
+    if (function_exists('connect_bench_migrate')) connect_bench_migrate();                                    // Connect K18 / #7 — cx_bench + cx_bench_alloc (agency private roster)
+    if (function_exists('connect_engage_migrate')) connect_engage_migrate();                                  // Connect K20 — cx_engagements (booking basis on award)
+    if (function_exists('connect_engv_migrate')) connect_engv_migrate();                                      // Connect K21 — cx_engagement_vouchers + lines (inclusive/exclusive claims)
+    if (function_exists('connect_crew_migrate')) connect_crew_migrate();          // Connect M10 — cx_positions (crew manifest)
+    if (function_exists('connect_org_migrate')) connect_org_migrate();            // Connect B0 — cx_organisations (org accounts + entitlements)
+    if (function_exists('connect_cap_migrate')) connect_cap_migrate();            // Connect — cx_org_capabilities (multi-select company capabilities)
+    if (function_exists('mkt_plans_migrate')) mkt_plans_migrate();                // Marketplace subscription plans & limits (Super-Admin owned)
+    if (function_exists('mkt_subs_migrate')) mkt_subs_migrate();                  // Marketplace subscriptions, access & usage
+    if (function_exists('pdso_gate_migrate')) pdso_gate_migrate();                // Stage 7 — dep_gate_pass (mobilization gate pass)
+    if (function_exists('books_migrate')) books_migrate();             // ensure the books ledger tables exist before anything stamps them
+    if (function_exists('engagement_migrate')) engagement_migrate();   // Revamp — first-class Engagement entity (additive; dual-read with contract_number)
     if (function_exists('competence_migrate')) competence_migrate();   // required certificates gate allocation
     if (function_exists('equipment_migrate')) equipment_migrate();     // measuring & test equipment, §6.2
     if (function_exists('samples_migrate')) samples_migrate();         // §7.2 inspection items & samples

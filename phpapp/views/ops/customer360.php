@@ -44,6 +44,14 @@
         <div class="ql">Received, not yet matched</div></div>
     <?php endif; ?>
   <?php endif; ?>
+  <?php // Revamp P4 — unbilled operational work captured as billable events (not yet invoiced).
+    $bill = $billable ?? null;
+    if ($bill !== null && (($bill['pending'] ?? 0) + ($bill['approved'] ?? 0)) > 0): ?>
+    <a class="qcard tone-warn" href="/billable-events?party=<?= (int)$p['id'] ?>">
+      <div class="qic">🧾</div><div class="qn" style="font-size:20px"><?= fmoney_short($bill['unbilled_amt']) ?></div>
+      <div class="ql">Unbilled work<?= ($bill['approved'] ?? 0) ? ' · ' . (int)$bill['approved'] . ' approved' : '' ?></div>
+    </a>
+  <?php endif; ?>
   <?php if ($pipeline !== null): ?>
     <a class="qcard tone-info" href="/opportunities?v=list&amp;q=<?= e(urlencode($name)) ?>">
       <div class="qic">💡</div><div class="qn"><?= count($pipeline['open']) ?></div>
@@ -119,6 +127,27 @@
     </form>
     <div class="ff-help" style="margin-top:6px">Set the parent, and this customer and its group share one quotation history on the quote screen.</div>
   <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php // Billing branch — attach this client to an office, so every invoice for them
+      // is raised from the right branch and never lands on "No branch is set". ?>
+<?php if (!empty($canWrite)): ?>
+<div class="panel" style="margin-top:16px">
+  <h3 style="margin-top:0">Billing branch</h3>
+  <p class="muted" style="font-size:12.5px;margin:0 0 10px">The office every new invoice for this client is raised from — so their invoices are never stuck on “No branch is set”. You can change it any time.</p>
+  <form method="post" action="/customer" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+    <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+    <input type="hidden" name="action" value="set_branch">
+    <div class="ff" style="min-width:260px;margin:0"><label for="hb">Billing branch</label>
+      <select class="form-control searchable" id="hb" name="home_branch_id">
+        <option value="">— not set —</option>
+        <?php foreach (ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name") as $o): ?>
+          <option value="<?= (int)$o['id'] ?>" <?= (int)($p['home_branch_id'] ?? 0) === (int)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <button class="btn small">Save branch</button>
+  </form>
 </div>
 <?php endif; ?>
 

@@ -548,6 +548,138 @@
 </div>
 
 <div class="panel settings-card">
+  <?php $s01 = function_exists('seed_s01_status') ? seed_s01_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S01 — marketplace scenario</h3>
+  <p class="sub" style="margin-bottom:8px">A complete, interconnected <strong>test scenario</strong>: a transmission-technician professional (Arjun Mehta) is discovered on the marketplace, selected by a client, linked to an internal inspector, deployed on a 220&nbsp;kV substation job, inspects, raises a finding, and the client receives an issued report — the whole journey through the <strong>existing</strong> engines, nothing duplicated.</p>
+  <p class="muted" style="margin:0 0 10px">Everything is tagged <code>DEMO-S01</code> and removes cleanly. Logins (password <code>demo12345</code>): professional <code>arjun.s01@demo.test</code> (/pro/login), client <code>client.s01@demo.test</code> (/portal/login), staff <code>coord.s01@demo.test</code> / <code>admin.s01@demo.test</code> / <code>reviewer.s01@demo.test</code> / <code>approver.s01@demo.test</code> (/login).</p>
+  <?php if (!empty($s01['loaded']) || (int)($s01['pros'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s01['pros'] ?? 0) ?> professionals · <?= (int)($s01['report'] ?? 0) ?> report. Re-load to refresh, or remove.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s01" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S01</button></form>
+      <form method="post" action="/seed-scenario-s01-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S01 scenario data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S01</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s01" onsubmit="return confirm('Load the DEMO-S01 marketplace scenario now? It adds namespaced demo records and can be removed in one click.')">
+      <button class="btn" type="submit">Load DEMO-S01 scenario</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line (no time limit): <code>php tools/seed-scenario-s01.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s01.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
+  <?php $s02 = function_exists('seed_s02_status') ? seed_s02_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S02 — agency / bench scenario</h3>
+  <p class="sub" style="margin-bottom:8px">The <strong>manpower-provider</strong> journey: an inspection agency (Apex) keeps a 6-person <strong>bench</strong>, receives a client requirement for 2 inspectors, searches its bench first, finds one strong internal match, spots a <strong>gap of 1</strong>, supplements from the marketplace, both are approved, they convert to one ops job, get scheduled over 30 days (with a conflict + a replacement), inspect, raise a major finding, produce a URFE report with a correction cycle, and the client receives it — margins kept staff-only.</p>
+  <p class="muted" style="margin:0 0 10px">Tagged <code>DEMO-S02</code>, removes cleanly. Logins (password <code>demo12345</code>): Apex staff <code>rajesh.s02@demo.test</code> / <code>priya.s02@demo.test</code> / <code>vikram.s02@demo.test</code> / <code>kavita.s02@demo.test</code> (/login); agency portal <code>agency.s02@demo.test</code> and client <code>client.s02@demo.test</code> (/portal/login).</p>
+  <?php if (!empty($s02['loaded']) || (int)($s02['bench'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s02['bench'] ?? 0) ?> bench professionals · <?= (int)($s02['report'] ?? 0) ?> report.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s02" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S02</button></form>
+      <form method="post" action="/seed-scenario-s02-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S02 scenario data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S02</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s02" onsubmit="return confirm('Load the DEMO-S02 agency scenario now? Adds namespaced demo records; removable in one click.')">
+      <button class="btn" type="submit">Load DEMO-S02 scenario</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s02.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s02.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
+  <?php $s03 = function_exists('seed_s03_status') ? seed_s03_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S03 — client &amp; client-portal foundation</h3>
+  <p class="sub" style="margin-bottom:8px">The <strong>client-side foundation</strong> reused by later scenarios: 6 client organisations (EPC, refinery, manufacturing, power/transmission, renewable, small) — each a single master that is also marketplace-enabled — with branches, 12 locations, 30 contacts across 20+ departments, 20 portal users in five role types (admin / technical / project / commercial / site) with invited/active/suspended lifecycle, and a spread of requirements (5 active · 2 draft · 2 completed · 1 cancelled) for the next prompts to match against.</p>
+  <p class="muted" style="margin:0 0 10px">Tagged <code>DEMO-S03</code>, removes cleanly. Portal logins (password <code>demo12345</code>, /portal/login): e.g. <code>epc.admin.s03@demo.test</code>, <code>epc.tech.s03@demo.test</code>, <code>power.tech.s03@demo.test</code>, <code>epc.commercial.s03@demo.test</code>.</p>
+  <?php if (!empty($s03['loaded']) || (int)($s03['clients'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s03['clients'] ?? 0) ?> clients · <?= (int)($s03['users'] ?? 0) ?> portal users.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s03" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S03</button></form>
+      <form method="post" action="/seed-scenario-s03-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S03 client foundation data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S03</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s03" onsubmit="return confirm('Load the DEMO-S03 client foundation now? Adds namespaced demo clients; removable in one click.')">
+      <button class="btn" type="submit">Load DEMO-S03 client foundation</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s03.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s03.md</code>.</p>
+</div>
+
+<?php if (function_exists('install_mode') && is_master()): $im = install_mode(); $imo = install_mode_options(); ?>
+<div class="panel settings-card">
+  <h3 class="tab-sub" style="margin-top:0;">Install mode <span class="pill <?= $im === 'licence' ? 'p-info' : 'p-ok' ?>" style="font-size:11px"><?= e($imo[$im] ?? $im) ?></span></h3>
+  <p class="sub" style="margin-bottom:8px">Is this the <strong>hosted cloud platform</strong> (companies join a shared marketplace) or a <strong>private licence copy</strong> a customer runs on their own server or laptop (their own operations only, no external marketplace)? Onboarding and the marketplace adapt to this. Set once at install; rarely changed.</p>
+  <form method="post" action="/install-mode-set" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <?php foreach ($imo as $k => $label): ?>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:13.5px;<?= $k === $im ? 'font-weight:600' : '' ?>">
+        <input type="radio" name="install_mode" value="<?= e($k) ?>" <?= $k === $im ? 'checked' : '' ?>> <?= e($label) ?>
+      </label>
+    <?php endforeach; ?>
+    <button class="btn secondary" type="submit" style="padding:4px 12px">Apply</button>
+  </form>
+  <p class="muted" style="margin-top:8px;font-size:12px"><?= $im === 'licence'
+      ? 'Local-only: this copy manages this company’s own people, clients and work. The shared marketplace is off (a future “Marketplace Connect” add-on can bridge to the cloud pool).'
+      : 'Cloud: companies self-register and meet in the shared marketplace.' ?></p>
+</div>
+<?php endif; ?>
+
+<div class="panel settings-card">
+  <?php $s04 = function_exists('seed_s04_status') ? seed_s04_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S04 — marketplace lifecycle (new engines)</h3>
+  <p class="sub" style="margin-bottom:8px">One walkable thread that lights up every capability from this revamp: a multi-capability <strong>supplier agency</strong> with a bench (so applicants show their <em>supplier type</em>), a requirement whose applicants carry a <em>schedule-conflict</em> flag, an awarded requirement <em>deployed to operations</em> (no re-keying), a job that is <em>not cleared for site entry</em> vs one with a <em>gate pass</em>, a <em>no-show</em> engagement that needs cover, a <em>credential verification ladder</em>, and a <em>billing-mismatch</em> flag. Prints a real 10-point PASS/FAIL dashboard.</p>
+  <p class="muted" style="margin:0 0 10px">Tagged <code>DEMO-S04</code>, removes cleanly. Client login (password <code>demo12345</code>, /portal/login): <code>s04.tech@demo.test</code>.</p>
+  <?php if (!empty($s04['loaded']) || (int)($s04['pros'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s04['pros'] ?? 0) ?> applicants · <?= (int)($s04['reqs'] ?? 0) ?> requirements.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s04" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S04</button></form>
+      <form method="post" action="/seed-scenario-s04-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S04 marketplace data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S04</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s04" onsubmit="return confirm('Load the DEMO-S04 marketplace lifecycle now? Adds namespaced demo data; removable in one click.')">
+      <button class="btn" type="submit">Load DEMO-S04 marketplace lifecycle</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s04.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s04.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
+  <?php $s05 = function_exists('seed_s05_status') ? seed_s05_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S05 — convergence &amp; reconciliation (read-only detectors)</h3>
+  <p class="sub" style="margin-bottom:8px">One walkable thread that lights up every <strong>read-only dual-truth detector</strong> from this revamp, with live drifting data: a <em>revenue-reconciliation</em> job whose legacy invoice disagrees with the ledger, a <em>cost-reconciliation</em> job whose sub-contractor cost disagrees with the committed cost ledger, and a recruitment candidate who is also a marketplace professional on the <em>candidate pool</em> — each seeded alongside a reconciled control row, so the detectors prove they flag the drift and leave the matching rows alone. Prints a real 10-point PASS/FAIL dashboard.</p>
+  <p class="muted" style="margin:0 0 10px">Tagged <code>DEMO-S05</code>, removes cleanly. See it at <code>/revenue-reconciliation</code>, <code>/cost-reconciliation</code> and <code>/candidate-pool</code>.</p>
+  <?php if (!empty($s05['loaded']) || (int)($s05['jobs'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s05['jobs'] ?? 0) ?> jobs · <?= (int)($s05['cands'] ?? 0) ?> candidates · <?= (int)($s05['pros'] ?? 0) ?> professional.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s05" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S05</button></form>
+      <form method="post" action="/seed-scenario-s05-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S05 data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S05</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s05" onsubmit="return confirm('Load the DEMO-S05 convergence scenario now? Adds namespaced demo data; removable in one click.')">
+      <button class="btn" type="submit">Load DEMO-S05 convergence &amp; reconciliation</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s05.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s05.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
+  <?php $s06 = function_exists('seed_s06_status') ? seed_s06_status() : ['loaded'=>false]; ?>
+  <h3 class="tab-sub" style="margin-top:0;">DEMO-S06 — gap-closure showcase (the eight residual gaps)</h3>
+  <p class="sub" style="margin-bottom:8px">One walkable thread that lights up every gap closed in the controlled gap-closure program: a marketplace deployment <em>threaded into the engagement &amp; finance spine</em>, the <em>taxonomy counting in inspector matching</em>, an <em>engagement status transition machine</em>, <em>shift-aware conflict</em> (day vs night), the <em>one credential ladder</em> across pools, <em>near-duplicate requirement</em> detection, a <em>part-billed</em> event, and <em>one person resolved across all three identity pools</em>. Prints a real 10-point PASS/FAIL dashboard.</p>
+  <p class="muted" style="margin:0 0 10px">Tagged <code>DEMO-S06</code>, removes cleanly. See it at <code>/candidate</code> (the linked person), <code>/connect-requirements</code>, <code>/billable-events</code>.</p>
+  <?php if (!empty($s06['loaded']) || (int)($s06['reqs'] ?? 0) > 0): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)($s06['reqs'] ?? 0) ?> requirements · <?= (int)($s06['pros'] ?? 0) ?> professionals · <?= (int)($s06['jobs'] ?? 0) ?> jobs.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/seed-scenario-s06" style="margin:0"><button class="btn" type="submit">↻ Reload DEMO-S06</button></form>
+      <form method="post" action="/seed-scenario-s06-remove" style="margin:0" onsubmit="return confirm('Remove all DEMO-S06 data? Your real records are not touched.')"><button class="btn danger" type="submit">🗑 Remove DEMO-S06</button></form>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/seed-scenario-s06" onsubmit="return confirm('Load the DEMO-S06 gap-closure showcase now? Adds namespaced demo data; removable in one click.')">
+      <button class="btn" type="submit">Load DEMO-S06 gap-closure showcase</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/seed-scenario-s06.php</code> — <code>--status</code> / <code>--remove</code>. Full guide: <code>docs/demo-scenario-s06.md</code>.</p>
+</div>
+
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Traceability check</h3>
   <p class="sub" style="margin-bottom:8px">Builds <strong>one</strong> record and follows it the whole way through — customer, lead, contact, deal, quotation, accept, contract number, work-order, job, site check-in, report, invoice, money-in — then reads the database back and shows you, place by place, that every link was saved and every figure is right.</p>
   <p class="muted" style="margin:0 0 10px">Safe to run on a live system: everything it writes is one demo customer (<code><?= e(defined('TRACE_CLIENT_CODE') ? TRACE_CLIENT_CODE : 'GT-CLIENT') ?></code>) and can be removed again in one click on the results page. Use it to prove the flow end-to-end, or after any change to check nothing broke.</p>

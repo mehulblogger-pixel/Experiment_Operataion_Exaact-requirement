@@ -1879,11 +1879,12 @@ function tosrm_ops_metrics($offices = 'ALL') {
     $m['new'] = $one("SELECT COUNT(*) n FROM calls c WHERE (c.op_status IN ('RECEIVED','DRAFT','UNDER_REVIEW') OR (COALESCE(c.op_status,'')='' AND c.status='OPEN')) AND $w");
     $m['today'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.scheduled_date=? AND $w", [$today]);
     $m['overdue'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND c.inspection_required_date<>'' AND c.inspection_required_date<? AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND j.closed_flag=1) AND $w", [$today]);
-    // NOTE (R10): jobs.stage is vestigial (never advanced past the default/CANCELLED),
-    // so this count is effectively always 0. Left as-is to avoid a silent behaviour
-    // change; drive it from a real signal (closed job + report_approval='PENDING') when
-    // this metric is actually needed.
-    $m['report_pending'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.stage='REPORT_PENDING' AND $w");
+    // R10 (fixed, Revamp P5): jobs.stage is vestigial — never advanced past the
+    // default/CANCELLED — so counting j.stage='REPORT_PENDING' was always 0. The
+    // real "report pending" signal is a CLOSED job whose report is still awaiting
+    // the reporting manager's sign-off (report_approval='PENDING'), which is the
+    // live lifecycle field.
+    $m['report_pending'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.closed_flag=1 AND j.report_approval='PENDING' AND $w");
     $m['critical'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.priority='CRITICAL' AND c.status<>'CLOSED' AND $w");
     return $m;
 }

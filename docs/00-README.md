@@ -7,6 +7,12 @@ claim about a permission carries a `file:line` reference so you can verify it.
 > **Read order:** `01-roles.md` → `02-permission-matrix.md` →
 > `03-object-lifecycles.md` → the relevant `04-flows/<role>.md` →
 > `99-gaps-and-risks.md`.
+>
+> **Building or changing a user-facing screen?** Also read
+> `05-ui-ux-blueprint.md` first — the governing UI/UX standard (the product must
+> feel like Uber/Airbnb/LinkedIn/WhatsApp, never an ERP). It sets look, feel, and
+> interaction law, but grants no permissions: the matrix and lifecycles above still
+> bind.
 
 All file references are relative to the `phpapp/` folder unless stated otherwise.
 

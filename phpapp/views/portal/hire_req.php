@@ -1,0 +1,197 @@
+<?php
+// Connect K2b — the client manages one of its own requirements: who applied, and
+// shortlist / offer / award / reject. Ownership is enforced in the route.
+$req = $req ?? []; $apps = $apps ?? []; $req_next = $req_next ?? []; $vouchers = $vouchers ?? [];
+$vinr = fn($n) => '₹' . number_format((int)round((float)$n));
+$vlabel = ['DRAFT'=>['Draft','muted'],'SUBMITTED'=>['Awaiting your review','warn'],'APPROVED'=>['Approved','ok'],'PAID'=>['Paid','ok'],'REJECTED'=>['Returned','err']];
+$pill = function ($s) {
+    $s = strtoupper((string)$s);
+    $map = ['OPEN'=>'ok','SHORTLISTING'=>'ok','AWARDED'=>'ok','ACCEPTED'=>'ok','OFFERED'=>'ok','SHORTLISTED'=>'ok',
+            'APPLIED'=>'muted','DRAFT'=>'muted','CLOSED'=>'muted','WITHDRAWN'=>'muted','CANCELLED'=>'err','REJECTED'=>'err','DECLINED'=>'err','EXPIRED'=>'warn'];
+    return '<span class="ppill '.($map[$s] ?? 'muted').'">'.e(ucfirst(strtolower($s))).'</span>';
+};
+$awardedId = (int)($req['awarded_application_id'] ?? 0);
+$reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting','CLOSED'=>'Close','CANCELLED'=>'Cancel','EXPIRED'=>'Mark expired'];
+?>
+<style>
+  .ppill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .ppill.ok{background:#e7f5ef;color:#0f7d5a}.ppill.warn{background:#fbf3d8;color:#8a6d0b}
+  .ppill.err{background:#f6e6e6;color:#9a2a2a}.ppill.muted{background:#eceff1;color:#5b6b6a}
+  .inl{display:inline}
+</style>
+<p><a href="/portal/hire">← Your requirements</a></p>
+<h2 class="ptitle"><?= e($req['title']) ?> <?= $pill($req['status']) ?></h2>
+<p class="plead"><?= e($req['ref_code']) ?><?php if (!empty($req['location'])): ?> · <?= e($req['location']) ?><?php endif; ?> · <?= (int)$req['positions'] ?> position<?= (int)$req['positions']===1?'':'s' ?></p>
+
+<?php
+  // Terms & estimate — the deputation shape, rate model and (for a fee-only
+  // posting) what is covered on top of the fee, with the client's own ceilings
+  // and a plain estimate. Read-only; the professional sees the same before applying.
+  $est = function_exists('connect_reqterms_estimate') ? connect_reqterms_estimate($req) : null;
+  $rmLabel = function_exists('connect_engage_rate_model_label') ? connect_engage_rate_model_label($req['rate_inclusive'] ?? 'INCLUSIVE') : '';
+  $depLabel = (!empty($req['deputation_basis']) && function_exists('connect_engage_basis_label')) ? connect_engage_basis_label($req['deputation_basis']) : '';
+  $modeLabels = function_exists('connect_reqterms_cover_modes') ? connect_reqterms_cover_modes() : [];
+  if ($est):
+?>
+<div class="pcard" style="max-width:680px">
+  <div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:var(--muted);margin-bottom:8px">Terms &amp; estimate</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:<?= $est['has_estimate'] ? '12px' : '0' ?>">
+    <?php $bits = array_filter([$depLabel, $rmLabel]); echo e(implode(' · ', $bits)); ?>
+  </div>
+  <?php if (!$est['inclusive'] && $est['has_estimate']): ?>
+    <?php foreach ($est['lines'] as $ln): if ($ln['mode']==='IN_RATE') continue; ?>
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:2px 0;color:var(--muted)">
+        <span><?= e($ln['label']) ?> — <?= e($modeLabels[$ln['mode']] ?? $ln['mode']) ?><?php if ($ln['mode']==='CEILING' && $ln['ceiling']>0): ?> <?= e($vinr($ln['ceiling'])) ?><?= $ln['per']==='DAY'?'/day':'/deployment' ?><?php endif; ?></span>
+        <span style="font-variant-numeric:tabular-nums"><?= $ln['amount']>0 ? e($vinr($ln['amount'])) : '' ?></span>
+      </div>
+    <?php endforeach; ?>
+  <?php endif; ?>
+  <?php if ($est['has_estimate']): ?>
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:2px 0;color:var(--muted)"><span>Fee (<?= e($vinr($est['rate'])) ?> × <?= (float)$est['qty'] ?>)</span><span style="font-variant-numeric:tabular-nums"><?= e($vinr($est['fee_total'])) ?></span></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:13px;font-weight:700;padding:4px 0;border-top:1px solid var(--line,#eee);margin-top:4px"><span>Subtotal</span><span style="font-variant-numeric:tabular-nums"><?= e($vinr($est['subtotal'])) ?></span></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:2px 0;color:var(--muted)"><span>GST @ <?= (float)$est['tax_pct'] ?>%</span><span style="font-variant-numeric:tabular-nums"><?= e($vinr($est['tax'])) ?></span></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-top:6px;border-top:1px solid var(--line,#eee);margin-top:4px"><span style="font-weight:700">Invoice total (incl. GST)</span><span style="font-weight:800;font-size:17px;color:#0a5c5c;font-variant-numeric:tabular-nums"><?= e($vinr($est['invoice_total'])) ?></span></div>
+    <?php if ((float)$est['tds_pct'] > 0): ?>
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:4px 0 2px;color:var(--muted)"><span>Less: TDS @ <?= (float)$est['tds_pct'] ?>% (on <?= e($vinr($est['subtotal'])) ?>, pre-GST)</span><span style="font-variant-numeric:tabular-nums">− <?= e($vinr($est['tds'])) ?></span></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding-top:4px;border-top:1px dashed var(--line,#eee)"><span style="font-weight:700">Net payable to supplier</span><span style="font-weight:700;font-size:15px;font-variant-numeric:tabular-nums"><?= e($vinr($est['net_receivable'])) ?></span></div>
+    <?php endif; ?>
+    <?php if ($est['has_actuals']): ?><div style="font-size:11.5px;color:#8a6d0b;margin-top:6px">＋ items marked “at actuals” are claimed on receipts on top of this estimate.</div><?php endif; ?>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px"><?php if (!empty($est['sac'])): ?>SAC/HSN <?= e($est['sac']) ?> · <?php endif; ?>An estimate — the agreed rate is settled at award.</div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($req_next): ?>
+<div class="pcard" style="max-width:680px">
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php foreach ($req_next as $to): if ($to==='AWARDED') continue; ?>
+      <form method="post" action="/portal/hire-req" class="inl">
+        <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="req_transition"><input type="hidden" name="to" value="<?= e($to) ?>">
+        <button class="btn <?= $to==='CANCELLED'?'secondary':'' ?>" type="submit"><?= e($reqLabel[$to] ?? ucfirst(strtolower($to))) ?></button>
+      </form>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
+
+<h3 class="ptitle" style="font-size:16px;margin-top:24px">Applications (<?= count($apps) ?>)</h3>
+<?php if (!$apps): ?>
+  <p class="pempty">No applications yet.</p>
+<?php else: ?>
+  <div class="pcard" style="max-width:680px">
+    <?php foreach ($apps as $a): $st = strtoupper((string)$a['status']);
+      $next = ['APPLIED'=>['SHORTLISTED'=>'Shortlist','REJECTED'=>'Reject'],
+               'SHORTLISTED'=>['OFFERED'=>'Make offer','REJECTED'=>'Reject'],
+               'OFFERED'=>['ACCEPTED'=>'Mark accepted']][$st] ?? []; ?>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line,#eee);flex-wrap:wrap">
+        <div><?php $apid = (int)($a['applicant_professional_id'] ?? 0); $anm = $a['applicant_name'] !== '' ? $a['applicant_name'] : 'Applicant #'.$a['id']; ?>
+          <?php if ($apid > 0): ?><a href="/portal/talent?id=<?= $apid ?>&from=req&rid=<?= (int)$req['id'] ?>" style="text-decoration:none;color:inherit"><strong><?= e($anm) ?></strong> <span style="font-size:12px;color:#0f7d5a">View profile →</span></a><?php else: ?><strong><?= e($anm) ?></strong><?php endif; ?>
+          <?= $pill($a['status']) ?>
+          <?php if ($awardedId === (int)$a['id']): ?><span class="ppill ok">Awarded</span><?php endif; ?>
+          <?php // Stage 7 — flag a scheduling clash or a lapsed credential before this
+                //          person is shortlisted / offered / awarded (against the
+                //          requirement's own dates). Only shown when not clear.
+                if (function_exists('connect_conflict_check') && (int)($a['applicant_professional_id'] ?? 0) > 0):
+                  $cv = connect_conflict_check((int)$a['applicant_professional_id'], (string)($req['start_date'] ?? ''), (string)($req['end_date'] ?? ''));
+                  if (($cv['status'] ?? 'CLEAR') !== 'CLEAR'):
+                    $cb = connect_conflict_badge($cv);
+                    $rz = implode(' · ', array_map(fn($r) => $r['text'], array_slice($cv['reasons'], 0, 3))); ?>
+              <span style="display:inline-block;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;<?= $cb['tone']==='bad'?'background:#fbeceb;color:#9a2a2a':'background:#fbf3df;color:#a9720a' ?>" title="<?= e($rz) ?>"><?= $cb['tone']==='bad'?'⛔ ':'⚠ ' ?><?= e($cb['label']) ?></span>
+          <?php endif; endif; ?>
+          <?php if (($a['proposed_rate'] ?? 0)): ?><div style="font-size:12.5px;color:var(--muted)">Proposed ₹<?= (int)$a['proposed_rate'] ?></div><?php endif; ?></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <?php foreach ($next as $to=>$lbl): ?>
+            <form method="post" action="/portal/hire-req" class="inl">
+              <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="application_id" value="<?= (int)$a['id'] ?>"><input type="hidden" name="action" value="app_transition"><input type="hidden" name="to" value="<?= e($to) ?>">
+              <button class="btn secondary" type="submit"><?= e($lbl) ?></button>
+            </form>
+          <?php endforeach; ?>
+          <?php if (in_array($st,['SHORTLISTED','OFFERED'],true) && in_array('AWARDED',$req_next,true)): ?>
+            <form method="post" action="/portal/hire-req" class="inl" onsubmit="return confirm('Award to <?= e(addslashes($a['applicant_name'])) ?>?');">
+              <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="application_id" value="<?= (int)$a['id'] ?>"><input type="hidden" name="action" value="award">
+              <button class="btn" type="submit">🤝 Award</button>
+            </form>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+
+<?php // Stage 5 — marketplace → operations bridge (§20). Once awarded and mobilized
+      //          by our team, the same engagement IS an operational deployment — no
+      //          re-keying. Show the client that link (the operational job).
+      if ($awardedId > 0):
+        $deploy = function_exists('connect_deploy_row_for_requirement') ? connect_deploy_row_for_requirement((int)$req['id']) : null; ?>
+<h3 class="ptitle" style="font-size:16px;margin-top:24px">Deployment</h3>
+<div class="pcard" style="max-width:680px">
+  <?php if ($deploy): ?>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+      <div><span class="ppill ok">✓ Deployed to operations</span>
+        <div class="muted" style="font-size:12.5px;margin-top:3px">Reference <strong><?= e($deploy['job_code'] ?: ('JOB-'.$deploy['id'])) ?></strong><?= !empty($deploy['dep_site']) ? ' · '.e($deploy['dep_site']) : '' ?><?= !empty($deploy['dep_status']) ? ' · '.e(ucfirst(strtolower(str_replace('_',' ',$deploy['dep_status'])))) : '' ?></div></div>
+      <a class="btn secondary" href="/portal/deputations">Track deployment →</a>
+    </div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">This is the same person you awarded — the marketplace engagement became operational work directly, with no re-entry.</p>
+  <?php else: ?>
+    <div class="muted" style="font-size:13.5px">Awarded — our operations team is mobilizing the resource. The deployment reference will appear here.</div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php // Stage 7 — the awarded engagement: end it early (cancel / no-show) with a
+      //          reason, or, if already ended, a "needs cover" prompt to re-source.
+      $eng = $eng ?? null; $eng_kinds = $eng_kinds ?? [];
+      if ($eng): $es = strtoupper((string)($eng['status'] ?? '')); $ck = strtoupper((string)($eng['cancel_kind'] ?? '')); ?>
+<h3 class="ptitle" style="font-size:16px;margin-top:24px">Engagement</h3>
+<div class="pcard" style="max-width:680px">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+    <div><strong><?= e($eng['subject_name'] ?: 'Awarded resource') ?></strong>
+      <div class="muted" style="font-size:12.5px"><?= e(($eng['start_date'] ?? '') . (!empty($eng['end_date']) ? ' → ' . $eng['end_date'] : '')) ?></div></div>
+    <?php if ($es === 'CANCELLED' && $ck !== ''): ?>
+      <span class="ppill" style="background:#fbeceb;color:#9a2a2a"><?= $ck === 'NO_SHOW' ? '⛔ No-show' : '✕ Cancelled' ?></span>
+    <?php else: ?>
+      <span class="ppill ok"><?= e(ucfirst(strtolower($es ?: 'booked'))) ?></span>
+    <?php endif; ?>
+  </div>
+
+  <?php if ($es === 'CANCELLED' && $ck !== ''): ?>
+    <div style="margin-top:10px;padding:11px 13px;border-radius:11px;background:#fff7ea;border:1px solid #efd9a3">
+      <strong style="color:#8a6d0b">⚠ Needs cover</strong>
+      <div style="font-size:13px;margin-top:2px">Ended as <em><?= e($ck === 'NO_SHOW' ? 'a no-show' : 'cancelled') ?></em><?= !empty($eng['cancel_reason']) ? ' — ' . e($eng['cancel_reason']) : '' ?>. The resource is free; source a replacement.</div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn" href="/portal/find">🔎 Find a replacement</a>
+        <?php if (in_array('SHORTLISTING', $req_next, true)): ?>
+          <form method="post" action="/portal/hire-req" class="inl"><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="req_transition"><input type="hidden" name="to" value="SHORTLISTING"><button class="btn secondary" type="submit">Re-open shortlisting</button></form>
+        <?php endif; ?>
+      </div>
+    </div>
+  <?php elseif (in_array($es, ['BOOKED', 'ACTIVE'], true)): ?>
+    <form method="post" action="/portal/hire-req" style="margin-top:10px" onsubmit="return confirm('End this booking early?');">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engage_cancel"><input type="hidden" name="engagement_id" value="<?= (int)$eng['id'] ?>">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select name="kind" class="form-control" style="max-width:230px">
+          <?php foreach ($eng_kinds as $k => $lbl): ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?>
+        </select>
+        <input name="reason" class="form-control" style="flex:1;min-width:180px" placeholder="Reason (optional)">
+        <button class="btn secondary" type="submit">End booking</button>
+      </div>
+    </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($vouchers): ?>
+<h3 class="ptitle" style="font-size:16px;margin-top:24px">Vouchers</h3>
+<p class="plead" style="margin:-4px 0 10px">Claims raised by the professional against this job — review the receipts, return for clarification, or approve.</p>
+<div class="pcard" style="max-width:680px">
+  <?php foreach ($vouchers as $vv): [$vl,$vc] = $vlabel[strtoupper((string)$vv['status'])] ?? $vlabel['DRAFT']; ?>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line,#eee)">
+      <div>
+        <a href="/portal/voucher?id=<?= (int)$vv['id'] ?>"><strong><?= e($vv['period_label'] ?: 'Voucher') ?></strong></a>
+        <div style="font-size:12.5px;color:var(--muted)">Fee <?= e($vinr($vv['fee_total'])) ?><?php if (strtoupper((string)$vv['rate_inclusive'])==='EXCLUSIVE'): ?> · Expenses <?= e($vinr($vv['reimb_total'])) ?><?php endif; ?> · Total <?= e($vinr($vv['grand_total'])) ?></div>
+      </div>
+      <span class="ppill <?= $vc ?>"><?= e($vl) ?></span>
+    </div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>

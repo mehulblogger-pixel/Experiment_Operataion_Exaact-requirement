@@ -158,3 +158,94 @@ function licence_summary() {
                       'on' => $core ? true : licence_enabled($key)];
     return $out;
 }
+
+// ===========================================================================
+//  Product packages (Revamp P6) — presets over the switches that already exist
+// ---------------------------------------------------------------------------
+//  "Which EXAACT is this?" A one-click chooser that sets ONLY the two existing
+//  switches — the industry pack (packs_enabled) and the product bundles
+//  (modules_off) — and remembers the choice. It hides nothing any other way;
+//  Enterprise turns everything back on; every choice is reversible, and an admin
+//  can still fine-tune any single module on the Licence screen afterwards.
+//  Bundle keys are PRODUCT_MODULES keys; 'admin' is core and never switchable.
+// ===========================================================================
+const PRODUCT_PACKAGES = [
+    'TPIA' => [
+        'label' => 'EXAACT TPIA',
+        'desc'  => 'Third-party inspection & certification: calls, jobs, the report engine, QAP/IRN, quality registers, competence and billing. Sales CRM and hiring are hidden.',
+        'packs' => 'inspection',
+        'off'   => ['sales', 'hr'],
+    ],
+    'STAFFING' => [
+        'label' => 'EXAACT Technical Staffing',
+        'desc'  => 'Technical manpower & deputation: requirements, competence, mobilization, attendance & timesheets, hiring and billing. The sales CRM is hidden; ISO inspection gates are off by default.',
+        'packs' => '',
+        'off'   => ['sales'],
+    ],
+    'RECRUITMENT' => [
+        'label' => 'EXAACT Recruitment',
+        'desc'  => 'Technical recruitment: CRM, requirements, candidates, interviews, placement and invoicing. Field operations and the inspection report engine are hidden.',
+        'packs' => '',
+        'off'   => ['operations', 'reporting'],
+    ],
+    'ENTERPRISE' => [
+        'label' => 'EXAACT Enterprise',
+        'desc'  => 'The whole platform: every capability enabled, then tuned per role and office through access.',
+        'packs' => 'inspection',
+        'off'   => [],
+    ],
+];
+
+function product_packages() { return PRODUCT_PACKAGES; }
+function product_package_can() { return function_exists('is_master') && is_master(); }
+
+function _pp_norm($csv) {
+    $x = array_values(array_filter(array_map('trim', explode(',', (string)$csv)), fn($v) => $v !== ''));
+    sort($x); return $x;
+}
+
+// Do the LIVE switches equal this preset? (So a hand change on the Licence screen
+// correctly shows the package as "custom" rather than a stale stored label.)
+function product_package_matches($key) {
+    $p = PRODUCT_PACKAGES[$key] ?? null; if (!$p) return false;
+    if (_pp_norm(implode(',', packs_enabled())) !== _pp_norm($p['packs'])) return false;
+    $offNow = licence_disabled(); sort($offNow);
+    $wantOff = $p['off']; sort($wantOff);
+    return $offNow === $wantOff;
+}
+
+// The currently active package key, or '' when the switches match no preset.
+function product_package_current() {
+    $stored = function_exists('setting_get') ? (string)setting_get('product_package', '') : '';
+    if ($stored !== '' && isset(PRODUCT_PACKAGES[$stored]) && product_package_matches($stored)) return $stored;
+    foreach (PRODUCT_PACKAGES as $k => $p) if (product_package_matches($k)) return $k;
+    return '';
+}
+
+// Apply a preset: set the pack + the off-bundles, and remember the choice.
+function product_package_apply($key) {
+    $p = PRODUCT_PACKAGES[$key] ?? null; if (!$p) return false;
+    if (function_exists('packs_save')) packs_save($p['packs']);
+    elseif (function_exists('setting_set')) { setting_set('packs_enabled', $p['packs']); if (function_exists('packs_enabled')) packs_enabled(true); }
+    if (function_exists('setting_set')) setting_set('modules_off', implode(',', $p['off']));
+    if (function_exists('licence_disabled')) licence_disabled(true);
+    if (function_exists('setting_set')) setting_set('product_package', $key);
+    return true;
+}
+
+// The chooser screen (master only; deliberately not module-gated, like Licence).
+function ops_product_package($route, $method) {
+    ops_require(product_package_can(), 'Only a master admin can change the product package.');
+    if ($route === 'product-package-apply' && $method === 'POST') {
+        $key = (string)($_POST['package'] ?? '');
+        if (product_package_apply($key)) flash('Product package set to “' . (PRODUCT_PACKAGES[$key]['label'] ?? $key) . '”. Fine-tune any single module on the Licence screen.');
+        else flash('Unknown product package.', 'error');
+        redirect('/product-package');
+    }
+    view('ops/product_package', [
+        'packages' => PRODUCT_PACKAGES,
+        'current'  => product_package_current(),
+        'modules'  => function_exists('licence_summary') ? licence_summary() : [],
+    ]);
+    return true;
+}

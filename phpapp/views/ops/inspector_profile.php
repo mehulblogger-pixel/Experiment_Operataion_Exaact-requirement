@@ -11,6 +11,7 @@
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <a class="btn secondary" href="/timesheet?ins=<?= (int)$ins['id'] ?>">⏱️ Timesheet</a>
     <a class="btn secondary" href="/ratings">⭐ Ratings</a>
+    <?php if (function_exists('entity_360_link')) echo entity_360_link('INSPECTOR', (int)$ins['id'], 'Credential vault'); ?>
     <?php if (is_master() || (function_exists('is_coordinator_level') && is_coordinator_level())): ?><a class="btn secondary" href="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>">Edit</a><?php endif; ?>
   </div>
 </div>

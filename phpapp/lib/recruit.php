@@ -420,6 +420,80 @@ function recruit_fit_score($cand, $req) {
 }
 function recruit_fit_band($s) { return $s >= 80 ? ['Strong', 'p-ok'] : ($s >= 55 ? ['Fair', 'p-warn'] : ['Weak', 'p-bad']); }
 
+// P1b — the same explainable Workforce-Fit, but for a MARKETPLACE PROFESSIONAL
+// (cx_professionals) against a recruitment requisition. So a recruiter filling a
+// requisition automatically sees benched / verified people from the marketplace who
+// fit — not only existing candidate rows. Same ['score','factors'] shape as
+// recruit_fit_score(), so recruit_fit_band() and the fit UI render it unchanged.
+function recruit_pro_fit_score($pro, $req) {
+    $F = [];
+    $add = function ($label, $state, $note, $wt) use (&$F) { $F[] = ['label' => $label, 'state' => $state, 'note' => $note, 'wt' => $wt]; };
+    $proText = strtolower(trim(($pro['disciplines'] ?? '') . ' ' . ($pro['skills'] ?? '') . ' ' . ($pro['headline'] ?? '') . ' ' . ($pro['work_types'] ?? '')));
+
+    // Discipline (25)
+    $disc = trim((string)($req['discipline'] ?? ''));
+    if ($disc !== '') $add('Discipline', _rk_hit($proText, _rk_tokens($disc)) ? 'ok' : 'no', $disc, 25);
+    else $add('Discipline', 'part', 'any', 25);
+
+    // Skills (20)
+    $sk = _rk_tokens($req['skills'] ?? '');
+    if ($sk) { $hit = array_filter($sk, fn($t) => strpos($proText, $t) !== false);
+        $add('Skills', count($hit) === count($sk) ? 'ok' : (count($hit) ? 'part' : 'no'), count($hit) . '/' . count($sk) . ' matched', 20); }
+    else $add('Skills', 'part', 'none required', 20);
+
+    // Role / designation (15) — matched against the professional's headline/disciplines
+    $rd = trim((string)($req['designation'] ?? ''));
+    if ($rd !== '') $add('Role', _rk_hit($proText, _rk_tokens($rd)) ? 'ok' : 'no', $rd, 15);
+    else $add('Role', 'part', 'not specified', 15);
+
+    // Location (15) — pan-India pros fit anywhere; else match base city / preferred locations
+    $loc = trim((string)($req['deploy_location'] ?? '') . ' ' . (string)($req['project_site'] ?? ''));
+    $proLoc = trim((string)($pro['base_city'] ?? '') . ' ' . (string)($pro['preferred_locations'] ?? ''));
+    if (!empty($pro['pan_india'])) $add('Location', 'ok', 'pan-India', 15);
+    elseif (trim($loc) !== '' && $proLoc !== '')
+        $add('Location', _rk_hit($loc, _rk_tokens($proLoc)) || _rk_hit($proLoc, _rk_tokens($loc)) ? 'ok' : 'no', 'base vs site', 15);
+    else $add('Location', 'part', 'flexible', 15);
+
+    // Availability (15)
+    $av = strtoupper(trim((string)($pro['availability'] ?? '')));
+    if ($av === 'AVAILABLE') $add('Availability', 'ok', 'available', 15);
+    elseif (in_array($av, ['AVAILABLE_SOON', 'OPEN', 'BUSY'], true)) $add('Availability', 'part', strtolower($av), 15);
+    elseif ($av === '') $add('Availability', 'part', 'unknown', 15);
+    else $add('Availability', 'no', strtolower($av), 15);
+
+    // Verification (10) — a proven professional is worth more confidence
+    $vt = strtolower(trim((string)($pro['verification_tier'] ?? '')));
+    if (in_array($vt, ['verified', 'id_verified', 'engaged'], true)) $add('Verification', 'ok', $vt, 10);
+    elseif (in_array($vt, ['documented', 'document'], true)) $add('Verification', 'part', $vt, 10);
+    else $add('Verification', 'part', $vt ?: 'registered', 10);
+
+    // Rate (10) — the professional's floor day-rate vs the requisition's billing rate
+    $rate = (float)($pro['day_rate_min'] ?? 0); $bill = (float)($req['billing_rate'] ?? 0);
+    if ($rate > 0 && $bill > 0) $add('Rate', $rate <= $bill ? 'ok' : ($rate <= $bill * 1.1 ? 'part' : 'no'), 'floor vs bill rate', 10);
+    else $add('Rate', 'part', 'not priced', 10);
+
+    $score = 0; $max = 0;
+    foreach ($F as $f) { $max += $f['wt']; $score += $f['wt'] * ($f['state'] === 'ok' ? 1 : ($f['state'] === 'part' ? 0.5 : 0)); }
+    return ['score' => $max ? (int)round($score / $max * 100) : 0, 'factors' => $F];
+}
+
+// The ranked marketplace-professional shortlist for a requisition: active pros
+// scored against it, kept at or above $min, strongest first, capped at $limit.
+// Read-only; scores in memory (one pool read, no per-pro query).
+function recruit_pro_pool($req, $limit = 5, $min = 55) {
+    try { $pros = ops_all("SELECT id, name, headline, disciplines, skills, work_types, base_city, preferred_locations,
+                                  pan_india, verification_tier, availability, day_rate_min, day_rate_max
+                           FROM cx_professionals WHERE COALESCE(is_active,1)=1") ?: []; }
+    catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($pros as $p) {
+        $f = recruit_pro_fit_score($p, $req);
+        if ($f['score'] >= $min) { $p['fit'] = $f; $out[] = $p; }
+    }
+    usort($out, fn($a, $b) => $b['fit']['score'] <=> $a['fit']['score']);
+    return array_slice($out, 0, $limit);
+}
+
 // §18 — Requirement Health: is this vacancy on track to fill in time?
 function recruit_req_health($req) {
     $id = (int)($req['id'] ?? 0);
@@ -483,6 +557,73 @@ function recruit_deploy_readiness($cand, $req = null) {
     $done = count(array_filter($reqItems, fn($i) => $i['ok']));
     $pct = count($reqItems) ? (int)round($done / count($reqItems) * 100) : 0;
     return ['pct' => $pct, 'done' => $done, 'total' => count($reqItems), 'ready' => $pct === 100, 'items' => $items];
+}
+
+// ---------------------------------------------------------------------------
+//  RÉSUMÉ AUTO-EXTRACT for candidate intake. Reuses the marketplace CV engine
+//  (connect_cv_extract_text + connect_cv_scan) that already reads txt/docx/pdf and
+//  maps text to the skills/role taxonomy — we do NOT build a second parser. From a
+//  résumé we prefill the reliable fields (name, e-mail, mobile, experience) and a
+//  role/skills summary; the recruiter always reviews and saves. Nothing auto-creates.
+// ---------------------------------------------------------------------------
+function recruit_cv_autofill($text) {
+    $text = (string)$text;
+    $out = ['first_name'=>'','middle_name'=>'','last_name'=>'','email'=>'','mobile'=>'',
+            'experience_years'=>'','remarks'=>'','cv_keywords'=>''];
+    if (trim($text) === '') return $out;
+
+    // E-mail (first match).
+    if (preg_match('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $text, $m)) $out['email'] = strtolower($m[0]);
+    // Mobile — an Indian 10-digit number, optional +91 / 0 prefix. First join digit
+    // groups split by spaces or dashes ("98123 45678" → "9812345678") so a formatted
+    // number still matches, then read the 10-digit core.
+    $numNorm = preg_replace('/(?<=\d)[\s\-]+(?=\d)/', '', $text);
+    if (preg_match('/(?:\+?91|\b0)?([6-9]\d{9})\b/', $numNorm, $m)) $out['mobile'] = $m[1];
+    // Experience — the largest "N years / yrs" mentioned.
+    if (preg_match_all('/(\d{1,2})\s*\+?\s*(?:years|yrs|year)\b/i', $text, $mm) && $mm[1]) $out['experience_years'] = (string)max(array_map('intval', $mm[1]));
+    // Name — the first line that reads like a person's name (2–4 words, letters only).
+    foreach (preg_split('/\r\n|\r|\n/', $text) as $line) {
+        $line = trim($line); if ($line === '' || strlen($line) > 40) continue;
+        if (stripos($line, 'resume') !== false || stripos($line, 'curriculum') !== false || stripos($line, 'vitae') !== false) continue;
+        if (preg_match("/^[A-Za-z][A-Za-z.'\\-]+(?:\\s+[A-Za-z.'\\-]+){1,3}$/", $line)) {
+            $parts = preg_split('/\s+/', $line);
+            $out['first_name'] = $parts[0];
+            $out['last_name']  = count($parts) > 1 ? $parts[count($parts)-1] : '';
+            if (count($parts) > 2) $out['middle_name'] = implode(' ', array_slice($parts, 1, -1));
+            break;
+        }
+    }
+    // Taxonomy scan → primary role + skills + base city (the real, existing engine).
+    $role = ''; $skills = []; $base = '';
+    if (function_exists('connect_cv_scan')) {
+        $scan = connect_cv_scan($text);
+        foreach (($scan['expertise'] ?? []) as $node) {
+            $kind = strtoupper((string)($node['kind'] ?? ''));
+            if (($node['relation'] ?? '') === 'PRIMARY_ROLE' && $role === '') $role = (string)$node['name'];
+            elseif ($kind === 'ROLE' && $role === '') $role = (string)$node['name'];
+            if (in_array($kind, ['SKILL','METHOD','EQUIPMENT','CERTIFICATION','ACTIVITY','SYSTEM','SPECIALIZATION'], true)) $skills[] = (string)$node['name'];
+        }
+        if (!empty($scan['base_place']['name'])) $base = (string)$scan['base_place']['name'];
+    }
+    $skills = array_values(array_unique(array_filter($skills)));
+    $bits = [];
+    if ($role)   $bits[] = 'Role: ' . $role;
+    if ($skills) $bits[] = 'Skills: ' . implode(', ', array_slice($skills, 0, 20));
+    if ($base)   $bits[] = 'Base: ' . $base;
+    if ($bits)   $out['remarks'] = 'From résumé — ' . implode(' · ', $bits);
+    $out['cv_keywords'] = function_exists('cv_extract_keywords') ? cv_extract_keywords($text) : '';
+    return $out;
+}
+
+/** A short human line saying what the résumé extract filled in (for the banner). */
+function recruit_cv_autofill_summary($a) {
+    $got = [];
+    if (!empty($a['first_name']))      $got[] = 'name';
+    if (!empty($a['email']))           $got[] = 'e-mail';
+    if (!empty($a['mobile']))          $got[] = 'mobile';
+    if (!empty($a['experience_years']))$got[] = $a['experience_years'] . ' yrs experience';
+    if (!empty($a['remarks']))         $got[] = 'role & skills';
+    return $got ? implode(', ', $got) : '';
 }
 
 // §15 — AI extraction of a requirement from a pasted email / JD / WhatsApp.

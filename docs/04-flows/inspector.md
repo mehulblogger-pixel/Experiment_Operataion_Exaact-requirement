@@ -23,8 +23,13 @@ flowchart TD
 ```
 
 **Landing:** `/` → `views/dashboard.php` **inspector branch** (`dashboard.php:23-43`):
-attendance widget + four KPI cards — Open jobs, Reports pending, Overdue, This month's
-voucher — plus "All my jobs", "My Voucher", and the "Your pending tasks" panel.
+attendance widget + the **personal KPI board** — the same universal
+`connect_kpi_board`/`connect_kpi_render` engine that powers the client and
+freelancer dashboards, here at `audience='inspector'` scope (own `inspector_id`):
+**Active jobs · Reports pending · Overdue · Ratings · Completed**, with one-tap
+attention chips (reports pending / overdue) — plus quick-action cards ("All my
+jobs", "My Voucher") and the "Your pending tasks" panel. Least-privilege: the
+board shows **no money figure**; the monthly voucher stays a link, not a total.
 
 **Walkthrough:**
 1. Land on the personal dashboard; tap into **My Jobs** (`/my-jobs`) — job cards + a week/month schedule.

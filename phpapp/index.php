@@ -102,6 +102,10 @@ try {
     require __DIR__ . '/lib/db.php';
     require __DIR__ . '/lib/indexes.php';
     require __DIR__ . '/lib/helpers.php';
+    require __DIR__ . '/lib/install_mode.php';   // Cloud vs Licence deployment posture (onboarding adapts)
+    require __DIR__ . '/lib/onboarding.php';      // Guided getting-started welcome (mode-aware)
+    require __DIR__ . '/lib/mkt_plans.php';        // Marketplace subscription plans & limits (Super-Admin owned)
+    require __DIR__ . '/lib/mkt_subs.php';         // Marketplace subscriptions, access & usage limits
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';
@@ -200,6 +204,7 @@ try {
     require __DIR__ . '/lib/hwpoints.php';
     require __DIR__ . '/lib/seed_demo.php';
     require __DIR__ . '/lib/seed_demo_c.php';
+    require __DIR__ . '/lib/seed_connect.php';
     require __DIR__ . '/lib/seed_recruit_cc.php';
     require __DIR__ . '/lib/seed_costing.php';
     require __DIR__ . '/lib/trace_seed.php';
@@ -216,6 +221,7 @@ try {
     require __DIR__ . '/lib/inspectorprofile.php';
     require __DIR__ . '/lib/recruit.php';
     require __DIR__ . '/lib/recruit_cc.php';
+    require __DIR__ . '/lib/candpool.php';         // Revamp P11 — candidate pool convergence (read-only)
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
     require __DIR__ . '/lib/qualitycase.php';     // Phase 2 §39 — quality-case umbrella (read-only)
@@ -223,6 +229,7 @@ try {
     require __DIR__ . '/lib/engagement.php';       // Phase 2 §25 — engagement grouping (read-only view over contract_number)
     require __DIR__ . '/lib/bulk.php';             // Phase 2 §48 — server-side preview/dry-run for bulk actions
     require __DIR__ . '/lib/revrecon.php';         // Phase 2 §29 — recognised-revenue reconciliation (read-only)
+    require __DIR__ . '/lib/costrecon.php';        // Revamp P8 — sub-contractor cost reconciliation (read-only)
     require __DIR__ . '/lib/settingmeta.php';      // Phase 2 §47 — settings governance registry (read-only)
     require __DIR__ . '/lib/settlement.php';       // Phase 2 §32 — inter-office settlement matrix (read-only)
     require __DIR__ . '/lib/invready.php';         // Phase 2 §33 — invoice readiness (advisory; strict-gated)
@@ -232,7 +239,53 @@ try {
     require __DIR__ . '/lib/vendor360.php';        // Phase 3 §16 — vendor-360 depth (contacts + party + history)
     require __DIR__ . '/lib/tmplpreview.php';      // Phase 3 §8 — report-template persona preview
     require __DIR__ . '/lib/entity360.php';        // Phase 3 §49 — uniform Entity-360 shell
+    require __DIR__ . '/lib/billable.php';          // Revamp P4 — the Billable Event ledger (operational→commercial bridge)
     require __DIR__ . '/lib/attendreview.php';     // Phase 3 §35 — attendance review (anomaly + send-back)
+    require __DIR__ . '/lib/connect_taxonomy.php'; // Connect K0 — manpower-marketplace industry taxonomy (additive masters)
+    require __DIR__ . '/lib/connect_qualtax.php';  // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA ladder, additive masters)
+    require __DIR__ . '/lib/connect_tax_graph.php'; // Connect K0+ — universal taxonomy GRAPH unifying the flat masters (nodes/edges/aliases + profile links)
+    require __DIR__ . '/lib/connect_geo.php'; // Connect K-GEO — universal location & mobility engine (structured geo + distance-priority matching)
+    require __DIR__ . '/lib/connect_cv.php'; // Connect K0+ — CV-assisted passport prefill (extract → map to taxonomy → confirm)
+    require __DIR__ . '/lib/connect_credentials.php'; // Connect K0+ — structured certifications & project experience
+    require __DIR__ . '/lib/connect_privacy.php'; // Connect K0+ — professional privacy states & contact-reveal resolver
+    require __DIR__ . '/lib/connect_client_search.php'; // Connect K0+ — client-facing talent search & privacy-safe result cards
+    require __DIR__ . '/lib/connect_hiring.php'; // Connect K0+ — hiring home for marketplace clients (saved searches + home aggregate)
+    require __DIR__ . '/lib/connect_identity.php'; // Connect K0+ — unified professional identity (link inspector ↔ marketplace pro, no merge)
+    require __DIR__ . '/lib/connect_person.php';   // Gap-8 — unified person resolver across the linked identity pools (read-view, no merge)
+    require __DIR__ . '/lib/connect_client_bench.php'; // Connect K0+ — client private bench / roster (demand-side, relationship over cx_professionals)
+    require __DIR__ . '/lib/connect_deploy.php'; // Connect K0+ — award → deployment bridge (marketplace award becomes a PDSO deputation job)
+    require __DIR__ . '/lib/connect_source.php'; // Connect K0+ — inspection request → unified manpower sourcing (rank + controlled assign across pools)
+    require __DIR__ . '/lib/connect_reqtools.php'; // Connect K0+ — requirement reuse: duplicate + named templates
+    require __DIR__ . '/lib/seed_scenario_s01.php'; // DEMO-S01 — scenario seed engine (CLI + admin button)
+    require __DIR__ . '/lib/seed_scenario_s02.php'; // DEMO-S02 — agency bench scenario seed engine (CLI + admin button)
+    require __DIR__ . '/lib/connect_client_dash.php'; // Connect K0+ — role-based client-portal dashboard tiles (live-computed)
+    require __DIR__ . '/lib/seed_scenario_s03.php'; // DEMO-S03 — client + client-portal foundation seed engine
+    require __DIR__ . '/lib/seed_scenario_s04.php'; // DEMO-S04 — marketplace lifecycle (new engines) seed engine
+    require __DIR__ . '/lib/seed_scenario_s05.php'; // DEMO-S05 — convergence & reconciliation (read-only detectors) seed engine
+    require __DIR__ . '/lib/seed_scenario_s06.php'; // DEMO-S06 — gap-closure showcase (the eight Stage-0 residual gaps)
+    require __DIR__ . '/lib/connect_verify.php';   // Connect K14 / #3 — verification & moderation (tier ladder + deterministic checks + queue)
+    require __DIR__ . '/lib/connect_msg.php';      // Connect K15 / #4 — in-app messaging (per-engagement two-way threads)
+    require __DIR__ . '/lib/connect_channels.php'; // Connect K16 / #5 — WhatsApp/SMS/email channel (behind the notification seam)
+    require __DIR__ . '/lib/connect_bench.php';    // Connect K18 / #7 — agency bench workspace (private roster + allocation)
+    require __DIR__ . '/lib/connect_engage.php';   // Connect K20 — engagements/bookings (man-days / months / deputation / continuous / frequency)
+    require __DIR__ . '/lib/connect_engvoucher.php';// Connect K21 — engagement vouchers (inclusive/exclusive, per-day/per-deployment; freelancer + on-roll)
+    require __DIR__ . '/lib/connect_kpi.php';      // Connect — reusable KPI board (one engine + renderer for ops "concern" + client dashboards)
+    require __DIR__ . '/lib/connect_analytics.php';// Connect K19 / #8 — labour-market analytics (read-only aggregations over cx_*)
+    require __DIR__ . '/lib/connect_passport.php'; // Connect K1 — public professional passport (over the P1 credential vault)
+    require __DIR__ . '/lib/connect_market.php';   // Connect K2a — manpower marketplace (post a requirement / apply)
+    require __DIR__ . '/lib/connect_match.php';    // Connect K3 — matching & recommendation cards (read-only over eligibility + rating)
+    require __DIR__ . '/lib/connect_trust.php';    // Connect K5 — Trust Score 0-1000 (read-only composition of existing signals)
+    require __DIR__ . '/lib/connect_concierge.php';// Connect K4 — guided requirement builder (conversation-before-forms)
+    require __DIR__ . '/lib/connect_ratings.php';  // Connect K9 — two-way ratings on a marketplace engagement
+    require __DIR__ . '/lib/connect_disputes.php'; // Connect K9b — disputes & mediation on a marketplace engagement
+    require __DIR__ . '/lib/connect_govern.php';   // Connect K10 — commercial terms + site-readiness (Part-F F1/F3)
+    require __DIR__ . '/lib/connect_advisor.php';  // Connect K12 — Operations Advisor (readiness + delay-risk verdict, read-only)
+    require __DIR__ . '/lib/connect_pro.php';      // Connect A1/A2 — freelancer self-service pool (shared, self-registered)
+    require __DIR__ . '/lib/connect_bridge.php';   // Connect — award → engagement → invoice bridge (reuses the P4 billable ledger)
+    require __DIR__ . '/lib/connect_crew.php';     // Connect M10 — crew/bulk booking (position manifest)
+    require __DIR__ . '/lib/connect_org.php';      // Connect B0 — organisation accounts + org-type entitlements
+    require __DIR__ . '/lib/connect_capability.php'; // Connect — multi-select company business capabilities (Combination Engine)
+    require __DIR__ . '/lib/connect_conflict.php';   // Connect — resource conflict & availability (Stage 7)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
@@ -334,6 +387,18 @@ try {
     db()->query("SELECT invoice_raised FROM jobs LIMIT 1");
     db()->query("SELECT supersedes FROM boss_numbers LIMIT 1");
     db()->query("SELECT billable_value FROM calls LIMIT 1");
+    db()->query("SELECT verify_status FROM inspector_certs LIMIT 1");   // Slice P1 — Credential Vault
+    db()->query("SELECT bill_ref FROM billable_events LIMIT 1");         // Revamp P4 — Billable Event ledger (+P4c bill_ref)
+    db()->query("SELECT engagement_id FROM calls LIMIT 1");              // Revamp — Engagement entity (additive engagement_id)
+    db()->query("SELECT id FROM cx_sectors LIMIT 1");                    // Connect K0 — industry taxonomy masters (cx_*)
+    db()->query("SELECT passport_token FROM inspectors LIMIT 1");        // Connect K1 — public passport share key
+    db()->query("SELECT id FROM cx_requirements LIMIT 1");               // Connect K2a — marketplace requirements/applications
+    db()->query("SELECT id FROM cx_ratings LIMIT 1");                    // Connect K9 — two-way marketplace ratings
+    db()->query("SELECT id FROM cx_disputes LIMIT 1");                   // Connect K9b — marketplace disputes
+    db()->query("SELECT id FROM cx_readiness LIMIT 1");                  // Connect K10 — site-readiness checklist
+    db()->query("SELECT id FROM cx_professionals LIMIT 1");              // Connect A1 — self-registered freelancer pool
+    db()->query("SELECT id FROM cx_positions LIMIT 1");                  // Connect M10 — crew position manifest
+    db()->query("SELECT id FROM cx_organisations LIMIT 1");             // Connect B0 — organisation accounts
     db()->query("SELECT id FROM agencies LIMIT 1");
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM requisitions LIMIT 1");
@@ -756,6 +821,15 @@ if ($route === 'verify') {
     exit;
 }
 
+// Connect K1 — a professional's PUBLIC passport, reached via an unguessable
+// share token (/p/<token>) and from the QR printed on it. Public like /verify:
+// no account, dispatched in front of require_login(). It shows only verified
+// credentials, live status and reputation — nothing confidential.
+if (strncmp($route, 'p/', 2) === 0 && function_exists('connect_passport_route')) {
+    connect_passport_route(substr($route, 2));   // renders a standalone page and exits
+    exit;
+}
+
 // Field #17 — the report itself, downloadable from the public verification page.
 // Public like /verify: gated only by the printed verify code, issued reports only,
 // every access logged. Dispatched here, in front of require_login().
@@ -794,6 +868,32 @@ if (function_exists('cvp_vendor_route') && ($route === 'vendor' || strncmp($rout
     exit;
 }
 
+// The freelancer portal — a FOURTH audience: an individual technical
+// professional who listed THEMSELVES on the shared pool. Its own table
+// (cx_professionals), its own session key (cxpid) and its own /pro addresses.
+// Dispatched here, in front of require_login(), because a freelancer has no
+// staff account. connect_pro_route() always exits.
+if (function_exists('connect_pro_route') && ($route === 'pro' || strncmp($route, 'pro/', 4) === 0)) {
+    connect_pro_route($route, $method);
+    exit;
+}
+
+// Connect B1 — public organisation onboarding. An organisation applies for
+// itself and lands as PENDING for a platform admin to approve. Public, in front
+// of require_login(). connect_org_join_route() always exits.
+if ($route === 'join' && function_exists('connect_org_join_route')) {
+    connect_org_join_route($method);
+    exit;
+}
+
+// Connect — the ONE public front door for the marketplace. A single page where a
+// professional, a company, or an agency creates an account or signs in. Public,
+// in front of require_login(). connect_front_route() always exits.
+if ($route === 'connect' && function_exists('connect_front_route')) {
+    connect_front_route($method);
+    exit;
+}
+
 // A signed handoff from a sibling MGH application (Books, BlogPro, Ads Pro).
 // It sits HERE, in front of require_login(), because its whole job is to satisfy
 // that gate — and behind the portal dispatch, because a client is not a staff
@@ -805,6 +905,16 @@ if (function_exists('sso_accept') && isset($_GET['sso']) && $_GET['sso'] !== '')
     $clean = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
     if ($ssoOk) { flash('Welcome, ' . user_name(current_user()) . '.'); redirect($clean ?: '/'); }
     redirect('/login');
+}
+
+// The marketplace is the public face: an unauthenticated visitor landing on the
+// bare root is sent to the Connect front door rather than the staff sign-in.
+// Guarded by connect_enabled() so a fresh install / staff-only instance is
+// unaffected; staff reach their own sign-in at /login (linked from Connect).
+if ($route === '' && function_exists('current_user') && !current_user()
+    && function_exists('connect_enabled') && connect_enabled()
+    && function_exists('connect_front_route')) {
+    redirect('/connect');
 }
 
 // --- Everything below requires login ---
@@ -914,6 +1024,14 @@ if ($method === 'POST' && isset($_POST['_ft'])) {
 }
 
 if ($route === '') {
+    // A brand-new company is guided to the welcome / getting-started once, instead of
+    // landing on a deep module with no orientation. Only while setup is incomplete, only
+    // for signed-in staff, and only once per session (so it never loops and an established
+    // company never sees it — its steps are already done).
+    if (function_exists('current_user') && current_user() && empty($_SESSION['onb_seen'])
+        && function_exists('onboarding_incomplete') && onboarding_incomplete()) {
+        redirect('/welcome');
+    }
     $clients = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_client=1")->fetchColumn();
     $vendors = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_vendor=1")->fetchColumn();
     return view('dashboard', ['clients' => $clients, 'vendors' => $vendors]);
@@ -1205,6 +1323,14 @@ if ($route === 'partner-add' && $method === 'POST') {
         }
         $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
         $newId = (int)$pdo->lastInsertId();
+        // R4 (Revamp P5b) — a contract registered through this partner-screen door
+        // must enter the SAME two-signature lifecycle as the CRM registration path,
+        // not go straight to the default OPEN. Register it as PENDING (awaiting a
+        // manager's endorsement, then the branch manager's approval) so no single
+        // person can put a live contract on the books unchecked.
+        if ($kind === 'contract') {
+            try { $pdo->prepare("UPDATE partner_contracts SET open_status='PENDING', is_active=0 WHERE id=?")->execute([$newId]); } catch (Throwable $e) {}
+        }
         // Field #1 — a registration may arrive with its scanned document. Store it
         // on the new row (base64 in-row, like a lead/quote file); over 8 MB is skipped
         // with a notice rather than failing the whole save.
@@ -1240,11 +1366,11 @@ if ($route === 'partner-add' && $method === 'POST') {
             $qid = (int)($b['quotation_id'] ?? 0);
             if ($qid && contract_link_quotation($newId, $qid)) {
                 $qn = ops_val("SELECT quote_no FROM quotations WHERE id=?", [$qid]);
-                flash('Contract added, and ' . ($qn ?: Tl('quote')) . ' now carries this contract number.');
+                flash('Contract registered (awaiting endorsement), and ' . ($qn ?: Tl('quote')) . ' now carries this contract number.');
                 redirect("/partner?id={$p['id']}&tab=contracts");
             }
         }
-        flash('Added.');
+        flash($kind === 'contract' ? 'Contract registered — it is awaiting endorsement, then approval, before it goes live.' : 'Added.');
         redirect("/partner?id={$p['id']}&tab=$tab");
     }
     redirect("/partner?id={$p['id']}");

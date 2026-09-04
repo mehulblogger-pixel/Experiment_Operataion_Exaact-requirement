@@ -94,6 +94,67 @@ if ($personApps):
 </div>
 <?php endif; ?>
 
+<?php // P11 — this person is also a marketplace professional (read-only convergence; nothing merged).
+$proMatches = $proMatches ?? []; $proLink = $proLink ?? null;
+$linkedProId = $proLink ? (int)$proLink['professional_id'] : 0;
+if ($proMatches || $proLink):
+  $rLabel = ['mobile' => 'same mobile', 'email' => 'same e-mail', 'name' => 'same name'];
+  $rTone  = ['mobile' => 'p-ok', 'email' => 'p-ok', 'name' => 'p-warn'];
+  $canLink = is_coordinator_level();
+?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Also on the marketplace
+    <span class="pill p-info" style="font-size:11px;margin-left:4px"><?= count($proMatches) ?></span>
+    <?php if ($proLink): ?><span class="pill p-ok" style="font-size:11px;margin-left:4px">✓ confirmed same person</span><?php endif; ?>
+  </h3>
+  <p class="muted" style="font-size:12px;margin:0 0 8px">This candidate matches a known <strong>marketplace professional</strong> — the same person is already on the bench / passport. Matched by mobile / e-mail / name. <strong>Confirming</strong> records them as one person; nothing is merged and each pool keeps its own record, so it can be unlinked any time.</p>
+  <?php // Gap-8 — once linked, show the ONE person resolved across every pool (read-view, no merge).
+  $person = $person ?? null;
+  if ($person && !empty($person['linked'])):
+    $pl = []; if (($person['pools']['professional'] ?? 0) > 0) $pl[] = 'marketplace'; if (($person['pools']['inspector'] ?? 0) > 0) $pl[] = 'operations inspector'; if (($person['pools']['candidate'] ?? 0) > 0) $pl[] = 'recruitment'; ?>
+  <p class="msg" style="margin:0 0 8px;font-size:12.5px;background:var(--panel-2,#eef1f3);border-radius:6px;padding:8px 12px">
+    <strong>🔗 One person across the platform.</strong>
+    <?= e($person['name'] ?: 'This person') ?> is present in <?= e(implode(' + ', $pl)) ?>.
+    <strong><?= (int)$person['credentials'] ?></strong> credential<?= (int)$person['credentials'] === 1 ? '' : 's' ?> across all pools<?= (int)$person['verified'] > 0 ? ' · <strong>' . (int)$person['verified'] . '</strong> verified' : '' ?>,
+    read on the one verification ladder. Nothing is merged.
+  </p>
+  <?php endif; ?>
+  <div style="overflow-x:auto">
+  <table class="grid" style="min-width:600px">
+    <thead><tr><th>Professional</th><th>Verification</th><th>Availability</th><th>Matched by</th><th></th></tr></thead>
+    <tbody>
+      <?php foreach ($proMatches as $pm): $isLinked = $linkedProId === (int)$pm['pro_id']; ?>
+      <tr>
+        <td><?= e($pm['name'] ?: ('#' . $pm['pro_id'])) ?></td>
+        <td><span class="pill <?= in_array(strtolower((string)$pm['verification_tier']), ['verified','id_verified','engaged'], true) ? 'p-ok' : 'p-mut' ?>" style="font-size:11px"><?= e($pm['verification_tier'] ?: '—') ?></span></td>
+        <td class="muted" style="font-size:12px"><?= e($pm['availability'] ?: '—') ?></td>
+        <td><span class="pill <?= $rTone[$pm['reason']] ?? 'p-mut' ?>" style="font-size:11px"><?= e($rLabel[$pm['reason']] ?? $pm['reason']) ?></span></td>
+        <td style="text-align:right">
+          <?php if ($isLinked): ?>
+            <span class="pill p-ok" style="font-size:11px">✓ Confirmed</span>
+            <?php if ($canLink): ?>
+            <form method="post" action="/candidate-unlink-pro?id=<?= (int)$cand['id'] ?>" style="display:inline" onsubmit="return confirm('Remove the confirmed link? Neither record is deleted.')">
+              <input type="hidden" name="link_id" value="<?= (int)$proLink['id'] ?>">
+              <button class="btn btn-ghost" type="submit" style="padding:2px 9px;font-size:12px">Unlink</button>
+            </form>
+            <?php endif; ?>
+          <?php elseif ($proLink): ?>
+            <span class="muted" style="font-size:11px">another confirmed</span>
+          <?php elseif ($canLink): ?>
+            <form method="post" action="/candidate-link-pro?id=<?= (int)$cand['id'] ?>" style="display:inline" onsubmit="return confirm('Confirm this candidate and marketplace professional are the same person? Nothing is merged.')">
+              <input type="hidden" name="pro_id" value="<?= (int)$pm['pro_id'] ?>">
+              <button class="btn btn-ghost" type="submit" style="padding:2px 9px;font-size:12px">Confirm same person</button>
+            </form>
+          <?php endif; ?>
+        </td>
+      </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php // §16 — explainable workforce fit against the linked requirement.
 $fit = $fit ?? null; $readiness = $readiness ?? null; $linkReq = $linkReq ?? null;
 if (!empty($fit) && !empty($linkReq)): [$fl, $ftone] = recruit_fit_band($fit['score']); ?>

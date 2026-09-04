@@ -134,6 +134,10 @@
         <div><span class="k">Rounding</span><span><?= e(fmoney($inv['round_off'])) ?></span></div>
       <?php endif; ?>
       <div><span class="k">Invoice total</span><span><b><?= e(fmoney($inv['total'])) ?></b></span></div>
+      <?php if ((float)($inv['tds_amount'] ?? 0) > 0): ?>
+        <div><span class="k">Less TDS @ <?= e(rtrim(rtrim(number_format((float)$inv['tds_pct'],2),'0'),'.')) ?>%</span><span>− <?= e(fmoney($inv['tds_amount'])) ?></span></div>
+        <div><span class="k">Net payable</span><span><b><?= e(fmoney(function_exists('books_net_payable') ? books_net_payable($inv) : ((float)$inv['total'] - (float)$inv['tds_amount']))) ?></b></span></div>
+      <?php endif; ?>
     </div>
     <?php if ($isLive): ?>
       <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">

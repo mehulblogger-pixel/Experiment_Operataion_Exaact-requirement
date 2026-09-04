@@ -70,7 +70,7 @@ not even see.
    Plus the existing "Reset to role default" control. Tests: `tests/test_perms_no_lockout.php`.
    (`MASTER_ADMIN` remains un-lockable via `is_superuser` — keep one, per the recovery note below.)
 
-## R4 — HIGH · Contract registration has two doors, one unguarded — **permission door now closed**
+## R4 — HIGH · Contract registration has two doors, one unguarded — **FULLY CLOSED**
 **What:** the CRM path `quote-contract` requires `crm.contract.register` (`crm.php:1830`),
 but `partner-add kind=contract` (`index.php`) used to create a `partner_contracts` row
 with **no permission check** (only number-uniqueness).
@@ -81,9 +81,11 @@ salesperson, coordinator or even an inspector.
 `ops_require(can('crm.contract.register') || is_master())` — the same permission the CRM
 path uses — so only Accounts/back-office (and master) can register a contract from either
 door (`index.php` partner-add; `tests/test_contract_backdoor_guard.php`).
-**Still open (lower risk):** new numbers created via this door do not yet run through the
-PENDING→endorse→approve lifecycle — a follow-up if the two-signature control is wanted on
-this path too.
+**Lifecycle door closed (Revamp P5b):** a contract created through this door is now
+registered as **PENDING** (`open_status='PENDING', is_active=0`) — the same two-signature
+lifecycle as the CRM path — so it must be endorsed by a manager and approved by the branch
+manager before it goes live. No single person can put a live contract on the books from
+either door. (`index.php` partner-add; `tests/test_contract_backdoor_guard.php`.)
 
 ## R5 — MEDIUM · Voucher: reopen from any state + no segregation of duties — **FIXED**
 **What:** `voucher` reopen had **no source-status guard** — a coordinator could revert **any**
@@ -147,9 +149,15 @@ save); the edit form embeds it as `row_version`, and `stale_edit_block()` refuse
 whose baseline no longer matches — the editor is told to reopen, and **nothing is
 overwritten**. An empty baseline (older form) never blocks. Tests:
 `tests/test_optimistic_lock.php`.
-**Still open (noted, not a call/job edit):** the *cost picture* is still written from two
-sides — job-closure expenses (coordinator) and the inspector's voucher — which is a
-data-model overlap rather than a concurrent-edit race; left as-is unless it bites.
+**Cost dual-write — DETECTOR delivered (Revamp R9):** the *cost picture* is written from
+two doors — job-closure `expenses` (coordinator) and the inspector's `voucher` — for the
+same reimbursable category, and `job_profit()` sums both. A read-only detector now surfaces
+the overlap so it can be reconciled: `cost_sources()` / `cost_dualwrite_flag()` /
+`cost_dualwrite_scan()` (`costing.php`), and a warning on the job-detail Money fold when
+reimbursables sit on both sides (`cost_dualwrite_render()`; `tests/test_cost_dualwrite.php`).
+It changes **no figure**. **Convergence** (making one door authoritative, or netting the
+overlap) is a separate, deliberate data-model decision, still open — the detector is the
+safe first step before that.
 
 ## R10 — LOW · Vestigial statuses/fields the code never advances — **NOTED IN-CODE**
 **What:** legacy `calls.status` never reaches `CLOSED` in app flow (only up to ALLOCATED);
@@ -163,6 +171,14 @@ definition — `JOB_STAGES` (`ops.php`), `IDEMS_STATUS` ARCHIVED (`idems.php`), 
 `calls.status` note (`tosrm.php`) — plus an inline note on the dead `report_pending` read.
 Values are kept (not removed) to avoid a silent behaviour change; wire the transitions before
 building reporting on them. Tests: `tests/test_vestigial_fields_noted.php`.
+
+**Revamp P5 (the always-0 reader fixed):** the ops-desk `report_pending` metric
+(`tosrm_ops_metrics`, `tosrm.php`) now reads the **real** signal — a CLOSED job whose report
+is awaiting the reporting manager's sign-off (`closed_flag=1 AND report_approval='PENDING'`) —
+instead of the vestigial `jobs.stage='REPORT_PENDING'`. It is no longer always 0.
+The vestigial `jobs.stage` / `calls.status=CLOSED` / `report_docs.ARCHIVED` *fields* are still
+kept-and-noted (removing or advancing them would add transitions — out of scope without sign-off);
+only the misleading reader was corrected. Test: `tests/test_report_pending_metric.php`.
 
 ## R11 — LOW · Admin area appears for roles with no real admin access — **MOSTLY FIXED**
 **What:** ASST_MANAGER reached the Admin area only via the coordinator-level "SLA targets"

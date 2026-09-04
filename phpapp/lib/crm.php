@@ -1619,6 +1619,27 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         $base = (int)($q['parent_id'] ?: $q['id']);
+        // The order's jobs and calls, with the invoiced figure through the §28 revenue
+        // reader switch (P9). Jobs carry `_invoiced`; each call's `invoiced` is recomputed
+        // through the same reader so the order-360 agrees with every other revenue view.
+        $orderJobs = ops_all("SELECT j.id, j.job_code, j.stage, j.closed_flag, j.invoice_raised, j.invoice_amount, j.payment_received, j.payment_amount, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.quotation_id=? ORDER BY j.id", [$q['id']]) ?: [];
+        $ojLedger = function_exists('revrecon_ledger_net_map') ? revrecon_ledger_net_map(array_map(fn($j) => (int)$j['id'], $orderJobs)) : [];
+        foreach ($orderJobs as &$oj) $oj['_invoiced'] = function_exists('job_invoiced_amount') ? job_invoiced_amount($oj, $ojLedger[(int)$oj['id']] ?? 0) : (float)($oj['invoice_amount'] ?? 0);
+        unset($oj);
+        $orderCalls = ops_all(
+            "SELECT c.id, c.call_code, c.created_at, c.status, c.contract_number,
+                    (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count,
+                    (SELECT COALESCE(SUM(j.invoice_amount),0) FROM jobs j WHERE j.call_id=c.id AND j.invoice_raised=1) invoiced,
+                    (SELECT COALESCE(SUM(CASE WHEN j.payment_received=1 THEN j.payment_amount ELSE 0 END),0) FROM jobs j WHERE j.call_id=c.id) received
+             FROM calls c
+             WHERE c.quotation_id=? OR (COALESCE(c.contract_number,'')<>'' AND c.contract_number=?)
+             ORDER BY c.id DESC",
+            [$q['id'], (string)($q['contract_number'] ?? '')]) ?: [];
+        if (function_exists('call_invoiced_map') && $orderCalls) {
+            $ocInv = call_invoiced_map(array_map(fn($c) => (int)$c['id'], $orderCalls));
+            foreach ($orderCalls as &$oc) $oc['invoiced'] = $ocInv[(int)$oc['id']] ?? (float)($oc['invoiced'] ?? 0);
+            unset($oc);
+        }
         view('ops/crm/quote_detail', [
             'q' => $q, 'lines' => crm_quote_lines($q['id']),
             'preorderOn' => preorder_checklist_enabled(), 'preorderItems' => preorder_checklist_items(),
@@ -1659,18 +1680,10 @@ function ops_crm_quotes($route, $method) {
             'groupCandidates' => function_exists('quote_group_contract_candidates') ? quote_group_contract_candidates((int)$q['id']) : [],
             'canEndorseContract' => function_exists('can_endorse_contract_open') && can_endorse_contract_open(),
             'canApproveContract' => function_exists('can_approve_contract_open') && can_approve_contract_open(),
-            'orderJobs' => ops_all("SELECT j.id, j.job_code, j.stage, j.closed_flag, j.invoice_raised, j.invoice_amount, j.payment_received, j.payment_amount, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.quotation_id=? ORDER BY j.id", [$q['id']]),
+            'orderJobs' => $orderJobs,
             // Every inspection call raised under this quotation or its contract, with
             // the jobs and the money on each — so the whole order is checkable here.
-            'orderCalls' => ops_all(
-                "SELECT c.id, c.call_code, c.created_at, c.status, c.contract_number,
-                        (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count,
-                        (SELECT COALESCE(SUM(j.invoice_amount),0) FROM jobs j WHERE j.call_id=c.id AND j.invoice_raised=1) invoiced,
-                        (SELECT COALESCE(SUM(CASE WHEN j.payment_received=1 THEN j.payment_amount ELSE 0 END),0) FROM jobs j WHERE j.call_id=c.id) received
-                 FROM calls c
-                 WHERE c.quotation_id=? OR (COALESCE(c.contract_number,'')<>'' AND c.contract_number=?)
-                 ORDER BY c.id DESC",
-                [$q['id'], (string)($q['contract_number'] ?? '')])]);
+            'orderCalls' => $orderCalls]);
         return;
     }
     if ($route === 'quote-status' && $method === 'POST') {

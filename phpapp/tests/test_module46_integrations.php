@@ -22,6 +22,7 @@ t_ok(setting_change_class('licence_install')['secret'], 'licence_install is clas
 // A licence-key change records the event but never the value.
 $own = !db()->inTransaction(); if ($own) db()->beginTransaction();
 $savedUid = $_SESSION['uid'] ?? null;
+$savedKey = (string)setting_get('licence_key', '');   // restore explicitly — the rollback below does not always stick
 try {
     if (function_exists('ops_ensure_schema')) ops_ensure_schema();
     if (function_exists('idems_migrate')) idems_migrate();
@@ -55,6 +56,14 @@ try {
     if ($savedUid === null) unset($_SESSION['uid']); else $_SESSION['uid'] = $savedUid;
     if (function_exists('current_user')) current_user(true); if (function_exists('ua')) ua(true);
     if ($own && db()->inTransaction()) db()->rollBack();
+    // The bogus licence_key set above does NOT get undone by the rollback (a
+    // commit inside the try leaves it persisted), which put the whole app into an
+    // INVALID-licence state for every later test — masked only while the
+    // licence-disabled cache stayed stale. Restore the setting explicitly and
+    // re-prime the caches, so isolation actually holds.
+    setting_set('licence_key', $savedKey);
+    if (function_exists('lk_state')) lk_state(true);
+    if (function_exists('licence_disabled')) licence_disabled(true);
 }
 
 // ---- wiring / preservation ----

@@ -229,3 +229,229 @@ table (grep for a profitability `CREATE TABLE` is empty). Access is a **read gat
 (`data.profitability` / `data.revenue` / admin, `callprofit.php:62`). The only related
 persisted state is the month-end **cost freeze** (`cost_month_frozen()`, `costing.php:282`),
 which locks voucher/cost editing for a frozen month — an editing lock, not a status.
+
+---
+
+## Credential (held certificate) — verification & derived status (Slice P1)
+
+A held credential (`inspector_certs`) now carries an **additive** verification
+verdict `verify_status` (`competence.php` `competence_migrate()`), set by a
+manager via `/cert-verify` (gated by `competence_can_authorise()` — admin-level or
+master). It is **not** a workflow with transitions so much as a manager-set flag;
+a blank value (the default on every existing row) reproduces the previous
+date-only behaviour exactly.
+
+- **`verify_status` values** (`CREDENTIAL_VERIFY_STATES`): `''` (not verified),
+  `UNDER_VERIFICATION`, `VERIFIED`, `REJECTED`, `SUPERSEDED`.
+- **Derived display status** (`credential_status()`, read-only —
+  `CREDENTIAL_STATUS`): `VALID`, `EXPIRING` (within 45 days), `EXPIRED`,
+  `UNDER_VERIFICATION`, `REJECTED`, `SUPERSEDED`, `MISSING`. `REJECTED` /
+  `SUPERSEDED` stand regardless of dates; an expired certificate reads `EXPIRED`
+  even while `UNDER_VERIFICATION`; `VERIFIED` classifies by date like a normal
+  in-date credential.
+- **No gate change.** The allocation gate (`competence_lapsed()` /
+  `auth_block()`) is untouched — it still reads `is_mandatory` + `valid_to`. The
+  derived status is display-only (the Credential Vault), not a new block.
+- **No new permission** — reuses `competence_can_authorise()` for setting the
+  verdict and `mod.competence.view` / `person.iddoc.view` for viewing.
+
+---
+
+## Billable event (`billable_events.status`) — Revamp P4
+
+The operational→commercial bridge (`lib/billable.php`). One additive record per
+approved operational occurrence, keyed idempotently by
+`(source_module, source_kind, source_id)`. The **books ledger stays the money
+truth**: a billed event is reconciled to the invoice that consumed it and never
+invents money.
+
+`BILLABLE_STATUS`: **PENDING → APPROVED → BILLED**, plus **CANCELLED** and
+**DISPUTED**.
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING : derived by billable_events_sync() from a closed, not-yet-invoiced billable job (idempotent upsert)
+  PENDING --> APPROVED : billable-approve · billable_can_manage (finance.reconcile / master)
+  PENDING --> CANCELLED : billable-cancel (reason required)
+  APPROVED --> DISPUTED : billable-dispute (reason required)
+  APPROVED --> CANCELLED : billable-cancel (reason required)
+  DISPUTED --> APPROVED : billable-approve (re-approve)
+  DISPUTED --> CANCELLED : billable-cancel
+  APPROVED --> BILLED : (job source) reconciliation — the source job becomes invoiced (books_invoices_for_job); amount taken from the invoice
+  PENDING --> BILLED : (job source) reconciliation, if invoiced before review
+  APPROVED --> BILLED : (non-job source) billable-bill — finance attests the invoice number (bill_ref); P4c
+  BILLED --> [*] : terminal, linked to invoice_id (reconciled) or bill_ref (attested)
+  CANCELLED --> [*] : terminal
+```
+
+- **BILLED for a job source is never a manual transition** (`billable_allowed_next()`
+  excludes it); it is set by `billable_events_sync()` when `books_invoices_for_job()`
+  shows a non-cancelled invoice, taking the amount from the invoice.
+- **BILLED for a non-job source (P4c)** — timesheet / placement, which have no
+  automatic invoice linkage — is set by `billable_mark_billed()` via the
+  `billable-bill` action, and **requires the invoice number** (`bill_ref`): finance
+  attests the real invoice they raised, so the ledger still never claims BILLED
+  without an invoice behind it. Only an APPROVED event can be billed this way.
+- **Sources (`BILLABLE_SOURCES`):** `JOB_CLOSED` (inline hook + sync, job-invoice
+  reconciled), `TIMESHEET_APPROVED` (inline hook on `pdso_att_approval_set_status`
+  APPROVED; qty=man-days, amount priced at invoice), `PLACEMENT_FEE` (sync-derived
+  from inspectors with `fee_status='CONFIRMED'` and a real `placement_fee`).
+- **Permission:** reuses **`finance.reconcile`** (decision D1) via
+  `billable_can_manage()`; viewing via `billable_can()` (`finance.reconcile` /
+  `data.credit` / master). **No new permission** → `docs/02-permission-matrix.md`
+  unchanged. Route gate maps to the existing `invoicing` module.
+- **Idempotent:** re-running the sync refreshes only the derived fields while an
+  event is still PENDING; a human decision (APPROVED/BILLED/CANCELLED/DISPUTED) is
+  never overwritten.
+- **P4a scope:** only the `JOB_CLOSED` source is wired, populated by the sync
+  pass. Inline hooks at job-close / report-issue / timesheet-approval and more
+  sources are P4b.
+
+---
+
+## Connect Requirement (`cx_requirements.status`) — marketplace (K2a)
+
+A posted technical-manpower requirement in the marketplace folded into EXAACT
+(`lib/connect_market.php`, `CX_REQ_TRANSITIONS`). Additive `cx_requirements` table;
+no existing object touched.
+
+> **DRAFT → OPEN → SHORTLISTING → AWARDED → CLOSED**, plus **CANCELLED** and
+> **EXPIRED** as off-ramps.
+
+- `DRAFT → OPEN` (post) · `DRAFT → CANCELLED`
+- `OPEN → SHORTLISTING` · `OPEN → CLOSED` · `OPEN → CANCELLED` · `OPEN → EXPIRED`
+- `SHORTLISTING → AWARDED` (via `cx_requirement_award`, which also accepts the
+  chosen application) · `SHORTLISTING → OPEN` (reopen) · `SHORTLISTING → CLOSED` ·
+  `SHORTLISTING → CANCELLED`
+- `AWARDED → CLOSED`
+- Terminal: `CLOSED`, `CANCELLED`, `EXPIRED`. Transitions are enforced by
+  `cx_req_can_transition()`; an illegal move is refused, not applied.
+
+## Connect Application (`cx_applications.status`) — marketplace (K2a)
+
+A professional's application to a requirement (`CX_APP_TRANSITIONS`). Additive
+`cx_applications` table; one live application per professional per requirement.
+
+> **APPLIED → SHORTLISTED → OFFERED → ACCEPTED**, plus **DECLINED**, **WITHDRAWN**,
+> **REJECTED** as off-ramps.
+
+- `APPLIED → SHORTLISTED | REJECTED | WITHDRAWN`
+- `SHORTLISTED → OFFERED | REJECTED | WITHDRAWN`
+- `OFFERED → ACCEPTED | DECLINED | WITHDRAWN`
+- Terminal: `ACCEPTED`, `DECLINED`, `WITHDRAWN`, `REJECTED`. Enforced by
+  `cx_app_can_transition()`. Awarding a requirement drives the chosen application
+  to `ACCEPTED` via its legal path.
+
+- **Permission (K2a):** the staff desk reuses existing **coordinator/master**
+  gates (`connect_market_can()`) — **no new permission**; `docs/02-permission-matrix.md`
+  unchanged. External self-service (client-portal post, vendor/inspector-portal
+  apply) is **K2b**, where the new portal permissions will be added to the matrix
+  with the owner's sign-off.
+
+## Connect Engagement / Booking (`cx_engagements.status`) — marketplace (K20)
+
+The booking created once a requirement is **AWARDED** — it captures the *basis* on
+which the person is engaged (`lib/connect_engage.php`). Additive `cx_engagements`
+table; one engagement per requirement (upsert). The **basis** is one of
+`MAN_DAYS · MAN_MONTHS · DEPUTATION · CONTINUOUS · FREQUENCY` (a descriptor, not a
+status). The **status** is the engagement's own lifecycle:
+
+> **BOOKED → ACTIVE → COMPLETED**, plus **CANCELLED** as an off-ramp.
+
+- `BOOKED → ACTIVE | CANCELLED`
+- `ACTIVE → COMPLETED | CANCELLED`
+- Terminal: `COMPLETED`, `CANCELLED`. Set via `connect_engage_set_status()`.
+- Recorded/edited only after the requirement is `AWARDED`
+  (`connect_engage_save_for_requirement()`); the subject is derived from the awarded
+  application (professional / inspector / agency-bench). It does not replace the P4
+  **billable event** — it enriches the award with the basis finance bills on.
+- **Permission (K20):** the staff desk reuses **coordinator/master**
+  (`connect_market_can()`) — **no new permission**; a professional sees only their
+  own bookings (`/pro/bookings`, subject-scoped) and withdraws only their own live
+  application. `docs/02-permission-matrix.md` records this.
+- **Rate model & voucher cadence (K21):** the booking also carries how the rate is
+  quoted — `rate_inclusive` = `INCLUSIVE` (the rate covers fee + travel / hotel /
+  local conveyance / allowances) or `EXCLUSIVE` (fee only; those are reimbursed) —
+  and `voucher_cadence` = `PER_DAY | PER_DEPLOYMENT`. Both are chosen by the client
+  at posting (`cx_requirements.rate_inclusive / voucher_cadence`, via
+  `cx_requirement_save_terms()`) and inherited by the booking. Descriptors, not
+  statuses.
+
+## Connect Engagement Voucher (`cx_engagement_vouchers.status`) — marketplace + on-roll (K21)
+
+A claim the engaged person raises against their booking (`lib/connect_engvoucher.php`).
+**ONE** model serves every case because the engagement's subject is already
+`professional | inspector | bench`: a marketplace freelancer, an inspector on a
+company/agency roll, or an agency-bench person all raise the same voucher. A voucher
+= header + day/period lines; **fee = Σ(units × rate)**; **reimbursable = Σ(expense
+heads)** *only* when the engagement is `EXCLUSIVE`; **grand = fee + reimbursable**.
+Cadence (`PER_DAY | PER_DEPLOYMENT`) is inherited from the engagement.
+
+> **DRAFT → SUBMITTED → APPROVED → PAID**, with **REJECTED** ("sent back") as a
+> return path.
+
+- `DRAFT → SUBMITTED` (needs at least one line)
+- `SUBMITTED → APPROVED | REJECTED | DRAFT`
+- `APPROVED → PAID | REJECTED`
+- `REJECTED → DRAFT | SUBMITTED`
+- Terminal: `PAID`. Transitions via `connect_engv_set_status()`; only a `DRAFT`
+  accepts new/removed lines. On an `INCLUSIVE` engagement every expense head is
+  forced to 0 (the rate already covers them).
+- **Who reviews / approves**: for a **client-posted** marketplace engagement the
+  **client** who posted the job is the reviewer — the platform is a matchmaker, not a
+  paymaster. The client **returns for clarification** (`SUBMITTED → REJECTED`, with a
+  note in `decided_note`) or **approves** (`SUBMITTED → APPROVED`); the professional
+  reopens a returned voucher (`REJECTED → DRAFT`, which clears the note), revises and
+  resubmits. For an **on-roll / bench** engagement the internal desk plays that role
+  on the existing coordinator/master gate. Same states, no new status — only who is
+  allowed to move them (client, via the `market.vouchers` portal permission, scoped
+  to their own `poster_party_id`).
+- **Platform commission** (matchmaker model): the platform charges a nominal
+  commission on the **fee only** (never on reimbursed expenses), **split 50/50**
+  between client and professional. Rate is the admin setting `connect_commission_pct`
+  (default 5%). `connect_engv_recompute()` stores `commission_total`,
+  `commission_client`, `commission_pro`, `client_payable` (= grand + client half) and
+  `pro_net` (= grand − pro half) on the voucher. The platform takes no responsibility
+  for the settlement — it only records it.
+- **Settlement** (both sides confirm): after the client APPROVES, each side confirms
+  payment — the client that it has paid (`client_paid_at`), the professional that it
+  has received (`pro_received_at`). When **both** confirm, `settled_at` is stamped and
+  the voucher moves to **PAID** (`connect_engv_confirm()`). A voucher already PAID by
+  any path counts as settled (`connect_engv_is_settled()`).
+- **Report release gate**: the professional uploads the inspection report deliverable
+  (`cx_engagement_reports`); the **client can download it only once the engagement is
+  cleared** — every APPROVED/PAID voucher on it is settled
+  (`connect_engv_engagement_cleared()`). Until then the client portal serves HTTP 402
+  and shows a locked state. No new permission.
+- **Supporting documents** (receipts / bills): a voucher carries an additive
+  `cx_engagement_voucher_files` set — the claimant attaches receipts to back the
+  claim and the approver sees them with the voucher. Attachments may be added or
+  removed only while the voucher is **DRAFT or SUBMITTED** (`connect_engv_can_attach`);
+  once `APPROVED`/`PAID` the set is frozen with the decision. Uploads go through the
+  shared `upload_reject_reason()` guard; a document may optionally be pinned to one
+  day line. No new status and **no new permission** — the freelancer serves their own
+  via `/pro/voucher-file`, the desk via `/connect-voucher-file` on the same
+  marketplace gate.
+- **New object lifecycle** (this table did not exist before K21); documented here in
+  the same commit as the code. Additive `cx_engagement_vouchers` +
+  `cx_engagement_voucher_lines`; **no new named permission** — a professional owns
+  only their own vouchers (`/pro/vouchers`, subject-scoped), and the desk
+  approves/pays on the same coordinator/master gate used for the marketplace.
+
+## Connect Dispute (`cx_disputes.status`) — marketplace (K9b)
+
+A concern raised on a marketplace engagement (`lib/connect_disputes.php`,
+`CX_DISPUTE_TRANSITIONS`). Additive `cx_disputes` table; no existing object touched.
+
+> **OPEN → UNDER_REVIEW → RESOLVED**, plus **WITHDRAWN** as an off-ramp.
+
+- `OPEN → UNDER_REVIEW | RESOLVED | WITHDRAWN`
+- `UNDER_REVIEW → RESOLVED | WITHDRAWN`
+- Terminal: `RESOLVED` (records a resolution note + who/when), `WITHDRAWN`.
+  Enforced by `cx_dispute_can_transition()`.
+
+Categories: `PROCESS`, `COMMERCIAL`, `CONDUCT`, `FINDING`. **The M14 rule is
+encoded:** a `FINDING` dispute (about whether the material passed or was rejected)
+has `affects_fee = 0` — it is settled by review and **never** by withholding the
+professional's fee (`cx_dispute_affects_fee()`). Staff gate reuses
+coordinator/master (`connect_market_can`) — **no new permission**.

@@ -1010,11 +1010,21 @@ function ops_contract_360() {
          FROM report_docs rd JOIN jobs j ON j.id=rd.job_id JOIN calls cl ON cl.id=j.call_id
          WHERE COALESCE(cl.contract_number,'')=? AND rd.deleted=0 ORDER BY rd.id DESC", [$cno]) ?: []) : [];
 
-    // Commercial rollup across the jobs.
+    // Commercial rollup across the jobs. The invoiced figure honours the §28 revenue
+    // reader switch (P9); the ledger nets are read once for all the jobs.
     $invoiced = 0.0; $received = 0.0;
+    $cLedger = function_exists('revrecon_ledger_net_map') ? revrecon_ledger_net_map(array_map(fn($j) => (int)$j['id'], $jobs)) : [];
     foreach ($jobs as $j) {
-        if (!empty($j['invoice_raised'])) $invoiced += (float)$j['invoice_amount'];
+        if (!empty($j['invoice_raised']))
+            $invoiced += function_exists('job_invoiced_amount') ? job_invoiced_amount($j, $cLedger[(int)$j['id']] ?? 0) : (float)$j['invoice_amount'];
         if (!empty($j['payment_received'])) $received += (float)$j['payment_amount'];
+    }
+    // Keep the per-call invoiced line (a SUM(invoice_amount) sub-select) consistent with
+    // the rollup above by recomputing it through the same reader.
+    if (function_exists('call_invoiced_map') && $calls) {
+        $callInv = call_invoiced_map(array_map(fn($cl) => (int)$cl['id'], $calls));
+        foreach ($calls as &$cl) $cl['invoiced'] = $callInv[(int)$cl['id']] ?? (float)($cl['invoiced'] ?? 0);
+        unset($cl);
     }
     $value = (float)($c['value'] ?? 0);
     $money = ['value' => $value, 'invoiced' => $invoiced, 'received' => $received,

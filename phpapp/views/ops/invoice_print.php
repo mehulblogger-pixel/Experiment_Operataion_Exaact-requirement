@@ -136,8 +136,15 @@
       <tr><td colspan="7" class="r">Round off</td><td class="r"><?= $m($inv['round_off']) ?></td></tr>
     <?php endif; ?>
     <tr class="tot"><td colspan="7" class="r">Total</td><td class="r"><?= $m($inv['total']) ?></td></tr>
+    <?php if ((float)($inv['tds_amount'] ?? 0) > 0): ?>
+      <tr><td colspan="7" class="r">Less: TDS @ <?= e(rtrim(rtrim(number_format((float)$inv['tds_pct'],2),'0'),'.')) ?>% (on taxable value)</td><td class="r">− <?= $m($inv['tds_amount']) ?></td></tr>
+      <tr class="tot"><td colspan="7" class="r">Net payable</td><td class="r"><?= $m(function_exists('books_net_payable') ? books_net_payable($inv) : ((float)$inv['total'] - (float)$inv['tds_amount'])) ?></td></tr>
+    <?php endif; ?>
   </tfoot>
 </table>
+<?php if ((float)($inv['tds_amount'] ?? 0) > 0): ?>
+  <p class="words muted" style="font-size:11px">TDS is deducted by the customer on the taxable value (excl. GST) and deposited against the supplier's PAN; it is not a reduction of the invoice value.</p>
+<?php endif; ?>
 
 <?php if (function_exists('amount_in_words_inr')): ?>
   <p class="words">Amount in words: <b><?= e(amount_in_words_inr((float)$inv['total'])) ?></b></p>

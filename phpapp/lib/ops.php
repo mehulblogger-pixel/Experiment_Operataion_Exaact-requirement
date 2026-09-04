@@ -1698,7 +1698,9 @@ function job_profit($job, $officeId = null) {
     // job — travel, lodging, food. Real money out of the branch, and it was
     // missing from this sum entirely.
     $voucher  = $bearsCost ? job_voucher_total($job['id']) : 0;
-    $subcon   = $bearsCost ? (float)($job['subcon_cost'] ?? 0) : 0;
+    // §28 (P10) — the sub-contractor cost honours the cost reader switch. The ledger
+    // map is request-cached, so this stays O(1) even when job_profit loops all jobs.
+    $subcon   = $bearsCost ? (function_exists('job_subcon_cost') ? job_subcon_cost($job) : (float)($job['subcon_cost'] ?? 0)) : 0;
     $other    = $bearsCost ? (float)($job['other_cost'] ?? 0) : 0;
 
     // What the client agreed to pay back on top of the fee — the bills filed
@@ -1712,7 +1714,12 @@ function job_profit($job, $officeId = null) {
     $recovered = ($bearsCost && function_exists('job_recovered_total'))
         ? min(job_recovered_total($job), $expenses + $voucher) : 0;
 
-    $direct = $labour + $overhead + $expenses + $voucher + $subcon + $other - $recovered;
+    // P8 Option B — when reimbursable de-duplication is switched on (off by default),
+    // subtract the detected overlap between the two reimbursable doors for a both-sided
+    // job. Uses the already-computed figures, so it adds no query. An estimate, by design.
+    $dedupe = ($bearsCost && function_exists('reimbursable_dedupe_amount'))
+        ? (float)reimbursable_dedupe_amount($expenses, $voucher) : 0.0;
+    $direct = $labour + $overhead + $expenses + $voucher + $subcon + $other - $recovered - $dedupe;
     $contingency = round($direct * $contPct / 100, 2);
     $cost = round($direct + $contingency, 2);
     $profit = round($revenue - $cost, 2);
@@ -1721,7 +1728,7 @@ function job_profit($job, $officeId = null) {
         'mandays' => $mandays, 'daily_cost' => $daily, 'daily_base' => $dailyBase,
         'labour' => $labour, 'overhead' => $overhead, 'overhead_pct' => $ohPct,
         'expenses' => $expenses, 'voucher' => $voucher, 'subcon' => $subcon, 'other' => $other,
-        'recovered' => $recovered,
+        'recovered' => $recovered, 'dedupe' => $dedupe,
         'chargeable' => function_exists('chargeable_head_labels') ? chargeable_head_labels($job) : [],
         'contingency' => $contingency, 'contingency_pct' => $contPct,
         'cost' => $cost,
@@ -2426,8 +2433,8 @@ function ops_module_gate($route) {
         // to this person. One module gate here would either hide the whole screen
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
-        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring',
-        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring',
+        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring','candidate-link-pro'=>'hiring','candidate-unlink-pro'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
@@ -2481,8 +2488,11 @@ function ops_module_gate($route) {
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls','contract-open'=>'quotes',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
+        'connect-capabilities'=>'settings',
         'service-scope'=>'settings','service-formats'=>'settings',
         'deputations'=>'jobs',
+        'billable-events'=>'invoicing','billable-sync'=>'invoicing','billable-approve'=>'invoicing',
+        'billable-cancel'=>'invoicing','billable-dispute'=>'invoicing','billable-bill'=>'invoicing','billable-bill-partial'=>'invoicing',
         'call-status'=>'calls','call-attrs'=>'calls','call-override'=>'calls',
         'call-clar-new'=>'calls','call-clar-respond'=>'calls','call-clar-status'=>'calls',
         'assign-hold'=>'jobs','assign-accept'=>'jobs','assign-reassign'=>'jobs',
@@ -2540,6 +2550,7 @@ function ops_module_gate($route) {
         'imp-threat-add'=>'impartiality','imp-threat-decide'=>'impartiality',
         'competence'=>'competence','auth-add'=>'competence','auth-status'=>'competence',
         'auth-enforce'=>'competence','witness-add'=>'competence',
+        'cert-verify'=>'competence','credential-req-init'=>'competence',
         'equipment'=>'equipment','equip-new'=>'equipment','equip-edit'=>'equipment',
         'equip-cal-add'=>'equipment','equip-cal-del'=>'equipment','equip-cert'=>'equipment',
         'report-equip-add'=>'equipment','report-equip-del'=>'equipment',
@@ -2661,7 +2672,7 @@ function ops_dispatch($route, $method) {
         // Bills backing the expenses the client is being charged for.
         case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
             return ops_job_bill($route, $method);
-        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial' || $route === 'candidate-link-person':
+        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial' || $route === 'candidate-link-person' || $route === 'candidate-link-pro' || $route === 'candidate-unlink-pro':
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit' || $route === 'inquiry-delete':
             ops_crm_inquiries($route, $method); return true;
@@ -2679,6 +2690,8 @@ function ops_dispatch($route, $method) {
             ops_requisitions($route, $method); return true;
         case $route === 'recruitment':
             return ops_recruitment_home($method);
+        case $route === 'candidate-pool':   // Revamp P11 — candidate pool convergence (read-only)
+            return ops_candpool($method);
         case $route === 'recruitment-cc':
             return ops_recruitment_cc($method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
@@ -2738,6 +2751,111 @@ function ops_dispatch($route, $method) {
                 if (!empty($res['error'])) flash('Could not remove demo data: ' . $res['error'], 'error');
                 else flash('Demo data removed — ' . (int)($res['deleted'] ?? 0) . ' records deleted. You can load it again anytime.');
             }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s01':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S01 scenario.');
+            if ($method === 'POST' && function_exists('seed_s01_load')) {
+                try {
+                    $r = seed_s01_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S01 scenario loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' Log in: professional arjun.s01@demo.test (/pro/login), client client.s01@demo.test (/portal/login), staff coord.s01@demo.test / admin.s01@demo.test / reviewer.s01@demo.test / approver.s01@demo.test (/login) — password demo12345.',
+                        $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S01: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s01-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S01 scenario.');
+            if ($method === 'POST' && function_exists('seed_s01_remove')) {
+                $n = seed_s01_remove();
+                flash('DEMO-S01 scenario removed — ' . (int)$n . ' records deleted.');
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s02':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S02 scenario.');
+            if ($method === 'POST' && function_exists('seed_s02_load')) {
+                try {
+                    $r = seed_s02_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S02 scenario loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' Logins (demo12345): Apex staff rajesh.s02@demo.test / priya.s02@demo.test / vikram.s02@demo.test / kavita.s02@demo.test (/login), agency portal agency.s02@demo.test + client client.s02@demo.test (/portal/login).',
+                        $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S02: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s02-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S02 scenario.');
+            if ($method === 'POST' && function_exists('seed_s02_remove')) flash('DEMO-S02 scenario removed — ' . (int)seed_s02_remove() . ' records deleted.');
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s03':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S03 scenario.');
+            if ($method === 'POST' && function_exists('seed_s03_load')) {
+                try {
+                    $r = seed_s03_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S03 client foundation loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' 6 clients + portal users (password demo12345), e.g. epc.admin.s03@demo.test / epc.tech.s03@demo.test / power.tech.s03@demo.test (/portal/login).',
+                        $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S03: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s03-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S03 scenario.');
+            if ($method === 'POST' && function_exists('seed_s03_remove')) flash('DEMO-S03 client foundation removed — ' . (int)seed_s03_remove() . ' records deleted.');
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s04':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S04 scenario.');
+            if ($method === 'POST' && function_exists('seed_s04_load')) {
+                try {
+                    $r = seed_s04_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S04 marketplace lifecycle loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' Client login s04.tech@demo.test (password demo12345, /portal/login).', $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S04: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s04-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S04 scenario.');
+            if ($method === 'POST' && function_exists('seed_s04_remove')) flash('DEMO-S04 marketplace lifecycle removed — ' . (int)seed_s04_remove() . ' records deleted.');
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s05':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S05 scenario.');
+            if ($method === 'POST' && function_exists('seed_s05_load')) {
+                try {
+                    $r = seed_s05_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S05 convergence & reconciliation loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' See it at /revenue-reconciliation, /cost-reconciliation and /candidate-pool.', $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S05: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s05-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S05 scenario.');
+            if ($method === 'POST' && function_exists('seed_s05_remove')) flash('DEMO-S05 convergence & reconciliation removed — ' . (int)seed_s05_remove() . ' records deleted.');
+            redirect('/settings'); return true;
+        case $route === 'welcome':               // Guided getting-started welcome (mode-aware)
+            return ops_welcome($method);
+        case $route === 'install-mode-set':
+            ops_require(is_master(), 'Only the Master Admin can change the install mode.');
+            if ($method === 'POST' && function_exists('install_mode_set')) {
+                if (install_mode_set($_POST['install_mode'] ?? '')) flash('Install mode set to “' . install_mode_label() . '”.');
+                else flash('That is not a valid install mode.', 'error');
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s06':
+            ops_require(is_master(), 'Only the Master Admin can load the DEMO-S06 scenario.');
+            if ($method === 'POST' && function_exists('seed_s06_load')) {
+                try {
+                    $r = seed_s06_load();
+                    $pass = count(array_filter($r['dashboard'], fn($d) => $d[1])); $tot = count($r['dashboard']);
+                    flash('DEMO-S06 gap-closure showcase loaded — ' . $pass . '/' . $tot . ' checks pass' . ($r['allpass'] ? ' (ALL PASS).' : '.')
+                        . ' See it at /candidate (the linked person), /connect-requirements, /billable-events.', $r['allpass'] ? 'success' : 'warning');
+                } catch (Throwable $e) { flash('Could not load DEMO-S06: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
+        case $route === 'seed-scenario-s06-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S06 scenario.');
+            if ($method === 'POST' && function_exists('seed_s06_remove')) flash('DEMO-S06 gap-closure showcase removed — ' . (int)seed_s06_remove() . ' records deleted.');
             redirect('/settings'); return true;
         case $route === 'trace-thread':
             ops_require(is_master(), 'Only the Master Admin can build the traceability thread.');
@@ -2804,6 +2922,8 @@ function ops_dispatch($route, $method) {
             ops_consents($route, $method); return true;
         case $route === 'super-admin' || $route === 'control-panel':
             return ops_super_admin($method);
+        case $route === 'marketplace-plans':   // Super-Admin: marketplace subscription plans & limits
+            return ops_mkt_plans($method);
         case $route === 'tenants' || $route === 'tenant-enable' || $route === 'tenant-add'
              || $route === 'tenant-status' || $route === 'tenant-remove'
              || $route === 'cpanel-save' || $route === 'cpanel-test':
@@ -2883,6 +3003,14 @@ function ops_dispatch($route, $method) {
         // Who arrived here from a sibling application, and who was turned away.
         case $route === 'licence' || $route === 'licence-save' || $route === 'licence-check' || $route === 'licence-pubkey':
             return ops_licence($route, $method);
+        case $route === 'product-package' || $route === 'product-package-apply':   // Revamp P6 — product-package chooser
+            return ops_product_package($route, $method);
+        case $route === 'revenue-reconciliation':   // Revamp §29 — revenue reconciliation worklist (read-only)
+            return ops_revrecon($method);
+        case $route === 'cost-reconciliation':   // Revamp P8 — sub-contractor cost reconciliation worklist (read-only)
+            return ops_costrecon($method);
+        case $route === 'reimbursable-dedup':   // Revamp P8 — reimbursable double-count worklist + de-dup toggle
+            return ops_reimbursable_dedup($method);
         case $route === 'vendor' || $route === 'signing-setup':
             ops_vendor($route, $method); return true;
         case $route === 'agreement':
@@ -2968,7 +3096,8 @@ function ops_dispatch($route, $method) {
             return ops_assets($route, $method);
         case $route === 'impartiality' || strncmp($route, 'imp-', 4) === 0:
             return ops_impartiality($route, $method);
-        case $route === 'competence' || strncmp($route, 'auth-', 5) === 0 || $route === 'witness-add':
+        case $route === 'competence' || strncmp($route, 'auth-', 5) === 0 || $route === 'witness-add'
+             || $route === 'cert-verify' || $route === 'credential-req-init':
             return ops_competence($route, $method);
         case strncmp($route, 'equip', 5) === 0 || $route === 'report-equip-add' || $route === 'report-equip-del':
             return ops_equipment($route, $method);
@@ -3024,7 +3153,7 @@ function ops_dispatch($route, $method) {
             return ops_attend_action($route, $method);
         case $route === 'operations':
             return ops_operations_home($method);
-        case in_array($route, ['sales','quality','reporting','money','insights','directory','admin'], true):
+        case in_array($route, ['sales','marketplace','quality','reporting','money','insights','directory','admin'], true):
             return ops_area_home($route, $method);
         case $route === 'ops-desk':
             // Merged into the Operations home (Backlog & registers tab). Kept as a
@@ -3162,6 +3291,46 @@ function ops_dispatch($route, $method) {
             return ops_system_status($method);
         case $route === 'tasks':               // Phase 3 §26 — my persisted tasks
             return ops_tasks($method);
+        case $route === 'billable-events' || strncmp($route, 'billable-', 9) === 0:   // Revamp P4 — Billable Event ledger
+            return ops_billable($route, $method);
+        case $route === 'connect-taxonomy':    // Connect K0 — marketplace industry taxonomy (read-only)
+            return ops_connect_taxonomy($method);
+        case $route === 'connect-taxonomy-admin': // Connect K0+ — universal taxonomy graph admin (CRUD)
+            return ops_connect_taxonomy_admin($method);
+        case $route === 'connect-qualifications': // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA, read-only)
+            return ops_connect_qualifications($method);
+        case $route === 'connect-verify':       // Connect K14 / #3 — verification & moderation desk
+            return ops_connect_verify($method);
+        case $route === 'connect-identity':     // Connect K0+ — unified professional identity (link inspector ↔ marketplace pro)
+            return ops_connect_identity($method);
+        case $route === 'connect-source':       // Connect K0+ — inspection request → unified manpower sourcing (rank + controlled assign)
+            return ops_connect_source($method);
+        case $route === 'connect-match-weights': // Connect K0+ — admin-tunable matching weights (§23)
+            return ops_connect_match_weights($method);
+        case $route === 'connect-messages':     // Connect K15 / #4 — in-app messaging (staff desk)
+            return ops_connect_messages($method);
+        case $route === 'connect-channels':     // Connect K16 / #5 — WhatsApp/SMS/email channel desk
+            return ops_connect_channels($method);
+        case $route === 'connect-bench':        // Connect K18 / #7 — agency bench workspace
+            return ops_connect_bench($method);
+        case $route === 'connect-analytics':    // Connect K19 / #8 — labour-market analytics (read-only)
+            return ops_connect_analytics($method);
+        case $route === 'passport-share':      // Connect K1 — get/copy a professional's public passport link + QR
+            return ops_connect_passport_share($method);
+        case $route === 'connect-requirements': // Connect K2a — manpower marketplace board (post + list)
+            return ops_connect_requirements($route, $method);
+        case $route === 'connect-requirement':  // Connect K2a — one requirement (applications + lifecycle)
+            return ops_connect_requirement($method);
+        case $route === 'connect-voucher-file': // Connect K21 — serve a voucher's supporting document (desk)
+            return ops_connect_voucher_file();
+        case $route === 'connect-concierge':    // Connect K4 — guided requirement builder
+            return ops_connect_concierge($method);
+        case $route === 'connect-talent':       // Connect A3 — talent search over the shared professional pool
+            return ops_connect_talent($method);
+        case $route === 'connect-orgs':         // Connect B0 — organisation accounts (master-only)
+            return ops_connect_orgs($method);
+        case $route === 'connect-capabilities': // Connect — company business capabilities (master-only)
+            return ops_connect_capabilities($method);
         case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board
             return ops_command_centre($method);
         case $route === 'entity-360':          // Phase 3 §49 — uniform 360 shell for any entity
@@ -4676,13 +4845,15 @@ function ops_requisitions($route, $method) {
             foreach ($others as $o) { $f = recruit_fit_score($o, $req); if ($f['score'] >= 55) { $o['fit'] = $f; $pool[] = $o; } }
             usort($pool, fn($a, $b) => $b['fit']['score'] <=> $a['fit']['score']); $pool = array_slice($pool, 0, 5);
         }
+        // P1b — the same ranked shortlist, but from the MARKETPLACE professional bench.
+        $proPool = function_exists('recruit_pro_pool') ? recruit_pro_pool($req) : [];
         // Phase 5 — commercial rollup across hires (planned vs approved vs actual) + per-candidate commercials for the table.
         $rollup = function_exists('recruit_req_commercial_rollup') ? recruit_req_commercial_rollup($req) : null;
         $candComm = [];
         if (function_exists('assignment_commercials')) {
             foreach ($cands as $c) if (($c['stage'] ?? '') === 'ACCEPTED' || !empty($c['inspector_id'])) $candComm[$c['id']] = assignment_commercials($c, $req);
         }
-        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands, 'health' => $health, 'pool' => $pool, 'rollup' => $rollup, 'candComm' => $candComm,
+        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands, 'health' => $health, 'pool' => $pool, 'proPool' => $proPool, 'rollup' => $rollup, 'candComm' => $candComm,
             'groups' => function_exists('req_groups') ? req_groups((int)$req['id']) : []]); return;
     }
 }
@@ -4824,8 +4995,27 @@ function ops_candidates($route, $method) {
             $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int)($_GET['id'] ?? 0)]);
             if (!$cand) { http_response_code(404); view('notfound'); return; }
         }
-        $dupBlock = []; $prefill = null;
-        if ($method === 'POST') {
+        $dupBlock = []; $prefill = null; $cvBanner = null;
+        if ($method === 'POST' && ($_POST['action'] ?? '') === 'cv_prefill' && !$cand) {
+            // RÉSUMÉ AUTO-EXTRACT — read the pasted text or uploaded file, prefill the
+            // blank fields, and re-render the form for the recruiter to review & Save.
+            // Never creates a candidate; only fills the form.
+            $b = $_POST;
+            $cvText = trim((string)($b['cv_text'] ?? ''));
+            if (!empty($_FILES['cv_file']['tmp_name']) && (int)$_FILES['cv_file']['error'] === 0) {
+                $bytes = @file_get_contents($_FILES['cv_file']['tmp_name']);
+                if ($bytes !== false && function_exists('connect_cv_extract_text'))
+                    $cvText = connect_cv_extract_text($bytes, (string)($_FILES['cv_file']['type'] ?? ''), (string)($_FILES['cv_file']['name'] ?? ''));
+            }
+            $auto = function_exists('recruit_cv_autofill') ? recruit_cv_autofill($cvText) : [];
+            $prefill = $b;                                   // keep whatever the recruiter already typed…
+            foreach ($auto as $k => $v) { if ($v !== '' && $v !== null && trim((string)($prefill[$k] ?? '')) === '') $prefill[$k] = $v; } // …fill only the blanks
+            $prefill['cv_text'] = $cvText;
+            $sum = function_exists('recruit_cv_autofill_summary') ? recruit_cv_autofill_summary($auto) : '';
+            $cvBanner = $cvText === '' ? 'Paste some résumé text (or choose a file) first, then press “Extract”.'
+                      : ($sum !== '' ? 'Filled from the résumé: ' . $sum . '. Check everything, add the requisition, and Save.'
+                                     : 'Could not read much from that file — type the details in, or paste the résumé text instead.');
+        } elseif ($method === 'POST') {
             $b = $_POST;
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
@@ -4855,6 +5045,13 @@ function ops_candidates($route, $method) {
                 $pdo->prepare("INSERT INTO candidates (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
                 if (function_exists('custom_save')) custom_save('candidate', (int)$id, $b);
+                // If the résumé text was carried through the prefill, save it and its
+                // search keywords too, so the CV is on file from the moment of intake.
+                $cvText = trim((string)($b['cv_text'] ?? ''));
+                if ($cvText !== '') {
+                    $kw = function_exists('cv_extract_keywords') ? cv_extract_keywords($cvText) : '';
+                    try { $pdo->prepare("UPDATE candidates SET cv_text=?, cv_keywords=?, cv_analyzed_at=? WHERE id=?")->execute([$cvText, $kw, date('c'), $id]); } catch (Throwable $e) {}
+                }
                 $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                     ->execute([$id, '', 'RECEIVED', 'CV received', user_name(current_user()), date('c')]);
                 flash("$code added to the hiring pipeline.");
@@ -4885,7 +5082,7 @@ function ops_candidates($route, $method) {
         view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls, 'agencies' => $agencies,
             'requisitions' => requisitions_list(true), 'preReq' => $preReq, 'reqLocations' => $reqLocations, 'reqGroups' => $reqGroups,
             'cfvals' => $cand ? custom_values_map('candidate', $cand['id']) : [],
-            'dupes' => $dupBlock ?? [], 'prefill' => $prefill ?? null,
+            'dupes' => $dupBlock ?? [], 'prefill' => $prefill ?? null, 'cvBanner' => $cvBanner ?? null,
             'rccUsers' => function_exists('rcc_users') ? rcc_users() : [], 'rccDepts' => function_exists('rcc_departments') ? rcc_departments() : [],
             'rccDropReasons' => function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : [], 'rccDropPoints' => function_exists('rcc_drop_points') ? rcc_drop_points() : [],
             'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'skillsByTrade' => skills_by_trade()]);
@@ -4930,6 +5127,29 @@ function ops_candidates($route, $method) {
         redirect('/candidate?id=' . $id);
     }
 
+    // P11 — confirm a candidate and a marketplace professional are the same person
+    // (additive, reversible; nothing merged). Coordinator-gated like the person link.
+    if ($route === 'candidate-link-pro') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can confirm a marketplace match.');
+        $id  = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        $pro = (int)($_POST['pro_id'] ?? 0);
+        if ($method === 'POST' && $id && $pro && function_exists('connect_identity_candidate_link_create')) {
+            [$ok, $msg] = connect_identity_candidate_link_create($id, $pro, 'manual');
+            flash($msg, $ok ? 'success' : 'error');
+        }
+        redirect('/candidate?id=' . $id);
+    }
+    if ($route === 'candidate-unlink-pro') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can remove a marketplace match.');
+        $id   = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        $link = (int)($_POST['link_id'] ?? 0);
+        if ($method === 'POST' && $link && function_exists('connect_identity_unlink')) {
+            [$ok, $msg] = connect_identity_unlink($link);
+            flash($msg, $ok ? 'success' : 'error');
+        }
+        redirect('/candidate?id=' . $id);
+    }
+
     if ($route === 'candidate') {
         ops_require(is_coordinator_level());
         $cand = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp,
@@ -4959,9 +5179,15 @@ function ops_candidates($route, $method) {
         }
         // Phase 6 — this person's other application rows (same person, kept distinct).
         $personApps = function_exists('person_applications') ? person_applications($cand) : [];
+        // P11 — is this person also a marketplace professional? (read-only convergence)
+        $proMatches = function_exists('candpool_pro_matches') ? candpool_pro_matches($cand) : [];
+        // P11 — has a coordinator already confirmed this candidate IS one of those professionals?
+        $proLink = function_exists('connect_identity_of_candidate') ? connect_identity_of_candidate((int)$cand['id']) : null;
+        // Gap-8 — the unified person across every linked pool (resolve-view, no merge).
+        $person = function_exists('connect_person_summary') ? connect_person_summary('candidate', (int)$cand['id']) : null;
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
             'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket,
-            'personApps' => $personApps,
+            'personApps' => $personApps, 'proMatches' => $proMatches, 'proLink' => $proLink, 'person' => $person,
             'rccDropPoints' => function_exists('rcc_drop_points') ? rcc_drop_points() : [], 'rccDropReasons' => function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : []]);
         return;
     }
@@ -6083,6 +6309,9 @@ function ops_jobs($route, $method) {
                 ->execute([date('c'), $reportDate, $b['report_link'] ?? '', $tat, $needsApproval, $job['id']]);
             // Phase 2 §30 — freeze this job's cost basis at close so its profit is reproducible.
             if (function_exists('job_cost_snapshot')) job_cost_snapshot((int)$job['id']);
+            // Revamp P4b — queue this closed work as a billable candidate the moment
+            // it closes (idempotent, and self-guarded so it can never block the close).
+            if (function_exists('billable_on_job_closed')) billable_on_job_closed((int)$job['id']);
             send_closure_email($job['id']);
             if ($needsApproval === 'PENDING') report_approval_notify($job['id']);
             flash("Job {$job['job_code']} closed. TAT " . ($tat === null ? '—' : $tat) . " day(s). Closure email sent.");
@@ -6472,7 +6701,7 @@ function boss_profit($bossId) {
         // The order is judged on what the client is charged for it, whichever
         // branch of ours did the work.
         $revenue += job_money($j)['invoice'];
-        $jSub = (float)($j['subcon_cost'] ?? 0); $subcon += $jSub;
+        $jSub = function_exists('job_subcon_cost') ? job_subcon_cost($j) : (float)($j['subcon_cost'] ?? 0); $subcon += $jSub;
         $jLab = 0;
         if ($seeSal) {
             $sal = $j['inspector_id'] ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$j['inspector_id']]) : 0;
@@ -7169,6 +7398,27 @@ function system_status() {
                  $rc > 0 ? $rc . ' job(s) disagree' : 'Ledger reconciled',
                  $rc > 0 ? 'The legacy per-job invoice figure differs from the books ledger — review before it is trusted.'
                          : 'Every job\'s legacy invoice figure matches the books ledger.', '/data-control');
+        } catch (Throwable $e) {}
+    }
+    // P8 — cost-side twin: where a job's legacy sub-contractor cost differs from the
+    // committed cost ledger. Advisory only; changes no number.
+    if (function_exists('costrecon_count') && function_exists('can_see_salary') && can_see_salary()) {
+        try { $cc = costrecon_count();
+            $add('cost_recon', 'Cost reconciliation', $cc > 0 ? 'warn' : 'ok',
+                 $cc > 0 ? $cc . ' job(s) disagree' : 'Costs reconciled',
+                 $cc > 0 ? 'A job\'s legacy sub-contractor cost differs from what a committed cost run put in the ledger — review before it is trusted.'
+                         : 'Every job\'s sub-contractor cost matches the committed cost ledger.', '/cost-reconciliation');
+        } catch (Throwable $e) {}
+    }
+    // P8 — reimbursables recorded on both doors (closure expenses + inspector voucher).
+    // Advisory: profit sums both, so each flagged job needs a human to confirm they are
+    // different trips, not the same one twice.
+    if (function_exists('cost_dualwrite_count') && function_exists('can_see_salary') && can_see_salary()) {
+        try { $dw = cost_dualwrite_count();
+            $add('reimb_dedup', 'Reimbursable duplication', $dw > 0 ? 'warn' : 'ok',
+                 $dw > 0 ? $dw . ' job(s) both-sided' : 'No duplication',
+                 $dw > 0 ? 'Reimbursables sit on both the closure expenses and the voucher for these jobs — reconcile each before its profit is trusted.'
+                         : 'No job records reimbursables on both doors.', '/reimbursable-dedup');
         } catch (Throwable $e) {}
     }
     return $out;

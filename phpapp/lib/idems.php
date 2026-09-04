@@ -5972,6 +5972,16 @@ function idems_awaiting_my_approval_clause() {
               . " ) )";
     return [$sql, [$uid, $uid, $role]];
 }
+// How many reports are waiting on ME right now for review/approval — the reviewer/
+// approver queue count, so a dashboard can surface it instead of leaving it buried.
+function idems_awaiting_my_approval_count() {
+    if (!function_exists('idems_awaiting_my_approval_clause')) return 0;
+    [$aw, $aa] = idems_awaiting_my_approval_clause();
+    if ($aw === '0') return 0;
+    [$w, $a] = function_exists('scope_clause') ? scope_clause('d.office_id', 'd.sbu') : ['1=1', []];
+    try { return (int) ops_val("SELECT COUNT(*) FROM report_docs d WHERE d.deleted=0 AND $w AND $aw", array_merge($a, $aa)); }
+    catch (Throwable $e) { return 0; }
+}
 function idems_approver_email($userId) { return $userId ? (string)ops_val("SELECT email FROM users WHERE id=? AND is_active=1", [(int)$userId]) : ''; }
 function idems_notify_approver($doc, $step) {
     $to = idems_approver_email($step['resolved_user_id'] ?? 0);

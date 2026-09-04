@@ -39,6 +39,7 @@ const PLAIN = [
   '/work-norms', '/office-finance', '/cost-run', '/sbu-pl', '/mis', '/partner-import', '/duplicates',
   '/reset-data', '/m/office-expense-heads', '/reports', '/profitability', '/invoicing',
   '/users', '/user-new', '/hierarchy', '/settings', '/access', '/terminology',
+  '/connect-orgs', '/connect-capabilities',
   '/ai-settings', '/templates', '/crm-templates', '/approval-rules', '/my-signature',
   '/change-password', '/my-jobs', '/boss-renew',
   // Global search: the empty box, a term that matches several registers, and a

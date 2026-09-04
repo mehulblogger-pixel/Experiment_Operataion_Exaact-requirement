@@ -20,6 +20,15 @@ $insertPos = strpos($src, 'INSERT INTO $table');
 t_ok($guardPos !== false && $insertPos !== false && $guardPos < $insertPos,
     'the permission check precedes the contract INSERT');
 
+// R4 (Revamp P5b) — beyond the permission gate, a contract created through this
+// door now enters the SAME two-signature lifecycle as the CRM path: it is set
+// PENDING (awaiting a manager's endorsement, then approval), never the default OPEN.
+t_ok(strpos($src, "UPDATE partner_contracts SET open_status='PENDING', is_active=0 WHERE id=?") !== false,
+    'a contract registered through this door is set PENDING (awaiting endorsement), not straight to OPEN');
+$pendPos = strpos($src, "UPDATE partner_contracts SET open_status='PENDING', is_active=0");
+t_ok($pendPos !== false && $insertPos !== false && $insertPos < $pendPos,
+    'the PENDING lifecycle is applied right after the contract INSERT');
+
 // The permission logic per role: only Finance / master may register a contract;
 // sales, coordinator and inspector may not. (Same gate the route enforces.)
 $pdo = db();

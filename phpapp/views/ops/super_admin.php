@@ -103,6 +103,14 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
   <!-- BILLING + TENANTS -->
   <div class="band"><h2>Subscription &amp; workspaces</h2><span class="bd">how it earns and who's on it</span></div>
   <div class="g2">
+    <div class="panel" style="border-left:3px solid var(--brand)"><div class="ph"><h3>Marketplace plans &amp; limits</h3><span class="note"><a href="/marketplace-plans">Manage ›</a></span></div>
+      <div class="pb">
+        <div class="kv"><span class="k">What it is</span><span>Connect subscription plans, prices &amp; limits for clients &amp; freelancers</span></div>
+        <div class="kv"><span class="k">Plans</span><span class="tnum"><?= function_exists('mkt_plans_all') ? count(mkt_plans_all()) : 0 ?> configured</span></div>
+        <div class="kv"><span class="k">Freelancer promo</span><span><?= (function_exists('mkt_pro_is_free') && mkt_pro_is_free()) ? '<span class="pill p-ok">Free until '.$e(mkt_pro_free_until()).'</span>' : '—' ?></span></div>
+        <div class="kv"><span class="k">Annual</span><span>pay <?= function_exists('mkt_annual_months') ? (int)mkt_annual_months() : 10 ?> months / year</span></div>
+      </div>
+    </div>
     <div class="panel"><div class="ph"><h3>Subscription &amp; billing</h3><span class="note"><a href="/billing">Manage ›</a></span></div>
       <div class="pb">
         <div class="kv"><span class="k">Gateway</span><span><?= !empty($bill['enabled']) ? '<span class="pill p-ok">Razorpay set</span>' : '<span class="pill p-warn">Not configured</span>' ?></span></div>

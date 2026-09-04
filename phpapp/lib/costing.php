@@ -975,3 +975,126 @@ function costing_span_label($span, $fy, $yr, $mon) {
     if ($span === 'ytd') return 'FY ' . $fy . ' to date';
     return date('F Y', mktime(0, 0, 0, (int)$mon, 1, (int)$yr));
 }
+
+// ===========================================================================
+//  R9 — cost dual-write detector (read-only; Revamp)
+// ---------------------------------------------------------------------------
+//  Reimbursables (travel / lodging / food) have TWO data-entry doors for one
+//  job: the coordinator's closure `expenses` and the inspector's monthly
+//  `voucher`. job_profit() sums BOTH (ops.php), which is correct when they record
+//  DIFFERENT costs — but if the same trip is keyed on both sides it is
+//  double-counted. This surfaces such jobs so a human can reconcile them; it
+//  changes no figure. Convergence (making one side authoritative) is a separate,
+//  deliberate decision and is NOT done here.
+// ===========================================================================
+function cost_sources($jobId) {
+    $exp = function_exists('job_expenses_total') ? round((float)job_expenses_total((int)$jobId), 2) : 0.0;
+    $vou = function_exists('job_voucher_total')  ? round((float)job_voucher_total((int)$jobId), 2)  : 0.0;
+    $both = ($exp > 0 && $vou > 0);
+    return ['expenses' => $exp, 'voucher' => $vou, 'total' => round($exp + $vou, 2),
+            'both_sided' => $both, 'overlap' => $both ? round(min($exp, $vou), 2) : 0.0];
+}
+
+// True when reimbursables are recorded on both doors for this job (a likely
+// double-entry that job_profit() sums).
+function cost_dualwrite_flag($jobId) { return cost_sources($jobId)['both_sided']; }
+
+// The reconciliation worklist: closed jobs with reimbursables on both sides,
+// largest likely-overlap first. Read-only.
+function cost_dualwrite_scan($limit = 200) {
+    $rows = [];
+    try {
+        foreach (ops_all("SELECT id, job_code, call_id FROM jobs WHERE closed_flag=1 ORDER BY id DESC LIMIT " . max(1, (int)$limit)) ?: [] as $j) {
+            $c = cost_sources((int)$j['id']);
+            if ($c['both_sided']) $rows[] = ['job_id' => (int)$j['id'], 'job_code' => (string)$j['job_code']] + $c;
+        }
+    } catch (Throwable $e) {}
+    usort($rows, fn($a, $b) => $b['overlap'] <=> $a['overlap']);
+    return $rows;
+}
+
+// A per-job warning for the job-detail Money fold (managers/coordinators only).
+function cost_dualwrite_render($jobId) {
+    $c = cost_sources((int)$jobId);
+    if (!$c['both_sided']) return;
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n, 2);
+    $eng = function_exists('Tl') ? Tl('engineer') : 'engineer';
+    $job = function_exists('Tl') ? Tl('job') : 'job';
+    echo '<div class="msg msg-warning" style="margin:0 0 10px">⚠ Reimbursables are recorded on <strong>both</strong> the closure expenses ('
+       . $e($m($c['expenses'])) . ') and the ' . $e($eng) . '’s voucher (' . $e($m($c['voucher']))
+       . ') for this ' . $e($job) . '. Profit sums both, so up to <strong>' . $e($m($c['overlap']))
+       . '</strong> may be double-counted — confirm the two sides record different costs, not the same trip twice.</div>';
+}
+
+// How many closed jobs are both-sided, and the total overlap at risk (advisory).
+function cost_dualwrite_count() { return count(cost_dualwrite_scan(100000)); }
+function cost_dualwrite_summary() {
+    $rows = cost_dualwrite_scan(100000);
+    $tot = 0.0; foreach ($rows as $r) $tot += (float)$r['overlap'];
+    return ['jobs' => count($rows), 'overlap_total' => round($tot, 2)];
+}
+
+// ---------------------------------------------------------------------------
+//  P8 · Option B — the reimbursable de-duplication mode. The estimate toggle,
+//  OFF by default, mirroring the P9/P10 reader switches. When 'net', job_profit
+//  subtracts the detected overlap (min(expenses, voucher)) for a both-sided job.
+//  It is deliberately not the default: the overlap is an ESTIMATE, so netting can
+//  over-remove when the two doors hold genuinely different trips. The accurate
+//  path is Option C — reconcile each flagged job from the worklist below.
+// ---------------------------------------------------------------------------
+function reimbursable_dedupe_modes() {
+    return [
+        'off' => 'Count both doors (accurate total — reconcile per job)',
+        'net' => 'Net the detected overlap (estimate)',
+    ];
+}
+function reimbursable_dedupe_mode() {
+    $m = strtolower((string)setting_get('reimbursable_dedupe', 'off'));
+    return isset(reimbursable_dedupe_modes()[$m]) ? $m : 'off';
+}
+function reimbursable_dedupe_set_mode($mode) {
+    $mode = strtolower((string)$mode);
+    if (!isset(reimbursable_dedupe_modes()[$mode])) return false;
+    if (function_exists('setting_set')) setting_set('reimbursable_dedupe', $mode);
+    return true;
+}
+// The amount job_profit should subtract for a both-sided job under the current mode.
+// Takes the already-computed expenses/voucher so it adds no query.
+function reimbursable_dedupe_amount($expenses, $voucher) {
+    if (reimbursable_dedupe_mode() !== 'net') return 0.0;
+    $e = (float)$expenses; $v = (float)$voucher;
+    return ($e > 0 && $v > 0) ? round(min($e, $v), 2) : 0.0;
+}
+
+// The Option-C worklist screen: every both-sided job to reconcile, largest overlap
+// first, each linking to the job so a coordinator can remove the duplicate at source.
+// Carries the Option-B mode control. Read-only apart from setting the mode.
+function ops_reimbursable_dedup($method) {
+    ops_require((function_exists('can_see_salary') && can_see_salary())
+        || (function_exists('can') && (can('finance.reconcile') || can('mod.profitability.view'))) || is_master(),
+        'You cannot open the reimbursable duplication worklist.');
+    if ($method === 'POST' && isset($_POST['reimbursable_dedupe'])) {
+        if (reimbursable_dedupe_set_mode($_POST['reimbursable_dedupe']))
+            flash('Reimbursable handling set to “' . (reimbursable_dedupe_modes()[reimbursable_dedupe_mode()] ?? reimbursable_dedupe_mode()) . '”.');
+        else flash('That is not a valid option.', 'error');
+        redirect('/reimbursable-dedup'); return true;
+    }
+    $rows = cost_dualwrite_scan(300);
+    foreach ($rows as &$r) {
+        try {
+            $j = ops_one("SELECT j.job_code, COALESCE(NULLIF(bp.display_name,''), bp.legal_name) client_name
+                          FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+                          LEFT JOIN business_partners bp ON bp.id=c.client_id WHERE j.id=?", [(int)$r['job_id']]);
+        } catch (Throwable $e) { $j = null; }
+        $r['client_name'] = (string)($j['client_name'] ?? '');
+    }
+    unset($r);
+    view('ops/reimbursable_dedup', [
+        'rows'    => $rows,
+        'summary' => cost_dualwrite_summary(),
+        'mode'    => reimbursable_dedupe_mode(),
+        'modes'   => reimbursable_dedupe_modes(),
+    ]);
+    return true;
+}

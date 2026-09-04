@@ -12,36 +12,19 @@
 //  and set the environment variable CRON_KEY=YOUR_SECRET.
 // ============================================================================
 
-require __DIR__ . '/lib/db.php';
-require __DIR__ . '/lib/helpers.php';
-require __DIR__ . '/lib/ops.php';
-require __DIR__ . '/lib/lookups.php';
-require __DIR__ . '/lib/access.php';
-require __DIR__ . '/lib/terms.php';
-require __DIR__ . '/lib/compose.php';
-require __DIR__ . '/lib/crm.php';
-require __DIR__ . '/lib/pdf.php';
-require __DIR__ . '/lib/ai.php';
-require __DIR__ . '/lib/workforce.php';
-require __DIR__ . '/lib/orgadmin.php';
-require __DIR__ . '/lib/contracts.php';
-require __DIR__ . '/lib/idems.php';
-require __DIR__ . '/lib/costing.php';
-require __DIR__ . '/lib/joblock.php';
-require __DIR__ . '/lib/capa.php';
-require __DIR__ . '/lib/ncr.php';
-require __DIR__ . '/lib/adspro.php';
-require __DIR__ . '/lib/adssync.php';
-require __DIR__ . '/lib/licencekey.php';
-require __DIR__ . '/lib/licencesync.php';
-// Retention lives across these two, and BOTH were missing from this list — so
-// the nightly trim below silently did nothing at all: function_exists() returned
-// false and the block skipped without a word. security.php holds the retention
-// period, compliance.php holds the trim itself.
-require __DIR__ . '/lib/security.php';
-require __DIR__ . '/lib/compliance.php';
-require __DIR__ . '/lib/books.php';
-require __DIR__ . '/lib/booksbridge.php';
+// Load EXACTLY the libraries the front controller (index.php) loads, in the same
+// order — discovered from index.php itself so this list can never drift out of
+// step again. A partial hardcoded list here repeatedly left libraries unloaded
+// (first retention, then the whole licence/books/billable chain), so boot() and
+// several nightly tasks silently did nothing — function_exists() returned false
+// and the blocks skipped without a word. Deriving the list removes that whole
+// class of bug.
+$__idx = @file_get_contents(__DIR__ . '/index.php');
+if ($__idx === false) { fwrite(STDERR, "cron: cannot read index.php to resolve the library list\n"); exit(1); }
+preg_match_all("#require __DIR__ \\. '(/lib/[a-z0-9_]+\\.php)';#i", $__idx, $__m);
+if (empty($__m[1])) { fwrite(STDERR, "cron: could not resolve any libraries from index.php\n"); exit(1); }
+foreach ($__m[1] as $__rel) require_once __DIR__ . $__rel;
+unset($__idx, $__m, $__rel);
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -124,6 +107,22 @@ if (function_exists('idems_run_sla_escalations')) {
 if (function_exists('tosrm_run_recurring')) {
     $gen = tosrm_run_recurring();
     if ($gen > 0) echo "TOSRM recurring: $gen call(s) generated.\n";
+}
+
+// Revamp P4 — keep the billable-event ledger fresh: backstop-derive any closed
+// work not yet queued, and reconcile events whose job has since been invoiced.
+if (function_exists('billable_events_sync')) {
+    $be = billable_events_sync();
+    if (($be['created'] ?? 0) + ($be['billed'] ?? 0) > 0)
+        echo "Billable events: {$be['created']} derived, {$be['billed']} reconciled.\n";
+}
+
+// Revamp — Engagement entity: backfill the engagement per contract_number and
+// stamp engagement_id onto any records still carrying only the string.
+if (function_exists('engagement_backfill')) {
+    $eng = engagement_backfill();
+    if (($eng['engagements'] ?? 0) + ($eng['stamped'] ?? 0) > 0)
+        echo "Engagements: {$eng['engagements']} created, {$eng['stamped']} records stamped.\n";
 }
 
 // Automated MIS digest to leadership — weekly on Monday, monthly on the 1st.

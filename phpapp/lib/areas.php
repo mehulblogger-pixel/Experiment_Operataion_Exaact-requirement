@@ -40,6 +40,36 @@ function ops_area_def($area) {
     };
 
     switch ($area) {
+        case 'marketplace':
+            // Connect — the technical-manpower marketplace, dissolved into EXAACT.
+            // The whole area appears only when the module is enabled and the
+            // viewer is coordinator/master (connect_market_can). One integrated
+            // area, cleanly optional.
+            $title = 'Marketplace'; $icon = '🧑‍🏭';
+            $sub = 'Post technical-manpower requirements, match and shortlist professionals, and their public passports.';
+            $routes = ['connect-requirements','connect-requirement','connect-concierge','connect-talent','connect-orgs','passport-share','connect-taxonomy','connect-qualifications','connect-verify','connect-messages','connect-channels','connect-bench','connect-analytics'];
+            $on = $fx('connect_market_can') && connect_market_can();
+            if ($on) {
+                $sec('');
+                $t(true, '📋', 'Requirements', '/connect-requirements', 'Post a manpower requirement and manage who applies.',
+                    $num(fn() => $fx('cx_market_summary') ? (cx_market_summary()['open'] ?? 0) : 0), 'green');
+                $t(true, '💬', 'Guided post', '/connect-concierge', 'Build a requirement by answering a few questions.');
+                $t(true, '🔎', 'Talent search', '/connect-talent', 'Search the shared pool of self-listed professionals.',
+                    $num(fn() => $fx('connect_pro_pool_count') ? connect_pro_pool_count() : 0));
+                $t(true, '🪪', 'Passports', '/passport-share', 'A professional\'s public, verifiable credential page.');
+                $t(true, '🏭', 'Industry taxonomy', '/connect-taxonomy', 'Sectors, equipment, materials, disciplines, standards, certifications.');
+                $t(true, '🎓', 'Qualification taxonomy', '/connect-qualifications', 'ITI → diploma → engineer → MBA ladder, job families, roles and certifications.');
+                $t(true, '✅', 'Verification desk', '/connect-verify', 'Confirm identity & credential checks; move professionals up the trust ladder.',
+                    $num(fn() => $fx('connect_verify_pending_count') ? connect_verify_pending_count() : 0), 'amber');
+                $t(true, '💬', 'Messages', '/connect-messages', 'Two-way chat with applicants, tied to each requirement.',
+                    $num(fn() => $fx('connect_msg_staff_unread') ? connect_msg_staff_unread() : 0));
+                $t(true, '📲', 'Channels', '/connect-channels', 'WhatsApp / SMS / email alerts, templates and delivery log.');
+                $t(true, '🏗️', 'Agency bench', '/connect-bench', 'An agency\'s own private roster — add people and allocate them to jobs.');
+                $t(true, '📊', 'Market analytics', '/connect-analytics', 'Supply vs demand, fill funnel, time-to-award, rate benchmarks, pool growth.');
+                $t(is_master(), '🏢', 'Organisations', '/connect-orgs', 'Register organisations and their module entitlements (TPIA / agency / company).',
+                    $num(fn() => $fx('connect_org_pending_count') ? connect_org_pending_count() : 0), 'amber');
+            }
+            break;
         case 'sales':
             $title = 'Sales'; $icon = '🎯';
             $sub = 'Leads, opportunities, ' . strtolower(THP('inquiry')) . ', ' . strtolower(THP('quote')) . ' and the pipeline.';
@@ -61,10 +91,15 @@ function ops_area_def($area) {
             $t($fx('roi_available') && roi_available() && $fx('roi_can') && roi_can(), '💸', 'Advertising return', '/ads-roi', 'Spend against leads produced.');
             break;
 
+        // Stage 6 Combination Engine: the quality area's ISO/inspection registers
+        // ($inspPack tiles) show only when the operating company does inspection —
+        // a pure recruiter/staffer never sees them. Permissive until an operating
+        // company is designated. (connect_cap_owner_does_inspection, connect_capability.php)
         case 'quality':
             $title = 'Quality & Accreditation'; $icon = '🛡️';
             $sub = 'Two halves: the everyday quality work you touch during jobs, and the accreditation registers an assessor asks for.';
             $routes = ['quality','equipment','samples','sample','methods','method','drules','drule','cdocs','cdoc','risks','risk','retention','disclosure','competence','impartiality','complaints','complaint','satisfaction','confidentiality','conf-breach','site-docs','report-reviews','ncr','issues','departures','hold-points','capa','internal-audits','internal-audit','management-reviews','management-review','evidence-review','data-control','identity','sla-targets'];
+            if (function_exists('connect_cap_owner_does_inspection')) $inspPack = $inspPack && connect_cap_owner_does_inspection();
 
             // ── Everyday quality — the things you touch during live jobs. ──
             $sec('Everyday quality');
@@ -119,11 +154,14 @@ function ops_area_def($area) {
             // the duplicate that was here is parked in Admin.
             break;
 
+        // Stage 6 Combination Engine: the inspection Reporting area shows only when
+        // the operating company's capabilities produce reports (inspection work or
+        // freelance-inspector supply). Permissive until an operating company is set.
         case 'reporting':
             $title = 'Reporting'; $icon = '📑';
             $sub = 'Where inspection reports are written, endorsed, expedited and the formats that govern them.';
             $routes = ['reporting','documents','document','endorsements','endorsement','vendors','vendor-profile','expediting','expediting-projects','writing-assistant','phrase-library','learning','compliance'];
-            if (can('mod.idems.view')) {
+            if ((!function_exists('connect_cap_owner_shows') || connect_cap_owner_shows('reporting')) && can('mod.idems.view')) {
                 $sec('Reports');
                 $t(true, '📑', T_REG('report'), '/documents', 'The report register.');
                 $t(can('mod.idems.edit') || is_master_of('idems'), '➕', ucfirst(T_NEW('report')), '/document-new', 'Start a new report.');
@@ -149,8 +187,14 @@ function ops_area_def($area) {
         case 'money':
             $title = 'Money'; $icon = '💰';
             $sub = 'From what is waiting to be billed, through invoices and money in, to the profit each ' . strtolower(Tl('sbu')) . ' makes.';
-            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit'];
+            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit','billable-events','revenue-reconciliation','cost-reconciliation','reimbursable-dedup'];
             $sec('Billing');
+            // Revamp P4 — the operational→commercial bridge: approved work on its
+            // way to an invoice, so nothing done is lost before it is billed.
+            if (can('mod.invoicing.view') && $fx('billable_can') && billable_can()) {
+                $t(true, '🧾', 'Billable events', '/billable-events', 'Approved operational work waiting to be invoiced.',
+                    $num(fn() => $fx('billable_pending_count') ? billable_pending_count() : 0), 'amber');
+            }
             // A quick per-job tracker (invoiced? paid? credit received?) that feeds
             // profitability — kept as its own tile because everyone uses it.
             $t(can('mod.invoicing.view'), '💳', 'Invoice tracker', '/invoicing', 'Tick each job: invoiced, paid, inter-office credit.');
@@ -161,12 +205,21 @@ function ops_area_def($area) {
                 $t(true, '🧾', 'Billing workspace', '/to-bill', 'Bill, invoice, collect, age and export — one screen with tabs.');
             }
             $t($fx('books_switch_ready') && books_switch_ready(), '📗', 'Accounts & GST ↗', ($fx('books_app_url') ? books_app_url() : '#'), 'Open MGH Books, already signed in.', null, '', true);
+            // Revamp §29 — where the legacy invoice snapshot disagrees with the ledger.
+            $t(($fx('can_see_salary') && can_see_salary()) || can('finance.reconcile') || is_master(), '⚖️', 'Revenue reconciliation', '/revenue-reconciliation', 'Where a job’s legacy invoice figure disagrees with the books ledger.',
+                $num(fn() => $fx('revrecon_count') ? revrecon_count() : 0), 'amber');
 
             // Costs & margins — moved here from Admin so all of money lives together.
             $sec('Costs & margins');
             $t(can('mod.profitability.view'), '💹', T_REG('boss'), '/profitability', 'Profit and margin by job.');
             $t(can('mod.overheads.view'), '📐', TH('office') . ' costs & overheads', '/office-finance', 'Per-office cost model.');
             $t(can('mod.overheads.view'), '🧮', 'Month-end cost run', '/cost-run', 'Roll up costs for the month.');
+            // Revamp P8 — where a job's legacy sub-contractor cost disagrees with what a committed cost run put in the ledger.
+            $t(($fx('can_see_salary') && can_see_salary()) || can('finance.reconcile') || is_master(), '⚖️', 'Cost reconciliation', '/cost-reconciliation', 'Where a job’s legacy sub-contractor cost disagrees with the committed cost ledger.',
+                $num(fn() => $fx('costrecon_count') ? costrecon_count() : 0), 'amber');
+            // Revamp P8 — reimbursables recorded on both doors (closure expenses + inspector voucher); reconcile before profit is trusted.
+            $t(($fx('can_see_salary') && can_see_salary()) || can('finance.reconcile') || can('mod.profitability.view') || is_master(), '🧾', 'Reimbursable duplication', '/reimbursable-dedup', 'Jobs whose reimbursables are recorded on both doors — reconcile so profit is not double-charged.',
+                $num(fn() => $fx('cost_dualwrite_count') ? cost_dualwrite_count() : 0), 'amber');
             $t(can('mod.profitability.view'), '📊', T('sbu') . ' profit & loss', '/sbu-pl', 'P&L by business unit.');
             $t(can('mod.profitability.view'), '🧾', 'Profit by ' . strtolower(Tl('call')), '/call-profit', 'What each inspection made.');
             break;
@@ -204,7 +257,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             $sec('Masters');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
@@ -236,6 +289,8 @@ function ops_area_def($area) {
 
             $sec('Super admin');
             $t(is_master(), '🛰️', 'Control panel', '/super-admin', 'Licence, seats, modules, subscription, tenants and system tools in one place.');
+            // Revamp P6 — pick which EXAACT this install is (TPIA / Staffing / Recruitment / Enterprise).
+            $t($fx('product_package_can') && product_package_can(), '📦', 'Product package', '/product-package', 'TPIA, Staffing, Recruitment or Enterprise — set the pack & bundles in one click.');
 
             $sec('Connections');
             $t($fx('ads_can_manage') && ads_can_manage(), '📢', 'Ads Pro connection', '/adspro', 'Connect the advertising source.');

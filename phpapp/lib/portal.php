@@ -165,6 +165,51 @@ function portal_partner_id() {
     return $u ? (int)$u['partner_id'] : 0;
 }
 
+/** K18 — the ACTIVE manpower/recruitment agency organisation this portal user
+ *  belongs to (its party is the login's party), or null. Gates the agency bench
+ *  workspace: only a signed-in agency sees / uses it. */
+function portal_agency_org() {
+    static $cache = false;
+    if ($cache !== false) return $cache;
+    $pid = portal_partner_id();
+    if ($pid <= 0) return $cache = null;
+    try {
+        return $cache = ops_one("SELECT * FROM cx_organisations
+            WHERE party_id=? AND org_type IN ('MANPOWER_AGENCY','RECRUITMENT_AGENCY') AND COALESCE(status,'ACTIVE')='ACTIVE'
+            ORDER BY id LIMIT 1", [$pid]) ?: null;
+    } catch (Throwable $e) { return $cache = null; }
+}
+
+/** True when this client can hire on the marketplace (the discovery/hire right). */
+function portal_can_hire() {
+    return (!function_exists('connect_enabled') || connect_enabled()) && function_exists('pcan') && pcan('market.post');
+}
+
+/**
+ * True when this client is marketplace-FIRST — they signed up to hire technical
+ * manpower (a self-service 'connect'-package organisation) and carry no live
+ * inspection footprint. Such a client lands on the hiring home instead of the
+ * inspection dashboard. An established inspection client (calls/reports on file)
+ * keeps their dashboard and merely gains a hiring shortcut. Cached per request.
+ */
+function portal_marketplace_first() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    if (!portal_can_hire()) return $cache = false;
+    // Supply-side agencies get the bench workspace, not the buyer home.
+    if (function_exists('portal_agency_org') && portal_agency_org()) return $cache = false;
+    $pid = portal_partner_id();
+    if ($pid <= 0) return $cache = false;
+    try {
+        // Registered through the marketplace door (has a cx_organisations record)…
+        $isMarketOrg = (int)ops_val("SELECT COUNT(*) FROM cx_organisations WHERE party_id=?", [$pid]) > 0;
+        if (!$isMarketOrg) return $cache = false;
+        // …and carries no inspection footprint → the marketplace is their home.
+        $hasCalls = (int)ops_val("SELECT COUNT(*) FROM calls WHERE client_id=?", [$pid]) > 0;
+        return $cache = !$hasCalls;
+    } catch (Throwable $e) { return $cache = false; }
+}
+
 function portal_off() {
     http_response_code(404);
     require __DIR__ . '/../views/portal/off.php';
@@ -740,10 +785,51 @@ function portal_route($route, $method) {
     $u = portal_user();
 
     switch ($route) {
+        case 'portal/plans':   // Slice 3 — the client's marketplace subscription & plan
+            if ($method === 'POST' && function_exists('mkt_subscribe')) {
+                [$ok, $msg] = mkt_subscribe('CLIENT', portal_partner_id(), (int)($_POST['plan_id'] ?? 0), (string)($_POST['period'] ?? 'MONTH'), portal_client_name());
+                $_SESSION['portal_flash'] = $msg;
+                redirect('/portal/plans');
+            }
+            portal_view('plans', [
+                'plans'        => function_exists('mkt_plans_all') ? mkt_plans_all('CLIENT') : [],
+                'current'      => function_exists('mkt_current_plan') ? mkt_current_plan('CLIENT', portal_partner_id()) : null,
+                'enforce'      => function_exists('mkt_enforce_on') && mkt_enforce_on(),
+                'currency'     => function_exists('mkt_currency') ? mkt_currency() : '₹',
+                'annualMonths' => function_exists('mkt_annual_months') ? mkt_annual_months() : 10,
+                'party'        => portal_partner_id(),
+            ]);
+            exit;
+
         case 'portal':
             portal_log('DASHBOARD');
+            // A marketplace-first client's home IS the hiring home.
+            if (function_exists('portal_marketplace_first') && portal_marketplace_first()) redirect('/portal/hiring');
             if (function_exists('cvp_notify_sync')) cvp_notify_sync('CLIENT', portal_partner_id());
-            portal_view('dashboard', ['d' => portal_dashboard()]);
+            portal_view('dashboard', ['d' => portal_dashboard(),
+                'canHire' => function_exists('portal_can_hire') && portal_can_hire(),
+                'kpi' => function_exists('connect_kpi_board') ? connect_kpi_board(['audience' => 'client', 'party_id' => portal_partner_id()]) : null]);
+            exit;
+
+        // Connect K0+ — the buyer home: search & post at the top, then the live
+        // state of this client's hiring (open requirements + who's waiting, contact
+        // requests, saved searches). Read-only over the marketplace engines.
+        case 'portal/hiring':
+            portal_need('market.post', 'the hiring home');
+            if (!function_exists('connect_hiring_home') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            $party = portal_partner_id();
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'save_search' && function_exists('connect_hiring_saved_search_save')) {
+                    [, $msg] = connect_hiring_saved_search_save($party, (string)($_POST['label'] ?? ''), (string)($_POST['qs'] ?? ''));
+                    $_SESSION['portal_flash'] = $msg;
+                } elseif ($act === 'del_search' && function_exists('connect_hiring_saved_search_delete')) {
+                    connect_hiring_saved_search_delete((int)($_POST['id'] ?? 0), $party);
+                    $_SESSION['portal_flash'] = 'Saved search removed.';
+                }
+                redirect('/portal/hiring');
+            }
+            portal_view('hiring', ['home' => connect_hiring_home($party), 'client' => portal_client_name()]);
             exit;
 
         // Phase 10 (CVP) Slice 4 — the client's notification feed.
@@ -788,6 +874,17 @@ function portal_route($route, $method) {
                 'statuses'  => function_exists('pdso_statuses') ? pdso_statuses() : [],
             ]);
             exit;
+
+        case 'portal/dep-gate':
+            portal_need('deputation', 'gate passes');
+            $jid = (int)($_POST['job_id'] ?? 0); $party = portal_partner_id();
+            $owns = $jid > 0 && (int)ops_val("SELECT COUNT(*) FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.id=? AND c.client_id=?", [$jid, $party]) > 0;
+            if ($method === 'POST' && $owns && function_exists('mobilization_gate_issue')) {
+                if ((string)($_POST['action'] ?? '') === 'revoke') [, $gmsg] = mobilization_gate_revoke($jid, (string)(portal_user()['name'] ?? 'Client'));
+                else [, $gmsg] = mobilization_gate_issue($jid, (string)(portal_user()['name'] ?? 'Client'), (string)($_POST['note'] ?? ''));
+                $_SESSION['portal_flash'] = $gmsg; portal_log('DEP_GATE', $jid);
+            } elseif (!$owns) { $_SESSION['portal_flash'] = 'That deployment is not yours.'; }
+            redirect('/portal/deputations');
 
         case 'portal/dep-approve':
             portal_need('deputation.approve', 'approving attendance');
@@ -879,6 +976,323 @@ function portal_route($route, $method) {
             }
             portal_view('request', ['rows' => portal_requests_mine(), 'err' => $err]);
             exit;
+
+        // Connect K2b — the client posts a technical-manpower requirement to the
+        // marketplace and manages who applies. External self-service over the same
+        // cx_requirements engine the staff desk uses; scoped to this client's own
+        // party (poster_party_id) so a client only ever sees its own postings.
+        case 'portal/hire':
+            portal_need('market.post', 'posting manpower requirements');
+            if (!function_exists('cx_requirement_create') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            if ($method === 'POST') {
+                $party = portal_partner_id();
+                $act = (string)($_POST['action'] ?? '');
+                // Requirement reuse (§49) — duplicate a previous one, or save/use a template.
+                if ($act === 'duplicate' && function_exists('connect_requirement_duplicate')) {
+                    $src = function_exists('cx_requirement_get') ? cx_requirement_get((int)($_POST['id'] ?? 0)) : null;
+                    if ($src && (int)$src['poster_party_id'] === (int)$party) {
+                        $nid = connect_requirement_duplicate((int)$src['id'], $party); // new DRAFT
+                        $_SESSION['portal_flash'] = $nid ? 'Duplicated as a draft — edit and post it below.' : 'Could not duplicate.';
+                    } else $_SESSION['portal_flash'] = 'That requirement is not yours.';
+                    redirect('/portal/hire');
+                } elseif ($act === 'save_template' && function_exists('connect_reqtemplate_save_from_requirement')) {
+                    $src = function_exists('cx_requirement_get') ? cx_requirement_get((int)($_POST['id'] ?? 0)) : null;
+                    if ($src && (int)$src['poster_party_id'] === (int)$party) { [, $tm] = connect_reqtemplate_save_from_requirement($party, (int)$src['id'], (string)($_POST['label'] ?? ''), portal_client_name()); $_SESSION['portal_flash'] = $tm; }
+                    redirect('/portal/hire');
+                } elseif ($act === 'template_delete' && function_exists('connect_reqtemplate_delete')) {
+                    connect_reqtemplate_delete((int)($_POST['id'] ?? 0), $party); $_SESSION['portal_flash'] = 'Template removed.';
+                    redirect('/portal/hire');
+                } elseif ($act === 'from_template' && function_exists('connect_reqtemplate_create_requirement')) {
+                    $nid = connect_reqtemplate_create_requirement((int)($_POST['template_id'] ?? 0), $party, [], true); // post to OPEN
+                    $_SESSION['portal_flash'] = $nid ? 'Requirement created from your template and posted.' : 'Could not use that template.';
+                    redirect('/portal/hire');
+                } elseif (trim((string)($_POST['title'] ?? '')) !== '') {
+                    // Marketplace gate — a no-op while enforcement is OFF (open marketplace).
+                    if (function_exists('mkt_can_use') && !mkt_can_use('CLIENT', $party, 'posts')) {
+                        $_SESSION['portal_flash'] = (function_exists('mkt_has_access') && !mkt_has_access('CLIENT', $party))
+                            ? 'A marketplace plan is needed to post a requirement — see Plans.'
+                            : 'You have used all the job posts in your plan this month — upgrade your plan or add a credit pack.';
+                        redirect('/portal/hire');
+                    }
+                    $in = $_POST; $in['poster_party_id'] = $party; $in['poster_name'] = portal_client_name();
+                    cx_requirement_create($in, true); // posted straight to OPEN
+                    if (function_exists('mkt_usage_add')) mkt_usage_add('CLIENT', $party, 'posts');
+                    $_SESSION['portal_flash'] = 'Your requirement is posted and open for applications.';
+                    redirect('/portal/hire');
+                }
+            }
+            portal_view('hire', [
+                'rows'        => cx_requirements_for_party(portal_partner_id()),
+                'templates'   => function_exists('connect_reqtemplates_for') ? connect_reqtemplates_for(portal_partner_id()) : [],
+                'sectors'     => function_exists('connect_tx_rows') ? connect_tx_rows('cx_sectors') : [],
+                'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+            ]);
+            exit;
+
+        // Connect K0+ — the client SEARCHES the shared professional pool directly
+        // (one keyword + filters), sees privacy-safe ranked cards, requests contact
+        // (the pro approves) and invites a professional onto one of its OWN open
+        // requirements. Gated by the same market.post right that lets a client hire.
+        case 'portal/find':
+            portal_need('market.post', 'searching the technical-manpower pool');
+            if (!function_exists('connect_client_search') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            $party = portal_partner_id();
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'reveal_request' && function_exists('connect_privacy_reveal_request')) {
+                    [$rok, $rmsg] = connect_privacy_reveal_request((int)($_POST['pro_id'] ?? 0), $party, portal_client_name());
+                    $_SESSION['portal_flash'] = $rmsg;
+                    portal_log('CONNECT_REVEAL_REQ', (string)($_POST['pro_id'] ?? ''));
+                } elseif ($act === 'save_search' && function_exists('connect_hiring_saved_search_save')) {
+                    [, $smsg] = connect_hiring_saved_search_save($party, (string)($_POST['label'] ?? ''), (string)($_POST['qs'] ?? ''));
+                    $_SESSION['portal_flash'] = $smsg;
+                } elseif ($act === 'bench_add' && function_exists('connect_client_bench_add')) {
+                    [, $bmsg] = connect_client_bench_add($party, ['professional_id' => (int)($_POST['pro_id'] ?? 0), 'source' => 'marketplace'], portal_client_name());
+                    $_SESSION['portal_flash'] = $bmsg;
+                } elseif ($act === 'invite' && function_exists('cx_application_add')) {
+                    $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['pro_id'] ?? 0);
+                    $req = function_exists('cx_requirement_get') ? cx_requirement_get($rid) : null;
+                    if ($req && (int)$req['poster_party_id'] === (int)$party && $pid) {   // only onto the client's OWN job
+                        $nm = (string)ops_val("SELECT name FROM cx_professionals WHERE id=?", [$pid]);
+                        $newId = cx_application_add($rid, ['applicant_professional_id' => $pid, 'applicant_name' => $nm]);
+                        $_SESSION['portal_flash'] = $newId ? ($nm . ' invited to ' . $req['ref_code'] . '.') : ($nm . ' is already on that requirement.');
+                    } else { $_SESSION['portal_flash'] = 'Pick one of your own open requirements to invite to.'; }
+                }
+                redirect('/portal/find' . (($_POST['qs'] ?? '') !== '' ? '?' . $_POST['qs'] : ''));
+            }
+            $f = [
+                'q'              => (string)($_GET['q'] ?? ''),
+                'discipline'     => (string)($_GET['discipline'] ?? ''),
+                'work_type'      => (string)($_GET['work_type'] ?? ''),
+                'location'       => (string)($_GET['location'] ?? ''),
+                'supplier'       => (string)($_GET['supplier'] ?? ''),
+                'available_only' => !empty($_GET['available_only']),
+            ];
+            portal_view('find', [
+                'f'           => $f,
+                'cards'       => connect_client_search($party, $f),
+                'supplier_options' => function_exists('connect_supplier_filter_options') ? connect_supplier_filter_options() : [],
+                'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+                'work_types'  => function_exists('cx_pro_work_types') ? cx_pro_work_types() : [],
+                'open_reqs'   => function_exists('cx_requirements_for_party')
+                                    ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
+                                    : [],
+            ]);
+            exit;
+
+        // Connect — a professional's FULL profile, identity-masked. The client sees
+        // the whole competence picture (skills, taxonomy, verified certs, projects,
+        // verification tier, availability) while name / phone / e-mail stay hidden
+        // until the professional approves a contact request or the client engages
+        // them. Reuses connect_privacy_resolve; scoped read-only to the pool.
+        case 'portal/talent':
+            portal_need('market.post', 'viewing a professional profile');
+            if (!function_exists('connect_privacy_resolve') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            $party = portal_partner_id();
+            $proId = (int)($_GET['id'] ?? ($_POST['pro_id'] ?? 0));
+            if ($method === 'POST') {
+                if ((string)($_POST['action'] ?? '') === 'reveal_request' && function_exists('connect_privacy_reveal_request')) {
+                    [, $rmsg] = connect_privacy_reveal_request($proId, $party, portal_client_name());
+                    $_SESSION['portal_flash'] = $rmsg; portal_log('CONNECT_REVEAL_REQ', (string)$proId);
+                } elseif ((string)($_POST['action'] ?? '') === 'bench_add' && function_exists('connect_client_bench_add')) {
+                    [, $bmsg] = connect_client_bench_add($party, ['professional_id' => $proId, 'source' => 'marketplace'], portal_client_name());
+                    $_SESSION['portal_flash'] = $bmsg;
+                }
+                redirect('/portal/talent?id=' . $proId);
+            }
+            $pro = $proId ? ops_one("SELECT * FROM cx_professionals WHERE id=? AND is_active=1", [$proId]) : null;
+            if (!$pro) { http_response_code(404); portal_view('notfound'); exit; }
+            $engaged = function_exists('connect_privacy_engaged') && connect_privacy_engaged($proId, $party);
+            $view = connect_privacy_resolve($pro, ['party_id' => $party, 'engaged' => $engaged]);
+            $pending = (bool)ops_val("SELECT COUNT(*) FROM cx_pro_contact_reveals WHERE pro_id=? AND client_party_id=? AND status='REQUESTED' AND revoked_at=''", [$proId, $party]);
+            // Requirement context — when the client arrived from reviewing a
+            // requirement's applicants, offer a back link and a direct shortlist
+            // (only onto their own requirement, only for this pro's application).
+            $ctxReq = null; $ctxApp = null;
+            if ((string)($_GET['from'] ?? '') === 'req' && (int)($_GET['rid'] ?? 0) > 0 && function_exists('cx_requirement_get')) {
+                $rq = cx_requirement_get((int)$_GET['rid']);
+                if ($rq && (int)$rq['poster_party_id'] === (int)$party) {
+                    $ctxReq = $rq;
+                    $ctxApp = ops_one("SELECT id, status FROM cx_applications WHERE requirement_id=? AND applicant_professional_id=? ORDER BY id DESC LIMIT 1", [(int)$rq['id'], $proId]) ?: null;
+                }
+            }
+            portal_view('talent', [
+                'ctx_req' => $ctxReq, 'ctx_app' => $ctxApp,
+                'pro'      => $pro,
+                'view'     => $view,
+                'pending'  => $pending,
+                'certs'    => function_exists('connect_cred_certs') ? connect_cred_certs($proId) : [],
+                'projects' => function_exists('connect_cred_projects') ? connect_cred_projects($proId) : [],
+                'tier'     => function_exists('connect_verify_tier_label') ? connect_verify_tier_label(function_exists('connect_verify_tier_for_professional') ? connect_verify_tier_for_professional($proId) : 'registered') : 'Registered',
+                'avail'    => function_exists('connect_availability_status') ? connect_availability_status($proId) : null,
+                'open_reqs'=> function_exists('cx_requirements_for_party')
+                                  ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
+                                  : [],
+            ]);
+            exit;
+
+        // Connect K0+ — the client's PRIVATE bench / roster (demand-side). Add from
+        // the marketplace / previous work / by hand, keep private notes & ratings,
+        // rehire onto an open requirement. Scoped to this client's own party.
+        case 'portal/roster':
+            portal_need('market.post', 'your private bench');
+            if (!function_exists('connect_client_bench_list') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            $party = portal_partner_id();
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'add')          [, $m] = connect_client_bench_add($party, $_POST, portal_client_name());
+                elseif ($act === 'update')   [, $m] = connect_client_bench_update((int)($_POST['id'] ?? 0), $party, $_POST);
+                elseif ($act === 'remove')   { connect_client_bench_remove((int)($_POST['id'] ?? 0), $party); $m = 'Removed from your bench.'; }
+                elseif ($act === 'link')     [, $m] = connect_client_bench_link((int)($_POST['id'] ?? 0), $party, (int)($_POST['professional_id'] ?? 0));
+                elseif ($act === 'invite' && function_exists('cx_application_add')) {
+                    $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['pro_id'] ?? 0);
+                    $req = function_exists('cx_requirement_get') ? cx_requirement_get($rid) : null;
+                    if ($req && (int)$req['poster_party_id'] === (int)$party && $pid) {
+                        $nm = (string)ops_val("SELECT name FROM cx_professionals WHERE id=?", [$pid]);
+                        $newId = cx_application_add($rid, ['applicant_professional_id' => $pid, 'applicant_name' => $nm]);
+                        $m = $newId ? ($nm . ' invited to ' . $req['ref_code'] . '.') : ($nm . ' is already on that requirement.');
+                    } else { $m = 'Pick one of your own open requirements.'; }
+                } else { $m = ''; }
+                if ($m !== '') $_SESSION['portal_flash'] = $m;
+                redirect('/portal/roster');
+            }
+            portal_view('roster', [
+                'bench'     => connect_client_bench_list($party),
+                'previous'  => function_exists('connect_client_bench_previous') ? connect_client_bench_previous($party) : [],
+                'open_reqs' => function_exists('cx_requirements_for_party')
+                                  ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
+                                  : [],
+            ]);
+            exit;
+
+        case 'portal/hire-req':
+            portal_need('market.post', 'posting manpower requirements');
+            if (!function_exists('cx_requirement_get')) { http_response_code(404); portal_view('notfound'); exit; }
+            $req = cx_requirement_get((int)($_GET['id'] ?? $_POST['id'] ?? 0));
+            if (!$req || (int)$req['poster_party_id'] !== (int)portal_partner_id()) { http_response_code(404); portal_view('notfound'); exit; }
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'req_transition') cx_requirement_transition((int)$req['id'], $_POST['to'] ?? '');
+                elseif ($act === 'app_transition') {
+                    $ap = cx_application_get((int)($_POST['application_id'] ?? 0));
+                    if ($ap && (int)$ap['requirement_id'] === (int)$req['id']) cx_application_transition((int)$ap['id'], $_POST['to'] ?? '');
+                } elseif ($act === 'award') {
+                    $ap = cx_application_get((int)($_POST['application_id'] ?? 0));
+                    if ($ap && (int)$ap['requirement_id'] === (int)$req['id']) cx_requirement_award((int)$req['id'], (int)$ap['id']);
+                } elseif ($act === 'engage_cancel' && function_exists('connect_engage_cancel')) {
+                    // Stage 7 — end the booking early (cancel / no-show) with a reason;
+                    // the resource frees up and the work surfaces as needing cover.
+                    $eng = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement((int)$req['id']) : null;
+                    if ($eng && (int)$eng['id'] === (int)($_POST['engagement_id'] ?? 0)) {
+                        [, $emsg] = connect_engage_cancel((int)$eng['id'], (string)($_POST['kind'] ?? 'CANCELLED'), (string)($_POST['reason'] ?? ''), portal_client_name());
+                        $_SESSION['portal_flash'] = $emsg;
+                    }
+                    redirect('/portal/hire-req?id=' . (int)$req['id']);
+                }
+                $_SESSION['portal_flash'] = 'Updated.';
+                redirect('/portal/hire-req?id=' . (int)$req['id']);
+            }
+            // K21 — vouchers raised against this posted job's engagement, so the
+            // client can review receipts, return for clarification, or approve.
+            $engRow = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement((int)$req['id']) : null;
+            portal_view('hire_req', ['req' => $req, 'apps' => cx_applications_for((int)$req['id']),
+                'req_next' => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
+                'eng'      => $engRow,
+                'eng_kinds'=> function_exists('connect_engage_cancel_kinds') ? connect_engage_cancel_kinds() : [],
+                'vouchers' => ($engRow && function_exists('connect_engv_for_engagement')) ? connect_engv_for_engagement((int)$engRow['id']) : []]);
+            exit;
+
+        case 'portal/bench':   // K18 — the agency manages its OWN bench and supplies people
+            $org = function_exists('portal_agency_org') ? portal_agency_org() : null;
+            if (!$org || !function_exists('connect_bench_list')) { http_response_code(404); portal_view('notfound'); exit; }
+            $orgId = (int)$org['id'];
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                if ($act === 'add')           [$ok, $msg] = connect_bench_add($orgId, $_POST);
+                elseif ($act === 'update')    [$ok, $msg] = connect_bench_update((int)($_POST['id'] ?? 0), $orgId, $_POST);
+                elseif ($act === 'toggle')    [$ok, $msg] = connect_bench_toggle((int)($_POST['id'] ?? 0), $orgId);
+                elseif ($act === 'allocate')  [$ok, $msg] = connect_bench_allocate((int)($_POST['bench_id'] ?? 0), $orgId, (int)($_POST['requirement_id'] ?? 0), 0, (string)($_POST['note'] ?? ''));
+                elseif ($act === 'alloc_set') [$ok, $msg] = connect_bench_alloc_set((int)($_POST['alloc_id'] ?? 0), $orgId, (string)($_POST['status'] ?? ''));
+                else { $ok = false; $msg = 'Unknown action.'; }
+                $_SESSION['portal_flash'] = $msg;
+                redirect('/portal/bench');
+            }
+            $openReqs = [];
+            try { $openReqs = ops_all("SELECT id, ref_code, title, status, location FROM cx_requirements
+                                       WHERE status IN ('OPEN','SHORTLISTING') ORDER BY id DESC LIMIT 60") ?: []; }
+            catch (Throwable $e) {}
+            portal_view('bench', [
+                'org'     => $org,
+                'bench'   => connect_bench_list($orgId, false),
+                'summary' => function_exists('connect_bench_summary') ? connect_bench_summary($orgId) : [],
+                'allocs'  => function_exists('connect_bench_allocs_for_org') ? connect_bench_allocs_for_org($orgId, false) : [],
+                'reqs'    => $openReqs,
+                'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+            ]);
+            exit;
+
+        case 'portal/voucher':   // K21 — the client reviews one voucher on its own posted job
+            portal_need('market.vouchers', 'reviewing vouchers');
+            if (!function_exists('connect_engv_get')) { http_response_code(404); portal_view('notfound'); exit; }
+            $vid = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+            $v = connect_engv_get($vid);
+            if (!$v || !connect_engv_owned_by_party($v, portal_partner_id())) { http_response_code(404); portal_view('notfound'); exit; }
+            if ($method === 'POST') {
+                $act = (string)($_POST['action'] ?? '');
+                $who = 'Client · ' . portal_client_name();
+                if ($act === 'approve') {
+                    [$ok, $msg] = connect_engv_set_status($vid, 'APPROVED', $who);
+                    $_SESSION['portal_flash'] = $ok ? 'Voucher approved.' : $msg;
+                } elseif ($act === 'return') {
+                    [$ok, $msg] = connect_engv_set_status($vid, 'REJECTED', $who, (string)($_POST['note'] ?? ''));
+                    $_SESSION['portal_flash'] = $ok ? 'Returned to the inspector for clarification.' : $msg;
+                } elseif ($act === 'confirm_paid' && function_exists('connect_engv_confirm')) {
+                    [$ok, $msg] = connect_engv_confirm($vid, 'client', $who);
+                    $_SESSION['portal_flash'] = $ok ? 'Payment confirmed. The report unlocks once the professional also confirms receipt.' : $msg;
+                }
+                redirect('/portal/voucher?id=' . $vid);
+            }
+            $engId = (int)($v['engagement_id'] ?? 0);
+            $engTermsRow = $engId ? (ops_one("SELECT reimb_terms, quantity FROM cx_engagements WHERE id=?", [$engId]) ?: []) : [];
+            portal_view('voucher', [
+                'v'       => $v,
+                'lines'   => function_exists('connect_engv_lines') ? connect_engv_lines($vid) : [],
+                'heads'   => function_exists('connect_engv_expense_heads') ? connect_engv_expense_heads() : [],
+                'files'   => function_exists('connect_engv_files') ? connect_engv_files($vid) : [],
+                'reports' => function_exists('connect_engv_reports') ? connect_engv_reports($engId) : [],
+                'cleared' => function_exists('connect_engv_engagement_cleared') ? connect_engv_engagement_cleared($engId) : false,
+                // The ceilings the client agreed at posting, so the approver checks
+                // each claimed head against its limit side by side (guidance, not a block).
+                'terms'      => ($engTermsRow && function_exists('connect_reqterms_parse')) ? connect_reqterms_parse($engTermsRow) : [],
+                'termLabels' => function_exists('connect_reqterms_heads') ? connect_reqterms_heads() : [],
+                'engQty'     => (float)($engTermsRow['quantity'] ?? 0),
+            ]);
+            exit;
+
+        case 'portal/report-file':   // K21 — serve the inspection report, ONLY once payment is cleared
+            portal_need('market.vouchers', 'reviewing vouchers');
+            $row = function_exists('connect_engv_report_row') ? connect_engv_report_row((int)($_GET['id'] ?? 0)) : null;
+            if (!$row || (int)$row['poster_party_id'] !== (int)portal_partner_id()) { http_response_code(404); echo 'Not found.'; exit; }
+            if (!function_exists('connect_engv_engagement_cleared') || !connect_engv_engagement_cleared((int)$row['engagement_id'])) {
+                http_response_code(402); echo 'This report is released once the payment is confirmed by both sides.'; exit;
+            }
+            $bytes = base64_decode((string)$row['file_data']);
+            if (function_exists('send_uploaded_file')) { send_uploaded_file($bytes, (string)$row['file_name'], (string)$row['mime']); exit; }
+            header('Content-Type: ' . ((string)$row['mime'] ?: 'application/octet-stream'));
+            header('Content-Disposition: inline; filename="' . rawurlencode((string)$row['file_name']) . '"');
+            echo $bytes; exit;
+
+        case 'portal/voucher-file':   // K21 — serve a receipt on the client's own posted-job voucher
+            portal_need('market.vouchers', 'reviewing vouchers');
+            $row = function_exists('connect_engv_file_row') ? connect_engv_file_row((int)($_GET['id'] ?? 0)) : null;
+            if ($row) { $vv = connect_engv_get((int)$row['voucher_id']);
+                if (!$vv || !connect_engv_owned_by_party($vv, portal_partner_id())) $row = null; }
+            if (!$row) { http_response_code(404); echo 'Not found.'; exit; }
+            $bytes = base64_decode((string)$row['file_data']);
+            if (function_exists('send_uploaded_file')) { send_uploaded_file($bytes, (string)$row['file_name'], (string)$row['mime']); exit; }
+            header('Content-Type: ' . ((string)$row['mime'] ?: 'application/octet-stream'));
+            header('Content-Disposition: inline; filename="' . rawurlencode((string)$row['file_name']) . '"');
+            echo $bytes; exit;
 
         // Phase 10 (CVP) Slice 3: the client sees nonconformities raised to them
         // (marked client-visible) and responds — the same engine loop the vendor
@@ -1134,6 +1548,8 @@ const PORTAL_PERMS = [
     'deputation'         => 'See deputed personnel, attendance and site reports',
     'deputation.approve' => 'Approve or return attendance / timesheet periods',
     'issues'             => 'See nonconformities raised to them and respond',
+    'market.post'        => 'Post technical-manpower requirements to the marketplace and manage applications',
+    'market.vouchers'    => 'Review vouchers on your own posted jobs — see receipts, return for clarification, approve',
 ];
 
 // A constant cannot call T(), so the labels that name a business noun are

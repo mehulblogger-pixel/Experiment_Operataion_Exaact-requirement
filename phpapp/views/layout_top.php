@@ -120,12 +120,21 @@
         <a class="s-item<?= $navOn(ops_area_routes('sales')) ?>" href="/sales"><span class="s-ic">🎯</span><span>Sales</span></a>
         <?php endif; ?>
 
+        <?php // Connect — the technical-manpower marketplace, its own rail item,
+              //  shown only when the module is enabled and the viewer may use it. ?>
+        <?php if (ops_area_has('marketplace')): ?>
+        <a class="s-item<?= $navOn(ops_area_routes('marketplace')) ?>" href="/marketplace"><span class="s-ic">🧑‍🏭</span><span>Marketplace</span></a>
+        <?php endif; ?>
+
         <?php // Operations is no longer a folding group. Tapping it navigates to
               // the Operations Home, where every one of the screens that used to
               // hang under this heading is laid out on the page with its live
               // state. The link is "on" for any Operations-area route so you are
               // never on an Operations screen with nothing highlighted. ?>
-        <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>
+        <?php // Stage 6: field Operations is hidden for a company whose capability
+              // mix has no operational work (e.g. a pure recruiter who only places
+              // people). Permissive until an operating company is designated. ?>
+        <?php if ((can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')) && (!function_exists('connect_cap_owner_shows')||connect_cap_owner_shows('operations'))): ?>
         <a class="s-item<?= $navOn(['operations','ops-desk','calls','call','jobs','job','deputations','availability','schedule','capacity-outlook','recurring','timesheet','ratings','vouchers','voucher','attendance-recon','contract-overrides']) ?>" href="/operations"><span class="s-ic">🛠️</span><span>Operations</span></a>
         <?php endif; ?>
 
@@ -133,7 +142,10 @@
               // pipeline dashboard is one tap from anywhere, not buried in a tab
               // of the Operations Home. Same gate as the Operations recruitment
               // tile, which still exists. ?>
-        <?php if (can('mod.hiring.view')): ?>
+        <?php // Stage 6: Recruitment shows for companies whose mix includes people
+              // supply/recruitment (the 'hr' module); a pure inspection body without
+              // staffing/recruitment capabilities does not see it. Permissive default. ?>
+        <?php if (can('mod.hiring.view') && (!function_exists('connect_cap_owner_shows')||connect_cap_owner_shows('hr'))): ?>
         <a class="s-item<?= $navOn(['recruitment-cc','recruitment','requisitions','requisition','requisition-new','requisition-edit','candidates','candidate','recruit-config','req-ai-extract']) ?>" href="/recruitment-cc"><span class="s-ic">🧭</span><span>Recruitment</span></a>
         <?php endif; ?>
 

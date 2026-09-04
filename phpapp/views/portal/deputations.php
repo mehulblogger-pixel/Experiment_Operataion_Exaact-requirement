@@ -44,7 +44,7 @@
   <p class="pempty">No deputed personnel to show yet.</p>
 <?php else: ?>
   <div class="pscroll"><table class="ptable">
-    <thead><tr><th>Person</th><th>Reference</th><th>Site</th><th>Period</th><th>Status</th></tr></thead>
+    <thead><tr><th>Person</th><th>Reference</th><th>Site</th><th>Period</th><th>Status</th><th>Site entry</th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r): ?>
       <tr>
@@ -53,6 +53,21 @@
         <td><?= e($r['dep_site'] ?: '—') ?></td>
         <td><?= e($fmt($r['inspection_start_date'])) ?> – <?= e($fmt($r['inspection_end_date'])) ?></td>
         <td><?= e($r['dep_status'] ? $lbl($r['dep_status']) : '—') ?></td>
+        <td><?php
+          // Stage 7 — mobilization gate pass. Cleared for site entry only when
+          // every required readiness item is done; the pass cannot be issued while
+          // anything is open.
+          $g = function_exists('mobilization_gate') ? mobilization_gate((int)$r['id']) : null;
+          if (!$g): ?>—<?php
+          elseif ($g['cleared']): ?>
+            <span class="ppill ok" title="Cleared for site entry">✓ Gate pass</span>
+            <form method="post" action="/portal/dep-gate" class="inl" style="margin-left:4px"><input type="hidden" name="job_id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="action" value="revoke"><button class="btn secondary" style="padding:3px 8px;font-size:11.5px" type="submit">Revoke</button></form>
+          <?php elseif ($g['ready']): ?>
+            <form method="post" action="/portal/dep-gate" class="inl"><input type="hidden" name="job_id" value="<?= (int)$r['id'] ?>"><button class="btn" style="padding:4px 10px;font-size:12px" type="submit">Issue gate pass</button></form>
+          <?php else: ?>
+            <span class="ppill" style="background:#fbeceb;color:#9a2a2a" title="<?= e(implode(' · ', array_map(fn($b)=>$b['text'], array_slice($g['blockers'],0,4)))) ?>">⛔ Not cleared · <?= count($g['blockers']) ?> open</span>
+          <?php endif; ?>
+        </td>
       </tr>
     <?php endforeach; ?>
     </tbody>

@@ -2,6 +2,26 @@
 <p class="plead">Everything <?= e(app_name()) ?> is doing for <?= e(portal_client_name()) ?>, at a glance.
   Reports appear here the moment they are issued — you do not have to ask for them.</p>
 
+<?php // Role-based client dashboard tiles (live-computed, scoped to this client).
+      if (function_exists('connect_client_dash_render') && function_exists('pcan') && pcan('market.post') && function_exists('portal_user') && portal_user())
+          connect_client_dash_render(portal_partner_id(), portal_user()); ?>
+
+<?php if (!empty($canHire)): ?>
+<div class="pcard" style="background:linear-gradient(135deg,#0f7d7d,#0a5c5c);color:#fff;border:0">
+  <div style="font-weight:700;font-size:17px;margin-bottom:3px">Need technical manpower?</div>
+  <div style="color:#dcefee;font-size:13.5px;margin-bottom:12px">Search the professional pool or post a requirement — inspectors, welders, NDT, engineers.</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <a href="/portal/find" style="background:#fff;color:#0a5c5c;font-weight:700;border-radius:10px;padding:10px 16px;text-decoration:none;font-size:14px">🔍 Search the pool</a>
+    <a href="/portal/hire" style="background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.5);font-weight:700;border-radius:10px;padding:10px 16px;text-decoration:none;font-size:14px">➕ Post a requirement</a>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php // Shared KPI board — the SAME engine that powers the ops "concern" dashboard,
+      // scoped to this client. Reuses financial_rollup / complaints / report_docs /
+      // jobs, so there is no duplicate metric code. ?>
+<?php if (!empty($kpi) && function_exists('connect_kpi_render')) connect_kpi_render($kpi); ?>
+
 <?php if (!empty($d['actions'])): ?>
 <div class="pcard" style="border-left:5px solid var(--warn)">
   <div style="font-weight:600;margin-bottom:8px">Awaiting you</div>

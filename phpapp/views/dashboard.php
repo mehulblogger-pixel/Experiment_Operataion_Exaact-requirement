@@ -20,6 +20,19 @@
       // In-office / On-site; the mark flows to availability + links to the report.
       if (function_exists('attend_render_widget')) attend_render_widget($u); ?>
 
+<?php // Reports waiting on ME to review / approve — surfaced on EVERY staff dashboard
+      // so a reviewer or approver sees their queue the moment they sign in, instead of
+      // hunting for it. Shows only when something is actually waiting on this person.
+      $awApprove = function_exists('idems_awaiting_my_approval_count') ? idems_awaiting_my_approval_count() : 0;
+      if ($awApprove > 0): ?>
+  <div class="qcards" style="margin-top:16px;grid-template-columns:1fr">
+    <a class="qcard tone-warn" href="/documents?mine=approve" style="border-color:var(--brand)">
+      <div class="qic">✅</div><div class="qn"><?= (int)$awApprove ?></div>
+      <div class="ql">Report<?= $awApprove === 1 ? '' : 's' ?> waiting for your review / approval →</div>
+    </a>
+  </div>
+<?php endif; ?>
+
 <?php if (function_exists('is_field_inspector') ? is_field_inspector() : is_inspector()): ?>
   <?php $myId = $u['inspector_id'] ?? 0;
     $mc = fn($sql, $extra = []) => $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$myId], $extra)) : 0;
@@ -28,12 +41,21 @@
     $myReports = $mc("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
     $myDone    = $mc("closed_flag=1");
   ?>
-  <div class="qcards" style="margin-top:18px">
-    <a class="qcard tone-info" href="/my-jobs?f=open"><div class="qic">🗂</div><div class="qn"><?= $myOpen ?></div><div class="ql">Open jobs to do</div></a>
-    <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports pending</div></a>
-    <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Overdue</div></a>
-    <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn"><?= e(cur_sym()) ?></div><div class="ql">This month's voucher</div></a>
-  </div>
+  <?php // My cockpit — the SAME universal KPI board that powers the client and
+        // freelancer dashboards, here at the inspector's own scope (own jobs +
+        // ratings). One engine, one card design, no duplicate metric code. ?>
+  <?php if (function_exists('connect_kpi_render') && function_exists('connect_kpi_board')): ?>
+    <div style="margin-top:18px"><?php connect_kpi_render(connect_kpi_board(['audience' => 'inspector', 'party_id' => (int)$myId])); ?></div>
+  <?php else: ?>
+    <div class="qcards" style="margin-top:18px">
+      <a class="qcard tone-info" href="/my-jobs?f=open"><div class="qic">🗂</div><div class="qn"><?= $myOpen ?></div><div class="ql">Open jobs to do</div></a>
+      <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports pending</div></a>
+      <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Overdue</div></a>
+      <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn"><?= e(cur_sym()) ?></div><div class="ql">This month's voucher</div></a>
+    </div>
+  <?php endif; ?>
+  <?php // Quick actions the metric board does not carry — jump to the full job
+        // list, and the monthly voucher (their timesheet + expense claim). ?>
   <div class="qcards" style="grid-template-columns:repeat(2,1fr)">
     <a class="qcard" href="/my-jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">All my jobs</div><div class="ql"><?= $myOpen ?> open · <?= $myDone ?> completed</div></a>
     <a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">My Voucher</div><div class="ql">Enter km &amp; expenses</div></a>
@@ -43,6 +65,13 @@
   <?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
 
 <?php else: ?>
+  <?php // Reusable KPI board — the SAME engine that scopes the client portal, here
+        // at staff/global scope: inspections, revenue, open concerns, ratings and
+        // reports pending, with one-tap actions. No duplicate metric code. ?>
+  <?php if (function_exists('connect_enabled') && connect_enabled() && function_exists('connect_kpi_render')): ?>
+    <h2 style="font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted,#777);margin:18px 0 2px">Service &amp; marketplace KPIs</h2>
+    <?php connect_kpi_render(connect_kpi_board(['audience' => 'staff'])); ?>
+  <?php endif; ?>
   <?php // Module 36 — ambient licence/subscription health, so an admin sees a lapse or
         // seat-limit BEFORE it forces the app read-only or refuses the next user. Shown
         // only to someone who can act on it; hidden when nothing needs attention.
