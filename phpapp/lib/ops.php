@@ -2698,6 +2698,10 @@ function ops_dispatch($route, $method) {
             return ops_recruit_pipelines($route, $method);
         case $route === 'candidate-flow':      // Phase 2b — move a candidate along its configured pipeline
             return ops_recruit_candidate_flow($route, $method);
+        case $route === 'positions' || $route === 'positions-org':   // Phase 3 — position master & org chart
+            return ops_positions($route, $method);
+        case $route === 'requisition-position':                      // Phase 3 — link a requisition to a position
+            return ops_requisition_position($route, $method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
             return ops_projcosting($route, $method);
         case $route === 'recruit-config':

@@ -11,6 +11,9 @@
   <?php if (is_coordinator_level()): ?><a class="btn secondary" href="/requisition-edit?id=<?= (int)$req['id'] ?>">Edit</a><?php endif; ?>
 </div>
 
+<?php // Phase 3 — manpower-plan validation against the position master (§14).
+if (function_exists('position_requisition_panel')) position_requisition_panel($req); ?>
+
 <?php // §18 — Requirement Health: is this vacancy on track to fill in time?
 $h = $health ?? null; if ($h): [$hband, $htone] = $h['band']; ?>
 <div class="panel" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">

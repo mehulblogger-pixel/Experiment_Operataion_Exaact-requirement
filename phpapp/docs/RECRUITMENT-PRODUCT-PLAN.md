@@ -83,7 +83,16 @@ Roughly **40–50% of the brief already exists in reusable form.**
   top of `candidate_detail`; requisition gains an additive `grade` column for
   seniority-based conditions. Legacy `CAND_STAGES` flow preserved. 28 pipeline
   assertions + full suite (6013) green.
-- **Phase 3 — SRF, Position master, Org-chart, Manpower-plan validation.**
+- **Phase 3 — Position master, Org-chart, Manpower-plan validation** ✅ *(done)* —
+  `lib/position.php`: `positions` table (code/name/department/BU/grade/level/
+  reports-to/office/HOD/sanctioned·occupied·budgeted headcount) with a CRUD admin
+  screen (`positions`) and an org-chart view (`positions-org`) built from the
+  reporting lines. `requisitions.position_id` (additive) links an SRF to a
+  position; the requisition detail shows a **manpower-plan validation** panel
+  computing cases A–E (§14): A proceed / B escalate (full or short) / C new-
+  position approval / D replacement / E over-budget → finance. Never a silent
+  bypass. Routes gated `mod.hiring.view` (see) + `is_coordinator_level()`
+  (manage) — no new permission. 15 assertions + full suite (6028) green.
 - **Phase 4 — Interviews (multi-round + scorecards), Documents/DMS.**
 - **Phase 5 — Compensation/salary-structure, Offer (template + approval), HR
   discussion, Onboarding hand-off to the person spine.**
