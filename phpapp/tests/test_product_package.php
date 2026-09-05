@@ -15,6 +15,7 @@ $prev = [
     'modules_off'     => (string)setting_get('modules_off', ''),
     'packs_enabled'   => (string)setting_get('packs_enabled', 'inspection'),
     'product_package' => (string)setting_get('product_package', ''),
+    'connect_enabled' => (string)setting_get('connect_enabled', '1'),
 ];
 // The modules_off setting is authoritative only when no signed licence enforces a set.
 $settingsPath = !function_exists('lk_modules') || lk_modules() === null;
@@ -47,6 +48,18 @@ try {
     $apply_ok('RECRUITMENT', '',           ['operations', 'reporting'], ['sales', 'hr', 'money']);
     $apply_ok('ENTERPRISE',  'inspection', [],                      ['operations', 'sales', 'reporting', 'money', 'hr']);
 
+    // In-house HR recruitment preset: recruitment + admin only, and it pins the
+    // marketplace off via the optional 'connect' key.
+    t_ok(isset($pkgs['RECRUITMENT_HR']), 'the in-house HR recruitment package is defined');
+    $apply_ok('RECRUITMENT_HR', '', ['operations', 'reporting', 'sales', 'money'], ['hr']);
+    if ($settingsPath && function_exists('connect_enabled')) {
+        t_ok(!connect_enabled(), 'RECRUITMENT_HR switches the marketplace off');
+        // An older preset without a 'connect' key must NOT touch the marketplace.
+        setting_set('connect_enabled', '1'); if (function_exists('connect_enabled')) connect_enabled();
+        product_package_apply('TPIA');
+        t_ok(setting_get('connect_enabled','1') === '1', 'applying TPIA leaves the marketplace switch untouched');
+    }
+
     // A hand-tuned change reads back as "custom" (settings path only).
     if ($settingsPath) {
         setting_set('product_package', 'ENTERPRISE');   // stored says ENTERPRISE…
@@ -59,6 +72,7 @@ try {
     setting_set('modules_off', $prev['modules_off']);
     setting_set('packs_enabled', $prev['packs_enabled']);
     setting_set('product_package', $prev['product_package']);
+    setting_set('connect_enabled', $prev['connect_enabled']);
     if (function_exists('licence_disabled')) licence_disabled(true);
     if (function_exists('packs_enabled')) packs_enabled(true);
 }

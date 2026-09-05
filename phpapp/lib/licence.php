@@ -188,6 +188,19 @@ const PRODUCT_PACKAGES = [
         'packs' => '',
         'off'   => ['operations', 'reporting'],
     ],
+    // In-house corporate HR who buy ONLY Recruitment & Selection: no sales
+    // pipeline, no client invoicing, no field operations, no inspection engine,
+    // and — via the optional 'connect' switch below — no marketplace either.
+    // The result is a workspace that shows recruitment and administration and
+    // nothing else. 'connect' is honoured only where present, so the older
+    // presets above are completely unaffected.
+    'RECRUITMENT_HR' => [
+        'label' => 'EXAACT Recruitment — In-house HR',
+        'desc'  => 'Corporate hiring only: staff requisitions, candidates, the full selection workflow, interviews, offer and onboarding. Sales CRM, invoicing, field operations, the inspection report engine and the marketplace are all hidden.',
+        'packs' => '',
+        'off'   => ['operations', 'reporting', 'sales', 'money'],
+        'connect' => '0',
+    ],
     'ENTERPRISE' => [
         'label' => 'EXAACT Enterprise',
         'desc'  => 'The whole platform: every capability enabled, then tuned per role and office through access.',
@@ -211,7 +224,14 @@ function product_package_matches($key) {
     if (_pp_norm(implode(',', packs_enabled())) !== _pp_norm($p['packs'])) return false;
     $offNow = licence_disabled(); sort($offNow);
     $wantOff = $p['off']; sort($wantOff);
-    return $offNow === $wantOff;
+    if ($offNow !== $wantOff) return false;
+    // A preset that pins the marketplace (the optional 'connect' key) only
+    // matches when the live marketplace switch agrees. Presets without the key
+    // are judged exactly as before.
+    if (isset($p['connect']) && function_exists('connect_enabled')) {
+        if (connect_enabled() !== ($p['connect'] === '1')) return false;
+    }
+    return true;
 }
 
 // The currently active package key, or '' when the switches match no preset.
@@ -229,6 +249,9 @@ function product_package_apply($key) {
     elseif (function_exists('setting_set')) { setting_set('packs_enabled', $p['packs']); if (function_exists('packs_enabled')) packs_enabled(true); }
     if (function_exists('setting_set')) setting_set('modules_off', implode(',', $p['off']));
     if (function_exists('licence_disabled')) licence_disabled(true);
+    // Optional marketplace switch: only presets that declare 'connect' touch it,
+    // so applying an older preset leaves the marketplace exactly as it was.
+    if (isset($p['connect']) && function_exists('setting_set')) setting_set('connect_enabled', $p['connect']);
     if (function_exists('setting_set')) setting_set('product_package', $key);
     return true;
 }
