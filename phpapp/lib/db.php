@@ -489,7 +489,9 @@ function run_schema($withSeeds = true) {
     if (function_exists('recruitpipe_migrate')) recruitpipe_migrate(); // Phase 2 — configurable recruitment pipelines + stages
     if (function_exists('position_migrate')) position_migrate();       // Phase 3 — position master + requisition.position_id
     if (function_exists('recruit_iv_migrate')) recruit_iv_migrate();   // Phase 4 — interviews + candidate_docs
+    if (function_exists('comp_migrate')) comp_migrate();               // Phase 5.1A — salary_component_defs (configurable compensation)
     if (function_exists('recruit_offer_migrate')) recruit_offer_migrate(); // Phase 5 — salary_structures + hr_discussions + job_offers
+    if (function_exists('doc_tpl_migrate')) doc_tpl_migrate();          // Phase 5.1B — doc_templates (configurable letters)
     if (function_exists('tally_migrate')) tally_migrate();             // what has already been handed to Tally
     if (function_exists('tasks_migrate')) tasks_migrate();             // Phase 3 §26 — persisted user tasks
     if (function_exists('webhookq_migrate')) webhookq_migrate();       // Phase 3 §50 — generic integration queue

@@ -114,6 +114,17 @@ Roughly **40–50% of the brief already exists in reusable form.**
   salary figures gated `can_see_salary()`. Onboarding hand-off (§34) reuses the
   existing candidate → inspector person spine (no duplicate person). 22 assertions
   + full suite (6072) green.
+- **Phase 5.1 — Configurable compensation & Document Studio** ✅ *(done)* —
+  (A) `comp_config.php`: `salary_component_defs` master (earnings/deductions/
+  employer with FIXED/%-of-basic/%-of-gross calc + statutory flags; Indian
+  defaults seeded, all editable) driving a computed salary structure (gross/CTC/
+  net/employer-cost); admin route `comp-setup`. (B) `doc_templates.php`:
+  configurable offer/appointment/other letter templates + letterhead/footer,
+  auto-filled from candidate/position/salary/company data with **missing fields
+  highlighted and listed**; admin route `doc-templates`, printable
+  `candidate-letter`; the issued offer letter uses the OFFER template. No new
+  permission (salary gated `can_see_salary`). 32 new assertions + full suite
+  (6106) green.
 - **Phase 6 — Approvals (routed, per-tenant), SLA + escalation, notifications
   wired to `ops_mail()`.**
 - **Phase 7 — Recruitment dashboards/reports hardening, careers intake, exports.**

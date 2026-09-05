@@ -2708,6 +2708,12 @@ function ops_dispatch($route, $method) {
             return ops_candidate_doc($route, $method);
         case $route === 'candidate-offer' || $route === 'offer-letter': // Phase 5 — salary, HR discussion, offer, letter
             return ops_candidate_offer($route, $method);
+        case $route === 'comp-setup':                                // Phase 5.1A — configurable compensation setup
+            return ops_comp_setup($route, $method);
+        case $route === 'doc-templates':                             // Phase 5.1B — configurable document studio
+            return ops_doc_templates($route, $method);
+        case $route === 'candidate-letter':                          // Phase 5.1B — generate a letter from a template
+            return ops_candidate_letter($route, $method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
             return ops_projcosting($route, $method);
         case $route === 'recruit-config':

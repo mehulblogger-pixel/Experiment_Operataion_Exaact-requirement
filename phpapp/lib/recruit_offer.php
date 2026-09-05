@@ -98,6 +98,11 @@ function recruit_offer_migrate() {
             created_by VARCHAR(160) DEFAULT '',
             created_at VARCHAR(30) DEFAULT ''
         )");
+        // Phase 5.1A — computed totals + the component lines (configurable comp).
+        ensure_column('salary_structures', 'net_pay', "DECIMAL(14,2) DEFAULT 0");
+        ensure_column('salary_structures', 'total_deductions', "DECIMAL(14,2) DEFAULT 0");
+        ensure_column('salary_structures', 'employer_cost', "DECIMAL(14,2) DEFAULT 0");
+        ensure_column('salary_structures', 'lines_json', $lt);
         if (function_exists('act_index')) {
             act_index('salary_structures', 'idx_sal_cand', '(candidate_id)');
             act_index('hr_discussions', 'idx_hrd_cand', '(candidate_id)');
@@ -117,21 +122,49 @@ function sal_current($candidateId) {
     recruit_offer_migrate();
     return ops_one("SELECT * FROM salary_structures WHERE candidate_id=? ORDER BY id DESC LIMIT 1", [(int)$candidateId]) ?: null;
 }
+// The component lines of a structure — from the configurable engine (lines_json)
+// if present, else reconstructed from the legacy fixed columns (back-compat).
+function sal_lines($row) {
+    if (!empty($row['lines_json'])) {
+        $j = json_decode((string)$row['lines_json'], true);
+        if (is_array($j)) return array_values(array_filter($j, fn($l) => (float)($l['amount'] ?? 0) != 0));
+    }
+    $out = [];
+    foreach (sal_components() as $k => $lbl) {
+        $v = (float)($row[$k] ?? 0); if ($v == 0) continue;
+        $out[] = ['code' => strtoupper($k), 'name' => $lbl, 'section' => 'EARNING', 'amount' => $v, 'statutory' => 0, 'taxable' => 1];
+    }
+    return $out;
+}
 function sal_total($row) {
-    $t = 0.0; foreach (array_keys(sal_components()) as $c) $t += (float)($row[$c] ?? 0);
+    // Gross earnings = sum of EARNING lines.
+    $t = 0.0; foreach (sal_lines($row) as $l) if (($l['section'] ?? 'EARNING') === 'EARNING') $t += (float)$l['amount'];
+    if ($t == 0) foreach (array_keys(sal_components()) as $c) $t += (float)($row[$c] ?? 0);
     return $t;
 }
 function sal_save($candidateId, $post) {
     recruit_offer_migrate();
+    // Drive off the configurable component definitions (Phase 5.1A).
+    if (function_exists('comp_defs') && function_exists('comp_compute')) {
+        $inputs = [];
+        foreach (comp_defs(true) as $d) if ($d['calc'] === 'FIXED') $inputs[$d['code']] = (float)($post['c_' . $d['code']] ?? 0);
+        $r = comp_compute($inputs);
+        db()->prepare("INSERT INTO salary_structures (candidate_id,currency,gross_ctc,net_pay,total_deductions,employer_cost,lines_json,candidate_expected,internal_benchmark,approved_budget,notes,created_by,created_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            ->execute([(int)$candidateId, _off_cur(), $r['ctc'], $r['net'], $r['deductions'], $r['employer'], json_encode($r['lines']),
+                (float)($post['candidate_expected'] ?? 0), (float)($post['internal_benchmark'] ?? 0), (float)($post['approved_budget'] ?? 0),
+                trim((string)($post['notes'] ?? '')), _off_actor(), _off_now()]);
+        return (int)db()->lastInsertId();
+    }
+    // Fallback (no comp engine): legacy fixed columns.
     $cols = array_keys(sal_components());
-    $vals = []; foreach ($cols as $c) $vals[$c] = (float)($post[$c] ?? 0);
+    $vals = []; foreach ($cols as $c) $vals[$c] = (float)($post['c_' . strtoupper($c)] ?? $post[$c] ?? 0);
     $gross = array_sum($vals);
     $set = implode(',', $cols);
     $ph = implode(',', array_fill(0, count($cols), '?'));
     db()->prepare("INSERT INTO salary_structures (candidate_id,currency,$set,gross_ctc,candidate_expected,internal_benchmark,approved_budget,notes,created_by,created_at)
                    VALUES (?,?, $ph, ?,?,?,?,?,?,?)")
-        ->execute(array_merge(
-            [(int)$candidateId, _off_cur()], array_values($vals),
+        ->execute(array_merge([(int)$candidateId, _off_cur()], array_values($vals),
             [$gross, (float)($post['candidate_expected'] ?? 0), (float)($post['internal_benchmark'] ?? 0),
              (float)($post['approved_budget'] ?? 0), trim((string)($post['notes'] ?? '')), _off_actor(), _off_now()]));
     return (int)db()->lastInsertId();
@@ -200,7 +233,13 @@ function offer_issue($id) {
     if (!$o) return [false, 'Offer not found.'];
     if ($o['status'] !== 'APPROVED') return [false, 'The offer must be approved before it can be issued.'];
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int)$o['candidate_id']]);
-    $letter = offer_letter_html($o, $cand, sal_current((int)$o['candidate_id']));
+    // Prefer a configurable OFFER template (Phase 5.1B); fall back to the built-in letter.
+    $letter = '';
+    if (function_exists('doc_tpl_by_code') && function_exists('doc_render_template')) {
+        $tpl = doc_tpl_by_code('OFFER');
+        if ($tpl) { $r = doc_render_template($tpl, $cand); $letter = $r['html']; }
+    }
+    if ($letter === '') $letter = offer_letter_html($o, $cand, sal_current((int)$o['candidate_id']));
     db()->prepare("UPDATE job_offers SET status='ISSUED', issued_by=?, issued_at=?, letter_html=? WHERE id=?")
         ->execute([_off_actor(), _off_now(), $letter, (int)$id]);
     // Coarse-sync the candidate's legacy stage to OFFERED (unless already closed).
@@ -252,14 +291,23 @@ function offer_letter_html($offer, $cand, $sal) {
     $body = strtr(offer_letter_template(), $tokens);
     $html = '<div style="font-family:Georgia,serif;max-width:720px;margin:auto;color:#1a2230;line-height:1.6">'
           . '<div style="white-space:pre-wrap;font-size:15px">' . $e($body) . '</div>';
-    // Salary-structure annexure (component breakdown).
+    // Salary-structure annexure (configurable component breakdown, grouped).
     if ($sal) {
+        $lines = sal_lines($sal);
+        $secLbl = ['EARNING' => 'Earnings', 'DEDUCTION' => 'Deductions', 'EMPLOYER' => 'Employer contributions'];
         $html .= '<h3 style="margin:22px 0 8px">Annexure — Compensation structure</h3><table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif">';
-        foreach (sal_components() as $k => $lbl) {
-            $v = (float)($sal[$k] ?? 0); if ($v == 0) continue;
-            $html .= '<tr><td style="padding:5px 8px;border-bottom:1px solid #eee">' . $e($lbl) . '</td><td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right">' . $e($cur . number_format($v, 0)) . '</td></tr>';
+        foreach (['EARNING', 'DEDUCTION', 'EMPLOYER'] as $sec) {
+            $secLines = array_filter($lines, fn($l) => ($l['section'] ?? 'EARNING') === $sec);
+            if (!$secLines) continue;
+            $html .= '<tr><td colspan="2" style="padding:8px 8px 3px;font-weight:700;color:#555;font-size:12px">' . $e($secLbl[$sec]) . '</td></tr>';
+            foreach ($secLines as $l)
+                $html .= '<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">' . $e($l['name']) . ((int)($l['statutory'] ?? 0) ? ' <span style="color:#999;font-size:10px">(statutory)</span>' : '') . '</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right">' . $e($cur . number_format((float)$l['amount'], 0)) . '</td></tr>';
         }
-        $html .= '<tr><td style="padding:7px 8px;font-weight:700">Total CTC</td><td style="padding:7px 8px;text-align:right;font-weight:700">' . $e($cur . number_format(sal_total($sal), 0)) . '</td></tr></table>';
+        $ctc = (float)($sal['gross_ctc'] ?? sal_total($sal));
+        $html .= '<tr><td style="padding:7px 8px;font-weight:700;border-top:2px solid #333">Total CTC</td><td style="padding:7px 8px;text-align:right;font-weight:700;border-top:2px solid #333">' . $e($cur . number_format($ctc, 0)) . '</td></tr>';
+        if ((float)($sal['net_pay'] ?? 0) > 0)
+            $html .= '<tr><td style="padding:4px 8px;color:#555">Net pay</td><td style="padding:4px 8px;text-align:right;color:#555">' . $e($cur . number_format((float)$sal['net_pay'], 0)) . '</td></tr>';
+        $html .= '</table>';
     }
     return $html . '</div>';
 }
@@ -325,30 +373,44 @@ function recruit_offer_panel($cand) {
       <?php if (!$seeSal): ?>
         <p class="muted">Compensation is restricted — you do not have salary access.</p>
       <?php else:
-        $var = $sal ? sal_variance($sal) : null; ?>
+        $var = $sal ? sal_variance($sal) : null;
+        $lines = $sal ? sal_lines($sal) : [];
+        $secLbl = ['EARNING'=>'Earnings','DEDUCTION'=>'Deductions (employee)','EMPLOYER'=>'Employer contributions'];
+        $defs = function_exists('comp_defs') ? comp_defs(true) : [];
+        $cur_amt = []; foreach ($lines as $l) $cur_amt[$l['code']] = (float)$l['amount']; ?>
         <?php if ($sal): ?>
-          <table style="width:100%;border-collapse:collapse;max-width:520px">
-            <?php foreach ($comp as $k => $lbl): if ((float)($sal[$k] ?? 0) == 0) continue; ?>
-              <tr><td style="padding:4px 8px;border-bottom:1px solid var(--line,#eef1f5)"><?= $e($lbl) ?></td><td style="padding:4px 8px;border-bottom:1px solid var(--line,#eef1f5);text-align:right"><?= $e($money($sal[$k])) ?></td></tr>
+          <table style="width:100%;border-collapse:collapse;max-width:560px">
+            <?php foreach (['EARNING','DEDUCTION','EMPLOYER'] as $sec): $secLines = array_filter($lines, fn($l)=>($l['section']??'EARNING')===$sec); if (!$secLines) continue; ?>
+              <tr><td colspan="2" style="padding:8px 8px 2px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--muted,#656e7a)"><?= $e($secLbl[$sec]) ?></td></tr>
+              <?php foreach ($secLines as $l): ?>
+                <tr><td style="padding:4px 8px;border-bottom:1px solid var(--line,#eef1f5)"><?= $e($l['name']) ?><?= (int)($l['statutory']??0)?' <span class="pill p-mut" style="font-size:9.5px">statutory</span>':'' ?></td><td style="padding:4px 8px;border-bottom:1px solid var(--line,#eef1f5);text-align:right"><?= $e($money($l['amount'])) ?></td></tr>
+              <?php endforeach; ?>
             <?php endforeach; ?>
-            <tr><td style="padding:6px 8px;font-weight:700">Total CTC</td><td style="padding:6px 8px;text-align:right;font-weight:700"><?= $e($money($sal['gross_ctc'])) ?></td></tr>
+            <tr><td style="padding:6px 8px;font-weight:700;border-top:2px solid var(--ink,#333)">Total CTC</td><td style="padding:6px 8px;text-align:right;font-weight:700;border-top:2px solid var(--ink,#333)"><?= $e($money($sal['gross_ctc'])) ?></td></tr>
+            <?php if ((float)($sal['net_pay']??0)>0): ?><tr><td style="padding:4px 8px;color:var(--muted,#656e7a)">Net pay (in-hand)</td><td style="padding:4px 8px;text-align:right;color:var(--muted,#656e7a)"><?= $e($money($sal['net_pay'])) ?></td></tr><?php endif; ?>
           </table>
           <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12.5px">
             <?php if ($var['vs_budget'] !== null): ?><span>Budget <?= $e($money($sal['approved_budget'])) ?> · <span class="pill <?= $var['vs_budget']>0?'p-bad':'p-ok' ?>"><?= ($var['vs_budget']>0?'+':'') . $e($money($var['vs_budget'])) ?></span></span><?php endif; ?>
             <?php if ($var['vs_expected'] !== null): ?><span>Candidate expected <?= $e($money($sal['candidate_expected'])) ?> · <span class="pill <?= $var['vs_expected']<0?'p-warn':'p-ok' ?>"><?= ($var['vs_expected']>0?'+':'') . $e($money($var['vs_expected'])) ?></span></span><?php endif; ?>
-            <?php if ($var['vs_benchmark'] !== null): ?><span>Benchmark <?= $e($money($sal['internal_benchmark'])) ?></span><?php endif; ?>
           </div>
         <?php else: ?><p class="muted">No salary structure yet.</p><?php endif; ?>
         <?php if ($can): ?>
         <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;color:var(--brand,#1e40af)"><?= $sal ? 'Revise the salary structure' : 'Build the salary structure' ?></summary>
           <form method="post" action="<?= $act ?>" style="margin-top:8px"><input type="hidden" name="do" value="sal_save">
-            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
-              <?php foreach ($comp as $k => $lbl): ?>
-                <div><label class="ff-l"><?= $e($lbl) ?></label><input class="form-control" type="number" step="any" name="<?= $k ?>" value="<?= $sal ? (float)$sal[$k] : '' ?>"></div>
+            <p class="muted" style="margin:0 0 6px;font-size:11.5px">Enter the fixed amounts; % components compute automatically. Headings are set under <a href="/comp-setup">Compensation setup</a>.</p>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+              <?php foreach ($defs as $d): ?>
+                <div><label class="ff-l"><?= $e($d['name']) ?><?= $d['calc']!=='FIXED'?' <span style="color:var(--muted,#94a3b8)">('.$e(rtrim(rtrim(number_format((float)$d['rate'],2,'.',''),'0'),'.')).'% '.($d['calc']==='PCT_BASIC'?'basic':'gross').')</span>':'' ?></label>
+                  <?php if ($d['calc']==='FIXED'): ?>
+                    <input class="form-control" type="number" step="any" name="c_<?= $e($d['code']) ?>" value="<?= isset($cur_amt[$d['code']])?$cur_amt[$d['code']]:'' ?>">
+                  <?php else: ?>
+                    <input class="form-control" value="auto" disabled style="background:#f1f5f9;color:#94a3b8">
+                  <?php endif; ?>
+                </div>
               <?php endforeach; ?>
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
-              <div><label class="ff-l">Candidate expected</label><input class="form-control" type="number" step="any" name="candidate_expected" value="<?= $sal ? (float)$sal['candidate_expected'] : '' ?>"></div>
+              <div><label class="ff-l">Candidate expected (CTC)</label><input class="form-control" type="number" step="any" name="candidate_expected" value="<?= $sal ? (float)$sal['candidate_expected'] : '' ?>"></div>
               <div><label class="ff-l">Internal benchmark</label><input class="form-control" type="number" step="any" name="internal_benchmark" value="<?= $sal ? (float)$sal['internal_benchmark'] : '' ?>"></div>
               <div><label class="ff-l">Approved budget</label><input class="form-control" type="number" step="any" name="approved_budget" value="<?= $sal ? (float)$sal['approved_budget'] : '' ?>"></div>
             </div>
@@ -438,6 +500,7 @@ function recruit_offer_panel($cand) {
         </form>
       <?php else: ?><p class="muted">No offer yet.</p><?php endif; ?>
     </div>
+    <?php if (function_exists('recruit_letters_block')) recruit_letters_block($cand); ?>
     <style>.ff-l{display:block;font-size:11.5px;font-weight:600;color:var(--muted,#656e7a);margin-bottom:3px}</style>
     <?php
 }

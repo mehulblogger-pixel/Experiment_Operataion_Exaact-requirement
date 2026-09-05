@@ -99,8 +99,11 @@ function ops_nav_index() {
             $add('Add candidate', '/candidate-new', $A, '➕', 'Add a candidate.', 'action');
             $add('Positions', '/positions', $A, '🏷️', 'Position master — sanctioned roles & headcount.');
             $add('Org chart', '/positions-org', $A, '🗂️', 'Reporting hierarchy from the position master.');
-            if ($fx('is_admin_level') && is_admin_level())
+            if ($fx('is_admin_level') && is_admin_level()) {
                 $add('Hiring workflows', '/recruit-pipelines', $A, '⇥', 'Configure the recruitment pipeline & stages.');
+                $add('Compensation setup', '/comp-setup', $A, '₹', 'Configure salary headings & statutory components.');
+                $add('Document templates', '/doc-templates', $A, '📄', 'Configure offer / appointment letter templates.');
+            }
         }
         if ($fx('pc_can') && pc_can())
             $add('Project costing', '/project-costings', $A, '🧮', 'Team cost build-ups → rates & margin.');
