@@ -34,3 +34,6 @@ handoff_docs/
 # local dev SQLite database (seeded for screenshots; never commit)
 phpapp/dev.sqlite
 dev.sqlite
+
+# build output — generated installer packages, never committed to source
+dist/
