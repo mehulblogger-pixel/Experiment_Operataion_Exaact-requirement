@@ -530,3 +530,41 @@ legacy `candidates.stage` is kept in **coarse sync** only at the interview →
 stage** — so the loss/withdraw handling and the explicit Hire (create-inspector)
 action are never disturbed. Terminal outcomes (hire, reject, withdraw) remain the
 legacy `candidate-stage` control's job.
+
+---
+
+## Interview (`interviews.result`) — recruitment (Phase 4)
+
+Interviews are a multi-round entity (many per candidate; rounds L1/L2/L3/HR/
+Technical/Management/Panel/Client/Practical/Assessment). Each carries a scorecard
+(competencies, rating 0–5, recommendation, comments).
+
+```
+SCHEDULED ─▶ PASS
+        ├──▶ FAIL
+        ├──▶ HOLD
+        ├──▶ RE_INTERVIEW
+        ├──▶ NO_SHOW
+        └──▶ CANCELLED
+```
+
+A concluding result (PASS/FAIL/HOLD/NO_SHOW/CANCELLED) stamps `done_at`. Managed
+by `is_coordinator_level()` (`recruit_iv.php`, route `candidate-interview`) — no
+new permission. Additive; does not affect the candidate stage lifecycle.
+
+## Candidate document (`candidate_docs.status`) — recruitment (Phase 4)
+
+A structured document set with configurable types (`candidate_doc_type` master).
+Sensitive types (salary, medical, identity, PAN) are download-restricted to
+admin-level users.
+
+```
+NOT_REQUIRED   REQUIRED ─▶ REQUESTED ─▶ UPLOADED ─▶ UNDER_REVIEW ─▶ VERIFIED
+                                            ▲                          │
+                                            └──── RESUBMIT ◀── REJECTED ┘
+VERIFIED ─▶ EXPIRED   (derived when a verified document is past its expiry date)
+```
+
+Managed by `is_coordinator_level()` (`recruit_iv.php`, route `candidate-doc`) — no
+new permission. `EXPIRED` is a derived display status (`doc_effective_status`),
+not stored. Additive.

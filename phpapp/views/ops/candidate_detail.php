@@ -27,7 +27,7 @@ if ($dupes): ?>
 </div>
 <?php endif; ?>
 
-<div data-tabs data-tabs-key="ct" data-tabs-order="Overview,Recruitment,CV,Timeline">
+<div data-tabs data-tabs-key="ct" data-tabs-order="Overview,Interviews,Documents,Recruitment,CV,Timeline">
 <section data-tab="Overview">
 <div class="panel">
   <h3 class="tab-sub">Candidate details</h3>
@@ -476,6 +476,9 @@ usort($tl, fn($a, $b) => strcmp(substr($b['at'], 0, 10) . $b['at'], substr($a['a
 </div>
 
 </section>
+<?php // Phase 4 — interviews (multi-round + scorecards) and the document set. ?>
+<section data-tab="Interviews"><?php if (function_exists('recruit_iv_panel')) recruit_iv_panel($cand); ?></section>
+<section data-tab="Documents"><?php if (function_exists('recruit_docs_panel')) recruit_docs_panel($cand); ?></section>
 </div><!-- /data-tabs -->
 
 <?php

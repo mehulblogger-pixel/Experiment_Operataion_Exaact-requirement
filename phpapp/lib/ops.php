@@ -2702,6 +2702,10 @@ function ops_dispatch($route, $method) {
             return ops_positions($route, $method);
         case $route === 'requisition-position':                      // Phase 3 — link a requisition to a position
             return ops_requisition_position($route, $method);
+        case $route === 'candidate-interview':                       // Phase 4 — multi-round interviews + scorecards
+            return ops_candidate_interview($route, $method);
+        case $route === 'candidate-doc':                             // Phase 4 — candidate document DMS
+            return ops_candidate_doc($route, $method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
             return ops_projcosting($route, $method);
         case $route === 'recruit-config':

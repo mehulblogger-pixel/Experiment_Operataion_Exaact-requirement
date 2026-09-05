@@ -93,7 +93,16 @@ Roughly **40–50% of the brief already exists in reusable form.**
   position approval / D replacement / E over-budget → finance. Never a silent
   bypass. Routes gated `mod.hiring.view` (see) + `is_coordinator_level()`
   (manage) — no new permission. 15 assertions + full suite (6028) green.
-- **Phase 4 — Interviews (multi-round + scorecards), Documents/DMS.**
+- **Phase 4 — Interviews (multi-round + scorecards) & Document DMS** ✅ *(done)* —
+  `lib/recruit_iv.php`: `interviews` table (many rounds per candidate; L1/L2/L3/
+  HR/Technical/Management/Panel/Client/Practical/Assessment) with a scorecard
+  (competencies, rating, recommendation, result PASS/FAIL/HOLD/RE_INTERVIEW/
+  NO_SHOW/CANCELLED); `candidate_docs` table with a configurable type list and the
+  full status lifecycle (NOT_REQUIRED→…→VERIFIED/REJECTED/RESUBMIT, derived
+  EXPIRED). Two new tabs (Interviews, Documents) on the candidate screen; routes
+  `candidate-interview`/`candidate-doc` gated `is_coordinator_level()`; sensitive
+  documents (salary/medical/identity/PAN) are download-restricted to admin-level
+  (§39). No new permission. 22 assertions + full suite (6050) green.
 - **Phase 5 — Compensation/salary-structure, Offer (template + approval), HR
   discussion, Onboarding hand-off to the person spine.**
 - **Phase 6 — Approvals (routed, per-tenant), SLA + escalation, notifications

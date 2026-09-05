@@ -231,6 +231,7 @@ try {
     require __DIR__ . '/lib/recruit_cc.php';
     require __DIR__ . '/lib/recruitpipe.php';      // Phase 2 — configurable pipeline / stage engine
     require __DIR__ . '/lib/position.php';         // Phase 3 — position master, org-chart, manpower validation
+    require __DIR__ . '/lib/recruit_iv.php';       // Phase 4 — interviews (multi-round + scorecards) & document DMS
     require __DIR__ . '/lib/candpool.php';         // Revamp P11 — candidate pool convergence (read-only)
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
