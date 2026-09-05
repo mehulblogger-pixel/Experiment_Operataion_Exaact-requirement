@@ -97,6 +97,8 @@ function ops_nav_index() {
             $add('Candidates', '/candidates', $A, '👤', 'Candidate pipeline.');
             $add('New requirement', '/requisition-new', $A, '➕', 'Raise a new requirement.', 'action');
             $add('Add candidate', '/candidate-new', $A, '➕', 'Add a candidate.', 'action');
+            if ($fx('is_admin_level') && is_admin_level())
+                $add('Hiring workflows', '/recruit-pipelines', $A, '⇥', 'Configure the recruitment pipeline & stages.');
         }
         if ($fx('pc_can') && pc_can())
             $add('Project costing', '/project-costings', $A, '🧮', 'Team cost build-ups → rates & margin.');

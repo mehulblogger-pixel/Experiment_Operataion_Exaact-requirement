@@ -481,3 +481,41 @@ ratings **about themselves**) or by staff on their behalf — **no new permissio
 either side. The investigation desk (`/rating-disputes`) reuses the marketplace
 moderation gate (`connect_market_can`) — **no new permission**, exactly like the K9b
 dispute and the verification desk.
+
+---
+
+## Candidate (`candidates.stage`) — recruitment
+
+The legacy hiring pipeline (technical-manpower deputation) is a fixed set of
+stage keys, `CAND_STAGES` (`ops.php:70`):
+
+```
+RECEIVED → SUBMITTED → SHORTLISTED → INTERVIEW → OFFERED → ACCEPTED (hired)
+                 │                                   │
+                 └─────────────→ HOLD / REJECTED / WITHDRAWN / OFFER_DECLINED (terminal)
+```
+
+Every move is written to `candidate_events (from_stage, to_stage, remark, actor,
+created_at)`; hire (`ACCEPTED`) may create an `inspectors` row via the identity
+ledger (candidate → employee, no duplicate person). Guards: create/edit and
+stage-move `is_coordinator_level()`. **This lifecycle is unchanged.**
+
+### Configurable pipeline (Phase 2 — additive, data-driven)
+
+A per-tenant pipeline engine (`recruitpipe.php`; tables `recruit_pipelines` +
+`recruit_stages`) lets each customer define their **own** ordered stages instead
+of the fixed keys above — so different companies run different selection
+processes on one engine (brief §9, §45–46). Stages carry a `kind`
+(step/gate/interview/offer/terminal), a responsible role, an optional SLA, and an
+optional **condition** (`condition_field`/`op`/`value`) that makes a stage apply
+only when the requisition matches (e.g. an L2 only for senior grades; a medical
+only when required — brief §10). `recruitpipe_for($requisition)` resolves the
+applicable pipeline (narrowest applicability match wins, else the default), and
+`recruitpipe_effective_stages()` returns the stages that apply after conditions.
+
+This is **configuration data, not new code statuses/transitions**: it adds no
+status to `candidates.stage` and does not alter the lifecycle above. Configuration
+is gated `is_admin_level()` (route `recruit-pipelines`) — no new permission. The
+default seed is the client's 18-stage *Corporate Recruitment Workflow*
+(Staff Requisition → … → Offer → Onboarding), shipped alongside *Simple* and
+*Executive* templates.

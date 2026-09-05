@@ -65,9 +65,14 @@ Roughly **40–50% of the brief already exists in reusable form.**
   package `RECRUITMENT_HR` isolates an in-house HR customer to Recruitment +
   Administration only (Operations, Inspection reporting, Sales CRM, Invoicing and
   the Marketplace all hidden). Verified; existing presets unaffected.
-- **Phase 2 — Configurable pipeline engine** — per-tenant pipeline/stage tables +
-  admin screen, seeded with the client's 18-stage template (below), driving the
-  candidate flow. Conditional stages (skip L2 / medical / references by rule).
+- **Phase 2 — Configurable pipeline engine** ✅ *(done)* — per-tenant
+  `recruit_pipelines`/`recruit_stages` tables + admin screen (`recruit-pipelines`,
+  `is_admin_level()`), seeded with the client's 18-stage template plus *Simple*
+  and *Executive* templates. Resolver picks the applicable pipeline per
+  requisition; conditional stages skip by rule (L2 for senior grades only; medical
+  only when required). `lib/recruitpipe.php` + `views/ops/recruit_pipelines.php`;
+  wired into boot; 18 engine assertions + full suite green. Wiring the live
+  candidate screen to drive off the resolved pipeline is Phase 2b.
 - **Phase 3 — SRF, Position master, Org-chart, Manpower-plan validation.**
 - **Phase 4 — Interviews (multi-round + scorecards), Documents/DMS.**
 - **Phase 5 — Compensation/salary-structure, Offer (template + approval), HR

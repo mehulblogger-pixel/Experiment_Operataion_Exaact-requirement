@@ -2694,6 +2694,8 @@ function ops_dispatch($route, $method) {
             return ops_candpool($method);
         case $route === 'recruitment-cc':
             return ops_recruitment_cc($method);
+        case $route === 'recruit-pipelines':   // Phase 2 — configurable hiring workflows (admin)
+            return ops_recruit_pipelines($route, $method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
             return ops_projcosting($route, $method);
         case $route === 'recruit-config':

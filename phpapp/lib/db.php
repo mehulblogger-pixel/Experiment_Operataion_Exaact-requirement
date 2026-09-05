@@ -486,6 +486,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('rcr_migrate')) rcr_migrate();                   // the client's answer to an issued report           // the client's own sign-in, its own table
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits
     if (function_exists('req_groups_migrate')) req_groups_migrate();  // 1c — requisition deployment groups (headcount + reporting contact + site)
+    if (function_exists('recruitpipe_migrate')) recruitpipe_migrate(); // Phase 2 — configurable recruitment pipelines + stages
     if (function_exists('tally_migrate')) tally_migrate();             // what has already been handed to Tally
     if (function_exists('tasks_migrate')) tasks_migrate();             // Phase 3 §26 — persisted user tasks
     if (function_exists('webhookq_migrate')) webhookq_migrate();       // Phase 3 §50 — generic integration queue
