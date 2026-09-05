@@ -50,7 +50,19 @@
   .help{font-size:12.5px;color:var(--muted);text-align:center;line-height:1.6;margin-top:20px}
   .ver{margin-top:20px;text-align:center;font-size:11.5px;color:var(--muted)}
   .err{background:#fee2e2;color:#991b1b;border-radius:10px;padding:10px 13px;font-size:13.5px;margin-bottom:16px}
-  @media (max-width:900px){.stage{grid-template-columns:1fr}.brand-side{padding:38px 28px 30px}.pitch h1{font-size:28px}.auth-side{padding:30px 20px 56px}}
+  /* Mobile: stack the two panels as normal content-height blocks. The desktop layout
+     forces the grid to 100vh, which on a phone stretches the brand panel to half the
+     screen and clips its text behind the login card — so on mobile we drop the grid,
+     drop the 100vh, and let each panel size to its own content. */
+  @media (max-width:900px){
+    body{display:block}
+    .stage{display:block;min-height:auto}
+    .brand-side{min-height:auto;padding:36px 26px 30px}
+    .brand-side .foot{margin-top:22px}
+    .pitch{margin:22px 0}
+    .pitch h1{font-size:28px}
+    .auth-side{padding:28px 20px 56px}
+  }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head><body>
