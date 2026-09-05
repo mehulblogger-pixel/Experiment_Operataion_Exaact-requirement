@@ -8,10 +8,12 @@ function nav_items() {
     // [route, label, icon, permission]
     return [
         ['dashboard',    'Dashboard',    '▪', 'view'],
+        ['tasks',        'My Tasks',     '✓', 'view'],
         ['requisitions', 'Requisitions', '▤', 'view'],
         ['candidates',   'Candidates',   '☰', 'view'],
         ['pipeline',     'Pipeline',     '⇥', 'pipeline.edit'],
         ['users',        'Users',        '◍', 'users'],
+        ['billing',      'Billing',      '❖', 'settings'],
         ['settings',     'Branding',     '✦', 'settings'],
     ];
 }

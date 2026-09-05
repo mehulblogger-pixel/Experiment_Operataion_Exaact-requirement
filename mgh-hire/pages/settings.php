@@ -20,9 +20,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (post('remove_logo')) setting_set('logo_data','');
         flash('Branding saved.');
+    } elseif ($do === 'email') {
+        setting_set('mail_enabled', post('mail_enabled')?'1':'0');
+        setting_set('mail_from_name', post('mail_from_name','MGH Hire'));
+        $fe = post('mail_from_email'); $hr = post('mail_hr_inbox');
+        setting_set('mail_from_email', filter_var($fe,FILTER_VALIDATE_EMAIL)?$fe:'');
+        setting_set('mail_hr_inbox',   filter_var($hr,FILTER_VALIDATE_EMAIL)?$hr:'');
+        flash('Email settings saved.');
+    } elseif ($do === 'careers') {
+        setting_set('careers_enabled', post('careers_enabled')?'1':'0');
+        setting_set('careers_intro', post('careers_intro'));
+        flash('Careers page settings saved.');
+    } elseif ($do === 'email_test') {
+        $to = post('test_to');
+        if (!filter_var($to,FILTER_VALIDATE_EMAIL)) flash('Enter a valid test address.', 'err');
+        else { notify($to,'Test','MGH Hire test email','<p>This is a test message from MGH Hire. If you can read this, email delivery works.</p>','test',0); flash('Test email queued — see the outbox below for its status.'); }
     }
     redirect('?p=settings');
 }
+
+$outbox = db()->query("SELECT * FROM emails ORDER BY id DESC LIMIT 10")->fetchAll();
 
 $logo = setting('logo_data','');
 layout_top('Branding');
@@ -51,6 +68,57 @@ layout_top('Branding');
     </div>
     <div style="margin-top:16px"><button class="btn">Save branding</button></div>
   </form>
+</div>
+
+<?php $careersUrl = (isset($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off'?'https':'http').'://'.($_SERVER['HTTP_HOST']??'your-site').strtok($_SERVER['REQUEST_URI']??'/','?').'?p=careers'; ?>
+<div class="card">
+  <h2>Public careers page</h2>
+  <p class="muted mt0">A public page where anyone can see your open positions and apply. Applications land as candidates at the first stage, with the CV auto-read.</p>
+  <form method="post">
+    <input type="hidden" name="do" value="careers"><?= csrf_field() ?>
+    <label style="font-weight:600"><input type="checkbox" name="careers_enabled" value="1" <?= setting('careers_enabled','1')==='1'?'checked':'' ?> style="width:auto;margin-right:7px">Enable the public careers page</label>
+    <label>Intro line shown to applicants</label>
+    <input name="careers_intro" value="<?= e(setting('careers_intro','')) ?>">
+    <div style="margin-top:14px"><button class="btn">Save careers settings</button></div>
+  </form>
+  <p class="muted" style="margin-top:12px">Public link: <a href="?p=careers" target="_blank"><?= e($careersUrl) ?></a> — share this on your website or job posts.</p>
+</div>
+
+<div class="card">
+  <h2>Email notifications</h2>
+  <p class="muted mt0">Automatic emails on key events — requisition approved, interview scheduled, offer issued, and new applications from the careers page. Every message is logged in the outbox below whether or not sending is switched on.</p>
+  <form method="post">
+    <input type="hidden" name="do" value="email"><?= csrf_field() ?>
+    <label style="font-weight:600"><input type="checkbox" name="mail_enabled" value="1" <?= mail_enabled()?'checked':'' ?> style="width:auto;margin-right:7px">Send emails automatically</label>
+    <div class="row3">
+      <div><label>From name</label><input name="mail_from_name" value="<?= e(setting('mail_from_name','MGH Hire')) ?>"></div>
+      <div><label>From email</label><input name="mail_from_email" type="email" value="<?= e(setting('mail_from_email','')) ?>" placeholder="hr@yourcompany.com"></div>
+      <div><label>HR inbox (new-application alerts)</label><input name="mail_hr_inbox" type="email" value="<?= e(setting('mail_hr_inbox','')) ?>" placeholder="careers@yourcompany.com"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn">Save email settings</button></div>
+  </form>
+  <form method="post" style="margin-top:14px;display:flex;gap:8px;align-items:end;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:14px">
+    <input type="hidden" name="do" value="email_test"><?= csrf_field() ?>
+    <div style="min-width:240px"><label>Send a test email to</label><input name="test_to" type="email" placeholder="you@example.com"></div>
+    <div><button class="btn ghost">Send test</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Email outbox <span class="muted" style="font-weight:400;font-size:12px">(last 10)</span></h2>
+  <?php if (!$outbox): ?><p class="muted mt0">No emails yet.</p><?php else: ?>
+  <table>
+    <tr><th>When</th><th>To</th><th>Subject</th><th>Status</th></tr>
+    <?php foreach ($outbox as $m):
+      $sp = ['sent'=>'g','pending'=>'a','failed'=>'r','skipped'=>'s'][$m['status']] ?? 's'; ?>
+      <tr><td class="muted"><?= fdate($m['created_at'],true) ?></td>
+          <td><?= e($m['to_addr'] ?: '—') ?></td>
+          <td><?= e($m['subject']) ?></td>
+          <td><span class="pill <?= $sp ?>"><?= e($m['status']) ?></span><?= $m['error']?'<div class="muted" style="font-size:11px">'.e($m['error']).'</div>':'' ?></td></tr>
+    <?php endforeach; ?>
+  </table>
+  <p class="muted" style="margin-top:10px"><b>pending</b> = saved but not sent yet (sending off, or the host's mail isn't set up). <b>skipped</b> = no email address on file.</p>
+  <?php endif; ?>
 </div>
 
 <div class="card">

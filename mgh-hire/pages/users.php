@@ -9,6 +9,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $exists = db()->prepare("SELECT 1 FROM users WHERE username=?"); $exists->execute([$uname]);
         if (!$uname || $exists->fetch()) { flash('Username missing or already taken.', 'err'); }
         elseif (strlen(post('password')) < 6) { flash('Password must be at least 6 characters.', 'err'); }
+        elseif (!seats_available()) {
+            $ls = licence_status();
+            flash($ls['expired'] ? 'Your licence has expired — renew it on the Billing screen before adding users.'
+                                 : "You've reached your seat limit ({$ls['used']}/{$ls['limit']}). Add seats on the Billing screen, or disable a user to free a seat.", 'err');
+        }
         else {
             db()->prepare("INSERT INTO users (name,email,username,pass_hash,role,active,created_at) VALUES (?,?,?,?,?,1,?)")
                 ->execute([post('name'),post('email'),$uname,password_hash(post('password'),PASSWORD_DEFAULT),
@@ -17,10 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($do === 'toggle') {
         $uid = (int)post('uid');
-        if ($uid !== (int)current_user()['id']) {
+        $cur = db()->prepare("SELECT active FROM users WHERE id=?"); $cur->execute([$uid]); $active=(int)$cur->fetchColumn();
+        if ($uid === (int)current_user()['id']) flash("You can't deactivate yourself.", 'err');
+        elseif ($active === 0 && !seats_available()) flash('No free seat to enable this user — check Billing.', 'err');
+        else {
             db()->prepare("UPDATE users SET active = CASE active WHEN 1 THEN 0 ELSE 1 END WHERE id=?")->execute([$uid]);
             flash('User updated.');
-        } else flash("You can't deactivate yourself.", 'err');
+        }
     } elseif ($do === 'reset') {
         $uid = (int)post('uid');
         if (strlen(post('password')) < 6) flash('Password too short.', 'err');

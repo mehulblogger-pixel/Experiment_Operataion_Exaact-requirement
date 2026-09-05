@@ -18,8 +18,23 @@ $recent = db()->query("SELECT c.*, r.title req FROM candidates c
                        LEFT JOIN requisitions r ON r.id=c.requisition_id
                        ORDER BY c.id DESC LIMIT 8")->fetchAll();
 
+$taskGroups = tasks_groups();
+$taskTotal = 0; foreach ($taskGroups as $g) $taskTotal += $g['count'];
+
 layout_top('Dashboard');
 ?>
+<?php if ($taskGroups): ?>
+<div class="card" style="border-left:4px solid var(--brand)">
+  <h2 class="mt0">Needs your attention <span class="pill a"><?= $taskTotal ?></span></h2>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <?php foreach ($taskGroups as $g): ?>
+      <a href="?p=tasks" style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:9px 13px;color:var(--ink)">
+        <span class="pill <?= e($g['tone']) ?>"><?= $g['count'] ?></span> <?= e($g['label']) ?>
+      </a>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
 <div class="grid kpis" style="margin-bottom:18px">
   <div class="kpi b"><div class="n"><?= $openReq ?></div><div class="l">Open requisitions</div></div>
   <div class="kpi"><div class="n"><?= $pendReq ?></div><div class="l">Awaiting approval</div></div>

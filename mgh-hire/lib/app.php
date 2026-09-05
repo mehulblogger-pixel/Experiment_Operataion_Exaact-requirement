@@ -4,6 +4,10 @@
 // =========================================================================
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/mail.php';
+require_once __DIR__ . '/licence.php';
+require_once __DIR__ . '/cv.php';
+require_once __DIR__ . '/tasks.php';
 
 // ---- Output / request utilities ------------------------------------------
 function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }

@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         require_can('gate.decide');
         db()->prepare("UPDATE candidates SET status='rejected' WHERE id=?")->execute([$id]);
         cand_log($id, 'reject', (int)$c['stage_id'], (int)$c['stage_id'], 'rejected', post('remarks'));
+        if (post('notify')) notify_rejected($c);
         flash("{$c['name']} marked rejected.");
     } elseif ($do === 'hold') {
         require_can('cand.move');
@@ -43,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        VALUES (?,?,?,?,?,?)")
             ->execute([$id, post('round','L1'), post('scheduled_at'), post('panel'), post('mode','In person'), now()]);
         cand_log($id, 'interview_scheduled', (int)$c['stage_id'], (int)$c['stage_id'], '', post('round').' — '.post('scheduled_at'));
+        notify_interview($c, post('round','L1'), post('scheduled_at'));
         flash('Interview scheduled.');
     } elseif ($do === 'interview_result') {
         require_can('interview.log');
@@ -83,6 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         db()->prepare("UPDATE candidates SET status='offer' WHERE id=?")->execute([$id]);
         cand_log($id, 'offer_issued', (int)$c['stage_id'], (int)$c['stage_id'], '', 'CTC '.post('ctc').' · joining '.post('joining_date'));
+        notify_offer($c, ['ctc'=>post('ctc'),'joining_date'=>post('joining_date')]);
         flash('Offer issued.');
     } elseif ($do === 'offer_accept') {
         require_can('offer.manage');
@@ -139,9 +142,10 @@ layout_top('Candidate ' . $c['code']);
       </form>
     <?php endif; ?>
     <?php if (can('gate.decide')): ?>
-      <form method="post" onsubmit="return confirm('Reject this candidate?')">
+      <form method="post" onsubmit="return confirm('Reject this candidate?')" style="display:flex;align-items:center;gap:6px">
         <input type="hidden" name="do" value="reject"><?= csrf_field() ?>
         <button class="btn bad sm">Reject</button>
+        <label style="margin:0;font-weight:500;font-size:12px;color:#64748b"><input type="checkbox" name="notify" value="1" style="width:auto;margin-right:4px">email candidate</label>
       </form>
     <?php endif; ?>
     <?php if (can('cand.move')): ?>

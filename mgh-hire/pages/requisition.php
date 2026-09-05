@@ -16,6 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $u = current_user();
         db()->prepare("UPDATE requisitions SET status='approved', approved_by=? WHERE id=?")
             ->execute([$u['name'], $id]);
+        $r['status']='approved';
+        notify_requisition_approved($r);
         flash("Requisition {$r['code']} approved. You can now add candidates.");
     } elseif ($do === 'hold') {
         require_can('req.approve');

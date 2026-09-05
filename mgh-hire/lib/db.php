@@ -182,6 +182,23 @@ function db_build() {
         created_at VARCHAR(30) DEFAULT ''
     )");
 
+    // Email outbox — every notification is recorded here, then delivered.
+    // A durable log means a customer can always see what was sent, and a host
+    // where mail() is disabled still shows the trail (status='pending').
+    $p->exec("CREATE TABLE IF NOT EXISTS emails (
+        id $ID,
+        to_addr VARCHAR(200) DEFAULT '',
+        to_name VARCHAR(160) DEFAULT '',
+        subject VARCHAR(240) DEFAULT '',
+        body $LT,
+        event VARCHAR(60) DEFAULT '',
+        ref_id INT DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'pending',
+        error VARCHAR(240) DEFAULT '',
+        created_at VARCHAR(30) DEFAULT '',
+        sent_at VARCHAR(30) DEFAULT ''
+    )");
+
     db_seed();
 }
 
@@ -212,6 +229,20 @@ function db_seed() {
         'currency'     => '₹',
         'seq_req'      => '0',
         'seq_cand'     => '0',
+        // Email
+        'mail_enabled'    => '0',
+        'mail_from_name'  => 'MGH Hire',
+        'mail_from_email' => '',
+        'mail_hr_inbox'   => '',   // where "new application" alerts go
+        // Licence / seats  (0 seat_limit = unlimited)
+        'plan_name'    => 'Starter',
+        'seat_limit'   => '0',
+        'licence_exp'  => '',
+        // Careers page
+        'careers_enabled' => '1',
+        'careers_intro'   => 'Explore open positions and apply below.',
+        // Stall threshold (days a candidate may sit at a stage before it is a task)
+        'stall_days'   => '7',
     ];
     foreach ($defaults as $k => $v) setting_default($k, $v);
 

@@ -27,21 +27,24 @@ csrf_check();
 
 $p = preg_replace('/[^a-z_]/', '', strtolower(get('p', 'dashboard'))) ?: 'dashboard';
 
-// Public route: login / logout.
-if ($p === 'logout') { logout(); redirect('?p=login'); }
-if ($p === 'login')  { require __DIR__ . '/pages/login.php'; exit; }
+// Public routes: careers page, login / logout.
+if ($p === 'careers') { require __DIR__ . '/pages/careers.php'; exit; }
+if ($p === 'logout')  { logout(); redirect('?p=login'); }
+if ($p === 'login')   { require __DIR__ . '/pages/login.php'; exit; }
 
 // Everything else needs a session.
 require_login();
 
 $routes = [
     'dashboard'      => 'dashboard.php',
+    'tasks'          => 'tasks.php',
     'requisitions'   => 'requisitions.php',
     'requisition'    => 'requisition.php',
     'candidates'     => 'candidates.php',
     'candidate'      => 'candidate.php',
     'pipeline'       => 'pipeline.php',
     'users'          => 'users.php',
+    'billing'        => 'billing.php',
     'settings'       => 'settings.php',
 ];
 $file = $routes[$p] ?? 'dashboard.php';
