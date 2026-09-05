@@ -220,6 +220,7 @@ try {
     require __DIR__ . '/lib/setup.php';
     require __DIR__ . '/lib/tenants.php';
     require __DIR__ . '/lib/cpanel.php';
+    require __DIR__ . '/lib/tenant_signup.php';   // Public workspace signup → PENDING → Super-Admin approves
     require __DIR__ . '/lib/agreement.php';
     require __DIR__ . '/lib/company.php';
     require __DIR__ . '/lib/customforms.php';
@@ -892,6 +893,15 @@ if (function_exists('connect_pro_route') && ($route === 'pro' || strncmp($route,
 // of require_login(). connect_org_join_route() always exits.
 if ($route === 'join' && function_exists('connect_org_join_route')) {
     connect_org_join_route($method);
+    exit;
+}
+
+// Public "Start your workspace" — a new inspection company applies for its own
+// OPERATIONS workspace (not a marketplace account). Lands as PENDING for the
+// Super-Admin to approve, then the workspace is provisioned. Public, in front of
+// require_login(); off by default until the operator turns signup on. Always exits.
+if ($route === 'get-started' && function_exists('tenant_signup_route')) {
+    tenant_signup_route($method);
     exit;
 }
 

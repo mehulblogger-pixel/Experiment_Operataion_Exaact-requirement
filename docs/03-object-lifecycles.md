@@ -481,3 +481,30 @@ ratings **about themselves**) or by staff on their behalf — **no new permissio
 either side. The investigation desk (`/rating-disputes`) reuses the marketplace
 moderation gate (`connect_market_can`) — **no new permission**, exactly like the K9b
 dispute and the verification desk.
+
+---
+
+## `tenant_requests.status` — public workspace signup (operations tenants)
+
+A NEW inspection company applies for its **own operations workspace** from the
+public `/get-started` page (off by default; the operator turns online registration
+on from the Workspaces panel). The request lands as **PENDING** for the Super-Admin
+to approve — the operations-side mirror of Connect B1 (an org applies for itself).
+Additive `tenant_requests` table; **nothing existing is touched**. Provisioning only
+ever **adds** a workspace (its own subdomain + database), never changes or deletes one.
+
+> **PENDING → APPROVED → PROVISIONED**, plus **REJECTED** as an off-ramp.
+
+- `PENDING → APPROVED` — Super-Admin approves; if the cPanel API is **not** set up,
+  the workspace is created by hand and the request waits at APPROVED until marked set up.
+- `PENDING → PROVISIONED` — approve with the cPanel API configured provisions the
+  database (+ subdomain) at once via `cpanel_provision_workspace()` + `tenant_add()`.
+- `APPROVED → PROVISIONED` — operator finishes the manual two-click setup and marks it.
+- `PENDING → REJECTED` — Super-Admin declines. Terminal.
+- Terminal: `PROVISIONED` (workspace exists), `REJECTED`.
+
+Approve/decline reuse **`can_manage_tenants()`** — Master Admin, on the base/control
+domain only (a workspace can never reach the fleet). **No new permission.** Each
+provisioned workspace is a full independent install: its own subdomain
+(`<name>.<base-domain>`), its own database, its own `admin`, its own licence and data —
+its people sign in at **their own subdomain's `/login`**, never at the marketplace door.

@@ -58,6 +58,72 @@
   </table>
 </div>
 
+<?php
+  // --- Workspace requests inbox (a new company applied for itself) ---
+  $requests = (array)($requests ?? []);
+  $signupOn = !empty($signup_on);
+  $statuses = (array)($req_statuses ?? []);
+  $pending  = array_values(array_filter($requests, fn($r) => ($r['status'] ?? '') === 'PENDING'));
+  $pillFor = function($s) {
+    switch ($s) {
+      case 'PENDING':     return '<span class="pill p-warn">pending</span>';
+      case 'APPROVED':    return '<span class="pill p-mut">approved — set up</span>';
+      case 'PROVISIONED': return '<span class="pill p-ok">workspace created</span>';
+      case 'REJECTED':    return '<span class="pill p-bad">declined</span>';
+    }
+    return '<span class="pill p-mut">' . e($s) . '</span>';
+  };
+?>
+<div class="panel">
+  <div class="ctitle" style="margin-top:0"><h3>Workspace requests
+      <?php if ($pending): ?><span class="pill p-warn"><?= count($pending) ?> new</span><?php else: ?><span class="muted">(<?= count($requests) ?>)</span><?php endif; ?></h3>
+    <form method="post" action="/workspace-signup-toggle" style="margin:0">
+      <input type="hidden" name="on" value="<?= $signupOn ? '0' : '1' ?>">
+      <button class="btn small <?= $signupOn ? 'secondary' : '' ?>" type="submit">
+        <?= $signupOn ? 'Online registration: ON — turn off' : 'Online registration: OFF — turn on' ?></button>
+    </form>
+  </div>
+  <p class="sub" style="margin:0 0 10px">When online registration is on, a new inspection company can apply for its own
+    workspace at <code>/get-started</code>. Each request waits here for you to approve; approving creates the workspace
+    (automatically if the cPanel API is set up, otherwise you finish it with the two steps below).</p>
+  <table class="dt">
+    <thead><tr><th>Company</th><th>Contact</th><th>Wants</th><th>State</th><th></th></tr></thead>
+    <tbody>
+    <?php if (!$requests): ?><tr><td colspan="5" class="muted">No requests yet.</td></tr><?php endif; ?>
+    <?php foreach ($requests as $r): $st = (string)($r['status'] ?? 'PENDING'); ?>
+      <tr>
+        <td><strong><?= e($r['company'] ?? '') ?></strong>
+          <?php if (!empty($r['note'])): ?><br><span class="muted" style="font-size:12px"><?= e($r['note']) ?></span><?php endif; ?></td>
+        <td><?= e($r['contact_name'] ?? '') ?><br>
+          <a class="muted" style="font-size:12px" href="mailto:<?= e($r['email'] ?? '') ?>"><?= e($r['email'] ?? '') ?></a>
+          <?php if (!empty($r['phone'])): ?><br><span class="muted" style="font-size:12px"><?= e($r['phone']) ?></span><?php endif; ?></td>
+        <td><code><?= e($r['sub'] ?? '') ?></code>.<?= e($base) ?>
+          <?php if (!empty($r['admin_note'])): ?><br><span class="muted" style="font-size:11.5px"><?= e($r['admin_note']) ?></span><?php endif; ?></td>
+        <td><?= $pillFor($st) ?></td>
+        <td style="white-space:nowrap">
+          <?php if ($st === 'PENDING'): ?>
+            <form method="post" action="/tenant-request-approve" style="display:inline"
+                  onsubmit="return confirm('Approve “<?= e($r['company'] ?? '') ?>” and create workspace “<?= e($r['sub'] ?? '') ?>”?')">
+              <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+              <button class="btn small" type="submit">Approve</button></form>
+            <form method="post" action="/tenant-request-reject" style="display:inline"
+                  onsubmit="return confirm('Decline this request?')">
+              <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+              <button class="btn small danger" type="submit">Decline</button></form>
+          <?php elseif ($st === 'APPROVED'): ?>
+            <form method="post" action="/tenant-request-provisioned" style="display:inline">
+              <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+              <button class="btn small secondary" type="submit">Mark set up</button></form>
+          <?php else: ?>
+            <span class="muted" style="font-size:12px"><?= e($r['decided_by'] ?? '') ?></span>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+
 <?php $cpOn = function_exists('cpanel_configured') && cpanel_configured();
       $cp = function_exists('cpanel_config') ? cpanel_config() : [];
       $appRoot = realpath(__DIR__ . '/../..') ?: ''; ?>

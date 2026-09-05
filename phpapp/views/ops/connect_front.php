@@ -129,6 +129,16 @@ $freeLaunch = true; // platform is free during launch
     </div>
   </div>
 
+  <?php if (function_exists('tenant_signup_enabled') && tenant_signup_enabled()
+            && !(function_exists('install_is_licence') && install_is_licence())): ?>
+  <div class="sec-label">Run an inspection company?</div>
+  <div class="signin">
+    <h3>Get your own operations workspace</h3>
+    <p>Not hiring or freelancing — you run an inspection firm and want to manage calls, jobs, inspectors, reports and finances on your own private workspace.</p>
+    <div class="btns"><a class="btn primary" href="/get-started">Start your workspace →</a></div>
+  </div>
+  <?php endif; ?>
+
   <p class="foot">Powered by <?= e($appName) ?>. One account, your own private data.<br>
     <a href="/login">Staff sign-in</a></p>
 </main>

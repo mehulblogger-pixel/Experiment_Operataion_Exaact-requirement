@@ -2934,7 +2934,9 @@ function ops_dispatch($route, $method) {
             return ops_mkt_gates($method);
         case $route === 'tenants' || $route === 'tenant-enable' || $route === 'tenant-add'
              || $route === 'tenant-status' || $route === 'tenant-remove'
-             || $route === 'cpanel-save' || $route === 'cpanel-test':
+             || $route === 'cpanel-save' || $route === 'cpanel-test'
+             || $route === 'tenant-request-approve' || $route === 'tenant-request-reject'
+             || $route === 'tenant-request-provisioned' || $route === 'workspace-signup-toggle':
             ops_tenants($route, $method); return true;
         case $route === 'billing' || $route === 'billing-config' || $route === 'billing-order'
              || $route === 'billing-verify':

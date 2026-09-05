@@ -209,7 +209,41 @@ function ops_tenants($route, $method) {
         flash('Workspace removed from the list. Its database was NOT deleted — delete it in cPanel if you want it gone.', 'warning');
         redirect('/tenants');
     }
-    view('ops/tenants', ['reg' => tenant_registry()]);
+
+    // --- Public workspace-signup inbox (a new company applied for itself) ---
+    if ($route === 'workspace-signup-toggle' && $method === 'POST') {
+        if (function_exists('tenant_signup_set_enabled'))
+            tenant_signup_set_enabled(!empty($_POST['on']));
+        flash(!empty($_POST['on'])
+            ? 'Online workspace registration is ON — companies can now apply at /get-started.'
+            : 'Online workspace registration is OFF.');
+        redirect('/tenants');
+    }
+    if ($route === 'tenant-request-approve' && $method === 'POST') {
+        [$ok, $msg] = function_exists('tenant_request_approve')
+            ? tenant_request_approve((int)($_POST['id'] ?? 0)) : [false, 'Signup module missing.'];
+        flash($msg, $ok ? 'success' : 'error');
+        redirect('/tenants');
+    }
+    if ($route === 'tenant-request-provisioned' && $method === 'POST') {
+        [$ok, $msg] = function_exists('tenant_request_mark_provisioned')
+            ? tenant_request_mark_provisioned((int)($_POST['id'] ?? 0)) : [false, 'Signup module missing.'];
+        flash($msg, $ok ? 'success' : 'error');
+        redirect('/tenants');
+    }
+    if ($route === 'tenant-request-reject' && $method === 'POST') {
+        [$ok, $msg] = function_exists('tenant_request_reject')
+            ? tenant_request_reject((int)($_POST['id'] ?? 0), (string)($_POST['note'] ?? '')) : [false, 'Signup module missing.'];
+        flash($msg, $ok ? 'success' : 'error');
+        redirect('/tenants');
+    }
+
+    view('ops/tenants', [
+        'reg'           => tenant_registry(),
+        'requests'      => function_exists('tenant_requests_list') ? tenant_requests_list() : [],
+        'signup_on'     => function_exists('tenant_signup_enabled') && tenant_signup_enabled(),
+        'req_statuses'  => function_exists('tenant_request_statuses') ? tenant_request_statuses() : [],
+    ]);
 }
 
 // The plain page an unknown or suspended workspace sees, before any database is
