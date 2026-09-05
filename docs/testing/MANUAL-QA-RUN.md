@@ -61,7 +61,7 @@ Status: ✅ PASS · ◑ PARTIAL · ✗ FAIL · ⛔ BLOCKED · ▷ NOT YET · ↻
 ## Defect register
 | ID | Stage | Severity | Root cause | Screen/route | Expected | Actual | Status |
 |----|-------|----------|-----------|--------------|----------|--------|--------|
-| — | — | — | — | — | *(none logged yet)* | — | — |
+| D-001 | 9 | P3 (cosmetic/label) | Portal shell header hard-coded to "Client portal" for any non-hire-first user; agency case not handled | `/portal` (`views/portal/top.php`) | An agency sees its portal named as an **Agency workspace** | Agency saw **"Client portal"** | ✅ FIXED — `$portalKind` now shows "Agency workspace" for `portal_agency_org()`; title + H1 use it. Crawl clean. |
 
 ---
 
