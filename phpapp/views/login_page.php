@@ -1,4 +1,8 @@
-<?php $lg = logo_html(); ?><!doctype html>
+<?php $lg = logo_html();
+  // Wayfinding: only offer the marketplace door when Connect is actually available here
+  // (cloud with the add-on on). On a private licence copy there is no marketplace to point to.
+  $mktOn = function_exists('install_marketplace_enabled') && install_marketplace_enabled();
+?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e(app_name()) ?> — Sign in</title>
@@ -54,13 +58,13 @@
   <aside class="brand-side">
     <div class="grid-motif"></div><div class="glow a"></div><div class="glow b"></div>
     <div class="wm"><?php if ($lg): ?><?= $lg ?><?php else: ?><div class="mk">◈</div><?php endif; ?>
-      <div><b><?= e(app_name()) ?></b><span>Operations &amp; Finance</span></div></div>
+      <div><b><?= e(app_name()) ?></b><span>Operations Workspace</span></div></div>
     <div class="pitch">
       <h1>Run every office. <em>See every rupee.</em></h1>
-      <p>Calls, jobs, inspector vouchers and profitability — one system for independent inspection offices, each with its own targets and P&amp;L.</p>
+      <p>The private operations &amp; finance workspace for your team — calls, jobs, inspector vouchers, reports and profitability, one system for independent inspection offices.</p>
       <div class="chips"><span class="chip">Call &amp; Job register</span><span class="chip">Inspector vouchers</span><span class="chip">Contract profitability</span><span class="chip">Live dashboards</span></div>
     </div>
-    <div class="foot"><b>Peer offices, one platform</b> · your role decides what you see</div>
+    <div class="foot"><b>Staff sign-in</b> · your role decides what you see<?php if ($mktOn): ?> · <a href="/connect" style="color:rgba(255,255,255,.9);font-weight:600">Marketplace →</a><?php endif; ?></div>
   </aside>
 
   <main class="auth-side">
@@ -97,6 +101,7 @@
         <button class="go" type="submit">Sign in →</button>
       </form>
       <p class="help">No account? Ask your <strong>office administrator</strong> to create one.</p>
+      <?php if ($mktOn): ?><p class="help" style="margin-top:10px;padding-top:12px;border-top:1px solid var(--line)">Not staff? Looking for freelance work or to hire inspectors? <a href="/connect" style="color:var(--brand);font-weight:700">Go to the marketplace →</a></p><?php endif; ?>
       <?php endif; ?>
       <div class="ver"><?= e(app_name()) ?> · v<?= e(defined('APP_VERSION') ? APP_VERSION : '1.0') ?></div>
     </div>
