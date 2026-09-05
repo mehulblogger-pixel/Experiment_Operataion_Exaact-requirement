@@ -27,6 +27,11 @@ $freeLaunch = true; // platform is free during launch
   .hero h1{font-size:clamp(29px,5.4vw,46px);line-height:1.06;letter-spacing:-.02em;margin:0 0 12px;text-wrap:balance}
   .hero h1 .hl{color:var(--teal)}
   .hero p.lead{font-size:clamp(16px,2.4vw,19px);color:var(--muted);max-width:58ch;margin:0 auto 22px}
+  .ask{display:flex;gap:10px;max-width:620px;margin:0 auto;flex-wrap:wrap}
+  .ask input{flex:1;min-width:240px;min-height:54px;border:2px solid var(--line);border-radius:13px;padding:14px 18px;font-size:16.5px;background:var(--card);color:var(--ink)}
+  .ask input:focus{border-color:var(--teal);outline:none}
+  .ask .btn{flex:0 0 auto}
+  @media(max-width:560px){.ask{flex-direction:column}.ask .btn{width:100%}}
   .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border-radius:13px;padding:14px 24px;font-size:16.5px;font-weight:700;border:2px solid var(--teal);cursor:pointer}
   .btn.primary{background:var(--teal);color:#fff}
@@ -69,11 +74,11 @@ $freeLaunch = true; // platform is free during launch
   <?php if ($freeLaunch): ?><span class="ribbon">🎉 Free for everyone during launch</span><?php endif; ?>
   <h1>Post a job. Find the <span class="hl">right inspector</span>. Get it done.</h1>
   <p class="lead">One marketplace for inspectors, welders, NDT technicians and the companies who need them — with verified profiles, on-platform reports and genuine reviews.</p>
-  <div class="cta">
-    <a class="btn primary" href="/join?type=COMPANY">📋 Post a requirement</a>
-    <a class="btn ghost" href="/pro/register">👷 Join as a professional</a>
-  </div>
-  <p class="under">Already have an account? <a href="#signin">Sign in →</a></p>
+  <form class="ask" method="get" action="/connect/start">
+    <input name="need" maxlength="200" placeholder="What do you need inspected? e.g. CSWIP welding inspector at Dahej" aria-label="What do you need inspected?">
+    <button class="btn primary" type="submit">Post a requirement →</button>
+  </form>
+  <p class="under">Or <a href="/pro/register">join as a professional</a> · Already have an account? <a href="#signin">Sign in →</a></p>
 </section>
 
 <div class="trust">

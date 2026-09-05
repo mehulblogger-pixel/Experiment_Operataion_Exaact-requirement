@@ -20,7 +20,9 @@ $pill = function ($s) {
 
 <form method="post" action="/portal/hire" class="pcard" style="max-width:680px">
   <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">What do you need? *</label>
-  <input class="form-control" name="title" maxlength="200" required placeholder="e.g. Welding inspector for a pressure-vessel FAT at Dahej">
+  <?php $prefillTitle = (string)($prefillTitle ?? ''); ?>
+  <input class="form-control" name="title" maxlength="200" required value="<?= e($prefillTitle) ?>" placeholder="e.g. Welding inspector for a pressure-vessel FAT at Dahej"<?= $prefillTitle !== '' ? ' autofocus' : '' ?>>
+  <?php if ($prefillTitle !== ''): ?><div class="muted" style="font-size:12.5px;margin-top:5px">✓ Carried over from the landing page — review it and post.</div><?php endif; ?>
   <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:14px">
     <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Discipline</label>
       <select class="form-control" name="discipline_code"><option value="">— any —</option>

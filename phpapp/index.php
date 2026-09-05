@@ -903,6 +903,17 @@ if ($route === 'connect' && function_exists('connect_front_route')) {
     exit;
 }
 
+// Guided "post-first" — a visitor types what they need on the landing page; we stash it
+// and send them to create a company account, after which it pre-fills the hire form.
+// Public, in front of require_login(). Permission is still enforced downstream (posting
+// requires a client account); this only carries the intent through sign-up.
+if ($route === 'connect/start') {
+    $need = trim((string)($_GET['need'] ?? $_POST['need'] ?? ''));
+    if ($need !== '') $_SESSION['connect_need'] = mb_substr($need, 0, 200);
+    $isClient = function_exists('portal_user') && portal_user();
+    redirect($isClient ? '/portal/hire' : '/join?type=COMPANY');
+}
+
 // A signed handoff from a sibling MGH application (Books, BlogPro, Ads Pro).
 // It sits HERE, in front of require_login(), because its whole job is to satisfy
 // that gate — and behind the portal dispatch, because a client is not a staff

@@ -1077,11 +1077,16 @@ function portal_route($route, $method) {
                     redirect('/portal/hire');
                 }
             }
+            // Guided "post-first" landing — a need typed on the public landing page is
+            // stashed in the session and pre-fills the title here (read once, then cleared).
+            $prefillTitle = (string)($_SESSION['connect_need'] ?? '');
+            unset($_SESSION['connect_need']);
             portal_view('hire', [
                 'rows'        => cx_requirements_for_party(portal_partner_id()),
                 'templates'   => function_exists('connect_reqtemplates_for') ? connect_reqtemplates_for(portal_partner_id()) : [],
                 'sectors'     => function_exists('connect_tx_rows') ? connect_tx_rows('cx_sectors') : [],
                 'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+                'prefillTitle'=> $prefillTitle,
             ]);
             exit;
 
