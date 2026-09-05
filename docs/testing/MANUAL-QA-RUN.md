@@ -30,7 +30,7 @@ Status: ✅ PASS · ◑ PARTIAL · ✗ FAIL · ⛔ BLOCKED · ▷ NOT YET · ↻
 | Stage | Title | Status | Notes |
 |------:|-------|:------:|-------|
 | 0 | Environment & application inventory | ✅ | See STAGE-0 below. Inventory already locked in `inventory-v1.0.md`. |
-| 1 | First customer experience (new signup → dashboard) | ◑ | 1.1 first-access + first-login PASS (B′). 1.2 setup-wizard walk-through NOT YET. |
+| 1 | First customer experience (new signup → dashboard) | ✅ | 1.1 first access+login, 1.2 setup wizard, 1.3 staff-account model, 1.4 cloud onboarding — all PASS (B′; 1.1 also confirmed on B live). |
 | 2 | Company configuration | ▷ | |
 | 3 | Masters & taxonomy | ▷ | |
 | 4 | Users / roles / permissions | ▷ | |
@@ -140,5 +140,26 @@ supply STAGE 0.x steps and results and they'll be logged here.)*
 
 **RESOLUTION (built this session — `lib/tenant_signup.php`):** public **`/get-started`** page (off by default) where a new inspection company applies → request lands **PENDING** in the Super-Admin Workspaces panel (`/tenants`) → **Approve** provisions the workspace (auto via cPanel API, or assisted two-click). Lifecycle **PENDING→APPROVED→PROVISIONED / REJECTED** (docs updated same commit); approval reuses `can_manage_tenants()` — **no new permission**. Additive `tenant_requests` table; nothing existing touched. 18 tests, full harness 5990/0, all screens render.
 
-### QA-1.2 — First-run setup wizard → dashboard  ▷ NOT YET
-Set the admin password, create the first office, confirm the wizard completes and the next visit to `/` lands on the live dashboard (not back on `/setup`). To be run next.
+### QA-1.2 — First-run setup wizard → dashboard  ✅ PASS
+**TEST ID:** QA-1.2 · **STAGE:** 1 · **MODULE:** Platform / Setup · **USER:** brand-new admin · **ENV:** B′ (sandbox, empty SQLite)
+**OBJECTIVE:** Walk the first-time wizard end to end and confirm it completes, changes the admin password, and lands on the live dashboard without looping back to `/setup`.
+
+| # | Action | Value | Expected | Actual | ✓/✗ |
+|--|--------|-------|----------|--------|:--:|
+| 1 | Sign in as default admin | `admin` / `admin12345` | Accepted | 302 → `/` | ✓ |
+| 2 | Authed `/` | — | Routes to the wizard | 302 → `/setup` | ✓ |
+| 3 | `/setup` renders | — | Wizard form with all fields | 200; fields present: admin_pass, app_name, industry, fy_start_month, currency_symbol, date_format, grievance_name, grievance_email, _csrf | ✓ |
+| 4 | Submit wizard | new pwd + company "Acme Inspection Ops" + industry=inspection + FY/currency/date + DPDP contact | Saved, setup marked done | 302 → `/` | ✓ |
+| 5 | Authed `/` again | — | **Dashboard**, not `/setup` | 200 → `/welcome`, title now "Acme Inspection Ops"; **no loop back to `/setup`** | ✓ |
+| 6 | Re-login with **new** password | `admin` / `Acme#Secure2026` | Accepted | 302 → `/` | ✓ |
+| 7 | Login with **old** default password | `admin` / `admin12345` | Rejected | 200, error "Invalid…", no session | ✓ |
+
+**FINDING (behaviour-as-designed, not a defect):** the wizard collects **company name, industry, financial-year start, currency, date format, DPDP grievance contact, and the admin password** — it does **not** ask the admin to create an office. Offices are auto-seeded on first boot and edited later under Settings. (Earlier plan text said "create first office"; the real design is lighter — corrected here.)
+
+**SECURITY (good):** setting a new admin password in the wizard **immediately retires the config default** (`admin12345` no longer works) and is not reverted by `admin_sync_from_config()` on the next request.
+
+**STATUS:** ✅ PASS. **RETEST REQUIRED:** No (unless the setup route or admin-sync changes).
+
+---
+
+**Stage 1 verdict: ✅ PASS.** First access, first login, setup wizard, staff-account model, and the cloud onboarding model (with the new public workspace-signup build) are all confirmed. Ready for Stage 2 (Company configuration).
