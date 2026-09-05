@@ -50,18 +50,21 @@
   .help{font-size:12.5px;color:var(--muted);text-align:center;line-height:1.6;margin-top:20px}
   .ver{margin-top:20px;text-align:center;font-size:11.5px;color:var(--muted)}
   .err{background:#fee2e2;color:#991b1b;border-radius:10px;padding:10px 13px;font-size:13.5px;margin-bottom:16px}
-  /* Mobile: stack the two panels as normal content-height blocks. The desktop layout
-     forces the grid to 100vh, which on a phone stretches the brand panel to half the
-     screen and clips its text behind the login card — so on mobile we drop the grid,
-     drop the 100vh, and let each panel size to its own content. */
+  /* Mobile: the login box is the centrepiece. A slim brand strip on top, the sign-in
+     card in the middle, and the pitch/footer below. We flatten the brand panel
+     (display:contents) so its pieces become direct items of the column, then reorder
+     them around the card and give the brand pieces their own solid background. */
   @media (max-width:900px){
     body{display:block}
-    .stage{display:block;min-height:auto}
-    .brand-side{min-height:auto;padding:36px 26px 30px}
-    .brand-side .foot{margin-top:22px}
-    .pitch{margin:22px 0}
-    .pitch h1{font-size:28px}
-    .auth-side{padding:28px 20px 56px}
+    .stage{display:flex;flex-direction:column;min-height:auto}
+    .brand-side{display:contents}
+    .grid-motif,.glow{display:none!important}
+    .wm{order:1;background:color-mix(in srgb,var(--brand) 88%,#060a12);padding:18px 22px}
+    .auth-side{order:2;background:var(--bg);padding:26px 18px 22px}
+    .pitch{order:3;background:color-mix(in srgb,var(--brand) 88%,#060a12);margin:0;padding:24px 22px 10px}
+    .pitch h1{font-size:26px;max-width:none}
+    .foot{order:4;background:color-mix(in srgb,var(--brand) 88%,#060a12);margin:0;padding:2px 22px 30px}
+    .card{max-width:none}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
