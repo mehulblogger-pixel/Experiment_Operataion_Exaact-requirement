@@ -120,20 +120,22 @@ function tenant_request_mark($id, $status, $tenantSub = '', $adminNote = '') {
  * Auto-provisions via cPanel when configured; otherwise marks APPROVED and
  * leaves the two-click finish to the operator on the Workspaces panel.
  */
-function tenant_request_approve($id) {
+function tenant_request_approve($id, $subOverride = '') {
     $r = tenant_request_get($id);
     if (!$r)                        return [false, 'That request no longer exists.'];
     if ($r['status'] !== 'PENDING') return [false, 'That request has already been dealt with.'];
 
-    $sub = strtolower(trim((string)$r['sub']));
+    // The operator may rename the workspace at approval time — this is how two
+    // companies with the same name are kept apart (e.g. acme → acme-mumbai).
+    $sub = strtolower(trim((string)($subOverride !== '' ? $subOverride : $r['sub'])));
     if (!(function_exists('tenant_valid_sub') && tenant_valid_sub($sub)))
-        return [false, 'The workspace name on this request is not usable — it must be lowercase letters, digits or hyphens.'];
+        return [false, 'The workspace name must be lowercase letters, digits or hyphens (e.g. acme-mumbai).'];
 
     $reg = function_exists('tenant_registry') ? tenant_registry() : ['tenants' => []];
     if (($reg['base_domain'] ?? '') === '')
         return [false, 'Switch cloud mode on first (set the base domain on the Workspaces panel), then approve.'];
     if (isset($reg['tenants'][$sub]))
-        return [false, 'A workspace named “' . $sub . '” already exists — pick a different name before approving.'];
+        return [false, 'A workspace named “' . $sub . '” already exists — type a different name in the box and approve again (e.g. ' . $sub . '-2 or ' . $sub . '-<city>).'];
 
     // Automatic path — cPanel makes the database (and maybe the subdomain).
     if (function_exists('cpanel_configured') && cpanel_configured()) {

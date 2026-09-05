@@ -97,14 +97,19 @@
         <td><?= e($r['contact_name'] ?? '') ?><br>
           <a class="muted" style="font-size:12px" href="mailto:<?= e($r['email'] ?? '') ?>"><?= e($r['email'] ?? '') ?></a>
           <?php if (!empty($r['phone'])): ?><br><span class="muted" style="font-size:12px"><?= e($r['phone']) ?></span><?php endif; ?></td>
-        <td><code><?= e($r['sub'] ?? '') ?></code>.<?= e($base) ?>
+        <?php $reqSub = (string)($r['sub'] ?? ''); $taken = isset($tenants[$reqSub]); ?>
+        <td><code><?= e($reqSub) ?></code>.<?= e($base) ?>
+          <?php if ($taken && $st === 'PENDING'): ?><br><span class="pill p-warn" style="font-size:11px">name already used — rename below</span><?php endif; ?>
           <?php if (!empty($r['admin_note'])): ?><br><span class="muted" style="font-size:11.5px"><?= e($r['admin_note']) ?></span><?php endif; ?></td>
         <td><?= $pillFor($st) ?></td>
         <td style="white-space:nowrap">
           <?php if ($st === 'PENDING'): ?>
-            <form method="post" action="/tenant-request-approve" style="display:inline"
-                  onsubmit="return confirm('Approve “<?= e($r['company'] ?? '') ?>” and create workspace “<?= e($r['sub'] ?? '') ?>”?')">
+            <form method="post" action="/tenant-request-approve" style="display:inline-flex;gap:5px;align-items:center"
+                  onsubmit="return confirm('Approve “<?= e($r['company'] ?? '') ?>” and create this workspace?')">
               <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+              <input name="sub" value="<?= e($reqSub) ?>" pattern="[a-z0-9-]+" title="lowercase letters, digits, hyphens"
+                     style="width:110px;font-size:13px;padding:6px 8px;border:1px solid var(--line, #ccc);border-radius:8px"
+                     aria-label="Workspace name">
               <button class="btn small" type="submit">Approve</button></form>
             <form method="post" action="/tenant-request-reject" style="display:inline"
                   onsubmit="return confirm('Decline this request?')">

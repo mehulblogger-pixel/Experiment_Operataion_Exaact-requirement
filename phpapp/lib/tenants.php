@@ -221,7 +221,7 @@ function ops_tenants($route, $method) {
     }
     if ($route === 'tenant-request-approve' && $method === 'POST') {
         [$ok, $msg] = function_exists('tenant_request_approve')
-            ? tenant_request_approve((int)($_POST['id'] ?? 0)) : [false, 'Signup module missing.'];
+            ? tenant_request_approve((int)($_POST['id'] ?? 0), (string)($_POST['sub'] ?? '')) : [false, 'Signup module missing.'];
         flash($msg, $ok ? 'success' : 'error');
         redirect('/tenants');
     }
