@@ -123,5 +123,20 @@ supply STAGE 0.x steps and results and they'll be logged here.)*
 
 **No expected behaviour invented; no change made.** Full CRUD + role/permission coverage of `/users` is scheduled at **Stage 4 (Users / roles / permissions)** — cross-referenced here so it isn't missed.
 
+### QA-1.4 — Cloud onboarding model for a NEW operations company (architecture confirmation)  ✅ PASS (finding logged)
+**Owner question:** "If a company wants to use our **operations** platform on the cloud, how do they use it and create an account?"
+**Verified in code (`lib/tenants.php`, `lib/cpanel.php`).** The platform is **multi-tenant: one codebase, many workspaces, one database each.** Each operations customer = a **workspace** on its own subdomain (e.g. `acme.operations.mghaiapps.com`) with its **own database, own admin, own settings** — tenants are fully isolated (`current_tenant()`; comment: "one tenant can never see another's records").
+
+**Three distinct "company/account" doors — do not conflate:**
+| Who | Wants to… | Door | Self-serve today? | Creates |
+|---|---|---|---|---|
+| **Operations customer** | Run their inspection office on the platform | Workspace provisioning at **`/tenants`** (Master Admin, base domain only; `can_manage_tenants()`) | ❌ **No public signup** — operator-provisioned | A tenant workspace (subdomain + DB + admin) |
+| **Marketplace hiring company** | Hire freelancers from the shared pool | **`/connect` → `/join?type=COMPANY`** | ✅ Yes | A marketplace hiring client (`market.post`) — **not** an ops workspace |
+| **Freelancer** | Get freelance work | **`/connect`** | ✅ Yes | Self-registered pro (`cx_professionals`) |
+
+**How a new operations company is onboarded today (operator-assisted):** Master Admin opens **`/tenants`** on the main site → either (a) **automatic** if a cPanel API token is set (`cpanel_provision_workspace()` creates DB + DB-user + subdomain), or (b) **assisted/manual** (default): operator creates the MySQL DB + subdomain in cPanel by hand, then registers them on `/tenants`; the app builds the schema on first visit and the workspace gets its own `admin`. The customer then adds their staff at `/users`.
+
+**FINDING (DESIGN GAP for self-serve scale — not a defect):** the multi-tenant machinery **works**, but onboarding is **sales-assisted, not instant self-serve** — there is **no public "Start your workspace / request a free trial" page** for the *operations* side that captures a company and queues provisioning. This is a deliberate, documented choice (auto-provisioning needs cPanel credentials the app "has no other reason to hold"), and sales-assisted B2B onboarding is normal for a vertical ops product. Logged for the launch decision: if instant self-serve is wanted, a public operations-company signup front-door (feeding `/tenants` provisioning) is a future build slice — it dovetails with the Connect landing-page work. **No behaviour invented; nothing changed.**
+
 ### QA-1.2 — First-run setup wizard → dashboard  ▷ NOT YET
 Set the admin password, create the first office, confirm the wizard completes and the next visit to `/` lands on the live dashboard (not back on `/setup`). To be run next.
