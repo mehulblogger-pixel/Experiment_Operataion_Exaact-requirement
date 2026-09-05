@@ -103,8 +103,17 @@ Roughly **40–50% of the brief already exists in reusable form.**
   `candidate-interview`/`candidate-doc` gated `is_coordinator_level()`; sensitive
   documents (salary/medical/identity/PAN) are download-restricted to admin-level
   (§39). No new permission. 22 assertions + full suite (6050) green.
-- **Phase 5 — Compensation/salary-structure, Offer (template + approval), HR
-  discussion, Onboarding hand-off to the person spine.**
+- **Phase 5 — Salary structure, HR discussion, Offer & Onboarding** ✅ *(done)* —
+  `lib/recruit_offer.php`: `salary_structures` (component breakdown → CTC vs
+  candidate expectation / internal benchmark / approved budget, with variance;
+  versioned), `hr_discussions` (§26), `job_offers` with a controlled lifecycle
+  DRAFT → PENDING_APPROVAL → APPROVED → ISSUED → ACCEPTED/DECLINED/WITHDRAWN — an
+  **unapproved offer can never be issued** (§32); template-driven offer letter
+  with a compensation annexure and a printable `offer-letter` view. Offer tab on
+  the candidate screen; manage `is_coordinator_level()`, approve `is_admin_level()`;
+  salary figures gated `can_see_salary()`. Onboarding hand-off (§34) reuses the
+  existing candidate → inspector person spine (no duplicate person). 22 assertions
+  + full suite (6072) green.
 - **Phase 6 — Approvals (routed, per-tenant), SLA + escalation, notifications
   wired to `ops_mail()`.**
 - **Phase 7 — Recruitment dashboards/reports hardening, careers intake, exports.**

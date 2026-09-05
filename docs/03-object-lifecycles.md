@@ -568,3 +568,30 @@ VERIFIED ─▶ EXPIRED   (derived when a verified document is past its expiry d
 Managed by `is_coordinator_level()` (`recruit_iv.php`, route `candidate-doc`) — no
 new permission. `EXPIRED` is a derived display status (`doc_effective_status`),
 not stored. Additive.
+
+---
+
+## Job offer (`job_offers.status`) — recruitment (Phase 5)
+
+An offer is generated from an approved salary structure and moves through a
+controlled lifecycle. **An unapproved offer can never be issued** (§32).
+
+```
+DRAFT ─▶ PENDING_APPROVAL ─▶ APPROVED ─▶ ISSUED ─▶ VIEWED ─▶ ACCEPTED
+  │            │                │           │                    (→ onboarding)
+  │            │                │           └──▶ DECLINED (reason) / EXPIRED
+  └────────────┴────────────────┴──▶ WITHDRAWN  (any pre-accept state)
+```
+
+- Create / submit / issue / accept / decline / withdraw: `is_coordinator_level()`;
+  **approve: `is_admin_level()`** (a manager). Route `candidate-offer`
+  (`recruit_offer.php`). `offer_issue()` refuses unless the offer is `APPROVED`,
+  generates the letter (`offer-letter` printable view) and coarse-syncs the
+  candidate's legacy stage to `OFFERED`.
+- **Salary structure** (`salary_structures`, versioned — a revision is a new row)
+  and **HR discussion** (`hr_discussions`) are additive; salary figures are shown
+  only to `can_see_salary()` (`data.salary`). Adds **no new permission**.
+- **Onboarding hand-off (§34):** on `ACCEPTED` the candidate is completed through
+  the existing `candidate-stage` → `ACCEPTED` + "add to workforce" path, which
+  **reuses the same person** (candidate → inspector, no duplicate). This offer
+  lifecycle does not itself create the employee.

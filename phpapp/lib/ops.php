@@ -2706,6 +2706,8 @@ function ops_dispatch($route, $method) {
             return ops_candidate_interview($route, $method);
         case $route === 'candidate-doc':                             // Phase 4 — candidate document DMS
             return ops_candidate_doc($route, $method);
+        case $route === 'candidate-offer' || $route === 'offer-letter': // Phase 5 — salary, HR discussion, offer, letter
+            return ops_candidate_offer($route, $method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
             return ops_projcosting($route, $method);
         case $route === 'recruit-config':
