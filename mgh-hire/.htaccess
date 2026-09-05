@@ -1,0 +1,16 @@
+# MGH Hire — Apache front-controller + safety.
+# The database file and local config must never be served over the web.
+<FilesMatch "\.(sqlite|db|log)$">
+  Require all denied
+</FilesMatch>
+<Files "config.local.php">
+  Require all denied
+</Files>
+
+# Route everything through index.php (clean URLs optional; ?p=... always works).
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.php [L]
+</IfModule>

@@ -1,0 +1,6 @@
+# Local, per-install files — never committed, never shipped in an upgrade.
+config.local.php
+data.sqlite
+data.sqlite-wal
+data.sqlite-shm
+*.log
