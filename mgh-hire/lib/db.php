@@ -234,6 +234,12 @@ function db_seed() {
         'mail_from_name'  => 'MGH Hire',
         'mail_from_email' => '',
         'mail_hr_inbox'   => '',   // where "new application" alerts go
+        // SMTP (reliable delivery). Empty host = fall back to PHP mail().
+        'smtp_host'     => '',
+        'smtp_port'     => '587',
+        'smtp_user'     => '',
+        'smtp_pass'     => '',
+        'smtp_security' => 'tls',  // 'tls' (587) | 'ssl' (465) | 'none'
         // Licence / seats  (0 seat_limit = unlimited)
         'plan_name'    => 'Starter',
         'seat_limit'   => '0',
@@ -279,8 +285,12 @@ function db_seed() {
 // =========================================================================
 //  Settings helpers
 // =========================================================================
+// Shared settings cache, reachable from both reader and writer so a set is
+// immediately visible to a later read in the same request.
+function &_settings_cache() { static $c = null; return $c; }
+
 function setting($key, $fallback = '') {
-    static $cache = null;
+    $cache =& _settings_cache();
     if ($cache === null) {
         $cache = [];
         foreach (db()->query("SELECT skey,sval FROM settings")->fetchAll() as $r)
@@ -291,7 +301,10 @@ function setting($key, $fallback = '') {
 function setting_default($key, $val) {
     $r = db()->prepare("SELECT 1 FROM settings WHERE skey=?");
     $r->execute([$key]);
-    if (!$r->fetch()) db()->prepare("INSERT INTO settings (skey,sval) VALUES (?,?)")->execute([$key,$val]);
+    if (!$r->fetch()) {
+        db()->prepare("INSERT INTO settings (skey,sval) VALUES (?,?)")->execute([$key,$val]);
+        $cache =& _settings_cache(); if (is_array($cache)) $cache[$key] = $val;
+    }
 }
 function setting_set($key, $val) {
     if (db_driver() === 'sqlite') {
@@ -301,6 +314,7 @@ function setting_set($key, $val) {
         db()->prepare("INSERT INTO settings (skey,sval) VALUES (?,?)
                        ON DUPLICATE KEY UPDATE sval=VALUES(sval)")->execute([$key,$val]);
     }
+    $cache =& _settings_cache(); if (is_array($cache)) $cache[$key] = $val;   // keep cache fresh
 }
 
 // Next code in a per-object sequence, e.g. SRF-0007 / CAN-0031.

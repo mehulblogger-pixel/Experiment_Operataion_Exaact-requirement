@@ -31,14 +31,24 @@ function notify($toAddr, $toName, $subject, $bodyHtml, $event = '', $refId = 0) 
     if (!$from) { mail_mark($id, 'pending', 'sender not configured'); return $id; }
 
     $fromName = setting('mail_from_name','MGH Hire');
+    $html     = mail_wrap($subject, $bodyHtml);
+
+    // Preferred path: a real SMTP server (reliable everywhere). Falls back to
+    // the host's PHP mail() only when SMTP isn't configured.
+    if (smtp_configured()) {
+        [$ok, $errText] = smtp_send($toAddr, $toName, $subject, $html, $from, $fromName);
+        mail_mark($id, $ok ? 'sent' : 'failed', $ok ? '' : 'SMTP: '.$errText);
+        return $id;
+    }
+
     $headers  = 'MIME-Version: 1.0' . "\r\n"
               . 'Content-Type: text/html; charset=UTF-8' . "\r\n"
               . 'From: ' . mail_encode_name($fromName) . ' <' . $from . '>' . "\r\n"
               . 'Reply-To: ' . $from . "\r\n";
     $ok = false;
-    try { $ok = @mail($toAddr, mail_encode_subject($subject), mail_wrap($subject,$bodyHtml), $headers); }
+    try { $ok = @mail($toAddr, mail_encode_subject($subject), $html, $headers); }
     catch (Throwable $e) { $ok = false; }
-    mail_mark($id, $ok ? 'sent' : 'failed', $ok ? '' : 'mail() returned false / not available on this host');
+    mail_mark($id, $ok ? 'sent' : 'failed', $ok ? '' : 'mail() returned false / not available on this host — configure SMTP for reliable delivery');
     return $id;
 }
 

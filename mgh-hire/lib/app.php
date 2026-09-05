@@ -4,6 +4,7 @@
 // =========================================================================
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/smtp.php';
 require_once __DIR__ . '/mail.php';
 require_once __DIR__ . '/licence.php';
 require_once __DIR__ . '/cv.php';

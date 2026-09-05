@@ -26,6 +26,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fe = post('mail_from_email'); $hr = post('mail_hr_inbox');
         setting_set('mail_from_email', filter_var($fe,FILTER_VALIDATE_EMAIL)?$fe:'');
         setting_set('mail_hr_inbox',   filter_var($hr,FILTER_VALIDATE_EMAIL)?$hr:'');
+        // SMTP
+        setting_set('smtp_host', trim(post('smtp_host')));
+        setting_set('smtp_port', (string)max(0,(int)post('smtp_port','587')));
+        setting_set('smtp_user', trim(post('smtp_user')));
+        if (post('smtp_pass') !== '') setting_set('smtp_pass', post('smtp_pass')); // keep existing if blank
+        setting_set('smtp_security', in_array(post('smtp_security'),['tls','ssl','none'],true)?post('smtp_security'):'tls');
         flash('Email settings saved.');
     } elseif ($do === 'careers') {
         setting_set('careers_enabled', post('careers_enabled')?'1':'0');
@@ -94,6 +100,25 @@ layout_top('Branding');
       <div><label>From name</label><input name="mail_from_name" value="<?= e(setting('mail_from_name','MGH Hire')) ?>"></div>
       <div><label>From email</label><input name="mail_from_email" type="email" value="<?= e(setting('mail_from_email','')) ?>" placeholder="hr@yourcompany.com"></div>
       <div><label>HR inbox (new-application alerts)</label><input name="mail_hr_inbox" type="email" value="<?= e(setting('mail_hr_inbox','')) ?>" placeholder="careers@yourcompany.com"></div>
+    </div>
+    <div style="border-top:1px dashed var(--line);margin-top:14px;padding-top:12px">
+      <b style="font-size:13px">SMTP server <span class="muted" style="font-weight:400">(recommended — for reliable delivery via Gmail, Outlook 365, SendGrid, SES, or your company mail)</span></b>
+      <div class="row3">
+        <div><label>SMTP host</label><input name="smtp_host" value="<?= e(setting('smtp_host','')) ?>" placeholder="smtp.gmail.com"></div>
+        <div><label>Port</label><input name="smtp_port" type="number" value="<?= e(setting('smtp_port','587')) ?>" placeholder="587"></div>
+        <div><label>Security</label>
+          <select name="smtp_security">
+            <?php foreach (['tls'=>'STARTTLS (587)','ssl'=>'SSL/TLS (465)','none'=>'None'] as $k=>$v): ?>
+              <option value="<?= $k ?>" <?= setting('smtp_security','tls')===$k?'selected':'' ?>><?= e($v) ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div><label>SMTP username</label><input name="smtp_user" value="<?= e(setting('smtp_user','')) ?>" placeholder="your login / API user"></div>
+        <div><label>SMTP password <span class="muted" style="font-weight:400">(leave blank to keep)</span></label><input name="smtp_pass" type="password" placeholder="<?= setting('smtp_pass','')?'•••••••• (saved)':'app password / API key' ?>"></div>
+      </div>
+      <p class="muted" style="margin-top:6px">Leave the host blank to use the server's built-in mail instead. Gmail/Outlook need an <b>app password</b>, not your normal password.</p>
     </div>
     <div style="margin-top:14px"><button class="btn">Save email settings</button></div>
   </form>
