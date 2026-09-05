@@ -519,3 +519,14 @@ is gated `is_admin_level()` (route `recruit-pipelines`) — no new permission. T
 default seed is the client's 18-stage *Corporate Recruitment Workflow*
 (Staff Requisition → … → Offer → Onboarding), shipped alongside *Simple* and
 *Executive* templates.
+
+**Phase 2b — the candidate runs on the configured pipeline.** A candidate's
+position within its resolved pipeline is stored additively in
+`candidates.pipeline_id` / `candidates.pipeline_stage_id`; the candidate screen
+shows this as its primary tracker and moves along it via the `candidate-flow`
+route (`is_coordinator_level()`), auditing each move to `candidate_events`. The
+legacy `candidates.stage` is kept in **coarse sync** only at the interview →
+`INTERVIEW` and offer → `OFFERED` milestones, and **never over a terminal legacy
+stage** — so the loss/withdraw handling and the explicit Hire (create-inspector)
+action are never disturbed. Terminal outcomes (hire, reject, withdraw) remain the
+legacy `candidate-stage` control's job.

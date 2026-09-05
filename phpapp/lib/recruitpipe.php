@@ -80,6 +80,14 @@ function recruitpipe_migrate() {
         if (function_exists('act_index')) {
             act_index('recruit_stages', 'idx_rs_pipe', '(pipeline_id)');
         }
+        // Phase 2b — the candidate's position within its configured pipeline.
+        // Additive nullable columns; the legacy `stage` (CAND_STAGES) is untouched.
+        ensure_column('candidates', 'pipeline_id', 'INT NULL');
+        ensure_column('candidates', 'pipeline_stage_id', 'INT NULL');
+        // A grade band on the requisition, so a stage can be made conditional on
+        // seniority (e.g. an L2 only for senior grades). Additive; the SRF form
+        // exposes it in Phase 3. Empty = "any grade".
+        ensure_column('requisitions', 'grade', "VARCHAR(80) DEFAULT ''");
     } catch (Throwable $e) { /* never break boot */ }
     recruitpipe_seed();
 }
@@ -350,4 +358,131 @@ function ops_recruit_pipelines($route, $method) {
         'ops'    => RPIPE_COND_OPS,
     ]);
     return true;
+}
+
+// ============================================================================
+//  Phase 2b — drive a real candidate along its configured pipeline.
+//
+//  The candidate's detailed journey runs on the configured pipeline (stored in
+//  candidates.pipeline_stage_id). The legacy `stage` (CAND_STAGES) is preserved
+//  and kept in COARSE sync only at the interview/offer milestones, so existing
+//  dashboards keep working and the explicit Hire action (create inspector) is
+//  never triggered as a side-effect here.
+// ============================================================================
+
+// Legacy stages that mean "closed" — the configured flow is locked at these.
+function recruitpipe_legacy_terminal() { return ['ACCEPTED', 'REJECTED', 'WITHDRAWN', 'OFFER_DECLINED']; }
+
+// Resolve a candidate's live position: [pipeline, effectiveStages, idx].
+function recruitpipe_cand_state($cand) {
+    recruitpipe_migrate();
+    $req = !empty($cand['requisition_id'])
+        ? ops_one("SELECT * FROM requisitions WHERE id=?", [(int)$cand['requisition_id']]) : [];
+    $req = is_array($req) ? $req : [];
+    // A locked pipeline (chosen on first move) wins; otherwise resolve by rule.
+    $pipe = null;
+    if (!empty($cand['pipeline_id'])) $pipe = recruitpipe_get((int)$cand['pipeline_id']);
+    if (!$pipe || (int)($pipe['active'] ?? 0) === 0) $pipe = recruitpipe_for($req);
+    if (!$pipe) return [null, [], 0];
+    $eff = recruitpipe_effective_stages($pipe['id'], $req);
+    $idx = 0;
+    if (!empty($cand['pipeline_stage_id'])) {
+        foreach ($eff as $i => $s) if ((int)$s['id'] === (int)$cand['pipeline_stage_id']) { $idx = $i; break; }
+    }
+    return [$pipe, $eff, $idx];
+}
+
+// Move a candidate to a specific stage id within its pipeline (with audit).
+function recruitpipe_cand_goto($cand, $targetStageId, $remark, $actor) {
+    [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
+    if (!$pipe || !$eff) return false;
+    $target = null; foreach ($eff as $s) if ((int)$s['id'] === (int)$targetStageId) { $target = $s; break; }
+    if (!$target) return false;
+    $fromName = $eff[$idx]['name'] ?? '';
+    db()->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=? WHERE id=?")
+        ->execute([(int)$pipe['id'], (int)$target['id'], (int)$cand['id']]);
+    db()->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
+        ->execute([(int)$cand['id'], $fromName, $target['name'], (string)$remark, (string)$actor, date('c')]);
+    // Coarse legacy sync — only at the interview/offer milestones, and never
+    // over a terminal legacy stage (so hire/loss handling is never disturbed).
+    $cur = (string)($cand['stage'] ?? '');
+    if (!in_array($cur, recruitpipe_legacy_terminal(), true)) {
+        if ($target['kind'] === 'interview' && in_array($cur, ['RECEIVED','SUBMITTED','SHORTLISTED',''], true))
+            db()->prepare("UPDATE candidates SET stage='INTERVIEW' WHERE id=?")->execute([(int)$cand['id']]);
+        elseif ($target['kind'] === 'offer' && $cur !== 'ACCEPTED')
+            db()->prepare("UPDATE candidates SET stage='OFFERED' WHERE id=?")->execute([(int)$cand['id']]);
+    }
+    return true;
+}
+
+// The candidate-flow route: advance / back / jump within the pipeline.
+function ops_recruit_candidate_flow($route, $method) {
+    ops_require(is_coordinator_level(), 'Only coordinators and admins can move a candidate.');
+    $id = (int)($_GET['id'] ?? 0);
+    $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
+    if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    if ($method !== 'POST') { redirect('/candidate?id=' . $id); return true; }
+
+    if (in_array((string)$cand['stage'], recruitpipe_legacy_terminal(), true)) {
+        flash('This candidate is closed (' . (lk_options_or('candidate_stage', CAND_STAGES)[$cand['stage']] ?? $cand['stage']) . ') — reopen it from the stage control to continue the workflow.', 'warning');
+        redirect('/candidate?id=' . $id); return true;
+    }
+
+    [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
+    if (!$pipe || !$eff) { flash('No hiring workflow applies to this candidate yet.', 'warning'); redirect('/candidate?id=' . $id); return true; }
+
+    $action = (string)($_POST['action'] ?? '');
+    $remark = trim((string)($_POST['remark'] ?? ''));
+    $target = null;
+    if ($action === 'advance') $target = $eff[min($idx + 1, count($eff) - 1)] ?? null;
+    elseif ($action === 'back') $target = $eff[max($idx - 1, 0)] ?? null;
+    elseif ($action === 'jump') { $tid = (int)($_POST['stage_id'] ?? 0); foreach ($eff as $s) if ((int)$s['id'] === $tid) $target = $s; }
+
+    if ($target && (int)$target['id'] !== (int)($eff[$idx]['id'] ?? 0)) {
+        recruitpipe_cand_goto($cand, (int)$target['id'], $remark, user_name(current_user()));
+        flash('Moved to “' . $target['name'] . '”.');
+    } elseif ($target) {
+        flash('Already at that stage.');
+    }
+    redirect('/candidate?id=' . $id);
+    return true;
+}
+
+// The panel injected at the top of the candidate screen — the primary tracker.
+function recruitpipe_candidate_panel($cand) {
+    if (!is_array($cand) || empty($cand['id'])) return;
+    [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
+    if (!$pipe || !$eff) return;
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $closed = in_array((string)$cand['stage'], recruitpipe_legacy_terminal(), true);
+    $can = function_exists('is_coordinator_level') && is_coordinator_level();
+    $cur = $eff[$idx] ?? null;
+    ?>
+    <div class="panel" style="border-left:4px solid var(--brand,#1e40af);padding:13px 16px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <b style="font-size:13.5px">Hiring workflow — <?= $e($pipe['name']) ?></b>
+        <span class="muted" style="font-size:12px"><?= $closed ? 'Closed ('.$e(lk_options_or('candidate_stage', CAND_STAGES)[$cand['stage']] ?? $cand['stage']).')' : ('Stage '.($idx+1).' of '.count($eff).($cur?' · '.$e($cur['name']):'')) ?></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin:9px 0 4px">
+        <?php foreach ($eff as $i => $s):
+          $cls = $i < $idx ? 'done' : ($i === $idx ? 'now' : '');
+          $bg = $cls === 'done' ? 'background:#dcfce7;color:#15803d' : ($cls === 'now' ? 'background:var(--brand,#1e40af);color:#fff;font-weight:700' : 'background:#f1f5f9;color:#64748b'); ?>
+          <span style="font-size:10.5px;padding:3px 9px;border-radius:16px;white-space:nowrap;<?= $bg ?>"><?= $e($s['name']) ?></span>
+        <?php endforeach; ?>
+      </div>
+      <?php if ($can && !$closed): ?>
+      <form method="post" action="/candidate-flow?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:7px;align-items:center;margin-top:8px;flex-wrap:wrap">
+        <input name="remark" placeholder="remark (optional)" style="flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--line,#d7dde5);border-radius:7px;font:inherit">
+        <?php if ($idx > 0): ?><button name="action" value="back" class="btn secondary" style="padding:6px 11px">← Back</button><?php endif; ?>
+        <?php if ($idx < count($eff) - 1): ?>
+          <button name="action" value="advance" class="btn" style="padding:6px 13px">Advance → <?= $e($eff[$idx + 1]['name'] ?? '') ?></button>
+        <?php else: ?>
+          <span class="muted" style="font-size:12px">Final stage — complete the hire from the stage control below.</span>
+        <?php endif; ?>
+      </form>
+      <?php elseif ($closed): ?>
+        <div class="muted" style="font-size:12px;margin-top:4px">The workflow is locked while the candidate is closed.</div>
+      <?php endif; ?>
+    </div>
+    <?php
 }

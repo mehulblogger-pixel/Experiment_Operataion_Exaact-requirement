@@ -14,6 +14,9 @@
   </div>
 </div>
 
+<?php // Phase 2b — the configured hiring-workflow tracker (primary journey view).
+if (function_exists('recruitpipe_candidate_panel')) recruitpipe_candidate_panel($cand); ?>
+
 <?php // §11 — heads-up when other records look like the same person.
 $dupes = $dupes ?? []; $subDupes = $subDupes ?? [];
 if ($dupes): ?>

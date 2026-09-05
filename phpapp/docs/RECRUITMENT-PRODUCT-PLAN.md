@@ -71,8 +71,18 @@ Roughly **40–50% of the brief already exists in reusable form.**
   and *Executive* templates. Resolver picks the applicable pipeline per
   requisition; conditional stages skip by rule (L2 for senior grades only; medical
   only when required). `lib/recruitpipe.php` + `views/ops/recruit_pipelines.php`;
-  wired into boot; 18 engine assertions + full suite green. Wiring the live
-  candidate screen to drive off the resolved pipeline is Phase 2b.
+  wired into boot; 18 engine assertions + full suite green.
+- **Phase 2b — Candidate driven by the configured pipeline** ✅ *(done)* — the
+  candidate screen leads with the resolved workflow as its primary tracker
+  (done/current/upcoming) with Advance/Back/jump controls. Position stored
+  additively in `candidates.pipeline_id`/`pipeline_stage_id`; every move audited
+  to `candidate_events`; legacy `candidates.stage` kept in coarse sync only at
+  the interview/offer milestones (never over a terminal stage, so the explicit
+  Hire → create-inspector action is never triggered as a side-effect). New
+  `candidate-flow` route gated `is_coordinator_level()`; panel injected at the
+  top of `candidate_detail`; requisition gains an additive `grade` column for
+  seniority-based conditions. Legacy `CAND_STAGES` flow preserved. 28 pipeline
+  assertions + full suite (6013) green.
 - **Phase 3 — SRF, Position master, Org-chart, Manpower-plan validation.**
 - **Phase 4 — Interviews (multi-round + scorecards), Documents/DMS.**
 - **Phase 5 — Compensation/salary-structure, Offer (template + approval), HR
