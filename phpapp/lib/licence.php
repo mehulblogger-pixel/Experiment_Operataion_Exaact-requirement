@@ -269,6 +269,48 @@ function recruitment_only_provision() {
     return $done;
 }
 
+// ---------------------------------------------------------------------------
+//  Delivery edition — "build once, sell many ways."
+//  The SAME codebase is shipped in different editions. A tiny marker placed in
+//  a package at build time (a file `edition.txt`, or the EXAACT_EDITION env var)
+//  tells a fresh install which edition it is, so a Recruitment customer's copy
+//  configures itself to Recruitment-only on first boot with zero clicks. No
+//  marker = the full platform, exactly as before. Nothing here is destructive.
+// ---------------------------------------------------------------------------
+function edition_marker() {
+    $e = getenv('EXAACT_EDITION');
+    if ($e !== false && trim($e) !== '') return strtolower(trim($e));
+    foreach ([__DIR__ . '/../edition.txt', __DIR__ . '/../data/edition.txt'] as $f) {
+        if (is_file($f)) {
+            $v = strtolower(trim((string) @file_get_contents($f)));
+            if ($v !== '') return $v;
+        }
+    }
+    return '';
+}
+
+// Apply the delivery edition ONCE, on first boot. Idempotent and safe:
+//  - does nothing if a product package has already been chosen (so it never
+//    overrides an admin who later picks a different package), and
+//  - records that it ran, so it never repeats on later boots.
+// Returns the edition it applied ('recruitment'), or '' when it did nothing.
+function edition_autoapply() {
+    if (!function_exists('setting_get') || !function_exists('setting_set')) return '';
+    if ((string) setting_get('product_package', '') !== '') return '';   // already configured
+    if ((string) setting_get('edition_applied', '') !== '') return '';   // one-shot guard
+    $ed = edition_marker();
+    if ($ed === '') return '';
+    if (in_array($ed, ['recruitment', 'recruitment_only', 'recruitment_hr'], true)) {
+        if (function_exists('recruitment_only_provision')) recruitment_only_provision();
+        setting_set('edition_applied', 'recruitment');
+        return 'recruitment';
+    }
+    // An unrecognised marker: record it so we don't re-check every boot, but
+    // change nothing (fail safe = the full platform).
+    setting_set('edition_applied', $ed);
+    return '';
+}
+
 // The chooser screen (master only; deliberately not module-gated, like Licence).
 function ops_product_package($route, $method) {
     ops_require(product_package_can(), 'Only a master admin can change the product package.');

@@ -242,6 +242,18 @@ function ensure_admin() {
         $pdo->prepare("INSERT INTO users (username,password_hash,role,is_superuser,is_active,email)
             VALUES (?,?,?,1,1,?)")
             ->execute([$cfg['admin']['user'], $hash, 'ADMIN', 'admin@mghaiapps.com']);
+        // A brand-new install still holds the shared factory-default password
+        // from config.php. Flag the freshly created admin to replace it before
+        // doing anything else (enforced in index.php). This affects ONLY a newly
+        // created admin — one who later sets their own password clears the flag
+        // through the normal change-password flow, and existing installs are
+        // never touched because we only reach here when the admin did not exist.
+        try {
+            $nid = $pdo->prepare("SELECT id FROM users WHERE username=?");
+            $nid->execute([$cfg['admin']['user']]);
+            if ($id = $nid->fetchColumn())
+                $pdo->prepare("UPDATE users SET must_change_pwd=1 WHERE id=?")->execute([$id]);
+        } catch (Throwable $e) { /* column may not exist on a very early boot; harmless */ }
     }
 }
 
@@ -507,6 +519,9 @@ function run_schema($withSeeds = true) {
     if (function_exists('indexes_migrate')) indexes_migrate();
     ensure_admin();
     if ($withSeeds) auto_seed();
+    // Delivery edition (e.g. a Recruitment-only build) configures itself once,
+    // on a fresh install. No marker present = the full platform, unchanged.
+    if ($withSeeds && function_exists('edition_autoapply')) edition_autoapply();
 }
 
 // Fresh install / full run — schema + seed data.
