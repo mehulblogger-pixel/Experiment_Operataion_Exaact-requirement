@@ -819,6 +819,15 @@ function lk_admin($route, $method) {
             flash('Updated where this list appears.');
             redirect('/lookup?key=' . $t['type_key']);
         }
+        if ($method === 'POST' && isset($_POST['set_module'])) {
+            // "Module" panel — move this list into another module group. A direct
+            // update (not lk_set_module, which only fills a blank) so an admin can
+            // re-file a list that already has a module.
+            $module = trim($_POST['module'] ?? '');
+            $pdo->prepare("UPDATE lookup_types SET module=? WHERE id=?")->execute([$module, $t['id']]);
+            flash($module !== '' ? 'Moved to “' . (function_exists('lk_module_group_label') ? lk_module_group_label($module) : $module) . '”.' : 'Moved to General.');
+            redirect('/lookup?key=' . $t['type_key']);
+        }
         if ($method === 'POST') {
             $label = trim($_POST['label'] ?? '');
             $code = trim($_POST['code'] ?? '');

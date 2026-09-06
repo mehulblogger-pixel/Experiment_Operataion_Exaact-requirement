@@ -17,6 +17,30 @@
   </form>
 </details>
 
+<?php // Which module this list belongs to — move it to another group here. ?>
+<details class="panel" style="margin-bottom:14px">
+  <summary style="cursor:pointer;font-weight:600">🗂️ Module — <?= e(function_exists('lk_module_group_label') ? lk_module_group_label($t['module'] ?? '') : ($t['module'] ?: 'General')) ?></summary>
+  <form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" style="margin-top:12px">
+    <input type="hidden" name="set_module" value="1">
+    <div class="ff" style="max-width:340px"><label>This list belongs to</label>
+      <select class="form-control" name="module">
+        <?php
+          $cur = (string)($t['module'] ?? '');
+          $modOpts = ['' => 'General'];
+          foreach (['People', 'Directory', 'Sales', 'Operations', 'Reporting', 'Money'] as $mtag) {
+              // Always include the list's current module even if that module is off,
+              // so moving is never blocked; otherwise only offer enabled modules.
+              if ($mtag !== $cur && function_exists('lk_group_enabled') && !lk_group_enabled($mtag)) continue;
+              $modOpts[$mtag] = function_exists('lk_module_group_label') ? lk_module_group_label($mtag) : $mtag;
+          }
+          foreach ($modOpts as $mv => $ml) echo '<option value="' . e($mv) . '"' . ($mv === $cur ? ' selected' : '') . '>' . e($ml) . '</option>';
+        ?>
+      </select>
+      <small class="muted">Changes which heading it sits under on the Masters screen.</small></div>
+    <div style="margin-top:12px"><button class="btn small" type="submit">Save module</button></div>
+  </form>
+</details>
+
 <table class="grid">
   <?php // Module 01 — is this value safe to remove? Show how many records use it. ?>
   <?php $tracked = function_exists('lk_value_usage') && isset(lk_usage_map()[$t['type_key']]); ?>

@@ -18,6 +18,17 @@ $inPeople = false;
 foreach ($grouped['People'] ?? [] as $row) if ($row['type_key'] === 'test_source_channel') $inPeople = true;
 t_ok($inPeople, 'it appears under the Recruitment & people group on the Masters screen');
 
+// Editing an existing list can MOVE it to another module (direct update, so it
+// re-files even a list that already had a module — the /lookup edit panel path).
+$id0 = (int)$t['id'];
+db()->prepare("UPDATE lookup_types SET module=? WHERE id=?")->execute(['Sales', $id0]);
+$t = lk_type('test_source_channel');
+t_eq($t['module'], 'Sales', 'an existing list can be re-filed into another module');
+$grouped = lk_types_grouped();
+$inSales = false;
+foreach ($grouped['Sales'] ?? [] as $row) if ($row['type_key'] === 'test_source_channel') $inSales = true;
+t_ok($inSales, 'after the move it appears under the new module group');
+
 // Clean up so the shared DB is left as found.
 $id = (int)$t['id'];
 db()->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([$id]);
