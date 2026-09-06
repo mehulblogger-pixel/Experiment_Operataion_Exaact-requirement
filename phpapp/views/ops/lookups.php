@@ -32,6 +32,20 @@
   <form method="post" action="/lookups" style="margin-top:12px">
     <div class="form-grid">
       <div class="ff"><label>List name *</label><input class="form-control" name="label" placeholder="e.g. Activity code, Product family, Service type" required></div>
+      <div class="ff"><label>Module <span class="muted">(which part of the system this belongs to)</span></label>
+        <select class="form-control" name="module">
+          <?php
+            // Offer the module groups this install actually has, so a new list is
+            // filed where it belongs and shows in that group above. Blank = General.
+            $modOpts = ['' => 'General'];
+            foreach (['People', 'Directory', 'Sales', 'Operations', 'Reporting', 'Money'] as $mtag) {
+                if (function_exists('lk_group_enabled') && !lk_group_enabled($mtag)) continue;   // hide modules not in this plan
+                $modOpts[$mtag] = function_exists('lk_module_group_label') ? lk_module_group_label($mtag) : $mtag;
+            }
+            foreach ($modOpts as $mv => $ml) echo '<option value="' . e($mv) . '">' . e($ml) . '</option>';
+          ?>
+        </select>
+        <small class="muted">Pick “Recruitment &amp; people” for a hiring list. It then appears under that heading.</small></div>
       <div class="ff"><label>Short key (auto if blank)</label><input class="form-control" name="type_key" placeholder="e.g. activity"></div>
       <div class="ff"><label>Depends on (optional — makes it a dependent list)</label>
         <select class="form-control searchable" name="parent_type_id"><option value="">— none (top-level list) —</option>

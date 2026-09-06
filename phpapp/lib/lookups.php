@@ -777,6 +777,10 @@ function lk_admin($route, $method) {
             if ($key === '' || $label === '') { flash('Give the list a name.', 'error'); redirect('/lookups'); }
             if (lk_type($key)) { flash('A list with that key already exists.', 'error'); redirect('/lookups'); }
             lk_add_type($key, $label, $parent, 0, 99);
+            // File it under the module the admin picked, so it lands in the right
+            // group on the Masters screen (blank = General / Other).
+            $module = trim($_POST['module'] ?? '');
+            if ($module !== '' && function_exists('lk_set_module')) lk_set_module($key, $module);
             // "Show this list on…" — put it straight onto the ticked forms, so the
             // admin does not have to make a custom field by hand afterwards.
             $forms = array_values(array_intersect((array)($_POST['forms'] ?? []), array_keys(lk_form_targets())));
