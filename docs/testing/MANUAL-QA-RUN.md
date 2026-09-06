@@ -33,7 +33,7 @@ Status: ✅ PASS · ◑ PARTIAL · ✗ FAIL · ⛔ BLOCKED · ▷ NOT YET · ↻
 | 1 | First customer experience (new signup → dashboard) | ✅ | 1.1 first access+login, 1.2 setup wizard, 1.3 staff-account model, 1.4 cloud onboarding — all PASS (B′; 1.1 also confirmed on B live). |
 | 2 | Company configuration | ✅ | All config screens render; company profile (GSTIN→PAN/state auto-derive), office add, duplicate reject, invalid-GSTIN edge — all PASS (B′). |
 | 3 | Masters & taxonomy | ✅ | Master screens render; add/edit/delete values, duplicate-value guard, dependent-list parent guard, new-list create + duplicate-key guard — all PASS (B′). |
-| 4 | Users / roles / permissions | ▷ | |
+| 4 | Users / roles / permissions | ✅ | Create staff w/ roles, weak-pwd guard, permission gate blocks inspector from admin screens — PASS. **D-002 fixed**: duplicate username was a 500, now a friendly message. |
 | 5 | Universal technical passport | ▷ | |
 | 6 | Client & CRM | ▷ | |
 | 7 | Technical requirements | ▷ | |
@@ -62,6 +62,7 @@ Status: ✅ PASS · ◑ PARTIAL · ✗ FAIL · ⛔ BLOCKED · ▷ NOT YET · ↻
 | ID | Stage | Severity | Root cause | Screen/route | Expected | Actual | Status |
 |----|-------|----------|-----------|--------------|----------|--------|--------|
 | D-001 | 9 | P3 (cosmetic/label) | Portal shell header hard-coded to "Client portal" for any non-hire-first user; agency case not handled | `/portal` (`views/portal/top.php`) | An agency sees its portal named as an **Agency workspace** | Agency saw **"Client portal"** | ✅ FIXED — `$portalKind` now shows "Agency workspace" for `portal_agency_org()`; title + H1 use it. Crawl clean. |
+| D-002 | 4 | P3 (error handling) | Duplicate username not pre-checked; INSERT hit the UNIQUE constraint and threw a raw exception | `/user-new`, `/user-edit` (`lib/ops.php` `ops_users`) | Friendly "username already taken" message, form re-shown | **HTTP 500** (SQLSTATE UNIQUE); no bad row created (data safe) | ✅ FIXED — pre-check before any team-member is created: clash → flash + re-render form (200). Verified: dup now 200 "already taken", `r.patel` count stays 1. Harness 5992/0. |
 
 ---
 
@@ -226,3 +227,34 @@ Re-creating "Weld Process" → *"A list with that key already exists."*
 Deleting the PSI value (by its exact row id) → removed. Delete is guarded by `type_id` (a mismatched id silently no-ops rather than deleting across lists — good defensive behaviour; the first test attempt hit this and was a test-harness id-extraction error, not an app fault).
 
 **Stage 3 verdict: ✅ PASS.** Typed master lists, value CRUD, duplicate + dependent-parent guards, and custom-list creation all confirmed. No defects. Ready for Stage 4 (Users / roles / permissions).
+
+---
+
+## STAGE 4 — Users / roles / permissions
+
+**ENV:** B′ (sandbox) · **USER:** admin (Master) creates staff; then re-tested as the created **inspector**.
+
+### QA-4.1 — Users screens render  ✅
+`/users` (list) and `/user-new` (create form) → 200.
+
+### QA-4.2 — Create staff with roles  ✅ PASS
+Created **INSPECTOR** (`r.patel`) and **COORDINATOR** (`s.shah`) — each auto-linked to a new team-member from first/last name, assigned to the head office. Both appear in `/users`. Seats unlimited on a fresh (OPEN-state) install, so no seat block. ✅
+
+### QA-4.3 — Weak-password guard  ✅ PASS (negative)
+Creating a user with password `123` → rejected ("…at least…"); the account is **not** created. Admin-set passwords face the same strength rule as self-chosen ones. ✅
+
+### QA-4.4 — Duplicate username → **D-002 (fixed this session)**  ↻→✅
+Creating a second `r.patel` originally threw **HTTP 500** (UNIQUE constraint, unhandled). Data was safe (no duplicate row), but the UX was a raw error page. **Fixed:** a pre-check now runs *before* any team-member is auto-created — a clash shows *"The username 'r.patel' is already taken — choose a different one."* and re-renders the form (200). Re-verified: dup → 200 with the message, `r.patel` count stays 1, no orphan team-member. ✅
+
+### QA-4.5 — Permission gate enforces the matrix  ✅ PASS (the key test)
+Signed in as the new **inspector** (valid session: GET `/` → 200), then hit admin-only screens:
+| Inspector → | Result |
+|---|---|
+| `/users` | ✅ blocked → redirect to `/` |
+| `/user-new` | ✅ blocked → `/` |
+| `/access` (role editor) | ✅ blocked → `/` |
+| `/company-profile` | ✅ blocked → `/` |
+| `/lookups` | ✅ blocked → `/` |
+The permission matrix genuinely gates the UI — a limited role cannot reach administration, even by typing the URL directly. ✅
+
+**Stage 4 verdict: ✅ PASS** (1 defect found and fixed: D-002). Staff creation, role assignment, password strength, and — most importantly — **real permission enforcement** all confirmed. Ready for Stage 5 (Universal technical passport).

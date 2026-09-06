@@ -7737,6 +7737,25 @@ function ops_users($route, $method) {
                 flash('Only a Master Admin can create or change a Master Admin account.', 'error');
                 redirect($user ? '/user-edit?id=' . (int)$user['id'] : '/users');
             }
+            // D-002 — a username is UNIQUE in the schema. Check it HERE (before any
+            // team-member is auto-created below) and show a friendly message, rather
+            // than letting the INSERT/UPDATE hit the constraint and throw a raw 500.
+            $unameChk = trim((string)($b['username'] ?? ''));
+            if ($unameChk === '') {
+                flash('Enter a username for this login.', 'error');
+                redirect($user ? '/user-edit?id=' . (int)$user['id'] : '/user-new');
+            }
+            $unameClash = (int) ops_val(
+                "SELECT id FROM users WHERE LOWER(username)=LOWER(?)" . ($user ? " AND id<>?" : ""),
+                $user ? [$unameChk, (int)$user['id']] : [$unameChk]);
+            if ($unameClash) {
+                flash('The username “' . $unameChk . '” is already taken — choose a different one.', 'error');
+                $mgrsU = ops_all("SELECT id, first_name, last_name, username, role, position_title FROM users WHERE is_active=1" . ($user ? " AND id<>" . (int)$user['id'] : "") . " ORDER BY first_name, last_name");
+                view('ops/user_form', ['user' => user_row_from_post($b, $user), 'inspectors' => inspectors_list(false), 'offices' => offices_list(),
+                    'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'globalMgr' => $globalMgr, 'managers' => $mgrsU,
+                    'defaults' => role_defaults($role)] + user_cost_vars(user_row_from_post($b, $user)));
+                return;
+            }
             // An existing team member picked from the list; '__new__' or blank is
             // resolved below, once the home office is known, into either a newly
             // created team member or a blocking error (a login must belong to
