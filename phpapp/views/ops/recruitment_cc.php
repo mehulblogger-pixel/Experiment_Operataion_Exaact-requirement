@@ -115,6 +115,19 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
       <a class="btn secondary" href="/candidates">Candidates</a>
       <?php if (function_exists('pc_can') && pc_can()): ?><a class="btn secondary" href="/project-costings">🧮 Project costing</a><?php endif; ?>
       <a class="btn secondary" href="/recruitment">Action view</a>
+      <?php // Recruitment setup — the configuration screens, one click, admins only. ?>
+      <?php if (function_exists('hiring_admin_can') ? hiring_admin_can() : (function_exists('is_admin_level') && is_admin_level())): ?>
+      <span class="rcc-setup" style="position:relative;display:inline-block">
+        <a class="btn secondary" href="/recruit-pipelines">⚙️ Setup ▾</a>
+        <span class="rcc-setup-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--card,#fff);border:1px solid var(--line,#e5e9f0);border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,.12);z-index:20;min-width:250px;padding:6px">
+          <a href="/recruit-pipelines" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">⇥ Hiring workflows — pipeline &amp; stages</a>
+          <a href="/comp-setup" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">₹ Compensation setup</a>
+          <a href="/doc-templates" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">📄 Document templates</a>
+          <a href="/recruit-approvals" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">🧷 Approval rules</a>
+          <a href="/careers-admin" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">🌐 Careers page</a>
+        </span>
+      </span>
+      <?php endif; ?>
       <?php
         // Phase 7 — export the current view (same filters) to a spreadsheet.
         $__q = array_filter(['fy'=>$f['fy'] ?? '', 'month'=>$f['month'] ?? '', 'dept'=>$f['dept'] ?? '', 'source'=>$f['source'] ?? '', 'manager'=>$f['manager'] ?? ''], fn($v) => (string)$v !== '');
@@ -132,6 +145,9 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
     </div>
   </div>
   <script>(function(){var w=document.querySelector('.rcc-export');if(!w)return;var b=w.querySelector('a.btn'),m=w.querySelector('.rcc-export-menu');
+    b.addEventListener('click',function(e){e.preventDefault();m.style.display=m.style.display==='none'?'block':'none';});
+    document.addEventListener('click',function(e){if(!w.contains(e.target))m.style.display='none';});})();</script>
+  <script>(function(){var w=document.querySelector('.rcc-setup');if(!w)return;var b=w.querySelector('a.btn'),m=w.querySelector('.rcc-setup-menu');
     b.addEventListener('click',function(e){e.preventDefault();m.style.display=m.style.display==='none'?'block':'none';});
     document.addEventListener('click',function(e){if(!w.contains(e.target))m.style.display='none';});})();</script>
 
