@@ -104,6 +104,87 @@ function position_set_active($id, $on) {
 }
 
 // ============================================================================
+//  Import an existing org chart / organogram (paste or CSV) → positions.
+//  Reuses the position master; builds the reporting tree from a "Reports to"
+//  column resolved by code or by name. Two passes: create/update all rows, then
+//  link parents — so order in the file does not matter.
+// ============================================================================
+const POS_IMPORT_HEADS = [
+    'name' => 'name', 'code' => 'code', 'department' => 'department', 'dept' => 'department',
+    'grade' => 'grade', 'reports to' => 'reports_to', 'reports_to' => 'reports_to', 'manager' => 'reports_to',
+    'reporting to' => 'reports_to', 'sanctioned' => 'sanctioned', 'sanctioned headcount' => 'sanctioned',
+    'occupied' => 'occupied', 'occupied headcount' => 'occupied', 'hod' => 'hod',
+];
+// Turn pasted text (tab- or comma-separated, optional header) into row dicts.
+function positions_import_parse($text) {
+    $text = trim((string)$text); if ($text === '') return [];
+    $lines = preg_split('/\r\n|\r|\n/', $text);
+    $rows = []; $map = null; $order = ['name','code','department','grade','reports_to','sanctioned','occupied'];
+    foreach ($lines as $ln) {
+        if (trim($ln) === '') continue;
+        $delim = (strpos($ln, "\t") !== false) ? "\t" : ',';
+        $cells = array_map(fn($c) => trim($c, " \t\"'"), explode($delim, $ln));
+        // Header row? (first non-empty line whose cells are known header names)
+        if ($map === null) {
+            $lc = array_map('strtolower', $cells);
+            $known = 0; foreach ($lc as $c) if (isset(POS_IMPORT_HEADS[$c])) $known++;
+            if ($known >= 2) { $map = []; foreach ($lc as $i => $c) if (isset(POS_IMPORT_HEADS[$c])) $map[POS_IMPORT_HEADS[$c]] = $i; continue; }
+            $map = false;   // no header — fall back to fixed column order
+        }
+        $get = function ($field) use ($cells, $map, $order) {
+            if (is_array($map)) return isset($map[$field]) ? ($cells[$map[$field]] ?? '') : '';
+            $idx = array_search($field, $order, true); return $idx !== false ? ($cells[$idx] ?? '') : '';
+        };
+        $name = trim((string)$get('name'));
+        if ($name === '') continue;
+        $rows[] = [
+            'name' => $name, 'code' => trim((string)$get('code')), 'department' => trim((string)$get('department')),
+            'grade' => trim((string)$get('grade')), 'reports_to' => trim((string)$get('reports_to')),
+            'hod' => trim((string)$get('hod')),
+            'sanctioned' => (int)preg_replace('/\D+/', '', (string)$get('sanctioned')),
+            'occupied' => (int)preg_replace('/\D+/', '', (string)$get('occupied')),
+        ];
+    }
+    return $rows;
+}
+// Apply parsed rows. Returns ['created','updated','linked','unresolved'=>[names]].
+function positions_import_apply($rows) {
+    position_migrate();
+    $res = ['created' => 0, 'updated' => 0, 'linked' => 0, 'unresolved' => []];
+    if (!$rows) return $res;
+    $byCode = []; $byName = [];
+    foreach (positions_all(false) as $p) {
+        if (trim((string)$p['code']) !== '') $byCode[strtolower(trim($p['code']))] = (int)$p['id'];
+        $byName[strtolower(trim($p['name']))] = (int)$p['id'];
+    }
+    // Pass 1 — create / update every row (no parent links yet).
+    $rowId = [];
+    foreach ($rows as $i => $r) {
+        $existing = 0;
+        if ($r['code'] !== '' && isset($byCode[strtolower($r['code'])])) $existing = $byCode[strtolower($r['code'])];
+        elseif (isset($byName[strtolower($r['name'])])) $existing = $byName[strtolower($r['name'])];
+        $post = ['code' => $r['code'], 'name' => $r['name'], 'department' => $r['department'],
+                 'grade' => $r['grade'], 'hod_name' => $r['hod'],
+                 'sanctioned_headcount' => $r['sanctioned'], 'occupied_headcount' => $r['occupied'],
+                 'budgeted_headcount' => $r['sanctioned']];
+        $id = position_save($existing, $post);
+        if ($existing) $res['updated']++; else $res['created']++;
+        $rowId[$i] = $id;
+        if ($r['code'] !== '') $byCode[strtolower($r['code'])] = $id;
+        $byName[strtolower($r['name'])] = $id;
+    }
+    // Pass 2 — link "reports to" by code or name.
+    foreach ($rows as $i => $r) {
+        $rt = trim((string)$r['reports_to']); if ($rt === '') continue;
+        $pid = $byCode[strtolower($rt)] ?? $byName[strtolower($rt)] ?? 0;
+        if (!$pid || $pid === $rowId[$i]) { if (!$pid) $res['unresolved'][] = $r['name'] . ' → ' . $rt; continue; }
+        db()->prepare("UPDATE positions SET reports_to_id=? WHERE id=?")->execute([$pid, $rowId[$i]]);
+        $res['linked']++;
+    }
+    return $res;
+}
+
+// ============================================================================
 //  Manpower-plan validation (§14) — never a silent bypass.
 // ============================================================================
 function position_manpower_check($pos, $qty, $reqType = 'NEW') {
@@ -152,6 +233,24 @@ function ops_positions($route, $method) {
     }
 
     ops_require(is_coordinator_level(), 'Only coordinators / administrators can manage positions.');
+
+    if ($route === 'positions-import') {
+        $result = null; $preview = null; $raw = '';
+        if ($method === 'POST') {
+            $raw = (string)($_POST['data'] ?? '');
+            if ($raw === '' && !empty($_FILES['file']['tmp_name']) && is_uploaded_file($_FILES['file']['tmp_name']))
+                $raw = (string)@file_get_contents($_FILES['file']['tmp_name']);
+            $rows = positions_import_parse($raw);
+            if ((string)($_POST['do'] ?? '') === 'apply') {
+                $result = positions_import_apply($rows);
+                flash("Org chart imported — {$result['created']} created, {$result['updated']} updated, {$result['linked']} linked.");
+                redirect('/positions-org'); return true;
+            }
+            $preview = $rows;   // "Preview" — show what was parsed before committing
+        }
+        view('ops/positions_import', ['preview' => $preview, 'raw' => $raw]);
+        return true;
+    }
 
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');

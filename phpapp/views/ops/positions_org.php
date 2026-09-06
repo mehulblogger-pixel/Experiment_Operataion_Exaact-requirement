@@ -7,7 +7,7 @@ $tree = $tree ?? [];
 <div class="master-head">
   <div><h1>Organisation chart</h1>
     <p class="sub" style="margin:2px 0 0">The reporting hierarchy built from the position master (who reports to whom).</p></div>
-  <div class="row-actions"><a class="btn secondary" href="/positions">← Positions</a></div>
+  <div class="row-actions"><a class="btn secondary" href="/positions-import">⬆ Import org chart</a> <a class="btn secondary" href="/positions">← Positions</a></div>
 </div>
 
 <div class="panel">

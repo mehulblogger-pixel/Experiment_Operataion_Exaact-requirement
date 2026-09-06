@@ -99,6 +99,8 @@ function ops_nav_index($fresh = false) {
             $add('Add candidate', '/candidate-new', $A, '➕', 'Add a candidate.', 'action');
             $add('Positions', '/positions', $A, '🏷️', 'Position master — sanctioned roles & headcount.');
             $add('Org chart', '/positions-org', $A, '🗂️', 'Reporting hierarchy from the position master.');
+            if ($fx('is_coordinator_level') && is_coordinator_level())
+                $add('Import org chart', '/positions-import', $A, '⬆️', 'Import an existing organogram from a spreadsheet.', 'action');
             $apc = ($fx('appr_inbox_count') ? (int)appr_inbox_count() : 0);
             $add('My approvals' . ($apc > 0 ? ' (' . $apc . ')' : ''), '/my-approvals', $A, '✅', 'Items waiting on your approval.');
             $add('Export data', '/recruit-export?dataset=candidates', $A, '⬇️', 'Download candidates, requirements & offers as CSV.');

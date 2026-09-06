@@ -2438,7 +2438,7 @@ function ops_module_gate($route) {
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring','candidate-link-pro'=>'hiring','candidate-unlink-pro'=>'hiring',
-        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring','recruit-export'=>'hiring','careers-admin'=>'hiring','jd-generate'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring','recruit-export'=>'hiring','careers-admin'=>'hiring','jd-generate'=>'hiring','positions-import'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
@@ -2702,7 +2702,7 @@ function ops_dispatch($route, $method) {
             return ops_recruit_pipelines($route, $method);
         case $route === 'candidate-flow':      // Phase 2b — move a candidate along its configured pipeline
             return ops_recruit_candidate_flow($route, $method);
-        case $route === 'positions' || $route === 'positions-org':   // Phase 3 — position master & org chart
+        case $route === 'positions' || $route === 'positions-org' || $route === 'positions-import':   // Phase 3 — position master, org chart & import
             return ops_positions($route, $method);
         case $route === 'requisition-position':                      // Phase 3 — link a requisition to a position
             return ops_requisition_position($route, $method);
