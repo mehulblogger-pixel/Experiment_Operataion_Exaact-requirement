@@ -3133,6 +3133,17 @@ function ops_dispatch($route, $method) {
             ops_preflight(); return true;
         case $route === 'settings':
             ops_settings($method); return true;
+        case $route === 'load-sample-data' && $method === 'POST':
+            // D-003 — explicit, master-only "Load sample data" action. A fresh
+            // hosted install starts empty of partners (see auto_seed); this lets an
+            // operator populate the bundled sample clients/vendors on demand, e.g.
+            // for a demo. No-ops once any partner exists.
+            ops_require(is_master(), 'Only the Master Admin can load sample data.');
+            if (function_exists('auto_seed_load_sample')) {
+                $added = auto_seed_load_sample();
+                flash($added > 0 ? "Loaded $added sample clients & vendors." : 'Sample data was not loaded — partners already exist.', $added > 0 ? 'success' : 'warning');
+            }
+            redirect('/clients');
         case $route === 'access':
             ops_access($method); return true;
         case $route === 'ai-settings':

@@ -40,7 +40,18 @@
     </td>
   </tr>
   <?php endforeach; ?>
-  <?php if (!$rows): ?><tr><td colspan="7">No records found. <a href="/partner-new?role=<?= e($roleField) ?>">Add one</a>.</td></tr><?php endif; ?>
+  <?php if (!$rows): ?><tr><td colspan="7">No records found. <a href="/partner-new?role=<?= e($roleField) ?>">Add one</a>.
+    <?php // D-003 — a fresh install starts empty. Offer the Master Admin a one-click
+          // load of the bundled sample clients/vendors (for a demo), only when the
+          // list is genuinely empty (no search/filter) and the DB has none.
+          if (empty($q) && empty($status) && (int)($total ?? 0) === 0 && function_exists('is_master') && is_master()): ?>
+      <form method="post" action="/load-sample-data" style="display:inline;margin-left:8px"
+            onsubmit="return confirm('Load the bundled sample clients &amp; vendors? Use this only for a demo — not on a live company workspace.')">
+        <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+        <button class="btn small secondary" type="submit">Load sample data</button>
+      </form>
+    <?php endif; ?>
+    </td></tr><?php endif; ?>
 </table>
 </div>
 

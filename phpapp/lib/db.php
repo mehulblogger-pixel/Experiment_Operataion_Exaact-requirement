@@ -322,8 +322,37 @@ function auto_seed() {
     try { if (ops_val("SELECT svalue FROM settings WHERE skey='partners_seeded'")) return; } catch (Throwable $e) {}
     $n = (int)$pdo->query("SELECT COUNT(*) FROM business_partners")->fetchColumn();
     if ($n > 0) { @setting_set('partners_seeded', '1'); return; }
+    // D-003 — the bundled sample list (data/seed_data.json) is the BASE company's
+    // OWN clients and vendors. It must never auto-populate a customer's fresh
+    // workspace — a tenant subdomain, or a private licence copy — because that
+    // would expose one company's commercial relationships inside another's. So on
+    // a real hosted install a brand-new database starts EMPTY; the sample list is
+    // loaded only on explicit opt-in (the master-only "Load sample data" action,
+    // or the seed_sample_partners setting). The automated test suite and the local
+    // dev/built-in server still seed, so test fixtures and the screen crawl are
+    // unchanged. An already-populated install (the owner's live site) never
+    // reaches here — it returned above on $n > 0.
+    $devContext = in_array(PHP_SAPI, ['cli', 'cli-server', 'phpdbg'], true);
+    $optedIn    = function_exists('setting_get') && setting_get('seed_sample_partners', '') === '1';
+    if (!$devContext && !$optedIn) { @setting_set('partners_seeded', '1'); return; }
+    auto_seed_load_sample();
+}
+
+/**
+ * Load the bundled sample clients/vendors (data/seed_data.json) into
+ * business_partners. Returns the number of partner rows created. Name-idempotent
+ * and a no-op once any partner exists (see auto_seed's $n > 0 guard, which callers
+ * share). Used by auto_seed() in dev/opt-in contexts, and by the master-only
+ * "Load sample data" admin action so an operator can populate demo data on demand.
+ */
+function auto_seed_load_sample() {
+    $pdo = db();
+    if ((int)$pdo->query("SELECT COUNT(*) FROM business_partners")->fetchColumn() > 0) {
+        @setting_set('partners_seeded', '1');
+        return 0;
+    }
     $file = __DIR__ . '/../data/seed_data.json';
-    if (!is_file($file)) return;
+    if (!is_file($file)) return 0;
     $data = json_decode(file_get_contents($file), true);
     $byNorm = [];
     $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,is_client,is_vendor,status,created_at) VALUES (?,?,?,?, 'ACTIVE', ?)");
@@ -351,6 +380,8 @@ function auto_seed() {
     foreach (($data['clients'] ?? []) as $name) $ensure($name, 1, 0);
     foreach (($data['vendors'] ?? []) as $row) $ensure(is_array($row) ? $row['name'] : $row, 0, 1);
     $pdo->commit();
+    @setting_set('partners_seeded', '1');
+    return (int)$pdo->query("SELECT COUNT(*) FROM business_partners")->fetchColumn();
 }
 
 // The whole schema build/upgrade, in one ordered pass. $withSeeds distinguishes
