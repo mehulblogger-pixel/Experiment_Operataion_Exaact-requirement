@@ -59,6 +59,9 @@ if not defined PHPEXE (
 REM The built-in database - no MySQL, no setup. One file next to the app.
 set DB_DRIVER=sqlite
 set "SQLITE_PATH=%~dp0data.sqlite"
+REM A downloaded copy is a private on-premise install: open on the staff login,
+REM not the hosted marketplace front door.
+set INSTALL_MODE=licence
 
 echo.
 echo   Found PHP:   !PHPEXE!

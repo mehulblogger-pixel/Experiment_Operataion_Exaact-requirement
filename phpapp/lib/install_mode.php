@@ -26,6 +26,16 @@ function install_mode_options() {
     ];
 }
 function install_mode() {
+    // A desktop / on-premise launch declares itself through the environment
+    // (the start-easy.bat / start.command launchers set INSTALL_MODE=licence),
+    // which OUTRANKS the stored setting — so a private copy opens on the staff
+    // login instead of the hosted marketplace front door, without changing the
+    // hosted cloud's own default. Same override shape as MODULES_OFF.
+    $env = getenv('INSTALL_MODE');
+    if ($env !== false && trim($env) !== '') {
+        $e = strtolower(trim($env));
+        if (isset(install_mode_options()[$e])) return $e;
+    }
     $m = strtolower((string)(function_exists('setting_get') ? setting_get('install_mode', 'cloud') : 'cloud'));
     return isset(install_mode_options()[$m]) ? $m : 'cloud';
 }

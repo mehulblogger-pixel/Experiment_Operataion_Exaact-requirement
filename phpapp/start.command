@@ -27,6 +27,7 @@ fi
 # The built-in database — no MySQL, no configuration. One file next to the app.
 export DB_DRIVER=sqlite
 export SQLITE_PATH="$(pwd)/data.sqlite"
+export INSTALL_MODE=licence
 
 URL="http://127.0.0.1:$PORT"
 echo

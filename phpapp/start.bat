@@ -28,6 +28,7 @@ if errorlevel 1 (
 REM The built-in database — no MySQL, no configuration. One file next to the app.
 set DB_DRIVER=sqlite
 set SQLITE_PATH=%~dp0data.sqlite
+set INSTALL_MODE=licence
 
 echo.
 echo   Starting the system ...
