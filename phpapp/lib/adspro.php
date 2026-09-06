@@ -143,7 +143,7 @@ function ads_can_manage() { return can('settings.manage') || is_master(); }
 // ---- The wire ---------------------------------------------------------------
 // One place that talks to Ads Pro, so timeouts, headers, error shape and logging
 // are decided once. Returns ['ok'=>bool, 'code'=>int, 'data'=>array, 'error'=>string].
-function ads_call($action, array $body = null, $log = true) {
+function ads_call($action, ?array $body = null, $log = true) {
     ads_migrate();
     $c = ads_config();
     if (!ads_on()) return ['ok' => false, 'code' => 0, 'data' => [],

@@ -80,6 +80,7 @@ if defined PHPDIR (
     -d extension=gd ^
     -d extension=zip ^
     -d date.timezone=UTC ^
+    -d display_errors=stderr ^
     -d upload_max_filesize=32M ^
     -d post_max_size=32M ^
     -d memory_limit=512M ^
