@@ -33,6 +33,31 @@ $title = function ($r) use ($e) { return $e(trim((string)($r['designation'] ?? '
   </form>
 </div>
 
+<?php if (!empty($jdcfg)): ?>
+<div class="panel">
+  <h3 class="tab-sub">Posting defaults <span class="muted" style="font-weight:400;font-size:12px">— the boilerplate every generated posting inherits</span></h3>
+  <form method="post">
+    <input type="hidden" name="do" value="jd_settings">
+    <div class="ff"><label style="font-size:12px;font-weight:600">Intro / about us <span class="muted" style="font-weight:400">— tokens: {company} {role} {department} {location}</span></label>
+      <textarea class="form-control" name="about" rows="2"><?= $e($jdcfg['about'] ?? '') ?></textarea></div>
+    <div class="ff" style="margin-top:10px"><label style="font-size:12px;font-weight:600">What we offer</label>
+      <textarea class="form-control" name="offer" rows="2"><?= $e($jdcfg['offer'] ?? '') ?></textarea></div>
+    <div class="ff" style="margin-top:10px"><label style="font-size:12px;font-weight:600">How to apply (footer)</label>
+      <textarea class="form-control" name="apply" rows="2"><?= $e($jdcfg['apply'] ?? '') ?></textarea></div>
+    <div class="ff" style="margin-top:10px;max-width:240px"><label style="font-size:12px;font-weight:600">Tone</label>
+      <select class="form-control" name="tone">
+        <?php foreach (['professional'=>'Professional & warm','friendly'=>'Friendly & conversational','concise'=>'Concise & direct'] as $tk=>$tl): ?>
+          <option value="<?= $tk ?>" <?= ($jdcfg['tone'] ?? '')===$tk?'selected':'' ?>><?= $e($tl) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+      <button class="btn">Save posting defaults</button>
+      <span class="muted" style="font-size:12px"><?= !empty($ai_on) ? 'AI is on — postings are written in fluent prose.' : 'AI is off — postings are assembled from a clear template (turn on AI under Settings → AI providers for richer copy).' ?></span>
+    </div>
+  </form>
+</div>
+<?php endif; ?>
+
 <div class="panel">
   <h3 class="tab-sub">Openings</h3>
   <p class="muted" style="font-size:12.5px;margin:0 0 12px">Tick “Advertise” and add a short public description for each role you want on the careers page. Roles that are closed, filled or on hold never appear.</p>
@@ -58,10 +83,41 @@ $title = function ($r) use ($e) { return $e(trim((string)($r['designation'] ?? '
           <input type="checkbox" name="publish" value="1" <?= $pub?'checked':'' ?> style="width:auto"> Advertise
         </label>
       </div>
-      <div class="ff" style="margin-top:10px"><label style="font-size:12px;font-weight:600">Public description (what applicants see)</label>
-        <textarea class="form-control" name="careers_summary" rows="3" placeholder="Describe the role, key responsibilities and what you're looking for."><?= $e($r['careers_summary'] ?? '') ?></textarea></div>
+      <div class="ff" style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <label style="font-size:12px;font-weight:600;margin:0">Public description (what applicants see)</label>
+          <span style="display:flex;gap:8px;align-items:center">
+            <span class="jd-msg muted" style="font-size:11.5px"></span>
+            <button type="button" class="btn secondary jd-gen" data-req="<?= (int)$r['id'] ?>" data-target="sum_<?= (int)$r['id'] ?>" style="padding:5px 12px;font-size:12.5px">✨ Generate</button>
+          </span>
+        </div>
+        <textarea class="form-control" id="sum_<?= (int)$r['id'] ?>" name="careers_summary" rows="4" placeholder="Describe the role, key responsibilities and what you're looking for — or click Generate."><?= $e($r['careers_summary'] ?? '') ?></textarea></div>
       <div style="margin-top:8px"><button class="btn secondary" style="padding:6px 14px;font-size:13px">Save</button></div>
     </form>
   <?php endforeach; endif; ?>
 </div>
+<script>
+(function(){
+  var CSRF = '<?= function_exists('csrf_token') ? e(csrf_token()) : '' ?>';
+  document.querySelectorAll('.jd-gen').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var wrap = btn.closest('.ff'), msg = wrap.querySelector('.jd-msg'),
+          ta = document.getElementById(btn.dataset.target);
+      btn.disabled = true; msg.textContent = 'Writing…';
+      var fd = new FormData(); fd.append('_csrf', CSRF); fd.append('req_id', btn.dataset.req);
+      fetch('/jd-generate', {method:'POST', body:fd, headers:{'X-Requested-With':'fetch'}})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          btn.disabled = false;
+          if(!d || !d.ok){ msg.textContent = (d && d.error) || 'Could not generate — write it manually.'; return; }
+          ta.value = d.text || ''; ta.dispatchEvent(new Event('input'));
+          var src = d.source === 'ai' ? 'AI' : 'template';
+          var miss = (d.missing && d.missing.length) ? ' · add ' + d.missing.join(', ') + ' for a fuller posting' : '';
+          msg.innerHTML = '<b style="color:var(--brand,#1e40af)">Drafted (' + src + ')</b> — review &amp; Save' + miss;
+        })
+        .catch(function(){ btn.disabled = false; msg.textContent = 'Network error — try again.'; });
+    });
+  });
+})();
+</script>
 <style>.ff label{display:block;margin-bottom:4px}</style>

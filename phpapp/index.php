@@ -239,6 +239,7 @@ try {
     require __DIR__ . '/lib/recruit_export.php';   // Phase 7 — recruitment CSV exports (candidates/requisitions/offers/funnel)
     require __DIR__ . '/lib/careers.php';          // Phase 7 — public careers page + application intake
     require __DIR__ . '/lib/workspace.php';        // Configurable role workspaces — per-role landing + launchpad
+    require __DIR__ . '/lib/recruit_jd.php';       // Auto job-description & public posting generator (template + AI)
     require __DIR__ . '/lib/candpool.php';         // Revamp P11 — candidate pool convergence (read-only)
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer

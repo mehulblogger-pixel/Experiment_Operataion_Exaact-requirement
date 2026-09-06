@@ -226,7 +226,9 @@ function req_extra_fields() {
         // Cost build-up heads (sourcing-model aware).
         'sourcing_model','cost_wage','cost_statutory_pct','cost_agency_pct','cost_reimburse','cost_oneoff',
         // Phase 7 — ownership (Responsible 1 = recruiter, Responsible 2 = manager) + department.
-        'recruiter_id','manager_id','department'];
+        'recruiter_id','manager_id','department',
+        // Auto job-description — free-text key responsibilities feed the generator.
+        'responsibilities'];
 }
 
 // Duration in months from an explicit value, else derived from start/end dates.

@@ -289,6 +289,11 @@ function ops_careers_admin($route, $method) {
             flash($on ? 'Opening published to the careers page.' : 'Opening removed from the careers page.');
             redirect('/careers-admin'); return true;
         }
+        if ($do === 'jd_settings' && function_exists('jd_config_save')) {
+            jd_config_save($_POST);
+            flash('Posting defaults saved.');
+            redirect('/careers-admin'); return true;
+        }
     }
     $reqs = [];
     try {
@@ -301,6 +306,8 @@ function ops_careers_admin($route, $method) {
         'intro'   => careers_intro(),
         'reqs'    => $reqs,
         'live'    => count(careers_open_jobs()),
+        'jdcfg'   => function_exists('jd_config') ? jd_config() : null,
+        'ai_on'   => function_exists('ai_enabled') && ai_enabled(),
     ]);
     return true;
 }

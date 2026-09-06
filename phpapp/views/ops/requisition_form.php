@@ -195,6 +195,7 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
       <div class="ff rq-adv"><label>Skills / certifications</label><input class="form-control" name="skills" value="<?= $v('skills') ?>" placeholder="e.g. CSWIP 3.1, NDT UT-II"></div>
       <div class="ff rq-adv"><label>Experience (min years)</label><input class="form-control" type="number" step="0.5" name="experience_min" value="<?= $v('experience_min') ?>"></div>
       <div class="ff rq-adv"><label>Relevant experience</label><input class="form-control" name="relevant_experience" value="<?= $v('relevant_experience') ?>" placeholder="in the required scope"></div>
+      <div class="ff rq-adv" style="grid-column:1/-1"><label>Key responsibilities</label><textarea class="form-control" name="responsibilities" rows="3" placeholder="One responsibility per line — feeds the auto-generated job description &amp; careers posting."><?= $v('responsibilities') ?></textarea></div>
     </div>
   </div>
 
