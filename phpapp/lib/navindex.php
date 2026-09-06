@@ -101,11 +101,13 @@ function ops_nav_index() {
             $add('Org chart', '/positions-org', $A, '🗂️', 'Reporting hierarchy from the position master.');
             $apc = ($fx('appr_inbox_count') ? (int)appr_inbox_count() : 0);
             $add('My approvals' . ($apc > 0 ? ' (' . $apc . ')' : ''), '/my-approvals', $A, '✅', 'Items waiting on your approval.');
+            $add('Export data', '/recruit-export?dataset=candidates', $A, '⬇️', 'Download candidates, requirements & offers as CSV.');
             if ($fx('is_admin_level') && is_admin_level()) {
                 $add('Hiring workflows', '/recruit-pipelines', $A, '⇥', 'Configure the recruitment pipeline & stages.');
                 $add('Compensation setup', '/comp-setup', $A, '₹', 'Configure salary headings & statutory components.');
                 $add('Document templates', '/doc-templates', $A, '📄', 'Configure offer / appointment letter templates.');
                 $add('Approval rules', '/recruit-approvals', $A, '🧷', 'Configure approval matrix, SLA & escalations.');
+                $add('Careers page', '/careers-admin', $A, '🌐', 'Publish openings to a public careers page.');
             }
         }
         if ($fx('pc_can') && pc_can())

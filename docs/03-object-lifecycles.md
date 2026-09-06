@@ -500,6 +500,13 @@ created_at)`; hire (`ACCEPTED`) may create an `inspectors` row via the identity
 ledger (candidate → employee, no duplicate person). Guards: create/edit and
 stage-move `is_coordinator_level()`. **This lifecycle is unchanged.**
 
+**Public entry point (Phase 7 — additive).** Besides staff creation, a candidate
+may now enter at the **same `RECEIVED` start** through the opt-in public careers
+page (`careers.php`): a self-application creates the row with `source=CAREERS`,
+linked to the advertised requisition, and logs the intake to `candidate_events`
+like any other. No new stage or transition — only a new, unauthenticated *source*
+of a `RECEIVED` candidate, guarded by a honeypot + per-requisition de-dupe.
+
 ### Configurable pipeline (Phase 2 — additive, data-driven)
 
 A per-tenant pipeline engine (`recruitpipe.php`; tables `recruit_pipelines` +

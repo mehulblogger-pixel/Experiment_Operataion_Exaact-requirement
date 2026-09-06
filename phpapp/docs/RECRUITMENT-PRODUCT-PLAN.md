@@ -146,7 +146,27 @@ Roughly **40–50% of the brief already exists in reusable form.**
   `ops_mail()`. No new permission; no existing route or screen touched (the
   platform's separate `/approval-rules` quote/report screen is untouched).
   25 assertions + full suite (6131) green.
-- **Phase 7 — Recruitment dashboards/reports hardening, careers intake, exports.**
+- **Phase 7 — Recruitment exports + public careers intake** ✅ *(done)* —
+  (A) `lib/recruit_export.php`: a `recruit-export` route (gated the same as the
+  Recruitment command centre, `recruit_home_can()`) that streams **CSV** for four
+  datasets — candidates, requirements, offers, and a funnel/KPI summary — honouring
+  the *same* filters as the dashboard (FY / month / department / source / recruiter)
+  via `rcc_filters()`, and reusing the platform `csv_download()` helper. Money
+  columns stay gated by `can_see_salary()` (an export can never leak a CTC the
+  viewer cannot see on screen). An **Export ▾** menu was added to the command
+  centre and an **Export data** nav tile. (B) `lib/careers.php`: an opt-in
+  **public careers page** (`/careers`, in front of `require_login()`, off by
+  default) listing the requirements an admin chose to advertise
+  (`requisitions.careers_published`) with a standalone premium shell; a candidate
+  applies with their details + résumé and a real `candidates` row is created
+  (`source=CAREERS`, stage RECEIVED) against that requirement — reusing the CV
+  reader (`connect_cv_extract_text` + `recruit_cv_autofill`), the DMS
+  (`doc_upload`) to keep the résumé on file, and the mailer to notify the
+  recruiter. A honeypot + light per-requisition de-dupe guard block spam/double
+  submits. Admin screen `careers-admin` (`is_admin_level()`) toggles the page,
+  writes the intro and picks which openings are advertised. **No new permission**;
+  additive columns only. 29 assertions + full suite (6160) green. *Concludes the
+  recruitment product roadmap.*
 
 Each phase updates `docs/01-roles.md`, `docs/02-permission-matrix.md` and
 `docs/03-object-lifecycles.md` in the same commit as its code, per CLAUDE.md.

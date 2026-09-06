@@ -236,6 +236,8 @@ try {
     require __DIR__ . '/lib/recruit_offer.php';    // Phase 5 — salary structure, HR discussion, offer & onboarding
     require __DIR__ . '/lib/doc_templates.php';    // Phase 5.1B — configurable document studio (offer/appointment/other)
     require __DIR__ . '/lib/recruit_approval.php'; // Phase 6 — configurable approval matrix + SLA + reminders + escalations
+    require __DIR__ . '/lib/recruit_export.php';   // Phase 7 — recruitment CSV exports (candidates/requisitions/offers/funnel)
+    require __DIR__ . '/lib/careers.php';          // Phase 7 — public careers page + application intake
     require __DIR__ . '/lib/candpool.php';         // Revamp P11 — candidate pool convergence (read-only)
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
@@ -943,6 +945,16 @@ if (function_exists('sso_accept') && isset($_GET['sso']) && $_GET['sso'] !== '')
 if ($route === '' && function_exists('current_user') && !current_user()) {
     $front = function_exists('install_front_route') ? install_front_route() : '/login';
     if ($front !== '' && $front !== '/') redirect($front);
+}
+
+// Phase 7 — public Careers page + application intake. A candidate browses the
+// openings a company chose to advertise and applies with their details + résumé,
+// creating a real candidate on the recruiter's desk. Public, in front of
+// require_login(); enabled per-tenant (off ⇒ visitors go to staff login).
+// careers_route() always exits.
+if (($route === 'careers' || strpos($route, 'careers/') === 0) && function_exists('careers_route')) {
+    careers_route($route, $method);
+    exit;
 }
 
 // --- Everything below requires login ---

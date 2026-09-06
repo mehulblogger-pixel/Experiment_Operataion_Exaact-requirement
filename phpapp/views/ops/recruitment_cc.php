@@ -106,8 +106,25 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
       <a class="btn secondary" href="/candidates">Candidates</a>
       <?php if (function_exists('pc_can') && pc_can()): ?><a class="btn secondary" href="/project-costings">🧮 Project costing</a><?php endif; ?>
       <a class="btn secondary" href="/recruitment">Action view</a>
+      <?php
+        // Phase 7 — export the current view (same filters) to a spreadsheet.
+        $__q = array_filter(['fy'=>$f['fy'] ?? '', 'month'=>$f['month'] ?? '', 'dept'=>$f['dept'] ?? '', 'source'=>$f['source'] ?? '', 'manager'=>$f['manager'] ?? ''], fn($v) => (string)$v !== '');
+        $__qs = $__q ? '&' . http_build_query($__q) : '';
+      ?>
+      <span class="rcc-export" style="position:relative;display:inline-block">
+        <a class="btn secondary" href="/recruit-export?dataset=candidates<?= $__qs ?>">⬇️ Export ▾</a>
+        <span class="rcc-export-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--card,#fff);border:1px solid var(--line,#e5e9f0);border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,.12);z-index:20;min-width:210px;padding:6px">
+          <a href="/recruit-export?dataset=candidates<?= $__qs ?>" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">Candidates</a>
+          <a href="/recruit-export?dataset=requisitions<?= $__qs ?>" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">Requirements</a>
+          <a href="/recruit-export?dataset=offers<?= $__qs ?>" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">Offers</a>
+          <a href="/recruit-export?dataset=funnel<?= $__qs ?>" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">Funnel &amp; KPI summary</a>
+        </span>
+      </span>
     </div>
   </div>
+  <script>(function(){var w=document.querySelector('.rcc-export');if(!w)return;var b=w.querySelector('a.btn'),m=w.querySelector('.rcc-export-menu');
+    b.addEventListener('click',function(e){e.preventDefault();m.style.display=m.style.display==='none'?'block':'none';});
+    document.addEventListener('click',function(e){if(!w.contains(e.target))m.style.display='none';});})();</script>
 
   <!-- CONFIGURABLE FILTERS -->
   <form method="get" action="/recruitment-cc" id="rccFilters">
