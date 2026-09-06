@@ -32,12 +32,21 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   .rcc .band .bd{font-size:12px;color:var(--muted)}
   .rcc .add{font-size:9.5px;font-weight:800;letter-spacing:.4px;color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);border-radius:20px;padding:1px 8px;text-transform:uppercase}
   .rcc .kpis{display:grid;gap:12px}.rcc .k4{grid-template-columns:repeat(4,1fr)}.rcc .k3{grid-template-columns:repeat(3,1fr)}
-  .rcc .kpi{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:12px;padding:12px 13px;text-decoration:none;color:inherit;display:block}
-  .rcc .kpi .l{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
-  .rcc .kpi .v{font-size:25px;font-weight:800;line-height:1.05;margin-top:5px}
-  .rcc .kpi .dd{font-size:11px;color:var(--muted);margin-top:3px}
-  .rcc .kpi.good{border-left-color:var(--ok)}.rcc .kpi.good .v{color:var(--ok)}
-  .rcc .kpi.bad{border-left-color:var(--bad)}.rcc .kpi.bad .v{color:var(--bad)}
+  /* KPI cards — bold, colour-headed, big-number (wall-display friendly). */
+  .rcc .kpi{position:relative;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:0;overflow:hidden;text-decoration:none;color:inherit;display:flex;flex-direction:column;box-shadow:0 1px 2px rgba(16,24,40,.05),0 8px 22px -18px rgba(16,24,40,.28);transition:transform .1s ease,box-shadow .1s ease}
+  .rcc a.kpi:hover{transform:translateY(-1px);box-shadow:0 2px 4px rgba(16,24,40,.08),0 12px 26px -16px rgba(16,24,40,.36)}
+  .rcc .kpi .l{display:block;background:var(--kh,var(--brand));color:#fff;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;font-weight:800;padding:8px 13px;line-height:1.3}
+  .rcc .kpi .v{font-size:32px;font-weight:800;line-height:1;padding:15px 14px 0;letter-spacing:-.5px}
+  .rcc .kpi .dd{font-size:11.5px;color:var(--muted);padding:6px 14px 14px;margin-top:auto}
+  /* A gentle multi-colour header cycle across a row, echoing a live wall board. */
+  .rcc .kpis .kpi:nth-child(5n+1){--kh:#3b6fb0}
+  .rcc .kpis .kpi:nth-child(5n+2){--kh:#3aa6a6}
+  .rcc .kpis .kpi:nth-child(5n+3){--kh:#4a9d5b}
+  .rcc .kpis .kpi:nth-child(5n+4){--kh:#7d5ba6}
+  .rcc .kpis .kpi:nth-child(5n+5){--kh:#e08a3c}
+  /* Semantic state always wins over the decorative cycle. */
+  .rcc .kpi.good{--kh:var(--ok)}.rcc .kpi.good .v{color:var(--ok)}
+  .rcc .kpi.bad{--kh:var(--bad)}.rcc .kpi.bad .v{color:var(--bad)}
   .rcc .g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
   .rcc .g2.wide{grid-template-columns:1.35fr 1fr}
   .rcc .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
