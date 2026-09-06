@@ -188,3 +188,30 @@ location ~ \.(sqlite|db)$ { deny all; }
 - Set `upload_max_filesize` and `post_max_size` in `php.ini` to at least the
   app's own upload limit (Settings, default 12 MB) or large files fail at the
   web-server layer before the app ever sees them.
+
+---
+
+## 9. Licensing (on-premise)
+
+An on-premise copy is governed by a **signed licence key** you paste into
+**Admin → Licence**. The key is signed with a private key that never leaves the
+vendor, so it cannot be forged or altered. It carries:
+
+- **Customer** name, a **reference**, the **seat count** and the **expiry date**.
+- Optionally a **host lock** (`hosts`): the web address(es) this copy may run on.
+  A copy served on any other address goes **read-only** with a clear message —
+  so one key cannot quietly drive a second deployment. Loopback
+  (`localhost` / `127.0.0.1` / `::1`) and background/cron runs are never blocked,
+  so a laptop-server and internal testing keep working. Set one or more hosts,
+  comma-separated, or a wildcard such as `*.acme.com`.
+
+**Nobody is ever locked out of their own data.** An expired, invalid or
+wrong-host key drops the app to **read-only** (view and export only) until a
+correct key is applied — it never withholds the customer's data.
+
+**Optional online check-in.** Set `licence_server` + `licence_install` (Settings)
+and the daily cron reports usage back to the vendor and can pull down a **renewed
+or revoked** key automatically. It is best-effort: an offline on-premise copy
+keeps working on its existing key.
+
+**Renewal** is simply a new key with a later expiry — no reinstall.

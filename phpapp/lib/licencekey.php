@@ -156,6 +156,47 @@ function lk_verify($key) {
     return $c;
 }
 
+// ---- Optional host / domain binding ----------------------------------------
+// A key MAY name the address(es) it is licensed for, in `hosts` (array or a
+// comma-separated string) or `host` (single). When present, this copy only runs
+// on those addresses — so the same key cannot quietly drive a second deployment.
+// Backward-compatible: a key with no host claim is unrestricted, exactly as
+// before. Loopback (localhost / 127.0.0.1 / ::1) is always allowed so a laptop
+// server, an internal test, and every background/cron run keep working.
+function lk_host_norm($h) {
+    $h = strtolower(trim((string)$h));
+    $h = preg_replace('#^[a-z]+://#', '', $h);   // strip scheme if someone pasted a URL
+    $h = preg_replace('#/.*$#', '', $h);         // strip any path
+    if ($h !== '' && $h[0] === '[') {            // bracketed IPv6, optionally with :port
+        $h = preg_replace('/^\[([^\]]+)\](?::\d+)?$/', '$1', $h);
+    } elseif (strpos($h, '::') === false) {      // a bare IPv6 (has "::") keeps its colons
+        $h = preg_replace('/:\d+$/', '', $h);    // strip a trailing :port on a normal host
+    }
+    return $h;
+}
+function lk_host_is_local($h) {
+    return $h === '' || $h === 'localhost' || $h === '127.0.0.1' || $h === '::1'
+        || substr($h, -10) === '.localhost';
+}
+// Returns ['ok'=>bool, 'allow'=>[normalised hosts]]. $host is the address this
+// copy is being served on.
+function lk_host_ok($claims, $host) {
+    $raw = $claims['hosts'] ?? ($claims['host'] ?? '');
+    $allow = is_array($raw) ? $raw : ($raw !== '' ? explode(',', (string)$raw) : []);
+    $allow = array_values(array_filter(array_map('lk_host_norm', $allow), fn($h) => $h !== ''));
+    if (!$allow) return ['ok' => true, 'allow' => []];                 // no lock configured
+    $cur = lk_host_norm($host);
+    if (lk_host_is_local($cur)) return ['ok' => true, 'allow' => $allow]; // laptop / internal / CLI
+    foreach ($allow as $a) {
+        if ($a === $cur) return ['ok' => true, 'allow' => $allow];
+        if (strpos($a, '*.') === 0) {                                 // *.acme.com → sub.acme.com or acme.com
+            $base = substr($a, 2);
+            if ($cur === $base || substr($cur, -(strlen($base) + 1)) === '.' . $base) return ['ok' => true, 'allow' => $allow];
+        }
+    }
+    return ['ok' => false, 'allow' => $allow];
+}
+
 // ---- The state machine ------------------------------------------------------
 // The public entry point: the licence state from the signed key (or trial),
 // with the self-service billing grant laid over it. A paid seat plan bought
@@ -214,6 +255,22 @@ function lk_state_base($reload = false) {
         // A bad key is still read-only, never a lock-out. The customer's data is
         // theirs whatever went wrong with our paperwork.
         $out['state'] = 'INVALID'; $out['read_only'] = true; $out['err'] = $c['err'];
+        return $out;
+    }
+
+    // Host / domain lock (optional). A copy running on the wrong address is read
+    // only — the data is still the customer's, but it cannot be USED as a second
+    // deployment on one key. Uses SERVER_NAME (set by the web server) first, then
+    // the Host header. No host present (cron/CLI) is never blocked.
+    $curHost = (string)($_SERVER['SERVER_NAME'] ?? ($_SERVER['HTTP_HOST'] ?? ''));
+    $hk = lk_host_ok($c, $curHost);
+    $out['hosts'] = $hk['allow'];
+    if (!$hk['ok']) {
+        $out['state'] = 'INVALID'; $out['read_only'] = true;
+        $out['customer'] = (string)($c['cust'] ?? ''); $out['seats'] = (int)($c['seats'] ?? 0);
+        $out['err'] = 'This licence key is registered to ' . implode(', ', $hk['allow'])
+                    . ' — but this copy is running on ' . lk_host_norm($curHost)
+                    . '. Ask MGH to re-issue the key for this address.';
         return $out;
     }
 
@@ -361,6 +418,7 @@ function lk_summary() {
         'expires'   => (string)($st['claims']['exp'] ?? ''),
         'days_left' => $st['days_left'],
         'seats'     => (int)$st['seats'],
+        'hosts'     => (array)($st['hosts'] ?? []),
         'field_seats' => (int)($st['field_seats'] ?? 0),
         'field_used'  => lk_field_seats_used(),
         'used'      => lk_seats_used(),

@@ -112,6 +112,7 @@ $t = $tone[$s['state']] ?? 'info';
       <div><span class="k">Customer</span><span><?= e($s['customer'] ?: '—') ?></span></div>
       <div><span class="k">Reference</span><span><?= e($s['ref'] ?: '—') ?></span></div>
       <div><span class="k">Expires</span><span><?= $s['expires'] !== '' ? e(fdate($s['expires'])) : '—' ?></span></div>
+      <?php if (!empty($s['hosts'])): ?><div><span class="k">Licensed for</span><span><?= e(implode(', ', $s['hosts'])) ?> <span class="muted">(this copy runs only on this address)</span></span></div><?php endif; ?>
       <div><span class="k">People covered</span><span>
         <?php if ($s['seats'] > 0): ?>
           <?= (int)$s['used'] ?> of <?= (int)$s['seats'] ?> in use
