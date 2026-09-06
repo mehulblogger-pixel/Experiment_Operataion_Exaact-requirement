@@ -67,5 +67,34 @@ exist; this is presentation, branding and filtering on top.
 
 ---
 
+## ⭐ Delivery reminder — restrict each customer to what they bought (DO NOT FORGET)
+
+Before handing a copy to any customer, make sure they only see the modules they
+paid for. There are two ways, and the licence key is the real, tamper-proof one:
+
+1. **Issue a licence key for the plan they bought** (the proper, secure way).
+   On the vendor machine: **Admin → Control panel → Licence console →
+   pick the "Recruitment" plan (or Starter / Pro / Enterprise) → set seats &
+   expiry → Generate signed key.** Send the key; the customer pastes it under
+   **Admin → Licence**. A signed key OUTRANKS every in-app switch, so the
+   customer can never turn on a module they did not buy, and a tampered key
+   grants nothing beyond the core. An expired key goes read-only, never a
+   lock-out.
+2. **Or ship the Recruitment Edition build** (carries an `edition.txt` marker),
+   which self-configures to Recruitment-only on first boot — a friendly default
+   before/without a key. A hand switch is also available any time:
+   **Admin → Control panel → Product package → "Set up as a Recruitment-only
+   company."**
+
+**Why a fresh test install shows every module:** with no licence key it runs in
+"Open" mode — everything unlocked — which is intended for the vendor's own
+testing. The key is the lock; no key = full access. Remember to apply one of the
+two options above for every real customer.
+
+_Module key for recruitment = `hr` (People & hiring). Recruitment plan grants
+`admin` + `hr` only._
+
+---
+
 _Maintained as the recruitment product backlog. Update as items ship or new
 customer requests arrive._
