@@ -32,6 +32,7 @@
         // versions of itself, so those cards send you to the one place that
         // owns them instead of opening a second form over the top. ?>
   <?php foreach ($masters as $key => $cfg): if (!master_access_ok($cfg['access'])) continue;
+        if (!master_card_shown($key)) continue;   // hide records for modules not in this plan
         $n = (int)ops_val("SELECT COUNT(*) FROM {$cfg['table']}"); ?>
     <?php if (!empty($cfg['goto'])): ?>
       <a class="master-card" href="<?= e($cfg['goto']) ?>">
@@ -49,7 +50,9 @@
   <a class="master-card" href="/vendors"><strong><?= e(TP('vendor')) ?></strong><span class="muted">Manufacturer / supplier master</span></a>
   <a class="master-card" href="/work-norms"><strong>🕔 Working norms</strong><span class="muted">Weekly days &amp; hours per designation / office</span></a>
   <a class="master-card" href="/agency-staff"><strong>🧑‍🔧 Agency staff</strong><span class="muted">Freelancers / sub-contractors by agency, with their documents</span></a>
+  <?php if (master_card_shown('asset-register')): ?>
   <a class="master-card" href="/asset-register"><strong>📦 Asset issuance</strong><span class="muted">Stamps, diaries, safety gear &amp; devices issued to engineers</span></a>
+  <?php endif; ?>
 </div>
 
 <?php if (is_admin_level()): ?>
@@ -97,10 +100,23 @@
 <?php endif; ?>
 
 <h3 class="tab-sub" style="margin-top:26px;">3 · Extra fields on a form</h3>
-<p class="sub">Add a field the form doesn't have yet. It appears on that form automatically. A dropdown field can use any list from layer 2.</p>
-<div class="card-grid">
-  <a class="master-card" href="/custom-fields?entity=call"><strong>➕ Fields on the <?= e(TH('call')) ?> form</strong><span class="muted">Add your own boxes to the <?= e(Tl('call')) ?> form</span></a>
-  <a class="master-card" href="/custom-fields?entity=job"><strong>➕ Fields on the <?= e(TH('job')) ?> form</strong><span class="muted">Add your own boxes to the <?= e(Tl('job')) ?> form</span></a>
-  <a class="master-card" href="/custom-fields?entity=partner"><strong>➕ Fields on Client / Vendor</strong><span class="muted">Add fields to a <?= e(Tl('client')) ?> / <?= e(Tl('vendor')) ?> or any master form</span></a>
-</div>
+<p class="sub">Add a field the form doesn't have yet. It appears on that form automatically. A dropdown field can use any list from layer 2. Only the forms this plan includes are shown.</p>
+<?php
+  // Show custom-field targets grouped, hiding whole groups / forms that belong
+  // to a module this install did not buy (so recruitment offers Requisition,
+  // Candidate and Client/Vendor, not the inspection Call / Job / Sample forms).
+  $cfGroups = function_exists('lk_form_target_groups') ? lk_form_target_groups() : [];
+  foreach ($cfGroups as $groupName => $forms):
+      $shown = array_filter($forms, fn($lbl, $ent) => cf_target_shown($ent), ARRAY_FILTER_USE_BOTH);
+      if (!$shown) continue; ?>
+  <h4 style="margin:14px 0 6px;font-size:14px"><?= e($groupName) ?></h4>
+  <div class="card-grid">
+    <?php foreach ($shown as $entity => $label): ?>
+      <a class="master-card" href="/custom-fields?entity=<?= e($entity) ?>">
+        <strong>➕ Fields on the <?= e($label) ?> form</strong>
+        <span class="muted">Add your own boxes to the <?= e($label) ?> form</span>
+      </a>
+    <?php endforeach; ?>
+  </div>
+<?php endforeach; ?>
 <?php endif; ?>

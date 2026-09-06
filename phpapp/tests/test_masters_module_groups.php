@@ -31,6 +31,20 @@ t_ok(!lk_group_enabled('Sales'),     'sales lists are hidden');
 t_ok(!lk_group_enabled('Money'),     'money lists are hidden');
 t_ok(!lk_group_enabled('Reporting'), 'inspection-reporting lists are hidden');
 
+// Section 1 — record cards: recruitment/core kept, inspection/money hidden.
+t_ok(master_card_shown('agencies'),          'the recruitment agencies record stays');
+t_ok(master_card_shown('offices'),           'core office records stay');
+t_ok(!master_card_shown('inspectors'),       'the Inspectors record is hidden');
+t_ok(!master_card_shown('asset-register'),   'the Asset issuance record is hidden');
+t_ok(!master_card_shown('credit-recon'),     'the money Credit-reconciliation record is hidden');
+
+// Section 3 — custom-field targets: recruitment forms kept, inspection hidden.
+t_ok(cf_target_shown('requisition'), 'the Requisition form is an available custom-field target');
+t_ok(cf_target_shown('candidate'),   'the Candidate form is an available custom-field target');
+t_ok(cf_target_shown('partner'),     'the Client/Vendor form stays (core)');
+t_ok(!cf_target_shown('call'),       'the inspection Call form target is hidden');
+t_ok(!cf_target_shown('sample'),     'the inspection Sample form target is hidden');
+
 // restore the shared DB exactly as found
 $cache = &settings_cache();
 foreach ($keys as $k) {

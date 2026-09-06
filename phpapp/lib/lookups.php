@@ -452,6 +452,40 @@ function lk_types_grouped() {
     });
     return $groups;
 }
+
+// --- Section 1 ("Records you keep") + Section 3 ("Extra fields") module gates.
+// So a Recruitment-only copy also hides the inspection/money RECORD cards and
+// the inspection custom-field form targets, not just the dropdown lists.
+
+// Which licence module a Masters record card belongs to. Unlisted = core (shown).
+function master_card_module($key) {
+    static $m = [
+        'inspectors' => 'operations', 'subcons' => 'operations', 'subcon-rates' => 'operations',
+        'travel-modes' => 'operations', 'attendance' => 'operations', 'asset-register' => 'operations',
+        'office-expense-heads' => 'money', 'expense-heads' => 'money', 'credit-recon' => 'money',
+    ];
+    return $m[$key] ?? 'admin';
+}
+function master_card_shown($key) {
+    return !function_exists('licence_enabled') || licence_enabled(master_card_module($key));
+}
+
+// Which licence module a custom-field form target belongs to (Section 3), so a
+// recruitment copy offers Requisition / Candidate / Client-Vendor and hides the
+// inspection Call / Job / Sample / Method targets.
+function cf_target_module($entity) {
+    static $m = [
+        'call' => 'operations', 'job' => 'operations', 'partner' => 'admin',
+        'sample' => 'reporting', 'method' => 'reporting', 'risk' => 'reporting',
+        'decision_rule' => 'reporting', 'controlled_doc' => 'reporting', 'satisfaction' => 'operations',
+        'requisition' => 'hr', 'candidate' => 'hr',
+    ];
+    if (isset($m[$entity])) return $m[$entity];
+    return function_exists('master_card_module') ? master_card_module($entity) : 'admin';
+}
+function cf_target_shown($entity) {
+    return !function_exists('licence_enabled') || licence_enabled(cf_target_module($entity));
+}
 function lk_type($key) { return ops_one("SELECT * FROM lookup_types WHERE type_key=?", [$key]); }
 function lk_type_by_id($id) { return $id ? ops_one("SELECT * FROM lookup_types WHERE id=?", [$id]) : null; }
 function lk_root_types() { return ops_all("SELECT * FROM lookup_types WHERE parent_type_id IS NULL ORDER BY sort_order, label"); }
