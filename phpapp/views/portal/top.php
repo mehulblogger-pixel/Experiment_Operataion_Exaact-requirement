@@ -8,6 +8,10 @@ $here = trim((string)parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_
 // Only what this person actually holds. The routes refuse independently —
 // hiding a link is presentation, not access control.
 $mktFirst = function_exists('portal_marketplace_first') && portal_marketplace_first();
+// A manpower/recruitment agency is a SUPPLY-side portal user, not a client — it
+// gets its own bench workspace and must not be mislabelled "Client portal".
+$isAgency = function_exists('portal_agency_org') && portal_agency_org();
+$portalKind = $isAgency ? 'Agency workspace' : ($mktFirst ? 'Hiring' : 'Client portal');
 $canHire  = pcan('market.post') && (!function_exists('connect_enabled') || connect_enabled());
 $links = ['portal' => $mktFirst ? 'Hiring home' : 'Overview'];
 // A marketplace-first client leads with hiring and is spared the inspection menu
@@ -32,7 +36,7 @@ if (function_exists('cvp_client_is_admin') && cvp_client_is_admin()) $links['por
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= e(app_name()) ?><?= isset($pageTitle) ? ' — ' . e($pageTitle) : ' — Client portal' ?></title>
+<title><?= e(app_name()) ?><?= isset($pageTitle) ? ' — ' . e($pageTitle) : ' — ' . e($portalKind) ?></title>
 <link rel="stylesheet" href="/assets/css/app.css">
 <?= theme_style_tag() ?>
 <style>
@@ -71,7 +75,7 @@ if (function_exists('cvp_client_is_admin') && cvp_client_is_admin()) $links['por
 </head><body>
 <div class="pwrap">
   <div class="phead">
-    <h1><?= e(app_name()) ?> · <?= $mktFirst ? 'Hiring' : 'Client portal' ?></h1>
+    <h1><?= e(app_name()) ?> · <?= e($portalKind) ?></h1>
     <?php if ($nav && $u): ?>
       <div class="who"><?= e($u['name'] ?: $u['email']) ?> · <?= e(portal_client_name()) ?>
         · <a href="/portal/logout">Sign out</a></div>

@@ -2,6 +2,10 @@
   // Wayfinding: only offer the marketplace door when Connect is actually available here
   // (cloud with the add-on on). On a private licence copy there is no marketplace to point to.
   $mktOn = function_exists('install_marketplace_enabled') && install_marketplace_enabled();
+  // Offer the "start your own workspace" door only on the cloud control site, and
+  // only when online registration has been switched on.
+  $wsOn = function_exists('tenant_signup_enabled') && tenant_signup_enabled()
+          && !(function_exists('install_is_licence') && install_is_licence());
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -117,6 +121,7 @@
       </form>
       <p class="help">No account? Ask your <strong>office administrator</strong> to create one.</p>
       <?php if ($mktOn): ?><p class="help" style="margin-top:10px;padding-top:12px;border-top:1px solid var(--line)">Not staff? Looking for freelance work or to hire inspectors? <a href="/connect" style="color:var(--brand);font-weight:700">Go to the marketplace →</a></p><?php endif; ?>
+      <?php if ($wsOn): ?><p class="help" style="margin-top:<?= $mktOn ? '8' : '10' ?>px;<?= $mktOn ? '' : 'padding-top:12px;border-top:1px solid var(--line)' ?>">Run an inspection company and want your own workspace? <a href="/get-started" style="color:var(--brand);font-weight:700">Start here →</a></p><?php endif; ?>
       <?php endif; ?>
       <div class="ver"><?= e(app_name()) ?> · v<?= e(defined('APP_VERSION') ? APP_VERSION : '1.0') ?></div>
     </div>

@@ -341,3 +341,11 @@ Outbound alerts (`/connect-channels`) add **no new named permission**:
   message. Nothing is *sent* until an admin sets mode `live` AND a provider is
   connected AND the template is APPROVED — until then messages are recorded, not
   sent. No object status or module gate is introduced.
+
+---
+
+**Public workspace signup (`tenant_requests`).** A new company applies for its own
+operations workspace at `/get-started` (public; off until the operator enables it).
+Approve / decline / provision on the Workspaces panel reuse **`can_manage_tenants()`**
+(Master Admin, base/control domain only) — **no new permission**. See
+`03-object-lifecycles.md` → `tenant_requests.status`.

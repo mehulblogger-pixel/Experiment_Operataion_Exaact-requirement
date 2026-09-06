@@ -438,6 +438,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('mkt_fees_migrate')) mkt_fees_migrate();                  // Marketplace fee-rule engine
     if (function_exists('mkt_ledger_migrate')) mkt_ledger_migrate();              // Financial ledger + state machine
     if (function_exists('mkt_billing_migrate')) mkt_billing_migrate();            // Subscription lifecycle + coupons
+    if (function_exists('tenant_signup_migrate')) tenant_signup_migrate();        // Public workspace signup inbox (tenant_requests → PENDING → approve)
     if (function_exists('pdso_gate_migrate')) pdso_gate_migrate();                // Stage 7 — dep_gate_pass (mobilization gate pass)
     if (function_exists('books_migrate')) books_migrate();             // ensure the books ledger tables exist before anything stamps them
     if (function_exists('engagement_migrate')) engagement_migrate();   // Revamp — first-class Engagement entity (additive; dual-read with contract_number)
