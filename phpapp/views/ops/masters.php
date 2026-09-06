@@ -54,19 +54,47 @@
 
 <?php if (is_admin_level()): ?>
 <h3 class="tab-sub" style="margin-top:26px;">2 · Dropdown lists</h3>
-<p class="sub">The choices behind every dropdown on the Call and Job screens — <?= e(Tl("sbu")) ?>, Region, Activity, and the rest. Click a list to edit its choices, or use <strong>All master lists</strong> to add a new one and tick which forms it appears on.</p>
-<div class="card-grid">
+<p class="sub">The choices behind every dropdown, <strong>grouped by the part of the system they belong to</strong>. Click a list to edit its choices, or use <strong>All master lists</strong> to add a new one and tick which forms it appears on.</p>
+<div class="card-grid" style="margin-bottom:6px">
   <a class="master-card" href="/lookups" style="border:1px solid var(--brand)">
     <strong>⚙️ All master lists →</strong>
-    <span class="muted">Add a list, add a dependent list (<?= e(Tl("sbu")) ?> → Activity), and choose which forms it shows on — one place.</span>
+    <span class="muted">Add a list, add a dependent list, and choose which forms it shows on — one place.</span>
   </a>
-  <?php foreach (lk_types() as $t): $parent = $t['parent_type_id'] ? lk_type_by_id($t['parent_type_id']) : null; ?>
-    <a class="master-card" href="/lookup?key=<?= e($t['type_key']) ?>">
-      <strong><?= e($t['label']) ?></strong>
-      <span class="muted"><?= (int)ops_val("SELECT COUNT(*) FROM lookup_values WHERE type_id=?", [$t['id']]) ?> choice(s)<?= $parent ? ' · under ' . e($parent['label']) : '' ?></span>
-    </a>
-  <?php endforeach; ?>
 </div>
+<?php
+  // Group the lists by module, and split into the groups this install actually
+  // has vs. the ones belonging to modules it did not buy (shown, collapsed, only
+  // so nothing looks lost). A helper to render one group's cards.
+  $renderGroup = function($tag, $rows) {
+      echo '<h4 style="margin:16px 0 6px;font-size:14px">' . e(lk_module_group_label($tag))
+         . ' <span class="muted" style="font-weight:400">· ' . count($rows) . ' list(s)</span></h4>';
+      echo '<div class="card-grid">';
+      foreach ($rows as $t) {
+          $parent = $t['parent_type_id'] ? lk_type_by_id($t['parent_type_id']) : null;
+          $n = (int)ops_val("SELECT COUNT(*) FROM lookup_values WHERE type_id=?", [$t['id']]);
+          echo '<a class="master-card" href="/lookup?key=' . e($t['type_key']) . '"><strong>'
+             . e($t['label']) . '</strong><span class="muted">' . $n . ' choice(s)'
+             . ($parent ? ' · under ' . e($parent['label']) : '') . '</span></a>';
+      }
+      echo '</div>';
+  };
+  $grouped = lk_types_grouped();
+  $offGroups = [];
+  foreach ($grouped as $tag => $rows) {
+      if (lk_group_enabled($tag)) $renderGroup($tag, $rows);
+      else $offGroups[$tag] = $rows;
+  }
+?>
+<?php if ($offGroups): ?>
+  <details style="margin-top:14px">
+    <summary style="cursor:pointer;color:var(--muted);font-size:13.5px;padding:6px 0">
+      Show lists from modules not in this plan (<?= array_sum(array_map('count', $offGroups)) ?> more)
+    </summary>
+    <div style="opacity:.85;margin-top:4px">
+      <?php foreach ($offGroups as $tag => $rows) $renderGroup($tag, $rows); ?>
+    </div>
+  </details>
+<?php endif; ?>
 
 <h3 class="tab-sub" style="margin-top:26px;">3 · Extra fields on a form</h3>
 <p class="sub">Add a field the form doesn't have yet. It appears on that form automatically. A dropdown field can use any list from layer 2.</p>

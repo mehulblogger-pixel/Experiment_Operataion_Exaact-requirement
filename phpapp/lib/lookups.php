@@ -402,6 +402,56 @@ function lk_add_value($typeId, $parentValueId, $code, $label, $sort = 0) {
     return db()->lastInsertId();
 }
 function lk_types() { return ops_all("SELECT * FROM lookup_types ORDER BY sort_order, label"); }
+
+// ---------------------------------------------------------------------------
+//  Masters screen — group dropdown lists by module, and hide the lists that
+//  belong to a module this install did not buy. A Recruitment-only copy then
+//  shows only the recruitment/people + core lists, not the inspection, sales,
+//  operations and money lists that made the screen so long. Nothing is deleted:
+//  lists for switched-off modules are simply collapsed out of the way.
+// ---------------------------------------------------------------------------
+
+// The display "module" tag on a list -> the licence PRODUCT_MODULES key that
+// owns it. Untagged / unknown = 'admin' (core), which is always shown.
+function lk_module_product_key($tag) {
+    static $map = [
+        'operations' => 'operations', 'money' => 'money', 'sales' => 'sales',
+        'reporting'  => 'reporting',  'people' => 'hr',
+        'directory'  => 'admin',      'admin'  => 'admin',
+    ];
+    return $map[strtolower(trim((string)$tag))] ?? 'admin';
+}
+
+// Is the module that owns this group switched on for this install?
+function lk_group_enabled($tag) {
+    if (!function_exists('licence_enabled')) return true;
+    return licence_enabled(lk_module_product_key($tag));
+}
+
+// A friendlier heading for each module group on the Masters screen.
+function lk_module_group_label($tag) {
+    static $m = [
+        'People' => 'Recruitment & people', 'Directory' => 'Directory (clients, vendors, industry)',
+        'Sales' => 'Sales & CRM', 'Operations' => 'Operations', 'Reporting' => 'Inspection reporting',
+        'Money' => 'Money & billing',
+    ];
+    return $m[$tag] ?? ($tag !== '' ? $tag : 'General');
+}
+
+// All dropdown lists grouped by their module tag, in a sensible display order.
+// Returns ['People' => [rows...], 'Directory' => [...], ...].
+function lk_types_grouped() {
+    $order = ['People', 'Directory', 'Sales', 'Operations', 'Reporting', 'Money', ''];
+    $groups = [];
+    foreach (lk_types() as $t) $groups[(string)($t['module'] ?? '')][] = $t;
+    uksort($groups, function ($a, $b) use ($order) {
+        $ia = array_search($a, $order, true); $ib = array_search($b, $order, true);
+        if ($ia === false) $ia = 900;
+        if ($ib === false) $ib = 900;
+        return $ia === $ib ? strcmp($a, $b) : $ia <=> $ib;
+    });
+    return $groups;
+}
 function lk_type($key) { return ops_one("SELECT * FROM lookup_types WHERE type_key=?", [$key]); }
 function lk_type_by_id($id) { return $id ? ops_one("SELECT * FROM lookup_types WHERE id=?", [$id]) : null; }
 function lk_root_types() { return ops_all("SELECT * FROM lookup_types WHERE parent_type_id IS NULL ORDER BY sort_order, label"); }
