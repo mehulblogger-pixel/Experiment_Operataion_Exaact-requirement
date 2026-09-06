@@ -31,7 +31,7 @@ Status: ✅ PASS · ◑ PARTIAL · ✗ FAIL · ⛔ BLOCKED · ▷ NOT YET · ↻
 |------:|-------|:------:|-------|
 | 0 | Environment & application inventory | ✅ | See STAGE-0 below. Inventory already locked in `inventory-v1.0.md`. |
 | 1 | First customer experience (new signup → dashboard) | ✅ | 1.1 first access+login, 1.2 setup wizard, 1.3 staff-account model, 1.4 cloud onboarding — all PASS (B′; 1.1 also confirmed on B live). |
-| 2 | Company configuration | ▷ | |
+| 2 | Company configuration | ✅ | All config screens render; company profile (GSTIN→PAN/state auto-derive), office add, duplicate reject, invalid-GSTIN edge — all PASS (B′). |
 | 3 | Masters & taxonomy | ▷ | |
 | 4 | Users / roles / permissions | ▷ | |
 | 5 | Universal technical passport | ▷ | |
@@ -163,3 +163,37 @@ supply STAGE 0.x steps and results and they'll be logged here.)*
 ---
 
 **Stage 1 verdict: ✅ PASS.** First access, first login, setup wizard, staff-account model, and the cloud onboarding model (with the new public workspace-signup build) are all confirmed. Ready for Stage 2 (Company configuration).
+
+---
+
+## STAGE 2 — Company configuration
+
+**ENV:** B′ (sandbox, fresh install past the setup wizard) · **USER:** admin (Master)
+
+### QA-2.1 — Every configuration screen renders
+| Screen | Route | Result |
+|--------|-------|:------:|
+| Company profile | `/company-profile` | ✅ 200 |
+| Settings | `/settings` | ✅ 200 |
+| Org chart | `/hierarchy?tab=chart` | ✅ 200 |
+| Offices | `/hierarchy?tab=offices` | ✅ 200 |
+| People | `/hierarchy?tab=people` | ✅ 200 |
+| Role access (permissions) | `/access` | ✅ 200 |
+| Licence | `/licence` | ✅ 200 |
+| Masters | `/masters` | ✅ 200 |
+| Lookups | `/lookups` | ✅ 200 |
+
+### QA-2.2 — Company profile save + GSTIN intelligence  ✅ PASS
+Saved legal name, brand, address, **GSTIN `24ABCDE1234F1Z5`**, email, phone. On reload:
+GSTIN persisted; **PAN auto-derived** to `ABCDE1234F`; **state auto-derived** to 24 (Gujarat) from the GSTIN's first two digits — so header and GST split can never disagree. ✅
+
+### QA-2.3 — Invalid GSTIN edge  ✅ PASS
+Saving GSTIN `NOTAGSTIN` shows the warning *"does not look valid…"* **but still saves the rest** (email updated) — graceful, no data loss, no hard block. ✅ (matches design: warn, don't reject.)
+
+### QA-2.4 — Add an office  ✅ PASS
+`do=office-save` "Vadodara Branch" (code VAD, city Vadodara, BRANCH) → 302, appears in the Offices list. ✅
+
+### QA-2.5 — Duplicate office name rejected  ✅ PASS (negative)
+Re-adding "Vadodara Branch" → rejected: *"…already exists — names must be unique."* No duplicate created. ✅
+
+**Stage 2 verdict: ✅ PASS.** Company profile, GSTIN-driven PAN/state derivation, office CRUD + uniqueness guard, and all nine config screens confirmed. No defects. Ready for Stage 3 (Masters & taxonomy).
