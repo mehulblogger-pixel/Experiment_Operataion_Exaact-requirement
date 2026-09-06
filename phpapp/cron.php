@@ -376,3 +376,11 @@ if (function_exists('iddoc_encrypt_backfill')) {
     try { $ie = iddoc_encrypt_backfill(); if ($ie) echo "Identity documents encrypted: $ie\n"; }
     catch (Throwable $e) { echo "Identity encryption: failed — " . $e->getMessage() . "\n"; }
 }
+
+// Phase 6 — recruitment approvals: remind approvers whose action is due and
+// escalate any step that has passed its SLA. Emails go through ops_mail(). No-op
+// when nothing is pending.
+if (function_exists('appr_tick')) {
+    try { $ap = appr_tick(); if ($ap) echo "Approval reminders/escalations sent: $ap\n"; }
+    catch (Throwable $e) { echo "Approval tick: failed — " . $e->getMessage() . "\n"; }
+}

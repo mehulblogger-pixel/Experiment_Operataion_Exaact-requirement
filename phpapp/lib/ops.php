@@ -2714,6 +2714,10 @@ function ops_dispatch($route, $method) {
             return ops_doc_templates($route, $method);
         case $route === 'candidate-letter':                          // Phase 5.1B — generate a letter from a template
             return ops_candidate_letter($route, $method);
+        case $route === 'recruit-approvals':                         // Phase 6 — configurable recruitment approval matrix + SLA
+            return ops_recruit_approvals($route, $method);
+        case $route === 'my-approvals':                              // Phase 6 — recruitment approver inbox (approve/reject)
+            return ops_my_approvals($route, $method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
             return ops_projcosting($route, $method);
         case $route === 'recruit-config':

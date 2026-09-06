@@ -125,8 +125,27 @@ Roughly **40–50% of the brief already exists in reusable form.**
   `candidate-letter`; the issued offer letter uses the OFFER template. No new
   permission (salary gated `can_see_salary`). 32 new assertions + full suite
   (6106) green.
-- **Phase 6 — Approvals (routed, per-tenant), SLA + escalation, notifications
-  wired to `ops_mail()`.**
+- **Phase 6 — Configurable approval matrix + SLA + reminders + escalations** ✅
+  *(done)* — `lib/recruit_approval.php`: four per-tenant tables
+  (`recruit_approval_rules`, `recruit_approval_levels`,
+  `recruit_approval_requests`, `recruit_approval_steps`). An administrator
+  configures **rules** matched by entity (Requisition / Offer / Salary) and by
+  department / business unit / grade / position and a value band — the
+  **narrowest match wins**, and no rule is a silent catch-all. Each rule carries
+  a multi-**level** chain; every level names an approver role (or user), its own
+  **SLA (days)**, a **reminder cadence** and an **escalation** target. A runtime
+  request + steps drive the chain: approve advances to the next level, the final
+  approval (or a rejection) **calls back** into the entity (`job_offers` →
+  APPROVED/DRAFT, `requisitions` → approved/on_hold) — an unapproved offer still
+  can never be issued (§32). `offer_submit()` routes an offer through the chain
+  when a rule matches, coexisting with the existing admin approve as a fallback.
+  A **My approvals** inbox (`my-approvals`) lets the current approver approve or
+  reject with a remark; the admin screen is `recruit-approvals` (`is_admin_level()`).
+  A cron **tick** (`appr_tick()`, wired into `cron.php`) sends reminders when a
+  step is due and escalations once its SLA is breached — all e-mail through
+  `ops_mail()`. No new permission; no existing route or screen touched (the
+  platform's separate `/approval-rules` quote/report screen is untouched).
+  25 assertions + full suite (6131) green.
 - **Phase 7 — Recruitment dashboards/reports hardening, careers intake, exports.**
 
 Each phase updates `docs/01-roles.md`, `docs/02-permission-matrix.md` and

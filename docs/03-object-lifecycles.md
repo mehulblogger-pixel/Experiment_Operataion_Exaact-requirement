@@ -595,3 +595,42 @@ DRAFT ─▶ PENDING_APPROVAL ─▶ APPROVED ─▶ ISSUED ─▶ VIEWED ─▶
   the existing `candidate-stage` → `ACCEPTED` + "add to workforce" path, which
   **reuses the same person** (candidate → inspector, no duplicate). This offer
   lifecycle does not itself create the employee.
+
+## Approval request (`recruit_approval_requests.status`) — recruitment (Phase 6)
+
+Recruitment approvals are **configurable, not hardcoded**. An administrator
+defines *rules* (matched by entity — Requisition / Offer / Salary — and by
+department / business unit / grade / position and a value band; the **narrowest
+match wins**) and, per rule, a multi-*level* chain. Each level names an approver
+role (or user), its own **SLA (days)**, a **reminder cadence** and an
+**escalation** target.
+
+At submit time a runtime **request** is opened with one **step** per level. The
+request status:
+
+```
+PENDING ─▶ APPROVED        (every level approved → callback: entity approved)
+   │
+   └─────▶ REJECTED         (any level rejects → callback: entity reverted)
+```
+
+Per-step status: `PENDING ─▶ APPROVED` / `REJECTED`. The request's
+`current_seq` names the level awaiting action; only that level's approver (role
+match, named-user match, or a master) may act. Approving advances to the next
+level; the final approval — or any rejection — fires a **callback** that updates
+the underlying entity: `job_offers` → `APPROVED` (else back to `DRAFT`),
+`requisitions` → `approved` (else `on_hold`). **An unapproved offer still can
+never be issued** (§32) — the chain is the thing that approves it.
+
+- Configure rules/levels: **`is_admin_level()`** (route `recruit-approvals`).
+  Act on your own pending step: any signed-in approver whose role/id matches
+  (route `my-approvals` — the approver inbox). Adds **no new permission**; it is
+  additive to, and independent of, the platform's existing `/approval-rules`
+  quote/report routing screen.
+- **Reminders & escalations** run on the daily cron (`appr_tick()`): a step past
+  its reminder date re-notifies the approver; a step past its SLA escalates once
+  to the configured escalation role (or, if none, to management). Every
+  notification is sent through the platform mailer (`ops_mail()`).
+- The chain **coexists** with the manual admin approve on an offer: when no rule
+  matches, `offer_submit()` leaves the offer in `PENDING_APPROVAL` for the
+  existing `is_admin_level()` approve, so no tenant is forced to configure rules.

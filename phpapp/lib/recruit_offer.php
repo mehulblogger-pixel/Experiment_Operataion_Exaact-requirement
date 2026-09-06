@@ -217,9 +217,33 @@ function offer_create($candidateId, $post) {
             trim((string)($post['offer_terms'] ?? '')), trim((string)($post['expiry_date'] ?? '')), _off_actor(), _off_now()]);
     return (int)db()->lastInsertId();
 }
+// Build the matching context for the configurable approval engine (Phase 6)
+// from the candidate's requisition: business unit, grade, position and value.
+function offer_appr_ctx($o) {
+    $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int)$o['candidate_id']]) ?: [];
+    $req = !empty($cand['requisition_id']) ? (ops_one("SELECT * FROM requisitions WHERE id=?", [(int)$cand['requisition_id']]) ?: []) : [];
+    return [
+        'department' => (string)($req['sbu'] ?? ''),
+        'sbu'        => (string)($req['sbu'] ?? ''),
+        'grade'      => (string)($req['grade'] ?? ''),
+        'position'   => (string)($req['designation'] ?? ''),
+        'amount'     => (float)($o['ctc'] ?? 0),
+        '_cand'      => $cand,
+    ];
+}
 function offer_submit($id) {
     $o = offer_get($id); if (!$o || $o['status'] !== 'DRAFT') return [false, 'Only a draft can be submitted for approval.'];
     db()->prepare("UPDATE job_offers SET status='PENDING_APPROVAL' WHERE id=?")->execute([(int)$id]);
+    // Phase 6 — if a configurable approval rule matches, route the offer through
+    // the chain (SLA + reminders + escalation). The manual admin approve coexists
+    // as a fallback for tenants that have configured no rule.
+    if (function_exists('appr_start')) {
+        $ctx = offer_appr_ctx($o);
+        $subject = 'Offer' . (!empty($ctx['_cand']['name']) ? ' — ' . $ctx['_cand']['name'] : (' #' . (int)$id))
+                 . (($ctx['position'] ?? '') !== '' ? ' (' . $ctx['position'] . ')' : '');
+        [$started] = appr_start('OFFER', (int)$id, $ctx, $subject, (float)($o['ctc'] ?? 0));
+        if ($started) return [true, 'Offer submitted — routed to the approval chain.'];
+    }
     return [true, 'Offer submitted for approval.'];
 }
 function offer_approve($id) {

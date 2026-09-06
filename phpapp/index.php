@@ -235,6 +235,7 @@ try {
     require __DIR__ . '/lib/comp_config.php';      // Phase 5.1A — configurable compensation setup (headings + statutory)
     require __DIR__ . '/lib/recruit_offer.php';    // Phase 5 — salary structure, HR discussion, offer & onboarding
     require __DIR__ . '/lib/doc_templates.php';    // Phase 5.1B — configurable document studio (offer/appointment/other)
+    require __DIR__ . '/lib/recruit_approval.php'; // Phase 6 — configurable approval matrix + SLA + reminders + escalations
     require __DIR__ . '/lib/candpool.php';         // Revamp P11 — candidate pool convergence (read-only)
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
