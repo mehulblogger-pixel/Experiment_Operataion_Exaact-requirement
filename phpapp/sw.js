@@ -39,7 +39,7 @@ self.addEventListener('fetch', e => {
   if (isAsset) {
     e.respondWith(
       caches.match(req).then(hit => {
-        const net = fetch(req).then(res => { if (res && res.ok) caches.open(CACHE).then(c => c.put(req, res.clone())); return res; }).catch(() => hit);
+        const net = fetch(req).then(res => { if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return res; }).catch(() => hit);
         return hit || net;
       })
     );
