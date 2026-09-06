@@ -34,7 +34,7 @@ Status: ✅ PASS · ◑ PARTIAL · ✗ FAIL · ⛔ BLOCKED · ▷ NOT YET · ↻
 | 2 | Company configuration | ✅ | All config screens render; company profile (GSTIN→PAN/state auto-derive), office add, duplicate reject, invalid-GSTIN edge — all PASS (B′). |
 | 3 | Masters & taxonomy | ✅ | Master screens render; add/edit/delete values, duplicate-value guard, dependent-list parent guard, new-list create + duplicate-key guard — all PASS (B′). |
 | 4 | Users / roles / permissions | ✅ | Create staff w/ roles, weak-pwd guard, permission gate blocks inspector from admin screens — PASS. **D-002 fixed**: duplicate username was a 500, now a friendly message. |
-| 5 | Universal technical passport | ▷ | |
+| 5 | Universal technical passport | ✅ | Pro self-register, cert add w/ expiry status (VALID/EXPIRED), owner view, privacy-safe public passport, duplicate/weak-pwd guards — all PASS (B′). |
 | 6 | Client & CRM | ▷ | |
 | 7 | Technical requirements | ▷ | |
 | 8 | Marketplace (match → apply → shortlist → engage) | ▷ | |
@@ -258,3 +258,36 @@ Signed in as the new **inspector** (valid session: GET `/` → 200), then hit ad
 The permission matrix genuinely gates the UI — a limited role cannot reach administration, even by typing the URL directly. ✅
 
 **Stage 4 verdict: ✅ PASS** (1 defect found and fixed: D-002). Staff creation, role assignment, password strength, and — most importantly — **real permission enforcement** all confirmed. Ready for Stage 5 (Universal technical passport).
+
+---
+
+## STAGE 5 — Universal technical passport
+
+**ENV:** B′ (sandbox) · Marketplace/pro portal on by default (`connect_enabled`=1). Engine: `lib/connect_pro.php`, `lib/connect_credentials.php`, `lib/connect_passport.php`.
+
+### QA-5.1 — Public pro pages render  ✅
+`/pro/login` and `/pro/register` → 200 (no login).
+
+### QA-5.2 — Register a professional  ✅ PASS
+Registered "Ramesh Patel" (email, ≥8-char password, mobile) → 302 to `/pro/profile`, session set, an unguessable `passport_token` minted.
+
+### QA-5.3 — Pro dashboard + passport link  ✅
+`/pro` → 200; dashboard exposes the person's public passport URL.
+
+### QA-5.4/5.5 — Certifications with expiry status  ✅ PASS
+Added two certs (via `action=cert_save`):
+| Cert | Expiry | Computed status |
+|------|--------|-----------------|
+| CSWIP 3.1 Welding Inspector (TWI) | 2030-12-31 | **VALID** ✅ |
+| NDT Level II old (ASNT) | 2020-01-01 | **EXPIRED** ✅ |
+Both saved (`cx_pro_certs`); the owner's `/pro/credentials` shows both, with an **"Expired"** badge on the lapsed one. Status logic: EXPIRED (past), EXPIRING (≤60 days), VALID.
+
+### QA-5.6 — Public passport `/p/<token>` (privacy contract)  ✅ PASS
+Public page (no login) → 200, shows the professional's **name** and verified/live status. **No leakage**: cert number, mobile, and password hash are all absent. By design the public passport publishes only **verified** credentials + live status + reputation — a self-registered pro's *unverified* marketplace certs stay private to the owner until verified. (Behaviour-as-designed, not a gap.)
+
+### QA-5.7 — Negatives  ✅ PASS
+Duplicate email → "already registered"; password `123` → "at least 8 characters". Neither account created.
+
+**Notes (test-harness only, no app defect):** two false blanks in the first pass were my test using the wrong POST key (`act` instead of `action`) and an out-of-context status snippet; corrected and re-run clean.
+
+**Stage 5 verdict: ✅ PASS.** Self-registration, structured certifications with correct expiry status, owner credential view, and a **privacy-safe public passport** all confirmed. No defects. Ready for Stage 6 (Client & CRM).
