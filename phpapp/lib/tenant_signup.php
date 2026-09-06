@@ -25,8 +25,9 @@
  *  required in index.php (meta-test enforces both). */
 function tenant_signup_migrate($pdo = null) {
     $pdo = $pdo ?: db();
+    $pk  = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     $pdo->exec("CREATE TABLE IF NOT EXISTS tenant_requests (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id $pk,
         company        VARCHAR(150) NOT NULL DEFAULT '',
         contact_name   VARCHAR(120) NOT NULL DEFAULT '',
         email          VARCHAR(160) NOT NULL DEFAULT '',
