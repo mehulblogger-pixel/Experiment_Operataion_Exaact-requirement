@@ -18,6 +18,8 @@ function superadmin_tiers() {
     return [
         'STARTER' => ['label' => 'Starter', 'mods' => ['admin', 'operations'],
             'pitch' => 'Core operations for a single office / small TPIA.'],
+        'RECRUITMENT' => ['label' => 'Recruitment', 'mods' => ['admin', 'hr'],
+            'pitch' => 'Recruitment & Selection only — requisitions, candidates, interviews, offer & onboarding. Operations, Sales, Money and the report engine are not licensed.'],
         'PRO'     => ['label' => 'Professional', 'mods' => ['admin', 'operations', 'sales', 'hr', 'money'],
             'pitch' => 'Adds Recruitment Command Centre, Sales/CRM, invoicing & portals.'],
         'ENTERPRISE' => ['label' => 'Enterprise', 'mods' => ['admin', 'operations', 'sales', 'hr', 'money', 'reporting'],
