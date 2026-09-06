@@ -15,9 +15,10 @@ $applySummary = function ($p) use ($e) {
 };
 ?>
 <style>
-  .rp-wrap{display:grid;grid-template-columns:280px 1fr;gap:18px;align-items:start}
+  .rp-wrap{display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px;align-items:start}
   .rp-card{background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:14px;
-    box-shadow:var(--shadow-sm,0 1px 2px rgba(18,32,60,.06))}
+    box-shadow:var(--shadow-sm,0 1px 2px rgba(18,32,60,.06));min-width:0}
+  .rp-body{min-width:0}
   .rp-card h2{margin:0;padding:14px 16px;font-size:15px;border-bottom:1px solid var(--line,#e5e7eb)}
   .rp-list a{display:block;padding:12px 16px;border-bottom:1px solid var(--line,#eef1f5);color:inherit;text-decoration:none}
   .rp-list a:hover{background:var(--soft,#f6f8fb)}
