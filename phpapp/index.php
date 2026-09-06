@@ -238,6 +238,7 @@ try {
     require __DIR__ . '/lib/recruit_approval.php'; // Phase 6 — configurable approval matrix + SLA + reminders + escalations
     require __DIR__ . '/lib/recruit_export.php';   // Phase 7 — recruitment CSV exports (candidates/requisitions/offers/funnel)
     require __DIR__ . '/lib/careers.php';          // Phase 7 — public careers page + application intake
+    require __DIR__ . '/lib/workspace.php';        // Configurable role workspaces — per-role landing + launchpad
     require __DIR__ . '/lib/candpool.php';         // Revamp P11 — candidate pool convergence (read-only)
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
@@ -1071,6 +1072,17 @@ if ($route === '') {
     if (function_exists('current_user') && current_user() && empty($_SESSION['onb_seen'])
         && function_exists('onboarding_incomplete') && onboarding_incomplete()) {
         redirect('/welcome');
+    }
+    // Configurable role workspaces — send the user to their landing page once per
+    // session (their personal start page, else their role's configured landing).
+    // Only fires when configured and only to a screen they may open; otherwise the
+    // dashboard shows as before. Once per session so "Home" still reaches the dashboard.
+    if (function_exists('current_user') && current_user() && empty($_SESSION['ws_landed'])) {
+        $_SESSION['ws_landed'] = 1;
+        if (function_exists('workspace_landing_for')) {
+            $__land = workspace_landing_for(current_user());
+            if ($__land !== '' && $__land !== '/') redirect($__land);
+        }
     }
     $clients = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_client=1")->fetchColumn();
     $vendors = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_vendor=1")->fetchColumn();

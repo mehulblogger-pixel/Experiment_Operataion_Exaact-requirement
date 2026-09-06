@@ -15,6 +15,10 @@
   <span class="scope-tag"><?= $scopeAll ? 'All offices' : ($office ? e($office) : 'Your scope') ?></span>
 </div>
 
+<?php // Configurable role workspace — a curated quick-access launchpad for this
+      // user's role (permission-safe; shows nothing unless an admin configured it).
+      if (function_exists('workspace_launchpad_html')) echo workspace_launchpad_html($u); ?>
+
 <?php // Self-service daily attendance — shows for any user with an inspector
       // record (inspectors + field coordinators). Location is mandatory for
       // In-office / On-site; the mark flows to availability + links to the report.
@@ -498,7 +502,11 @@
       <div class="kpi"><span class="kic">✅</span><div class="k">Confirmed (payable)</div><div class="v"><?= fmoney_short($pf['conf_amt']) ?></div><div class="d"><?= (int)$pf['conf_n'] ?> past guarantee</div></div>
     </div>
   <?php endif; ?>
-  <?php $openReqs = $deskAdmin ? ops_all("SELECT id, req_code, designation, req_type, project_site, status FROM requisitions WHERE status IN ('OPEN','PROPOSED','OFFERED') ORDER BY id DESC") : [];
+  <?php
+    // Scope the open-requisitions tile to the viewer's offices/business units,
+    // consistent with the main /requisitions list (no cross-branch leak).
+    [$reqScopeW, $reqScopeA] = function_exists('scope_clause') ? scope_clause('office_id', 'sbu') : ['1=1', []];
+    $openReqs = $deskAdmin ? ops_all("SELECT id, req_code, designation, req_type, project_site, status FROM requisitions WHERE $reqScopeW AND status IN ('OPEN','PROPOSED','OFFERED') ORDER BY id DESC", $reqScopeA) : [];
     if ($openReqs): ?>
     <h3 class="tab-sub" style="margin-top:26px;">Open manpower requisitions <span class="muted">(<?= count($openReqs) ?>)</span></h3>
     <div class="card-grid">

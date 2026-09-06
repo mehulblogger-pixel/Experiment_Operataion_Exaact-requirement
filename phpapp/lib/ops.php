@@ -2722,6 +2722,10 @@ function ops_dispatch($route, $method) {
             return ops_recruit_export($route, $method);
         case $route === 'careers-admin':                             // Phase 7 — manage the public careers page
             return ops_careers_admin($route, $method);
+        case $route === 'role-workspaces':                           // Configurable role workspaces (master admin)
+            return ops_role_workspaces($route, $method);
+        case $route === 'my-start':                                  // per-user start page (self-service)
+            return ops_my_start($route, $method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
             return ops_projcosting($route, $method);
         case $route === 'recruit-config':
@@ -4753,8 +4757,13 @@ function send_forward_email($callId) {
 // ---- Manpower requisition / position approval (mandatory before hiring) ----
 function requisitions_list($openOnly = false) {
     // Carries the fields the candidate form pre-fills from the chosen requisition
-    // (1b — client, designation, SBU, rate) so they are not re-keyed.
-    return ops_all("SELECT id, req_code, designation, req_type, status, client_id, sbu, billing_rate, rate_basis, discipline, skills, project_site FROM requisitions" . ($openOnly ? " WHERE status IN ('OPEN','PROPOSED','OFFERED')" : "") . " ORDER BY id DESC");
+    // (1b — client, designation, SBU, rate) so they are not re-keyed. Scoped to the
+    // viewer's offices/business units so the dropdown never leaks other branches'
+    // requisitions (consistent with the main /requisitions list).
+    [$scW, $scA] = function_exists('scope_clause') ? scope_clause('office_id', 'sbu') : ['1=1', []];
+    $where = $scW;
+    if ($openOnly) $where .= " AND status IN ('OPEN','PROPOSED','OFFERED')";
+    return ops_all("SELECT id, req_code, designation, req_type, status, client_id, sbu, billing_rate, rate_basis, discipline, skills, project_site FROM requisitions WHERE $where ORDER BY id DESC", $scA);
 }
 function ops_requisitions($route, $method) {
     $pdo = db();

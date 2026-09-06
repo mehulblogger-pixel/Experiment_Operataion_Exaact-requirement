@@ -18,9 +18,9 @@
 // One flat, de-duplicated, permission-filtered list of destinations for the
 // signed-in user. Each entry: label, url, area, icon, desc, kind ('screen' |
 // 'action'). Cached per request.
-function ops_nav_index() {
+function ops_nav_index($fresh = false) {
     static $cache = null;
-    if ($cache !== null) return $cache;
+    if ($cache !== null && !$fresh) return $cache;
 
     $u = function_exists('current_user') ? current_user() : null;
     if (!$u) return $cache = [];

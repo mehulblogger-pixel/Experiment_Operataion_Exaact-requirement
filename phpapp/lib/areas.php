@@ -259,7 +259,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             $sec('Masters');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
@@ -271,6 +271,7 @@ function ops_area_def($area) {
             $t(can('mod.users.view'), '👥', T_REG('user'), '/users', 'People who can sign in.');
             $t(can('mod.users.view'), '🗂️', 'Organisation', '/hierarchy', 'The reporting hierarchy.');
             $t(is_master(), '🔐', 'Roles & permissions', '/access', 'Who can do what.');
+            $t(is_master(), '🧭', 'Role workspaces', '/role-workspaces', 'Per-role landing page & quick-access launchpad.');
             $t($fx('sso_on') && (can('users.manage.global') || is_master()), '🔑', 'Single sign-on', '/sso', 'Identity provider settings.');
 
             $sec('Configuration');
