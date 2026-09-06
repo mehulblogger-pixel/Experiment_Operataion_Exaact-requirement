@@ -327,7 +327,7 @@ function recruitpipe_stage_delete($sid) {
 //  Admin screen — Settings-style config, gated is_admin_level()
 // ============================================================================
 function ops_recruit_pipelines($route, $method) {
-    ops_require(is_admin_level(), 'Only an administrator can configure hiring workflows.');
+    ops_require(hiring_admin_can(), 'Only an administrator can configure hiring workflows.');
     recruitpipe_migrate();
 
     if ($method === 'POST') {

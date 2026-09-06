@@ -271,7 +271,7 @@ function careers_view_thanks($job) {
 //  Admin — choose which openings are advertised + page settings.
 // ============================================================================
 function ops_careers_admin($route, $method) {
-    ops_require(is_admin_level(), 'Only an administrator can manage the careers page.');
+    ops_require(hiring_admin_can(), 'Only an administrator can manage the careers page.');
     careers_migrate();
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');

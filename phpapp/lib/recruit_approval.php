@@ -286,7 +286,7 @@ function appr_email_requester($req, $result, $remarks = '') {
 //  Admin screen — configure rules + levels
 // ============================================================================
 function ops_recruit_approvals($route, $method) {
-    ops_require(is_admin_level(), 'Only an administrator can configure approval rules.');
+    ops_require(hiring_admin_can(), 'Only an administrator can configure approval rules.');
     appr_migrate();
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');

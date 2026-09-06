@@ -563,6 +563,10 @@ function role_label($u = null) { $roles = defined('ORG_ROLES') ? ORG_ROLES : [];
 function is_master() { return ua()['master']; }
 function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
 function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
+// May the current user CONFIGURE the recruitment module? A full administrator
+// always can; so can any role granted the module-scoped `hiring.admin` permission
+// (a "Recruitment Manager" who configures hiring without system-wide powers).
+function hiring_admin_can() { return is_admin_level() || (function_exists('can') && can('hiring.admin')); }
 // R9 — optimistic locking. A call/job can be edited by a coordinator and a manager at
 // the same time; with last-write-wins the second save silently overwrites the first.
 // The edit form carries the row's `updated_at` as a baseline; on save we compare it

@@ -184,7 +184,7 @@ function doc_render_template($tpl, $candidate) {
 
 // ---- Admin studio ----------------------------------------------------------
 function ops_doc_templates($route, $method) {
-    ops_require(is_admin_level(), 'Only an administrator can edit document templates.');
+    ops_require(hiring_admin_can(), 'Only an administrator can edit document templates.');
     doc_tpl_migrate();
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');

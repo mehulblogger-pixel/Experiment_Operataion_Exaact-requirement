@@ -125,7 +125,7 @@ function comp_compute($inputs) {
 
 // ---- Admin screen ----------------------------------------------------------
 function ops_comp_setup($route, $method) {
-    ops_require(is_admin_level(), 'Only an administrator can configure the compensation structure.');
+    ops_require(hiring_admin_can(), 'Only an administrator can configure the compensation structure.');
     comp_migrate();
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');

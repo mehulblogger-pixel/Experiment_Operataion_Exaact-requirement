@@ -53,6 +53,11 @@ const PERMISSIONS = [
     'users.manage.branch' => 'Manage users in own office',
     'users.manage.global' => 'Manage all users & access',
     'settings.manage' => 'Manage system settings',
+    // Recruitment module — configure ONLY the hiring module (pipelines, salary
+    // headings, letter templates, approval matrix, careers page). Lets a customer
+    // appoint a Recruitment Manager who configures their hiring product without
+    // any system-wide administrator powers.
+    'hiring.admin'    => 'Configure the recruitment module',
     // ---- CRM / Marketing & Sales (fine-grained actions) ----
     'crm.quote.create'    => 'Create / edit quotations',
     'crm.quote.approve'   => 'Approve quotations (approval chain)',
@@ -94,6 +99,7 @@ function permission_groups() {
         'Inspection documentation (IDEMS)' => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.audit.view'],
         'Money'                          => ['finance.reconcile'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
+        'Recruitment'                    => ['hiring.admin'],
         'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
         'Complaints & appeals'           => ['complaints.decide','capa.close','ncr.close'],
         'Administration'                 => ['master.manage','users.manage.branch','users.manage.global','org.hierarchy.view','settings.manage'],
