@@ -30,6 +30,37 @@ function doc_tpl_migrate() {
         )");
     } catch (Throwable $e) { return; }
     doc_tpl_seed();
+    doc_tpl_seed_extra();   // backfill common extra letters into existing installs too
+}
+
+// Additional ready-made letters (relieving, confirmation, internship). Idempotent
+// by code, so existing installs pick them up and none is ever duplicated. These
+// are ordinary editable templates — a starting point, not a fixed format.
+function doc_tpl_seed_extra() {
+    $now = function_exists('now_iso') ? now_iso() : date('c');
+    $have = function ($code) { try { return (int)ops_one("SELECT COUNT(*) c FROM doc_templates WHERE code=?", [$code])['c'] > 0; } catch (Throwable $e) { return true; } };
+    $add = function ($code, $name, $body) use ($now, $have) {
+        if ($have($code)) return;
+        db()->prepare("INSERT INTO doc_templates (code,name,doc_type,body,active,created_at) VALUES (?,?, 'OTHER', ?,1,?)")->execute([$code, $name, $body, $now]);
+    };
+    $add('CONFIRMATION', 'Confirmation of employment',
+        "Date: {date}\n\nDear {name},\n\nSub: Confirmation of employment — {position}\n\n"
+        . "We are pleased to confirm your employment as {position} in the {department} department at {company} "
+        . "with effect from {date}, following the successful completion of your probation.\n\n"
+        . "All other terms and conditions of your appointment remain unchanged.\n\n{terms}\n\n"
+        . "We congratulate you and look forward to your continued contribution.\n\nWarm regards,\nFor {company}\n\nAuthorised Signatory");
+    $add('RELIEVING', 'Relieving & experience letter',
+        "Date: {date}\n\nTO WHOMSOEVER IT MAY CONCERN\n\n"
+        . "This is to certify that {name} was employed with {company} as {position} in the {department} department.\n\n"
+        . "During the tenure of employment, their conduct and performance were found to be satisfactory. "
+        . "They are hereby relieved of their duties with effect from {date}.\n\n"
+        . "We wish {name} every success in their future endeavours.\n\nWarm regards,\nFor {company}\n\nAuthorised Signatory");
+    $add('INTERNSHIP', 'Internship offer letter',
+        "Date: {date}\n\nDear {name},\n\nSub: Internship offer — {position}\n\n"
+        . "We are pleased to offer you an internship as {position} in the {department} department at {company}, "
+        . "commencing {joining_date}.\n\nA stipend, where applicable, and the terms of the internship are set out below.\n\n"
+        . "{salary_table}\n\n{terms}\n\nPlease confirm your acceptance by signing and returning a copy of this letter.\n\n"
+        . "Warm regards,\nFor {company}\n\nAuthorised Signatory");
 }
 
 function doc_tpl_seed() {

@@ -256,10 +256,28 @@ function product_package_apply($key) {
     return true;
 }
 
+// One-click "Recruitment-only company": hide every other module (the
+// RECRUITMENT_HR package) AND make the Coordinator role a Recruitment Manager
+// (grant the module-scoped hiring.admin), so the customer has a ready recruitment
+// admin who is not a system-wide administrator. Idempotent; reversible by
+// choosing another package. Returns a short summary of what it did.
+function recruitment_only_provision() {
+    $done = [];
+    if (product_package_apply('RECRUITMENT_HR')) $done[] = 'other modules hidden (Recruitment + Admin only)';
+    if (function_exists('role_grant_perm') && role_grant_perm('COORDINATOR', 'hiring.admin')) $done[] = 'Coordinator set up as a Recruitment Manager';
+    if (function_exists('doc_tpl_migrate')) { doc_tpl_migrate(); $done[] = 'offer, appointment & extra letter templates ready'; }
+    return $done;
+}
+
 // The chooser screen (master only; deliberately not module-gated, like Licence).
 function ops_product_package($route, $method) {
     ops_require(product_package_can(), 'Only a master admin can change the product package.');
     if ($route === 'product-package-apply' && $method === 'POST') {
+        if ((string)($_POST['preset'] ?? '') === 'recruitment_only') {
+            $did = recruitment_only_provision();
+            flash('Set up as a Recruitment-only company — ' . implode('; ', $did) . '.');
+            redirect('/product-package');
+        }
         $key = (string)($_POST['package'] ?? '');
         if (product_package_apply($key)) flash('Product package set to “' . (PRODUCT_PACKAGES[$key]['label'] ?? $key) . '”. Fine-tune any single module on the Licence screen.');
         else flash('Unknown product package.', 'error');

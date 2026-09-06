@@ -433,6 +433,21 @@ function role_perms($role) {
     return role_defaults($role)['perms'];
 }
 
+// Grant a single permission to a role, preserving everything the role already
+// has (seeds the override from the role's current effective set the first time,
+// so nothing is lost). Non-destructive; used by one-click setup presets.
+function role_grant_perm($role, $perm) {
+    if (!isset(ORG_ROLES[$role]) || !array_key_exists($perm, PERMISSIONS)) return false;
+    $raw = setting_get('role_access', '');
+    $store = $raw !== '' ? json_decode($raw, true) : [];
+    if (!is_array($store)) $store = [];
+    $cur = (isset($store[$role]) && is_array($store[$role])) ? array_values($store[$role]) : role_perms($role);
+    if (!in_array($perm, $cur, true)) $cur[] = $perm;
+    $store[$role] = array_values(array_unique($cur));
+    setting_set('role_access', json_encode($store));
+    return true;
+}
+
 // Role defaults: permissions granted, and scope (offices/sbus: ALL | OWN).
 // Wrapper merges the per-module view/edit defaults onto the fine-grained ones.
 function role_defaults($role) {

@@ -22,6 +22,19 @@
     Applying a package below will set it to that preset; you can then tune individual modules on Licence.</div>
 <?php endif; ?>
 
+<div class="panel" style="margin-top:14px;border:1px dashed var(--brand,#1e40af);background:var(--soft,#eef2ff)">
+  <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap">
+    <div>
+      <h3 style="margin:0 0 3px">🎯 Set up as a Recruitment-only company</h3>
+      <p class="muted" style="margin:0;font-size:13px;max-width:64ch">One click: hides every module except Recruitment &amp; Admin, makes the <b>Coordinator</b> a <b>Recruitment Manager</b> (configures hiring only, no system-wide powers), and ensures the offer, appointment and extra letter templates are ready. Reversible — pick another package any time.</p>
+    </div>
+    <form method="post" action="/product-package-apply" style="flex:0 0 auto">
+      <input type="hidden" name="preset" value="recruitment_only">
+      <button class="btn" onclick="return confirm('Set this installation up as a Recruitment-only company?')">Set up now</button>
+    </form>
+  </div>
+</div>
+
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:14px">
   <?php foreach ($packages as $key => $p):
     $isCur = ($current === $key);
