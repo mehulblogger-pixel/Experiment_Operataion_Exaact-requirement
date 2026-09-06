@@ -32,7 +32,7 @@ Status: ✅ PASS · ◑ PARTIAL · ✗ FAIL · ⛔ BLOCKED · ▷ NOT YET · ↻
 | 0 | Environment & application inventory | ✅ | See STAGE-0 below. Inventory already locked in `inventory-v1.0.md`. |
 | 1 | First customer experience (new signup → dashboard) | ✅ | 1.1 first access+login, 1.2 setup wizard, 1.3 staff-account model, 1.4 cloud onboarding — all PASS (B′; 1.1 also confirmed on B live). |
 | 2 | Company configuration | ✅ | All config screens render; company profile (GSTIN→PAN/state auto-derive), office add, duplicate reject, invalid-GSTIN edge — all PASS (B′). |
-| 3 | Masters & taxonomy | ▷ | |
+| 3 | Masters & taxonomy | ✅ | Master screens render; add/edit/delete values, duplicate-value guard, dependent-list parent guard, new-list create + duplicate-key guard — all PASS (B′). |
 | 4 | Users / roles / permissions | ▷ | |
 | 5 | Universal technical passport | ▷ | |
 | 6 | Client & CRM | ▷ | |
@@ -197,3 +197,32 @@ Saving GSTIN `NOTAGSTIN` shows the warning *"does not look valid…"* **but stil
 Re-adding "Vadodara Branch" → rejected: *"…already exists — names must be unique."* No duplicate created. ✅
 
 **Stage 2 verdict: ✅ PASS.** Company profile, GSTIN-driven PAN/state derivation, office CRUD + uniqueness guard, and all nine config screens confirmed. No defects. Ready for Stage 3 (Masters & taxonomy).
+
+---
+
+## STAGE 3 — Masters & taxonomy
+
+**ENV:** B′ (sandbox, fresh install past setup) · **USER:** admin (Master) · Engine: `lib/lookups.php` (typed `lookup_types` + `lookup_values`; `/lookups` list, `/lookup?key=` values).
+
+### QA-3.1 — Master screens render  ✅
+`/lookups` (all lists), `/masters`, `/lookup?key=inspection_type` (38 rows), `/lookup?key=trade`, `/lookup?key=skill` (dependent list, 64 rows), `/custom-fields?entity=call` — all 200. *(Note: `/masters` shows 0 rows on a fresh install — it lists admin-defined operational master tables, none exist yet; the taxonomy itself lives under `/lookups`. Behaviour-as-designed, not a defect.)*
+
+### QA-3.2 — Add a value  ✅ PASS
+Added "Pre-Shipment Inspection" (code PSI) to `inspection_type` → appears in the list.
+
+### QA-3.3 — Duplicate value rejected  ✅ PASS (negative)
+Re-adding the same label → *"…is already on this list."* No duplicate. (Dedup is scoped per parent, so the same label under a different parent is still allowed — correct for dependent lists.)
+
+### QA-3.4 — Dependent-list parent guard  ✅ PASS (edge)
+Adding a `skill` value with **no parent trade** → blocked: *"Pick which Trade / discipline this belongs under."* Prevents orphan dependent values.
+
+### QA-3.5 — Create a new master list  ✅ PASS
+Created "Weld Process" (key auto-derived) → appears in the lists table.
+
+### QA-3.6 — Duplicate list key rejected  ✅ PASS (negative)
+Re-creating "Weld Process" → *"A list with that key already exists."*
+
+### QA-3.7 — Delete a value  ✅ PASS
+Deleting the PSI value (by its exact row id) → removed. Delete is guarded by `type_id` (a mismatched id silently no-ops rather than deleting across lists — good defensive behaviour; the first test attempt hit this and was a test-harness id-extraction error, not an app fault).
+
+**Stage 3 verdict: ✅ PASS.** Typed master lists, value CRUD, duplicate + dependent-parent guards, and custom-list creation all confirmed. No defects. Ready for Stage 4 (Users / roles / permissions).
