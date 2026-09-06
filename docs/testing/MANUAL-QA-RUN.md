@@ -35,7 +35,7 @@ Status: ✅ PASS · ◑ PARTIAL · ✗ FAIL · ⛔ BLOCKED · ▷ NOT YET · ↻
 | 3 | Masters & taxonomy | ✅ | Master screens render; add/edit/delete values, duplicate-value guard, dependent-list parent guard, new-list create + duplicate-key guard — all PASS (B′). |
 | 4 | Users / roles / permissions | ✅ | Create staff w/ roles, weak-pwd guard, permission gate blocks inspector from admin screens — PASS. **D-002 fixed**: duplicate username was a 500, now a friendly message. |
 | 5 | Universal technical passport | ✅ | Pro self-register, cert add w/ expiry status (VALID/EXPIRED), owner view, privacy-safe public passport, duplicate/weak-pwd guards — all PASS (B′). |
-| 6 | Client & CRM | ▷ | |
+| 6 | Client & CRM | ✅ | Client CRUD + all guards, primary contact, portal invite→accept→login, staff/portal isolation — all PASS. **D-003 raised (P2)**: fresh DB auto-seeds 779 real MGH partners into every tenant. |
 | 7 | Technical requirements | ▷ | |
 | 8 | Marketplace (match → apply → shortlist → engage) | ▷ | |
 | 9 | Freelance / supplier ecosystem | ▷ | |
@@ -63,6 +63,7 @@ Status: ✅ PASS · ◑ PARTIAL · ✗ FAIL · ⛔ BLOCKED · ▷ NOT YET · ↻
 |----|-------|----------|-----------|--------------|----------|--------|--------|
 | D-001 | 9 | P3 (cosmetic/label) | Portal shell header hard-coded to "Client portal" for any non-hire-first user; agency case not handled | `/portal` (`views/portal/top.php`) | An agency sees its portal named as an **Agency workspace** | Agency saw **"Client portal"** | ✅ FIXED — `$portalKind` now shows "Agency workspace" for `portal_agency_org()`; title + H1 use it. Crawl clean. |
 | D-002 | 4 | P3 (error handling) | Duplicate username not pre-checked; INSERT hit the UNIQUE constraint and threw a raw exception | `/user-new`, `/user-edit` (`lib/ops.php` `ops_users`) | Friendly "username already taken" message, form re-shown | **HTTP 500** (SQLSTATE UNIQUE); no bad row created (data safe) | ✅ FIXED — pre-check before any team-member is created: clash → flash + re-render form (200). Verified: dup now 200 "already taken", `r.patel` count stays 1. Harness 5992/0. |
+| D-003 | 6 | **P2 (multi-tenant confidentiality / onboarding)** | `auto_seed()` loads `data/seed_data.json` (**327 real client + 452 real vendor names**) into ANY fresh DB; not gated to the control install | `lib/db.php` `auto_seed()` (called from `run_schema`) | A brand-new customer/tenant workspace starts **empty** of partners | Every fresh DB (incl. a new tenant workspace) boots with **779 real MGH client/vendor names** | ⏳ **OPEN — awaiting owner decision.** MGH's own live install is unaffected (its `business_partners` is non-empty → seed early-returns). Proposed fix: skip `auto_seed()` for tenant workspaces & licence installs (start empty); keep it as an explicit "load sample data" admin action. Not changed yet — behaviour + real-data decision belongs to the owner. |
 
 ---
 
@@ -291,3 +292,34 @@ Duplicate email → "already registered"; password `123` → "at least 8 charact
 **Notes (test-harness only, no app defect):** two false blanks in the first pass were my test using the wrong POST key (`act` instead of `action`) and an out-of-context status snippet; corrected and re-run clean.
 
 **Stage 5 verdict: ✅ PASS.** Self-registration, structured certifications with correct expiry status, owner credential view, and a **privacy-safe public passport** all confirmed. No defects. Ready for Stage 6 (Client & CRM).
+
+---
+
+## STAGE 6 — Client & CRM
+
+**ENV:** B′ (sandbox) · Client create at `/partner-new`; portal is opt-in (`portal_enabled`=0 by default).
+
+### QA-6.1 — CRM screens render  ✅
+`/clients`, `/vendors`, `/leads`, `/opportunities`, `/portal-users` → all 200.
+
+### QA-6.2 — Create a client  ✅ PASS
+Created "Reliance Testing Ltd" (client, 30-day terms, GSTIN `24ADUPL3517E2ZJ`, primary contact Anil Mehta). Result: lands on the partner detail page (`/partner?id=…`), **primary contact saved**, **PAN auto-derived** (`ADUPL3517E`) from the GSTIN. *(Note: `/clients` list is paginated over the auto-seeded partners — see D-003 — so a brand-new row isn't on page 1; the record exists and opens correctly.)*
+
+### QA-6.3 — Client guards  ✅ PASS (negatives)
+| Attempt | Result |
+|---------|--------|
+| No payment terms | ✅ "Payment terms are required…" |
+| Invalid GSTIN | ✅ "GSTIN should be 15…" |
+| No role ticked | ✅ "Select at least one role…" |
+| Duplicate company | ✅ "…already exists…" (matched by name/GSTIN/PAN/TAN) |
+
+### QA-6.4/6.5/6.6 — Client-portal invite → accept → login  ✅ PASS
+Portal is off by default (all `/portal/*` correctly 404 until enabled — verified). After the admin switches it on:
+- **Invite** (`/portal-users`): admin creates an invite — a token is minted, **admin never chooses a password** (good: the client sets their own). ✅
+- **Accept** (`/portal/accept?t=…`): client sets their own password → 200. ✅
+- **Login** (`/portal/login`): client signs in → 302 to `/portal`; dashboard shows **their own company** "Reliance Testing". ✅
+
+### QA-6.7 — Staff ⇄ portal isolation  ✅ PASS (security)
+A **portal-authenticated client** hitting staff routes `/users` and `/company-profile` → **302 to `/login`** — a client session cannot reach the staff application at all. Confirms the two audiences are fully walled off.
+
+**Stage 6 verdict: ✅ PASS** (functionally). Client CRUD, every guard, the primary-contact carry, the passwordless-invite portal flow, and staff/portal isolation all confirmed. **One P2 finding (D-003)** — fresh-DB partner seeding — is raised for the owner's decision; it does not block the CRM functionality but must be resolved before onboarding real, separate customers. Ready for Stage 7 (Technical requirements).
