@@ -222,8 +222,15 @@ function offer_create($candidateId, $post) {
 function offer_appr_ctx($o) {
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int)$o['candidate_id']]) ?: [];
     $req = !empty($cand['requisition_id']) ? (ops_one("SELECT * FROM requisitions WHERE id=?", [(int)$cand['requisition_id']]) ?: []) : [];
+    // Department for rule-matching: the requisition's department first, then the
+    // candidate's, then the business unit as a last resort. (Previously this used
+    // the SBU alone, so an approval rule keyed on Department never matched a
+    // requisition that set a department but no SBU.)
+    $dept = (string)($req['department'] ?? '');
+    if ($dept === '') $dept = (string)($cand['department'] ?? '');
+    if ($dept === '') $dept = (string)($req['sbu'] ?? '');
     return [
-        'department' => (string)($req['sbu'] ?? ''),
+        'department' => $dept,
         'sbu'        => (string)($req['sbu'] ?? ''),
         'grade'      => (string)($req['grade'] ?? ''),
         'position'   => (string)($req['designation'] ?? ''),
