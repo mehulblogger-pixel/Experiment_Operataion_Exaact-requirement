@@ -81,7 +81,7 @@ function recruit_iv_migrate() {
             id $pk,
             candidate_id INT,
             doc_type VARCHAR(120) DEFAULT '',
-            sensitive INT DEFAULT 0,
+            `sensitive` INT DEFAULT 0,
             file_name VARCHAR(200) DEFAULT '',
             file_data $lt,
             issue_date VARCHAR(20) DEFAULT '',
@@ -158,7 +158,7 @@ function doc_add($candidateId, $post) {
     recruit_iv_migrate();
     $type = trim((string)($post['doc_type'] ?? 'Other')) ?: 'Other';
     $status = array_key_exists($post['status'] ?? '', DOC_STATUSES) ? $post['status'] : 'REQUIRED';
-    db()->prepare("INSERT INTO candidate_docs (candidate_id,doc_type,sensitive,status,created_at) VALUES (?,?,?,?,?)")
+    db()->prepare("INSERT INTO candidate_docs (candidate_id,doc_type,`sensitive`,status,created_at) VALUES (?,?,?,?,?)")
         ->execute([(int)$candidateId, $type, doc_is_sensitive($type) ? 1 : 0, $status, _iv_now()]);
     return (int)db()->lastInsertId();
 }
@@ -178,7 +178,7 @@ function doc_upload($candidateId, $post, $file) {
             ->execute([$name, $data, $issue, $expiry, _iv_actor(), _iv_now(), $id]);
     } else {
         $type = trim((string)($post['doc_type'] ?? 'Other')) ?: 'Other';
-        db()->prepare("INSERT INTO candidate_docs (candidate_id,doc_type,sensitive,file_name,file_data,issue_date,expiry_date,status,uploaded_by,uploaded_at,created_at)
+        db()->prepare("INSERT INTO candidate_docs (candidate_id,doc_type,`sensitive`,file_name,file_data,issue_date,expiry_date,status,uploaded_by,uploaded_at,created_at)
                        VALUES (?,?,?,?,?,?,?, 'UPLOADED', ?,?,?)")
             ->execute([(int)$candidateId, $type, doc_is_sensitive($type) ? 1 : 0, $name, $data, $issue, $expiry, _iv_actor(), _iv_now(), _iv_now()]);
     }
