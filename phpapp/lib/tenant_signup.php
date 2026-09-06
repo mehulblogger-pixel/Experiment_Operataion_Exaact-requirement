@@ -26,6 +26,11 @@
 function tenant_signup_migrate($pdo = null) {
     $pdo = $pdo ?: db();
     $pk  = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    // Never let this one table's creation abort the whole boot chain: a failure
+    // here must not stop the ~50 migrations that follow (that is what left
+    // candidate_docs and other later tables uncreated). Same guard every other
+    // migration uses.
+    try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS tenant_requests (
         id $pk,
         company        VARCHAR(150) NOT NULL DEFAULT '',
@@ -41,6 +46,7 @@ function tenant_signup_migrate($pdo = null) {
         decided_at     VARCHAR(40)  NOT NULL DEFAULT '',
         created_at     VARCHAR(40)  NOT NULL DEFAULT ''
     )");
+    } catch (Throwable $e) { /* never block the rest of the boot chain */ }
 }
 
 /** The public page is OFF by default — the operator turns it on from the

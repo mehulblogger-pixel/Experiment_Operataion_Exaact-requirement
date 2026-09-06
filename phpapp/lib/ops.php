@@ -5207,6 +5207,10 @@ function ops_candidates($route, $method) {
 
     if ($route === 'candidate') {
         ops_require(is_coordinator_level());
+        // Self-heal: make sure the recruitment tables this screen reads exist,
+        // even if a boot migration was skipped on this database.
+        if (function_exists('recruit_iv_migrate')) recruit_iv_migrate();     // interviews + candidate_docs
+        if (function_exists('recruit_offer_migrate')) recruit_offer_migrate(); // offers + salary structure
         $cand = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp,
             t.label trade_label, s.label skill_label, ca.call_code
             FROM candidates c LEFT JOIN business_partners bp ON bp.id=c.client_id
