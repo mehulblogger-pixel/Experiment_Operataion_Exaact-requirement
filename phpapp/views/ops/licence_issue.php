@@ -50,6 +50,9 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
         <small class="muted">Read-only after expiry, for this long, before write is refused.</small></div>
       <div class="ff"><label>Install id <span class="muted">— optional</span></label><input class="form-control" name="install_id" placeholder="for automatic pull">
         <small class="muted">Set this to let the customer's install fetch renewals automatically.</small></div>
+      <div class="ff ff-wide"><label>Licensed for (address) <span class="muted">— optional, on-premise lock</span></label>
+        <input class="form-control" name="hosts" placeholder="e.g. hr.acme.com  or  *.acme.com  (blank = runs anywhere)">
+        <small class="muted">The web address(es) this key may run on, comma-separated. A copy served on any other address goes read-only. Loopback / laptop is always allowed. Leave blank for cloud or unrestricted keys.</small></div>
       <?php // What the customer was billed for this key — a record for us, so the
             // "Keys issued" list can answer "how much did we charge". It is NOT part
             // of the signed key; it changes nothing the customer's copy enforces. ?>

@@ -115,6 +115,7 @@ function licissue_migrate() {
         if (function_exists('ensure_column')) {
             ensure_column('issued_licences', 'amount',   "INT DEFAULT 0");
             ensure_column('issued_licences', 'currency', "VARCHAR(8) DEFAULT ''");
+            ensure_column('issued_licences', 'hosts',    "VARCHAR(255) DEFAULT ''");   // on-premise host lock
         }
     } catch (Throwable $e) {}
 }
@@ -221,6 +222,7 @@ function ops_buy($route, $method) {
         $ref  = 'LIC-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
         $claims = ['cust' => (string) $rec['customer'], 'exp' => $exp, 'seats' => $seats,
                    'grace' => (int) $rec['grace'] ?: LICENCE_GRACE_DEFAULT, 'ref' => $ref, 'mods' => $mods];
+        if (!empty($rec['hosts'])) $claims['hosts'] = (string) $rec['hosts'];   // keep any host lock on renewal
         $r = lk_issue($claims);
         if (empty($r['ok'])) buy_page_shell('Could not issue the licence', '<p>' . e($r['err'] ?? 'error') . ' Your payment succeeded — contact your provider and quote ' . e($payId) . '.</p>', 500);
         try { db()->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,key_text,by_user,created_at)
@@ -334,14 +336,16 @@ function ops_licence_issue($route, $method) {
         $exp   = (string)$src['exp'] ?: date('Y-m-d', strtotime('+1 year'));
         $grace = (int)$src['grace'] ?: LICENCE_GRACE_DEFAULT;
         $ref   = 'LIC-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+        $hosts = (string)($src['hosts'] ?? '');
         $claims = ['cust' => (string)$src['customer'], 'exp' => $exp, 'seats' => $seats, 'grace' => $grace, 'ref' => $ref, 'mods' => $mods];
+        if ($hosts !== '') $claims['hosts'] = $hosts;   // keep the host lock across a re-issue
         $r = lk_issue($claims);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/issue-licence'); }
         try {
-            db()->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,key_text,by_user,created_at)
-                           VALUES (?,?,?,?,?,?,?,?,?,?)")
+            db()->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,hosts,key_text,by_user,created_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?)")
                 ->execute([$ref, (string)$src['customer'], (string)$src['install_id'], $seats, $exp, $grace,
-                           implode(',', $mods), $r['key'], user_name(current_user()), date('c')]);
+                           implode(',', $mods), $hosts, $r['key'], user_name(current_user()), date('c')]);
         } catch (Throwable $e) {}
         flash('Reissued for ' . ($src['customer'] ?: 'this customer') . ' — now ' . $seats . ' seats. Send the new key below.', 'success');
         view('ops/licence_issued', ['key' => $r['key'], 'claims' => $claims, 'ref' => $ref, 'install' => (string)$src['install_id']]);
@@ -382,15 +386,18 @@ function ops_licence_issue($route, $method) {
         $amount   = max(0, (int) ($_POST['amount'] ?? 0));
         $currency = strtoupper(substr(trim((string) ($_POST['currency'] ?? '')), 0, 5));
         if ($currency === '') $currency = function_exists('billing_config') ? billing_config()['currency'] : 'INR';
+        // Optional on-premise host lock: the web address(es) this key may run on.
+        $hosts = substr(trim((string) ($_POST['hosts'] ?? '')), 0, 255);
         $ref = 'LIC-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
         $claims = ['cust' => $cust, 'exp' => $exp, 'seats' => $seats, 'grace' => $grace, 'ref' => $ref, 'mods' => $mods];
         if ($fieldSeats > 0) $claims['field_seats'] = $fieldSeats;
+        if ($hosts !== '') $claims['hosts'] = $hosts;
         $r = lk_issue($claims);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/issue-licence'); }
         try {
-            db()->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,amount,currency,key_text,by_user,created_at)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute([$ref, $cust, $install, $seats, $exp, $grace, implode(',', $mods), $amount, $currency, $r['key'],
+            db()->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,hosts,amount,currency,key_text,by_user,created_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute([$ref, $cust, $install, $seats, $exp, $grace, implode(',', $mods), $hosts, $amount, $currency, $r['key'],
                            user_name(current_user()), date('c')]);
         } catch (Throwable $e) {}
         view('ops/licence_issued', ['key' => $r['key'], 'claims' => $claims, 'ref' => $ref, 'install' => $install,
