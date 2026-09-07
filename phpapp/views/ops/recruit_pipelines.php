@@ -17,7 +17,7 @@ $applySummary = function ($p) use ($e) {
 <style>
   .rp-wrap{display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px;align-items:start}
   .rp-card{background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:14px;
-    box-shadow:var(--shadow-sm,0 1px 2px rgba(18,32,60,.06));min-width:0}
+    box-shadow:var(--shadow-sm,0 1px 2px rgba(18,32,60,.06));min-width:0;max-width:100%;overflow:hidden}
   .rp-body{min-width:0}
   .rp-card h2{margin:0;padding:14px 16px;font-size:15px;border-bottom:1px solid var(--line,#e5e7eb)}
   .rp-list a{display:block;padding:12px 16px;border-bottom:1px solid var(--line,#eef1f5);color:inherit;text-decoration:none}
@@ -43,7 +43,11 @@ $applySummary = function ($p) use ($e) {
   .pill.k{background:#eef2ff;color:#4338ca}.pill.c{background:#fffbeb;color:#b45309}.pill.d{background:#ecfdf5;color:#047857}
   .rp-note{font-size:12px;color:var(--muted,#656e7a);margin:2px 0 10px}
   .rp-cond{background:var(--soft,#f6f8fb);border:1px dashed var(--line,#d7dde5);border-radius:8px;padding:8px 10px;margin-top:6px}
-  @media(max-width:820px){.rp-wrap{grid-template-columns:1fr}.rp-grid2,.rp-grid3{grid-template-columns:1fr}}
+  /* Stack into one column early (1080px) so it collapses on tablets AND on a
+     phone left in the browser's "Desktop site" mode, which reports ~980px. */
+  @media(max-width:1080px){.rp-wrap{grid-template-columns:1fr}}
+  @media(max-width:820px){.rp-grid3{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.rp-grid2,.rp-grid3{grid-template-columns:1fr}}
 </style>
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
