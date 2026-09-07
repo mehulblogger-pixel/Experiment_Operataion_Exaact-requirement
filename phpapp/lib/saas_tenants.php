@@ -203,8 +203,12 @@ function saas_enter_tenant($key) {
     return true;
 }
 function saas_leave_tenant() {
+    // Only reconnect if we were actually inside a company. Resetting when we are
+    // already on the control database would open a SECOND connection to the same
+    // store while the first is still in use — on SQLite that is a lock deadlock.
+    $had = isset($_SESSION['saas_tenant']) && $_SESSION['saas_tenant'] !== '';
     unset($_SESSION['saas_tenant']);
-    if (function_exists('db_reset')) db_reset();   // back to the control database
+    if ($had && function_exists('db_reset')) db_reset();   // back to the control database
 }
 
 // Which company does this email sign in to? Returns a tenant_key or ''.
@@ -216,4 +220,117 @@ function saas_login_lookup($email) {
         $r = ops_one("SELECT tenant_key FROM saas_logins WHERE email=? AND is_active=1", [$email]);
         return $r ? (string) $r['tenant_key'] : '';
     } catch (Throwable $e) { return ''; }
+}
+
+// ---------------------------------------------------------------------------
+//  SUPER-ADMIN — the Companies console (route /companies)
+//
+//  Extends the existing Super Admin panel with a cross-company management
+//  surface, mirroring the Books super-admin: every company in one list with its
+//  plan, purchased seats, modules and status, plus the levers to change them and
+//  to log in as a company. Additive — the per-install control panel is untouched.
+//  Super-admin only.
+// ---------------------------------------------------------------------------
+
+// The plan catalogue the console offers, enriched with the base login count so
+// the screen can show "plan base + purchased = total seats" at a glance.
+function saas_console_plans() {
+    $tiers = function_exists('superadmin_tiers') ? superadmin_tiers() : [];
+    $out = [];
+    foreach ($tiers as $key => $t) {
+        $out[$key] = [
+            'label' => $t['label'] ?? $key,
+            'mods'  => array_values((array) ($t['mods'] ?? [])),
+            'base'  => saas_plan_logins($key),
+            'pitch' => $t['pitch'] ?? '',
+        ];
+    }
+    return $out;
+}
+
+// Every company for the console: the directory row joined with its routing
+// status (from tenants.php) so "suspended" is shown truthfully.
+function saas_console_companies() {
+    $rows = saas_tenant_all();
+    $reg  = function_exists('tenant_registry') ? tenant_registry() : ['tenants' => []];
+    $routes = (array) ($reg['tenants'] ?? []);
+    foreach ($rows as &$r) {
+        $k = (string) ($r['tenant_key'] ?? '');
+        $r['routed']        = isset($routes[$k]);
+        $r['route_status']  = $routes[$k]['status'] ?? '';
+        $r['mods_list']     = saas_tenant_modules($k);
+        $r['seat_limit']    = saas_tenant_seat_limit($k);
+        $r['base_logins']   = saas_plan_logins($r['plan'] ?? '');
+    }
+    unset($r);
+    return $rows;
+}
+
+function ops_saas_admin($route, $method) {
+    ops_require(function_exists('superadmin_can') ? superadmin_can() : (function_exists('is_master') && is_master()),
+        'Only the Super Admin can open the Companies console.');
+
+    if ($method === 'POST') {
+        $do  = (string) ($_POST['do'] ?? '');
+        $key = strtolower(trim((string) ($_POST['key'] ?? '')));
+        $back = '/companies' . ($key !== '' ? '?key=' . urlencode($key) : '');
+
+        if ($do === 'company_plan' && $key !== '') {
+            saas_tenant_set_plan($key, (string) ($_POST['plan'] ?? ''), trim((string) ($_POST['plan_expiry'] ?? '')) ?: null);
+            flash('Plan updated for ' . $key . '.');
+            redirect($back);
+        }
+        if ($do === 'company_seats' && $key !== '') {
+            // Set an absolute purchased-seat count (over the plan base).
+            $want = max(0, (int) ($_POST['extra_user_seats'] ?? 0));
+            $t = saas_tenant_get($key);
+            $cur = (int) ($t['extra_user_seats'] ?? 0);
+            saas_tenant_add_seats($key, $want - $cur);
+            flash('Seats updated for ' . $key . '.');
+            redirect($back);
+        }
+        if ($do === 'company_modules' && $key !== '') {
+            $valid = function_exists('licence_owner') && defined('PRODUCT_MODULES') ? array_keys(PRODUCT_MODULES) : ['admin', 'hr'];
+            $picked = array_values(array_intersect($valid, (array) ($_POST['mods'] ?? [])));
+            if (!in_array('admin', $picked, true)) $picked[] = 'admin';   // admin is core, always on
+            saas_tenant_set_modules($key, $picked);
+            flash('Modules updated for ' . $key . '.');
+            redirect($back);
+        }
+        if ($do === 'company_status' && $key !== '') {
+            $status = ($_POST['status'] ?? '') === 'suspended' ? 'suspended' : 'active';
+            saas_tenant_set_status($key, $status);
+            // Make it effective at the door: the routing registry decides login.
+            if (function_exists('tenant_set_status')) tenant_set_status($key, $status);
+            flash('Company ' . $key . ' ' . ($status === 'suspended' ? 'suspended' : 'reactivated') . '.');
+            redirect('/companies');
+        }
+        if ($do === 'company_login_as' && $key !== '') {
+            // Jump into a company as its admin. Super-admin only (guarded above).
+            saas_enter_tenant($key);                       // switch the live DB to the company
+            $admin = null;
+            try { $admin = ops_one("SELECT * FROM users WHERE is_superuser=1 AND is_active=1 ORDER BY id LIMIT 1"); }
+            catch (Throwable $e) { $admin = null; }
+            if (!$admin) {
+                saas_leave_tenant();
+                flash('That company has no active admin yet (its database may not be set up).', 'error');
+                redirect('/companies');
+            }
+            $_SESSION['uid'] = (int) $admin['id'];
+            $_SESSION['saas_impersonating'] = 1;           // a return-to-console breadcrumb for later
+            flash('You are now signed in to ' . ($_POST['company'] ?? $key) . '. Log out to return.');
+            redirect('/');
+        }
+        redirect('/companies');
+    }
+
+    $sel = strtolower(trim((string) ($_GET['key'] ?? '')));
+    view('ops/saas_companies', [
+        'companies' => saas_console_companies(),
+        'plans'     => saas_console_plans(),
+        'modules'   => defined('PRODUCT_MODULES') ? PRODUCT_MODULES : [],
+        'sel'       => $sel !== '' ? saas_tenant_get($sel) : null,
+        'base_domain' => function_exists('tenant_base_domain') ? tenant_base_domain() : '',
+    ]);
+    return true;
 }

@@ -292,6 +292,7 @@ function ops_area_def($area) {
 
             $sec('Super admin');
             $t(is_master(), '🛰️', 'Control panel', '/super-admin', 'Licence, seats, modules, subscription, tenants and system tools in one place.');
+            $t(is_master(), '🏢', 'Companies', '/companies', 'Every company on the platform — plan, seats, modules, suspend and log in as. (Super-Admin.)');
             // Revamp P6 — pick which EXAACT this install is (TPIA / Staffing / Recruitment / Enterprise).
             $t($fx('product_package_can') && product_package_can(), '📦', 'Product package', '/product-package', 'TPIA, Staffing, Recruitment or Enterprise — set the pack & bundles in one click.');
 

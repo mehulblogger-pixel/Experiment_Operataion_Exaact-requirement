@@ -2960,6 +2960,8 @@ function ops_dispatch($route, $method) {
             ops_consents($route, $method); return true;
         case $route === 'super-admin' || $route === 'control-panel':
             return ops_super_admin($method);
+        case $route === 'companies':   // Super-Admin: cross-company console (add/plan/seats/modules/suspend/login-as)
+            return ops_saas_admin($route, $method);
         case $route === 'marketplace-plans':   // Super-Admin: marketplace subscription plans & limits
             return ops_mkt_plans($method);
         case $route === 'marketplace-escrow':  // Marketplace desk: escrow holds (hold → release/refund)

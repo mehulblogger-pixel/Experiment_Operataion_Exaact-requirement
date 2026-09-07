@@ -82,3 +82,20 @@ $stillWorks = true; try { ops_val("SELECT COUNT(*) FROM users"); } catch (Throwa
 t_ok($stillWorks, 'the database still answers after a connection reset');
 saas_leave_tenant();
 t_eq(saas_current_tenant(), '', 'leaving clears the chosen company (back to the control DB)');
+
+// Regression: leaving when NOT in a company must be a clean no-op — it must not
+// reconnect (a second connection to the same store deadlocks SQLite).
+saas_leave_tenant();   // already on the control DB
+$afterLeave = true; try { ops_val("SELECT COUNT(*) FROM users"); } catch (Throwable $e) { $afterLeave = false; }
+t_ok($afterLeave, 'leaving when already on the control DB is a safe no-op (no deadlock)');
+
+// The Companies console helpers.
+t_section('SaaS control plane — super-admin Companies console');
+t_ok(function_exists('ops_saas_admin'), 'the Companies console handler exists');
+$plans = saas_console_plans();
+t_ok(isset($plans['RECRUITMENT']) && (int)$plans['RECRUITMENT']['base'] === 3, 'the console offers the Recruitment plan (3 base logins)');
+t_ok(isset($plans['ENTERPRISE']) && count($plans['ENTERPRISE']['mods']) >= 5, 'the console offers Enterprise (all modules)');
+$list = saas_console_companies();
+$asme = null; foreach ($list as $r) if (($r['tenant_key'] ?? '') === 'asme') $asme = $r;
+t_ok($asme !== null, 'the console lists a company from the directory');
+t_ok(isset($asme['seat_limit']) && isset($asme['mods_list']), 'each listed company carries its seat limit and module list');
