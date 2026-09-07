@@ -515,6 +515,9 @@ function run_schema($withSeeds = true) {
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.
     if ($withSeeds && function_exists('lk_register_module_lists')) lk_register_module_lists();
+    // SaaS control plane — the cross-company directory used by single-URL login
+    // and the super-admin console. Additive; empty on a single-company install.
+    if (function_exists('saas_tenants_migrate')) saas_tenants_migrate();
     // Secondary indexes, last of all: every table it references now exists.
     if (function_exists('indexes_migrate')) indexes_migrate();
     ensure_admin();
