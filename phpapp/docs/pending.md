@@ -96,5 +96,39 @@ _Module key for recruitment = `hr` (People & hiring). Recruitment plan grants
 
 ---
 
+## Fully configurable per-company plan — "pay only for what you use" (à la carte)
+
+**Requested.** Instead of only fixed tiers (Starter / Recruitment / Pro /
+Enterprise), let a company be sold an **exact set of modules** (Operations,
+Quality, Sales, Money, Reporting, Recruitment) plus its **seat count**, and be
+billed for precisely that — module price × chosen modules + per-seat price ×
+seats (+ any add-ons). A tier just becomes a saved shortcut for a common bundle.
+
+**This is possible and the foundation is already in place** (SaaS control plane,
+increments 1–2):
+- `saas_tenants.enabled_modules` is already a per-company JSON list, so any
+  subset of modules is representable today — no schema change needed for the
+  entitlement side.
+- `licence_disabled()` + the area-licence gate (already shipped) hide exactly
+  the modules a company did not buy — from staff and the admin alike.
+- `extra_user_seats` + `saas_tenant_seat_limit()` already give per-seat scaling.
+
+**Still to build:**
+1. A **price book**: price per module per month/year (a Settings/Super-Admin
+   table), reusing the existing per-seat price (`billing_price_user_month`).
+2. A **plan builder** on the Super-Admin "add / edit company" screen: tick the
+   modules + set seats → it writes `enabled_modules` + seats and shows the
+   computed monthly/annual price live.
+3. **Billing math** `saas_company_quote(modules, seats, period)` → line items +
+   total, wired to the existing Razorpay buy/verify flow so a company pays for
+   its exact configuration and the licence re-issues to match.
+4. Optional: let a company **add a module later** (self-service upgrade) through
+   the same Razorpay flow, merging it into `enabled_modules` (Books' add-on
+   pattern).
+
+Do after the single-URL / super-admin console increments land.
+
+---
+
 _Maintained as the recruitment product backlog. Update as items ship or new
 customer requests arrive._

@@ -783,8 +783,26 @@ if ($route === 'login') {
             idems_log('user', null, 'LOGIN_FAILED', ['field'=>'blocked source ' . client_ip()]);
             return render_login('Too many failed attempts from this connection. Try again in ' . $ipWait . ' minute(s).');
         }
-        $q = $pdo->prepare("SELECT * FROM users WHERE username = ?");
-        $q->execute([$_POST['username'] ?? '']);
+        // ---- Single-URL SaaS: route the person to THEIR company by email ------
+        // On the one product domain a person signs in with their email. Each
+        // attempt starts from the control database so the cross-company directory
+        // lookup is reliable; a match switches the live database to that company,
+        // so the password is checked against — and the person lands in — their own
+        // workspace. Additive: a plain username, or an install with no directory,
+        // skips all of this and behaves exactly as before.
+        $loginId = trim((string)($_POST['username'] ?? ''));
+        if (function_exists('saas_leave_tenant')) saas_leave_tenant();
+        if ($loginId !== '' && strpos($loginId, '@') !== false && function_exists('saas_login_lookup')) {
+            $tk = saas_login_lookup($loginId);
+            if ($tk !== '' && function_exists('saas_enter_tenant')) { saas_enter_tenant($tk); $pdo = db(); }
+        }
+        if (strpos($loginId, '@') !== false) {
+            $q = $pdo->prepare("SELECT * FROM users WHERE username = ? OR email = ?");
+            $q->execute([$loginId, $loginId]);
+        } else {
+            $q = $pdo->prepare("SELECT * FROM users WHERE username = ?");
+            $q->execute([$loginId]);
+        }
         $u = $q->fetch();
         if ($u && $u['is_active'] && login_allowed($u['username'])
             && password_verify($_POST['password'] ?? '', $u['password_hash'])) {
