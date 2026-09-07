@@ -90,7 +90,26 @@ if (is_file($tenantsFile)) {
         $aliases = array_map('strtolower', (array)($reg['aliases'] ?? []));
         $isBase = $host === '' || $host === 'localhost' || $host === '127.0.0.1'
                || $host === $base || $host === 'www.' . $base || in_array($host, $aliases, true);
-        if (!$isBase) {
+        // Single-URL SaaS: a company chosen at login (held in the session) wins
+        // over the web address, so every company can live on the ONE base domain
+        // — no subdomain per client. Additive: with nothing in the session this
+        // is skipped and the address-based resolution below runs exactly as before.
+        $sessKey = (isset($_SESSION['saas_tenant']) && $_SESSION['saas_tenant'] !== '')
+            ? strtolower(trim((string) $_SESSION['saas_tenant'])) : '';
+        if ($sessKey !== '' && isset($reg['tenants'][$sessKey])) {
+            $t = (array) $reg['tenants'][$sessKey];
+            $TENANT['key'] = $sessKey;
+            $TENANT['company'] = (string) ($t['company'] ?? $sessKey);
+            if (($t['status'] ?? 'active') === 'suspended') {
+                $TENANT['error'] = 'suspended';
+            } elseif (!empty($t['sqlite'])) {
+                $DB['driver'] = 'sqlite';
+                $SQLITE = (string) $t['sqlite'];
+            } elseif (!empty($t['db']) && is_array($t['db'])) {
+                $DB = array_merge($DB, $t['db']);
+                if (empty($DB['driver'])) $DB['driver'] = 'mysql';
+            }
+        } elseif (!$isBase) {
             $sub = '';
             $suffix = '.' . $base;
             if (strlen($host) > strlen($suffix) && substr($host, -strlen($suffix)) === $suffix) {

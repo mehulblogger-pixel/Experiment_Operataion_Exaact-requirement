@@ -186,6 +186,27 @@ function saas_login_index_set($email, $key, $active = true) {
     } catch (Throwable $e) { return false; }
 }
 
+// ---------------------------------------------------------------------------
+//  Entering / leaving a company's workspace within a request (single-URL login).
+//  These remember the chosen company in the session and switch the live database
+//  to it, so config.php resolves to that company on this and every later request
+//  until the person signs out. Additive: a plain install never sets this.
+// ---------------------------------------------------------------------------
+function saas_current_tenant() {
+    return isset($_SESSION['saas_tenant']) ? (string) $_SESSION['saas_tenant'] : '';
+}
+function saas_enter_tenant($key) {
+    $key = strtolower(trim((string) $key));
+    if ($key === '') return false;
+    $_SESSION['saas_tenant'] = $key;
+    if (function_exists('db_reset')) db_reset();   // next db() opens THIS company's store
+    return true;
+}
+function saas_leave_tenant() {
+    unset($_SESSION['saas_tenant']);
+    if (function_exists('db_reset')) db_reset();   // back to the control database
+}
+
 // Which company does this email sign in to? Returns a tenant_key or ''.
 function saas_login_lookup($email) {
     if (!function_exists('ops_one')) return '';

@@ -1,8 +1,13 @@
 <?php
 // Database connection, schema creation, admin bootstrap and first-run seed.
 
-function db() {
+function db($reset = false) {
     static $pdo = null;
+    // Additive: db(true) drops the cached connection so the NEXT db() rebuilds
+    // it from config — used when a company is chosen at login and the live
+    // database must switch to that company's own store. No existing caller
+    // passes an argument, so this changes nothing for them.
+    if ($reset) { $pdo = null; return null; }
     if ($pdo) return $pdo;
     $cfg = require __DIR__ . '/../config.php';
     $d = $cfg['db'];
@@ -56,6 +61,10 @@ function db() {
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
     return $pdo;
 }
+
+// Drop the cached connection so the next db() call reconnects from config. Used
+// when the live company changes within a request (single-URL login). Additive.
+function db_reset() { db(true); }
 
 function db_driver() {
     $cfg = require __DIR__ . '/../config.php';

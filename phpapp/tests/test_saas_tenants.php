@@ -58,3 +58,27 @@ saas_tenant_upsert('asme', ['plan_expiry' => '2027-03-31']);
 $t2 = saas_tenant_get('asme');
 t_eq((string) $t2['company'], 'Asme Pharmaceutical Private Limited', 'a partial update leaves the company name intact');
 t_eq((int) $t2['extra_user_seats'], 17, 'a partial update leaves purchased seats intact');
+
+// The whole platform, not just recruitment: any plan / module mix is a company.
+t_section('SaaS control plane — whole platform (all modules, not just recruitment)');
+saas_tenant_upsert('acme-ops', ['company' => 'Acme Inspections', 'plan' => 'STARTER']);
+saas_tenant_set_plan('acme-ops', 'STARTER');
+t_ok(in_array('operations', saas_tenant_modules('acme-ops'), true), 'a STARTER company gets Operations');
+t_ok(!in_array('hr', saas_tenant_modules('acme-ops'), true), 'a STARTER company does NOT get recruitment');
+
+saas_tenant_upsert('acme-ent', ['company' => 'Acme Group', 'plan' => 'ENTERPRISE']);
+saas_tenant_set_plan('acme-ent', 'ENTERPRISE');
+$em = saas_tenant_modules('acme-ent');
+foreach (['operations', 'sales', 'hr', 'money', 'reporting'] as $m)
+    t_ok(in_array($m, $em, true), "an ENTERPRISE company gets $m");
+t_eq(saas_tenant_seat_limit('acme-ent'), 9, 'ENTERPRISE includes 9 base logins');
+
+// Switch helpers: choose / leave a company within a request (single-URL login).
+t_section('SaaS control plane — choose a company at login (session switch)');
+t_ok(function_exists('saas_enter_tenant') && function_exists('db_reset'), 'the login switch helpers exist');
+saas_enter_tenant('demo-co');
+t_eq(saas_current_tenant(), 'demo-co', 'entering a company records it for the request');
+$stillWorks = true; try { ops_val("SELECT COUNT(*) FROM users"); } catch (Throwable $e) { $stillWorks = false; }
+t_ok($stillWorks, 'the database still answers after a connection reset');
+saas_leave_tenant();
+t_eq(saas_current_tenant(), '', 'leaving clears the chosen company (back to the control DB)');
