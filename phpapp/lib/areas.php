@@ -326,7 +326,29 @@ function ops_area_tile_count($area) {
 
 // Does this user have any access to the area? Drives both the rail link and the
 // route gate.
-function ops_area_has($area) { return ops_area_tile_count($area) > 0; }
+// A whole area belongs to a saleable module; when that module is not licensed,
+// the area is gone — nav link AND route — no matter what individual tiles do.
+// This closes a leak: dozens of tiles guard with a bare is_master(), which walks
+// straight past the licence (see the note in lib/licence.php), so a master on a
+// Recruitment-only install was still shown Sales, Operations, Quality and Money.
+// Gating the area once, here, is the root-cause fix. Core areas (Admin, its
+// Directory) and self-gating areas (Marketplace) are never touched, and on a
+// full install every module is enabled so nothing changes.
+function ops_area_licence_ok($area) {
+    if (!function_exists('licence_enabled')) return true;
+    switch ($area) {
+        case 'sales':      return licence_enabled('sales');
+        case 'operations': return licence_enabled('operations');
+        case 'quality':    return licence_enabled('operations'); // accreditation packs are Operations access-modules
+        case 'reporting':  return licence_enabled('reporting');
+        case 'money':      return licence_enabled('money');
+        case 'insights':   // pure analytics OVER other modules — hide only when none of them is on
+            return licence_enabled('operations') || licence_enabled('sales')
+                || licence_enabled('reporting')  || licence_enabled('money');
+        default:           return true; // marketplace, directory, admin, hr/recruitment, …
+    }
+}
+function ops_area_has($area) { return ops_area_licence_ok($area) && ops_area_tile_count($area) > 0; }
 
 // The route prefixes that mark this area "current" in the rail.
 function ops_area_routes($area) {
@@ -337,7 +359,7 @@ function ops_area_routes($area) {
 // Render an area Home.
 function ops_area_home($area, $method) {
     $def = ops_area_def($area);
-    ops_require($def && ops_area_tile_count($area) > 0, 'You do not have access to this area.');
+    ops_require($def && ops_area_has($area), 'You do not have access to this area.');
     view('ops/area_home', ['def' => $def]);
     return true;
 }

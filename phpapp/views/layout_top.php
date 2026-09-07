@@ -134,7 +134,11 @@
         <?php // Stage 6: field Operations is hidden for a company whose capability
               // mix has no operational work (e.g. a pure recruiter who only places
               // people). Permissive until an operating company is designated. ?>
-        <?php if ((can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')) && (!function_exists('connect_cap_owner_shows')||connect_cap_owner_shows('operations'))): ?>
+        <?php // NOTE: mod.hiring.view was removed from this condition. Recruitment is
+              // its own rail item below; leaving it here made the Operations menu
+              // appear on a Recruitment-only install (the modules-off leak). Operations
+              // now shows only for real Operations work AND when the module is licensed. ?>
+        <?php if (licence_enabled('operations') && (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.reconcile.view')) && (!function_exists('connect_cap_owner_shows')||connect_cap_owner_shows('operations'))): ?>
         <a class="s-item<?= $navOn(['operations','ops-desk','calls','call','jobs','job','deputations','availability','schedule','capacity-outlook','recurring','timesheet','ratings','vouchers','voucher','attendance-recon','contract-overrides']) ?>" href="/operations"><span class="s-ic">🛠️</span><span>Operations</span></a>
         <?php endif; ?>
 
