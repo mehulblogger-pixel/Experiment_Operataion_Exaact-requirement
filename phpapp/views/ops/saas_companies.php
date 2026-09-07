@@ -40,6 +40,36 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
   </div>
 </div>
 
+<details class="sc-card" style="padding:0">
+  <summary style="cursor:pointer;padding:13px 16px;font-size:14px;font-weight:600;background:var(--soft,#f6f8fb);border-bottom:1px solid var(--line,#e5e7eb)">＋ Add a company</summary>
+  <form method="post" style="padding:16px">
+    <input type="hidden" name="do" value="company_add">
+    <div class="sc-edit" style="padding:0">
+      <div class="ff"><label>Company name *</label><input name="company" required placeholder="Asme Pharmaceutical Private Limited"></div>
+      <div class="ff"><label>Workspace key <span class="sc-key">(optional — made from the name)</span></label><input name="new_key" placeholder="asme"></div>
+      <div class="ff"><label>Owner name</label><input name="owner_name" placeholder="Asme Admin"></div>
+      <div class="ff"><label>Owner email * <span class="sc-key">(their login)</span></label><input type="email" name="owner_email" required placeholder="admin@asmehr.com"></div>
+      <div class="ff"><label>Temporary password <span class="sc-key">(blank = auto)</span></label><input name="owner_pass" placeholder="leave blank to auto-generate"></div>
+      <div class="ff"><label>Plan</label><select name="new_plan"><?php foreach ($plans as $pk => $p): ?><option value="<?= $e($pk) ?>" <?= $pk === 'RECRUITMENT' ? 'selected' : '' ?>><?= $e($p['label']) ?> — <?= implode(', ', array_map($modLabel, $p['mods'])) ?></option><?php endforeach; ?></select></div>
+    </div>
+    <div style="margin-top:12px;border-top:1px dashed var(--line,#e5e7eb);padding-top:12px">
+      <label style="font-size:12px;font-weight:600">Where the company's data lives</label>
+      <div style="display:flex;gap:16px;align-items:center;margin:6px 0 8px;flex-wrap:wrap">
+        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="sqlite" checked> Its own file (simplest — no setup)</label>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="mysql"> MySQL database (you created it in cPanel)</label>
+      </div>
+      <div class="sc-edit" style="padding:0">
+        <div class="ff"><label>MySQL host</label><input name="db_host" value="localhost"></div>
+        <div class="ff"><label>MySQL database name</label><input name="db_name" placeholder="prefix_asme"></div>
+        <div class="ff"><label>MySQL user</label><input name="db_user" placeholder="prefix_asme"></div>
+        <div class="ff"><label>MySQL password</label><input type="password" name="db_pass" autocomplete="new-password"></div>
+      </div>
+      <div class="sc-note">MySQL fields are used only when “MySQL database” is chosen above. The company's data stays fully separate from every other company.</div>
+    </div>
+    <button class="btn" style="margin-top:6px">Create company</button>
+  </form>
+</details>
+
 <?php if (!$companies): ?>
   <div class="sc-card"><div style="padding:18px" class="sc-note">
     No companies in the directory yet. A company is registered from <a href="/tenants">Cloud workspaces</a> (its database) and appears here for plan, seat and module management. Auto “add a company in one form” is the next increment.

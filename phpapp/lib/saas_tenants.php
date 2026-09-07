@@ -266,6 +266,30 @@ function saas_console_companies() {
     return $rows;
 }
 
+// A URL-safe workspace key from a company name (lowercase, hyphenated).
+function saas_slug($s) {
+    $s = strtolower(trim((string) $s));
+    $s = preg_replace('/[^a-z0-9]+/', '-', $s);
+    return trim((string) $s, '-');
+}
+
+// Apply a plan's module entitlement to the CURRENT database (the tenant's own
+// store): switch off every non-core module the plan does not include, exactly
+// the mechanism the licence gate already enforces. Reused at provisioning and,
+// later, when a plan is changed from the console.
+function saas_apply_plan_modules($plan) {
+    if (!defined('PRODUCT_MODULES') || !function_exists('setting_set')) return;
+    $mods = saas_plan_modules($plan);
+    $off = [];
+    foreach (PRODUCT_MODULES as $k => $m) {
+        $core = !empty($m[3]);
+        if (!$core && !in_array($k, $mods, true)) $off[] = $k;
+    }
+    setting_set('modules_off', implode(',', $off));
+    setting_set('product_package', strtoupper((string) $plan));
+    if (function_exists('licence_disabled')) licence_disabled(true);   // reload the off-list cache
+}
+
 function ops_saas_admin($route, $method) {
     ops_require(function_exists('superadmin_can') ? superadmin_can() : (function_exists('is_master') && is_master()),
         'Only the Super Admin can open the Companies console.');
@@ -274,6 +298,82 @@ function ops_saas_admin($route, $method) {
         $do  = (string) ($_POST['do'] ?? '');
         $key = strtolower(trim((string) ($_POST['key'] ?? '')));
         $back = '/companies' . ($key !== '' ? '?key=' . urlencode($key) : '');
+
+        // ---- Add a company in one form ------------------------------------
+        // Registers routing + directory + login index, then hands off to
+        // /company-init (a fresh request) to boot and set up the new company's
+        // OWN database. Booting it here would collide with this request's
+        // control-DB migrations (process-static guards), so we redirect and let
+        // a clean request do it.
+        if ($do === 'company_add') {
+            $company = trim((string) ($_POST['company'] ?? ''));
+            $nkey    = saas_slug($_POST['new_key'] ?? '') ?: saas_slug($company);
+            $oname   = trim((string) ($_POST['owner_name'] ?? ''));
+            $oemail  = strtolower(trim((string) ($_POST['owner_email'] ?? '')));
+            $opass   = (string) ($_POST['owner_pass'] ?? '');
+            $plan    = strtoupper((string) ($_POST['new_plan'] ?? 'RECRUITMENT'));
+            $dbkind  = (string) ($_POST['db_kind'] ?? 'sqlite');
+
+            if ($company === '' || $oemail === '' || !filter_var($oemail, FILTER_VALIDATE_EMAIL)) {
+                flash('A company name and a valid owner email are required.', 'error'); redirect('/companies');
+            }
+            if ($nkey === '' || (function_exists('tenant_valid_sub') && !tenant_valid_sub($nkey))) {
+                flash('The workspace key must be lowercase letters, digits or hyphens.', 'error'); redirect('/companies');
+            }
+            $reg = function_exists('tenant_registry') ? tenant_registry() : ['tenants' => []];
+            if (saas_tenant_get($nkey) || isset($reg['tenants'][$nkey])) {
+                flash('That workspace key is already taken — pick another.', 'error'); redirect('/companies');
+            }
+            if (saas_login_lookup($oemail) !== '') {
+                flash('That owner email already belongs to a company.', 'error'); redirect('/companies');
+            }
+            if ($opass === '') $opass = bin2hex(random_bytes(4));   // a temp password to hand over
+
+            if ($dbkind === 'mysql') {
+                $db = ['host' => trim((string) ($_POST['db_host'] ?? 'localhost')), 'name' => trim((string) ($_POST['db_name'] ?? '')),
+                       'user' => trim((string) ($_POST['db_user'] ?? '')), 'pass' => (string) ($_POST['db_pass'] ?? '')];
+                if ($db['name'] === '' || $db['user'] === '') { flash('A MySQL database name and user are required.', 'error'); redirect('/companies'); }
+            } else {
+                $db = ['sqlite' => dirname(__DIR__) . '/tenant-' . $nkey . '.sqlite'];
+            }
+            $err = function_exists('tenant_add') ? tenant_add($nkey, $company, $db) : 'Cloud mode is not enabled.';
+            if ($err !== '') { flash($err, 'error'); redirect('/companies'); }
+
+            saas_tenant_upsert($nkey, ['company' => $company, 'owner_name' => $oname, 'owner_email' => $oemail, 'plan' => $plan, 'status' => 'active']);
+            saas_tenant_set_plan($nkey, $plan);
+            saas_login_index_set($oemail, $nkey);
+
+            // Build the company's OWN database in a clean child process (see
+            // lib/saas_provision_cli.php for why a separate process).
+            $php = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
+            $cli = __DIR__ . '/saas_provision_cli.php';
+            $env = 'SAAS_COMPANY=' . escapeshellarg($company) . ' SAAS_EMAIL=' . escapeshellarg($oemail)
+                 . ' SAAS_NAME=' . escapeshellarg($oname) . ' SAAS_PASS=' . escapeshellarg($opass)
+                 . ' SAAS_PLAN=' . escapeshellarg($plan);
+            if ($dbkind === 'mysql') {
+                $env .= ' DB_DRIVER=mysql DB_HOST=' . escapeshellarg($db['host']) . ' DB_NAME=' . escapeshellarg($db['name'])
+                      . ' DB_USER=' . escapeshellarg($db['user']) . ' DB_PASS=' . escapeshellarg($db['pass']);
+            } else {
+                $env .= ' SAAS_SQLITE=' . escapeshellarg($db['sqlite']);
+            }
+            $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+            $canExec = function_exists('exec') && !in_array('exec', $disabled, true);
+            $out = []; $code = 1;
+            if ($canExec) @exec($env . ' ' . escapeshellarg($php) . ' ' . escapeshellarg($cli) . ' 2>&1', $out, $code);
+
+            if ($canExec && $code === 0) {
+                flash('Company “' . $company . '” is ready. Its owner signs in at the one product URL with '
+                    . $oemail . ' (temporary password: ' . $opass . ' — they set their own on first login).');
+            } elseif ($canExec) {
+                if (function_exists('tenant_remove')) tenant_remove($nkey);   // roll back a half-made company
+                saas_login_index_set($oemail, $nkey, false);
+                flash('Could not set up the company database: ' . trim(implode(' ', $out)), 'error');
+            } else {
+                flash('Company “' . $company . '” registered. This server cannot auto-build databases, so '
+                    . $oemail . ' finishes a one-time setup on first login (temporary password: ' . $opass . ').', 'warning');
+            }
+            redirect('/companies');
+        }
 
         if ($do === 'company_plan' && $key !== '') {
             saas_tenant_set_plan($key, (string) ($_POST['plan'] ?? ''), trim((string) ($_POST['plan_expiry'] ?? '')) ?: null);
@@ -334,3 +434,4 @@ function ops_saas_admin($route, $method) {
     ]);
     return true;
 }
+

@@ -99,3 +99,25 @@ $list = saas_console_companies();
 $asme = null; foreach ($list as $r) if (($r['tenant_key'] ?? '') === 'asme') $asme = $r;
 t_ok($asme !== null, 'the console lists a company from the directory');
 t_ok(isset($asme['seat_limit']) && isset($asme['mods_list']), 'each listed company carries its seat limit and module list');
+
+// Add-a-company helpers.
+t_section('SaaS control plane — add a company (provisioning helpers)');
+t_ok(function_exists('saas_slug'), 'the workspace-key slug helper exists');
+t_eq(saas_slug('Delta Traders Pvt Ltd'), 'delta-traders-pvt-ltd', 'a company name becomes a clean workspace key');
+t_eq(saas_slug('  Acme & Co.  '), 'acme-co', 'punctuation and spaces collapse to a single hyphen');
+t_ok(is_file(dirname(__DIR__) . '/lib/saas_provision_cli.php'), 'the CLI provisioner script is shipped');
+
+// saas_apply_plan_modules switches off exactly what the plan does not include.
+// Applied to THIS test database, then restored so nothing leaks to later tests.
+$origOff = function_exists('setting_get') ? (string) setting_get('modules_off', '') : '';
+saas_apply_plan_modules('RECRUITMENT');
+$off = (string) setting_get('modules_off', '');
+t_ok(strpos($off, 'operations') !== false && strpos($off, 'sales') !== false && strpos($off, 'reporting') !== false,
+    'the Recruitment plan switches off operations, sales and reporting');
+t_ok(strpos($off, 'hr') === false, 'the Recruitment plan keeps People & hiring on');
+saas_apply_plan_modules('PRO');
+$off2 = (string) setting_get('modules_off', '');
+t_ok(strpos($off2, 'reporting') !== false && strpos($off2, 'sales') === false,
+    'the PRO plan keeps sales on and only switches off reporting');
+setting_set('modules_off', $origOff);
+if (function_exists('licence_disabled')) licence_disabled(true);   // restore for later tests
