@@ -113,20 +113,21 @@ increments 1–2):
   the modules a company did not buy — from staff and the admin alike.
 - `extra_user_seats` + `saas_tenant_seat_limit()` already give per-seat scaling.
 
-**Still to build:**
-1. A **price book**: price per module per month/year (a Settings/Super-Admin
-   table), reusing the existing per-seat price (`billing_price_user_month`).
-2. A **plan builder** on the Super-Admin "add / edit company" screen: tick the
-   modules + set seats → it writes `enabled_modules` + seats and shows the
-   computed monthly/annual price live.
-3. **Billing math** `saas_company_quote(modules, seats, period)` → line items +
-   total, wired to the existing Razorpay buy/verify flow so a company pays for
-   its exact configuration and the licence re-issues to match.
-4. Optional: let a company **add a module later** (self-service upgrade) through
-   the same Razorpay flow, merging it into `enabled_modules` (Books' add-on
-   pattern).
+**Built (à-la-carte plan builder increment):**
+1. ✅ **Price book** — per-module month/year prices + the per-seat price, set on
+   the console's **Pricing** panel (`saas_price_book()`, settings-backed).
+2. ✅ **Plan builder** — the Manage panel's module checkboxes + seats now show a
+   **live monthly/annual quote**; saving pushes the exact module set to the
+   company's live database (`saas_apply_modules_list`, package `CUSTOM`).
+3. ✅ **Billing math** — `saas_company_quote(modules, seats, period)` → line items
+   + total.
 
-Do after the single-URL / super-admin console increments land.
+**Still to build:**
+4. **Customer-facing checkout** — wire `saas_company_quote()` to the existing
+   Razorpay buy/verify flow so a company (not just the super-admin) can pay for
+   its exact configuration, and **add a module later** self-service (merge into
+   `enabled_modules`, Books' add-on pattern). The super-admin can already set any
+   configuration today and it is enforced + priced.
 
 ---
 

@@ -290,6 +290,76 @@ function saas_apply_plan_modules($plan) {
     if (function_exists('licence_disabled')) licence_disabled(true);   // reload the off-list cache
 }
 
+// Apply an EXPLICIT module list to the current database — the à-la-carte path,
+// where a company buys exactly the modules it wants rather than a fixed plan.
+// Switches off every non-core module not in the list; admin is always on.
+function saas_apply_modules_list(array $mods) {
+    if (!defined('PRODUCT_MODULES') || !function_exists('setting_set')) return;
+    $mods = array_map('strtolower', $mods);
+    $off = [];
+    foreach (PRODUCT_MODULES as $k => $m) {
+        $core = !empty($m[3]);
+        if (!$core && !in_array($k, $mods, true)) $off[] = $k;
+    }
+    setting_set('modules_off', implode(',', $off));
+    setting_set('product_package', 'CUSTOM');
+    if (function_exists('licence_disabled')) licence_disabled(true);
+}
+
+// ---------------------------------------------------------------------------
+//  À-la-carte pricing — "pay only for what you use".
+// ---------------------------------------------------------------------------
+
+// Sensible default monthly prices (major currency units) per module, used until
+// a super-admin sets their own on the Pricing panel.
+function saas_price_defaults() {
+    return ['operations' => 1500, 'sales' => 1200, 'reporting' => 1400, 'money' => 900, 'hr' => 1000];
+}
+
+// The price book: per-seat price (reuses the existing Billing per-seat price) and
+// a per-module price, monthly and yearly, plus the currency. Settings override
+// the defaults, so it is fully configurable without code.
+function saas_price_book() {
+    $get = function ($k, $d) {
+        if (!function_exists('setting_get')) return (int) $d;
+        $v = setting_get($k, '');
+        return $v === '' ? (int) $d : (int) $v;
+    };
+    $bill  = function_exists('billing_config') ? billing_config() : [];
+    $seatM = (int) ($bill['price_month'] ?? 0) ?: $get('billing_price_user_month', 1799);
+    $seatY = (int) ($bill['price_year'] ?? 0)  ?: $get('billing_price_user_year', $seatM * 10);
+    $defM  = saas_price_defaults();
+    $mods  = [];
+    if (defined('PRODUCT_MODULES')) {
+        foreach (PRODUCT_MODULES as $k => $m) {
+            if (!empty($m[3])) continue;   // core (admin) is included, never priced
+            $mm = $get('saas_price_mod_' . $k . '_month', $defM[$k] ?? 1000);
+            $my = $get('saas_price_mod_' . $k . '_year', $mm * 10);
+            $mods[$k] = ['label' => $m[0] ?? $k, 'month' => $mm, 'year' => $my];
+        }
+    }
+    return ['seat' => ['month' => $seatM, 'year' => $seatY], 'modules' => $mods,
+            'currency' => (string) ($bill['currency'] ?? 'INR')];
+}
+
+// Quote a company configuration: chosen modules + seats, monthly or yearly.
+// Returns line items and a total, so the console and (later) a customer checkout
+// can price exactly what was picked.
+function saas_company_quote(array $mods, $seats, $period = 'month') {
+    $period = $period === 'year' ? 'year' : 'month';
+    $pb = saas_price_book();
+    $mods = array_map('strtolower', $mods);
+    $lines = []; $total = 0;
+    foreach ($pb['modules'] as $k => $m) {
+        if (in_array($k, $mods, true)) { $lines[] = ['label' => $m['label'], 'amount' => $m[$period]]; $total += $m[$period]; }
+    }
+    $seats = max(0, (int) $seats);
+    $seatAmt = $seats * $pb['seat'][$period];
+    $lines[] = ['label' => $seats . ' seat' . ($seats === 1 ? '' : 's'), 'amount' => $seatAmt];
+    $total += $seatAmt;
+    return ['period' => $period, 'currency' => $pb['currency'], 'lines' => $lines, 'total' => $total, 'seats' => $seats];
+}
+
 // Enforce the seat cap when a company adds a login. Reads the seat limit that
 // was pushed into THIS company's own database (setting saas_seat_limit); returns
 // a message to block, or '' to allow. Complements the licence seat check — a
@@ -318,7 +388,8 @@ function saas_push_to_tenant($key) {
     $php = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
     $cli = __DIR__ . '/saas_sync_cli.php';
     $env = 'SAAS_PLAN=' . escapeshellarg(strtoupper((string) ($t['plan'] ?? 'RECRUITMENT')))
-         . ' SAAS_SEAT_LIMIT=' . escapeshellarg((string) saas_tenant_seat_limit($key));
+         . ' SAAS_SEAT_LIMIT=' . escapeshellarg((string) saas_tenant_seat_limit($key))
+         . ' SAAS_MODULES=' . escapeshellarg(implode(',', saas_tenant_modules($key)));   // exact modules bought (à la carte)
     if (!empty($route['sqlite'])) {
         $env .= ' SAAS_SQLITE=' . escapeshellarg((string) $route['sqlite']);
     } elseif (!empty($route['db']) && is_array($route['db'])) {
@@ -428,6 +499,18 @@ function ops_saas_admin($route, $method) {
                 : '. (Saved here; it will apply to their workspace on the next sync — automatic pushing is off on this server.)'),
                 $ok ? 'success' : 'warning');
         };
+        if ($do === 'price_save') {
+            $g = fn($k) => max(0, (int) ($_POST[$k] ?? 0));
+            if (defined('PRODUCT_MODULES')) foreach (PRODUCT_MODULES as $mk => $mm) {
+                if (!empty($mm[3])) continue;   // core module, never priced
+                setting_set('saas_price_mod_' . $mk . '_month', (string) $g('price_' . $mk . '_month'));
+                setting_set('saas_price_mod_' . $mk . '_year',  (string) $g('price_' . $mk . '_year'));
+            }
+            if (isset($_POST['seat_month'])) setting_set('billing_price_user_month', (string) $g('seat_month'));
+            if (isset($_POST['seat_year']))  setting_set('billing_price_user_year',  (string) $g('seat_year'));
+            flash('Price book saved.');
+            redirect('/companies');
+        }
         if ($do === 'company_plan' && $key !== '') {
             saas_tenant_set_plan($key, (string) ($_POST['plan'] ?? ''), trim((string) ($_POST['plan_expiry'] ?? '')) ?: null);
             $pushed($key, 'Plan');
@@ -478,11 +561,14 @@ function ops_saas_admin($route, $method) {
     }
 
     $sel = strtolower(trim((string) ($_GET['key'] ?? '')));
+    $selRow = $sel !== '' ? saas_tenant_get($sel) : null;
     view('ops/saas_companies', [
         'companies' => saas_console_companies(),
         'plans'     => saas_console_plans(),
         'modules'   => defined('PRODUCT_MODULES') ? PRODUCT_MODULES : [],
-        'sel'       => $sel !== '' ? saas_tenant_get($sel) : null,
+        'sel'       => $selRow,
+        'price_book' => saas_price_book(),
+        'quote'     => $selRow ? saas_company_quote(saas_tenant_modules($sel), saas_tenant_seat_limit($sel), 'month') : null,
         'base_domain' => function_exists('tenant_base_domain') ? tenant_base_domain() : '',
     ]);
     return true;

@@ -136,9 +136,66 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
           <label><input type="checkbox" name="mods[]" value="<?= $e($mk) ?>" <?= $on ? 'checked' : '' ?> <?= $core ? 'disabled' : '' ?>><?= $e($m[0] ?? $mk) ?><?= $core ? ' <span class="sc-key">(always on)</span>' : '' ?></label>
         <?php endforeach; ?>
       </div>
-      <div class="sc-note">À-la-carte: tick exactly what they pay for. (Pushing a change to the company's live database + the price book are on the roadmap in <code>docs/pending.md</code>.)</div>
+      <div class="sc-note">À-la-carte: tick exactly what they pay for. Saving applies the change to the company's live workspace.</div>
       <button class="btn">Save modules</button>
     </div>
   </form>
+
+  <?php // ---- Live à-la-carte quote: modules + seats -> price, monthly / yearly ----
+    $pb = $price_book ?? ['seat'=>['month'=>0,'year'=>0],'modules'=>[],'currency'=>'INR'];
+    $cur = ($pb['currency'] === 'INR') ? '₹' : ($e($pb['currency']) . ' ');
+    $base = function_exists('saas_plan_logins') ? saas_plan_logins($sel['plan'] ?? '') : 0;
+  ?>
+  <div style="padding:16px;border-top:1px solid var(--line,#eef1f5);background:var(--soft,#f6f8fb)">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <label style="font-size:12px;font-weight:600">Price for this configuration</label>
+      <label style="font-size:12.5px">Bill: <select id="scq-period" style="padding:4px 8px;border:1px solid var(--line,#d7dde5);border-radius:7px"><option value="month">Monthly</option><option value="year">Annual</option></select></label>
+    </div>
+    <div id="scq-lines" style="margin:8px 0 6px;font-size:13px"></div>
+    <div id="scq-total" style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:20px"></div>
+    <div class="sc-note">Seats counted = plan base (<?= (int) $base ?>) + purchased (the box above). Set per-module prices in <b>Pricing</b> below. A customer pays this via your existing Razorpay checkout.</div>
+  </div>
+  <script>
+  (function(){
+    var PB=<?= json_encode($pb, JSON_UNESCAPED_SLASHES) ?>, BASE=<?= (int) $base ?>, CUR=<?= json_encode($cur) ?>;
+    function money(n){ return CUR + Number(n||0).toLocaleString(); }
+    function calc(){
+      var per=document.getElementById('scq-period').value==='year'?'year':'month';
+      var mods=[].slice.call(document.querySelectorAll('input[name="mods[]"]:checked')).map(function(c){return c.value;});
+      var extra=parseInt((document.querySelector('input[name=extra_user_seats]')||{}).value||'0',10)||0;
+      var seats=Math.max(0,BASE+extra), lines=[], total=0;
+      Object.keys(PB.modules).forEach(function(k){ if(mods.indexOf(k)>=0){ var a=PB.modules[k][per]; total+=a; lines.push([PB.modules[k].label, a]); } });
+      var sa=seats*PB.seat[per]; total+=sa; lines.push([seats+' seat'+(seats===1?'':'s'), sa]);
+      document.getElementById('scq-lines').innerHTML=lines.map(function(l){return '<div style="display:flex;justify-content:space-between"><span>'+l[0]+'</span><span>'+money(l[1])+'</span></div>';}).join('');
+      document.getElementById('scq-total').textContent=money(total)+' / '+(per==='year'?'year':'month');
+    }
+    document.getElementById('scq-period').addEventListener('change',calc);
+    document.querySelectorAll('input[name="mods[]"]').forEach(function(c){c.addEventListener('change',calc);});
+    var sb=document.querySelector('input[name=extra_user_seats]'); if(sb) sb.addEventListener('input',calc);
+    calc();
+  })();
+  </script>
 </div>
 <?php endif; ?>
+
+<?php // ---- Pricing panel (super-admin): the price book ---------------------------
+  $pb = $price_book ?? saas_price_book(); $cur = ($pb['currency'] === 'INR') ? '₹' : ($e($pb['currency']) . ' '); ?>
+<details class="sc-card" style="padding:0">
+  <summary style="cursor:pointer;padding:13px 16px;font-size:14px;font-weight:600;background:var(--soft,#f6f8fb);border-bottom:1px solid var(--line,#e5e7eb)">💳 Pricing — what each module &amp; seat costs</summary>
+  <form method="post" style="padding:16px">
+    <input type="hidden" name="do" value="price_save">
+    <div class="sc-scroll"><table class="sc" style="min-width:520px">
+      <tr><th>Item</th><th>Per month (<?= $cur ?>)</th><th>Per year (<?= $cur ?>)</th></tr>
+      <tr><td class="sc-co">Each seat (user)</td>
+        <td><input type="number" name="seat_month" min="0" value="<?= (int) $pb['seat']['month'] ?>" style="width:110px;padding:6px 8px;border:1px solid var(--line,#d7dde5);border-radius:7px"></td>
+        <td><input type="number" name="seat_year" min="0" value="<?= (int) $pb['seat']['year'] ?>" style="width:110px;padding:6px 8px;border:1px solid var(--line,#d7dde5);border-radius:7px"></td></tr>
+      <?php foreach ($pb['modules'] as $mk => $m): ?>
+      <tr><td class="sc-co"><?= $e($m['label']) ?> <span class="sc-key">module</span></td>
+        <td><input type="number" name="price_<?= $e($mk) ?>_month" min="0" value="<?= (int) $m['month'] ?>" style="width:110px;padding:6px 8px;border:1px solid var(--line,#d7dde5);border-radius:7px"></td>
+        <td><input type="number" name="price_<?= $e($mk) ?>_year" min="0" value="<?= (int) $m['year'] ?>" style="width:110px;padding:6px 8px;border:1px solid var(--line,#d7dde5);border-radius:7px"></td></tr>
+      <?php endforeach; ?>
+    </table></div>
+    <div class="sc-note">Administration is always included and never priced. These prices drive the live quote on each company's Manage panel.</div>
+    <button class="btn">Save prices</button>
+  </form>
+</details>

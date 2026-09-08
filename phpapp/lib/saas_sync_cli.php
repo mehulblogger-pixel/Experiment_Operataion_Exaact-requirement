@@ -35,9 +35,16 @@ foreach ($m[1] as $rel) { if (basename($rel) === 'saas_sync_cli.php') continue; 
 try {
     $plan  = strtoupper((string) getenv('SAAS_PLAN') ?: 'RECRUITMENT');
     $limit = max(0, (int) getenv('SAAS_SEAT_LIMIT'));
-    if (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules($plan);   // modules_off + product_package
+    $modsCsv = (string) getenv('SAAS_MODULES');
+    // Prefer the exact module list the company bought (à la carte); fall back to
+    // the plan preset when no explicit list is given.
+    if ($modsCsv !== '' && function_exists('saas_apply_modules_list')) {
+        saas_apply_modules_list(array_filter(array_map('trim', explode(',', $modsCsv))));
+    } elseif (function_exists('saas_apply_plan_modules')) {
+        saas_apply_plan_modules($plan);
+    }
     if (function_exists('setting_set')) setting_set('saas_seat_limit', (string) $limit);
-    echo "OK sync plan=$plan seats=$limit\n";
+    echo "OK sync plan=$plan seats=$limit mods=$modsCsv\n";
     exit(0);
 } catch (Throwable $e) {
     fwrite(STDERR, "ERR " . $e->getMessage() . "\n");

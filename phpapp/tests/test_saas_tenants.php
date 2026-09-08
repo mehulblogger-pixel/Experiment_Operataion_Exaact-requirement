@@ -137,3 +137,28 @@ setting_set('saas_seat_limit', (string) max(1, $active));
 t_ok(saas_seat_block() !== '', 'at the limit a new login is blocked');
 t_ok(strpos(saas_seat_block(), 'seat') !== false, 'the block message tells them to buy seats');
 setting_set('saas_seat_limit', $origLimit);   // MUST restore — a stray limit would block later tests' user creation
+
+// À-la-carte pricing (plan builder).
+t_section('SaaS control plane — à-la-carte pricing');
+t_ok(function_exists('saas_price_book') && function_exists('saas_company_quote'), 'the price book and quote helpers exist');
+$pb = saas_price_book();
+t_ok(isset($pb['seat']['month']) && isset($pb['modules']['operations']), 'the price book has a seat price and per-module prices');
+t_ok(!isset($pb['modules']['admin']), 'the core Administration module is never priced');
+$q = saas_company_quote(['operations', 'sales'], 3, 'month');
+$expect = $pb['modules']['operations']['month'] + $pb['modules']['sales']['month'] + 3 * $pb['seat']['month'];
+t_eq($q['total'], $expect, 'a monthly quote = chosen modules + seats × seat price');
+t_eq(count($q['lines']), 3, 'the quote has one line per module plus a seats line');
+$qy = saas_company_quote(['hr'], 1, 'year');
+t_eq($qy['total'], $pb['modules']['hr']['year'] + $pb['seat']['year'], 'a yearly quote uses the yearly prices');
+$qEmpty = saas_company_quote([], 0, 'month');
+t_eq($qEmpty['total'], 0, 'no modules and no seats costs nothing');
+
+// Custom (à-la-carte) module apply — the push path respects the exact set bought.
+t_ok(function_exists('saas_apply_modules_list'), 'the custom-modules apply helper exists');
+$origOff2 = (string) setting_get('modules_off', '');
+saas_apply_modules_list(['hr']);
+$off3 = (string) setting_get('modules_off', '');
+t_ok(strpos($off3, 'operations') !== false && strpos($off3, 'hr') === false, 'a custom list of just hr switches off everything except hr (+core admin)');
+t_eq((string) setting_get('product_package', ''), 'CUSTOM', 'a custom module set marks the package CUSTOM');
+setting_set('modules_off', $origOff2);
+if (function_exists('licence_disabled')) licence_disabled(true);
