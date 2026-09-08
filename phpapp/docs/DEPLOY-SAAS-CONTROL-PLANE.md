@@ -39,35 +39,43 @@ every stage is quick.
 
 ---
 
-## 2. Two decisions only you can make (before we start)
+## 2. The two decisions — CONFIRMED
 
-Everything else I can drive. These two are business calls.
+Both business calls are now settled.
 
-### Decision A — What is `operations.mghaiapps.com` *after* this?
+### Decision A — CONFIRMED: **A1, the shared front door**
 
-| Option | What it means | My recommendation |
-|---|---|---|
-| **A1. It becomes the shared front door** and your own MGH operations data becomes the first company behind it ("workspace zero"). | One site, one login page, serves MGH **and** every client. Cleanest long-term. | ✅ **Recommended.** It mirrors how Books works and avoids running two sites. |
-| **A2. Keep `operations.mghaiapps.com` exactly as it is** and stand up a **separate** address (e.g. `app.mghaiapps.com`) as the SaaS front door. | Your live operations site is never touched at all; clients live on a brand-new URL. | Safest of all if you are nervous — but it means two installs to maintain. Good as a *temporary* first step, then fold into A1 later. |
+`operations.mghaiapps.com` becomes the **single sign-in address for everyone** —
+MGH and every client. There is no second site to maintain.
 
-I will assume **A1** in the steps below, and call out where **A2** differs.
+### Decision B — CONFIRMED: **MySQL, per company**
 
-### Decision B — Where does each client's data live?
+Every client company gets its **own MySQL database** (created once in cPanel), so
+each client is fully isolated on a proper server database. We are **not** using the
+built-in file database anywhere. MGH's own operations stays on the MySQL database
+it already uses.
 
-Each client company gets its **own private database** (that is what keeps them
-isolated). There are two kinds and we can mix them:
+### What these two choices mean in practice — the very good news
 
-| Kind | Setup effort per client | Best for |
-|---|---|---|
-| **Built-in file database** (one file per client) | **None** — the system creates it automatically when you add the company. | Small clients, the pilot, quick trials. |
-| **MySQL database** (a proper server database per client) | You create an empty database + user once in cPanel, then add the company. | Busy clients with many users, and MGH's own workspace. |
+Because MGH already runs on MySQL and we chose the shared front door, **your
+current live database does not move and is not migrated at all.** The current
+install simply takes on a second role:
 
-**Recommendation:** use the **built-in file database for the pilot and small
-clients** (zero friction), and **MySQL for MGH's own workspace and any large
-client.** The system supports both at the same time.
+- It **stays** MGH's own operations workspace — exactly as it works today, with the
+  same data, the same MySQL database, the same username sign-in.
+- It **also becomes** the control install: the place where you add and manage other
+  companies (the **Companies** console). This is just a new menu, not a new site.
 
-> Once you tell me A and B, I will fill the exact hostnames and database names into
-> the checklist in §8.
+So MGH's data is never copied, exported, re-imported or touched. Each **new client**
+gets a fresh, empty MySQL database of its own; MGH keeps the one it has. That is the
+lowest-risk shape possible, and it is exactly what the "additive / nothing changes
+until you add a company" design gives us.
+
+> **The one practical routine this adds:** for each new client, someone with cPanel
+> access creates an empty MySQL database + user first (2 minutes), then you add the
+> company on the console pointing at it. The layout to copy is in
+> `tenants.sample.php`. (Whether that cPanel step can be fully automated depends on
+> your host — see §9.)
 
 ---
 
@@ -151,9 +159,9 @@ deploy can never touch them. That is the safest way to update.
 - Turn on cloud mode (Settings → Cloud workspaces) and, from the **Companies**
   console, **Add a company**: its name, owner email + password, plan (or à-la-carte
   module set), and seats. The system builds its private database automatically.
-- Under **Decision A1**, also register MGH's own operations as a company at this
-  point so the front door serves it too. Under **A2**, skip this — MGH stays on its
-  untouched site.
+- MGH's own operations needs **no** migration: the current install *is* the control
+  install and MGH's workspace at the same time (see §2). MGH keeps signing in exactly
+  as today; only the new client signs in by email into its own database.
 - **Verify the pilot end-to-end:** the pilot owner signs in **by email** at the same
   URL, lands in their **own** workspace, sees only their modules, invites staff up
   to the seat cap, and runs their real day-one task (for Asme: build the recruitment
@@ -196,18 +204,19 @@ MGH's own.
 
 ## 6. New day-2 routines (the short runbook)
 
-**Adding a company** — Companies console → *Add a company* → name, owner email +
-password, plan or à-la-carte modules, seats → Save. The system builds the private
-database and the owner can sign in by email immediately. (For a **MySQL** client,
-first create the empty database + user in cPanel, then add the company pointing at
-it — the sample layout is in `tenants.sample.php`.)
+**Adding a company** (MySQL, our confirmed model) — two steps:
+1. In **cPanel → MySQL Databases**, create an empty database + a user with all
+   privileges on it (about 2 minutes). Note the database name, user and password.
+2. On the **Companies** console → *Add a company* → name, owner email + password,
+   plan or à-la-carte modules, seats, and the database details from step 1 → Save.
+   The system fills that empty database with a fresh, isolated install and the
+   owner can sign in by email immediately. The layout is in `tenants.sample.php`.
 
-**Backups now** — you back up **each client's database**, not just one:
-- Built-in-database clients: back up each company's data file.
-- MySQL clients: export each company's database.
-- Keep backing up the **control database** too (it holds the company directory).
-A nightly cPanel backup of the whole account covers all of them in one shot — the
-simplest option, and recommended.
+**Backups now** — you back up **each client's MySQL database**, not just one:
+- Export each company's database (phpMyAdmin), **plus** MGH's own database (which
+  doubles as the control database holding the company directory).
+- A **nightly cPanel full-account backup covers all of them in one shot** — the
+  simplest option, and the recommended one.
 
 **Changing a plan, seats or modules** — Companies console → the company → adjust →
 Save. The change is pushed into that company's live site automatically.
@@ -224,7 +233,7 @@ can see what they see, without knowing their password.
 
 | Risk | Guard already in place |
 |---|---|
-| An update wipes a client's settings/data | `config.local.php`, `data.sqlite` and `tenants.php` are excluded from every update; per-client databases are never in the code package. |
+| An update wipes a client's settings/data | `config.local.php` and `tenants.php` are excluded from every update, and every client's data lives in its **own MySQL database** — never inside the code package, so an upload cannot reach it. |
 | A client sees another client's data | Each company is a **separate database**; the login routes an email only to its own registered company; unknown emails resolve to nothing. Proven in rehearsal. |
 | A client turns on a module they did not buy | Modules are enforced by licence per company and hidden from staff and admin alike; the console is the only place they change. |
 | More logins created than paid for | Seat cap blocks the next login with a "buy more seats" message at the limit. Proven in rehearsal. |
@@ -236,44 +245,62 @@ can see what they see, without knowing their password.
 
 ## 8. Go-live checklist (tick as you go)
 
-Fill the blanks once you confirm Decisions A and B.
-
-**Decisions**
-- [ ] Decision A chosen: A1 (shared front door) / A2 (separate URL) → `__________`
-- [ ] Decision B chosen for the pilot: built-in file DB / MySQL → `__________`
-- [ ] Front-door address confirmed: `__________`
+**Decisions — CONFIRMED**
+- [x] Decision A: **A1 — shared front door** at `operations.mghaiapps.com`
+- [x] Decision B: **MySQL, one database per client**; MGH stays on its current MySQL DB, no migration
 - [ ] Pilot company + owner email confirmed: `__________`
 
 **Stage 0 — Backup**
-- [ ] Live database exported and copied off the server
+- [ ] Live MySQL database exported (phpMyAdmin) and copied off the server
 - [ ] `config.local.php` copied safely
 - [ ] Known-good version / full folder backup recorded
 
 **Stage 1 — Rehearsal on a copy**
-- [ ] Staging built from `Testing` with a copy of live data
+- [ ] Staging built from `Testing` with a copy of the live MySQL data
 - [ ] 3-company isolation + seat-cap + suspend rehearsal passed
 - [ ] Server check green; test suite green (6,410 passing)
+- [ ] Confirmed on this host: adding a company auto-builds the client DB (see §9)
 
 **Stage 2 — Ship dark to live**
-- [ ] Whole `phpapp` folder updated (Git pull preferred)
-- [ ] `config.local.php` / `data.sqlite` / `tenants.php` NOT overwritten
+- [ ] Whole `phpapp` folder updated (cPanel Git → Update from Remote preferred)
+- [ ] `config.local.php` / `tenants.php` NOT overwritten
 - [ ] One page opened; self-upgrade ran
 - [ ] Current site verified normal (username sign-in, main screens, Server check)
 
 **Stage 3 — Pilot**
+- [ ] Empty MySQL database + user created in cPanel for the pilot
 - [ ] Cloud mode turned on (`tenants.php` written from Settings)
-- [ ] Pilot company added; owner signs in by email into own workspace
-- [ ] (A1) MGH operations registered as its own company
+- [ ] Pilot company added pointing at that database; owner signs in by email
 - [ ] Pilot day-one task completed; modules + seat cap correct
 - [ ] Watched 2–3 days, stable
 
 **Stage 4 — Open + billing**
-- [ ] Further companies added one at a time
+- [ ] Further companies added one at a time (empty DB first, then console)
 - [ ] Live Razorpay keys connected; price book set; per-company billing correct
 
 **Stage 5 — Hand-over**
 - [ ] Runbook (§6) shared with whoever runs hosting
-- [ ] Per-client backup routine confirmed running
+- [ ] Per-client MySQL backup routine confirmed running (nightly full-account backup)
+
+---
+
+## 9. Three small host facts worth confirming (I can also self-check these)
+
+None of these blocks us — I will verify each during the Stage 1 rehearsal — but if
+you can get quick answers from whoever manages the cPanel, it removes all guesswork:
+
+1. **Does the hosting plan allow enough MySQL databases?** One per client. Some
+   shared plans cap the number (e.g. 25). If yours is capped, we simply know the
+   client ceiling in advance and can request an upgrade before we hit it.
+2. **Is the live site updated via cPanel "Git Version Control", or by uploading a
+   ZIP?** Git → *Update from Remote* is the safest (it can never touch your three
+   "keep" files). If it is ZIP uploads today, I will note the extra care needed.
+3. **Does the host allow the app to run a small background command (PHP `exec`/shell
+   or SSH)?** This is what lets *Add a company* build the client's database in one
+   click. **If the host blocks it, nothing is lost** — the client's database is
+   filled by opening its address once and finishing the 60-second first-run wizard
+   instead. I will confirm which path applies during rehearsal and wire it so *Add a
+   company* "just works" either way.
 
 ---
 
