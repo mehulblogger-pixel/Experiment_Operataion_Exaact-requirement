@@ -203,9 +203,11 @@ deploy can never touch them. That is the safest way to update.
 - Once the pilot is happy, add further companies the same way, one at a time.
 - Turn on **per-seat billing** for real: connect your live Razorpay keys and use the
   console's price book so each company is charged for its exact modules + seats.
-  *(Note: the customer-facing self-checkout — where a client pays and upgrades
-  themselves — is the one remaining piece to build; today you set and charge each
-  configuration from the console. See `pending.md` item 4.)*
+- **Customer self-service is built:** each company's own admin has a **Subscription**
+  screen (`/subscription`) to add modules or seats and pay online themselves, with a
+  live quote; a paid purchase unlocks immediately and is held as a floor your pushes
+  never revoke. The only thing that needs the live account is the real Razorpay
+  charge — exercise it once here at Stage 1 with your live keys.
 - **Backout:** per company — suspend or downgrade any single company without
   affecting the others.
 

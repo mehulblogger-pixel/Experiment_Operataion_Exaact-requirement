@@ -132,12 +132,22 @@ increments 1–2):
   (business name, industry, financial year, currency), name pre-filled by the
   provider. The provisioner flags onboarding; finishing it clears the flag.
 
-**Still to build:**
-4. **Customer-facing checkout** — wire `saas_company_quote()` to the existing
-   Razorpay buy/verify flow so a company (not just the super-admin) can pay for
-   its exact configuration, and **add a module later** self-service (merge into
-   `enabled_modules`, Books' add-on pattern). The super-admin can already set any
-   configuration today and it is enforced + priced.
+**Built (customer-facing self-service checkout):**
+4. ✅ **Customer-facing checkout** — a company's own admin has a **Subscription**
+   screen (`/subscription`) showing their plan and an à-la-carte builder with a
+   live quote; they buy extra modules and/or seats and pay online via the existing
+   Razorpay order/verify flow (`ops_saas_subscription`). On a verified payment the
+   module turns on and the seat cap rises immediately in their own workspace
+   (`saas_selfservice_apply`), and the purchase is recorded in the billing ledger.
+   What a customer pays for is held as a **floor** (`saas_paid_modules` /
+   `saas_seat_floor`) that a later provider push can never silently revoke.
+   Proven: unit-tested (self-service apply, floor protection, signature verify) and
+   the screen + live quote demonstrated in the browser.
+
+**Still to finish (needs the live account):**
+- **Go-live payment check** — exercise the Razorpay charge end-to-end with the
+  real live keys at Stage 1 of the deployment (no charge can be completed in a
+  test sandbox). The math, unlock and signature-verify are done and tested.
 
 ---
 

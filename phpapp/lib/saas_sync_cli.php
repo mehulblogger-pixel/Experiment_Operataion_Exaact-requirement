@@ -43,6 +43,9 @@ try {
     } elseif (function_exists('saas_apply_plan_modules')) {
         saas_apply_plan_modules($plan);
     }
+    // Never drop below what the customer has already paid for themselves — a
+    // provider push tops a company up, it does not silently revoke paid seats.
+    if (function_exists('saas_paid_seat_floor')) $limit = max($limit, saas_paid_seat_floor());
     if (function_exists('setting_set')) setting_set('saas_seat_limit', (string) $limit);
     echo "OK sync plan=$plan seats=$limit mods=$modsCsv\n";
     exit(0);

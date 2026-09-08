@@ -156,6 +156,25 @@ function billing_record($seats, $period, $paymentId, $orderId, $until) {
     } catch (Throwable $e) {}
 }
 
+// Record a self-service à-la-carte purchase (modules and/or seats) in the same
+// ledger, with the module list kept in a `note` column. Amount is the full quote
+// for exactly what was bought, so the history reads true.
+function billing_record_line($seats, $period, $modulesCsv, $paymentId, $orderId, $until) {
+    try {
+        billing_migrate();
+        if (function_exists('ensure_column')) ensure_column('billing_orders', 'note', "VARCHAR(200) DEFAULT ''");
+        $mods = array_values(array_filter(array_map('trim', explode(',', (string) $modulesCsv))));
+        $amount = 0;
+        if (function_exists('saas_company_quote')) { $q = saas_company_quote($mods, (int) $seats, $period); $amount = (int) $q['total']; }
+        $note = $mods ? ('modules: ' . implode(', ', $mods)) : 'seats only';
+        db()->prepare("INSERT INTO billing_orders (seats,period,amount,currency,order_id,payment_id,paid_until,by_user,created_at,note)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)")
+            ->execute([(int) $seats, $period, $amount, (string) (billing_config()['currency'] ?? 'INR'),
+                       (string) $orderId, (string) $paymentId, $until,
+                       function_exists('user_name') ? user_name(current_user()) : 'self-service', date('c'), $note]);
+    } catch (Throwable $e) {}
+}
+
 function billing_history($limit = 20) {
     try { billing_migrate(); return ops_all("SELECT * FROM billing_orders ORDER BY id DESC LIMIT " . (int) $limit); }
     catch (Throwable $e) { return []; }

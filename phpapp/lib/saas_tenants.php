@@ -277,9 +277,22 @@ function saas_slug($s) {
 // store): switch off every non-core module the plan does not include, exactly
 // the mechanism the licence gate already enforces. Reused at provisioning and,
 // later, when a plan is changed from the console.
+// ---- Customer self-service: the paid "floor" -------------------------------
+// A company can buy extra modules / seats itself (customer-facing checkout).
+// What it has PAID for is a floor the provider's own pushes must never drop
+// below — so a later control-side sync can top a company up, but can never
+// silently revoke a module or seat the customer already paid for.
+function saas_paid_modules() {
+    $csv = function_exists('setting_get') ? (string) setting_get('saas_paid_modules', '') : '';
+    return array_values(array_filter(array_map('trim', explode(',', strtolower($csv)))));
+}
+function saas_paid_seat_floor() {
+    return function_exists('setting_get') ? max(0, (int) setting_get('saas_seat_floor', 0)) : 0;
+}
+
 function saas_apply_plan_modules($plan) {
     if (!defined('PRODUCT_MODULES') || !function_exists('setting_set')) return;
-    $mods = saas_plan_modules($plan);
+    $mods = array_values(array_unique(array_merge(saas_plan_modules($plan), saas_paid_modules())));   // never drop a paid module
     $off = [];
     foreach (PRODUCT_MODULES as $k => $m) {
         $core = !empty($m[3]);
@@ -295,7 +308,7 @@ function saas_apply_plan_modules($plan) {
 // Switches off every non-core module not in the list; admin is always on.
 function saas_apply_modules_list(array $mods) {
     if (!defined('PRODUCT_MODULES') || !function_exists('setting_set')) return;
-    $mods = array_map('strtolower', $mods);
+    $mods = array_values(array_unique(array_merge(array_map('strtolower', $mods), saas_paid_modules())));   // never drop a paid module
     $off = [];
     foreach (PRODUCT_MODULES as $k => $m) {
         $core = !empty($m[3]);
@@ -358,6 +371,89 @@ function saas_company_quote(array $mods, $seats, $period = 'month') {
     $lines[] = ['label' => $seats . ' seat' . ($seats === 1 ? '' : 's'), 'amount' => $seatAmt];
     $total += $seatAmt;
     return ['period' => $period, 'currency' => $pb['currency'], 'lines' => $lines, 'total' => $total, 'seats' => $seats];
+}
+
+// ---------------------------------------------------------------------------
+//  Customer self-service subscription — a company buys extra modules / seats
+//  itself, pays with Razorpay, and its own workspace unlocks immediately. What
+//  it buys is recorded as a paid floor (above) so a provider push never revokes
+//  it. This all runs inside the company's OWN database.
+// ---------------------------------------------------------------------------
+
+// The modules this company currently has switched ON (non-core, not in modules_off).
+function saas_current_modules() {
+    if (!defined('PRODUCT_MODULES')) return [];
+    $off = function_exists('setting_get') ? array_filter(array_map('trim', explode(',', (string) setting_get('modules_off', '')))) : [];
+    $on = [];
+    foreach (PRODUCT_MODULES as $k => $m) {
+        if (!empty($m[3])) continue;                 // core admin — not a purchasable line
+        if (!in_array($k, $off, true)) $on[] = $k;
+    }
+    return $on;
+}
+
+// The modules this company does NOT yet have — the ones it could buy.
+function saas_addable_modules() {
+    if (!defined('PRODUCT_MODULES')) return [];
+    $on = saas_current_modules();
+    $add = [];
+    foreach (PRODUCT_MODULES as $k => $m) {
+        if (!empty($m[3])) continue;
+        if (!in_array($k, $on, true)) $add[] = $k;
+    }
+    return $add;
+}
+
+// A plain snapshot of the company's subscription for the self-service screen.
+function saas_subscription() {
+    $limit = function_exists('setting_get') ? max(0, (int) setting_get('saas_seat_limit', 0)) : 0;
+    $used  = 0; try { $used = (int) ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"); } catch (Throwable $e) {}
+    $until = function_exists('setting_get') ? (string) setting_get('billing_paid_until', '') : '';
+    return [
+        'modules'    => saas_current_modules(),
+        'addable'    => saas_addable_modules(),
+        'seat_limit' => $limit,
+        'seats_used' => $used,
+        'paid_until' => $until,
+        'package'    => function_exists('setting_get') ? (string) setting_get('product_package', '') : '',
+    ];
+}
+
+// Apply a VERIFIED self-service purchase to this company's own workspace:
+// turn the bought modules on (and hold them as a paid floor), raise the seat
+// cap by the seats bought (also a floor), extend the paid-until date, and record
+// the order. $addModules is a list of module keys; $addSeats an integer.
+function saas_selfservice_apply(array $addModules, $addSeats, $period = 'month', $paymentId = '', $orderId = '') {
+    $period = $period === 'year' ? 'year' : 'month';
+    $addSeats = max(0, (int) $addSeats);
+    $addModules = array_values(array_intersect(saas_addable_modules(), array_map('strtolower', $addModules)));
+
+    // 1) Record the paid floor (cumulative), so a provider sync can never revoke it.
+    if ($addModules) {
+        $paid = array_values(array_unique(array_merge(saas_paid_modules(), $addModules)));
+        setting_set('saas_paid_modules', implode(',', $paid));
+    }
+    // 2) Turn the modules on now: current ON set ∪ bought.
+    $target = array_values(array_unique(array_merge(saas_current_modules(), $addModules)));
+    saas_apply_modules_list($target);   // unions the paid floor too
+
+    // 3) Raise the seat cap by the seats bought (a metered company has a cap>0).
+    if ($addSeats > 0) {
+        $cur = max(0, (int) setting_get('saas_seat_limit', 0));
+        $newCap = ($cur > 0 ? $cur : (int) setting_get('saas_seat_floor', 0)) + $addSeats;
+        setting_set('saas_seat_limit', (string) $newCap);
+        setting_set('saas_seat_floor', (string) max(saas_paid_seat_floor(), $newCap));
+    }
+
+    // 4) Extend validity and record the order in the billing ledger.
+    $cur = (string) setting_get('billing_paid_until', '');
+    $from = ($cur !== '' && $cur >= date('Y-m-d')) ? $cur : date('Y-m-d');
+    $until = date('Y-m-d', strtotime($from . ($period === 'year' ? ' +1 year' : ' +1 month')));
+    setting_set('billing_paid_until', $until);
+    if (function_exists('billing_record_line'))
+        billing_record_line($addSeats, $period, implode(',', $addModules), $paymentId, $orderId, $until);
+
+    return ['modules' => $target, 'added' => $addModules, 'seat_add' => $addSeats, 'paid_until' => $until];
 }
 
 // Enforce the seat cap when a company adds a login. Reads the seat limit that
@@ -648,6 +744,72 @@ function ops_saas_admin($route, $method) {
         'quote'     => $selRow ? saas_company_quote(saas_tenant_modules($sel), saas_tenant_seat_limit($sel), 'month') : null,
         'base_domain' => function_exists('tenant_base_domain') ? tenant_base_domain() : '',
         'can_autocreate' => saas_can_autocreate_db(),
+    ]);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+//  Customer-facing self-service subscription screen — a company's own admin
+//  reviews their plan and buys extra modules / seats à la carte, paying online.
+//  Runs inside the company's OWN workspace (not the provider console).
+// ---------------------------------------------------------------------------
+function ops_saas_subscription($route, $method) {
+    ops_require(function_exists('billing_can_manage') ? billing_can_manage() : (function_exists('is_master') && is_master()),
+        'You cannot manage the subscription.');
+    // Meaningful only for a metered (cloud) company — one with a seat cap set.
+    $metered = function_exists('setting_get') && (int) setting_get('saas_seat_limit', 0) > 0;
+
+    // Step 1 → price the à-la-carte selection and open the payment window.
+    if ($route === 'subscription-order' && $method === 'POST') {
+        if (!function_exists('billing_configured') || !billing_configured()) {
+            flash('Online payment is not switched on for your workspace yet. Please contact your provider.', 'error'); redirect('/subscription');
+        }
+        $mods   = array_values(array_intersect(saas_addable_modules(), array_map('strtolower', (array) ($_POST['add_mods'] ?? []))));
+        $seats  = max(0, (int) ($_POST['add_seats'] ?? 0));
+        $period = ($_POST['period'] ?? 'month') === 'year' ? 'year' : 'month';
+        if (!$mods && $seats <= 0) { flash('Pick at least one module or some seats to add.', 'error'); redirect('/subscription'); }
+        $q = saas_company_quote($mods, $seats, $period);
+        if ((int) $q['total'] <= 0) { flash('That selection has no price set yet — please contact your provider.', 'error'); redirect('/subscription'); }
+        $ord = rzp_create_order((int) round($q['total'] * 100), 'sub-' . date('ymdHis'),
+            ['modules' => implode(',', $mods), 'seats' => $seats, 'period' => $period]);
+        if (empty($ord['ok'])) { flash('Could not start the payment: ' . $ord['error'], 'error'); redirect('/subscription'); }
+        view('ops/billing_pay', [
+            'amt' => ['seats' => $seats, 'period' => $period, 'currency' => $q['currency'], 'total' => $q['total']],
+            'order' => $ord, 'cfg' => billing_config(),
+            'verify_action' => '/subscription-verify', 'back' => '/subscription',
+            'extra' => ['add_mods' => implode(',', $mods)],
+        ]);
+        return true;
+    }
+
+    // Step 2 → Razorpay called back. Verify, then unlock exactly what was bought.
+    if ($route === 'subscription-verify' && $method === 'POST') {
+        $orderId   = (string) ($_POST['razorpay_order_id'] ?? '');
+        $paymentId = (string) ($_POST['razorpay_payment_id'] ?? '');
+        $sig       = (string) ($_POST['razorpay_signature'] ?? '');
+        $seats     = max(0, (int) ($_POST['seats'] ?? 0));
+        $period    = ($_POST['period'] ?? 'month') === 'year' ? 'year' : 'month';
+        $mods      = array_values(array_filter(array_map('trim', explode(',', (string) ($_POST['add_mods'] ?? '')))));
+        if (!rzp_verify_signature($orderId, $paymentId, $sig)) {
+            flash('That payment could not be verified. If money was taken it is refunded automatically — nothing was changed.', 'error');
+            redirect('/subscription');
+        }
+        $r = saas_selfservice_apply($mods, $seats, $period, $paymentId, $orderId);
+        $bits = [];
+        if ($r['added'])        $bits[] = count($r['added']) . ' module' . (count($r['added']) === 1 ? '' : 's');
+        if ($r['seat_add'] > 0) $bits[] = $r['seat_add'] . ' seat' . ($r['seat_add'] === 1 ? '' : 's');
+        flash('Payment received. Added ' . ($bits ? implode(' and ', $bits) : 'your purchase') . '. Your plan is active until '
+            . (function_exists('fdate') ? fdate($r['paid_until']) : $r['paid_until']) . '.', 'success');
+        redirect('/subscription');
+    }
+
+    view('ops/subscription', [
+        'sub'     => saas_subscription(),
+        'pb'      => saas_price_book(),
+        'cfg'     => billing_config(),
+        'metered' => $metered,
+        'modules' => defined('PRODUCT_MODULES') ? PRODUCT_MODULES : [],
+        'history' => function_exists('billing_history') ? billing_history() : [],
     ]);
     return true;
 }

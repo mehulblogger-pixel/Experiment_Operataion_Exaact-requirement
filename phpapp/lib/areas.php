@@ -299,6 +299,9 @@ function ops_area_def($area) {
             $sec('Connections');
             $t($fx('ads_can_manage') && ads_can_manage(), '📢', 'Ads Pro connection', '/adspro', 'Connect the advertising source.');
             $t($fx('lk_can_manage') && lk_can_manage(), '📜', 'Licence', '/licence', 'The product licence and its state.');
+            // A cloud (metered) company's own self-service plan: buy modules / seats online.
+            $t($fx('billing_can_manage') && billing_can_manage() && $fx('setting_get') && (int) setting_get('saas_seat_limit', 0) > 0,
+                '💳', 'Subscription', '/subscription', 'Your plan — add modules or seats and pay online. You pay only for what you use.');
             $t((can('settings.manage') || is_master()) && $fx('books_licensed') && books_licensed(), '📗', 'MGH Books', '/books-bridge', 'The accounts bridge.',
                 $num(fn() => $fx('books_outbox_counts') ? (books_outbox_counts()['stuck'] ?? 0) : 0), 'red');
 

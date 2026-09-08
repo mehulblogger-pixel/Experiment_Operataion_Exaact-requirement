@@ -2,6 +2,10 @@
   $amt = $amt ?? []; $order = $order ?? []; $cfg = $cfg ?? [];
   $cur = $amt['currency'] ?? 'INR';
   $sym = $cur === 'INR' ? '₹' : ($cur . ' ');
+  $verify_action = $verify_action ?? '/billing-verify';   // subscription checkout overrides this
+  $back = $back ?? '/billing';
+  $extra = $extra ?? [];                                   // extra hidden fields (e.g. modules)
+  $amtMajor = isset($amt['major']) ? (int) $amt['major'] : (isset($amt['total']) ? (int) $amt['total'] : 0);
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/billing">Users &amp; billing</a> › Payment</div>
 <div class="master-head"><div><h1>Complete your payment</h1>
@@ -10,17 +14,18 @@
 
 <div class="panel" style="max-width:520px;text-align:center">
   <p class="sub">The secure Razorpay window should open automatically. If it does not, use the button below.</p>
-  <button class="btn" id="paybtn" type="button">Pay <?= e($sym . number_format((int)$amt['major'])) ?></button>
-  <a class="btn secondary" href="/billing" style="margin-left:8px">Cancel</a>
+  <button class="btn" id="paybtn" type="button">Pay <?= e($sym . number_format($amtMajor)) ?></button>
+  <a class="btn secondary" href="<?= e($back) ?>" style="margin-left:8px">Cancel</a>
   <p class="muted" style="margin-top:14px;font-size:12.5px">Your card details go straight to Razorpay — this application never sees them.
-    Seats activate the instant the payment is confirmed.</p>
+    Your plan activates the instant the payment is confirmed.</p>
 </div>
 
 <?php // Filled in by the Razorpay callback, then submitted. CSRF is stamped in
       // automatically at render, so the verify step is protected like any POST. ?>
-<form method="post" action="/billing-verify" id="verifyform" style="display:none">
+<form method="post" action="<?= e($verify_action) ?>" id="verifyform" style="display:none">
   <input type="hidden" name="seats" value="<?= (int)$amt['seats'] ?>">
   <input type="hidden" name="period" value="<?= e($amt['period']) ?>">
+  <?php foreach ($extra as $k => $v): ?><input type="hidden" name="<?= e($k) ?>" value="<?= e($v) ?>"><?php endforeach; ?>
   <input type="hidden" name="razorpay_order_id" id="f_order">
   <input type="hidden" name="razorpay_payment_id" id="f_payment">
   <input type="hidden" name="razorpay_signature" id="f_sig">

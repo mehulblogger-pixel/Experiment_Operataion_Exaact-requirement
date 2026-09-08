@@ -206,3 +206,61 @@ t_ok(is_array($adm) && $adm['user'] === 'root' && $adm['host'] === 'localhost', 
 t_ok(saas_can_autocreate_db() === true, 'with a credential the console offers one-click database creation');
 foreach (['SAAS_DB_ADMIN_USER','SAAS_DB_ADMIN_HOST','SAAS_DB_ADMIN_PASS','SAAS_DB_ADMIN_PREFIX'] as $ev) putenv($ev);
 if ($origGlobal !== null) $GLOBALS['SAAS_DB_ADMIN'] = $origGlobal;   // restore
+
+// Customer self-service checkout — a company buys extra modules / seats itself,
+// its workspace unlocks immediately, and what it paid for becomes a floor the
+// provider's own pushes can never silently revoke. All mutates this test DB, so
+// every touched setting is snapshotted and restored.
+t_section('SaaS control plane — customer self-service subscription (à la carte)');
+t_ok(function_exists('saas_selfservice_apply') && function_exists('saas_subscription'), 'the self-service helpers exist');
+$snap = [];
+foreach (['modules_off','saas_seat_limit','saas_seat_floor','saas_paid_modules','billing_paid_until','product_package'] as $k)
+    $snap[$k] = (string) setting_get($k, '');
+
+// Start the company as recruitment-only (admin + hr) with a 5-seat plan.
+saas_apply_modules_list(['hr']);
+setting_set('saas_paid_modules', '');            // no prior self-service
+setting_set('saas_seat_floor', '');
+setting_set('saas_seat_limit', '5');
+$before = saas_subscription();
+t_ok(in_array('hr', $before['modules'], true) && !in_array('sales', $before['modules'], true), 'before: the company has hr but not sales');
+t_ok(in_array('sales', $before['addable'], true), 'sales is offered as an addable module');
+t_eq((int) $before['seat_limit'], 5, 'before: the plan covers 5 seats');
+
+// Buy the Sales module + 2 more seats, monthly.
+$r = saas_selfservice_apply(['sales'], 2, 'month', 'pay_TEST', 'order_TEST');
+$after = saas_subscription();
+t_ok(in_array('sales', $after['modules'], true), 'after paying, Sales is switched on immediately');
+t_ok(in_array('hr', $after['modules'], true), 'the module it already had stays on');
+t_eq((int) $after['seat_limit'], 7, 'the seat cap rises by the seats bought (5 + 2 = 7)');
+t_eq(saas_paid_seat_floor(), 7, 'the paid seats become a floor (7)');
+t_ok(in_array('sales', saas_paid_modules(), true), 'Sales is recorded as a paid module (a floor)');
+t_ok($after['paid_until'] >= date('Y-m-d'), 'the subscription is now active into the future');
+
+// The floor holds against a provider push: applying the RECRUITMENT preset must
+// NOT revoke the paid Sales module, and must not drop the paid seat floor.
+saas_apply_plan_modules('RECRUITMENT');
+$off = (string) setting_get('modules_off', '');
+t_ok(strpos($off, 'sales') === false, 'a later provider push does NOT revoke the customer-paid Sales module');
+t_ok(strpos($off, 'operations') !== false, 'the push still switches off what was never bought (operations)');
+t_eq(saas_paid_seat_floor(), 7, 'the paid seat floor survives a provider push');
+
+// An à-la-carte provider push also respects the floor.
+saas_apply_modules_list(['hr']);
+t_ok(strpos((string) setting_get('modules_off', ''), 'sales') === false, 'even a bare hr-only push keeps the paid Sales module on');
+
+// Razorpay signature verification: a correct signature passes, a forged one fails.
+$origSecret = (string) setting_get('rzp_key_secret', '');
+setting_set('rzp_key_secret', 'test_secret_key');
+$good = hash_hmac('sha256', 'order_1|pay_1', 'test_secret_key');
+t_ok(rzp_verify_signature('order_1', 'pay_1', $good) === true, 'a genuine Razorpay signature verifies');
+t_ok(rzp_verify_signature('order_1', 'pay_1', 'deadbeef') === false, 'a forged signature is rejected (no unpaid unlock)');
+setting_set('rzp_key_secret', $origSecret);
+
+// The purchase is recorded in the billing ledger with the module note.
+$hist = billing_history(5);
+$found = false; foreach ($hist as $h) if (strpos((string) ($h['note'] ?? ''), 'sales') !== false) $found = true;
+t_ok($found, 'the self-service purchase is written to the billing history with what was bought');
+
+foreach ($snap as $k => $v) setting_set($k, $v);   // restore every touched setting
+if (function_exists('licence_disabled')) licence_disabled(true);
