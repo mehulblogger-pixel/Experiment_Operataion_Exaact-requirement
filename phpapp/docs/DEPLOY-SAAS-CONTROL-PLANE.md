@@ -71,11 +71,39 @@ gets a fresh, empty MySQL database of its own; MGH keeps the one it has. That is
 lowest-risk shape possible, and it is exactly what the "additive / nothing changes
 until you add a company" design gives us.
 
-> **The one practical routine this adds:** for each new client, someone with cPanel
-> access creates an empty MySQL database + user first (2 minutes), then you add the
-> company on the console pointing at it. The layout to copy is in
-> `tenants.sample.php`. (Whether that cPanel step can be fully automated depends on
-> your host — see §9.)
+### The hosting is a VPS — so we go fully one-click, with self-onboarding
+
+Because you run a **VPS** (your own server, not shared cPanel), two limits that
+would exist on shared hosting simply do not apply:
+
+- **No cap on the number of databases** — you can host as many client companies as
+  the server has room for.
+- **The app is allowed to create databases and run its own setup step**, which lets
+  us make *Add a company* **truly one-click** — no manual database step at all.
+
+So the confirmed flow on your VPS is the premium one you described:
+
+1. **You** add a company on the console (name, owner email, plan, seats). The app
+   **creates that client's MySQL database automatically** and stands up a fresh,
+   isolated install inside it.
+2. **The client's admin** signs in by email and is walked through a short
+   **onboarding wizard** — they enter their own company details (business name,
+   logo/branding, financial year, currency) and add their first team members.
+   You never key in their details for them; they self-serve, exactly like Notion or
+   Linear onboarding.
+
+The only server-side prerequisite for step 1's automatic database creation is a
+**database admin credential in `config.local.php`** on the VPS (a MySQL user allowed
+to create databases). Your VPS already has this available; it just needs to be set
+once. If you would ever prefer *not* to give the app that power, the fallback is the
+same two steps done by hand (create the empty DB, then add the company) — but on a
+VPS the automatic route is the right one.
+
+> **Small build note:** the one-click auto-create of a client's database, and
+> leaving the onboarding wizard on for the new client, are a small, well-scoped
+> addition on top of what is already built and proven (today the console can add a
+> company against a database that already exists). This is the natural next
+> increment — see the closing note.
 
 ---
 
@@ -121,11 +149,10 @@ deploy can never touch them. That is the safest way to update.
 ## 4. The rollout — five stages, each with a way back
 
 ### Stage 0 — Back up and note the "known-good" point (10 min)
-- Export the live database (cPanel → phpMyAdmin → Export) **and** keep a copy of
+- Dump the live database on the VPS (`mysqldump`) **and** keep a copy of
   `config.local.php`. This is the single most important step.
-- Record today's live version so we can return to it: it is commit on the branch
-  the live site tracks. (If the live site does **not** use Git yet, we take a full
-  file backup of the `phpapp` folder as the restore point.)
+- Record today's live commit so we can return to it — a plain `git` rollback on the
+  VPS to that commit restores the exact previous code in seconds.
 - **Backout at this stage:** nothing has changed. There is nothing to undo.
 
 ### Stage 1 — Rehearse on a copy, not the live site (half a day)
@@ -143,7 +170,8 @@ deploy can never touch them. That is the safest way to update.
 > adds — that real data upgrades cleanly.
 
 ### Stage 2 — Ship the code to live, "dark" (15 min, low risk)
-- Update the live site the normal way (§3): pull/upload the whole `phpapp` folder.
+- Merge the approved code into the branch the VPS tracks, then `git pull` on the VPS
+  (Git leaves `config.local.php` and `tenants.php` untouched — they are ignored).
 - Open one page so the site upgrades its own database (this creates the empty
   `saas_tenants` directory). **Do NOT turn on cloud mode yet. Do NOT add a company.**
 - **Result:** the live site looks and works **exactly** as before to every current
@@ -204,19 +232,17 @@ MGH's own.
 
 ## 6. New day-2 routines (the short runbook)
 
-**Adding a company** (MySQL, our confirmed model) — two steps:
-1. In **cPanel → MySQL Databases**, create an empty database + a user with all
-   privileges on it (about 2 minutes). Note the database name, user and password.
-2. On the **Companies** console → *Add a company* → name, owner email + password,
-   plan or à-la-carte modules, seats, and the database details from step 1 → Save.
-   The system fills that empty database with a fresh, isolated install and the
-   owner can sign in by email immediately. The layout is in `tenants.sample.php`.
+**Adding a company** (VPS, one-click) — a single step:
+- On the **Companies** console → *Add a company* → name, owner email + password,
+  plan or à-la-carte modules, seats → Save. The app **creates the client's MySQL
+  database automatically** and stands up a fresh, isolated install in it. The owner
+  then signs in by email and is guided through the **onboarding wizard** to enter
+  their company details and first team members.
 
 **Backups now** — you back up **each client's MySQL database**, not just one:
-- Export each company's database (phpMyAdmin), **plus** MGH's own database (which
-  doubles as the control database holding the company directory).
-- A **nightly cPanel full-account backup covers all of them in one shot** — the
-  simplest option, and the recommended one.
+- On the VPS, a **nightly `mysqldump --all-databases`** (or your panel's scheduled
+  backup) captures every client's database **plus** MGH's own control database in
+  one job. Keep those dumps off the server. This is the simplest, recommended route.
 
 **Changing a plan, seats or modules** — Companies console → the company → adjust →
 Save. The change is pushed into that company's live site automatically.
@@ -250,57 +276,62 @@ can see what they see, without knowing their password.
 - [x] Decision B: **MySQL, one database per client**; MGH stays on its current MySQL DB, no migration
 - [ ] Pilot company + owner email confirmed: `__________`
 
+**Build (before Stage 2) — the one-click + onboarding increment**
+- [ ] Auto-create the client's MySQL database when a company is added (VPS)
+- [ ] New company lands its owner in the onboarding wizard (self-entered details)
+- [ ] Tests + rehearsal green for the new path
+
 **Stage 0 — Backup**
-- [ ] Live MySQL database exported (phpMyAdmin) and copied off the server
+- [ ] Live MySQL database dumped (`mysqldump`) and copied off the server
 - [ ] `config.local.php` copied safely
-- [ ] Known-good version / full folder backup recorded
+- [ ] Known-good commit on the live branch recorded (for a quick `git` rollback)
 
 **Stage 1 — Rehearsal on a copy**
 - [ ] Staging built from `Testing` with a copy of the live MySQL data
+- [ ] One-click add → auto-created DB → client self-onboards, proven
 - [ ] 3-company isolation + seat-cap + suspend rehearsal passed
-- [ ] Server check green; test suite green (6,410 passing)
-- [ ] Confirmed on this host: adding a company auto-builds the client DB (see §9)
+- [ ] Server check green; test suite green
 
 **Stage 2 — Ship dark to live**
-- [ ] Whole `phpapp` folder updated (cPanel Git → Update from Remote preferred)
-- [ ] `config.local.php` / `tenants.php` NOT overwritten
+- [ ] VPS pulls the approved code (`git pull` on the branch the VPS tracks)
+- [ ] `config.local.php` / `tenants.php` NOT touched (Git ignores them)
 - [ ] One page opened; self-upgrade ran
 - [ ] Current site verified normal (username sign-in, main screens, Server check)
 
 **Stage 3 — Pilot**
-- [ ] Empty MySQL database + user created in cPanel for the pilot
+- [ ] Database-admin credential present in `config.local.php` (enables auto-create)
 - [ ] Cloud mode turned on (`tenants.php` written from Settings)
-- [ ] Pilot company added pointing at that database; owner signs in by email
+- [ ] Pilot company added in one click; owner signs in by email and self-onboards
 - [ ] Pilot day-one task completed; modules + seat cap correct
 - [ ] Watched 2–3 days, stable
 
 **Stage 4 — Open + billing**
-- [ ] Further companies added one at a time (empty DB first, then console)
+- [ ] Further companies added one at a time (one click each)
 - [ ] Live Razorpay keys connected; price book set; per-company billing correct
 
 **Stage 5 — Hand-over**
-- [ ] Runbook (§6) shared with whoever runs hosting
-- [ ] Per-client MySQL backup routine confirmed running (nightly full-account backup)
+- [ ] Runbook (§6) shared with whoever runs the VPS
+- [ ] Nightly all-databases backup confirmed running
 
 ---
 
-## 9. Three small host facts worth confirming (I can also self-check these)
+## 9. Your VPS — the three host facts, resolved
 
-None of these blocks us — I will verify each during the Stage 1 rehearsal — but if
-you can get quick answers from whoever manages the cPanel, it removes all guesswork:
+On a VPS (your own server) all three unknowns from the shared-hosting version are
+settled in the good direction:
 
-1. **Does the hosting plan allow enough MySQL databases?** One per client. Some
-   shared plans cap the number (e.g. 25). If yours is capped, we simply know the
-   client ceiling in advance and can request an upgrade before we hit it.
-2. **Is the live site updated via cPanel "Git Version Control", or by uploading a
-   ZIP?** Git → *Update from Remote* is the safest (it can never touch your three
-   "keep" files). If it is ZIP uploads today, I will note the extra care needed.
-3. **Does the host allow the app to run a small background command (PHP `exec`/shell
-   or SSH)?** This is what lets *Add a company* build the client's database in one
-   click. **If the host blocks it, nothing is lost** — the client's database is
-   filled by opening its address once and finishing the 60-second first-run wizard
-   instead. I will confirm which path applies during rehearsal and wire it so *Add a
-   company* "just works" either way.
+1. **Database count:** **no limit.** Host as many client companies as the server has
+   room for; grow the VPS when it fills, not because of an artificial cap.
+2. **Updating the live site:** **you code it and push; the VPS pulls the code.** The
+   go-live route is a Git pull on the server (or a deploy hook that runs `git pull`).
+   This is the safest kind of update — it never touches your protected files
+   (`config.local.php`, `tenants.php`). *(Working note: all new code lands on the
+   `Testing` branch. "Going live" is a deliberate, human-approved merge into the
+   branch the VPS tracks, followed by the pull — never an automatic push to live.)*
+3. **Running the setup step:** **allowed.** The VPS lets the app create databases and
+   run its own provisioning, so *Add a company* is genuinely one-click and the client
+   self-onboards (see §2). The only setup is a database-admin credential in
+   `config.local.php`, which the VPS already has.
 
 ---
 
