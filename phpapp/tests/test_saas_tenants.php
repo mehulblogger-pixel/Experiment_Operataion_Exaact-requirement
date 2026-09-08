@@ -121,3 +121,19 @@ t_ok(strpos($off2, 'reporting') !== false && strpos($off2, 'sales') === false,
     'the PRO plan keeps sales on and only switches off reporting');
 setting_set('modules_off', $origOff);
 if (function_exists('licence_disabled')) licence_disabled(true);   // restore for later tests
+
+// Per-seat enforcement (Increment 4).
+t_section('SaaS control plane — per-seat enforcement');
+t_ok(function_exists('saas_seat_block'), 'the seat-cap check exists');
+t_ok(function_exists('saas_push_to_tenant'), 'the push-to-live helper exists');
+t_ok(is_file(dirname(__DIR__) . '/lib/saas_sync_cli.php'), 'the sync worker is shipped');
+$origLimit = (string) setting_get('saas_seat_limit', '');
+setting_set('saas_seat_limit', '0');
+t_eq(saas_seat_block(), '', 'no seat limit set means unlimited (no block)');
+$active = (int) ops_val("SELECT COUNT(*) FROM users WHERE is_active=1");
+setting_set('saas_seat_limit', (string) ($active + 1));
+t_eq(saas_seat_block(), '', 'below the limit a new login is allowed');
+setting_set('saas_seat_limit', (string) max(1, $active));
+t_ok(saas_seat_block() !== '', 'at the limit a new login is blocked');
+t_ok(strpos(saas_seat_block(), 'seat') !== false, 'the block message tells them to buy seats');
+setting_set('saas_seat_limit', $origLimit);   // MUST restore — a stray limit would block later tests' user creation

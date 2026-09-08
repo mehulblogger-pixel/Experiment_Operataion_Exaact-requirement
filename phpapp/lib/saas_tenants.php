@@ -290,6 +290,50 @@ function saas_apply_plan_modules($plan) {
     if (function_exists('licence_disabled')) licence_disabled(true);   // reload the off-list cache
 }
 
+// Enforce the seat cap when a company adds a login. Reads the seat limit that
+// was pushed into THIS company's own database (setting saas_seat_limit); returns
+// a message to block, or '' to allow. Complements the licence seat check — a
+// SaaS company has no signed licence, so that one lets everyone through.
+function saas_seat_block($role = '') {
+    if (!function_exists('setting_get')) return '';
+    $limit = (int) setting_get('saas_seat_limit', 0);
+    if ($limit <= 0) return '';                 // not a metered company / unlimited
+    try { $used = (int) ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"); }
+    catch (Throwable $e) { return ''; }
+    if ($used < $limit) return '';
+    return 'This company is on ' . $limit . ' ' . ($limit === 1 ? 'seat' : 'seats')
+         . ' and all ' . $limit . ' are in use. Buy more seats — or ask your provider to add them — before creating another login.';
+}
+
+// Push a company's plan / modules / seat limit into its OWN database so the
+// change takes effect there. Light child process against the company's store
+// (no reboot — it already exists). Returns true on success.
+function saas_push_to_tenant($key) {
+    $key = strtolower(trim((string) $key));
+    $t = saas_tenant_get($key);
+    if (!$t) return false;
+    $reg = function_exists('tenant_registry') ? tenant_registry() : ['tenants' => []];
+    $route = $reg['tenants'][$key] ?? null;
+    if (!$route) return false;
+    $php = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
+    $cli = __DIR__ . '/saas_sync_cli.php';
+    $env = 'SAAS_PLAN=' . escapeshellarg(strtoupper((string) ($t['plan'] ?? 'RECRUITMENT')))
+         . ' SAAS_SEAT_LIMIT=' . escapeshellarg((string) saas_tenant_seat_limit($key));
+    if (!empty($route['sqlite'])) {
+        $env .= ' SAAS_SQLITE=' . escapeshellarg((string) $route['sqlite']);
+    } elseif (!empty($route['db']) && is_array($route['db'])) {
+        $d = $route['db'];
+        $env .= ' DB_DRIVER=mysql DB_HOST=' . escapeshellarg((string) ($d['host'] ?? 'localhost'))
+              . ' DB_NAME=' . escapeshellarg((string) ($d['name'] ?? '')) . ' DB_USER=' . escapeshellarg((string) ($d['user'] ?? ''))
+              . ' DB_PASS=' . escapeshellarg((string) ($d['pass'] ?? ''));
+    } else { return false; }
+    $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+    if (!function_exists('exec') || in_array('exec', $disabled, true)) return false;
+    $out = []; $code = 1;
+    @exec($env . ' ' . escapeshellarg($php) . ' ' . escapeshellarg($cli) . ' 2>&1', $out, $code);
+    return $code === 0;
+}
+
 function ops_saas_admin($route, $method) {
     ops_require(function_exists('superadmin_can') ? superadmin_can() : (function_exists('is_master') && is_master()),
         'Only the Super Admin can open the Companies console.');
@@ -349,7 +393,8 @@ function ops_saas_admin($route, $method) {
             $cli = __DIR__ . '/saas_provision_cli.php';
             $env = 'SAAS_COMPANY=' . escapeshellarg($company) . ' SAAS_EMAIL=' . escapeshellarg($oemail)
                  . ' SAAS_NAME=' . escapeshellarg($oname) . ' SAAS_PASS=' . escapeshellarg($opass)
-                 . ' SAAS_PLAN=' . escapeshellarg($plan);
+                 . ' SAAS_PLAN=' . escapeshellarg($plan)
+                 . ' SAAS_SEAT_LIMIT=' . escapeshellarg((string) saas_tenant_seat_limit($nkey));
             if ($dbkind === 'mysql') {
                 $env .= ' DB_DRIVER=mysql DB_HOST=' . escapeshellarg($db['host']) . ' DB_NAME=' . escapeshellarg($db['name'])
                       . ' DB_USER=' . escapeshellarg($db['user']) . ' DB_PASS=' . escapeshellarg($db['pass']);
@@ -375,9 +420,17 @@ function ops_saas_admin($route, $method) {
             redirect('/companies');
         }
 
+        // Apply a directory change to the company's live database, and word the
+        // confirmation by whether that push actually took effect.
+        $pushed = function ($key, $what) {
+            $ok = saas_push_to_tenant($key);
+            flash($what . ' updated for ' . $key . ($ok ? ' and applied to their live workspace.'
+                : '. (Saved here; it will apply to their workspace on the next sync — automatic pushing is off on this server.)'),
+                $ok ? 'success' : 'warning');
+        };
         if ($do === 'company_plan' && $key !== '') {
             saas_tenant_set_plan($key, (string) ($_POST['plan'] ?? ''), trim((string) ($_POST['plan_expiry'] ?? '')) ?: null);
-            flash('Plan updated for ' . $key . '.');
+            $pushed($key, 'Plan');
             redirect($back);
         }
         if ($do === 'company_seats' && $key !== '') {
@@ -386,7 +439,7 @@ function ops_saas_admin($route, $method) {
             $t = saas_tenant_get($key);
             $cur = (int) ($t['extra_user_seats'] ?? 0);
             saas_tenant_add_seats($key, $want - $cur);
-            flash('Seats updated for ' . $key . '.');
+            $pushed($key, 'Seats');
             redirect($back);
         }
         if ($do === 'company_modules' && $key !== '') {
@@ -394,7 +447,7 @@ function ops_saas_admin($route, $method) {
             $picked = array_values(array_intersect($valid, (array) ($_POST['mods'] ?? [])));
             if (!in_array('admin', $picked, true)) $picked[] = 'admin';   // admin is core, always on
             saas_tenant_set_modules($key, $picked);
-            flash('Modules updated for ' . $key . '.');
+            $pushed($key, 'Modules');
             redirect($back);
         }
         if ($do === 'company_status' && $key !== '') {

@@ -7979,6 +7979,14 @@ function ops_users($route, $method) {
                 // might be. Editing an existing person is never blocked — that
                 // would strand a customer who is over their seat count with no
                 // way to correct anybody's details.
+                // Cloud per-seat cap (a company on the shared platform, metered by
+                // the plan + purchased seats pushed into its own store). Sits beside
+                // the licence check below, which a SaaS company — having no signed
+                // licence — never trips.
+                if (function_exists('saas_seat_block') && ($seatErr = saas_seat_block($role)) !== '') {
+                    flash($seatErr, 'error');
+                    redirect('/users');
+                }
                 if (function_exists('lk_seat_block') && ($seatErr = lk_seat_block($role)) !== '') {
                     flash($seatErr, 'error');
                     redirect('/users');

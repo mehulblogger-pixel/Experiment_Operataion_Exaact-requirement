@@ -72,6 +72,8 @@ try {
 
     // The bought modules — switch off everything the plan does not include.
     if (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules($plan);
+    // How many logins this company may hold (plan base + purchased seats).
+    setting_set('saas_seat_limit', (string) max(0, (int) getenv('SAAS_SEAT_LIMIT')));
     if (function_exists('doc_tpl_migrate')) doc_tpl_migrate();
 
     echo "OK " . $company . "\n";
