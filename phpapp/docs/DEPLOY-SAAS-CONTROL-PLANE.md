@@ -276,10 +276,13 @@ can see what they see, without knowing their password.
 - [x] Decision B: **MySQL, one database per client**; MGH stays on its current MySQL DB, no migration
 - [ ] Pilot company + owner email confirmed: `__________`
 
-**Build (before Stage 2) — the one-click + onboarding increment**
-- [ ] Auto-create the client's MySQL database when a company is added (VPS)
-- [ ] New company lands its owner in the onboarding wizard (self-entered details)
-- [ ] Tests + rehearsal green for the new path
+**Build (before Stage 2) — the one-click + onboarding increment — DONE**
+- [x] Auto-create the client's MySQL database when a company is added (VPS) —
+      `saas_mysql_provision_db()`, driven by a DB-admin credential in `config.local.php`
+- [x] New company lands its owner in the onboarding wizard (self-entered company
+      profile) — provisioner flags onboarding; the setup wizard fires on first login
+- [x] Tests green (suite passing); self-onboarding proven end-to-end in the browser
+- [ ] MySQL auto-create exercised against the real server (done at Stage 1 on the VPS)
 
 **Stage 0 — Backup**
 - [ ] Live MySQL database dumped (`mysqldump`) and copied off the server

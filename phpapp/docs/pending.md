@@ -122,6 +122,16 @@ increments 1–2):
 3. ✅ **Billing math** — `saas_company_quote(modules, seats, period)` → line items
    + total.
 
+**Built (one-click provisioning + self-onboarding increment):**
+- ✅ **One-click "Add a company"** — on a VPS the console creates the client's own
+  MySQL database automatically (`saas_mysql_provision_db()`), driven by a
+  database-admin credential kept only in `config.local.php`. Falls back to
+  "point at an existing database" when that credential is absent.
+- ✅ **Client self-onboarding** — a newly provisioned company lands its owner in
+  the setup wizard on first sign-in to complete their own company profile
+  (business name, industry, financial year, currency), name pre-filled by the
+  provider. The provisioner flags onboarding; finishing it clears the flag.
+
 **Still to build:**
 4. **Customer-facing checkout** — wire `saas_company_quote()` to the existing
    Razorpay buy/verify flow so a company (not just the super-admin) can pay for

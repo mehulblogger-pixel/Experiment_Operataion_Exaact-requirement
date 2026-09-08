@@ -375,6 +375,72 @@ function saas_seat_block($role = '') {
          . ' and all ' . $limit . ' are in use. Buy more seats — or ask your provider to add them — before creating another login.';
 }
 
+// ---- Auto-provision a client's MySQL database (VPS one-click) ---------------
+// On a self-managed server (a VPS) the app can create each new company's own
+// database itself, so "Add a company" is genuinely one click — no manual cPanel
+// step. It needs a database-admin credential allowed to CREATE DATABASE / CREATE
+// USER, kept ONLY in the server's private config.local.php (never in the code,
+// never in git). Without that credential the console simply offers "point at an
+// existing database" instead — nothing breaks.
+
+// The database-admin credential, if the server is configured for auto-create.
+// Read from config.local.php (exposed by config.php as $SAAS_DB_ADMIN), with an
+// environment fallback so it is testable. Returns null when not configured.
+function saas_db_admin_config() {
+    $cfg = $GLOBALS['SAAS_DB_ADMIN'] ?? null;
+    if (!is_array($cfg)) {
+        $u = getenv('SAAS_DB_ADMIN_USER');
+        if ($u === false || $u === '') return null;
+        $cfg = ['host' => getenv('SAAS_DB_ADMIN_HOST') ?: 'localhost', 'user' => $u,
+                'pass' => (string) getenv('SAAS_DB_ADMIN_PASS'), 'prefix' => (string) getenv('SAAS_DB_ADMIN_PREFIX')];
+    }
+    if ((string) ($cfg['user'] ?? '') === '') return null;
+    $cfg['host']   = (string) ($cfg['host'] ?? 'localhost') ?: 'localhost';
+    $cfg['prefix'] = (string) ($cfg['prefix'] ?? '');
+    return $cfg;
+}
+
+// True when this server can create a client database on its own.
+function saas_can_autocreate_db() { return saas_db_admin_config() !== null; }
+
+// A workspace key → a safe MySQL identifier fragment (letters, digits, underscore).
+function saas_db_ident($s) {
+    $s = strtolower((string) $s);
+    $s = preg_replace('/[^a-z0-9]+/', '_', $s);
+    $s = trim($s, '_');
+    return $s === '' ? 'co' : $s;
+}
+
+// Derive the database name + user for a workspace, honouring an optional prefix
+// (e.g. an account prefix). MySQL caps identifiers at 64 (database) and 32 (user)
+// characters, so the user name is truncated to fit.
+function saas_db_names_for($key, $prefix = '') {
+    $frag = saas_db_ident($key);
+    $p = $prefix !== '' ? rtrim(saas_db_ident($prefix), '_') . '_' : '';
+    return ['name' => substr($p . $frag, 0, 64), 'user' => substr($p . $frag, 0, 32)];
+}
+
+// Create the empty database + a user scoped to just that database, using the
+// admin credential. Returns the tenant db config ['host','name','user','pass']
+// on success; throws on any failure. Identifier names are DERIVED and VALIDATED
+// (never raw user input) because SQL identifiers cannot be bound as parameters.
+function saas_mysql_provision_db($key, array $admin) {
+    $names = saas_db_names_for($key, (string) ($admin['prefix'] ?? ''));
+    $name = $names['name']; $user = $names['user'];
+    if (!preg_match('/^[a-z0-9_]{1,64}$/', $name) || !preg_match('/^[a-z0-9_]{1,32}$/', $user))
+        throw new RuntimeException('Could not derive a safe database name for this company.');
+    $host = (string) ($admin['host'] ?? 'localhost') ?: 'localhost';
+    $pass = bin2hex(random_bytes(12));
+    $pdo  = new PDO("mysql:host={$host};charset=utf8mb4", (string) $admin['user'], (string) ($admin['pass'] ?? ''),
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 8]);
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $pdo->exec("CREATE USER IF NOT EXISTS '{$user}'@'{$host}' IDENTIFIED BY " . $pdo->quote($pass));
+    $pdo->exec("ALTER USER '{$user}'@'{$host}' IDENTIFIED BY " . $pdo->quote($pass));   // ensure the fresh password
+    $pdo->exec("GRANT ALL PRIVILEGES ON `{$name}`.* TO '{$user}'@'{$host}'");
+    $pdo->exec("FLUSH PRIVILEGES");
+    return ['host' => $host, 'name' => $name, 'user' => $user, 'pass' => $pass];
+}
+
 // Push a company's plan / modules / seat limit into its OWN database so the
 // change takes effect there. Light child process against the company's store
 // (no reboot — it already exists). Returns true on success.
@@ -444,7 +510,17 @@ function ops_saas_admin($route, $method) {
             }
             if ($opass === '') $opass = bin2hex(random_bytes(4));   // a temp password to hand over
 
-            if ($dbkind === 'mysql') {
+            if ($dbkind === 'auto') {
+                // One-click on a VPS: the app creates the client's MySQL database
+                // itself, using the server's database-admin credential.
+                $admin = saas_db_admin_config();
+                if (!$admin) {
+                    flash('Automatic database creation is not set up on this server. Enter the database details instead, or ask your administrator to add the database-admin credential to config.local.php.', 'error');
+                    redirect('/companies');
+                }
+                try { $db = saas_mysql_provision_db($nkey, $admin); }
+                catch (Throwable $e) { flash('Could not create the database automatically: ' . $e->getMessage(), 'error'); redirect('/companies'); }
+            } elseif ($dbkind === 'mysql') {
                 $db = ['host' => trim((string) ($_POST['db_host'] ?? 'localhost')), 'name' => trim((string) ($_POST['db_name'] ?? '')),
                        'user' => trim((string) ($_POST['db_user'] ?? '')), 'pass' => (string) ($_POST['db_pass'] ?? '')];
                 if ($db['name'] === '' || $db['user'] === '') { flash('A MySQL database name and user are required.', 'error'); redirect('/companies'); }
@@ -466,11 +542,11 @@ function ops_saas_admin($route, $method) {
                  . ' SAAS_NAME=' . escapeshellarg($oname) . ' SAAS_PASS=' . escapeshellarg($opass)
                  . ' SAAS_PLAN=' . escapeshellarg($plan)
                  . ' SAAS_SEAT_LIMIT=' . escapeshellarg((string) saas_tenant_seat_limit($nkey));
-            if ($dbkind === 'mysql') {
-                $env .= ' DB_DRIVER=mysql DB_HOST=' . escapeshellarg($db['host']) . ' DB_NAME=' . escapeshellarg($db['name'])
-                      . ' DB_USER=' . escapeshellarg($db['user']) . ' DB_PASS=' . escapeshellarg($db['pass']);
-            } else {
+            if (!empty($db['sqlite'])) {
                 $env .= ' SAAS_SQLITE=' . escapeshellarg($db['sqlite']);
+            } else {
+                $env .= ' DB_DRIVER=mysql DB_HOST=' . escapeshellarg((string) ($db['host'] ?? 'localhost')) . ' DB_NAME=' . escapeshellarg((string) $db['name'])
+                      . ' DB_USER=' . escapeshellarg((string) $db['user']) . ' DB_PASS=' . escapeshellarg((string) ($db['pass'] ?? ''));
             }
             $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
             $canExec = function_exists('exec') && !in_array('exec', $disabled, true);
@@ -479,7 +555,8 @@ function ops_saas_admin($route, $method) {
 
             if ($canExec && $code === 0) {
                 flash('Company “' . $company . '” is ready. Its owner signs in at the one product URL with '
-                    . $oemail . ' (temporary password: ' . $opass . ' — they set their own on first login).');
+                    . $oemail . ' (temporary password: ' . $opass . '). On first sign-in they set their own password '
+                    . 'and complete their company onboarding (business profile, financial year, currency).');
             } elseif ($canExec) {
                 if (function_exists('tenant_remove')) tenant_remove($nkey);   // roll back a half-made company
                 saas_login_index_set($oemail, $nkey, false);
@@ -570,6 +647,7 @@ function ops_saas_admin($route, $method) {
         'price_book' => saas_price_book(),
         'quote'     => $selRow ? saas_company_quote(saas_tenant_modules($sel), saas_tenant_seat_limit($sel), 'month') : null,
         'base_domain' => function_exists('tenant_base_domain') ? tenant_base_domain() : '',
+        'can_autocreate' => saas_can_autocreate_db(),
     ]);
     return true;
 }

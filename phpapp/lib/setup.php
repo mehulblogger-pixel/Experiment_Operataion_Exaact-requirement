@@ -196,13 +196,21 @@ function setup_render_db_form(array $vals = [], $msg = '', $isError = false) {
 function setup_done() {
     return function_exists('setting_get') && setting_get('setup_done', '') === '1';
 }
-function setup_mark_done() { if (function_exists('setting_set')) setting_set('setup_done', '1'); }
+function setup_mark_done() {
+    if (function_exists('setting_set')) {
+        setting_set('setup_done', '1');
+        setting_set('saas_onboarding_pending', '');   // onboarding finished
+    }
+}
 
 // Whether to force the wizard. True only on a genuinely fresh system — an
 // install that already has data was set up before this wizard existed and must
 // never be dragged through it. Any real sign of use answers "no".
 function setup_needed() {
     if (setup_done()) return false;
+    // A company the provider just provisioned is explicitly flagged to complete
+    // its own onboarding — show the wizard even though its name was pre-filled.
+    if (function_exists('setting_get') && (string) setting_get('saas_onboarding_pending', '') === '1') return true;
     try {
         // Offices and business partners are auto-seeded on first boot, so they
         // prove nothing. Real signs of a system in use do: a company name set, a

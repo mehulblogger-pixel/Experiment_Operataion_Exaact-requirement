@@ -54,8 +54,14 @@ try {
     $pass    = (string) getenv('SAAS_PASS');
     $plan    = strtoupper((string) getenv('SAAS_PLAN') ?: 'RECRUITMENT');
 
+    // Pre-fill the company name as a friendly default, but leave the company to
+    // finish its OWN onboarding on first login — the setup wizard walks the owner
+    // through their company profile (confirm name, industry, financial year,
+    // currency) and their admin password. We deliberately do NOT mark setup_done;
+    // the onboarding flag below forces the wizard even though the name is set, and
+    // completing it clears the flag and marks setup done.
     if ($company !== '') setting_set('app_name', substr($company, 0, 120));
-    setting_set('setup_done', '1');
+    setting_set('saas_onboarding_pending', '1');
 
     // The owner becomes the company's admin; they set their own password at first
     // login (must_change_pwd = 1).

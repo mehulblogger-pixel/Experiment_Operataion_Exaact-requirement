@@ -4,7 +4,7 @@
 // to log in as a company. Data: $companies, $plans, $modules, $sel, $base_domain.
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 $companies = $companies ?? []; $plans = $plans ?? []; $modules = $modules ?? [];
-$sel = $sel ?? null; $base_domain = $base_domain ?? '';
+$sel = $sel ?? null; $base_domain = $base_domain ?? ''; $can_autocreate = $can_autocreate ?? false;
 $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
 ?>
 <style>
@@ -55,8 +55,11 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     <div style="margin-top:12px;border-top:1px dashed var(--line,#e5e7eb);padding-top:12px">
       <label style="font-size:12px;font-weight:600">Where the company's data lives</label>
       <div style="display:flex;gap:16px;align-items:center;margin:6px 0 8px;flex-wrap:wrap">
-        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="sqlite" checked> Its own file (simplest — no setup)</label>
-        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="mysql"> MySQL database (you created it in cPanel)</label>
+        <?php if ($can_autocreate): ?>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="auto" checked> ✨ Create its MySQL database automatically <span class="sc-key">(recommended)</span></label>
+        <?php endif; ?>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="sqlite" <?= $can_autocreate ? '' : 'checked' ?>> Its own file (simplest — no setup)</label>
+        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="mysql"> MySQL database I created myself</label>
       </div>
       <div class="sc-edit" style="padding:0">
         <div class="ff"><label>MySQL host</label><input name="db_host" value="localhost"></div>
@@ -64,7 +67,10 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
         <div class="ff"><label>MySQL user</label><input name="db_user" placeholder="prefix_asme"></div>
         <div class="ff"><label>MySQL password</label><input type="password" name="db_pass" autocomplete="new-password"></div>
       </div>
-      <div class="sc-note">MySQL fields are used only when “MySQL database” is chosen above. The company's data stays fully separate from every other company.</div>
+      <div class="sc-note">
+        <?php if ($can_autocreate): ?>“Create automatically” builds a fresh, isolated MySQL database for this company on this server — no manual step. <?php endif; ?>
+        The MySQL fields below are used only when “I created myself” is chosen. Either way the company's data stays fully separate from every other company, and the owner then completes their own onboarding (company profile) on first sign-in.
+      </div>
     </div>
     <button class="btn" style="margin-top:6px">Create company</button>
   </form>
@@ -72,7 +78,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
 
 <?php if (!$companies): ?>
   <div class="sc-card"><div style="padding:18px" class="sc-note">
-    No companies in the directory yet. A company is registered from <a href="/tenants">Cloud workspaces</a> (its database) and appears here for plan, seat and module management. Auto “add a company in one form” is the next increment.
+    No companies in the directory yet. Use <strong>＋ Add a company</strong> above to create one in a single step — the app builds its database and the owner signs in and completes their own onboarding. (Existing workspaces registered from <a href="/tenants">Cloud workspaces</a> also appear here for plan, seat and module management.)
   </div></div>
 <?php else: ?>
 <div class="sc-card">

@@ -162,3 +162,47 @@ t_ok(strpos($off3, 'operations') !== false && strpos($off3, 'hr') === false, 'a 
 t_eq((string) setting_get('product_package', ''), 'CUSTOM', 'a custom module set marks the package CUSTOM');
 setting_set('modules_off', $origOff2);
 if (function_exists('licence_disabled')) licence_disabled(true);
+
+// Self-onboarding — a freshly provisioned company completes its own company
+// profile on first login. The provisioner flags it; the setup wizard fires even
+// though the name was pre-filled; finishing setup clears the flag.
+t_section('SaaS control plane — a new company self-onboards on first login');
+t_ok(function_exists('setup_needed') && function_exists('setup_mark_done'), 'the setup-wizard helpers exist');
+$origDone = (string) setting_get('setup_done', '');
+$origOnb  = (string) setting_get('saas_onboarding_pending', '');
+setting_set('setup_done', '');                       // as a fresh tenant would be
+setting_set('saas_onboarding_pending', '1');         // as the provisioner stamps it
+t_ok(setup_needed() === true, 'a provisioned company is sent through onboarding even with its name pre-filled');
+setup_mark_done();                                   // owner finishes onboarding
+t_eq((string) setting_get('setup_done', ''), '1', 'finishing onboarding marks setup done');
+t_eq((string) setting_get('saas_onboarding_pending', ''), '', 'finishing onboarding clears the pending flag');
+t_ok(setup_needed() === false, 'onboarding is not shown again once complete');
+setting_set('setup_done', $origDone);                // restore for later tests
+setting_set('saas_onboarding_pending', $origOnb);
+
+// One-click database creation on a VPS — the console can build a client's own
+// MySQL database. We prove the naming/derivation and the credential detection;
+// the live CREATE DATABASE is exercised against the real server at rehearsal.
+t_section('SaaS control plane — one-click database creation (VPS)');
+t_ok(function_exists('saas_db_names_for') && function_exists('saas_mysql_provision_db'), 'the auto-create helpers exist');
+t_eq(saas_db_ident('Acme & Co.'), 'acme_co', 'a company name becomes a safe MySQL identifier fragment');
+t_eq(saas_db_ident('   '), 'co', 'an empty name still yields a safe fragment');
+$n1 = saas_db_names_for('asme-pharma');
+t_eq($n1['name'], 'asme_pharma', 'the database name is derived from the workspace key');
+t_eq($n1['user'], 'asme_pharma', 'the database user is derived from the workspace key');
+$n2 = saas_db_names_for('asme', 'acct');
+t_eq($n2['name'], 'acct_asme', 'an account prefix is prepended to the database name');
+$long = saas_db_names_for(str_repeat('workspace-', 6));   // very long key
+t_ok(strlen($long['name']) <= 64, 'the database name is capped at 64 characters (MySQL limit)');
+t_ok(strlen($long['user']) <= 32, 'the database user is capped at 32 characters (MySQL limit)');
+
+// Credential detection: absent by default, present when configured (env fallback).
+$origGlobal = $GLOBALS['SAAS_DB_ADMIN'] ?? null; unset($GLOBALS['SAAS_DB_ADMIN']);
+foreach (['SAAS_DB_ADMIN_USER','SAAS_DB_ADMIN_HOST','SAAS_DB_ADMIN_PASS','SAAS_DB_ADMIN_PREFIX'] as $ev) putenv($ev);
+t_ok(saas_db_admin_config() === null && saas_can_autocreate_db() === false, 'without a credential the server cannot auto-create (safe default: manual entry)');
+putenv('SAAS_DB_ADMIN_USER=root'); putenv('SAAS_DB_ADMIN_HOST=localhost');
+$adm = saas_db_admin_config();
+t_ok(is_array($adm) && $adm['user'] === 'root' && $adm['host'] === 'localhost', 'a configured credential is read back');
+t_ok(saas_can_autocreate_db() === true, 'with a credential the console offers one-click database creation');
+foreach (['SAAS_DB_ADMIN_USER','SAAS_DB_ADMIN_HOST','SAAS_DB_ADMIN_PASS','SAAS_DB_ADMIN_PREFIX'] as $ev) putenv($ev);
+if ($origGlobal !== null) $GLOBALS['SAAS_DB_ADMIN'] = $origGlobal;   // restore
