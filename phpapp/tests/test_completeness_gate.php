@@ -23,14 +23,14 @@ if (function_exists('idems_completeness_check') && function_exists('idems_type_i
         return 'absent';
     };
 
-    // A standalone vendor audit has no QAP/ITP field and no linked job -> N/A.
-    t_eq($status('UAUD_VENDOR', 'qap'), 'NA', 'a vendor audit does not demand QAP / ITP (N/A, not a dead-end)');
-    // A vendor assessment has neither an inspection-scope field nor QAP -> both N/A.
-    t_eq($status('VASR', 'scope'), 'NA', 'a vendor assessment does not demand Scope of inspection (N/A)');
-    t_eq($status('VASR', 'qap'),   'NA', 'a vendor assessment does not demand QAP / ITP (N/A)');
+    // QAP / ITP never BLOCKS — it is attached in the document list, so with no QAP
+    // evidence the check is N/A (never FAIL), on every report type.
+    t_eq($status('UAUD_VENDOR', 'qap'), 'NA', 'a vendor audit never blocks on QAP / ITP (N/A)');
+    t_eq($status('VASR', 'qap'),        'NA', 'a vendor assessment never blocks on QAP / ITP (N/A)');
+    t_eq($status('MGHIR', 'qap'),       'NA', 'an inspection report with no QAP recorded is N/A, not a dead-end FAIL');
+    // When a QAP revision IS recorded, the check shows PASS (green), never a block.
+    t_eq($status('MGHIR', 'qap', ['qap_rev' => 'R3']), 'PASS', 'a recorded QAP revision shows the check as passed');
 
-    // But when the report IS linked to an inspection job, QAP / ITP becomes a real
-    // requirement again (proving we did not simply switch the check off).
-    $q = $status('UAUD_VENDOR', 'qap', ['job_id' => 999999]);
-    t_ok($q === 'FAIL' || $q === 'PASS', 'with a linked inspection job, QAP / ITP is required again (not N/A)');
+    // A vendor assessment has no inspection-scope field -> scope is N/A.
+    t_eq($status('VASR', 'scope'), 'NA', 'a vendor assessment does not demand Scope of inspection (N/A)');
 }

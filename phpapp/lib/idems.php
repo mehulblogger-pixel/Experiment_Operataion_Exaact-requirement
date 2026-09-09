@@ -3960,20 +3960,30 @@ function idems_completeness_check($doc) {
         $scopeOk = ($scopeField['ftype'] ?? '') === 'table' ? (is_array($sv) && $sv) : (trim((string)$sv) !== '');
         [$s,$d] = $yn($scopeOk, '', 'No scope / activities recorded'); $add('scope','Scope of inspection',$s,$d);
     }
+    // Applicable specification: honour the "Applicable Standards" captured INSIDE
+    // the report body (its own table / field) as well as the header field, so the
+    // standards recorded on the report itself count — they need not be re-typed in
+    // the "Edit details" header.
     $spec = $eff([0=>'standards']);
-    if ($spec !== '') $add('spec','Applicable specification','PASS',$spec);
+    $stdField = $hasField(fn($f) => (bool)preg_match('/standard|specification/i', (string)($f['label'] ?? '').' '.(string)($f['fkey'] ?? '')));
+    $stdInBody = false;
+    if ($stdField) { $sv = $data[$stdField['fkey']] ?? ''; $stdInBody = ($stdField['ftype'] ?? '') === 'table' ? (is_array($sv) && $sv) : (trim((string)$sv) !== ''); }
+    if ($spec !== '' || $stdInBody) $add('spec','Applicable specification','PASS', $spec !== '' ? $spec : 'Recorded in the report');
     else $add('spec','Applicable specification','NA','Held in the reference documents / not captured on this report type');
-    // QAP / ITP is required only when there is a way to record it on this report:
-    // a QAP/ITP field on the form, a linked inspection job (which carries QAP
-    // files), or a rev already entered. A standalone vendor audit has none of
-    // these, so it is N/A rather than an unsatisfiable failure.
+    // QAP / ITP is NOT a blocking requirement — teams attach the QAP/ITP in the
+    // report's document list (a separate non-blocking "missing document" reminder
+    // already nudges for that). So this PASSES when QAP evidence exists (a rev, a
+    // linked job's QAP files, or a QAP/ITP field filled on the form) and is
+    // otherwise N/A — never a dead-end failure with nowhere to enter it.
     $qapRev = trim((string)($doc['qap_rev'] ?? ''));
     $qapFiles = (!empty($doc['job_id']) && function_exists('job_qaps')) ? count(job_qaps((int)$doc['job_id'])) : 0;
     $qapField = $hasField(fn($f) => (bool)preg_match('/\b(qap|itp)\b/i', (string)($f['label'] ?? '').' '.(string)($f['fkey'] ?? '')));
-    if (!$qapField && empty($doc['job_id']) && $qapRev === '') {
-        $add('qap','QAP / ITP identified','NA','Not applicable to this report type');
+    $qapFieldFilled = false;
+    if ($qapField) { $qv = $data[$qapField['fkey']] ?? ''; $qapFieldFilled = ($qapField['ftype'] ?? '') === 'table' ? (is_array($qv) && $qv) : (trim((string)$qv) !== ''); }
+    if ($qapRev !== '' || $qapFiles > 0 || $qapFieldFilled) {
+        $add('qap','QAP / ITP identified','PASS', $qapRev !== '' ? 'Rev '.$qapRev : ($qapFiles > 0 ? $qapFiles.' file(s)' : 'Recorded on the report'));
     } else {
-        [$s,$d] = ($qapRev !== '' || $qapFiles > 0) ? ['PASS', $qapRev !== '' ? 'Rev '.$qapRev : $qapFiles.' file(s)'] : ['FAIL','No QAP/ITP rev or attachment']; $add('qap','QAP / ITP identified',$s,$d);
+        $add('qap','QAP / ITP identified','NA','Attached in the document list — not a blocking field');
     }
 
     // --- Activities & measurements (form-driven) ---
