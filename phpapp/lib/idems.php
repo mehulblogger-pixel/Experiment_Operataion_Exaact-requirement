@@ -3947,16 +3947,34 @@ function idems_completeness_check($doc) {
     [$s,$d] = $yn(trim((string)($doc['inspection_date'] ?? '')) !== '', $doc['inspection_date'] ?? '', 'No inspection date'); $add('date','Inspection date',$s,$d);
 
     // --- Scope, spec, QAP ---
-    $scopeOk = false;
-    foreach ($tableFields as $tf) { $rows = $data[$tf['fkey']] ?? null; if (is_array($rows) && $rows) { $scopeOk = true; break; } }
-    if (!$scopeOk) foreach ($fields as $f) { $lbl = strtolower(($f['label'] ?? '').' '.($f['fkey'] ?? '')); if (strpos($lbl,'scope')!==false && trim((string)($data[$f['fkey']] ?? ''))!=='') { $scopeOk = true; break; } }
-    [$s,$d] = $yn($scopeOk, '', 'No scope / activities recorded'); $add('scope','Scope of inspection',$s,$d);
+    // Scope of inspection is required only when the report type's form actually
+    // captures it (an inspection report has a 'scope of activities' field). Report
+    // types that don't — vendor assessments/audits, which record their own
+    // checklists instead — are N/A, never a dead-end failure demanding a field the
+    // form does not offer.
+    $scopeField = $hasField(fn($f) => strpos(strtolower(($f['label'] ?? '').' '.($f['fkey'] ?? '')), 'scope') !== false);
+    if (!$scopeField) {
+        $add('scope','Scope of inspection','NA','Not captured on this report type');
+    } else {
+        $sv = $data[$scopeField['fkey']] ?? '';
+        $scopeOk = ($scopeField['ftype'] ?? '') === 'table' ? (is_array($sv) && $sv) : (trim((string)$sv) !== '');
+        [$s,$d] = $yn($scopeOk, '', 'No scope / activities recorded'); $add('scope','Scope of inspection',$s,$d);
+    }
     $spec = $eff([0=>'standards']);
     if ($spec !== '') $add('spec','Applicable specification','PASS',$spec);
     else $add('spec','Applicable specification','NA','Held in the reference documents / not captured on this report type');
+    // QAP / ITP is required only when there is a way to record it on this report:
+    // a QAP/ITP field on the form, a linked inspection job (which carries QAP
+    // files), or a rev already entered. A standalone vendor audit has none of
+    // these, so it is N/A rather than an unsatisfiable failure.
     $qapRev = trim((string)($doc['qap_rev'] ?? ''));
     $qapFiles = (!empty($doc['job_id']) && function_exists('job_qaps')) ? count(job_qaps((int)$doc['job_id'])) : 0;
-    [$s,$d] = ($qapRev !== '' || $qapFiles > 0) ? ['PASS', $qapRev !== '' ? 'Rev '.$qapRev : $qapFiles.' file(s)'] : ['FAIL','No QAP/ITP rev or attachment']; $add('qap','QAP / ITP identified',$s,$d);
+    $qapField = $hasField(fn($f) => (bool)preg_match('/\b(qap|itp)\b/i', (string)($f['label'] ?? '').' '.(string)($f['fkey'] ?? '')));
+    if (!$qapField && empty($doc['job_id']) && $qapRev === '') {
+        $add('qap','QAP / ITP identified','NA','Not applicable to this report type');
+    } else {
+        [$s,$d] = ($qapRev !== '' || $qapFiles > 0) ? ['PASS', $qapRev !== '' ? 'Rev '.$qapRev : $qapFiles.' file(s)'] : ['FAIL','No QAP/ITP rev or attachment']; $add('qap','QAP / ITP identified',$s,$d);
+    }
 
     // --- Activities & measurements (form-driven) ---
     // All activities completed: any table with a status/progress column must have no incomplete rows.
