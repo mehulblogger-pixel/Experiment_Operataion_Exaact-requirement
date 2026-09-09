@@ -336,25 +336,22 @@ function idems_migrate() {
     // Prebuild the ready-to-use company inspection report ONCE — a complete type
     // with every section wired. Guarded by a flag so a user who deletes it does
     // not get it back, and wrapped so a failure can never break login/migrate.
-    if (function_exists('setting_get') && !setting_get('mgh_report_seeded', '')) {
-        try { idems_build_mgh_report(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('mgh_report_seeded', '1');
+    if (function_exists('setting_get') && !setting_get('mgh_report_seeded_v2', '')) {
+        try { idems_build_mgh_report(); if (function_exists('setting_set')) setting_set('mgh_report_seeded_v2', '1'); } catch (Throwable $e) {}
     }
     // Prebuild the ready-to-use FIRE EXTINGUISHER inspection report ONCE — a
     // complete, fully-designed type so it renders like every other report (not a
     // blank "no form designed yet" screen). Guarded so a user who deletes it does
     // not get it back; wrapped so a failure can never break login/migrate.
-    if (function_exists('setting_get') && !setting_get('fext_report_seeded', '')) {
-        try { idems_build_fire_extinguisher_report(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('fext_report_seeded', '1');
+    if (function_exists('setting_get') && !setting_get('fext_report_seeded_v2', '')) {
+        try { idems_build_fire_extinguisher_report(); if (function_exists('setting_set')) setting_set('fext_report_seeded_v2', '1'); } catch (Throwable $e) {}
     }
     // ONE-TIME: give the project-site progress reports (Daily / Weekly /
     // Fortnightly / Monthly) a shared ready-to-fill form, so they no longer open
     // the blank "no form designed yet" screen. Guarded so a user who removes one
     // does not get it back; wrapped so a failure never breaks migrate/login.
-    if (function_exists('setting_get') && !setting_get('progress_reports_seeded', '')) {
-        try { idems_build_progress_reports(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('progress_reports_seeded', '1');
+    if (function_exists('setting_get') && !setting_get('progress_reports_seeded_v2', '')) {
+        try { idems_build_progress_reports(); if (function_exists('setting_set')) setting_set('progress_reports_seeded_v2', '1'); } catch (Throwable $e) {}
     }
     // ONE-TIME: a few seeded section titles / field labels stored a literal
     // "&amp;" that then rendered as "&amp;" on screen (double-escaped). A label a

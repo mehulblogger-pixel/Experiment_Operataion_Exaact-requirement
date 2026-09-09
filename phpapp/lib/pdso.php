@@ -156,13 +156,12 @@ function pdso_migrate() {
         created_by VARCHAR(120) DEFAULT '', created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
 
     // Deputation report library sections + sample report types (via URFE).
-    if (function_exists('setting_get') && !setting_get('pdso_library_seeded_v1', '')) {
-        try { pdso_seed_library(); } catch (Throwable $e) { /* never break login/migrate */ }
-        if (function_exists('setting_set')) setting_set('pdso_library_seeded_v1', '1');
+    // Self-healing seeds (see uvae.php): flag set only on success; _v2 repairs once.
+    if (function_exists('setting_get') && !setting_get('pdso_library_seeded_v2', '')) {
+        try { pdso_seed_library(); if (function_exists('setting_set')) setting_set('pdso_library_seeded_v2', '1'); } catch (Throwable $e) { /* never break login/migrate; retry next boot */ }
     }
-    if (function_exists('setting_get') && !setting_get('pdso_samples_seeded_v1', '')) {
-        try { pdso_seed_sample_types(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('pdso_samples_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('pdso_samples_seeded_v2', '')) {
+        try { pdso_seed_sample_types(); if (function_exists('setting_set')) setting_set('pdso_samples_seeded_v2', '1'); } catch (Throwable $e) {}
     }
 }
 

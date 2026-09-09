@@ -154,13 +154,12 @@ function ncdca_migrate() {
         approved_by VARCHAR(150) DEFAULT '', approved_on VARCHAR(20) DEFAULT '', new_due VARCHAR(20) DEFAULT '',
         status VARCHAR(20) DEFAULT 'REQUESTED', created_at VARCHAR(30) DEFAULT '')");
 
-    if (function_exists('setting_get') && !setting_get('ncdca_library_seeded_v1', '')) {
-        try { ncdca_seed_library(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('ncdca_library_seeded_v1', '1');
+    // Self-healing seeds (see uvae.php): flag set only on success; _v2 repairs once.
+    if (function_exists('setting_get') && !setting_get('ncdca_library_seeded_v2', '')) {
+        try { ncdca_seed_library(); if (function_exists('setting_set')) setting_set('ncdca_library_seeded_v2', '1'); } catch (Throwable $e) {}
     }
-    if (function_exists('setting_get') && !setting_get('ncdca_samples_seeded_v1', '')) {
-        try { ncdca_seed_sample_types(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('ncdca_samples_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('ncdca_samples_seeded_v2', '')) {
+        try { ncdca_seed_sample_types(); if (function_exists('setting_set')) setting_set('ncdca_samples_seeded_v2', '1'); } catch (Throwable $e) {}
     }
 }
 

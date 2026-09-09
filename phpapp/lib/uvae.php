@@ -136,21 +136,23 @@ function uvae_migrate() {
         effective_on VARCHAR(20) DEFAULT '', expiry_on VARCHAR(20) DEFAULT '', risk VARCHAR(20) DEFAULT '',
         assessment_id INT NULL, updated_at VARCHAR(30) DEFAULT '')");
 
-    if (function_exists('setting_get') && !setting_get('uvae_criteria_seeded_v1', '')) {
-        try { uvae_seed_criteria(); } catch (Throwable $e) { /* never break login/migrate */ }
-        if (function_exists('setting_set')) setting_set('uvae_criteria_seeded_v1', '1');
+    // Self-healing seeds: the "installed" flag is set ONLY on success (inside the
+    // try), so a failed install — e.g. during a half-uploaded deploy — retries on
+    // the next boot instead of being marked done forever. The _v2 flag re-runs the
+    // installer once on existing databases to repair any that were left empty; the
+    // installers are idempotent (they skip formats that already exist), so nothing
+    // is duplicated and anything a user has customised is untouched.
+    if (function_exists('setting_get') && !setting_get('uvae_criteria_seeded_v2', '')) {
+        try { uvae_seed_criteria(); if (function_exists('setting_set')) setting_set('uvae_criteria_seeded_v2', '1'); } catch (Throwable $e) { /* never break login/migrate; retry next boot */ }
     }
-    if (function_exists('setting_get') && !setting_get('uvae_disqual_seeded_v1', '')) {
-        try { uvae_seed_disqual_rules(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('uvae_disqual_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('uvae_disqual_seeded_v2', '')) {
+        try { uvae_seed_disqual_rules(); if (function_exists('setting_set')) setting_set('uvae_disqual_seeded_v2', '1'); } catch (Throwable $e) {}
     }
-    if (function_exists('setting_get') && !setting_get('uvae_library_seeded_v1', '')) {
-        try { uvae_seed_library(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('uvae_library_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('uvae_library_seeded_v2', '')) {
+        try { uvae_seed_library(); if (function_exists('setting_set')) setting_set('uvae_library_seeded_v2', '1'); } catch (Throwable $e) {}
     }
-    if (function_exists('setting_get') && !setting_get('uvae_samples_seeded_v1', '')) {
-        try { uvae_seed_sample_types(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('uvae_samples_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('uvae_samples_seeded_v2', '')) {
+        try { uvae_seed_sample_types(); if (function_exists('setting_set')) setting_set('uvae_samples_seeded_v2', '1'); } catch (Throwable $e) {}
     }
 }
 

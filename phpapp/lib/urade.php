@@ -93,13 +93,12 @@ function urade_migrate() {
         if (function_exists('setting_set')) setting_set('urade_rules_seeded_v1', '1');
     }
     // Release sections/fields into the URFE Library (needs urfe_migrate first).
-    if (function_exists('setting_get') && !setting_get('urade_library_seeded_v1', '')) {
-        try { urade_seed_release_library(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('urade_library_seeded_v1', '1');
+    // Self-healing seeds (see uvae.php): flag set only on success; _v2 repairs once.
+    if (function_exists('setting_get') && !setting_get('urade_library_seeded_v2', '')) {
+        try { urade_seed_release_library(); if (function_exists('setting_set')) setting_set('urade_library_seeded_v2', '1'); } catch (Throwable $e) {}
     }
-    if (function_exists('setting_get') && !setting_get('urade_samples_seeded_v1', '')) {
-        try { urade_seed_sample_release_types(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('urade_samples_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('urade_samples_seeded_v2', '')) {
+        try { urade_seed_sample_release_types(); if (function_exists('setting_set')) setting_set('urade_samples_seeded_v2', '1'); } catch (Throwable $e) {}
     }
 }
 

@@ -183,21 +183,19 @@ function uvaae_migrate() {
         client_id INT NULL, active INT DEFAULT 1, is_system INT DEFAULT 0, sort_order INT DEFAULT 0)");
     idems_unique_index('audit_conclusion_rules', 'code');
 
-    if (function_exists('setting_get') && !setting_get('uvaae_criteria_seeded_v1', '')) {
-        try { uvaae_seed_criteria(); } catch (Throwable $e) { /* never break login/migrate */ }
-        if (function_exists('setting_set')) setting_set('uvaae_criteria_seeded_v1', '1');
+    // Self-healing seeds (see uvae.php): flag set only on success, _v2 re-runs the
+    // idempotent installer once to repair databases left empty by a failed boot.
+    if (function_exists('setting_get') && !setting_get('uvaae_criteria_seeded_v2', '')) {
+        try { uvaae_seed_criteria(); if (function_exists('setting_set')) setting_set('uvaae_criteria_seeded_v2', '1'); } catch (Throwable $e) { /* never break login/migrate; retry next boot */ }
     }
-    if (function_exists('setting_get') && !setting_get('uvaae_rules_seeded_v1', '')) {
-        try { uvaae_seed_conclusion_rules(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('uvaae_rules_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('uvaae_rules_seeded_v2', '')) {
+        try { uvaae_seed_conclusion_rules(); if (function_exists('setting_set')) setting_set('uvaae_rules_seeded_v2', '1'); } catch (Throwable $e) {}
     }
-    if (function_exists('setting_get') && !setting_get('uvaae_library_seeded_v1', '')) {
-        try { uvaae_seed_library(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('uvaae_library_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('uvaae_library_seeded_v2', '')) {
+        try { uvaae_seed_library(); if (function_exists('setting_set')) setting_set('uvaae_library_seeded_v2', '1'); } catch (Throwable $e) {}
     }
-    if (function_exists('setting_get') && !setting_get('uvaae_samples_seeded_v1', '')) {
-        try { uvaae_seed_sample_types(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('uvaae_samples_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('uvaae_samples_seeded_v2', '')) {
+        try { uvaae_seed_sample_types(); if (function_exists('setting_set')) setting_set('uvaae_samples_seeded_v2', '1'); } catch (Throwable $e) {}
     }
 }
 

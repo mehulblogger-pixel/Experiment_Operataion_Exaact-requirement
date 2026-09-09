@@ -151,21 +151,19 @@ function uire_migrate() {
     // covers). Additive, nullable — nothing existing is affected.
     if (function_exists('ensure_column')) ensure_column('report_docs', 'reinspects_id', 'INT NULL');
 
-    if (function_exists('setting_get') && !setting_get('uire_criteria_seeded_v1', '')) {
-        try { uire_seed_criteria(); } catch (Throwable $e) { /* never break login/migrate */ }
-        if (function_exists('setting_set')) setting_set('uire_criteria_seeded_v1', '1');
+    // Self-healing seeds (see uvae.php): flag set only on success; _v2 repairs once.
+    if (function_exists('setting_get') && !setting_get('uire_criteria_seeded_v2', '')) {
+        try { uire_seed_criteria(); if (function_exists('setting_set')) setting_set('uire_criteria_seeded_v2', '1'); } catch (Throwable $e) { /* never break login/migrate; retry next boot */ }
     }
     // Extend the URFE Library with inspection sections/fields (needs urfe_migrate
     // to have created the library tables first — it runs before us in run_schema).
-    if (function_exists('setting_get') && !setting_get('uire_library_seeded_v1', '')) {
-        try { uire_seed_inspection_library(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('uire_library_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('uire_library_seeded_v2', '')) {
+        try { uire_seed_inspection_library(); if (function_exists('setting_set')) setting_set('uire_library_seeded_v2', '1'); } catch (Throwable $e) {}
     }
-    // Seed the sample inspection report configurations (§98) — ready, removable
-    // types assembled from the Library. Guarded, so deleting them keeps them gone.
-    if (function_exists('setting_get') && !setting_get('uire_samples_seeded_v1', '')) {
-        try { uire_seed_sample_inspection_types(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('uire_samples_seeded_v1', '1');
+    // Seed the sample inspection report configurations (§98) — ready types
+    // assembled from the Library; the installer skips any that already exist.
+    if (function_exists('setting_get') && !setting_get('uire_samples_seeded_v2', '')) {
+        try { uire_seed_sample_inspection_types(); if (function_exists('setting_set')) setting_set('uire_samples_seeded_v2', '1'); } catch (Throwable $e) {}
     }
 }
 
