@@ -442,21 +442,18 @@ function idems_migrate() {
     }
     // ONE-TIME: give the "RN — Release Note" type its form so a Release Note is
     // designed like the inspection report and renders through the same engine.
-    if (function_exists('setting_get') && !setting_get('rn_form_seeded_v1', '')) {
-        try { idems_build_release_note(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('rn_form_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('rn_form_seeded_v2', '')) {
+        try { idems_build_release_note(); if (function_exists('setting_set')) setting_set('rn_form_seeded_v2', '1'); } catch (Throwable $e) {}
     }
     // ONE-TIME: give the "VASR — Vendor Assessment Report" type its scored form,
     // proving the weighted-scoring engine end to end.
-    if (function_exists('setting_get') && !setting_get('vasr_form_seeded_v1', '')) {
-        try { idems_build_vendor_assessment(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('vasr_form_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('vasr_form_seeded_v2', '')) {
+        try { idems_build_vendor_assessment(); if (function_exists('setting_set')) setting_set('vasr_form_seeded_v2', '1'); } catch (Throwable $e) {}
     }
     // ONE-TIME: give the "VAR — Vendor Audit Report" type its form (findings →
     // NCR/CAPA on issue).
-    if (function_exists('setting_get') && !setting_get('var_form_seeded_v1', '')) {
-        try { idems_build_vendor_audit(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('var_form_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('var_form_seeded_v2', '')) {
+        try { idems_build_vendor_audit(); if (function_exists('setting_set')) setting_set('var_form_seeded_v2', '1'); } catch (Throwable $e) {}
     }
     // ONE-TIME: add the Audit checklist table to a VAR form seeded before it
     // existed. Safe — issued reports keep their frozen schema; drafts keep their
@@ -525,9 +522,8 @@ function idems_migrate() {
         if (function_exists('setting_set')) setting_set('ir_evidence_v1', '1');
     }
     // ONE-TIME: give the "ER — Expediting Report" type its universal form.
-    if (function_exists('setting_get') && !setting_get('er_form_seeded_v1', '')) {
-        try { idems_build_expediting(); } catch (Throwable $e) {}
-        if (function_exists('setting_set')) setting_set('er_form_seeded_v1', '1');
+    if (function_exists('setting_get') && !setting_get('er_form_seeded_v2', '')) {
+        try { idems_build_expediting(); if (function_exists('setting_set')) setting_set('er_form_seeded_v2', '1'); } catch (Throwable $e) {}
     }
     // ONE-TIME (P2): add the engineering/material/inspection/NCR sections to an ER
     // seeded before they existed. Reseeds only when the inspection table is absent.

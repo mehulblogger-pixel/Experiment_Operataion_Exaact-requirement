@@ -28,3 +28,26 @@ t_eq((int) ops_val("SELECT COUNT(*) FROM report_types WHERE code='UVA_MFG'"), 1,
 // And running migrate yet again does NOT duplicate it (the installer is idempotent).
 uvae_migrate();
 t_eq((int) ops_val("SELECT COUNT(*) FROM report_types WHERE code='UVA_MFG'"), 1, 'a healthy install is never duplicated by the self-heal');
+
+// The FORMS themselves (the field layouts) must also be present — a type with no
+// fields is the "(no form yet)" screen the user hit. VASR and VAR ship complete
+// forms, and a form wiped by a failed boot must rebuild on the next boot.
+if (function_exists('idems_migrate') && function_exists('idems_type_id_by_code')) {
+    $fieldCount = function ($code) {
+        $tid = idems_type_id_by_code($code);
+        return $tid ? (int) ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=?", [$tid]) : 0;
+    };
+    t_ok($fieldCount('VASR') > 0, 'the Vendor Assessment (VASR) form has fields — not "no form yet"');
+    t_ok($fieldCount('VAR')  > 0, 'the Vendor Audit (VAR) form has fields — not "no form yet"');
+
+    // Simulate the stuck state: wipe the VASR form and clear the success flag.
+    $vid = idems_type_id_by_code('VASR');
+    if ($vid) {
+        db()->prepare("DELETE FROM report_fields WHERE report_type_id=?")->execute([$vid]);
+        db()->prepare("DELETE FROM report_sections WHERE report_type_id=?")->execute([$vid]);
+    }
+    setting_set('vasr_form_seeded_v2', '');
+    t_eq($fieldCount('VASR'), 0, 'the VASR form is empty before the heal (the stuck state)');
+    idems_migrate();
+    t_ok($fieldCount('VASR') > 0, 'the VASR form is rebuilt automatically on the next boot');
+}
