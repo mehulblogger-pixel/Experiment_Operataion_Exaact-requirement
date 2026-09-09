@@ -50,4 +50,9 @@ if (function_exists('idems_migrate') && function_exists('idems_type_id_by_code')
     t_eq($fieldCount('VASR'), 0, 'the VASR form is empty before the heal (the stuck state)');
     idems_migrate();
     t_ok($fieldCount('VASR') > 0, 'the VASR form is rebuilt automatically on the next boot');
+
+    // FAR / STIR / NCR now ship ready-to-fill forms (previously "no form yet").
+    foreach (['FAR' => 'Factory Assessment', 'STIR' => 'Site Inspection', 'NCR' => 'Non-Conformance'] as $code => $name) {
+        t_ok($fieldCount($code) > 0, "the $name report ($code) now has a ready-to-fill form (was 'no form yet')");
+    }
 }

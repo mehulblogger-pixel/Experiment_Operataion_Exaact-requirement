@@ -525,6 +525,18 @@ function idems_migrate() {
     if (function_exists('setting_get') && !setting_get('er_form_seeded_v2', '')) {
         try { idems_build_expediting(); if (function_exists('setting_set')) setting_set('er_form_seeded_v2', '1'); } catch (Throwable $e) {}
     }
+    // Ready-to-fill forms for Factory Assessment (FAR), Site Inspection (STIR) and
+    // Non-Conformance (NCR) — self-healing (flag set only on success; the builders
+    // skip a type that already has a form, so a user's edits are never overwritten).
+    if (function_exists('setting_get') && !setting_get('far_form_seeded_v1', '')) {
+        try { idems_build_factory_assessment(); if (function_exists('setting_set')) setting_set('far_form_seeded_v1', '1'); } catch (Throwable $e) {}
+    }
+    if (function_exists('setting_get') && !setting_get('stir_form_seeded_v1', '')) {
+        try { idems_build_site_inspection(); if (function_exists('setting_set')) setting_set('stir_form_seeded_v1', '1'); } catch (Throwable $e) {}
+    }
+    if (function_exists('setting_get') && !setting_get('ncr_form_seeded_v1', '')) {
+        try { idems_build_ncr(); if (function_exists('setting_set')) setting_set('ncr_form_seeded_v1', '1'); } catch (Throwable $e) {}
+    }
     // ONE-TIME (P2): add the engineering/material/inspection/NCR sections to an ER
     // seeded before they existed. Reseeds only when the inspection table is absent.
     if (function_exists('setting_get') && !setting_get('er_p2_v1', '')) {
@@ -1338,6 +1350,230 @@ function idems_build_vendor_audit() {
     $has = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId]);
     if (!$has) idems_install_vendor_audit_sections($typeId);
     return $typeId;
+}
+
+// ---------------------------------------------------------------------------
+//  Ready-to-fill forms for the Factory Assessment (FAR), Site Inspection (STIR)
+//  and Non-Conformance (NCR) report types. Each build is idempotent — it finds
+//  or creates the type and installs the form only when the type has no sections,
+//  so a user's edits are never overwritten. Every field/table is editable and
+//  removable under Report types → Form builder.
+// ---------------------------------------------------------------------------
+
+// Shared closures for a form installer, so the three below read the same.
+function idems_form_installer($typeId) {
+    $pdo = db();
+    $st = ['so' => 0, 'fo' => 0];
+    $section = function($title, $help = '', $pgb = 0, $keep = 0) use ($pdo, $typeId, &$st) {
+        $st['so'] += 10;
+        $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,page_break_before,keep_together,sort_order) VALUES (?,?,?,?,?,?)")
+            ->execute([$typeId, $title, $help, $pgb, $keep, $st['so']]);
+        return (int)$pdo->lastInsertId();
+    };
+    $field = function($secId, $fkey, $label, $ftype, $opts = '', $span = 1, $help = '') use ($pdo, $typeId, &$st) {
+        $st['fo'] += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,help,sort_order,col_span) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $ftype, $opts, $help, $st['fo'], $span]);
+    };
+    $table = function($secId, $fkey, $label, $cols, $span = 2, $help = '') use ($pdo, $typeId, &$st) {
+        $st['fo'] += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span) VALUES (?,?,?,?, 'table',?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $cols, $help, $st['fo'], $span]);
+    };
+    return [$section, $field, $table];
+}
+
+function idems_build_factory_assessment() {
+    $pdo = db();
+    $t = ops_one("SELECT id FROM report_types WHERE code='FAR'");
+    if ($t) { $typeId = (int)$t['id']; }
+    else {
+        $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+        $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
+            ->execute(['FAR', 'Factory Assessment Report', $sort, date('c')]);
+        $typeId = (int)$pdo->lastInsertId();
+    }
+    if (!(int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId])) idems_install_factory_assessment_sections($typeId);
+    return $typeId;
+}
+function idems_install_factory_assessment_sections($typeId) {
+    [$sec, $field, $table] = idems_form_installer($typeId);
+
+    $s = $sec('Assessment identification', 'Which factory was assessed, against what, when and by whom.', 0, 1);
+    $field($s, 'vendor', 'Factory / company assessed', 'text');
+    $field($s, 'vendor_code', 'Vendor code', 'text');
+    $field($s, 'location', 'Factory address / location', 'text', '', 2);
+    $field($s, 'products', 'Products / processes manufactured', 'textarea', '', 2);
+    $field($s, 'assessment_type', 'Assessment type', 'select', "Pre-award / new vendor\nCapability assessment\nSurveillance / periodic\nRe-assessment / follow-up");
+    $field($s, 'assessment_criteria', 'Assessment criteria / standard', 'text');
+    $field($s, 'assessment_date', 'Assessment date', 'date');
+    $field($s, 'assessor', 'Lead assessor', 'text');
+    $field($s, 'accompanied_by', 'Accompanied by (factory rep)', 'text');
+
+    $s = $sec('Company & statutory', 'Basic standing of the company.');
+    $field($s, 'year_established', 'Year established', 'text');
+    $field($s, 'legal_status', 'Legal status', 'select', "Proprietorship\nPartnership\nPrivate Limited\nPublic Limited\nLLP\nOther");
+    $field($s, 'registrations', 'Statutory registrations (GST, factory licence, etc.)', 'textarea', '', 2);
+    $field($s, 'employee_count', 'Total employees', 'number');
+    $field($s, 'works_area', 'Total / covered works area', 'text');
+
+    $s = $sec('Facilities & infrastructure', 'Adequacy of the premises and utilities for the products offered.');
+    $table($s, 'facilities', 'Facilities & infrastructure', "Facility / area\nAdequacy|select|Adequate,Needs improvement,Inadequate,N/A\nRemarks", 2,
+        'Plant layout, material storage, utilities (power/water/air), housekeeping, safety — one row each.');
+
+    $s = $sec('Manufacturing capability', 'Key plant & machinery relevant to the products offered.');
+    $table($s, 'machinery', 'Plant & machinery', "Process / operation\nEquipment / machine\nMake / model\nCapacity\nCondition|select|Good,Fair,Poor\nRemarks", 2);
+
+    $s = $sec('Testing & inspection facilities', 'In-house and outsourced test/inspection capability.');
+    $table($s, 'test_facilities', 'Testing & inspection facilities', "Facility / instrument\nIn-house / outsourced|select|In-house,Outsourced\nCalibrated|select|Yes,No,N/A\nCalibration due|date\nRemarks", 2);
+
+    $s = $sec('Quality management system', 'Certification and control of the quality system.');
+    $field($s, 'qms_certified', 'QMS certification', 'select', "ISO 9001\nISO 9001 + product cert\nUnder certification\nNot certified");
+    $field($s, 'qms_cert_no', 'Certificate number', 'text');
+    $field($s, 'qms_valid_till', 'Certificate valid till', 'date');
+    $field($s, 'documented_procedures', 'Documented procedures maintained', 'select', "Yes\nPartially\nNo");
+    $field($s, 'inspection_stages', 'Incoming / in-process / final inspection carried out', 'select', "All three\nPartially\nNo");
+
+    $s = $sec('Manpower & competence', 'Key functions and their competence.');
+    $table($s, 'manpower', 'Manpower & competence', "Function\nNo. of persons|number\nQualification\nExperience", 2);
+
+    $s = $sec('Assessment findings', 'Area-by-area assessment against the criteria.');
+    $table($s, 'findings', 'Assessment findings', "Sr.|merge\nAssessment area\nRequirement\nObservation\nRating|select|Satisfactory,Needs improvement,Unsatisfactory,N/A\nRemarks", 2);
+
+    $s = $sec('Overall assessment & recommendation');
+    $field($s, 'overall_rating', 'Overall rating', 'select', "Approved\nApproved with conditions\nConditional — re-assess\nNot approved", 1);
+    $field($s, 'score', 'Assessment score (%)', 'number');
+    $field($s, 'recommendation', 'Recommendation', 'textarea', '', 2);
+    $field($s, 'conditions', 'Conditions / actions required', 'textarea', '', 2);
+
+    $s = $sec('Photographs', 'Photos of the facility — auto-compressed and captioned; or mark photography denied.');
+    $field($s, 'photos', 'Photographs', 'photo', '', 2);
+
+    $s = $sec('', '', 0, 1);
+    $field($s, 'disclaimer', 'Disclaimer', 'richtext',
+        'This assessment reflects the condition of the facility observed at the time and place stated and does not relieve the manufacturer/supplier of their contractual obligations. Our liability is limited to the fee charged for this assessment.', 2);
+
+    $s = $sec('Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
+    $field($s, 'signoff', 'Sign-off', 'sigblock', "Prepared by\nReviewed by\nApproved by", 2);
+}
+
+function idems_build_site_inspection() {
+    $pdo = db();
+    $t = ops_one("SELECT id FROM report_types WHERE code='STIR'");
+    if ($t) { $typeId = (int)$t['id']; }
+    else {
+        $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+        $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
+            ->execute(['STIR', 'Site Inspection Report', $sort, date('c')]);
+        $typeId = (int)$pdo->lastInsertId();
+    }
+    if (!(int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId])) idems_install_site_inspection_sections($typeId);
+    return $typeId;
+}
+function idems_install_site_inspection_sections($typeId) {
+    [$sec, $field, $table] = idems_form_installer($typeId);
+
+    $s = $sec('Inspection details', 'Most of this carries forward from the job — Client, Contractor, PO, Project and dates fill in automatically.', 0, 1);
+    $field($s, 'client', 'Client', 'text');
+    $field($s, 'contractor', 'Contractor / vendor', 'text');
+    $field($s, 'project', 'Project', 'text');
+    $field($s, 'location', 'Site / location', 'text', '', 2);
+    $field($s, 'po_number', 'P.O. No.', 'text');
+    $field($s, 'inspection_stage', 'Stage of inspection', 'select', "Pre-installation\nIn-process / installation\nFinal / completion\nWitness\nSnag / punch verification");
+    $field($s, 'inspection_date', 'Date of inspection', 'date');
+    $field($s, 'inspector', 'Inspector', 'text');
+
+    $s = $sec('Reference documents', 'The drawings, specifications, method statements and standards inspected against — one row per document.');
+    $table($s, 'reference_documents', 'Reference documents', "Document Name\nDocument Number\nRevision No.\nApproval Code\nApproved / Issued by\nDate of Approval|date", 2);
+
+    $s = $sec('Applicable Standards', 'The standards, codes and specifications the inspection was carried out against.');
+    $table($s, 'applicable_standards', 'Applicable Standards', "Standard No.|merge\nTitle / Subject\nEdition / Year\nClause(s) applied", 2);
+
+    $s = $sec('Scope of inspection', 'Each activity inspected — requirement, method/quantum, finding and result.');
+    $table($s, 'scope_activities', 'Scope of activities', "Sr.|merge\nActivity / location\nRequirement / acceptance criteria\nMethod / quantum of check\nObservation / finding\nResult|select|Accepted,Rejected,Hold,N/A\nRemarks", 2);
+
+    $s = $sec('Measurements', 'Recorded values against specified limits (leave blank if not applicable).');
+    $table($s, 'measurements', 'Measurements', "Parameter\nSpecified\nObserved\nUnit|unit\nResult|select|OK,Not OK,N/A", 2);
+
+    $s = $sec('Non-conformances & punch points', 'Deviations observed at site and the action needed.');
+    $table($s, 'punch_points', 'Non-conformances / punch points', "Sr.|merge\nDescription\nSeverity|select|Major,Minor\nReference\nAction required\nTarget date|date\nStatus|select|Open,Closed", 2);
+
+    $s = $sec('Hold / witness status');
+    $field($s, 'prev_holdpoint_status', 'Status of previous hold points / deviations', 'textarea', '', 2);
+    $field($s, 'current_holdpoints', 'Current hold points / deviations', 'textarea', '', 2);
+
+    $s = $sec('Observations & conclusion');
+    $field($s, 'observations', 'Details of inspection carried out / observations', 'textarea', '', 2);
+    $field($s, 'result', 'Overall result', 'select', "Accepted\nAccepted with remarks\nRejected\nHold");
+    $field($s, 'conclusion', 'Conclusion', 'textarea', '', 2);
+    $field($s, 'general_remarks', 'General remarks', 'textarea', '', 2);
+
+    $s = $sec('Photographs', 'Take or upload photos — each auto-compressed and captioned; or mark photography denied.');
+    $field($s, 'photos', 'Photographs', 'photo', '', 2);
+
+    $s = $sec('', '', 0, 1);
+    $field($s, 'disclaimer', 'Disclaimer', 'richtext',
+        'This report is issued on the basis of the inspection carried out at the time and place stated. It reflects the condition of the works inspected and does not relieve the contractor/supplier of their contractual obligations. Our liability is limited to the fee charged for this inspection.', 2);
+
+    $s = $sec('Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
+    $field($s, 'signoff', 'Sign-off', 'sigblock', "Prepared by\nReviewed by\nApproved by", 2);
+}
+
+function idems_build_ncr() {
+    $pdo = db();
+    $t = ops_one("SELECT id FROM report_types WHERE code='NCR'");
+    if ($t) { $typeId = (int)$t['id']; }
+    else {
+        $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+        $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
+            ->execute(['NCR', 'Non-Conformance Report', $sort, date('c')]);
+        $typeId = (int)$pdo->lastInsertId();
+    }
+    if (!(int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId])) idems_install_ncr_sections($typeId);
+    return $typeId;
+}
+function idems_install_ncr_sections($typeId) {
+    [$sec, $field, $table] = idems_form_installer($typeId);
+
+    $s = $sec('NCR identification', 'What the non-conformance is against, and who raised it.', 0, 1);
+    $field($s, 'project', 'Project', 'text');
+    $field($s, 'client', 'Client', 'text');
+    $field($s, 'vendor', 'Vendor / supplier', 'text');
+    $field($s, 'po_number', 'P.O. No.', 'text');
+    $field($s, 'item_description', 'Item / description', 'text', '', 2);
+    $field($s, 'location_stage', 'Location / stage', 'text');
+    $field($s, 'raised_on', 'Date raised', 'date');
+    $field($s, 'raised_by', 'Raised by', 'text');
+
+    $s = $sec('Non-conformance details', 'Describe what does not conform, and to which requirement.');
+    $field($s, 'nc_description', 'Description of non-conformance', 'textarea', '', 2);
+    $field($s, 'requirement', 'Requirement / specification violated', 'textarea', '', 2);
+    $field($s, 'reference_clause', 'Reference document / clause', 'text', '', 2);
+    $field($s, 'quantity_affected', 'Quantity affected', 'number');
+    $field($s, 'severity', 'Severity', 'select', "Critical\nMajor\nMinor");
+    $field($s, 'category', 'Category', 'select', "Material\nDimensional\nDocumentation\nProcess\nWorkmanship\nWelding\nCoating / painting\nOther");
+
+    $s = $sec('Root cause');
+    $field($s, 'root_cause', 'Root cause (if known)', 'textarea', '', 2);
+
+    $s = $sec('Disposition', 'How the non-conformance is to be dealt with.');
+    $field($s, 'disposition', 'Proposed disposition', 'select', "Use as is\nRework\nRepair\nReject\nReturn to vendor\nRe-grade / accept under concession");
+    $field($s, 'disposition_justification', 'Justification / concession details', 'textarea', '', 2);
+
+    $s = $sec('Corrective & preventive action', 'Actions to correct this and prevent recurrence.');
+    $table($s, 'capa', 'Corrective & preventive action', "Type|select|Correction,Corrective,Preventive\nAction\nResponsible\nTarget date|date\nStatus|select|Open,In progress,Closed", 2);
+
+    $s = $sec('Verification & close-out', 'Confirmation the action was completed and effective.');
+    $field($s, 'verified_by', 'Verified by', 'text');
+    $field($s, 'verified_on', 'Verification date', 'date');
+    $field($s, 'closeout_remarks', 'Close-out remarks', 'textarea', '', 2);
+    $field($s, 'ncr_status', 'NCR status', 'select', "Open\nClosed");
+
+    $s = $sec('Photographs', 'Photos of the non-conformance — auto-compressed and captioned; or mark photography denied.');
+    $field($s, 'photos', 'Photographs', 'photo', '', 2);
+
+    $s = $sec('Sign-off', 'Raised / Reviewed / Approved / Closed — name, designation and date auto-fill from the workflow.', 0, 1);
+    $field($s, 'signoff', 'Sign-off', 'sigblock', "Raised by\nReviewed by\nApproved by\nClosed by", 2);
 }
 
 // Seed the Vendor Audit form. The Audit findings table is the one the NCR engine
