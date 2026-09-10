@@ -27,7 +27,7 @@ function cx_pro_work_types() {
 }
 
 function connect_pro_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     db()->exec("CREATE TABLE IF NOT EXISTS cx_professionals (
         id $pk, email VARCHAR(200) DEFAULT '', name VARCHAR(150) DEFAULT '', mobile VARCHAR(40) DEFAULT '',

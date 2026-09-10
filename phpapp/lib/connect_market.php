@@ -43,7 +43,7 @@ function cx_app_can_transition($from, $to) {
 
 /** Additive tables — requirements (the post) and applications (the apply). */
 function connect_market_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     db()->exec("CREATE TABLE IF NOT EXISTS cx_requirements (
         id $pk, ref_code VARCHAR(24) DEFAULT '', title VARCHAR(200) DEFAULT '',

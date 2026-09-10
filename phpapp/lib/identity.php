@@ -137,7 +137,7 @@ const IDDOC_ACTIONS = [
 const IDDOC_RETAIN_DEFAULT = 730;
 
 function identity_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS person_documents (
         id $pk, person_kind VARCHAR(20) DEFAULT 'INSPECTOR', person_id INT,
@@ -704,7 +704,7 @@ function iddoc_flash_number($number = null, $docId = 0) {
 // ============================================================================
 
 function sitedoc_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS site_doc_requirements (
         id $pk, partner_id INT, site_address_id INT NULL,

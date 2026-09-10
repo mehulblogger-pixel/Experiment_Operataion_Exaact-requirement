@@ -76,7 +76,7 @@ function ads_status_out($kind, $row) {
 }
 
 function ads_sync_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     ads_migrate();
     $pdo = db(); $pk = pk_clause();
     // The queue. Deliberately holds the local id rather than a built payload:

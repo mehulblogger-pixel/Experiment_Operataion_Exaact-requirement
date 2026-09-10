@@ -28,7 +28,7 @@ function idx_add($table, $name, $cols) {
 }
 
 function indexes_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
 
     // ---- Directory: parties are the most-joined table in the app ------------
     idx_add('business_partners', 'ix_bp_client',  '(is_client, status)');

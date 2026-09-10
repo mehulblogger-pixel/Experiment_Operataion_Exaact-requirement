@@ -24,7 +24,7 @@
 // ============================================================================
 
 function connect_deploy_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (function_exists('ensure_column')) {
         // The bridge link + idempotency key (one deployment per requirement).
         try { ensure_column('jobs', 'source_module', "VARCHAR(24) DEFAULT ''"); } catch (Throwable $e) {}

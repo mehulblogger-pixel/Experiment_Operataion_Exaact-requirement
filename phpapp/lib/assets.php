@@ -44,7 +44,7 @@ function asset_can_view()   { return is_coordinator_level() || is_master(); }
 function asset_can_manage() { return is_coordinator_level() || is_master(); }
 
 function assets_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = pk_clause();
     db()->exec("CREATE TABLE IF NOT EXISTS asset_issues (
         id $pk,

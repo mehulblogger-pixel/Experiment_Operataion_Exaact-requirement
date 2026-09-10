@@ -31,7 +31,7 @@ function connect_privacy_defaults() {
 }
 
 function connect_privacy_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     // Columns live on the professional master (one record, reused everywhere).
     if (function_exists('ensure_column')) {
         try { ensure_column('cx_professionals', 'privacy_contact',  "VARCHAR(16) DEFAULT 'on_request'"); } catch (Throwable $e) {}

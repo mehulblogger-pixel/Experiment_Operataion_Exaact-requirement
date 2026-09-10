@@ -18,7 +18,7 @@
 // Additive, nullable ownership columns. Responsible 1 = Recruiter, Responsible 2
 // = Reporting manager. Department + drop reason are configurable lookups.
 function rcc_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     ensure_column('requisitions', 'recruiter_id', 'INT NULL');   // Responsible 1
     ensure_column('requisitions', 'manager_id',   'INT NULL');   // Responsible 2
     ensure_column('requisitions', 'department',    "VARCHAR(60) NULL");

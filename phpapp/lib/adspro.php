@@ -52,7 +52,7 @@ const ADSPRO_MAX_PULL  = 500;     // leads per import run
 function ads_try($fn, $fb = null) { try { return $fn(); } catch (Throwable $e) { return $fb; } }
 
 function ads_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // One row per lead brought across. Holds the Ads Pro id so a second import
     // recognises it, and the campaign so revenue can be attributed later without

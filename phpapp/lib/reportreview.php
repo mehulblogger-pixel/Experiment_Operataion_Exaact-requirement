@@ -55,7 +55,7 @@ const RCR_REASONS = [
 ];
 
 function rcr_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // One row per decision per revision. Never overwritten — a re-issue that
     // followed a rejection has to be able to show what the rejection said.

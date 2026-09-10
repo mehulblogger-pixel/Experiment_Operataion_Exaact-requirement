@@ -27,7 +27,7 @@ function cforms_migrate() {
     // older install), it was remembered as "done" and never retried — leaving a
     // live install querying a table that does not exist ("custom_records doesn't
     // exist"). Now a failed attempt is retried on the next call.
-    static $done = false; if ($done) return;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return;
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     try {
         db()->exec("CREATE TABLE IF NOT EXISTS custom_forms (
@@ -37,7 +37,7 @@ function cforms_migrate() {
         db()->exec("CREATE TABLE IF NOT EXISTS custom_records (
             id $pk, form_id INT, title VARCHAR(200) DEFAULT '', created_by VARCHAR(150) DEFAULT '',
             created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
-        $done = true;   // both tables are present — safe to stop retrying
+        $doneAt = db_epoch();   // both tables are present — safe to stop retrying
     } catch (Throwable $e) { /* leave $done false so the next call retries */ }
 }
 

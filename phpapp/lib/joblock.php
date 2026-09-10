@@ -21,7 +21,7 @@
 // ===========================================================================
 
 function joblock_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     ensure_column('jobs', 'locked_at',      "VARCHAR(30) DEFAULT ''");
     ensure_column('jobs', 'lock_alerted_at', "VARCHAR(30) DEFAULT ''");
     ensure_column('jobs', 'unlocked_by',    "VARCHAR(120) DEFAULT ''");

@@ -12,7 +12,7 @@
 // Additive columns on the existing `attendance` table; nothing is removed, no capture path changes.
 
 function attendreview_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     ensure_column('attendance', 'review_status', "VARCHAR(20) DEFAULT ''");   // '' / RETURNED / CLEARED / ESCALATED
     ensure_column('attendance', 'review_note',   "VARCHAR(500) DEFAULT ''");
     ensure_column('attendance', 'reviewed_by',   'INT NULL');

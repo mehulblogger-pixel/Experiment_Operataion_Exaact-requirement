@@ -97,7 +97,7 @@ const LEAD_FILE_KINDS = [
 const LEAD_FILE_MAX = 8388608; // 8 MB per file, same ceiling as a quote's files.
 
 function leads_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS pipelines (
         id $pk, name VARCHAR(120) DEFAULT '', entity_kind VARCHAR(20) DEFAULT 'LEAD',

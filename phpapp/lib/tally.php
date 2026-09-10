@@ -66,7 +66,7 @@ const GST_STATE_CODES = [
 ];
 
 function tally_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = pk_clause();
     // One row per voucher handed over. Kept so the screen can say "already
     // exported" and so a failed import can be undone and sent again.

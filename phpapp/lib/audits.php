@@ -103,7 +103,7 @@ const MR_ACTION_KINDS = [
 ];
 
 function audits_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS internal_audits (
         id $pk, ref VARCHAR(40) DEFAULT '',

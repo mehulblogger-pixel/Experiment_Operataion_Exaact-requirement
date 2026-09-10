@@ -72,7 +72,7 @@ const CAPA_DUE_DEFAULT    = 30;   // days to complete the action
 const CAPA_VERIFY_DEFAULT = 60;   // days after completion before we check it worked
 
 function capa_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS capa (
         id $pk, ref VARCHAR(40) DEFAULT '',

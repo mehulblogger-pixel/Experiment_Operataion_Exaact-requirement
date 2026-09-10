@@ -19,7 +19,7 @@
 const METHOD_STATUSES = ['DRAFT', 'CURRENT', 'SUPERSEDED', 'WITHDRAWN'];
 
 function methods_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     try {
         db()->exec("CREATE TABLE IF NOT EXISTS methods (

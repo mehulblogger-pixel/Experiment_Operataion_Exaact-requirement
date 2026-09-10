@@ -68,7 +68,7 @@ function connect_cap_groups() {
 function connect_cap_freelance_supplier_codes() { return ['FREELANCE_SUPPLY', 'FREELANCE_INSPECTOR_SUPPLY']; }
 
 function connect_cap_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     db()->exec("CREATE TABLE IF NOT EXISTS cx_org_capabilities (
         id $pk, org_party_id INT DEFAULT 0, capability_code VARCHAR(40) DEFAULT '',

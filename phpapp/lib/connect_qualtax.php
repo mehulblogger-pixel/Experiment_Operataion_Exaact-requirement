@@ -25,7 +25,7 @@
 
 /** The qualification-taxonomy master tables — additive, `cx_` namespaced. */
 function connect_qualtax_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
 
     // Every master carries is_active (soft on/off — deactivate without breaking

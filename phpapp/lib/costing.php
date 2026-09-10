@@ -55,7 +55,7 @@ function office_idle_basis($officeId) {
 }
 
 function costing_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = (db_driver() === 'sqlite') ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT AUTO_INCREMENT PRIMARY KEY';
 
     // Which Business Units actually operate in this office. Without this there is no

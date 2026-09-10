@@ -62,7 +62,7 @@ const CONF_BREACH_STATUS = [
 ];
 
 function conf_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // What one of our people has signed. Never overwritten on renewal — a new
     // row, so "what was in force in March" is answerable.

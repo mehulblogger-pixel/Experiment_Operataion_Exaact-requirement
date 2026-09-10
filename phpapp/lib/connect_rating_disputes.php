@@ -23,7 +23,7 @@ const CX_RDISPUTE_TRANSITIONS = [
 ];
 
 function connect_rating_disputes_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     db()->exec("CREATE TABLE IF NOT EXISTS cx_rating_disputes (
         id $pk, ref_code VARCHAR(24) DEFAULT '', rating_id INT DEFAULT 0,

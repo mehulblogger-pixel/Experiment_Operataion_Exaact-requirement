@@ -30,7 +30,7 @@
 // ============================================================================
 
 function bills_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // The ticked headings, as a CSV of expense-heading codes. On both tables:
     // the call is where it is agreed, the deputation is where it is worked to,

@@ -11,7 +11,7 @@
 const CX_RATING_DIRECTIONS = ['CLIENT_TO_PRO', 'PRO_TO_CLIENT'];
 
 function connect_ratings_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     db()->exec("CREATE TABLE IF NOT EXISTS cx_ratings (
         id $pk, requirement_id INT DEFAULT 0, application_id INT DEFAULT 0,

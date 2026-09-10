@@ -58,7 +58,7 @@ const IB_TYPES = [
 ];
 
 function impartiality_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // The periodic statement by a named person.
     $pdo->exec("CREATE TABLE IF NOT EXISTS impartiality_declarations (

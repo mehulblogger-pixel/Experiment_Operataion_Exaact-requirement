@@ -46,7 +46,7 @@ const TAPI_CATEGORIES = [
 const TAPI_FUNCS = ['round', 'abs', 'min', 'max', 'coalesce'];
 
 function tapi_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = pk_clause();
     // The KPI MASTER — configurable definitions, the thing the spec says must
     // exist and never did. `formula` composes metric keys (see the registry);
@@ -445,7 +445,7 @@ function tapi_kpi_save($d) {
 }
 
 function tapi_seed_defaults() {
-    static $seeded = false; if ($seeded) return; $seeded = true;
+    static $seededAt = -1; if ($seededAt === db_epoch()) return; $seededAt = db_epoch();
     $starter = [
         ['kpi_key'=>'jobs_closed', 'name'=>'Jobs closed', 'category'=>'OPERATIONS', 'formula'=>'jobs.closed',
          'unit'=>'count', 'direction'=>'HIGHER', 'sort_order'=>10, 'data_source'=>'ops/jobs'],
@@ -980,7 +980,7 @@ function tapi_bd_portal_activity($ctx) {
 
 // Seed the domain KPIs (idempotent, additive to the Slice-1 starter set).
 function tapi_seed_domain() {
-    static $seeded = false; if ($seeded) return; $seeded = true;
+    static $seededAt = -1; if ($seededAt === db_epoch()) return; $seededAt = db_epoch();
     $more = [
         ['kpi_key'=>'sla_compliance', 'name'=>'SLA compliance', 'category'=>'OPERATIONS',
          'formula'=>'round(sla.within / sla.evaluable * 100, 1)', 'unit'=>'%', 'direction'=>'HIGHER',

@@ -75,7 +75,7 @@ function opp_try($fn, $fb = []) {
 }
 
 function opp_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (function_exists('leads_migrate')) leads_migrate();   // pipelines/stages live there
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS opportunities (

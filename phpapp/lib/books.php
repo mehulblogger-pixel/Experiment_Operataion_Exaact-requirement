@@ -88,7 +88,7 @@ function books_try($fn, $fallback = []) {
 }
 
 function books_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
 
     // What was agreed with this customer, held once on the customer instead of

@@ -194,7 +194,7 @@ function packs_save($csv) {
 // Everything below is the ONLY place the ISO rules reach into shared paths.
 // The functions themselves stay where they are — this just wires them.
 function packs_boot() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
 
     pack_register('work.assign', 'inspection', function (array $c) {
         $out = ['block' => [], 'warn' => []];

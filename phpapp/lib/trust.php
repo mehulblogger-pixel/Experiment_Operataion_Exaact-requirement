@@ -83,7 +83,7 @@ const GEO_MAX_KMH = 900;
 const CLOCK_SKEW_MIN = 30;
 
 function trust_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
 
     // Fact 1 — the camera. Fact 2 — the upload. Held in different columns on

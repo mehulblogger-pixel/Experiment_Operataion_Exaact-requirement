@@ -101,7 +101,7 @@ function lk_issue(array $claims) {
 }
 
 function licissue_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     try {
         db()->exec("CREATE TABLE IF NOT EXISTS issued_licences (
             id " . (function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT') . ",
@@ -130,7 +130,7 @@ function licissue_migrate() {
 // it is not a guarantee against a determined attacker, which no self-hosted
 // software can give.
 function licbeat_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     try {
         db()->exec("CREATE TABLE IF NOT EXISTS install_beats (
             install_id VARCHAR(80) PRIMARY KEY, customer VARCHAR(200) DEFAULT '',

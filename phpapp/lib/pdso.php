@@ -80,7 +80,7 @@ const PDSO_SOURCE = [
 //  and/or client; none re-stores attendance, expenses, personnel or billing.
 // ---------------------------------------------------------------------------
 function pdso_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (function_exists('lk_ensure_type_map')) {
         lk_ensure_type_map('deputation_status',        'Deputation status',           PDSO_STATUS,          'pdso');
         lk_ensure_type_map('deputation_mob_status',    'Mobilization item status',    PDSO_MOB_STATUS,      'pdso');
@@ -353,7 +353,7 @@ function mobilization_readiness($jobId) {
 //  existing status. Once cleared, the job is "cleared to deploy".
 // ---------------------------------------------------------------------------
 function pdso_gate_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     db()->exec("CREATE TABLE IF NOT EXISTS dep_gate_pass (
         id $pk, job_id INT DEFAULT 0, status VARCHAR(12) DEFAULT 'ISSUED',

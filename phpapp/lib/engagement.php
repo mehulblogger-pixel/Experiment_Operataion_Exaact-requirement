@@ -73,7 +73,7 @@ function engagement_empty_rollup() {
 //  new lifecycle is introduced.
 // ===========================================================================
 function engagement_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     db()->exec("CREATE TABLE IF NOT EXISTS engagements (
         id $pk, engagement_key VARCHAR(120) DEFAULT '', partner_id INT DEFAULT 0,

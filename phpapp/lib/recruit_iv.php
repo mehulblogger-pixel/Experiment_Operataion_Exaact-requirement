@@ -54,7 +54,7 @@ function doc_is_sensitive($type) { return in_array((string)$type, DOC_SENSITIVE,
 
 // ---- Schema (one migrate creates both tables; wired into boot) --------------
 function recruit_iv_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (!function_exists('ensure_column')) return;
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     $lt = (function_exists('db_driver') && db_driver() === 'sqlite') ? 'TEXT' : 'LONGTEXT';

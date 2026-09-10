@@ -159,8 +159,8 @@ function roles_label($p) {
 //  working.
 // ---------------------------------------------------------------------------
 function form_tokens_migrate() {
-    static $done = false;
-    if ($done) return; $done = true;
+    static $doneAt = -1;
+    if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     try {
         db()->exec("CREATE TABLE IF NOT EXISTS form_tokens (
             token VARCHAR(64) PRIMARY KEY, used_at VARCHAR(30) DEFAULT '')");
@@ -284,7 +284,7 @@ function csrf_stamp_forms($html) {
 const LOGIN_MAX_TRIES = 5;
 const LOGIN_LOCK_MIN  = 15;
 function login_attempts_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     try { db()->exec("CREATE TABLE IF NOT EXISTS login_attempts (
         username VARCHAR(150) PRIMARY KEY, tries INT DEFAULT 0, last_at VARCHAR(30) DEFAULT '')"); }
     catch (Throwable $e) {}

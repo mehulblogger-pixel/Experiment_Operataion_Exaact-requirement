@@ -17,7 +17,7 @@ const WEBHOOKQ_MAX = 6;        // default attempts before giving up
 const WEBHOOKQ_BACKOFF_CAP = 60;  // minutes
 
 function webhookq_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS integration_outbox (
         id $pk,

@@ -11,7 +11,7 @@
 // badge stays unified. Non-destructive and additive: a new table, no change to any existing one.
 
 function tasks_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS user_tasks (
         id $pk,

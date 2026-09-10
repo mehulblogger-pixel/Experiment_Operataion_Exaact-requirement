@@ -68,7 +68,7 @@ const PATTERN_KINDS = [
 ];
 
 function sched_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     foreach (['calls', 'jobs'] as $t) {
         ensure_column($t, 'engagement_type', "VARCHAR(20) DEFAULT ''");
         ensure_column($t, 'days_count',   'INT DEFAULT 0');     // CONTINUOUS

@@ -13,7 +13,7 @@
 // ============================================================================
 
 function connect_hiring_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     db()->exec("CREATE TABLE IF NOT EXISTS cx_client_saved_search (
         id $pk, client_party_id INT DEFAULT 0, label VARCHAR(120) DEFAULT '',

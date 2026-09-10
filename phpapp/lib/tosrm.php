@@ -61,7 +61,7 @@ const TOSRM_CLAR_STATUS = ['OPEN'=>'Open','ANSWERED'=>'Answered','CLOSED'=>'Clos
 //  Schema — additive only.
 // ---------------------------------------------------------------------------
 function tosrm_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (function_exists('lk_ensure_type_map')) {
         lk_ensure_type_map('call_status',        'Service-request status',  CALL_STATUSES,       'tosrm');
         lk_ensure_type_map('service_priority',   'Service priority',        SERVICE_PRIORITIES,  'tosrm');
@@ -658,7 +658,7 @@ const TOSRM_ASSIGN_KINDS = [
 ];
 
 function tosrm_migrate_b() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     tosrm_migrate();
     if (function_exists('lk_ensure_type_map')) {
         lk_ensure_type_map('assign_state',   'Assignment hold state',   TOSRM_ASSIGN_STATES,  'tosrm');
@@ -1164,7 +1164,7 @@ const TOSRM_READY_ITEMS = [
 const TOSRM_CONFIRM_PARTIES = ['CLIENT'=>'Client','VENDOR'=>'Vendor'];
 
 function tosrm_migrate_c() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     tosrm_migrate_b();
     if (function_exists('lk_ensure_type_map')) {
         lk_ensure_type_map('readiness_status', 'Readiness status', TOSRM_READY_STATUS, 'tosrm');
@@ -1476,7 +1476,7 @@ const TOSRM_DELAY_RESP = ['TPIA'=>'TPIA','CLIENT'=>'Client','VENDOR'=>'Vendor','
 const TOSRM_RECUR_FREQ = ['DAILY'=>'Daily','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','QUARTERLY'=>'Quarterly','CUSTOM'=>'Custom (every N days)'];
 
 function tosrm_migrate_d() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     tosrm_migrate_c();
     if (function_exists('lk_ensure_type_map')) {
         lk_ensure_type_map('sla_stage',   'SLA stage',        TOSRM_SLA_STAGES,   'tosrm');
@@ -2174,7 +2174,7 @@ function tosrm_disruptions_html($d, $rangeLabel = '') {
 const TOSRM_XO_ESCALATE_DAYS = 2;
 
 function tosrm_xo_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     tosrm_migrate();
     // Stamped the first time a forwarded call is auto-escalated to the executing
     // office's manager, so the mail goes out once and not on every scan.

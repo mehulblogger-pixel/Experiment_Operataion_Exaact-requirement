@@ -27,7 +27,7 @@
 // ============================================================================
 
 function competence_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     // Only a certificate marked required can stop an allocation.
     ensure_column('inspector_certs', 'is_mandatory', 'INT DEFAULT 0');
     // Who let a lapsed one through, and why. Held on the deputation because
@@ -237,7 +237,7 @@ const WITNESS_CRITERIA = [
 ];
 
 function competence_spine_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // The library of qualifications the body recognises. Configurable, because
     // a body inspecting lifts and a body inspecting pipelines share nothing.
@@ -670,7 +670,7 @@ const AUTH_BASES = [
 ];
 
 function competence_cycle_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     ensure_column('authorisations', 'basis', "VARCHAR(20) DEFAULT ''");
     ensure_column('authorisations', 'basis_ref', "VARCHAR(200) DEFAULT ''");
     ensure_column('authorisations', 'review_months', 'INT DEFAULT 0');

@@ -70,7 +70,7 @@ const SERVICE_SCOPE_LEVELS = [
 //  Schema — additive only.
 // ---------------------------------------------------------------------------
 function services_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = pk_clause();
     db()->exec("CREATE TABLE IF NOT EXISTS service_catalog (
         id $pk, code VARCHAR(40), name VARCHAR(120) DEFAULT '', description VARCHAR(400) DEFAULT '',

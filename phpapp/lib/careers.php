@@ -19,7 +19,7 @@
 
 // Additive columns/settings. No new table (candidates carries the applicant).
 function careers_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (!function_exists('ensure_column')) return;
     try {
         // A public application writes candidates.department / recruiter_id (added

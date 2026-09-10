@@ -44,7 +44,7 @@ const PORTAL_REQ_STATUS = [
 ];
 
 function portal_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // A person at the client company. Deliberately its own table: a row here
     // can never be mistaken for staff by any query anywhere in the app.

@@ -33,7 +33,7 @@ const REQ_SOURCING_MODELS = [
 // Additive, nullable columns that enrich a requirement (Phase 2). Never renames
 // or drops anything — a requisition raised before this still loads and saves.
 function req_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (!function_exists('ensure_column')) return;
     $cols = [
         // Client & contact (client_id links the CRM master — no second client store)
@@ -104,7 +104,7 @@ function req_migrate() {
 // (picked from the client's own contacts, or typed if not on file) + an optional
 // site. The requisition's total quantity is the sum of the group headcounts.
 function req_groups_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (!function_exists('ensure_column')) return;
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     try {
@@ -848,7 +848,7 @@ function ops_recruitment_home($method) {
 
 // Additive, nullable commercial-lifecycle columns on the assignment (candidate).
 function asg_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $cols = [
         ['asg_bill_rate','DECIMAL(14,2) NULL'], ['asg_bill_basis',"VARCHAR(20) NULL"],
         ['asg_cost_rate','DECIMAL(14,2) NULL'], ['asg_months','DECIMAL(8,2) NULL'],
@@ -1012,7 +1012,7 @@ function recruit_default_hire_type() {
 
 // Additive, nullable thread that ties a person's several application rows.
 function person_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     ensure_column('candidates', 'person_ref', "VARCHAR(40) NULL");
 }
 

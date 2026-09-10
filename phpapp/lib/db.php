@@ -1,13 +1,25 @@
 <?php
 // Database connection, schema creation, admin bootstrap and first-run seed.
 
+// The database "epoch" — a counter bumped every time db(true) switches the live
+// connection to a different store (choosing a company at login, provisioning a
+// new company, pushing a change into a company). The per-request, run-once
+// migration/seed guards key off this instead of a plain process-static, so a
+// SECOND database opened in the same process (a fresh company's first request,
+// or "Log in as") gets its FULL schema built too — the guards were "spent" on
+// the first database otherwise, which left the company's own database empty and
+// its login broken on multi-worker hosting right after a deploy.
+function db_epoch() { return (int) ($GLOBALS['__db_epoch'] ?? 0); }
+
 function db($reset = false) {
     static $pdo = null;
+    static $epoch = 0;
     // Additive: db(true) drops the cached connection so the NEXT db() rebuilds
     // it from config — used when a company is chosen at login and the live
     // database must switch to that company's own store. No existing caller
     // passes an argument, so this changes nothing for them.
-    if ($reset) { $pdo = null; return null; }
+    if ($reset) { $pdo = null; $epoch++; $GLOBALS['__db_epoch'] = $epoch; return null; }
+    if (!isset($GLOBALS['__db_epoch'])) $GLOBALS['__db_epoch'] = $epoch;
     if ($pdo) return $pdo;
     $cfg = require __DIR__ . '/../config.php';
     $d = $cfg['db'];

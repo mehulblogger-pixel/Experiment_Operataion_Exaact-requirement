@@ -20,7 +20,7 @@ const TAPI_ALERT_OPS = ['LT' => 'is below', 'LTE' => 'is at or below', 'GT' => '
 const TAPI_SEVERITY  = ['INFO' => 'Info', 'WARN' => 'Warning', 'HIGH' => 'High', 'CRITICAL' => 'Critical'];
 
 function tapi_score_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = pk_clause();
     // Per-scope / per-period target overrides. A blank office/sbu/period means
     // "applies to all"; resolution picks the most specific matching row, else
@@ -128,7 +128,7 @@ function tapi_scorecard_eval($id, $ctx = []) {
 }
 
 function tapi_seed_scorecard() {
-    static $seeded = false; if ($seeded) return; $seeded = true;
+    static $seededAt = -1; if ($seededAt === db_epoch()) return; $seededAt = db_epoch();
     if (ops_val("SELECT COUNT(*) FROM scorecards")) return;
     db()->prepare("INSERT INTO scorecards (code,name,description,active,created_at) VALUES ('MGMT','Management scorecard','A weighted view of operations, service and quality — every category shows its own contribution.',1,?)")->execute([date('c')]);
     $sid = (int)db()->lastInsertId();

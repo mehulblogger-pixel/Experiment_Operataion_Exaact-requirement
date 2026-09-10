@@ -21,7 +21,7 @@
 const TAPI_PERIOD_STATES = ['OPEN' => 'Open', 'REVIEW' => 'Under review', 'FINAL' => 'Final', 'LOCKED' => 'Locked'];
 
 function tapi_gov_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = pk_clause();
     // Old KPI definitions, kept so a historical report remains reproducible.
     db()->exec("CREATE TABLE IF NOT EXISTS kpi_versions (

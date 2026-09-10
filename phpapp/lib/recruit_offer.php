@@ -44,7 +44,7 @@ const HRD_OUTCOMES = ['PENDING' => 'Pending', 'AGREED' => 'Agreed', 'REVISION' =
 
 // ---- Schema (one migrate, three tables; wired into boot) -------------------
 function recruit_offer_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (!function_exists('ensure_column')) return;
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     $lt = (function_exists('db_driver') && db_driver() === 'sqlite') ? 'TEXT' : 'LONGTEXT';

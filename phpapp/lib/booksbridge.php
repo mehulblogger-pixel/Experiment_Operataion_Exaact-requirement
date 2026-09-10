@@ -24,7 +24,7 @@
 const BOOKS_RETRY_MAX = 6;   // ~6 cron runs before a failure stands
 
 function booksbridge_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS books_outbox (

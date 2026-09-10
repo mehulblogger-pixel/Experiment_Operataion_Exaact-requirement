@@ -42,7 +42,7 @@ const CVP_VISIBILITY_AUDIENCE = [
 ];
 
 function cvp_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // client_users is owned by portal.php and its migrate may run after ours in
     // the boot order. We add columns to it below, so guarantee it exists first —

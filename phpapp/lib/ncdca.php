@@ -96,7 +96,7 @@ const NCDCA_RESPONSE_KINDS = ['ACCEPT'=>'Acceptance','PARTIAL'=>'Partial accepta
 //  Schema — additive only. Elevate the existing record; add the gap tables.
 // ---------------------------------------------------------------------------
 function ncdca_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     // The corrective-action spine must exist before we elevate it — both are
     // idempotent (static-guarded), so calling them here just guarantees order
     // regardless of where run_schema places this migrate.

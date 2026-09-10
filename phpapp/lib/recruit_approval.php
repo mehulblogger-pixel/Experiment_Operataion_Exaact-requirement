@@ -18,7 +18,7 @@
 const APPR_ENTITIES = ['REQUISITION' => 'Requisition (SRF)', 'OFFER' => 'Offer', 'SALARY' => 'Salary structure'];
 
 function appr_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (!function_exists('ensure_column')) return;
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     try {

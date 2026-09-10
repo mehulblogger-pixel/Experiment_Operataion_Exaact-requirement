@@ -23,7 +23,7 @@
 // ============================================================================
 
 function connect_geo_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     // Searchable place hierarchy with coordinates. kind: COUNTRY | REGION | STATE | CITY.
     db()->exec("CREATE TABLE IF NOT EXISTS cx_geo_places (
@@ -45,7 +45,7 @@ function connect_geo_migrate() {
  *  free-text fields). Kept separate from migrate() because cx_professionals is
  *  created later at boot; called once the table exists, and lazily before a save. */
 function connect_geo_augment_professional() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (!function_exists('ensure_column')) return;
     foreach ([
         ['base_place_id', 'INT DEFAULT 0'], ['base_state', "VARCHAR(80) DEFAULT ''"], ['base_country', "VARCHAR(4) DEFAULT 'IN'"],

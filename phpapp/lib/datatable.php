@@ -37,7 +37,7 @@ const DT_PAGE_SIZES = [25, 50, 100, 200];
 const DT_PAGE_MAX   = 200;
 
 function dt_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pk = pk_clause();
     db()->exec("CREATE TABLE IF NOT EXISTS user_prefs (
         id $pk, user_id INT, pref_key VARCHAR(80) DEFAULT '', pref_value TEXT,

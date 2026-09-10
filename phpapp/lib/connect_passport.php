@@ -21,7 +21,7 @@
 
 /** Additive: the share-key column on the existing inspectors table. */
 function connect_passport_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (function_exists('ensure_column')) ensure_column('inspectors', 'passport_token', "VARCHAR(40) DEFAULT ''");
 }
 

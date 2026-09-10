@@ -39,7 +39,7 @@ const GATE_STATUS = ['PENDING' => 'Waiting', 'APPROVED' => 'Approved', 'REJECTED
 function gate_try($fn, $fb = null) { try { return $fn(); } catch (Throwable $e) { return $fb; } }
 
 function gate_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // stage_id 0 means "any stage of this kind", so one rule can cover Won on
     // every pipeline a company runs — including the ones it has not built yet.

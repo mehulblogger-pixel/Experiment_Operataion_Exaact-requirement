@@ -25,7 +25,7 @@ const ATTEND_SELF = [
 const ATTEND_LOC_REQUIRED = ['OFFICE', 'SITE'];   // must carry a location
 
 function attend_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (function_exists('lk_ensure_type_map')) lk_ensure_type_map('attendance_self', 'Self-marked attendance', ATTEND_SELF, 'attend');
     if (function_exists('ensure_column')) {
         // Arrival + departure are two facts; a location and time for each.

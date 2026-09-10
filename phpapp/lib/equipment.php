@@ -41,7 +41,7 @@ const EQUIP_STATUS = [
 const EQUIP_UNUSABLE = ['QUARANTINE', 'RETIRED', 'REPAIR'];
 
 function equipment_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS equipment (
         id $pk, code VARCHAR(60), name VARCHAR(200) DEFAULT '', kind VARCHAR(80) DEFAULT '',

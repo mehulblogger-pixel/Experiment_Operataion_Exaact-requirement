@@ -368,7 +368,7 @@ function contract_link_quotation($contractId, $quotationId) {
 // pulled through again rather than re-keyed. Added here because contracts.php
 // is where the quote/contract/order relationship already lives.
 function po_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     ensure_column('partner_purchase_orders', 'quotation_id', 'INT NULL');
     ensure_column('partner_purchase_orders', 'lines_synced_at', "VARCHAR(30) DEFAULT ''");
 }

@@ -60,7 +60,7 @@ const SW_REVIEW_DEFAULT = 365;
 const INTEGRITY_STALE_DAYS = 90;
 
 function datacontrol_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS sw_validations (
         id $pk, ref VARCHAR(40) DEFAULT '', kind VARCHAR(20) DEFAULT 'APP',

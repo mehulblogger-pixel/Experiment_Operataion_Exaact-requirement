@@ -46,7 +46,7 @@ function sso_on() { return strlen(sso_secret()) >= 32; }
 function sso_try($fn, $fb = null) { try { return $fn(); } catch (Throwable $e) { return $fb; } }
 
 function sso_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     $pdo = db(); $pk = pk_clause();
     // Every attempt, accepted or refused. Doubles as the replay guard: a token
     // whose signature we have already seen is refused whatever it says.

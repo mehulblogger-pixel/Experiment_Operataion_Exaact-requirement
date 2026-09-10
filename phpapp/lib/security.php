@@ -692,7 +692,7 @@ function app_decrypt($stored) {
 }
 
 function security_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     ensure_column('users', 'deactivated_at', "VARCHAR(30) DEFAULT ''");
     ensure_column('users', 'daily_hours',     "DECIMAL(4,2) NULL");
     ensure_column('users', 'half_day_hours',  "DECIMAL(4,2) NULL");

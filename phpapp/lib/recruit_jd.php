@@ -18,7 +18,7 @@
 // ============================================================================
 
 function jd_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     if (function_exists('ensure_column')) {
         try { ensure_column('requisitions', 'responsibilities', 'TEXT'); } catch (Throwable $e) {}
     }
