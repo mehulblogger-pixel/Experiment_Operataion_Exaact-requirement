@@ -173,6 +173,21 @@ if (function_exists('tenant_registry_heal')) {
     // Idempotent: a second heal with nothing missing changes nothing.
     t_ok(tenant_registry_heal() === false, 'a heal with nothing out of step makes no change');
 
+    // Recovery when there is NO saved base domain either (cloud was turned on by
+    // an older version): the base domain is adopted from the current request host
+    // so routing still comes back with no manual step.
+    setting_set('saas_base_domain', '');          // as if it was never saved
+    @unlink($regFile);                             // upload wiped the routing file again
+    $origHost = $_SERVER['HTTP_HOST'] ?? null;
+    $_SERVER['HTTP_HOST'] = 'ops.example.com';     // the site's own address
+    $healed2 = tenant_registry_heal();
+    t_ok($healed2 === true, 'with no saved base domain, routing still recovers from the site address');
+    $reg2 = tenant_registry();
+    t_eq((string) ($reg2['base_domain'] ?? ''), 'ops.example.com', 'the base domain is adopted from the site address');
+    t_eq((string) setting_get('saas_base_domain', ''), 'ops.example.com', 'and saved durably so it never needs adopting again');
+    t_ok(isset($reg2['tenants']['healco']), 'the company is routable again after host-based recovery');
+    if ($origHost === null) { unset($_SERVER['HTTP_HOST']); } else { $_SERVER['HTTP_HOST'] = $origHost; }
+
     // Clean up the directory row + saved base domain we added.
     if (function_exists('saas_tenant_delete')) saas_tenant_delete('healco');
     setting_set('saas_base_domain', '');

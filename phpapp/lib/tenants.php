@@ -98,7 +98,21 @@ function tenant_registry_heal() {
     if (!function_exists('db') || !function_exists('setting_get')) return false;
     if (function_exists('current_tenant') && current_tenant() !== '') return false;   // never inside a workspace
     $base = (string) setting_get('saas_base_domain', '');
-    if ($base === '') return false;                       // cloud was never turned on — nothing to heal
+    if ($base === '') {
+        // Recovery: the saved base domain is missing (cloud was turned on by an
+        // older version, or the setting was lost) BUT companies already exist in
+        // the database. Adopt the current request's own host as the base domain
+        // so cloud routing comes back on its own, with no manual step. Guarded:
+        // only a real domain, only when there is genuinely something to restore.
+        $rows0 = function_exists('saas_tenant_all') ? saas_tenant_all() : [];
+        if (!$rows0) return false;                        // no companies — this is a plain single install
+        $host = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
+        if ($host === '' || $host === 'localhost' || $host === '127.0.0.1'
+            || strpos($host, '.') === false || filter_var($host, FILTER_VALIDATE_IP)) return false;
+        if (strncmp($host, 'www.', 4) === 0) $host = substr($host, 4);   // normalise off a www. prefix
+        $base = $host;
+        try { setting_set('saas_base_domain', $base); } catch (Throwable $e) {}   // remember it durably now
+    }
     $reg = tenant_registry();
     $changed = false;
     if (($reg['base_domain'] ?? '') === '') { $reg['base_domain'] = $base; $changed = true; }
