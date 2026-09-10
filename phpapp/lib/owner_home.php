@@ -28,7 +28,24 @@ function ops_owner_home($method) {
         flash('Saved. Your left-hand menu updates on the next page.');
         redirect('/owner');
     }
+    return ops_owner_home_render();
+}
 
+// One-tap Marketplace on/off, callable from anywhere the owner already is
+// (linked from the Super-Admin Control Panel's Product-modules block too).
+function ops_marketplace_toggle($method) {
+    ops_require(function_exists('is_master') && is_master(),
+        'Only the owner / super admin can change this.');
+    if ($method === 'POST' && function_exists('setting_set')) {
+        $on = (($_POST['on'] ?? '') === '1');
+        setting_set('connect_enabled', $on ? '1' : '0');
+        if (function_exists('licence_disabled')) licence_disabled(true);
+        flash('Marketplace turned ' . ($on ? 'ON' : 'OFF') . '. Your left-hand menu updates on the next page.');
+    }
+    redirect(($_POST['back'] ?? '') === 'owner' ? '/owner' : '/super-admin');
+}
+
+function ops_owner_home_render() {
     // Read the current state for the screen.
     $mods = [];
     if (defined('PRODUCT_MODULES')) foreach (PRODUCT_MODULES as $k => $m) {
@@ -36,12 +53,10 @@ function ops_owner_home($method) {
                      'on' => function_exists('licence_enabled') ? licence_enabled($k) : true];
     }
     $modsOn = 0; foreach ($mods as $mm) if ($mm['on']) $modsOn++;
-
     $companies = function_exists('saas_tenant_all') ? count(saas_tenant_all()) : 0;
     $seatsUsed = 0;
     try { $seatsUsed = function_exists('lk_seats_used') ? (int) lk_seats_used() : (int) ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"); }
     catch (Throwable $e) {}
-
     view('ops/owner_home', [
         'mods'       => $mods,
         'mods_on'    => $modsOn,

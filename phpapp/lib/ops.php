@@ -2960,6 +2960,8 @@ function ops_dispatch($route, $method) {
             ops_consents($route, $method); return true;
         case $route === 'owner':                                     // calm owner landing (modules + marketplace switches)
             return ops_owner_home($method);
+        case $route === 'marketplace-toggle':                        // one-tap Marketplace on/off
+            return ops_marketplace_toggle($method);
         case $route === 'super-admin' || $route === 'control-panel':
             return ops_super_admin($method);
         case $route === 'companies':   // Super-Admin: cross-company console (add/plan/seats/modules/suspend/login-as)

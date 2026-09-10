@@ -96,6 +96,15 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
           </div>
         <?php endforeach; ?>
         <?php if (empty($lic['modules'])): ?><p class="muted" style="font-size:12.5px">All modules available (unlicensed / dev). A licence key gates these per tier.</p><?php endif; ?>
+        <?php // One-tap Marketplace on/off — the manpower marketplace ("Connect"). ?>
+        <?php $mktOn = function_exists('connect_enabled') ? connect_enabled() : true; ?>
+        <form method="post" action="/marketplace-toggle" class="mod" style="justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--line,#e5e7eb);margin-top:10px;padding-top:12px">
+          <span><span class="pill <?= $mktOn ? 'p-ok' : 'p-mut' ?>"><?= $mktOn ? 'On' : 'Off' ?></span>
+            <span class="mn" style="margin-left:8px">🧑‍🏭 Marketplace</span><br>
+            <span class="md" style="margin-left:8px">The technical-manpower marketplace — shows <b>Marketplace</b> in the left menu (URL: <code>/marketplace</code>).</span></span>
+          <input type="hidden" name="on" value="<?= $mktOn ? '0' : '1' ?>">
+          <button class="btn <?= $mktOn ? 'secondary' : '' ?>" type="submit" style="white-space:nowrap"><?= $mktOn ? 'Turn OFF' : 'Turn ON' ?></button>
+        </form>
       </div></div>
     </div>
   </div>
