@@ -134,6 +134,11 @@ function tenant_registry_heal() {
             // first use, so point at that.
             $entry['sqlite'] = __DIR__ . '/../tenant-' . $key . '.sqlite';
         }
+        // Restore the owner's first-login details too, so a company rebuilt after
+        // an upload keeps the owner's ability to sign in by email. Harmless once
+        // the workspace is live (the stamp is guarded by saas_provisioned).
+        $pend = json_decode((string) ($r['pending_json'] ?? ''), true);
+        if (is_array($pend) && !empty($pend['owner_email'])) $entry['pending'] = $pend;
         $reg['tenants'][$key] = $entry;
         $changed = true;
     }

@@ -155,6 +155,7 @@ if (function_exists('tenant_registry_heal')) {
     setting_set('saas_base_domain', 'ops.example.com');
     saas_tenant_upsert('healco', ['company' => 'Heal Co', 'plan' => 'RECRUITMENT', 'status' => 'active']);
     saas_tenant_upsert('healco', ['route_json' => json_encode(['sqlite' => $tSqlite])]);
+    saas_tenant_upsert('healco', ['pending_json' => json_encode(['owner_email' => 'owner@heal.test', 'plan' => 'RECRUITMENT'])]);
 
     // Simulate an upload that wiped the routing file.
     @unlink($regFile);
@@ -169,6 +170,7 @@ if (function_exists('tenant_registry_heal')) {
     t_ok(isset($regNew['tenants']['healco']), 'the company is routable again');
     t_eq((string) ($regNew['tenants']['healco']['sqlite'] ?? ''), $tSqlite, 'the company points back at its own stored database');
     t_eq((string) ($regNew['tenants']['healco']['company'] ?? ''), 'Heal Co', 'the company name is restored');
+    t_eq((string) ($regNew['tenants']['healco']['pending']['owner_email'] ?? ''), 'owner@heal.test', 'the owner\'s first-login details are restored too (owner can still sign in by email)');
 
     // Idempotent: a second heal with nothing missing changes nothing.
     t_ok(tenant_registry_heal() === false, 'a heal with nothing out of step makes no change');

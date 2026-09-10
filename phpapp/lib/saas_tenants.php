@@ -67,6 +67,10 @@ function saas_tenants_migrate() {
     // only a cache. Added by migration so existing installs gain it in place.
     if (function_exists('ensure_column')) {
         try { ensure_column('saas_tenants', 'route_json', "TEXT DEFAULT ''"); } catch (Throwable $e) {}
+        // The owner's first-login details (email, temp-password hash, plan) so the
+        // routing file can restore them too if an upload wipes it — otherwise a
+        // rebuilt company would lose the owner's ability to sign in by email.
+        try { ensure_column('saas_tenants', 'pending_json', "TEXT DEFAULT ''"); } catch (Throwable $e) {}
     }
 
     // Email -> company index, so a person typing only their email + password on
@@ -108,7 +112,7 @@ function saas_tenant_upsert($key, array $data) {
     if (!$pdo) return false;
     $key = strtolower(trim((string) $key));
     if ($key === '') return false;
-    $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules', 'route_json'];
+    $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules', 'route_json', 'pending_json'];
     $existing = saas_tenant_get($key);
     try {
         if ($existing) {
@@ -789,16 +793,18 @@ function ops_saas_admin($route, $method) {
             // exec() is disabled and the old separate-process provisioner did
             // nothing. "Log in as" and the owner's first sign-in both trigger it
             // on demand, so the company is ready the moment anyone opens it.
-            if (function_exists('tenant_pending_set')) {
-                tenant_pending_set($nkey, [
-                    'owner_email' => $oemail,
-                    'owner_name'  => $oname,
-                    'pass_hash'   => password_hash($opass, PASSWORD_DEFAULT),
-                    'plan'        => $plan,
-                    'seat_limit'  => (int) saas_tenant_seat_limit($nkey),
-                    'app_name'    => $company,
-                ]);
-            }
+            $pending = [
+                'owner_email' => $oemail,
+                'owner_name'  => $oname,
+                'pass_hash'   => password_hash($opass, PASSWORD_DEFAULT),
+                'plan'        => $plan,
+                'seat_limit'  => (int) saas_tenant_seat_limit($nkey),
+                'app_name'    => $company,
+            ];
+            if (function_exists('tenant_pending_set')) tenant_pending_set($nkey, $pending);
+            // Also keep the owner details in the control database, so the routing
+            // file can restore them if an upload wipes it (durable owner login).
+            saas_tenant_upsert($nkey, ['pending_json' => json_encode($pending)]);
             flash('Company “' . $company . '” is ready. Its owner signs in at the one product URL with '
                 . $oemail . ' (temporary password: ' . $opass . '). On first sign-in they set their own '
                 . 'password and complete their company onboarding (business profile, financial year, '
