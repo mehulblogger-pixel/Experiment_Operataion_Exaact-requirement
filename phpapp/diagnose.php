@@ -105,24 +105,40 @@ if (function_exists('tenant_registry')) {
 
     // Deep readiness test for one company.
     $key = strtolower(trim((string) ($_GET['key'] ?? '')));
-    if ($key !== '' && isset($ts[$key]) && $newCode) {
-        $p("");
-        $p("=== deep readiness test: " . $key . " ===");
-        try {
-            saas_enter_tenant($key);
-            $ok = function_exists('saas_tenant_ensure_ready') ? saas_tenant_ensure_ready($key) : null;
-            $p("  ensure_ready() -> " . ($ok === true ? "TRUE (workspace ready)" : "FALSE"));
-            try { $p("  active admins in workspace: " . (int) ops_val("SELECT COUNT(*) FROM users WHERE is_superuser=1 AND is_active=1")); }
-            catch (Throwable $e) { $p("  users query error: " . $e->getMessage()); }
-            if (function_exists('saas_leave_tenant')) saas_leave_tenant();
-        } catch (Throwable $e) {
-            $p("  EXCEPTION while opening the workspace:");
-            $p("    " . $e->getMessage());
-            $p("    at " . $e->getFile() . ":" . $e->getLine());
+    // Deep readiness test on EVERY company — step by step, with the real error
+    // shown. (The normal open-workspace path hides its error on purpose, so we
+    // redo the steps here and print exactly what fails.)
+    if ($newCode) {
+        foreach ($ts as $ck => $ct) {
+            $p("");
+            $p("=== deep test: " . $ck . " ===");
+            try {
+                saas_enter_tenant($ck);
+                try { db(); } catch (Throwable $e) {}
+                $gt = $GLOBALS['__tenant'] ?? [];
+                $p("  resolved to     : key='" . ($gt['key'] ?? '') . "'  error='" . ($gt['error'] ?? '') . "'");
+                $cfgNow = @require __DIR__ . '/config.php';
+                $drv = (string) ($cfgNow['db']['driver'] ?? '?');
+                $p("  database driver : " . $drv);
+                if ($drv === 'sqlite') $p("  sqlite file     : " . (string) ($cfgNow['sqlite_path'] ?? '?'));
+                try {
+                    $has = false;
+                    try { db()->query("SELECT id FROM users LIMIT 1"); $has = true; } catch (Throwable $e) { $has = false; }
+                    $p("  users table before build: " . ($has ? "exists" : "missing"));
+                    if (!$has) { $p("  building schema (boot)…"); boot(); $p("  boot() completed OK"); }
+                    $n = (int) db()->query("SELECT COUNT(*) FROM users WHERE is_superuser=1 AND is_active=1")->fetchColumn();
+                    $p("  active admins   : " . $n);
+                    $ok = function_exists('saas_tenant_ensure_ready') ? saas_tenant_ensure_ready($ck) : null;
+                    $p("  ensure_ready()  : " . ($ok === true ? "TRUE  <-- this company can open" : "FALSE"));
+                } catch (Throwable $e) {
+                    $p("  >>> BUILD ERROR : " . $e->getMessage());
+                    $p("      at " . $e->getFile() . ":" . $e->getLine());
+                }
+                if (function_exists('saas_leave_tenant')) saas_leave_tenant();
+            } catch (Throwable $e) {
+                $p("  >>> SWITCH ERROR: " . $e->getMessage());
+            }
         }
-    } elseif ($key === '') {
-        $p("");
-        $p("(Tip: add &key=THE-COMPANY-KEY to the address to deep-test one company.)");
     }
 } else {
     $p("Cloud routing library not loaded — the app may be running old code.");
