@@ -744,8 +744,15 @@ function app_name() {
 }
 function &settings_cache() {
     static $cache = null;
-    if ($cache === null) {
+    static $atEpoch = -1;
+    // Reload when the live database is switched (choosing a company at login,
+    // "Log in as", provisioning). Without this, the settings read inside a
+    // company's workspace would be the CONTROL database's — a cross-company
+    // leak of modules, seat limits and every other setting.
+    $epoch = function_exists('db_epoch') ? db_epoch() : 0;
+    if ($cache === null || $atEpoch !== $epoch) {
         $cache = [];
+        $atEpoch = $epoch;
         try { foreach (ops_all("SELECT skey, svalue FROM settings") as $r) $cache[$r['skey']] = $r['svalue']; }
         catch (Throwable $e) { $cache = []; }
     }
