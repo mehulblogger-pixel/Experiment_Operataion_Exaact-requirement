@@ -81,6 +81,9 @@
       </div>
       <p class="s-find-none" id="navFindNone" hidden>Nothing matches that.</p>
       <a class="s-item<?= $navOn(['']) ?>" href="/"><span class="s-ic">🏠</span><span>Dashboard</span></a>
+      <?php if (function_exists('is_master') && is_master()): ?>
+      <a class="s-item<?= $navOn(['owner']) ?>" href="/owner"><span class="s-ic">🧭</span><span>Owner home</span></a>
+      <?php endif; ?>
       <?php // Also in the top bar, but a destination in the menu is how people
             // discover that searching records is a thing at all. ?>
       <a class="s-item<?= $navOn(['search']) ?>" href="/search"><span class="s-ic">🔍</span><span>Search records</span></a>
