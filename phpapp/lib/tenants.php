@@ -79,7 +79,53 @@ function tenant_enable_cloud($baseDomain) {
         return 'Enter the base domain workspaces live under, e.g. operations.example.com.';
     $reg = tenant_registry();
     $reg['base_domain'] = $baseDomain;
+    // Also remember it in the control database, which survives every upload. The
+    // routing file (tenants.php) is rebuilt from here if an upload ever wipes it,
+    // so cloud mode never silently "switches off" again.
+    if (function_exists('setting_set')) { try { setting_set('saas_base_domain', $baseDomain); } catch (Throwable $e) {} }
     return tenant_registry_write($reg);
+}
+
+// Rebuild the routing file (tenants.php) from the control DATABASE, which
+// survives every upload. The file is only a cache of what the database already
+// knows — the saved base domain and each company's stored routing — so if an
+// upload wipes it, cloud mode and every company come straight back on the next
+// page load instead of appearing "switched off". Only ever reconciles TOWARDS
+// the database: it adds the base domain and any company missing from the file,
+// and never removes or overwrites an entry the file already has. Runs only on
+// the control install. Returns true if it changed the file.
+function tenant_registry_heal() {
+    if (!function_exists('db') || !function_exists('setting_get')) return false;
+    if (function_exists('current_tenant') && current_tenant() !== '') return false;   // never inside a workspace
+    $base = (string) setting_get('saas_base_domain', '');
+    if ($base === '') return false;                       // cloud was never turned on — nothing to heal
+    $reg = tenant_registry();
+    $changed = false;
+    if (($reg['base_domain'] ?? '') === '') { $reg['base_domain'] = $base; $changed = true; }
+    if (!is_array($reg['tenants'] ?? null)) $reg['tenants'] = [];
+    $rows = function_exists('saas_tenant_all') ? saas_tenant_all() : [];
+    foreach ($rows as $r) {
+        $key = strtolower(trim((string) ($r['tenant_key'] ?? '')));
+        if ($key === '' || isset($reg['tenants'][$key])) continue;   // already routed — leave it exactly as it is
+        $entry = ['company' => (string) ($r['company'] ?? $key), 'status' => (string) ($r['status'] ?? 'active')];
+        $route = json_decode((string) ($r['route_json'] ?? ''), true);
+        if (is_array($route) && !empty($route['sqlite'])) {
+            $entry['sqlite'] = (string) $route['sqlite'];
+        } elseif (is_array($route) && !empty($route['name'])) {
+            $entry['db'] = ['host' => (string) ($route['host'] ?? 'localhost'), 'name' => (string) $route['name'],
+                            'user' => (string) ($route['user'] ?? ''), 'pass' => (string) ($route['pass'] ?? '')];
+        } else {
+            // A company created before durable routing existed: the default
+            // storage is a file named after the workspace key, opened/rebuilt on
+            // first use, so point at that.
+            $entry['sqlite'] = __DIR__ . '/../tenant-' . $key . '.sqlite';
+        }
+        $reg['tenants'][$key] = $entry;
+        $changed = true;
+    }
+    if (!$changed) return false;
+    tenant_registry_write($reg);
+    return true;
 }
 
 // Validate a subdomain label: lowercase letters, digits and hyphens only.

@@ -664,6 +664,18 @@ if (function_exists('current_tenant') && current_tenant() !== '' && function_exi
     try { saas_tenant_apply_bootstrap(current_tenant()); } catch (Throwable $e) {}
 }
 
+// Self-heal the cloud routing file on the control install. The routing file
+// (tenants.php) is deliberately kept out of every upload, so a "delete then
+// extract" re-upload can wipe it — which used to make cloud mode look switched
+// off and every company un-openable. The control database is the durable source
+// of truth (it survives uploads), so we rebuild the file from it whenever the
+// file is missing the base domain or a company the database already knows. Runs
+// only on the control install, and only actually writes when something is out of
+// step, so ordinary requests pay just one settings read.
+if (function_exists('current_tenant') && current_tenant() === '' && function_exists('tenant_registry_heal')) {
+    try { tenant_registry_heal(); } catch (Throwable $e) {}
+}
+
 // Locked out of the admin login? Drop a plain text file named
 // "reset-admin.txt" in this folder (cPanel File Manager → New File) with the
 // new password on the first line, then load any page once. The password is set,

@@ -60,6 +60,15 @@ function saas_tenants_migrate() {
         )");
     } catch (Throwable $e) { /* never block the rest of the boot chain */ }
 
+    // Durable routing: where each company's OWN database lives (a SQLite path or
+    // MySQL coordinates), stored as JSON on the directory row. This is what lets
+    // the routing file (tenants.php) rebuild itself from the database after an
+    // upload wipes it — the database is the durable source of truth, the file is
+    // only a cache. Added by migration so existing installs gain it in place.
+    if (function_exists('ensure_column')) {
+        try { ensure_column('saas_tenants', 'route_json', "TEXT DEFAULT ''"); } catch (Throwable $e) {}
+    }
+
     // Email -> company index, so a person typing only their email + password on
     // the one product URL can be routed to their company. One person can belong
     // to exactly one company here (their login company); the row is kept in step
@@ -99,7 +108,7 @@ function saas_tenant_upsert($key, array $data) {
     if (!$pdo) return false;
     $key = strtolower(trim((string) $key));
     if ($key === '') return false;
-    $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules'];
+    $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules', 'route_json'];
     $existing = saas_tenant_get($key);
     try {
         if ($existing) {
@@ -765,6 +774,10 @@ function ops_saas_admin($route, $method) {
             if ($err !== '') { flash($err, 'error'); redirect('/companies'); }
 
             saas_tenant_upsert($nkey, ['company' => $company, 'owner_name' => $oname, 'owner_email' => $oemail, 'plan' => $plan, 'status' => 'active']);
+            // Remember WHERE this company's database lives, in the control DB, so
+            // the routing file can rebuild itself from the database if an upload
+            // ever wipes it (durable routing — the DB is the source of truth).
+            saas_tenant_upsert($nkey, ['route_json' => json_encode($db)]);
             saas_tenant_set_plan($nkey, $plan);
             saas_login_index_set($oemail, $nkey);
 

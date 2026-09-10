@@ -139,6 +139,46 @@ if ($canExec) {
 }
 
 // ---------------------------------------------------------------------------
+t_section('SaaS isolation — routing rebuilds itself from the database after an upload');
+
+// The control database is the durable source of truth; tenants.php is only a
+// cache kept out of every upload. Prove that if the file is wiped, cloud mode
+// and every company come back automatically from the database.
+if (function_exists('tenant_registry_heal')) {
+    // Make sure this process is resolved to the CONTROL install (heal refuses
+    // inside a workspace). The config-safety section above left the tenant
+    // descriptor pointed at a company; re-resolve with no company in session.
+    unset($_SESSION['saas_tenant']);
+    require $root . '/config.php';
+    // Register a company IN THE DATABASE (directory + saved base domain + its
+    // stored route), exactly as adding a company now does.
+    setting_set('saas_base_domain', 'ops.example.com');
+    saas_tenant_upsert('healco', ['company' => 'Heal Co', 'plan' => 'RECRUITMENT', 'status' => 'active']);
+    saas_tenant_upsert('healco', ['route_json' => json_encode(['sqlite' => $tSqlite])]);
+
+    // Simulate an upload that wiped the routing file.
+    @unlink($regFile);
+    $regGone = tenant_registry();
+    t_eq((string) ($regGone['base_domain'] ?? ''), '', 'after an upload wipes it, the routing file has no base domain');
+
+    // Heal from the database.
+    $healed = tenant_registry_heal();
+    t_ok($healed === true, 'the routing file is rebuilt from the database');
+    $regNew = tenant_registry();
+    t_eq((string) ($regNew['base_domain'] ?? ''), 'ops.example.com', 'cloud mode is restored (base domain comes back)');
+    t_ok(isset($regNew['tenants']['healco']), 'the company is routable again');
+    t_eq((string) ($regNew['tenants']['healco']['sqlite'] ?? ''), $tSqlite, 'the company points back at its own stored database');
+    t_eq((string) ($regNew['tenants']['healco']['company'] ?? ''), 'Heal Co', 'the company name is restored');
+
+    // Idempotent: a second heal with nothing missing changes nothing.
+    t_ok(tenant_registry_heal() === false, 'a heal with nothing out of step makes no change');
+
+    // Clean up the directory row + saved base domain we added.
+    if (function_exists('saas_tenant_delete')) saas_tenant_delete('healco');
+    setting_set('saas_base_domain', '');
+}
+
+// ---------------------------------------------------------------------------
 // Cleanup: remove the throwaway registry + database, restore any real one, and
 // return this process cleanly to the control database.
 @unlink($tSqlite);
