@@ -131,6 +131,27 @@ function saas_tenant_set_status($key, $status) {
     $status = in_array($status, ['active', 'pending', 'suspended'], true) ? $status : 'active';
     return saas_tenant_upsert($key, ['status' => $status]);
 }
+
+// Delete a company from the control-plane DIRECTORY (control database). Used by
+// the console's "Remove company". The routing registry and login index are
+// cleared separately (see ops_saas_admin company_remove).
+function saas_tenant_delete($key) {
+    if (!function_exists('db')) return false;
+    $key = strtolower(trim((string) $key));
+    if ($key === '') return false;
+    try { db()->prepare("DELETE FROM saas_tenants WHERE tenant_key=?")->execute([$key]); return true; }
+    catch (Throwable $e) { return false; }
+}
+
+// Free every email that signed in to this company (control database), so the
+// same owner email can be used again for a fresh company of the same name.
+function saas_login_index_clear_tenant($key) {
+    if (!function_exists('db')) return false;
+    $key = strtolower(trim((string) $key));
+    if ($key === '') return false;
+    try { db()->prepare("DELETE FROM saas_logins WHERE tenant_key=?")->execute([$key]); return true; }
+    catch (Throwable $e) { return false; }
+}
 function saas_tenant_set_plan($key, $plan, $expiry = null) {
     $d = ['plan' => strtoupper((string) $plan), 'enabled_modules' => saas_plan_modules($plan)];
     if ($expiry !== null) $d['plan_expiry'] = (string) $expiry;
@@ -820,6 +841,44 @@ function ops_saas_admin($route, $method) {
             // Make it effective at the door: the routing registry decides login.
             if (function_exists('tenant_set_status')) tenant_set_status($key, $status);
             flash('Company ' . $key . ' ' . ($status === 'suspended' ? 'suspended' : 'reactivated') . '.');
+            redirect('/companies');
+        }
+        // ---- Permanently remove a company --------------------------------
+        // The destructive counterpart to Suspend. Unregisters the company from
+        // routing, the directory and the login index (freeing its owner email),
+        // and — for a file-backed workspace — deletes its data file. A MySQL
+        // workspace's database is left in place (dropping it needs the panel),
+        // so the operator is told to remove it there if they want the space
+        // back. Guarded (super-admin), confirmed in the UI, and refused for a
+        // workspace the operator is currently signed into.
+        if ($do === 'company_remove' && $key !== '') {
+            if (function_exists('current_tenant') && current_tenant() === $key) {
+                flash('You are currently signed in to that company. Log out of it first, then remove it.', 'error');
+                redirect('/companies');
+            }
+            $t = saas_tenant_get($key);
+            $company = $t ? (string) ($t['company'] ?? $key) : $key;
+            // Find its own database so a file-backed workspace can be deleted.
+            $reg = function_exists('tenant_registry') ? tenant_registry() : ['tenants' => []];
+            $route = $reg['tenants'][$key] ?? null;
+            $sqliteFile = is_array($route) ? (string) ($route['sqlite'] ?? '') : '';
+            $wasMysql = is_array($route) && !empty($route['db']);
+            // 1) Stop routing to it, 2) drop the directory row, 3) free the
+            //    owner email(s) so the company can be re-created cleanly.
+            if (function_exists('tenant_remove')) tenant_remove($key);
+            saas_tenant_delete($key);
+            saas_login_index_clear_tenant($key);
+            // 4) Delete the workspace's own data file, if it is file-backed and
+            //    inside the app folder (never touch anything outside it).
+            $fileNote = '';
+            if ($sqliteFile !== '') {
+                $base = realpath(dirname(__DIR__));
+                $real = realpath($sqliteFile);
+                if ($real && $base && strncmp($real, $base, strlen($base)) === 0) { @unlink($real); $fileNote = ' Its data file was deleted.'; }
+            } elseif ($wasMysql) {
+                $fileNote = ' Its MySQL database was left in place — drop it from your hosting panel if you want the space back.';
+            }
+            flash('Company “' . $company . '” was removed.' . $fileNote . ' Its owner email is free to use again.');
             redirect('/companies');
         }
         if ($do === 'company_login_as' && $key !== '') {

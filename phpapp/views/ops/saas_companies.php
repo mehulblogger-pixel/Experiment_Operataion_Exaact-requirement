@@ -99,6 +99,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
         <a class="btn xs ghost" href="/companies?key=<?= $k ?>">Manage</a>
         <form method="post" style="display:inline"><input type="hidden" name="do" value="company_login_as"><input type="hidden" name="key" value="<?= $k ?>"><input type="hidden" name="company" value="<?= $e($c['company']) ?>"><button class="btn xs">Log in as ›</button></form>
         <form method="post" style="display:inline" onsubmit="return confirm('<?= $active ? 'Suspend' : 'Reactivate' ?> <?= $e($c['company']) ?>?')"><input type="hidden" name="do" value="company_status"><input type="hidden" name="key" value="<?= $k ?>"><input type="hidden" name="status" value="<?= $active ? 'suspended' : 'active' ?>"><button class="btn xs ghost" style="color:<?= $active ? '#dc2626' : '#047857' ?>"><?= $active ? 'Suspend' : 'Activate' ?></button></form>
+        <form method="post" style="display:inline" onsubmit="return confirm('PERMANENTLY REMOVE “<?= $e($c['company']) ?>”?\n\nThis deletes its workspace and all its data and cannot be undone. Its owner email will be free to use again.\n\nTip: use Suspend instead if you only want to block sign-in for now.')"><input type="hidden" name="do" value="company_remove"><input type="hidden" name="key" value="<?= $k ?>"><button class="btn xs ghost" style="color:#b91c1c" title="Permanently remove this company and its data">Remove</button></form>
       </div></td>
     </tr>
     <?php endforeach; ?>

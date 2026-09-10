@@ -100,6 +100,20 @@ $asme = null; foreach ($list as $r) if (($r['tenant_key'] ?? '') === 'asme') $as
 t_ok($asme !== null, 'the console lists a company from the directory');
 t_ok(isset($asme['seat_limit']) && isset($asme['mods_list']), 'each listed company carries its seat limit and module list');
 
+// Remove-a-company helpers (the console's destructive "Remove company").
+t_section('SaaS control plane — remove a company (directory + login index)');
+t_ok(function_exists('saas_tenant_delete') && function_exists('saas_login_index_clear_tenant'),
+    'the remove helpers exist');
+saas_tenant_upsert('temp-co', ['company' => 'Temp Test Co', 'plan' => 'RECRUITMENT', 'status' => 'active']);
+saas_login_index_set('owner@temp-co.test', 'temp-co');
+t_ok(saas_tenant_get('temp-co') !== null, 'a throwaway company is registered');
+t_eq(saas_login_lookup('owner@temp-co.test'), 'temp-co', 'its owner email resolves to it');
+// Remove it from the directory and free its owner email.
+saas_login_index_clear_tenant('temp-co');
+saas_tenant_delete('temp-co');
+t_ok(saas_tenant_get('temp-co') === null, 'after removal the company is gone from the directory');
+t_eq(saas_login_lookup('owner@temp-co.test'), '', 'after removal the owner email is free to use again (no leak)');
+
 // Add-a-company helpers.
 t_section('SaaS control plane — add a company (provisioning helpers)');
 t_ok(function_exists('saas_slug'), 'the workspace-key slug helper exists');
