@@ -111,9 +111,14 @@ if (is_file($tenantsFile)) {
             } elseif (!empty($t['sqlite'])) {
                 $DB['driver'] = 'sqlite';
                 $SQLITE = (string) $t['sqlite'];
-            } elseif (!empty($t['db']) && is_array($t['db'])) {
+            } elseif (!empty($t['db']) && is_array($t['db']) && ($t['db']['name'] ?? '') !== '') {
                 $DB = array_merge($DB, $t['db']);
                 if (empty($DB['driver'])) $DB['driver'] = 'mysql';
+            } else {
+                // A company whose own database was never wired up. NEVER fall
+                // through to the control database (that would leak the owner's
+                // data to a client). Refuse safely instead.
+                $TENANT['error'] = 'unconfigured';
             }
         } elseif (!$isBase) {
             $sub = '';
@@ -132,9 +137,11 @@ if (is_file($tenantsFile)) {
                 } elseif (!empty($t['sqlite'])) {
                     $DB['driver'] = 'sqlite';
                     $SQLITE = (string)$t['sqlite'];
-                } elseif (!empty($t['db']) && is_array($t['db'])) {
+                } elseif (!empty($t['db']) && is_array($t['db']) && ($t['db']['name'] ?? '') !== '') {
                     $DB = array_merge($DB, $t['db']);
                     if (empty($DB['driver'])) $DB['driver'] = 'mysql';
+                } else {
+                    $TENANT['error'] = 'unconfigured';              // a workspace whose DB was never wired
                 }
             } else {
                 $TENANT['error'] = 'unknown';                       // a subdomain with no workspace

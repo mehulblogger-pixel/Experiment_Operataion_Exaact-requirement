@@ -561,10 +561,127 @@ function saas_push_to_tenant($key) {
               . ' DB_PASS=' . escapeshellarg((string) ($d['pass'] ?? ''));
     } else { return false; }
     $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
-    if (!function_exists('exec') || in_array('exec', $disabled, true)) return false;
-    $out = []; $code = 1;
-    @exec($env . ' ' . escapeshellarg($php) . ' ' . escapeshellarg($cli) . ' 2>&1', $out, $code);
-    return $code === 0;
+    $canExec = function_exists('exec') && !in_array('exec', $disabled, true);
+    if ($canExec) {
+        $out = []; $code = 1;
+        @exec($env . ' ' . escapeshellarg($php) . ' ' . escapeshellarg($cli) . ' 2>&1', $out, $code);
+        if ($code === 0) return true;
+    }
+    // Exec-free fallback (managed hosting): apply the change to the company's
+    // OWN database in-process. Plan / seat / module changes are plain settings
+    // writes — no schema build — so a transient switch into the workspace is
+    // enough. We restore the operator's own session afterwards so this push
+    // never strands them inside the company they were only editing.
+    return saas_push_to_tenant_inproc($key, $t);
+}
+
+// Apply a company's current plan / modules / seat limit to its OWN database
+// from within this request, restoring the operator's session afterwards. Used
+// when exec() is unavailable. Returns true on success.
+function saas_push_to_tenant_inproc($key, $t = null) {
+    $key = strtolower(trim((string) $key));
+    if ($key === '' || !function_exists('saas_enter_tenant')) return false;
+    if ($t === null) $t = saas_tenant_get($key);
+    if (!$t) return false;
+    $prev = $_SESSION['saas_tenant'] ?? null;             // remember where the operator was
+    $ok = false;
+    try {
+        saas_enter_tenant($key);                          // switch the live DB to the company
+        // Refuse unless we truly landed in the workspace's own database.
+        $rt = $GLOBALS['__tenant'] ?? [];
+        try { db(); $rt = $GLOBALS['__tenant'] ?? []; } catch (Throwable $e) {}
+        if (strtolower((string) ($rt['key'] ?? '')) === $key && ($rt['error'] ?? '') === '') {
+            if (function_exists('saas_tenant_ensure_ready')) saas_tenant_ensure_ready($key);   // build + stamp if brand new
+            $mods = saas_tenant_modules($key);
+            if ($mods && function_exists('saas_apply_modules_list')) saas_apply_modules_list($mods);
+            elseif (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules((string) ($t['plan'] ?? 'RECRUITMENT'));
+            if (function_exists('setting_set')) setting_set('saas_seat_limit', (string) saas_tenant_seat_limit($key));
+            $ok = true;
+        }
+    } catch (Throwable $e) { $ok = false; }
+    // Restore the operator's own context (they were on the control install).
+    if ($prev === null) { unset($_SESSION['saas_tenant']); } else { $_SESSION['saas_tenant'] = $prev; }
+    if (function_exists('db_reset')) db_reset();
+    if (function_exists('licence_disabled')) licence_disabled(true);   // drop the company's off-list cache
+    return $ok;
+}
+
+// ---------------------------------------------------------------------------
+//  First-boot stamp — apply a company's stashed owner details to its OWN
+//  database the first time that workspace is opened. Runs in a request pointed
+//  only at the company's database, so the per-process migration guards are
+//  clean. Idempotent and one-shot: guarded by the saas_provisioned setting, so
+//  it can never overwrite a live workspace a second time.
+// ---------------------------------------------------------------------------
+function saas_tenant_apply_bootstrap($key = '') {
+    if (!function_exists('setting_get') || !function_exists('db')) return false;
+    $key = strtolower(trim((string) ($key !== '' ? $key
+        : (function_exists('current_tenant') ? current_tenant() : ''))));
+    if ($key === '') return false;
+    try { if ((string) setting_get('saas_provisioned', '') === '1') return true; }   // already live — never touch twice
+    catch (Throwable $e) { return false; }
+    $p = function_exists('tenant_pending') ? tenant_pending($key) : null;
+    if (!is_array($p)) return false;                       // no deferred stamp waiting for this workspace
+    try {
+        $pdo = db();
+        // 1) A friendly company name (the owner confirms/edits it in onboarding).
+        $company = (string) ($p['app_name'] ?? '');
+        if ($company !== '') setting_set('app_name', substr($company, 0, 120));
+        // 2) Force the owner through first-login onboarding (password + profile).
+        setting_set('saas_onboarding_pending', '1');
+        // 3) The owner becomes this workspace's admin — their email + temp password.
+        $email = strtolower(trim((string) ($p['owner_email'] ?? '')));
+        $name  = trim((string) ($p['owner_name'] ?? '')) ?: 'Administrator';
+        [$fn, $ln] = array_pad(explode(' ', $name, 2), 2, '');
+        $hash  = (string) ($p['pass_hash'] ?? '');
+        if ($hash === '') $hash = password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
+        $pdo->prepare("UPDATE users SET email=?, first_name=?, last_name=?, password_hash=?, must_change_pwd=1, pwd_changed_at=? WHERE is_superuser=1")
+            ->execute([$email, $fn, $ln, $hash, date('c')]);
+        // 4) Stop the config-admin sync from reverting that password on later boots.
+        try {
+            $cfg = require dirname(__DIR__) . '/config.php';
+            setting_set('admin_cfg_sig', md5(((string) ($cfg['admin']['user'] ?? 'admin')) . "\x00" . ((string) ($cfg['admin']['pass'] ?? ''))));
+        } catch (Throwable $e) {}
+        // 5) Turn on exactly the modules the plan includes; set the seat cap.
+        if (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules((string) ($p['plan'] ?? 'RECRUITMENT'));
+        setting_set('saas_seat_limit', (string) max(0, (int) ($p['seat_limit'] ?? 0)));
+        if (function_exists('doc_tpl_migrate')) doc_tpl_migrate();
+        // 6) Mark done so this never runs again, then drop the stashed details.
+        setting_set('saas_provisioned', '1');
+        if (function_exists('tenant_pending_clear')) tenant_pending_clear($key);
+        return true;
+    } catch (Throwable $e) { return false; }
+}
+
+// Make sure the CURRENTLY-ENTERED company workspace is ready to use: build its
+// schema the first time it is opened, then apply the owner first-boot stamp.
+// Safe to call on every entry — it is a no-op once the workspace is live.
+// Returns true only when the workspace has its own database with an active
+// owner login. NEVER touches the control database: it refuses unless config
+// resolved this request to the workspace's OWN store.
+function saas_tenant_ensure_ready($key) {
+    $key = strtolower(trim((string) $key));
+    if ($key === '' || !function_exists('db')) return false;
+    // Force config to re-resolve for the entered workspace and confirm we are
+    // pointed at ITS database — not silently back on the control database.
+    try { db(); } catch (Throwable $e) {}
+    $t = $GLOBALS['__tenant'] ?? [];
+    if (strtolower((string) ($t['key'] ?? '')) !== $key || ($t['error'] ?? '') !== '') return false;
+    // Fast path: already provisioned.
+    try { if ((string) setting_get('saas_provisioned', '') === '1') return true; } catch (Throwable $e) {}
+    // Build the schema on first visit. On a healthy, up-to-date control install
+    // the per-request schema probe is skipped, so the per-process migration
+    // guards are untouched and this builds the full schema for THIS database.
+    try {
+        $need = true;
+        try { db()->query("SELECT id FROM users LIMIT 1"); $need = false; } catch (Throwable $e) { $need = true; }
+        if ($need && function_exists('boot')) boot();
+    } catch (Throwable $e) { return false; }
+    // Apply the owner stamp (idempotent, guarded by saas_provisioned).
+    saas_tenant_apply_bootstrap($key);
+    // Ready only when an active owner login now exists in the workspace.
+    try { return (int) ops_val("SELECT COUNT(*) FROM users WHERE is_superuser=1 AND is_active=1") > 0; }
+    catch (Throwable $e) { return false; }
 }
 
 function ops_saas_admin($route, $method) {
@@ -630,37 +747,28 @@ function ops_saas_admin($route, $method) {
             saas_tenant_set_plan($nkey, $plan);
             saas_login_index_set($oemail, $nkey);
 
-            // Build the company's OWN database in a clean child process (see
-            // lib/saas_provision_cli.php for why a separate process).
-            $php = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
-            $cli = __DIR__ . '/saas_provision_cli.php';
-            $env = 'SAAS_COMPANY=' . escapeshellarg($company) . ' SAAS_EMAIL=' . escapeshellarg($oemail)
-                 . ' SAAS_NAME=' . escapeshellarg($oname) . ' SAAS_PASS=' . escapeshellarg($opass)
-                 . ' SAAS_PLAN=' . escapeshellarg($plan)
-                 . ' SAAS_SEAT_LIMIT=' . escapeshellarg((string) saas_tenant_seat_limit($nkey));
-            if (!empty($db['sqlite'])) {
-                $env .= ' SAAS_SQLITE=' . escapeshellarg($db['sqlite']);
-            } else {
-                $env .= ' DB_DRIVER=mysql DB_HOST=' . escapeshellarg((string) ($db['host'] ?? 'localhost')) . ' DB_NAME=' . escapeshellarg((string) $db['name'])
-                      . ' DB_USER=' . escapeshellarg((string) $db['user']) . ' DB_PASS=' . escapeshellarg((string) ($db['pass'] ?? ''));
+            // Stash the owner's details on the workspace's registry entry. The
+            // workspace builds its OWN database and applies these the first time
+            // it is opened — a clean request pointed only at its own store (see
+            // saas_tenant_apply_bootstrap / saas_tenant_ensure_ready). This needs
+            // no exec() and so works on managed hosting (cPanel/mPanel), where
+            // exec() is disabled and the old separate-process provisioner did
+            // nothing. "Log in as" and the owner's first sign-in both trigger it
+            // on demand, so the company is ready the moment anyone opens it.
+            if (function_exists('tenant_pending_set')) {
+                tenant_pending_set($nkey, [
+                    'owner_email' => $oemail,
+                    'owner_name'  => $oname,
+                    'pass_hash'   => password_hash($opass, PASSWORD_DEFAULT),
+                    'plan'        => $plan,
+                    'seat_limit'  => (int) saas_tenant_seat_limit($nkey),
+                    'app_name'    => $company,
+                ]);
             }
-            $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
-            $canExec = function_exists('exec') && !in_array('exec', $disabled, true);
-            $out = []; $code = 1;
-            if ($canExec) @exec($env . ' ' . escapeshellarg($php) . ' ' . escapeshellarg($cli) . ' 2>&1', $out, $code);
-
-            if ($canExec && $code === 0) {
-                flash('Company “' . $company . '” is ready. Its owner signs in at the one product URL with '
-                    . $oemail . ' (temporary password: ' . $opass . '). On first sign-in they set their own password '
-                    . 'and complete their company onboarding (business profile, financial year, currency).');
-            } elseif ($canExec) {
-                if (function_exists('tenant_remove')) tenant_remove($nkey);   // roll back a half-made company
-                saas_login_index_set($oemail, $nkey, false);
-                flash('Could not set up the company database: ' . trim(implode(' ', $out)), 'error');
-            } else {
-                flash('Company “' . $company . '” registered. This server cannot auto-build databases, so '
-                    . $oemail . ' finishes a one-time setup on first login (temporary password: ' . $opass . ').', 'warning');
-            }
+            flash('Company “' . $company . '” is ready. Its owner signs in at the one product URL with '
+                . $oemail . ' (temporary password: ' . $opass . '). On first sign-in they set their own '
+                . 'password and complete their company onboarding (business profile, financial year, '
+                . 'currency). Their workspace is a separate database — no other company can see its data.');
             redirect('/companies');
         }
 
@@ -717,12 +825,19 @@ function ops_saas_admin($route, $method) {
         if ($do === 'company_login_as' && $key !== '') {
             // Jump into a company as its admin. Super-admin only (guarded above).
             saas_enter_tenant($key);                       // switch the live DB to the company
+            // Build + stamp the workspace on first entry (exec-free). This also
+            // guarantees we are truly inside the company's OWN database and not
+            // silently back on the control database before we read any user.
+            $ready = function_exists('saas_tenant_ensure_ready') ? saas_tenant_ensure_ready($key) : true;
             $admin = null;
-            try { $admin = ops_one("SELECT * FROM users WHERE is_superuser=1 AND is_active=1 ORDER BY id LIMIT 1"); }
-            catch (Throwable $e) { $admin = null; }
+            if ($ready) {
+                try { $admin = ops_one("SELECT * FROM users WHERE is_superuser=1 AND is_active=1 ORDER BY id LIMIT 1"); }
+                catch (Throwable $e) { $admin = null; }
+            }
             if (!$admin) {
                 saas_leave_tenant();
-                flash('That company has no active admin yet (its database may not be set up).', 'error');
+                flash('That company’s workspace could not be opened yet. Please try again in a moment — '
+                    . 'it finishes setting itself up on first use.', 'error');
                 redirect('/companies');
             }
             $_SESSION['uid'] = (int) $admin['id'];

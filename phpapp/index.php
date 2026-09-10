@@ -653,6 +653,17 @@ try {
 }
 }   // end: the schema probe runs only when the code fingerprint has changed
 
+// First-boot stamp for a company workspace opened directly (via its remembered
+// session company, or its own subdomain): apply the owner details stashed when
+// the company was created — its admin login, plan modules, seat cap and the
+// first-login onboarding flag. The schema was just built above if this is the
+// workspace's very first request. One-shot and guarded by the saas_provisioned
+// setting, so it is a no-op once the workspace is live and never runs on the
+// control install (current_tenant() is '' there).
+if (function_exists('current_tenant') && current_tenant() !== '' && function_exists('saas_tenant_apply_bootstrap')) {
+    try { saas_tenant_apply_bootstrap(current_tenant()); } catch (Throwable $e) {}
+}
+
 // Locked out of the admin login? Drop a plain text file named
 // "reset-admin.txt" in this folder (cPanel File Manager → New File) with the
 // new password on the first line, then load any page once. The password is set,
@@ -795,7 +806,18 @@ if ($route === 'login') {
         if (function_exists('saas_leave_tenant')) saas_leave_tenant();
         if ($loginId !== '' && strpos($loginId, '@') !== false && function_exists('saas_login_lookup')) {
             $tk = saas_login_lookup($loginId);
-            if ($tk !== '' && function_exists('saas_enter_tenant')) { saas_enter_tenant($tk); $pdo = db(); }
+            if ($tk !== '' && function_exists('saas_enter_tenant')) {
+                saas_enter_tenant($tk);
+                // Build + stamp the workspace the first time its owner signs in
+                // (exec-free provisioning). This also refuses if we did not land
+                // in the company's OWN database, so the password is never checked
+                // against — and the person never lands in — the control store.
+                if (function_exists('saas_tenant_ensure_ready') && !saas_tenant_ensure_ready($tk)) {
+                    if (function_exists('saas_leave_tenant')) saas_leave_tenant();
+                    return render_login('Your workspace is still being set up. Please try signing in again in a moment.');
+                }
+                $pdo = db();
+            }
         }
         if (strpos($loginId, '@') !== false) {
             $q = $pdo->prepare("SELECT * FROM users WHERE username = ? OR email = ?");

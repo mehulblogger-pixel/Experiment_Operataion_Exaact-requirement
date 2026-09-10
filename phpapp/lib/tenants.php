@@ -129,6 +129,41 @@ function tenant_remove($sub) {
     return tenant_registry_write($reg);
 }
 
+// ---------------------------------------------------------------------------
+//  Deferred, exec-free provisioning ("first-boot stamp").
+//
+//  Managed hosting (cPanel/mPanel) very often disables PHP's exec(), so the
+//  old provisioner — which ran a separate PHP process to build the new
+//  company's database — silently did nothing there, leaving a company with no
+//  database and no owner login. To work everywhere, we instead stash the
+//  owner's details on the tenant's registry entry when the company is created,
+//  and apply them the first time that company's OWN workspace is opened (a
+//  clean request pointed only at its own database, so the per-process migration
+//  guards are untouched). Nothing sensitive is exposed: tenants.php already
+//  holds the database credentials and is kept off every upload, and only a
+//  password HASH is stored here, never the plaintext.
+// ---------------------------------------------------------------------------
+function tenant_pending_set($sub, array $payload) {
+    $sub = strtolower(trim((string)$sub));
+    $reg = tenant_registry();
+    if (!isset($reg['tenants'][$sub])) return 'No such workspace.';
+    $reg['tenants'][$sub]['pending'] = $payload;
+    return tenant_registry_write($reg);
+}
+function tenant_pending($sub) {
+    $sub = strtolower(trim((string)$sub));
+    $reg = tenant_registry();
+    $p = $reg['tenants'][$sub]['pending'] ?? null;
+    return is_array($p) ? $p : null;
+}
+function tenant_pending_clear($sub) {
+    $sub = strtolower(trim((string)$sub));
+    $reg = tenant_registry();
+    if (!isset($reg['tenants'][$sub]['pending'])) return '';
+    unset($reg['tenants'][$sub]['pending']);
+    return tenant_registry_write($reg);
+}
+
 // ---- The management screen (control install, Master Admin only) -----------
 function ops_tenants($route, $method) {
     ops_require(can_manage_tenants(),
@@ -250,15 +285,26 @@ function ops_tenants($route, $method) {
 // touched. Standalone — the workspace's own branding lives in a database this
 // request must not open. Always exits.
 function tenant_error_page($kind, $sub = '') {
-    if (!headers_sent()) http_response_code($kind === 'suspended' ? 403 : 404);
+    if (!headers_sent()) {
+        http_response_code($kind === 'suspended' ? 403 : ($kind === 'unconfigured' ? 503 : 404));
+    }
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $title = $kind === 'suspended' ? 'Workspace paused'
+           : ($kind === 'unconfigured' ? 'Workspace being set up' : 'Workspace not found');
     echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
-    echo '<title>' . ($kind === 'suspended' ? 'Workspace paused' : 'Workspace not found') . '</title>';
+    echo '<title>' . $title . '</title>';
     echo '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:70px auto;padding:26px;text-align:center;color:#333">';
     if ($kind === 'suspended') {
         echo '<h2 style="color:#b8480f">This workspace is paused</h2>';
         echo '<p style="color:#555;font-size:15px">The workspace <b>' . $e($sub) . '</b> is currently suspended. '
            . 'Please contact your administrator to have it restored.</p>';
+    } elseif ($kind === 'unconfigured') {
+        // The company exists in the registry but its own database is not wired
+        // up yet. We refuse rather than showing another workspace's data.
+        echo '<h2 style="color:#1e40af">This workspace is still being set up</h2>';
+        echo '<p style="color:#555;font-size:15px">The workspace <b>' . $e($sub) . '</b> does not have its own '
+           . 'database connected yet, so we can\'t open it safely. Please ask your administrator to finish '
+           . 'setting it up, then sign in again.</p>';
     } else {
         echo '<h2 style="color:#1e40af">No workspace here</h2>';
         echo '<p style="color:#555;font-size:15px">There is no workspace at this address'
