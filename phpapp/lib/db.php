@@ -347,6 +347,9 @@ function admin_recovery_from_file() {
 }
 
 function auto_seed() {
+    // A client company must NEVER receive EXAACT's demo clients and vendors — a
+    // fresh company workspace starts with no business partners at all.
+    if (function_exists('current_tenant') && current_tenant() !== '') return;
     $pdo = db();
     // Seeded once, and remembered. Without the flag this ran again the moment
     // the table was empty — which is exactly the state right after somebody

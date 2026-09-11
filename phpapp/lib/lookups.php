@@ -347,6 +347,11 @@ function lk_rename_value_label($typeKey, $from, $to) {
 
 // ---- Seed system lists (from the old fixed choice lists) + demo hierarchies -
 function lk_seed() {
+    // A fresh CLIENT company starts with EMPTY master lists — it builds its own.
+    // Forms fall back to their built-in defaults via lk_options_or(), so the app
+    // is fully usable with the lists empty. Only the control / single-business
+    // install gets the starter lists.
+    if (function_exists('current_tenant') && current_tenant() !== '') return;
     // Once the master lists have been cleared ON PURPOSE (Settings → Clear
     // records), they stay cleared. Without this the very next page load re-seeds
     // every starter + demo list, so the delete looked as though it had done

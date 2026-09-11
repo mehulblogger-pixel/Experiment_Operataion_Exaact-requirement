@@ -514,6 +514,9 @@ function ops_migrate() {
 // Seed the expense-head and travel-mode masters once (idempotent — count-guarded,
 // so it runs on a fresh install and on an upgrade of an existing database).
 function ops_seed_expense_masters() {
+    // Client companies start with no expense heads / travel modes — they add
+    // their own. Only the control / single-business install seeds these.
+    if (function_exists('current_tenant') && current_tenant() !== '') return;
     $pdo = db();
     // Ensure each standard head exists BY CODE (not just when the table is empty),
     // so heads added in a later release — e.g. "Food bills (actual)" — appear on the
@@ -530,6 +533,11 @@ function ops_seed_expense_masters() {
 
 // Seed offices (head office + branches) once.
 function ops_seed() {
+    // A fresh CLIENT company starts empty — the 17 starter branches are EXAACT's
+    // own demo data and must never flow into another company's workspace. It adds
+    // its own offices during onboarding. Only the control install / a plain
+    // single-business install seeds them.
+    if (function_exists('current_tenant') && current_tenant() !== '') return;
     $pdo = db();
     // Once the offices have been cleared ON PURPOSE (Settings → Clear records →
     // People, offices & agencies), they stay cleared instead of the 17 starter
