@@ -44,6 +44,11 @@ catch (Throwable $e) { $admin = null; }
 t_ok($admin !== null, 'the company has its own active admin to sign in as');
 t_eq((string) ($admin['email'] ?? ''), 'owner@acme-x.test', 'that admin is THIS company\'s owner (isolated to its database)');
 
+// A client company workspace must never be shown the software licence gate —
+// the platform owner already accepted it for the whole platform.
+t_ok(function_exists('agreement_exempt') && agreement_exempt() === true,
+    'inside a company workspace the software licence agreement is not shown');
+
 // The company's OWN settings must be read — not the control database's, which
 // the process-wide settings cache used to keep serving after the switch.
 t_eq((string) setting_get('saas_provisioned', ''), '1', 'the company\'s own settings are read after the switch (no control-DB bleed)');

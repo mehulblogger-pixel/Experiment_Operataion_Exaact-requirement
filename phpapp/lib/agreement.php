@@ -40,6 +40,11 @@ function agreement_exempt() {
     $s = getenv('SKIP_AGREEMENT');
     if ($s !== false && (string)$s !== '' && (string)$s !== '0') return true;
     if (function_exists('lk_privkey') && lk_privkey() !== '') return true;
+    // A cloud COMPANY workspace is downstream of the platform owner, who already
+    // accepted the software licence for the whole platform when they set up the
+    // control install. A client company must never be shown the Licensor's
+    // software agreement — it is not a party to it.
+    if (function_exists('current_tenant') && current_tenant() !== '') return true;
     if (function_exists('setting_get')) {
         try { if ((string)setting_get('setup_done', '') === '1') return true; } catch (Throwable $e) {}
         try { if (trim((string)setting_get('app_name', '')) !== '') return true; } catch (Throwable $e) {}
