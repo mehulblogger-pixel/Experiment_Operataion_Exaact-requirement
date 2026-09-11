@@ -467,6 +467,7 @@ function master_card_module($key) {
     static $m = [
         'inspectors' => 'operations', 'subcons' => 'operations', 'subcon-rates' => 'operations',
         'travel-modes' => 'operations', 'attendance' => 'operations', 'asset-register' => 'operations',
+        'boss' => 'operations',   // BOSS numbers — an inspection-workflow master
         'office-expense-heads' => 'money', 'expense-heads' => 'money', 'credit-recon' => 'money',
     ];
     return $m[$key] ?? 'admin';
@@ -625,33 +626,39 @@ function custom_display($entity, $recordId) {
 //  of forms the Custom fields screen offers, kept in step from one place.
 function lk_form_target_groups() {
     $th = fn($k, $fallback) => function_exists('TH') ? TH($k) : $fallback;
+    // Only offer form targets whose owning module is switched ON for this
+    // company. A Recruitment company therefore never sees the Inspection Call /
+    // Deputation / Sample / Test-method / etc. forms it will never use — only
+    // Requisition, Candidate, Client/Vendor and its own custom forms.
+    $show = fn($en) => !function_exists('cf_target_shown') || cf_target_shown($en);
     $groups = [
-        'Everyday forms' => [
-            'call'    => $th('call', 'Call'),
-            'job'     => $th('job',  'Job'),
-            'partner' => 'Client / Vendor',
-        ],
-        'Operations & compliance' => [
-            'sample'         => 'Sample',
-            'method'         => 'Test method',
-            'risk'           => 'Risk',
-            'decision_rule'  => 'Decision rule',
-            'controlled_doc' => 'Controlled document',
-            'satisfaction'   => 'Satisfaction survey',
-        ],
-        'People & hiring' => [
-            'requisition' => $th('requisition', 'Requisition'),
-            'candidate'   => $th('candidate',   'Candidate'),
-        ],
+        'Everyday forms' => array_filter([
+            'call'    => $show('call')    ? $th('call', 'Call') : null,
+            'job'     => $show('job')     ? $th('job',  'Job') : null,
+            'partner' => $show('partner') ? 'Client / Vendor' : null,
+        ]),
+        'Operations & compliance' => array_filter([
+            'sample'         => $show('sample')         ? 'Sample' : null,
+            'method'         => $show('method')         ? 'Test method' : null,
+            'risk'           => $show('risk')           ? 'Risk' : null,
+            'decision_rule'  => $show('decision_rule')  ? 'Decision rule' : null,
+            'controlled_doc' => $show('controlled_doc') ? 'Controlled document' : null,
+            'satisfaction'   => $show('satisfaction')   ? 'Satisfaction survey' : null,
+        ]),
+        'People & hiring' => array_filter([
+            'requisition' => $show('requisition') ? $th('requisition', 'Requisition') : null,
+            'candidate'   => $show('candidate')   ? $th('candidate',   'Candidate') : null,
+        ]),
     ];
     // Master-record forms (Inspectors, Agencies, …). Skip any that are edited
     // elsewhere (a 'goto' card) — their own form isn't the live editor, so a
-    // field added there would never show.
+    // field added there would never show — and any whose owning module is off.
     if (function_exists('ops_masters')) {
         $m = [];
         foreach (ops_masters() as $mk => $mc) {
             if (!empty($mc['goto'])) continue;
             if (function_exists('master_access_ok') && !master_access_ok($mc['access'] ?? '')) continue;
+            if (function_exists('master_card_shown') && !master_card_shown($mk)) continue;   // off-module record — hide it
             $m[$mk] = $mc['label'] ?? ucfirst($mk);
         }
         if ($m) $groups['Master records'] = $m;
@@ -662,7 +669,7 @@ function lk_form_target_groups() {
         foreach (cforms_all(false) as $cf) $c[$cf['slug']] = $cf['name'] ?? $cf['slug'];
         if ($c) $groups['Your custom forms'] = $c;
     }
-    return $groups;
+    return array_filter($groups);   // drop any group the module filter emptied
 }
 // Group an arbitrary set of form entities under the SAME category names the
 // "show on forms" ticks use, so the Custom fields form-picker and the Masters
