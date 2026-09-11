@@ -278,8 +278,14 @@ function ops_area_def($area) {
             $t(can('mod.settings.view') && can('settings.manage'), '⚙️', 'System settings', '/settings', 'Company-wide settings and terminology.');
             $t(can('settings.manage'), '🔤', 'Terminology / wording', '/terminology', 'Rename what things are called on every screen — e.g. “Requirement”, “Candidate”, “Client” — to match your business.');
             $t(($fx('fd_can') && fd_can()), '🧱', 'Form Designer', '/form-designer', 'Rename, reorder, hide or require the fields on your Requirement & Candidate forms — no coding.');
-            $t(can('settings.manage') || is_master(), '🧩', 'Service scope', '/service-scope', 'Which services are offered and where.');
-            $t(can('settings.manage') || is_master(), '📄', 'Report formats by service', '/service-formats', 'The report format each service allocates.');
+            // Service scope and its report formats are field-operations / inspection
+            // concepts (which inspection services are offered, and the report format
+            // each allocates). They belong to the Operations and Reporting modules —
+            // gate them there so a Recruitment-only company (both modules off) is not
+            // shown inspection configuration it can never use. A bare is_master()
+            // here used to walk straight past the licence and surface both tiles.
+            $t(licence_enabled('operations') && (can('settings.manage') || is_master()), '🧩', 'Service scope', '/service-scope', 'Which services are offered and where.');
+            $t(licence_enabled('reporting') && (can('settings.manage') || is_master()), '📄', 'Report formats by service', '/service-formats', 'The report format each service allocates.');
             // R11 — SLA targets moved to Quality (service delivery) so it no longer pulls
             // coordinators / asst. managers into Admin. See the 'quality' area above.
             $t(can('settings.manage') || is_master(), '🏢', 'Company profile', '/company-profile', 'Legal name, logo and details.');
@@ -299,7 +305,11 @@ function ops_area_def($area) {
             $t($fx('product_package_can') && product_package_can(), '📦', 'Product package', '/product-package', 'TPIA, Staffing, Recruitment or Enterprise — set the pack & bundles in one click.');
 
             $sec('Connections');
-            $t($fx('ads_can_manage') && ads_can_manage(), '📢', 'Ads Pro connection', '/adspro', 'Connect the advertising source.');
+            // Ads Pro is the advertising source that feeds the Sales pipeline (its
+            // only consumer, Advertising return, lives under Sales). With Sales off
+            // the connection is an orphan, so gate it to the Sales module — a
+            // Recruitment-only company is not shown an advertising integration.
+            $t(licence_enabled('sales') && $fx('ads_can_manage') && ads_can_manage(), '📢', 'Ads Pro connection', '/adspro', 'Connect the advertising source.');
             // Product licence is a platform-owner concern — never shown inside a
             // client company (its entitlement comes from its plan/subscription).
             $t($fx('superadmin_can') && superadmin_can() && $fx('lk_can_manage') && lk_can_manage(), '📜', 'Licence', '/licence', 'The product licence and its state.');

@@ -2599,6 +2599,22 @@ function ops_module_gate($route) {
         ops_require(false, 'This register is part of an accreditation pack (Inspection or Laboratory), and none is '
             . 'switched on for this installation. An administrator can switch one on under Settings → Industry packs.');
     }
+
+    // Set-once configuration that belongs to a specific product module. These
+    // routes gate on 'settings' (core admin), which every install has, so the map
+    // above lets them through. But the SCREENS are inspection concepts — service
+    // scope and the report format each service allocates — so refuse a typed or
+    // bookmarked URL when the owning module is switched off. Without this a
+    // Recruitment-only company (Operations + Reporting off) could still reach the
+    // inspection service configuration through the address bar.
+    if (function_exists('licence_enabled')) {
+        static $moduleRoute = ['service-scope' => 'operations', 'service-formats' => 'reporting'];
+        $needMod = $moduleRoute[$base] ?? null;
+        if ($needMod !== null && !licence_enabled($needMod)) {
+            ops_require(false, 'The ' . PRODUCT_MODULES[$needMod][0]
+                . ' module is not switched on for this installation.');
+        }
+    }
 }
 
 // Settings → Roles & access: edit each role's default permission set.
