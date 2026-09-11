@@ -8,8 +8,8 @@
 // ===========================================================================
 
 function ops_owner_home($method) {
-    ops_require(function_exists('is_master') && is_master(),
-        'Only the owner / super admin can open the Owner Home.');
+    ops_require(function_exists('superadmin_can') && superadmin_can(),
+        'The Owner Home is for the platform owner, on the main site — not inside a company workspace.');
 
     // Save the module + marketplace switches.
     if ($method === 'POST' && (($_POST['do'] ?? '') === 'modules_save')) {
@@ -34,8 +34,8 @@ function ops_owner_home($method) {
 // One-tap Marketplace on/off, callable from anywhere the owner already is
 // (linked from the Super-Admin Control Panel's Product-modules block too).
 function ops_marketplace_toggle($method) {
-    ops_require(function_exists('is_master') && is_master(),
-        'Only the owner / super admin can change this.');
+    ops_require(function_exists('superadmin_can') && superadmin_can(),
+        'Only the platform owner, on the main site, can change this.');
     if ($method === 'POST' && function_exists('setting_set')) {
         $on = (($_POST['on'] ?? '') === '1');
         setting_set('connect_enabled', $on ? '1' : '0');

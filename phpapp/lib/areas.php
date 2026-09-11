@@ -291,14 +291,16 @@ function ops_area_def($area) {
             $t(licence_enabled('reporting') && (can('idems.audit.view') || is_master()), '🛡️', 'Report audit trail', '/audit-log', 'Who changed what, and when.');
 
             $sec('Super admin');
-            $t(is_master(), '🛰️', 'Control panel', '/super-admin', 'Licence, seats, modules, subscription, tenants and system tools in one place.');
-            $t(is_master(), '🏢', 'Companies', '/companies', 'Every company on the platform — plan, seats, modules, suspend and log in as. (Super-Admin.)');
+            $t($fx('superadmin_can') && superadmin_can(), '🛰️', 'Control panel', '/super-admin', 'Licence, seats, modules, subscription, tenants and system tools in one place.');
+            $t($fx('superadmin_can') && superadmin_can(), '🏢', 'Companies', '/companies', 'Every company on the platform — plan, seats, modules, suspend and log in as. (Super-Admin.)');
             // Revamp P6 — pick which EXAACT this install is (TPIA / Staffing / Recruitment / Enterprise).
             $t($fx('product_package_can') && product_package_can(), '📦', 'Product package', '/product-package', 'TPIA, Staffing, Recruitment or Enterprise — set the pack & bundles in one click.');
 
             $sec('Connections');
             $t($fx('ads_can_manage') && ads_can_manage(), '📢', 'Ads Pro connection', '/adspro', 'Connect the advertising source.');
-            $t($fx('lk_can_manage') && lk_can_manage(), '📜', 'Licence', '/licence', 'The product licence and its state.');
+            // Product licence is a platform-owner concern — never shown inside a
+            // client company (its entitlement comes from its plan/subscription).
+            $t($fx('superadmin_can') && superadmin_can() && $fx('lk_can_manage') && lk_can_manage(), '📜', 'Licence', '/licence', 'The product licence and its state.');
             // A cloud (metered) company's own self-service plan: buy modules / seats online.
             $t($fx('billing_can_manage') && billing_can_manage() && $fx('setting_get') && (int) setting_get('saas_seat_limit', 0) > 0,
                 '💳', 'Subscription', '/subscription', 'Your plan — add modules or seats and pay online. You pay only for what you use.');

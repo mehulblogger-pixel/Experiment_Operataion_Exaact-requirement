@@ -81,7 +81,7 @@
       </div>
       <p class="s-find-none" id="navFindNone" hidden>Nothing matches that.</p>
       <a class="s-item<?= $navOn(['']) ?>" href="/"><span class="s-ic">🏠</span><span>Dashboard</span></a>
-      <?php if (function_exists('is_master') && is_master()): ?>
+      <?php if (function_exists('superadmin_can') && superadmin_can()): // platform owner only — never inside a company workspace ?>
       <a class="s-item<?= $navOn(['owner']) ?>" href="/owner"><span class="s-ic">🧭</span><span>Owner home</span></a>
       <?php endif; ?>
       <?php // Also in the top bar, but a destination in the menu is how people

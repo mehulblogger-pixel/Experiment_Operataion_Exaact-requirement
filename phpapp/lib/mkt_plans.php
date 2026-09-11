@@ -141,7 +141,7 @@ function mkt_settings_save(array $in) {
 
 /** Route handler — the Super-Admin marketplace-plans screen (master only). */
 function ops_mkt_plans($method) {
-    ops_require(function_exists('is_master') && is_master(), 'Only the Super Admin can manage marketplace plans.');
+    ops_require(function_exists('superadmin_can') && superadmin_can(), 'Only the platform owner, on the main site, can manage marketplace plans.');
     mkt_plans_migrate();
     if ($method === 'POST') {
         $act = (string)($_POST['action'] ?? '');

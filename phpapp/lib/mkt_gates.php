@@ -56,7 +56,7 @@ function mkt_gate_active($feature) {
 
 /** Route handler — the feature-gate board (master only). */
 function ops_mkt_gates($method) {
-    ops_require(function_exists('is_master') && is_master(), 'Only the Super Admin can set feature gates.');
+    ops_require(function_exists('superadmin_can') && superadmin_can(), 'Only the platform owner, on the main site, can set feature gates.');
     if ($method === 'POST') {
         foreach (array_keys(mkt_gates_catalog()) as $f) {
             if (isset($_POST['gate_' . $f])) mkt_gate_set($f, (string)$_POST['gate_' . $f]);

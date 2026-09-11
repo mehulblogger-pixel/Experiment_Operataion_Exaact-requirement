@@ -210,7 +210,12 @@ const PRODUCT_PACKAGES = [
 ];
 
 function product_packages() { return PRODUCT_PACKAGES; }
-function product_package_can() { return function_exists('is_master') && is_master(); }
+// Choosing the product package is a platform-owner action — only on the control
+// install, never inside a client company (a company's modules come from its plan).
+function product_package_can() {
+    return function_exists('is_master') && is_master()
+        && (!function_exists('current_tenant') || current_tenant() === '');
+}
 
 function _pp_norm($csv) {
     $x = array_values(array_filter(array_map('trim', explode(',', (string)$csv)), fn($v) => $v !== ''));

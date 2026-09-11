@@ -9,7 +9,15 @@
 //  a control surface without duplicating logic. Master Admin only.
 // ============================================================================
 
-function superadmin_can() { return function_exists('is_master') && is_master(); }
+// Platform super-admin — the provider's own control surface (companies & tenants,
+// product package, licence, marketplace provider config, system tools). It belongs
+// ONLY to the control install (the platform owner). A client COMPANY's own master
+// admin manages their company through the normal Admin screens, but must never see
+// or reach the platform tools, so this is false inside any company workspace.
+function superadmin_can() {
+    return function_exists('is_master') && is_master()
+        && (!function_exists('current_tenant') || current_tenant() === '');
+}
 
 // Recommended plan packaging: which PRODUCT_MODULES each tier grants when a
 // licence key is issued. The licence engine already reads `mods` from the key —
