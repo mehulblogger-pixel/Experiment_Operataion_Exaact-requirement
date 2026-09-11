@@ -276,6 +276,7 @@ function ops_area_def($area) {
 
             $sec('Configuration');
             $t(can('mod.settings.view') && can('settings.manage'), '⚙️', 'System settings', '/settings', 'Company-wide settings and terminology.');
+            $t(can('settings.manage'), '🔤', 'Terminology / wording', '/terminology', 'Rename what things are called on every screen — e.g. “Requirement”, “Candidate”, “Client” — to match your business.');
             $t(can('settings.manage') || is_master(), '🧩', 'Service scope', '/service-scope', 'Which services are offered and where.');
             $t(can('settings.manage') || is_master(), '📄', 'Report formats by service', '/service-formats', 'The report format each service allocates.');
             // R11 — SLA targets moved to Quality (service delivery) so it no longer pulls
