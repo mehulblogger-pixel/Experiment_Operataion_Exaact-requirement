@@ -288,6 +288,10 @@ function ensure_admin() {
 // settings read). It never touches a password changed inside the app, because
 // that leaves the config signature unchanged.
 function admin_sync_from_config() {
+    // NEVER inside a company workspace. The config admin credential belongs to the
+    // control install (the platform owner); syncing it into a company would reset
+    // that company's own owner login to the platform password on every request.
+    if (function_exists('current_tenant') && current_tenant() !== '') return;
     try {
         $cfg  = require __DIR__ . '/../config.php';
         $user = (string) ($cfg['admin']['user'] ?? 'admin');

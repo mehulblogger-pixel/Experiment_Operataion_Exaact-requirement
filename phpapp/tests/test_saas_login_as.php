@@ -52,6 +52,18 @@ t_ok(function_exists('agreement_exempt') && agreement_exempt() === true,
 // The company's OWN settings must be read — not the control database's, which
 // the process-wide settings cache used to keep serving after the switch.
 t_eq((string) setting_get('saas_provisioned', ''), '1', 'the company\'s own settings are read after the switch (no control-DB bleed)');
+
+// One-shot guard: the owner is stamped once. Re-running provisioning must NOT
+// re-force a password reset or re-run onboarding — this was the "asks to reset
+// the password on every login" bug.
+try {
+    db()->prepare("UPDATE users SET must_change_pwd=0 WHERE is_superuser=1")->execute();
+    setting_set('saas_onboarding_pending', '');
+    saas_tenant_apply_bootstrap('acme-x');
+    $adm2 = ops_one("SELECT must_change_pwd FROM users WHERE is_superuser=1 AND is_active=1 ORDER BY id LIMIT 1");
+    t_eq((int) ($adm2['must_change_pwd'] ?? 9), 0, 're-running provisioning does NOT re-force a password reset (one-shot guard holds)');
+    t_eq((string) setting_get('saas_onboarding_pending', ''), '', 're-running provisioning does NOT re-open the onboarding wizard');
+} catch (Throwable $e) { t_ok(false, 'one-shot guard check threw: ' . $e->getMessage()); }
 t_ok((int) setting_get('saas_seat_limit', 0) === 3, 'the company\'s own seat limit is read (its settings, not control\'s)');
 
 // Clean up: back to the control database, remove the throwaway registry + file.

@@ -676,13 +676,18 @@ function saas_tenant_apply_bootstrap($key = '') {
             $cfg = require dirname(__DIR__) . '/config.php';
             setting_set('admin_cfg_sig', md5(((string) ($cfg['admin']['user'] ?? 'admin')) . "\x00" . ((string) ($cfg['admin']['pass'] ?? ''))));
         } catch (Throwable $e) {}
-        // 5) Turn on exactly the modules the plan includes; set the seat cap.
-        if (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules((string) ($p['plan'] ?? 'RECRUITMENT'));
-        setting_set('saas_seat_limit', (string) max(0, (int) ($p['seat_limit'] ?? 0)));
-        if (function_exists('doc_tpl_migrate')) doc_tpl_migrate();
-        // 6) Mark done so this never runs again, then drop the stashed details.
+        // 5) MARK DONE NOW — before the optional steps below. This is the one-shot
+        //    guard: if a later step ever threw, the stamp used to re-run on EVERY
+        //    login and re-force the password reset + onboarding wizard. Setting it
+        //    here means the owner is stamped exactly once, whatever happens next.
         setting_set('saas_provisioned', '1');
         if (function_exists('tenant_pending_clear')) tenant_pending_clear($key);
+        // 6) Best-effort finishing touches — each guarded so a failure can never
+        //    un-provision the workspace. Turn on exactly the plan's modules, set
+        //    the seat cap, and install the letter templates.
+        try { if (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules((string) ($p['plan'] ?? 'RECRUITMENT')); } catch (Throwable $e) {}
+        try { setting_set('saas_seat_limit', (string) max(0, (int) ($p['seat_limit'] ?? 0))); } catch (Throwable $e) {}
+        try { if (function_exists('doc_tpl_migrate')) doc_tpl_migrate(); } catch (Throwable $e) {}
         return true;
     } catch (Throwable $e) { return false; }
 }
