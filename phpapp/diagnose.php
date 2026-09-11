@@ -33,6 +33,31 @@ if ($adminPass === '' || !hash_equals($adminPass, $pin)) {
     exit;
 }
 
+// One-click safety: copy the CURRENT working database + admin settings into
+// config.local.php (which uploads never overwrite), so config.php can then be
+// updated safely without losing your credentials. Run this BEFORE uploading a
+// new config.php if config.local.php does not exist yet.
+if (($_GET['savelocal'] ?? '') === '1') {
+    $lf = $root . '/config.local.php';
+    if (is_file($lf)) {
+        echo "config.local.php already exists — your credentials are already kept safely there.\n";
+        echo "It is safe to upload the new config.php now.\n";
+        exit;
+    }
+    $body = "<?php\n// Your server's real settings, kept OUT of every upload so they are never\n"
+          . "// overwritten. Written by diagnose.php from the settings config.php was using.\n"
+          . "return " . var_export(['db' => (array) ($cfg['db'] ?? []), 'admin' => (array) ($cfg['admin'] ?? [])], true) . ";\n";
+    if (@file_put_contents($lf, $body) !== false) {
+        @chmod($lf, 0600);
+        echo "Saved config.local.php with your current database and admin settings.\n";
+        echo "You can now safely upload the new config.php — your credentials will be kept.\n";
+    } else {
+        echo "Could not write config.local.php (the app folder is not writable).\n";
+        echo "Create it by hand in mPanel File Manager instead, then upload config.php.\n";
+    }
+    exit;
+}
+
 $out = [];
 $p = function ($s) use (&$out) { $out[] = $s; };
 
@@ -72,6 +97,18 @@ $p("");
 
 // App folder writable? (needed to create per-company file databases + tenants.php)
 $p("App folder writable?    : " . (is_writable($root) ? "YES" : "NO — PHP cannot create files here, which blocks new company databases"));
+
+// Is config.php itself up to date? The company-routing logic lives inside it,
+// and config.php is sometimes left un-uploaded to protect database credentials —
+// but then routing stays old and every workspace opens the CONTROL database.
+$cfgSrc = (string) @file_get_contents($root . '/config.php');
+$cfgOk  = (strpos($cfgSrc, 'saas_tenant') !== false);
+$p("");
+$p("config.php size         : " . strlen($cfgSrc) . " bytes, modified " . date('Y-m-d H:i', (int) @filemtime($root . '/config.php')));
+$p("config.php has routing? : " . ($cfgOk
+    ? "YES — config.php is current."
+    : "NO  <<< THIS IS THE PROBLEM. config.php is OLD and has no company routing, so every workspace opens the control database. Upload the new config.php (your credentials stay safe in config.local.php)."));
+$p("config.local.php present: " . (is_file($root . '/config.local.php') ? "yes (credentials live here — safe to overwrite config.php)" : "NO — your DB credentials may be inside config.php itself; move them to config.local.php before overwriting config.php"));
 
 if (function_exists('tenant_registry')) {
     $reg = tenant_registry();
