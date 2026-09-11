@@ -1149,6 +1149,14 @@ if ($route === '') {
             if ($__land !== '' && $__land !== '/') redirect($__land);
         }
     }
+    // A recruitment-only company (Operations not licensed, People & hiring on) gets
+    // the Recruitment command centre as its HOME — not the operations / service
+    // dashboard, which is meaningless without inspections, jobs and invoicing. The
+    // control install and any plan that includes Operations keep the full board.
+    if (function_exists('licence_enabled') && !licence_enabled('operations') && licence_enabled('hr')
+        && function_exists('ops_recruitment_home') && function_exists('recruit_home_can') && recruit_home_can()) {
+        return ops_recruitment_home($method);
+    }
     $clients = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_client=1")->fetchColumn();
     $vendors = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_vendor=1")->fetchColumn();
     return view('dashboard', ['clients' => $clients, 'vendors' => $vendors]);
