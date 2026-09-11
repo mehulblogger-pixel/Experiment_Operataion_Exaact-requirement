@@ -259,7 +259,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','masters','m/','lookups','custom-fields','cforms','cform','form-designer','form-designer-save','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             $sec('Masters');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
@@ -277,6 +277,7 @@ function ops_area_def($area) {
             $sec('Configuration');
             $t(can('mod.settings.view') && can('settings.manage'), '⚙️', 'System settings', '/settings', 'Company-wide settings and terminology.');
             $t(can('settings.manage'), '🔤', 'Terminology / wording', '/terminology', 'Rename what things are called on every screen — e.g. “Requirement”, “Candidate”, “Client” — to match your business.');
+            $t(($fx('fd_can') && fd_can()), '🧱', 'Form Designer', '/form-designer', 'Rename, reorder, hide or require the fields on your Requirement & Candidate forms — no coding.');
             $t(can('settings.manage') || is_master(), '🧩', 'Service scope', '/service-scope', 'Which services are offered and where.');
             $t(can('settings.manage') || is_master(), '📄', 'Report formats by service', '/service-formats', 'The report format each service allocates.');
             // R11 — SLA targets moved to Quality (service delivery) so it no longer pulls

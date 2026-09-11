@@ -3090,6 +3090,8 @@ function ops_dispatch($route, $method) {
         case $route === 'cform' || $route === 'cform-new' || $route === 'cform-edit' || $route === 'cform-view'
              || $route === 'cform-save' || $route === 'cform-del':
             return ops_cform_records($route, $method);
+        case $route === 'form-designer' || $route === 'form-designer-save':   // rename/reorder/hide/require built-in form fields
+            return ops_form_designer($route, $method);
         case $route === 'partner-geo' && $method === 'POST':
             return geofence_save_party($route, $method);
         case $route === 'job-geo' && $method === 'POST':

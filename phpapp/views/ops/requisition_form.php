@@ -330,6 +330,7 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
 
   <div style="margin-top:8px"><button class="btn" type="submit">Save requirement</button> <a class="btn secondary" href="/requisitions">Cancel</a></div>
 </form>
+<?php if (function_exists('fd_overlay_html')) echo fd_overlay_html('requisition'); // Form Designer: per-company label/order/hide overrides ?>
 
 <script>(function(){
   var form = document.getElementById('rqForm');

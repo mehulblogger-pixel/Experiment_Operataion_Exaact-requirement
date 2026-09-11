@@ -507,6 +507,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('licissue_migrate')) licissue_migrate();       // Super Admin licence console: issued_licences
     if (function_exists('licbeat_migrate')) licbeat_migrate();         // self-hosted install heartbeats
     if (function_exists('cforms_migrate')) cforms_migrate();           // no-code custom forms + custom_records
+    if (function_exists('fd_migrate')) fd_migrate();                   // Form Designer — per-company field overrides
     if (function_exists('billing_migrate')) billing_migrate();         // SaaS billing/subscriptions
     if (function_exists('form_tokens_migrate')) form_tokens_migrate(); // CSRF form tokens
     if (function_exists('login_attempts_migrate')) login_attempts_migrate(); // brute-force throttle

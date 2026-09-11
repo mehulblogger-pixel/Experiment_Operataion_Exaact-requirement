@@ -150,6 +150,7 @@
     <a class="btn secondary" href="/candidates">Cancel</a>
   </div>
 </form>
+<?php if (function_exists('fd_overlay_html')) echo fd_overlay_html('candidate'); // Form Designer: per-company label/order/hide overrides ?>
 <!-- Quick-add modal (shared markup — client + agency) -->
 <div class="modal-back" id="qa_back" style="display:none;">
   <div class="modal">

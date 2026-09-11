@@ -6,7 +6,7 @@ t_section('report config moved to Admin (simplify step 3)');
 
 $a = (string)file_get_contents(__DIR__ . '/../lib/areas.php');
 $reporting = substr($a, strpos($a, "case 'reporting':"), 1600);
-$admin = substr($a, strpos($a, "case 'admin':"), 3500);
+$admin = substr($a, strpos($a, "case 'admin':"), 7000);   // full admin case (it has grown with Terminology + Form Designer cards)
 
 foreach ([['Approver mapping', '/approver-map'], ['Approval rules', '/approval-rules'],
           ['Document templates', '/templates']] as [$lbl, $rt]) {

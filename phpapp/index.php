@@ -224,6 +224,7 @@ try {
     require __DIR__ . '/lib/agreement.php';
     require __DIR__ . '/lib/company.php';
     require __DIR__ . '/lib/customforms.php';
+    require __DIR__ . '/lib/formdesign.php';
     require __DIR__ . '/lib/geofence.php';
     require __DIR__ . '/lib/timesheet.php';
     require __DIR__ . '/lib/rating.php';
