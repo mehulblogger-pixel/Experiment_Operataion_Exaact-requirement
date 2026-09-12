@@ -433,6 +433,25 @@ function ops_recruit_candidate_flow($route, $method) {
 
     $action = (string)($_POST['action'] ?? '');
     $remark = trim((string)($_POST['remark'] ?? ''));
+
+    // Switch this candidate to a different (chosen) workflow. Admin action, used
+    // when the auto-resolved pipeline is not the one this hire should follow.
+    if ($action === 'setpipe') {
+        if (!hiring_admin_can()) { flash('Only an administrator can change the workflow.', 'error'); redirect('/candidate?id=' . $id); return true; }
+        $pid = (int)($_POST['pipeline_id'] ?? 0);
+        $np = recruitpipe_get($pid);
+        if ($np && (int)($np['active'] ?? 0) === 1) {
+            $neff = recruitpipe_effective_stages($np['id'], $req);
+            $first = $neff[0]['id'] ?? null;
+            db()->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=? WHERE id=?")
+                ->execute([(int)$np['id'], $first ? (int)$first : null, $id]);
+            db()->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
+                ->execute([$id, ($eff[$idx]['name'] ?? ''), 'Workflow: ' . $np['name'], $remark, user_name(current_user()), date('c')]);
+            flash('Workflow changed to “' . $np['name'] . '”.');
+        } else { flash('That workflow is not available.', 'error'); }
+        redirect('/candidate?id=' . $id); return true;
+    }
+
     $target = null;
     if ($action === 'advance') $target = $eff[min($idx + 1, count($eff) - 1)] ?? null;
     elseif ($action === 'back') $target = $eff[max($idx - 1, 0)] ?? null;
@@ -458,16 +477,28 @@ function recruitpipe_candidate_panel($cand) {
     $can = function_exists('is_coordinator_level') && is_coordinator_level();
     $cur = $eff[$idx] ?? null;
     ?>
+    $isAdmin = function_exists('hiring_admin_can') && hiring_admin_can();
+    ?>
     <div class="panel" style="border-left:4px solid var(--brand,#1e40af);padding:13px 16px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
         <b style="font-size:13.5px">Hiring workflow — <?= $e($pipe['name']) ?></b>
-        <span class="muted" style="font-size:12px"><?= $closed ? 'Closed ('.$e(lk_options_or('candidate_stage', CAND_STAGES)[$cand['stage']] ?? $cand['stage']).')' : ('Stage '.($idx+1).' of '.count($eff).($cur?' · '.$e($cur['name']):'')) ?></span>
+        <span class="muted" style="font-size:12px"><?= $closed ? 'Closed ('.$e(lk_options_or('candidate_stage', CAND_STAGES)[$cand['stage']] ?? $cand['stage']).')' : ('Stage '.($idx+1).' of '.count($eff).($cur?' · '.$e($cur['name']):'')) ?>
+          <?php if ($isAdmin): ?> · <a href="/recruit-pipelines" style="font-size:12px">Edit workflow ↗</a><?php endif; ?></span>
       </div>
+      <?php // The stage strip is a clickable stepper: tap any stage to move the
+            //  candidate straight there (with confirmation). Done = green, current
+            //  = filled, later = grey. Read-only when closed or without rights. ?>
       <div style="display:flex;flex-wrap:wrap;gap:5px;margin:9px 0 4px">
         <?php foreach ($eff as $i => $s):
           $cls = $i < $idx ? 'done' : ($i === $idx ? 'now' : '');
-          $bg = $cls === 'done' ? 'background:#dcfce7;color:#15803d' : ($cls === 'now' ? 'background:var(--brand,#1e40af);color:#fff;font-weight:700' : 'background:#f1f5f9;color:#64748b'); ?>
-          <span style="font-size:10.5px;padding:3px 9px;border-radius:16px;white-space:nowrap;<?= $bg ?>"><?= $e($s['name']) ?></span>
+          $bg = $cls === 'done' ? 'background:#dcfce7;color:#15803d' : ($cls === 'now' ? 'background:var(--brand,#1e40af);color:#fff;font-weight:700' : 'background:#f1f5f9;color:#64748b');
+          $pill = '<span style="font-size:10.5px;padding:3px 9px;border-radius:16px;white-space:nowrap;display:inline-block;' . $bg . '">' . ($i + 1) . '. ' . $e($s['name']) . '</span>';
+          if ($can && !$closed && $i !== $idx): ?>
+            <form method="post" action="/candidate-flow?id=<?= (int)$cand['id'] ?>" style="display:inline" onsubmit="return confirm('Move this candidate to “<?= $e(addslashes($s['name'])) ?>”?')">
+              <input type="hidden" name="action" value="jump"><input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
+              <button type="submit" title="Move to this stage" style="border:none;background:none;padding:0;margin:0;cursor:pointer"><?= $pill ?></button>
+            </form>
+          <?php else: echo $pill; endif; ?>
         <?php endforeach; ?>
       </div>
       <?php if ($can && !$closed): ?>
@@ -480,6 +511,18 @@ function recruitpipe_candidate_panel($cand) {
           <span class="muted" style="font-size:12px">Final stage — complete the hire from the stage control below.</span>
         <?php endif; ?>
       </form>
+      <div class="muted" style="font-size:11.5px;margin-top:6px">Tip: tap any stage above to jump straight to it.</div>
+      <?php // Admin: switch this hire to a different configured workflow. ?>
+      <?php if ($isAdmin): $allPipes = recruitpipe_all(true); if (count($allPipes) > 1): ?>
+      <form method="post" action="/candidate-flow?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:7px;align-items:center;margin-top:7px;flex-wrap:wrap">
+        <input type="hidden" name="action" value="setpipe">
+        <label class="muted" style="font-size:12px">Workflow:</label>
+        <select name="pipeline_id" class="form-control" style="width:auto;min-width:170px;padding:5px 9px;font-size:12.5px">
+          <?php foreach ($allPipes as $p): ?><option value="<?= (int)$p['id'] ?>" <?= (int)$p['id'] === (int)$pipe['id'] ? 'selected' : '' ?>><?= $e($p['name']) ?></option><?php endforeach; ?>
+        </select>
+        <button class="btn secondary" style="padding:5px 11px;font-size:12.5px" onclick="return confirm('Switch this candidate to the selected workflow? It will restart at the first stage.')">Apply</button>
+      </form>
+      <?php endif; endif; ?>
       <?php elseif ($closed): ?>
         <div class="muted" style="font-size:12px;margin-top:4px">The workflow is locked while the candidate is closed.</div>
       <?php endif; ?>
