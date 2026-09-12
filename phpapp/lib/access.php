@@ -530,13 +530,48 @@ function access_diff($oldRow, $newRow) {
 // operational subset (never salary / global-user / settings). Used by BOTH the form
 // (what it renders) and the save handler (what it accepts + what it must preserve),
 // so the two can never drift and silently drop a permission the editor never saw.
+// Which sellable MODULE a permission belongs to, or null when it is always
+// available (administration, users, settings, org hierarchy, people dashboards).
+// Used to hide permissions for modules a company has not licensed, so the access
+// editor shows only what the company can actually use.
+function perm_product_module($perm) {
+    if (strncmp($perm, 'mod.', 4) === 0) {
+        $p = explode('.', $perm);
+        return function_exists('licence_owner') ? licence_owner($p[1] ?? '') : null;   // via the access-module's owner
+    }
+    static $exact = [
+        'data.credit' => 'money', 'data.revenue' => 'money', 'data.salary' => 'money', 'data.profitability' => 'money',
+        'dash.operations' => 'operations', 'dash.financial' => 'money',
+    ];
+    if (isset($exact[$perm])) return $exact[$perm];
+    static $pre = [
+        'crm.' => 'sales', 'ops.' => 'operations', 'workforce.' => 'operations', 'idems.' => 'reporting',
+        'finance.' => 'money', 'hiring.' => 'hr',
+        'complaints.' => 'operations', 'capa.' => 'operations', 'ncr.' => 'operations', 'person.iddoc' => 'operations',
+    ];
+    foreach ($pre as $k => $m) if (strncmp($perm, $k, strlen($k)) === 0) return $m;
+    return null;   // master.manage, users.*, settings.manage, org.*, dash.utilization, dash.people → always available
+}
+
+// Drop permissions whose owning module is switched off for this company. can()
+// already refuses them; hiding them from the editor removes the confusion of
+// showing Sales / Reporting / Money / Quality to a company that has none of them.
+function permissions_drop_unlicensed(array $perms) {
+    if (!function_exists('licence_enabled')) return $perms;
+    foreach (array_keys($perms) as $k) {
+        $m = perm_product_module($k);
+        if ($m !== null && !licence_enabled($m)) unset($perms[$k]);
+    }
+    return $perms;
+}
+
 function assignable_permissions($globalMgr) {
-    if ($globalMgr) return all_permissions();
+    if ($globalMgr) return permissions_drop_unlicensed(all_permissions());
     $keys = ['mod.calls.view','mod.calls.edit','mod.jobs.view','mod.jobs.edit','mod.vouchers.view','mod.vouchers.edit',
         'mod.hiring.view','mod.hiring.edit','mod.reconcile.view','mod.reconcile.edit','mod.clients.view','mod.vendors.view',
         'mod.masters.view','mod.masters.edit','mod.reports.view','mod.invoicing.view',
         'dash.operations','dash.utilization','data.credit','ops.call.create','ops.job.allocate','ops.job.close','master.manage'];
-    return array_intersect_key(all_permissions(), array_flip($keys));
+    return permissions_drop_unlicensed(array_intersect_key(all_permissions(), array_flip($keys)));
 }
 function role_defaults_base($role) {
     $all = array_keys(PERMISSIONS);

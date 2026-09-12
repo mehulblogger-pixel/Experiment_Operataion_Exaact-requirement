@@ -162,6 +162,10 @@
         <?php endforeach; ?>
       </div></div>
 
+    <?php // Business Unit scope is an operations concept (profitability, allocation
+          // by business unit). A company without Operations doesn't use it, so the
+          // whole block is hidden and the person simply keeps every unit by default.
+          if (!function_exists('licence_enabled') || licence_enabled('operations')): ?>
     <div class="ff ff-wide"><label><?= e(THP('sbu')) ?> this person can see
         <span class="muted">— from the <?= e(Tl('sbu')) ?> master</span></label>
       <label class="ff-check" style="margin-bottom:6px"><input type="checkbox" name="scope_sbus_all" value="1"
@@ -173,6 +177,9 @@
         <?php endforeach; ?>
       </div>
       <small class="muted">Missing one? Add it to the <a href="/m/sbu"><?= e(Tl('sbu')) ?> master</a> and it appears here.</small></div>
+    <?php else: ?>
+      <input type="hidden" name="scope_sbus_all" value="1">
+    <?php endif; ?>
   </div>
   <script>
     // "Every office" and the individual ticks contradict each other, so one
@@ -252,7 +259,10 @@
           // the work they did, day by day, and needs no percentages. Everybody
           // else has to say where their cost belongs, because no single job
           // caused it. That is the whole difference, so it is one tick box. ?>
-    <?php if ($canSalary): ?>
+    <?php // The month-end cost run / profitability machinery belongs to Money and
+          // Operations. A company without either (e.g. a pure recruitment agency)
+          // does not run it, so the whole cost-allocation block is hidden.
+          if ($canSalary && (!function_exists('licence_enabled') || licence_enabled('money') || licence_enabled('operations'))): ?>
     <div class="ff-wide" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px">
       <h3 class="tab-sub" style="margin-top:0">Cost &amp; where it belongs</h3>
       <p class="sub">Used by the month-end cost run to work out profit by <?= e(Tl('sbu')) ?>, activity code and <?= e(T('boss')) ?> number. Leave the salary blank and this person is simply left out of the calculation.</p>
@@ -264,7 +274,7 @@
     <div class="ff ff-check">
       <label><input type="checkbox" name="is_production" id="u_prod" value="1"
         <?= !empty($user['is_production']) ? 'checked' : '' ?>>
-        This person does inspections (production staff)</label>
+        This person is field / production staff — their cost follows the days they work</label>
       <small class="muted">Tick it and their cost follows the days they worked. Leave it and you set the split below.</small></div>
 
     <div class="ff-wide" id="u_split_wrap" style="<?= !empty($user['is_production']) ? 'display:none' : '' ?>">
