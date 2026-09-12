@@ -61,8 +61,15 @@ const TERM_DEFAULTS = [
     'voucher'      => ['Voucher', 'Vouchers', 'Money', 'The monthly statement of travelling expenses.'],
     // -- people --------------------------------------------------------------
     'user'         => ['User', 'Users', 'People', 'A login account.'],
-    'candidate'    => ['Candidate', 'Candidates', 'People', 'A person being considered for hiring.'],
-    'requisition'  => ['Requisition', 'Requisitions', 'People', 'Approved demand for a new position.'],
+    // -- recruitment (People & hiring) ---------------------------------------
+    //  Homed in their own group so a recruitment workspace (hr on) can rename its
+    //  everyday words even when Operations/Sales/etc. are switched off. These are
+    //  the words a recruiter actually reads on screen.
+    'candidate'    => ['Candidate', 'Candidates', 'Recruitment', 'A person being considered for hiring.'],
+    'requisition'  => ['Requisition', 'Requisitions', 'Recruitment', 'Approved demand for a new position — the role you are hiring for.'],
+    'offer'        => ['Offer', 'Offers', 'Recruitment', 'The job offer made to a selected candidate.'],
+    'placement'    => ['Placement', 'Placements', 'Recruitment', 'A candidate successfully hired and placed.'],
+    'recruiter'    => ['Recruiter', 'Recruiters', 'Recruitment', 'The person who runs the hiring for a requisition.'],
 ];
 
 // ---- Industry packs --------------------------------------------------------
@@ -316,7 +323,8 @@ function term_groups() {
 // their module is off — so a recruitment company is not asked to rename
 // "Inspection Call", "Deputation", "Voucher" or "Endorsement".
 function term_group_module($group) {
-    static $m = ['Sales' => 'sales', 'Operations' => 'operations', 'Reporting' => 'reporting', 'Money' => 'money'];
+    static $m = ['Sales' => 'sales', 'Operations' => 'operations', 'Reporting' => 'reporting',
+                 'Money' => 'money', 'Recruitment' => 'hr'];
     return $m[$group] ?? null;   // Parties / People / anything else = core
 }
 function term_groups_licensed() {
@@ -329,8 +337,16 @@ function term_groups_licensed() {
     return $out;
 }
 function term_save($post) {
-    $ov = [];
+    // Start from what is already saved, so a screen that shows only SOME word
+    // groups (a recruitment plan hides Operations / Sales / Money / Reporting)
+    // can never wipe the words it is not displaying. Only the keys whose input
+    // was actually on the submitted form are rebuilt from the POST; every other
+    // key keeps its existing override untouched.
+    $ov = term_overrides();
+    if (!is_array($ov)) $ov = [];
     foreach (TERM_DEFAULTS as $k => $d) {
+        if (!array_key_exists('t_' . $k . '_s', $post) && !array_key_exists('t_' . $k . '_p', $post)) continue;
+        unset($ov[$k]);                                    // this word was on the form — rebuild it
         $s = trim((string)($post['t_' . $k . '_s'] ?? ''));
         $p = trim((string)($post['t_' . $k . '_p'] ?? ''));
         // only store what actually differs from the shipped default

@@ -410,6 +410,7 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
     applyModel();
     var bu=buildup(); renderBuildup(bu);
     var q=Math.max(1,parseInt(qty.value)||1), r=parseFloat(rate.value)||0, c=parseFloat(cost.value)||0, b=basis.value, m=months_();
+    if(m<=0) m=1;   // an unspecified duration is quoted per month — mirror the server, never zero the P&L
     var units=(b==='MANDAY'||b==='DAILY')?Math.round(m*22):m;
     var rev=(b==='FIXED')?q*r:q*r*Math.max(units,0);
     var recurring=q*c*Math.max(m,0), oneoffTot=q*(bu.oneoff||0);

@@ -78,20 +78,20 @@ $grp = function ($icon, $title, $n) use ($e) {
   <div class="row-actions rc-quick">
     <?php if (can('mod.hiring.view')): ?>
       <a class="btn primary" href="/recruitment-cc">📊 Command centre</a>
-      <a class="btn secondary" href="/requisition-new">＋ New requirement</a>
-      <a class="btn secondary" href="/candidate-new">＋ Add candidate</a>
-      <a class="btn secondary" href="/requisitions">Requirements</a>
-      <a class="btn secondary" href="/candidates">Candidates</a>
+      <a class="btn secondary" href="/requisition-new">＋ New <?= e(Tl('requisition')) ?></a>
+      <a class="btn secondary" href="/candidate-new">＋ Add <?= e(Tl('candidate')) ?></a>
+      <a class="btn secondary" href="/requisitions"><?= e(TP('requisition')) ?></a>
+      <a class="btn secondary" href="/candidates"><?= e(TP('candidate')) ?></a>
       <a class="btn secondary" href="/candidate-pool">🔗 Candidate pool</a>
     <?php endif; ?>
   </div>
 </div>
 
 <div class="rc-kpis">
-  <a class="rc-kpi" href="/requisitions"><div class="v"><?= (int)($d['open_reqs'] ?? 0) ?></div><div class="l">Open requirements</div></a>
+  <a class="rc-kpi" href="/requisitions"><div class="v"><?= (int)($d['open_reqs'] ?? 0) ?></div><div class="l">Open <?= e(Tlp('requisition')) ?></div></a>
   <a class="rc-kpi" href="/candidates"><div class="v"><?= (int)($d['pipeline'] ?? 0) ?></div><div class="l">In pipeline</div></a>
   <a class="rc-kpi" href="/candidates"><div class="v"><?= (int)($d['interviews'] ?? 0) ?></div><div class="l">Interviews ≤7d</div></a>
-  <a class="rc-kpi warn" href="/candidates"><div class="v"><?= (int)($d['offers'] ?? 0) ?></div><div class="l">Offers out</div></a>
+  <a class="rc-kpi warn" href="/candidates"><div class="v"><?= (int)($d['offers'] ?? 0) ?></div><div class="l"><?= e(TP('offer')) ?> out</div></a>
   <a class="rc-kpi warn" href="/deputations"><div class="v"><?= (int)($d['expiring'] ?? 0) ?></div><div class="l">Expiring ≤30d</div></a>
   <a class="rc-kpi good" href="/availability"><div class="v"><?= (int)($d['available'] ?? 0) ?></div><div class="l">Available now</div></a>
 </div>
@@ -102,7 +102,7 @@ $grp = function ($icon, $title, $n) use ($e) {
   <section class="rc-col today">
     <div class="rc-head"><h2>Today</h2><span class="sub">needs action</span></div>
     <?php $anyToday = ($d['counts']['today'] ?? 0) > 0; ?>
-    <?php if (!empty($d['t_reqs'])): $grp('📋', 'Requirements to work', count($d['t_reqs']));
+    <?php if (!empty($d['t_reqs'])): $grp('📋', TP('requisition') . ' to work', count($d['t_reqs']));
       foreach ($d['t_reqs'] as $r) {
         $qty = max(1, (int)$r['quantity']); $filled = (int)$r['filled'];
         $tone = $filled >= $qty ? ['filled', 'p-ok'] : ($filled > 0 ? [$filled . ' of ' . $qty, 'p-warn'] : ['sourcing', 'p-info']);
@@ -136,7 +136,7 @@ $grp = function ($icon, $title, $n) use ($e) {
       if (!empty($d['r_interviews'])): $grp('🎤', 'Interviews awaiting an outcome', count($d['r_interviews']));
       foreach ($d['r_interviews'] as $r) $row('/candidate?id=' . (int)$r['id'], $r['nm'] ?: $r['cand_code'],
              ($r['stage'] . ' · interview ' . $fdate($r['interview_date'])), ['no outcome', 'p-bad']); endif; ?>
-    <?php if (!empty($d['r_reqs'])): $grp('⚠️', 'Requirements at risk (14d+, no pipeline)', count($d['r_reqs']));
+    <?php if (!empty($d['r_reqs'])): $grp('⚠️', TP('requisition') . ' at risk (14d+, no pipeline)', count($d['r_reqs']));
       foreach ($d['r_reqs'] as $r) $row('/requisition?id=' . (int)$r['id'], $r['req_code'] . ' · ' . $desig($r['designation']),
              ($r['office'] ?: '') . ' · ' . (int)$r['cands'] . ' candidate' . ((int)$r['cands'] === 1 ? '' : 's'), ['aging', 'p-bad']); endif; ?>
     <?php if (!empty($d['r_urgent'])): $grp('🚨', 'Deployment ending ≤7d', count($d['r_urgent']));

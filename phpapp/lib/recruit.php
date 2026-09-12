@@ -280,10 +280,18 @@ function req_commercials($b) {
     $rate  = (float)($b['billing_rate'] ?? 0);
     $basis = (string)($b['rate_basis'] ?? 'MONTHLY');
     $months = req_duration_months($b);
-    // Monthly cost per person: prefer the built-up figure when the heads are
-    // filled, else fall back to the flat budgeted_cost that was always here.
+    // An unspecified duration must NOT zero out the P&L. A per-month/day rate with
+    // no stated duration is quoted per month — show at least one month so the
+    // Expected cost and Expected profit are real, not a misleading zero.
+    if ($months <= 0) $months = 1;
+    // Monthly cost per person: use the flat "Est. cost / person / month" the user
+    // sees on the form (the live preview populates it from the cost build-up, and
+    // a manual figure typed over it must win — what is shown is what is saved).
+    // Fall back to the built-up figure only when the flat field is empty (e.g. a
+    // save with JavaScript off).
     $bu = req_cost_buildup($b);
-    $cost  = $bu['monthly'] > 0 ? $bu['monthly'] : (float)($b['budgeted_cost'] ?? 0);
+    $flatCost = (float)($b['budgeted_cost'] ?? 0);
+    $cost  = $flatCost > 0 ? $flatCost : $bu['monthly'];
     $oneoff = $bu['oneoff'];
     $units = ($basis === 'MANDAY' || $basis === 'DAILY') ? round($months * 22) : $months;
     if ($basis === 'FIXED') $revenue = $qty * $rate;

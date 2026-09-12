@@ -48,8 +48,13 @@
   <?php endforeach; ?>
   <a class="master-card" href="/clients"><strong><?= e(TP('client')) ?></strong><span class="muted"><?= e(T('client')) ?> master</span></a>
   <a class="master-card" href="/vendors"><strong><?= e(TP('vendor')) ?></strong><span class="muted">Manufacturer / supplier master</span></a>
+  <?php // Working norms (timesheet/capacity) and the agency sub-contractor register
+        //  are Operations concepts — gated to that module everywhere else, so a
+        //  recruitment-only workspace should not see them here either. ?>
+  <?php if (!function_exists('licence_enabled') || licence_enabled('operations')): ?>
   <a class="master-card" href="/work-norms"><strong>🕔 Working norms</strong><span class="muted">Weekly days &amp; hours per designation / office</span></a>
   <a class="master-card" href="/agency-staff"><strong>🧑‍🔧 Agency staff</strong><span class="muted">Freelancers / sub-contractors by agency, with their documents</span></a>
+  <?php endif; ?>
   <?php if (master_card_shown('asset-register')): ?>
   <a class="master-card" href="/asset-register"><strong>📦 Asset issuance</strong><span class="muted">Stamps, diaries, safety gear &amp; devices issued to engineers</span></a>
   <?php endif; ?>

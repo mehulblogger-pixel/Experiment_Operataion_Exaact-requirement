@@ -91,8 +91,11 @@ function appr_rule_set_active($id, $on) { appr_migrate(); db()->prepare("UPDATE 
 function appr_level_save($post) {
     appr_migrate();
     $rid = (int)($post['rule_id'] ?? 0); if (!$rid) return;
-    $role = in_array($post['approver_role'] ?? '', array_keys(ORG_ROLES), true) ? $post['approver_role'] : '';
-    $esc  = in_array($post['escalate_role'] ?? '', array_keys(ORG_ROLES), true) ? $post['escalate_role'] : '';
+    // Validate the posted roles against the roles THIS workspace's plan uses, so a
+    // switched-off module's role (Inspector, Marketing, Finance…) can never be saved.
+    $roleSet = array_keys(function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES);
+    $role = in_array($post['approver_role'] ?? '', $roleSet, true) ? $post['approver_role'] : '';
+    $esc  = in_array($post['escalate_role'] ?? '', $roleSet, true) ? $post['escalate_role'] : '';
     $data = [(int)($post['seq']??0), trim((string)($post['label']??'')), $role, (int)($post['approver_user_id']??0)?:null,
              max(0,(int)($post['sla_days']??2)), max(0,(int)($post['reminder_days']??1)), $esc, (int)($post['escalate_user_id']??0)?:null];
     $lid = (int)($post['level_id'] ?? 0);
@@ -301,7 +304,7 @@ function ops_recruit_approvals($route, $method) {
         'rules'  => appr_rules(null, false),
         'sel'    => $sel,
         'levels' => $sel ? appr_levels($sel['id']) : [],
-        'roles'  => ORG_ROLES,
+        'roles'  => function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES,
         'entities' => APPR_ENTITIES,
     ]);
     return true;
