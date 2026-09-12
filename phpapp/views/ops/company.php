@@ -35,6 +35,29 @@
         <?php endif; ?>
       </div>
     </div>
+
+    <?php // What the company DOES — folded in from the old separate "Business
+          //  profile" so identity and activities live on ONE screen. Only the
+          //  activities the current plan supports are shown (+ any already chosen).
+          $capGroups = $capGroups ?? []; $chosenFlip = array_flip($capChosen ?? []);
+          if ($capGroups): ?>
+      <div style="border-top:1px solid var(--line);margin-top:8px;padding-top:14px">
+        <h3 class="tab-sub" style="margin:0 0 2px">What does your company do?</h3>
+        <p class="muted" style="margin:0 0 10px;font-size:13px">Select all that apply — it tailors your workspace.</p>
+        <?php foreach ($capGroups as $groupName => $caps): ?>
+          <div style="margin:0 0 12px">
+            <div class="muted" style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px"><?= e($groupName) ?></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:7px">
+              <?php foreach ($caps as $code => $label): ?>
+                <label class="chk" style="border:1px solid var(--line);border-radius:10px;padding:9px 11px;display:flex;gap:8px;align-items:center">
+                  <input type="checkbox" name="caps[]" value="<?= e($code) ?>" <?= isset($chosenFlip[$code]) ? 'checked' : '' ?>> <?= e($label) ?></label>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+
     <button class="btn" type="submit" style="margin-top:12px">Save company profile</button>
   </form>
   <p class="muted" style="font-size:12px;margin-top:10px">This feeds the quotation letterhead and invoice header. Leaving it blank

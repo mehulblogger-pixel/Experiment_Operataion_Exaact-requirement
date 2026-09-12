@@ -92,9 +92,21 @@ function ops_company_profile($route, $method) {
         setting_set('quote_lh_contact', company_contact_line());
         setting_set('quote_lh_footer', $foot);
 
+        // What the company DOES — the multi-select business activities, now folded
+        // into this one company screen (previously a separate "Business profile").
+        // Reuses the cockpit's capability store, so there is a single source.
+        if (function_exists('cockpit_capabilities_set') && array_key_exists('caps', $_POST)) {
+            cockpit_capabilities_set(array_map('strval', (array) ($_POST['caps'] ?? [])));
+        }
+
         flash('Company profile saved — it now appears on your quotations, invoices and records.');
         redirect('/company-profile');
     }
 
-    view('ops/company', ['p' => company_profile()]);
+    $chosen = function_exists('cockpit_capabilities') ? cockpit_capabilities() : [];
+    view('ops/company', [
+        'p'         => company_profile(),
+        'capGroups' => function_exists('cockpit_capability_groups') ? cockpit_capability_groups($chosen) : [],
+        'capChosen' => $chosen,
+    ]);
 }

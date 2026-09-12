@@ -232,9 +232,9 @@ function cockpit_sections() {
     $caps    = cockpit_capabilities();
     $bpPct   = ($hasName ? 50 : 0) + ($caps ? 50 : 0);
     $secs['business_profile'] = [
-        'key' => 'business_profile', 'icon' => '🏢', 'label' => 'Business profile',
-        'desc' => 'Your company name and what you do.',
-        'route' => '/workspace/setup/profile',
+        'key' => 'business_profile', 'icon' => '🏢', 'label' => 'Company profile',
+        'desc' => 'Your company name, details and what you do.',
+        'route' => '/company-profile',
         'status' => $bpPct >= 100 ? 'complete' : ($bpPct > 0 ? 'in_progress' : 'not_started'),
         'pct' => $bpPct, 'weight' => 1,
     ];
@@ -340,7 +340,7 @@ function cockpit_health() {
 
     // Business profile capability not chosen.
     if (!cockpit_capabilities())
-        $out[] = $warn('business_profile', 'Tell us what your company does so we can tailor your workspace.', '/workspace/setup/profile');
+        $out[] = $warn('business_profile', 'Tell us what your company does so we can tailor your workspace.', '/company-profile');
 
     return $cache = $out;
 }
@@ -351,7 +351,7 @@ function cockpit_checklist() {
     $items = [];
     // Business profile item (cockpit-owned).
     $items[] = ['done' => (bool) cockpit_capabilities(),
-        'label' => 'Tell us what your company does', 'fix' => '/workspace/setup/profile'];
+        'label' => 'Tell us what your company does', 'fix' => '/company-profile'];
     // Reuse the existing onboarding steps verbatim (§36 — no duplicate questions).
     if (function_exists('onboarding_steps')) {
         try {
@@ -370,7 +370,7 @@ function cockpit_checklist() {
 function cockpit_search_index() {
     $hr = !function_exists('licence_enabled') || licence_enabled('hr');
     $idx = [
-        ['label' => 'Business profile', 'route' => '/workspace/setup/profile', 'kw' => 'company what we do capabilities industry activity'],
+        ['label' => 'Business profile', 'route' => '/company-profile', 'kw' => 'company what we do capabilities industry activity'],
         ['label' => 'Features & modules', 'route' => '/workspace/setup/modules', 'kw' => 'module feature turn on off enable recruitment manpower crm inspection'],
         ['label' => 'Forms', 'route' => '/workspace/setup/forms', 'kw' => 'form field label required dropdown candidate requisition requirement builder'],
         ['label' => 'Dropdown lists', 'route' => '/masters', 'kw' => 'dropdown list master value option department source employment type'],
@@ -481,7 +481,7 @@ function ops_cockpit($route, $method) {
         // Mark the profile step visited so "resume" advances (§38).
         if (function_exists('setting_set')) setting_set('cockpit_profile_done', '1');
         flash('Saved. Your workspace profile is up to date.');
-        redirect('/workspace/setup/profile');
+        redirect('/company-profile');
     }
     if ($route === 'workspace/setup/module-toggle' && $method === 'POST') {
         $key = (string) ($_POST['module'] ?? '');
@@ -494,12 +494,9 @@ function ops_cockpit($route, $method) {
     // --- GET pages ---
     switch ($route) {
         case 'workspace/setup/profile':
-            $chosen = cockpit_capabilities();
-            view('ops/cockpit_profile', [
-                'groups'   => cockpit_capability_groups($chosen),   // only activities the company can use (+ any already chosen)
-                'chosen'   => $chosen,
-                'company'  => (string) (setting_get('company_name', '') ?: setting_get('app_name', '')),
-            ]);
+            // Merged into the single "Company profile" screen (identity + what you
+            // do). Kept as a redirect so old links / bookmarks keep working.
+            redirect('/company-profile');
             return true;
         case 'workspace/setup/modules':
             view('ops/cockpit_modules', [

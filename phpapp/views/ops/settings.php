@@ -467,6 +467,11 @@
     a decision anybody gets to make.</p>
 </div>
 
+<?php // Developer / demo tooling — the sample-data loader, the DEMO-Sxx scenarios,
+      // the install-mode switch and the QA self-checks below. A hosted customer must
+      // never load demo data into their live workspace or touch deployment internals,
+      // so this whole block is shown ONLY on the control / owner install.
+if (!function_exists('current_tenant') || current_tenant() === ''): ?>
 <div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Demo / sample data</h3>
   <?php if (function_exists('demo_flag_is_stale') && demo_flag_is_stale()): ?>
@@ -698,6 +703,7 @@
   </form>
   <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/trace-audit.php</code> — add <code>--remove</code> to take it out.</p>
 </div>
+<?php endif; // end developer / demo block (control-install only) ?>
 
 <div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Clear records</h3>
