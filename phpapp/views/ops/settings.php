@@ -417,6 +417,7 @@
   <p class="sub" style="margin-bottom:10px">Everything you run as the software provider — cloud workspaces, customer
     licences, per-user pricing and the one-click signing setup — in one place.</p>
   <a class="btn" href="/vendor">Open Super Admin</a>
+  <a class="btn secondary" href="/pricing-usage" style="margin-left:8px">Plans, pricing &amp; usage</a>
 </div>
 <?php endif; ?>
 <div class="panel settings-card">

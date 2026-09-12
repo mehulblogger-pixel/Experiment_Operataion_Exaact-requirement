@@ -259,7 +259,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','workspace/setup','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','workspace/setup','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             // Phase 1 — the Company Setup Cockpit is the single front door to all
             // configuration below. Shown first so a non-technical admin starts here.

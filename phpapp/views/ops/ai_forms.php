@@ -23,16 +23,26 @@ $typeLabel = ['text' => 'Text', 'textarea' => 'Paragraph', 'number' => 'Number',
 
 <?php if (!empty($pool)):
         $used = (int) ($used ?? 0); $cap = (int) ($cap ?? 0); $left = max(0, $cap - $used);
+        $packSize = (int) ($packSize ?? 0); $packPrice = (int) ($packPrice ?? 0); $psym = $sym ?? '₹';
+        $canBuy = !empty($payOn) && $packSize > 0 && $packPrice >= 0;
         $tone = $left === 0 ? 'var(--warn,#b45309)' : 'var(--brand)'; ?>
   <div class="panel" style="max-width:820px;margin-top:14px;border-left:3px solid <?= $tone ?>;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
     <div>
       <strong>✨ AI is included in your plan</strong>
       <div class="muted" style="font-size:12.5px;margin-top:2px">
-        <?php if ($left === 0): ?>You've used all <?= $cap ?> AI actions this month — they reset on the 1st. Add your own AI key below for unlimited use.
+        <?php if ($left === 0): ?>You've used all <?= $cap ?> AI actions this month — they reset on the 1st.<?= $canBuy ? ' Buy a top-up to continue now,' : '' ?> or add your own AI key below for unlimited use.
         <?php else: ?><strong><?= $left ?></strong> of <?= $cap ?> AI actions left this month.<?php endif; ?>
       </div>
     </div>
-    <div class="muted" style="font-size:12px;white-space:nowrap"><?= $used ?> / <?= $cap ?> used</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="muted" style="font-size:12px;white-space:nowrap"><?= $used ?> / <?= $cap ?> used</span>
+      <?php if ($canBuy && ($left === 0 || $left <= max(5, (int) round($cap * 0.15)))): ?>
+        <form method="post" action="/ai-topup-order" style="margin:0">
+          <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
+          <button class="btn" type="submit">Buy <?= $packSize ?> more · <?= e($psym . number_format($packPrice)) ?></button>
+        </form>
+      <?php endif; ?>
+    </div>
   </div>
 <?php endif; ?>
 

@@ -97,8 +97,25 @@ function ai_monthly_cap() {
 function ai_usage_setting() { return 'ai_usage_' . date('Y-m'); }
 function ai_usage_month()   { return function_exists('setting_get') ? (int) setting_get(ai_usage_setting(), 0) : 0; }
 function ai_usage_bump($n = 1) { if (function_exists('setting_set')) setting_set(ai_usage_setting(), (string) (ai_usage_month() + max(0, (int) $n))); }
-function ai_pool_remaining() { return max(0, ai_monthly_cap() - ai_usage_month()); }
-function ai_pool_over()      { return ai_usage_month() >= ai_monthly_cap(); }
+
+// Top-up credits a workspace bought THIS month, added on top of the plan cap.
+// Tracked per month so a top-up applies to the month it was bought and does not
+// silently carry a permanent cap increase forward.
+function ai_topup_setting() { return 'ai_topup_' . date('Y-m'); }
+function ai_topup_month()   { return function_exists('setting_get') ? (int) setting_get(ai_topup_setting(), 0) : 0; }
+function ai_topup_add($n)   { if (function_exists('setting_set')) setting_set(ai_topup_setting(), (string) (ai_topup_month() + max(0, (int) $n))); }
+// The allowance actually in force this month = the plan cap + any top-ups bought.
+function ai_effective_cap()  { return ai_monthly_cap() + ai_topup_month(); }
+function ai_pool_remaining() { return max(0, ai_effective_cap() - ai_usage_month()); }
+function ai_pool_over()      { return ai_usage_month() >= ai_effective_cap(); }
+
+// The AI top-up pack sold when a workspace runs out — how many actions it adds
+// and what it costs. Both are set by the super admin (settings), with sensible
+// defaults, and are pushed to a workspace like the other pricing.
+const AI_DEFAULT_PACK_SIZE = 100;
+const AI_DEFAULT_PACK_PRICE = 199;   // major currency units (₹)
+function ai_pack_size()  { $v = function_exists('setting_get') ? (int) setting_get('ai_pack_size', 0)  : 0; return $v > 0 ? $v : AI_DEFAULT_PACK_SIZE; }
+function ai_pack_price() { $v = function_exists('setting_get') ? (int) setting_get('ai_pack_price', 0) : 0; return $v > 0 ? $v : AI_DEFAULT_PACK_PRICE; }
 
 // Whether AI is usable at all here — an own key, or the platform pool. (When the
 // pool is configured but this month's cap is spent, AI is still "available"; the
@@ -179,7 +196,7 @@ function ai_chat($system, $user, $maxTokens = 1200) {
     $act = ai_active();
     if (!$act) {
         if (function_exists('ai_pool_applies') && ai_pool_applies() && ai_pool_over())
-            return [null, 'This workspace has used all ' . ai_monthly_cap() . ' AI actions included this month (they reset on the 1st). For unlimited use now, add your own AI key under Settings → AI providers.'];
+            return [null, 'This workspace has used all ' . ai_effective_cap() . ' AI actions available this month (they reset on the 1st). Buy a top-up pack to continue now, or add your own AI key under Settings → AI providers for unlimited use.'];
         return [null, 'No AI provider is enabled. Add a key under Settings → AI providers.'];
     }
     $p = $act['provider']; $model = $act['model'];
@@ -264,7 +281,7 @@ function ai_chat_doc($system, $user, $files, $maxTokens = 1500) {
     $act = ai_active();
     if (!$act) {
         if (function_exists('ai_pool_applies') && ai_pool_applies() && ai_pool_over())
-            return [null, 'This workspace has used all ' . ai_monthly_cap() . ' AI actions included this month (they reset on the 1st). Add your own AI key under Settings → AI providers for unlimited use.'];
+            return [null, 'This workspace has used all ' . ai_effective_cap() . ' AI actions available this month (they reset on the 1st). Buy a top-up pack to continue now, or add your own AI key under Settings → AI providers for unlimited use.'];
         return [null, 'No AI provider is enabled. Add a key under Settings → AI providers.'];
     }
     $p = $act['provider']; $model = $act['model'];

@@ -199,9 +199,13 @@ function ops_ai_forms($method) {
         'flow'  => $flow,
         'aiOn'  => function_exists('ai_enabled') && ai_enabled(),
         'forms' => aifg_forms(),
-        // Platform-provided AI: show the workspace its monthly allowance.
+        // Platform-provided AI: show the workspace its monthly allowance + top-up.
         'pool'  => function_exists('ai_pool_applies') && ai_pool_applies(),
         'used'  => function_exists('ai_usage_month') ? ai_usage_month() : 0,
-        'cap'   => function_exists('ai_monthly_cap') ? ai_monthly_cap() : 0,
+        'cap'   => function_exists('ai_effective_cap') ? ai_effective_cap() : 0,
+        'packSize'  => function_exists('ai_pack_size') ? ai_pack_size() : 0,
+        'packPrice' => function_exists('ai_pack_price') ? ai_pack_price() : 0,
+        'payOn'     => function_exists('billing_configured') && billing_configured(),
+        'sym'       => function_exists('cur_sym') ? cur_sym() : '₹',
     ]);
 }

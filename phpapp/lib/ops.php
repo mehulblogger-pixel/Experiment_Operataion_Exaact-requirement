@@ -2995,6 +2995,10 @@ function ops_dispatch($route, $method) {
             return ops_saas_admin($route, $method);
         case $route === 'subscription' || $route === 'subscription-order' || $route === 'subscription-verify':
             return ops_saas_subscription($route, $method);   // a company's own self-service plan / à-la-carte buy
+        case $route === 'pricing-usage':                     // Super-Admin: module/seat prices, AI allowance & top-up, per-workspace usage
+            return ops_pricing_usage($method);
+        case $route === 'ai-topup-order' || $route === 'ai-topup-verify':   // customer buys extra AI actions (Razorpay)
+            return ops_ai_topup($route, $method);
         case $route === 'marketplace-plans':   // Super-Admin: marketplace subscription plans & limits
             return ops_mkt_plans($method);
         case $route === 'marketplace-escrow':  // Marketplace desk: escrow holds (hold → release/refund)
