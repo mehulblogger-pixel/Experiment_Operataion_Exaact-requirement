@@ -108,8 +108,8 @@ Per §45 "keep new tables focused on orchestration" and §67 "no orphaned settin
 | New artefact | Type | Why it is needed (not a duplicate) |
 |---|---|---|
 | `lib/setup_cockpit.php` | Orchestrator service (§74, §76) | The one new architectural capability: answers "what has this tenant enabled / configured / still needs", consuming the engines above. Contains no config storage. |
-| `company_capabilities` table | Orchestration data (§45) | The tenant's multi-select "what we do" (§11 many-to-many). **Catalogue** comes from a `business_activity` master list (reuse), not hard-coded. Distinct from `cx_org_capabilities`, which is per-marketplace-party and gates marketplace visibility; this is the tenant-level business profile. Vocabulary is aligned so the two never disagree. |
-| `business_activity` lookup list | Master data via existing engine | The capability catalogue, created through `lookups.php` — configurable, not code. |
+| `company_capabilities` table | Orchestration data (§45) | The tenant's multi-select "what we do" (§11 many-to-many). Distinct from `cx_org_capabilities`, which is per-marketplace-party and gates marketplace visibility; this is the tenant-level business profile. Vocabulary is aligned so the two never disagree. |
+| Capability **catalogue** | **Reused** from `connect_cap_catalog()` | *Refined during build:* rather than seed a new `business_activity` master list, the cockpit reuses the existing grouped, module-mapped capability catalogue in `connect_capability.php` — an even stronger reuse (one catalogue, already extensible "additively; never remove"). No new master list is created. |
 | `settings` keys `cockpit_*` | Config values | e.g. `cockpit_profile_done`, resume pointer. Auto-audited by `setting_set()`. |
 | `views/ops/cockpit_*.php` | Views | Presentation only. |
 
