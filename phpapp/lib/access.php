@@ -222,6 +222,39 @@ function module_groups() {
     if ($orphans) $g['Not yet grouped'] = $orphans;
     return $g;
 }
+
+// Is a single permission relevant to THIS workspace's plan? Core permissions
+// (master.manage, users.*, settings.*, org.*) are always relevant; a permission
+// owned by a switched-off module is not.
+function perm_licensed($perm) {
+    $m = perm_product_module($perm);
+    return $m === null || !function_exists('licence_enabled') || licence_enabled($m);
+}
+// Is an access-module (mod.<key>) relevant to this workspace's plan?
+function module_key_licensed($k) {
+    $m = perm_product_module('mod.' . $k . '.view');
+    return $m === null || !function_exists('licence_enabled') || licence_enabled($m);
+}
+// The permission / module groups for the Roles & access editor, filtered to the
+// modules this workspace actually has — so a recruitment company is not shown
+// inspection, sales, finance or accreditation permissions it can never use.
+// (Empty groups drop out entirely.)
+function permission_groups_licensed() {
+    $out = [];
+    foreach (permission_groups() as $g => $perms) {
+        $keep = array_values(array_filter($perms, 'perm_licensed'));
+        if ($keep) $out[$g] = $keep;
+    }
+    return $out;
+}
+function module_groups_licensed() {
+    $out = [];
+    foreach (module_groups() as $g => $keys) {
+        $keep = array_values(array_filter($keys, 'module_key_licensed'));
+        if ($keep) $out[$g] = $keep;
+    }
+    return $out;
+}
 // Every permission — fine-grained AND per-module view/edit — arranged under the
 // SAME headings as the app's main navigation (Sales, Operations, … Admin), so
 // the Add/Edit-user screen reads like the menu the person will actually use

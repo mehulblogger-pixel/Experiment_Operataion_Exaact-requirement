@@ -2623,7 +2623,10 @@ function ops_module_gate($route) {
 // Settings → Roles & access: edit each role's default permission set.
 function ops_access($method) {
     ops_require(is_master(), 'Only the Master Admin can edit role access.');
-    $roles = ORG_ROLES; unset($roles['MASTER_ADMIN']); // Master Admin always has everything
+    // Only the roles this workspace's plan uses (plus its own custom roles) — a
+    // recruitment company is not shown Inspector, Marketing or Finance roles.
+    $roles = function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES;
+    unset($roles['MASTER_ADMIN']); // Master Admin always has everything
     $sel = $_GET['role'] ?? 'COORDINATOR';
     if (!isset($roles[$sel])) $sel = array_key_first($roles);
     if ($method === 'POST') {
@@ -2645,7 +2648,7 @@ function ops_access($method) {
             $store[$sel] = role_recommended_perms($sel);
             setting_set('role_access', json_encode($store));
             $logRoleAccess($store[$sel]);
-            flash('Recommended permissions applied for ' . ORG_ROLES[$sel] . '. Review and Save, or adjust as needed.');
+            flash('Recommended permissions applied for ' . (function_exists("role_name") ? role_name($sel) : (ORG_ROLES[$sel] ?? $sel)) . '. Review and Save, or adjust as needed.');
             redirect('/access?role=' . $sel);
         }
         // Restore to built-in default (drop the override).
@@ -2653,7 +2656,7 @@ function ops_access($method) {
             unset($store[$sel]);
             setting_set('role_access', json_encode($store));
             $logRoleAccess(role_perms($sel));
-            flash('Access for ' . ORG_ROLES[$sel] . ' reset to the built-in default.');
+            flash('Access for ' . (function_exists("role_name") ? role_name($sel) : (ORG_ROLES[$sel] ?? $sel)) . ' reset to the built-in default.');
             redirect('/access?role=' . $sel);
         }
         $valid = array_keys(all_permissions());
@@ -2667,12 +2670,14 @@ function ops_access($method) {
         // Remember which modules existed at this moment, so a module added in a
         // later version is known to be new rather than deliberately untieked.
         stamp_modules_at_save();
-        flash('Access for ' . ORG_ROLES[$sel] . ' saved.');
+        flash('Access for ' . (function_exists("role_name") ? role_name($sel) : (ORG_ROLES[$sel] ?? $sel)) . ' saved.');
         redirect('/access?role=' . $sel);
     }
     view('ops/access', ['roles' => $roles, 'sel' => $sel, 'current' => role_perms($sel),
-        'recommended' => role_recommended_perms($sel), 'permGroups' => permission_groups(),
-        'moduleGroups' => module_groups(), 'scope' => role_defaults_base($sel)]);
+        'recommended' => role_recommended_perms($sel),
+        'permGroups' => function_exists('permission_groups_licensed') ? permission_groups_licensed() : permission_groups(),
+        'moduleGroups' => function_exists('module_groups_licensed') ? module_groups_licensed() : module_groups(),
+        'scope' => role_defaults_base($sel)]);
 }
 
 function ops_dispatch($route, $method) {
