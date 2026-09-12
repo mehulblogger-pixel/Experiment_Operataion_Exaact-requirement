@@ -16,7 +16,18 @@
 <?php // Which parts of the product this installation runs. Its own form, because
       // switching a module off changes what everybody can see and should not be
       // saved by accident alongside a logo upload. ?>
-<?php if (is_master()): $mods = licence_summary(); $pinned = (bool)getenv('MODULES_OFF'); ?>
+<?php if (is_master()): ?>
+<?php // Inside a customer workspace, features are managed in the one place — the
+      //  Company setup → Features screen (with the paid-plan lock). So here we show
+      //  a link, not a second editor. The raw editor stays on the owner/control
+      //  install, where env-pinning and platform tweaks may still be needed.
+      if (function_exists('current_tenant') && current_tenant() !== ''): ?>
+<div class="panel settings-card">
+  <h3 class="tab-sub" style="margin-top:0;">Features</h3>
+  <p class="sub" style="margin-top:0">Turn the parts of the software your company uses on or off — all in one place, within your plan.</p>
+  <a class="btn" href="/workspace/setup/modules">Manage features →</a>
+</div>
+<?php else: $mods = licence_summary(); $pinned = (bool)getenv('MODULES_OFF'); ?>
 <form method="post" action="/settings" class="panel settings-form">
   <input type="hidden" name="modules_form" value="1">
   <h3 class="tab-sub" style="margin-top:0;">Modules</h3>
@@ -42,7 +53,8 @@
     a system without <?= e(Tlp('call')) ?>, <?= e(Tlp('job')) ?>, masters and users is not a smaller product.</p>
   <?php if (!$pinned): ?><button class="btn" type="submit">Save modules</button><?php endif; ?>
 </form>
-<?php endif; ?>
+<?php endif; // tenant-link vs control-editor ?>
+<?php endif; // is_master ?>
 
 <form method="post" action="/settings" enctype="multipart/form-data" class="panel settings-form">
 <div data-tabs data-tabs-key="prefs" data-tabs-order="Branding &amp; theme,Financial &amp; norms,Display &amp; terms,Numbering &amp; reports,Security">

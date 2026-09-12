@@ -52,6 +52,15 @@ t_ok(licence_enabled('admin') === true, 'the core module is enabled');
 t_ok(licence_enabled('sales') === false, 'an unpaid module is forced OFF even with an empty modules_off');
 t_ok(licence_enabled('operations') === false, 'every module outside the ceiling is forced off');
 
+// The "what these settings affect" governance table only lists modules the plan
+// runs. A recruitment-only workspace (operations / money / sales all off) has no
+// report/finance/contract settings to govern, so the whole panel folds away —
+// no inspection clutter on a recruitment company's settings screen.
+if (function_exists('setting_meta_for_context')) {
+    $mk();
+    t_ok(setting_meta_for_context() === [], 'the governance reference table is empty for a recruitment-only workspace (no inspection/finance/contract rows)');
+}
+
 // --- The write path cannot escape it: ticking Sales on is clamped. ---
 if (function_exists('licence_save')) {
     licence_save(['mod_on' => ['sales' => 1, 'hr' => 1, 'operations' => 1]]); $mk(); licence_disabled(true);
@@ -90,6 +99,9 @@ if (function_exists('cockpit_capability_groups')) {
 // --- The control/owner install is NEVER limited, even if the setting is present. ---
 $GLOBALS['__tenant'] = ['key' => '', 'company' => '', 'error' => '', 'saas' => false, 'base' => ''];
 t_ok(licence_entitled_ceiling() === null, 'on the control/owner install there is no ceiling (owner is never limited)');
+if (function_exists('setting_meta_for_context')) {
+    t_ok(count(setting_meta_for_context()) === count(setting_meta_all()), 'the provider/control install still sees the full governance reference (never filtered)');
+}
 
 // Restore for later tests.
 setting_set('modules_off', $savedOff);

@@ -49,10 +49,48 @@ function setting_meta($key) {
     return $all[(string)$key] ?? null;
 }
 
+// Which sellable module each governed setting belongs to, so a client workspace only sees the governance
+// rows for the modules it actually runs. Every setting here concerns report/inspection workflow (operations),
+// finance & profitability (money) or the sales/contract pipeline (sales); a recruitment-only workspace runs
+// none of these, so the whole panel folds away for it. '' marks a provider-only platform switch that never
+// belongs on a customer's screen. Kept beside the registry (not inside it) so the registry stays untouched.
+function setting_meta_module_map() {
+    return [
+        'issue_gate_strict' => 'operations', 'vetting_gate_required' => 'operations',
+        'vetting_checklist_require' => 'operations', 'rn_require_client_acceptance' => 'operations',
+        'report_escalate_days' => 'operations', 'tat_threshold_days' => 'operations',
+        'vendor_requal_months' => 'operations', 'geofence_on' => 'operations',
+        'checkin_entry_exit_required' => 'operations', 'checkin_photo_required' => 'operations',
+        'invoice_gate_strict' => 'money', 'finance_truth_unified' => 'money',
+        'revenue_reader_mode' => 'money', 'reimbursable_dedupe' => 'money', 'cost_reader_mode' => 'money',
+        'fy_start_month' => 'money', 'fy_current' => 'money', 'manmonth_basis' => 'money',
+        'daily_hours_cap' => 'money', 'fy_revenue_target' => 'money', 'revrecon_tolerance' => 'money',
+        'contract_idle_close_days' => 'sales', 'contract_idle_warn_days' => 'sales',
+        'licence_enforce' => '', // provider-only platform switch
+    ];
+}
+
+// The governed settings that apply to THIS workspace: on the provider/control install, all of them; on a
+// client workspace, only those whose module the plan includes (so an unlicensed module's settings never
+// clutter the screen). Unknown keys are shown by default so a new setting is never silently hidden.
+function setting_meta_for_context() {
+    $all = setting_meta_all();
+    if (function_exists('current_tenant') && current_tenant() !== '') {
+        $map = setting_meta_module_map();
+        foreach ($all as $key => $m) {
+            $mod = $map[$key] ?? null;
+            if ($mod === null) continue;                 // not mapped → keep (fail-open)
+            if ($mod === '') { unset($all[$key]); continue; } // provider-only → hide from customers
+            if (function_exists('module_entitled') && !module_entitled($mod)) unset($all[$key]);
+        }
+    }
+    return $all;
+}
+
 // A read-only governance reference panel: every governed setting, its purpose, what it affects, whether
 // it applies live or only forward, and its current value. For the settings screen and the audit context.
 function setting_meta_render($title = 'What these settings affect') {
-    $all = setting_meta_all();
+    $all = setting_meta_for_context();
     if (!$all) return;
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     $impactTone = ['high' => 'p-bad', 'medium' => 'p-warn', 'low' => 'p-mut'];
