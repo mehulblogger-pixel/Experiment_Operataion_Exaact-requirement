@@ -225,6 +225,7 @@ try {
     require __DIR__ . '/lib/company.php';
     require __DIR__ . '/lib/customforms.php';
     require __DIR__ . '/lib/formdesign.php';
+    require __DIR__ . '/lib/ai_formgen.php';      // AI Form & Dropdown Builder — reuses ai.php + formdesign.php
     require __DIR__ . '/lib/setup_cockpit.php';   // Company Setup Cockpit — configuration orchestrator (Phase 1)
     require __DIR__ . '/lib/geofence.php';
     require __DIR__ . '/lib/timesheet.php';

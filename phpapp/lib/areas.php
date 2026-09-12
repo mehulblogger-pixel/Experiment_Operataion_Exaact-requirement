@@ -259,7 +259,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','workspace/setup','masters','m/','lookups','custom-fields','cforms','cform','form-designer','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','workspace/setup','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             // Phase 1 — the Company Setup Cockpit is the single front door to all
             // configuration below. Shown first so a non-technical admin starts here.
@@ -283,6 +283,7 @@ function ops_area_def($area) {
             $t(can('mod.settings.view') && can('settings.manage'), '⚙️', 'System settings', '/settings', 'Company-wide settings and terminology.');
             $t(can('settings.manage'), '🔤', 'Terminology / wording', '/terminology', 'Rename what things are called on every screen — e.g. “Requirement”, “Candidate”, “Client” — to match your business.');
             $t(($fx('fd_can') && fd_can()), '🧱', 'Form Designer', '/form-designer', 'Build your Requirement & Candidate forms end to end — add or delete a field, create a dropdown with its options, rename, reorder, hide or require — all on one screen, no coding.');
+            $t(($fx('fd_can') && fd_can() && (!$fx('licence_enabled') || licence_enabled('hr'))), '✨', 'Build forms with AI', '/ai-forms', 'Describe your recruitment process and let AI suggest the extra fields and dropdown lists to capture it — you review and approve before anything is added.');
             // Service scope and its report formats are field-operations / inspection
             // concepts (which inspection services are offered, and the report format
             // each allocates). They belong to the Operations and Reporting modules —

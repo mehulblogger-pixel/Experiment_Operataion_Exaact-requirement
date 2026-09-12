@@ -3111,6 +3111,8 @@ function ops_dispatch($route, $method) {
             return ops_cform_records($route, $method);
         case strncmp($route, 'form-designer', 13) === 0:   // design forms: rename/reorder/hide/require + add/edit/delete fields & dropdowns
             return ops_form_designer($route, $method);
+        case $route === 'ai-forms':                        // AI Form & Dropdown Builder — paste your process, review suggestions, apply
+            return ops_ai_forms($method);
         case $route === 'workspace/setup' || strncmp($route, 'workspace/setup/', 16) === 0:   // Company Setup Cockpit (Phase 1 orchestrator)
             return ops_cockpit($route, $method);
         case $route === 'partner-geo' && $method === 'POST':

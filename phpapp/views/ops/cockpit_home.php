@@ -123,6 +123,7 @@ $warns = array_values(array_filter($health ?? [], fn($h) => $h['level'] === 'war
   <div class="ck-sec">Quick actions</div>
   <div class="ck-qa">
     <a class="btn ghost" href="/workspace/setup/forms">+ Add a form field</a>
+    <a class="btn ghost" href="/ai-forms">✨ Build forms with AI</a>
     <a class="btn ghost" href="/masters">+ Add a dropdown value</a>
     <a class="btn ghost" href="/users">+ Add a user</a>
     <a class="btn ghost" href="/hierarchy?tab=offices">+ Add a branch</a>
