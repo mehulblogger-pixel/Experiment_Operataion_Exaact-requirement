@@ -259,7 +259,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','masters','m/','lookups','custom-fields','cforms','cform','form-designer','form-designer-save','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','masters','m/','lookups','custom-fields','cforms','cform','form-designer','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             $sec('Masters');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
@@ -277,7 +277,7 @@ function ops_area_def($area) {
             $sec('Configuration');
             $t(can('mod.settings.view') && can('settings.manage'), '⚙️', 'System settings', '/settings', 'Company-wide settings and terminology.');
             $t(can('settings.manage'), '🔤', 'Terminology / wording', '/terminology', 'Rename what things are called on every screen — e.g. “Requirement”, “Candidate”, “Client” — to match your business.');
-            $t(($fx('fd_can') && fd_can()), '🧱', 'Form Designer', '/form-designer', 'Rename, reorder, hide or require the fields on your Requirement & Candidate forms — no coding.');
+            $t(($fx('fd_can') && fd_can()), '🧱', 'Form Designer', '/form-designer', 'Build your Requirement & Candidate forms end to end — add or delete a field, create a dropdown with its options, rename, reorder, hide or require — all on one screen, no coding.');
             // Service scope and its report formats are field-operations / inspection
             // concepts (which inspection services are offered, and the report format
             // each allocates). They belong to the Operations and Reporting modules —

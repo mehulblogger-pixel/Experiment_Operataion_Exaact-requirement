@@ -934,6 +934,8 @@ function render_custom_fields($entity, $vals = []) {
         if ($f['field_type'] === 'text' || $f['field_type'] === 'number' || $f['field_type'] === 'date') {
             $type = $f['field_type'] === 'text' ? 'text' : $f['field_type'];
             echo '<input class="form-control" type="' . $type . '" name="' . e($key) . '" value="' . e($cur['value_text'] ?? '') . '"' . ($f['required'] ? ' required' : '') . '>';
+        } elseif ($f['field_type'] === 'textarea') {
+            echo '<textarea class="form-control" name="' . e($key) . '" rows="3"' . ($f['required'] ? ' required' : '') . '>' . e($cur['value_text'] ?? '') . '</textarea>';
         } elseif ($f['field_type'] === 'select') {
             $t = lk_type_by_id($f['lookup_type_id']);
             echo '<select class="form-control searchable" name="' . e($key) . '"><option value="">—</option>';

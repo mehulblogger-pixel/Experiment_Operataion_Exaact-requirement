@@ -2500,6 +2500,9 @@ function ops_module_gate($route) {
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls','contract-open'=>'quotes',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
+        'form-designer'=>'settings','form-designer-save'=>'settings',
+        'form-designer-field-add'=>'settings','form-designer-field-edit'=>'settings','form-designer-field-del'=>'settings',
+        'form-designer-option-add'=>'settings','form-designer-option-del'=>'settings',
         'connect-capabilities'=>'settings',
         'service-scope'=>'settings','service-formats'=>'settings',
         'deputations'=>'jobs',
@@ -3106,7 +3109,7 @@ function ops_dispatch($route, $method) {
         case $route === 'cform' || $route === 'cform-new' || $route === 'cform-edit' || $route === 'cform-view'
              || $route === 'cform-save' || $route === 'cform-del':
             return ops_cform_records($route, $method);
-        case $route === 'form-designer' || $route === 'form-designer-save':   // rename/reorder/hide/require built-in form fields
+        case strncmp($route, 'form-designer', 13) === 0:   // design forms: rename/reorder/hide/require + add/edit/delete fields & dropdowns
             return ops_form_designer($route, $method);
         case $route === 'partner-geo' && $method === 'POST':
             return geofence_save_party($route, $method);
