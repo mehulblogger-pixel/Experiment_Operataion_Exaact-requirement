@@ -310,7 +310,7 @@
                   </select></div>
                 <div class="ff"><label>Role</label>
                   <select class="form-control" name="o_head_role">
-                    <?php foreach (ORG_ROLES as $rk => $rl): ?>
+                    <?php foreach ((function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES) as $rk => $rl): ?>
                       <option value="<?= e($rk) ?>"<?= $rk === 'BRANCH_MANAGER' ? ' selected' : '' ?>><?= e($rl) ?></option>
                     <?php endforeach; ?>
                   </select></div>
@@ -433,7 +433,7 @@
             <td><a href="/user-edit?id=<?= (int)$p['id'] ?>"><b><?= e($nm) ?></b></a>
                 <div class="muted" style="font-size:11.5px"><?= e($p['username']) ?><?= $p['email'] ? ' · ' . e($p['email']) : '' ?></div></td>
             <td><select class="form-control" name="p_role[<?= (int)$p['id'] ?>]" <?= $canEdit ? '' : 'disabled' ?>>
-              <?php foreach (ORG_ROLES as $k => $v): ?>
+              <?php foreach ((function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES) as $k => $v): ?>
                 <option value="<?= e($k) ?>"<?= $p['role'] === $k ? ' selected' : '' ?>><?= e($v) ?></option>
               <?php endforeach; ?>
             </select></td>
@@ -542,7 +542,7 @@
               <?php // Never let a blank role look like whichever role happens to
                     // be first in the list — make the gap visible instead. ?>
               <?php if ($r['role'] === ''): ?><option value="" selected>— choose a role —</option><?php endif; ?>
-              <?php foreach (ORG_ROLES as $k => $v): ?>
+              <?php foreach ((function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES) as $k => $v): ?>
                 <option value="<?= e($k) ?>"<?= $r['role'] === $k ? ' selected' : '' ?>><?= e($v) ?></option>
               <?php endforeach; ?>
             </select></td>

@@ -600,6 +600,11 @@ function industry_seed_list($typeKey, $typeLabel, array $values) {
 
 function ops_industry($route, $method) {
     ops_require(industry_can(), 'Only an administrator can set the industry template.');
+    // The industry template builds sales pipelines and inspection accreditation
+    // rules — only meaningful where sales or operations is on. A recruitment
+    // workspace configures its wording under Terminology instead.
+    ops_require(!function_exists('licence_enabled') || licence_enabled('sales') || licence_enabled('operations'),
+        'Industry templates apply to the Sales and Operations modules, which are not part of your plan. Set your wording under Terminology instead.');
 
     if ($route === 'industry-apply' && $method === 'POST') {
         $key = preg_replace('/[^a-z]/', '', (string)($_POST['key'] ?? ''));

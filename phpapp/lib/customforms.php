@@ -16,9 +16,27 @@
 //  Only the form registry and a thin records table are new here.
 // ============================================================================
 
-// The nav groups a form can be filed under — the same headings the sidebar uses.
+// The nav groups a custom form can be filed under — the same headings the sidebar
+// uses, filtered to the modules this workspace has (so a recruitment company is not
+// offered to file a register under Operations, Sales, Reporting, Money or Quality
+// menus it does not have). The generic groups are always available.
 function cform_nav_groups() {
-    return ['Operations', 'Sales', 'Quality & accreditation', 'Reporting', 'Money', 'Insights', 'Directory', 'My work'];
+    $all = [
+        'Operations'             => 'operations',
+        'Sales'                  => 'sales',
+        'Quality & accreditation'=> 'reporting',
+        'Reporting'              => 'reporting',
+        'Money'                  => 'money',
+        'Insights'               => null,   // generic
+        'Directory'              => null,
+        'My work'                => null,
+    ];
+    $out = [];
+    foreach ($all as $group => $mod) {
+        if ($mod !== null && function_exists('licence_enabled') && !licence_enabled($mod)) continue;
+        $out[] = $group;
+    }
+    return $out;
 }
 
 function cforms_migrate() {

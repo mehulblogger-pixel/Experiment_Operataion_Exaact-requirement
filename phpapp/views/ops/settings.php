@@ -131,6 +131,9 @@
         <option value="AUTO" <?= ($fyPin === '' || $fyPin === 'AUTO') ? 'selected' : '' ?>>Automatic — follow today (<?= e(current_fy()) ?>)</option>
         <?php foreach (fy_options() as $o): ?><option value="<?= e($o) ?>" <?= $fyPin === strtoupper($o) ? 'selected' : '' ?>>FY <?= e($o) ?></option><?php endforeach; ?>
       </select><small class="muted">Calls, quotes, jobs and invoices open on this year. A per-screen year filter still overrides it. Opening on <strong>FY <?= e(active_fy()) ?></strong><?= fy_is_pinned() ? ' (pinned)' : '' ?>.</small></div>
+    <?php // TAT, revenue target, report escalation, man-month & contract-expiry are
+          //  Operations / Money settings — hidden for a plan without those modules.
+          if (!function_exists('licence_enabled') || licence_enabled('operations') || licence_enabled('money')): ?>
     <div class="ff"><label>On-time TAT threshold (days)</label>
       <input class="form-control" type="number" min="0" name="tat_threshold_days" value="<?= e(setting_get('tat_threshold_days', 3)) ?>"></div>
     <div class="ff"><label>Annual revenue target (<?= e(cur_sym()) ?>) <span class="muted">— shows on the leadership dashboard</span></label>
@@ -157,8 +160,10 @@
       <input class="form-control" type="number" min="1" max="365" name="contract_warn_days" value="<?= e(setting_get('contract_warn_days', 30)) ?>">
       <small class="muted">Everyone on the order is e-mailed once when a contract comes inside this window. Past the end
         date, scheduling stops until the Super Admin grants an exception.</small></div>
+    <?php endif; // operations/money financial fields ?>
   </div>
 
+  <?php if (!function_exists('licence_enabled') || licence_enabled('operations')): // working norms are a field-operations concept ?>
   <h3 class="tab-sub">Working norms &amp; limits</h3>
   <p class="sub" style="margin-bottom:10px">The ceiling and defaults the whole app enforces. Per-designation and per-<?= e(Tl('office')) ?> norms are set separately under <a href="/work-norms">Working norms</a>.</p>
   <div class="form-grid">
@@ -190,6 +195,7 @@
       <input class="form-control" name="emp_code_prefix" value="<?= e(setting_get('emp_code_prefix','')) ?>" placeholder="EMP">
       <small class="muted">Sub-contractors stay <code>SC-</code>, freelancers <code>FL-</code>.</small></div>
   </div>
+  <?php endif; // working norms — operations only ?>
 
 </section>
 <section class="fs-pane" data-tab="Display &amp; terms">
@@ -207,9 +213,11 @@
       <small class="muted">Rename <?= e(Tlp('client')) ?>, <?= e(Tlp('call')) ?>, <?= e(Tlp('job')) ?> and every other business word.</small></div>
   </div>
 
+  <?php if (!function_exists('licence_enabled') || licence_enabled('sales')): // quotation T&C is a Sales concept ?>
   <h3 class="tab-sub">Default terms &amp; conditions</h3>
   <p class="sub" style="margin-bottom:10px">Carried onto every new <?= e(Tl('quote')) ?>, where it can still be edited for that one <?= e(Tl('quote')) ?>. Changing it here does not alter <?= e(Tlp('quote')) ?> already written.</p>
   <textarea class="form-control" name="quote_terms" rows="10" style="font-family:inherit"><?= e(setting_get('quote_terms','') !== '' ? setting_get('quote_terms') : crm_default_terms()) ?></textarea>
+  <?php endif; // quote terms — sales only ?>
 
   <?php if (function_exists('numbering_types')): ?>
 </section>
@@ -326,7 +334,7 @@
       <small class="muted">The CERT-In directions require at least 180 days, so that is the floor. 400 covers a full year plus an audit cycle.</small></div>
     <div class="ff ff-wide"><label>Roles that must use two-step sign-in</label>
       <div class="chip-row" id="twofaRoles">
-        <?php $tr = twofa_required_roles(); foreach (ORG_ROLES as $rk=>$rl): ?>
+        <?php $tr = twofa_required_roles(); foreach ((function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES) as $rk=>$rl): ?>
           <label class="ff-check"><input type="checkbox" name="twofa_roles[]" value="<?= e($rk) ?>" <?= in_array($rk,$tr,true)?'checked':'' ?>> <?= e($rl) ?></label>
         <?php endforeach; ?>
       </div>
@@ -432,7 +440,11 @@
     invoices and records.</p>
   <a class="btn" href="/company-profile">Edit company profile</a>
 </div>
-<?php $curIndT = function_exists('industry_current') ? (string)industry_current() : ''; ?>
+<?php // "Your industry" builds SALES pipelines/funnels and INSPECTION accreditation
+      // rules; it only makes sense where sales or operations is on. A recruitment
+      // company sets its wording under Terminology instead, so the card is hidden.
+      $curIndT = function_exists('industry_current') ? (string)industry_current() : '';
+      if (!function_exists('licence_enabled') || licence_enabled('sales') || licence_enabled('operations')): ?>
 <div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Your industry</h3>
   <p class="sub" style="margin-bottom:10px">One choice builds the whole thing for your trade — the sales pipeline &amp; funnel,
@@ -442,6 +454,7 @@
     Fine-tune individual words under <a href="/terminology">Terminology</a>.</p>
   <a class="btn" href="/industry">Choose your industry</a>
 </div>
+<?php endif; // Your industry — sales/operations only ?>
 
 <?php if (function_exists('billing_can_manage') && billing_can_manage()): ?>
 <div class="panel settings-card">

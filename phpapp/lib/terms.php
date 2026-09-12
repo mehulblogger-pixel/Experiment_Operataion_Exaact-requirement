@@ -393,6 +393,10 @@ function approval_rule_tabs($active) {
     return count($t) > 1 ? module_tabs($t, $active) : '';
 }
 function ops_approval_rules($method) {
+    // Merged Sales/Reporting screen — reachable only where one of those modules is
+    // on (the Admin tiles are already gated; this guards a typed/bookmarked URL).
+    ops_require(!function_exists('licence_enabled') || licence_enabled('sales') || licence_enabled('reporting') || licence_enabled('operations'),
+        'Approval rules apply to the Sales and Reporting modules, which are not part of your plan.');
     $mod = ($_GET['module'] ?? '') === 'quote' ? 'quote' : 'report';
     // Land on a tab the person can actually open.
     if ($mod === 'report' && !can('mod.idems.view') && can('mod.quotes.view')) $mod = 'quote';
@@ -408,6 +412,8 @@ function template_tabs($active) {
     return count($t) > 1 ? module_tabs($t, $active) : '';
 }
 function ops_templates($method) {
+    ops_require(!function_exists('licence_enabled') || licence_enabled('sales') || licence_enabled('reporting') || licence_enabled('operations'),
+        'Document templates apply to the Sales and Reporting modules, which are not part of your plan.');
     $kind = ($_GET['kind'] ?? '') === 'quote' ? 'quote' : 'report';
     if ($kind === 'report' && !can('mod.idems.view') && can('mod.quotes.view')) $kind = 'quote';
     if ($kind === 'quote' && !can('mod.quotes.view') && can('mod.idems.view')) $kind = 'report';
