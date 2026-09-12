@@ -286,7 +286,22 @@ function cockpit_sections() {
         'pct' => $roleProblem ? 70 : 100, 'weight' => 1, 'note' => $team . ' ' . ($team === 1 ? 'person' : 'people'),
     ];
 
-    // 6) Terminology — defaults always work; "complete" (customised if overrides).
+    // 6) Branches / offices — optional. Reuses the existing Organisation screen
+    //    (its offices tab) rather than a second branch engine. Informational
+    //    (weight 0) so a single-office company is never nagged, but it gives a
+    //    clear place in setup to add offices and post people to them.
+    $officeLabel = function_exists('THP') ? THP('office') : 'Branches';
+    $offCount = _ck_count("SELECT COUNT(*) FROM offices");
+    $secs['branches'] = [
+        'key' => 'branches', 'icon' => '🏬', 'label' => $officeLabel,
+        'desc' => 'Your offices and who works where — add a branch and assign people to it.',
+        'route' => '/hierarchy?tab=offices',
+        'status' => $offCount > 0 ? 'complete' : 'not_started',
+        'pct' => $offCount > 0 ? 100 : 0, 'weight' => 0,
+        'note' => $offCount > 0 ? ($offCount . ' set up') : 'none yet',
+    ];
+
+    // 7) Terminology — defaults always work; "complete" (customised if overrides).
     $termCust = false;
     if (function_exists('term_overrides')) { try { $termCust = (bool) term_overrides(); } catch (Throwable $e) {} }
     $secs['terminology'] = [

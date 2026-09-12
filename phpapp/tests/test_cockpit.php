@@ -83,6 +83,13 @@ t_ok($r >= 0 && $r <= 100, 'workspace readiness is a 0–100% figure (§8)');
 // With two capabilities chosen the business profile is no longer "not started".
 t_ok($secs['business_profile']['status'] !== 'not_started', 'choosing capabilities advances the profile status');
 
+// Branches / offices setup is surfaced as its own card, reusing the existing
+// Organisation screen (offices tab) rather than a second branch engine, and it is
+// informational (weight 0) so it never nags a single-office company.
+t_ok(isset($secs['branches']), 'the cockpit surfaces a Branches / offices setup card');
+t_eq($secs['branches']['route'] ?? '', '/hierarchy?tab=offices', 'the Branches card opens the existing Organisation offices screen (no new engine)');
+t_eq((int) ($secs['branches']['weight'] ?? -1), 0, 'Branches is informational — it never drags the readiness score');
+
 // -- §59 canonical forms: cockpit reflects the ONE form engine; owns no copy.
 if (function_exists('fd_field_add') && function_exists('custom_fields_for') && licence_enabled('hr')) {
     $before = count(fd_custom_fields('requisition'));

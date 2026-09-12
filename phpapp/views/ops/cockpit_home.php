@@ -125,6 +125,7 @@ $warns = array_values(array_filter($health ?? [], fn($h) => $h['level'] === 'war
     <a class="btn ghost" href="/workspace/setup/forms">+ Add a form field</a>
     <a class="btn ghost" href="/masters">+ Add a dropdown value</a>
     <a class="btn ghost" href="/users">+ Add a user</a>
+    <a class="btn ghost" href="/hierarchy?tab=offices">+ Add a branch</a>
     <a class="btn ghost" href="/workspace/setup/modules">Configure features</a>
     <a class="btn ghost" href="/terminology">Change wording</a>
   </div>
