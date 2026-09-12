@@ -80,7 +80,7 @@ $confirmOff = (string) ($confirmOff ?? '');
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <span class="core">This feature isn’t part of your plan.</span>
             <?php if (function_exists('billing_can_manage') && billing_can_manage() && (int) setting_get('saas_seat_limit', 0) > 0): ?>
-              <a class="btn" href="/subscription">Upgrade to add it</a>
+              <a class="btn" href="/subscription?add=<?= $e($key) ?>">Upgrade to add it</a>
             <?php else: ?>
               <span class="muted" style="font-size:12.5px">Contact us to add it to your plan.</span>
             <?php endif; ?>
