@@ -28,6 +28,34 @@ const MGMT_ROLES = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANC
 // Marketing & Sales roles (CRM funnel owners)
 const SALES_ROLES = ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'];
 
+// Which module a role belongs to — used to hide roles a company can't use.
+// Only module-specific roles are listed; management/admin/coordinator roles are
+// generic org roles and always available.
+const ROLE_MODULE = [
+    'BUSINESS_DEV_MANAGER' => 'sales', 'KEY_ACCOUNTS_MANAGER' => 'sales',
+    'MARKETING_MANAGER' => 'sales', 'MARKETING_EXECUTIVE' => 'sales',
+    'FINANCE' => 'money',
+    'SR_INSPECTOR' => 'operations', 'INSPECTOR' => 'operations',
+];
+
+// The roles worth OFFERING on this installation: hide any role whose owning
+// module is switched off, so a Recruitment company is not asked to choose an
+// Inspector, a Marketing Manager or a Finance role it has no use for. Pass a
+// subset of ORG_ROLES to filter it; $keep is a role to always include (e.g. the
+// person's current role, so editing an existing user never drops their setting).
+function roles_for_licence($roles = null, $keep = '') {
+    $roles = $roles ?? ORG_ROLES;
+    if (!function_exists('licence_enabled')) return $roles;
+    $out = [];
+    foreach ($roles as $k => $v) {
+        $mod = ROLE_MODULE[$k] ?? null;
+        if ($mod !== null && !licence_enabled($mod) && $k !== $keep) continue;
+        $out[$k] = $v;
+    }
+    if ($keep !== '' && !isset($out[$keep]) && isset(ORG_ROLES[$keep])) $out[$keep] = ORG_ROLES[$keep];
+    return $out;
+}
+
 // ---- Permission catalogue --------------------------------------------------
 const PERMISSIONS = [
     'dash.operations' => 'Operations dashboard',

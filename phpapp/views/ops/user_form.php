@@ -18,7 +18,11 @@
   } else {
       $curPerms = $defaults['perms'] ?? [];
   }
-  $roleList = $globalMgr ? ORG_ROLES : ['OPERATION_MANAGER'=>ORG_ROLES['OPERATION_MANAGER'],'ASST_MANAGER'=>ORG_ROLES['ASST_MANAGER'],'COORDINATOR'=>ORG_ROLES['COORDINATOR'],'INSPECTOR'=>ORG_ROLES['INSPECTOR']];
+  $roleBase = $globalMgr ? ORG_ROLES : ['OPERATION_MANAGER'=>ORG_ROLES['OPERATION_MANAGER'],'ASST_MANAGER'=>ORG_ROLES['ASST_MANAGER'],'COORDINATOR'=>ORG_ROLES['COORDINATOR'],'INSPECTOR'=>ORG_ROLES['INSPECTOR']];
+  // Only offer roles this company can actually use — a Recruitment company is not
+  // shown Inspector / Marketing / Finance roles (their modules are off). The
+  // person's current role is always kept, so editing a user never loses it.
+  $roleList = function_exists('roles_for_licence') ? roles_for_licence($roleBase, $curRole) : $roleBase;
   // The set this administrator may toggle — shared with the save handler so the two
   // never drift (a permission the editor cannot see is preserved on save, not dropped).
   $allowPerms = function_exists('assignable_permissions') ? assignable_permissions($globalMgr)
@@ -110,12 +114,19 @@
         <?php endforeach; ?>
       </select>
       <small class="muted">Choose the person from the team, or leave “Add this person…” to create their team record from the name above.</small></div>
+    <?php // "Which team / site work" is a field-deployment concept (who goes to
+          // site). A company without Operations does no site work, so the choice is
+          // hidden and the person is simply recorded as office-based. ?>
+    <?php if (!function_exists('licence_enabled') || licence_enabled('operations')): ?>
     <div class="ff" id="u_team_role" style="<?= $curLink ? 'display:none' : '' ?>"><label>Which team <span class="muted">— sets where they sit for site work</span></label>
       <select class="form-control" name="team_member_role">
         <option value="FIELD">Field <?= e(Tl('engineer')) ?> — goes to site (top of the allocate list)</option>
         <option value="COORD">Coordinator / office-based — can still be deputed, listed below field <?= e(Tlp('engineer')) ?></option>
         <option value="OFFICE">Back office — can still be deputed, listed last</option>
       </select></div>
+    <?php else: ?>
+      <input type="hidden" name="team_member_role" value="OFFICE">
+    <?php endif; ?>
     <script>
       (function () {
         var t = document.getElementById('u_team'), box = document.getElementById('u_team_role');
