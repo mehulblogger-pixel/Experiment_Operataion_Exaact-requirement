@@ -310,6 +310,24 @@ function term_groups() {
     foreach (TERM_DEFAULTS as $k => $d) $g[$d[2]][$k] = $d;
     return $g;
 }
+// The word groups to SHOW on the terminology screen, filtered to the modules
+// this workspace has. Parties and People are core (every business names its
+// clients and its staff); Sales / Operations / Reporting / Money are hidden when
+// their module is off — so a recruitment company is not asked to rename
+// "Inspection Call", "Deputation", "Voucher" or "Endorsement".
+function term_group_module($group) {
+    static $m = ['Sales' => 'sales', 'Operations' => 'operations', 'Reporting' => 'reporting', 'Money' => 'money'];
+    return $m[$group] ?? null;   // Parties / People / anything else = core
+}
+function term_groups_licensed() {
+    $out = [];
+    foreach (term_groups() as $group => $rows) {
+        $mod = term_group_module($group);
+        if ($mod !== null && function_exists('licence_enabled') && !licence_enabled($mod)) continue;
+        $out[$group] = $rows;
+    }
+    return $out;
+}
 function term_save($post) {
     $ov = [];
     foreach (TERM_DEFAULTS as $k => $d) {
@@ -358,7 +376,7 @@ function ops_terminology($method) {
         redirect('/terminology');
     }
     view('ops/terminology', [
-        'groups' => term_groups(),
+        'groups' => function_exists('term_groups_licensed') ? term_groups_licensed() : term_groups(),
         'ov'     => term_overrides(),
         'packs'  => TERM_PACKS,
         'pack'   => term_pack_current(),

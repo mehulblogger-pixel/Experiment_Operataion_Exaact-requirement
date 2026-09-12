@@ -470,6 +470,10 @@
   <a class="btn" href="/ai-settings">Open AI settings</a>
 </div>
 
+<?php // The industry packs are inspection/lab accreditation rule-sets (ISO 17020 /
+      // 17025). They only make sense where inspection reporting or field operations
+      // is on — a recruitment company never meets them, so the whole card is hidden.
+      if (!function_exists('licence_enabled') || licence_enabled('reporting') || licence_enabled('operations')): ?>
 <div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Industry packs</h3>
   <p class="sub" style="margin-bottom:10px">This application is general. A pack adds the rules of one industry —
@@ -488,6 +492,7 @@
     inspection body cannot untick §8.7.3. Choosing packs is an installation decision; softening a standard is not
     a decision anybody gets to make.</p>
 </div>
+<?php endif; // industry packs — inspection/lab only ?>
 
 <?php // Developer / demo tooling — the sample-data loader, the DEMO-Sxx scenarios,
       // the install-mode switch and the QA self-checks below. A hosted customer must

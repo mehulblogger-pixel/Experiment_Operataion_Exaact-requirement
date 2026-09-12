@@ -47,6 +47,27 @@ function workspace_config_save($role, $landing, array $tiles) {
 // ---- Catalogue of destinations an admin can pick from ----------------------
 // Built from the CURRENT user's permission-filtered menu. The configurator is
 // master-only and a master sees the full menu, so this is the whole catalogue.
+// Which sellable module a launchpad route belongs to, so a workspace is not
+// offered another trade's screens. Conservative: only the clearly module-specific
+// routes are mapped; everything else (recruitment, directory, admin, home) is
+// core and always shown.
+function workspace_route_module($url) {
+    $u = '/' . ltrim(strtolower(trim((string) $url)), '/');
+    $starts = fn($p) => strpos($u, $p) === 0;
+    // Operations / field work / inspection ops
+    foreach (['/operations','/schedule','/capacity','/availability','/inspector','/calls','/call','/jobs','/job',
+              '/vouchers','/voucher','/deputation','/attendance','/contract-opening','/allocate','/manpower-plan'] as $p) if ($starts($p)) return 'operations';
+    // Reporting / inspection documentation / quality & accreditation
+    foreach (['/idems','/reporting','/endorse','/report-','/irn','/sample','/method','/decision-rule','/controlled-doc',
+              '/nla','/quality','/accreditation','/equipment','/competence','/impartiality','/audits','/ncr','/capa',
+              '/complaints','/confidential','/datacontrol','/disclosure','/risks'] as $p) if ($starts($p)) return 'reporting';
+    // Sales / CRM
+    foreach (['/leads','/inquir','/quote','/crm','/pipeline'] as $p) if ($starts($p)) return 'sales';
+    // Money / billing / reconciliation
+    foreach (['/money','/invoic','/receipt','/profitab','/revenue-recon','/cost-recon','/reimbursable','/overhead',
+              '/credit-recon','/sbu-pl'] as $p) if ($starts($p)) return 'money';
+    return null;   // core / recruitment / directory / admin
+}
 function workspace_catalog() {
     $out = []; $seen = [];
     if (!function_exists('ops_nav_index')) return $out;
@@ -54,6 +75,9 @@ function workspace_catalog() {
         $url = (string)($n['url'] ?? '');
         if ($url === '' || $url === '#' || ($n['kind'] ?? '') === 'action') continue;
         if (isset($seen[$url])) continue; $seen[$url] = true;
+        // Hide a launchpad screen whose module the plan does not include.
+        $mod = workspace_route_module($url);
+        if ($mod !== null && function_exists('licence_enabled') && !licence_enabled($mod)) continue;
         $out[] = ['url' => $url, 'label' => (string)($n['label'] ?? $url),
                   'icon' => (string)($n['icon'] ?? '•'), 'area' => (string)($n['area'] ?? '')];
     }
@@ -147,11 +171,12 @@ function ops_role_workspaces($route, $method) {
     if ($method === 'POST' && (string)($_POST['do'] ?? '') === 'save') {
         $role = (string)($_POST['role'] ?? '');
         workspace_config_save($role, (string)($_POST['landing'] ?? ''), (array)($_POST['tiles'] ?? []));
-        flash('Workspace saved for ' . (ORG_ROLES[$role] ?? $role) . '.');
+        flash('Workspace saved for ' . (function_exists('role_name') ? role_name($role) : (ORG_ROLES[$role] ?? $role)) . '.');
         redirect('/role-workspaces?role=' . urlencode($role));
         return true;
     }
-    $roles = ORG_ROLES;
+    // Only the roles this workspace's plan uses (+ its own custom roles).
+    $roles = function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES;
     $sel = (string)($_GET['role'] ?? array_key_first($roles));
     if (!isset($roles[$sel])) $sel = array_key_first($roles);
     view('ops/role_workspaces', [
