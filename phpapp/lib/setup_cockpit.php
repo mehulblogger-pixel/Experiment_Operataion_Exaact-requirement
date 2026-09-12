@@ -246,7 +246,7 @@ function cockpit_sections() {
     $secs['masters'] = [
         'key' => 'masters', 'icon' => '📋', 'label' => 'Dropdown lists',
         'desc' => 'The options behind your form dropdowns.',
-        'route' => '/workspace/setup/masters',
+        'route' => '/masters',
         'status' => $vals > 0 ? 'configured' : 'in_progress',
         'pct' => $vals > 0 ? 100 : 40, 'weight' => 1,
     ];
@@ -259,7 +259,7 @@ function cockpit_sections() {
     $secs['roles'] = [
         'key' => 'roles', 'icon' => '👥', 'label' => 'People & access',
         'desc' => 'Who can sign in and what they can do.',
-        'route' => '/workspace/setup/roles',
+        'route' => '/users',
         'status' => $roleProblem ? 'needs_attention' : ($team > 1 ? 'complete' : 'configured'),
         'pct' => $roleProblem ? 70 : 100, 'weight' => 1, 'note' => $team . ' ' . ($team === 1 ? 'person' : 'people'),
     ];
@@ -270,7 +270,7 @@ function cockpit_sections() {
     $secs['terminology'] = [
         'key' => 'terminology', 'icon' => '🔤', 'label' => 'Wording',
         'desc' => 'Rename things to match how your business speaks.',
-        'route' => '/workspace/setup/terminology',
+        'route' => '/terminology',
         'status' => 'complete', 'pct' => 100, 'weight' => 0,
         'note' => $termCust ? 'customised' : 'default',
     ];
@@ -404,4 +404,101 @@ function cockpit_configuration() {              // getTenantConfiguration()
         'readiness'    => cockpit_readiness(),
         'health'       => cockpit_health(),
     ];
+}
+
+// ===========================================================================
+//  Turn a feature on/off — delegates to the ONE module engine (licence_save).
+//  Never writes a second module record (§13, §58). Core modules can't change.
+//  Turning OFF asks for confirmation first, listing what depends on it (§17).
+// ===========================================================================
+function cockpit_module_apply($key, $on, $confirmed) {
+    if (!function_exists('licence_summary') || !function_exists('licence_save')) {
+        flash('The features engine is unavailable.', 'error'); redirect('/workspace/setup/modules');
+    }
+    $sum = licence_summary();
+    if (!isset($sum[$key]) || !empty($sum[$key]['core'])) {
+        flash('That is a core feature and can’t be turned off — every workspace needs it.', 'error');
+        redirect('/workspace/setup/modules');
+    }
+    // Turning OFF with dependents → confirm first (never silently disable, §17).
+    if (!$on && !$confirmed && cockpit_module_dependents($key)) {
+        redirect('/workspace/setup/modules?confirm_off=' . urlencode($key));
+    }
+    // Rebuild the full on-set from current state, flip the one, hand to licence_save.
+    $modOn = [];
+    foreach ($sum as $k => $r) {
+        if (!empty($r['core'])) continue;
+        $isOn = !empty($r['on']);
+        if ($k === $key) $isOn = $on;
+        if ($isOn) $modOn[$k] = 1;
+    }
+    licence_save(['mod_on' => $modOn]);   // writes settings.modules_off — the one engine
+    flash(($sum[$key]['label'] ?? $key) . ($on ? ' is now on.' : ' is now off.'));
+    redirect('/workspace/setup/modules');
+}
+
+// ===========================================================================
+//  ROUTE HANDLER — /workspace/setup and its sub-pages. Tenant-admin only (§47).
+//  Every sub-page reuses the canonical engines; the cockpit only orchestrates.
+// ===========================================================================
+function ops_cockpit($route, $method) {
+    ops_require(cockpit_can(), 'Only a workspace administrator can configure the company.');
+    cockpit_migrate();
+
+    // --- POST actions ---
+    if ($route === 'workspace/setup/profile-save' && $method === 'POST') {
+        // Company name (optional convenience) + the multi-select capabilities.
+        $name = trim((string) ($_POST['company_name'] ?? ''));
+        if ($name !== '' && function_exists('setting_set')) setting_set('company_name', $name);
+        cockpit_capabilities_set(array_map('strval', (array) ($_POST['caps'] ?? [])));
+        // Mark the profile step visited so "resume" advances (§38).
+        if (function_exists('setting_set')) setting_set('cockpit_profile_done', '1');
+        flash('Saved. Your workspace profile is up to date.');
+        redirect('/workspace/setup/profile');
+    }
+    if ($route === 'workspace/setup/module-toggle' && $method === 'POST') {
+        $key = (string) ($_POST['module'] ?? '');
+        $on  = !empty($_POST['on']);
+        $confirmed = !empty($_POST['confirm']);
+        cockpit_module_apply($key, $on, $confirmed);
+        return true;
+    }
+
+    // --- GET pages ---
+    switch ($route) {
+        case 'workspace/setup/profile':
+            view('ops/cockpit_profile', [
+                'groups'   => cockpit_capability_groups(),
+                'chosen'   => cockpit_capabilities(),
+                'company'  => (string) (setting_get('company_name', '') ?: setting_get('app_name', '')),
+            ]);
+            return true;
+        case 'workspace/setup/modules':
+            view('ops/cockpit_modules', [
+                'modules'    => cockpit_modules(),
+                'confirmOff' => (string) ($_GET['confirm_off'] ?? ''),
+            ]);
+            return true;
+        case 'workspace/setup/forms':
+            $forms = function_exists('fd_forms') ? fd_forms() : [];
+            $customCounts = [];
+            foreach ($forms as $fk => $f) {
+                $customCounts[$fk] = function_exists('fd_custom_fields') ? count(fd_custom_fields($fk)) : 0;
+            }
+            view('ops/cockpit_forms', ['forms' => $forms, 'customCounts' => $customCounts]);
+            return true;
+        default:
+            // The cockpit home.
+            view('ops/cockpit_home', [
+                'sections'  => cockpit_sections(),
+                'readiness' => cockpit_readiness(),
+                'health'    => cockpit_health(),
+                'checklist' => cockpit_checklist(),
+                'caps'      => cockpit_capabilities(),
+                'capCat'    => cockpit_capability_catalogue(),
+                'search'    => cockpit_search((string) ($_GET['q'] ?? '')),
+                'q'         => (string) ($_GET['q'] ?? ''),
+            ]);
+            return true;
+    }
 }

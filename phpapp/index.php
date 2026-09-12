@@ -1138,6 +1138,14 @@ if ($route === '') {
     // company never sees it — its steps are already done).
     if (function_exists('current_user') && current_user() && empty($_SESSION['onb_seen'])
         && function_exists('onboarding_incomplete') && onboarding_incomplete()) {
+        // A workspace administrator lands on the Company Setup Cockpit — the single
+        // front door (Phase 1). Everyone else keeps the lightweight welcome. Once
+        // per session either way, so "Home" still reaches the dashboard afterwards
+        // and an established company never sees it.
+        if (function_exists('cockpit_can') && cockpit_can()) {
+            $_SESSION['onb_seen'] = 1;
+            redirect('/workspace/setup');
+        }
         redirect('/welcome');
     }
     // Configurable role workspaces — send the user to their landing page once per
