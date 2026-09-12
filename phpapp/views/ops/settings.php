@@ -418,71 +418,48 @@
 <?php if (function_exists('setting_meta_render') && (is_admin_level() || is_master())) setting_meta_render(); ?>
 
 <?php if (is_master()): ?>
+<h3 class="tab-sub" style="margin:20px 0 2px">Admin &amp; configuration</h3>
+<p class="sub" style="margin-top:0">Set up how your workspace works — each opens its own screen.</p>
+<div class="set-tiles">
+<?php
+  // A dense, tappable tile instead of a tall paragraph card, so this list stays
+  // short on a phone. Titles/descriptions are trusted static HTML (not escaped);
+  // hrefs are escaped. Every tile below repeats the SAME gating the cards had.
+  $setTile = function (string $href, string $icon, string $titleHtml, string $descHtml, bool $danger = false) {
+    echo '<a class="set-tile' . ($danger ? ' danger' : '') . '" href="' . e($href) . '">'
+       . '<span class="set-ic">' . $icon . '</span>'
+       . '<span class="set-tx"><b>' . $titleHtml . '</b><em>' . $descHtml . '</em></span>'
+       . '<span class="set-go">›</span></a>';
+  };
+  if (function_exists('lk_console_allowed') && lk_console_allowed()) {
+    $setTile('/vendor', '🛠️', 'Super Admin', 'Cloud workspaces, licences &amp; signing');
+    $setTile('/pricing-usage', '📊', 'Plans, pricing &amp; usage', 'What each workspace uses');
+  }
+  $setTile('/cforms', '🧩', 'Custom forms', 'Build a new register — no coding');
+  $setTile('/company-profile', '🏢', 'Your company', 'Legal name, address, GSTIN &amp; logo');
+  // "Your industry" builds SALES pipelines and INSPECTION accreditation rules —
+  // only where sales or operations is on. A recruitment workspace sets its wording
+  // under Terminology instead, so the tile is hidden.
+  if (!function_exists('licence_enabled') || licence_enabled('sales') || licence_enabled('operations')) {
+    $curIndT = function_exists('industry_current') ? (string) industry_current() : '';
+    $indLbl  = ($curIndT && defined('INDUSTRY_TEMPLATES') && isset(INDUSTRY_TEMPLATES[$curIndT])) ? INDUSTRY_TEMPLATES[$curIndT]['label'] : 'Not set';
+    $setTile('/industry', '🧭', 'Your industry', 'Now: ' . e($indLbl));
+  }
+  if (function_exists('billing_can_manage') && billing_can_manage()) {
+    $bcfg = (function_exists('billing_configured') && billing_configured());
+    $setTile('/billing', '💳', 'Users &amp; billing', $bcfg ? 'Add or renew seats online' : 'Set price &amp; keys to switch on');
+  }
+  $setTile('/access', '🔐', 'Roles &amp; access', 'Who can view or edit what');
+  $setTile('/terminology', '🔤', 'Terminology', 'Rename the words the app uses');
+  $setTile('/ai-settings', '🤖', 'AI providers &amp; models', 'API keys &amp; model selection');
+  $setTile('/reset-data', '🧹', 'Clear records', 'Empty record groups to start clean', true);
+  if (function_exists('can_manage_tenants') && can_manage_tenants()) {
+    $setTile('/tenants', '☁️', 'Cloud workspaces', (function_exists('saas_enabled') && saas_enabled()) ? 'Cloud mode is on' : 'Run many businesses on one copy');
+  }
+?>
+</div>
+
 <div class="settings-cards">
-<?php if (function_exists('lk_console_allowed') && lk_console_allowed()): ?>
-<div class="panel settings-card" style="border-left:3px solid var(--brand)">
-  <h3 class="tab-sub" style="margin-top:0;">Super Admin</h3>
-  <p class="sub" style="margin-bottom:10px">Everything you run as the software provider — cloud workspaces, customer
-    licences, per-user pricing and the one-click signing setup — in one place.</p>
-  <a class="btn" href="/vendor">Open Super Admin</a>
-  <a class="btn secondary" href="/pricing-usage" style="margin-left:8px">Plans, pricing &amp; usage</a>
-</div>
-<?php endif; ?>
-<div class="panel settings-card">
-  <h3 class="tab-sub" style="margin-top:0;">Custom forms</h3>
-  <p class="sub" style="margin-bottom:10px">Build a whole new register with no coding — its own fields and dropdowns — and it appears in the
-    menu under the module you choose.</p>
-  <a class="btn" href="/cforms">Build a form</a>
-</div>
-<div class="panel settings-card">
-  <h3 class="tab-sub" style="margin-top:0;">Your company</h3>
-  <p class="sub" style="margin-bottom:10px">Your legal name, address, GSTIN and logo — entered once, shown on your quotations,
-    invoices and records.</p>
-  <a class="btn" href="/company-profile">Edit company profile</a>
-</div>
-<?php // "Your industry" builds SALES pipelines/funnels and INSPECTION accreditation
-      // rules; it only makes sense where sales or operations is on. A recruitment
-      // company sets its wording under Terminology instead, so the card is hidden.
-      $curIndT = function_exists('industry_current') ? (string)industry_current() : '';
-      if (!function_exists('licence_enabled') || licence_enabled('sales') || licence_enabled('operations')): ?>
-<div class="panel settings-card">
-  <h3 class="tab-sub" style="margin-top:0;">Your industry</h3>
-  <p class="sub" style="margin-bottom:10px">One choice builds the whole thing for your trade — the sales pipeline &amp; funnel,
-    the wording across the app (<?= e(Tl('call')) ?>, <?= e(Tl('report')) ?>, <?= e(Tl('client')) ?>…), and the
-    inspection accreditation rules when the trade is inspection.</p>
-  <p class="muted" style="margin:0 0 10px">Now: <strong><?= e($curIndT && defined('INDUSTRY_TEMPLATES') && isset(INDUSTRY_TEMPLATES[$curIndT]) ? INDUSTRY_TEMPLATES[$curIndT]['label'] : 'Not set') ?></strong>.
-    Fine-tune individual words under <a href="/terminology">Terminology</a>.</p>
-  <a class="btn" href="/industry">Choose your industry</a>
-</div>
-<?php endif; // Your industry — sales/operations only ?>
-
-<?php if (function_exists('billing_can_manage') && billing_can_manage()): ?>
-<div class="panel settings-card">
-  <h3 class="tab-sub" style="margin-top:0;">Users &amp; billing</h3>
-  <p class="sub" style="margin-bottom:10px">Pay per person, monthly or yearly. Add or renew seats online — the seat count
-    goes live the moment payment clears.<?= (function_exists('billing_configured') && billing_configured()) ? '' : ' <em>Set your price and Razorpay keys to switch it on.</em>' ?></p>
-  <a class="btn" href="/billing">Open users &amp; billing</a>
-</div>
-<?php endif; ?>
-
-<div class="panel settings-card">
-  <h3 class="tab-sub" style="margin-top:0;">Roles &amp; access</h3>
-  <p class="sub" style="margin-bottom:10px">Control which <strong>modules and features</strong> each role can view or edit — Calls, Jobs, Vouchers, Invoicing, Profitability, Masters, Users, Settings and more. Set defaults per role; fine-tune per person under Users.</p>
-  <a class="btn" href="/access">Open Roles &amp; access</a>
-</div>
-
-<div class="panel settings-card">
-  <h3 class="tab-sub" style="margin-top:0;">Terminology</h3>
-  <p class="sub" style="margin-bottom:10px">Rename every business word the app uses — <?= e(Tl('client')) ?>, <?= e(Tl('vendor')) ?>, <?= e(Tl('quote')) ?>, <?= e(Tl('call')) ?>, <?= e(Tl('job')) ?>, <?= e(Tl('report')) ?>, <?= e(T('office')) ?>, <?= e(T('boss')) ?> and the rest. Change a word once and every heading, menu, button and e-mail follows.</p>
-  <a class="btn" href="/terminology">Open terminology</a>
-</div>
-
-<div class="panel settings-card">
-  <h3 class="tab-sub" style="margin-top:0;">AI providers &amp; models</h3>
-  <p class="sub" style="margin-bottom:10px">Enter API keys for OpenAI, Claude, Gemini, Perplexity or GitHub Copilot / Models, refresh each provider's live model list (retired models drop off), and pick which models to use.</p>
-  <a class="btn" href="/ai-settings">Open AI settings</a>
-</div>
-
 <?php // The industry packs are inspection/lab accreditation rule-sets (ISO 17020 /
       // 17025). They only make sense where inspection reporting or field operations
       // is on — a recruitment company never meets them, so the whole card is hidden.
@@ -744,23 +721,7 @@ if (!function_exists('current_tenant') || current_tenant() === ''): ?>
   <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/trace-audit.php</code> — add <code>--remove</code> to take it out.</p>
 </div>
 <?php endif; // end developer / demo block (control-install only) ?>
-
-<div class="panel settings-card">
-  <h3 class="tab-sub" style="margin-top:0;">Clear records</h3>
-  <p class="sub" style="margin-bottom:10px">For setting up and testing: empty whole groups of records — day-to-day work, reports, costing figures, <?= e(Tlp('client')) ?> &amp; <?= e(Tlp('vendor')) ?>, people, master lists — and start again with a clean register. You see the count before anything happens, and your own login is never deleted.</p>
-  <a class="btn danger" href="/reset-data">Open clear records</a>
-</div>
-
-<?php if (function_exists('can_manage_tenants') && can_manage_tenants()): ?>
-<div class="panel settings-card">
-  <h3 class="tab-sub" style="margin-top:0;">Cloud workspaces</h3>
-  <p class="sub" style="margin-bottom:10px">Run one copy of the app as many separate businesses — each on its own subdomain
-    and its own database, isolated from the rest. <?= saas_enabled()
-      ? 'Cloud mode is <strong>on</strong>.' : 'Turn it on and add workspaces here.' ?></p>
-  <a class="btn" href="/tenants">Manage cloud workspaces</a>
-</div>
-<?php endif; ?>
-</div><?php // .settings-cards ?>
+</div><?php // .settings-cards — "Clear records" and "Cloud workspaces" now live in the tile grid above ?>
 <?php endif; ?>
 
 <style>
@@ -775,10 +736,26 @@ if (!function_exists('current_tenant') || current_tenant() === ''): ?>
   .settings-form .ff-wide{max-width:none}
   .settings-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
     gap:16px;margin-top:18px;align-items:start}
+  .settings-cards:empty{display:none}
   .settings-cards .settings-card{margin:0}
+  /* Compact admin tiles — a dense, tappable list instead of tall paragraph cards,
+     so the settings screen stays short on a phone. */
+  .set-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin:8px 0 6px}
+  .set-tile{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line,#e5e9f0);
+    border-radius:12px;background:var(--card,#fff);text-decoration:none;color:inherit;box-shadow:0 1px 2px rgba(16,24,40,.04);transition:border-color .12s,box-shadow .12s}
+  .set-tile:hover{border-color:var(--brand);box-shadow:0 2px 8px rgba(16,24,40,.08)}
+  .set-tile .set-ic{font-size:20px;flex:0 0 auto;width:24px;text-align:center;line-height:1}
+  .set-tile .set-tx{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
+  .set-tile .set-tx b{font-size:14px;font-weight:650;line-height:1.25}
+  .set-tile .set-tx em{font-style:normal;color:var(--muted);font-size:12px;line-height:1.35;margin-top:1px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .set-tile .set-go{margin-left:auto;color:var(--muted);font-size:20px;flex:0 0 auto;line-height:1}
+  .set-tile.danger:hover{border-color:var(--danger,#d92d20)}
+  .set-tile.danger .set-ic{filter:none}
   @media(max-width:720px){
     .settings-form .form-grid{grid-template-columns:1fr}
     .settings-cards{grid-template-columns:1fr}
+    .set-tiles{grid-template-columns:1fr}
   }
   .theme-swatches{display:flex;flex-wrap:wrap;gap:10px}
   .theme-sw{cursor:pointer;border:2px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:5px;align-items:center;min-width:90px}
