@@ -18,7 +18,7 @@
   } else {
       $curPerms = $defaults['perms'] ?? [];
   }
-  $roleBase = $globalMgr ? ORG_ROLES : ['OPERATION_MANAGER'=>ORG_ROLES['OPERATION_MANAGER'],'ASST_MANAGER'=>ORG_ROLES['ASST_MANAGER'],'COORDINATOR'=>ORG_ROLES['COORDINATOR'],'INSPECTOR'=>ORG_ROLES['INSPECTOR']];
+  $roleBase = $globalMgr ? (function_exists('roles_all') ? roles_all() : ORG_ROLES) : ['OPERATION_MANAGER'=>ORG_ROLES['OPERATION_MANAGER'],'ASST_MANAGER'=>ORG_ROLES['ASST_MANAGER'],'COORDINATOR'=>ORG_ROLES['COORDINATOR'],'INSPECTOR'=>ORG_ROLES['INSPECTOR']];
   // Only offer roles this company can actually use — a Recruitment company is not
   // shown Inspector / Marketing / Finance roles (their modules are off). The
   // person's current role is always kept, so editing a user never loses it.
@@ -56,8 +56,42 @@
     <div class="ff"><label>First name</label><input class="form-control" name="first_name" value="<?= e($user['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Last name</label><input class="form-control" name="last_name" value="<?= e($user['last_name'] ?? '') ?>"></div>
     <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($user['email'] ?? '') ?>"></div>
-    <div class="ff"><label>Role</label>
-      <select class="form-control searchable" name="role"><?php foreach ($roleList as $k=>$v): ?><option value="<?= $k ?>" <?= $curRole===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Role <span class="muted">— what they can see &amp; do</span></label>
+      <select class="form-control searchable" name="role" id="u_role"><?php foreach ($roleList as $k=>$v): ?><option value="<?= $k ?>" <?= $curRole===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?><?php if ($globalMgr): ?><option value="__new__">+ Add a role not on this list…</option><?php endif; ?></select></div>
+    <?php // A company can name its own role. It is never a blank cheque: it copies
+          //  an existing role's permissions (its "base"), so it always means
+          //  something definite, and is fine-tuned later under Roles & access. Added
+          //  inline, like a new office, so nothing typed on this form is lost. ?>
+    <?php if ($globalMgr): ?>
+    <div class="ff ff-wide" id="u_role_new" style="display:none">
+      <div class="panel" style="margin:0;padding:12px;background:var(--field)">
+        <b style="font-size:13px">New role</b>
+        <div class="muted" style="font-size:12.5px;margin:2px 0 8px">Give it a name and choose the role it should behave like. You can fine-tune exactly what it can do afterwards under <a href="/access">Roles &amp; access</a>.</div>
+        <div class="form-grid" style="margin:0">
+          <div class="ff"><label>Role name *</label><input class="form-control" name="new_role_label" placeholder="e.g. Sourcing Lead"></div>
+          <div class="ff"><label>Same permissions as</label>
+            <select class="form-control" name="new_role_base">
+              <?php foreach ($roleList as $k=>$v): if ($k==='__new__' || $k==='MASTER_ADMIN') continue; ?>
+                <option value="<?= e($k) ?>"<?= $k==='COORDINATOR'?' selected':'' ?>><?= e($v) ?></option>
+              <?php endforeach; ?>
+            </select></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var s = document.getElementById('u_role'), box = document.getElementById('u_role_new');
+        if (!s || !box) return;
+        function sync() {
+          var isNew = s.value === '__new__';
+          box.style.display = isNew ? '' : 'none';
+          var n = box.querySelector('input[name=new_role_label]');
+          if (isNew && n) n.focus();
+        }
+        s.addEventListener('change', sync); sync();
+      })();
+    </script>
+    <?php endif; ?>
     <?php // The same offices the Organisation screen owns — one table, so one
           // added here shows up there and in every other dropdown at once. And
           // it can be added here, because being sent to another screen halfway

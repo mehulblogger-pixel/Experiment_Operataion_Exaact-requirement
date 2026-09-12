@@ -49,7 +49,7 @@
     <td><?= e($u['username']) ?></td>
     <td><?= e(trim(($u['first_name'] ?? '').' '.($u['last_name'] ?? '')) ?: '—') ?></td>
     <td><?= e($u['email'] ?: '—') ?></td>
-    <td><?= e(ORG_ROLES[!empty($u['is_superuser'])?'MASTER_ADMIN':strtoupper($u['role'] ?? 'ADMIN')] ?? $u['role']) ?></td>
+    <td><?= e(!empty($u['is_superuser']) ? 'Master Admin' : (function_exists('role_name') ? role_name($u['role'] ?? 'ADMIN') : (ORG_ROLES[strtoupper($u['role'] ?? 'ADMIN')] ?? $u['role']))) ?></td>
     <?php // A user with no signature on file has their approvals and quotations
           // printed without one, so it belongs in the register, not hidden. ?>
     <td><?= trim((string)($u['signature'] ?? '')) !== ''

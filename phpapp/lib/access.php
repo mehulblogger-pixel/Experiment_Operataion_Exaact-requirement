@@ -44,7 +44,11 @@ const ROLE_MODULE = [
 // subset of ORG_ROLES to filter it; $keep is a role to always include (e.g. the
 // person's current role, so editing an existing user never drops their setting).
 function roles_for_licence($roles = null, $keep = '') {
-    $roles = $roles ?? ORG_ROLES;
+    // Default to every role including this workspace's own custom ones, so the
+    // Add-person dropdown offers them. Custom roles have no ROLE_MODULE, so they
+    // are always shown.
+    $all = function_exists('roles_all') ? roles_all() : ORG_ROLES;
+    $roles = $roles ?? $all;
     if (!function_exists('licence_enabled')) return $roles;
     $out = [];
     foreach ($roles as $k => $v) {
@@ -52,8 +56,72 @@ function roles_for_licence($roles = null, $keep = '') {
         if ($mod !== null && !licence_enabled($mod) && $k !== $keep) continue;
         $out[$k] = $v;
     }
-    if ($keep !== '' && !isset($out[$keep]) && isset(ORG_ROLES[$keep])) $out[$keep] = ORG_ROLES[$keep];
+    if ($keep !== '' && !isset($out[$keep]) && isset($all[$keep])) $out[$keep] = $all[$keep];
     return $out;
+}
+
+// ---- Custom (company-defined) roles ---------------------------------------
+// A workspace can add its own role names from the Add-person screen. A custom
+// role is NEVER free-floating: it copies an existing built-in role's permissions
+// (its "base"), so it always means something definite and can never accidentally
+// grant everything. Stored per-workspace in the `custom_roles` setting as
+// { KEY: { label, base } }. Fine-tuned later by adjusting its base role under
+// Roles & access.
+function custom_roles_all() {
+    $raw = function_exists('setting_get') ? (string) setting_get('custom_roles', '') : '';
+    if ($raw === '') return [];
+    $d = json_decode($raw, true);
+    if (!is_array($d)) return [];
+    $out = [];
+    foreach ($d as $k => $v) {
+        $k = strtoupper(trim((string) $k));
+        if ($k === '' || isset(ORG_ROLES[$k]) || !is_array($v)) continue;
+        $base = strtoupper((string) ($v['base'] ?? 'COORDINATOR'));
+        if (!isset(ORG_ROLES[$base])) $base = 'COORDINATOR';
+        $out[$k] = ['label' => (string) ($v['label'] ?? $k), 'base' => $base];
+    }
+    return $out;
+}
+// Every selectable role: the built-in org roles plus this workspace's custom ones.
+function roles_all() {
+    $r = ORG_ROLES;
+    foreach (custom_roles_all() as $k => $v) $r[$k] = $v['label'];
+    return $r;
+}
+// A role KEY's display label (built-in or custom); the key itself as a last
+// resort. (Distinct from ops.php role_label(), which labels a whole user row.)
+function role_name($role) {
+    $role = strtoupper(trim((string) $role));
+    return roles_all()[$role] ?? $role;
+}
+// Resolve any role key to the BUILT-IN role whose permissions it uses. A custom
+// role uses its chosen base; a built-in role is itself; an unknown key is left
+// unchanged so each caller keeps its own historical fallback (least-privilege in
+// the defaults, ADMIN in the two session choke points). This is the one place
+// custom roles enter the permission engine, so a custom role can never mean more
+// than the built-in role it was copied from.
+function role_effective_key($role) {
+    $role = strtoupper(trim((string) $role));
+    if (isset(ORG_ROLES[$role])) return $role;
+    $c = custom_roles_all();
+    return isset($c[$role]) ? $c[$role]['base'] : $role;
+}
+// Create a custom role (a name + the built-in role it copies permissions from),
+// store it on this workspace, and return its new key.
+function custom_role_add($label, $base) {
+    $label = trim((string) $label);
+    if ($label === '') return '';
+    $base = strtoupper(trim((string) $base));
+    if (!isset(ORG_ROLES[$base])) $base = 'COORDINATOR';
+    $key = trim(preg_replace('/[^A-Z0-9]+/', '_', strtoupper($label)), '_');
+    if ($key === '') $key = 'ROLE';
+    if (isset(ORG_ROLES[$key])) $key = 'CR_' . $key;
+    $all = custom_roles_all();
+    $stem = $key; $n = 1;
+    while (isset($all[$key])) $key = $stem . '_' . (++$n);
+    $all[$key] = ['label' => $label, 'base' => $base];
+    if (function_exists('setting_set')) setting_set('custom_roles', json_encode($all));
+    return $key;
 }
 
 // ---- Permission catalogue --------------------------------------------------
@@ -356,6 +424,7 @@ function all_permissions() {
 // Which modules each role can view / edit by default (edit implies view).
 // Used as the starting point; the super admin can override per role / per user.
 function module_defaults($role) {
+    if (function_exists('role_effective_key')) $role = role_effective_key($role);   // custom role → its base
     $edit = []; $view = [];
     $all = array_keys(ACCESS_MODULES);
     switch ($role) {
@@ -453,6 +522,7 @@ function merge_new_module_defaults($perms, $role) {
 // Effective default permission set for a role: a super-admin override stored in
 // settings (Roles & access) wins; otherwise the built-in role defaults.
 function role_perms($role) {
+    if (function_exists('role_effective_key')) $role = role_effective_key($role);   // custom role → its base
     $raw = setting_get('role_access', '');
     if ($raw !== '') {
         $ov = json_decode($raw, true);
@@ -490,6 +560,7 @@ function role_defaults($role) {
 // wins (with the legacy module back-fill); otherwise the role's effective set.
 function user_effective_perms($u) {
     $role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper($u['role'] ?? 'ADMIN');
+    if (function_exists('role_effective_key')) $role = role_effective_key($role);   // custom role → its base (so it never falls through to ADMIN)
     if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
     if ($role === 'MASTER_ADMIN') return array_keys(all_permissions());
     if (trim((string)($u['permissions'] ?? '')) !== '') {
@@ -574,6 +645,7 @@ function assignable_permissions($globalMgr) {
     return permissions_drop_unlicensed(array_intersect_key(all_permissions(), array_flip($keys)));
 }
 function role_defaults_base($role) {
+    if (function_exists('role_effective_key')) $role = role_effective_key($role);   // custom role → its base
     $all = array_keys(PERMISSIONS);
     switch ($role) {
         case 'MASTER_ADMIN': case 'ADMIN':
@@ -622,6 +694,7 @@ function ua($fresh = false) {
     $u = current_user($fresh);
     if (!$u) return $a = ['role' => 'GUEST', 'perms' => [], 'offices' => [], 'sbus' => [], 'self' => true, 'home' => null, 'master' => false];
     $role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper($u['role'] ?? 'ADMIN');
+    if (function_exists('role_effective_key')) $role = role_effective_key($role);   // custom role → its base (so it never falls through to ADMIN)
     if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
     $def = role_defaults($role);
     // permissions: per-user csv override wins; else the role's effective set

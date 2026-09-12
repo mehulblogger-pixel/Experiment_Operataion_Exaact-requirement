@@ -7813,7 +7813,17 @@ function ops_users($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
-            $allowedRoles = $globalMgr ? array_keys(ORG_ROLES) : ['OPERATION_MANAGER','ASST_MANAGER','COORDINATOR','INSPECTOR'];
+            $allowedRoles = $globalMgr
+                ? array_merge(array_keys(ORG_ROLES), function_exists('custom_roles_all') ? array_keys(custom_roles_all()) : [])
+                : ['OPERATION_MANAGER','ASST_MANAGER','COORDINATOR','INSPECTOR'];
+            // "+ Add a role" — a global manager can name a new role inline (it copies
+            // an existing role's permissions), exactly like "+ Add an office". The new
+            // role is stored on the workspace and used for this person straight away.
+            if ($globalMgr && ($b['role'] ?? '') === '__new__' && function_exists('custom_role_add')) {
+                $newRoleKey = custom_role_add($b['new_role_label'] ?? '', $b['new_role_base'] ?? 'COORDINATOR');
+                if ($newRoleKey !== '') { $b['role'] = $newRoleKey; $allowedRoles[] = $newRoleKey; }
+                else flash('A new role needs a name, so none was added.', 'warning');
+            }
             $role = in_array($b['role'] ?? '', $allowedRoles, true) ? $b['role'] : 'COORDINATOR';
             $isSuper = $role === 'MASTER_ADMIN' ? 1 : 0;
             // Module 02 (hard guard, B) — only a Master Admin may create or change a
