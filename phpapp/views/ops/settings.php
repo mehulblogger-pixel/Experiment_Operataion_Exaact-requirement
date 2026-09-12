@@ -219,10 +219,13 @@
     whether the financial year is in it, and the number to start from. The example updates as you change it. Numbers already
     issued are never renumbered; new ones follow the scheme from the next one on.</p>
   <input type="hidden" name="numbering_form" value="1">
+  <?php // Show a document's numbering only where that document exists on this
+        // workspace (numbering_types_visible filters by the enabled modules) — a
+        // recruitment agency sees only Requirements and Candidates. ?>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="grid" style="min-width:720px">
     <tr><th>Document</th><th>Prefix</th><th>Separator</th><th>Digits</th><th>Financial year</th><th>Start&nbsp;from</th><th>Example</th></tr>
-    <?php foreach (numbering_types() as $nk => $nt): $sc = numbering_scheme($nk); $fromOffice = !empty($sc['prefix_from']); ?>
+    <?php foreach (numbering_types_visible() as $nk => $nt): $sc = numbering_scheme($nk); $fromOffice = !empty($sc['prefix_from']); ?>
     <tr data-num="<?= e($nk) ?>">
       <td><b><?= e($nt['label']) ?></b><?php if (!empty($sc['money'])): ?><br><span class="muted" style="font-size:11px">resets each financial year</span><?php endif; ?></td>
       <td><?php if ($fromOffice): ?>
@@ -247,9 +250,12 @@
     <?php endforeach; ?>
   </table>
   </div>
+  <?php $reportingOn = !function_exists('licence_enabled') || licence_enabled('reporting') || licence_enabled('operations'); ?>
+  <?php if ($reportingOn): ?>
   <p class="muted" style="font-size:12.5px;margin-top:8px"><b><?= e(Tl('report')) ?> numbers (IRN)</b> use a richer token
     template (company, branch, year, client, type, serial) configured under
     <a href="/irn-rules">Reports → IRN numbering rules</a>. Contract numbers are entered by hand from the client's PO.</p>
+  <?php endif; ?>
   <script>
   (function(){
     var fyNow = <?= json_encode(array_map(fn($s)=>numbering_fy_string($s), array_combine(array_keys(numbering_fy_styles()), array_keys(numbering_fy_styles())))) ?>;
@@ -268,6 +274,8 @@
   </script>
   <?php endif; ?>
 
+  <?php $reportingOn = $reportingOn ?? (!function_exists('licence_enabled') || licence_enabled('reporting') || licence_enabled('operations'));
+        if ($reportingOn): // the inspection-pack, compliance-reviewer and report-issue controls only apply where Reporting / Operations is on ?>
   <h3 class="tab-sub">Reporting controls</h3>
   <div class="form-grid">
     <div class="ff ff-wide"><label>Source documents a complete inspection pack must contain</label>
@@ -290,6 +298,7 @@
         verification code — never the <?= e(Tl('report')) ?> itself or any finding. Sent to the portal users who
         can see reports, or the primary contact if none.</small></div>
   </div>
+  <?php endif; // reporting controls ?>
 
 </section>
 <section class="fs-pane" data-tab="Security">

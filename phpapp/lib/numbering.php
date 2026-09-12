@@ -37,6 +37,25 @@ function numbering_types() {
 }
 function numbering_has($key) { return isset(numbering_types()[$key]); }
 
+// Which product module each document belongs to, so a workspace only sees the
+// numbering for documents it actually raises. A recruitment agency has no
+// enquiries, quotations, inspection calls, deputations or invoices — only
+// Requirements and Candidates remain.
+function numbering_module_map() {
+    return ['INQ' => 'sales', 'Q' => 'sales', 'CALL' => 'operations', 'JOB' => 'operations',
+            'REQ' => 'hr', 'CV' => 'hr', 'INV' => 'money', 'RCP' => 'money', 'CN' => 'money'];
+}
+// The document types to show on THIS workspace — filtered by the enabled modules.
+function numbering_types_visible() {
+    $map = numbering_module_map();
+    $out = [];
+    foreach (numbering_types() as $k => $t) {
+        $mod = $map[$k] ?? 'admin';
+        if (!function_exists('licence_enabled') || licence_enabled($mod)) $out[$k] = $t;
+    }
+    return $out;
+}
+
 function numbering_fy_styles() {
     return ['YY-YY' => '26-27', 'YYYY-YY' => '2026-27', 'YYYYC' => '2627', 'YYYY' => '2026', 'YY' => '26'];
 }
