@@ -191,7 +191,7 @@ function lk_module_lists() {
         ['travel_basis',        'Travel basis',              TRAVEL_BASIS,           'Operations'],
         // --- People / hiring -------------------------------------------------
         ['candidate_stage',     'Candidate stage',           CAND_STAGES,            'People'],
-        ['candidate_source',    'Candidate source',          CAND_SOURCES,           'People'],
+        ['candidate_source',    'Candidate source',          RECRUIT_CAND_SOURCES,   'People'],  // where a CANDIDATE came from (Job Portal, Referral…) — a hiring list, not the workforce-engagement list
         ['agency_type',         'Agency type',               AGENCY_TYPES,           'People'],
         ['asset_type',          'Asset type',                ASSET_TYPES,            'People'],
         ['roll_type',           'Whose roll',                ROLL_TYPES,             'People'],
@@ -262,7 +262,15 @@ const DOCUMENT_STATUSES = [
     'SUPERSEDED'      => 'Superseded',
 ];
 function lk_register_module_lists() {
+    // On a hosted workspace, do not even materialise the dropdown lists for a
+    // module the plan does not include — so a recruitment copy never carries the
+    // inspection, sales or finance lists, in the database or on the Masters screen.
+    // The control / single-business install (no tenant) keeps every list.
+    $tenant = function_exists('current_tenant') && current_tenant() !== '';
+    $groupModule = ['Operations' => 'operations', 'Money' => 'money', 'Reporting' => 'reporting', 'Sales' => 'sales'];
     foreach (lk_module_lists() as [$key, $label, $map, $module]) {
+        if ($tenant && isset($groupModule[$module]) && function_exists('licence_enabled') && !licence_enabled($groupModule[$module]))
+            continue;
         lk_ensure_type_map($key, $label, $map, $module);
         // back-fill values added to the shipped list after this install was set up
         lk_ensure_values_from_map($key, $map);
@@ -346,12 +354,79 @@ function lk_rename_value_label($typeKey, $from, $to) {
 }
 
 // ---- Seed system lists (from the old fixed choice lists) + demo hierarchies -
+// A hosted CLIENT workspace does not want the inspection company's 40 starter
+// lists — but it should not open to a BLANK "0 lists" Masters screen either, with
+// its designation and source dropdowns silently falling back to inspection-shaped
+// defaults (Inspector, Engineer, Sub-contractor…). Instead it gets a small,
+// correctly-worded starter set matched to its plan: a recruitment/people plan gets
+// hiring-shaped lists (recruiter designations, real candidate sources); any other
+// plan gets the generic business lists. Everything stays fully editable, and the
+// "cleared on purpose" opt-out is honoured exactly as on the control install.
+const RECRUIT_DESIGNATIONS = [
+    'RECRUITER'=>'Recruiter', 'SR_RECRUITER'=>'Sr. Recruiter',
+    'TA_SPECIALIST'=>'Talent Acquisition Specialist', 'SOURCING_SPECIALIST'=>'Sourcing Specialist',
+    'TEAM_LEAD'=>'Team Lead — Recruitment', 'RECRUITMENT_MANAGER'=>'Recruitment Manager',
+    'ACCOUNT_MANAGER'=>'Account Manager', 'BD_EXECUTIVE'=>'Business Development Executive',
+    'HR_EXECUTIVE'=>'HR Executive', 'HR_MANAGER'=>'HR Manager',
+    'OPERATIONS_EXECUTIVE'=>'Operations Executive', 'DIRECTOR'=>'Director', 'OTHER'=>'Other',
+];
+const RECRUIT_DEPARTMENTS = [
+    'TALENT_ACQUISITION'=>'Recruitment / Talent Acquisition', 'SOURCING'=>'Sourcing',
+    'ACCOUNT_MANAGEMENT'=>'Account Management', 'BUSINESS_DEVELOPMENT'=>'Business Development',
+    'HR_COMPLIANCE'=>'HR & Compliance', 'OPERATIONS'=>'Operations',
+    'FINANCE'=>'Finance & Accounts', 'MANAGEMENT'=>'Management',
+];
+const RECRUIT_CAND_SOURCES = [
+    'JOB_PORTAL'=>'Job Portal (Naukri / Indeed)', 'LINKEDIN'=>'LinkedIn',
+    'REFERRAL'=>'Employee Referral', 'CAREER_PAGE'=>'Career Page / Website',
+    'WALK_IN'=>'Walk-in', 'CONSULTANT'=>'Consultant / Vendor', 'SOCIAL_MEDIA'=>'Social Media',
+    'DATABASE'=>'Internal Database', 'CAMPUS'=>'Campus / Institute', 'OTHER'=>'Other',
+];
+
+// The compact starter lists a hosted client workspace opens with, chosen by plan:
+// a recruitment / people plan (People & hiring on, field operations off) gets the
+// hiring-shaped lists; any other plan gets the generic business lists. Pure — no
+// database writes — so it can be reasoned about and tested on its own.
+function lk_client_starter_lists() {
+    $recruit = function_exists('licence_enabled')
+        && licence_enabled('hr') && !licence_enabled('operations') && !licence_enabled('reporting');
+    // NB: candidate_source is a module list (registered by lk_register_module_lists
+    // from RECRUIT_CAND_SOURCES), so it is intentionally NOT duplicated here.
+    return $recruit ? [
+        ['designation',      'Designation',       RECRUIT_DESIGNATIONS],
+        ['department',       'Department',        RECRUIT_DEPARTMENTS],
+        ['leave_type',       'Leave type',        LEAVE_TYPES],
+        ['day_code',         'Day / office code', DAY_CODES],
+    ] : [
+        ['designation', 'Designation',       DESIGNATIONS],
+        ['department',  'Department',        DEPARTMENTS],
+        ['leave_type',  'Leave type',        LEAVE_TYPES],
+        ['day_code',    'Day / office code', DAY_CODES],
+    ];
+}
+
+// Seed the compact starter set for a hosted client workspace (see the note above).
+function lk_seed_client_starter() {
+    $cleared = ''; try { $cleared = (string) setting_get('masters_seeded', ''); } catch (Throwable $e) {}
+    if ($cleared === '1') return;                                            // cleared on purpose → stay cleared
+    if ((int) ops_val("SELECT COUNT(*) FROM lookup_types") > 0) return;      // already has lists → nothing to do
+    $lists = lk_client_starter_lists();
+    $so = 0;
+    foreach ($lists as [$key, $label, $map]) {
+        if (lk_type($key)) continue;
+        $tid = lk_add_type($key, $label, null, 1, $so++);
+        $vso = 0;
+        foreach ($map as $code => $vlabel) lk_add_value($tid, null, $code, $vlabel, $vso++);
+        if (function_exists('lk_set_module')) lk_set_module($key, 'People');
+    }
+}
+
 function lk_seed() {
-    // A fresh CLIENT company starts with EMPTY master lists — it builds its own.
-    // Forms fall back to their built-in defaults via lk_options_or(), so the app
-    // is fully usable with the lists empty. Only the control / single-business
-    // install gets the starter lists.
-    if (function_exists('current_tenant') && current_tenant() !== '') return;
+    // A fresh CLIENT workspace gets a small, plan-appropriate starter set (not the
+    // inspection company's full catalogue, and not a blank screen) — see the note
+    // above lk_seed_client_starter(). Only the control / single-business install
+    // gets the full inspection starter lists below.
+    if (function_exists('current_tenant') && current_tenant() !== '') { lk_seed_client_starter(); return; }
     // Once the master lists have been cleared ON PURPOSE (Settings → Clear
     // records), they stay cleared. Without this the very next page load re-seeds
     // every starter + demo list, so the delete looked as though it had done

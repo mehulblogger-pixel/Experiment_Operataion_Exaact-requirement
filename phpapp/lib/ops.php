@@ -7924,9 +7924,20 @@ function ops_users($route, $method) {
             $posTitle = trim($b['position_title'] ?? '');
             if ($posTitle === '__new__') {
                 $posTitle = trim($b['position_title_new'] ?? '');
-                if ($posTitle !== '' && ($dt = lk_type('designation')))
-                    if (!in_array($posTitle, lk_options_or('designation', DESIGNATIONS), true))
+                if ($posTitle !== '') {
+                    // The Designation master may not exist yet on a fresh workspace
+                    // (client copies start without the inspection company's lists).
+                    // Create it on first use so "+ Add a designation" always sticks
+                    // and the next person picks it instead of retyping it.
+                    $dt = lk_type('designation');
+                    if (!$dt && function_exists('lk_add_type')) {
+                        lk_add_type('designation', 'Designation', null, 1, 50);
+                        if (function_exists('lk_set_module')) lk_set_module('designation', 'People');
+                        $dt = lk_type('designation');
+                    }
+                    if ($dt && !in_array($posTitle, lk_options_or('designation', DESIGNATIONS), true))
                         lk_add_value($dt['id'], null, strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $posTitle), 0, 20)), $posTitle);
+                }
             }
             // 5.5 days means five full days plus one half day — not "alternate
             // Saturday off", which is what it used to say and is a different

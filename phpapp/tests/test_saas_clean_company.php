@@ -59,8 +59,11 @@ if (is_array($res)) {
     t_eq((string) $res['tenant'], 'cleanco', 'the boot ran in the company context (current_tenant is set)');
     t_eq((int) $res['offices'], 0, 'a new company has NO offices (EXAACT branches do not flow in)');
     t_eq((int) $res['partners'], 0, 'a new company has NO clients or vendors (no demo partners)');
-    t_eq((int) $res['lookups'], 0, 'a new company has NO starter master lists');
-    t_eq((int) $res['expense_heads'], 0, 'a new company has NO expense heads seeded');
+    // A new company gets its OWN plan-appropriate starter dropdown lists (so Masters
+    // is not a blank "0 lists" screen and its designation / source dropdowns are real
+    // and correctly worded) — but NONE of EXAACT's demo data flows in (checked above).
+    t_ok((int) $res['lookups'] > 0, 'a new company gets its own starter master lists (not EXAACT demo data)');
+    t_eq((int) $res['expense_heads'], 0, 'a new company has NO expense heads seeded (no demo data)');
     t_ok((int) $res['admins'] >= 1, 'but the company DOES get its own admin + full schema');
 }
 
