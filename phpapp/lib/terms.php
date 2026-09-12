@@ -151,6 +151,18 @@ const TERM_PACKS = [
             'manday'   => ['Man-day', 'Man-days'],
         ],
     ],
+    'recruitment' => [
+        'label' => 'Recruitment agency',
+        'note'  => 'Permanent placement, executive search and technical recruitment — requirement to CV to offer to placement.',
+        'terms' => [
+            'call'        => ['Requirement', 'Requirements'],
+            'job'         => ['Placement', 'Placements'],
+            'engineer'    => ['Recruiter', 'Recruiters'],
+            'requisition' => ['Requirement', 'Requirements'],
+            'candidate'   => ['Candidate', 'Candidates'],
+            'client'      => ['Client', 'Clients'],
+        ],
+    ],
     'exim' => [
         'label' => 'Export & import',
         'note'  => 'Exporters, importers, merchant traders, buying houses.',
