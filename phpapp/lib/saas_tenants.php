@@ -334,7 +334,35 @@ function saas_apply_plan_modules($plan) {
     }
     setting_set('modules_off', implode(',', $off));
     setting_set('product_package', strtoupper((string) $plan));
+    // THE PAID ENTITLEMENT CEILING — what this company MAY switch on (its plan
+    // plus any separately-paid modules). Written here, on the provisioning /
+    // super-admin side, so the company itself can never raise it; the customer's
+    // own Features screen may only turn things off/on WITHIN this set. (Read by
+    // licence_entitled_ceiling / licence_disabled.)
+    $entitled = array_values(array_filter($mods, fn($k) => isset(PRODUCT_MODULES[$k]) && empty(PRODUCT_MODULES[$k][3])));
+    setting_set('saas_entitled_modules', implode(',', $entitled));
     if (function_exists('licence_disabled')) licence_disabled(true);   // reload the off-list cache
+}
+
+// Grandfather an already-provisioned company onto its entitlement ceiling exactly
+// once: if it has no ceiling yet, its ceiling becomes the modules it is using
+// today — so the lock is applied to existing companies WITHOUT removing anything
+// they already have. Cheap and idempotent; runs from the boot chain.
+function saas_entitlement_ensure() {
+    if (!function_exists('current_tenant') || current_tenant() === '') return;      // client companies only
+    if (!function_exists('setting_get') || !function_exists('setting_set')) return;
+    try {
+        if ((string) setting_get('saas_provisioned', '') !== '1') return;           // real provisioned tenants only
+        if (trim((string) setting_get('saas_entitled_modules', '')) !== '') return; // already set → done
+        if (!defined('PRODUCT_MODULES')) return;
+        $on = [];
+        foreach (PRODUCT_MODULES as $k => $mm) {
+            if (!empty($mm[3])) continue;                                           // core is always entitled
+            if (function_exists('licence_enabled') && licence_enabled($k)) $on[] = $k;
+        }
+        setting_set('saas_entitled_modules', implode(',', $on));
+        if (function_exists('licence_disabled')) licence_disabled(true);
+    } catch (Throwable $e) { /* never block the boot chain */ }
 }
 
 // Apply an EXPLICIT module list to the current database — the à-la-carte path,

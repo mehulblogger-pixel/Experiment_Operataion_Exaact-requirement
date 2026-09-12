@@ -155,17 +155,24 @@ function cockpit_modules() {
         $covers = defined('PRODUCT_MODULES') && isset(PRODUCT_MODULES[$key][2]) ? PRODUCT_MODULES[$key][2] : [];
         $features = [];
         foreach ($covers as $c) $features[] = function_exists('access_module_label') ? access_module_label($c) : $c;
+        // Is the company entitled to this module (has it paid for / been granted it)?
+        // A locked module is outside the plan — it can never be switched on here.
+        $entitled = !function_exists('module_entitled') || module_entitled($key);
+        $locked   = !$entitled && empty($row['core']);
         // Why is this available? (§16) — data-driven.
         if (!empty($row['core']))              $why = 'Always on — every workspace needs it.';
+        elseif ($locked)                       $why = 'Not in your plan — upgrade to add it.';
         elseif (in_array($key, $capMods, true)) $why = 'Available because of what your company does.';
         elseif (!empty($row['on']))             $why = 'Included in your current plan.';
-        else                                    $why = 'Not turned on yet.';
+        else                                    $why = 'In your plan — turn it on when you need it.';
         $out[$key] = [
             'key'       => $key,
             'label'     => $row['label'],
             'blurb'     => cockpit_module_blurb($key) ?: ($row['desc'] ?? ''),
             'on'        => !empty($row['on']),
             'core'      => !empty($row['core']),
+            'entitled'  => $entitled,
+            'locked'    => $locked,
             'features'  => $features,
             'why'       => $why,
         ];
@@ -418,6 +425,11 @@ function cockpit_module_apply($key, $on, $confirmed) {
     $sum = licence_summary();
     if (!isset($sum[$key]) || !empty($sum[$key]['core'])) {
         flash('That is a core feature and can’t be turned off — every workspace needs it.', 'error');
+        redirect('/workspace/setup/modules');
+    }
+    // The entitlement lock: a company can never switch ON a module outside its plan.
+    if ($on && function_exists('module_entitled') && !module_entitled($key)) {
+        flash('“' . ($sum[$key]['label'] ?? $key) . '” isn’t in your plan yet. Upgrade to add it to your workspace.', 'error');
         redirect('/workspace/setup/modules');
     }
     // Turning OFF with dependents → confirm first (never silently disable, §17).

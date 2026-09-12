@@ -96,7 +96,58 @@ function licence_disabled($reload = false) {
         // A core module named here is ignored on purpose, not obeyed.
         if ($k !== '' && isset(PRODUCT_MODULES[$k]) && !licence_is_core($k)) $off[] = $k;
     }
+    // THE CLOUD ENTITLEMENT CEILING. A hosted company may switch a module ON only
+    // within what it is entitled to (paid for, or granted by the platform owner).
+    // Anything outside that ceiling is forced OFF here — so a company editing its
+    // own modules_off setting, or ticking a box on any settings screen, can never
+    // unlock a module it has not paid for. The ceiling itself (saas_entitled_modules)
+    // is written only by provisioning / super-admin / billing, never by the
+    // company's own screens. Empty ceiling = no cloud limit (the single-business /
+    // control install); a signed licence has already returned above and is
+    // unaffected. This is the same "an authoritative source outranks the settings
+    // screen" rule the signed licence uses — extended to cloud tenants.
+    $ceil = licence_entitled_ceiling();
+    if ($ceil !== null) {
+        foreach (PRODUCT_MODULES as $k => $mm) {
+            if (empty($mm[3]) && !in_array($k, $ceil, true)) $off[] = $k;
+        }
+    }
     return $off = array_values(array_unique($off));
+}
+
+// The set of NON-CORE modules this cloud install is entitled to switch on, or
+// null when no cloud ceiling is in force. Read from the protected setting
+// saas_entitled_modules (written only on the provisioning / super-admin / billing
+// side). Core modules are always entitled and are not listed here.
+function licence_entitled_ceiling() {
+    // The ceiling is a HOSTED-TENANT concept only. The control / platform-owner
+    // install (and a self-hosted single business, which uses the signed licence
+    // instead) is never limited by it — so it applies solely inside a client
+    // company workspace. This also keeps any stray saas_entitled_modules on the
+    // control database from ever restricting the owner.
+    if (function_exists('current_tenant') && current_tenant() === '') return null;
+    $csv = function_exists('setting_get') ? (string) setting_get('saas_entitled_modules', '') : '';
+    if (trim($csv) === '') return null;
+    $out = [];
+    foreach (explode(',', strtolower($csv)) as $k) {
+        $k = trim($k);
+        if ($k !== '' && isset(PRODUCT_MODULES[$k]) && !licence_is_core($k)) $out[] = $k;
+    }
+    return array_values(array_unique($out));
+}
+
+// Is this company entitled to this module (may it be switched on)? Core modules
+// always yes. A signed licence decides for on-premise; otherwise the cloud
+// ceiling decides; with neither in force, everything is allowed.
+function module_entitled($key) {
+    if (function_exists('licence_is_core') && licence_is_core($key)) return true;
+    if (function_exists('lk_modules')) {
+        $m = lk_modules();
+        if (is_array($m)) return in_array(strtolower($key), array_map('strtolower', $m), true);
+    }
+    $ceil = licence_entitled_ceiling();
+    if ($ceil === null) return true;
+    return in_array(strtolower($key), $ceil, true);
 }
 
 function licence_enabled($key) { return !in_array($key, licence_disabled(), true); }
@@ -142,6 +193,15 @@ function licence_save($posted) {
     foreach (PRODUCT_MODULES as $key => [$lbl, $desc, $covers, $core]) {
         if ($core) continue;
         if (empty($posted['mod_on'][$key])) $off[] = $key;
+    }
+    // The entitlement ceiling wins over what was ticked: a module outside the
+    // ceiling stays off no matter what the form sent, so no settings screen can
+    // enable an unpaid module. (No-op when there is no cloud ceiling.)
+    $ceil = licence_entitled_ceiling();
+    if ($ceil !== null) {
+        foreach (PRODUCT_MODULES as $key => $mm) {
+            if (empty($mm[3]) && !in_array($key, $ceil, true) && !in_array($key, $off, true)) $off[] = $key;
+        }
     }
     setting_set('modules_off', implode(',', $off));
     // Re-read at once: the person who just saved must see the result on the

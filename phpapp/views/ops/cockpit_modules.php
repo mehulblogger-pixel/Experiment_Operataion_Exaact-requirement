@@ -18,6 +18,7 @@ $confirmOff = (string) ($confirmOff ?? '');
   .ck .on-pill{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
   .ck .is-on{background:#e7f6ee;color:#137a4b;border:1px solid #bfe0cd}
   .ck .is-off{background:#eef1f5;color:#5c6b80;border:1px solid #dbe2ec}
+  .ck .is-locked{background:#f4ecfb;color:#6b3fa0;border:1px solid #e0cff2}
   .ck .core{font-size:11.5px;color:#8494a8}
   .ck .confirm{border:1px solid #f0c2c0;background:#fdf3f3;border-radius:12px;padding:14px 16px;margin-bottom:14px}
   .ck .confirm h3{margin:0 0 6px;font-size:15px;color:#b42318}
@@ -61,7 +62,11 @@ $confirmOff = (string) ($confirmOff ?? '');
           <p class="blurb"><?= $e($m['blurb']) ?></p>
         </div>
         <div style="text-align:right">
-          <span class="on-pill <?= $m['on'] ? 'is-on' : 'is-off' ?>"><?= $m['on'] ? 'On' : 'Off' ?></span>
+          <?php if (!empty($m['locked'])): ?>
+            <span class="on-pill is-locked">🔒 Not in plan</span>
+          <?php else: ?>
+            <span class="on-pill <?= $m['on'] ? 'is-on' : 'is-off' ?>"><?= $m['on'] ? 'On' : 'Off' ?></span>
+          <?php endif; ?>
         </div>
       </div>
       <div class="why"><?= $e($m['why']) ?></div>
@@ -71,6 +76,15 @@ $confirmOff = (string) ($confirmOff ?? '');
       <div style="margin-top:12px">
         <?php if ($m['core']): ?>
           <span class="core">Always on — every workspace needs it.</span>
+        <?php elseif (!empty($m['locked'])): ?>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span class="core">This feature isn’t part of your plan.</span>
+            <?php if (function_exists('billing_can_manage') && billing_can_manage() && (int) setting_get('saas_seat_limit', 0) > 0): ?>
+              <a class="btn" href="/subscription">Upgrade to add it</a>
+            <?php else: ?>
+              <span class="muted" style="font-size:12.5px">Contact us to add it to your plan.</span>
+            <?php endif; ?>
+          </div>
         <?php else: ?>
           <form method="post" action="/workspace/setup/module-toggle" style="margin:0">
             <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
