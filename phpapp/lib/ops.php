@@ -8057,6 +8057,10 @@ function ops_users($route, $method) {
                     idems_log('user', $user['id'], 'PASSWORD_CHANGED', ['field'=>$user['username'], 'reason'=>'set by ' . user_name(current_user())]);
                 }
                 $pdo->prepare("UPDATE users SET must_change_pwd=? WHERE id=?")->execute([$mustChange, $user['id']]);
+                // Department (interview-panel defaulting) — separate, guarded write
+                // so the big statement above is never touched and an old schema
+                // without the column can't break the save.
+                try { $pdo->prepare("UPDATE users SET department=? WHERE id=?")->execute([trim((string)($b['department'] ?? '')), $user['id']]); } catch (Throwable $e) {}
                 flash('User saved.');
             } else {
                 // Seats. Checked here, at the one place a NEW active account is
@@ -8082,6 +8086,7 @@ function ops_users($route, $method) {
                 $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days,daily_hours,half_day_hours,pwd_changed_at,must_change_pwd)
                     VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, date('c'), $newPw === '' ? 1 : $mustChange]);
                 $newId = (int)$pdo->lastInsertId();
+                try { $pdo->prepare("UPDATE users SET department=? WHERE id=?")->execute([trim((string)($b['department'] ?? '')), $newId]); } catch (Throwable $e) {}
                 // Module 02 (A) — record the new login's initial access on the audit chain.
                 $adiff = function_exists('access_diff') ? access_diff(null,
                     ['role' => $role, 'permissions' => $perms, 'is_superuser' => $isSuper, 'is_active' => 1,

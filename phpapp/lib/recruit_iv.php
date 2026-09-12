@@ -98,6 +98,9 @@ function recruit_iv_migrate() {
             act_index('interviews', 'idx_iv_cand', '(candidate_id)');
             act_index('candidate_docs', 'idx_cd_cand', '(candidate_id)');
         }
+        // A person's department — used to default an interview panel to the
+        // candidate's own department. Additive; blank on existing users.
+        ensure_column('users', 'department', "VARCHAR(120) DEFAULT ''");
     } catch (Throwable $e) { /* never break boot */ }
 }
 
@@ -120,7 +123,7 @@ function iv_schedule($candidateId, $post) {
     db()->prepare("INSERT INTO interviews (candidate_id,round,mode,location,scheduled_at,panel,competencies,result,created_by,created_at)
                    VALUES (?,?,?,?,?,?,?,'SCHEDULED',?,?)")
         ->execute([(int)$candidateId, $round, $mode, trim((string)($post['location'] ?? '')),
-            trim((string)($post['scheduled_at'] ?? '')), trim((string)($post['panel'] ?? '')),
+            trim((string)($post['scheduled_at'] ?? '')), iv_panel_from_post($post),
             trim((string)($post['competencies'] ?? '')), _iv_actor(), _iv_now()]);
     return (int)db()->lastInsertId();
 }
@@ -135,6 +138,49 @@ function iv_record($id, $post) {
             trim((string)($post['questions'] ?? '')), trim((string)($post['comments'] ?? '')), $done, (int)$id]);
 }
 function iv_delete($id) { recruit_iv_migrate(); db()->prepare("DELETE FROM interviews WHERE id=?")->execute([(int)$id]); }
+
+// The people who can sit on an interview panel — active users, with their
+// department so the panel can default to the candidate's own department.
+function iv_interviewers() {
+    recruit_iv_migrate();
+    try {
+        return ops_all("SELECT id, first_name, last_name, COALESCE(department,'') department, COALESCE(role,'') role
+                        FROM users WHERE is_active=1 ORDER BY first_name, last_name");
+    } catch (Throwable $e) { return []; }
+}
+// The department a candidate is being hired into (candidate row, else its
+// requisition, else the requisition's position) — used to pre-tick the panel.
+function iv_candidate_department($cand) {
+    $dept = trim((string)($cand['department'] ?? ''));
+    if ($dept === '' && !empty($cand['requisition_id'])) {
+        $req = ops_one("SELECT department, position_id FROM requisitions WHERE id=?", [(int)$cand['requisition_id']]);
+        $dept = trim((string)($req['department'] ?? ''));
+        if ($dept === '' && $req && !empty($req['position_id']) && function_exists('position_get')) {
+            $pos = position_get((int)$req['position_id']); if ($pos) $dept = trim((string)($pos['department'] ?? ''));
+        }
+    }
+    return $dept;
+}
+// Build the stored panel string from the multi-select (user ids) plus any free
+// text for people not in the system (e.g. a client-side interviewer). Falls back
+// to a legacy plain 'panel' text field so older forms still work.
+function iv_panel_from_post($post) {
+    $names = [];
+    $ids = array_values(array_filter(array_map('intval', (array)($post['panel_users'] ?? []))));
+    if ($ids) {
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            foreach (ops_all("SELECT first_name, last_name FROM users WHERE id IN ($in)", $ids) as $u) {
+                $nm = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''));
+                if ($nm !== '') $names[] = $nm;
+            }
+        } catch (Throwable $e) { /* ignore — fall through to extra/legacy */ }
+    }
+    $extra = trim((string)($post['panel_extra'] ?? ''));
+    if ($extra !== '') $names[] = $extra;
+    if (!$names && trim((string)($post['panel'] ?? '')) !== '') return trim((string)$post['panel']);
+    return implode(', ', $names);
+}
 
 // ============================================================================
 //  Documents
@@ -253,6 +299,8 @@ function recruit_iv_panel($cand) {
     $ivs = iv_list((int)$cand['id']);
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     $can = function_exists('is_coordinator_level') && is_coordinator_level();
+    $ivUsers = $can ? iv_interviewers() : [];
+    $ivDept  = strtolower(trim(iv_candidate_department($cand)));
     $pill = ['PASS'=>'p-ok','FAIL'=>'p-bad','HOLD'=>'p-warn','RE_INTERVIEW'=>'p-warn','NO_SHOW'=>'p-bad','CANCELLED'=>'p-mut','SCHEDULED'=>'p-info'];
     ?>
     <div class="panel">
@@ -265,9 +313,27 @@ function recruit_iv_panel($cand) {
           <div><label class="ff-l">Round</label><select class="form-control" name="round"><?php foreach (IV_ROUNDS as $r): ?><option><?= $e($r) ?></option><?php endforeach; ?></select></div>
           <div><label class="ff-l">When</label><input class="form-control" type="datetime-local" name="scheduled_at"></div>
           <div><label class="ff-l">Mode</label><select class="form-control" name="mode"><?php foreach (IV_MODES as $m): ?><option><?= $e($m) ?></option><?php endforeach; ?></select></div>
-          <div><label class="ff-l">Panel / interviewers</label><input class="form-control" name="panel" placeholder="names"></div>
           <div><label class="ff-l">Location / link</label><input class="form-control" name="location"></div>
-          <div><label class="ff-l">Competencies to assess</label><input class="form-control" name="competencies"></div>
+          <div style="grid-column:1/-1"><label class="ff-l">Competencies to assess</label><input class="form-control" name="competencies"></div>
+        </div>
+        <?php // Interview panel — pick one or more interviewers from your people.
+              //  Those in the candidate's own department are pre-ticked; change
+              //  them freely, and add anyone not in the system in the box below. ?>
+        <div style="margin-top:10px">
+          <label class="ff-l">Interview panel — choose interviewers<?= $ivDept !== '' ? ' <span class="muted" style="font-weight:400">(people in the ' . $e(iv_candidate_department($cand)) . ' department are pre-selected)</span>' : '' ?></label>
+          <?php if ($ivUsers): ?>
+          <div style="display:flex;flex-wrap:wrap;gap:6px 14px;max-height:150px;overflow:auto;border:1px solid var(--line,#e5e7eb);border-radius:9px;padding:9px 11px;background:var(--surface,#fff)">
+            <?php foreach ($ivUsers as $u): $nm = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')); if ($nm === '') continue;
+                  $udept = strtolower(trim((string)($u['department'] ?? '')));
+                  $pre = ($ivDept !== '' && $udept === $ivDept); ?>
+              <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap">
+                <input type="checkbox" name="panel_users[]" value="<?= (int)$u['id'] ?>" <?= $pre ? 'checked' : '' ?>>
+                <?= $e($nm) ?><?= ($u['department'] ?? '') !== '' ? ' <span class="muted" style="font-size:11px">· ' . $e($u['department']) . '</span>' : '' ?>
+              </label>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
+          <input class="form-control" name="panel_extra" placeholder="<?= $ivUsers ? 'Other panelists not in the system (e.g. a client-side interviewer)' : 'Panel / interviewers (names)' ?>" style="margin-top:7px">
         </div>
         <div style="margin-top:10px"><button class="btn">Schedule</button></div>
       </form>

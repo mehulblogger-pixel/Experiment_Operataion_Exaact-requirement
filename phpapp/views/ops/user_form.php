@@ -101,6 +101,13 @@
         <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (($user['home_office_id'] ?? '')==$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
         <?php if ($globalMgr): ?><option value="__new__">+ Add an <?= e(Tl('office')) ?> not on this list…</option><?php endif; ?>
       </select><?php if (!$globalMgr): ?><small class="muted">Fixed to your <?= e(Tl('office')) ?>.</small><?php endif; ?></div>
+    <?php // Department — used to default an interview panel to the candidate's
+          //  own department. Optional; drawn from the Department master list. ?>
+    <div class="ff"><label>Department <span class="muted" style="font-weight:400">— optional</span></label>
+      <?php $deptOpts = function_exists('lk_options_or') ? lk_options_or('department', []) : []; $curDept = trim((string)($user['department'] ?? '')); ?>
+      <input class="form-control" name="department" list="u_dept_list" value="<?= e($curDept) ?>" placeholder="e.g. Engineering" autocomplete="off">
+      <?php if ($deptOpts): ?><datalist id="u_dept_list"><?php foreach ($deptOpts as $dv): ?><option value="<?= e($dv) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
+      <small class="muted">Interviews auto-suggest people from the candidate's department.</small></div>
     <?php if ($globalMgr): ?>
     <div class="ff ff-wide" id="u_home_off_new" style="display:none">
       <div class="panel" style="margin:0;padding:12px;background:var(--field)">

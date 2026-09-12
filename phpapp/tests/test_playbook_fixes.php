@@ -106,3 +106,43 @@ if (!function_exists('doc_tpl_by_code') || !function_exists('doc_render_template
         t_ok(false, 'one-pager render raised: ' . $e->getMessage());
     }
 }
+
+t_section('Playbook fixes — interview panel multi-select (10.3)');
+
+if (!function_exists('iv_panel_from_post') || !function_exists('iv_candidate_department')) {
+    t_ok(true, 'interview panel helpers not present — skipped');
+} else {
+    recruit_iv_migrate();
+    try {
+        $now = function_exists('now_iso') ? now_iso() : date('c');
+        db()->prepare("INSERT INTO users (username,first_name,last_name,role,is_active,department) VALUES ('iv_a','Meera','Nair','COORDINATOR',1,'Engineering')")->execute();
+        $u1 = (int) db()->lastInsertId();
+        db()->prepare("INSERT INTO users (username,first_name,last_name,role,is_active,department) VALUES ('iv_b','Rohit','Sen','BRANCH_MANAGER',1,'Engineering')")->execute();
+        $u2 = (int) db()->lastInsertId();
+        db()->prepare("INSERT INTO users (username,first_name,last_name,role,is_active,department) VALUES ('iv_c','Sana','Ali','COORDINATOR',1,'Finance')")->execute();
+        $u3 = (int) db()->lastInsertId();
+
+        // Panel is built from the picked user ids (names), with free-text appended.
+        $panel = iv_panel_from_post(['panel_users' => [$u1, $u2], 'panel_extra' => 'Client-side lead']);
+        t_ok(strpos($panel, 'Meera Nair') !== false && strpos($panel, 'Rohit Sen') !== false, 'selected interviewers are stored by name');
+        t_ok(strpos($panel, 'Client-side lead') !== false, 'an external panelist typed in the box is included');
+
+        // Legacy free-text still works when no users are picked.
+        t_ok(iv_panel_from_post(['panel' => 'Old Panel Text']) === 'Old Panel Text', 'a legacy plain panel field still works');
+        t_ok(iv_panel_from_post([]) === '', 'an empty panel is empty, not an error');
+
+        // Department is resolved from the candidate's requisition, to pre-tick the panel.
+        db()->prepare("INSERT INTO requisitions (req_code,designation,department,status,created_at) VALUES ('REQ-T1','Engineer','Engineering','OPEN',?)")->execute([$now]);
+        $rid = (int) db()->lastInsertId();
+        db()->prepare("INSERT INTO candidates (first_name,last_name,designation,requisition_id,stage,created_at) VALUES ('Test','Cand','Engineer',?,'APPLIED',?)")->execute([$rid, $now]);
+        $cid2 = (int) db()->lastInsertId();
+        $cand2 = ops_one("SELECT * FROM candidates WHERE id=?", [$cid2]);
+        t_ok(strtolower(iv_candidate_department($cand2)) === 'engineering', 'the candidate department comes from the requisition (used to pre-select the panel)');
+
+        db()->prepare("DELETE FROM candidates WHERE id=?")->execute([$cid2]);
+        db()->prepare("DELETE FROM requisitions WHERE id=?")->execute([$rid]);
+        db()->prepare("DELETE FROM users WHERE id IN (?,?,?)")->execute([$u1, $u2, $u3]);
+    } catch (Throwable $e) {
+        t_ok(false, 'interview panel test raised: ' . $e->getMessage());
+    }
+}
