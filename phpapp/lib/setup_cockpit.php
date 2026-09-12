@@ -73,10 +73,25 @@ function cockpit_capability_catalogue() {
     ];
 }
 
-// The catalogue grouped by its display groups → ['Group' => [code => label]].
-function cockpit_capability_groups() {
+// The catalogue grouped by its display groups → ['Group' => [code => label]],
+// FILTERED to what this company can actually use. An activity is shown only when
+// the company is entitled to every module that activity needs — so a
+// Recruitment-only company sees the Recruitment activities, not the inspection /
+// resource-supply / project activities that belong to modules it hasn't
+// licensed. Any activity the company has already chosen is always shown, so a
+// past choice is never silently dropped. (On the control / owner install nothing
+// is entitlement-limited, so the full catalogue shows.)
+function cockpit_capability_groups($chosen = []) {
+    $chosen = array_flip(array_map('strval', (array) $chosen));
     $out = [];
     foreach (cockpit_capability_catalogue() as $code => $c) {
+        if (!isset($chosen[$code])) {
+            $relevant = true;
+            foreach (($c['modules'] ?? []) as $m) {
+                if (function_exists('module_entitled') && !module_entitled($m)) { $relevant = false; break; }
+            }
+            if (!$relevant) continue;
+        }
         $g = $c['group'] ?? 'Other';
         $out[$g][$code] = $c['label'] ?? $code;
     }
@@ -479,9 +494,10 @@ function ops_cockpit($route, $method) {
     // --- GET pages ---
     switch ($route) {
         case 'workspace/setup/profile':
+            $chosen = cockpit_capabilities();
             view('ops/cockpit_profile', [
-                'groups'   => cockpit_capability_groups(),
-                'chosen'   => cockpit_capabilities(),
+                'groups'   => cockpit_capability_groups($chosen),   // only activities the company can use (+ any already chosen)
+                'chosen'   => $chosen,
                 'company'  => (string) (setting_get('company_name', '') ?: setting_get('app_name', '')),
             ]);
             return true;

@@ -32,7 +32,7 @@ $chosen = array_flip($chosen ?? []);
     </div>
 
     <h2 style="font-size:17px;margin:0 0 4px">What does your company do?</h2>
-    <p class="muted" style="margin-top:0;font-size:13px">Select all that apply.</p>
+    <p class="muted" style="margin-top:0;font-size:13px">Select all that apply. Only the activities your current plan supports are shown — add more features to unlock others.</p>
 
     <?php foreach ($groups as $groupName => $caps): ?>
       <div class="cap-group">

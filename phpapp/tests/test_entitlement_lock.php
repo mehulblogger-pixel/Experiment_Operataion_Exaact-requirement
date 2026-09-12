@@ -74,6 +74,19 @@ licence_save(['mod_on' => ['hr' => 1]]); $mk(); licence_disabled(true);   // com
 t_ok(licence_enabled('sales') === false, 'within the ceiling the company may still keep an entitled module off (its own choice)');
 t_ok(module_entitled('sales') === true, 'though off by choice, it remains entitled (can be turned on)');
 
+// --- Business profile shows only the activities the plan supports. ---
+setting_set('saas_entitled_modules', 'hr'); $mk(); licence_disabled(true);
+if (function_exists('cockpit_capability_groups')) {
+    $mk();
+    $groups = cockpit_capability_groups([]);
+    t_ok(isset($groups['Recruitment']), 'a recruitment company sees the Recruitment activities');
+    t_ok(!isset($groups['Inspection & Technical Services']) && !isset($groups['Resource Supply']) && !isset($groups['Project Services']),
+        'inspection / resource-supply / project activities are hidden for a recruitment-only company');
+    $mk();
+    $groups2 = cockpit_capability_groups(['TPIA']);   // an already-chosen out-of-plan activity
+    t_ok(isset($groups2['Inspection & Technical Services']['TPIA']), 'an activity the company already chose is still shown, never silently dropped');
+}
+
 // --- The control/owner install is NEVER limited, even if the setting is present. ---
 $GLOBALS['__tenant'] = ['key' => '', 'company' => '', 'error' => '', 'saas' => false, 'base' => ''];
 t_ok(licence_entitled_ceiling() === null, 'on the control/owner install there is no ceiling (owner is never limited)');
