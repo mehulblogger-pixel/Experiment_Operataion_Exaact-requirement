@@ -25,6 +25,22 @@ t_ok(workspace_route_module('/recruitment') === null && workspace_route_module('
 t_ok(workspace_route_module('/company-profile') === null && workspace_route_module('/masters') === null,
     'admin/directory routes are core');
 
+// Routes the router map does not cover, but which are clearly a paid trade's
+// screens, must still be hidden from the Role-workspaces launchpad.
+t_eq(workspace_route_module('/timesheet'), 'operations', 'timesheet maps to operations');
+t_eq(workspace_route_module('/ratings'), 'operations', 'inspector ratings maps to operations');
+t_eq(workspace_route_module('/project-costings'), 'operations', 'project costing maps to operations');
+t_ok(workspace_route_module('/sbu-pl') === 'money', 'SBU P&L maps to money');
+
+// The router's OWN gate, queried read-only (peek), is the authoritative source the
+// launchpad now consults first. Off-plan routes are refused; core/HR routes pass.
+if (function_exists('ops_module_gate')) {
+    t_eq(ops_module_gate('service-scope', true), false, 'peek: an operations-mapped route is refused off-plan');
+    t_eq(ops_module_gate('opportunities', true), false, 'peek: a sales-mapped route is refused off-plan');
+    t_ok(ops_module_gate('candidates', true) !== false, 'peek: a recruitment/core route is allowed');
+    t_ok(ops_module_gate('company-profile', true) !== false, 'peek: an admin route is allowed');
+}
+
 setting_set('modules_off', $savedOff);
 setting_set('licence_key', $savedKey);
 if (function_exists('lk_state')) lk_state(true);

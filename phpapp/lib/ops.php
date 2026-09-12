@@ -2422,7 +2422,7 @@ function job_owned_by_me($jobId) {
         return (int)ops_val("SELECT COUNT(*) FROM job_visits WHERE job_id=? AND inspector_id=?", [$jobId, $mine]) > 0;
     } catch (Throwable $e) { return false; }
 }
-function ops_module_gate($route) {
+function ops_module_gate($route, $peek = false) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
@@ -2573,6 +2573,19 @@ function ops_module_gate($route) {
         'partner-import'=>'clients','partner-template'=>'clients','duplicates'=>'clients',
     ];
     $mod = $map[$base] ?? null;
+    // Read-only mode: return whether THIS route is allowed under the current
+    // licence (used by menus / launchpads to hide a screen the plan excludes),
+    // using the SAME authoritative map as the enforcement below — never halting.
+    if ($peek) {
+        if ($mod && function_exists('licence_owner') && function_exists('licence_enabled')) {
+            $ow = licence_owner($mod);
+            if ($ow && !licence_enabled($ow)) return false;
+        }
+        static $peekExtra = ['service-scope' => 'operations', 'service-formats' => 'reporting', 'industry' => 'sales', 'industry-apply' => 'sales'];
+        $pm = $peekExtra[$base] ?? null;
+        if ($pm !== null && function_exists('licence_enabled') && !licence_enabled($pm)) return false;
+        return true;
+    }
     // An assigned inspector owns their own job: let them open it, upload its
     // documents/bills and close it (recording the day's expenses) without the jobs
     // module. Scoped to a safe allowlist of owner actions on the job in ?id= (or

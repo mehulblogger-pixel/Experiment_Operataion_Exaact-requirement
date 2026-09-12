@@ -52,20 +52,22 @@ function workspace_config_save($role, $landing, array $tiles) {
 // routes are mapped; everything else (recruitment, directory, admin, home) is
 // core and always shown.
 function workspace_route_module($url) {
-    $u = '/' . ltrim(strtolower(trim((string) $url)), '/');
+    $u = '/' . ltrim(strtolower(trim((string) (parse_url((string) $url, PHP_URL_PATH) ?: $url))), '/');
     $starts = fn($p) => strpos($u, $p) === 0;
-    // Operations / field work / inspection ops
-    foreach (['/operations','/schedule','/capacity','/availability','/inspector','/calls','/call','/jobs','/job',
-              '/vouchers','/voucher','/deputation','/attendance','/contract-opening','/allocate','/manpower-plan'] as $p) if ($starts($p)) return 'operations';
+    // Operations / field work / inspection ops. Exact operations routes the router
+    // map does not cover are listed first so they can never leak into a launchpad.
+    foreach (['/timesheet','/ratings','/tapi','/project-costing','/work-norms','/schedule','/capacity',
+              '/availability','/allocate','/deputation','/attendance','/contract-opening','/manpower-plan',
+              '/operations','/inspector','/calls','/call','/jobs','/job','/vouchers','/voucher'] as $p) if ($starts($p)) return 'operations';
     // Reporting / inspection documentation / quality & accreditation
     foreach (['/idems','/reporting','/endorse','/report-','/irn','/sample','/method','/decision-rule','/controlled-doc',
               '/nla','/quality','/accreditation','/equipment','/competence','/impartiality','/audits','/ncr','/capa',
               '/complaints','/confidential','/datacontrol','/disclosure','/risks'] as $p) if ($starts($p)) return 'reporting';
     // Sales / CRM
-    foreach (['/leads','/inquir','/quote','/crm','/pipeline'] as $p) if ($starts($p)) return 'sales';
+    foreach (['/leads','/inquir','/quote','/crm','/pipeline','/opportunit','/preorder','/adspro','/stage-gate'] as $p) if ($starts($p)) return 'sales';
     // Money / billing / reconciliation
     foreach (['/money','/invoic','/receipt','/profitab','/revenue-recon','/cost-recon','/reimbursable','/overhead',
-              '/credit-recon','/sbu-pl'] as $p) if ($starts($p)) return 'money';
+              '/credit-recon','/sbu-pl','/office-finance'] as $p) if ($starts($p)) return 'money';
     return null;   // core / recruitment / directory / admin
 }
 function workspace_catalog() {
@@ -75,7 +77,14 @@ function workspace_catalog() {
         $url = (string)($n['url'] ?? '');
         if ($url === '' || $url === '#' || ($n['kind'] ?? '') === 'action') continue;
         if (isset($seen[$url])) continue; $seen[$url] = true;
-        // Hide a launchpad screen whose module the plan does not include.
+        $base = ltrim((string) (parse_url($url, PHP_URL_PATH) ?: $url), '/');
+        // 1) The router's OWN authoritative licence gate (read-only) — hides
+        //    anything a typed URL would be refused for (calls, idems, opportunities,
+        //    quotes/preorder, invoicing, service-scope, …).
+        if ($base !== '' && function_exists('ops_module_gate')) {
+            try { if (ops_module_gate($base, true) === false) continue; } catch (Throwable $e) {}
+        }
+        // 2) A supplement for the few module screens the router map does not cover.
         $mod = workspace_route_module($url);
         if ($mod !== null && function_exists('licence_enabled') && !licence_enabled($mod)) continue;
         $out[] = ['url' => $url, 'label' => (string)($n['label'] ?? $url),
