@@ -411,6 +411,42 @@ function lk_client_starter_lists() {
     ];
 }
 
+// Replace a list's values with $new ONLY when it still holds exactly the shipped
+// default $oldDefault (compared by code) — i.e. it has not been touched. So a
+// workspace seeded on an older build with the inspection defaults gets the right
+// content, while a workspace that customised its list is never clobbered.
+function lk_replace_if_default($typeKey, array $oldDefault, array $new) {
+    $t = lk_type($typeKey);
+    if (!$t) return false;
+    try { $rows = ops_all("SELECT code FROM lookup_values WHERE type_id=?", [$t['id']]); }
+    catch (Throwable $e) { return false; }
+    $have = array_values(array_filter(array_map(fn($r) => (string) $r['code'], $rows), fn($c) => $c !== ''));
+    sort($have);
+    $want = array_keys($oldDefault); sort($want);
+    if ($have !== $want) return false;                 // customised / already fixed → leave it
+    try {
+        db()->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([$t['id']]);
+        $so = 0; foreach ($new as $code => $label) lk_add_value($t['id'], null, $code, $label, $so++);
+    } catch (Throwable $e) { return false; }
+    return true;
+}
+
+// A recruitment workspace created on an OLDER build was seeded with the inspection
+// company's people lists (Inspector, Engineer, Lead Inspector… as designations;
+// Quality / Inspection / NDT… as departments). This corrects that content in
+// place for a recruitment-plan hosted workspace, but only where the list is still
+// the untouched shipped inspection default (so a customer's own edits are kept).
+// Runs at boot, which re-runs after any code upload (the schema fingerprint), so
+// existing workspaces are corrected without any manual step.
+function lk_fix_recruitment_content() {
+    if (!function_exists('current_tenant') || current_tenant() === '') return;
+    if (!(function_exists('licence_enabled') && licence_enabled('hr')
+        && !licence_enabled('operations') && !licence_enabled('reporting'))) return;   // recruitment plan only
+    lk_replace_if_default('designation',      DESIGNATIONS,  RECRUIT_DESIGNATIONS);
+    lk_replace_if_default('department',       DEPARTMENTS,   RECRUIT_DEPARTMENTS);
+    if (defined('CAND_SOURCES')) lk_replace_if_default('candidate_source', CAND_SOURCES, RECRUIT_CAND_SOURCES);
+}
+
 // Seed the compact starter set for a hosted client workspace (see the note above).
 function lk_seed_client_starter() {
     $cleared = ''; try { $cleared = (string) setting_get('masters_seeded', ''); } catch (Throwable $e) {}

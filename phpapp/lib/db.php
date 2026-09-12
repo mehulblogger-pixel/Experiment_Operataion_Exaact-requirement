@@ -551,6 +551,10 @@ function run_schema($withSeeds = true) {
     // copy). Self-healing: if that module is later bought, its setup re-creates
     // the list. Never touches the control / single-business install.
     if ($withSeeds && function_exists('lk_prune_offplan_lists')) lk_prune_offplan_lists();
+    // Correct the people lists' CONTENT for a recruitment workspace seeded on an
+    // older build with the inspection defaults (Inspector/Engineer designations,
+    // etc.). Only touches an untouched shipped default; never the control install.
+    if ($withSeeds && function_exists('lk_fix_recruitment_content')) lk_fix_recruitment_content();
     // SaaS control plane — the cross-company directory used by single-URL login
     // and the super-admin console. Additive; empty on a single-company install.
     if (function_exists('saas_tenants_migrate')) saas_tenants_migrate();
