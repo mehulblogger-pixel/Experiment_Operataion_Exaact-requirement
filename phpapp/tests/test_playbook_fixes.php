@@ -72,3 +72,37 @@ if (!function_exists('req_commercials')) {
     t_ok(abs($c4['revenue'] - 1800000) < 0.01, '3 people × 100k × 6 months = 18,00,000 revenue');
     t_ok(abs($c4['cost'] - (3 * 70000 * 6 + 3 * 5000)) < 0.01, 'cost = recurring + one-off across all people');
 }
+
+t_section('Playbook fixes — document generation & one-pager (10.3)');
+
+if (!function_exists('doc_tpl_by_code') || !function_exists('doc_render_template')) {
+    t_ok(true, 'document studio not present — skipped');
+} else {
+    doc_tpl_migrate();
+    // The standard letters and the new one-pager are all seeded and generatable.
+    t_ok(doc_tpl_by_code('OFFER') !== null, 'the offer letter template exists');
+    t_ok(doc_tpl_by_code('APPOINTMENT') !== null, 'the appointment letter template exists');
+    $one = doc_tpl_by_code('ONE_PAGER');
+    t_ok($one !== null, 'the candidate one-pager template exists');
+
+    // The token catalogue advertises the new candidate-profile tokens.
+    $help = doc_tokens_help();
+    t_ok(isset($help['experience']) && isset($help['skills']) && isset($help['expected_rate']),
+        'one-pager profile tokens are documented');
+
+    // Render the one-pager for a real candidate row — the merge fills the name and
+    // does not fatal on absent optional columns.
+    try {
+        db()->prepare("INSERT INTO candidates (first_name,last_name,designation,mobile,email,cand_code,experience_years,cv_keywords,stage,created_at)
+                       VALUES ('Asha','Rao','Recruiter','9800000000','asha@example.com','CV-T01','6','sourcing, screening','APPLIED',?)")
+            ->execute([function_exists('now_iso') ? now_iso() : date('c')]);
+        $cid = (int) db()->lastInsertId();
+        $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$cid]);
+        $r = doc_render_template($one, $cand);
+        t_ok(strpos($r['html'], 'Asha Rao') !== false, 'the one-pager renders the candidate name from their data');
+        t_ok(strpos($r['html'], '6 years') !== false, 'experience is merged into the one-pager');
+        db()->prepare("DELETE FROM candidates WHERE id=?")->execute([$cid]);
+    } catch (Throwable $e) {
+        t_ok(false, 'one-pager render raised: ' . $e->getMessage());
+    }
+}

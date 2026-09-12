@@ -4978,7 +4978,10 @@ function ops_requisitions($route, $method) {
 
 // ---- CV / hiring pipeline (deputation resourcing) --------------------------
 function candidate_name($c) {
-    return trim(($c['first_name'] ?? '') . ' ' . ($c['middle_name'] ?? '') . ' ' . ($c['last_name'] ?? '')) ?: '(no name)';
+    // Collapse the gap left by an empty middle name so a letter never shows
+    // "Asha  Rao" with a double space.
+    $n = trim(preg_replace('/\s+/', ' ', ($c['first_name'] ?? '') . ' ' . ($c['middle_name'] ?? '') . ' ' . ($c['last_name'] ?? '')));
+    return $n !== '' ? $n : '(no name)';
 }
 function nzc_cand($f, $v) {
     if (in_array($f, ['client_id','call_id','trade_id','skill_id','requisition_id','recruiter_id','group_id'], true)) return $v === '' ? null : (int)$v;

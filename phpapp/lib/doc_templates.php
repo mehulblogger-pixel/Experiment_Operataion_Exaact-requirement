@@ -61,6 +61,15 @@ function doc_tpl_seed_extra() {
         . "commencing {joining_date}.\n\nA stipend, where applicable, and the terms of the internship are set out below.\n\n"
         . "{salary_table}\n\n{terms}\n\nPlease confirm your acceptance by signing and returning a copy of this letter.\n\n"
         . "Warm regards,\nFor {company}\n\nAuthorised Signatory");
+    // A one-page candidate profile the recruiter shares with the client — built
+    // from the candidate's own data, editable like any other template.
+    $add('ONE_PAGER', 'Candidate one-pager (profile)',
+        "CANDIDATE PROFILE\n\n"
+        . "Name: {name}\nCode: {cand_code}\nApplied for: {position}\nDepartment: {department}\n\n"
+        . "CONTACT\nPhone: {phone}\nEmail: {email}\nLocation: {location}\n\n"
+        . "SUMMARY\nExperience: {experience}\nKey skills: {skills}\nExpected: {expected_rate}\nSource: {source}\n\n"
+        . "{summary}\n\n"
+        . "Shared by {company} on {date}. Confidential — for the client's evaluation only.");
 }
 
 function doc_tpl_seed() {
@@ -125,6 +134,9 @@ function doc_tokens_help() {
         'joining_date' => 'Date of joining', 'offer_valid_till' => 'Offer validity date', 'terms' => 'Offer terms',
         'company' => 'Company / workspace name', 'company_address' => 'Company address',
         'date' => "Today's date", 'cand_code' => 'Candidate code',
+        'experience' => 'Total experience', 'skills' => 'Key skills / keywords',
+        'summary' => 'Recruiter summary / remarks', 'source' => 'Sourcing channel',
+        'expected_rate' => 'Expected salary / rate',
     ];
 }
 
@@ -172,6 +184,13 @@ function doc_token_map($candidate) {
         'terms' => $offer ? (string)($offer['offer_terms'] ?? '') : '',
         'company' => $company, 'company_address' => function_exists('setting_get') ? setting_get('company_address', '') : '',
         'date' => date('d M Y'), 'cand_code' => $g('cand_code'),
+        // Candidate-profile tokens — used by the one-pager. Safe if a column is
+        // absent ($g returns ''), so the letter highlights it rather than erroring.
+        'experience' => $g('experience_years') !== '' ? ($g('experience_years') . ' years') : '',
+        'skills'     => $g('cv_keywords'),
+        'summary'    => $g('remarks'),
+        'source'     => $g('source_type'),
+        'expected_rate' => $g('expected_rate') !== '' ? ($money($g('expected_rate')) . ($g('rate_type') ? ' / ' . strtolower((string)$g('rate_type')) : '')) : '',
     ];
 }
 

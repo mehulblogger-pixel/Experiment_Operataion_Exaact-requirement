@@ -363,4 +363,9 @@ function recruit_docs_panel($cand) {
       <?php endif; ?>
     </div>
     <?php
+    // The auto-generated letters (offer / appointment / one-pager / …) belong in
+    // the Documents tab too — this is where anyone looks for a candidate's papers,
+    // not only at the foot of the Offer tab. Merge tokens are filled from the
+    // candidate's own data; missing fields are highlighted in the letter.
+    if (function_exists('recruit_letters_block')) recruit_letters_block($cand);
 }
