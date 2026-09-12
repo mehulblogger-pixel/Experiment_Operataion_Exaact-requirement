@@ -148,6 +148,12 @@ function trade_options() {
 function lk_ensure_type_map($key, $label, $map, $module = '') {
     if (lk_type($key)) { if ($module !== '') lk_set_module($key, $module); return; }
     if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") === 0) return;
+    // On a hosted workspace, don't create a dropdown list for a module the plan
+    // excludes — otherwise every module's setup (idems, ncr, vendor, expediting,
+    // …) would seed its lists into, say, a recruitment copy. The control /
+    // single-business install (no tenant) still gets everything.
+    if ($module !== '' && function_exists('current_tenant') && current_tenant() !== ''
+        && function_exists('lk_group_enabled') && !lk_group_enabled($module)) return;
     $tid = lk_add_type($key, $label, null, 0, 50);
     $so = 0;
     foreach ($map as $code => $lab) lk_add_value($tid, null, $code, $lab, $so++);
@@ -492,20 +498,57 @@ function lk_types() { return ops_all("SELECT * FROM lookup_types ORDER BY sort_o
 // ---------------------------------------------------------------------------
 
 // The display "module" tag on a list -> the licence PRODUCT_MODULES key that
-// owns it. Untagged / unknown = 'admin' (core), which is always shown.
+// owns it. Only a small, explicit set of tags is CORE (always shown): the
+// people/recruitment lists, the shared directory lists, and the untagged /
+// general ones. Every other tag — including the many raw internal tags the
+// inspection, vendor, NCR, CAPA, audit, expediting and reporting modules use
+// (idems, ncr, vendor, …) — is module-specific and must be tucked away on a
+// plan that doesn't include it, NOT shown as if it were core.
 function lk_module_product_key($tag) {
-    static $map = [
-        'operations' => 'operations', 'money' => 'money', 'sales' => 'sales',
-        'reporting'  => 'reporting',  'people' => 'hr',
-        'directory'  => 'admin',      'admin'  => 'admin',
+    $t = strtolower(trim((string) $tag));
+    static $core = ['' => 1, 'admin' => 1, 'general' => 1, 'core' => 1, 'directory' => 1, 'setup' => 1];
+    static $mod  = [
+        'people' => 'hr', 'recruitment' => 'hr', 'hr' => 'hr', 'hiring' => 'hr',
+        'sales' => 'sales', 'crm' => 'sales', 'leads' => 'sales',
+        'money' => 'money', 'finance' => 'money', 'billing' => 'money',
+        'operations' => 'operations', 'reporting' => 'reporting',
     ];
-    return $map[strtolower(trim((string)$tag))] ?? 'admin';
+    if (isset($core[$t])) return 'admin';
+    if (isset($mod[$t]))  return $mod[$t];
+    // Any other tag is a module-specific list from a feature this workspace may
+    // not have (idems, ncr, vendor, expediting, audit, …). Treat it as non-core
+    // so a narrow plan collapses it into "modules not in this plan" instead of
+    // showing another trade's lists. On a full install every module is on, so
+    // these still show there.
+    return 'operations';
 }
 
 // Is the module that owns this group switched on for this install?
 function lk_group_enabled($tag) {
     if (!function_exists('licence_enabled')) return true;
     return licence_enabled(lk_module_product_key($tag));
+}
+
+// Remove the dropdown lists a hosted workspace accumulated for modules its plan
+// does not include — so a recruitment copy is not carrying the inspection,
+// vendor, NCR, CAPA, audit and reporting lists in its database or on Masters.
+// Only runs inside a hosted workspace (never the control / single-business
+// install), only removes lists tagged to a switched-OFF module, and is
+// self-healing: if that module is later enabled, its own setup re-creates the
+// list on the next boot. Untagged / core / people / directory lists are kept.
+function lk_prune_offplan_lists() {
+    if (!function_exists('current_tenant') || current_tenant() === '') return;
+    if (!function_exists('licence_enabled')) return;
+    try { $rows = ops_all("SELECT id, module FROM lookup_types WHERE module IS NOT NULL AND module <> ''"); }
+    catch (Throwable $e) { return; }
+    foreach ($rows as $t) {
+        $mod = (string) ($t['module'] ?? '');
+        if ($mod === '' || lk_group_enabled($mod)) continue;   // untagged, or its module is on → keep
+        try {
+            db()->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([(int) $t['id']]);
+            db()->prepare("DELETE FROM lookup_types  WHERE id=?")->execute([(int) $t['id']]);
+        } catch (Throwable $e) { /* referenced or locked — leave it, the screen still collapses it */ }
+    }
 }
 
 // A friendlier heading for each module group on the Masters screen.
