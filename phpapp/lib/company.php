@@ -17,7 +17,10 @@ function company_profile() {
     $g = fn($k, $d = '') => function_exists('setting_get') ? (string)setting_get($k, $d) : $d;
     return [
         'legal_name' => $g('company_legal_name'),
-        'brand'      => $g('company_name'),
+        // The brand / trading name falls back to the workspace name (app_name) set
+        // at signup, so the screen is never blank just because the legal form was
+        // never opened. Saving here still writes company_name as before.
+        'brand'      => $g('company_name') ?: $g('app_name'),
         'address'    => $g('company_address'),
         'gstin'      => $g('company_gstin'),
         'pan'        => $g('company_pan'),
