@@ -199,5 +199,9 @@ function ops_ai_forms($method) {
         'flow'  => $flow,
         'aiOn'  => function_exists('ai_enabled') && ai_enabled(),
         'forms' => aifg_forms(),
+        // Platform-provided AI: show the workspace its monthly allowance.
+        'pool'  => function_exists('ai_pool_applies') && ai_pool_applies(),
+        'used'  => function_exists('ai_usage_month') ? ai_usage_month() : 0,
+        'cap'   => function_exists('ai_monthly_cap') ? ai_monthly_cap() : 0,
     ]);
 }

@@ -21,6 +21,21 @@ $typeLabel = ['text' => 'Text', 'textarea' => 'Paragraph', 'number' => 'Number',
   </div>
 <?php else: ?>
 
+<?php if (!empty($pool)):
+        $used = (int) ($used ?? 0); $cap = (int) ($cap ?? 0); $left = max(0, $cap - $used);
+        $tone = $left === 0 ? 'var(--warn,#b45309)' : 'var(--brand)'; ?>
+  <div class="panel" style="max-width:820px;margin-top:14px;border-left:3px solid <?= $tone ?>;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+    <div>
+      <strong>✨ AI is included in your plan</strong>
+      <div class="muted" style="font-size:12.5px;margin-top:2px">
+        <?php if ($left === 0): ?>You've used all <?= $cap ?> AI actions this month — they reset on the 1st. Add your own AI key below for unlimited use.
+        <?php else: ?><strong><?= $left ?></strong> of <?= $cap ?> AI actions left this month.<?php endif; ?>
+      </div>
+    </div>
+    <div class="muted" style="font-size:12px;white-space:nowrap"><?= $used ?> / <?= $cap ?> used</div>
+  </div>
+<?php endif; ?>
+
 <div class="panel settings-form" style="max-width:820px;margin-top:14px">
   <form method="post" action="/ai-forms">
     <input type="hidden" name="action" value="suggest">

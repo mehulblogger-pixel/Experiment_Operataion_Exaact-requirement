@@ -56,17 +56,69 @@ function ai_key_mask($key) { $key = (string)$key; $n = strlen($key); return $n =
 // A key input is "unchanged" if left blank or still showing the mask.
 function ai_key_is_placeholder($v) { $v = trim((string)$v); return $v === '' || strpos($v, '•') !== false; }
 
-// Whether any provider is enabled with a key (used as the AI seam for features).
+// ---- Platform-provided AI (the shared "pool") + monthly cap ----------------
+// The platform (super admin) can supply AI centrally, so a non-technical customer
+// gets the AI features with no setup. The key is a SERVER secret — read from the
+// environment or config.local.php, never a tenant database and never git. Usage is
+// metered per workspace per month and HARD-CAPPED: a call over the cap is refused
+// before it ever reaches the provider, so the platform can never be over-charged.
+// A workspace that adds its OWN key bypasses the pool and the cap (unlimited).
+function platform_ai_cfg($k, $d = '') {
+    $env = getenv('PLATFORM_AI_' . strtoupper($k));
+    if ($env !== false && $env !== '') return $env;
+    $const = 'PLATFORM_AI_' . strtoupper($k);
+    return defined($const) ? constant($const) : $d;
+}
+function platform_ai_default_model($prov) {
+    static $d = ['openai' => 'gpt-4o-mini', 'anthropic' => 'claude-haiku-4-5-20251001',
+        'gemini' => 'gemini-2.5-flash', 'perplexity' => 'sonar', 'copilot' => 'gpt-4o-mini'];
+    return $d[$prov] ?? '';
+}
+function platform_ai_config() {
+    $prov = strtolower(trim((string) platform_ai_cfg('provider')));
+    $key  = trim((string) platform_ai_cfg('key'));
+    if ($prov === '' || $key === '') return [];
+    $model = trim((string) platform_ai_cfg('model')) ?: platform_ai_default_model($prov);
+    if ($model === '') return [];
+    return ['provider' => $prov, 'key' => $key, 'model' => $model, 'base' => trim((string) platform_ai_cfg('base'))];
+}
+function platform_ai_available() { return platform_ai_config() !== []; }
+// Only a hosted workspace draws on the pool; the control/owner install always uses
+// its own keys with no cap.
+function ai_pool_applies() { return function_exists('current_tenant') && current_tenant() !== '' && platform_ai_available(); }
+
+// Monthly cap + meter, per workspace. Counts AI ACTIONS (each feature call = 1);
+// every call has a bounded max_tokens, so a request cap bounds the monthly cost.
+const AI_DEFAULT_MONTHLY_CAP = 100;
+function ai_monthly_cap() {
+    $c = function_exists('setting_get') ? (int) setting_get('ai_monthly_cap', 0) : 0;
+    return $c > 0 ? $c : AI_DEFAULT_MONTHLY_CAP;
+}
+function ai_usage_setting() { return 'ai_usage_' . date('Y-m'); }
+function ai_usage_month()   { return function_exists('setting_get') ? (int) setting_get(ai_usage_setting(), 0) : 0; }
+function ai_usage_bump($n = 1) { if (function_exists('setting_set')) setting_set(ai_usage_setting(), (string) (ai_usage_month() + max(0, (int) $n))); }
+function ai_pool_remaining() { return max(0, ai_monthly_cap() - ai_usage_month()); }
+function ai_pool_over()      { return ai_usage_month() >= ai_monthly_cap(); }
+
+// Whether AI is usable at all here — an own key, or the platform pool. (When the
+// pool is configured but this month's cap is spent, AI is still "available"; the
+// call is refused with a clear message, not hidden behind a setup wall.)
 function ai_enabled() {
     foreach (ai_config() as $p) if (!empty($p['enabled']) && trim((string)($p['key'] ?? '')) !== '') return true;
-    return false;
+    return ai_pool_applies();
 }
-// The first enabled provider + its first active model, for feature calls.
+// The provider + model to use for a feature call. A workspace's OWN enabled key
+// wins (unlimited); otherwise the platform pool while under the monthly cap. The
+// pool result carries its key + base, since those are not in the tenant config.
 function ai_active() {
     foreach (ai_config() as $name => $p) {
         if (empty($p['enabled']) || trim((string)($p['key'] ?? '')) === '') continue;
         $m = $p['active'][0] ?? ($p['models'][0] ?? '');
-        if ($m) return ['provider' => $name, 'model' => $m];
+        if ($m) return ['provider' => $name, 'model' => $m, 'source' => 'own'];
+    }
+    if (ai_pool_applies() && !ai_pool_over()) {
+        $pc = platform_ai_config();
+        if ($pc) return ['provider' => $pc['provider'], 'model' => $pc['model'], 'key' => $pc['key'], 'base' => $pc['base'], 'source' => 'pool'];
     }
     return null;
 }
@@ -125,9 +177,17 @@ function ai_error_message($err, $body) {
 }
 function ai_chat($system, $user, $maxTokens = 1200) {
     $act = ai_active();
-    if (!$act) return [null, 'No AI provider is enabled. Add a key under Settings → AI providers.'];
+    if (!$act) {
+        if (function_exists('ai_pool_applies') && ai_pool_applies() && ai_pool_over())
+            return [null, 'This workspace has used all ' . ai_monthly_cap() . ' AI actions included this month (they reset on the 1st). For unlimited use now, add your own AI key under Settings → AI providers.'];
+        return [null, 'No AI provider is enabled. Add a key under Settings → AI providers.'];
+    }
     $p = $act['provider']; $model = $act['model'];
-    $cfg = ai_provider_cfg($p); $key = trim((string)$cfg['key']);
+    $pool = (($act['source'] ?? '') === 'pool');
+    // The pool result carries its own key/base (a server secret); a workspace's own
+    // provider reads them from its saved config.
+    $cfg = $pool ? ['key' => $act['key'], 'base' => $act['base'] ?? ''] : ai_provider_cfg($p);
+    $key = trim((string)$cfg['key']);
     $reg = ai_providers()[$p] ?? null;
     if (!$reg || $key === '') return [null, 'The selected AI provider has no API key.'];
     // Never send an empty prompt. Gemini answers an empty "contents" with a raw
@@ -174,6 +234,7 @@ function ai_chat($system, $user, $maxTokens = 1200) {
         ?? ($d['candidates'][0]['content']['parts'][0]['text'] ?? null) // gemini
         ?? null;
     if ($text === null || trim((string)$text) === '') return [null, 'The AI provider returned no usable text.'];
+    if ($pool && function_exists('ai_usage_bump')) ai_usage_bump(1);   // one AI action against this month's allowance (only on real success)
     return [trim((string)$text), null];
 }
 
@@ -201,9 +262,15 @@ function ai_can_send_doc($mime) {
 // are dropped; if none remain it falls back to the plain-text ai_chat().
 function ai_chat_doc($system, $user, $files, $maxTokens = 1500) {
     $act = ai_active();
-    if (!$act) return [null, 'No AI provider is enabled. Add a key under Settings → AI providers.'];
+    if (!$act) {
+        if (function_exists('ai_pool_applies') && ai_pool_applies() && ai_pool_over())
+            return [null, 'This workspace has used all ' . ai_monthly_cap() . ' AI actions included this month (they reset on the 1st). Add your own AI key under Settings → AI providers for unlimited use.'];
+        return [null, 'No AI provider is enabled. Add a key under Settings → AI providers.'];
+    }
     $p = $act['provider']; $model = $act['model'];
-    $cfg = ai_provider_cfg($p); $key = trim((string)$cfg['key']);
+    $pool = (($act['source'] ?? '') === 'pool');
+    $cfg = $pool ? ['key' => $act['key'], 'base' => $act['base'] ?? ''] : ai_provider_cfg($p);
+    $key = trim((string)$cfg['key']);
     if (!isset(ai_providers()[$p]) || $key === '') return [null, 'The selected AI provider has no API key.'];
     $system = trim((string)$system); $user = trim((string)$user);
     if ($user === '') $user = 'Extract the requested information from the attached document.';
@@ -258,6 +325,7 @@ function ai_chat_doc($system, $user, $files, $maxTokens = 1500) {
         ?? ($d['candidates'][0]['content']['parts'][0]['text'] ?? null)
         ?? null;
     if ($text === null || trim((string)$text) === '') return [null, 'The AI provider returned no usable text.'];
+    if ($pool && function_exists('ai_usage_bump')) ai_usage_bump(1);   // one AI action against this month's allowance (only on real success)
     return [trim((string)$text), null];
 }
 function ai_parse_models($mode, $data) {
