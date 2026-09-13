@@ -235,20 +235,37 @@ function ops_positions($route, $method) {
     ops_require(is_coordinator_level(), 'Only coordinators / administrators can manage positions.');
 
     if ($route === 'positions-import') {
-        $result = null; $preview = null; $raw = '';
-        if ($method === 'POST') {
-            $raw = (string)($_POST['data'] ?? '');
-            if ($raw === '' && !empty($_FILES['file']['tmp_name']) && is_uploaded_file($_FILES['file']['tmp_name']))
-                $raw = (string)@file_get_contents($_FILES['file']['tmp_name']);
-            $rows = positions_import_parse($raw);
-            if ((string)($_POST['do'] ?? '') === 'apply') {
-                $result = positions_import_apply($rows);
-                flash("Org chart imported — {$result['created']} created, {$result['updated']} updated, {$result['linked']} linked.");
+        // Downloadable CSV template.
+        if (($_GET['tpl'] ?? '') === '1' && function_exists('orga_template_csv')) {
+            header('Content-Type: text/csv; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="organogram-template.csv"');
+            echo orga_template_csv();
+            return true;
+        }
+        $preview = null; $raw = ''; $note = ''; $error = ''; $format = ''; $summary = null; $rowsJson = '';
+        if ($method === 'POST' && function_exists('orga_read')) {
+            $do = (string)($_POST['do'] ?? '');
+            if ($do === 'apply') {
+                // Confirm — apply the rows the admin approved on the preview. The AI
+                // (if used) ran once at the preview step; this never calls it again.
+                $rows = json_decode((string)($_POST['rows_json'] ?? ''), true);
+                $rows = is_array($rows) ? $rows : [];
+                if (!$rows) { flash('Nothing to import — the preview was empty.', 'error'); redirect('/positions-import'); return true; }
+                $r = orga_apply($rows);
+                $msg = "Organogram imported — {$r['created']} position(s) created, {$r['updated']} updated, "
+                     . "{$r['linked']} reporting link(s), {$r['offices']} office(s) and {$r['designations']} designation(s) added.";
+                if (!empty($r['unresolved'])) $msg .= ' ' . count($r['unresolved']) . ' reporting line(s) could not be matched — set them on the org chart.';
+                flash($msg);
                 redirect('/positions-org'); return true;
             }
-            $preview = $rows;   // "Preview" — show what was parsed before committing
+            // Preview — read whatever was uploaded or pasted into rows.
+            $raw = (string)($_POST['data'] ?? '');
+            $read = orga_read($raw, $_FILES['file'] ?? null);
+            $preview = $read['rows']; $note = $read['note']; $error = $read['error']; $format = $read['format'];
+            $summary = $preview ? orga_preview_summary($preview) : null;
+            $rowsJson = $preview ? json_encode(array_map('orga_norm_row', $preview)) : '';
         }
-        view('ops/positions_import', ['preview' => $preview, 'raw' => $raw]);
+        view('ops/positions_import', compact('preview', 'raw', 'note', 'error', 'format', 'summary', 'rowsJson'));
         return true;
     }
 
