@@ -41,6 +41,14 @@ if (function_exists('ops_module_gate')) {
     t_ok(ops_module_gate('company-profile', true) !== false, 'peek: an admin route is allowed');
 }
 
+// The "All master lists" screen (/lookups) must GATE the rendered groups, not
+// only the "add new list" dropdown — the real leak the recruitment tenant saw.
+$lkView = (string) @file_get_contents(__DIR__ . '/../views/ops/lookups.php');
+t_ok(strpos($lkView, 'lk_group_enabled($gname)') !== false || strpos($lkView, '$off[$gname]') !== false,
+    'the All-master-lists screen collapses off-plan module groups (not just the add-list dropdown)');
+t_ok(substr_count($lkView, 'lk_group_enabled') >= 2,
+    'lk_group_enabled gates both the add-list dropdown AND the rendered groups');
+
 setting_set('modules_off', $savedOff);
 setting_set('licence_key', $savedKey);
 if (function_exists('lk_state')) lk_state(true);

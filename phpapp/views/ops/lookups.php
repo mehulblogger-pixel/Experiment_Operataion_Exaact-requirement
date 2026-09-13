@@ -2,8 +2,8 @@
   // Every dropdown in the app, grouped by the module it belongs to so an admin
   // can find the one they mean without knowing its internal key.
   $groups = [];
-  foreach ($types as $t) $groups[$t['module'] ?: 'Other'][] = $t;
-  $order = ['Sales','Operations','Reporting','People','Money','Directory','Other'];
+  foreach ($types as $t) $groups[(string)($t['module'] ?? '')][] = $t;   // '' = untagged / core
+  $order = ['People','Directory','Sales','Operations','Reporting','Money',''];
   uksort($groups, function($a, $b) use ($order) {
       $ia = array_search($a, $order, true); $ib = array_search($b, $order, true);
       return ($ia === false ? 99 : $ia) <=> ($ib === false ? 99 : $ib);
@@ -63,13 +63,17 @@
   </form>
 </details>
 
-<?php foreach ($groups as $gname => $list):
-      if ($q !== '') {
-          $list = array_values(array_filter($list, fn($t) =>
-              stripos($t['label'], $q) !== false || stripos($t['type_key'], $q) !== false));
-          if (!$list) continue;
-      } ?>
-  <h3 class="tab-sub"><?= e($gname) ?> <span class="muted">(<?= count($list) ?>)</span></h3>
+<?php
+// Render one module's group of lists. Defined as a closure so we can render the
+// on-plan groups inline and the off-plan ones inside a collapsed section.
+$renderGroup = function ($gname, $list) use ($q, $counts, $formsByType) {
+    if ($q !== '') {
+        $list = array_values(array_filter($list, fn($t) => stripos($t['label'], $q) !== false || stripos($t['type_key'], $q) !== false));
+        if (!$list) return;
+    }
+    $label = function_exists('lk_module_group_label') ? lk_module_group_label($gname) : ($gname !== '' ? $gname : 'General');
+    ?>
+  <h3 class="tab-sub"><?= e($label) ?> <span class="muted">(<?= count($list) ?>)</span></h3>
   <div class="panel" style="padding:0;overflow:hidden">
     <div class="tbl-scroll" style="overflow-x:auto">
     <table class="dt">
@@ -96,4 +100,21 @@
     </table>
     </div>
   </div>
-<?php endforeach; ?>
+<?php };
+
+// Split into the modules THIS workspace has (shown) and the ones it does not
+// (collapsed), so a recruitment plan is not carrying inspection / sales / money /
+// reporting lists on screen. Untagged / core / directory groups always show.
+$off = [];
+foreach ($groups as $gname => $list) {
+    if (function_exists('lk_group_enabled') && !lk_group_enabled($gname)) { $off[$gname] = $list; continue; }
+    $renderGroup($gname, $list);
+}
+?>
+<?php if ($off): ?>
+  <details style="margin-top:18px">
+    <summary style="cursor:pointer;color:var(--muted,#64748b);font-size:13px">Lists for modules not in this plan (<?= count($off) ?>) — hidden from day-to-day use</summary>
+    <p class="muted" style="font-size:12.5px;margin:8px 0 4px">These belong to modules this workspace does not have switched on (inspection, sales, finance, reporting…). They are kept, not deleted — turn the module on under Workspace setup → Features to use them.</p>
+    <?php foreach ($off as $gname => $list) $renderGroup($gname, $list); ?>
+  </details>
+<?php endif; ?>
