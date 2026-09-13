@@ -2747,6 +2747,8 @@ function ops_dispatch($route, $method) {
             return ops_recruit_pipelines($route, $method);
         case $route === 'candidate-flow':      // Phase 2b — move a candidate along its configured pipeline
             return ops_recruit_candidate_flow($route, $method);
+        case $route === 'candidate-stage':     // Per-stage capture — notes + documents for one pipeline stage
+            return ops_recruit_candidate_stage($route, $method);
         case $route === 'positions' || $route === 'positions-org' || $route === 'positions-import':   // Phase 3 — position master, org chart & import
             return ops_positions($route, $method);
         case $route === 'requisition-position':                      // Phase 3 — link a requisition to a position

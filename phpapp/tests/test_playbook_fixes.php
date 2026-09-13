@@ -146,3 +146,38 @@ if (!function_exists('iv_panel_from_post') || !function_exists('iv_candidate_dep
         t_ok(false, 'interview panel test raised: ' . $e->getMessage());
     }
 }
+
+t_section('Playbook fixes — per-stage capture (10.3)');
+
+if (!function_exists('cand_stage_note_save') || !function_exists('docs_for_stage')) {
+    t_ok(true, 'per-stage capture helpers not present — skipped');
+} else {
+    recruitpipe_migrate(); recruit_iv_migrate();
+    try {
+        $now = function_exists('now_iso') ? now_iso() : date('c');
+        db()->prepare("INSERT INTO candidates (first_name,last_name,designation,stage,created_at) VALUES ('Stage','Test','Engineer','APPLIED',?)")->execute([$now]);
+        $sc = (int) db()->lastInsertId();
+        $stageId = 4242;   // arbitrary stage id — the capture is keyed by (candidate, stage)
+
+        // Notes are stored per (candidate, stage) and updated in place, not duplicated.
+        cand_stage_note_save($sc, $stageId, 'Screened — strong fit, proceed to L1', 'Tester');
+        $n = cand_stage_note($sc, $stageId);
+        t_ok($n && strpos((string)$n['notes'], 'strong fit') !== false, 'stage notes are saved and read back');
+        cand_stage_note_save($sc, $stageId, 'Updated note', 'Tester');
+        $cnt = (int) ops_val("SELECT COUNT(*) FROM candidate_stage_data WHERE candidate_id=? AND stage_id=?", [$sc, $stageId]);
+        t_ok($cnt === 1, 'saving again updates the same stage row (no duplicate)');
+
+        // A document uploaded with a stage_id is tagged to that stage and listed for it.
+        db()->prepare("INSERT INTO candidate_docs (candidate_id,doc_type,file_name,status,pipeline_stage_id,created_at) VALUES (?,?,?,?,?,?)")
+            ->execute([$sc, 'Educational certificate', 'degree.pdf', 'UPLOADED', $stageId, $now]);
+        $sd = docs_for_stage($sc, $stageId);
+        t_ok(count($sd) === 1 && $sd[0]['doc_type'] === 'Educational certificate', 'a document captured against a stage is listed for that stage only');
+        t_ok(count(docs_for_stage($sc, 9999)) === 0, 'another stage does not see it');
+
+        db()->prepare("DELETE FROM candidate_docs WHERE candidate_id=?")->execute([$sc]);
+        db()->prepare("DELETE FROM candidate_stage_data WHERE candidate_id=?")->execute([$sc]);
+        db()->prepare("DELETE FROM candidates WHERE id=?")->execute([$sc]);
+    } catch (Throwable $e) {
+        t_ok(false, 'per-stage capture test raised: ' . $e->getMessage());
+    }
+}

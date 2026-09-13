@@ -88,8 +88,38 @@ function recruitpipe_migrate() {
         // seniority (e.g. an L2 only for senior grades). Additive; the SRF form
         // exposes it in Phase 3. Empty = "any grade".
         ensure_column('requisitions', 'grade', "VARCHAR(80) DEFAULT ''");
+        // Per-stage capture: the notes / details a recruiter records at each stage
+        // of a candidate's journey (the Pipeline tab). One row per (candidate,
+        // stage); documents attach separately via candidate_docs.pipeline_stage_id.
+        $lt = (function_exists('db_driver') && db_driver() === 'sqlite') ? 'TEXT' : 'LONGTEXT';
+        db()->exec("CREATE TABLE IF NOT EXISTS candidate_stage_data (
+            id $pk,
+            candidate_id INT,
+            stage_id INT,
+            notes $lt,
+            updated_by VARCHAR(160) DEFAULT '',
+            updated_at VARCHAR(30) DEFAULT ''
+        )");
+        if (function_exists('act_index')) act_index('candidate_stage_data', 'idx_csd_cand', '(candidate_id)');
     } catch (Throwable $e) { /* never break boot */ }
     recruitpipe_seed();
+}
+
+// ---- Per-stage capture (notes) --------------------------------------------
+function cand_stage_note($candId, $stageId) {
+    recruitpipe_migrate();
+    try { $r = ops_one("SELECT * FROM candidate_stage_data WHERE candidate_id=? AND stage_id=?", [(int)$candId, (int)$stageId]); }
+    catch (Throwable $e) { $r = null; }
+    return $r ?: null;
+}
+function cand_stage_note_save($candId, $stageId, $notes, $actor) {
+    recruitpipe_migrate();
+    $now = date('c');
+    $ex = cand_stage_note($candId, $stageId);
+    if ($ex) db()->prepare("UPDATE candidate_stage_data SET notes=?, updated_by=?, updated_at=? WHERE id=?")
+        ->execute([(string)$notes, (string)$actor, $now, (int)$ex['id']]);
+    else db()->prepare("INSERT INTO candidate_stage_data (candidate_id,stage_id,notes,updated_by,updated_at) VALUES (?,?,?,?,?)")
+        ->execute([(int)$candId, (int)$stageId, (string)$notes, (string)$actor, $now]);
 }
 
 // ---- Seed the shipped templates (only when empty) --------------------------
@@ -526,6 +556,140 @@ function recruitpipe_candidate_panel($cand) {
       <?php elseif ($closed): ?>
         <div class="muted" style="font-size:12px;margin-top:4px">The workflow is locked while the candidate is closed.</div>
       <?php endif; ?>
+    </div>
+    <?php
+}
+
+// ============================================================================
+//  Per-stage capture — the "Pipeline" tab on the candidate screen.
+//  Each stage of the candidate's configured workflow gets its own notes and its
+//  own uploaded documents, so everything is captured against the step it belongs
+//  to (not just against the candidate as a whole).
+// ============================================================================
+function ops_recruit_candidate_stage($route, $method) {
+    ops_require(is_coordinator_level(), 'Only coordinators and admins can update a stage.');
+    $id = (int)($_GET['id'] ?? 0);
+    $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
+    if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    if ($method === 'POST') {
+        $do = (string)($_POST['do'] ?? '');
+        $stageId = (int)($_POST['stage_id'] ?? 0);
+        if ($do === 'notes' && $stageId) {
+            cand_stage_note_save($id, $stageId, (string)($_POST['notes'] ?? ''), user_name(current_user()));
+            flash('Stage notes saved.');
+        } elseif ($do === 'upload' && $stageId) {
+            [$ok, $msg] = doc_upload($id, $_POST + ['stage_id' => $stageId], $_FILES['file'] ?? []);
+            flash($msg, $ok ? 'success' : 'error');
+        } elseif ($do === 'deletedoc') {
+            if (function_exists('doc_delete')) doc_delete((int)($_POST['doc_id'] ?? 0));
+            flash('Document removed.');
+        }
+    }
+    redirect('/candidate?id=' . $id . '#ct=pipeline');
+    return true;
+}
+
+// The Pipeline tab: every stage of the candidate's workflow, each with its own
+// notes + document capture, and a one-click "move here".
+function recruitpipe_stage_tab($cand) {
+    if (!is_array($cand) || empty($cand['id'])) return;
+    [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    if (!$pipe || !$eff) { echo '<div class="panel"><p class="muted">No hiring workflow applies to this candidate yet. Once a requirement is linked, its workflow appears here.</p></div>'; return; }
+    $can = function_exists('is_coordinator_level') && is_coordinator_level();
+    $closed = in_array((string)$cand['stage'], recruitpipe_legacy_terminal(), true);
+    $kinds = defined('RPIPE_STAGE_KINDS') ? RPIPE_STAGE_KINDS : [];
+    $cid = (int)$cand['id'];
+    $pill = ['VERIFIED'=>'p-ok','REJECTED'=>'p-bad','EXPIRED'=>'p-bad','RESUBMIT'=>'p-warn','UNDER_REVIEW'=>'p-info','UPLOADED'=>'p-info','REQUESTED'=>'p-warn','REQUIRED'=>'p-mut'];
+    ?>
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <h3 class="tab-sub" style="margin:0">Pipeline — <?= $e($pipe['name']) ?></h3>
+        <span class="muted" style="font-size:12px">Enter notes and upload documents for each stage. Stage <?= $idx + 1 ?> of <?= count($eff) ?> is current.</span>
+      </div>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+      <?php foreach ($eff as $i => $s):
+        $state = $i < $idx ? 'done' : ($i === $idx ? 'now' : 'todo');
+        $accent = $state === 'done' ? '#15803d' : ($state === 'now' ? 'var(--brand,#1e40af)' : '#94a3b8');
+        $lbl = $kinds[$s['kind']] ?? ucfirst((string)$s['kind']);
+        $note = cand_stage_note($cid, (int)$s['id']);
+        $sdocs = docs_for_stage($cid, (int)$s['id']);
+        $reqDocs = array_filter(array_map('trim', explode(',', (string)($s['required_docs'] ?? ''))));
+        $open = ($state === 'now'); ?>
+        <details <?= $open ? 'open' : '' ?> style="border:1px solid var(--line,#e5e7eb);border-left:4px solid <?= $accent ?>;border-radius:10px;overflow:hidden">
+          <summary style="cursor:pointer;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;list-style:none">
+            <span style="font-weight:700;color:<?= $accent ?>"><?= $i + 1 ?></span>
+            <b style="font-size:13.5px"><?= $e($s['name']) ?></b>
+            <span class="pill <?= $state==='done'?'p-ok':($state==='now'?'p-info':'p-mut') ?>" style="font-size:10px"><?= $state==='done'?'Done':($state==='now'?'Current':'Upcoming') ?></span>
+            <?php if ($lbl && $s['kind'] !== 'step'): ?><span class="muted" style="font-size:11px"><?= $e($lbl) ?></span><?php endif; ?>
+            <?php if ($sdocs): ?><span class="muted" style="font-size:11px">· <?= count($sdocs) ?> doc<?= count($sdocs)===1?'':'s' ?></span><?php endif; ?>
+            <?php if ($note && trim((string)$note['notes']) !== ''): ?><span class="muted" style="font-size:11px">· notes ✓</span><?php endif; ?>
+          </summary>
+          <div style="padding:0 14px 13px">
+            <?php if ($reqDocs): ?>
+              <div class="muted" style="font-size:12px;margin-bottom:8px">Required at this stage: <?= $e(implode(', ', $reqDocs)) ?></div>
+            <?php endif; ?>
+
+            <?php // Notes for this stage ?>
+            <?php if ($can && !$closed): ?>
+            <form method="post" action="/candidate-stage?id=<?= $cid ?>" style="margin-bottom:10px">
+              <input type="hidden" name="do" value="notes"><input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
+              <label class="ff-l" style="display:block;font-size:11.5px;font-weight:600;color:var(--muted,#656e7a);margin-bottom:3px">Notes / details captured at this stage</label>
+              <textarea class="form-control" name="notes" rows="2" placeholder="What happened at this stage — screening notes, decision, next step…"><?= $e($note['notes'] ?? '') ?></textarea>
+              <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <button class="btn secondary" style="padding:5px 12px;font-size:12.5px">Save notes</button>
+                <?php if ($i !== $idx): ?>
+                <span style="margin-left:auto"></span>
+                <?php endif; ?>
+              </div>
+            </form>
+            <?php elseif ($note && trim((string)$note['notes']) !== ''): ?>
+              <div style="font-size:13px;white-space:pre-wrap;margin-bottom:10px"><?= $e($note['notes']) ?></div>
+            <?php endif; ?>
+
+            <?php // Documents captured against this stage ?>
+            <?php if ($sdocs): ?>
+            <div style="margin-bottom:8px">
+              <?php foreach ($sdocs as $d): $st = function_exists('doc_effective_status') ? doc_effective_status($d) : ($d['status'] ?? ''); ?>
+                <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--line-2,#f1f5f9)">
+                  <span>📎 <b><?= $e($d['doc_type']) ?></b>
+                    <?php if ($d['file_name']): ?><?php if (function_exists('doc_can_download') && doc_can_download($d) && $d['file_data']): ?>· <a href="<?= $e($d['file_data']) ?>" download="<?= $e($d['file_name']) ?>"><?= $e($d['file_name']) ?></a><?php else: ?>· <span class="muted"><?= $e($d['file_name']) ?></span><?php endif; ?><?php endif; ?></span>
+                  <span class="pill <?= $pill[$st] ?? 'p-mut' ?>" style="font-size:10px"><?= $e(DOC_STATUSES[$st] ?? $st) ?></span>
+                  <?php if ($can && !$closed): ?>
+                  <form method="post" action="/candidate-stage?id=<?= $cid ?>" style="margin:0 0 0 auto" onsubmit="return confirm('Remove this document?')">
+                    <input type="hidden" name="do" value="deletedoc"><input type="hidden" name="doc_id" value="<?= (int)$d['id'] ?>">
+                    <button class="btn secondary" style="padding:2px 8px;font-size:11px">✕</button>
+                  </form>
+                  <?php endif; ?>
+                </div>
+              <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($can && !$closed): ?>
+            <form method="post" action="/candidate-stage?id=<?= $cid ?>" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+              <input type="hidden" name="do" value="upload"><input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
+              <div><label class="ff-l" style="display:block;font-size:11.5px;font-weight:600;color:var(--muted,#656e7a);margin-bottom:3px">Document type</label>
+                <select class="form-control" name="doc_type" style="min-width:150px"><?php foreach (doc_types() as $t): ?><option><?= $e($t) ?></option><?php endforeach; ?></select></div>
+              <div><label class="ff-l" style="display:block;font-size:11.5px;font-weight:600;color:var(--muted,#656e7a);margin-bottom:3px">Upload (≤12 MB)</label><input class="form-control" type="file" name="file"></div>
+              <button class="btn secondary" style="padding:6px 12px;font-size:12.5px">Upload to this stage</button>
+              <?php if ($i !== $idx): ?>
+              <span style="margin-left:auto"></span>
+              <?php endif; ?>
+            </form>
+            <?php endif; ?>
+
+            <?php // Move the candidate to this stage (reuses the flow handler's jump). ?>
+            <?php if ($can && !$closed && $i !== $idx): ?>
+            <form method="post" action="/candidate-flow?id=<?= $cid ?>" style="margin-top:9px" onsubmit="return confirm('Move this candidate to “<?= $e(addslashes($s['name'])) ?>”?')">
+              <input type="hidden" name="action" value="jump"><input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
+              <button class="btn" style="padding:5px 12px;font-size:12.5px"><?= $i < $idx ? '← Move back here' : 'Move candidate here →' ?></button>
+            </form>
+            <?php endif; ?>
+          </div>
+        </details>
+      <?php endforeach; ?>
+      </div>
     </div>
     <?php
 }

@@ -101,6 +101,10 @@ function recruit_iv_migrate() {
         // A person's department — used to default an interview panel to the
         // candidate's own department. Additive; blank on existing users.
         ensure_column('users', 'department', "VARCHAR(120) DEFAULT ''");
+        // A document can be captured against a specific pipeline stage (the
+        // Pipeline tab), so each stage collects its own paperwork. Nullable —
+        // existing documents stay candidate-wide.
+        ensure_column('candidate_docs', 'pipeline_stage_id', 'INT NULL');
     } catch (Throwable $e) { /* never break boot */ }
 }
 
@@ -190,6 +194,12 @@ function docs_list($candidateId) {
     return ops_all("SELECT * FROM candidate_docs WHERE candidate_id=? ORDER BY id", [(int)$candidateId]);
 }
 function doc_get($id) { recruit_iv_migrate(); return ops_one("SELECT * FROM candidate_docs WHERE id=?", [(int)$id]) ?: null; }
+// Documents captured against one pipeline stage (the Pipeline tab).
+function docs_for_stage($candidateId, $stageId) {
+    recruit_iv_migrate();
+    try { return ops_all("SELECT * FROM candidate_docs WHERE candidate_id=? AND pipeline_stage_id=? ORDER BY id", [(int)$candidateId, (int)$stageId]); }
+    catch (Throwable $e) { return []; }
+}
 
 // The effective (display) status — a verified doc whose expiry has passed reads EXPIRED.
 function doc_effective_status($d) {
@@ -224,9 +234,10 @@ function doc_upload($candidateId, $post, $file) {
             ->execute([$name, $data, $issue, $expiry, _iv_actor(), _iv_now(), $id]);
     } else {
         $type = trim((string)($post['doc_type'] ?? 'Other')) ?: 'Other';
-        db()->prepare("INSERT INTO candidate_docs (candidate_id,doc_type,`sensitive`,file_name,file_data,issue_date,expiry_date,status,uploaded_by,uploaded_at,created_at)
-                       VALUES (?,?,?,?,?,?,?, 'UPLOADED', ?,?,?)")
-            ->execute([(int)$candidateId, $type, doc_is_sensitive($type) ? 1 : 0, $name, $data, $issue, $expiry, _iv_actor(), _iv_now(), _iv_now()]);
+        $stageId = (int)($post['stage_id'] ?? 0) ?: null;   // captured against a pipeline stage, when provided
+        db()->prepare("INSERT INTO candidate_docs (candidate_id,doc_type,`sensitive`,file_name,file_data,issue_date,expiry_date,status,pipeline_stage_id,uploaded_by,uploaded_at,created_at)
+                       VALUES (?,?,?,?,?,?,?, 'UPLOADED', ?,?,?,?)")
+            ->execute([(int)$candidateId, $type, doc_is_sensitive($type) ? 1 : 0, $name, $data, $issue, $expiry, $stageId, _iv_actor(), _iv_now(), _iv_now()]);
     }
     return [true, 'Document uploaded.'];
 }
