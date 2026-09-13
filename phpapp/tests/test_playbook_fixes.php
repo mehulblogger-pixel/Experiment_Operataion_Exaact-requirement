@@ -181,3 +181,39 @@ if (!function_exists('cand_stage_note_save') || !function_exists('docs_for_stage
         t_ok(false, 'per-stage capture test raised: ' . $e->getMessage());
     }
 }
+
+t_section('Playbook fixes — per-interviewer scorecards (10.3)');
+
+if (!function_exists('iv_score_save') || !function_exists('iv_score_summary')) {
+    t_ok(true, 'per-interviewer scorecard helpers not present — skipped');
+} else {
+    recruit_iv_migrate();
+    try {
+        $now = function_exists('now_iso') ? now_iso() : date('c');
+        db()->prepare("INSERT INTO interviews (candidate_id,round,mode,panel,result,created_at) VALUES (0,'L1','In person','Meera Nair, Rohit Sen','SCHEDULED',?)")->execute([$now]);
+        $iv = (int) db()->lastInsertId();
+
+        // Two panel members score individually.
+        iv_score_save(['iv_id' => $iv, 'member' => 'Meera Nair', 'srating' => 4, 'srecommendation' => 'Hire', 'scomments' => 'Solid on fundamentals']);
+        iv_score_save(['iv_id' => $iv, 'member' => 'Rohit Sen', 'srating' => 2, 'srecommendation' => 'No hire']);
+        $sum = iv_score_summary($iv);
+        t_ok($sum['n'] === 2, 'two individual panel-member scores are recorded');
+        t_ok(abs($sum['avg'] - 3.0) < 0.01, 'the panel average is computed across members (4 and 2 → 3.0)');
+
+        // Saving the same member again updates their row, not a duplicate.
+        iv_score_save(['iv_id' => $iv, 'member' => 'Meera Nair', 'srating' => 5, 'srecommendation' => 'Strong hire']);
+        $sum2 = iv_score_summary($iv);
+        t_ok($sum2['n'] === 2, 'a second save for the same interviewer updates in place (no duplicate)');
+        t_ok(abs($sum2['avg'] - 3.5) < 0.01, 'the average reflects the updated score (5 and 2 → 3.5)');
+
+        // Panel members are parsed from the interview panel for the picker.
+        $ivrow = ops_one("SELECT * FROM interviews WHERE id=?", [$iv]);
+        $mem = iv_panel_members($ivrow);
+        t_ok(in_array('Meera Nair', $mem, true) && in_array('Rohit Sen', $mem, true), 'the panel members are offered for scoring');
+
+        db()->prepare("DELETE FROM interview_scores WHERE interview_id=?")->execute([$iv]);
+        db()->prepare("DELETE FROM interviews WHERE id=?")->execute([$iv]);
+    } catch (Throwable $e) {
+        t_ok(false, 'per-interviewer scorecard test raised: ' . $e->getMessage());
+    }
+}

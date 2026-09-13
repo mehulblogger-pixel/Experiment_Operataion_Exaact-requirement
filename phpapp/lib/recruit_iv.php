@@ -105,7 +105,57 @@ function recruit_iv_migrate() {
         // Pipeline tab), so each stage collects its own paperwork. Nullable —
         // existing documents stay candidate-wide.
         ensure_column('candidate_docs', 'pipeline_stage_id', 'INT NULL');
+        // Per-interviewer scorecards: each panel member scores one interview
+        // individually (rating, recommendation, comments). The interview's own
+        // rating/recommendation stay as the overall/aggregate view.
+        db()->exec("CREATE TABLE IF NOT EXISTS interview_scores (
+            id $pk,
+            interview_id INT,
+            member VARCHAR(160) DEFAULT '',
+            rating INT DEFAULT 0,
+            recommendation VARCHAR(40) DEFAULT '',
+            comments $lt,
+            created_by VARCHAR(160) DEFAULT '',
+            created_at VARCHAR(30) DEFAULT ''
+        )");
+        if (function_exists('act_index')) act_index('interview_scores', 'idx_ivs_iv', '(interview_id)');
     } catch (Throwable $e) { /* never break boot */ }
+}
+
+// ---- Per-interviewer scorecards -------------------------------------------
+function iv_scores($ivId) {
+    recruit_iv_migrate();
+    try { return ops_all("SELECT * FROM interview_scores WHERE interview_id=? ORDER BY id", [(int)$ivId]); }
+    catch (Throwable $e) { return []; }
+}
+// Count of member scores and the average of the non-zero ratings.
+function iv_score_summary($ivId) {
+    $rows = iv_scores($ivId);
+    $rated = array_values(array_filter($rows, fn($r) => (int)$r['rating'] > 0));
+    $avg = $rated ? round(array_sum(array_map(fn($r) => (int)$r['rating'], $rated)) / count($rated), 1) : 0;
+    return ['n' => count($rows), 'rated' => count($rated), 'avg' => $avg];
+}
+function iv_score_save($post) {
+    recruit_iv_migrate();
+    $ivId = (int)($post['iv_id'] ?? 0);
+    $member = trim((string)($post['member'] ?? ''));
+    if (!$ivId || $member === '') return;
+    $rating = max(0, min(5, (int)($post['srating'] ?? 0)));
+    $rec = in_array($post['srecommendation'] ?? '', IV_RECOMMENDATIONS, true) ? $post['srecommendation'] : '';
+    $comments = trim((string)($post['scomments'] ?? ''));
+    $sid = (int)($post['score_id'] ?? 0);
+    // Idempotent by member: a second save for the same interviewer updates their
+    // row rather than adding a duplicate.
+    if (!$sid) { try { $ex = ops_one("SELECT id FROM interview_scores WHERE interview_id=? AND member=?", [$ivId, $member]); if ($ex) $sid = (int)$ex['id']; } catch (Throwable $e) {} }
+    if ($sid > 0) db()->prepare("UPDATE interview_scores SET member=?,rating=?,recommendation=?,comments=? WHERE id=?")
+        ->execute([$member, $rating, $rec, $comments, $sid]);
+    else db()->prepare("INSERT INTO interview_scores (interview_id,member,rating,recommendation,comments,created_by,created_at) VALUES (?,?,?,?,?,?,?)")
+        ->execute([$ivId, $member, $rating, $rec, $comments, _iv_actor(), _iv_now()]);
+}
+function iv_score_delete($id) { recruit_iv_migrate(); db()->prepare("DELETE FROM interview_scores WHERE id=?")->execute([(int)$id]); }
+// The interviewer names on an interview's panel (for the per-member picker).
+function iv_panel_members($iv) {
+    return array_values(array_filter(array_map('trim', explode(',', (string)($iv['panel'] ?? '')))));
 }
 
 function _iv_now() { return function_exists('now_iso') ? now_iso() : date('c'); }
@@ -278,6 +328,8 @@ function ops_candidate_interview($route, $method) {
         if ($do === 'schedule') { iv_schedule($id, $_POST); flash('Interview scheduled.'); }
         elseif ($do === 'record') { iv_record((int)($_POST['iv_id'] ?? 0), $_POST); flash('Interview outcome saved.'); }
         elseif ($do === 'delete') { iv_delete((int)($_POST['iv_id'] ?? 0)); flash('Interview removed.'); }
+        elseif ($do === 'score_save') { iv_score_save($_POST); flash('Panel member score saved.'); }
+        elseif ($do === 'score_delete') { iv_score_delete((int)($_POST['score_id'] ?? 0)); flash('Score removed.'); }
     }
     redirect('/candidate?id=' . $id . '#tab=Interviews');
     return true;
@@ -350,7 +402,8 @@ function recruit_iv_panel($cand) {
       </form>
       <?php endif; ?>
       <?php if (!$ivs): ?><p class="muted">No interviews yet.</p><?php endif; ?>
-      <?php foreach ($ivs as $iv): $st = (string)$iv['result']; ?>
+      <?php foreach ($ivs as $iv): $st = (string)$iv['result'];
+            $ivScores = iv_scores((int)$iv['id']); $ivSum = iv_score_summary((int)$iv['id']); $ivMembers = iv_panel_members($iv); ?>
         <div style="border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:11px 13px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline">
             <b><?= $e($iv['round']) ?> · <?= $e($iv['mode']) ?><?= $iv['scheduled_at'] ? ' · ' . $e(function_exists('fdate') ? fdate(substr($iv['scheduled_at'],0,10), substr($iv['scheduled_at'],0,10)) . ' ' . substr($iv['scheduled_at'],11,5) : $iv['scheduled_at']) : '' ?></b>
@@ -359,8 +412,34 @@ function recruit_iv_panel($cand) {
           <?php if ($iv['panel']): ?><div class="muted" style="font-size:12px">Panel: <?= $e($iv['panel']) ?><?= $iv['location'] ? ' · ' . $e($iv['location']) : '' ?></div><?php endif; ?>
           <?php if ($iv['competencies']): ?><div class="muted" style="font-size:12px">Competencies: <?= $e($iv['competencies']) ?></div><?php endif; ?>
           <?php if ($iv['recommendation'] || $iv['comments']): ?><div style="font-size:12.5px;margin-top:4px"><?= $iv['recommendation'] ? '<b>' . $e($iv['recommendation']) . '</b> — ' : '' ?><?= $e($iv['comments']) ?></div><?php endif; ?>
+          <?php // Individual panel-member scores, with the average across the panel. ?>
+          <?php if ($ivScores): ?>
+          <div style="margin-top:7px;border-top:1px dashed var(--line,#e5e7eb);padding-top:7px">
+            <div class="muted" style="font-size:11.5px;font-weight:600;margin-bottom:3px">Panel scores<?= $ivSum['rated'] ? ' · average ' . $ivSum['avg'] . ' ★ (' . $ivSum['rated'] . ')' : '' ?></div>
+            <?php foreach ($ivScores as $sc): ?>
+              <div style="font-size:12.5px;padding:2px 0"><b><?= $e($sc['member']) ?></b><?= (int)$sc['rating'] ? ' · ' . str_repeat('★', (int)$sc['rating']) : '' ?><?= $sc['recommendation'] ? ' · ' . $e($sc['recommendation']) : '' ?><?= trim((string)$sc['comments']) !== '' ? ' — ' . $e($sc['comments']) : '' ?>
+                <?php if ($can): ?><form method="post" action="/candidate-interview?id=<?= (int)$cand['id'] ?>" style="display:inline" onsubmit="return confirm('Remove this score?')"><input type="hidden" name="do" value="score_delete"><input type="hidden" name="score_id" value="<?= (int)$sc['id'] ?>"><button class="btn secondary" style="padding:1px 6px;font-size:10.5px;margin-left:4px">✕</button></form><?php endif; ?>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
           <?php if ($can): ?>
-          <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:var(--brand,#1e40af)">Record / edit scorecard</summary>
+          <details style="margin-top:7px"><summary style="cursor:pointer;font-size:12px;color:var(--brand,#1e40af)">Add / edit a panel member's score</summary>
+            <form method="post" action="/candidate-interview?id=<?= (int)$cand['id'] ?>" style="margin-top:8px;border:1px solid var(--line-2,#eef1f5);border-radius:8px;padding:9px 11px">
+              <input type="hidden" name="do" value="score_save"><input type="hidden" name="iv_id" value="<?= (int)$iv['id'] ?>">
+              <div style="display:grid;grid-template-columns:1.4fr .7fr 1fr;gap:9px">
+                <div><label class="ff-l">Interviewer</label>
+                  <input class="form-control" name="member" list="ivmem_<?= (int)$iv['id'] ?>" placeholder="panel member" autocomplete="off">
+                  <?php if ($ivMembers): ?><datalist id="ivmem_<?= (int)$iv['id'] ?>"><?php foreach ($ivMembers as $mm): ?><option value="<?= $e($mm) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
+                </div>
+                <div><label class="ff-l">Rating (0–5)</label><input class="form-control" type="number" min="0" max="5" name="srating" value="0"></div>
+                <div><label class="ff-l">Recommendation</label><select class="form-control" name="srecommendation"><?php foreach (IV_RECOMMENDATIONS as $r): ?><option value="<?= $e($r) ?>"><?= $e($r ?: '—') ?></option><?php endforeach; ?></select></div>
+              </div>
+              <label class="ff-l" style="margin-top:7px">This interviewer's comments</label><input class="form-control" name="scomments" placeholder="their notes on the candidate">
+              <div style="margin-top:8px"><button class="btn secondary" style="padding:5px 12px;font-size:12.5px">Save this interviewer's score</button></div>
+            </form>
+          </details>
+          <details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--brand,#1e40af)">Record / edit overall outcome</summary>
             <form method="post" action="/candidate-interview?id=<?= (int)$cand['id'] ?>" style="margin-top:8px">
               <input type="hidden" name="do" value="record"><input type="hidden" name="iv_id" value="<?= (int)$iv['id'] ?>">
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
