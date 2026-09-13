@@ -2751,6 +2751,8 @@ function ops_dispatch($route, $method) {
             return ops_recruit_candidate_stage($route, $method);
         case $route === 'positions' || $route === 'positions-org' || $route === 'positions-import':   // Phase 3 — position master, org chart & import
             return ops_positions($route, $method);
+        case $route === 'departments':                               // Department hub — designations, positions, headcount & people by department
+            return ops_departments($route, $method);
         case $route === 'requisition-position':                      // Phase 3 — link a requisition to a position
             return ops_requisition_position($route, $method);
         case $route === 'candidate-interview':                       // Phase 4 — multi-round interviews + scorecards

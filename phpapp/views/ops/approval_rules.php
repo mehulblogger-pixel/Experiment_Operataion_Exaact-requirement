@@ -2,6 +2,19 @@
 // Approval rules — configurable matrix + multi-level chains. Data: $rules,$sel,$levels,$roles,$entities.
 $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
 $rules = $rules ?? []; $sel = $sel ?? null; $levels = $levels ?? []; $roles = $roles ?? []; $entities = $entities ?? [];
+// Org-chart approver options ("reporting manager", "HOD", …) offered alongside
+// the fixed roles — the approval then follows the reporting lines automatically.
+$orgApprovers = defined('APPR_ORG_APPROVERS') ? APPR_ORG_APPROVERS : [];
+$roleOptions = function ($selected) use ($e, $roles, $orgApprovers) {
+    $h = '<option value="">—</option>';
+    foreach ($roles as $rk => $rl) $h .= '<option value="' . $e($rk) . '"' . ((string) $selected === (string) $rk ? ' selected' : '') . '>' . $e($rl) . '</option>';
+    if ($orgApprovers) {
+        $h .= '<optgroup label="Follow the org chart">';
+        foreach ($orgApprovers as $tk => $tl) $h .= '<option value="' . $e($tk) . '"' . ((string) $selected === (string) $tk ? ' selected' : '') . '>' . $e($tl) . '</option>';
+        $h .= '</optgroup>';
+    }
+    return $h;
+};
 $applySummary = function ($r) use ($e) {
     $b = [];
     foreach (['applies_department'=>'Dept','applies_sbu'=>'Unit','applies_grade'=>'Grade','applies_position'=>'Position'] as $c=>$l) if (trim((string)($r[$c]??''))!=='') $b[] = $l.':'.$e($r[$c]);
@@ -61,10 +74,10 @@ $applySummary = function ($r) use ($e) {
           <form method="post" style="display:contents"><input type="hidden" name="do" value="level_save"><input type="hidden" name="rule_id" value="<?= (int)$sel['id'] ?>"><input type="hidden" name="level_id" value="<?= (int)$lv['id'] ?>">
             <td style="padding:6px 8px"><input class="form-control" type="number" name="seq" value="<?= (int)$lv['seq'] ?>" style="width:56px"></td>
             <td style="padding:6px 8px"><input class="form-control" name="label" value="<?= $e($lv['label']) ?>" placeholder="e.g. HR Head"></td>
-            <td style="padding:6px 8px"><select class="form-control" name="approver_role"><option value="">—</option><?php foreach ($roles as $rk=>$rl): ?><option value="<?= $rk ?>" <?= $lv['approver_role']===$rk?'selected':'' ?>><?= $e($rl) ?></option><?php endforeach; ?></select></td>
+            <td style="padding:6px 8px"><select class="form-control" name="approver_role"><?= $roleOptions($lv['approver_role']) ?></select></td>
             <td style="padding:6px 8px"><input class="form-control" type="number" name="sla_days" value="<?= (int)$lv['sla_days'] ?>" style="width:64px"></td>
             <td style="padding:6px 8px"><input class="form-control" type="number" name="reminder_days" value="<?= (int)$lv['reminder_days'] ?>" style="width:64px"></td>
-            <td style="padding:6px 8px"><select class="form-control" name="escalate_role"><option value="">—</option><?php foreach ($roles as $rk=>$rl): ?><option value="<?= $rk ?>" <?= $lv['escalate_role']===$rk?'selected':'' ?>><?= $e($rl) ?></option><?php endforeach; ?></select></td>
+            <td style="padding:6px 8px"><select class="form-control" name="escalate_role"><?= $roleOptions($lv['escalate_role']) ?></select></td>
             <td style="padding:6px 8px;white-space:nowrap"><button class="btn secondary" style="padding:4px 9px;font-size:12px">Save</button><button class="btn secondary" style="padding:4px 9px;font-size:12px" name="do" value="level_delete" onclick="return confirm('Remove this level?')">✕</button></td>
           </form>
         </tr>
@@ -73,10 +86,10 @@ $applySummary = function ($r) use ($e) {
           <form method="post" style="display:contents"><input type="hidden" name="do" value="level_save"><input type="hidden" name="rule_id" value="<?= (int)$sel['id'] ?>">
             <td style="padding:6px 8px"><input class="form-control" type="number" name="seq" value="<?= (count($levels)+1)*10 ?>" style="width:56px"></td>
             <td style="padding:6px 8px"><input class="form-control" name="label" placeholder="new level"></td>
-            <td style="padding:6px 8px"><select class="form-control" name="approver_role"><option value="">—</option><?php foreach ($roles as $rk=>$rl): ?><option value="<?= $rk ?>"><?= $e($rl) ?></option><?php endforeach; ?></select></td>
+            <td style="padding:6px 8px"><select class="form-control" name="approver_role"><?= $roleOptions('') ?></select></td>
             <td style="padding:6px 8px"><input class="form-control" type="number" name="sla_days" value="2" style="width:64px"></td>
             <td style="padding:6px 8px"><input class="form-control" type="number" name="reminder_days" value="1" style="width:64px"></td>
-            <td style="padding:6px 8px"><select class="form-control" name="escalate_role"><option value="">—</option><?php foreach ($roles as $rk=>$rl): ?><option value="<?= $rk ?>"><?= $e($rl) ?></option><?php endforeach; ?></select></td>
+            <td style="padding:6px 8px"><select class="form-control" name="escalate_role"><?= $roleOptions('') ?></select></td>
             <td style="padding:6px 8px"><button class="btn" style="padding:4px 11px;font-size:12px">Add</button></td>
           </form>
         </tr>

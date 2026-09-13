@@ -292,6 +292,10 @@ function orga_apply($rows) {
     };
     $ensureMaster('designation', array_unique(array_map(fn($r) => $r['designation'], $rows)));
     $ensureMaster('department',  array_unique(array_filter(array_map(fn($r) => $r['department'], $rows))));
+    // File each designation under its department (only where still General), so
+    // the chart's structure carries through to department-wise pickers.
+    if (function_exists('desig_link_department'))
+        foreach ($rows as $r) if ($r['designation'] !== '' && $r['department'] !== '') desig_link_department($r['designation'], $r['department']);
 
     // 3) Positions — create/update (pass 1), then link reports-to (pass 2).
     $byCode = []; $byName = []; $usedPos = [];

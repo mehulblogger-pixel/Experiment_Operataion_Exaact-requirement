@@ -236,6 +236,7 @@ try {
     require __DIR__ . '/lib/recruitpipe.php';      // Phase 2 — configurable pipeline / stage engine
     require __DIR__ . '/lib/position.php';         // Phase 3 — position master, org-chart, manpower validation
     require __DIR__ . '/lib/organogram.php';       // Organogram importer (Excel/CSV/PPT/Visio/paste + AI image/PDF)
+    require __DIR__ . '/lib/deptorg.php';           // Department⇄designation masters, Department hub, org-driven approvals
     require __DIR__ . '/lib/recruit_iv.php';       // Phase 4 — interviews (multi-round + scorecards) & document DMS
     require __DIR__ . '/lib/comp_config.php';      // Phase 5.1A — configurable compensation setup (headings + statutory)
     require __DIR__ . '/lib/recruit_offer.php';    // Phase 5 — salary structure, HR discussion, offer & onboarding

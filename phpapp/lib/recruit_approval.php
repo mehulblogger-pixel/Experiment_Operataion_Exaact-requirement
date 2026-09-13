@@ -94,8 +94,9 @@ function appr_level_save($post) {
     // Validate the posted roles against the roles THIS workspace's plan uses, so a
     // switched-off module's role (Inspector, Marketing, Finance…) can never be saved.
     $roleSet = array_keys(function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES);
-    $role = in_array($post['approver_role'] ?? '', $roleSet, true) ? $post['approver_role'] : '';
-    $esc  = in_array($post['escalate_role'] ?? '', $roleSet, true) ? $post['escalate_role'] : '';
+    $okApprover = fn($v) => in_array($v, $roleSet, true) || (function_exists('appr_is_org_approver') && appr_is_org_approver($v));
+    $role = $okApprover($post['approver_role'] ?? '') ? $post['approver_role'] : '';
+    $esc  = $okApprover($post['escalate_role'] ?? '') ? $post['escalate_role'] : '';
     $data = [(int)($post['seq']??0), trim((string)($post['label']??'')), $role, (int)($post['approver_user_id']??0)?:null,
              max(0,(int)($post['sla_days']??2)), max(0,(int)($post['reminder_days']??1)), $esc, (int)($post['escalate_user_id']??0)?:null];
     $lid = (int)($post['level_id'] ?? 0);
@@ -152,9 +153,26 @@ function appr_start($entity, $entityId, $ctx, $subject = '', $amount = 0) {
     db()->prepare("INSERT INTO recruit_approval_requests (entity,entity_id,rule_id,rule_name,subject,amount,status,current_seq,requester,created_at) VALUES (?,?,?,?,?,?, 'PENDING', ?,?,?)")
         ->execute([$entity,(int)$entityId,(int)$rule['id'],(string)$rule['name'],(string)$subject,(float)$amount, (int)$levels[0]['seq'], _appr_actor(), _appr_now()]);
     $reqId = (int)db()->lastInsertId();
+    // An org-chart approver token ("reporting manager", "HOD", …) is resolved to a
+    // real person here, from the requisition's position walked up the reporting
+    // line. If it resolves, the step is pinned to that user; if not, the token is
+    // kept and appr_can_act lets a hiring admin act so a step is never stranded.
+    $orgResolve = function ($role) use ($ctx) {
+        if ($role === '' || !function_exists('appr_is_org_approver') || !appr_is_org_approver($role)) return 0;
+        $posId = (int) ($ctx['position_id'] ?? 0);
+        if (!$posId && !empty($ctx['position'])) {
+            try { $pp = ops_one("SELECT id FROM positions WHERE LOWER(name)=LOWER(?) OR LOWER(code)=LOWER(?) LIMIT 1", [$ctx['position'], $ctx['position']]); if ($pp) $posId = (int) $pp['id']; }
+            catch (Throwable $e) {}
+        }
+        return function_exists('appr_resolve_org_approver') ? (int) appr_resolve_org_approver($role, $posId, (string) ($ctx['department'] ?? '')) : 0;
+    };
     foreach ($levels as $lv) {
+        $role = (string) $lv['approver_role']; $uid = $lv['approver_user_id'] ?: null;
+        $esc = (string) $lv['escalate_role']; $euid = $lv['escalate_user_id'] ?: null;
+        if (!$uid && ($rid = $orgResolve($role)) > 0) { $uid = $rid; $role = ''; }   // pinned to the resolved manager
+        if (!$euid && ($eid = $orgResolve($esc)) > 0) { $euid = $eid; $esc = ''; }
         db()->prepare("INSERT INTO recruit_approval_steps (request_id,seq,label,approver_role,approver_user_id,escalate_role,escalate_user_id,sla_due,reminder_at,status) VALUES (?,?,?,?,?,?,?,?,?, 'PENDING')")
-            ->execute([$reqId,(int)$lv['seq'],(string)$lv['label'],(string)$lv['approver_role'],$lv['approver_user_id']?:null,(string)$lv['escalate_role'],$lv['escalate_user_id']?:null,_appr_days($lv['sla_days']),_appr_days($lv['reminder_days'])]);
+            ->execute([$reqId,(int)$lv['seq'],(string)$lv['label'],$role,$uid,$esc,$euid,_appr_days($lv['sla_days']),_appr_days($lv['reminder_days'])]);
     }
     // Notify the first-level approvers.
     $first = appr_current_step(appr_request($reqId));
@@ -167,7 +185,12 @@ function appr_can_act($step, $user = null) {
     if (!$user) return false;
     if (function_exists('is_master') && is_master()) return true;
     if ((int)($step['approver_user_id'] ?? 0) > 0) return (int)$step['approver_user_id'] === (int)$user['id'];
-    return (string)($step['approver_role'] ?? '') !== '' && (string)$user['role'] === (string)$step['approver_role'];
+    $role = (string)($step['approver_role'] ?? '');
+    // An org-chart approver that could not be pinned to a person: a hiring admin
+    // acts so the chain is never stranded.
+    if ($role !== '' && function_exists('appr_is_org_approver') && appr_is_org_approver($role))
+        return function_exists('hiring_admin_can') ? hiring_admin_can() : (function_exists('is_admin_level') && is_admin_level());
+    return $role !== '' && (string)$user['role'] === $role;
 }
 
 // Approve or reject the given step. Returns [ok, message].

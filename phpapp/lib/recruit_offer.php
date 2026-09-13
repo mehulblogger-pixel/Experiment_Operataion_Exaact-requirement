@@ -234,6 +234,9 @@ function offer_appr_ctx($o) {
         'sbu'        => (string)($req['sbu'] ?? ''),
         'grade'      => (string)($req['grade'] ?? ''),
         'position'   => (string)($req['designation'] ?? ''),
+        // The exact linked position, so an org-chart approver walks the real
+        // reporting line (falls back to matching the position by name/designation).
+        'position_id' => (int)($req['position_id'] ?? 0),
         'amount'     => (float)($o['ctc'] ?? 0),
         '_cand'      => $cand,
     ];

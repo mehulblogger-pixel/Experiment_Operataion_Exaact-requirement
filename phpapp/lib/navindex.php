@@ -98,6 +98,7 @@ function ops_nav_index($fresh = false) {
             $add('New requirement', '/requisition-new', $A, '➕', 'Raise a new requirement.', 'action');
             $add('Add candidate', '/candidate-new', $A, '➕', 'Add a candidate.', 'action');
             $add('Positions', '/positions', $A, '🏷️', 'Position master — sanctioned roles & headcount.');
+            $add('Departments', '/departments', $A, '🏛️', 'Designations, positions, headcount & people by department.');
             $add('Org chart', '/positions-org', $A, '🗂️', 'Reporting hierarchy from the position master.');
             if ($fx('is_coordinator_level') && is_coordinator_level())
                 $add('Import org chart', '/positions-import', $A, '⬆️', 'Import an existing organogram from a spreadsheet.', 'action');
