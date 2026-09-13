@@ -452,6 +452,7 @@
   $setTile('/access', '🔐', 'Roles &amp; access', 'Who can view or edit what');
   $setTile('/terminology', '🔤', 'Terminology', 'Rename the words the app uses');
   $setTile('/ai-settings', '🤖', 'AI providers &amp; models', 'API keys &amp; model selection');
+  $setTile('/backup', '💾', 'Backup &amp; restore', 'Download a safe copy &amp; restore anytime');
   $setTile('/reset-data', '🧹', 'Clear records', 'Empty record groups to start clean', true);
   if (function_exists('can_manage_tenants') && can_manage_tenants()) {
     $setTile('/tenants', '☁️', 'Cloud workspaces', (function_exists('saas_enabled') && saas_enabled()) ? 'Cloud mode is on' : 'Run many businesses on one copy');

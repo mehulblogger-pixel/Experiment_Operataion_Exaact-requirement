@@ -251,6 +251,7 @@ try {
     require __DIR__ . '/lib/owner_home.php';   // calm owner landing (modules + marketplace switches)
     require __DIR__ . '/lib/saas_tenants.php';    // SaaS control plane — cross-company directory for single-URL login + console (additive)
     require __DIR__ . '/lib/tenant_migrate.php';  // Move a file-backed (SQLite) workspace's data into MySQL — upload-proof storage
+    require __DIR__ . '/lib/backup.php';          // Per-workspace Backup & Restore — snapshots stored above the web root (upload-proof)
     require __DIR__ . '/lib/pricing_admin.php';   // Super-Admin pricing & usage + customer AI top-up (reuses billing + saas_tenants + ai)
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
     require __DIR__ . '/lib/qualitycase.php';     // Phase 2 §39 — quality-case umbrella (read-only)
@@ -682,6 +683,12 @@ if (function_exists('current_tenant') && current_tenant() !== '' && function_exi
 if (function_exists('current_tenant') && current_tenant() === '' && function_exists('tenant_registry_heal')) {
     try { tenant_registry_heal(); } catch (Throwable $e) {}
 }
+
+// One automatic, upload-proof backup a day per signed-in workspace. Cheap
+// (guarded to once per session) and silent — never breaks a page if the backup
+// store is unavailable. Snapshots live above the web root, so they survive the
+// "delete every file, then re-upload" update method.
+if (function_exists('backup_auto_daily')) { try { backup_auto_daily(); } catch (Throwable $e) {} }
 
 // Locked out of the admin login? Drop a plain text file named
 // "reset-admin.txt" in this folder (cPanel File Manager → New File) with the

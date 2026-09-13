@@ -3238,6 +3238,8 @@ function ops_dispatch($route, $method) {
             ops_preflight(); return true;
         case $route === 'settings':
             ops_settings($method); return true;
+        case $route === 'backup':
+            ops_backup($method); return true;
         case $route === 'access':
             ops_access($method); return true;
         case $route === 'ai-settings':
