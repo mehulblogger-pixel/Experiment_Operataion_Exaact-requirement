@@ -252,6 +252,7 @@ try {
     require __DIR__ . '/lib/saas_tenants.php';    // SaaS control plane — cross-company directory for single-URL login + console (additive)
     require __DIR__ . '/lib/tenant_migrate.php';  // Move a file-backed (SQLite) workspace's data into MySQL — upload-proof storage
     require __DIR__ . '/lib/backup.php';          // Per-workspace Backup & Restore — snapshots stored above the web root (upload-proof)
+    require __DIR__ . '/lib/pwreset.php';         // Self-service forgot / reset password (e-mail one-time link)
     require __DIR__ . '/lib/pricing_admin.php';   // Super-Admin pricing & usage + customer AI top-up (reuses billing + saas_tenants + ai)
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
     require __DIR__ . '/lib/qualitycase.php';     // Phase 2 §39 — quality-case umbrella (read-only)
@@ -891,6 +892,12 @@ if ($route === 'logout') {
     if (function_exists('idems_log') && current_user()) idems_log('user', current_user()['id'], 'LOGOUT', []);
     session_destroy(); redirect('/login');
 }
+
+// Self-service password recovery — public, in front of the login gate, because a
+// person who has forgotten their password has no way through it. /forgot takes an
+// e-mail and sends a one-time link; /reset sets the new password from that link.
+if ($route === 'forgot' && function_exists('pwreset_forgot_route')) { pwreset_forgot_route($method); exit; }
+if ($route === 'reset'  && function_exists('pwreset_reset_route'))  { pwreset_reset_route($method);  exit; }
 
 // How we handle complaints has to be readable by anybody who wants to complain
 // — ISO/IEC 17020 §7.5.1 asks for the description to be available to any

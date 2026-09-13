@@ -773,7 +773,10 @@ function ops_saas_admin($route, $method) {
             $oemail  = strtolower(trim((string) ($_POST['owner_email'] ?? '')));
             $opass   = (string) ($_POST['owner_pass'] ?? '');
             $plan    = strtoupper((string) ($_POST['new_plan'] ?? 'RECRUITMENT'));
-            $dbkind  = (string) ($_POST['db_kind'] ?? 'sqlite');
+            // Default is fully automatic — no technical choice for the operator.
+            // 'mysql' (paste your own database) stays available as an advanced
+            // option on the form.
+            $dbkind  = (string) ($_POST['db_kind'] ?? 'auto');
 
             if ($company === '' || $oemail === '' || !filter_var($oemail, FILTER_VALIDATE_EMAIL)) {
                 flash('A company name and a valid owner email are required.', 'error'); redirect('/companies');
@@ -790,22 +793,22 @@ function ops_saas_admin($route, $method) {
             }
             if ($opass === '') $opass = bin2hex(random_bytes(4));   // a temp password to hand over
 
-            if ($dbkind === 'auto') {
-                // One-click on a VPS: the app creates the client's MySQL database
-                // itself, using the server's database-admin credential.
-                $admin = saas_db_admin_config();
-                if (!$admin) {
-                    flash('Automatic database creation is not set up on this server. Enter the database details instead, or ask your administrator to add the database-admin credential to config.local.php.', 'error');
-                    redirect('/companies');
-                }
-                try { $db = saas_mysql_provision_db($nkey, $admin); }
-                catch (Throwable $e) { flash('Could not create the database automatically: ' . $e->getMessage(), 'error'); redirect('/companies'); }
-            } elseif ($dbkind === 'mysql') {
+            // Treat it as "bring your own MySQL" only when a database name was
+            // actually filled in (the Advanced box); otherwise it is automatic —
+            // so an empty Advanced box never blocks creation.
+            if ($dbkind === 'mysql' && trim((string) ($_POST['db_name'] ?? '')) !== '') {
+                // Advanced: the operator pastes a MySQL database they created.
                 $db = ['host' => trim((string) ($_POST['db_host'] ?? 'localhost')), 'name' => trim((string) ($_POST['db_name'] ?? '')),
                        'user' => trim((string) ($_POST['db_user'] ?? '')), 'pass' => (string) ($_POST['db_pass'] ?? '')];
                 if ($db['name'] === '' || $db['user'] === '') { flash('A MySQL database name and user are required.', 'error'); redirect('/companies'); }
             } else {
-                $db = ['sqlite' => dirname(__DIR__) . '/tenant-' . $nkey . '.sqlite'];
+                // Automatic (the default): a real MySQL database when the server can
+                // make one itself; otherwise a data file placed ABOVE the web root,
+                // so an upload into the app folder can never delete it. Either way
+                // the operator ticks nothing.
+                [$db] = function_exists('tenant_auto_storage')
+                    ? tenant_auto_storage($nkey)
+                    : [['sqlite' => (function_exists('tenant_default_sqlite_path') ? tenant_default_sqlite_path($nkey)[0] : dirname(__DIR__) . '/tenant-' . $nkey . '.sqlite')]];
             }
             $err = function_exists('tenant_add') ? tenant_add($nkey, $company, $db) : 'Cloud mode is not enabled.';
             if ($err !== '') { flash($err, 'error'); redirect('/companies'); }

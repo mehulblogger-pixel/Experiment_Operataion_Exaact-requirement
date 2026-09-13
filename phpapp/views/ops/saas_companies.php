@@ -53,24 +53,24 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
       <div class="ff"><label>Plan</label><select name="new_plan"><?php foreach ($plans as $pk => $p): ?><option value="<?= $e($pk) ?>" <?= $pk === 'RECRUITMENT' ? 'selected' : '' ?>><?= $e($p['label']) ?> — <?= implode(', ', array_map($modLabel, $p['mods'])) ?></option><?php endforeach; ?></select></div>
     </div>
     <div style="margin-top:12px;border-top:1px dashed var(--line,#e5e7eb);padding-top:12px">
-      <label style="font-size:12px;font-weight:600">Where the company's data lives</label>
-      <div style="display:flex;gap:16px;align-items:center;margin:6px 0 8px;flex-wrap:wrap">
-        <?php if ($can_autocreate): ?>
-        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="auto" checked> ✨ Create its MySQL database automatically <span class="sc-key">(recommended)</span></label>
-        <?php endif; ?>
-        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="sqlite" <?= $can_autocreate ? '' : 'checked' ?>> Its own file (simplest — no setup)</label>
-        <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="db_kind" value="mysql"> MySQL database I created myself</label>
+      <!-- Storage is automatic: a MySQL database when the server can create one,
+           otherwise a data file placed above the web root (upload-proof). The
+           operator ticks nothing. Power users can still paste their own DB. -->
+      <input type="hidden" name="db_kind" id="db_kind" value="auto">
+      <div style="display:flex;gap:8px;align-items:center;font-size:13px;color:#047857">
+        <span style="font-size:15px">🛡️</span>
+        <span><b>Its own private database is set up automatically</b> — <?= $can_autocreate ? 'a fresh, isolated MySQL database on this server.' : 'kept safely outside the app folder so uploads can never delete it.' ?> Nothing to configure.</span>
       </div>
-      <div class="sc-edit" style="padding:0">
-        <div class="ff"><label>MySQL host</label><input name="db_host" value="localhost"></div>
-        <div class="ff"><label>MySQL database name</label><input name="db_name" placeholder="prefix_asme"></div>
-        <div class="ff"><label>MySQL user</label><input name="db_user" placeholder="prefix_asme"></div>
-        <div class="ff"><label>MySQL password</label><input type="password" name="db_pass" autocomplete="new-password"></div>
-      </div>
-      <div class="sc-note">
-        <?php if ($can_autocreate): ?>“Create automatically” builds a fresh, isolated MySQL database for this company on this server — no manual step. <?php endif; ?>
-        The MySQL fields below are used only when “I created myself” is chosen. Either way the company's data stays fully separate from every other company, and the owner then completes their own onboarding (company profile) on first sign-in.
-      </div>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-size:12.5px;color:var(--muted,#6b7280)">Advanced: use a MySQL database I created myself</summary>
+        <div class="sc-edit" style="padding:8px 0 0" onclick="document.getElementById('db_kind').value='mysql'">
+          <div class="ff"><label>MySQL host</label><input name="db_host" value="localhost"></div>
+          <div class="ff"><label>MySQL database name</label><input name="db_name" placeholder="prefix_asme"></div>
+          <div class="ff"><label>MySQL user</label><input name="db_user" placeholder="prefix_asme"></div>
+          <div class="ff"><label>MySQL password</label><input type="password" name="db_pass" autocomplete="new-password"></div>
+          <div class="sc-note">Filling these in and creating the company uses this database instead of the automatic one.</div>
+        </div>
+      </details>
     </div>
     <button class="btn" style="margin-top:6px">Create company</button>
   </form>

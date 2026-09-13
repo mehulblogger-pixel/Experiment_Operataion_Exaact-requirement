@@ -1400,6 +1400,44 @@
     initModuleCrumb();
     initResponsiveTables();
     initEmbedModals();
+    initPasswordReveal();
+  }
+
+  // Every password field gets a "Show / Hide" toggle, app-wide, from one place —
+  // so a person can always check what they typed before submitting. Skips a
+  // field that already has its own toggle (the sign-in page) or opts out with
+  // data-noreveal. Purely visual; the field's name/value/validation are untouched.
+  function initPasswordReveal() {
+    Array.prototype.forEach.call(document.querySelectorAll('input[type="password"]'), function (inp) {
+      if (inp.getAttribute('data-noreveal') !== null) return;
+      if (inp.getAttribute('data-pwreveal') !== null) return;         // already enhanced
+      var host = inp.parentNode;
+      if (!host) return;
+      // If a hand-built toggle already sits next to it (e.g. the login card's
+      // ".eye" button), leave that one in charge.
+      if (host.querySelector('.eye, .pw-eye')) return;
+      inp.setAttribute('data-pwreveal', '1');
+      // Make room on the right so the toggle never overlaps typed characters.
+      var cs = window.getComputedStyle(host);
+      if (cs && cs.position === 'static') host.style.position = 'relative';
+      inp.style.paddingRight = '58px';
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pw-eye';
+      btn.textContent = 'Show';
+      btn.setAttribute('aria-label', 'Show password');
+      btn.setAttribute('tabindex', '-1');                              // don't interrupt tabbing to the submit button
+      btn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);' +
+        'border:none;background:none;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.03em;' +
+        'color:var(--muted,#6b7280);padding:6px;line-height:1;z-index:2';
+      btn.addEventListener('click', function () {
+        var show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        btn.textContent = show ? 'Hide' : 'Show';
+        btn.setAttribute('aria-label', (show ? 'Hide' : 'Show') + ' password');
+      });
+      host.appendChild(btn);
+    });
   }
 
   // ---- In-page popups (Field #9/#10) --------------------------------------

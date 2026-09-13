@@ -32,6 +32,48 @@
 //     so running the move twice yields the same result rather than duplicates.
 // ============================================================================
 
+// A data folder ABOVE the web root (beside the app folder), so a workspace file
+// stored there is NOT deleted by the "delete every file, then re-upload" update
+// method. Falls back to the app folder only if nothing above the root is
+// writable. Returns [dir, safe_bool].
+function tenant_safe_data_dir() {
+    $mk = function ($d) {
+        if ($d === '') return false;
+        if (!is_dir($d) && !@mkdir($d, 0750, true)) return false;
+        if (!is_writable($d)) return false;
+        $ht = $d . '/.htaccess';
+        if (!is_file($ht)) @file_put_contents($ht, "Options -Indexes\nRequire all denied\nOrder deny,allow\nDeny from all\n");
+        return true;
+    };
+    $above = dirname(dirname(__DIR__)) . '/exaact_data';   // sibling of the app folder → above web root
+    if ($mk($above)) return [$above, true];
+    $inApp = dirname(__DIR__) . '/data';                    // fallback, inside the app folder (backups still protect it)
+    if ($mk($inApp)) return [$inApp, false];
+    return [dirname(__DIR__), false];                       // last resort: the app folder root (legacy)
+}
+
+// The default storage-file path for a NEW file-backed workspace — placed in the
+// safe off-folder location when available. [path, safe_bool].
+function tenant_default_sqlite_path($key) {
+    $key = preg_replace('/[^a-zA-Z0-9_\-]/', '_', strtolower(trim((string) $key)));
+    [$dir, $safe] = tenant_safe_data_dir();
+    return [$dir . '/tenant-' . $key . '.sqlite', $safe];
+}
+
+// Choose storage for a NEW workspace automatically — no technical choice for the
+// operator. Prefers a real MySQL database when the server can create one itself;
+// otherwise a file in the safe off-folder location. Returns
+// [$db, $kind] where $db is a route array and $kind is 'mysql'|'sqlite'.
+function tenant_auto_storage($key) {
+    if (function_exists('saas_can_autocreate_db') && saas_can_autocreate_db()
+        && function_exists('saas_mysql_provision_db') && function_exists('saas_db_admin_config')) {
+        try { return [saas_mysql_provision_db($key, saas_db_admin_config()), 'mysql']; }
+        catch (Throwable $e) { /* fall through to a safe file */ }
+    }
+    [$path] = tenant_default_sqlite_path($key);
+    return [['sqlite' => $path], 'sqlite'];
+}
+
 // ---- Storage facts about a workspace, for the console -----------------------
 // Returns: ['type' => 'sqlite'|'mysql'|'unconfigured'|'unknown',
 //           'path' => sqlite file path (sqlite only),
