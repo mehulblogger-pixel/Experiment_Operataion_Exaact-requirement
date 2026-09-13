@@ -8223,6 +8223,27 @@ function ops_settings($method) {
         setting_set('smtp_user', trim($_POST['smtp_user'] ?? ''));
         if (($_POST['smtp_pass'] ?? '') !== '') setting_set('smtp_pass', $_POST['smtp_pass']); // keep existing if left blank
         setting_set('smtp_from', trim($_POST['smtp_from'] ?? ''));
+        // "Send test email": confirm the settings actually work before relying on
+        // them (for password-reset links, reminders, etc.). Uses the settings just
+        // saved above; reports the exact outcome, success or the SMTP error.
+        if (($_POST['send_test'] ?? '') !== '') {
+            $u = function_exists('current_user') ? current_user() : null;
+            $to = trim((string) ($_POST['test_to'] ?? '')) ?: trim((string) ($u['email'] ?? ''));
+            if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+                flash('Enter a valid address to send the test to (or set your own email on your profile first).', 'error');
+            } elseif (!smtp_config()) {
+                flash('Fill in the SMTP host, username and password first, then send the test.', 'error');
+            } else {
+                $app = function_exists('app_name') ? app_name() : 'Your workspace';
+                $ok = ops_mail($to, $app . ' — test email', "This is a test email from " . $app . ".\n\nIf you are reading this, automatic email is working — password-reset links and reminders will be delivered.\n\n— " . $app, '', 'smtp_test');
+                if ($ok) flash('Test email sent to ' . $to . '. Check the inbox (and spam). If it arrived, email is working.');
+                else {
+                    $last = ops_one("SELECT error FROM email_log WHERE kind='smtp_test' ORDER BY id DESC LIMIT 1");
+                    flash('The test email could not be sent. ' . (($last && $last['error']) ? 'Reason: ' . $last['error'] : 'Check the host, port, username and password.'), 'error');
+                }
+            }
+            redirect('/settings#prefs=security');
+        }
         if (($_POST['clear_logo'] ?? '') === '1') setting_set('logo_data', '');
         // logo upload → stored as a data URI (works without file permissions)
         if (!empty($_FILES['logo']['tmp_name']) && is_uploaded_file($_FILES['logo']['tmp_name'])) {

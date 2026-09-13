@@ -398,16 +398,25 @@
       <small class="muted">The grey text is a starting draft written for an inspection business — read it, change what is not true of you, and paste it in.</small></div>
   </div>
 
-  <h3 class="tab-sub">Email — automatic sending (Office 365 SMTP)</h3>
-  <p class="sub" style="margin-bottom:10px">Fill these to send assignment / closure / reminder emails <strong>automatically</strong> from your mailbox. Leave blank to keep the current behaviour (emails are logged and opened in Outlook to send by hand).</p>
+  <h3 class="tab-sub" id="email-settings">Email — automatic sending (SMTP)</h3>
+  <p class="sub" style="margin-bottom:10px">Fill these so the app can send email <strong>automatically</strong> from your mailbox — <strong>password-reset links</strong>, assignment / closure / reminder emails and more. Leave blank and emails are only logged (nothing is sent).</p>
   <div class="form-grid">
-    <div class="ff"><label>SMTP host</label><input class="form-control" name="smtp_host" value="<?= e(setting_get('smtp_host','')) ?>" placeholder="smtp.office365.com"></div>
+    <div class="ff"><label>SMTP host</label><input class="form-control" name="smtp_host" value="<?= e(setting_get('smtp_host','')) ?>" placeholder="smtp.hostinger.com"></div>
     <div class="ff"><label>Port</label><input class="form-control" type="number" name="smtp_port" value="<?= e(setting_get('smtp_port', 587)) ?>" placeholder="587"></div>
-    <div class="ff"><label>Username (mailbox)</label><input class="form-control" name="smtp_user" value="<?= e(setting_get('smtp_user','')) ?>" placeholder="ops@yourcompany.com" autocomplete="off"></div>
+    <div class="ff"><label>Username (mailbox)</label><input class="form-control" name="smtp_user" value="<?= e(setting_get('smtp_user','')) ?>" placeholder="no-reply@yourcompany.com" autocomplete="off"></div>
     <div class="ff"><label>Password / app password</label><input class="form-control" type="password" name="smtp_pass" value="" placeholder="<?= setting_get('smtp_pass','') ? '•••••••• (leave blank to keep)' : 'enter to enable' ?>" autocomplete="new-password"></div>
-    <div class="ff ff-wide"><label>From address <span class="muted">(usually same as the mailbox)</span></label><input class="form-control" name="smtp_from" value="<?= e(setting_get('smtp_from','')) ?>" placeholder="ops@yourcompany.com"></div>
+    <div class="ff ff-wide"><label>From address <span class="muted">(usually same as the mailbox)</span></label><input class="form-control" name="smtp_from" value="<?= e(setting_get('smtp_from','')) ?>" placeholder="no-reply@yourcompany.com"></div>
   </div>
-  <p class="muted" style="margin:6px 2px">Office 365: host <code>smtp.office365.com</code>, port <code>587</code>. Use an app password if MFA is on. <?= smtp_config() ? '<strong style="color:#15803d">✓ SMTP is configured — emails will auto-send.</strong>' : 'Not configured yet — emails are logged only.' ?></p>
+  <p class="muted" style="margin:6px 2px">
+    Common hosts — <strong>MilesWeb / cPanel:</strong> your domain's mail server (e.g. <code>mail.yourcompany.com</code> or the one shown in cPanel → Email Accounts → Connect Devices), port <code>587</code> (TLS) or <code>465</code> (SSL).
+    <strong>Hostinger:</strong> <code>smtp.hostinger.com</code>:587. <strong>Office 365:</strong> <code>smtp.office365.com</code>:587. <strong>Gmail:</strong> <code>smtp.gmail.com</code>:587 with an app password.
+    <br><?= smtp_config() ? '<strong style="color:#15803d">✓ SMTP is configured — emails will auto-send.</strong>' : '<strong style="color:#b45309">Not configured yet — emails are logged only (password-reset links will not reach anyone until this is filled in and saved).</strong>' ?>
+  </p>
+  <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:8px">
+    <div class="ff" style="margin:0"><label>Send a test email to</label><input class="form-control" name="test_to" type="email" placeholder="<?= e(setting_get('smtp_user','') ?: 'you@yourcompany.com') ?>"></div>
+    <button class="btn ghost" type="submit" name="send_test" value="1" style="height:40px">✉️ Save &amp; send test email</button>
+  </div>
+  <p class="muted" style="margin:4px 2px;font-size:12px">This saves the settings above and sends one test message, then tells you exactly whether it worked — so you can confirm email before relying on it.</p>
 
 </section>
 </div><!-- /.prefs tabs -->
