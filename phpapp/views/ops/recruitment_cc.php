@@ -120,6 +120,12 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
       <span class="rcc-setup" style="position:relative;display:inline-block">
         <a class="btn secondary" href="/recruit-pipelines">⚙️ Setup ▾</a>
         <span class="rcc-setup-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--card,#fff);border:1px solid var(--line,#e5e9f0);border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,.12);z-index:20;min-width:250px;padding:6px">
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted,#94a3b8);padding:6px 12px 2px">Organisation structure</div>
+          <a href="/departments" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">🏛️ Departments &amp; designations</a>
+          <a href="/positions" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">🏷️ Positions — roles &amp; headcount</a>
+          <a href="/positions-org" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">🗂️ Org chart</a>
+          <a href="/positions-import" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">⬆️ Import organogram (Excel / PPT / image)</a>
+          <div style="font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted,#94a3b8);padding:8px 12px 2px;border-top:1px solid var(--line-2,#f1f5f9);margin-top:4px">Hiring setup</div>
           <a href="/recruit-pipelines" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">⇥ Hiring workflows — pipeline &amp; stages</a>
           <a href="/comp-setup" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">₹ Compensation setup</a>
           <a href="/doc-templates" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">📄 Document templates</a>
