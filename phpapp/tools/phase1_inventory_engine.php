@@ -11,6 +11,15 @@
 //  into the application. It is loaded only by the standalone runner
 //  (phase1-inventory.php) and by tests/test_phase1_inventory.php.
 //
+//  ── WHY THIS LIVES IN tools/ AND NOT IN lib/ ───────────────────────────────
+//  index.php builds a code fingerprint by globbing lib/*.php (index.php:379).
+//  Adding ANY file to lib/ changes that fingerprint, which makes the next page
+//  load run migrate_all() -> run_schema() -> saas_entitlement_ensure(), which
+//  WRITES saas_entitled_modules onto provisioned workspaces with a blank
+//  ceiling. Merely deploying this tool inside lib/ would therefore have altered
+//  the entitlement data before it could be measured. tools/ is not globbed, so
+//  deploying this file is fingerprint-neutral and measurement-safe.
+//
 //  ── THE CRITICAL SAFETY RULE ───────────────────────────────────────────────
 //  The application's own boot chain WRITES entitlement: saas_entitlement_ensure()
 //  runs at lib/db.php:523 and stamps saas_entitled_modules on any provisioned

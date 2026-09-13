@@ -44,41 +44,36 @@ Every query passes through `p1_ro_query()`, which **hard-refuses** anything that
 
 ---
 
-## 3. How to run it
+## 3. How to run it — administrator, in your browser
 
-### Option A — command line (preferred)
+**No terminal, no SSH, no phpMyAdmin, no editing files.**
 
-In cPanel → **Cron Jobs**, add a one-off command (or run over SSH):
+1. **Upload two things** to your app folder using cPanel → File Manager (exactly as you upload any build):
+   - `phase1-inventory.php` → next to `index.php`
+   - the `tools/` folder (containing `phase1_inventory_engine.php`)
+2. **Sign in to EXAACT as you normally do**, on your **main address** (the control installation — e.g. `https://operations.mghaiapps.com`).
+3. In the **same browser**, open: **`/phase1-inventory.php`**
+4. Press the single button: **“Run Phase-1 Entitlement Inventory”**.
+5. Press **Download JSON** and send me that file. (There are also *Download report* and *Copy report* buttons.)
+6. **Delete `phase1-inventory.php` and the `tools/` folder** from the server afterwards.
 
-```
-php /home/USER/public_html/phase1-inventory.php
-```
+### Who can open it
+Only a **signed-in administrator** (`is_superuser`) of the **control installation**.
 
-For machine-readable output:
+- Not signed in → **404**
+- Signed in but not an administrator → **404**
 
-```
-php /home/USER/public_html/phase1-inventory.php --json
-```
+It returns a plain *“Not available.”*, so the page is **not discoverable** by anyone else. It uses your **existing login session** — no new password, and no change to the application's login or security architecture.
 
-### Option B — browser (when no command line is available)
-
-1. Upload `phase1-inventory.php` to the app folder (it is in the repository root, alongside `index.php`).
-2. Create a file next to it called **`phase1-inventory.key`** containing **one line: a long random password you invent**.
-3. Visit:
-   `https://YOUR-DOMAIN/phase1-inventory.php?key=THAT-PASSWORD`
-   (add `&json=1` for JSON)
-4. **Delete `phase1-inventory.key` when finished.**
-
-Without that key file the browser route returns `404 Not available.` — so the page cannot be discovered or run by anyone else.
-
-### Run it on the CONTROL install
-Run it at your **base domain** (the platform/owner install — e.g. `operations.mghaiapps.com`), not inside a workspace. The tool forces control-install resolution itself, but running it there is clearest.
+### Fallback doors (you should not need these)
+- **Command line**, if your host offers it: `php /home/USER/public_html/phase1-inventory.php --json`
+- **Key file**, only if nobody can sign in: create `phase1-inventory.key` next to the script containing a long random password you invent, then open `/phase1-inventory.php?key=THAT-PASSWORD`. Delete the key file afterwards. Creating that file needs server access, which is equivalent authority to an admin login.
 
 ---
 
 ## 4. How to supply the output
 
-Copy **the entire output** and send it back for review.
+Press **Download JSON** on the results page and send me that file (or use **Copy report** and paste it).
 
 - It contains **no passwords** — database credentials are never printed; only the database *name* and host appear, as a label.
 - It contains workspace names, plans and module lists. If you would rather redact company names before sending, replace them — the analysis only needs the tenant keys, entitlement fields and risk lines.
@@ -110,11 +105,11 @@ There is also a **Marketplace** line per workspace. Marketplace is not governed 
 
 | File | Purpose |
 |---|---|
-| `phpapp/lib/phase1_inventory.php` | The engine: read-only guard, entitlement maths, risk classification. **Not loaded by `index.php`** — the application does not know it exists. |
-| `phpapp/phase1-inventory.php` | The standalone runner (CLI + key-gated browser). |
+| `phpapp/tools/phase1_inventory_engine.php` | The engine: read-only guard, entitlement maths, risk classification. **Not in `lib/`** (see §2a) and **not loaded by `index.php`** — the application does not know it exists. |
+| `phpapp/phase1-inventory.php` | The runner: admin browser page, plus CLI and key-file fallbacks. |
 | `phpapp/tests/test_phase1_inventory.php` | 62 assertions covering the engine. |
 
-**Delete `phase1-inventory.php` (and the `.key` file) from the server once the inventory has been supplied.** It is a one-off diagnostic, not part of the product.
+**Delete `phase1-inventory.php`, the `tools/` folder (and any `.key` file) from the server once the inventory has been supplied.** It is a one-off diagnostic, not part of the product.
 
 ---
 
@@ -129,6 +124,19 @@ There is also a **Marketplace** line per workspace. Marketplace is not governed 
 | Engine | SQLite harness · PHP 8.4.19 |
 
 End-to-end execution was verified against a synthetic four-workspace fixture producing one of each classification (SAFE, RECOVERABLE, AMBIGUOUS, ERROR), and the database files were **byte-identical afterwards**.
+
+The browser layer was tested against a live PHP server with real session cookies:
+
+| Check | Result |
+|---|---|
+| Stranger, no session | **HTTP 404** |
+| Signed in, **not** an administrator | **HTTP 404** |
+| Signed-in administrator | HTTP 200, sees the button |
+| Administrator runs it | report renders, Download JSON / Copy report present, classifications correct |
+| POST with an invalid token (CSRF attempt) | refused — the button is shown again, nothing runs |
+| Database credentials in the page | **none** (only a `name @ host` label is ever printed) |
+| **Databases after the browser run** | **byte-identical** |
+| Command line still works | yes |
 
 **Production database is MySQL/MariaDB.** The harness result above is supplementary. The tool's own MySQL path is exercised when you run it on your server — that run is the authoritative evidence for this step.
 

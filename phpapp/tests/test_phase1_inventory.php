@@ -4,7 +4,7 @@
 // exactly as lib/licence.php does, and it must be incapable of writing. Both are
 // asserted here, the second against a real database.
 
-require_once __DIR__ . '/../lib/phase1_inventory.php';
+require_once __DIR__ . '/../tools/phase1_inventory_engine.php';
 
 t_section('Phase 1 Step 1 — read-only entitlement inventory');
 
