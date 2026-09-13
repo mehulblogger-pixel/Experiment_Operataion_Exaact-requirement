@@ -250,6 +250,7 @@ try {
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/owner_home.php';   // calm owner landing (modules + marketplace switches)
     require __DIR__ . '/lib/saas_tenants.php';    // SaaS control plane — cross-company directory for single-URL login + console (additive)
+    require __DIR__ . '/lib/tenant_migrate.php';  // Move a file-backed (SQLite) workspace's data into MySQL — upload-proof storage
     require __DIR__ . '/lib/pricing_admin.php';   // Super-Admin pricing & usage + customer AI top-up (reuses billing + saas_tenants + ai)
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
     require __DIR__ . '/lib/qualitycase.php';     // Phase 2 §39 — quality-case umbrella (read-only)

@@ -148,6 +148,54 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     </div>
   </form>
 
+  <?php // ---- Data storage & safety: move a file-backed workspace into MySQL ----
+    $si = function_exists('saas_tenant_storage_info') ? saas_tenant_storage_info($sel['tenant_key']) : ['type'=>'unknown','at_risk'=>false];
+    $fmtSize = function($b){ $b=(int)$b; if($b<1024) return $b.' B'; if($b<1048576) return round($b/1024).' KB'; return round($b/1048576,2).' MB'; };
+  ?>
+  <div style="padding:16px;border-top:1px solid var(--line,#eef1f5)">
+    <label style="font-size:12px;font-weight:600">Where this workspace's data is stored</label>
+    <?php if ($si['type'] === 'mysql'): ?>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center;font-size:13.5px;color:#047857">
+        <span style="font-size:16px">🛡️</span><b>MySQL database — safe.</b>
+        <span style="color:var(--muted,#6b7280)">A file upload can never touch this data.</span>
+      </div>
+    <?php elseif ($si['type'] === 'sqlite' && !empty($si['at_risk'])): ?>
+      <div style="margin-top:8px;padding:12px 14px;border:1px solid #fca5a5;background:#fef2f2;border-radius:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:#b91c1c">
+          <span style="font-size:16px;line-height:1.2">⚠️</span>
+          <div><b>Stored as a file inside the app folder</b> (<?= $e($fmtSize($si['size'])) ?>,
+            <?= (int) $si['rows'] ?> records across <?= (int) $si['tables'] ?> tables).<br>
+            <span style="color:#7f1d1d">If you update by <b>deleting every file</b> and re-uploading, this file — and all its data — is deleted with them.
+            Move it into MySQL to make this workspace upload-proof. This is <b>safe and reversible</b>: the file is copied, never touched, and kept as a backup.</span>
+          </div>
+        </div>
+        <form method="post" style="margin-top:12px" onsubmit="return confirm('Move <?= $e($sel['company'] ?: $sel['tenant_key']) ?> into MySQL now? The original file is kept as a backup — nothing is deleted.');">
+          <input type="hidden" name="do" value="migrate_mysql"><input type="hidden" name="key" value="<?= $sk ?>">
+          <div style="display:flex;flex-direction:column;gap:7px;font-size:13px">
+            <?php if (!empty($can_autocreate)): ?>
+              <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="mig_mode" value="auto" checked onchange="document.getElementById('mig-manual').style.display='none'"> ✨ Create the MySQL database automatically <span class="sc-key">(recommended)</span></label>
+              <label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="radio" name="mig_mode" value="manual" onchange="document.getElementById('mig-manual').style.display='block'"> Use a MySQL database I created in my hosting panel</label>
+            <?php else: ?>
+              <input type="hidden" name="mig_mode" value="manual">
+              <div class="sc-note" style="margin:0">First create an empty MySQL database and user in your hosting panel (Databases), then paste the details below.</div>
+            <?php endif; ?>
+          </div>
+          <div id="mig-manual" style="<?= !empty($can_autocreate) ? 'display:none;' : '' ?>margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:520px">
+            <div class="ff" style="grid-column:1/2"><label>Database host</label><input name="db_host" value="localhost" placeholder="localhost"></div>
+            <div class="ff" style="grid-column:2/3"><label>Database name</label><input name="db_name" placeholder="myacc_xyzrecruit"></div>
+            <div class="ff" style="grid-column:1/2"><label>Database user</label><input name="db_user" placeholder="myacc_xyz"></div>
+            <div class="ff" style="grid-column:2/3"><label>Database password</label><input name="db_pass" type="password" placeholder="••••••••"></div>
+          </div>
+          <div style="margin-top:10px"><button class="btn" style="background:#b91c1c">🛡️ Move to MySQL now</button></div>
+        </form>
+      </div>
+    <?php elseif ($si['type'] === 'sqlite'): ?>
+      <div style="margin-top:8px;font-size:13.5px;color:var(--muted,#6b7280)">File (SQLite), <?= $e($fmtSize($si['size'])) ?> — stored outside the app folder, so a normal upload will not remove it.</div>
+    <?php else: ?>
+      <div style="margin-top:8px;font-size:13.5px;color:var(--muted,#6b7280)">Not wired up yet.</div>
+    <?php endif; ?>
+  </div>
+
   <?php // ---- Live à-la-carte quote: modules + seats -> price, monthly / yearly ----
     $pb = $price_book ?? ['seat'=>['month'=>0,'year'=>0],'modules'=>[],'currency'=>'INR'];
     $cur = ($pb['currency'] === 'INR') ? '₹' : ($e($pb['currency']) . ' ');

@@ -845,6 +845,44 @@ function ops_saas_admin($route, $method) {
             redirect('/companies');
         }
 
+        // ---- Move a file-backed workspace's data into MySQL (upload-proof) --
+        // Non-destructive: copies the SQLite file into a MySQL database and, only
+        // if every table's row count matches, repoints routing. The file is left
+        // in place as a backup. See lib/tenant_migrate.php.
+        if ($do === 'migrate_mysql' && $key !== '') {
+            if (!function_exists('saas_tenant_migrate_to_mysql')) {
+                flash('The storage-move tool is not available on this build.', 'error'); redirect($back);
+            }
+            if (function_exists('current_tenant') && current_tenant() === $key) {
+                flash('You are currently signed in to that workspace. Log out of it first, then move its storage.', 'error');
+                redirect($back);
+            }
+            $mode = (string) ($_POST['mig_mode'] ?? 'manual');
+            if ($mode === 'auto') {
+                $admin = function_exists('saas_db_admin_config') ? saas_db_admin_config() : null;
+                if (!$admin) {
+                    flash('Automatic database creation is not set up on this server. Create a MySQL database in your hosting panel, then choose “a MySQL database I created” and paste its details.', 'error');
+                    redirect($back);
+                }
+                try { $my = saas_mysql_provision_db($key, $admin); }
+                catch (Throwable $e) { flash('Could not create the MySQL database automatically: ' . $e->getMessage() . ' — create one in your hosting panel and paste its details instead.', 'error'); redirect($back); }
+            } else {
+                $my = ['host' => trim((string) ($_POST['db_host'] ?? 'localhost')), 'name' => trim((string) ($_POST['db_name'] ?? '')),
+                       'user' => trim((string) ($_POST['db_user'] ?? '')), 'pass' => (string) ($_POST['db_pass'] ?? '')];
+                if ($my['name'] === '' || $my['user'] === '') { flash('Enter the MySQL database name and user.', 'error'); redirect($back); }
+            }
+            $r = saas_tenant_migrate_to_mysql($key, $my);
+            if (!empty($r['ok'])) {
+                flash('Done — “' . $key . '” now stores its data in MySQL (' . (int) $r['created'] . ' tables, '
+                    . (int) $r['rows'] . ' records moved). Its data is now safe from file uploads. The original file was '
+                    . 'kept as a backup; you can delete it later once you have confirmed everything looks right.');
+            } else {
+                flash('The move did not complete: ' . ($r['error'] ?: 'unknown error')
+                    . ' Your workspace and its data are untouched and still working.', 'error');
+            }
+            redirect($back);
+        }
+
         // Apply a directory change to the company's live database, and word the
         // confirmation by whether that push actually took effect.
         $pushed = function ($key, $what) {
