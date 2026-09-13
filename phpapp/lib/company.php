@@ -96,7 +96,21 @@ function ops_company_profile($route, $method) {
         // into this one company screen (previously a separate "Business profile").
         // Reuses the cockpit's capability store, so there is a single source.
         if (function_exists('cockpit_capabilities_set') && array_key_exists('caps', $_POST)) {
-            cockpit_capabilities_set(array_map('strval', (array) ($_POST['caps'] ?? [])));
+            $savedCaps = cockpit_capabilities_set(array_map('strval', (array) ($_POST['caps'] ?? [])));
+            // Auto-configure the workspace to match what the company does: switch the
+            // modules on/off so a recruitment-only company becomes a recruitment-only
+            // workspace (nav, masters and wording follow). Reversible under Features.
+            if (function_exists('cockpit_apply_capability_modules')) {
+                $left = cockpit_apply_capability_modules($savedCaps);
+                if (is_array($left)) {
+                    $lbl = function_exists('licence_summary') ? licence_summary() : [];
+                    $onNames = array_values(array_filter(array_map(fn($k) => $lbl[$k]['label'] ?? $k, $left)));
+                    flash('Company profile saved. Your workspace is now set up for: '
+                        . (($onNames ? implode(', ', $onNames) . ' + ' : '') . 'Administration')
+                        . '. Anything you don’t use is switched off — turn a feature back on anytime under Workspace setup → Features.');
+                    redirect('/company-profile');
+                }
+            }
         }
 
         flash('Company profile saved — it now appears on your quotations, invoices and records.');

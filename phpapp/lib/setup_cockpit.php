@@ -141,6 +141,32 @@ function cockpit_capability_modules($codes = null) {
     return array_keys($mods);
 }
 
+// Auto-configure the workspace to match what the company DOES: switch the sellable
+// modules on/off so a company that picked only Recruitment activities becomes a
+// recruitment-only workspace (nav, masters, wording all follow), while a company
+// that also does inspection keeps those modules. Only inside a hosted workspace,
+// only within the paid plan (never switches on an un-entitled module), core always
+// stays on, and it is fully reversible under Workspace setup → Features. Writes via
+// the one module engine (licence_save → settings.modules_off). Returns the list of
+// non-core module keys left ON, or null if it did not run.
+function cockpit_apply_capability_modules($codes = null) {
+    if (function_exists('current_tenant') && current_tenant() === '') return null;   // control install: never
+    if (!function_exists('licence_summary') || !function_exists('licence_save')) return null;
+    $codes = $codes === null ? cockpit_capabilities() : array_values(array_filter(array_map('strval', $codes)));
+    if (!$codes) return null;                                   // nothing chosen → change nothing (never nuke a workspace)
+    $want = cockpit_capability_modules($codes);                 // the modules those activities need
+    $sum = licence_summary();
+    $modOn = [];
+    foreach ($sum as $k => $r) {
+        if (!empty($r['core'])) continue;                       // core is always on, not part of mod_on
+        $entitled = !function_exists('module_entitled') || module_entitled($k);
+        if (in_array($k, $want, true) && $entitled) $modOn[$k] = 1;   // keep ON only what the activities imply AND the plan allows
+    }
+    licence_save(['mod_on' => $modOn]);                         // the one engine that writes settings.modules_off
+    if (function_exists('licence_disabled')) licence_disabled(true);
+    return array_keys($modOn);
+}
+
 // ===========================================================================
 //  MODULES & FEATURES  — reads licence.php, never a second module engine (§13)
 // ===========================================================================
