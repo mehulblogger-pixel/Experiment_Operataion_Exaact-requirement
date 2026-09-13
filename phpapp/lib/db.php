@@ -67,7 +67,14 @@ function db($reset = false) {
         // Relax the session to match the engine the code was written for. This is
         // a per-connection setting, so it changes nothing on the server itself, and
         // it is wrapped because a locked-down host may refuse SET.
-        try { $pdo->exec("SET SESSION sql_mode = ''"); } catch (Throwable $e) {}
+        //
+        // PIPES_AS_CONCAT: the app is authored in SQLite's dialect, where `||`
+        // concatenates strings (e.g. first_name || ' ' || last_name). MySQL/MariaDB
+        // default to reading `||` as a logical OR, which turns a person's name into
+        // "0" on those servers. Turning on PIPES_AS_CONCAT — and ONLY that flag, so
+        // STRICT_TRANS_TABLES / NO_ZERO_DATE stay OFF as before — makes every such
+        // query behave identically on MySQL and SQLite, with no query rewrites.
+        try { $pdo->exec("SET SESSION sql_mode = 'PIPES_AS_CONCAT'"); } catch (Throwable $e) {}
     }
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
