@@ -41,3 +41,27 @@ foreach ([$id, $id2] as $tid) {
     db()->prepare("DELETE FROM lookup_types WHERE id=?")->execute([$tid]);
 }
 t_ok(true, 'throwaway lists cleaned up');
+
+// The manual "Use recruitment defaults" reset — puts a list right even when the
+// automatic (only-if-untouched) fix would skip it.
+t_section('Recruitment master reset (manual)');
+if (!function_exists('lk_recruit_default_for') || !function_exists('lk_reset_values')) {
+    t_ok(true, 'reset helpers not present — skipped');
+} else {
+    t_ok(lk_recruit_default_for('department') !== null, 'Department has a recruitment default set');
+    t_ok(lk_recruit_default_for('designation') !== null, 'Designation has a recruitment default set');
+    t_ok(lk_recruit_default_for('sbu') === null, 'a non-people list has no recruitment default');
+
+    if (function_exists('lk_type') && !lk_type('department') && function_exists('lk_add_type')) lk_add_type('department', 'Department', null, 0, 50);
+    $t = lk_type('department');
+    if ($t) {
+        // Pollute the list with an industrial department, then reset.
+        lk_add_value($t['id'], null, 'NDT', 'NDT', 5);
+        lk_add_value($t['id'], null, 'INSPECTION', 'Inspection', 6);
+        $n = lk_reset_values('department', lk_recruit_default_for('department'));
+        t_ok($n === count(RECRUIT_DEPARTMENTS), 'reset writes exactly the recruitment department set');
+        $codes = array_map(fn($r) => (string) $r['code'], ops_all("SELECT code FROM lookup_values WHERE type_id=?", [$t['id']]));
+        t_ok(!in_array('NDT', $codes, true) && !in_array('INSPECTION', $codes, true), 'the industrial departments are gone after reset');
+        t_ok(in_array('TALENT_ACQUISITION', $codes, true), 'recruitment departments are present after reset');
+    }
+}

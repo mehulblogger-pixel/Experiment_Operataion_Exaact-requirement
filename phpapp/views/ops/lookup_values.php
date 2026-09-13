@@ -5,6 +5,22 @@
   <a class="btn secondary" href="/lookups">← All master lists</a>
 </div>
 
+<?php // A recruitment workspace can reset this list to the recruitment-agency
+      // defaults if it is carrying the generic/inspection content (e.g. Department
+      // showing Inspection / NDT / HSE). Only where the list has a recruitment
+      // default and the Recruitment module is on. ?>
+<?php $recDef = function_exists('lk_recruit_default_for') ? lk_recruit_default_for($t['type_key']) : null;
+      if ($recDef && function_exists('licence_enabled') && licence_enabled('hr')): ?>
+<div class="panel" style="border-left:4px solid var(--brand,#3f4fce);background:var(--soft,#f6f8fb);padding:11px 14px;margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+  <div style="flex:1;min-width:220px"><b>Recruitment-agency defaults available</b>
+    <div class="muted" style="font-size:12.5px">Replace this list with the recruitment set (<?= count($recDef) ?> values) — e.g. Recruitment / Talent Acquisition, Sourcing, Account Management, Business Development, HR &amp; Compliance… Existing records keep their saved value.</div></div>
+  <form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" onsubmit="return confirm('Replace all values on this list with the recruitment-agency defaults? Records already saved keep their value; only the dropdown options change.')">
+    <input type="hidden" name="reset_recruit" value="1">
+    <button class="btn" type="submit">↺ Use recruitment defaults</button>
+  </form>
+</div>
+<?php endif; ?>
+
 <?php // Where this list appears. Tick a form to add it as a dropdown there; untick
       // to take it off (values people already chose stay saved, just stop showing). ?>
 <details class="panel" <?= empty($shownOn) ? '' : 'open' ?> style="margin-bottom:14px">

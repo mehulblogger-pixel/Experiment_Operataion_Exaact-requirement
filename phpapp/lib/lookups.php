@@ -447,6 +447,28 @@ function lk_fix_recruitment_content() {
     if (defined('CAND_SOURCES')) lk_replace_if_default('candidate_source', CAND_SOURCES, RECRUIT_CAND_SOURCES);
 }
 
+// The recruitment-agency default value set for a list, if it has one. Powers the
+// manual "Use recruitment defaults" button — so an admin can put a list right even
+// when it was edited (which the automatic, only-if-untouched fix deliberately skips).
+function lk_recruit_default_for($key) {
+    $map = [
+        'department'       => RECRUIT_DEPARTMENTS,
+        'designation'      => RECRUIT_DESIGNATIONS,
+        'candidate_source' => defined('RECRUIT_CAND_SOURCES') ? RECRUIT_CAND_SOURCES : [],
+    ];
+    $d = $map[(string) $key] ?? null;
+    return (is_array($d) && $d) ? $d : null;
+}
+// Force a list to a value set (admin-initiated). Returns the number of values set.
+function lk_reset_values($typeKey, array $values) {
+    $t = lk_type($typeKey); if (!$t) return 0;
+    try {
+        db()->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([(int) $t['id']]);
+        $so = 0; foreach ($values as $code => $label) lk_add_value($t['id'], null, (string) $code, (string) $label, $so++);
+    } catch (Throwable $e) { return 0; }
+    return count($values);
+}
+
 // Seed the compact starter set for a hosted client workspace (see the note above).
 function lk_seed_client_starter() {
     $cleared = ''; try { $cleared = (string) setting_get('masters_seeded', ''); } catch (Throwable $e) {}
@@ -983,6 +1005,17 @@ function lk_admin($route, $method) {
             // "Appears on these forms" panel — sync the list's forms to the ticks.
             lk_sync_forms($t, (array)($_POST['forms'] ?? []));
             flash('Updated where this list appears.');
+            redirect('/lookup?key=' . $t['type_key']);
+        }
+        if ($method === 'POST' && isset($_POST['reset_recruit'])) {
+            // Put a list back to the recruitment-agency defaults on demand — for a
+            // workspace that carries the inspection defaults (e.g. because other
+            // modules are on) and wants recruitment content on this list.
+            $def = function_exists('lk_recruit_default_for') ? lk_recruit_default_for($t['type_key']) : null;
+            if ($def && function_exists('licence_enabled') && licence_enabled('hr')) {
+                $n = lk_reset_values($t['type_key'], $def);
+                flash($n > 0 ? 'Reset to the recruitment-agency defaults (' . $n . ' values).' : 'Could not reset this list.', $n > 0 ? 'success' : 'error');
+            } else flash('This list has no recruitment defaults to reset to.', 'warning');
             redirect('/lookup?key=' . $t['type_key']);
         }
         if ($method === 'POST' && isset($_POST['set_module'])) {
