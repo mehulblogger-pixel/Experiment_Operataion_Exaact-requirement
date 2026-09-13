@@ -1,7 +1,12 @@
 # 06 — DUPLICATE AUDIT & REUSE/EXTEND/CONNECT/MERGE/MAP/DEPRECATE/BUILD MATRIX
 Covers deliverables **16, 23**.
 
-**Governing rule from the brief:** prefer `REUSE → EXTEND → CONNECT → MIGRATE → DEPRECATE`. Do **not** physically merge database tables without technical justification.
+**Governing rule:** prefer `REUSE → EXTEND → CONNECT → MAP → MIGRATE → DEPRECATE` before `BUILD`. Do **not** physically merge database tables without technical justification.
+
+> ## ⚠ THIS IS NOT A WORK LIST
+> A decision recorded here is **not** authorisation to implement it. Every row carries a class:
+> **A · REQUIRED NOW** (inside an authorised phase) · **B · PROTECT** · **C · FUTURE/DEFERRED** · **D · OBSERVATION**.
+> Only **Class A** items inside an authorised phase may be built. See `15-ARCHITECTURE-LOCK.md` §17, §21, §23.
 
 ---
 
@@ -45,31 +50,31 @@ Both use `IF NOT EXISTS`, so **whichever migration runs first wins**. `ops_migra
 
 **No physical table merge is proposed anywhere in this matrix.** Every convergence is by link, adapter or shared service.
 
-| # | Duplicate pair | Decision | Justification |
-|---|---|---|---|
-| D1 | Candidate vs Person | **CONNECT** | `candidates` is correctly a row *per application*, not per person. Link it to the spine via `inspectors`, extending the existing `candidates.inspector_id` + `person_ref`. Never merge. |
-| D2 | Candidate vs Marketplace Professional | **CONNECT (already partly built)** | `cx_identity_link` + `candidate-link-pro` route exist. Extend coverage; keep "a relationship, never a merge". |
-| D3 | Employee vs Inspector | **MAP** | `users.inspector_id` already exists and is uniqueness-enforced. Adopt as the standard. |
-| D4 | Worker vs Resource vs Bench | **CONNECT** | `cx_bench`/`cx_client_bench` already point at `cx_professionals`; bridge that to the spine. |
-| D5 | Client vs Organisation vs Agency | **CONNECT** | Add nullable cross-reference IDs between `business_partners`, `cx_organisations`, `agencies`. Do not merge — different lifecycles and permissions. |
-| D6 | **`candidates.agency` free text → Agency** | **BUILD (small) — high value** | Add `candidates.agency_id` FK to `agencies`, backfill by name match, keep the text column. Unblocks the brief's §13 *Source Party*. |
-| D7 | Requirement vs Requisition | **CONNECT, do NOT merge** | Two lifecycles, two audiences, 65-vs-22 table estates. Introduce a thin *fulfilment* link so a requisition can be sourced via marketplace. Precedent already exists: `lib/connect_source.php:35-51`. |
-| D8 | Application vs Submission | **MAP** | Map `CAND_STAGES` ↔ `CX_APP_STATUSES` in one adapter; do not unify tables. |
-| D9 | Job vs Position | **REUSE** | `positions` (org sanctioned role) and `jobs` (work order) are genuinely different. No action. |
-| D10 | Job Profile vs Designation | **EXTEND** | Designation is a lookup; job profile is emerging (`recruit_jd`). Keep separate, link. |
-| D11 | Recruiter vs User | **REUSE** | `recruiter_id` already references `users`. No action. |
-| D12 | Bench vs Candidate Pool | **CONNECT** | `candpool_pro_matches()` already bridges; formalise. |
-| D13 | Project vs Engagement | **DEFER** | No first-class project entity exists. Out of scope for this programme; record as debt. |
-| D14 | Two pipeline engines (sales vs recruitment) | **REUSE separately** | Different domains, both working. No convergence justified. |
-| D15 | Legacy `CAND_STAGES` vs configurable pipeline | **REFACTOR (recruitment-internal)** | Make the configurable pipeline the single source of truth; derive the legacy stage. Removes a live consistency risk. |
-| D16 | **`inspector_day_status` declared twice** | **FIX NOW** | Divergent DDL, order-dependent. Reconcile to one definition. Independent of this programme. |
-| D17 | Four SLA/ageing engines | **BUILD (one small shared helper) + REUSE** | Do not build a fifth. Extract a generic ageing/SLA helper and have recruitment consume it, per brief §20. |
-| D18 | Five audit trails | **DEFER** | Large, risky, no programme dependency. Record as debt. |
-| D19 | Five billing shapes | **DEFER** | Money module is healthy; no programme dependency. |
-| D20 | Four field/template metadata stores | **DEFER** | No programme dependency. |
-| D21 | Taxonomy: flat vs graph, Connect vs Recruitment | **CONNECT + EXTEND** | Recruitment should consume the Connect taxonomy for discipline/role rather than growing a third vocabulary. Phase-gated behind entitlement work. |
-| D22 | **KPI engine** | **REUSE (mandatory)** | TAPI already provides `kpi_defs`, metric adapters, a safe formula parser, scorecards and alerts. Recruitment KPIs **must** be TAPI metrics. Building a second KPI engine is explicitly forbidden by brief §20. |
-| D23 | **Approval engine** | **EXTEND, do not duplicate** | `recruit_approval` mechanism is generic (rule matching, multi-level, SLA, reminders, escalation, cron). Its *storage* is recruitment-named. Widen `APPR_ENTITIES` and actually invoke it for `REQUISITION`. |
+| # | Duplicate pair | Decision | Class · Phase | Justification |
+|---|---|---|---|---|
+| D1 | Candidate vs Person | **CONNECT** | **A · Phase 6** | `candidates` is correctly a row *per application*, not per person. Link it to the spine via `inspectors`, extending the existing `candidates.inspector_id` + `person_ref`. Never merge. |
+| D2 | Candidate vs Marketplace Professional | **CONNECT (already partly built)** | **A · Phase 6** | `cx_identity_link` + `candidate-link-pro` route exist. Extend coverage; keep "a relationship, never a merge". |
+| D3 | Employee vs Inspector | **MAP** | **D · none** | `users.inspector_id` already exists and is uniqueness-enforced. Adopt as the standard. |
+| D4 | Worker vs Resource vs Bench | **CONNECT** | **A · Phase 6** | `cx_bench`/`cx_client_bench` already point at `cx_professionals`; bridge that to the spine. |
+| D5 | Client vs Organisation vs Agency | **CONNECT** | **A · Phase 6** | Add nullable cross-reference IDs between `business_partners`, `cx_organisations`, `agencies`. Do not merge — different lifecycles and permissions. |
+| D6 | **`candidates.agency` free text → Agency** | **BUILD (small) — high value** | **A · Phase 2** | Add `candidates.agency_id` FK to `agencies`, backfill by name match, keep the text column. Unblocks the brief's §13 *Source Party*. |
+| D7 | Requirement vs Requisition | **CONNECT, do NOT merge** | **A · Phase 4** | Two lifecycles, two audiences, 65-vs-22 table estates. Introduce a thin *fulfilment* link so a requisition can be sourced via marketplace. Precedent already exists: `lib/connect_source.php:35-51`. |
+| D8 | Application vs Submission | **MAP** | **A · Phase 4** | Map `CAND_STAGES` ↔ `CX_APP_STATUSES` in one adapter; do not unify tables. |
+| D9 | Job vs Position | **REUSE** | **D · none** | `positions` (org sanctioned role) and `jobs` (work order) are genuinely different. No action. |
+| D10 | Job Profile vs Designation | **EXTEND** | **C · deferred** | Designation is a lookup; job profile is emerging (`recruit_jd`). Keep separate, link. |
+| D11 | Recruiter vs User | **REUSE** | **D · none** | `recruiter_id` already references `users`. No action. |
+| D12 | Bench vs Candidate Pool | **CONNECT** | **C · deferred** | `candpool_pro_matches()` already bridges; formalise. |
+| D13 | Project vs Engagement | **DEFER** | **C · deferred** | No first-class project entity exists. Out of scope for this programme; record as debt. |
+| D14 | Two pipeline engines (sales vs recruitment) | **REUSE separately** | **B · protect** | Different domains, both working. No convergence justified. |
+| D15 | Legacy `CAND_STAGES` vs configurable pipeline | **REFACTOR (recruitment-internal)** | **A · Phase 2** | Make the configurable pipeline the single source of truth; derive the legacy stage. Removes a live consistency risk. |
+| D16 | **`inspector_day_status` declared twice** | **FIX** | **A · Phase 2** | Divergent DDL, order-dependent. Reconcile to one definition. A live defect, scheduled in Phase 2. |
+| D17 | Four SLA/ageing engines | **BUILD (one small shared helper) + REUSE** | **A · Phase 5** | Do not build a fifth. Extract a generic ageing/SLA helper and have recruitment consume it, per brief §20. |
+| D18 | Five audit trails | **DEFER** | **C · deferred** | Large, risky, no programme dependency. Record as debt. |
+| D19 | Five billing shapes | **DEFER** | **C · deferred** | Money module is healthy; no programme dependency. |
+| D20 | Four field/template metadata stores | **DEFER** | **C · deferred** | No programme dependency. |
+| D21 | Taxonomy: flat vs graph, Connect vs Recruitment | **CONNECT + EXTEND** | **C · deferred** | Recruitment should consume the Connect taxonomy for discipline/role rather than growing a third vocabulary. Phase-gated behind entitlement work. |
+| D22 | **KPI engine** | **REUSE (mandatory)** | **A · Phase 5** | TAPI already provides `kpi_defs`, metric adapters, a safe formula parser, scorecards and alerts. Recruitment KPIs **must** be TAPI metrics. Building a second KPI engine is explicitly forbidden by brief §20. |
+| D23 | **Approval engine** | **EXTEND, do not duplicate** | **A · Phase 3** | `recruit_approval` mechanism is generic (rule matching, multi-level, SLA, reminders, escalation, cron). Its *storage* is recruitment-named. Widen `APPR_ENTITIES` and actually invoke it for `REQUISITION`. |
 
 ### 2.1 Items that are NOT duplicates (explicitly cleared)
 - `business_partners` handling both clients and vendors — a deliberate, working single-table design. Leave alone.

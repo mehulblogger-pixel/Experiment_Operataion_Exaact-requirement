@@ -14,13 +14,14 @@ The schema engine is **forward-only**. There is no `schema_version` table, no do
 3. **Backfill idempotently.** Every backfill must be safe to run repeatedly (the boot chain may re-run it).
 4. **Dual-write during transition.** When a free-text field gains an FK (e.g. `candidates.agency` → `agency_id`), write both and read the FK with a text fallback until coverage is proven.
 5. **No data deletion on module deactivation.** Already true and verified — preserve it (brief §8).
-6. **Every migration must be tested on MySQL**, not only SQLite (see `08-…` W1).
+6. **Every migration must be tested on the production engine, MySQL/MariaDB** — the SQLite harness is supplementary only (see `08-…` W1).
 
 ### 1.3 Specific migrations implied by this audit (not yet scheduled)
 | Change | Type | Risk |
 |---|---|---|
 | `saas_entitled_modules` default-deny semantics | behavioural, no schema | **High** — must not lock out existing tenants; needs a guarded backfill first |
-| New module keys `marketplace`, `quality` | additive to `PRODUCT_MODULES` + ceiling backfill | Medium |
+| New module key `marketplace` | additive to `PRODUCT_MODULES` + ceiling backfill | Medium |
+| ~~New module key `quality`~~ | **NOT IN SCOPE** — Quality is KEEP/PROTECT (architecture lock §7) | — |
 | `candidates.agency_id` FK | additive column + name-match backfill | Low |
 | Requisition target/SLA dates | additive columns | Low |
 | Hiring-request requestor fields | additive columns | Low |

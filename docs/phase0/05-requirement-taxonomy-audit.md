@@ -83,7 +83,7 @@ But the same `department` master is used on the **requisition**, where the value
 
 Loading the agency's internal departments into the requisition's department dropdown is a **semantic collision**, and it is what makes the screens read as confusing. Same for `designation`.
 
-### 2.4 Required separation (for Phase 1 design, not implemented)
+### 2.4 Required separation (designed in Phase 2 — Recruitment Structural Foundation; not implemented)
 | Concept | Means | Used on |
 |---|---|---|
 | **Security role** | what a user may do | `users.role` + `can()` |

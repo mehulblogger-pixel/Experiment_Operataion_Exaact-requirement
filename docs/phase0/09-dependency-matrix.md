@@ -78,7 +78,7 @@ Rows depend on columns. **H** = hard (code/schema), **S** = soft (shared masters
 ## 5. Dependency rules adopted for all later phases
 
 1. **No new inbound dependency on recruitment tables** from other modules.
-2. Recruitment persistence must migrate **out of `lib/ops.php`** into recruitment libraries before it is extended — otherwise every recruitment feature keeps enlarging Operations' blast radius. (Sequenced as a Phase-2 refactor, behind tests.)
+2. Recruitment persistence must migrate **out of `lib/ops.php`** into recruitment libraries before it is extended — otherwise every recruitment feature keeps enlarging Operations' blast radius. (Sequenced as **Phase 2 item 8 — safe extraction only**, behind Operations regression. Operations itself is never rebuilt: `15-ARCHITECTURE-LOCK.md` §5.)
 3. `lib/projcosting.php:323` inserting requisitions must be re-pointed at a recruitment-owned function, not duplicated.
 4. Any schema change is **additive only** (no rollback exists).
 5. Any change to shared services (lookups, RBAC, scope, licence) runs the **full 6948-assertion suite** plus the MySQL suite once it exists.

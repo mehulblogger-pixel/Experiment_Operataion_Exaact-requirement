@@ -3,6 +3,10 @@
 **Status: PHASE 0 READY FOR REVIEW**
 **Scope: audit, analysis, architecture, mapping, testing strategy, roadmap, risk. NO implementation performed.**
 
+**Status of this document set: CORRECTED AND ARCHITECTURE-LOCKED.** See `15-ARCHITECTURE-LOCK.md` — the authoritative Phase-0 decision record. Where any document here disagrees with the architecture lock, **the architecture lock wins**.
+
+**Production database: MySQL/MariaDB. Existing automated regression harness: SQLite.** The current automated suite therefore does not fully exercise the production MySQL/MariaDB database engine.
+
 Baseline audited: the supplied working EXAACT codebase.
 Measured at audit time: **154,873 lines of PHP**, **221 library files**, **394 view files**, **444 test files**, **435 distinct application routes**, **266 operational screens**.
 
@@ -48,6 +52,7 @@ The 32 required deliverables are covered by the documents in this folder.
 | 30 | Detailed Testing Roadmap | `12-testing-roadmap.md` |
 | 31 | Risk Register | `13-risk-register.md` |
 | 32 | Phase Completion Template | `14-phase-completion-template.md` |
+| — | **Architecture Lock (authoritative decision record)** | **`15-ARCHITECTURE-LOCK.md`** |
 
 ---
 
@@ -56,8 +61,10 @@ The 32 required deliverables are covered by the documents in this folder.
 **F1 — Entitlement currently FAILS OPEN. (Critical)**
 `licence_entitled_ceiling()` returns `null` when the tenant setting `saas_entitled_modules` is empty, and `module_entitled()` then returns `true` for every module (`lib/licence.php:122-152`). A tenant whose ceiling was never written is entitled to **everything**. The locked principle in the brief — entitlement as a hard security boundary — is therefore not yet met by default. This is the single highest-priority fix and is the root cause of a recruitment workspace displaying the full ERP.
 
-**F2 — Marketplace and Quality are NOT modules. (Critical for the commercial model)**
-`PRODUCT_MODULES` contains only six entries: `operations, admin(core), sales, reporting, money, hr` (`lib/licence.php:29-50`). Marketplace/Connect is gated by a plain tenant setting that **defaults to ON for every cloud tenant** (`marketplace_addon_on()`, default `'1'` when cloud). Quality is gated by accreditation-pack settings (`accredited_pack_on()`). Neither passes through the entitlement ceiling, so neither can be sold, withheld, suspended or audited as a module. Customer D (Marketplace + Operations + Reporting) and Customer E (which includes Quality) are **not expressible** in today's plan catalogue.
+**F2 — Marketplace is not a sellable module. (Critical for the commercial model)**
+`PRODUCT_MODULES` contains only six entries: `operations, admin(core), sales, reporting, money, hr` (`lib/licence.php:29-50`). Marketplace/Connect is gated by a plain tenant setting that **defaults to ON for every cloud tenant** (`marketplace_addon_on()`, default `'1'` when cloud). Quality is gated by accreditation-pack settings (`accredited_pack_on()`). Neither passes through the entitlement ceiling, so neither can be sold, withheld, suspended or audited as a module. Customer D (Marketplace + Operations + Reporting) is **not expressible** in today's plan catalogue.
+
+**Scope ruling:** *Marketplace* is corrected in Phase 1. *Quality* is **KEEP / PROTECT** — its bundling inside Operations is recorded as an **observation only**, not an implementation task (architecture lock §6–7).
 
 **F3 — Public routes bypass the module gate. (High)**
 The gate `ops_module_gate()` is enforced at exactly one chokepoint, `ops_dispatch()` (`lib/ops.php:2697`), invoked from the **last line** of the front controller (`index.php:1670`). Everything dispatched earlier bypasses it: 9 authenticated routes handled inline in `index.php`, plus all public routes. Critically, `lib/careers.php` contains **zero** references to `licence_enabled` or `module_entitled`; the public careers page and its application intake — which writes `candidates` rows — are gated only by the tenant setting `careers_enabled` (`lib/careers.php:34,154`). A tenant that loses the `hr` module keeps serving jobs and collecting applicants.
@@ -70,8 +77,21 @@ There is no per-source allocation quantity anywhere. `sourcing_model` is a singl
 
 ---
 
-## Recommended sequencing consequence
+## How findings convert to work — the four-way rule
 
-F1 and F2 are **prerequisites**. Until entitlement is default-deny and every sellable capability is a real module, no Recruitment work can be safely validated — because "a recruitment-only tenant" is not yet a state the platform can actually enforce. Phase 1 must therefore be the entitlement hardening, not recruitment features.
+A Phase-0 finding is **not** automatic implementation scope. Every finding carries one of:
 
-Detailed sequencing: `11-implementation-roadmap.md`.
+| Class | Meaning |
+|---|---|
+| **A · REQUIRED NOW** | Explicitly inside the authorised phase scope |
+| **B · PROTECT** | Healthy functionality that must not be disturbed |
+| **C · FUTURE / DEFERRED** | Known debt, documented, deliberately not implemented |
+| **D · OBSERVATION** | Useful finding, no current implementation action |
+
+**No developer or coding agent may implement a finding merely because it appears in this audit. Only authorised phase scope may be implemented.**
+
+## Sequencing consequence
+
+F1 is a **prerequisite**. Until entitlement is default-deny and Marketplace is a real module, no Recruitment work can be safely validated — because "a recruitment-only tenant" is not yet a state the platform can enforce. Phase 1 is therefore entitlement and module boundary, not recruitment features.
+
+Authoritative decisions: `15-ARCHITECTURE-LOCK.md`. Detailed sequencing: `11-implementation-roadmap.md`.

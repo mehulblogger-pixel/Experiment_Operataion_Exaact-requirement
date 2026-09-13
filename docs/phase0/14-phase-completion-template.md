@@ -58,10 +58,10 @@ What business outcome this delivers, in one paragraph of plain language.
 
 ### 6.2 Measured suite result (re-measured, never quoted)
 ```
-SQLite:  php tests/run.php      → ____ passed, ____ failed, ____ s
-MySQL:   (Phase 2.1 harness)    → ____ passed, ____ failed, ____ s
+MySQL/MariaDB (PRODUCTION ENGINE — authoritative)  → ____ passed, ____ failed, ____ s
+SQLite (supplementary fast layer)                 → ____ passed, ____ failed, ____ s
 ```
-Baseline at Phase 0 was **6948 passed / 0 failed / 81.83 s (SQLite only)**. Any drop must be explained.
+Baseline at Phase 0 was **6948 passed / 0 failed / 81.83 s** on the SQLite harness. **Production is MySQL/MariaDB; the MySQL/MariaDB result is the authoritative one.** Any drop must be explained.
 
 ### 6.3 Mandatory regression scenario
 - [ ] **S-1 Operations-only tenant** still fully functional and Recruitment still unreachable.

@@ -11,7 +11,7 @@ For each module: subscription/entitlement dependency, database footprint, and th
 - **Principal libs:** `ops.php` (8,285 ln), `tosrm.php` (2,589), `pdso.php`, `attend.php`, `sched.php`.
 - **Note:** the `operations` feature list **also owns quality features** (`equipment, competence, impartiality, ncr, capa, audits, datacontrol, confidentiality`). So "Quality" is commercially inside Operations while being *separately* gated by accreditation-pack settings — a double gate with no single owner. See §5.
 - **Owns the operations SLA engine** (`sla_targets`, `TOSRM_SLA_STAGES`, `tosrm_sla_eval()` `lib/tosrm.php:1467-1620`) — WITHIN / AT_RISK (80% of target) / BREACHED, hard-wired to `calls`/`jobs`/`report_docs`.
-- **Status: HEALTHY — protect. No changes proposed.**
+- **Status: HEALTHY — KEEP / PROTECT. No changes proposed by this programme.**
 
 ## 2. Recruitment audit (deliverable 5)
 - **Entitlement:** `hr` → feature `hiring`.
@@ -51,7 +51,8 @@ For each module: subscription/entitlement dependency, database footprint, and th
 - **Entitlement: NONE.** Gated by `accredited_pack_on()` → accreditation-pack settings, *and* commercially bundled inside the `operations` feature list.
 - **Tables: 31** — `internal_audits, audit_findings, mgmt_reviews, capa(+_actions,_events), complaints, nonconformities, ncr_events, impartiality_*, confidentiality_*, controlled_docs, risk_items, retention_rules, satisfaction_surveys, data_consents, data_requests, security_incidents, …`
 - `ops_module_gate()` **does** refuse accreditation registers when no pack is on (`lib/ops.php`, the `accredited_pack_on()` block) — so route protection exists; **entitlement** protection does not.
-- **Finding:** Quality is a sellable product in the brief (Customer E) but has no module key, no price, no plan slot.
+- **OBSERVATION (not an implementation task):** Quality has no module key, no price and no plan slot; it is commercially bundled inside Operations and gated by accreditation-pack settings.
+- **ARCHITECTURE LOCK — KEEP / PROTECT.** Operations and Quality are a functioning existing asset. This programme makes **no change** to Quality: no standalone Quality engine, no duplicated Quality tables, no migration of Quality into another module, and no redesign of Operations to tidy module boundaries. Independent subscribability for Quality is a separate future architecture decision. See `15-ARCHITECTURE-LOCK.md` §6–7.
 
 ## 6. Money audit (deliverable 9)
 - **Entitlement:** `money` → features `invoicing, profitability`.

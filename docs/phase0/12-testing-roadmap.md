@@ -1,7 +1,9 @@
 # 12 — DETAILED TESTING ROADMAP
 Covers deliverable **30**. Implements the brief's §24–§34.
 
-**Baseline to beat (measured at Phase 0): 444 files / 6948 assertions / 0 failures / 81.83 s / SQLite only.**
+**Baseline to beat (measured at Phase 0): 444 files / 6948 assertions / 0 failures / 81.83 s.**
+
+**Production database: MySQL/MariaDB. Existing automated regression harness: SQLite.** The current automated suite therefore does not fully exercise the production MySQL/MariaDB database engine. SQLite remains acceptable as a fast supplementary layer; it is never the production database.
 
 ---
 
@@ -11,7 +13,7 @@ Covers deliverable **30**. Implements the brief's §24–§34.
 |---|---|---|---|
 | 1 Static | syntax, lint, includes, routes | `php -l` used ad hoc | **no CI gate** |
 | 2 Unit | business logic | strong (6948 assertions) | fine |
-| 3 Database | CRUD, constraints, tenant isolation, migrations, rollback, idempotency | partial | **MySQL untested; no rollback exists to test; no cross-tenant test** |
+| 3 Database | CRUD, constraints, tenant isolation, migrations, rollback, idempotency | partial | **production MySQL/MariaDB engine not exercised; no rollback exists to test; no cross-tenant test** |
 | 4 API | every endpoint | N/A — no tenant API | genuinely N/A |
 | 5 UI | every screen/field/state | none in this suite (separate Playwright crawl, not run) | **not integrated** |
 | 6 Workflow | every legal transition | only Connect + Offer guard transitions | **requisition/candidate unguarded** |
@@ -22,9 +24,9 @@ Covers deliverable **30**. Implements the brief's §24–§34.
 
 ---
 
-## 2. Mandatory new test infrastructure (Phase 2)
+## 2. Mandatory new test infrastructure (delivered inside PHASE 1)
 
-**T-1 MySQL suite run.** The product ships on MySQL; the suite pins SQLite (`tests/bootstrap.php`). Two production defects this session (`ON CONFLICT` → SQLSTATE 1064; `||` → `"0"`) were invisible to 6948 green assertions. **Until this exists, no green result is trustworthy evidence for production.**
+**T-1 MySQL/MariaDB suite run.** Production is MySQL/MariaDB; the existing harness pins SQLite (`tests/bootstrap.php`). Two production defects this session (`ON CONFLICT` → SQLSTATE 1064; `||` → `"0"`) were invisible to 6948 green assertions. **Until this exists, no green result is trustworthy evidence for production.**
 
 **T-2 End-to-end entitlement denial.** No test today drives a real request through the router for an un-entitled module and asserts denial. Required per surface: menu, route, **direct URL**, form POST, AJAX, public route, cron, export, report, notification, deep link.
 
@@ -44,16 +46,16 @@ New tenant; activate Operations + Reporting only; **do not** activate Recruitmen
 *This scenario is the single best protection against the brief's §39 no-break rule, because recruitment CRUD currently lives inside `lib/ops.php` (`09-…` §1).*
 
 ### S-2 Corporate HR without a career page (brief §28)
-Requestor → Hiring Request → Approval → Recruiter assignment → manual CV intake → Candidate → Screening → Interview → Selection → Offer → Appointment → Joining → Confirmation. Verify target dates and recruiter KPIs. *Blocked until Phases 4 and 6.*
+Requestor → Hiring Request → Approval → Recruiter assignment → manual CV intake → Candidate → Screening → Interview → Selection → Offer → Appointment → Joining → Confirmation. Verify target dates and recruiter KPIs. *Blocked until Phases 4 and 6 (Multi-Source Fulfilment, Person/Organisation/Marketplace Convergence).*
 
 ### S-3 Corporate HR with career page (brief §29)
-Repeat S-2 with the career page on; verify the applicant lands in the **same** candidate engine. *Already true today (`lib/careers.php:65-139`) — lock it with a test.*
+Repeat S-2 with the career page on; verify the applicant lands in the **same** candidate engine. *Already true today (`lib/careers.php:65-139`) — lock it with a test. Career Page remains OPTIONAL: manual CV intake must work fully without it.*
 
 ### S-4 Agency (brief §30)
 Client → Requirement → Recruiter → Candidate → Submission → Client interview → Selection → Placement; verify recruiter KPI and commercial outcome.
 
 ### S-5 Multi-source (brief §31)
-One requirement for 20; allocate internal/direct/agency/supplier/marketplace; verify total, allocated, remaining, duplicate prevention, source traceability, progress, closure. *Blocked until Phase 5. **Today this fails at the first placement** (`lib/ops.php:5091`).*
+One requirement for 20; allocate internal/direct/agency/supplier/marketplace; verify total, allocated, remaining, duplicate prevention, source traceability, progress, closure. *Blocked until Phase 4 — Multi-Source Fulfilment. **Today this fails at the first placement** (`lib/ops.php:5091`).*
 
 ### S-6 TPIA (brief §32)
 Project → Workforce requirement → multi-source → verification → mobilisation → deployment → Operations → Quality → Reporting → Money; verify **one person identity persists throughout**. *Blocked until Phases 5 and 7.*
@@ -78,6 +80,6 @@ Manual scenarios must start from a **genuinely new tenant**, not seeded data, an
 ---
 
 ## 6. Per-phase testing procedure (brief §24)
-1 define acceptance criteria → 2 test cases → 3 negative → 4 edge → 5 regression → 6 cross-module → 7 implement → 8 automated run (**SQLite + MySQL**) → 9 manual → 10 fix → 11 re-run → 12 UAT → 13 record evidence → **14 only then mark COMPLETED**.
+1 define acceptance criteria → 2 test cases → 3 negative → 4 edge → 5 regression → 6 cross-module → 7 implement → 8 automated run (**MySQL/MariaDB authoritative; SQLite supplementary**) → 9 manual → 10 fix → 11 re-run → 12 UAT → 13 record evidence → **14 only then mark COMPLETED**.
 
 **A phase may never be marked COMPLETED on a quoted test figure. Numbers must be re-measured and restated.**

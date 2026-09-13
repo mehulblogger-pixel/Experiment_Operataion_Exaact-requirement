@@ -66,9 +66,11 @@ This is the root cause of the observed behaviour where a recruitment-agency work
 
 **Marketplace/Connect is absent.** It is gated by `marketplace_addon_on()`, a plain tenant setting whose default is **`'1'` when the install is cloud** — i.e. every cloud tenant gets Marketplace ON by default — further gated by `connect_enabled()`, another setting defaulting to `'1'`. Neither passes through the ceiling. **65 database tables** belong to this un-sellable capability.
 
-**Quality is absent.** It is gated by `accredited_pack_on()` → accreditation-pack settings. **31 tables**.
+**Quality is absent** from `PRODUCT_MODULES`. It is gated by `accredited_pack_on()` → accreditation-pack settings, and is commercially bundled inside the `operations` feature list. **31 tables**.
 
-**Commercial consequence.** From the brief: Customer D = *Marketplace + Operations + Reporting*; Customer E includes *Quality*. Neither is expressible today — the plan catalogue cannot grant or withhold them, billing cannot price them, and suspension cannot reach them.
+> **ARCHITECTURE LOCK — OBSERVATION ONLY.** That Quality is technically embedded within Operations is recorded as an architectural observation. It is **not** an implementation task. Operations and Quality are a functioning existing asset and are **preserved unchanged** by this programme. Making Quality independently subscribable would be a separate future architecture decision. See `15-ARCHITECTURE-LOCK.md` §6–7.
+
+**Commercial consequence.** Customer D = *Marketplace + Operations + Reporting* is not expressible today: the plan catalogue cannot grant or withhold Marketplace, billing cannot price it, and suspension cannot reach it. **Marketplace is therefore in Phase 1 scope. Quality is not** — Quality stays as it is (observation only).
 
 ### 2.3 FINDING F3 — enforcement surface is incomplete (High)
 
@@ -110,7 +112,7 @@ The brief requires four visible states (ACTIVE / AVAILABLE-NOT-SUBSCRIBED / SUSP
 
 Seat map: `['STARTER'=>2,'RECRUITMENT'=>3,'PRO'=>5,'ENTERPRISE'=>9]` (`lib/saas_tenants.php:27`).
 
-**No plan can express Marketplace or Quality.** Customer D and Customer E from the brief are unsellable.
+**No plan can express Marketplace.** Customer D (*Marketplace + Operations + Reporting*) is unsellable today — corrected in Phase 1. Quality remains bundled with Operations by decision, not by oversight.
 
 Per-tenant à-la-carte override exists — `saas_tenant_set_modules()` / `enabled_modules` — so the commercial model is *already* à-la-carte-capable at the tenant level; the plan tiers are presets over it. This is the right foundation to extend.
 
@@ -153,7 +155,7 @@ Target state. **E** = entitlement-controlled, **S** = setting-controlled (today)
 | Sales & CRM | yes | E `sales` | 23 | E (unchanged) |
 | Money | yes | E `money` | 20 | E (unchanged) |
 | **Marketplace / Connect** | **no** | **S** `marketplace_addon` (defaults ON in cloud) | **65** | **promote to E `marketplace`** |
-| **Quality / Accreditation** | **no** | **S** accreditation packs | **31** | **promote to E `quality`** |
+| **Quality / Accreditation** | no | **S** accreditation packs | **31** | **KEEP / PROTECT — no change in this programme** (architecture lock §7) |
 
 Enforcement points that must ALL be true for a module to be considered entitlement-protected:
 

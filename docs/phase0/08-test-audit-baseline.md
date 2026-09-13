@@ -56,14 +56,18 @@ So **6948 = individual assertions, not test cases.** Static call sites: 4075 `t_
 
 These are not failures. They are reasons the green result is **weaker evidence than it appears**, and each becomes a mandatory fix in the testing roadmap.
 
-### W1 — The suite validates a database engine the product does not ship on. (Critical)
-`bootstrap.php` hard-pins `DB_DRIVER=sqlite`. **MySQL is never exercised.** Only 4 files mention MySQL and all test *string/config derivation*, never a connection.
+### W1 — The harness engine is not the production engine. (Critical)
+**Production database: MySQL/MariaDB. Existing automated regression harness: SQLite.**
 
-Production runs MySQL/MariaDB. This session already produced two live MySQL-only defects that 6948 green assertions did not catch:
+`bootstrap.php` hard-pins `DB_DRIVER=sqlite`, so the current automated suite **does not fully exercise the production MySQL/MariaDB database engine**. Only 4 files mention MySQL and all test *string/config derivation*, never a connection.
+
+SQLite may remain as a fast supplementary test layer, but it is never the production database. This session already produced two live MySQL-only defects that 6948 green assertions did not catch:
 - `INSERT … ON CONFLICT` (SQLite syntax) crashing MariaDB with SQLSTATE 1064;
 - `||` read as logical-OR on MySQL, turning concatenated names into `"0"`.
 
-Both are exactly the class of bug a SQLite-only suite is blind to.
+Both are exactly the class of bug that a SQLite-backed harness is blind to.
+
+**Authoritative requirement going forward: MySQL/MariaDB is the database-testing target for every phase.**
 
 ### W2 — Module entitlement has almost no test coverage. (Critical)
 Given entitlement is the brief's **hard security boundary**, coverage is:
@@ -99,7 +103,8 @@ All 444 files share **one mutating SQLite database** in a single process — no 
 ## 3. Baseline statement for the programme
 
 > **EXAACT test baseline, established at Phase 0:**
-> 444 files / **6948 assertions** / **0 failures** / 81.83 s / SQLite only / PHP 8.4.19.
+> 444 files / **6948 assertions** / **0 failures** / 81.83 s / PHP 8.4.19.
+> Harness engine: **SQLite**. Production engine: **MySQL/MariaDB** — not yet exercised by the suite.
 > Entitlement coverage: 22 assertions (0.3%), none end-to-end.
 > MySQL coverage: **none**.
 > Rendering coverage: none in this suite.
