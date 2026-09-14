@@ -45,24 +45,57 @@ $_SESSION['saas_tenant'] = '';            // in memory only: resolve the CONTROL
 $_SERVER['HTTP_HOST']    = '';
 $_SERVER['SERVER_NAME']  = $_SERVER['SERVER_NAME'] ?? 'localhost';
 
-$CFG = @require __DIR__ . '/config.php';
-if (!$IS_CLI && is_array($CFG) && $UID > 0) {
-    try {
-        $d = (array) ($CFG['db'] ?? []);
-        $pdo = ($d['driver'] ?? '') === 'sqlite'
-            ? new PDO('sqlite:' . $CFG['sqlite_path'])
-            : new PDO("mysql:host={$d['host']};dbname={$d['name']};charset=utf8mb4", $d['user'], $d['pass'], [PDO::ATTR_TIMEOUT => 10]);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $st = $pdo->prepare("SELECT id, username, is_superuser, is_active FROM users WHERE id = ?");
-        $st->execute([$UID]);
-        $u = $st->fetch(PDO::FETCH_ASSOC) ?: null;
-        if ($u && (int) $u['is_superuser'] === 1 && (int) $u['is_active'] === 1) $AUTH = $u;
-    } catch (Throwable $e) { $AUTH = null; }
+$CFG  = @require __DIR__ . '/config.php';
+$WHY  = '';                     // why we could not confirm an administrator
+if (!$IS_CLI) {
+    if (!is_array($CFG))      $WHY = 'config';
+    elseif ($UID <= 0)        $WHY = 'signin';
+    else {
+        try {
+            $d = (array) ($CFG['db'] ?? []);
+            $pdo = ($d['driver'] ?? '') === 'sqlite'
+                ? new PDO('sqlite:' . $CFG['sqlite_path'])
+                : new PDO("mysql:host={$d['host']};dbname={$d['name']};charset=utf8mb4", $d['user'], $d['pass'], [PDO::ATTR_TIMEOUT => 10]);
+            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $st = $pdo->prepare("SELECT id, username, is_superuser, is_active FROM users WHERE id = ?");
+            $st->execute([$UID]);
+            $u = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($u && (int) $u['is_superuser'] === 1 && (int) $u['is_active'] === 1) $AUTH = $u;
+            else $WHY = 'notadmin';
+        } catch (Throwable $e) { $WHY = 'db'; }
+    }
 }
+
+// A bare 404 for every refusal was a mistake in a tool whose whole job is to
+// tell the operator what is wrong: "page not found" then means BOTH "the file
+// did not upload" and "you are not signed in", and those need opposite actions.
+//
+// So a visitor who is simply not signed in gets a short page saying so. It
+// reveals only that the file exists — every file name, size and checksum stays
+// behind the administrator check. Someone signed in who is NOT an
+// administrator still gets a plain 404.
 if (!$IS_CLI && !$AUTH) {
-    http_response_code(404);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "Not Found\n";
+    if ($WHY === 'notadmin') {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Not Found\n";
+        exit;
+    }
+    $msg = $WHY === 'signin'
+        ? 'Sign in to EXAACT as an administrator in this same browser, then reload this page.'
+        : ($WHY === 'config'
+            ? 'This page could not read config.php. Check that config.php and config.local.php are both in the application folder.'
+            : 'This page could not open the database. The settings in config.local.php may be wrong, or the database server may be down.');
+    http_response_code(200);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+       . '<title>Deployment check</title>'
+       . '<div style="max-width:560px;margin:0 auto;padding-block:48px;padding-left:16px;padding-right:16px;'
+       . 'font:15px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a">'
+       . '<h1 style="font-size:20px;margin:0 0 10px">Deployment check</h1>'
+       . '<p style="margin:0 0 14px">' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</p>'
+       . '<p style="color:#64748b;font-size:13.5px;margin:0">The file is on the server and reachable &mdash; so if a '
+       . '&ldquo;page not found&rdquo; sent you here, that part is already solved.</p></div>';
     exit;
 }
 
