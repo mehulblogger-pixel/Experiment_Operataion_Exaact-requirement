@@ -27,7 +27,30 @@ if (!defined('AGREEMENT_LICENSOR'))    define('AGREEMENT_LICENSOR', getenv('AGRE
 if (!defined('AGREEMENT_JURISDICTION'))define('AGREEMENT_JURISDICTION', getenv('AGREEMENT_JURISDICTION') ?: 'Gandhinagar, Gujarat, India');
 if (!defined('AGREEMENT_CONTACT'))     define('AGREEMENT_CONTACT', getenv('AGREEMENT_CONTACT') ?: 'legal@mghaiapps.com');
 
-function agreement_file() { return __DIR__ . '/../licence-agreement.json'; }
+// WHERE THE ACCEPTED AGREEMENT IS KEPT.
+//
+// It used to be a file inside the application folder — the folder the update
+// method deletes before uploading fresh code. So every upload destroyed the
+// record of acceptance, and the software demanded the agreement again. Exactly
+// the fault that destroyed two workspaces, in a different place.
+//
+// It now lives ABOVE the web root, beside the workspace data, where no upload
+// can reach it. A copy already sitting in the application folder is honoured and
+// lifted to the safe location once, so an install that accepted before this
+// change is never asked a second time.
+function agreement_file() {
+    $inApp = dirname(__DIR__) . '/licence-agreement.json';
+    $dir   = function_exists('tenant_safe_data_dir') ? tenant_safe_data_dir()[0] : '';
+    if ($dir === '' || $dir === dirname(__DIR__)) return $inApp;   // nowhere safer to put it
+    $safe = rtrim($dir, '/') . '/licence-agreement.json';
+
+    if (is_file($safe)) return $safe;
+    // Lift an existing acceptance out of harm's way. Copied, never moved: if the
+    // copy failed silently the original must still be there to be read.
+    if (is_file($inApp) && @copy($inApp, $safe) && is_file($safe)) return $safe;
+    if (is_file($inApp)) return $inApp;
+    return is_writable($dir) ? $safe : $inApp;
+}
 
 // Skip on the provider's own issuing server, on a developer opt-out, and — most
 // importantly — on any installation that is ALREADY established. The agreement
@@ -247,8 +270,64 @@ function ops_agreement($route, $method) {
 
 // The pre-install gate: handle its POST, else render the standalone page. Called
 // from index.php before the database-setup step. Always exits when it acts.
+// Shown instead of the agreement when the configured database will not open.
+// It names what is wrong and what to check, and it offers nothing to click —
+// there is no safe action here except correcting the settings. Always exits.
+function agreement_db_down_page($why, $dbName = '', $dbUser = '') {
+    $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+    http_response_code(503);
+    header('Content-Type: text/html; charset=utf-8');
+    header('Retry-After: 60');
+    echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+       . '<title>Database not reachable</title>'
+       . '<div style="max-width:620px;margin:0 auto;padding-block:48px;padding-left:16px;padding-right:16px;'
+       . 'font:15px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a">'
+       . '<h1 style="font-size:21px;margin:0 0 6px;color:#b91c1c">The database could not be opened</h1>'
+       . '<p style="margin:0 0 16px;color:#334155">Your data is safe and nothing has been lost or changed. '
+       . 'The application simply cannot reach the database, so it cannot start.</p>'
+       . '<div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:13px 15px;margin:0 0 18px;color:#7f1d1d">'
+       . $e($why) . '</div>'
+       . '<p style="margin:0 0 6px;font-weight:600">What to check, in order</p>'
+       . '<ol style="margin:0 0 18px 18px;padding:0;color:#334155">'
+       . '<li>Open <code>config.php</code> in your hosting File Manager and confirm the database '
+       . '<b>password</b> matches the one you set in the hosting panel. A password changed in one place '
+       . 'and not the other is the usual cause.</li>'
+       . '<li>Wrap the password in <b>single</b> quotes, not double. A password containing <code>$</code> '
+       . 'or <code>{</code> is read as something else inside double quotes.</li>'
+       . '<li>If a file named <code>config.local.php</code> exists, its settings <b>override</b> '
+       . '<code>config.php</code>. Correct that one instead, or rename it to '
+       . '<code>config.local.sample.php</code> to take it out of use.</li>'
+       . '</ol>'
+       . ($dbName !== '' ? '<p style="color:#64748b;font-size:13px;margin:0 0 6px">Trying database <code>'
+            . $e($dbName) . '</code> as user <code>' . $e($dbUser) . '</code>. The password is never shown.</p>' : '')
+       . '<p style="color:#64748b;font-size:13px;margin:0">Reload this page once the settings are corrected. '
+       . 'There is nothing to install and nothing to accept — this is a settings problem, not a new installation.</p>'
+       . '</div>';
+    exit;
+}
+
 function agreement_gate() {
     if (agreement_accepted()) return;   // already agreed, or exempt
+
+    // A DATABASE THAT WILL NOT OPEN MUST NEVER LOOK LIKE "YOU NEED TO INSTALL".
+    //
+    // Acceptance is remembered in two places: a file, and — as a safety net —
+    // the database (setup_done). When real credentials are configured but the
+    // database cannot be reached, BOTH go quiet, and the software used to
+    // respond by offering to install itself over a live system. The operator is
+    // then one button away from making a bad situation permanent, and is being
+    // asked to sign a contract instead of being told the password is wrong.
+    if (function_exists('setup_config_placeholder') && function_exists('setup_test_db')
+        && !setup_config_placeholder()) {
+        try {
+            $cfg = require dirname(__DIR__) . '/config.php';
+            $d   = (array) ($cfg['db'] ?? []);
+            if (($d['driver'] ?? '') !== 'sqlite') {
+                $why = setup_test_db($d);
+                if ($why !== '') { agreement_db_down_page($why, (string) ($d['name'] ?? ''), (string) ($d['user'] ?? '')); }
+            }
+        } catch (Throwable $e) { /* never let the check itself block the page */ }
+    }
     $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
