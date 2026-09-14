@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '11415c0 · 2026-09-14 17:54 UTC · 653 files';
+$RELEASE = 'd3f5244 · 2026-09-14 18:23 UTC · 653 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -155,10 +155,10 @@ $EXPECT  = [
     'lib/mis.php' => ['s'=>23675,'h'=>'07733bc4e9241217'],
     'lib/mkt_billing.php' => ['s'=>8396,'h'=>'34d5dafe732275bb'],
     'lib/mkt_credits.php' => ['s'=>9152,'h'=>'a415feb6c7997cff'],
-    'lib/mkt_escrow.php' => ['s'=>12254,'h'=>'9039f1451f05df4d'],
+    'lib/mkt_escrow.php' => ['s'=>12953,'h'=>'38961c0e1478671e'],
     'lib/mkt_fees.php' => ['s'=>7830,'h'=>'d357fad88aebd4ae'],
     'lib/mkt_gates.php' => ['s'=>3563,'h'=>'33cc1d5744a2da96'],
-    'lib/mkt_ledger.php' => ['s'=>9779,'h'=>'a9a625021e620e74'],
+    'lib/mkt_ledger.php' => ['s'=>10121,'h'=>'a26d0ec31a84af92'],
     'lib/mkt_pay.php' => ['s'=>11289,'h'=>'500559c4192f9fda'],
     'lib/mkt_plans.php' => ['s'=>10762,'h'=>'513801027f92ce90'],
     'lib/mkt_rules.php' => ['s'=>12129,'h'=>'f541702a11884133'],
@@ -183,7 +183,7 @@ $EXPECT  = [
     'lib/position.php' => ['s'=>19369,'h'=>'66f6dff09b985620'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'fbf0949ead05b0b8'],
     'lib/pricing_admin.php' => ['s'=>10272,'h'=>'7f36c21dab0d782d'],
-    'lib/projcosting.php' => ['s'=>31662,'h'=>'b5f37b94cd50703a'],
+    'lib/projcosting.php' => ['s'=>33425,'h'=>'7256bfb79c4fdbd6'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
     'lib/qr.php' => ['s'=>17936,'h'=>'4d50b69b53bfa5e2'],
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],

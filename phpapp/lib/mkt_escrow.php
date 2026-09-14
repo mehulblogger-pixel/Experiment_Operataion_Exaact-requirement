@@ -173,7 +173,18 @@ function mkt_escrow_totals() {
 
 /** Route handler — the escrow management screen (master / marketplace desk). Always returns true. */
 function ops_mkt_escrow($method) {
-    ops_require((function_exists('is_master') && is_master()) || (function_exists('connect_market_can') && connect_market_can()),
+    // M16 — the bare is_master() that used to sit in front of this was an
+    // ENTITLEMENT BYPASS, proved on a live host: a master on an Operations-only
+    // workspace reached this Marketplace screen because is_master() short-circuits
+    // the OR before connect_market_can() is ever consulted. This is the M10
+    // anti-pattern, on routes M9 added after that audit ran.
+    //
+    // The fix is NOT to swap the order — that is cosmetic, and the master branch
+    // would still win whenever it were reached. connect_market_can() already does
+    // the right thing on its own: it returns true for a master when Connect is
+    // live, and false for anyone at all when it is not. So the master branch is
+    // deleted rather than moved.
+    ops_require(function_exists('connect_market_can') && connect_market_can(),
         'Only the marketplace desk can manage escrow.');
     mkt_escrow_migrate();
     if ($method === 'POST') {

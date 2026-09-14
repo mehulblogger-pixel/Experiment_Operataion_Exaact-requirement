@@ -160,9 +160,20 @@ function pc_lines($id) {
 }
 function pc_all($limit = 200) {
     pc_migrate();
+    // M16 (product decision, Option B) — costings follow BRANCH SCOPE.
+    //
+    // A costing carries day rates, overheads, contingency, negotiation margin and
+    // expected revenue: the commercially sensitive numbers. Until now this list
+    // applied no scope at all, so every holder of the costing permission saw every
+    // branch's margins. The business decision is that they should not, so the
+    // register is scoped the same way leads, complaints and receipts are — by
+    // office, with an UNASSIGNED costing still visible to everyone so that work
+    // nobody has filed to a branch does not disappear.
+    [$sw, $sa] = function_exists('scope_office_clause') ? scope_office_clause('c.office_id') : ['1=1', []];
     return ops_all("SELECT c.*, COALESCE(p.display_name,p.legal_name) client_name
                     FROM project_costings c LEFT JOIN business_partners p ON p.id=c.client_id
-                    ORDER BY c.id DESC LIMIT " . (int)$limit) ?: [];
+                    WHERE $sw
+                    ORDER BY c.id DESC LIMIT " . (int)$limit, $sa) ?: [];
 }
 // The costing linked to a given quotation / opportunity (or null).
 function pc_for_quote($qid) { pc_migrate(); return $qid ? (ops_one("SELECT * FROM project_costings WHERE quote_id=? ORDER BY id DESC LIMIT 1", [(int)$qid]) ?: null) : null; }
@@ -360,8 +371,22 @@ function pc_make_requisition($cid, $lineId) {
 }
 
 // ---- Routing ---------------------------------------------------------------
+// M16 — ONE door for the module, the same shape as lead_scope_gate() in leads.php.
+// The routes name their costing as either `id` or `costing_id`; both are resolved
+// here so no route can be reached with the other spelling. A line id is never the
+// object being guarded — the costing it belongs to is.
+function pc_scope_gate() {
+    $id = (int)($_POST['costing_id'] ?? $_GET['costing_id'] ?? $_GET['id'] ?? $_POST['id'] ?? 0);
+    if ($id <= 0) return;                       // a list, a new form: no costing named
+    try { $office = ops_val("SELECT office_id FROM project_costings WHERE id=?", [$id]); }
+    catch (Throwable $e) { return; }            // table not built yet — nothing to guard
+    if ($office === false) return;              // no such costing — the route's own answer
+    ops_require(scope_office_allows($office), 'This costing is outside your office / branch scope.');
+}
+
 function ops_projcosting($route, $method) {
     ops_require(pc_can(), 'You do not have access to project costing.');
+    pc_scope_gate();   // M16 — object-level branch scope, before anything reads an id
     pc_migrate();
     $pdo = db();
 

@@ -149,7 +149,12 @@ function mkt_finstate_is_terminal($state) { return mkt_finstate_next($state) ===
 
 /** Route handler — the daily financial-control dashboard (master / marketplace desk). */
 function ops_mkt_ledger($method) {
-    ops_require((function_exists('is_master') && is_master()) || (function_exists('connect_market_can') && connect_market_can()),
+    // M16 — see lib/mkt_escrow.php: the bare is_master() in front of this was an
+    // entitlement bypass, proved on a live host. connect_market_can() already
+    // grants a master when Connect is live and denies everyone when it is not, so
+    // the master branch is deleted rather than reordered (reordering would be
+    // cosmetic — the master branch still wins wherever it sits).
+    ops_require(function_exists('connect_market_can') && connect_market_can(),
         'Only the marketplace desk can see financial control.');
     mkt_ledger_migrate();
     $from = ($_GET['from'] ?? '') !== '' ? (string)$_GET['from'] : date('Y-m-01');
