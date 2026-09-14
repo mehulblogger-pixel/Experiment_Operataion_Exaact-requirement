@@ -325,6 +325,13 @@ function ops_books($route, $method) {
     if ($route === 'receipt') {
         $r = books_receipt($_GET['id'] ?? 0);
         if (!$r) { http_response_code(404); view('notfound'); return true; }
+        // M14 — the receipts LIST scopes by branch (scope_office_clause in
+        // books_receipts); this fetch-by-id did not, so another branch's receipt
+        // — payer and amount — opened for anyone who guessed its id. Same rule,
+        // one record: an unbanked receipt with no branch stays visible to all,
+        // exactly as the list has it.
+        ops_require(scope_office_allows($r['office_id'] ?? null),
+                    'This receipt is outside your office / branch scope.');
         view('ops/receipt_detail', [
             'r' => $r, 'allocs' => books_receipt_allocations((int)$r['id']),
             'open' => books_open_invoices((int)$r['partner_id']),

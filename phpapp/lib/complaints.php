@@ -422,11 +422,25 @@ function cmp_can_record() { return can('mod.complaints.edit'); }
 function cmp_can_decide() { return can('complaints.decide'); }
 
 // ---- Screens ----------------------------------------------------------------
+// M14 — ONE door for the whole module; see lead_scope_gate() for the reasoning.
+// Every complaint route names its object as `id`. A complaint with no branch is
+// deliberately visible to all of them (scope_office_clause), and this keeps that
+// promise rather than quietly tightening it.
+function cmp_scope_gate() {
+    $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+    if ($id <= 0) return;
+    try { $office = ops_val("SELECT office_id FROM complaints WHERE id=?", [$id]); }
+    catch (Throwable $e) { if (cmp_missing_table($e)) return; throw $e; }
+    if ($office === false) return;              // no such complaint — the route's own answer
+    ops_require(scope_office_allows($office), 'This complaint is outside your office / branch scope.');
+}
+
 function ops_complaints($route, $method) {
     // Note: /complaints-policy is NOT handled here. §7.5.1 wants the description
     // available to any interested party, so it is served from index.php before
     // the sign-in gate and never reaches this function.
     ops_require(cmp_can_view(), 'You don’t have access to the complaints register. Ask your administrator.');
+    cmp_scope_gate();   // M14 — object-level branch scope, before anything reads an id
 
     if ($route === 'complaints') {
         view('ops/complaints', [

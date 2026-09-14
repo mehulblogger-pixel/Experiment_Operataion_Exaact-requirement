@@ -833,6 +833,31 @@ function scope_allows($officeId, $sbu = null) {
     return true;
 }
 
+// M14 §51b — the SCALAR twin of scope_office_clause(), the same way scope_allows()
+// above is the scalar twin of scope_clause(). It exists because the two list
+// rules disagree about one thing, and an object-level guard that borrowed the
+// wrong one would be wrong in a way nobody would notice:
+//
+//   scope_clause()        COALESCE(office, Ahmedabad) IN (...)   — no office means Ahmedabad
+//   scope_office_clause() (office IS NULL OR office IN (...))    — no office means EVERYONE sees it
+//
+// The second is deliberate: a complaint or a lead nobody has assigned to a
+// branch must not become invisible to every branch — that is how things get
+// lost. So a register scoped by scope_office_clause() (leads, opportunities,
+// complaints, receipts) must be guarded by THIS, not by scope_allows(), or the
+// detail would start hiding unassigned records its own list shows.
+//
+// One record, the same rule the list applies. Masters and ALL-scope roles are
+// unaffected.
+function scope_office_allows($officeId) {
+    if (function_exists('is_master') && is_master()) return true;
+    $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
+    if ($off === 'ALL' || !is_array($off) || !$off) return true;
+    // Unassigned → visible, exactly as scope_office_clause() has it.
+    if ($officeId === null || $officeId === '' || (int)$officeId === 0) return true;
+    return in_array((int)$officeId, array_map('intval', $off), true);
+}
+
 // Field-finding #22 — segregation of inspectors. A "team member" (an `inspectors` row) must belong to at
 // most ONE active login: two logins sharing one inspector_id would each see that inspector's jobs and
 // schedule (a leak between people). This returns the username of a DIFFERENT active login already linked

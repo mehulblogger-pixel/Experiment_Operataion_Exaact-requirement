@@ -4915,7 +4915,21 @@ function requisitions_list($openOnly = false) {
     if ($openOnly) $where .= " AND status IN ('OPEN','PROPOSED','OFFERED')";
     return ops_all("SELECT id, req_code, designation, req_type, status, client_id, sbu, billing_rate, rate_basis, discipline, skills, project_site FROM requisitions WHERE $where ORDER BY id DESC", $scA);
 }
+// M14 — ONE door for the requisition module; see lead_scope_gate() in leads.php
+// for the reasoning. The requisitions LIST scopes by branch AND Business Unit
+// (scope_clause at the top of this function), so the object-level twin is
+// scope_allows(). Every route here names its object as `id`.
+function req_scope_gate() {
+    $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+    if ($id <= 0) return;                       // a list, a new form: no object named
+    $r = ops_one("SELECT office_id, sbu FROM requisitions WHERE id=?", [$id]);
+    if (!$r) return;                            // no such requisition — the route's own 404 answers
+    ops_require(scope_allows($r['office_id'] ?? null, $r['sbu'] ?? null),
+                'This requisition is outside your office / branch scope.');
+}
+
 function ops_requisitions($route, $method) {
+    req_scope_gate();   // M14 — object-level branch scope, before anything reads an id
     $pdo = db();
     if (function_exists('req_migrate')) req_migrate();   // additive Phase-2 columns
     if (function_exists('asg_migrate')) asg_migrate();   // additive Phase-5 assignment-commercial columns

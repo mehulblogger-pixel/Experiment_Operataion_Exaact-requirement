@@ -973,7 +973,33 @@ function leads_bulk($action, array $ids) {
 }
 
 // ---- Screens ----------------------------------------------------------------
+// M14 — ONE door for the whole module.
+//
+// The leads LIST has always scoped by branch (scope_office_clause). None of the
+// dozen routes behind it did, so a coordinator in one branch could open, edit,
+// move, convert, DELETE and download the files of another branch's lead simply
+// by putting its id in the address. Guarding each route in turn would be twelve
+// chances to forget one — and the next route added would be the thirteenth — so
+// the check goes where the module is entered instead, the same shape as
+// ops_module_gate() for entitlement.
+//
+// Two routes carry a lead_files id rather than a lead id; they are resolved to
+// their parent lead, because a document is exactly as confidential as the lead
+// it is filed against.
+function lead_scope_gate($route) {
+    $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+    if ($id <= 0) return;                       // a list, a new form: no object named
+    if ($route === 'lead-file' || $route === 'lead-file-delete') {
+        $id = (int)leads_try(fn() => ops_val("SELECT lead_id FROM lead_files WHERE id=?", [$id]), 0);
+        if ($id <= 0) return;                   // no such file — the route's own 404 answers
+    }
+    $office = leads_try(fn() => ops_val("SELECT office_id FROM leads WHERE id=?", [$id]), false);
+    if ($office === false) return;              // no such lead — let the route say "not found"
+    ops_require(scope_office_allows($office), 'This lead is outside your office / branch scope.');
+}
+
 function ops_leads($route, $method) {
+    lead_scope_gate($route);   // M14 — object-level branch scope, before anything reads an id
     ops_require(leads_can_view(), 'You cannot open the lead register.');
     leads_migrate();
     $canEdit = leads_can_edit();

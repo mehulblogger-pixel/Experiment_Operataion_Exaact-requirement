@@ -1318,7 +1318,31 @@ function ops_crm_inquiries($route, $method) {
 // ---------------------------------------------------------------------------
 //  Handlers — Quotations (§2, §3, §4, §14, §23)
 // ---------------------------------------------------------------------------
+// M14 — ONE door for the whole quotation module; see lead_scope_gate() for the
+// reasoning. Quotations are scoped by branch AND Business Unit in their list
+// (scope_clause), so the object-level twin here is scope_allows(), not
+// scope_office_allows().
+//
+// Three routes carry a child id rather than a quotation id, and are resolved to
+// the quotation they belong to — an attached file and an approval step are
+// exactly as confidential as the quote they hang off.
+function crm_quote_scope_gate($route) {
+    $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+    if ($id <= 0) return;                       // a list, a new form: no object named
+    if ($route === 'quote-file' || $route === 'quote-file-delete') {
+        $id = (int)ops_val("SELECT quote_id FROM quote_files WHERE id=?", [$id]);
+    } elseif ($route === 'quote-approve') {
+        $id = (int)ops_val("SELECT quote_id FROM quote_approvals WHERE id=?", [(int)($_POST['step'] ?? $id)]);
+    }
+    if ($id <= 0) return;
+    $q = ops_one("SELECT office_id, sbu FROM quotations WHERE id=?", [$id]);
+    if (!$q) return;                            // no such quote — the route's own 404 answers
+    ops_require(scope_allows($q['office_id'] ?? null, $q['sbu'] ?? null),
+                'This quotation is outside your office / branch scope.');
+}
+
 function ops_crm_quotes($route, $method) {
+    crm_quote_scope_gate($route);   // M14 — object-level branch scope, before anything reads an id
     $pdo = db();
     if ($route === 'quotes') {
         // "Awaiting my approval" — the exact set the dashboard's "quotes to

@@ -848,7 +848,19 @@ function opp_dt_columns() {
 }
 
 // ---- Screens ----------------------------------------------------------------
+// M14 — ONE door for the whole module; see lead_scope_gate() for the reasoning.
+// Every opportunity route names its object as `id`; opportunity-from-lead names
+// a lead_id instead and creates a new deal, so there is nothing here to guard.
+function opp_scope_gate($route) {
+    $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+    if ($id <= 0) return;
+    $office = opp_try(fn() => ops_val("SELECT office_id FROM opportunities WHERE id=?", [$id]), false);
+    if ($office === false) return;              // no such deal — the route's own 404 answers
+    ops_require(scope_office_allows($office), 'This opportunity is outside your office / branch scope.');
+}
+
 function ops_opportunities($route, $method) {
+    opp_scope_gate($route);   // M14 — object-level branch scope, before anything reads an id
     ops_require(opp_can_view(), 'You cannot open the opportunity register.');
     opp_migrate();
     $canEdit = opp_can_edit();
