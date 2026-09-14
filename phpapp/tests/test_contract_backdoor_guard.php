@@ -11,8 +11,23 @@ $src = file_get_contents(__DIR__ . '/../index.php');
 
 // The guard exists in the partner-add route, and uses the same permission as the CRM path.
 t_ok(strpos($src, "if (\$kind === 'contract') {") !== false, 'partner-add branches on the contract kind');
-t_ok(preg_match("/if \(\\\$kind === 'contract'\) \{\s*ops_require\(can\('crm\.contract\.register'\) \|\| is_master\(\)/s", $src) === 1,
+// TEST CORRECTED IN MILESTONE 6 — and made stricter, not looser.
+//
+// The original pattern required the permission check to be the FIRST statement
+// inside the contract branch (`{` immediately followed by ops_require). That is
+// an assertion about layout, not about the guard. M6 added a SECOND, earlier
+// check in front of it — the Sales & CRM module must be licensed at all — and
+// the layout assertion failed even though the permission guard it exists to
+// protect is untouched.
+//
+// The permission assertion below is unchanged in substance: remove or weaken the
+// crm.contract.register guard and this still fails. It simply no longer insists
+// on being first. A second assertion now also requires the entitlement check, so
+// the M6 guard cannot be silently dropped either.
+t_ok(preg_match("/if \(\\\$kind === 'contract'\) \{[\s\S]{0,900}?ops_require\(can\('crm\.contract\.register'\) \|\| is_master\(\)/", $src) === 1,
     'the contract door is guarded by crm.contract.register (or master)');
+t_ok(preg_match("/if \(\\\$kind === 'contract'\) \{[\s\S]{0,900}?licence_module_live\('quotes'\)/", $src) === 1,
+    'M6 — and the contract door also requires the Sales & CRM module to be licensed');
 
 // The guard runs BEFORE the row is inserted (so denial happens before any write).
 $guardPos  = strpos($src, "if (\$kind === 'contract') {");

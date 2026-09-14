@@ -1649,7 +1649,39 @@ function portal_perms() {
     return array_values(array_intersect(array_map('trim', explode(',', $raw)), array_keys(PORTAL_PERMS)));
 }
 
-function pcan($key) { return in_array($key, portal_perms(), true); }
+// MILESTONE 6 — which product module each portal permission actually reads.
+//
+// The client portal is a SECOND front door. It has its own sign-in, its own
+// table and its own permissions, and it never passes the staff route gate — so
+// none of the enforcement added in M5 reached it. A company that stops paying
+// for Reporting kept serving issued reports here, and one that stops paying for
+// Money kept showing invoices and ageing. 'reports.decide' is worse than a read:
+// it accepts or rejects a report on the company's behalf.
+//
+// Mapped to ACCESS modules (not product modules) so the owner is resolved by the
+// same registry every other gate uses. A key with no module — the marketplace
+// ones, governed by connect_enabled() — is deliberately left alone.
+const PORTAL_PERM_MODULES = [
+    'calls'              => 'calls',        // Operations
+    'reports'            => 'idems',        // Inspection reporting
+    'reports.decide'     => 'idems',        // Inspection reporting — a WRITE
+    'invoices'           => 'invoicing',    // Money
+    'request'            => 'calls',        // Operations — asks for a new job
+    'complaint'          => 'complaints',   // Operations
+    'deputation'         => 'jobs',         // Operations
+    'deputation.approve' => 'jobs',         // Operations — a WRITE
+    'issues'             => 'ncr',          // Operations
+    'market.post'        => null,           // Marketplace — not a product module
+    'market.vouchers'    => null,           // Marketplace — not a product module
+];
+
+// Entitlement first, then the person's own permission — the same order the staff
+// side uses. A portal user can never hold more than the company has bought.
+function pcan($key) {
+    if (function_exists('licence_module_live')
+        && !licence_module_live(PORTAL_PERM_MODULES[$key] ?? null)) return false;
+    return in_array($key, portal_perms(), true);
+}
 
 // Refuse rather than hide: hiding a link but leaving the address reachable is
 // the bug this whole file exists to avoid. (portal_require() above is the

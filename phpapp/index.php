@@ -1388,6 +1388,14 @@ if ($route === 'partner-add' && $method === 'POST') {
     // off-book, bypassing the won-quote → Finance handoff. A contract is created
     // from the won quotation by Accounts, not here by anyone who reaches this form.
     if ($kind === 'contract') {
+        // M6 — registering a contract is Sales & CRM work. The CRM door
+        // (crm.php:1830) sits behind the route gate and is refused when the
+        // module is not licensed; this partner-screen door is handled here in
+        // index.php, before ops_dispatch(), so it never met that gate. Ask the
+        // module question first, then the permission — the same order, so the
+        // two doors now agree.
+        ops_require(!function_exists('licence_module_live') || licence_module_live('quotes'),
+            'Registering a contract is part of the Sales & CRM module, which is not switched on for this installation.');
         ops_require(can('crm.contract.register') || is_master(),
             'Only Accounts / back-office can register a contract. It is created from the won quotation, not here.');
     }
@@ -1633,6 +1641,11 @@ if ($route === 'po') {
     if ($method === 'POST' && ($_POST['do'] ?? '') === 'pull-quote') {
         // The quotation has been revised since this order was raised. Pull the
         // lines through again rather than making somebody re-key twelve of them.
+        // M6 — pulling lines reads a QUOTATION, which is Sales & CRM. The purchase
+        // order itself is core commercial master data and stays open; only this
+        // one sub-action reaches into a paid module, and only it is refused.
+        ops_require(!function_exists('licence_module_live') || licence_module_live('quotes'),
+            'Taking lines from a quotation is part of the Sales & CRM module, which is not switched on for this installation.');
         $qid = (int)($_POST['quotation_id'] ?? 0) ?: (int)($po['quotation_id'] ?? 0);
         $res = function_exists('po_pull_quote_lines') ? po_pull_quote_lines($po['id'], $qid) : ['ok' => false, 'error' => 'Not available.'];
         if (!$res['ok']) { flash($res['error'], 'error'); redirect('/po?id=' . $po['id']); }

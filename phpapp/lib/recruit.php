@@ -666,7 +666,11 @@ function recruit_ai_extract() {
 }
 
 function recruit_home_can() {
-    return function_exists('can') && (can('mod.hiring.view') || (function_exists('is_master') && is_master()));
+    // M6 — index.php can hand a recruitment-only company straight to the command
+    // centre BEFORE ops_dispatch(), so this helper is itself an entry point and
+    // must ask the module question rather than trust the master flag.
+    return function_exists('can') && (can('mod.hiring.view')
+        || (function_exists('is_master_of') && is_master_of('hiring')));
 }
 
 // SBU scope for candidate rows (candidates have no office_id — they carry an sbu).

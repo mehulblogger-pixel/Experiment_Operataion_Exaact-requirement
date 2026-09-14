@@ -38,7 +38,16 @@ const AR_BUCKETS = [
     ['key' => 'b90p',   'label' => '90+ days',    'lo' => 91,   'hi' => null],
 ];
 
-function ar_can() { return can('finance.reconcile') || can('data.credit') || is_master(); }
+// MILESTONE 6. finance.reconcile / data.credit are RBAC permissions, not module
+// permissions, so none of them ever asked whether this company has Money. On the
+// /receivables route the gate refuses first, but the dashboard's overdue panel
+// renders BEFORE the router reaches that gate — so this was real ledger data on
+// the screen of a company that had not bought the module. Entitlement first,
+// then the person's own permission.
+function ar_can() {
+    if (function_exists('licence_module_live') && !licence_module_live('invoicing')) return false;
+    return can('finance.reconcile') || can('data.credit') || is_master();
+}
 
 function ar_bucket_of($days) {
     if ($days <= 0) return 'notdue';

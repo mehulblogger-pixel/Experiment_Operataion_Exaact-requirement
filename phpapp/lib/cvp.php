@@ -157,7 +157,23 @@ function cvp_vendor_perms() {
     $p = trim((string)($u['perms'] ?? ''));
     return $p === '' ? array_keys(VENDOR_PERMS) : array_values(array_filter(explode(',', $p)));
 }
-function vcan($key) { return in_array($key, cvp_vendor_perms(), true); }
+// MILESTONE 6 — the vendor portal is a THIRD front door, and the same reasoning
+// applies as for the client portal: its own table, its own session, no staff
+// route gate. 'qualification' is the vendor's own approval status (core
+// administration) and 'market.apply' is the marketplace, so neither is bound to
+// a product module.
+const VENDOR_PERM_MODULES = [
+    'reports'       => 'idems',     // Inspection reporting
+    'issues'        => 'ncr',       // Operations
+    'qualification' => 'vendors',   // Administration (core)
+    'market.apply'  => null,        // Marketplace — not a product module
+];
+
+function vcan($key) {
+    if (function_exists('licence_module_live')
+        && !licence_module_live(VENDOR_PERM_MODULES[$key] ?? null)) return false;
+    return in_array($key, cvp_vendor_perms(), true);
+}
 
 function cvp_vendor_off() {
     http_response_code(404);

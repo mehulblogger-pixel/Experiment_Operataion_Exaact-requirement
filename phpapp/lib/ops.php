@@ -7382,7 +7382,10 @@ function attention_summary() {
     if ((function_exists('can') && (can('crm.contract.register') || can('mod.clients.view'))) || is_master()) {
         if (function_exists('contracts_expiring_count')) $push('con_exp', 'Contracts expiring soon', contracts_expiring_count(), '/contract-openings', 'risk', null, 'within the warning window');
     }
-    if ((function_exists('can') && (can('crm.quote.create') || can('mod.quotes.edit'))) || is_master()) {
+    // M6 — crm.quote.create is not a module permission, and these tiles are built
+    // for the pre-gate dashboard, so the Sales module is asked for first.
+    if ((!function_exists('licence_module_live') || licence_module_live('quotes'))
+        && ((function_exists('can') && (can('crm.quote.create') || can('mod.quotes.edit'))) || is_master())) {
         if (function_exists('quotes_expired_count')) $push('q_exp', 'Quotations lapsed', quotes_expired_count(), '/quotes', 'speed', null, 'expired without a decision');
     }
     // Money: real overdue receivables from the ledger (not the job-level proxy).
@@ -7403,7 +7406,7 @@ function attention_summary() {
         }
     }
     // Recruitment: interviews whose date passed with no outcome recorded.
-    if ((function_exists('can') && can('mod.hiring.view')) || is_master()) {
+    if ((function_exists('can') && can('mod.hiring.view')) || is_master_of('hiring')) {   // M6 — pre-gate tile
         if (function_exists('recruit_overdue_interviews_count'))
             $push('iv_overdue', 'Interviews awaiting an outcome', recruit_overdue_interviews_count(), '/recruitment', 'speed', null, 'the interview date has passed');
     }

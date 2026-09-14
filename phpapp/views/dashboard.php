@@ -96,7 +96,11 @@
     $overdue    = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND ((j.inspection_end_date<>'' AND j.inspection_end_date<?) OR (j.inspection_end_date='' AND j.scheduled_date<>'' AND j.scheduled_date<?)) AND $jw", array_merge([$today,$today], $ja));
     $status = ['Open'=>max(0,$openJobs-$overdue), 'Overdue'=>$overdue, 'Closed'=>$closedJobs];
 
-    $showMoney  = can('data.credit') || can('finance.reconcile');
+    // M6 — neither permission is a module permission, and this dashboard renders
+    // before the route gate, so ops_invoicing_counts() was reading the Money
+    // module for a company that may not have it. Entitlement first.
+    $showMoney  = (!function_exists('licence_module_live') || licence_module_live('invoicing'))
+                  && (can('data.credit') || can('finance.reconcile'));
     $showProfit = can('data.profitability');
     $showCharts = can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people');
     // Who actually OPERATES — has a real operations permission. This is what gates
@@ -154,7 +158,7 @@
     // the whole band disappears when there is nothing outstanding.
     ob_start();
     $compWait = [];
-    if (function_exists('ncr_counts') && (can('mod.ncr.view') || can('mod.capa.view') || is_master())) {
+    if (function_exists('ncr_counts') && (can('mod.ncr.view') || can('mod.capa.view') || is_master_of(['ncr','capa']))) {
         $n = ncr_counts();
         if ($n['open'])    $compWait[] = ['/ncr?f=open',    '⚠', $n['open'],    'Nonconformities open', $n['major'] ? 'bad' : 'warn'];
         if ($n['overdue']) $compWait[] = ['/ncr?f=overdue', '⏰', $n['overdue'], 'Past their date',       'bad'];
@@ -173,7 +177,7 @@
         $cn = (int)($cr['open'] ?? 0);
         if ($cn) $compWait[] = ['/complaints', '📣', $cn, 'Complaints open', 'warn'];
     }
-    if (function_exists('conf_readiness') && (can('mod.confidentiality.view') || is_master())) {
+    if (function_exists('conf_readiness') && (can('mod.confidentiality.view') || is_master_of('confidentiality'))) {
         $cf = conf_readiness();
         if ($cf['lapsed'] + $cf['none'])
             $compWait[] = ['/confidentiality', '🔒', $cf['lapsed'] + $cf['none'], 'Without a confidentiality undertaking', 'bad'];
@@ -492,7 +496,11 @@
     // Recruitment belongs to people who actually run hiring — gate on the hiring
     // module, not on a coarse "is management" flag, so a sales role (BDM/KAM)
     // never sees manpower requisitions, placement fees or agency renewals.
-    $deskAdmin = can('mod.hiring.view') || is_master();
+    // M6 — confirm_lapsed_placement_fees() WRITES, and this runs before the route
+    // gate, so a master in a company without People & hiring was both changing and
+    // reading HR data. is_master_of() keeps master authority where the module was
+    // actually bought (the M5 rule), and withdraws it where it was not.
+    $deskAdmin = can('mod.hiring.view') || is_master_of('hiring');
     if ($deskAdmin) confirm_lapsed_placement_fees(); // flip provisional→confirmed once guarantees lapse
     $pf = $deskAdmin ? placement_fee_summary(30) : null;
     if ($pf && ($pf['prov_n'] || $pf['conf_n'])): ?>

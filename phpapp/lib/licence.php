@@ -64,6 +64,22 @@ function licence_owner($accessModule) {
 
 function licence_is_core($key) { return !empty(PRODUCT_MODULES[$key][3]); }
 
+// MILESTONE 6. "Is this access module live for this company right now?"
+//
+// The same question licence_blocks() already answers for a staff permission,
+// asked where there is no staff permission to hang it on — an external portal
+// user, a dashboard panel rendered before the router reaches the route gate, a
+// server-side action reached directly. It adds no new rule: it is licence_blocks()
+// read the other way round, so the two can never drift apart.
+//
+// null / '' means the caller is not module-bound (a marketplace key governed by
+// its own switch, for example) and is left alone. An access module owned by no
+// product module is refused, exactly as M5 decided.
+function licence_module_live($accessModule) {
+    if ($accessModule === null || $accessModule === '') return true;
+    return !licence_blocks('mod.' . $accessModule . '.view');
+}
+
 // What THIS tenant has switched off for itself — its own choice, nothing else.
 // Read separately from the entitlement ceiling because the two answer different
 // questions and Phase 1 must never collapse them: a company may switch off a
@@ -110,7 +126,20 @@ function licence_ceiling_source() {
 // Pass $reload = true to re-read after saving. Same shape as term_overrides().
 function licence_disabled($reload = false) {
     static $off = null;
-    if ($off !== null && !$reload) return $off;
+    static $epoch = -1;
+    // MILESTONE 6 — TENANT ISOLATION. This answer is read from ONE company's
+    // database. db(true) bumps the epoch whenever the live connection is switched
+    // to a different store (choosing a company at login, provisioning, "log in
+    // as", the owner console walking its tenants), so keying the cache on the
+    // epoch means a second company opened in the same process re-reads its OWN
+    // entitlement instead of inheriting the first company's.
+    //
+    // The explicit licence_disabled(true) calls at the switch points still stand;
+    // this makes a forgotten one harmless rather than a cross-tenant leak. It is
+    // the same guard the migration/seed code already keys off, for the same reason.
+    $now = function_exists('db_epoch') ? db_epoch() : 0;
+    if ($off !== null && !$reload && $epoch === $now) return $off;
+    $epoch = $now;
 
     // A SIGNED LICENCE OUTRANKS THE SETTINGS SCREEN. When one is present it is
     // the contract, and what the customer ticked in Settings is irrelevant —
