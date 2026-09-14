@@ -64,6 +64,45 @@ function licence_owner($accessModule) {
 
 function licence_is_core($key) { return !empty(PRODUCT_MODULES[$key][3]); }
 
+// What THIS tenant has switched off for itself — its own choice, nothing else.
+// Read separately from the entitlement ceiling because the two answer different
+// questions and Phase 1 must never collapse them: a company may switch off a
+// module it is fully entitled to, and switch it back on again. An entitlement it
+// does not hold is not a choice it can make.
+//
+// A core module named here is ignored on purpose, not obeyed.
+function licence_tenant_off() {
+    $env = getenv('MODULES_OFF');
+    $raw = ($env !== false && $env !== '') ? $env : (string) (function_exists('setting_get') ? setting_get('modules_off', '') : '');
+    $off = [];
+    foreach (explode(',', (string) $raw) as $k) {
+        $k = strtolower(trim($k));
+        if ($k !== '' && isset(PRODUCT_MODULES[$k]) && !licence_is_core($k)) $off[] = $k;
+    }
+    return array_values(array_unique($off));
+}
+
+// Where the cloud entitlement ceiling stands, as three distinct answers. The
+// difference between "this company is not entitled to Money" and "we have no
+// record of what this company is entitled to" is the whole of Milestone 3: the
+// first is a decision, the second is a gap, and only the first was ever meant to
+// be expressible.
+//
+//   'none'     no ceiling applies — the control install, or a self-hosted
+//              single business, which is governed by its signed licence instead
+//   'recorded' a ceiling exists and names at least one valid module
+//   'blank'    a hosted company with NO usable entitlement record
+function licence_ceiling_source() {
+    if (function_exists('current_tenant') && current_tenant() === '') return 'none';
+    $csv = function_exists('setting_get') ? (string) setting_get('saas_entitled_modules', '') : '';
+    if (trim($csv) === '') return 'blank';
+    foreach (explode(',', strtolower($csv)) as $k) {
+        $k = trim($k);
+        if ($k !== '' && isset(PRODUCT_MODULES[$k]) && !licence_is_core($k)) return 'recorded';
+    }
+    return 'blank';                       // named only rubbish, or only core keys
+}
+
 // The switched-off list. Held as a setting so it survives an upgrade, and
 // overridable by environment variable so an on-premise install can be pinned
 // from outside the database — a customer with database access should not be
@@ -88,14 +127,7 @@ function licence_disabled($reload = false) {
         }
     }
 
-    $env = getenv('MODULES_OFF');
-    $raw = ($env !== false && $env !== '') ? $env : (string)setting_get('modules_off', '');
-    $off = [];
-    foreach (explode(',', $raw) as $k) {
-        $k = strtolower(trim($k));
-        // A core module named here is ignored on purpose, not obeyed.
-        if ($k !== '' && isset(PRODUCT_MODULES[$k]) && !licence_is_core($k)) $off[] = $k;
-    }
+    $off = licence_tenant_off();
     // THE CLOUD ENTITLEMENT CEILING. A hosted company may switch a module ON only
     // within what it is entitled to (paid for, or granted by the platform owner).
     // Anything outside that ceiling is forced OFF here — so a company editing its
@@ -125,9 +157,27 @@ function licence_entitled_ceiling() {
     // instead) is never limited by it — so it applies solely inside a client
     // company workspace. This also keeps any stray saas_entitled_modules on the
     // control database from ever restricting the owner.
-    if (function_exists('current_tenant') && current_tenant() === '') return null;
+    $src = licence_ceiling_source();
+    if ($src === 'none') return null;             // control install / self-hosted — unchanged
+
+    // ---- MILESTONE 3: A MISSING RECORD IS NOT A LICENCE TO EVERYTHING -------
+    //
+    // This used to return null for a hosted company with no entitlement record,
+    // and null means "no ceiling" — so a company nobody had recorded a purchase
+    // for could reach Operations, Sales, Reporting and Money alike. The absence
+    // of evidence was being read as evidence of purchase.
+    //
+    // An empty ceiling denies every non-core module instead. This is the same
+    // answer lk_modules() already gives for an INVALID or MISSING signed licence
+    // (lib/licencekey.php:314) — a pattern that exists because returning null
+    // there was a real defect, caught by the forgery test. Milestone 3 extends
+    // it to the cloud ceiling rather than inventing a second rule.
+    //
+    // The control install is exempt above, so the platform owner can never be
+    // locked out of their own console by this.
+    if ($src === 'blank') return [];
+
     $csv = function_exists('setting_get') ? (string) setting_get('saas_entitled_modules', '') : '';
-    if (trim($csv) === '') return null;
     $out = [];
     foreach (explode(',', strtolower($csv)) as $k) {
         $k = trim($k);
@@ -136,18 +186,71 @@ function licence_entitled_ceiling() {
     return array_values(array_unique($out));
 }
 
+// ---- THE ONE AUTHORITATIVE QUESTION ---------------------------------------
+//
+//   "What is the state of product module X for this tenant, right now?"
+//
+// Everything that needs an entitlement answer asks this, so there is one place
+// the answer is decided and one place to read to know what the answer will be.
+// It is a reader over the existing architecture — the registry, the signed
+// licence, the tenant's own choices and the cloud ceiling — and it replaces no
+// engine and duplicates no rule.
+//
+// PRECEDENCE, in the order the existing code already applies:
+//
+//   1 INVALID_MODULE    not in the registry            → deny
+//   2 CORE              admin — every install needs it → allow, always
+//   3 LICENCE_BLOCKED   a signed licence excludes it   → deny
+//   4 TENANT_DISABLED   the company switched it off    → deny, reversibly
+//   5 ENTITLED          licensed or within the ceiling → allow
+//   6 NOT_ENTITLED      a ceiling exists, omits it     → deny
+//   7 UNKNOWN           hosted, no entitlement record  → deny  (fail closed)
+//
+// Commercial entitlement and runtime access stay separate: TENANT_DISABLED says
+// nothing about what was bought, and module_entitled() ignores it.
+const MODULE_STATES = ['INVALID_MODULE', 'CORE', 'LICENCE_BLOCKED', 'TENANT_DISABLED',
+                       'ENTITLED', 'NOT_ENTITLED', 'UNKNOWN'];
+
+function module_state($key) {
+    $key = strtolower(trim((string) $key));
+    if ($key === '' || !isset(PRODUCT_MODULES[$key])) return 'INVALID_MODULE';
+    if (licence_is_core($key)) return 'CORE';
+
+    $offByTenant = in_array($key, licence_tenant_off(), true);
+
+    // A signed licence is the contract and outranks everything below it.
+    if (function_exists('lk_modules')) {
+        $bought = lk_modules();
+        if ($bought !== null) {
+            if (!in_array($key, array_map('strtolower', (array) $bought), true)) return 'LICENCE_BLOCKED';
+            return $offByTenant ? 'TENANT_DISABLED' : 'ENTITLED';
+        }
+    }
+
+    switch (licence_ceiling_source()) {
+        case 'none':                                  // control install / self-hosted
+            return $offByTenant ? 'TENANT_DISABLED' : 'ENTITLED';
+        case 'blank':                                 // hosted, nothing recorded
+            return 'UNKNOWN';
+        default:                                      // 'recorded'
+            $ceil = licence_entitled_ceiling();
+            if (!in_array($key, (array) $ceil, true)) return 'NOT_ENTITLED';
+            return $offByTenant ? 'TENANT_DISABLED' : 'ENTITLED';
+    }
+}
+
+// Is this tenant COMMERCIALLY entitled to the module — may it be switched on?
+// Deliberately blind to TENANT_DISABLED: a company that switched a module off
+// still owns it and may switch it back on. Runtime access is licence_enabled().
+function module_state_is_entitled($state) {
+    return $state === 'CORE' || $state === 'ENTITLED' || $state === 'TENANT_DISABLED';
+}
+
 // Is this company entitled to this module (may it be switched on)? Core modules
 // always yes. A signed licence decides for on-premise; otherwise the cloud
 // ceiling decides; with neither in force, everything is allowed.
 function module_entitled($key) {
-    if (function_exists('licence_is_core') && licence_is_core($key)) return true;
-    if (function_exists('lk_modules')) {
-        $m = lk_modules();
-        if (is_array($m)) return in_array(strtolower($key), array_map('strtolower', $m), true);
-    }
-    $ceil = licence_entitled_ceiling();
-    if ($ceil === null) return true;
-    return in_array(strtolower($key), $ceil, true);
+    return module_state_is_entitled(module_state($key));
 }
 
 function licence_enabled($key) { return !in_array($key, licence_disabled(), true); }

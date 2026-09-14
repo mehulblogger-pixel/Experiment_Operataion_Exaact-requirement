@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'fe48c24 · 2026-09-14 10:23 UTC · 650 files';
+$RELEASE = 'cc2e169 · 2026-09-14 10:44 UTC · 650 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -143,7 +143,7 @@ $EXPECT  = [
     'lib/invready.php' => ['s'=>6922,'h'=>'0f7637be388be1fc'],
     'lib/joblock.php' => ['s'=>12799,'h'=>'1b310fc2c11eb619'],
     'lib/leads.php' => ['s'=>71848,'h'=>'2ffed93aefd3f3b1'],
-    'lib/licence.php' => ['s'=>21284,'h'=>'1c0fefcea6a2675a'],
+    'lib/licence.php' => ['s'=>26581,'h'=>'964345080bf4b551'],
     'lib/licenceissue.php' => ['s'=>28363,'h'=>'e750e57678199d20'],
     'lib/licencekey.php' => ['s'=>29242,'h'=>'c42b2078fe80352f'],
     'lib/licencesync.php' => ['s'=>10254,'h'=>'c17cfa585e721f62'],

@@ -17,7 +17,21 @@ $fakeTenant  = function () { $GLOBALS['__tenant'] = ['key' => 'acme', 'company' 
 
 $fakeTenant();
 setting_set('licence_key', ''); if (function_exists('lk_state')) lk_state(true); $fakeTenant();
-setting_set('saas_entitled_modules', ''); $fakeTenant();   // empty ceiling = everything allowed (the buggy default)
+// SETUP CHANGED IN PHASE 1 MILESTONE 3 — the assertions below are unchanged.
+//
+//   was:  saas_entitled_modules = ''   with the comment "empty ceiling =
+//         everything allowed (the buggy default)"
+//   now:  a real full-plan ceiling
+//
+// WHY: this suite is about the ACTIVITY CHOOSER — that ticking "recruitment"
+// collapses the workspace to recruitment. It was reaching that state by leaning
+// on the blank-ceiling fail-open, which its own comment already called a bug.
+// Milestone 3 closes that hole, so a blank ceiling now entitles nothing and the
+// chooser would have had nothing to switch on. Giving the workspace the ceiling
+// a provisioned workspace actually has restores the scenario the test means to
+// exercise, and stops it depending on a defect. Every expectation below is the
+// original one.
+setting_set('saas_entitled_modules', 'operations,sales,reporting,money,hr'); $fakeTenant();
 
 // A recruitment-only company: only recruitment activities ticked.
 $left = cockpit_apply_capability_modules(['TECH_RECRUITMENT', 'PERMANENT_PLACEMENT']);

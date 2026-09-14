@@ -34,10 +34,33 @@ if (function_exists('lk_state')) lk_state(true);   // bust any cached signed-lic
 $savedOff  = (string) setting_get('modules_off', '');
 $savedCeil = (string) setting_get('saas_entitled_modules', '');
 
-// --- No ceiling → nothing is locked. ---
+// --- No entitlement record on a HOSTED company → nothing is allowed. --------
+//
+// EXPECTATION CHANGED IN PHASE 1 MILESTONE 3.
+//
+//   was:  licence_entitled_ceiling() === null   ("no cloud limit")
+//         module_entitled('sales')  === true    ("every module is allowed")
+//   now:  licence_entitled_ceiling() === []     (nothing non-core is entitled)
+//         module_entitled('sales')  === false
+//
+// WHY THE OLD EXPECTATION WAS WRONG: it asserted the defect. A hosted company
+// with no record of what it bought was being granted EVERY paid module, because
+// "we have no record" was returned as "no limit". Absence of evidence is not
+// evidence of purchase. The old assertions documented the behaviour faithfully,
+// but the behaviour was a fail-open hole, so the assertions had to move with it.
+//
+// The control install is a different case and is still exempt — asserted below.
 setting_set('saas_entitled_modules', ''); $mk(); licence_disabled(true);
-t_ok(licence_entitled_ceiling() === null, 'with no ceiling set, there is no cloud limit');
-t_ok(module_entitled('sales') === true, 'with no ceiling every module is allowed');
+t_ok(licence_entitled_ceiling() === [], 'a hosted company with no entitlement record is entitled to nothing');
+t_ok(module_entitled('sales') === false, 'and an unrecorded module is DENIED, not allowed');
+t_ok(module_entitled('admin') === true, 'while the core module is still reachable — never a dead workspace');
+
+// The one install that legitimately has no ceiling: the platform owner's own.
+$GLOBALS['__tenant'] = ['key' => '', 'company' => '', 'error' => '', 'saas' => true, 'base' => 'ops.example.com'];
+licence_disabled(true);
+t_ok(licence_entitled_ceiling() === null, 'the control install still has no cloud limit at all');
+t_ok(module_entitled('sales') === true, 'and the platform owner can still reach every module');
+$mk(); licence_disabled(true);
 
 // --- Recruitment ceiling: entitled to People & hiring only (admin is core). ---
 setting_set('modules_off', ''); $mk();
