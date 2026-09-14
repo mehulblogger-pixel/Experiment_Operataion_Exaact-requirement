@@ -41,3 +41,4 @@ dist/
 # Test artefacts: the app creates these ABOVE the app folder when tests run.
 exaact_data/
 exaact_backups/
+data.sqlite
