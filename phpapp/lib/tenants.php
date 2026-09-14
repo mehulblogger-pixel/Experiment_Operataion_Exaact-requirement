@@ -252,6 +252,20 @@ function ops_tenants($route, $method) {
         flash('cPanel settings saved.');
         redirect('/tenants');
     }
+    // Ask the server, once, whether the application's own database login may
+    // create databases. A yes removes every manual step on a panel with no API.
+    if ($route === 'db-selfcreate-test' && $method === 'POST') {
+        $r = function_exists('saas_db_selfcreate_probe')
+            ? saas_db_selfcreate_probe()
+            : ['ok' => false, 'msg' => 'This build cannot run the test.'];
+        if (function_exists('setting_set')) {
+            try { setting_set('saas_db_selfcreate', $r['ok'] ? '1' : '0'); } catch (Throwable $e) {}
+            try { setting_set('saas_db_selfcreate_at', date('c')); } catch (Throwable $e) {}
+        }
+        flash($r['msg'], $r['ok'] ? 'success' : 'error');
+        redirect('/tenants');
+    }
+
     if ($route === 'cpanel-test' && $method === 'POST') {
         $r = function_exists('cpanel_test') ? cpanel_test() : ['ok' => false, 'msg' => 'cPanel support is not installed.'];
         flash($r['msg'], $r['ok'] ? 'success' : 'error');

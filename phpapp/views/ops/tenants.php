@@ -174,6 +174,51 @@
 </div>
 <script>function tnMode(auto){var m=document.getElementById('tn-manual');if(m)m.style.display=auto?'none':'block';var a=document.getElementById('tn-auto');if(a)a.style.display=auto?'block':'none';}</script>
 
+<?php
+  // Automatic databases, in the order worth trying. This block is FIRST because
+  // the one-click test below settles the question for most hosting, and the
+  // cPanel panel underneath is irrelevant on a panel that has no API.
+  $selfOn  = function_exists('setting_get') && (string) setting_get('saas_db_selfcreate', '') === '1';
+  $selfRun = function_exists('setting_get') && (string) setting_get('saas_db_selfcreate_at', '') !== '';
+  $autoAny = function_exists('saas_can_autocreate_db') && saas_can_autocreate_db();
+?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Automatic databases for new companies
+    <?= $autoAny ? '<span class="pill p-ok">on</span>' : '<span class="pill p-mut">off</span>' ?></h3>
+  <p class="sub" style="margin:8px 0 12px">Each company gets its own separate database &mdash; that separation is what stops
+    one client ever seeing another's data. The only question is who creates it: this app, or you by hand in your hosting panel.</p>
+
+  <?php if ($selfOn): ?>
+    <div style="padding:12px 14px;border:1px solid #a7f3d0;background:#ecfdf5;border-radius:10px;font-size:13.5px;color:#065f46">
+      <b>&#128737;&#65039; On &mdash; this server lets the app create databases itself.</b>
+      Every new company gets its own MySQL database automatically. Nothing to do per client.
+    </div>
+  <?php else: ?>
+    <div style="padding:12px 14px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:10px;font-size:13.5px;color:#1e3a8a">
+      <b>Try this first &mdash; it takes ten seconds.</b><br>
+      Some hosting lets an application create its own databases and some does not, and the only way to find out is to ask.
+      This test creates one empty database with a random name and deletes it again immediately. Nothing you already have is
+      read, changed or removed.
+      <?php if ($selfRun && !$selfOn): ?><br><span style="color:#7f1d1d"><b>Last answer: no.</b> Your hosting does not allow it &mdash; use one of the options below.</span><?php endif; ?>
+    </div>
+    <form method="post" action="/db-selfcreate-test" style="margin-top:10px">
+      <button class="btn" type="submit">Test whether this server can create databases</button>
+    </form>
+  <?php endif; ?>
+
+  <?php if (!$autoAny): ?>
+    <div class="sub" style="margin-top:14px;font-size:13px">
+      <b>If the answer is no</b>, you have two ways to keep every client's data safe, and both are already built in:
+      <ul style="margin:6px 0 0 18px;padding:0">
+        <li><b>Do nothing</b> &mdash; each company's data is kept in its own private file <b>outside the app folder</b>,
+          backed up daily. Re-uploading the app cannot reach it. Fine for a growing client list.</li>
+        <li><b>Create a database per client by hand</b> in your hosting panel (Databases), then paste its details when you
+          add the company. Strongest, about two minutes each.</li>
+      </ul>
+    </div>
+  <?php endif; ?>
+</div>
+
 <details class="panel" id="cpanelcfg"<?= $cpOn ? '' : ' open' ?>>
   <summary style="cursor:pointer;font-weight:600">Automatic provisioning — cPanel API
     <?= $cpOn ? '<span class="pill p-ok">configured</span>' : '<span class="pill p-mut">off</span>' ?></summary>

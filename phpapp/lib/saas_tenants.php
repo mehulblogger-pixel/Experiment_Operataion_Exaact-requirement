@@ -586,9 +586,90 @@ function saas_db_admin_config() {
 //              VPS only.
 // Returns '' when neither is available, and only then does a new workspace fall
 // back to a file.
+// ---- Can the app's OWN database login create databases? --------------------
+//
+// Most shared hosting says no; some says yes; there is no way to know but to
+// ask. If the answer is yes, every client's database can be created
+// automatically with no hosting API, no token and no manual step — which on a
+// panel with no API at all is the difference between one click and a support
+// ticket per customer.
+//
+// The probe creates ONE uniquely-named empty database and drops it again
+// immediately. It never reads, alters or drops anything that already exists,
+// and the name it uses is generated here, never supplied by anyone.
+// Returns ['ok'=>bool, 'msg'=>string, 'leftover'=>string].
+function saas_db_selfcreate_probe() {
+    if (!function_exists('db_driver') || db_driver() !== 'mysql')
+        return ['ok' => false, 'leftover' => '',
+                'msg' => 'This install is not running on MySQL, so there is nothing to test.'];
+    try { $cfg = require dirname(__DIR__) . '/config.php'; $d = (array) ($cfg['db'] ?? []); }
+    catch (Throwable $e) { return ['ok' => false, 'leftover' => '', 'msg' => 'Could not read the database settings.']; }
+    if ((string) ($d['user'] ?? '') === '')
+        return ['ok' => false, 'leftover' => '', 'msg' => 'Could not read the database settings.'];
+
+    $probe = 'exaact_probe_' . bin2hex(random_bytes(5));
+    if (!preg_match('/^[a-z0-9_]{1,64}$/', $probe))
+        return ['ok' => false, 'leftover' => '', 'msg' => 'Internal error generating the test name.'];
+    try {
+        $pdo = new PDO('mysql:host=' . (string) ($d['host'] ?? 'localhost') . ';charset=utf8mb4',
+                       (string) $d['user'], (string) ($d['pass'] ?? ''),
+                       [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 8]);
+        $pdo->exec("CREATE DATABASE `{$probe}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    } catch (Throwable $e) {
+        return ['ok' => false, 'leftover' => '',
+                'msg' => 'This server does NOT let the application create databases by itself. '
+                       . 'That is normal on shared hosting. (' . $e->getMessage() . ')'];
+    }
+    $leftover = '';
+    try { $pdo->exec("DROP DATABASE `{$probe}`"); }
+    catch (Throwable $e) { $leftover = $probe; }
+    return ['ok' => true, 'leftover' => $leftover,
+            'msg' => 'Yes — this server lets the application create a database on its own. '
+                   . 'Every new company can now get its own MySQL database with nothing to set up.'
+                   . ($leftover !== '' ? ' (Please delete the leftover test database "' . $leftover . '" in your hosting panel.)' : '')];
+}
+
+// The database-name prefix this hosting account uses, taken from the control
+// database's own name (panels create "account_something"), so a new database
+// lands in the same namespace the account is allowed to use.
+function saas_db_account_prefix() {
+    // Only meaningful on MySQL. On any other driver the configured name is a
+    // placeholder from the sample config, and splitting it would invent a
+    // prefix out of nothing.
+    if (!function_exists('db_driver') || db_driver() !== 'mysql') return '';
+    try { $cfg = require dirname(__DIR__) . '/config.php'; $name = (string) ($cfg['db']['name'] ?? ''); }
+    catch (Throwable $e) { return ''; }
+    $pos = strpos($name, '_');
+    return $pos > 0 ? substr($name, 0, $pos) : '';
+}
+
+// Create a workspace database with the application's OWN login. Only reachable
+// once the probe above has proved the login is allowed to. The same login is
+// handed back as the workspace's credentials: it created the database, so it
+// owns it, and no second user has to be made.
+function saas_selfcreate_db($key) {
+    $cfg = require dirname(__DIR__) . '/config.php';
+    $d = (array) ($cfg['db'] ?? []);
+    $names = saas_db_names_for($key, saas_db_account_prefix());
+    $name = $names['name'];
+    if (!preg_match('/^[a-z0-9_]{1,64}$/', $name))
+        throw new RuntimeException('Could not derive a safe database name for this company.');
+    $pdo = new PDO('mysql:host=' . (string) ($d['host'] ?? 'localhost') . ';charset=utf8mb4',
+                   (string) $d['user'], (string) ($d['pass'] ?? ''),
+                   [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 8]);
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    return ['host' => (string) ($d['host'] ?? 'localhost'), 'name' => $name,
+            'user' => (string) $d['user'], 'pass' => (string) ($d['pass'] ?? '')];
+}
+
 function saas_db_autocreate_method() {
     if (function_exists('cpanel_configured') && cpanel_configured()) return 'cpanel';
     if (saas_db_admin_config() !== null) return 'admin';
+    // 'self' — the application's own database login is allowed to create
+    // databases. Proved by saas_db_selfcreate_probe() and remembered, never
+    // assumed: attempting it on a host that forbids it would fail every time a
+    // company is added.
+    if (function_exists('setting_get') && (string) setting_get('saas_db_selfcreate', '') === '1') return 'self';
     return '';
 }
 
@@ -609,6 +690,7 @@ function saas_autocreate_db($key, $withSubdomain = true) {
         return $r['db'];
     }
     if ($method === 'admin') return saas_mysql_provision_db($key, saas_db_admin_config());
+    if ($method === 'self')  return saas_selfcreate_db($key);
     throw new RuntimeException('This server is not set up to create databases automatically.');
 }
 

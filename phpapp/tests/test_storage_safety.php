@@ -48,6 +48,39 @@ $GLOBALS['SAAS_DB_ADMIN'] = $origAdmin;
 
 t_ok(!saas_can_autocreate_db(), 'test settings restored');
 
+// ---- 1b. The third way: the app's own database login ----------------------
+// On a panel with no API at all, this is the difference between one click and a
+// manual step per customer — so it is worth asking the server directly. It is
+// only ever used once the probe has PROVED it works: attempting it on a host
+// that forbids it would fail every single time a company is added.
+setting_set('saas_db_selfcreate', '');
+t_eq(saas_db_autocreate_method(), '', 'the app does not assume it may create databases');
+
+setting_set('saas_db_selfcreate', '1');
+t_eq(saas_db_autocreate_method(), 'self', 'once proved, the app can create them with its own login');
+
+setting_set('cpanel_host', 'server.example.com'); setting_set('cpanel_user', 'acct'); setting_set('cpanel_token', 'TOKEN');
+t_eq(saas_db_autocreate_method(), 'cpanel', 'a hosting API still outranks it');
+setting_set('cpanel_host', ''); setting_set('cpanel_user', ''); setting_set('cpanel_token', '');
+$GLOBALS['SAAS_DB_ADMIN'] = ['host' => 'localhost', 'user' => 'root', 'pass' => 'x'];
+t_eq(saas_db_autocreate_method(), 'admin', 'and so does a database-admin credential');
+$GLOBALS['SAAS_DB_ADMIN'] = null;
+setting_set('saas_db_selfcreate', '');
+
+// The probe must answer, never explode, and never touch anything on a database
+// that cannot be tested this way.
+$probe = saas_db_selfcreate_probe();
+t_ok(is_array($probe) && array_key_exists('ok', $probe) && array_key_exists('msg', $probe),
+     'the capability test always returns an answer');
+t_ok($probe['ok'] === false, 'on this SQLite harness it correctly answers no');
+t_ok(stripos($probe['msg'], 'not running on MySQL') !== false, 'and says why, in plain words');
+t_eq((string) ($probe['leftover'] ?? ''), '', 'and leaves nothing behind');
+
+t_eq(saas_db_account_prefix(), '', 'no account prefix can be derived without a MySQL database name');
+$n = saas_db_names_for('xyz-recurit', 'mghaiapp');
+t_eq($n['name'], 'mghaiapp_xyz_recurit', 'a new database is named inside the account prefix');
+t_ok(strlen($n['user']) <= 32, "and the user name fits MySQL's 32-character limit");
+
 // ---- 2. A new workspace never lands inside the app folder ------------------
 [$db, $kind] = tenant_auto_storage('brandnewco');
 t_eq($kind, 'sqlite', 'with no way to create a database, a file is used');
