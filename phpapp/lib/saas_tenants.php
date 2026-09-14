@@ -373,12 +373,29 @@ function saas_entitlement_ensure() {
         if ((string) setting_get('saas_provisioned', '') !== '1') return;           // real provisioned tenants only
         if (trim((string) setting_get('saas_entitled_modules', '')) !== '') return; // already set → done
         if (!defined('PRODUCT_MODULES')) return;
+
+        // ---- MILESTONE 4: THIS NO LONGER GRANDFATHERS FROM RUNTIME STATE ----
+        //
+        // It used to set the ceiling to "whatever is switched on right now". With
+        // a blank ceiling that meant everything was on, so it wrote EVERY module
+        // into the customer's record — turning a missing record into a permanent
+        // manufactured purchase. That is precisely what Milestone 4 forbids.
+        //
+        // Milestone 3 closed the hole it fed on, so this can no longer grant
+        // anything; left as it was it would simply rewrite an empty string on
+        // every page load for ever. It now writes only from evidence the
+        // WORKSPACE itself holds of what was paid for, and otherwise does
+        // nothing at all — leaving the workspace UNKNOWN, which the deliberate,
+        // audited migration in lib/entitlement_migrate.php then resolves from
+        // the commercial record on the control install.
+        $paid = function_exists('saas_paid_modules') ? saas_paid_modules() : [];
         $on = [];
-        foreach (PRODUCT_MODULES as $k => $mm) {
-            if (!empty($mm[3])) continue;                                           // core is always entitled
-            if (function_exists('licence_enabled') && licence_enabled($k)) $on[] = $k;
+        foreach ((array) $paid as $k) {
+            $k = strtolower(trim((string) $k));
+            if ($k !== '' && isset(PRODUCT_MODULES[$k]) && empty(PRODUCT_MODULES[$k][3])) $on[] = $k;
         }
-        setting_set('saas_entitled_modules', implode(',', $on));
+        if (!$on) return;                       // no evidence → grant nothing, write nothing
+        setting_set('saas_entitled_modules', implode(',', array_values(array_unique($on))));
         if (function_exists('licence_disabled')) licence_disabled(true);
     } catch (Throwable $e) { /* never block the boot chain */ }
 }

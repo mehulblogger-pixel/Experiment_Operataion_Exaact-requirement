@@ -65,6 +65,9 @@ $_SERVER['HTTP_HOST']    = '';        // treated as the base domain => control D
 $_SERVER['SERVER_NAME']  = $_SERVER['SERVER_NAME'] ?? 'localhost';
 
 require_once __DIR__ . '/lib/licence.php';        // PRODUCT_MODULES only (no side effects)
+// Milestone 4's classifier. Pure functions over two arrays — it reads nothing and
+// writes nothing on being loaded, so the tool stays read-only.
+@require_once __DIR__ . '/lib/entitlement_migrate.php';
 $CFG = require __DIR__ . '/config.php';           // reads configuration; writes nothing
 
 // ---- Open the CONTROL database (reads only) -------------------------------

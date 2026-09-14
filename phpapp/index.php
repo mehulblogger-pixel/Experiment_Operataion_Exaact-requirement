@@ -117,6 +117,7 @@ try {
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';
+    require __DIR__ . '/lib/entitlement_migrate.php';   // Phase 1 M4 — existing-customer entitlement migration (assessment + safe apply)
     require __DIR__ . '/lib/access.php';
     require __DIR__ . '/lib/numbering.php';
     require __DIR__ . '/lib/terms.php';

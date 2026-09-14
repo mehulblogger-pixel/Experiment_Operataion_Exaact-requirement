@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '1396bab · 2026-09-14 10:55 UTC · 650 files';
+$RELEASE = '7eeccfd · 2026-09-14 11:17 UTC · 651 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
     'cron.php' => ['s'=>20028,'h'=>'924b29115abf325a'],
     'cron_ads.php' => ['s'=>4735,'h'=>'c6e4f8fc0b7a2f2b'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>112982,'h'=>'be8d65b6d9d07514'],
+    'index.php' => ['s'=>113122,'h'=>'c81b4ad00c7e0e9d'],
     'lib/access.php' => ['s'=>69658,'h'=>'358965b79afc5ca7'],
     'lib/activity.php' => ['s'=>22744,'h'=>'2a63a2da6e0df9f5'],
     'lib/adspro.php' => ['s'=>27057,'h'=>'6c4ae73f0de726b3'],
@@ -125,6 +125,7 @@ $EXPECT  = [
     'lib/disclosure.php' => ['s'=>6412,'h'=>'d93ca116db60f19a'],
     'lib/doc_templates.php' => ['s'=>20986,'h'=>'c441ec37c64b9ea0'],
     'lib/engagement.php' => ['s'=>13585,'h'=>'ff1a5552554877f4'],
+    'lib/entitlement_migrate.php' => ['s'=>10281,'h'=>'bfd1dc34dec3e38b'],
     'lib/entity360.php' => ['s'=>4909,'h'=>'3d405b448a70e1e0'],
     'lib/equipment.php' => ['s'=>23618,'h'=>'78c1818b0b0ef3f5'],
     'lib/finevent.php' => ['s'=>8838,'h'=>'4ce2d3d330cd3231'],
@@ -202,7 +203,7 @@ $EXPECT  = [
     'lib/risks.php' => ['s'=>10571,'h'=>'83a96e16878654a2'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>77565,'h'=>'d8674b7aeacbddc6'],
+    'lib/saas_tenants.php' => ['s'=>78669,'h'=>'892dbfcc63a73364'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>15924,'h'=>'df9f9a6a9f86fa2c'],
     'lib/schedboard.php' => ['s'=>10324,'h'=>'36ea989f68bcd70f'],
@@ -254,7 +255,7 @@ $EXPECT  = [
     'lib/workforce.php' => ['s'=>39343,'h'=>'40796172e585e48a'],
     'lib/workspace.php' => ['s'=>12074,'h'=>'07dc0e50a644afa6'],
     'manifest.php' => ['s'=>1665,'h'=>'cd62f3f83b1a7969'],
-    'phase1-inventory.php' => ['s'=>23385,'h'=>'8dc59d54b6985ae8'],
+    'phase1-inventory.php' => ['s'=>23590,'h'=>'37dcca72c7f637f2'],
     'refresh.php' => ['s'=>3674,'h'=>'c828dd3fd0db7613'],
     'router.php' => ['s'=>855,'h'=>'824052bfe3521b8a'],
     'tenants.sample.php' => ['s'=>1889,'h'=>'4768416662a6303d'],
@@ -268,7 +269,7 @@ $EXPECT  = [
     'tools/cost-reconciliation.php' => ['s'=>2884,'h'=>'43103a0ad282892b'],
     'tools/engagement-parity.php' => ['s'=>2433,'h'=>'caecc781a3ede147'],
     'tools/licence-issue.php' => ['s'=>6116,'h'=>'563a0af4621b9578'],
-    'tools/phase1_inventory_engine.php' => ['s'=>51124,'h'=>'63ef64c7368b0829'],
+    'tools/phase1_inventory_engine.php' => ['s'=>53763,'h'=>'587c1ddbd38ed330'],
     'tools/reset-admin.php' => ['s'=>2377,'h'=>'5eba3ddcf695da09'],
     'tools/sbom.php' => ['s'=>5314,'h'=>'7da7803dd8b6a816'],
     'tools/seed-connect.php' => ['s'=>2576,'h'=>'f60af657b9feb4fe'],

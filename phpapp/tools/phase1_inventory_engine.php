@@ -221,6 +221,23 @@ function p1_build_row(array $control, array $settings, $routeLabel, $error = '')
     ];
     $row += p1_classify($row);
 
+    // MILESTONE 4 — the read-only pre-migration assessment, from the same facts
+    // already gathered here. Reuses the migration's own classifier, so the report
+    // the operator reads and the decision the migration would take are produced
+    // by one piece of code and cannot drift apart.
+    if (function_exists('entmig_assess')) {
+        $row['m4'] = entmig_assess(
+            ['tenant' => $row['tenant'], 'company' => $row['company'], 'status' => $row['status'],
+             'plan' => $row['plan'], 'enabled_modules' => $ctrlMods],
+            ['reachable'   => ((string) $error === ''),
+             'provisioned' => (string) ($settings['saas_provisioned'] ?? ''),
+             'ceiling'     => $ceil,
+             'modules_off' => $off,
+             'paid'        => (string) ($settings['saas_paid_modules'] ?? ''),
+             'package'     => (string) ($settings['product_package'] ?? ''),
+             'licence_key' => (string) ($settings['licence_key'] ?? '')]);
+    }
+
     // Marketplace is NOT in PRODUCT_MODULES, so the entitlement ceiling does not
     // govern it today. Three DIFFERENT things must be kept apart here, because
     // conflating them would manufacture an entitlement nobody bought:
@@ -323,6 +340,34 @@ function p1_render_text(array $report) {
         $L[] = '  marketplace      : ' . $r['marketplace_state'] . ($r['marketplace_needs_backfill'] ? '  [needs backfill when promoted]' : '');
         $L[] = '  -> ' . $r['note'];
     }
+    // ---- Milestone 4 · pre-migration assessment ---------------------------
+    if (isset($report['tenants'][0]['m4'])) {
+        $tally = [];
+        foreach ($report['tenants'] as $r) { $c = $r['m4']['class'] ?? '?'; $tally[$c] = ($tally[$c] ?? 0) + 1; }
+        $L[] = '';
+        $L[] = str_repeat('=', 78);
+        $L[] = 'MILESTONE 4 — PRE-MIGRATION ASSESSMENT  (read-only; nothing was written)';
+        $L[] = str_repeat('=', 78);
+        $parts = [];
+        foreach ($tally as $c => $n) $parts[] = $c . ': ' . $n;
+        $L[] = implode('   ', $parts);
+        foreach ($report['tenants'] as $r) {
+            $m = $r['m4'];
+            $L[] = '';
+            $L[] = '[' . $m['class'] . '] ' . $m['tenant'] . '  —  ' . $m['company'];
+            $L[] = '  sold (control)   : ' . (implode(',', $m['control_modules']) ?: '(nothing recorded)');
+            $L[] = '  workspace now    : ' . (implode(',', $m['runtime_ceiling']) ?: '(no record)');
+            $L[] = '  entitled today   : ' . (implode(',', $m['before']) ?: '(nothing)');
+            $L[] = '  would become     : ' . (implode(',', $m['after']) ?: '(nothing)');
+            if ($m['gained']) $L[] = '  REGAINS          : ' . implode(',', $m['gained']);
+            if ($m['lost'])   $L[] = '  WOULD LOSE       : ' . implode(',', $m['lost']) . '   << not applied automatically';
+            $L[] = '  evidence         : ' . $m['evidence'] . '  (confidence ' . $m['confidence'] . ')';
+            $L[] = '  reason           : ' . $m['reason'];
+        }
+        $L[] = '';
+        $L[] = 'Only SAFE_TO_MIGRATE records would be applied. Nothing else is touched.';
+    }
+
     $L[] = '';
     $L[] = str_repeat('=', 78);
     $L[] = 'END OF REPORT — nothing was written to any database.';
