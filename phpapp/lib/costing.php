@@ -1072,7 +1072,7 @@ function reimbursable_dedupe_amount($expenses, $voucher) {
 // Carries the Option-B mode control. Read-only apart from setting the mode.
 function ops_reimbursable_dedup($method) {
     ops_require((function_exists('can_see_salary') && can_see_salary())
-        || (function_exists('can') && (can('finance.reconcile') || can('mod.profitability.view'))) || is_master(),
+        || (function_exists('can') && (can('finance.reconcile') || can('mod.profitability.view') || is_master_of(['profitability','reconcile']))),
         'You cannot open the reimbursable duplication worklist.');
     if ($method === 'POST' && isset($_POST['reimbursable_dedupe'])) {
         if (reimbursable_dedupe_set_mode($_POST['reimbursable_dedupe']))

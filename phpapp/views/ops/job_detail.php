@@ -5,7 +5,7 @@
     <p class="sub"><?= e($job['client_disp'] ?: $job['client_name'] ?: '—') ?> · <?= e($job['inspector_name'] ?: 'Unassigned') ?></p></div>
   <div class="row-actions">
     <?php if (!$job['closed_flag'] && !$lock['locked']): ?><a class="btn" href="/job-close?id=<?= (int)$job['id'] ?>">Close job</a><?php endif; ?>
-    <?php if (can('mod.idems.edit') || is_master()): ?><a class="btn secondary" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
+    <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="btn secondary" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
     <?php if (is_coordinator_level() && !$job['closed_flag'] && !$lock['locked']): ?><a class="btn secondary" href="/job-edit?id=<?= (int)$job['id'] ?>">Edit</a><?php endif; ?>
     <?php if (function_exists('connect_source_can') && connect_source_can() && !$job['closed_flag'] && !$lock['locked']): ?><a class="btn secondary" href="/connect-source?job=<?= (int)$job['id'] ?>" title="Rank and assign people across internal inspectors, the marketplace and this client’s bench">🔎 Source manpower</a><?php endif; ?>
     <?php if ($job['call_id']): ?><a class="btn secondary" href="/call?id=<?= (int)$job['call_id'] ?>">View call</a><?php endif; ?>
@@ -106,7 +106,7 @@
         </span>
       <?php endif; ?>
     <?php endforeach; ?>
-    <?php if (can('mod.idems.edit') || is_master()): ?>
+    <?php if (can('mod.idems.edit') || is_master_of('idems')): ?>
       <a href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>" class="pill p-ok" style="text-decoration:none;font-size:12px">+ New <?= e(Tl('report')) ?></a>
     <?php endif; ?>
   </div>
@@ -556,7 +556,7 @@
       $jobDocs[$rd['type_code']][] = $rd;
   // Anything already written under a format nobody ticked, so it is still listed.
   $extraCodes = array_values(array_diff(array_keys($jobDocs), $dlCodes));
-  $canWrite = can('mod.idems.edit') || is_master();
+  $canWrite = can('mod.idems.edit') || is_master_of('idems');
   // §Module06 — applicability: where each agreed format came from, and which
   // formats do NOT apply to this job (read-only annotation over deliverables).
   $appl = function_exists('idems_job_applicability') ? idems_job_applicability($job) : ['applicable'=>[], 'not_applicable'=>[], 'source_labels'=>[]];
@@ -567,8 +567,8 @@
       // contract, so the next inspector sees the history and can open the past report.
       // Read-only here; forwarding / continuing come next. Only issued reports show. ?>
 <?php $priorInsp = function_exists('job_prior_inspections') ? job_prior_inspections($job) : []; ?>
-<?php if ($priorInsp && (is_master() || can('mod.idems.view') || can('mod.idems.edit'))):
-        $canMakeReport = can('mod.idems.edit') || is_master();
+<?php if ($priorInsp && (can('mod.idems.view') || can('mod.idems.edit') || is_master_of('idems'))):
+        $canMakeReport = can('mod.idems.edit') || is_master_of('idems');
         $canForward    = is_master() || (function_exists('is_coordinator_level') && is_coordinator_level()) || can('ops.job.allocate');
         $fwdId         = (int)($job['prior_report_id'] ?? 0);
         $fwdIrn        = ''; foreach ($priorInsp as $pi) if ((int)$pi['id'] === $fwdId) $fwdIrn = (string)$pi['irn']; ?>
@@ -614,7 +614,7 @@
 <?php // §R1-D — Quality Assurance Plans for this job. A PO may bring one QAP or
       // many (one per line item). They are attached as-is (usually PDF), never
       // parsed, and the inspector reads them while writing the report. ?>
-<?php $qaps = $qaps ?? []; $canQap = function_exists('job_qap_can') ? job_qap_can() : (can('mod.idems.edit') || is_master()); ?>
+<?php $qaps = $qaps ?? []; $canQap = function_exists('job_qap_can') ? job_qap_can() : (can('mod.idems.edit') || is_master_of('idems')); ?>
 <div class="panel" id="qaps" data-tab="Reports &amp; QA">
   <div class="ctitle" style="margin-top:0"><h3>QAP / reference documents <span class="muted">(<?= count($qaps) ?>)</span></h3></div>
   <p class="muted" style="margin:0 0 10px">The Quality Assurance Plan(s) for this <?= e(Tl('job')) ?> — one or several, per PO line item.
@@ -676,7 +676,7 @@
               <span class="pill <?= !empty($d['finalized']) ? 'p-ok' : (($d['status'] ?? '') === 'DRAFT' ? 'p-mut' : 'p-info') ?>">
                 <?= e(!empty($d['finalized']) ? 'issued' : strtolower((string)($d['status'] ?: 'draft'))) ?></span>
             <?php endforeach; endif; ?></td>
-        <td class="num"><?php if (can('mod.idems.edit') || is_master()): ?>
+        <td class="num"><?php if (can('mod.idems.edit') || is_master_of('idems')): ?>
           <a class="btn small<?= $docs ? ' secondary' : '' ?>" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call=' . (int)$job['call_id'] : '' ?>&type=<?= e(urlencode($code)) ?>"><?= $docs ? 'Add another' : 'Write it' ?></a>
         <?php endif; ?></td>
       </tr>

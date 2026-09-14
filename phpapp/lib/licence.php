@@ -271,9 +271,14 @@ function licence_enabled($key) { return !in_array($key, licence_disabled(), true
 // licensed, matching the `A or B` shape of the guards it replaces.
 function is_master_of($modules) {
     if (!is_master()) return false;
-    foreach ((array)$modules as $m) {
+    foreach ((array) $modules as $m) {
         $owner = licence_owner($m);
-        if ($owner === null || licence_enabled($owner)) return true;   // unclaimed or bought
+        // A product module key used where an access module is expected (M2
+        // anomaly A1) resolves directly; anything still unowned grants nothing,
+        // matching licence_blocks(). One rule, two readers.
+        if ($owner === null && defined('PRODUCT_MODULES') && isset(PRODUCT_MODULES[$m])) $owner = $m;
+        if ($owner === null) continue;                                 // unowned → no master override
+        if (licence_enabled($owner)) return true;                      // bought
     }
     return false;
 }
@@ -286,8 +291,29 @@ function licence_blocks($perm) {
     if (strncmp($perm, 'mod.', 4) !== 0) return false;
     $parts = explode('.', $perm);
     if (count($parts) < 3) return false;
-    $owner = licence_owner($parts[1]);
-    return $owner !== null && !licence_enabled($owner);
+    $access = $parts[1];
+    $owner  = licence_owner($access);
+
+    // Three routes gate on 'mod.admin.view', and 'admin' is a PRODUCT module key
+    // rather than an access module, so licence_owner() has nothing to return for
+    // it. Documented in M2 as anomaly A1. Resolve it directly: without this the
+    // fail-closed rule below would block the notification, integration and
+    // system-status screens, which are core and must never be blocked.
+    if ($owner === null && defined('PRODUCT_MODULES') && isset(PRODUCT_MODULES[$access])) $owner = $access;
+
+    // ---- MILESTONE 5: AN UNOWNED ACCESS MODULE DENIES ----------------------
+    //
+    // This returned false — "no owner, so nothing to block" — which meant an
+    // access module no product module claims was reachable by everyone. M2
+    // proved all 31 are owned, so this has never fired in production; it is
+    // closed because the next access module somebody adds without licensing it
+    // must not arrive switched on for every customer, paid for or not.
+    //
+    // No owner is invented and nothing is mapped to core: the permission is
+    // simply refused until the registry says who owns it.
+    if ($owner === null) return true;
+
+    return !licence_enabled($owner);
 }
 
 // What to save from the Settings screen. Core modules are never written.

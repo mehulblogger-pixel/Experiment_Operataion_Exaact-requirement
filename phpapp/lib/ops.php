@@ -2422,6 +2422,47 @@ function job_owned_by_me($jobId) {
         return (int)ops_val("SELECT COUNT(*) FROM job_visits WHERE job_id=? AND inspector_id=?", [$jobId, $mine]) > 0;
     } catch (Throwable $e) { return false; }
 }
+// A PAID MODULE'S ROUTE FAMILY, for routes the map does not name individually.
+//
+// ops_module_gate() resolved an unmapped route to null and then checked nothing
+// at all, so a paid-module route that nobody remembered to add to the map was
+// reachable by anyone who knew the URL. A measurement of the live dispatcher
+// found 30 such routes across Recruitment, Sales and Operations — candidate
+// documents, offers and letters, CRM templates, quote approval rules.
+//
+// Every prefix below is verified against routes the map ALREADY carries, so
+// this extends the existing mapping rather than inventing one:
+//   'candidate-cv' => 'hiring' is mapped, so 'candidate-offer' is hiring too.
+//
+// Deliberately NOT a general heuristic. A guessed prefix that is wrong denies a
+// working screen, so only families whose ownership is unambiguous are listed.
+// Routes outside these families keep their existing behaviour — see
+// docs/phase1/M5-KNOWN-LIMITATIONS.md.
+function ops_module_family($route) {
+    static $fam = [
+        // Recruitment (hr)
+        'candidate' => 'hiring', 'candidates' => 'hiring', 'requisition' => 'hiring',
+        'requisitions' => 'hiring', 'recruit' => 'hiring', 'recruitment' => 'hiring',
+        'positions' => 'hiring', 'careers' => 'hiring', 'jd' => 'hiring',
+        // Sales & CRM
+        'lead' => 'leads', 'leads' => 'leads', 'opportunity' => 'leads', 'pipeline' => 'leads',
+        'pipelines' => 'leads', 'quote' => 'quotes', 'quotes' => 'quotes', 'crm' => 'crm_reports',
+        // Money
+        'invoice' => 'invoicing', 'invoices' => 'invoicing', 'receipt' => 'invoicing',
+        'receipts' => 'invoicing', 'tally' => 'invoicing', 'credit' => 'invoicing',
+        // Operations
+        'voucher' => 'vouchers', 'vouchers' => 'vouchers',
+    ];
+    $base = (string) $route;
+    $parts = explode('-', $base);
+    // Longest first, so 'credit-note-new' prefers a two-word rule if one exists.
+    for ($n = min(2, count($parts)); $n >= 1; $n--) {
+        $p = implode('-', array_slice($parts, 0, $n));
+        if (isset($fam[$p])) return $fam[$p];
+    }
+    return null;
+}
+
 function ops_module_gate($route, $peek = false) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
@@ -2573,6 +2614,9 @@ function ops_module_gate($route, $peek = false) {
         'partner-import'=>'clients','partner-template'=>'clients','duplicates'=>'clients',
     ];
     $mod = $map[$base] ?? null;
+    // An unmapped route inside a paid module's family is still that module's.
+    // This is where the "route nobody added to the map" hole closes.
+    if ($mod === null) $mod = ops_module_family($base);
     // Read-only mode: return whether THIS route is allowed under the current
     // licence (used by menus / launchpads to hide a screen the plan excludes),
     // using the SAME authoritative map as the enforcement below — never halting.
@@ -6256,7 +6300,7 @@ function ops_jobs($route, $method) {
     // amount comes straight off the job's quote/call figures (books_line_add reads
     // billable_rate/qty/value), so nobody re-keys it (#4 / #5).
     if ($route === 'job-bill' && $method === 'POST') {
-        ops_require(is_master() || can('finance.reconcile') || can('mod.invoicing.view'), 'You cannot raise invoices.');
+        ops_require(can('finance.reconcile') || can('mod.invoicing.view') || is_master_of(['invoicing','reconcile']), 'You cannot raise invoices.');
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
         if (!function_exists('books_invoice_create')) { flash('The Money module is not enabled on this installation.', 'error'); redirect('/job?id=' . $job['id']); }
@@ -7174,7 +7218,7 @@ function ops_pending_tasks() {
         $add($cnt("SELECT COUNT(*) $base AND d.status='APPROVED' AND COALESCE(d.finalized,0)=0", $scopeArgs),
             '📄', 'to issue', 'approved reports to finalise', '/documents?status=APPROVED', 'ok');
     // To release — issued reports marked for a Release Note that have none yet.
-    if (is_master() || can('mod.idems.edit'))
+    if (can('mod.idems.edit') || is_master_of('idems'))
         $add($cnt("SELECT COUNT(*) $base AND COALESCE(d.finalized,0)=1 AND COALESCE(d.rn_to_issue,0)=1 AND d.type_code NOT IN ('RN','IRN')
                    AND NOT EXISTS (SELECT 1 FROM report_docs r WHERE r.type_code='RN' AND r.deleted=0 AND r.release_of_id=d.id)", $scopeArgs),
             '📋', 'to release', 'issued reports needing a Release Note', '/documents', 'info');

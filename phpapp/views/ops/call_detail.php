@@ -48,7 +48,7 @@
         <?php if (!$topHasJobs): ?><a class="btn" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate Job</a>
         <?php else: ?><a class="btn secondary" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate another job</a><?php endif; ?>
       <?php endif; ?>
-      <?php if (can('mod.idems.edit') || is_master()): ?><a class="btn secondary" href="/document-new?call=<?= (int)$call['id'] ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
+      <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="btn secondary" href="/document-new?call=<?= (int)$call['id'] ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
     <?php endif; ?>
     <?php if (is_master() || can('ops.call.delete')): ?>
       <form method="post" action="/call-delete?id=<?= (int)$call['id'] ?>" style="display:inline" onsubmit="return confirm('Delete this call and its jobs? This cannot be undone.')">

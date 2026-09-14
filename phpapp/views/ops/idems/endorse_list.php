@@ -2,7 +2,7 @@
 <div class="master-head">
   <div><h1><?= e(T_REG('endorsement')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Manufacturer / vendor quality records reviewed &amp; endorsed by the TPIA. The original is kept unaltered. <?= (int)($counts['total'] ?? 0) ?> record(s).</p></div>
-  <?php if (is_master() || can('mod.idems.edit')): ?><a class="btn" href="/endorsement-new">+ New endorsement</a><?php endif; ?>
+  <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="btn" href="/endorsement-new">+ New endorsement</a><?php endif; ?>
 </div>
 
 <div class="kpi-row">

@@ -314,7 +314,7 @@
 
     // ---------- section: reports awaiting my approval (reporting managers) ----------
     $secRepAppr = '';
-    if (function_exists('jobs_awaiting_report_approval') && (can('ops.job.close') || can('idems.finalize') || can('mod.idems.edit') || is_master())) {
+    if (function_exists('jobs_awaiting_report_approval') && (can('ops.job.close') || can('idems.finalize') || can('mod.idems.edit') || is_master_of(['idems','jobs']))) {
       $ra = jobs_awaiting_report_approval(12);
       if ($ra) { ob_start(); ?>
         <h3 class="tab-sub" style="margin-top:26px;">Reports awaiting your approval <span class="muted">(<?= count($ra) ?>)</span></h3>

@@ -220,7 +220,7 @@ function ops_area_def($area) {
             $t(($fx('can_see_salary') && can_see_salary()) || can('finance.reconcile') || is_master(), '⚖️', 'Cost reconciliation', '/cost-reconciliation', 'Where a job’s legacy sub-contractor cost disagrees with the committed cost ledger.',
                 $num(fn() => $fx('costrecon_count') ? costrecon_count() : 0), 'amber');
             // Revamp P8 — reimbursables recorded on both doors (closure expenses + inspector voucher); reconcile before profit is trusted.
-            $t(($fx('can_see_salary') && can_see_salary()) || can('finance.reconcile') || can('mod.profitability.view') || is_master(), '🧾', 'Reimbursable duplication', '/reimbursable-dedup', 'Jobs whose reimbursables are recorded on both doors — reconcile so profit is not double-charged.',
+            $t(($fx('can_see_salary') && can_see_salary()) || can('finance.reconcile') || can('mod.profitability.view') || is_master_of(['profitability','reconcile']), '🧾', 'Reimbursable duplication', '/reimbursable-dedup', 'Jobs whose reimbursables are recorded on both doors — reconcile so profit is not double-charged.',
                 $num(fn() => $fx('cost_dualwrite_count') ? cost_dualwrite_count() : 0), 'amber');
             $t(can('mod.profitability.view'), '📊', T('sbu') . ' profit & loss', '/sbu-pl', 'P&L by business unit.');
             $t(can('mod.profitability.view'), '🧾', 'Profit by ' . strtolower(Tl('call')), '/call-profit', 'What each inspection made.');

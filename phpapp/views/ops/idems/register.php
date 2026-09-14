@@ -8,7 +8,7 @@
     <?php if (is_master() || can('idems.type.manage') || can('master.manage')): ?><a class="btn secondary" href="/report-types">Report types</a><?php endif; ?>
     <?php if (is_master() || can('idems.type.manage')): ?><a class="btn secondary" href="/irn-rules">IRN rules</a><?php endif; ?>
     <?php if (is_master() || can('idems.audit.view')): ?><a class="btn secondary" href="/audit-log">Audit log</a><?php endif; ?>
-    <?php if (is_master() || can('mod.idems.edit')): ?><a class="btn" href="/document-new">+ New report</a><?php endif; ?>
+    <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="btn" href="/document-new">+ New report</a><?php endif; ?>
   </div>
 </div>
 

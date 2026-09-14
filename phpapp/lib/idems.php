@@ -3776,7 +3776,7 @@ function idems_can_edit_doc($doc) {
     // Once submitted, only a super-admin may still edit (a genuine correction);
     // the inspector cannot change a report that has gone for vetting/approval.
     if (!idems_status_allows_edit($doc['status'] ?? 'DRAFT') && !is_master()) return false;
-    return is_master() || can('mod.idems.edit');
+    return can('mod.idems.edit') || is_master_of('idems');
 }
 function idems_status_pill($s) {
     return ['DRAFT'=>'p-mut','SUBMITTED'=>'p-info','VETTING'=>'p-warn','UNDER_REVIEW'=>'p-warn','APPROVED'=>'p-ok','ISSUED'=>'p-ok','REJECTED'=>'p-bad','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut';
@@ -3973,7 +3973,7 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
     // Tools menu, so people believed there was "no button"). The status/type
     // decision is the pure helper below; the permission to actually create one is
     // a separate gate (and the create endpoint enforces it too).
-    $canMakeRn = (is_master() || (function_exists('can') && can('mod.idems.edit')));
+    $canMakeRn = (function_exists('can') && (can('mod.idems.edit') || is_master_of('idems')));
     $rnOffer = $canMakeRn ? idems_release_note_offer($doc) : null;
     if ($rnOffer) {
         if (!empty($rnOffer['existing'])) {
@@ -4299,7 +4299,7 @@ function idems_completeness_check($doc) {
 // the expediting engine (the formal "Report" is the PDF). One row per Expediting
 // Report, with its live progress, status and forecast computed deterministically.
 function ops_idems_expediting($route, $method) {
-    ops_require(is_master() || can('mod.idems.view') || can('mod.idems.edit'), 'You cannot view the expediting register.');
+    ops_require(can('mod.idems.view') || can('mod.idems.edit') || is_master_of('idems'), 'You cannot view the expediting register.');
     $q = trim($_GET['q'] ?? ''); $fs = $_GET['status'] ?? '';
     [$w, $a] = scope_clause('d.office_id', 'd.sbu');
     $where = "d.deleted=0 AND d.type_code='ER' AND $w"; $args = $a;
@@ -4344,7 +4344,7 @@ function ops_idems_expediting($route, $method) {
 // delivery risk, the binding delivery date and how many POs are forecast late,
 // each expandable to its PO/package children. One project, many POs, one view.
 function ops_idems_expediting_projects($route, $method) {
-    ops_require(is_master() || can('mod.idems.view') || can('mod.idems.edit'), 'You cannot view the expediting register.');
+    ops_require(can('mod.idems.view') || can('mod.idems.edit') || is_master_of('idems'), 'You cannot view the expediting register.');
     $q = trim($_GET['q'] ?? '');
     [$w, $a] = scope_clause('d.office_id', 'd.sbu');
     $where = "d.deleted=0 AND d.type_code='ER' AND $w"; $args = $a;
@@ -4368,9 +4368,9 @@ function ops_idems_expediting_projects($route, $method) {
 
 function ops_idems_vendors($route, $method) {
     $pdo = db();
-    $canView = is_master() || can('mod.idems.view') || can('mod.idems.edit') || can('mod.clients.view') || can('mod.vendors.view');
+    $canView = can('mod.idems.view') || can('mod.idems.edit') || can('mod.clients.view') || can('mod.vendors.view') || is_master_of(['idems','clients','vendors']);
     ops_require($canView, 'You cannot view the vendor register.');
-    $canEdit = is_master() || can('mod.idems.edit') || can('mod.clients.edit') || can('mod.vendors.edit');
+    $canEdit = can('mod.idems.edit') || can('mod.clients.edit') || can('mod.vendors.edit') || is_master_of(['idems','clients','vendors']);
 
     if ($route === 'vendor-profile-save' && $method === 'POST') {
         ops_require($canEdit, 'You cannot edit vendor profiles.');
@@ -4529,7 +4529,7 @@ function ops_idems_documents($route, $method) {
             if (!$doc) { http_response_code(404); view('notfound'); return true; }
             ops_require(idems_can_edit_doc($doc), 'This report is finalized and can no longer be edited.');
         } else {
-            ops_require(is_master() || can('mod.idems.edit'), 'You cannot create inspection reports.');
+            ops_require(can('mod.idems.edit') || is_master_of('idems'), 'You cannot create inspection reports.');
         }
         if ($method === 'POST') {
             $b = $_POST;
@@ -4753,7 +4753,7 @@ function ops_idems_documents($route, $method) {
             FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
             WHERE d.id=? AND d.deleted=0", [(int)($_POST['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
-        ops_require(is_master() || can('mod.idems.edit') || can('idems.finalize'), 'You cannot run a review on this report.');
+        ops_require(can('mod.idems.edit') || can('idems.finalize') || is_master_of('idems'), 'You cannot run a review on this report.');
         $fx = idems_fields($doc['report_type_id']);
         $dt = json_decode($doc['data'] ?: '[]', true) ?: [];
         [$text, $err] = idems_ai_review($doc, $fx, $dt, function_exists('idems_source_docs') ? idems_source_docs($doc['id']) : []);
@@ -4769,7 +4769,7 @@ function ops_idems_documents($route, $method) {
         // inspector / coordinator even after the report is locked from editing.
         $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
-        ops_require(is_master() || can('mod.idems.edit'), 'You cannot change this report.');
+        ops_require(can('mod.idems.edit') || is_master_of('idems'), 'You cannot change this report.');
         $v = !empty($_POST['rn_to_issue']) ? 1 : 0;
         $pdo->prepare("UPDATE report_docs SET rn_to_issue=?, updated_at=? WHERE id=?")->execute([$v, date('c'), $doc['id']]);
         idems_log('report_doc', $doc['id'], 'RN_FLAG', ['irn'=>$doc['irn'], 'new'=>$v ? 'Release Note to be issued' : 'no Release Note']);
@@ -4965,7 +4965,7 @@ function ops_idems_documents($route, $method) {
     if ($route === 'document-revise' && $method === 'POST') {
         $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
-        ops_require(is_master() || can('mod.idems.edit'), 'You cannot create reports.');
+        ops_require(can('mod.idems.edit') || is_master_of('idems'), 'You cannot create reports.');
         [$newId, $err] = idems_revise_doc($doc);
         if ($err === 'EXISTS') { flash('A revision of this report already exists.', 'warning'); redirect('/document?id=' . $newId); }
         if ($err) { flash($err, 'error'); redirect('/document?id=' . $doc['id']); }
@@ -8059,7 +8059,7 @@ function ops_idems_pdf($method) {
         FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
         WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); echo 'Not found'; return true; }
-    ops_require(is_master() || can('mod.idems.view'), 'You cannot view this report.');
+    ops_require(can('mod.idems.view') || is_master_of('idems'), 'You cannot view this report.');
     // Phase 2 §51 — scope the PDF to the viewer's office/SBU (the evidence-file path
     // was already scoped via idems_file_authorized; the full report PDF was not).
     ops_require(scope_allows($doc['office_id'] ?? null, $doc['sbu'] ?? null),
@@ -8176,7 +8176,7 @@ function idems_sample_doc($extra = []) {
 }
 // GET /report-type-preview?type=ID — system-format PDF filled with sample data.
 function ops_idems_type_preview() {
-    ops_require(is_master() || can('idems.type.manage') || can('mod.idems.view'), 'You cannot preview report forms.');
+    ops_require(can('idems.type.manage') || can('mod.idems.view') || is_master_of('idems'), 'You cannot preview report forms.');
     $typeId = (int)($_GET['type'] ?? 0);
     $type = $typeId ? ops_one("SELECT * FROM report_types WHERE id=?", [$typeId]) : null;
     if (!$type) { http_response_code(404); echo 'Report type not found'; return true; }
@@ -8474,7 +8474,7 @@ function ops_idems_docx($method) {
         FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN inspectors i ON i.id=d.inspector_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
         WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); echo 'Not found'; return true; }
-    ops_require(is_master() || can('mod.idems.view'), 'You cannot generate this report.');
+    ops_require(can('mod.idems.view') || is_master_of('idems'), 'You cannot generate this report.');
     $tpl = idems_render_template($doc);   // §33 — the frozen template for an issued report, else the current pick
     [$secs, $fields] = idems_render_schema($doc);   // frozen once issued, live for a draft
     $data = json_decode($doc['data'] ?: '[]', true) ?: [];
@@ -8969,7 +8969,7 @@ const ENDORSE_DOC_TYPES = ['MTC'=>'Material Test Certificate (MTC)','NDT'=>'NDT 
 const ENDORSE_STATUS = ['UPLOADED'=>'Uploaded','UNDER_REVIEW'=>'Under review','ENDORSED'=>'Endorsed','REJECTED'=>'Rejected','ARCHIVED'=>'Archived'];
 const ENDORSE_DECISION = ['ENDORSED'=>'Reviewed &amp; endorsed','ENDORSED_COND'=>'Endorsed with observations','REJECTED'=>'Rejected'];
 function endorse_status_pill($s) { return ['UPLOADED'=>'p-mut','UNDER_REVIEW'=>'p-warn','ENDORSED'=>'p-ok','REJECTED'=>'p-bad','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut'; }
-function endorse_can_edit($e) { return $e && empty($e['finalized']) && (is_master() || can('mod.idems.edit')); }
+function endorse_can_edit($e) { return $e && empty($e['finalized']) && (can('mod.idems.edit') || is_master_of('idems')); }
 function endorsement_files($eid, $kind = null) {
     if ($kind === null) return ops_all("SELECT id, kind, file_name, mime, note, created_by, created_at FROM endorsement_files WHERE endorsement_id=? ORDER BY id", [(int)$eid]);
     return ops_all("SELECT id, kind, file_name, mime, note, created_by, created_at FROM endorsement_files WHERE endorsement_id=? AND kind=? ORDER BY id", [(int)$eid, $kind]);
@@ -8987,7 +8987,7 @@ function ops_idems_endorsements($route, $method) {
     if ($route === 'endorsement-file') {
         $f = ops_one("SELECT ef.*, e.deleted, e.office_id e_office, e.sbu e_sbu FROM endorsement_files ef JOIN endorsements e ON e.id=ef.endorsement_id WHERE ef.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$f || $f['deleted']) { http_response_code(404); echo 'Not found'; return true; }
-        ops_require(is_master() || can('mod.idems.view'), 'Access denied.');
+        ops_require(can('mod.idems.view') || is_master_of('idems'), 'Access denied.');
         // Phase 2 §51 — scope the endorsement file to the viewer's office/SBU.
         ops_require(scope_allows($f['e_office'] ?? null, $f['e_sbu'] ?? null), 'This file is outside your office / branch scope.');
         $data = (string)$f['data']; if (strpos($data,'base64,')!==false) $data = base64_decode(substr($data, strpos($data,'base64,')+7));
@@ -9015,7 +9015,7 @@ function ops_idems_endorsements($route, $method) {
     if ($route === 'endorsement-new' || $route === 'endorsement-edit') {
         $e = null;
         if ($route === 'endorsement-edit') { $e = ops_one("SELECT * FROM endorsements WHERE id=? AND deleted=0", [(int)($_GET['id'] ?? 0)]); if (!$e) { http_response_code(404); view('notfound'); return true; } ops_require(endorse_can_edit($e), 'This endorsement is locked.'); }
-        else ops_require(is_master() || can('mod.idems.edit'), 'You cannot create endorsements.');
+        else ops_require(can('mod.idems.edit') || is_master_of('idems'), 'You cannot create endorsements.');
         if ($method === 'POST') {
             $b = $_POST;
             $clientId = ($b['client_id'] ?? '')!==''?(int)$b['client_id']:null;
@@ -9184,7 +9184,7 @@ function ops_idems_endorse_cert($method) {
         FROM endorsements e LEFT JOIN business_partners v ON v.id=e.vendor_id LEFT JOIN business_partners bp ON bp.id=e.client_id LEFT JOIN inspectors i ON i.id=e.inspector_id LEFT JOIN report_docs rd ON rd.id=e.report_doc_id
         WHERE e.id=? AND e.deleted=0", [(int)($_GET['id'] ?? 0)]);
     if (!$e) { http_response_code(404); echo 'Not found'; return true; }
-    ops_require(is_master() || can('mod.idems.view'), 'Access denied.');
+    ops_require(can('mod.idems.view') || is_master_of('idems'), 'Access denied.');
     $lh = function_exists('quote_letterhead') ? quote_letterhead() : ['name'=>app_name()];
     // approver identity
     $ap = $e['approver_user_id'] ? ops_one("SELECT first_name, last_name, position_title, role FROM users WHERE id=?", [$e['approver_user_id']]) : null;
@@ -9796,7 +9796,7 @@ function ops_idems_release_note($method) {
         FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
         WHERE d.id=? AND d.deleted=0", [(int)($_POST['id'] ?? 0)]);
     if (!$src) { http_response_code(404); view('notfound'); return true; }
-    ops_require(is_master() || can('mod.idems.edit'), 'You cannot create reports.');
+    ops_require(can('mod.idems.edit') || is_master_of('idems'), 'You cannot create reports.');
     // A Release Note is raised only once the inspection report is ACCEPTED — i.e.
     // issued (finalised). A draft or a merely-approved-but-not-issued report cannot
     // spawn one. (A master may still force it, for corrections.)
@@ -10719,7 +10719,7 @@ function learn_remarks($typeId, $limit = 8) {
 }
 // ---- Handler: learning insights (what the system has picked up) ----
 function ops_idems_learning($method) {
-    ops_require(is_master() || can('idems.type.manage') || can('mod.idems.view'), 'You cannot view the learning insights.');
+    ops_require(can('idems.type.manage') || can('mod.idems.view') || is_master_of('idems'), 'You cannot view the learning insights.');
     $pdo = db();
     if ($method === 'POST') {
         ops_require(is_master() || can('idems.type.manage'), 'You cannot change the learned library.');

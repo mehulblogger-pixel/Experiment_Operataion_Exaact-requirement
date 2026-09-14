@@ -27,7 +27,7 @@
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn secondary" href="/expediting-projects">Projects view</a>
     <a class="btn secondary" href="/documents">Reports</a>
-    <?php if (is_master() || can('mod.idems.edit')): ?><a class="btn" href="/document-new">+ New expediting report</a><?php endif; ?>
+    <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="btn" href="/document-new">+ New expediting report</a><?php endif; ?>
   </div>
 </div>
 

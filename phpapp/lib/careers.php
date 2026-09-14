@@ -31,7 +31,24 @@ function careers_migrate() {
     } catch (Throwable $e) { /* never break boot */ }
 }
 
-function careers_enabled() { careers_migrate(); return function_exists('setting_get') && (string)setting_get('careers_enabled', '0') === '1'; }
+// MILESTONE 5. Two separate questions, in the only safe order.
+//
+//   1. Does this installation HAVE People & hiring?      — licence_enabled('hr')
+//   2. Has this company chosen to publish a careers page? — the setting
+//
+// The public careers page is served from index.php BEFORE the router reaches
+// ops_dispatch(), so ops_module_gate() never sees it — every other hiring route
+// is gated there, this one was not. Asking question 1 here closes that path at
+// the single reader both the public site and the admin screen already use.
+//
+// Nothing changes for a company entitled to hiring: the setting still decides,
+// and the careers page stays opt-in. A company that has not bought hiring simply
+// cannot switch it on, exactly as it cannot open any other hiring screen.
+function careers_enabled() {
+    careers_migrate();
+    if (function_exists('licence_enabled') && !licence_enabled('hr')) return false;
+    return function_exists('setting_get') && (string) setting_get('careers_enabled', '0') === '1';
+}
 function careers_intro()   { return function_exists('setting_get') ? (string)setting_get('careers_intro', '') : ''; }
 
 // Requisitions currently advertised to the public.

@@ -80,10 +80,10 @@
         <a href="/document-evidence?id=<?= (int)$doc['id'] ?>">🖼 Evidence &amp; photos</a>
         <a href="/document-review?id=<?= (int)$doc['id'] ?>">🔍 Document review</a>
         <?php if (!empty($hasSchema)): ?><a href="/document-smart?id=<?= (int)$doc['id'] ?>">💡 Suggested remarks</a><?php endif; ?>
-        <?php if (in_array($doc['status'], ['APPROVED','ISSUED'], true) && $doc['type_code'] !== 'RN' && (is_master() || can('mod.idems.edit'))): ?>
+        <?php if (in_array($doc['status'], ['APPROVED','ISSUED'], true) && $doc['type_code'] !== 'RN' && (can('mod.idems.edit') || is_master_of('idems'))): ?>
           <form method="post" action="/document-release-note"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button type="submit">📋 Draft Release Note</button></form>
         <?php endif; ?>
-        <?php if (!empty($doc['finalized']) && empty($doc['revised_by_id']) && (is_master() || can('mod.idems.edit'))): ?>
+        <?php if (!empty($doc['finalized']) && empty($doc['revised_by_id']) && (can('mod.idems.edit') || is_master_of('idems'))): ?>
           <hr>
           <form method="post" action="/document-revise" onsubmit="return confirm('Create Rev <?= (int)($doc['rev'] ?? 0) + 1 ?> of this report? The original stays on file, unchanged.')"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button type="submit">♻️ Reissue as new revision</button></form>
         <?php endif; ?>
@@ -100,7 +100,7 @@
   // ---- Release Note decision: the inspector marks whether an IRN / Release Note
   // is to be issued for this report. Until ticked, no Release Note can be raised. ----
   $isReleaseType = in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN','IRN'], true);
-  if (!$isReleaseType && (is_master() || can('mod.idems.edit'))):
+  if (!$isReleaseType && (can('mod.idems.edit') || is_master_of('idems'))):
     $rnOn = !empty($doc['rn_to_issue']);
 ?>
 <div class="panel" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid <?= $rnOn ? 'var(--ok)' : 'var(--line,#e5e7eb)' ?>">
