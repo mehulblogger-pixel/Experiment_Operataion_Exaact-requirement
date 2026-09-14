@@ -420,6 +420,13 @@ function books_outbox_rows($status = 'PENDING', $n = 50) {
 
 // ---- Settings screen -----------------------------------------------------
 function ops_books_bridge($route, $method) {
+    // MILESTONE 10. books-bridge / -save / -drain are ungated routes, and
+    // settings.manage is core administration — so a workspace without Money could
+    // configure the accounts connection and DRAIN the bridge by hand. M8 already
+    // gated the nightly books_bridge_drain() on Money; this is the same operation
+    // reached through the screen, and it now agrees.
+    ops_require(!function_exists('licence_module_live') || licence_module_live('invoicing'),
+        'The Money module is not switched on for this installation.');
     ops_require(can('settings.manage') || is_master(), 'Only an administrator can configure the Books connection.');
     booksbridge_migrate();
     if ($route === 'books-bridge-save' && $method === 'POST') {

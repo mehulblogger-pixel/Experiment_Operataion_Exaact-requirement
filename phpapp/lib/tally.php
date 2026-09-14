@@ -85,8 +85,18 @@ function tally_missing_table(Throwable $e) {
 // ---- Who may use it --------------------------------------------------------
 // Same gate as the money desk: this reads the same rows and writes nothing to
 // them. Changing the ledger names is a settings act and is gated harder.
-function tally_can()        { return can('finance.reconcile') || can('data.credit') || is_master(); }
-function tally_can_manage() { return can('finance.reconcile') || can('settings.manage') || is_master(); }
+// MILESTONE 10 — defence in depth, NOT an exploitable defect. The tally routes
+// are mapped to 'invoicing' so the route gate already establishes Money before
+// these are reached (Category B). But the shape is the one that WAS exploitable
+// in books_can(): every term here is an RBAC permission or the bare master flag,
+// so the safety depends entirely on the route map staying correct. Asking the
+// module here makes the guarantee structural instead. No change for a workspace
+// that has Money.
+function tally_money_live() {
+    return !function_exists('licence_module_live') || licence_module_live('invoicing');
+}
+function tally_can()        { return tally_money_live() && (can('finance.reconcile') || can('data.credit') || is_master()); }
+function tally_can_manage() { return tally_money_live() && (can('finance.reconcile') || can('settings.manage') || is_master()); }
 
 // ---- Settings --------------------------------------------------------------
 // The accountant's own ledger names. Defaults are the names Tally ships with,

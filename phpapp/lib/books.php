@@ -74,9 +74,21 @@ const CN_REASONS = [
     'CANCEL'    => 'Invoice withdrawn in full',
 ];
 
-function books_can()        { return can('finance.reconcile') || can('data.credit') || is_master(); }
-function books_can_issue()  { return can('finance.reconcile') || is_master(); }
-function books_can_cancel() { return can('finance.reconcile') || is_master(); }
+// MILESTONE 10. None of finance.reconcile, data.credit or is_master() is a module
+// question, so these three asked nothing commercial. The invoice ROUTES are gated
+// on Money, but books_can() is also what the global search asks before offering an
+// Invoices section — and /search is not gated by anything. A master, or anyone
+// holding finance.reconcile, could read invoice records in a workspace that had
+// not bought Money.
+//
+// Entitlement first, then the person's own permission. Identical to the ar_can()
+// correction in M6, for the identical reason.
+function books_money_live() {
+    return !function_exists('licence_module_live') || licence_module_live('invoicing');
+}
+function books_can()        { return books_money_live() && (can('finance.reconcile') || can('data.credit') || is_master()); }
+function books_can_issue()  { return books_money_live() && (can('finance.reconcile') || is_master()); }
+function books_can_cancel() { return books_money_live() && (can('finance.reconcile') || is_master()); }
 
 function books_missing(Throwable $e) {
     $m = $e->getMessage();

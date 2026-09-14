@@ -138,7 +138,16 @@ function ads_url_safe($base) {
 }
 
 function ads_can_view()   { return can('mod.leads.view') || is_master_of('leads'); }
-function ads_can_manage() { return can('settings.manage') || is_master(); }
+// MILESTONE 10. Ads Pro pulls advertising LEADS into the CRM — Sales & CRM work.
+// M8 gated the nightly sync in cron_ads.php; this is the same operation reached
+// through the screen, on the 'adspro*' routes, which are in neither the gate map
+// nor a paid family. settings.manage is core administration and is_master() is a
+// bare flag, so nothing here asked whether the workspace had bought Sales. The
+// two doors to one operation now agree.
+function ads_can_manage() {
+    if (function_exists('licence_module_live') && !licence_module_live('leads')) return false;
+    return can('settings.manage') || is_master();
+}
 
 // ---- The wire ---------------------------------------------------------------
 // One place that talks to Ads Pro, so timeouts, headers, error shape and logging

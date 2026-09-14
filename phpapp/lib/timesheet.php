@@ -9,8 +9,19 @@
 //  screen and one CSV.
 // ============================================================================
 
+// MILESTONE 10. Timesheets belong to People & hiring or to Operations, and the
+// routes ('timesheets', 'timesheet') are ungated, so the bare master flag and the
+// coordinator level reached them in a workspace holding neither module.
+//
+// Either owning module is enough — that is the shape of the check it replaces.
+function timesheet_modules_live() {
+    if (!function_exists('licence_module_live')) return true;
+    return licence_module_live('hiring') || licence_module_live('jobs');
+}
 function timesheet_can() {
-    return is_master() || (function_exists('is_coordinator_level') && is_coordinator_level())
+    if (!timesheet_modules_live()) return false;
+    return (function_exists('is_master_of') && is_master_of(['hiring', 'jobs']))
+        || (function_exists('is_coordinator_level') && is_coordinator_level())
         || (function_exists('can') && (can('mod.hiring.view') || can('mod.jobs.view')));
 }
 

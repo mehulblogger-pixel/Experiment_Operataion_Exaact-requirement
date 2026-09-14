@@ -9,8 +9,15 @@
 //  rating. Nothing new is stored; it is a read of the existing records.
 // ============================================================================
 
+// MILESTONE 10. The same shape as timesheet_can(), and the same defect: an
+// inspector's profile belongs to People & hiring or to Operations, the
+// 'inspector-profile' route is ungated, and the bare master flag and the
+// coordinator level reached it in a workspace holding neither module.
 function inspector_profile_can() {
-    return is_master() || (function_exists('is_coordinator_level') && is_coordinator_level())
+    if (function_exists('licence_module_live')
+        && !licence_module_live('hiring') && !licence_module_live('jobs')) return false;
+    return (function_exists('is_master_of') && is_master_of(['hiring', 'jobs']))
+        || (function_exists('is_coordinator_level') && is_coordinator_level())
         || (function_exists('can') && (can('mod.hiring.view') || can('mod.jobs.view')));
 }
 

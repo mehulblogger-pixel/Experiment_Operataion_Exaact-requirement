@@ -220,7 +220,13 @@ function search_sources() {
     // Search a contract by number, title or client and open its 360 — the whole
     // thread (quote, POs, calls, jobs, reports, money) on one screen.
     $add('contracts', (function_exists('THP') ? THP('contract') : 'Contracts'), '📄',
-        can('mod.clients.view') || can('crm.contract.register') || can('data.credit') || is_master() || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        // M10 — a bare master flag on an ungated route. A contract is what a won
+        // quotation becomes (Sales), and it is also partner master data (core
+        // administration), so master authority is scoped to those two rather than
+        // withdrawn: is_master_of() grants through whichever the workspace has.
+        can('mod.clients.view') || can('crm.contract.register') || can('data.credit')
+            || (function_exists('is_master_of') && is_master_of(['clients', 'quotes']))
+            || (function_exists('is_coordinator_level') && is_coordinator_level()),
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = search_sbu_clause('pc.sbu');

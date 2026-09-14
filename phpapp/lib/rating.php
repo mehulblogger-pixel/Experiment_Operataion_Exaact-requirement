@@ -27,8 +27,15 @@ function rating_config() {
     ];
 }
 
+// MILESTONE 10. Inspector ratings are derived from jobs — Operations. The route
+// ('ratings', 'ratings-config') is in neither the gate map nor a paid family, so
+// nothing established entitlement before this was asked; the bare master flag and
+// the coordinator level then granted it outright. can('mod.jobs.view') was the
+// only term that asked the licence.
 function rating_can() {
-    return is_master() || (function_exists('is_coordinator_level') && is_coordinator_level())
+    if (function_exists('licence_module_live') && !licence_module_live('jobs')) return false;
+    return (function_exists('is_master_of') && is_master_of('jobs'))
+        || (function_exists('is_coordinator_level') && is_coordinator_level())
         || (function_exists('can') && can('mod.jobs.view'));
 }
 

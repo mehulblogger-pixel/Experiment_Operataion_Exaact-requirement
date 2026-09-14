@@ -138,8 +138,17 @@ function billable_mismatch($tol = 1.0) {
 function billable_mismatch_count($tol = 1.0) { return count(billable_mismatch($tol)); }
 
 // ---- Access (reuses finance rights — no new permission, D1) ----------------
-function billable_can()        { return function_exists('can') && (can('finance.reconcile') || can('data.credit') || is_master()); }
-function billable_can_manage() { return function_exists('can') && (can('finance.reconcile') || is_master()); }
+// MILESTONE 10 — defence in depth, NOT an exploitable defect. 'billable-events'
+// and 'billable-*' are mapped to 'invoicing', and the menu line in areas.php
+// already ANDs can('mod.invoicing.view'), so entitlement is established before
+// these are reached (Category B). Hardened for the same reason as tally_can():
+// every term is RBAC or the bare master flag, so without this the guarantee
+// rests on the route map rather than on the gate itself.
+function billable_money_live() {
+    return !function_exists('licence_module_live') || licence_module_live('invoicing');
+}
+function billable_can()        { return billable_money_live() && function_exists('can') && (can('finance.reconcile') || can('data.credit') || is_master()); }
+function billable_can_manage() { return billable_money_live() && function_exists('can') && (can('finance.reconcile') || is_master()); }
 function billable_actor()      { return function_exists('user_name') ? user_name(current_user()) : 'system'; }
 
 // Office-scope clause (fail-closed, mirrors finevent/lists).
