@@ -24,12 +24,12 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'c2f6f8f · 2026-09-14 12:28 UTC · 651 files';
+$RELEASE = '40f19cc · 2026-09-14 12:47 UTC · 651 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
-    'cron.php' => ['s'=>20028,'h'=>'924b29115abf325a'],
-    'cron_ads.php' => ['s'=>4735,'h'=>'c6e4f8fc0b7a2f2b'],
+    'cron.php' => ['s'=>23081,'h'=>'b2ebb8eff370868e'],
+    'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>114230,'h'=>'279ce22196863b6e'],
     'lib/access.php' => ['s'=>69658,'h'=>'358965b79afc5ca7'],
@@ -57,7 +57,7 @@ $EXPECT  = [
     'lib/callprofit.php' => ['s'=>5760,'h'=>'7f81b6e7a9d7835f'],
     'lib/candpool.php' => ['s'=>9050,'h'=>'0e367f7bb35f314c'],
     'lib/capa.php' => ['s'=>34248,'h'=>'8b68c9bbc8270eeb'],
-    'lib/careers.php' => ['s'=>20852,'h'=>'ebf75641f0d9212e'],
+    'lib/careers.php' => ['s'=>21757,'h'=>'08b6985b83fbcfb6'],
     'lib/chain.php' => ['s'=>27590,'h'=>'38344fcbe18d90b5'],
     'lib/comp_config.php' => ['s'=>7659,'h'=>'27cd15fc2a212675'],
     'lib/company.php' => ['s'=>7536,'h'=>'cf72adf65cfa6d50'],

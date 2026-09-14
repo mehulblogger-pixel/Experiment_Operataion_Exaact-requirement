@@ -83,6 +83,15 @@ if (function_exists('licsync_checkin')) {
     elseif (empty($lr['ok']))   echo "licence: " . $lr['msg'] . "\n";
 }
 
+// MILESTONE 8. This sync pulls advertising leads into the CRM — Sales & CRM
+// work, performed every few minutes with nobody signed in. Over HTTP this file
+// resolves the workspace named in the URL, so a company that has stopped paying
+// for Sales was still having leads created in its pipeline. Asked before the
+// feature switch, because entitlement decides what may be switched on at all.
+if (function_exists('licence_module_live') && !licence_module_live('leads')) {
+    echo "Sales & CRM is not enabled for this workspace — lead sync skipped.\n";
+    exit;
+}
 if (!function_exists('ads_on') || !ads_on()) {
     echo "Ads Pro is not connected — nothing more to do.\n";
     exit;

@@ -40,24 +40,62 @@ if (PHP_SAPI !== 'cli') {
 // Make sure the schema exists (safe if already there).
 try { boot(); } catch (Throwable $e) { echo "Boot error: " . $e->getMessage() . "\n"; exit(1); }
 
-$sent = ops_run_reminders();
+// ============================================================================
+//  MILESTONE 8 — a nightly run does paid-module work, and nobody is signed in
+//
+//  This file is invoked two ways, and they resolve to different places:
+//
+//    php cron.php                        — no HTTP host, so config.php resolves
+//                                          the CONTROL install, which is never
+//                                          limited by an entitlement ceiling
+//    https://<workspace>/cron.php?key=…  — resolves THAT workspace, and every
+//                                          step below then runs against it
+//
+//  The second is the one that matters. A workspace that has stopped paying for
+//  People & hiring was still having its recruitment approvals ticked and its
+//  placement-fee guarantees flipped every night; one without Sales & CRM still
+//  had its quotations expired and its follow-ups e-mailed. Nobody was signed in,
+//  so nothing asked.
+//
+//  Gated PER STEP, deliberately, and never with a single exit at the top of the
+//  file: this run also does core maintenance — audit trimming, licence sync,
+//  integrity checks, identity encryption — and an HR licence lapsing must not
+//  stop a company's Operations reminders going out.
+//
+//  There is no such thing as cron = master. A background process asks the same
+//  question a signed-in user does, through the same engine.
+$m8_live = function ($accessModule) {
+    return !function_exists('licence_module_live') || licence_module_live($accessModule);
+};
+$m8_skip = [];
+$m8 = function ($accessModule, $label) use ($m8_live, &$m8_skip) {
+    if ($m8_live($accessModule)) return true;
+    $m8_skip[$label] = true;
+    return false;
+};
+
+$sent = $m8('jobs', 'Operations') ? ops_run_reminders() : 0;
 // Contracts running out of time — one warning per contract per end date.
-$expiring = function_exists('contracts_expiry_reminders') ? contracts_expiry_reminders() : 0;
+// A contract is what a won quotation becomes, so these three are Sales & CRM.
+$m8sales = $m8('quotes', 'Sales & CRM');
+$expiring = ($m8sales && function_exists('contracts_expiry_reminders')) ? contracts_expiry_reminders() : 0;
 // A heads-up a couple of weeks before that close, so it never comes as a surprise.
-$idleWarned = function_exists('contracts_idle_warn') ? contracts_idle_warn() : 0;
+$idleWarned = ($m8sales && function_exists('contracts_idle_warn')) ? contracts_idle_warn() : 0;
 // A contract with no activity for two months is closed automatically; anything
 // still pending at close is flagged to the owner, branch manager and accounts.
-$idleClosed = function_exists('contracts_idle_autoclose') ? contracts_idle_autoclose() : 0;
+$idleClosed = ($m8sales && function_exists('contracts_idle_autoclose')) ? contracts_idle_autoclose() : 0;
 echo "Reminders processed. Emails queued/sent: $sent. Contracts expiring: $expiring. Idle warnings: $idleWarned. Contracts auto-closed: $idleClosed\n";
 
 // Flip recruitment placement fees from provisional to confirmed once the
 // agency's free-replacement guarantee window has passed.
-confirm_lapsed_placement_fees();
-echo "Placement-fee guarantees checked.\n";
+if ($m8('hiring', 'People & hiring')) {
+    confirm_lapsed_placement_fees();
+    echo "Placement-fee guarantees checked.\n";
+}
 
 // Jobs that ran out of time: lock them, and tell the engineer, the coordinator,
 // the branch manager and the administrators — once each, not every morning.
-if (function_exists('joblock_sweep')) {
+if ($m8('jobs', 'Operations') && function_exists('joblock_sweep')) {
     $lk = joblock_sweep();
     echo "Jobs locked for late closure: {$lk['locked']} (alerts sent: {$lk['alerted']})\n";
 }
@@ -65,19 +103,19 @@ if (function_exists('joblock_sweep')) {
 // Send any due quotation follow-up e-mails (3/6/9-day, fortnight, month).
 // ISO/IEC 17020 §6.2 — an instrument that falls out of calibration silently is
 // the whole problem. The same 30-day window as the personnel certificates.
-if (function_exists('equipment_run_cal_reminders')) {
+if ($m8('equipment', 'Operations') && function_exists('equipment_run_cal_reminders')) {
     $cal = equipment_run_cal_reminders();
     echo "Calibration reminders sent: $cal\n";
 }
 
 // §6.1 — an authorisation that has run out, or one resting on a certificate
 // that has lapsed, must stop being live without anybody having to notice.
-if (function_exists('auth_run_maintenance')) {
+if ($m8('competence', 'Operations') && function_exists('auth_run_maintenance')) {
     $am = auth_run_maintenance();
     echo "Authorisations expired: {$am['expired']}, suspended: {$am['suspended']}\n";
 }
 
-if (function_exists('crm_run_followups')) {
+if ($m8('quotes', 'Sales & CRM') && function_exists('crm_run_followups')) {
     $fu = crm_run_followups();
     echo "Quote follow-ups sent: $fu\n";
 }
@@ -85,33 +123,33 @@ if (function_exists('crm_run_followups')) {
 // §14 — a quotation past its validity is no longer a live offer. Turn "past
 // validity" into the EXPIRED status the lifecycle already knows, so a sent quote
 // stops counting as live pipeline once its clock has run out.
-if (function_exists('crm_expire_quotes')) {
+if ($m8('quotes', 'Sales & CRM') && function_exists('crm_expire_quotes')) {
     $exq = crm_expire_quotes();
     echo "Quotations expired: $exq\n";
 }
 
 // Module 09 — chase overdue invoices. Ageing was view-only; this follows up the
 // money, marking each so a daily run does not re-nag the same invoice.
-if (function_exists('ar_overdue_reminders')) {
+if ($m8('invoicing', 'Money') && function_exists('ar_overdue_reminders')) {
     $od = ar_overdue_reminders();
     echo "Overdue invoices chased: $od\n";
 }
 
 // IDEMS — escalate report approvals that have blown their SLA.
-if (function_exists('idems_run_sla_escalations')) {
+if ($m8('idems', 'Inspection reporting') && function_exists('idems_run_sla_escalations')) {
     $esc = idems_run_sla_escalations();
     echo "IDEMS approval SLA escalations: $esc\n";
 }
 
 // TOSRM Phase 9 — generate any calls that recurring schedules have made due.
-if (function_exists('tosrm_run_recurring')) {
+if ($m8('calls', 'Operations') && function_exists('tosrm_run_recurring')) {
     $gen = tosrm_run_recurring();
     if ($gen > 0) echo "TOSRM recurring: $gen call(s) generated.\n";
 }
 
 // Revamp P4 — keep the billable-event ledger fresh: backstop-derive any closed
 // work not yet queued, and reconcile events whose job has since been invoiced.
-if (function_exists('billable_events_sync')) {
+if ($m8('invoicing', 'Money') && function_exists('billable_events_sync')) {
     $be = billable_events_sync();
     if (($be['created'] ?? 0) + ($be['billed'] ?? 0) > 0)
         echo "Billable events: {$be['created']} derived, {$be['billed']} reconciled.\n";
@@ -127,7 +165,7 @@ if (function_exists('engagement_backfill')) {
 
 // Automated MIS digest to leadership — weekly on Monday, monthly on the 1st.
 // A per-day guard prevents duplicates if cron runs more than once a day.
-if (function_exists('ops_run_mis_digest')) {
+if ($m8('jobs', 'Operations') && function_exists('ops_run_mis_digest')) {
     $today = date('Y-m-d');
     if ((int)date('j') === 1 && setting_get('mis_last_monthly', '') !== $today) {
         ops_run_mis_digest('monthly'); setting_set('mis_last_monthly', $today);
@@ -141,14 +179,14 @@ if (function_exists('ops_run_mis_digest')) {
 // Nonconformities past their date — chase the owner. Runs alongside the
 // corrective-action and complaint chases so the registers actually reach the
 // person who has to act, rather than waiting to be visited.
-if (function_exists('ncr_run_reminders')) {
+if ($m8('ncr', 'Operations') && function_exists('ncr_run_reminders')) {
     $n = ncr_run_reminders();
     echo "Nonconformity chases sent: $n\n";
 }
 // Individual corrective-action tasks past their date. Separate from the
 // corrective action's own chase: the task has its own owner, and that is the
 // person who can actually move it.
-if (function_exists('capa_actions_overdue') && function_exists('ops_mail')) {
+if ($m8('capa', 'Operations') && function_exists('capa_actions_overdue') && function_exists('ops_mail')) {
     $n = 0;
     foreach (capa_actions_overdue() as $a) {
         $to = trim((string)$a['owner']);
@@ -162,17 +200,17 @@ if (function_exists('capa_actions_overdue') && function_exists('ops_mail')) {
     }
     echo "Corrective-action task chases sent: $n\n";
 }
-if (function_exists('capa_run_reminders')) {
+if ($m8('capa', 'Operations') && function_exists('capa_run_reminders')) {
     $n = capa_run_reminders();
     echo "Corrective-action chases sent: $n\n";
 }
-if (function_exists('cmp_run_reminders')) {
+if ($m8('complaints', 'Operations') && function_exists('cmp_run_reminders')) {
     $n = cmp_run_reminders();
     echo "Complaint chases sent: $n\n";
 }
 // Vendor qualification lifecycle — expire lapsed approvals and remind on
 // re-assessments falling due.
-if (function_exists('idems_vendor_run_reminders')) {
+if ($m8('idems', 'Inspection reporting') && function_exists('idems_vendor_run_reminders')) {
     $vr = idems_vendor_run_reminders();
     echo "Vendor approvals expired: {$vr['expired']}; re-assessment reminders sent: {$vr['reminded']}\n";
 }
@@ -186,7 +224,7 @@ if (function_exists('tapi_alerts_run')) {
 // Passports, visas, medicals and gate passes running out. Looked at 45 days
 // ahead rather than 30, because a visa takes weeks to renew and a document that
 // expires the week of the inspection is a wasted trip.
-if (function_exists('sitedoc_expiring') && function_exists('ops_mail')) {
+if ($m8('identity', 'Operations') && function_exists('sitedoc_expiring') && function_exists('ops_mail')) {
     $n = 0;
     foreach (sitedoc_expiring(45) as $d) {
         $to = trim((string)($d['email'] ?? ''));
@@ -204,7 +242,7 @@ if (function_exists('sitedoc_expiring') && function_exists('ops_mail')) {
 // Competence that has fallen out of date: authorisations expired, reviews come
 // round, witnessing due. Sent to the reporting manager rather than the person
 // themselves, because none of these are theirs to fix.
-if (function_exists('competence_due') && function_exists('ops_mail')) {
+if ($m8('competence', 'Operations') && function_exists('competence_due') && function_exists('ops_mail')) {
     $d = competence_due();
     $n = count($d['expired']) + count($d['review']) + count($d['witness']);
     if ($n) {
@@ -250,7 +288,7 @@ if (function_exists('licsync_checkin')) {
 //  Harmless if cron_ads.php is already running: every push is guarded by a
 //  payload hash and every pull is matched on the Ads Pro record id, so a second
 //  run finds nothing to do.
-if (function_exists('ads_on') && ads_on() && function_exists('ads_sync_now')) {
+if ($m8('leads', 'Sales & CRM') && function_exists('ads_on') && ads_on() && function_exists('ads_sync_now')) {
     $r = ads_sync_now();
     $out = $r['push'] ?? []; $in = $r['pull'] ?? [];
     echo "Ads Pro out: " . (!empty($out['err']) ? 'FAILED — ' . $out['err'] : ($out['msg'] ?? 'nothing waiting')) . "\n";
@@ -264,7 +302,7 @@ if (function_exists('ads_on') && ads_on() && function_exists('ads_sync_now')) {
 
 // ---------------------------------------------------------------------------
 //  MGH Books: drain the outbox (ERP -> Books). A no-op unless connected.
-if (function_exists('books_bridge_drain') && function_exists('books_connected') && books_connected()) {
+if ($m8('invoicing', 'Money') && function_exists('books_bridge_drain') && function_exists('books_connected') && books_connected()) {
     $bx = books_bridge_drain();
     echo "MGH Books queue: {$bx['sent']} sent, {$bx['failed']} failed\n";
     if (function_exists('books_bridge_pull_status')) {
@@ -314,7 +352,7 @@ if ((function_exists('audits_run_reminders') || function_exists('reviews_run_rem
 // Module 41 — chase a controlled document past its review date, at most weekly
 // (a year-scale review cycle needs no daily nudge). §8.3 was the one accreditation
 // register whose review-due signal was computed but never dispatched.
-if (function_exists('cdoc_run_reminders') && (string)setting_get('cdoc_reminder_week', '') !== date('o-W')) {
+if ($m8('datacontrol', 'Operations') && function_exists('cdoc_run_reminders') && (string)setting_get('cdoc_reminder_week', '') !== date('o-W')) {
     try {
         $cd = cdoc_run_reminders();
         setting_set('cdoc_reminder_week', date('o-W'));
@@ -357,7 +395,7 @@ if (function_exists('integrity_run') && (string)setting_get('integrity_run_day',
 // Phase 2 §11 — re-seal any issued report whose content seal failed to write at
 // issue (transient DB hiccup). Issued content is immutable, so the re-seal hash
 // equals what it would have been at issue. Self-healing; no-op when none pending.
-if (function_exists('idems_reseal_failed')) {
+if ($m8('idems', 'Inspection reporting') && function_exists('idems_reseal_failed')) {
     try { $rs = idems_reseal_failed(); if ($rs) echo "Report seals repaired: $rs\n"; }
     catch (Throwable $e) { echo "Seal repair: failed — " . $e->getMessage() . "\n"; }
 }
@@ -365,7 +403,7 @@ if (function_exists('idems_reseal_failed')) {
 // Phase 2 §30 — freeze the cost basis of any closed job that has none yet (a close
 // path that did not snapshot, or a pre-feature job). Uses the CURRENT live value, so
 // today's displayed profit is unchanged and future drift stops. Bounded per run.
-if (function_exists('jobs_backfill_cost_basis')) {
+if ($m8('jobs', 'Operations') && function_exists('jobs_backfill_cost_basis')) {
     try { $bf = jobs_backfill_cost_basis(); if ($bf) echo "Job cost bases frozen: $bf\n"; }
     catch (Throwable $e) { echo "Cost-basis backfill: failed — " . $e->getMessage() . "\n"; }
 }
@@ -380,7 +418,14 @@ if (function_exists('iddoc_encrypt_backfill')) {
 // Phase 6 — recruitment approvals: remind approvers whose action is due and
 // escalate any step that has passed its SLA. Emails go through ops_mail(). No-op
 // when nothing is pending.
-if (function_exists('appr_tick')) {
+if ($m8('hiring', 'People & hiring') && function_exists('appr_tick')) {
     try { $ap = appr_tick(); if ($ap) echo "Approval reminders/escalations sent: $ap\n"; }
     catch (Throwable $e) { echo "Approval tick: failed — " . $e->getMessage() . "\n"; }
+}
+
+// What this workspace is not subscribed to, named once rather than silently
+// missing. The operator reads this output; it says which product is not enabled
+// and nothing about how that is decided.
+if ($m8_skip) {
+    echo "\nSkipped — not enabled for this workspace: " . implode(', ', array_keys($m8_skip)) . "\n";
 }

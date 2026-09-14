@@ -77,7 +77,20 @@ function careers_job_location($j) {
 // ---- Intake ----------------------------------------------------------------
 // Create a candidate from a public application. Returns [ok, message, candId].
 // Runs in a public (unauthenticated) context — no current_user().
+// MILESTONE 8. careers_route() already refuses when the module is absent, and it
+// is the only caller today — but this is the function that CREATES a candidate,
+// uploads a CV and writes into the recruitment pipeline. Asking here as well
+// makes the guarantee structural rather than positional: no future route,
+// callback or job can reach the paid operation by reaching the function.
+//
+// Scoped to the ENTITLEMENT question only. The company's own opt-in switch is
+// already enforced at careers_route(), the only caller, and an opt-in is a
+// feature choice rather than a security boundary — so requiring it here as well
+// would change what the intake does for a fully entitled company, which is not
+// what this milestone is for.
 function careers_apply($job, $post, $files) {
+    if (function_exists('licence_module_live') && !licence_module_live('hiring'))
+        return [false, 'This careers page is not accepting applications.', 0];
     careers_migrate();
     // Honeypot: a bot fills the hidden "website" field. Accept silently, create nothing.
     if (trim((string)($post['website'] ?? '')) !== '') return [true, 'thanks', 0];
