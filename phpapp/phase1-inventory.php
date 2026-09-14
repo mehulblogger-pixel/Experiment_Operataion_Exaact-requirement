@@ -163,11 +163,41 @@ function p1_run_inventory(PDO $ctl, $engine) {
     return $report;
 }
 
+// ---- Step 2A: storage resolution probe (read-only) ------------------------
+function p1_run_probe(PDO $ctl, $appDir) {
+    $probe = ['generated_at' => date('c'), 'app_dir' => $appDir, 'registry_present' => false,
+              'dirs' => [], 'tenants' => []];
+
+    $registry = [];
+    $regFile = $appDir . '/tenants.php';
+    if (is_file($regFile)) {
+        $probe['registry_present'] = true;
+        $r = @require $regFile;
+        if (is_array($r) && is_array($r['tenants'] ?? null)) $registry = $r['tenants'];
+    }
+    foreach (p1_candidate_dirs($appDir) as $label => $dir)
+        $probe['dirs'][$label] = ['path' => $dir] + p1_scan_sqlite($dir);
+
+    try {
+        foreach (p1_ro_query($ctl, "SELECT tenant_key, route_json FROM saas_tenants ORDER BY tenant_key")->fetchAll() as $t) {
+            $k = (string) ($t['tenant_key'] ?? '');
+            $probe['tenants'][] = p1_probe_tenant($k, (string) ($t['route_json'] ?? ''), $registry[$k] ?? null, $appDir);
+        }
+    } catch (Throwable $e) { $probe['error'] = $e->getMessage(); }
+    return $probe;
+}
+
 // ---- Command line: unchanged behaviour ------------------------------------
 if ($IS_CLI) {
     if (!$ctl) { fwrite(STDERR, "Could not open the control database: $ctlError\n"); exit(1); }
+    $json = in_array('--json', $argv ?? [], true);
+    if (in_array('--probe', $argv ?? [], true)) {
+        $probe = p1_run_probe($ctl, __DIR__);
+        echo $json ? json_encode($probe, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n" : p1_render_storage_text($probe);
+        exit(0);
+    }
     $report = p1_run_inventory($ctl, $CONTROL_ENGINE);
-    echo in_array('--json', $argv ?? [], true)
+    echo $json
         ? json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n"
         : p1_render_text($report);
     exit(0);
@@ -186,11 +216,15 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 // is not modified. It stops another site from triggering a run in your browser.
 $TOKEN = hash('sha256', session_id() . '|phase1-inventory');
 $RAN   = ($_SERVER['REQUEST_METHOD'] === 'POST') && hash_equals($TOKEN, (string) ($_POST['t'] ?? ''));
+$MODE  = (string) ($_POST['mode'] ?? 'inventory');
 
-$report = null; $runError = '';
+$report = null; $probe = null; $runError = '';
 if ($RAN) {
     if (!$ctl) $runError = 'Could not open the control database: ' . $ctlError;
-    else { try { $report = p1_run_inventory($ctl, $CONTROL_ENGINE); } catch (Throwable $e) { $runError = $e->getMessage(); } }
+    else try {
+        if ($MODE === 'probe') $probe = p1_run_probe($ctl, __DIR__);
+        else                   $report = p1_run_inventory($ctl, $CONTROL_ENGINE);
+    } catch (Throwable $e) { $runError = $e->getMessage(); }
 }
 
 $h  = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
@@ -248,14 +282,52 @@ $who = $AUTH_USER ? ('signed in as ' . $AUTH_USER['username']) : 'authorised by 
     <?php if ($ctlError): ?><div class="err">Could not open the control database: <?= $h($ctlError) ?></div><?php endif; ?>
     <form method="post">
       <input type="hidden" name="t" value="<?= $h($TOKEN) ?>">
+      <input type="hidden" name="mode" value="inventory">
       <?php if ($KEY_OK && !$AUTH_USER): ?><input type="hidden" name="key" value="<?= $h($_GET['key'] ?? $_POST['key'] ?? '') ?>"><?php endif; ?>
       <button class="btn" type="submit">Run Phase-1 Entitlement Inventory</button>
     </form>
     <p style="margin-top:14px;font-size:13.5px">Takes a few seconds. Nothing is saved on the server —
       you download the result from this page.</p>
+    <hr style="border:none;border-top:1px solid var(--line);margin:20px 0">
+    <h2 style="margin-bottom:8px">Step 2A — storage check</h2>
+    <p style="font-size:14.5px">Use this if a workspace was reported as <strong>unreadable</strong>. It shows where each
+      workspace's data file is supposed to be, and where it actually is on disk. It opens nothing.</p>
+    <form method="post">
+      <input type="hidden" name="t" value="<?= $h($TOKEN) ?>">
+      <input type="hidden" name="mode" value="probe">
+      <?php if ($KEY_OK && !$AUTH_USER): ?><input type="hidden" name="key" value="<?= $h($_GET['key'] ?? $_POST['key'] ?? '') ?>"><?php endif; ?>
+      <button class="btn sec" type="submit">Run Step-2A storage diagnostic</button>
+    </form>
   <?php elseif ($runError): ?>
     <div class="err"><strong>The inventory could not run.</strong><br><?= $h($runError) ?></div>
     <div class="row"><a class="btn sec" href="phase1-inventory.php">Back</a></div>
+  <?php elseif ($probe !== null):
+      $txt = p1_render_storage_text($probe);
+      $jsn = json_encode($probe, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  ?>
+    <div class="note"><strong>Storage diagnostic complete.</strong> Press <em>Download JSON</em> and send that file.
+      Nothing was opened, created or written.</div>
+    <div class="row">
+      <button class="btn" type="button" id="dl-json">Download JSON</button>
+      <button class="btn sec" type="button" id="dl-txt">Download report</button>
+      <button class="btn sec" type="button" id="cp">Copy report</button>
+      <a class="btn sec" href="phase1-inventory.php">Back</a>
+    </div>
+  </div>
+  <div class="card"><h2>Storage report</h2><pre id="rep"><?= $h($txt) ?></pre></div>
+  <script id="p1json" type="application/json"><?= str_replace(['<', '>', '&'], ['\u003c', '\u003e', '\u0026'], $jsn) ?></script>
+  <script>
+  (function(){
+    var stamp=new Date().toISOString().slice(0,10);
+    function save(n,x,m){var b=new Blob([x],{type:m}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);}
+    var json=document.getElementById('p1json').textContent, txt=document.getElementById('rep').textContent;
+    document.getElementById('dl-json').onclick=function(){save('exaact-phase1-storage-'+stamp+'.json',json,'application/json');};
+    document.getElementById('dl-txt').onclick=function(){save('exaact-phase1-storage-'+stamp+'.txt',txt,'text/plain');};
+    document.getElementById('cp').onclick=function(){var b=this;var d=function(){b.textContent='Copied';setTimeout(function(){b.textContent='Copy report';},1800);};
+      if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(txt).then(d,f);}else f();
+      function f(){var ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');d();}catch(e){b.textContent='Press Ctrl/Cmd-C';}ta.remove();}};
+  })();
+  </script>
   <?php else:
       $s = $report['summary'];
       $txt = p1_render_text($report);

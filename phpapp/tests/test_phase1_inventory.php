@@ -113,3 +113,58 @@ $txt = p1_render_text(['generated_at' => 'now', 'tenants' => [$rowBlank, $rowAmb
 t_ok(strpos($txt, 'no data was written') !== false, 'the report states that nothing was written');
 t_ok(strpos($txt, 'DO NOT FLIP') !== false, 'the report warns against flipping while ambiguity remains');
 t_ok(strpos($txt, 'WOULD LOSE') !== false, 'the report shows what each workspace would lose');
+
+// ---- 9. Step 2A — storage resolution probe --------------------------------
+t_section('Phase 1 Step 2A — storage resolution probe');
+
+$dirs = p1_candidate_dirs('/srv/public_html');
+t_eq($dirs['above web root (exaact_data)'], '/srv/exaact_data', 'probes the above-web-root location first');
+t_eq($dirs['app folder root (legacy)'], '/srv/public_html', 'probes the legacy app-folder location');
+
+t_eq(p1_route_path(json_encode(['sqlite' => '/x/tenant-a.sqlite']))['kind'], 'sqlite', 'reads a file route');
+$mp = p1_route_path(json_encode(['host' => 'h', 'name' => 'db1', 'user' => 'u', 'pass' => 'SECRET']));
+t_eq($mp['kind'], 'mysql', 'reads a MySQL route');
+t_ok(strpos($mp['label'], 'SECRET') === false, 'the probe never exposes the password');
+t_eq(p1_route_path('')['kind'], 'none', 'an empty route reads as none');
+
+// A workspace whose file is really ABOVE the web root while the route points at
+// the app folder — the exact case that produced the live ERROR.
+$tmp = sys_get_temp_dir() . '/p1probe_' . bin2hex(random_bytes(4));
+@mkdir($tmp . '/public_html', 0777, true); @mkdir($tmp . '/exaact_data', 0777, true);
+file_put_contents($tmp . '/exaact_data/tenant-moved.sqlite', 'x');
+$pr = p1_probe_tenant('moved', json_encode(['sqlite' => $tmp . '/public_html/tenant-moved.sqlite']), null, $tmp . '/public_html');
+t_ok($pr['control_exists'] === false, 'the routed path is correctly reported as missing');
+t_ok(count($pr['found_elsewhere']) === 1, 'the probe finds the file in another location');
+t_eq($pr['found_elsewhere'][0]['where'], 'above web root (exaact_data)', 'and names that location as above the web root');
+t_ok($pr['sources_agree'] === null, 'no routing-file entry means "not applicable", not a false conflict');
+t_ok(!is_file($tmp . '/public_html/tenant-moved.sqlite'), 'the probe did NOT create the missing file');
+@unlink($tmp . '/exaact_data/tenant-moved.sqlite'); @rmdir($tmp . '/exaact_data'); @rmdir($tmp . '/public_html'); @rmdir($tmp);
+
+// A genuine conflict between the two routing sources must be reported.
+$conf = p1_probe_tenant('c', json_encode(['sqlite' => '/a/t.sqlite']), ['sqlite' => '/b/t.sqlite'], '/app');
+t_ok($conf['sources_agree'] === false, 'a real disagreement between control DB and routing file is flagged');
+
+// ---- 10. Marketplace: purchased vs merely ON by default -------------------
+t_section('Marketplace interpretation');
+$ctrlNoMk = ['tenant_key' => 't', 'company' => 'T', 'status' => 'active', 'plan' => 'RECRUITMENT',
+             'enabled_modules' => '["admin","hr"]'];
+$defaultOn = p1_build_row($ctrlNoMk, ['saas_entitled_modules' => 'hr', 'modules_off' => '',
+                                      'marketplace_addon' => '', 'connect_enabled' => ''], 'x');
+t_ok($defaultOn['marketplace_currently_on'], 'with the setting untouched Marketplace is reachable (cloud default)');
+t_ok(!$defaultOn['marketplace_purchased'], 'but it is NOT in the purchased record');
+t_ok($defaultOn['marketplace_default_only'], 'and is classified as default-only');
+t_ok(!$defaultOn['marketplace_needs_backfill'], 'so it must NOT be backfilled — a default is not a purchase');
+t_ok(strpos($defaultOn['marketplace_note'], 'NOT purchased') !== false, 'the note says plainly it was not purchased');
+
+$bought = p1_build_row(['tenant_key' => 't', 'company' => 'T', 'status' => 'active', 'plan' => 'PRO',
+                        'enabled_modules' => '["admin","hr","marketplace"]'],
+                       ['saas_entitled_modules' => 'hr', 'modules_off' => ''], 'x');
+t_ok($bought['marketplace_purchased'] && $bought['marketplace_needs_backfill'], 'a purchased Marketplace IS preserved');
+
+$explicit = p1_build_row($ctrlNoMk, ['saas_entitled_modules' => 'hr', 'modules_off' => '',
+                                     'marketplace_addon' => '1'], 'x');
+t_ok($explicit['marketplace_needs_backfill'], 'an explicitly switched-on Marketplace is flagged for a commercial decision');
+
+$off = p1_build_row($ctrlNoMk, ['saas_entitled_modules' => 'hr', 'modules_off' => '',
+                                'marketplace_addon' => '0'], 'x');
+t_ok(!$off['marketplace_currently_on'] && !$off['marketplace_needs_backfill'], 'an explicitly disabled Marketplace stays off');

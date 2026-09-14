@@ -205,13 +205,36 @@ function p1_build_row(array $control, array $settings, $routeLabel, $error = '')
     ];
     $row += p1_classify($row);
 
-    // Marketplace is NOT in PRODUCT_MODULES, so the ceiling does not govern it
-    // today. Record whether it is live, because promoting it to a real module
-    // would switch it OFF unless it is backfilled first.
-    $mkOn = $row['marketplace_addon'] === '' ? '(default)' : ($row['marketplace_addon'] === '1' ? 'ON' : 'off');
-    $cxOn = $row['connect_enabled']  === '' ? '(default ON)' : ($row['connect_enabled'] === '1' ? 'ON' : 'off');
-    $row['marketplace_state'] = 'addon=' . $mkOn . ' connect=' . $cxOn;
-    $row['marketplace_needs_backfill'] = ($row['marketplace_addon'] !== '0' && $row['connect_enabled'] !== '0');
+    // Marketplace is NOT in PRODUCT_MODULES, so the entitlement ceiling does not
+    // govern it today. Three DIFFERENT things must be kept apart here, because
+    // conflating them would manufacture an entitlement nobody bought:
+    //   purchased      — Marketplace appears in the control record of what was bought
+    //   explicitly on  — an administrator deliberately set marketplace_addon = '1'
+    //   on by default  — the setting was never touched; cloud installs default to ON
+    // Only the first two justify preserving access when Marketplace becomes a
+    // real module. "On by default" is an artefact of the default, NOT a purchase.
+    $mkRaw = $row['marketplace_addon'];
+    $cxRaw = $row['connect_enabled'];
+    $purchased   = in_array('marketplace', array_map('strtolower', $ctrlMods), true);
+    $explicitOn  = ($mkRaw === '1');
+    $explicitOff = ($mkRaw === '0' || $cxRaw === '0');
+    $row['marketplace_purchased']    = $purchased;
+    $row['marketplace_explicit_on']  = $explicitOn;
+    $row['marketplace_currently_on'] = !$explicitOff;          // default is ON on cloud
+    $row['marketplace_default_only'] = (!$purchased && !$explicitOn && !$explicitOff);
+
+    $mkOn = $mkRaw === '' ? 'never set (default)' : ($mkRaw === '1' ? 'explicitly ON' : 'explicitly off');
+    $cxOn = $cxRaw === '' ? 'never set (default ON)' : ($cxRaw === '1' ? 'ON' : 'off');
+    $row['marketplace_state'] = 'addon=' . $mkOn . ' · connect=' . $cxOn
+        . ' · purchased=' . ($purchased ? 'YES' : 'NO');
+
+    // Backfill ONLY what was bought or deliberately switched on.
+    $row['marketplace_needs_backfill'] = ($purchased || $explicitOn);
+    $row['marketplace_note'] = $purchased
+        ? 'Marketplace is in the control record of purchased modules — preserve it when Marketplace becomes a module.'
+        : ($explicitOn
+            ? 'Not in the purchased record, but an administrator explicitly switched it ON — confirm commercially before removing.'
+            : 'Reachable only because cloud installs default to ON. NOT purchased and NOT configured — promoting Marketplace to a real module would correctly lock it. No backfill.');
     return $row;
 }
 
@@ -271,3 +294,130 @@ function p1_render_text(array $report) {
     $L[] = 'END OF REPORT — nothing was written to any database.';
     return implode("\n", $L) . "\n";
 }
+
+// ============================================================================
+//  STEP 2A — STORAGE RESOLUTION PROBE  (read-only)
+//
+//  The inventory reported a workspace whose data file could not be found. This
+//  probe answers the only question that matters: is the file MISSING, or is it
+//  simply somewhere other than where the routing says?
+//
+//  It matters because the APPLICATION and this TOOL read routing from different
+//  places. config.php resolves a workspace ONLY from tenants.php (the routing
+//  file). This tool prefers saas_tenants.route_json in the control database and
+//  falls back to the routing file. If the two ever disagree, the application and
+//  the tool would open different databases.
+//
+//  Lists filenames and sizes only. Opens nothing, creates nothing, writes nothing.
+// ============================================================================
+
+// The places a workspace data file could legitimately live, newest convention first.
+function p1_candidate_dirs($appDir) {
+    $appDir = rtrim((string) $appDir, '/');
+    return [
+        'above web root (exaact_data)' => dirname($appDir) . '/exaact_data',
+        'app folder /data'             => $appDir . '/data',
+        'app folder root (legacy)'     => $appDir,
+    ];
+}
+
+// Filenames + sizes of workspace data files in a directory. Never opens them.
+function p1_scan_sqlite($dir) {
+    $out = ['exists' => is_dir($dir), 'readable' => is_dir($dir) && is_readable($dir), 'files' => []];
+    if (!$out['readable']) return $out;
+    foreach (glob(rtrim($dir, '/') . '/tenant-*.sqlite') ?: [] as $f)
+        $out['files'][] = ['name' => basename($f), 'bytes' => (int) @filesize($f)];
+    return $out;
+}
+
+// Extract just the storage path from a routing value, with credentials stripped.
+function p1_route_path($route) {
+    $r = is_string($route) ? json_decode($route, true) : $route;
+    if (!is_array($r)) return ['kind' => 'none', 'path' => '', 'label' => '(nothing recorded)'];
+    if (!empty($r['sqlite'])) return ['kind' => 'sqlite', 'path' => (string) $r['sqlite'], 'label' => (string) $r['sqlite']];
+    if (!empty($r['db']) && is_array($r['db'])) $r = $r['db'];
+    if (!empty($r['name']))
+        return ['kind' => 'mysql', 'path' => '',
+                'label' => 'mysql: ' . $r['name'] . ' @ ' . (string) ($r['host'] ?? 'localhost')];
+    return ['kind' => 'none', 'path' => '', 'label' => '(nothing recorded)'];
+}
+
+// Compare the two routing sources for one workspace and locate the real file.
+function p1_probe_tenant($key, $routeJson, $registryEntry, $appDir) {
+    $ctl = p1_route_path($routeJson);
+    $regRoute = null;
+    if (is_array($registryEntry)) {
+        if (!empty($registryEntry['sqlite'])) $regRoute = ['sqlite' => $registryEntry['sqlite']];
+        elseif (!empty($registryEntry['db']))  $regRoute = $registryEntry['db'];
+    }
+    $reg = p1_route_path($regRoute);
+
+    $row = [
+        'tenant'          => (string) $key,
+        'control_route'   => $ctl['label'],
+        'registry_route'  => $reg['label'],
+        // null = the routing file records nothing for this workspace, so there is
+        // nothing to disagree WITH. Only a real, populated difference is a conflict.
+        'sources_agree'   => ($reg['kind'] === 'none' || $ctl['kind'] === 'none')
+                              ? null : ($ctl['label'] === $reg['label']),
+        'registry_has_entry' => ($reg['kind'] !== 'none'),
+        'app_would_use'   => $reg['label'],     // config.php reads tenants.php ONLY
+        'tool_used'       => ($ctl['kind'] !== 'none' ? $ctl['label'] : $reg['label']),
+        'control_exists'  => ($ctl['kind'] === 'sqlite') ? is_file($ctl['path']) : null,
+        'registry_exists' => ($reg['kind'] === 'sqlite') ? is_file($reg['path']) : null,
+        'found_elsewhere' => [],
+    ];
+    // Look for a file bearing this workspace's name in every candidate location.
+    $want = 'tenant-' . preg_replace('/[^a-zA-Z0-9_\-]/', '_', strtolower((string) $key)) . '.sqlite';
+    foreach (p1_candidate_dirs($appDir) as $label => $dir) {
+        $f = rtrim($dir, '/') . '/' . $want;
+        if (is_file($f)) $row['found_elsewhere'][] = ['where' => $label, 'path' => $f, 'bytes' => (int) @filesize($f)];
+    }
+    return $row;
+}
+
+function p1_render_storage_text(array $probe) {
+    $L = [];
+    $L[] = 'EXAACT — PHASE 1 STEP 2A · STORAGE RESOLUTION PROBE';
+    $L[] = 'Generated: ' . $probe['generated_at'] . '   (read-only; nothing opened, created or written)';
+    $L[] = str_repeat('=', 78);
+    $L[] = 'App folder: ' . $probe['app_dir'];
+    $L[] = 'Routing file (tenants.php) present: ' . ($probe['registry_present'] ? 'yes' : 'NO');
+    $L[] = '';
+    $L[] = 'WORKSPACE DATA FILES FOUND ON DISK';
+    foreach ($probe['dirs'] as $label => $d) {
+        $L[] = '  ' . $label;
+        $L[] = '    path     : ' . $d['path'];
+        $L[] = '    exists   : ' . ($d['exists'] ? 'yes' : 'no') . ($d['exists'] && !$d['readable'] ? ' (NOT READABLE)' : '');
+        if ($d['files']) foreach ($d['files'] as $f)
+            $L[] = '    file     : ' . $f['name'] . '  (' . number_format($f['bytes']) . ' bytes)';
+        elseif ($d['readable']) $L[] = '    file     : (none)';
+    }
+    $L[] = '';
+    $L[] = 'PER-WORKSPACE ROUTING';
+    foreach ($probe['tenants'] as $r) {
+        $L[] = '';
+        $L[] = '  ' . $r['tenant'];
+        $L[] = '    control DB route_json : ' . $r['control_route'] . '  ' . p1_yn($r['control_exists']);
+        $L[] = '    tenants.php registry  : ' . $r['registry_route'] . '  ' . p1_yn($r['registry_exists']);
+        $L[] = '    sources agree         : ' . ($r['sources_agree'] === null
+            ? 'n/a — the routing file records no entry for this workspace'
+            : ($r['sources_agree'] ? 'YES' : 'NO  <-- the application and this tool would open DIFFERENT databases'));
+        $L[] = '    the APPLICATION uses  : ' . ($r['registry_has_entry']
+            ? $r['app_would_use']
+            : '(nothing — with no routing entry the application cannot open this workspace at all)');
+        $L[] = '    the INVENTORY used    : ' . $r['tool_used'];
+        if ($r['found_elsewhere']) {
+            foreach ($r['found_elsewhere'] as $f)
+                $L[] = '    FOUND ON DISK         : ' . $f['where'] . ' -> ' . $f['path'] . ' (' . number_format($f['bytes']) . ' bytes)';
+        } else {
+            $L[] = '    FOUND ON DISK         : nowhere — no data file exists for this workspace in any known location';
+        }
+    }
+    $L[] = '';
+    $L[] = str_repeat('=', 78);
+    $L[] = 'END OF PROBE — nothing was opened, created or written.';
+    return implode("\n", $L) . "\n";
+}
+
+function p1_yn($v) { return $v === null ? '' : ($v ? '[file exists]' : '[FILE NOT FOUND]'); }
