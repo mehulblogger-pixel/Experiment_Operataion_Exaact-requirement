@@ -299,7 +299,14 @@ function agreement_render(array $vals = [], $msg = '') {
     // somewhere else. Continuing would build a second, empty system alongside
     // the real one and make the real one look lost. Say so before the button,
     // not after.
-    if (is_file(dirname(__DIR__) . '/config.local.php')) {
+    // ONLY on the control installation. Inside a company workspace this screen is
+    // correct and expected: every workspace is a full independent install, and
+    // its owner accepts the agreement once, on their first sign-in. Warning
+    // there would tell every new customer to stop doing the one thing they must
+    // do — and config.local.php exists for the whole server, so the file test
+    // alone cannot tell the two situations apart.
+    $onControl = !function_exists('current_tenant') || current_tenant() === '';
+    if ($onControl && is_file(dirname(__DIR__) . '/config.local.php')) {
         echo '<div style="background:#fef2f2;border:1px solid #fca5a5;color:#7f1d1d;padding:14px 16px;'
            . 'border-radius:10px;font-size:14px;line-height:1.55;margin:0 0 14px">'
            . '<b style="font-size:15px">&#9888;&#65039; Stop if you already have this application running.</b><br>'
