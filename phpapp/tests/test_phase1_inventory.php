@@ -282,6 +282,78 @@ $hit = array_values(array_filter($sweep, fn($f) => $f['name'] === 'tenant-acme.s
 t_ok(count($hit) === 1, 'the sweep finds a workspace file that has moved');
 t_ok($hit[0]['is_sqlite'], 'and confirms it is a real database');
 
+// The sweep must ALSO report every folder it looked in, so a "nothing found"
+// answer can be audited rather than taken on trust.
+$full = p1_sweep($rd . '/app');
+t_ok(isset($full['searched']) && count($full['searched']) >= 5, 'the sweep reports every folder it searched');
+$missLabel = 'above web root (exaact_data)';
+t_ok(array_key_exists($missLabel, $full['searched']), 'the above-web-root location is among them');
+t_eq($full['searched'][$missLabel]['matches'], 1, 'and the count of matching files is reported per folder');
+
+// A copy that was RENAMED or given a suffix must still be found, because a
+// hand-made safety copy is exactly what an operator makes before deleting.
+file_put_contents($rd . '/exaact_data/tenant-acme.sqlite.bak', 'x');
+$renamed = p1_sweep_tenant_files($rd . '/app');
+t_ok((bool) array_filter($renamed, fn($f) => $f['name'] === 'tenant-acme.sqlite.bak'),
+     'a renamed/suffixed copy is found too');
+t_ok(!array_filter($renamed, fn($f) => $f['name'] === 'tenant-acme.sqlite.bak' && $f['is_sqlite']),
+     'and is correctly reported as NOT a valid database');
+@unlink($rd . '/exaact_data/tenant-acme.sqlite.bak');
+
+// A file MOVED one level deeper under the shared account root is found.
+@mkdir($rd . '/otherapp/data', 0777, true);
+file_put_contents($rd . '/otherapp/data/kv_store.sqlite3', 'not ours');
+file_put_contents($rd . '/otherapp/tenant-acme.sqlite', 'moved');
+$deep = p1_sweep_tenant_files($rd . '/app');
+t_ok((bool) array_filter($deep, fn($f) => $f['name'] === 'tenant-acme.sqlite' && strpos($f['where'], 'otherapp') !== false),
+     'a file moved into a neighbouring folder is found');
+t_ok(!array_filter($deep, fn($f) => $f['name'] === 'kv_store.sqlite3'),
+     "another application's database is never listed");
+@unlink($rd . '/otherapp/data/kv_store.sqlite3'); @unlink($rd . '/otherapp/tenant-acme.sqlite');
+@rmdir($rd . '/otherapp/data'); @rmdir($rd . '/otherapp');
+
+// THE DEFECT THIS SECTION EXISTS FOR.
+// An earlier version answered "recovery is possible" whenever ANY backup folder
+// held snapshots. On the live server the only folder was '__control' — the
+// routing directory, which contains no workspace records at all — so two
+// workspaces with no data and no backup were reported as recoverable. The
+// verdict is now computed from each workspace's OWN evidence.
+$recCtl = ['app_dir' => $rd . '/app', 'live_files' => [], 'backups' => [
+    'exaact_backups (above web root)' => ['path' => '', 'exists' => true, 'readable' => true,
+        'workspaces' => [['workspace' => '__control', 'snapshots' => 2, 'total_bytes' => 7220972,
+                          'newest' => '20260914_005754_daily.json.gz', 'newest_at' => '2026-09-14 00:57:55']]],
+]];
+$per = p1_recovery_per_workspace($recCtl, [['tenant' => 'xyz-recurit'], ['tenant' => 'sachee-hr']]);
+t_ok(!$per['xyz-recurit']['recoverable'], 'a __control snapshot does NOT make a workspace recoverable');
+t_ok(!$per['sachee-hr']['recoverable'], 'for any workspace');
+t_ok(strpos($per['xyz-recurit']['verdict'], 'NOT RECOVERABLE') === 0, 'and the verdict says so plainly');
+t_ok(strpos(p1_render_recovery_text($recCtl + ['per_workspace' => $per]),
+            'NO WORKSPACE CAN BE RECOVERED FROM THIS SERVER') !== false,
+     'the rendered report states it without hedging');
+t_ok(strpos(p1_render_recovery_text($recCtl + ['per_workspace' => $per]),
+            'the routing directory, NOT any workspace') !== false,
+     "and labels the __control folder for what it is");
+
+// A workspace that DOES have its own snapshot is recoverable from backup.
+$recOwn = $recCtl;
+$recOwn['backups']['exaact_backups (above web root)']['workspaces'][] =
+    ['workspace' => 'xyz-recurit', 'snapshots' => 3, 'total_bytes' => 100,
+     'newest' => '20260914_010000_daily.json.gz', 'newest_at' => '2026-09-14 01:00:00'];
+$per2 = p1_recovery_per_workspace($recOwn, [['tenant' => 'xyz-recurit'], ['tenant' => 'sachee-hr']]);
+t_ok($per2['xyz-recurit']['recoverable'], 'its own snapshot does make it recoverable');
+t_eq($per2['xyz-recurit']['snapshots'], 3, 'and the snapshot count is its own, not the total');
+t_ok(!$per2['sachee-hr']['recoverable'], 'without affecting the other workspace');
+t_ok(strpos(p1_render_recovery_text($recOwn + ['per_workspace' => $per2]), 'PARTIAL') !== false,
+     'a mixed outcome is reported as partial, not as success');
+
+// A live file beats everything: the data exists, only the routing is stale.
+$recLive = $recCtl;
+$recLive['live_files'] = [['name' => 'tenant-xyz-recurit.sqlite', 'bytes' => 40960,
+                           'modified' => '2026-09-14 00:50:00', 'is_sqlite' => true, 'where' => "sibling 'data' folder"]];
+$per3 = p1_recovery_per_workspace($recLive, [['tenant' => 'xyz-recurit']]);
+t_ok($per3['xyz-recurit']['recoverable'] && count($per3['xyz-recurit']['live_files']) === 1,
+     'a live file is matched to its workspace by key');
+
 foreach (['/exaact_backups/acme/20260101_010000_daily.json.gz', '/exaact_backups/acme/20260914_020000_manual.json.gz',
           '/exaact_data/tenant-acme.sqlite'] as $f) @unlink($rd . $f);
 @rmdir($rd . '/exaact_backups/acme'); @rmdir($rd . '/exaact_backups'); @rmdir($rd . '/exaact_data');

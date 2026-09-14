@@ -703,19 +703,104 @@ function p1_scan_backups($dir) {
     return $out;
 }
 
-// A wide sweep for workspace data files that may simply have moved.
-// Non-recursive, and only in locations this application itself uses.
-function p1_sweep_tenant_files($appDir) {
+// Every folder swept for workspace data files: the locations this application
+// uses, plus one level beneath the shared account root, so a file that was
+// MOVED into a sub-folder is still found.
+//
+// Other applications' folders are traversed by NAME ONLY. Nothing is matched
+// unless its filename carries this application's own 'tenant-' prefix or a
+// workspace key from the control database, so a neighbouring app's databases
+// are never listed, never opened and never touched.
+function p1_sweep_dirs($appDir) {
     $appDir = rtrim((string) $appDir, '/');
     $places = p1_search_dirs($appDir);
-    $found = [];
-    foreach ($places as $label => $dir) {
-        if (!is_dir($dir) || !is_readable($dir)) continue;
-        foreach (glob(rtrim($dir, '/') . '/tenant-*.sqlite') ?: [] as $f)
-            $found[] = p1_path_facts($f) + ['where' => $label, 'name' => basename($f),
-                                            'is_sqlite' => p1_is_sqlite_file($f)];
+    foreach (glob(dirname($appDir) . '/*', GLOB_ONLYDIR) ?: [] as $d) {
+        if (in_array($d, $places, true)) continue;
+        $places['account root -> ' . basename($d)] = $d;
     }
-    return $found;
+    return $places;
+}
+
+// Filename patterns that identify THIS application's workspace data, including
+// copies that were renamed or given a suffix (…​.sqlite.bak, …​.sqlite.old).
+function p1_sweep_patterns(array $keys = []) {
+    $pats = ['/tenant-*.sqlite', '/tenant-*.sqlite.*', '/tenant-*.db', '/tenant-*.sqlite3'];
+    foreach ($keys as $k) {
+        $k = trim((string) $k);
+        if ($k !== '') $pats[] = '/*' . $k . '*';
+    }
+    return $pats;
+}
+
+// A wide sweep for workspace data files that may simply have moved.
+// Returns BOTH what was found and every folder that was looked in, so a
+// "nothing found" result can be audited rather than taken on trust.
+function p1_sweep($appDir, array $keys = []) {
+    $places = p1_sweep_dirs($appDir);
+    $pats   = p1_sweep_patterns($keys);
+    $searched = [];
+    $files = [];
+    $seen  = [];
+    foreach ($places as $label => $dir) {
+        $rec = ['path' => $dir, 'exists' => is_dir($dir),
+                'readable' => is_dir($dir) && is_readable($dir), 'matches' => 0];
+        if ($rec['readable']) {
+            foreach ($pats as $pat) {
+                foreach (glob(rtrim($dir, '/') . $pat) ?: [] as $f) {
+                    if (!is_file($f) || isset($seen[$f])) continue;
+                    $seen[$f] = true;
+                    $rec['matches']++;
+                    $files[] = p1_path_facts($f) + ['where' => $label, 'name' => basename($f),
+                                                    'is_sqlite' => p1_is_sqlite_file($f)];
+                }
+            }
+        }
+        $searched[$label] = $rec;
+    }
+    return ['searched' => $searched, 'files' => $files];
+}
+
+// Backwards-compatible: just the files.
+function p1_sweep_tenant_files($appDir, array $keys = []) {
+    $s = p1_sweep($appDir, $keys);
+    return $s['files'];
+}
+
+// Per-workspace recovery verdict.
+//
+// This exists because an earlier version answered "recovery is possible" when
+// ANY backup folder held snapshots — including '__control', which holds the
+// routing directory and NOT a single workspace's records. A verdict about a
+// workspace must be computed from that workspace's own evidence only.
+function p1_recovery_per_workspace(array $rec, array $tenants) {
+    $out = [];
+    foreach ($tenants as $t) {
+        $k = is_array($t) ? (string) ($t['tenant'] ?? '') : (string) $t;
+        if ($k === '') continue;
+        $safeKey = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $k);   // backup_tenant_id()
+
+        $live = [];
+        foreach ($rec['live_files'] as $f)
+            if (strpos((string) $f['name'], $k) !== false) $live[] = $f;
+
+        $snaps = 0; $newest = ''; $newestIn = '';
+        foreach ($rec['backups'] as $label => $b) {
+            foreach (($b['workspaces'] ?? []) as $w) {
+                if ($w['workspace'] !== $k && $w['workspace'] !== $safeKey) continue;
+                $snaps += (int) $w['snapshots'];
+                if ((string) $w['newest'] > $newest) { $newest = (string) $w['newest']; $newestIn = $label; }
+            }
+        }
+
+        if ($live)            $verdict = 'RECOVERABLE — the data file still exists; only the routing is out of step';
+        elseif ($snaps > 0)   $verdict = 'RECOVERABLE FROM BACKUP — no live file, but a snapshot of this workspace exists';
+        else                  $verdict = 'NOT RECOVERABLE FROM THIS SERVER — no data file and no backup of this workspace';
+
+        $out[$k] = ['workspace' => $k, 'live_files' => $live, 'snapshots' => $snaps,
+                    'newest' => $newest, 'newest_in' => $newestIn,
+                    'recoverable' => ($live || $snaps > 0), 'verdict' => $verdict];
+    }
+    return $out;
 }
 
 function p1_render_recovery_text(array $rec) {
@@ -727,13 +812,24 @@ function p1_render_recovery_text(array $rec) {
     $L[] = 'App folder            : ' . $rec['app_dir'];
     $L[] = 'One level above it    : ' . dirname($rec['app_dir']);
     $L[] = '';
-    $L[] = 'LIVE WORKSPACE FILES FOUND (any location this app uses)';
+    $L[] = 'FOLDERS SEARCHED (so a "nothing found" answer can be checked, not trusted)';
+    foreach (($rec['searched'] ?? []) as $label => $s) {
+        $state = !$s['exists'] ? 'does not exist' : (!$s['readable'] ? 'exists, NOT readable' : 'searched');
+        $L[] = '  ' . str_pad($label, 44) . $state
+             . ($s['readable'] ? '  — ' . $s['matches'] . ' matching file(s)' : '');
+        $L[] = '      ' . $s['path'];
+    }
+    $L[] = '  Matched by name only: tenant-*.sqlite (and .bak/.old/.db copies) and any';
+    $L[] = '  filename carrying a workspace key. No other application\'s files are';
+    $L[] = '  listed, opened or touched.';
+    $L[] = '';
+    $L[] = 'LIVE WORKSPACE FILES FOUND';
     if ($rec['live_files']) {
         foreach ($rec['live_files'] as $f)
             $L[] = '  ' . $f['name'] . '  (' . number_format($f['bytes']) . ' bytes, modified ' . $f['modified']
                  . ', ' . ($f['is_sqlite'] ? 'valid database' : 'NOT a database') . ')  in ' . $f['where'];
     } else {
-        $L[] = '  NONE FOUND — no workspace data file exists in any location this application uses.';
+        $L[] = '  NONE FOUND — no workspace data file exists in any folder listed above.';
     }
     $L[] = '';
     $L[] = 'BACKUP SNAPSHOTS';
@@ -742,17 +838,47 @@ function p1_render_recovery_text(array $rec) {
         $L[] = '    path   : ' . $b['path'];
         $L[] = '    exists : ' . ($b['exists'] ? 'yes' : 'no');
         if (!empty($b['workspaces'])) {
-            foreach ($b['workspaces'] as $w)
+            foreach ($b['workspaces'] as $w) {
+                $note = $w['workspace'] === '__control'
+                      ? '   << the routing directory, NOT any workspace\'s records'
+                      : '';
                 $L[] = '    -> ' . $w['workspace'] . ' : ' . $w['snapshots'] . ' snapshot(s), '
-                     . number_format($w['total_bytes']) . ' bytes, newest ' . $w['newest'] . ' at ' . $w['newest_at'];
+                     . number_format($w['total_bytes']) . ' bytes, newest ' . $w['newest']
+                     . ' at ' . $w['newest_at'] . $note;
+            }
         } elseif ($b['exists']) {
             $L[] = '    -> (no snapshots)';
         }
     }
-    $L[] = '';
-    $L[] = $rec['live_files'] || $rec['any_backups']
-        ? '>> DATA FOUND. Recovery is possible. Do not upload or delete anything further.'
-        : '>> NOTHING FOUND in the application folders. Check your hosting provider backups immediately.';
+    $per = $rec['per_workspace'] ?? [];
+    if ($per) {
+        $L[] = '';
+        $L[] = 'VERDICT PER WORKSPACE';
+        foreach ($per as $w) {
+            $L[] = '  ' . $w['workspace'];
+            $L[] = '    live data file   : ' . ($w['live_files'] ? count($w['live_files']) . ' found' : 'none');
+            $L[] = '    backup snapshots : ' . ($w['snapshots'] ?: 'none')
+                 . ($w['newest'] ? '  (newest ' . $w['newest'] . ' in ' . $w['newest_in'] . ')' : '');
+            $L[] = '    >> ' . $w['verdict'];
+        }
+        $lost = array_values(array_filter($per, fn($w) => !$w['recoverable']));
+        $L[] = '';
+        if (!$lost) {
+            $L[] = '>> ALL WORKSPACES RECOVERABLE. Change nothing further until the routing is corrected.';
+        } elseif (count($lost) === count($per)) {
+            $L[] = '>> NO WORKSPACE CAN BE RECOVERED FROM THIS SERVER.';
+            $L[] = '   Next place to look is the hosting account backup (cPanel / JetBackup)';
+            $L[] = '   and the File Manager trash. Do not re-create the workspaces first.';
+        } else {
+            $L[] = '>> PARTIAL. Recoverable: ' . (count($per) - count($lost)) . ' of ' . count($per) . '.';
+            foreach ($lost as $w) $L[] = '   NOT recoverable: ' . $w['workspace'];
+        }
+    } else {
+        $L[] = '';
+        $L[] = $rec['live_files']
+            ? '>> Workspace data files found. Recovery is possible.'
+            : '>> No workspace data file found in any folder listed above.';
+    }
     $L[] = str_repeat('=', 78);
     return implode("\n", $L) . "\n";
 }

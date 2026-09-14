@@ -192,12 +192,23 @@ function p1_run_probe(PDO $ctl, $appDir) {
     } catch (Throwable $e) { $probe['error'] = $e->getMessage(); }
 
     // Recovery scan — does the data still exist anywhere, live or as a backup?
-    $rec = ['app_dir' => $appDir, 'live_files' => p1_sweep_tenant_files($appDir), 'backups' => [], 'any_backups' => false];
+    // The workspace keys are passed in so a file that was RENAMED but still
+    // carries its workspace key is found too.
+    $keys  = array_map(fn($r) => (string) ($r['tenant'] ?? ''), $probe['tenants']);
+    $sweep = p1_sweep($appDir, $keys);
+    $rec = ['app_dir' => $appDir, 'searched' => $sweep['searched'], 'live_files' => $sweep['files'],
+            'backups' => [], 'any_backups' => false];
     foreach (p1_backup_dirs($appDir) as $label => $dir) {
         $b = p1_scan_backups($dir);
         $rec['backups'][$label] = $b;
         if (!empty($b['workspaces'])) $rec['any_backups'] = true;
     }
+    // Per workspace, from that workspace's OWN evidence only — '__control'
+    // snapshots hold the routing directory, not any workspace's records, and
+    // must never make a workspace look recoverable.
+    $rec['per_workspace'] = p1_recovery_per_workspace($rec, $probe['tenants']);
+    $rec['unrecoverable'] = array_values(array_map(fn($w) => $w['workspace'],
+        array_filter($rec['per_workspace'], fn($w) => !$w['recoverable'])));
     $probe['recovery'] = $rec;
     return $probe;
 }
