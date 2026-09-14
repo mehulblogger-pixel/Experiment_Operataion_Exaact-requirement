@@ -371,6 +371,30 @@ t_ok(strpos(p1_render_recovery_text($recCtl + ['per_workspace' => $perNew]),
             'never been opened') !== false,
      'the report does not raise an alarm about a new company');
 
+// A HEALTHY workspace must not be described as recovered from something.
+// The live report said "RECOVERABLE - the data file still exists; only the
+// routing is out of step" about a workspace whose routed database was exactly
+// where it should be, agreed by both sources and readable. Alarming, and untrue.
+$recOk = $recCtl;
+$recOk['live_files'] = [['name' => 'tenant-acme.sqlite', 'bytes' => 3289088,
+                         'modified' => '2026-09-14 09:47:17', 'is_sqlite' => true,
+                         'where' => 'above web root (exaact_data)']];
+$perOk = p1_recovery_per_workspace($recOk, [['tenant' => 'acme', 'control_exists' => true,
+                                             'control_provisioned_at' => '2026-09-14T09:11:51+00:00']]);
+t_ok(!empty($perOk['acme']['healthy']), 'a workspace whose routed database is present is healthy');
+t_ok(strpos($perOk['acme']['verdict'], 'HEALTHY') === 0, 'and the verdict leads with that');
+t_ok(empty($perOk['acme']['lost']), 'and it has lost nothing');
+t_ok(strpos(p1_render_recovery_text($recOk + ['per_workspace' => $perOk]), 'ALL HEALTHY') !== false,
+     'the report says all healthy, not all recovered');
+
+// The distinction that matters: the file exists but NOT where the routing points.
+$perMoved = p1_recovery_per_workspace($recOk, [['tenant' => 'acme', 'control_exists' => false,
+                                                'control_provisioned_at' => '2026-09-14T09:11:51+00:00']]);
+t_ok(strpos($perMoved['acme']['verdict'], 'RECOVERABLE') === 0,
+     'a file found away from the routed path is recoverable, not healthy');
+t_ok(strpos($perMoved['acme']['verdict'], 'not where the routing points') !== false,
+     'and says precisely that');
+
 // A live file beats everything: the data exists, only the routing is stale.
 $recLive = $recCtl;
 $recLive['live_files'] = [['name' => 'tenant-xyz-recurit.sqlite', 'bytes' => 40960,

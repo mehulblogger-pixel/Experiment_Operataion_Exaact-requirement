@@ -833,14 +833,23 @@ function p1_recovery_per_workspace(array $rec, array $tenants) {
         $everSetUp = is_array($t) && trim((string) ($t['control_provisioned_at'] ?? '')) !== '';
         $recoverable = ($live || $snaps > 0);
 
-        if ($live)              $verdict = 'RECOVERABLE — the data file still exists; only the routing is out of step';
+        // A healthy workspace must not be described as recovered from something.
+        // "Only the routing is out of step" was printed for a workspace whose
+        // routed database was exactly where it should be — alarming, and untrue.
+        // Finding a file somewhere says nothing on its own; whether the ROUTED
+        // file is present is the question.
+        $routedOk = is_array($t) && !empty($t['control_exists']);
+
+        if ($routedOk)          $verdict = 'HEALTHY — the routed database is in place and readable';
+        elseif ($live)          $verdict = 'RECOVERABLE — the data file exists, but not where the routing points';
         elseif ($snaps > 0)     $verdict = 'RECOVERABLE FROM BACKUP — no live file, but a snapshot of this workspace exists';
         elseif (!$everSetUp)    $verdict = 'NOTHING TO RECOVER — never signed in to, so it has no data yet. Normal for a new company.';
         else                    $verdict = 'NOT RECOVERABLE FROM THIS SERVER — no data file and no backup of this workspace';
 
         $out[$k] = ['workspace' => $k, 'live_files' => $live, 'snapshots' => $snaps,
                     'newest' => $newest, 'newest_in' => $newestIn, 'ever_set_up' => $everSetUp,
-                    'recoverable' => $recoverable, 'lost' => (!$recoverable && $everSetUp),
+                    'healthy' => $routedOk, 'recoverable' => ($routedOk || $recoverable),
+                    'lost' => (!$routedOk && !$recoverable && $everSetUp),
                     'verdict' => $verdict];
     }
     return $out;
@@ -908,9 +917,12 @@ function p1_render_recovery_text(array $rec) {
         $new  = array_values(array_filter($per, fn($w) => empty($w['ever_set_up'])));
         $L[] = '';
         if (!$lost) {
+            $healthy = array_values(array_filter($per, fn($w) => !empty($w['healthy'])));
             $L[] = $new && count($new) === count($per)
                 ? '>> NOTHING TO RECOVER. Every workspace here is new and has never been opened.'
-                : '>> NOTHING LOST. Every workspace that has ever been used still has its data.';
+                : ($healthy && count($healthy) + count($new) === count($per)
+                    ? '>> ALL HEALTHY. Every workspace that has been opened has its database in place.'
+                    : '>> NOTHING LOST. Every workspace that has ever been used still has its data.');
         } elseif (count($lost) === count($per)) {
             $L[] = '>> NO WORKSPACE CAN BE RECOVERED FROM THIS SERVER.';
             $L[] = '   Next place to look is the hosting account backup (cPanel / JetBackup)';

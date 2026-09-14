@@ -207,8 +207,10 @@ function p1_run_probe(PDO $ctl, $appDir) {
     // snapshots hold the routing directory, not any workspace's records, and
     // must never make a workspace look recoverable.
     $rec['per_workspace'] = p1_recovery_per_workspace($rec, $probe['tenants']);
+    // Only workspaces that HAD data and no longer do. A company created and never
+    // opened has lost nothing and must not appear on a list headed "unrecoverable".
     $rec['unrecoverable'] = array_values(array_map(fn($w) => $w['workspace'],
-        array_filter($rec['per_workspace'], fn($w) => !$w['recoverable'])));
+        array_filter($rec['per_workspace'], fn($w) => !empty($w['lost']))));
     $probe['recovery'] = $rec;
     return $probe;
 }
