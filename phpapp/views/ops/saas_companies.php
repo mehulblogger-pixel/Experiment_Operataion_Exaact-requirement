@@ -53,13 +53,18 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
       <div class="ff"><label>Plan</label><select name="new_plan"><?php foreach ($plans as $pk => $p): ?><option value="<?= $e($pk) ?>" <?= $pk === 'RECRUITMENT' ? 'selected' : '' ?>><?= $e($p['label']) ?> — <?= implode(', ', array_map($modLabel, $p['mods'])) ?></option><?php endforeach; ?></select></div>
     </div>
     <div style="margin-top:12px;border-top:1px dashed var(--line,#e5e7eb);padding-top:12px">
-      <!-- Storage is automatic: a MySQL database when the server can create one,
-           otherwise a data file placed above the web root (upload-proof). The
-           operator ticks nothing. Power users can still paste their own DB. -->
+      <!-- WHERE THIS COMPANY'S DATA LIVES.
+           With a hosting API the app makes a real MySQL database itself and the
+           operator ticks nothing. WITHOUT one (mPanel and most simple panels
+           have no API), the choice is put in front of them in plain language
+           instead of being made silently - because the two options differ in
+           how the data can be lost, and that is not a detail to hide. Either
+           way the data is placed where a file upload cannot reach it. -->
+      <?php if ($can_autocreate): ?>
       <input type="hidden" name="db_kind" id="db_kind" value="auto">
       <div style="display:flex;gap:8px;align-items:center;font-size:13px;color:#047857">
-        <span style="font-size:15px">🛡️</span>
-        <span><b>Its own private database is set up automatically</b> — <?= $can_autocreate ? 'a fresh, isolated MySQL database on this server.' : 'kept safely outside the app folder so uploads can never delete it.' ?> Nothing to configure.</span>
+        <span style="font-size:15px">&#128737;&#65039;</span>
+        <span><b>Its own private database is set up automatically</b> &mdash; a fresh, isolated MySQL database on this server. Nothing to configure.</span>
       </div>
       <details style="margin-top:10px">
         <summary style="cursor:pointer;font-size:12.5px;color:var(--muted,#6b7280)">Advanced: use a MySQL database I created myself</summary>
@@ -71,6 +76,36 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
           <div class="sc-note">Filling these in and creating the company uses this database instead of the automatic one.</div>
         </div>
       </details>
+      <?php else: ?>
+      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:8px">Where this company's data is stored</label>
+      <input type="hidden" name="db_kind" id="db_kind" value="auto">
+      <div style="display:grid;gap:8px">
+        <label style="display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border:1px solid var(--line,#e5e7eb);border-radius:10px;cursor:pointer;font-size:13.5px">
+          <input type="radio" name="storage_choice" value="auto" checked style="margin-top:3px"
+                 onchange="document.getElementById('db_kind').value='auto';document.getElementById('sc-my').style.display='none'">
+          <span><b>Set it up for me</b> <span class="sc-key">&mdash; nothing to do</span><br>
+            <span style="color:var(--muted,#6b7280)">A private data file, kept <b>outside the app folder</b>. Re-uploading the app cannot reach it. Ready in one click.</span></span>
+        </label>
+        <label style="display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border:1px solid var(--line,#e5e7eb);border-radius:10px;cursor:pointer;font-size:13.5px">
+          <input type="radio" name="storage_choice" value="mysql" style="margin-top:3px"
+                 onchange="document.getElementById('db_kind').value='mysql';document.getElementById('sc-my').style.display='block'">
+          <span><b>Use a MySQL database</b> <span class="sc-key">&mdash; strongest, about 2 minutes</span><br>
+            <span style="color:var(--muted,#6b7280)">A real database, exactly like the Books app uses. Make one in your hosting panel first, then paste its details here.</span></span>
+        </label>
+      </div>
+      <div id="sc-my" style="display:none;margin-top:10px">
+        <div style="padding:11px 13px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:10px;font-size:12.5px;color:#1e3a8a;margin-bottom:10px">
+          <b>In your hosting panel &rarr; Databases:</b> create a database, create a user with a strong password, then add that
+          user to that database with <b>all privileges</b>. Your panel adds its own prefix to both names &mdash; copy them exactly as it shows them.
+        </div>
+        <div class="sc-edit" style="padding:0">
+          <div class="ff"><label>MySQL host</label><input name="db_host" value="localhost"></div>
+          <div class="ff"><label>MySQL database name</label><input name="db_name" placeholder="prefix_asme"></div>
+          <div class="ff"><label>MySQL user</label><input name="db_user" placeholder="prefix_asme"></div>
+          <div class="ff"><label>MySQL password</label><input type="password" name="db_pass" autocomplete="new-password"></div>
+        </div>
+      </div>
+      <?php endif; ?>
     </div>
     <button class="btn" style="margin-top:6px">Create company</button>
   </form>
