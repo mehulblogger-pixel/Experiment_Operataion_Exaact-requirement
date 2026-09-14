@@ -99,6 +99,73 @@ if (!$IS_CLI && !$AUTH) {
     exit;
 }
 
+// ---- Configuration health -------------------------------------------------
+//
+// Two files can hold this server's database credentials and only ONE of them is
+// read. config.php is part of the application and is replaced by every upload;
+// config.local.php is not sent by anyone and therefore survives. A sample file
+// filled in by mistake is read by nothing at all, while still leaving a copy of
+// the password in the folder.
+//
+// Nothing here ever prints a password. Values are compared by hash so two files
+// can be reported as agreeing or differing without either being shown.
+$loadArr = function ($rel) {
+    $p = __DIR__ . '/' . $rel;
+    if (!is_file($p)) return null;                       // not there
+    $r = @include $p;
+    return is_array($r) ? $r : false;                    // false = there but unreadable
+};
+$hasReal = function ($rel) {                             // still the shipped placeholders?
+    $p = __DIR__ . '/' . $rel;
+    if (!is_file($p)) return false;
+    $txt = (string) @file_get_contents($p);
+    return $txt !== '' && strpos($txt, 'your_db_name') === false && strpos($txt, 'your_db_password') === false;
+};
+$fp = fn($v) => $v === '' || $v === null ? '' : substr(hash('sha256', (string) $v), 0, 12);
+
+$cfgLocal  = $loadArr('config.local.php');
+$cfgSample = $loadArr('config.local.sample.php');
+$liveDb    = (array) ($CFG['db'] ?? []);
+
+$localReal  = is_array($cfgLocal)  && $hasReal('config.local.php');
+$sampleReal = is_array($cfgSample) && $hasReal('config.local.sample.php');
+$phpReal    = $hasReal('config.php');
+
+// Which file actually supplied the credentials in use.
+$source = 'config.php';
+if ($localReal && (string) ($cfgLocal['db']['name'] ?? '') === (string) ($liveDb['name'] ?? '')) $source = 'config.local.php';
+
+// The admin password is synced INTO the login on the next page load whenever it
+// changes, so a mismatch between the two files is not cosmetic: it silently
+// changes who can sign in.
+$adminDiffers = $localReal && isset($cfgLocal['admin']['pass'])
+             && $fp($cfgLocal['admin']['pass'] ?? '') !== $fp($CFG['admin']['pass'] ?? '');
+
+$cfgRows = [
+    ['config.php', is_file(__DIR__ . '/config.php'), $phpReal, true,
+     'Part of the application. REPLACED by every upload.'],
+    ['config.local.php', is_file(__DIR__ . '/config.local.php'), $localReal, true,
+     'Never sent by anyone, so it survives every upload. This is where credentials belong.'],
+    ['config.local.sample.php', is_file(__DIR__ . '/config.local.sample.php'), $sampleReal, false,
+     'A blank form to copy. The application never reads it.'],
+];
+
+$cfgWarn = [];
+if (!$localReal && $phpReal)
+    $cfgWarn[] = ['bad', 'Your credentials live only in config.php, which every upload replaces. '
+                       . 'One upload of that file takes the site down until you type them in again.'];
+if ($sampleReal)
+    $cfgWarn[] = ['bad', 'config.local.sample.php has real credentials in it, and the application never reads that file. '
+                       . 'It is doing nothing except keeping a copy of your password in the folder.'];
+if ($localReal && $phpReal)
+    $cfgWarn[] = ['warn', 'Both config.php and config.local.php hold real credentials. config.local.php wins, '
+                        . 'so config.php can safely be replaced with the clean copy from the code.']; 
+if ($adminDiffers)
+    $cfgWarn[] = ['warn', 'The administrator password in config.local.php differs from the one in use. '
+                        . 'On the next page load the application will change the admin login to match config.local.php.']; 
+if (!$cfgWarn && $localReal)
+    $cfgWarn[] = ['ok', 'Credentials are in config.local.php only. Uploads cannot touch them.'];
+
 // ---- Compare -------------------------------------------------------------
 $ok = []; $stale = []; $missing = [];
 foreach ($EXPECT as $rel => $want) {
@@ -184,6 +251,52 @@ header('Content-Type: text/html; charset=utf-8');
     <div class="stat"><span>Stale</span><div class="big" style="color:<?= $stale ? 'var(--bad)' : 'inherit' ?>"><?= count($stale) ?></div></div>
     <div class="stat"><span>Missing</span><div class="big" style="color:<?= $missing ? 'var(--bad)' : 'inherit' ?>"><?= count($missing) ?></div></div>
     <div class="stat"><span>Checked</span><div class="big"><?= (int) $total ?></div></div>
+  </div>
+
+  <div class="card">
+    <h2 style="font-size:15px;margin:0 0 4px">Where your database settings live</h2>
+    <p style="color:var(--mut);font-size:13px;margin:0 0 12px">Passwords are never shown on this page.</p>
+    <div class="scroll"><table>
+      <tr><th>File</th><th>On the server</th><th>Has real details</th><th>Read by the app</th></tr>
+      <?php foreach ($cfgRows as [$f, $exists, $real, $used, $note]): ?>
+      <tr>
+        <td><code><?= $h($f) ?></code><br><span style="color:var(--mut);font-size:12px"><?= $h($note) ?></span></td>
+        <td><?= $exists ? 'yes' : '<span style="color:var(--mut)">no</span>' ?></td>
+        <td><?= $real ? '<b>yes</b>' : '<span style="color:var(--mut)">no</span>' ?></td>
+        <td><?= $used ? 'yes' : '<span style="color:var(--mut)">never</span>' ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </table></div>
+    <p style="font-size:13.5px;margin:12px 0 0">In use right now: database <code><?= $h($liveDb['name'] ?? '?') ?></code>
+      as user <code><?= $h($liveDb['user'] ?? '?') ?></code>, taken from <code><?= $h($source) ?></code>.</p>
+    <?php foreach ($cfgWarn as [$kind, $text]): ?>
+      <div style="margin-top:10px;padding:11px 13px;border-radius:10px;font-size:13.5px;<?=
+        $kind === 'bad'  ? 'border:1px solid #fca5a5;background:var(--badbg);color:var(--bad)' :
+       ($kind === 'warn' ? 'border:1px solid #fcd34d;background:#fffbeb;color:#78350f'
+                         : 'border:1px solid #a7f3d0;background:var(--okbg);color:var(--ok)') ?>">
+        <?= $h($text) ?>
+      </div>
+    <?php endforeach; ?>
+    <?php if ($sampleReal || (!$localReal && $phpReal)): ?>
+      <h3 style="font-size:13.5px;margin:14px 0 4px">How to put this right &mdash; in your File Manager</h3>
+      <ol class="steps" style="font-size:13.5px">
+        <?php if ($sampleReal && !$localReal): ?>
+          <li><b>Rename</b> <code>config.local.sample.php</code> to <code>config.local.php</code>. Check first that the
+            database name, user and password in it are the ones in use above &mdash; if they are not, correct them before renaming.</li>
+        <?php elseif ($sampleReal && $localReal): ?>
+          <li><b>Replace</b> <code>config.local.sample.php</code> with the blank copy from the code, or delete it.
+            <code>config.local.php</code> already holds your real settings, so this file is only a spare copy of your password.</li>
+        <?php else: ?>
+          <li><b>Copy</b> <code>config.local.sample.php</code>, rename the copy to <code>config.local.php</code>,
+            and put your real database name, user and password in it.</li>
+        <?php endif; ?>
+        <li><b>Reload the site.</b> If it still works, the new file is being read.</li>
+        <li><b>Then</b> upload the clean <code>config.php</code> from the code over the one on the server, so your password
+          is in one place only. Do this <em>last</em>, and only after step&nbsp;2 worked.</li>
+      </ol>
+      <p style="color:var(--mut);font-size:12.5px;margin:8px 0 0">Keep the administrator user and password the same in both
+        files while you do this. If they differ, the application resets the admin login to match on the next page load.</p>
+    <?php endif; ?>
   </div>
 
   <?php if ($byDir): ?>

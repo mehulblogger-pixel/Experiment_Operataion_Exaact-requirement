@@ -13,8 +13,14 @@ RewriteRule ^ index.php [L]
     </IfModule>
 </FilesMatch>
 
-# Protect config and data
-<FilesMatch "^(config\.php)$">
+# Protect config and data.
+#
+# Every file that can hold this server's credentials, not just config.php:
+# config.local.php holds them by design, and a sample file filled in by mistake
+# holds them by accident. tenants.php carries each workspace's database details.
+# All are PHP and would normally execute to nothing, but if PHP is ever
+# mis-served these are the files that must not come back as readable text.
+<FilesMatch "^(config\.php|config\.local\.php|config\.local\.sample\.php|tenants\.php|tenants\.sample\.php)$">
     Require all denied
 </FilesMatch>
 <IfModule mod_rewrite.c>
