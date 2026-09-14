@@ -160,6 +160,13 @@ foreach (array_keys($gates) as $fn) {
 // administration alone. Each is either core functionality, or sits behind a
 // route the M5 gate already refuses (Category B).
 $BASELINE = [
+    // CLASSIFIED IN MILESTONE 12 — Category C (core). access_can_subscribe()
+    // answers "may this person act on a subscription", which is core billing
+    // administration, not a paid module. A master holding only core admin MUST
+    // be able to reach it, or a workspace could never buy anything. This guard
+    // firing on it is the guard working: a new gate must be classified before it
+    // is accepted, and this is that classification.
+    'access_can_subscribe',
     'act_can_view', 'act_can_write', 'asset_can_manage', 'asset_can_view',
     'attend_review_can', 'billing_can_manage', 'capa_can_close', 'cdoc_can_manage',
     'cdoc_can_view', 'cform_can_manage', 'cmp_can_decide', 'cockpit_can',

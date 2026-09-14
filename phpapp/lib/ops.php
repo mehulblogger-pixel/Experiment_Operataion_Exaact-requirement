@@ -2654,9 +2654,16 @@ function ops_module_gate($route, $peek = false) {
         if ($jid && job_owned_by_me($jid)) return;   // owner may proceed
     }
     if ($mod && !can("mod.$mod.view")) {
-        // Two different "no"s, and they need two different sentences. Telling
-        // somebody to ask their administrator for a module the company has not
-        // bought sends them on an errand that cannot succeed.
+        // MILESTONE 12. Two different "no"s still need two different sentences —
+        // telling somebody to ask their administrator for a module the company
+        // never bought sends them on an errand that cannot succeed — but now the
+        // answer is delivered as a SCREEN rather than a red toast on the
+        // dashboard. access_deny() reads the existing engine (module_state from
+        // M3), picks the right words for the actual state, offers the right next
+        // action for this person's role, answers a fetch() with JSON instead of a
+        // redirect, and returns 403 either way. It decides nothing: the refusal
+        // has already been decided, above, by can().
+        if (function_exists('access_deny')) access_deny($mod);
         $owner = function_exists('licence_owner') ? licence_owner($mod) : null;
         ops_require(false, ($owner && !licence_enabled($owner))
             ? 'The ' . PRODUCT_MODULES[$owner][0] . ' module is not switched on for this installation.'
@@ -2684,6 +2691,7 @@ function ops_module_gate($route, $peek = false) {
         static $moduleRoute = ['service-scope' => 'operations', 'service-formats' => 'reporting'];
         $needMod = $moduleRoute[$base] ?? null;
         if ($needMod !== null && !licence_enabled($needMod)) {
+            if (function_exists('access_deny')) access_deny($needMod);   // M12 — same screen, same words
             ops_require(false, 'The ' . PRODUCT_MODULES[$needMod][0]
                 . ' module is not switched on for this installation.');
         }

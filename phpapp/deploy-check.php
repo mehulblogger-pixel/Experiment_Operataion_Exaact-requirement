@@ -24,15 +24,16 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '422c6b4 · 2026-09-14 14:01 UTC · 651 files';
+$RELEASE = '1bf27b5 · 2026-09-14 14:35 UTC · 653 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
     'cron.php' => ['s'=>23081,'h'=>'b2ebb8eff370868e'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>114588,'h'=>'d7c967ea55264a40'],
+    'index.php' => ['s'=>114687,'h'=>'e050b4e26dfbc96c'],
     'lib/access.php' => ['s'=>69658,'h'=>'358965b79afc5ca7'],
+    'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
     'lib/activity.php' => ['s'=>22744,'h'=>'2a63a2da6e0df9f5'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
@@ -168,7 +169,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>65530,'h'=>'156e208c6595fdff'],
-    'lib/ops.php' => ['s'=>586876,'h'=>'06f0564c5eaa03bf'],
+    'lib/ops.php' => ['s'=>587528,'h'=>'b2fa3a30ec270b67'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -496,6 +497,7 @@ $EXPECT  = [
     'views/ops/mkt_ledger.php' => ['s'=>5424,'h'=>'3893ea528c0064c9'],
     'views/ops/mkt_plans.php' => ['s'=>18544,'h'=>'93088f2c39d2ce2c'],
     'views/ops/mkt_rules.php' => ['s'=>8994,'h'=>'91a1cd66dcd297fb'],
+    'views/ops/module_locked.php' => ['s'=>2419,'h'=>'82de67be8483b36c'],
     'views/ops/my_approvals.php' => ['s'=>3559,'h'=>'b895767a252cfd64'],
     'views/ops/my_jobs.php' => ['s'=>15228,'h'=>'bb2e2bb4879b97c4'],
     'views/ops/my_work.php' => ['s'=>5894,'h'=>'bd095a0094c135e3'],
