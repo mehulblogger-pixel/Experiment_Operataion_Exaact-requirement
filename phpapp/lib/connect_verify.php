@@ -300,8 +300,9 @@ function connect_verify_subject_checks($subjectKind, $subjectId) {
 /** The moderation queue — pending checks awaiting a human decision. */
 function connect_verify_pending($limit = 100) {
     try {
-        $st = db()->prepare("SELECT * FROM cx_verifications WHERE status='PENDING' ORDER BY id ASC LIMIT ?");
-        $st->execute([(int)$limit]);
+        $st = db()->prepare("SELECT * FROM cx_verifications WHERE status='PENDING' ORDER BY id ASC
+                             LIMIT " . max(1, (int)$limit));   // M15 — inlined int
+        $st->execute();
         $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } catch (Throwable $e) { return []; }
     foreach ($rows as &$r) $r['subject_name'] = connect_verify_subject_name($r['subject_kind'], (int)$r['subject_id']);

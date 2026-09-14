@@ -24,7 +24,11 @@ try {
     $NO = 'CN-ENG-1';
 
     $pdo->prepare("INSERT INTO partner_contracts (partner_id, contract_number, open_status) VALUES (7001,?, 'OPEN')")->execute([$NO]);
-    $pdo->prepare("INSERT INTO quotations (quote_no, rev, contract_number, status) VALUES ('Q-1',0,?, 'ACCEPTED')")->execute([$NO]);
+    // M15 — its own quote number. Every test shares one database, and another test
+// also books 'Q-1'; MySQL enforces the (quote_no, rev) unique index that SQLite
+// had skipped because duplicates already existed when it was built. Namespaced
+// to match this file's own CN-ENG-1 fixtures.
+$pdo->prepare("INSERT INTO quotations (quote_no, rev, contract_number, status) VALUES ('Q-ENG-1',0,?, 'ACCEPTED')")->execute([$NO]);
     $pdo->prepare("INSERT INTO calls (call_code, contract_number, status, op_status) VALUES ('CALL-1',?, 'OPEN','RECEIVED')")->execute([$NO]);
     $pdo->prepare("INSERT INTO calls (call_code, contract_number, status, op_status) VALUES ('CALL-2',?, 'CLOSED','CLOSED')")->execute([$NO]);
     $pdo->prepare("INSERT INTO jobs (job_code, contract_number, closed_flag) VALUES ('JOB-1',?, 0)")->execute([$NO]);

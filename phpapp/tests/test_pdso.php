@@ -34,12 +34,12 @@ $jobId = (int)$pdo->lastInsertId();
 // ---------------------------------------------------------------------------
 head('1. Migration — masters, additive columns & gap tables (nothing rebuilt)');
 ok(count(pdso_statuses()) >= 12, 'deputation_status lifecycle master seeded (' . count(pdso_statuses()) . ')');
-ok((int)ops_val("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='dep_site_log'") === 1, 'dep_site_log table created');
-ok((int)ops_val("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='dep_timesheet'") === 1, 'dep_timesheet table created');
+ok((int)(t_table_exists('dep_site_log') ? 1 : 0) === 1, 'dep_site_log table created');
+ok((int)(t_table_exists('dep_timesheet') ? 1 : 0) === 1, 'dep_timesheet table created');
 // Additive columns on the EXISTING tables (reuse, not rebuild).
-$jobCols = array_map(fn($r)=>$r['name'], ops_all("PRAGMA table_info(jobs)"));
+$jobCols = array_map(fn($r)=>$r['name'], t_columns_rows('jobs'));
 ok(in_array('dep_status', $jobCols, true), 'jobs gained an additive dep_status column (existing job reused)');
-$attCols = array_map(fn($r)=>$r['name'], ops_all("PRAGMA table_info(attendance)"));
+$attCols = array_map(fn($r)=>$r['name'], t_columns_rows('attendance'));
 ok(in_array('job_id', $attCols, true), 'existing attendance gained an optional job_id scope (attendance NOT rebuilt)');
 
 // ---------------------------------------------------------------------------

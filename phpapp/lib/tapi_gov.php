@@ -51,10 +51,22 @@ function tapi_audit($action, $detail = '') {
 // ---- KPI versioning --------------------------------------------------------
 function tapi_kpi_version_snapshot($old, $new) {
     // Only version when the MEANING changes.
+    //
+    // M15 — target and threshold are compared as NUMBERS, not as text. They are
+    // DECIMAL columns: MySQL hands back "20.00" where the form sends 20, so a
+    // string comparison called every cosmetic rename a change of meaning and wrote
+    // a spurious version into the governance history on production. SQLite handed
+    // back "20" and agreed, which is why it was never seen. A blank is still
+    // distinct from a zero, so clearing a target is still a real change.
+    $numSame = function ($a, $b) {
+        $a = (string)($a ?? ''); $b = (string)($b ?? '');
+        if ($a === '' || $b === '') return $a === $b;      // blank vs set is a change
+        return abs((float)$a - (float)$b) < 0.000001;
+    };
     $changed = ((string)$old['formula'] !== (string)($new['formula'] ?? $old['formula']))
         || ((string)$old['direction'] !== (string)($new['direction'] ?? $old['direction']))
-        || ((string)($old['target'] ?? '') !== (string)($new['target'] ?? ($old['target'] ?? '')))
-        || ((string)($old['threshold'] ?? '') !== (string)($new['threshold'] ?? ($old['threshold'] ?? '')));
+        || !$numSame($old['target'] ?? '', $new['target'] ?? ($old['target'] ?? ''))
+        || !$numSame($old['threshold'] ?? '', $new['threshold'] ?? ($old['threshold'] ?? ''));
     if (!$changed) return false;
     $ver = (int) ops_val("SELECT COALESCE(MAX(version),0)+1 FROM kpi_versions WHERE kpi_key=?", [(string)$old['kpi_key']]);
     db()->prepare("INSERT INTO kpi_versions (kpi_key,version,formula,unit,target,threshold,direction,effective_from,effective_to,changed_by,reason,created_at)

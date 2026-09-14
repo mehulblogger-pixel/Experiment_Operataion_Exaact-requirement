@@ -154,7 +154,8 @@ function connect_analytics_locations($limit = 8) {
     try {
         $rows = ops_all("SELECT location, COUNT(*) n FROM cx_requirements
                          WHERE status<>'DRAFT' AND COALESCE(location,'')<>''
-                         GROUP BY location ORDER BY n DESC LIMIT ?", [(int)$limit]) ?: [];
+                         GROUP BY location ORDER BY n DESC
+                         LIMIT " . max(1, (int)$limit)) ?: [];   // M15 — inlined int, see below
     } catch (Throwable $e) { return []; }
     return array_map(fn($r) => ['location' => (string)$r['location'], 'value' => (int)$r['n']], $rows);
 }

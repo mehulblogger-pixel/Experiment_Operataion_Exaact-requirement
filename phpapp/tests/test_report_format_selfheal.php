@@ -8,8 +8,12 @@ t_section('Report formats — always installed & self-healing');
 
 // After a normal boot the standard vendor formats exist (assessment + audit + the
 // scored VASR / VAR report types).
-$asmt  = (int) ops_val("SELECT COUNT(*) FROM report_types WHERE code LIKE 'UVA\\_%' ESCAPE '\\'");
-$audit = (int) ops_val("SELECT COUNT(*) FROM report_types WHERE code LIKE 'UAUD\\_%' ESCAPE '\\'");
+// M15 — '!' as the LIKE escape, not a backslash. MySQL treats a backslash as an
+// escape character inside string literals too, so ESCAPE '\' arrives as an
+// unterminated literal and is a syntax error there; SQLite accepts it. '!' is
+// ordinary on both engines and matches exactly the same rows.
+$asmt  = (int) ops_val("SELECT COUNT(*) FROM report_types WHERE code LIKE 'UVA!_%' ESCAPE '!'");
+$audit = (int) ops_val("SELECT COUNT(*) FROM report_types WHERE code LIKE 'UAUD!_%' ESCAPE '!'");
 $vasr  = (int) ops_val("SELECT COUNT(*) FROM report_types WHERE code IN ('VASR','VAR')");
 t_ok($asmt  >= 5, 'the standard Vendor Assessment formats install automatically');
 t_ok($audit >= 5, 'the standard Vendor Audit formats install automatically');

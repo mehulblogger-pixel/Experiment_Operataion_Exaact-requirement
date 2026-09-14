@@ -64,14 +64,14 @@ function sched_unallocated_calls($offices, $limit = 40) {
         $in = implode(',', array_map('intval', $offices));
         $w[] = "(c.executing_office_id IN ($in) OR c.executing_office_id IS NULL)";
     }
-    $a[] = (int)$limit;
+    // M15 — inlined int, never bound: MySQL rejects LIMIT '?'-as-string.
     try {
         return ops_all("SELECT c.id, c.call_code, c.inspection_required_date, c.sbu, c.inspection_type,
                                c.executing_office_id, bp.display_name, bp.legal_name
                         FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
                         WHERE " . implode(' AND ', $w) . "
                         ORDER BY CASE WHEN c.inspection_required_date='' THEN 1 ELSE 0 END, c.inspection_required_date, c.id DESC
-                        LIMIT ?", $a) ?: [];
+                        LIMIT " . max(1, (int)$limit), $a) ?: [];
     } catch (Throwable $e) { return []; }
 }
 

@@ -5,7 +5,7 @@ t_section('position master & manpower validation (Phase 3)');
 position_migrate();
 
 // --- Schema is additive ---
-$cols = array_map(fn($r) => $r['name'] ?? $r[1] ?? '', ops_all("PRAGMA table_info(requisitions)"));
+$cols = array_map(fn($r) => $r['name'] ?? $r[1] ?? '', t_columns_rows('requisitions'));
 t_ok(in_array('position_id', $cols, true), 'requisitions gains an additive position_id column');
 
 // --- CRUD ---

@@ -19,7 +19,7 @@ t_section('recruitment: PO ref / contract number split, facilities provider, edi
 req_migrate();
 
 // 1d — PO ref and contract number are now separate columns and fields.
-$reqCols = array_map(fn($c) => $c['name'], ops_all("PRAGMA table_info(requisitions)"));
+$reqCols = array_map(fn($c) => $c['name'], t_columns_rows('requisitions'));
 t_ok(in_array('po_ref', $reqCols, true) && in_array('contract_ref', $reqCols, true),
     'the requisition has separate po_ref and contract_ref columns');
 t_ok(in_array('po_ref', req_extra_fields(), true), 'po_ref is persisted on save');
@@ -108,7 +108,7 @@ t_ok(strpos($reqDetail, 'Deployment groups') !== false, 'the requisition detail 
 
 t_section('recruitment: tag a candidate to a deployment group + universal back button');
 // candidates carry a group_id, coerced like the other ids, and saved.
-$candCols = array_map(fn($c) => $c['name'], ops_all("PRAGMA table_info(candidates)"));
+$candCols = array_map(fn($c) => $c['name'], t_columns_rows('candidates'));
 t_ok(in_array('group_id', $candCols, true), 'candidates carry a group_id');
 t_ok(nzc_cand('group_id', '') === null && nzc_cand('group_id', '7') === 7, 'group_id is coerced to an int / null');
 t_ok(strpos($candForm, 'name="group_id"') !== false && strpos($candForm, 'REQ_GROUPS') !== false && strpos($candForm, 'fillGroups') !== false,

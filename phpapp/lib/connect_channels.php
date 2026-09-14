@@ -225,8 +225,9 @@ function connect_channels_recent($limit = 60) {
     connect_channels_migrate();
     try {
         $st = db()->prepare("SELECT m.*, p.name AS pro_name FROM cx_channel_messages m
-                             LEFT JOIN cx_professionals p ON p.id=m.pro_id ORDER BY m.id DESC LIMIT ?");
-        $st->execute([(int)$limit]);
+                             LEFT JOIN cx_professionals p ON p.id=m.pro_id ORDER BY m.id DESC
+                             LIMIT " . max(1, (int)$limit));   // M15 — inlined int
+        $st->execute();
         return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } catch (Throwable $e) { return []; }
 }

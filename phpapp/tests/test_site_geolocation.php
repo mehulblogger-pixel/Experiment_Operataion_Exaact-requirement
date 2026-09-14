@@ -10,7 +10,7 @@ geofence_migrate();
 $pdo = db();
 
 // The columns are on the address now.
-$cols = ops_all("PRAGMA table_info(partner_addresses)");
+$cols = t_columns_rows('partner_addresses');
 $names = array_map(fn($c) => $c['name'], $cols);
 t_ok(in_array('site_lat', $names, true) && in_array('site_lon', $names, true), 'partner_addresses carries its own site coordinates');
 

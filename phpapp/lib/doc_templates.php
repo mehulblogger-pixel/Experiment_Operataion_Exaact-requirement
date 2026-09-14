@@ -186,7 +186,13 @@ function doc_token_map($candidate) {
         'date' => date('d M Y'), 'cand_code' => $g('cand_code'),
         // Candidate-profile tokens — used by the one-pager. Safe if a column is
         // absent ($g returns ''), so the letter highlights it rather than erroring.
-        'experience' => $g('experience_years') !== '' ? ($g('experience_years') . ' years') : '',
+        // M15 — years are TRIMMED before they are printed. experience_years is a
+        // DECIMAL(5,1) column: MySQL hands back "6.0" where SQLite handed back the
+        // "6" that was written, so a one-pager sent to a client read "6.0 years" on
+        // production and "6 years" on the developer's machine. 6.5 still prints as
+        // "6.5"; only a meaningless trailing zero is dropped.
+        'experience' => $g('experience_years') !== ''
+            ? (rtrim(rtrim(number_format((float)$g('experience_years'), 1, '.', ''), '0'), '.') . ' years') : '',
         'skills'     => $g('cv_keywords'),
         'summary'    => $g('remarks'),
         'source'     => $g('source_type'),

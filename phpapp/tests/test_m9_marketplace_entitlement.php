@@ -200,7 +200,7 @@ $ceiling('connect,operations'); $login($masterId);
 t_ok(connect_enabled(), 'I · ON — the marketplace is open');
 $pdo = db();
 $hadTable = true;
-try { $pdo->exec("CREATE TABLE IF NOT EXISTS cx_requirements (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, created_at TEXT)"); }
+try { $pdo->exec("CREATE TABLE IF NOT EXISTS cx_requirements (id " . pk_clause() . ", title TEXT, created_at TEXT)"); }
 catch (Throwable $e) { $hadTable = false; }
 if ($hadTable) {
     try { $pdo->prepare("INSERT INTO cx_requirements (title, created_at) VALUES ('M9 lifecycle requirement', ?)")->execute([date('c')]); } catch (Throwable $e) {}

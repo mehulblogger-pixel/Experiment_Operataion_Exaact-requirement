@@ -8,7 +8,7 @@ t_section('Field #1 — upload a document with a client registration');
 if (function_exists('contracts_migrate')) contracts_migrate();
 
 // The file columns now exist on partner_registrations.
-$cols = array_map(fn($r) => $r['name'], ops_all("PRAGMA table_info(partner_registrations)"));
+$cols = array_map(fn($r) => $r['name'], t_columns_rows('partner_registrations'));
 foreach (['file_name','mime','file_data','uploaded_by','uploaded_at'] as $c)
     t_ok(in_array($c, $cols, true), "partner_registrations.$c column exists");
 

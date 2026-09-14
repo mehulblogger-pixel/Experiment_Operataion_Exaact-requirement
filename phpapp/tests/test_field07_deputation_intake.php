@@ -8,7 +8,7 @@ t_section('Field #7 — manday/manmonth deputation intake (conditional site deta
 leads_migrate();
 
 // The columns exist after migrate.
-$cols = array_map(fn($r) => $r['name'], ops_all("PRAGMA table_info(leads)"));
+$cols = array_map(fn($r) => $r['name'], t_columns_rows('leads'));
 foreach (['deputation_kind','manpower_count','manpower_skills','site_location'] as $c)
     t_ok(in_array($c, $cols, true), "leads.$c column exists");
 

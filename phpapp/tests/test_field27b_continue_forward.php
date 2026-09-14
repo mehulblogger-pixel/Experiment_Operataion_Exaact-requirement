@@ -12,7 +12,7 @@ $pdo->prepare("INSERT INTO business_partners (legal_name,display_name,is_vendor,
 $vid = (int)$pdo->lastInsertId();
 
 // jobs.prior_report_id column was added by migration.
-$jcols = array_map(fn($r) => $r['name'], ops_all("PRAGMA table_info(jobs)"));
+$jcols = array_map(fn($r) => $r['name'], t_columns_rows('jobs'));
 t_ok(in_array('prior_report_id', $jcols, true), 'jobs.prior_report_id column exists (coordinator forward target)');
 
 // Prior chain: call → job (with a QAP) → an ISSUED report carrying scope data.

@@ -4,7 +4,7 @@
 t_section('configurable numbering');
 
 // A throwaway table to allocate codes against.
-db()->exec("CREATE TABLE IF NOT EXISTS num_probe (id INTEGER PRIMARY KEY AUTOINCREMENT, code VARCHAR(60))");
+db()->exec("CREATE TABLE IF NOT EXISTS num_probe (id " . pk_clause() . ", code VARCHAR(60))");
 $mint = function () { $c = ops_next_code('num_probe', 'code', 'CALL');
     db()->prepare("INSERT INTO num_probe (code) VALUES (?)")->execute([$c]); return $c; };
 $reset = function () { db()->exec("DELETE FROM num_probe"); };
@@ -49,7 +49,7 @@ t_eq($mint(), 'CALL-00002', 'an already-taken number is stepped past');
 
 // 7. An unknown prefix (no scheme) still works via the original path.
 $reset();
-db()->exec("CREATE TABLE IF NOT EXISTS num_probe2 (id INTEGER PRIMARY KEY AUTOINCREMENT, x VARCHAR(60))");
+db()->exec("CREATE TABLE IF NOT EXISTS num_probe2 (id " . pk_clause() . ", x VARCHAR(60))");
 $c = ops_next_code('num_probe2', 'x', 'ZZZ');
 t_eq($c, 'ZZZ-00001', 'a prefix with no configured scheme falls back to the default format');
 

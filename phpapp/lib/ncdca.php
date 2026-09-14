@@ -319,10 +319,14 @@ function ncdca_possible_repeats($ncr, $limit = 10) {
     $w = ['id<>?']; $a = [$id];
     if ($partner) { $w[] = 'partner_id=?'; $a[] = $partner; }
     if ($clause !== '') { $w[] = "clause=?"; $a[] = $clause; }
-    $a[] = (int)$limit;
+    // M15 — the row limit is inlined as an integer, not bound. PDO binds a
+    // parameter as a string, and MySQL rejects LIMIT '20'; SQLite accepted it, so
+    // this whole lookup returned nothing on production while passing locally (the
+    // catch below swallowed it). An (int) cast cannot carry SQL.
     try {
         return ops_all("SELECT id, ref, title, clause, severity, detected_on, status FROM nonconformities
-                        WHERE " . implode(' AND ', $w) . " ORDER BY detected_on DESC, id DESC LIMIT ?", $a) ?: [];
+                        WHERE " . implode(' AND ', $w) . " ORDER BY detected_on DESC, id DESC
+                        LIMIT " . max(1, (int)$limit), $a) ?: [];
     } catch (Throwable $e) { return []; }
 }
 

@@ -72,11 +72,31 @@ setting_set('saas_db_selfcreate', '');
 $probe = saas_db_selfcreate_probe();
 t_ok(is_array($probe) && array_key_exists('ok', $probe) && array_key_exists('msg', $probe),
      'the capability test always returns an answer');
-t_ok($probe['ok'] === false, 'on this SQLite harness it correctly answers no');
-t_ok(stripos($probe['msg'], 'not running on MySQL') !== false, 'and says why, in plain words');
+// M15 — this block is genuinely engine-conditional, so it asserts what is right
+// for the engine that is actually live. Until M15 only the SQLite answer was ever
+// exercised; the MySQL branch is the one that matters in production and had never
+// been tested at all.
+if (t_driver() === 'sqlite') {
+    t_ok($probe['ok'] === false, 'on a SQLite harness it correctly answers no');
+    t_ok(stripos($probe['msg'], 'not running on MySQL') !== false, 'and says why, in plain words');
+} else {
+    t_ok(is_bool($probe['ok']), 'on MySQL the probe reaches a real yes/no');
+    t_ok(trim((string) $probe['msg']) !== '', 'and explains the answer in plain words');
+    t_ok(stripos((string) $probe['msg'], 'not running on MySQL') === false,
+         'and does NOT claim we are off MySQL when we are on it');
+}
 t_eq((string) ($probe['leftover'] ?? ''), '', 'and leaves nothing behind');
 
-t_eq(saas_db_account_prefix(), '', 'no account prefix can be derived without a MySQL database name');
+if (t_driver() === 'sqlite') {
+    t_eq(saas_db_account_prefix(), '', 'no account prefix can be derived without a MySQL database name');
+} else {
+    // On MySQL the prefix IS derivable — from the live database name. That is the
+    // whole point of the name-space logic below, and production always takes it.
+    $pfx = saas_db_account_prefix();
+    t_ok(is_string($pfx), 'on MySQL an account prefix is derived from the live database name');
+    t_ok($pfx === '' || preg_match('/^[A-Za-z0-9]+$/', $pfx) === 1,
+         'and it is plain letters and digits, never anything that could reach SQL');
+}
 
 // THE FALSE NEGATIVE THIS EXISTS FOR.
 // The live test reported "this server does NOT let the application create
@@ -100,7 +120,11 @@ t_ok(!in_array('..', saas_db_prefix_candidates(['name' => '../evil_x', 'user' =>
 
 // The proved prefix outranks the guessed one: the test knows, derivation infers.
 setting_set('saas_db_selfcreate_prefix', 'provedpfx');
-t_eq(saas_db_account_prefix(), '', 'on a non-MySQL install no prefix is claimed even so');
+if (t_driver() === 'sqlite') {
+    t_eq(saas_db_account_prefix(), '', 'on a non-MySQL install no prefix is claimed even so');
+} else {
+    t_eq(saas_db_account_prefix(), 'provedpfx', 'on MySQL a PROVED prefix outranks the derived one');
+}
 setting_set('saas_db_selfcreate_prefix', '');
 
 $p2 = saas_db_selfcreate_probe();

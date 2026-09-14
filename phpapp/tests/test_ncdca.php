@@ -26,12 +26,12 @@ $pdo = db();
 // ---------------------------------------------------------------------------
 head('1. Migration — elevate existing NCR/CAPA + gap tables (nothing rebuilt)');
 ok(count(ncdca_issue_types()) >= 18, 'issue_type master seeded (' . count(ncdca_issue_types()) . ' types incl. NCR as one of them)');
-$ncCols = array_map(fn($r)=>$r['name'], ops_all("PRAGMA table_info(nonconformities)"));
+$ncCols = array_map(fn($r)=>$r['name'], t_columns_rows('nonconformities'));
 ok(in_array('issue_type', $ncCols, true) && in_array('visibility', $ncCols, true), 'existing nonconformities gained issue_type + visibility (elevated, not rebuilt)');
-$capaCols = array_map(fn($r)=>$r['name'], ops_all("PRAGMA table_info(capa)"));
+$capaCols = array_map(fn($r)=>$r['name'], t_columns_rows('capa'));
 ok(in_array('eff_result', $capaCols, true), 'existing capa gained a richer effectiveness result');
 foreach (['issue_departures','issue_disputes','issue_extensions'] as $t)
-    ok((int)ops_val("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", [$t]) === 1, "gap table $t created");
+    ok((int)(t_table_exists($t) ? 1 : 0) === 1, "gap table $t created");
 
 // ---------------------------------------------------------------------------
 head('2. Issue-type dimension — NCR is one type, observation is another (§96)');

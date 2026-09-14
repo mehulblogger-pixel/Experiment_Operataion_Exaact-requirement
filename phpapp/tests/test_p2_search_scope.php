@@ -29,7 +29,10 @@ try {
     $pdo->prepare("INSERT INTO partner_contracts (contract_number, title, sbu, open_status) VALUES ('CN-THEIRS',?, 'LAB','OPEN')")->execute(["$TOK theirs"]);
 
     // A master session — ALL scope — finds everything.
-    $pdo->prepare("INSERT INTO users (username, first_name, is_active, is_superuser, role) VALUES ('srchmaster','S',1,1,'MASTER_ADMIN')")->execute();
+    // M15 — its own username. The suite shares one database and another search
+    // test also creates 'srchmaster'; MySQL enforces the unique index on
+    // users.username that SQLite had not built.
+    $pdo->prepare("INSERT INTO users (username, first_name, is_active, is_superuser, role) VALUES ('srchscope_master','S',1,1,'MASTER_ADMIN')")->execute();
     $mid = (int)$pdo->lastInsertId();
     $_SESSION['uid'] = $mid; current_user(true); ua(true);
     [$w, $a] = search_sbu_clause('sbu');

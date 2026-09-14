@@ -40,7 +40,13 @@ t_ok(substr((string)($byContract['PRJ-A']['closed_at'] ?? ''), 0, 7) === '2026-0
     'each line carries its closed month, so a month filter can pick a billing period');
 
 // A job already on a live invoice drops out of the pool (so it is not billed twice).
-$pdo->prepare("INSERT INTO invoices (partner_id, status, invoice_date, created_at) VALUES (?,?,?,?)")
+// M15 — invoice_no is NULL, not omitted. books_invoice_create() inserts NULL
+// explicitly for an unissued draft, because the production engine (MySQL) puts a
+// plain UNIQUE index on the column and allows many NULLs but only one ''. Leaving
+// it out here took the column default ('') and a SECOND draft then collided —
+// invisible on SQLite, whose index is partial (WHERE col <> ''). The fixture now
+// creates a draft the way the application does.
+$pdo->prepare("INSERT INTO invoices (invoice_no, partner_id, status, invoice_date, created_at) VALUES (NULL,?,?,?,?)")
     ->execute([$clientId, 'ISSUED', '2026-08-06', date('c')]);
 $invId = (int)$pdo->lastInsertId();
 $jobB = (int)ops_val("SELECT id FROM jobs WHERE job_code='JB-1'");
@@ -52,7 +58,13 @@ t_ok(!$stillThere, 'a job already on a live invoice leaves the billable pool');
 
 // A combined invoice carries the contract on every line, so the bill can group
 // the work by project. Draft one and add job A's line through the books path.
-$pdo->prepare("INSERT INTO invoices (partner_id, status, invoice_date, created_at) VALUES (?,?,?,?)")
+// M15 — invoice_no is NULL, not omitted. books_invoice_create() inserts NULL
+// explicitly for an unissued draft, because the production engine (MySQL) puts a
+// plain UNIQUE index on the column and allows many NULLs but only one ''. Leaving
+// it out here took the column default ('') and a SECOND draft then collided —
+// invisible on SQLite, whose index is partial (WHERE col <> ''). The fixture now
+// creates a draft the way the application does.
+$pdo->prepare("INSERT INTO invoices (invoice_no, partner_id, status, invoice_date, created_at) VALUES (NULL,?,?,?,?)")
     ->execute([$clientId, 'DRAFT', '2026-08-10', date('c')]);
 $inv2 = (int)$pdo->lastInsertId();
 $jobA = (int)ops_val("SELECT id FROM jobs WHERE job_code='JA-1'");

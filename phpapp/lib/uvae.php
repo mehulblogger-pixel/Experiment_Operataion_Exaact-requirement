@@ -386,7 +386,8 @@ function uvae_assessment_history($partnerId, $limit = 12) {
     return ops_all("SELECT d.id, d.irn, d.type_code, d.issue_date, d.created_at, d.result, d.status
                     FROM report_docs d JOIN report_types rt ON rt.id=d.report_type_id
                     WHERE d.vendor_id=? AND d.deleted=0 AND (d.type_code LIKE 'UVA\\_%' ESCAPE '\\' OR d.type_code='VASR')
-                    ORDER BY COALESCE(d.issue_date,d.created_at) DESC, d.id DESC LIMIT ?", [$partnerId, (int)$limit]);
+                    ORDER BY COALESCE(d.issue_date,d.created_at) DESC, d.id DESC
+                    LIMIT " . max(1, (int)$limit), [$partnerId]);   // M15 — inlined int
 }
 
 // Consume the vendor's OWN performance (§38/§90/§143) — reuse the existing

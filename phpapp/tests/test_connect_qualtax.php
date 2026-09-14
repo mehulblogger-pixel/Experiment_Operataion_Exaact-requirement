@@ -61,7 +61,7 @@ t_ok(stripos((string)$cswip, 'Welding') !== false, 'CSWIP is a welding-inspectio
 
 // The additive profile-capture columns exist on the professional (no new table).
 $cols = [];
-foreach (db()->query("PRAGMA table_info(cx_professionals)")->fetchAll(PDO::FETCH_ASSOC) as $c) $cols[$c['name']] = true;
+foreach (t_columns('cx_professionals') as $c) $cols[$c] = true;   // M15 — engine-independent
 foreach (['job_family_code', 'role_code', 'qual_level_code', 'iti_trade_code', 'cert_codes', 'years_experience'] as $col)
     t_ok(isset($cols[$col]), "cx_professionals gained the additive column $col");
 

@@ -557,5 +557,6 @@ function uvaae_audit_history($partnerId, $limit = 12) {
     return ops_all("SELECT d.id, d.irn, d.type_code, d.issue_date, d.created_at, d.result, d.status
                     FROM report_docs d JOIN report_types rt ON rt.id=d.report_type_id
                     WHERE d.vendor_id=? AND d.deleted=0 AND (d.type_code LIKE 'UAUD\\_%' ESCAPE '\\' OR d.type_code='VAR')
-                    ORDER BY COALESCE(d.issue_date,d.created_at) DESC, d.id DESC LIMIT ?", [$partnerId, (int)$limit]);
+                    ORDER BY COALESCE(d.issue_date,d.created_at) DESC, d.id DESC
+                    LIMIT " . max(1, (int)$limit), [$partnerId]);   // M15 — inlined int
 }

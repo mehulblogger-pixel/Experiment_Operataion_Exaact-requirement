@@ -2,7 +2,7 @@
 // The app builds its whole schema and seeds an admin on a clean database.
 t_section('boot & schema');
 
-$names = array_column(ops_all("SELECT name FROM sqlite_master WHERE type='table'") ?: [], 'name');
+$names = array_column(t_table_rows() ?: [], 'name');
 t_ok(count($names) > 80, 'many tables created (' . count($names) . ')');
 foreach (['users', 'calls', 'jobs', 'business_partners', 'quotations', 'quote_lines',
           'report_docs', 'idems_audit', 'lookup_types', 'lookup_values', 'custom_fields',
@@ -14,7 +14,7 @@ $admin = ops_one("SELECT id, username FROM users WHERE username='admin' OR is_su
 t_ok(!empty($admin), 'an admin / superuser account was seeded');
 
 // The secondary indexes from Step 1 must have been created during boot.
-$ix = ops_all("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'ix_%'") ?: [];
+$ix = t_index_rows('ix_%') ?: [];
 t_ok(count($ix) > 50, 'secondary indexes created during boot (' . count($ix) . ')');
 
 // A second boot() must be a clean no-op (idempotent migrations).
