@@ -190,6 +190,15 @@ function p1_run_probe(PDO $ctl, $appDir) {
             $probe['tenants'][] = $row;
         }
     } catch (Throwable $e) { $probe['error'] = $e->getMessage(); }
+
+    // Recovery scan — does the data still exist anywhere, live or as a backup?
+    $rec = ['app_dir' => $appDir, 'live_files' => p1_sweep_tenant_files($appDir), 'backups' => [], 'any_backups' => false];
+    foreach (p1_backup_dirs($appDir) as $label => $dir) {
+        $b = p1_scan_backups($dir);
+        $rec['backups'][$label] = $b;
+        if (!empty($b['workspaces'])) $rec['any_backups'] = true;
+    }
+    $probe['recovery'] = $rec;
     return $probe;
 }
 

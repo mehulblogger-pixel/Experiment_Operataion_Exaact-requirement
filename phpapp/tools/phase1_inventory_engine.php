@@ -376,7 +376,7 @@ function p1_probe_tenant($key, $routeJson, $registryEntry, $appDir, $company = '
 
     // STEP 2B — every candidate file for this workspace, including near-miss
     // filename variants, each identity-verified read-only.
-    $cands = p1_find_candidates($key, p1_candidate_dirs($appDir));
+    $cands = p1_find_candidates($key, p1_search_dirs($appDir));
     foreach ($cands as &$c)
         $c['identity'] = $c['is_sqlite']
             ? p1_identify_db($c['path'], $key, (string) $company)
@@ -478,6 +478,8 @@ function p1_render_storage_text(array $probe) {
         $L[] = '    >> CLASSIFICATION     : ' . ($r['classification'] ?? 'UNKNOWN');
     }
     $L[] = '';
+    if (!empty($probe['recovery'])) $L[] = rtrim(p1_render_recovery_text($probe['recovery']));
+    $L[] = '';
     $L[] = str_repeat('=', 78);
     $L[] = 'END OF PROBE — nothing was opened, created or written.';
     return implode("\n", $L) . "\n";
@@ -544,6 +546,20 @@ function p1_key_variants($key) {
     $out[] = str_replace('-', '_', $k);
     $out[] = str_replace('_', '-', $k);
     return array_values(array_unique($out));
+}
+
+// EVERY location worth searching for a workspace data file: the routing
+// locations, plus one level above the app folder and a sibling 'data' folder.
+// Using one list everywhere keeps the per-workspace classification and the
+// recovery scan from ever disagreeing.
+function p1_search_dirs($appDir) {
+    $appDir = rtrim((string) $appDir, '/');
+    $places = p1_candidate_dirs($appDir);
+    $places['one level above the app folder'] = dirname($appDir);
+    // On this server the sibling 'data' folder belongs to a DIFFERENT
+    // application, so only 'tenant-*.sqlite' is ever globbed there.
+    $places["sibling 'data' folder (shared account root)"] = dirname($appDir) . '/data';
+    return $places;
 }
 
 // Every workspace data file in $dirs that could belong to this key.
@@ -639,4 +655,104 @@ function p1_mysql_storage_check($routeJson, $registryEntry) {
         }
     }
     return $out;
+}
+
+// ============================================================================
+//  RECOVERY SCAN  (read-only)
+//
+//  Added when both workspaces became unreadable between two inventory runs.
+//  Its only job is to answer: does the data still exist ANYWHERE — as a live
+//  file that has merely moved, or as a backup snapshot?
+//
+//  Lists names, sizes and dates. Opens nothing. Creates nothing. Writes nothing.
+// ============================================================================
+
+// Where the backup engine stores snapshots (lib/backup.php backup_root()).
+function p1_backup_dirs($appDir) {
+    $appDir = rtrim((string) $appDir, '/');
+    return [
+        'exaact_backups (above web root)' => dirname($appDir) . '/exaact_backups',
+        'data-backups (inside app folder)' => $appDir . '/data-backups',
+    ];
+}
+
+// Per-workspace backup folders: how many snapshots, newest, total size.
+function p1_scan_backups($dir) {
+    $out = ['path' => $dir, 'exists' => is_dir($dir), 'readable' => is_dir($dir) && is_readable($dir), 'workspaces' => []];
+    if (!$out['readable']) return $out;
+    foreach (glob(rtrim($dir, '/') . '/*', GLOB_ONLYDIR) ?: [] as $wd) {
+        $files = array_merge(glob($wd . '/*.json.gz') ?: [], glob($wd . '/*.json') ?: []);
+        if (!$files) continue;
+        // Snapshot filenames are YYYYMMDD_HHMMSS_reason.json[.gz], so sorting by
+        // NAME is the reliable "newest" — file timestamps tie when several are
+        // written in the same second, or are rewritten by an upload.
+        $bytes = 0;
+        foreach ($files as $f) $bytes += (int) @filesize($f);
+        $names = array_map('basename', $files);
+        rsort($names);
+        $newestName = $names[0] ?? '';
+        $newest = $newestName !== '' ? (int) @filemtime(rtrim($wd, '/') . '/' . $newestName) : 0;
+        $out['workspaces'][] = [
+            'workspace'   => basename($wd),
+            'snapshots'   => count($files),
+            'total_bytes' => $bytes,
+            'newest'      => $newestName,
+            'newest_at'   => $newest ? date('Y-m-d H:i:s', $newest) : '',
+        ];
+    }
+    return $out;
+}
+
+// A wide sweep for workspace data files that may simply have moved.
+// Non-recursive, and only in locations this application itself uses.
+function p1_sweep_tenant_files($appDir) {
+    $appDir = rtrim((string) $appDir, '/');
+    $places = p1_search_dirs($appDir);
+    $found = [];
+    foreach ($places as $label => $dir) {
+        if (!is_dir($dir) || !is_readable($dir)) continue;
+        foreach (glob(rtrim($dir, '/') . '/tenant-*.sqlite') ?: [] as $f)
+            $found[] = p1_path_facts($f) + ['where' => $label, 'name' => basename($f),
+                                            'is_sqlite' => p1_is_sqlite_file($f)];
+    }
+    return $found;
+}
+
+function p1_render_recovery_text(array $rec) {
+    $L = [];
+    $L[] = '';
+    $L[] = str_repeat('=', 78);
+    $L[] = 'RECOVERY SCAN — does the data still exist anywhere?';
+    $L[] = str_repeat('=', 78);
+    $L[] = 'App folder            : ' . $rec['app_dir'];
+    $L[] = 'One level above it    : ' . dirname($rec['app_dir']);
+    $L[] = '';
+    $L[] = 'LIVE WORKSPACE FILES FOUND (any location this app uses)';
+    if ($rec['live_files']) {
+        foreach ($rec['live_files'] as $f)
+            $L[] = '  ' . $f['name'] . '  (' . number_format($f['bytes']) . ' bytes, modified ' . $f['modified']
+                 . ', ' . ($f['is_sqlite'] ? 'valid database' : 'NOT a database') . ')  in ' . $f['where'];
+    } else {
+        $L[] = '  NONE FOUND — no workspace data file exists in any location this application uses.';
+    }
+    $L[] = '';
+    $L[] = 'BACKUP SNAPSHOTS';
+    foreach ($rec['backups'] as $label => $b) {
+        $L[] = '  ' . $label;
+        $L[] = '    path   : ' . $b['path'];
+        $L[] = '    exists : ' . ($b['exists'] ? 'yes' : 'no');
+        if (!empty($b['workspaces'])) {
+            foreach ($b['workspaces'] as $w)
+                $L[] = '    -> ' . $w['workspace'] . ' : ' . $w['snapshots'] . ' snapshot(s), '
+                     . number_format($w['total_bytes']) . ' bytes, newest ' . $w['newest'] . ' at ' . $w['newest_at'];
+        } elseif ($b['exists']) {
+            $L[] = '    -> (no snapshots)';
+        }
+    }
+    $L[] = '';
+    $L[] = $rec['live_files'] || $rec['any_backups']
+        ? '>> DATA FOUND. Recovery is possible. Do not upload or delete anything further.'
+        : '>> NOTHING FOUND in the application folders. Check your hosting provider backups immediately.';
+    $L[] = str_repeat('=', 78);
+    return implode("\n", $L) . "\n";
 }

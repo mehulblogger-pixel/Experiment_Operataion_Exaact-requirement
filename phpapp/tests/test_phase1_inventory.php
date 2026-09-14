@@ -250,3 +250,40 @@ t_ok(p1_path_facts('/definitely/not/here.sqlite')['exists'] === false, 'a missin
 
 foreach (glob($dir . '/*') ?: [] as $f2) @unlink($f2); @rmdir($dir);
 t_ok(true, 'temporary diagnostic fixtures cleaned up');
+
+// ---- 12. Recovery scan — does the data still exist anywhere? --------------
+t_section('Recovery scan');
+
+$rd = sys_get_temp_dir() . '/p1rec_' . bin2hex(random_bytes(4));
+@mkdir($rd . '/app/tools', 0777, true);
+@mkdir($rd . '/exaact_backups/acme', 0777, true);
+file_put_contents($rd . '/exaact_backups/acme/20260101_010000_daily.json.gz', gzencode('a'));
+file_put_contents($rd . '/exaact_backups/acme/20260914_020000_manual.json.gz', gzencode('bb'));
+
+$bd = p1_backup_dirs($rd . '/app');
+t_eq($bd['exaact_backups (above web root)'], $rd . '/exaact_backups', 'backups are looked for above the web root');
+
+$scan = p1_scan_backups($rd . '/exaact_backups');
+t_ok($scan['exists'] && count($scan['workspaces']) === 1, 'a workspace backup folder is found');
+t_eq($scan['workspaces'][0]['workspace'], 'acme', 'the workspace is named');
+t_eq($scan['workspaces'][0]['snapshots'], 2, 'every snapshot is counted');
+t_eq($scan['workspaces'][0]['newest'], '20260914_020000_manual.json.gz',
+     'the newest snapshot is chosen by timestamped filename, not by file mtime');
+
+t_ok(p1_scan_backups($rd . '/nope')['exists'] === false, 'a missing backup folder is reported, not created');
+t_ok(!is_dir($rd . '/nope'), 'and scanning did not create it');
+
+// The sweep finds a live file that has moved above the web root.
+@mkdir($rd . '/exaact_data', 0777, true);
+$moved = $rd . '/exaact_data/tenant-acme.sqlite';
+$d = new PDO('sqlite:' . $moved); $d->exec('CREATE TABLE settings (skey TEXT, svalue TEXT)'); $d = null;
+$sweep = p1_sweep_tenant_files($rd . '/app');
+$hit = array_values(array_filter($sweep, fn($f) => $f['name'] === 'tenant-acme.sqlite'));
+t_ok(count($hit) === 1, 'the sweep finds a workspace file that has moved');
+t_ok($hit[0]['is_sqlite'], 'and confirms it is a real database');
+
+foreach (['/exaact_backups/acme/20260101_010000_daily.json.gz', '/exaact_backups/acme/20260914_020000_manual.json.gz',
+          '/exaact_data/tenant-acme.sqlite'] as $f) @unlink($rd . $f);
+@rmdir($rd . '/exaact_backups/acme'); @rmdir($rd . '/exaact_backups'); @rmdir($rd . '/exaact_data');
+@rmdir($rd . '/app/tools'); @rmdir($rd . '/app'); @rmdir($rd);
+t_ok(true, 'recovery fixtures cleaned up');
