@@ -80,12 +80,36 @@ foreach (['marketplace', 'no_such_module', ''] as $bad)
 
 // ---- H · Licence restriction ---------------------------------------------
 // A signed licence is the contract and outranks the cloud ceiling entirely.
-$GLOBALS['__test_lk_modules'] = ['operations'];
-if (!function_exists('lk_modules_test_override')) {
-    // lk_modules() is read through function_exists; the harness cannot replace it,
-    // so the licence path is asserted through its real behaviour below instead.
+//
+// Exercised for real, not simulated: a key that is present but does not verify
+// puts lk_state() into INVALID, and lk_modules() then returns [] — "this grants
+// nothing beyond core". That is the same fail-closed answer Milestone 3 gives a
+// blank ceiling, and it is the branch of module_state() that must win over any
+// cloud entitlement.
+$savedKey     = (string) setting_get('licence_key', '');
+$savedInstall = (string) setting_get('licence_install', '');
+$set('hr,operations,money');                       // a generous ceiling, to be overruled
+setting_set('licence_key', 'not-a-real-signed-key-so-verification-fails');
+$asTenant();
+if (function_exists('lk_state')) lk_state(true);
+licence_disabled(true);
+
+if (function_exists('lk_modules') && lk_modules() !== null) {
+    foreach (['hr', 'operations', 'money', 'sales', 'reporting'] as $k)
+        t_eq($state($k), 'LICENCE_BLOCKED', "H · an unverifiable licence blocks $k, whatever the cloud ceiling says");
+    t_ok(!$entitled('hr'), 'H · and a licence-blocked module is not entitled');
+    t_eq($state('admin'), 'CORE', 'H · while core survives — a bad key is not a dead install');
+    $asTenant(); licence_disabled(true);
+    t_ok(!licence_enabled('money'), 'H · and it cannot be switched on at runtime');
+} else {
+    t_ok(false, 'H · could not put the licence into an enforcing state — case H NOT covered');
 }
-t_ok(true, 'H · signed-licence precedence is asserted by the existing licence-key suite');
+
+setting_set('licence_key', $savedKey); setting_set('licence_install', $savedInstall);
+if (function_exists('lk_state')) lk_state(true);
+licence_disabled(true);
+$asTenant();
+t_ok(lk_modules() === null, 'H · licence state restored to OPEN for the cases below');
 
 // ---- I/J · Tenant disablement, and its precedence ------------------------
 $set('hr,operations', 'operations');
