@@ -37,3 +37,7 @@ dev.sqlite
 
 # build output — generated installer packages, never committed to source
 dist/
+
+# Test artefacts: the app creates these ABOVE the app folder when tests run.
+exaact_data/
+exaact_backups/
