@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '24ebc5d · 2026-09-14 13:21 UTC · 651 files';
+$RELEASE = '422c6b4 · 2026-09-14 14:01 UTC · 651 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
     'cron.php' => ['s'=>23081,'h'=>'b2ebb8eff370868e'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>114230,'h'=>'279ce22196863b6e'],
+    'index.php' => ['s'=>114588,'h'=>'d7c967ea55264a40'],
     'lib/access.php' => ['s'=>69658,'h'=>'358965b79afc5ca7'],
     'lib/activity.php' => ['s'=>22744,'h'=>'2a63a2da6e0df9f5'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
@@ -41,7 +41,7 @@ $EXPECT  = [
     'lib/agreement.php' => ['s'=>30404,'h'=>'850a0f08f100b313'],
     'lib/ai.php' => ['s'=>26123,'h'=>'9a1b149e7eb200b0'],
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
-    'lib/areas.php' => ['s'=>34810,'h'=>'7890b9b65c598ca9'],
+    'lib/areas.php' => ['s'=>35905,'h'=>'3ec6e4c8ef577d7b'],
     'lib/assets.php' => ['s'=>14164,'h'=>'c741d1d0aff275bd'],
     'lib/attend.php' => ['s'=>13919,'h'=>'695a4eae1fd9e2a9'],
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
@@ -168,7 +168,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>65530,'h'=>'156e208c6595fdff'],
-    'lib/ops.php' => ['s'=>585913,'h'=>'9f1134b93aac01f2'],
+    'lib/ops.php' => ['s'=>586876,'h'=>'06f0564c5eaa03bf'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -253,7 +253,7 @@ $EXPECT  = [
     'lib/visibility.php' => ['s'=>4843,'h'=>'281d50af3a4d26fa'],
     'lib/webhookq.php' => ['s'=>7844,'h'=>'10e0dde19b283fdf'],
     'lib/workforce.php' => ['s'=>39343,'h'=>'40796172e585e48a'],
-    'lib/workspace.php' => ['s'=>12074,'h'=>'07dc0e50a644afa6'],
+    'lib/workspace.php' => ['s'=>15210,'h'=>'7cf36505c40be5c2'],
     'manifest.php' => ['s'=>1665,'h'=>'cd62f3f83b1a7969'],
     'phase1-inventory.php' => ['s'=>23590,'h'=>'37dcca72c7f637f2'],
     'refresh.php' => ['s'=>3674,'h'=>'c828dd3fd0db7613'],
@@ -285,7 +285,7 @@ $EXPECT  = [
     'tools/trace-thread.php' => ['s'=>4962,'h'=>'cb20d74d1a6eb46e'],
     'views/admin.php' => ['s'=>1090,'h'=>'aeb34e3396fd4ac5'],
     'views/dashboard.php' => ['s'=>41733,'h'=>'ed34019f03f18dc7'],
-    'views/detail.php' => ['s'=>34118,'h'=>'2d6325edfa04bae4'],
+    'views/detail.php' => ['s'=>34739,'h'=>'fc48123e14455cee'],
     'views/forgot_password.php' => ['s'=>2716,'h'=>'c041f8176182b36c'],
     'views/form.php' => ['s'=>24206,'h'=>'959912d692fa235f'],
     'views/layout_bottom.php' => ['s'=>880,'h'=>'e6b33e19b84eb59f'],

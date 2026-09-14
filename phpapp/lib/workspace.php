@@ -118,6 +118,60 @@ function workspace_landing_for($user) {
     return isset($allowed[$cand]) ? $cand : '';                    // never send them somewhere they can't open
 }
 
+// ============================================================================
+//  MILESTONE 11 — where does this person start?
+//
+//  Until now that question had no single answer. The decision lived as a
+//  four-branch cascade inside index.php, and nine different "home" screens exist
+//  (dashboard, the Operations home, eight area homes, the CRM dashboard, the
+//  recruitment home, the setup cockpit, the owner home, welcome, role
+//  workspaces). Every branch was added for a real reason; together they meant no
+//  two customers necessarily saw the same first screen and nothing in the code
+//  could tell you why.
+//
+//  This resolver states the rule once, in the file that already owns landings.
+//  It DECIDES ONLY — it performs no redirect and writes no session — so it can
+//  be read, tested and explained. index.php still carries out the decision and
+//  still owns the once-per-session flags.
+//
+//  NOTHING WAS REMOVED. Every landing screen still exists and still works; what
+//  changed is that the order is now written down in one place.
+//
+//  Returns: ['route' => string, 'mode' => string, 'why' => string]
+//  An empty route means "no redirect — render the default home".
+// ============================================================================
+const LANDING_MODES = ['cockpit', 'welcome', 'role', 'recruitment', 'dashboard'];
+
+function ops_landing_decide($user, $onboardingSeen = false, $roleLandingUsed = false) {
+    if (!$user) return ['route' => '', 'mode' => 'dashboard', 'why' => 'not signed in'];
+
+    // 1. A workspace whose setup is unfinished is oriented first — once.
+    if (!$onboardingSeen && function_exists('onboarding_incomplete') && onboarding_incomplete()) {
+        if (function_exists('cockpit_can') && cockpit_can())
+            return ['route' => '/workspace/setup', 'mode' => 'cockpit',
+                    'why' => 'setup incomplete and this person can complete it'];
+        return ['route' => '/welcome', 'mode' => 'welcome',
+                'why' => 'setup incomplete and this person cannot complete it'];
+    }
+
+    // 2. A configured personal or role landing — once per session, and only ever
+    //    to a screen this person may actually open.
+    if (!$roleLandingUsed && function_exists('workspace_landing_for')) {
+        $land = workspace_landing_for($user);
+        if ($land !== '' && $land !== '/')
+            return ['route' => $land, 'mode' => 'role', 'why' => 'a personal or role landing is configured'];
+    }
+
+    // 3. A recruitment-only company gets the recruitment command centre as HOME.
+    //    The operations dashboard is meaningless without inspections and jobs.
+    if (function_exists('licence_enabled') && !licence_enabled('operations') && licence_enabled('hr')
+        && function_exists('ops_recruitment_home') && function_exists('recruit_home_can') && recruit_home_can())
+        return ['route' => '', 'mode' => 'recruitment', 'why' => 'Operations is not licensed and People & hiring is'];
+
+    // 4. Everyone else: the dashboard, exactly as before.
+    return ['route' => '', 'mode' => 'dashboard', 'why' => 'the default home'];
+}
+
 // The quick-access tiles this user should see on their home (role tiles ∩ allowed).
 function workspace_tiles_for($user) {
     if (!$user) return [];

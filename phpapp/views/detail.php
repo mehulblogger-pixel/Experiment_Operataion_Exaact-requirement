@@ -197,6 +197,16 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <b>group-company</b> contract under one <?= e(Tl('quote')) ?>, use the <?= e(Tl('quote')) ?>’s group-contract action.
   </div>
   <?php endif; ?>
+  <?php /* M11 — the authoritative path, stated before the form rather than only
+           after a partner already has live contracts. The form stays: it is a
+           legitimate secondary door for a contract recorded directly. */ ?>
+  <?php if (!$nlc): ?>
+  <div class="muted" style="margin:6px 0 10px">
+    A contract for a <b>won <?= e(Tl('quote')) ?></b> is normally registered from the <?= e(Tl('quote')) ?> itself,
+    which carries the value and the scope across for you. Use the form below when the contract was
+    agreed directly and there is no <?= e(Tl('quote')) ?> behind it.
+  </div>
+  <?php endif; ?>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=contract" class="inline-add">
     <div class="ff"><label>Contract number</label><input class="form-control" name="contract_number" required></div>
     <div class="ff"><label>Against <?= e(Tl('quote')) ?> <span class="muted">— only those with no contract number</span></label>

@@ -2628,6 +2628,19 @@ function ops_module_gate($route, $peek = false) {
         static $peekExtra = ['service-scope' => 'operations', 'service-formats' => 'reporting', 'industry' => 'sales', 'industry-apply' => 'sales'];
         $pm = $peekExtra[$base] ?? null;
         if ($pm !== null && function_exists('licence_enabled') && !licence_enabled($pm)) return false;
+        // MILESTONE 11 — "would this link work?" must answer correctly for the
+        // marketplace too. Its routes are absent from the map above (they have no
+        // access modules — see M9), so a menu that peeks would have been told
+        // "yes" for a company that has not bought Marketplace, and the click would
+        // then be refused by connect_enabled(). No navigation surface exploits
+        // that today, because every one of them is built from the licence-gated
+        // area definitions — but a link that opens a refusal is the dead end §20
+        // exists to prevent, so the peek is made honest here rather than left to
+        // each menu to remember.
+        if (function_exists('connect_enabled')
+            && (strncmp($base, 'connect-', 8) === 0 || strncmp($base, 'marketplace-', 12) === 0
+                || $base === 'connect' || strncmp($base, 'passport', 8) === 0)
+            && !connect_enabled()) return false;
         return true;
     }
     // An assigned inspector owns their own job: let them open it, upload its

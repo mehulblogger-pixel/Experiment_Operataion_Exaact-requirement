@@ -1170,17 +1170,24 @@ if ($route === '') {
     // landing on a deep module with no orientation. Only while setup is incomplete, only
     // for signed-in staff, and only once per session (so it never loops and an established
     // company never sees it — its steps are already done).
-    if (function_exists('current_user') && current_user() && empty($_SESSION['onb_seen'])
-        && function_exists('onboarding_incomplete') && onboarding_incomplete()) {
-        // A workspace administrator lands on the Company Setup Cockpit — the single
-        // front door (Phase 1). Everyone else keeps the lightweight welcome. Once
-        // per session either way, so "Home" still reaches the dashboard afterwards
-        // and an established company never sees it.
-        if (function_exists('cockpit_can') && cockpit_can()) {
-            $_SESSION['onb_seen'] = 1;
-            redirect('/workspace/setup');
-        }
-        redirect('/welcome');
+    // M11 — the decision now lives in ONE place, ops_landing_decide(), which is a
+    // pure function and can be read and tested. This block still performs the
+    // redirect and still owns the once-per-session flags, because those are side
+    // effects and the resolver has none.
+    //
+    // M11 also fixes a real defect here. The comment below said "once per session
+    // EITHER WAY", but $_SESSION['onb_seen'] was set only on the cockpit branch —
+    // so an ordinary member of staff in a company whose setup was unfinished was
+    // sent to /welcome EVERY time they clicked Home, and could never reach their
+    // dashboard. The flag is now set on both paths, which is what the comment
+    // always said and what "Home" has to mean.
+    $__land = function_exists('ops_landing_decide')
+        ? ops_landing_decide(current_user(), !empty($_SESSION['onb_seen']), !empty($_SESSION['ws_landed']))
+        : ['route' => '', 'mode' => 'dashboard', 'why' => ''];
+
+    if ($__land['mode'] === 'cockpit' || $__land['mode'] === 'welcome') {
+        $_SESSION['onb_seen'] = 1;
+        redirect($__land['route']);
     }
     // Configurable role workspaces — send the user to their landing page once per
     // session (their personal start page, else their role's configured landing).
@@ -1188,10 +1195,7 @@ if ($route === '') {
     // dashboard shows as before. Once per session so "Home" still reaches the dashboard.
     if (function_exists('current_user') && current_user() && empty($_SESSION['ws_landed'])) {
         $_SESSION['ws_landed'] = 1;
-        if (function_exists('workspace_landing_for')) {
-            $__land = workspace_landing_for(current_user());
-            if ($__land !== '' && $__land !== '/') redirect($__land);
-        }
+        if ($__land['mode'] === 'role' && $__land['route'] !== '') redirect($__land['route']);
     }
     // A recruitment-only company (Operations not licensed, People & hiring on) gets
     // the Recruitment command centre as its HOME — not the operations / service

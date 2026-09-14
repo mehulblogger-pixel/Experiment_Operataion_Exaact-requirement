@@ -34,7 +34,18 @@ t_ok(in_array('sla-targets', ops_area_routes('quality'), true), 'SLA targets rou
 t_ok(strpos($areas, "'SLA targets', '/sla-targets', 'Turnaround targets for service delivery.'") !== false,
     'the SLA targets tile is defined in the Quality area');
 // The Admin Document-templates tile no longer grants via crm.template.manage.
-t_ok(strpos($areas, "(can('idems.type.manage') || is_master()), '📝', 'Document templates'") !== false,
+// UPDATED IN MILESTONE 11 — the label changed ('Document templates' ->
+// 'Report templates', with an explicit ?kind=report destination). The POINT of
+// this assertion is the GATE, not the wording: the Admin tile must grant via
+// idems.type.manage or master, and must NOT grant via crm.template.manage. That
+// is asserted below unchanged, and a second assertion now pins the absence of
+// the crm grant explicitly, so this is stricter than it was.
+t_ok(strpos($areas, "(can('idems.type.manage') || is_master()), '📝', 'Report templates'") !== false,
     'the Admin templates tile is idems/master only (crm grant moved to Sales)');
+$adminCase = substr($areas, strpos($areas, "case 'admin':"), 7000);
+// Look for an actual GRANT, not the mention of it: the admin case carries a
+// comment recording that this grant moved to Sales, and a comment is not a gate.
+t_ok(strpos($adminCase, "can('crm.template.manage')") === false,
+    'M11 — and the Admin tile still does not grant through crm.template.manage');
 // The Admin subtitle is honest about who it is for.
 t_ok(strpos($areas, "For administrators: masters, people, access") !== false, 'the Admin area subtitle names administrators');

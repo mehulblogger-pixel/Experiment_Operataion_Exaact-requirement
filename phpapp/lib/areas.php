@@ -83,7 +83,10 @@ function ops_area_def($area) {
             // R11 — document / template library for marketing (crm.template.manage) moved
             // here from Admin, so a marketing manager reaches it in Sales — where their work
             // is — instead of via an Admin area that implied administrative power.
-            $t(can('crm.template.manage') || is_master(), '📝', 'Document templates', '/templates', 'The document / report template library.');
+            // M11 — name the destination and ask for it explicitly, so the Sales tile
+            // always opens quotation templates and the Reporting tile always opens
+            // report templates. One authoritative route, two unambiguous doors.
+            $t(can('crm.template.manage') || is_master(), '📝', ucfirst(Tl('quote')) . ' templates', '/templates?kind=quote', 'Letter and covering-note templates for ' . Tlp('quote') . '.');
             $t(is_master() || can('settings.manage') || can('crm.quote.approve'), '☑', 'Pre-order checklist', '/preorder-checklist', 'Enquiry / tender / contract review before a quote is approved.');
             $t(function_exists('pc_can') && pc_can(), '🧮', 'Project costing', '/project-costings', 'Team cost build-ups → man-month / man-day / lump rates and margin.');
             $t($fx('gate_can_view') && gate_can_view(), '🛂', 'Approvals', '/approvals', 'Deals held at a stage gate.',
@@ -241,11 +244,14 @@ function ops_area_def($area) {
         case 'directory':
             $title = 'Directory'; $icon = '🏢';
             $sub = 'The people and companies the work is done with — and the portals they sign in to.';
-            $routes = ['directory','activities','clients','client','vendors','vendor','client-holds','asset-register','portal-users','vendor-users'];
+            $routes = ['directory','activities','clients','client','vendors','vendor','client-holds','asset-register','duplicates','portal-users','vendor-users'];
             $t($fx('act_can_view') && act_can_view(), '🕘', 'Activity', '/activities', 'A timeline of what happened.');
             $t(can('mod.clients.view'), '🏢', T_REG('client'), '/clients', 'The client register.');
             $t(can('mod.vendors.view'), '🚚', T_REG('vendor'), '/vendors', 'The vendor register.');
             $t(is_master() || can('settings.manage') || ($fx('is_coordinator_level') && is_coordinator_level()), '⛔', 'Client holds', '/client-holds', 'Put a client on hold or block them before ordering.');
+            $t(($fx('is_admin_level') && is_admin_level()) || can('mod.clients.edit') || can('mod.vendors.edit'),
+               '🔍', 'Find duplicates', '/duplicates',
+               'Companies recorded twice — review and merge them.');   // M11 — was reachable only by typing the address
             $t($fx('asset_can_view') && asset_can_view(), '📦', 'Asset issuance', '/asset-register', 'Stamps, diaries, safety gear & devices issued to engineers — acknowledged and tracked.');
 
             // Portal administration — moved here from Quality (it manages the people
@@ -259,7 +265,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','workspace/setup','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','workspace/setup','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             // Phase 1 — the Company Setup Cockpit is the single front door to all
             // configuration below. Shown first so a non-technical admin starts here.
@@ -281,6 +287,10 @@ function ops_area_def($area) {
 
             $sec('Configuration');
             $t(can('mod.settings.view') && can('settings.manage'), '⚙️', 'System settings', '/settings', 'Company-wide settings and terminology.');
+            $t(is_master() || can('settings.manage'), '💾', 'Backup & restore', '/backup',
+               'Download a copy of this workspace, or restore one.');   // M11 — was reachable only by typing the address
+            $t(is_master() || can('settings.manage'), '🤖', 'AI settings', '/ai-settings',
+               'Connect and tune the assistant used by the form and document builders.');   // M11 — same
             $t(can('settings.manage'), '🔤', 'Terminology / wording', '/terminology', 'Rename what things are called on every screen — e.g. “Requirement”, “Candidate”, “Client” — to match your business.');
             $t(($fx('fd_can') && fd_can()), '🧱', 'Form Designer', '/form-designer', 'Build your Requirement & Candidate forms end to end — add or delete a field, create a dropdown with its options, rename, reorder, hide or require — all on one screen, no coding.');
             $t(($fx('fd_can') && fd_can() && (!$fx('licence_enabled') || licence_enabled('hr'))), '✨', 'Build forms with AI', '/ai-forms', 'Describe your recruitment process and let AI suggest the extra fields and dropdown lists to capture it — you review and approve before anything is added.');
@@ -301,7 +311,7 @@ function ops_area_def($area) {
             $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Approval rules', '/approval-rules', 'Routing rules for approval.');
             // R11 — the crm.template.manage grant moved to Sales (Document templates), so
             // holding only that permission no longer forces a marketing manager into Admin.
-            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '📝', 'Document templates', '/templates', 'The report template library.');
+            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '📝', 'Report templates', '/templates?kind=report', 'The report template library.');   // M11 — explicit destination
             $t(licence_enabled('reporting') && (can('idems.audit.view') || is_master()), '🛡️', 'Report audit trail', '/audit-log', 'Who changed what, and when.');
 
             $sec('Super admin');
