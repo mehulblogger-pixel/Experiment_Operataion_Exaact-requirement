@@ -600,33 +600,72 @@ function saas_db_admin_config() {
 // Returns ['ok'=>bool, 'msg'=>string, 'leftover'=>string].
 function saas_db_selfcreate_probe() {
     if (!function_exists('db_driver') || db_driver() !== 'mysql')
-        return ['ok' => false, 'leftover' => '',
+        return ['ok' => false, 'leftover' => '', 'prefix' => '', 'tried' => [],
                 'msg' => 'This install is not running on MySQL, so there is nothing to test.'];
     try { $cfg = require dirname(__DIR__) . '/config.php'; $d = (array) ($cfg['db'] ?? []); }
-    catch (Throwable $e) { return ['ok' => false, 'leftover' => '', 'msg' => 'Could not read the database settings.']; }
+    catch (Throwable $e) { return ['ok' => false, 'leftover' => '', 'prefix' => '', 'tried' => [],
+                                   'msg' => 'Could not read the database settings.']; }
     if ((string) ($d['user'] ?? '') === '')
-        return ['ok' => false, 'leftover' => '', 'msg' => 'Could not read the database settings.'];
+        return ['ok' => false, 'leftover' => '', 'prefix' => '', 'tried' => [],
+                'msg' => 'Could not read the database settings.'];
 
-    $probe = 'exaact_probe_' . bin2hex(random_bytes(5));
-    if (!preg_match('/^[a-z0-9_]{1,64}$/', $probe))
-        return ['ok' => false, 'leftover' => '', 'msg' => 'Internal error generating the test name.'];
     try {
         $pdo = new PDO('mysql:host=' . (string) ($d['host'] ?? 'localhost') . ';charset=utf8mb4',
                        (string) $d['user'], (string) ($d['pass'] ?? ''),
                        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 8]);
-        $pdo->exec("CREATE DATABASE `{$probe}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     } catch (Throwable $e) {
-        return ['ok' => false, 'leftover' => '',
-                'msg' => 'This server does NOT let the application create databases by itself. '
-                       . 'That is normal on shared hosting. (' . $e->getMessage() . ')'];
+        return ['ok' => false, 'leftover' => '', 'prefix' => '', 'tried' => [],
+                'msg' => 'Could not connect to the database server. (' . $e->getMessage() . ')'];
     }
-    $leftover = '';
-    try { $pdo->exec("DROP DATABASE `{$probe}`"); }
-    catch (Throwable $e) { $leftover = $probe; }
-    return ['ok' => true, 'leftover' => $leftover,
-            'msg' => 'Yes — this server lets the application create a database on its own. '
-                   . 'Every new company can now get its own MySQL database with nothing to set up.'
-                   . ($leftover !== '' ? ' (Please delete the leftover test database "' . $leftover . '" in your hosting panel.)' : '')];
+
+    // A panel-managed account is normally allowed to create databases, but ONLY
+    // inside its own name space: a grant like `mghaiapp1\_%`. So the name has to
+    // carry the account prefix. Testing an unprefixed name and reporting "this
+    // server cannot create databases" is a false negative — it measures the
+    // NAME, not the permission. Every prefix this install can be seen to use is
+    // tried, then the bare name last.
+    $tried = [];
+    $lastErr = '';
+    foreach (saas_db_prefix_candidates($d) as $prefix) {
+        $name = ($prefix !== '' ? $prefix . '_' : '') . 'probe_' . bin2hex(random_bytes(4));
+        if (!preg_match('/^[a-z0-9_]{1,64}$/', $name)) continue;
+        $tried[] = $name;
+        try {
+            $pdo->exec("CREATE DATABASE `{$name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        } catch (Throwable $e) { $lastErr = $e->getMessage(); continue; }
+
+        $leftover = '';
+        try { $pdo->exec("DROP DATABASE `{$name}`"); } catch (Throwable $e) { $leftover = $name; }
+        return ['ok' => true, 'leftover' => $leftover, 'prefix' => $prefix, 'tried' => $tried,
+                'msg' => 'Yes — this server lets the application create databases on its own'
+                       . ($prefix !== '' ? ' (named "' . $prefix . '_…", this account\'s own name space)' : '')
+                       . '. Every new company can now get its own MySQL database with nothing to set up.'
+                       . ($leftover !== '' ? ' Please delete the leftover test database "' . $leftover . '" in your hosting panel.' : '')];
+    }
+
+    return ['ok' => false, 'leftover' => '', 'prefix' => '', 'tried' => $tried,
+            'msg' => 'This database login is not allowed to create databases. That is set by the '
+                   . 'privileges given to the user "' . (string) $d['user'] . '", not by the kind of hosting — '
+                   . 'a panel-managed server restricts it whether it is shared or a VPS. '
+                   . 'Tried: ' . (implode(', ', $tried) ?: 'nothing') . '. (' . $lastErr . ')'];
+}
+
+// Every name-space prefix this install can be seen to use, most likely first.
+// Panels name both the database and the user "account_something", and grant the
+// user rights over "account\_%" — so the account name is the prefix, and it can
+// be read from either. The empty string at the end is an unprefixed attempt, for
+// a server with no such restriction at all.
+function saas_db_prefix_candidates(array $d) {
+    $out = [];
+    foreach ([(string) ($d['name'] ?? ''), (string) ($d['user'] ?? '')] as $src) {
+        $pos = strpos($src, '_');
+        if ($pos > 0) {
+            $p = strtolower(substr($src, 0, $pos));
+            if (preg_match('/^[a-z0-9]+$/', $p) && !in_array($p, $out, true)) $out[] = $p;
+        }
+    }
+    $out[] = '';
+    return $out;
 }
 
 // The database-name prefix this hosting account uses, taken from the control
@@ -637,10 +676,16 @@ function saas_db_account_prefix() {
     // placeholder from the sample config, and splitting it would invent a
     // prefix out of nothing.
     if (!function_exists('db_driver') || db_driver() !== 'mysql') return '';
-    try { $cfg = require dirname(__DIR__) . '/config.php'; $name = (string) ($cfg['db']['name'] ?? ''); }
+    // Prefer the prefix the capability test actually succeeded with: that one is
+    // proven, where anything derived is only inferred.
+    if (function_exists('setting_get')) {
+        $proved = trim((string) setting_get('saas_db_selfcreate_prefix', ''));
+        if ($proved !== '') return $proved;
+    }
+    try { $cfg = require dirname(__DIR__) . '/config.php'; $d = (array) ($cfg['db'] ?? []); }
     catch (Throwable $e) { return ''; }
-    $pos = strpos($name, '_');
-    return $pos > 0 ? substr($name, 0, $pos) : '';
+    $c = saas_db_prefix_candidates($d);
+    return (string) ($c[0] ?? '');
 }
 
 // Create a workspace database with the application's OWN login. Only reachable

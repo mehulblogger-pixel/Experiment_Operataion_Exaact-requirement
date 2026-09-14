@@ -155,7 +155,7 @@
       Some hosting lets an application create its own databases and some does not, and the only way to find out is to ask.
       This test creates one empty database with a random name and deletes it again immediately. Nothing you already have is
       read, changed or removed.
-      <?php if ($selfRun && !$selfOn): ?><br><span style="color:#7f1d1d"><b>Last answer: no.</b> Your hosting does not allow it &mdash; use one of the options below.</span><?php endif; ?>
+      <?php if ($selfRun && !$selfOn): ?><br><span style="color:#7f1d1d"><b>Last answer: no.</b> This is set by the privileges on the database login, not by the kind of hosting &mdash; a managed panel restricts it whether the server is shared or a VPS. Use one of the options below.</span><?php endif; ?>
     </div>
     <form method="post" action="/db-selfcreate-test" style="margin-top:10px">
       <button class="btn" type="submit">Test whether this server can create databases</button>
@@ -170,6 +170,9 @@
           backed up daily. Re-uploading the app cannot reach it. Fine for a growing client list.</li>
         <li><b>Create a database per client by hand</b> in your hosting panel (Databases), then paste its details when you
           add the company. Strongest, about two minutes each.</li>
+        <li><b>Ask your host for a database login that may create databases</b> &mdash; on your own server (VPS) this is
+          normally available on request. Put it in <code>config.local.php</code> as <code>$SAAS_DB_ADMIN</code> and every
+          new company is created automatically, with no further clicks ever.</li>
       </ul>
     </div>
   <?php endif; ?>

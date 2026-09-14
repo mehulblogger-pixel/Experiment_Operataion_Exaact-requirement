@@ -261,6 +261,9 @@ function ops_tenants($route, $method) {
         if (function_exists('setting_set')) {
             try { setting_set('saas_db_selfcreate', $r['ok'] ? '1' : '0'); } catch (Throwable $e) {}
             try { setting_set('saas_db_selfcreate_at', date('c')); } catch (Throwable $e) {}
+            // Remember the name space the test actually succeeded in, so every
+            // workspace database is created where this account is permitted.
+            try { setting_set('saas_db_selfcreate_prefix', (string) ($r['prefix'] ?? '')); } catch (Throwable $e) {}
         }
         flash($r['msg'], $r['ok'] ? 'success' : 'error');
         redirect('/tenants');

@@ -105,3 +105,68 @@ Both are already built. Neither depends on any hosting API.
   refusal path and its contract; the successful MySQL path is **not** exercised —
   no MySQL server is available in this environment. It is exactly what the
   one-click test on the live server is for.
+
+---
+
+## Addendum — the first live run of the capability test was a FALSE NEGATIVE
+
+**Date:** 2026-09-14
+
+The live test reported:
+
+> This server does NOT let the application create databases by itself.
+> `SQLSTATE[42000]: 1044 Access denied for user 'mghaiapp1_mehul'@'localhost' to database 'exaact_probe_9702f7ec01'`
+
+**That conclusion was wrong, and the error message says why.** A panel-managed
+hosting account normally *is* allowed to create databases — but only inside its
+own name space, granted as something like `` `mghaiapp1\_%` ``. The probe asked
+for `exaact_probe_…`, which is outside it. MySQL error 1044 was refusing the
+**name**, not the capability.
+
+So the test measured the wrong thing and declared a capability missing that may
+well be present. That is a worse failure than not testing at all, because it
+sends the operator down the manual path for no reason.
+
+### Fixed
+
+The probe now derives every name space this install can be seen to use — from
+the control database's name (`mghaiapp1_ops`) and from the database user
+(`mghaiapp1_mehul`) — and tries each in turn before falling back to an
+unprefixed name:
+
+```
+mghaiapp1_probe_a1b2c3d4      ← this account's own name space, tried first
+probe_a1b2c3d4                ← only if the server has no such restriction
+```
+
+The prefix that actually succeeded is remembered
+(`saas_db_selfcreate_prefix`) and used for every workspace database
+thereafter, so they are always created where this account is permitted —
+`mghaiapp1_xyz_recurit`. A proven prefix outranks a derived one.
+
+Prefix candidates are validated as plain letters and digits before ever reaching
+SQL; anything else is discarded.
+
+### Also corrected: "that is normal on shared hosting"
+
+That sentence was mine and it was a guess stated as fact. Whether a login may
+create databases is decided by **the privileges granted to that MySQL user**, not
+by the kind of hosting — a managed panel restricts it on a VPS exactly as it does
+on shared hosting. The message now says that, and names the user it tested with
+and the names it tried, so the answer can be checked rather than believed.
+
+### A third route, for a VPS
+
+On a server of one's own, a database login permitted to create databases is
+normally available on request from the host. Dropped into `config.local.php` as
+`$SAAS_DB_ADMIN`, it makes provisioning fully automatic through the existing
+`admin` method — no code change, no per-client work, ever. This is now offered on
+the screen as the third option.
+
+### Evidence
+
+* `tests/test_storage_safety.php`: **49 passed, 0 failed** (was 41; +8)
+* Full regression: **7,147 passed, 0 failed** (was 7,139; zero regressions)
+* The successful `CREATE DATABASE` path still cannot be exercised here — no MySQL
+  server in this environment. The prefix selection, ordering, de-duplication and
+  rejection of unsafe prefixes are all tested directly.

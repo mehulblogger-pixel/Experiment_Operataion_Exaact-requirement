@@ -77,6 +77,34 @@ t_ok(stripos($probe['msg'], 'not running on MySQL') !== false, 'and says why, in
 t_eq((string) ($probe['leftover'] ?? ''), '', 'and leaves nothing behind');
 
 t_eq(saas_db_account_prefix(), '', 'no account prefix can be derived without a MySQL database name');
+
+// THE FALSE NEGATIVE THIS EXISTS FOR.
+// The live test reported "this server does NOT let the application create
+// databases" with MySQL error 1044 — access denied for user 'mghaiapp1_mehul'
+// to database 'exaact_probe_…'. A panel-managed account normally MAY create
+// databases, but only inside its own name space (a grant over `mghaiapp1\_%`).
+// The probe had used an unprefixed name, so it measured the NAME, not the
+// permission, and declared a capability missing that may well be present.
+$cands = saas_db_prefix_candidates(['name' => 'mghaiapp1_ops', 'user' => 'mghaiapp1_mehul']);
+t_eq($cands[0], 'mghaiapp1', "the account's own name space is tried first");
+t_eq(end($cands), '', 'and an unprefixed name only as a last resort');
+t_eq(count($cands), 2, 'the same prefix seen twice is tried once');
+
+t_eq(saas_db_prefix_candidates(['name' => 'exaact', 'user' => 'exaact'])[0], '',
+     'a server with no name space at all still gets its plain attempt');
+$two = saas_db_prefix_candidates(['name' => 'acct1_ops', 'user' => 'acct2_user']);
+t_eq($two, ['acct1', 'acct2', ''], 'two different prefixes are both tried, database name first');
+
+t_ok(!in_array('..', saas_db_prefix_candidates(['name' => '../evil_x', 'user' => 'a b_c']), true),
+     'a prefix that is not plain letters and digits is discarded, never used in SQL');
+
+// The proved prefix outranks the guessed one: the test knows, derivation infers.
+setting_set('saas_db_selfcreate_prefix', 'provedpfx');
+t_eq(saas_db_account_prefix(), '', 'on a non-MySQL install no prefix is claimed even so');
+setting_set('saas_db_selfcreate_prefix', '');
+
+$p2 = saas_db_selfcreate_probe();
+t_ok(isset($p2['prefix']) && isset($p2['tried']), 'the test reports which names it tried, so a refusal can be checked');
 $n = saas_db_names_for('xyz-recurit', 'mghaiapp');
 t_eq($n['name'], 'mghaiapp_xyz_recurit', 'a new database is named inside the account prefix');
 t_ok(strlen($n['user']) <= 32, "and the user name fits MySQL's 32-character limit");

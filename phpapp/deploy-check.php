@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'ef98613 · 2026-09-14 03:59 UTC · 650 files';
+$RELEASE = 'f10654e · 2026-09-14 05:58 UTC · 650 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -202,7 +202,7 @@ $EXPECT  = [
     'lib/risks.php' => ['s'=>10571,'h'=>'83a96e16878654a2'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>74392,'h'=>'e6e4793651a5171c'],
+    'lib/saas_tenants.php' => ['s'=>76795,'h'=>'19abea4b43a94815'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>15924,'h'=>'df9f9a6a9f86fa2c'],
     'lib/schedboard.php' => ['s'=>10324,'h'=>'36ea989f68bcd70f'],
@@ -235,7 +235,7 @@ $EXPECT  = [
     'lib/tasks.php' => ['s'=>11239,'h'=>'82c11af4ebccd03c'],
     'lib/tenant_migrate.php' => ['s'=>19927,'h'=>'0b63124682d54a07'],
     'lib/tenant_signup.php' => ['s'=>11305,'h'=>'dfa7791f625c93fc'],
-    'lib/tenants.php' => ['s'=>22073,'h'=>'37719df821cb8c78'],
+    'lib/tenants.php' => ['s'=>22348,'h'=>'7bba6e22de34aa8a'],
     'lib/terms.php' => ['s'=>23374,'h'=>'66c844cd0b0bf9c6'],
     'lib/timesheet.php' => ['s'=>9006,'h'=>'db25f94d7ea8491e'],
     'lib/tmplpreview.php' => ['s'=>3520,'h'=>'770170cf566d21da'],
@@ -586,7 +586,7 @@ $EXPECT  = [
     'views/ops/tapi_scorecard.php' => ['s'=>2279,'h'=>'b5aec7c0907a3c2e'],
     'views/ops/tapi_snapshot.php' => ['s'=>2902,'h'=>'d1a0ef0be3421c2f'],
     'views/ops/tasks.php' => ['s'=>4329,'h'=>'0c2ffedf67f10633'],
-    'views/ops/tenants.php' => ['s'=>19593,'h'=>'ca06259df595faf5'],
+    'views/ops/tenants.php' => ['s'=>20035,'h'=>'7a5f476af3133e93'],
     'views/ops/terminology.php' => ['s'=>4501,'h'=>'e6913921361f0d9c'],
     'views/ops/timesheet.php' => ['s'=>6023,'h'=>'6bb468da2014ba37'],
     'views/ops/to_bill.php' => ['s'=>7114,'h'=>'6fb7607ae9343044'],
