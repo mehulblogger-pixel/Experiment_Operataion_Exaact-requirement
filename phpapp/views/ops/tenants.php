@@ -129,55 +129,11 @@
   </table>
 </div>
 
-<?php $cpOn = function_exists('cpanel_configured') && cpanel_configured();
-      $cp = function_exists('cpanel_config') ? cpanel_config() : [];
-      $appRoot = realpath(__DIR__ . '/../..') ?: ''; ?>
-<div class="panel settings-form">
-  <h3 class="tab-sub" style="margin-top:0">Add a workspace</h3>
-  <form method="post" action="/tenant-add">
-    <div class="form-grid">
-      <div class="ff"><label>Workspace name <span class="muted">— the subdomain</span></label>
-        <input class="form-control" name="sub" placeholder="acme" pattern="[a-z0-9-]+" required>
-        <small class="muted">Lowercase letters, digits, hyphens. Becomes <code>&lt;name&gt;.<?= e($base) ?></code>.</small></div>
-      <div class="ff"><label>Company name</label><input class="form-control" name="company" placeholder="Acme Inspection Pvt Ltd"></div>
-    </div>
-
-    <?php if ($cpOn): ?>
-      <div class="ff ff-wide" style="margin:8px 0 2px">
-        <label class="chk"><input type="radio" name="db_kind" value="auto" checked onclick="tnMode(1)">
-          <strong>Create the database automatically</strong> with cPanel<?= !empty($cp['make_subdomain']) ? ' — and the subdomain' : '' ?></label>
-        <label class="chk" style="margin-top:4px"><input type="radio" name="db_kind" value="mysql" onclick="tnMode(0)">
-          I created the database myself</label>
-      </div>
-      <div id="tn-auto"><p class="muted" style="font-size:12.5px;margin:2px 2px 0">cPanel makes the database, its user and privileges<?= !empty($cp['make_subdomain']) ? ', and the subdomain,' : '' ?> for you. The app builds the tables on first visit.</p></div>
-    <?php else: ?>
-      <input type="hidden" name="db_kind" value="mysql">
-      <p class="muted" style="font-size:12.5px;margin:8px 2px 4px">Create the database and subdomain in cPanel first (two screens below), then fill in the details — or set up the <a href="#cpanelcfg">cPanel API</a> to have it all done automatically.</p>
-    <?php endif; ?>
-
-    <div id="tn-manual"<?= $cpOn ? ' style="display:none"' : '' ?>>
-      <ol class="muted" style="font-size:13px;line-height:1.7;margin:6px 0 12px;padding-left:20px">
-        <li><strong>cPanel → MySQL Databases</strong> — create a database and a user, add the user with all privileges.</li>
-        <li><strong>cPanel → Subdomains</strong> — create <code>&lt;name&gt;.<?= e($base) ?></code>, document root pointing at <strong>this app's folder</strong>.</li>
-        <li>Fill in the details. The app builds the tables on first visit.</li>
-      </ol>
-      <div class="form-grid">
-        <div class="ff"><label>Database name</label><input class="form-control" name="db_name" placeholder="youracct_acme"></div>
-        <div class="ff"><label>Database user</label><input class="form-control" name="db_user" placeholder="youracct_acme"></div>
-        <div class="ff"><label>Database password</label><input class="form-control" type="password" name="db_pass" autocomplete="new-password"></div>
-        <div class="ff"><label>Host</label><input class="form-control" name="db_host" value="localhost"></div>
-      </div>
-    </div>
-    <button class="btn" type="submit" style="margin-top:10px">Add workspace</button>
-    <span class="muted" style="margin-left:8px;font-size:13px">The database is tested (or created) before the workspace goes live.</span>
-  </form>
-</div>
-<script>function tnMode(auto){var m=document.getElementById('tn-manual');if(m)m.style.display=auto?'none':'block';var a=document.getElementById('tn-auto');if(a)a.style.display=auto?'block':'none';}</script>
-
 <?php
-  // Automatic databases, in the order worth trying. This block is FIRST because
-  // the one-click test below settles the question for most hosting, and the
-  // cPanel panel underneath is irrelevant on a panel that has no API.
+  // Automatic databases, in the order worth trying. This sits ABOVE "Add a
+  // workspace" on purpose: that form asks for database details, and whether
+  // they are needed at all is decided here. Answering the question after
+  // presenting the manual form is how an optional step reads as a required one.
   $selfOn  = function_exists('setting_get') && (string) setting_get('saas_db_selfcreate', '') === '1';
   $selfRun = function_exists('setting_get') && (string) setting_get('saas_db_selfcreate_at', '') !== '';
   $autoAny = function_exists('saas_can_autocreate_db') && saas_can_autocreate_db();
@@ -218,6 +174,51 @@
     </div>
   <?php endif; ?>
 </div>
+
+<?php $cpOn = function_exists('cpanel_configured') && cpanel_configured();
+      $cp = function_exists('cpanel_config') ? cpanel_config() : [];
+      $appRoot = realpath(__DIR__ . '/../..') ?: ''; ?>
+<div class="panel settings-form">
+  <h3 class="tab-sub" style="margin-top:0">Add a workspace</h3>
+  <form method="post" action="/tenant-add">
+    <div class="form-grid">
+      <div class="ff"><label>Workspace name <span class="muted">— the subdomain</span></label>
+        <input class="form-control" name="sub" placeholder="acme" pattern="[a-z0-9-]+" required>
+        <small class="muted">Lowercase letters, digits, hyphens. Becomes <code>&lt;name&gt;.<?= e($base) ?></code>.</small></div>
+      <div class="ff"><label>Company name</label><input class="form-control" name="company" placeholder="Acme Inspection Pvt Ltd"></div>
+    </div>
+
+    <?php if ($cpOn): ?>
+      <div class="ff ff-wide" style="margin:8px 0 2px">
+        <label class="chk"><input type="radio" name="db_kind" value="auto" checked onclick="tnMode(1)">
+          <strong>Create the database automatically</strong> with cPanel<?= !empty($cp['make_subdomain']) ? ' — and the subdomain' : '' ?></label>
+        <label class="chk" style="margin-top:4px"><input type="radio" name="db_kind" value="mysql" onclick="tnMode(0)">
+          I created the database myself</label>
+      </div>
+      <div id="tn-auto"><p class="muted" style="font-size:12.5px;margin:2px 2px 0">cPanel makes the database, its user and privileges<?= !empty($cp['make_subdomain']) ? ', and the subdomain,' : '' ?> for you. The app builds the tables on first visit.</p></div>
+    <?php else: ?>
+      <input type="hidden" name="db_kind" value="mysql">
+      <p class="muted" style="font-size:12.5px;margin:8px 2px 4px">Create the database and subdomain in your hosting panel first (steps below), then fill in the details. If the test above said this server can create databases itself, use <b>Companies &rarr; Add a company</b> instead &mdash; it does all of this for you.</p>
+    <?php endif; ?>
+
+    <div id="tn-manual"<?= $cpOn ? ' style="display:none"' : '' ?>>
+      <ol class="muted" style="font-size:13px;line-height:1.7;margin:6px 0 12px;padding-left:20px">
+        <li><strong>Your hosting panel → Databases</strong> — create a database and a user, add the user with all privileges. The panel adds its own prefix to both names; copy them exactly as it shows them.</li>
+        <li><strong>Your hosting panel → Domains / Subdomains</strong> — create <code>&lt;name&gt;.<?= e($base) ?></code>, document root pointing at <strong>this app's folder</strong>.</li>
+        <li>Fill in the details. The app builds the tables on first visit.</li>
+      </ol>
+      <div class="form-grid">
+        <div class="ff"><label>Database name</label><input class="form-control" name="db_name" placeholder="youracct_acme"></div>
+        <div class="ff"><label>Database user</label><input class="form-control" name="db_user" placeholder="youracct_acme"></div>
+        <div class="ff"><label>Database password</label><input class="form-control" type="password" name="db_pass" autocomplete="new-password"></div>
+        <div class="ff"><label>Host</label><input class="form-control" name="db_host" value="localhost"></div>
+      </div>
+    </div>
+    <button class="btn" type="submit" style="margin-top:10px">Add workspace</button>
+    <span class="muted" style="margin-left:8px;font-size:13px">The database is tested (or created) before the workspace goes live.</span>
+  </form>
+</div>
+<script>function tnMode(auto){var m=document.getElementById('tn-manual');if(m)m.style.display=auto?'none':'block';var a=document.getElementById('tn-auto');if(a)a.style.display=auto?'block':'none';}</script>
 
 <details class="panel" id="cpanelcfg"<?= $cpOn ? '' : ' open' ?>>
   <summary style="cursor:pointer;font-weight:600">Automatic provisioning — cPanel API
