@@ -180,6 +180,19 @@
   <p class="sub" style="margin:10px 0">Give the app a cPanel API token and it can create each workspace's database (and
     subdomain) for you. In cPanel → <strong>Manage API Tokens</strong>, create a token; paste it below. It has the
     same power as your cPanel login, so it is kept on this control site only and shown masked.</p>
+  <?php if (!$cpOn): ?>
+  <div style="margin:10px 0 14px;padding:12px 14px;border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;font-size:13.5px;color:#78350f">
+    <b>&#9888;&#65039; This also decides how safe each client's data is.</b><br>
+    Without it, a new workspace's data is kept in a <b>file</b> on the server. With it, every new workspace gets its
+    <b>own real MySQL database</b> &mdash; which no file upload, however careless, can delete. If you can connect
+    cPanel, do it before adding your next client.
+  </div>
+  <?php else: ?>
+  <div style="margin:10px 0 14px;padding:12px 14px;border:1px solid #a7f3d0;background:#ecfdf5;border-radius:10px;font-size:13.5px;color:#065f46">
+    <b>&#128737;&#65039; Connected &mdash; new workspaces get their own MySQL database automatically.</b>
+    Their data is stored in the database, not as a file in this folder, so an upload can never delete it.
+  </div>
+  <?php endif; ?>
   <form method="post" action="/cpanel-save">
     <div class="form-grid">
       <div class="ff"><label>cPanel host</label><input class="form-control" name="cpanel_host" value="<?= e($cp['host'] ?? '') ?>" placeholder="server.yourhost.com or your domain"></div>

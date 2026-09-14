@@ -691,6 +691,14 @@ if (function_exists('current_tenant') && current_tenant() === '' && function_exi
 // "delete every file, then re-upload" update method.
 if (function_exists('backup_auto_daily')) { try { backup_auto_daily(); } catch (Throwable $e) {} }
 
+// Notice, once per workspace, that its data file really exists — so that if the
+// file ever goes missing the application KNOWS it is missing and refuses to
+// create an empty one in its place. Control install only, one write per
+// workspace in the life of the install, and never on the hot path afterwards.
+if (function_exists('current_tenant') && current_tenant() === '' && function_exists('saas_tenant_seen_alive_sweep')) {
+    try { saas_tenant_seen_alive_sweep(); } catch (Throwable $e) {}
+}
+
 // Locked out of the admin login? Drop a plain text file named
 // "reset-admin.txt" in this folder (cPanel File Manager → New File) with the
 // new password on the first line, then load any page once. The password is set,
@@ -841,7 +849,13 @@ if ($route === 'login') {
                 // against — and the person never lands in — the control store.
                 if (function_exists('saas_tenant_ensure_ready') && !saas_tenant_ensure_ready($tk)) {
                     if (function_exists('saas_leave_tenant')) saas_leave_tenant();
-                    return render_login('Your workspace is still being set up. Please try signing in again in a moment.');
+                    // Back on the control database, so the real reason can be
+                    // read. A missing data file is not "still being set up" —
+                    // saying so would send the owner away to wait for something
+                    // that is never going to happen.
+                    $why = function_exists('saas_tenant_data_missing') ? saas_tenant_data_missing($tk) : '';
+                    return render_login($why !== '' ? $why
+                        : 'Your workspace is still being set up. Please try signing in again in a moment.');
                 }
                 $pdo = db();
             }

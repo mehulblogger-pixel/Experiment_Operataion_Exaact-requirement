@@ -100,8 +100,12 @@ function cpanel_test() {
 // workspace. Returns ['ok'=>bool, 'db'=>[host,name,user,pass], 'subdomain'=>bool,
 // 'errors'=>string[]]. Never deletes anything: if a later step fails, the earlier
 // ones are left in place and reported, so the operator can finish by hand.
-function cpanel_provision_workspace($sub) {
+// $opts['subdomain']: null = follow the saved setting (default), false = database
+// only. Moving an EXISTING workspace's storage needs the database and nothing
+// else — its address already exists — so that path passes false.
+function cpanel_provision_workspace($sub, array $opts = []) {
     $c = cpanel_config();
+    if (array_key_exists('subdomain', $opts) && $opts['subdomain'] === false) $c['make_subdomain'] = false;
     $sub = strtolower(preg_replace('/[^a-z0-9]/', '', (string) $sub));
     if ($sub === '') return ['ok' => false, 'errors' => ['Workspace name is empty.']];
     // cPanel prefixes database and user names with the account name + underscore.

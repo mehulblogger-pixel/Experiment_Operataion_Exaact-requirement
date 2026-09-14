@@ -65,9 +65,13 @@ function tenant_default_sqlite_path($key) {
 // otherwise a file in the safe off-folder location. Returns
 // [$db, $kind] where $db is a route array and $kind is 'mysql'|'sqlite'.
 function tenant_auto_storage($key) {
+    // A real database beats a file every time: no upload, however careless, can
+    // delete a MySQL database. Try whichever way this server has of creating one
+    // — a cPanel API token (shared hosting) or a database-admin credential (a
+    // VPS) — and only fall back to a file when the server has neither.
     if (function_exists('saas_can_autocreate_db') && saas_can_autocreate_db()
-        && function_exists('saas_mysql_provision_db') && function_exists('saas_db_admin_config')) {
-        try { return [saas_mysql_provision_db($key, saas_db_admin_config()), 'mysql']; }
+        && function_exists('saas_autocreate_db')) {
+        try { return [saas_autocreate_db($key), 'mysql']; }
         catch (Throwable $e) { /* fall through to a safe file */ }
     }
     [$path] = tenant_default_sqlite_path($key);

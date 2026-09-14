@@ -67,6 +67,13 @@ function saas_tenants_migrate() {
     // only a cache. Added by migration so existing installs gain it in place.
     if (function_exists('ensure_column')) {
         try { ensure_column('saas_tenants', 'route_json', "TEXT DEFAULT ''"); } catch (Throwable $e) {}
+        // When this workspace was first fully set up. Durable (it lives in the
+        // control database, which no upload can touch) and it is what tells a
+        // brand-new workspace apart from one whose data file has gone missing.
+        // Without it, a workspace whose file was deleted looks exactly like a
+        // new one — and gets silently re-created empty, which is how a
+        // recoverable incident becomes permanent data loss.
+        try { ensure_column('saas_tenants', 'provisioned_at', "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
         // The owner's first-login details (email, temp-password hash, plan) so the
         // routing file can restore them too if an upload wipes it — otherwise a
         // rebuilt company would lose the owner's ability to sign in by email.
@@ -112,7 +119,7 @@ function saas_tenant_upsert($key, array $data) {
     if (!$pdo) return false;
     $key = strtolower(trim((string) $key));
     if ($key === '') return false;
-    $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules', 'route_json', 'pending_json'];
+    $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules', 'route_json', 'pending_json', 'provisioned_at'];
     $existing = saas_tenant_get($key);
     try {
         if ($existing) {
@@ -232,6 +239,17 @@ function saas_current_tenant() {
 function saas_enter_tenant($key) {
     $key = strtolower(trim((string) $key));
     if ($key === '') return false;
+    // Refuse to enter a workspace whose data file has gone missing. This runs
+    // HERE, while the control database is still the live connection, because one
+    // step later the connection is switched and the very act of connecting would
+    // create the empty file we are trying to prevent.
+    if (function_exists('saas_tenant_data_missing')) {
+        try {
+            $why = saas_tenant_data_missing($key);
+            if ($why !== '') { $GLOBALS['__saas_enter_error'] = $why; return false; }
+        } catch (Throwable $e) { /* a guard must never block a healthy workspace */ }
+    }
+    $GLOBALS['__saas_enter_error'] = '';
     $_SESSION['saas_tenant'] = $key;
     if (function_exists('db_reset')) db_reset();   // next db() opens THIS company's store
     return true;
@@ -558,8 +576,110 @@ function saas_db_admin_config() {
     return $cfg;
 }
 
+// ---- "Can this server create a database by itself?" — ONE answer ----------
+// There are two ways, and they are tried in the order that covers the most
+// hosting:
+//   'cpanel' — a cPanel API token. This is what shared hosting has (MilesWeb and
+//              most cPanel hosts). It is how a workspace gets a REAL MySQL
+//              database on an account that is not allowed to run CREATE DATABASE.
+//   'admin'  — a database-admin credential in config.local.php. A self-managed
+//              VPS only.
+// Returns '' when neither is available, and only then does a new workspace fall
+// back to a file.
+function saas_db_autocreate_method() {
+    if (function_exists('cpanel_configured') && cpanel_configured()) return 'cpanel';
+    if (saas_db_admin_config() !== null) return 'admin';
+    return '';
+}
+
 // True when this server can create a client database on its own.
-function saas_can_autocreate_db() { return saas_db_admin_config() !== null; }
+function saas_can_autocreate_db() { return saas_db_autocreate_method() !== ''; }
+
+// Create a workspace's own MySQL database by whichever method this server has.
+// Returns ['host','name','user','pass']; throws with a plain-English reason.
+// $withSubdomain is false when only the database is wanted (moving an existing
+// workspace's storage — its web address already exists).
+function saas_autocreate_db($key, $withSubdomain = true) {
+    $method = saas_db_autocreate_method();
+    if ($method === 'cpanel') {
+        $r = cpanel_provision_workspace(saas_db_ident($key),
+                                        $withSubdomain ? [] : ['subdomain' => false]);
+        if (empty($r['ok']) || empty($r['db']['name']))
+            throw new RuntimeException(implode(' ', (array) ($r['errors'] ?: ['cPanel refused the request.'])));
+        return $r['db'];
+    }
+    if ($method === 'admin') return saas_mysql_provision_db($key, saas_db_admin_config());
+    throw new RuntimeException('This server is not set up to create databases automatically.');
+}
+
+// Stamp, in the CONTROL database, that this workspace's data really exists.
+// Control install only: inside a workspace, db() is that workspace's own store
+// and the stamp would be written to the wrong place. Written once, ever.
+function saas_tenant_mark_provisioned($key, $when = '') {
+    $key = strtolower(trim((string) $key));
+    if ($key === '' || !function_exists('saas_tenant_upsert')) return false;
+    if (function_exists('current_tenant') && current_tenant() !== '') return false;
+    try { return (bool) saas_tenant_upsert($key, ['provisioned_at' => $when !== '' ? $when : date('c')]); }
+    catch (Throwable $e) { return false; }
+}
+
+// Notice, once per workspace, that its data file is really there.
+//
+// This is what makes the guard below self-maintaining: the control database
+// learns "this workspace's data exists" simply by SEEING it on an ordinary page
+// load, with no login and no migration needed. From then on, a missing file is
+// known to be a missing file rather than a workspace that was never used.
+// Writes at most one row per workspace in the life of the install.
+function saas_tenant_seen_alive_sweep() {
+    if (function_exists('current_tenant') && current_tenant() !== '') return 0;
+    if (!function_exists('ops_all')) return 0;
+    try { $rows = ops_all("SELECT tenant_key, route_json, provisioned_at FROM saas_tenants"); }
+    catch (Throwable $e) { return 0; }
+    $n = 0;
+    foreach ((array) $rows as $r) {
+        if (trim((string) ($r['provisioned_at'] ?? '')) !== '') continue;
+        $route = json_decode((string) ($r['route_json'] ?? ''), true);
+        $path  = is_array($route) ? (string) ($route['sqlite'] ?? '') : '';
+        if ($path === '' || !is_file($path) || (int) @filesize($path) <= 0) continue;
+        if (saas_tenant_mark_provisioned((string) ($r['tenant_key'] ?? ''))) $n++;
+    }
+    return $n;
+}
+
+// ---- The guard that stops a deleted workspace being silently re-created -----
+//
+// A file-backed workspace whose data file has gone (deleted by an upload, moved,
+// or lost with the server) looks IDENTICAL to a brand-new one: the file simply
+// is not there. The application would helpfully create it — a fresh, empty
+// database with a fresh owner login — and at that moment a restore from a
+// hosting backup has to overwrite a file that looks legitimate. That is how a
+// recoverable incident turns into permanent loss.
+//
+// So: if the control database records that this workspace was already set up, or
+// that somebody has signed in to it, its data file MUST exist. If it does not,
+// entry is refused and the operator is told plainly. Nothing is created,
+// nothing is deleted, and the workspace can still be restored.
+//
+// Returns '' when all is well, or a message to show the person signing in.
+function saas_tenant_data_missing($key) {
+    $key = strtolower(trim((string) $key));
+    if ($key === '' || !function_exists('saas_tenant_get')) return '';
+    try { $t = saas_tenant_get($key); } catch (Throwable $e) { return ''; }
+    if (!$t) return '';
+
+    $route = json_decode((string) ($t['route_json'] ?? ''), true);
+    $path  = is_array($route) ? (string) ($route['sqlite'] ?? '') : '';
+    if ($path === '') return '';                        // MySQL, or not wired up yet — not this check's business
+    if (is_file($path) && (int) @filesize($path) > 0) return '';   // healthy
+
+    $everSetUp = trim((string) ($t['provisioned_at'] ?? '')) !== ''
+              || trim((string) ($t['last_login_at'] ?? '')) !== '';
+    if (!$everSetUp) return '';                         // genuinely new — creating it is correct
+
+    return 'This workspace\'s data file is missing, so it cannot be opened. '
+         . 'It has NOT been re-created: an empty workspace here would make the real data harder to restore. '
+         . 'Restore the file from your hosting backup, or contact support. Nothing has been deleted by this refusal.';
+}
 
 // A workspace key → a safe MySQL identifier fragment (letters, digits, underscore).
 function saas_db_ident($s) {
@@ -862,12 +982,12 @@ function ops_saas_admin($route, $method) {
             }
             $mode = (string) ($_POST['mig_mode'] ?? 'manual');
             if ($mode === 'auto') {
-                $admin = function_exists('saas_db_admin_config') ? saas_db_admin_config() : null;
-                if (!$admin) {
-                    flash('Automatic database creation is not set up on this server. Create a MySQL database in your hosting panel, then choose “a MySQL database I created” and paste its details.', 'error');
+                if (!saas_can_autocreate_db()) {
+                    flash('Automatic database creation is not set up on this server. Either connect cPanel (Companies → cloud settings) or create a MySQL database in your hosting panel, then choose “a MySQL database I created” and paste its details.', 'error');
                     redirect($back);
                 }
-                try { $my = saas_mysql_provision_db($key, $admin); }
+                // Database only — this workspace already has its web address.
+                try { $my = saas_autocreate_db($key, false); }
                 catch (Throwable $e) { flash('Could not create the MySQL database automatically: ' . $e->getMessage() . ' — create one in your hosting panel and paste its details instead.', 'error'); redirect($back); }
             } else {
                 $my = ['host' => trim((string) ($_POST['db_host'] ?? 'localhost')), 'name' => trim((string) ($_POST['db_name'] ?? '')),
