@@ -292,6 +292,26 @@ function agreement_render(array $vals = [], $msg = '') {
     echo '<p style="color:#555;font-size:14px;margin:0 0 12px">Before installation continues, the person authorised by your '
        . 'organisation must read this Agreement with <b>' . $L . '</b> and accept it. Installation will not proceed until it is accepted.</p>';
     if ($msg !== '') echo '<div class="err">' . e_txt($msg) . '</div>';
+
+    // An install screen on a server that is ALREADY configured almost never
+    // means "install me". It means the application connected to an empty
+    // database — usually because the settings were just edited and now point
+    // somewhere else. Continuing would build a second, empty system alongside
+    // the real one and make the real one look lost. Say so before the button,
+    // not after.
+    if (is_file(dirname(__DIR__) . '/config.local.php')) {
+        echo '<div style="background:#fef2f2;border:1px solid #fca5a5;color:#7f1d1d;padding:14px 16px;'
+           . 'border-radius:10px;font-size:14px;line-height:1.55;margin:0 0 14px">'
+           . '<b style="font-size:15px">&#9888;&#65039; Stop if you already have this application running.</b><br>'
+           . 'This server has a <code>config.local.php</code>, so it has been set up before &mdash; yet the application is '
+           . 'looking at an <b>empty database</b>. That almost always means the database name, user or password in '
+           . '<code>config.local.php</code> is pointing at the wrong database, not that anything was lost.<br><br>'
+           . '<b>Do not continue.</b> Your existing data is untouched and is still in its own database. Correct the details in '
+           . '<code>config.local.php</code> &mdash; or rename that file back to <code>config.local.sample.php</code> to return to '
+           . 'the settings that were working &mdash; then reload this page.<br><br>'
+           . 'Continue only if this really is a brand-new installation.'
+           . '</div>';
+    }
     echo '<div class="doc">';
     foreach (agreement_sections() as $s) { echo '<h3>' . $s[0] . '</h3>' . $s[1]; }
     echo '<p style="color:#888;font-size:12px">Version ' . e_txt(AGREEMENT_VERSION) . '. This document is a template and does '

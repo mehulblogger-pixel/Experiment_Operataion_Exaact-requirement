@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '90ba7f0 · 2026-09-14 08:18 UTC · 650 files';
+$RELEASE = '8efb1b3 · 2026-09-14 08:27 UTC · 650 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -38,7 +38,7 @@ $EXPECT  = [
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
     'lib/adssync.php' => ['s'=>28174,'h'=>'325142a88491bfba'],
     'lib/advisor.php' => ['s'=>42525,'h'=>'1de07288d04eb86b'],
-    'lib/agreement.php' => ['s'=>23195,'h'=>'618787b33ed8f708'],
+    'lib/agreement.php' => ['s'=>24772,'h'=>'721a1d9fe04f7ad5'],
     'lib/ai.php' => ['s'=>26123,'h'=>'9a1b149e7eb200b0'],
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
     'lib/areas.php' => ['s'=>34778,'h'=>'6a454cde7aed544c'],
