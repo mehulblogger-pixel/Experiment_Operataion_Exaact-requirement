@@ -62,7 +62,19 @@ t_ok(!in_array('sales', p1_effective_modules('', 'sales', false), true), 'the te
 // ---- 4. Risk classification — never guesses -------------------------------
 $mk = fn(array $o) => p1_classify($o + ['would_lose' => [], 'control_modules' => [], 'error' => '', 'licence_key' => '']);
 t_eq($mk([])['risk'], 'SAFE', 'nothing lost => SAFE');
-t_eq($mk(['error' => 'refused'])['risk'], 'ERROR', 'unreadable workspace => ERROR');
+// A workspace the control database records as already set up, whose data will
+// not open, is a genuine fault.
+t_eq($mk(['error' => 'refused', 'control_provisioned_at' => '2026-09-01T00:00:00+00:00'])['risk'],
+     'ERROR', 'a workspace that WAS set up and will not open => ERROR');
+
+// A company created but never signed in to has no database yet — lazy
+// provisioning working as designed. Reporting it in red as an ERROR sends the
+// operator hunting for a problem that does not exist, which is exactly what
+// happened on the live server minutes after a new company was added.
+$newco = $mk(['error' => 'workspace data file not found']);
+t_eq($newco['risk'], 'NOT_YET_OPENED', 'a company never signed in to is NOT an error');
+t_eq($newco['severity'], 'NONE', 'and carries no severity');
+t_ok(stripos($newco['note'], 'Nothing is wrong') !== false, 'and says so plainly');
 t_eq($mk(['licence_key' => 'present', 'would_lose' => ['hr']])['risk'], 'LICENCE_GOVERNED', 'a signed licence outranks the ceiling');
 t_eq($mk(['would_lose' => ['hr'], 'control_modules' => ['hr']])['risk'], 'RECOVERABLE', 'loss + control record => RECOVERABLE');
 $amb = $mk(['would_lose' => ['hr']]);
@@ -323,7 +335,8 @@ $recCtl = ['app_dir' => $rd . '/app', 'live_files' => [], 'backups' => [
         'workspaces' => [['workspace' => '__control', 'snapshots' => 2, 'total_bytes' => 7220972,
                           'newest' => '20260914_005754_daily.json.gz', 'newest_at' => '2026-09-14 00:57:55']]],
 ]];
-$per = p1_recovery_per_workspace($recCtl, [['tenant' => 'xyz-recurit'], ['tenant' => 'sachee-hr']]);
+$used = fn($k) => ['tenant' => $k, 'control_provisioned_at' => '2026-09-11T00:00:00+00:00'];
+$per = p1_recovery_per_workspace($recCtl, [$used('xyz-recurit'), $used('sachee-hr')]);
 t_ok(!$per['xyz-recurit']['recoverable'], 'a __control snapshot does NOT make a workspace recoverable');
 t_ok(!$per['sachee-hr']['recoverable'], 'for any workspace');
 t_ok(strpos($per['xyz-recurit']['verdict'], 'NOT RECOVERABLE') === 0, 'and the verdict says so plainly');
@@ -339,18 +352,30 @@ $recOwn = $recCtl;
 $recOwn['backups']['exaact_backups (above web root)']['workspaces'][] =
     ['workspace' => 'xyz-recurit', 'snapshots' => 3, 'total_bytes' => 100,
      'newest' => '20260914_010000_daily.json.gz', 'newest_at' => '2026-09-14 01:00:00'];
-$per2 = p1_recovery_per_workspace($recOwn, [['tenant' => 'xyz-recurit'], ['tenant' => 'sachee-hr']]);
+$per2 = p1_recovery_per_workspace($recOwn, [$used('xyz-recurit'), $used('sachee-hr')]);
 t_ok($per2['xyz-recurit']['recoverable'], 'its own snapshot does make it recoverable');
 t_eq($per2['xyz-recurit']['snapshots'], 3, 'and the snapshot count is its own, not the total');
 t_ok(!$per2['sachee-hr']['recoverable'], 'without affecting the other workspace');
 t_ok(strpos(p1_render_recovery_text($recOwn + ['per_workspace' => $per2]), 'PARTIAL') !== false,
      'a mixed outcome is reported as partial, not as success');
 
+// A company created moments ago and never opened has nothing to lose. Calling
+// that "NOT RECOVERABLE" is alarming and wrong — it is what the live report said
+// about a company created four minutes earlier.
+$perNew = p1_recovery_per_workspace($recCtl, [['tenant' => 'acme-fire-safety']]);
+t_ok(!$perNew['acme-fire-safety']['recoverable'], 'a never-opened company has no data to recover');
+t_ok(empty($perNew['acme-fire-safety']['lost']), 'but it has lost nothing');
+t_ok(strpos($perNew['acme-fire-safety']['verdict'], 'NOTHING TO RECOVER') === 0,
+     'and the verdict says nothing to recover, not not-recoverable');
+t_ok(strpos(p1_render_recovery_text($recCtl + ['per_workspace' => $perNew]),
+            'never been opened') !== false,
+     'the report does not raise an alarm about a new company');
+
 // A live file beats everything: the data exists, only the routing is stale.
 $recLive = $recCtl;
 $recLive['live_files'] = [['name' => 'tenant-xyz-recurit.sqlite', 'bytes' => 40960,
                            'modified' => '2026-09-14 00:50:00', 'is_sqlite' => true, 'where' => "sibling 'data' folder"]];
-$per3 = p1_recovery_per_workspace($recLive, [['tenant' => 'xyz-recurit']]);
+$per3 = p1_recovery_per_workspace($recLive, [$used('xyz-recurit')]);
 t_ok($per3['xyz-recurit']['recoverable'] && count($per3['xyz-recurit']['live_files']) === 1,
      'a live file is matched to its workspace by key');
 

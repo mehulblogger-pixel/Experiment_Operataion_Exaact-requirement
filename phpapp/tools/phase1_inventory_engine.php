@@ -113,9 +113,21 @@ function p1_effective_modules($ceilRaw, $offRaw, $denyDefault = false) {
 // whose correct entitlement cannot be determined is reported as AMBIGUOUS.
 function p1_classify(array $t) {
     $lost = (array) ($t['would_lose'] ?? []);
-    if (!empty($t['error']))
+    if (!empty($t['error'])) {
+        // A company that has been created but never signed in to has no database
+        // yet — that is lazy provisioning working as designed, not a fault. Only
+        // a workspace the control database records as already set up
+        // (provisioned_at) is genuinely broken when its data is missing.
+        // Reporting a brand-new company in red as an ERROR sends the operator
+        // looking for a problem that does not exist.
+        if (trim((string) ($t['control_provisioned_at'] ?? '')) === '')
+            return ['risk' => 'NOT_YET_OPENED', 'severity' => 'NONE',
+                    'note' => 'Created but never signed in to, so its database does not exist yet. '
+                            . 'It is built the first time its owner signs in. Nothing is wrong; '
+                            . 'entitlement cannot be measured until then.'];
         return ['risk' => 'ERROR', 'severity' => 'UNKNOWN',
                 'note' => 'Workspace database could not be read: ' . $t['error'] . ' — entitlement unknown.'];
+    }
     if (!empty($t['licence_key']))
         return ['risk' => 'LICENCE_GOVERNED', 'severity' => 'NONE',
                 'note' => 'A signed licence is present and outranks the cloud ceiling; default-deny does not apply.'];
@@ -202,6 +214,10 @@ function p1_build_row(array $control, array $settings, $routeLabel, $error = '')
         'marketplace_addon' => (string) ($settings['marketplace_addon'] ?? ''),
         'connect_enabled'   => (string) ($settings['connect_enabled'] ?? ''),
         'error'             => (string) $error,
+        // From the CONTROL database, which survives everything: when this
+        // workspace was first fully set up. Blank means it has never been opened,
+        // and that is what separates "new" from "broken".
+        'control_provisioned_at' => (string) ($control['provisioned_at'] ?? ''),
     ];
     $row += p1_classify($row);
 
@@ -241,7 +257,7 @@ function p1_build_row(array $control, array $settings, $routeLabel, $error = '')
 // ---- Summary ---------------------------------------------------------------
 function p1_summarise(array $rows) {
     $s = ['total' => count($rows), 'SAFE' => 0, 'RECOVERABLE' => 0, 'AMBIGUOUS' => 0,
-          'ERROR' => 0, 'LICENCE_GOVERNED' => 0, 'not_provisioned' => 0,
+          'ERROR' => 0, 'LICENCE_GOVERNED' => 0, 'NOT_YET_OPENED' => 0, 'not_provisioned' => 0,
           'blank_ceiling' => 0, 'marketplace_backfill' => 0];
     foreach ($rows as $r) {
         $k = (string) ($r['risk'] ?? 'ERROR');
@@ -250,7 +266,12 @@ function p1_summarise(array $rows) {
         if (!empty($r['ceiling_blank']))       $s['blank_ceiling']++;
         if (!empty($r['marketplace_needs_backfill'])) $s['marketplace_backfill']++;
     }
-    $s['safe_to_flip'] = ($s['AMBIGUOUS'] === 0 && $s['ERROR'] === 0);
+    // A workspace nobody has opened cannot be measured, but it also cannot be
+    // harmed: it has no entitlement state yet, and it will be created correctly.
+    // It is neither a blocker nor a clean bill of health, so it is reported
+    // separately rather than folded into either.
+    $s['measurable']   = $s['total'] - $s['NOT_YET_OPENED'];
+    $s['safe_to_flip'] = ($s['AMBIGUOUS'] === 0 && $s['ERROR'] === 0 && $s['measurable'] > 0);
     return $s;
 }
 
@@ -264,20 +285,33 @@ function p1_render_text(array $report) {
     $L[] = 'Workspaces: ' . $sum['total']
          . '   SAFE: ' . $sum['SAFE'] . '   RECOVERABLE: ' . $sum['RECOVERABLE']
          . '   AMBIGUOUS: ' . $sum['AMBIGUOUS'] . '   ERROR: ' . $sum['ERROR']
-         . '   LICENCE: ' . $sum['LICENCE_GOVERNED'];
+         . '   LICENCE: ' . $sum['LICENCE_GOVERNED']
+         . '   NEVER OPENED: ' . $sum['NOT_YET_OPENED'];
     $L[] = 'Blank ceiling: ' . $sum['blank_ceiling']
          . '   Not provisioned: ' . $sum['not_provisioned']
          . '   Marketplace needing backfill: ' . $sum['marketplace_backfill'];
-    $L[] = 'VERDICT: ' . ($sum['safe_to_flip']
-        ? 'every workspace has a determinable entitlement.'
-        : 'DO NOT FLIP DEFAULT-DENY — ' . $sum['AMBIGUOUS'] . ' ambiguous, ' . $sum['ERROR'] . ' unreadable.');
+    if ($sum['safe_to_flip'])
+        $L[] = 'VERDICT: every workspace that can be measured has a determinable entitlement.';
+    elseif ($sum['measurable'] === 0)
+        $L[] = 'VERDICT: NOTHING TO MEASURE YET — no workspace has been opened, so none has an '
+             . 'entitlement to read. Sign in to one, then run this again.';
+    else
+        $L[] = 'VERDICT: DO NOT FLIP DEFAULT-DENY — ' . $sum['AMBIGUOUS'] . ' ambiguous, '
+             . $sum['ERROR'] . ' unreadable.';
     $L[] = str_repeat('=', 78);
     foreach ($report['tenants'] as $r) {
         $L[] = '';
         $L[] = '[' . $r['risk'] . '] ' . $r['tenant'] . '  —  ' . $r['company'];
         $L[] = '  status/plan      : ' . $r['status'] . ' / ' . $r['plan'] . ($r['plan_expiry'] ? ' (to ' . $r['plan_expiry'] . ')' : '');
         $L[] = '  storage          : ' . $r['storage'];
-        if ($r['error']) { $L[] = '  ERROR            : ' . $r['error']; continue; }
+        if ($r['error']) {
+            $L[] = ($r['risk'] === 'NOT_YET_OPENED' ? '  NOT OPENED YET   : ' : '  ERROR            : ')
+                 . ($r['risk'] === 'NOT_YET_OPENED'
+                     ? 'no database yet — it is built the first time its owner signs in. Nothing is wrong.'
+                     : $r['error']);
+            $L[] = '  control bought   : ' . ($r['control_modules'] ? implode(',', $r['control_modules']) : '(none recorded)');
+            continue;
+        }
         $L[] = '  control bought   : ' . ($r['control_modules'] ? implode(',', $r['control_modules']) : '(none recorded)');
         $L[] = '  provisioned      : ' . ($r['provisioned'] !== '' ? $r['provisioned'] : '(not set)');
         $L[] = '  ceiling          : ' . ($r['ceiling_blank'] ? '(BLANK — allows everything today)' : $r['ceiling_raw']);
@@ -792,13 +826,22 @@ function p1_recovery_per_workspace(array $rec, array $tenants) {
             }
         }
 
-        if ($live)            $verdict = 'RECOVERABLE — the data file still exists; only the routing is out of step';
-        elseif ($snaps > 0)   $verdict = 'RECOVERABLE FROM BACKUP — no live file, but a snapshot of this workspace exists';
-        else                  $verdict = 'NOT RECOVERABLE FROM THIS SERVER — no data file and no backup of this workspace';
+        // A company created moments ago and never opened has no data to lose.
+        // Calling that "NOT RECOVERABLE" is alarming and wrong: there is simply
+        // nothing there yet. Only a workspace the control database records as
+        // already set up can have lost anything.
+        $everSetUp = is_array($t) && trim((string) ($t['control_provisioned_at'] ?? '')) !== '';
+        $recoverable = ($live || $snaps > 0);
+
+        if ($live)              $verdict = 'RECOVERABLE — the data file still exists; only the routing is out of step';
+        elseif ($snaps > 0)     $verdict = 'RECOVERABLE FROM BACKUP — no live file, but a snapshot of this workspace exists';
+        elseif (!$everSetUp)    $verdict = 'NOTHING TO RECOVER — never signed in to, so it has no data yet. Normal for a new company.';
+        else                    $verdict = 'NOT RECOVERABLE FROM THIS SERVER — no data file and no backup of this workspace';
 
         $out[$k] = ['workspace' => $k, 'live_files' => $live, 'snapshots' => $snaps,
-                    'newest' => $newest, 'newest_in' => $newestIn,
-                    'recoverable' => ($live || $snaps > 0), 'verdict' => $verdict];
+                    'newest' => $newest, 'newest_in' => $newestIn, 'ever_set_up' => $everSetUp,
+                    'recoverable' => $recoverable, 'lost' => (!$recoverable && $everSetUp),
+                    'verdict' => $verdict];
     }
     return $out;
 }
@@ -861,10 +904,13 @@ function p1_render_recovery_text(array $rec) {
                  . ($w['newest'] ? '  (newest ' . $w['newest'] . ' in ' . $w['newest_in'] . ')' : '');
             $L[] = '    >> ' . $w['verdict'];
         }
-        $lost = array_values(array_filter($per, fn($w) => !$w['recoverable']));
+        $lost = array_values(array_filter($per, fn($w) => !empty($w['lost'])));
+        $new  = array_values(array_filter($per, fn($w) => empty($w['ever_set_up'])));
         $L[] = '';
         if (!$lost) {
-            $L[] = '>> ALL WORKSPACES RECOVERABLE. Change nothing further until the routing is corrected.';
+            $L[] = $new && count($new) === count($per)
+                ? '>> NOTHING TO RECOVER. Every workspace here is new and has never been opened.'
+                : '>> NOTHING LOST. Every workspace that has ever been used still has its data.';
         } elseif (count($lost) === count($per)) {
             $L[] = '>> NO WORKSPACE CAN BE RECOVERED FROM THIS SERVER.';
             $L[] = '   Next place to look is the hosting account backup (cPanel / JetBackup)';

@@ -185,7 +185,7 @@ function p1_run_probe(PDO $ctl, $appDir) {
                                    (string) ($t['company'] ?? ''));
             // Control-record facts required by Step 2B Part 2 (never credentials).
             foreach (['company', 'status', 'plan', 'plan_expiry', 'enabled_modules',
-                      'created_at', 'updated_at'] as $f)
+                      'created_at', 'updated_at', 'provisioned_at'] as $f)
                 if (array_key_exists($f, $t)) $row['control_' . $f] = (string) $t[$f];
             $probe['tenants'][] = $row;
         }
