@@ -170,3 +170,74 @@ the screen as the third option.
 * The successful `CREATE DATABASE` path still cannot be exercised here — no MySQL
   server in this environment. The prefix selection, ordering, de-duplication and
   rejection of unsafe prefixes are all tested directly.
+
+---
+
+## Addendum 2 — the host's proposed SQL, reviewed
+
+**Date:** 2026-09-14
+
+MilesWeb support confirmed the account is a VPS with root MySQL available and
+offered two statements. Both express the right intent; **neither will run as
+written.**
+
+### Errors in the proposed SQL
+
+```sql
+GRANT CREATE DATABASE, CREATE USER, GRANT OPTION ON mghaiapp1_*.* TO 'mghaiapp1_mehul'@'localhost';
+```
+
+| Problem | Why |
+|---|---|
+| `CREATE DATABASE` | Not a MySQL privilege name. The privilege that permits creating a database is `CREATE`. |
+| `mghaiapp1_*.*` | `*` is not a MySQL wildcard — `%` is. The `_` is itself a single-character wildcard and must be escaped, so the pattern is `` `mghaiapp1\_%`.* ``. |
+| `CREATE USER` | A global-only privilege. It cannot be granted on a database pattern; it requires `ON *.*`. |
+
+The same three apply to their Option 2.
+
+### What this application actually needs
+
+Less than either option asks for. With the `self` method
+(`saas_selfcreate_db()`, lib/saas_tenants.php:695) the application issues one
+statement — `CREATE DATABASE` — and then connects to the new database **with the
+same existing login**. It never creates a MySQL user, so:
+
+* `CREATE USER` — **not needed**
+* `GRANT OPTION` — **not needed**
+* a second admin account — **not needed**
+
+Granting either would hand the application more authority over the server than
+its job requires, for no benefit.
+
+### The statement to run
+
+```sql
+GRANT ALL PRIVILEGES ON `mghaiapp1\_%`.* TO 'mghaiapp1_mehul'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+`ALL PRIVILEGES` at database-pattern level includes `CREATE`, which is what
+permits creating a database whose name matches the pattern — this is exactly the
+mechanism hosting panels use to let an account create its own databases. Because
+the grant is by pattern, every database the application later creates
+(`mghaiapp1_xyz_recurit`, …) is covered by it automatically, with no further
+grant per client.
+
+**No `config.local.php` change is needed.** The `self` method uses the
+credentials already in place, so once the grant exists the capability test turns
+green and provisioning is automatic.
+
+### A hardening that came out of the review
+
+Creating a database and being able to **use** it are two different permissions,
+and a grant can give the first without the second. The probe now creates a
+throwaway table inside the test database and drops it again before dropping the
+database. A workspace provisioned into a database the application cannot build
+tables in would fail halfway through creating a company — a far worse place to
+discover the problem than a test button.
+
+### Evidence
+
+* Full regression: **7,147 passed, 0 failed** — unchanged.
+* The grant itself cannot be exercised here (no MySQL server in this
+  environment); the live capability test is what confirms it.

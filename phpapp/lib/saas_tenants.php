@@ -634,6 +634,20 @@ function saas_db_selfcreate_probe() {
             $pdo->exec("CREATE DATABASE `{$name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         } catch (Throwable $e) { $lastErr = $e->getMessage(); continue; }
 
+        // Creating a database and being able to USE it are two different
+        // permissions, and a grant can give the first without the second. Prove
+        // both here: a workspace created into a database the application cannot
+        // then build tables in would fail halfway through setting up a company,
+        // which is a far worse place to discover it.
+        try {
+            $pdo->exec("CREATE TABLE `{$name}`.`probe_t` (id INT)");
+            $pdo->exec("DROP TABLE `{$name}`.`probe_t`");
+        } catch (Throwable $e) {
+            $lastErr = 'the database was created but tables could not be built in it: ' . $e->getMessage();
+            try { $pdo->exec("DROP DATABASE `{$name}`"); } catch (Throwable $e2) {}
+            continue;
+        }
+
         $leftover = '';
         try { $pdo->exec("DROP DATABASE `{$name}`"); } catch (Throwable $e) { $leftover = $name; }
         return ['ok' => true, 'leftover' => $leftover, 'prefix' => $prefix, 'tried' => $tried,
