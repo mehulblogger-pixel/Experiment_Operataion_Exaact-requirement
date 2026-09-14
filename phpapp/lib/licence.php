@@ -47,6 +47,24 @@ const PRODUCT_MODULES = [
                      ['invoicing', 'profitability'], false],
     'hr'         => ['People & hiring', 'Requisitions, candidates, placement',
                      ['hiring'], false],
+    // MILESTONE 9. The marketplace was a substantial capability with no
+    // commercial identity: connect_enabled defaulted to ON and the only thing in
+    // front of it was a settings switch the company could flip for itself.
+    //
+    // The key is 'connect' because that is what the product already calls this
+    // dimension — PRODUCT_PACKAGES carries an optional 'connect' key and the
+    // setting is connect_enabled, so this names the existing commercial concept
+    // rather than inventing a parallel one.
+    //
+    // It claims NO access modules, and that is deliberate rather than an
+    // oversight. The marketplace has never had fine-grained access modules; its
+    // screens gate on connect_market_can() and the coordinator level. Minting
+    // 'mod.marketplace.*' permissions here would add RBAC surface that nothing
+    // reads and that no role grants — which is how you lock every customer out
+    // of a module you meant to sell them. Entitlement resolves through the
+    // product key directly, the same route 'admin' already takes (M2 anomaly A1).
+    'connect'    => ['Marketplace & Connect', 'The shared professional marketplace: requirements, sourcing, matching, bench, engagement, ratings and settlement',
+                     [], false],
 ];
 
 // Which product module owns a fine-grained access module. Anything not claimed

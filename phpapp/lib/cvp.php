@@ -166,7 +166,7 @@ const VENDOR_PERM_MODULES = [
     'reports'       => 'idems',     // Inspection reporting
     'issues'        => 'ncr',       // Operations
     'qualification' => 'vendors',   // Administration (core)
-    'market.apply'  => null,        // Marketplace — not a product module
+    'market.apply'  => 'connect',   // Marketplace — a product module since M9
 ];
 
 function vcan($key) {

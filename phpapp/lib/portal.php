@@ -1671,8 +1671,8 @@ const PORTAL_PERM_MODULES = [
     'deputation'         => 'jobs',         // Operations
     'deputation.approve' => 'jobs',         // Operations — a WRITE
     'issues'             => 'ncr',          // Operations
-    'market.post'        => null,           // Marketplace — not a product module
-    'market.vouchers'    => null,           // Marketplace — not a product module
+    'market.post'        => 'connect',      // Marketplace — a product module since M9
+    'market.vouchers'    => 'connect',      // Marketplace — a product module since M9
 ];
 
 // Entitlement first, then the person's own permission — the same order the staff

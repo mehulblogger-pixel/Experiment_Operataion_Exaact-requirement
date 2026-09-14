@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '40f19cc · 2026-09-14 12:47 UTC · 651 files';
+$RELEASE = 'eaf4748 · 2026-09-14 13:01 UTC · 651 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -89,7 +89,7 @@ $EXPECT  = [
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
     'lib/connect_identity.php' => ['s'=>18062,'h'=>'63c4f28bce150082'],
     'lib/connect_kpi.php' => ['s'=>25262,'h'=>'3d44c0796425cb27'],
-    'lib/connect_market.php' => ['s'=>38724,'h'=>'1d4fbd16be071f63'],
+    'lib/connect_market.php' => ['s'=>39876,'h'=>'0fd3332b96bb74f5'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
     'lib/connect_msg.php' => ['s'=>16414,'h'=>'37fd232a1fba99cc'],
     'lib/connect_org.php' => ['s'=>15830,'h'=>'626fdf913d82ba09'],
@@ -115,7 +115,7 @@ $EXPECT  = [
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>18815,'h'=>'62cf444263106e61'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
-    'lib/cvp.php' => ['s'=>60194,'h'=>'48c2dd34b5118492'],
+    'lib/cvp.php' => ['s'=>60199,'h'=>'e90a428d9e8c4a71'],
     'lib/datacontrol.php' => ['s'=>37308,'h'=>'be66a03dcb445dac'],
     'lib/datatable.php' => ['s'=>15699,'h'=>'dfea30bbc69ccef3'],
     'lib/db.php' => ['s'=>43960,'h'=>'75341b2effb14bb0'],
@@ -144,7 +144,7 @@ $EXPECT  = [
     'lib/invready.php' => ['s'=>6922,'h'=>'0f7637be388be1fc'],
     'lib/joblock.php' => ['s'=>12799,'h'=>'1b310fc2c11eb619'],
     'lib/leads.php' => ['s'=>71848,'h'=>'2ffed93aefd3f3b1'],
-    'lib/licence.php' => ['s'=>29857,'h'=>'decd5ec822c8eaff'],
+    'lib/licence.php' => ['s'=>31138,'h'=>'ae1f563479d4009c'],
     'lib/licenceissue.php' => ['s'=>28363,'h'=>'e750e57678199d20'],
     'lib/licencekey.php' => ['s'=>29242,'h'=>'c42b2078fe80352f'],
     'lib/licencesync.php' => ['s'=>10254,'h'=>'c17cfa585e721f62'],
@@ -178,7 +178,7 @@ $EXPECT  = [
     'lib/pdf.php' => ['s'=>26663,'h'=>'356a367da31c40a6'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
-    'lib/portal.php' => ['s'=>104401,'h'=>'afc2d5b60b4da375'],
+    'lib/portal.php' => ['s'=>104411,'h'=>'c56a746efc289328'],
     'lib/position.php' => ['s'=>19369,'h'=>'66f6dff09b985620'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'fbf0949ead05b0b8'],
     'lib/pricing_admin.php' => ['s'=>10272,'h'=>'7f36c21dab0d782d'],

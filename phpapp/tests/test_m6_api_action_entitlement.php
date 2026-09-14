@@ -95,8 +95,13 @@ t_ok(pcan('calls'),    'portal · while the one left on is unaffected');
 // Marketplace is not a product module — it has its own switch and must not be
 // dragged into entitlement by accident.
 $ceiling('operations');
-t_ok(in_array(PORTAL_PERM_MODULES['market.post'], [null], true),
-     'portal · marketplace keys are deliberately not bound to a product module');
+// UPDATED IN MILESTONE 9 — these keys were unowned because Marketplace had no
+// commercial identity. It has one now, so they are owned, and the assertion
+// tracks that rather than being deleted.
+t_eq(PORTAL_PERM_MODULES['market.post'], 'connect',
+     'portal · marketplace keys are bound to the Marketplace product module (M9)');
+t_eq(PORTAL_PERM_MODULES['market.vouchers'], 'connect',
+     'portal · including voucher review');
 
 // ---- VENDOR PORTAL ---------------------------------------------------------
 $pdo->prepare("INSERT INTO business_partners (legal_name,display_name,is_vendor,status,created_at)

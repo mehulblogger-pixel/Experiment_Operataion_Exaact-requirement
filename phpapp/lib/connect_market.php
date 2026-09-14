@@ -370,7 +370,26 @@ function cx_market_summary() {
  * operations. Every Connect entry point (staff routes, portals, public passport)
  * respects it.
  */
+// MILESTONE 9 — two questions, in the only safe order.
+//
+//   1. Has this company BOUGHT the marketplace?   — the entitlement engine
+//   2. Has it switched the marketplace on?        — its own setting
+//
+// Asked here because this is the one function the whole subsystem already runs
+// through: fifteen of the sixteen connect_*_can() gates consult it, the public
+// front door, the freelancer portal and the organisation join page consult it,
+// and the client portal's hiring tiles consult it. Putting the question anywhere
+// else would mean repeating it thirty-four times and missing one.
+//
+// The setting keeps its old meaning — a company that owns the marketplace may
+// still switch it off. What it can no longer do is switch ON something it has
+// not bought, which is exactly how modules_off relates to the entitlement
+// ceiling everywhere else in this application.
+//
+// A master user gets no exemption: connect_market_can() asks this BEFORE it asks
+// is_master(), so the ordering that already existed now carries the entitlement.
 function connect_enabled() {
+    if (function_exists('licence_module_live') && !licence_module_live('connect')) return false;
     return function_exists('setting_get') ? setting_get('connect_enabled', '1') === '1' : true;
 }
 

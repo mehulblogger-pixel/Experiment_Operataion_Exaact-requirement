@@ -19,8 +19,11 @@ t_section('Milestone 2 — module registry');
 
 // ---- One registry, six commercial modules --------------------------------
 t_ok(defined('PRODUCT_MODULES'), 'there is a product module registry');
-t_eq(count(PRODUCT_MODULES), 6, 'it holds exactly six commercial modules');
-foreach (['operations', 'admin', 'sales', 'reporting', 'money', 'hr'] as $k)
+// UPDATED IN MILESTONE 9 — this count was six until Marketplace & Connect was
+// given a commercial identity. The assertion is not relaxed: it still pins an
+// EXACT number, so a module arriving without a decision still fails here.
+t_eq(count(PRODUCT_MODULES), 7, 'it holds exactly seven commercial modules');
+foreach (['operations', 'admin', 'sales', 'reporting', 'money', 'hr', 'connect'] as $k)
     t_ok(isset(PRODUCT_MODULES[$k]), "the registry declares '$k'");
 
 // Keys are the commercial identity. A duplicate or a renamed key would split
@@ -47,14 +50,27 @@ t_ok(licence_is_core('admin'), 'admin is core');
 foreach (['operations', 'sales', 'reporting', 'money', 'hr'] as $k)
     t_ok(!licence_is_core($k), "'$k' is sellable, not core");
 
-// ---- Quality and Marketplace are not commercial modules ------------------
-// Quality lives inside the Operations boundary; splitting it would create a
-// second product nobody sold. Marketplace is Milestone 9 and its legacy cloud
-// default is not a purchase.
+// ---- Quality is still not a commercial module ----------------------------
+// UNCHANGED. Quality lives inside the Operations boundary; splitting it would
+// create a second product nobody sold. The architecture lock still holds.
 foreach (['quality', 'qms', 'accreditation'] as $k)
     t_ok(!isset(PRODUCT_MODULES[$k]), "Quality is not independently registered ('$k')");
-t_ok(!isset(PRODUCT_MODULES['marketplace']), 'Marketplace is not registered — deferred to Milestone 9');
-t_ok(!isset(PRODUCT_MODULES['connect']), 'and neither is Connect');
+
+// ---- Marketplace — UPDATED IN MILESTONE 9 --------------------------------
+// This file previously asserted that Marketplace was NOT registered, with its
+// own comment saying "Marketplace is Milestone 9". That milestone has now
+// happened, so the expectation is inverted — and made stricter rather than
+// dropped: there must be exactly ONE marketplace identity, under the key the
+// product already used ('connect', per PRODUCT_PACKAGES and connect_enabled).
+// A second, rival 'marketplace' key would split one product into two and make
+// entitlement unanswerable, so that remains forbidden.
+t_ok(isset(PRODUCT_MODULES['connect']), 'Marketplace & Connect IS a commercial module (M9)');
+t_ok(!isset(PRODUCT_MODULES['marketplace']), 'and there is no second, rival marketplace key');
+t_ok(!licence_is_core('connect'), 'Marketplace is sellable, not core');
+t_eq(PRODUCT_MODULES['connect'][2], [], 'it claims no access modules — it mints no RBAC surface');
+// It must not have quietly taken ownership of another product's access modules.
+foreach (['hiring', 'idems', 'invoicing', 'quotes', 'jobs', 'calls'] as $a)
+    t_ok(licence_owner($a) !== 'connect', "Marketplace does not own '$a'");
 
 // ---- The bridge: every access module has exactly one owner ---------------
 $covers = [];
