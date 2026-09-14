@@ -149,6 +149,7 @@ function sso_start_session(array $u) {
     if (function_exists('complete_login')) { complete_login($u); return; }
     session_regenerate_id(true);
     $_SESSION['uid'] = (int)$u['id'];
+    if (function_exists('auth_bind_workspace')) auth_bind_workspace();   // M13
     $_SESSION['started_at'] = time();
     sso_try(fn() => db()->prepare("UPDATE users SET last_login_at=?, last_login_ip=? WHERE id=?")
         ->execute([date('c'), substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45), (int)$u['id']]));

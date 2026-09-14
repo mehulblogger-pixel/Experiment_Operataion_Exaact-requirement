@@ -61,8 +61,23 @@ function pwreset_enter_workspace_for($loginId) {
     return '';
 }
 
+// MILESTONE 13. This is handed a workspace key that arrives in the QUERY STRING
+// (/reset?t=…&w=…), so it is attacker-controlled by definition. It has to stay —
+// the reset token lives in the workspace's own database, and there is no way to
+// find it without opening that database first.
+//
+// What it must never do is switch the workspace out from under somebody who is
+// ALREADY SIGNED IN. Before M13 that carried their session identity into another
+// company's database, because a uid was not bound to the workspace that issued
+// it. The binding in current_user() now stops the identity resolving there at
+// all; this refuses to make the switch in the first place, so a signed-in person
+// cannot be moved by a link somebody sent them.
+//
+// Resetting a password is something you do when you are NOT signed in. If you
+// are, the reset page has nothing to do with your session.
 function pwreset_enter_workspace_key($wkey) {
     $wkey = strtolower(trim((string) $wkey));
+    if (function_exists('current_user') && current_user()) return '';   // M13 — never move a signed-in session
     if (function_exists('saas_leave_tenant')) saas_leave_tenant();
     if ($wkey === '' || !function_exists('saas_enter_tenant')) return '';
     saas_enter_tenant($wkey);

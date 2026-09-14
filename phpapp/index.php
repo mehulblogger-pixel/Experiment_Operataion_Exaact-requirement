@@ -69,7 +69,19 @@ function ops_fatal($title, $hint, $detail = '', $showDetailToAnyone = false) {
         try { failure_record_auto($title, $detail); } catch (Throwable $ignored) {}
     }
     if (!headers_sent()) http_response_code(500);
-    $signedIn = !empty($_SESSION['uid']);
+    // MILESTONE 13 — the technical detail here is an exception message, a
+    // FILESYSTEM PATH and a line number, and the message routinely carries SQL
+    // and table names. It used to be shown to anyone merely SIGNED IN, which is
+    // every member of staff. An unauthenticated visitor correctly saw only a
+    // reference, so the rule was already right — it was drawn in the wrong place.
+    //
+    // Administrators keep it, because they are who diagnoses a fault. Everybody
+    // else gets the reference to quote, which is what they would relay anyway.
+    // Guarded with function_exists because this runs during boot, before the
+    // permission layer necessarily exists — and when it does not, nobody sees it.
+    $signedIn = !empty($_SESSION['uid'])
+        && ((function_exists('is_master') && is_master())
+            || (function_exists('is_admin_level') && is_admin_level()));
     $ref = strtoupper(substr(md5($detail . date('YmdH')), 0, 8));
     echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
     echo '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:660px;margin:50px auto;padding:26px;border:1px solid #e2ddd6;border-radius:12px">';
@@ -888,6 +900,15 @@ if ($route === 'login') {
         if (function_exists('idems_log')) idems_log('user', $u['id'] ?? null, 'LOGIN_FAILED', ['field'=>substr((string)($_POST['username'] ?? ''), 0, 60)]);
         $wait = login_fail((string)($_POST['username'] ?? ''));
         login_fail(login_ip_key());
+        // MILESTONE 13. Signing in with an e-mail belonging to another workspace
+        // switches the live database BEFORE the password is checked — it has to,
+        // because the password must be verified against that workspace's own
+        // users table. What it must not do is STAY there when the password is
+        // wrong: that left the session standing in a workspace the person had
+        // just failed to enter, and before the identity was workspace-bound it
+        // carried their existing login across with it. Step back out on every
+        // failure, so a failed attempt leaves nothing behind.
+        if (function_exists('saas_leave_tenant')) saas_leave_tenant();
         if ($wait > 0) return render_login('Too many failed attempts. Try again in ' . $wait . ' minute(s).');
         return render_login('Invalid username or password.');
     }

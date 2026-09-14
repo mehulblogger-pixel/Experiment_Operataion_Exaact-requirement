@@ -335,6 +335,7 @@ function complete_login($u) {
     login_clear($u['username']);
     login_clear(login_ip_key());
     $_SESSION['uid'] = $u['id'];
+    if (function_exists('auth_bind_workspace')) auth_bind_workspace();   // M13 — this identity belongs to THIS workspace
     $_SESSION['started_at'] = time();
     session_touch();
     try { db()->prepare("UPDATE users SET last_login_at=?, last_login_ip=? WHERE id=?")

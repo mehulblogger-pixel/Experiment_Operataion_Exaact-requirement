@@ -4617,6 +4617,14 @@ function ops_calls($route, $method) {
             LEFT JOIN business_partners v ON v.id=c.vendor_id LEFT JOIN offices o ON o.id=c.ibo_office_id
             LEFT JOIN offices x ON x.id=c.executing_office_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$call) { http_response_code(404); view('notfound'); return; }
+        // MILESTONE 13 — the same guard the job detail two thousand lines below
+        // already carries. The call LIST is office/SBU-scoped through
+        // scope_clause(), but this fetch-by-id was not: a branch-scoped
+        // coordinator who typed another branch's call id was served the record
+        // the list had correctly hidden from them. Proven with two branches
+        // before it was fixed.
+        ops_require(scope_allows($call['executing_office_id'] ?? null, $call['sbu'] ?? null),
+            'This ' . Tl('call') . ' is outside your office / branch scope.');
         $jobs = ops_all("SELECT j.*, i.name inspector_name, i.staff_kind, s.agency subcon_agency FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id LEFT JOIN subcons s ON s.id=j.subcon_id WHERE j.call_id=? ORDER BY j.id DESC", [$call['id']]);
         // lead-time metrics
         $firstJob = $jobs ? end($jobs) : null; // earliest allocated

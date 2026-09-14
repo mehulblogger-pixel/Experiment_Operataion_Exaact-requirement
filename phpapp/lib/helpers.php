@@ -62,10 +62,57 @@ function take_flash() {
 }
 
 // --- Auth ---
+// ============================================================================
+//  MILESTONE 13 — A SIGNED-IN IDENTITY BELONGS TO ONE WORKSPACE
+//
+//  This application gives every company its own database and resolves which one
+//  is live per request. current_user() then reads $_SESSION['uid'] against
+//  WHATEVER database is live — and nothing tied that uid to the workspace it was
+//  issued in. Proven, not assumed: with user id 1 being Alice in one workspace
+//  and Bob in another, the same session resolved to Alice on one connection and
+//  to Bob on the other.
+//
+//  That turned any path able to switch the live workspace into a cross-tenant
+//  authentication bypass. Two were reachable:
+//
+//    · signing in with an e-mail belonging to another workspace and a WRONG
+//      password — the workspace was switched before the password was checked and
+//      was not switched back on failure;
+//    · /reset?w=<workspace> — the public password-reset page took the workspace
+//      key straight from the query string.
+//
+//  Both are fixed at their own site as well, but this is the root cause and this
+//  is where it is closed: the session records WHICH workspace signed the person
+//  in, and current_user() refuses to resolve them anywhere else. Any future code
+//  that switches workspace with a stale session now fails closed by default
+//  rather than by remembering to.
+//
+//  Only server-side code that has already authorised the switch stamps the
+//  binding — signing in, completing two-factor, and the super-admin's deliberate
+//  "open this company" — so an attacker-driven switch can never carry an
+//  identity with it.
+// ============================================================================
+function auth_workspace_key() {
+    $t = $GLOBALS['__tenant'] ?? [];
+    return strtolower((string) (is_array($t) ? ($t['key'] ?? '') : ''));
+}
+// Stamp the workspace this session's identity belongs to. Called only where the
+// identity itself is being established.
+function auth_bind_workspace() {
+    $_SESSION['uid_ws'] = auth_workspace_key();
+}
+
 function current_user($fresh = false) {
     static $u = null;
     static $forUid = null;
     if (empty($_SESSION['uid'])) { if ($fresh) { $u = null; $forUid = null; } return null; }
+    // M13 — the identity was issued in one workspace; it is not valid in another.
+    // A session stamped before this existed carries no binding and is left alone;
+    // it acquires one the next time the person signs in.
+    if (isset($_SESSION['uid_ws']) && $_SESSION['uid_ws'] !== auth_workspace_key()) {
+        $u = null; $forUid = null;
+        return null;
+    }
     // Re-resolve when asked to, or when the signed-in uid has changed (tests that
     // switch user, or a re-login within one request). The default path is cached.
     if ($fresh || $u === null || $forUid !== $_SESSION['uid']) {

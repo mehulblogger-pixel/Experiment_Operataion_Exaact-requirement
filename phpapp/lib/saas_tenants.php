@@ -924,9 +924,11 @@ function saas_push_to_tenant_inproc($key, $t = null) {
     if ($t === null) $t = saas_tenant_get($key);
     if (!$t) return false;
     $prev = $_SESSION['saas_tenant'] ?? null;             // remember where the operator was
+    $prevWs = $_SESSION['uid_ws'] ?? null;                 // M13 — and which workspace their identity belongs to
     $ok = false;
     try {
         saas_enter_tenant($key);                          // switch the live DB to the company
+        if (function_exists('auth_bind_workspace')) auth_bind_workspace();   // M13 — deliberate, already-authorised
         // Refuse unless we truly landed in the workspace's own database.
         $rt = $GLOBALS['__tenant'] ?? [];
         try { db(); $rt = $GLOBALS['__tenant'] ?? []; } catch (Throwable $e) {}
@@ -941,6 +943,7 @@ function saas_push_to_tenant_inproc($key, $t = null) {
     } catch (Throwable $e) { $ok = false; }
     // Restore the operator's own context (they were on the control install).
     if ($prev === null) { unset($_SESSION['saas_tenant']); } else { $_SESSION['saas_tenant'] = $prev; }
+    if ($prevWs === null) { unset($_SESSION['uid_ws']); } else { $_SESSION['uid_ws'] = $prevWs; }
     if (function_exists('db_reset')) db_reset();
     if (function_exists('licence_disabled')) licence_disabled(true);   // drop the company's off-list cache
     return $ok;
@@ -1271,6 +1274,9 @@ function ops_saas_admin($route, $method) {
                 redirect('/companies');
             }
             $_SESSION['uid'] = (int) $admin['id'];
+            // M13 — a deliberate, already-authorised switch by the platform owner:
+            // the identity is re-issued in the company they have just opened.
+            if (function_exists('auth_bind_workspace')) auth_bind_workspace();
             $_SESSION['saas_impersonating'] = 1;           // a return-to-console breadcrumb for later
             flash('You are now signed in to ' . ($_POST['company'] ?? $key) . '. Log out to return.');
             redirect('/');
