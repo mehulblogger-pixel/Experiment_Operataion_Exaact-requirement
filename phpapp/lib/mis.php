@@ -144,7 +144,17 @@ function mis_summary(array $F) {
     $tot = $blank;
     $bySbu = []; $byActivity = []; $byOffice = []; $byInspector = []; $byIbo = [];
     $byClient = []; $byMonth = []; $byBoss = [];
-    $seeSalary = function_exists('can_see_salary') ? can_see_salary() : false;
+    // MILESTONE 7. data.salary is an RBAC permission, not a module permission, so
+    // it never asked whether this company has Money. The cost / profit / margin
+    // columns it unlocks ARE Money (profitability) — and /mis is mapped to the
+    // CORE reports module, so the route gate lets every company through.
+    //
+    // Set once here and carried in $S['seeSalary'] to BOTH the screen and the CSV,
+    // so the report and its export can never disagree about what may be shown.
+    // The MIS report itself is Operations data and is untouched: only the
+    // profitability columns are withheld.
+    $seeSalary = (!function_exists('licence_module_live') || licence_module_live('profitability'))
+                 && function_exists('can_see_salary') && can_see_salary();
     // Phase 2 §28 — when the financial-truth switch is ON, cost/profit are the canonical engine's
     // (overhead, voucher, other, contingency and the client-recovered credit all included); when OFF
     // (default) they are the historical partial formula, unchanged. Only the two derived totals move —

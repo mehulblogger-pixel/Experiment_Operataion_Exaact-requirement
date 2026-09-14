@@ -115,17 +115,39 @@ function pc_migrate() {
 
 // Who may open / edit costings: anyone who works either side of it (sells or
 // hires) plus management. Cross-module by design, like the advisor.
+// MILESTONE 7. A costing sheet is a SALES or HIRING artefact — it prices a
+// manpower quotation or budgets the roles a requisition has to fill. It is
+// module-neutral between those two, which is why the guards below name both.
+//
+// What it is not is free. pc_can() fell back to is_admin_level() || is_master()
+// with no module question, and the whole project-costing family is absent from
+// the route map, so neither the screen nor the printable sheet
+// (/project-costing-print) ever met the entitlement gate. A company with neither
+// module could open and print client names, cost build-ups, margins and sell
+// rates.
+//
+// Asked once here, so the screen and the printed export can never disagree:
+// ops_projcosting() requires pc_can() before it dispatches any of its routes,
+// the print route included.
+function pc_modules_live() {
+    if (!function_exists('licence_module_live')) return true;
+    foreach (['quotes', 'inquiries', 'hiring'] as $m) if (licence_module_live($m)) return true;
+    return false;   // neither Sales & CRM nor People & hiring — nothing to price
+}
 function pc_can() {
+    if (!pc_modules_live()) return false;
     return function_exists('can') && (
         can('mod.quotes.view') || can('mod.hiring.view') || can('mod.inquiries.view')
         || (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master()));
 }
 function pc_can_edit() {
+    if (!pc_modules_live()) return false;
     return function_exists('can') && (
         can('mod.quotes.edit') || can('mod.hiring.edit')
         || (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master()));
 }
 function pc_can_approve() {
+    if (!pc_modules_live()) return false;
     return (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master())
         || (function_exists('can') && can('crm.quote.approve'));
 }

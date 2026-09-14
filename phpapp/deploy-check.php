@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '724b0ba · 2026-09-14 12:11 UTC · 651 files';
+$RELEASE = 'c2f6f8f · 2026-09-14 12:28 UTC · 651 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -151,7 +151,7 @@ $EXPECT  = [
     'lib/lookups.php' => ['s'=>73979,'h'=>'d9dd346c6bcb28ea'],
     'lib/methods.php' => ['s'=>13959,'h'=>'14969626618c15f8'],
     'lib/mghsso.php' => ['s'=>9922,'h'=>'6eda2c5a11751853'],
-    'lib/mis.php' => ['s'=>22971,'h'=>'ab1e1f1123f76311'],
+    'lib/mis.php' => ['s'=>23675,'h'=>'07733bc4e9241217'],
     'lib/mkt_billing.php' => ['s'=>8396,'h'=>'34d5dafe732275bb'],
     'lib/mkt_credits.php' => ['s'=>9152,'h'=>'a415feb6c7997cff'],
     'lib/mkt_escrow.php' => ['s'=>12254,'h'=>'9039f1451f05df4d'],
@@ -182,7 +182,7 @@ $EXPECT  = [
     'lib/position.php' => ['s'=>19369,'h'=>'66f6dff09b985620'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'fbf0949ead05b0b8'],
     'lib/pricing_admin.php' => ['s'=>10272,'h'=>'7f36c21dab0d782d'],
-    'lib/projcosting.php' => ['s'=>30445,'h'=>'80ce27d236f3c068'],
+    'lib/projcosting.php' => ['s'=>31662,'h'=>'b5f37b94cd50703a'],
     'lib/pwreset.php' => ['s'=>8500,'h'=>'6ca7485e76455a1a'],
     'lib/qr.php' => ['s'=>17936,'h'=>'4d50b69b53bfa5e2'],
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],
@@ -229,7 +229,7 @@ $EXPECT  = [
     'lib/stagegate.php' => ['s'=>21633,'h'=>'9ca3dd19c9846c44'],
     'lib/superadmin.php' => ['s'=>10675,'h'=>'995da0045cd4e7ee'],
     'lib/tally.php' => ['s'=>42910,'h'=>'8b72dcead5eaeb36'],
-    'lib/tapi.php' => ['s'=>64888,'h'=>'7034f935c6e26f80'],
+    'lib/tapi.php' => ['s'=>67209,'h'=>'64834d5b55825df6'],
     'lib/tapi_dash.php' => ['s'=>19519,'h'=>'efd1e7a78a470736'],
     'lib/tapi_gov.php' => ['s'=>16589,'h'=>'7a2d09e5779d5df1'],
     'lib/tapi_score.php' => ['s'=>14322,'h'=>'e2256ab85fab255c'],

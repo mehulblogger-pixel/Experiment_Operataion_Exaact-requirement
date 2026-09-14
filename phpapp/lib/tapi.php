@@ -187,9 +187,55 @@ function tapi_metrics() {
 }
 
 function tapi_metric_def($key) { return tapi_metrics()[$key] ?? null; }
+
+// ---- MILESTONE 7: which module a metric reads from -------------------------
+//
+// Every metric already declares its lineage source — that is not new, it is the
+// data-lineage promise this engine was built on. So ownership is read from the
+// evidence already here rather than invented, and no second ownership model is
+// created: the source names a table, the ACCESS module owns it, and the product
+// registry says who owns that.
+//
+// Ten of the metrics below read idems/report_docs — Inspection reporting. The
+// analytics routes are mapped to the CORE reports module, so before M7 a company
+// with no Reporting subscription could still export report counts, turnaround and
+// release status through /analytics-export as CSV or XLSX.
+//
+// A source that is not named here is NOT assumed core: it resolves to no value,
+// which this engine already expresses as NO DATA. Failing closed on an unknown
+// source withholds a number; failing open would publish one.
+const TAPI_SOURCE_MODULES = [
+    'ops/jobs'             => 'jobs',      // Operations
+    'ops/calls'            => 'calls',     // Operations
+    'tosrm/calls'          => 'calls',     // Operations
+    'ncr/nonconformities'  => 'ncr',       // Operations
+    'capa'                 => 'capa',      // Operations
+    'idems/report_docs'    => 'idems',     // Inspection reporting
+    'idems/vendor_profiles'=> 'idems',     // Inspection reporting
+    'portal/client_users'  => 'portal',    // Administration (core)
+    'portal/portal_audit'  => 'portal',    // Administration (core)
+];
+
+function tapi_metric_module($key) {
+    $m = tapi_metric_def($key);
+    if (!$m) return null;
+    return TAPI_SOURCE_MODULES[(string) ($m['source'] ?? '')] ?? null;
+}
+
+// Whether this installation may be shown this metric at all. Asked ONCE per
+// metric per report — never per row: the resolvers below each run a single
+// scoped aggregate, and the check sits in front of that, not inside it.
+function tapi_metric_live($key) {
+    if (!function_exists('licence_module_live')) return true;
+    $mod = tapi_metric_module($key);
+    if ($mod === null) return false;               // unknown lineage — withhold, never publish
+    return licence_module_live($mod);
+}
+
 function tapi_metric_value($key, $ctx) {
     $m = tapi_metric_def($key);
     if (!$m) return null;
+    if (!tapi_metric_live($key)) return null;   // MILESTONE 7 — NO DATA, not a number
     try { return ($m['resolve'])($ctx); }
     catch (Throwable $e) { return null; }   // a broken source must never crash a dashboard
 }
