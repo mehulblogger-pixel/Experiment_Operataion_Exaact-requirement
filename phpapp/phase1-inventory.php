@@ -179,9 +179,15 @@ function p1_run_probe(PDO $ctl, $appDir) {
         $probe['dirs'][$label] = ['path' => $dir] + p1_scan_sqlite($dir);
 
     try {
-        foreach (p1_ro_query($ctl, "SELECT tenant_key, route_json FROM saas_tenants ORDER BY tenant_key")->fetchAll() as $t) {
+        foreach (p1_ro_query($ctl, "SELECT * FROM saas_tenants ORDER BY tenant_key")->fetchAll() as $t) {
             $k = (string) ($t['tenant_key'] ?? '');
-            $probe['tenants'][] = p1_probe_tenant($k, (string) ($t['route_json'] ?? ''), $registry[$k] ?? null, $appDir);
+            $row = p1_probe_tenant($k, (string) ($t['route_json'] ?? ''), $registry[$k] ?? null, $appDir,
+                                   (string) ($t['company'] ?? ''));
+            // Control-record facts required by Step 2B Part 2 (never credentials).
+            foreach (['company', 'status', 'plan', 'plan_expiry', 'enabled_modules',
+                      'created_at', 'updated_at'] as $f)
+                if (array_key_exists($f, $t)) $row['control_' . $f] = (string) $t[$f];
+            $probe['tenants'][] = $row;
         }
     } catch (Throwable $e) { $probe['error'] = $e->getMessage(); }
     return $probe;

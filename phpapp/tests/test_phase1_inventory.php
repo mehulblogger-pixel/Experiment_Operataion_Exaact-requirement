@@ -168,3 +168,85 @@ t_ok($explicit['marketplace_needs_backfill'], 'an explicitly switched-on Marketp
 $off = p1_build_row($ctrlNoMk, ['saas_entitled_modules' => 'hr', 'modules_off' => '',
                                 'marketplace_addon' => '0'], 'x');
 t_ok(!$off['marketplace_currently_on'] && !$off['marketplace_needs_backfill'], 'an explicitly disabled Marketplace stays off');
+
+// ---- 11. Step 2B — identity verification and hypothesis classification ----
+t_section('Phase 1 Step 2B — live storage diagnostic');
+
+// The strongest safety guarantee: a READ-ONLY open refuses to create.
+$missing = sys_get_temp_dir() . '/p1_absent_' . bin2hex(random_bytes(4)) . '.sqlite';
+$threw = false;
+try { p1_ro_sqlite($missing); } catch (Throwable $e) { $threw = true; }
+t_ok($threw, 'opening a missing database is refused, not created');
+t_ok(!file_exists($missing), 'and no file was created by the attempt');
+
+// Build a real workspace database to identify.
+$dir = sys_get_temp_dir() . '/p1_2b_' . bin2hex(random_bytes(4));
+@mkdir($dir, 0777, true);
+$mk = function ($path, $appName, $prov, $ceil, $cands = 2) {
+    $d = new PDO('sqlite:' . $path); $d->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    foreach (['settings (skey TEXT PRIMARY KEY, svalue TEXT)', 'users (id INTEGER PRIMARY KEY)',
+              'candidates (id INTEGER PRIMARY KEY)', 'requisitions (id INTEGER PRIMARY KEY)'] as $t) $d->exec("CREATE TABLE $t");
+    $s = $d->prepare('INSERT INTO settings VALUES (?,?)');
+    $s->execute(['app_name', $appName]); $s->execute(['saas_provisioned', $prov]); $s->execute(['saas_entitled_modules', $ceil]);
+    for ($i = 1; $i <= $cands; $i++) $d->exec("INSERT INTO candidates (id) VALUES ($i)");
+    $d = null;
+};
+$real = $dir . '/tenant-acme-corp.sqlite';
+$mk($real, 'Acme Corp', '1', 'hr', 5);
+
+t_ok(p1_is_sqlite_file($real), 'a real database is recognised by its file header');
+file_put_contents($dir . '/tenant-fake.sqlite', 'not a database at all');
+t_ok(!p1_is_sqlite_file($dir . '/tenant-fake.sqlite'), 'a file that is not a database is rejected by header check');
+
+$id = p1_identify_db($real, 'acme-corp', 'Acme Corp');
+t_eq($id['verdict'], 'MATCHES_EXPECTED_WORKSPACE', 'the database is identified as the expected workspace');
+t_eq($id['app_name'], 'Acme Corp', 'the workspace name is read');
+t_eq($id['saas_provisioned'], '1', 'the provisioning flag is read');
+t_eq($id['saas_entitled_modules'], 'hr', 'the entitlement ceiling is read');
+t_eq($id['counts']['candidates'], 5, 'record counts prove real data is present');
+t_ok(count($id['exaact_tables']) >= 3, 'it is recognised as an EXAACT workspace');
+
+$idWrong = p1_identify_db($real, 'sachee-hr', 'Sachee HR Recruitment Services');
+t_eq($idWrong['verdict'], 'BELONGS_TO_ANOTHER_WORKSPACE', 'a database belonging to someone else is NOT claimed');
+t_eq(p1_identify_db($dir . '/tenant-fake.sqlite', 'x', 'X')['verdict'], 'NOT_A_DATABASE', 'a non-database is classified as such');
+
+// Filename variants — the transposition that produced two xyz files.
+$vars = p1_key_variants('xyz-recurit');
+t_ok(in_array('xyz-recuirt', $vars, true), 'an adjacent-character transposition is treated as a candidate variant');
+t_ok(in_array('xyz-recurit', $vars, true), 'the exact key is always a variant of itself');
+
+// Candidate discovery finds the variant and flags it as not the routed name.
+$mk($dir . '/tenant-acme-corpo.sqlite', 'Someone Else Ltd', '1', 'operations', 1);
+$cands = p1_find_candidates('acme-corp', ['test dir' => $dir]);
+t_ok(count($cands) >= 1, 'candidate discovery finds the workspace file');
+$exact = array_values(array_filter($cands, fn($c) => $c['exact_name']));
+t_ok(count($exact) === 1 && $exact[0]['path'] === $real, 'the exactly-named file is identified as such');
+
+// MySQL storage detection, without exposing the password.
+$my = p1_mysql_storage_check(json_encode(['host' => 'h', 'name' => 'acc_db', 'user' => 'u', 'pass' => 'TOPSECRET']), null);
+t_ok($my['configured'], 'a MySQL route is detected as configured storage');
+t_eq($my['database'], 'acc_db', 'the database name is reported');
+t_ok(!in_array('TOPSECRET', $my, true), 'the password is never returned');
+
+t_ok(!p1_mysql_storage_check(json_encode(['sqlite' => '/x/a.sqlite']), null)['configured'],
+     'a file-backed workspace is not reported as MySQL storage');
+
+// Hypothesis classification end to end.
+$h1 = p1_probe_tenant('nowhere-co', json_encode(['sqlite' => $dir . '/tenant-nowhere-co.sqlite']), null, $dir);
+t_ok(strpos($h1['classification'], 'H1') === 0, 'no file anywhere classifies as H1');
+t_ok(!file_exists($dir . '/tenant-nowhere-co.sqlite'), 'H1 classification did not create the missing file');
+
+$h2 = p1_probe_tenant('acme-corp', json_encode(['sqlite' => '/nonexistent/tenant-acme-corp.sqlite']), null, $dir, 'Acme Corp');
+t_ok(strpos($h2['classification'], 'H2') === 0, 'file present elsewhere while the route is stale classifies as H2');
+
+$h4 = p1_probe_tenant('my-co', json_encode(['host' => 'h', 'name' => 'acc_x', 'user' => 'u', 'pass' => 'p']), null, $dir);
+t_ok(strpos($h4['classification'], 'H4') === 0, 'a configured MySQL route classifies as H4');
+
+// Path facts.
+$f = p1_path_facts($real);
+t_ok($f['exists'] && $f['absolute'] && $f['readable'] && $f['bytes'] > 0 && $f['modified'] !== '',
+     'path facts report existence, absoluteness, readability, size and modification time');
+t_ok(p1_path_facts('/definitely/not/here.sqlite')['exists'] === false, 'a missing path is reported as absent');
+
+foreach (glob($dir . '/*') ?: [] as $f2) @unlink($f2); @rmdir($dir);
+t_ok(true, 'temporary diagnostic fixtures cleaned up');

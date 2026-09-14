@@ -343,7 +343,7 @@ function p1_route_path($route) {
 }
 
 // Compare the two routing sources for one workspace and locate the real file.
-function p1_probe_tenant($key, $routeJson, $registryEntry, $appDir) {
+function p1_probe_tenant($key, $routeJson, $registryEntry, $appDir, $company = '') {
     $ctl = p1_route_path($routeJson);
     $regRoute = null;
     if (is_array($registryEntry)) {
@@ -367,12 +367,37 @@ function p1_probe_tenant($key, $routeJson, $registryEntry, $appDir) {
         'registry_exists' => ($reg['kind'] === 'sqlite') ? is_file($reg['path']) : null,
         'found_elsewhere' => [],
     ];
-    // Look for a file bearing this workspace's name in every candidate location.
-    $want = 'tenant-' . preg_replace('/[^a-zA-Z0-9_\-]/', '_', strtolower((string) $key)) . '.sqlite';
-    foreach (p1_candidate_dirs($appDir) as $label => $dir) {
-        $f = rtrim($dir, '/') . '/' . $want;
-        if (is_file($f)) $row['found_elsewhere'][] = ['where' => $label, 'path' => $f, 'bytes' => (int) @filesize($f)];
-    }
+    // STEP 2B — full filesystem facts for each routed path.
+    $row['control_facts']  = ($ctl['kind'] === 'sqlite') ? p1_path_facts($ctl['path']) : null;
+    $row['registry_facts'] = ($reg['kind'] === 'sqlite') ? p1_path_facts($reg['path']) : null;
+
+    // STEP 2B — is MySQL/MariaDB storage configured for this workspace?
+    $row['mysql'] = p1_mysql_storage_check($routeJson, $regRoute);
+
+    // STEP 2B — every candidate file for this workspace, including near-miss
+    // filename variants, each identity-verified read-only.
+    $cands = p1_find_candidates($key, p1_candidate_dirs($appDir));
+    foreach ($cands as &$c)
+        $c['identity'] = $c['is_sqlite']
+            ? p1_identify_db($c['path'], $key, (string) $company)
+            : ['verdict' => 'NOT_A_DATABASE', 'error' => 'header mismatch'];
+    unset($c);
+    $row['candidates'] = $cands;
+    $row['found_elsewhere'] = array_map(
+        fn($c) => ['where' => $c['where'], 'path' => $c['path'], 'bytes' => $c['bytes']], $cands);
+
+    // Classification for this workspace alone (H1/H2/H3/H4).
+    $credible = array_values(array_filter($cands, fn($c) =>
+        in_array(($c['identity']['verdict'] ?? ''), ['MATCHES_EXPECTED_WORKSPACE', 'EXAACT_WORKSPACE_UNNAMED'], true)));
+    $routedExists = ($row['control_facts']['exists'] ?? false) || ($row['registry_facts']['exists'] ?? false);
+
+    if ($row['mysql']['configured'])  $row['classification'] = 'H4 - MySQL/MariaDB storage is configured';
+    elseif (count($credible) > 1)     $row['classification'] = 'H3 - MULTIPLE credible databases (blocks repair)';
+    elseif (count($credible) === 1)   $row['classification'] = $routedExists
+                                       ? 'OK - routed database exists'
+                                       : 'H2 - database exists at a DIFFERENT location';
+    elseif ($cands)                   $row['classification'] = 'H3 - file(s) present but none verified as this workspace';
+    else                              $row['classification'] = 'H1 - no database anywhere (never provisioned)';
     return $row;
 }
 
@@ -397,7 +422,13 @@ function p1_render_storage_text(array $probe) {
     $L[] = 'PER-WORKSPACE ROUTING';
     foreach ($probe['tenants'] as $r) {
         $L[] = '';
-        $L[] = '  ' . $r['tenant'];
+        $L[] = '  ' . $r['tenant'] . (isset($r['control_company']) ? '  -  ' . $r['control_company'] : '');
+        if (isset($r['control_status']))
+            $L[] = '    control record        : status=' . $r['control_status']
+                 . ' plan=' . ($r['control_plan'] ?? '')
+                 . ' enabled_modules=' . ($r['control_enabled_modules'] ?? '')
+                 . (isset($r['control_created_at']) && $r['control_created_at'] !== '' ? ' created=' . $r['control_created_at'] : '')
+                 . (isset($r['control_updated_at']) && $r['control_updated_at'] !== '' ? ' updated=' . $r['control_updated_at'] : '');
         $L[] = '    control DB route_json : ' . $r['control_route'] . '  ' . p1_yn($r['control_exists']);
         $L[] = '    tenants.php registry  : ' . $r['registry_route'] . '  ' . p1_yn($r['registry_exists']);
         $L[] = '    sources agree         : ' . ($r['sources_agree'] === null
@@ -407,12 +438,44 @@ function p1_render_storage_text(array $probe) {
             ? $r['app_would_use']
             : '(nothing — with no routing entry the application cannot open this workspace at all)');
         $L[] = '    the INVENTORY used    : ' . $r['tool_used'];
-        if ($r['found_elsewhere']) {
-            foreach ($r['found_elsewhere'] as $f)
-                $L[] = '    FOUND ON DISK         : ' . $f['where'] . ' -> ' . $f['path'] . ' (' . number_format($f['bytes']) . ' bytes)';
+        $fct = function ($f) {
+            if (!$f) return '';
+            return $f['exists']
+                ? '[exists - ' . number_format($f['bytes']) . ' bytes - modified ' . $f['modified']
+                  . ' - ' . ($f['readable'] ? 'readable' : 'NOT READABLE') . ']'
+                : '[FILE ABSENT - NOT OPENED - NOT CREATED]';
+        };
+        if ($r['control_facts'])  $L[] = '      routed path facts   : ' . $fct($r['control_facts'])
+                                       . ($r['control_facts']['absolute'] ? ' (absolute)' : ' (RELATIVE)');
+        $L[] = !empty($r['mysql']['configured'])
+            ? '    MySQL storage         : CONFIGURED via ' . $r['mysql']['source']
+              . ' -> database "' . $r['mysql']['database'] . '" @ ' . $r['mysql']['host']
+            : '    MySQL storage         : not configured (file-backed workspace)';
+        if (!empty($r['candidates'])) {
+            foreach ($r['candidates'] as $c) {
+                $i = $c['identity'];
+                $L[] = '    CANDIDATE FILE        : ' . $c['path'];
+                $L[] = '        location          : ' . $c['where'] . ($c['exact_name'] ? '' : '   <-- FILENAME VARIANT, not the routed name');
+                $L[] = '        size / modified   : ' . number_format($c['bytes']) . ' bytes - ' . $c['modified']
+                     . ' - ' . ($c['readable'] ? 'readable' : 'NOT READABLE');
+                $L[] = '        real SQLite db    : ' . ($c['is_sqlite'] ? 'yes' : 'NO');
+                $L[] = '        identity          : ' . ($i['verdict'] ?? 'UNKNOWN') . (!empty($i['error']) ? ' (' . $i['error'] . ')' : '');
+                if (!empty($i['opened'])) {
+                    $L[] = '        tables            : ' . $i['tables'] . ' (EXAACT: ' . implode(',', $i['exaact_tables']) . ')';
+                    $L[] = '        workspace name    : ' . (trim($i['app_name'] . ' ' . $i['company_name']) ?: '(not set)');
+                    $L[] = '        provisioned       : ' . ($i['saas_provisioned'] !== '' ? $i['saas_provisioned'] : '(not set)');
+                    $L[] = '        ceiling           : ' . ($i['saas_entitled_modules'] !== '' ? $i['saas_entitled_modules'] : '(BLANK)');
+                    $L[] = '        modules_off       : ' . ($i['modules_off'] !== '' ? $i['modules_off'] : '(none)');
+                    if (!empty($i['counts'])) {
+                        $cc = []; foreach ($i['counts'] as $tb => $n) $cc[] = $tb . '=' . $n;
+                        $L[] = '        records           : ' . implode('  ', $cc);
+                    }
+                }
+            }
         } else {
-            $L[] = '    FOUND ON DISK         : nowhere — no data file exists for this workspace in any known location';
+            $L[] = '    CANDIDATE FILES       : none - no data file for this workspace in any known location';
         }
+        $L[] = '    >> CLASSIFICATION     : ' . ($r['classification'] ?? 'UNKNOWN');
     }
     $L[] = '';
     $L[] = str_repeat('=', 78);
@@ -421,3 +484,159 @@ function p1_render_storage_text(array $probe) {
 }
 
 function p1_yn($v) { return $v === null ? '' : ($v ? '[file exists]' : '[FILE NOT FOUND]'); }
+
+// ============================================================================
+//  STEP 2B — LIVE STORAGE DIAGNOSTIC  (read-only, identity-verifying)
+//
+//  Step 2A answered "is the routed file there?". Step 2B must answer the harder
+//  question: "does a REAL Sachee database exist anywhere, and is it genuinely
+//  Sachee's?" — without creating, modifying or provisioning anything.
+//
+//  Two hard guarantees:
+//   1. Every SQLite open uses PDO::SQLITE_OPEN_READONLY, which refuses at the
+//      operating-system level to create a missing file and cannot write.
+//   2. Every statement still passes through p1_ro_query()'s read-only guard.
+// ============================================================================
+
+// Filesystem facts about a path. Touches metadata only — never opens the file.
+function p1_path_facts($path) {
+    $path = (string) $path;
+    $f = ['path' => $path, 'absolute' => ($path !== '' && $path[0] === '/'),
+          'exists' => false, 'bytes' => 0, 'modified' => '', 'readable' => false];
+    if ($path === '' || !file_exists($path)) return $f;
+    $f['exists']   = true;
+    $f['bytes']    = (int) @filesize($path);
+    $mt            = @filemtime($path);
+    $f['modified'] = $mt ? date('Y-m-d H:i:s', $mt) : '';
+    $f['readable'] = @is_readable($path);
+    return $f;
+}
+
+// Is this really a SQLite database? Reads the 16-byte header only — no DB open.
+function p1_is_sqlite_file($path) {
+    if (!is_file($path) || !is_readable($path)) return false;
+    $fh = @fopen($path, 'rb');
+    if (!$fh) return false;
+    $magic = @fread($fh, 16);
+    @fclose($fh);
+    return $magic === "SQLite format 3\0";
+}
+
+// Open a SQLite file STRICTLY read-only. Refuses to create a missing file.
+function p1_ro_sqlite($path) {
+    if (!is_file($path)) throw new RuntimeException('file does not exist — not opened, not created');
+    $opts = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC];
+    if (defined('PDO::SQLITE_ATTR_OPEN_FLAGS') && defined('PDO::SQLITE_OPEN_READONLY'))
+        $opts[PDO::SQLITE_ATTR_OPEN_FLAGS] = PDO::SQLITE_OPEN_READONLY;
+    return new PDO('sqlite:' . $path, null, null, $opts);
+}
+
+// Filename variants for a workspace key, so a near-miss spelling is still found
+// (e.g. "recurit" vs "recuirt" — adjacent-character transpositions).
+function p1_key_variants($key) {
+    $k = preg_replace('/[^a-z0-9_\-]/', '_', strtolower(trim((string) $key)));
+    $out = [$k];
+    $len = strlen($k);
+    for ($i = 0; $i < $len - 1; $i++) {                    // single adjacent swap
+        $v = $k; $t = $v[$i]; $v[$i] = $v[$i + 1]; $v[$i + 1] = $t;
+        if ($v !== $k) $out[] = $v;
+    }
+    $out[] = str_replace('-', '_', $k);
+    $out[] = str_replace('_', '-', $k);
+    return array_values(array_unique($out));
+}
+
+// Every workspace data file in $dirs that could belong to this key.
+// $exactName is the file the routing expects; anything else is a variant.
+function p1_find_candidates($key, array $dirs) {
+    $variants = p1_key_variants($key);
+    $exact    = 'tenant-' . $variants[0] . '.sqlite';
+    $found    = [];
+    foreach ($dirs as $label => $dir) {
+        if (!is_dir($dir) || !is_readable($dir)) continue;
+        foreach (glob(rtrim($dir, '/') . '/tenant-*.sqlite') ?: [] as $f) {
+            $base = basename($f);
+            $stem = strtolower(preg_replace('/^tenant-|\.sqlite$/', '', $base));
+            if (!in_array($stem, $variants, true)) continue;      // not this workspace
+            $found[] = p1_path_facts($f) + [
+                'where'      => $label,
+                'name'       => $base,
+                'exact_name' => ($base === $exact),
+                'is_sqlite'  => p1_is_sqlite_file($f),
+            ];
+        }
+    }
+    return $found;
+}
+
+// Read-only identity check: is this database really the named workspace's?
+// Opens READONLY, lists tables, and reads a few identifying settings.
+function p1_identify_db($path, $expectKey = '', $expectCompany = '') {
+    $id = ['opened' => false, 'error' => '', 'tables' => 0, 'exaact_tables' => [],
+           'app_name' => '', 'saas_provisioned' => '', 'saas_entitled_modules' => '',
+           'modules_off' => '', 'company_name' => '', 'counts' => [], 'verdict' => 'UNKNOWN'];
+    if (!p1_is_sqlite_file($path)) {
+        $id['error'] = 'not a SQLite database (header mismatch)';
+        $id['verdict'] = 'NOT_A_DATABASE';
+        return $id;
+    }
+    try {
+        $db = p1_ro_sqlite($path);
+        $id['opened'] = true;
+        $names = p1_ro_query($db, "SELECT name FROM sqlite_master WHERE type='table'")->fetchAll(PDO::FETCH_COLUMN);
+        $names = array_map('strval', (array) $names);
+        $id['tables'] = count($names);
+        // Tables an EXAACT workspace is expected to have.
+        foreach (['settings', 'users', 'candidates', 'requisitions', 'lookup_values', 'offices'] as $t)
+            if (in_array($t, $names, true)) $id['exaact_tables'][] = $t;
+
+        if (in_array('settings', $names, true)) {
+            $keys = ['app_name', 'saas_provisioned', 'saas_entitled_modules', 'modules_off', 'company_name'];
+            $in = implode(',', array_fill(0, count($keys), '?'));
+            foreach (p1_ro_query($db, "SELECT skey, svalue FROM settings WHERE skey IN ($in)", $keys)->fetchAll() as $r)
+                $id[(string) $r['skey']] = (string) $r['svalue'];
+        }
+        foreach (['users', 'candidates', 'requisitions'] as $t)
+            if (in_array($t, $names, true)) {
+                try { $id['counts'][$t] = (int) p1_ro_query($db, "SELECT COUNT(*) c FROM \"$t\"")->fetch()['c']; }
+                catch (Throwable $e) {}
+            }
+        $db = null;
+    } catch (Throwable $e) {
+        $id['error'] = $e->getMessage();
+        $id['verdict'] = 'UNREADABLE';
+        return $id;
+    }
+
+    // Verdict, from evidence only.
+    $looksExaact = count($id['exaact_tables']) >= 3;
+    $label = strtolower(trim($id['app_name'] . ' ' . $id['company_name']));
+    $want  = strtolower(trim((string) $expectCompany));
+    $keyw  = strtolower(str_replace('-', ' ', (string) $expectKey));
+    $firstWord = strtok($keyw, ' ');
+    $nameMatch = ($want !== '' && $label !== '' && (strpos($label, $want) !== false || strpos($want, $label) !== false))
+              || ($firstWord !== false && $firstWord !== '' && strlen($firstWord) > 3 && strpos($label, $firstWord) !== false);
+
+    if (!$looksExaact)              $id['verdict'] = 'NOT_AN_EXAACT_WORKSPACE';
+    elseif ($label === '')          $id['verdict'] = 'EXAACT_WORKSPACE_UNNAMED';
+    elseif ($nameMatch)             $id['verdict'] = 'MATCHES_EXPECTED_WORKSPACE';
+    else                            $id['verdict'] = 'BELONGS_TO_ANOTHER_WORKSPACE';
+    return $id;
+}
+
+// Does this workspace have MySQL/MariaDB storage configured (from either source)?
+function p1_mysql_storage_check($routeJson, $registryEntry) {
+    $out = ['configured' => false, 'source' => '', 'database' => '', 'host' => ''];
+    foreach ([['control database route_json', $routeJson],
+              ['tenants.php routing file', $registryEntry]] as [$src, $raw]) {
+        $r = p1_route_path($raw);
+        if ($r['kind'] === 'mysql') {
+            $d = is_string($raw) ? json_decode($raw, true) : $raw;
+            if (is_array($d) && !empty($d['db']) && is_array($d['db'])) $d = $d['db'];
+            $out = ['configured' => true, 'source' => $src,
+                    'database' => (string) ($d['name'] ?? ''), 'host' => (string) ($d['host'] ?? '')];
+            return $out;                      // credentials deliberately not returned
+        }
+    }
+    return $out;
+}
