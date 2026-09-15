@@ -85,7 +85,16 @@ requirement, and a mutation that subtracts `in_progress` fails the suite.
 `filled` deliberately keeps the definition the Command Centre has always used
 (`stage='ACCEPTED'`), so no existing number changes meaning.
 
-## 6. Status is now a consequence, not a moment
+## 6. Status is recomputed wherever the counts change
+
+> **Corrected after the post-implementation audit.** This section originally read
+> "Status is now a consequence, not a moment". That was true only on the hire
+> path: the first cut of M3 recomputed the status in one place, so accepting a
+> candidate without creating a workforce record, reversing a hire, editing the
+> quantity, or moving a candidate between requisitions all left the stored status
+> stale — a requisition could still read `HIRED` with a seat genuinely open. The
+> recomputation now sits at every point a change passes through. See
+> `M3-AUDIT.md`.
 
 `reqf_derive_status()`:
 

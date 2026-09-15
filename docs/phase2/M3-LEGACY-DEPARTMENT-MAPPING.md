@@ -37,7 +37,25 @@ Welding, Painting & Coating and Instrumentation. Filing it as a *department*
 may be mixing organisation structure with professional taxonomy — the thing §3
 explicitly separates. Worth deciding deliberately rather than by default.
 
-## 4. The four questions only you can answer
+## 3b. DECIDED — the customer's answers
+
+Given, and to be applied once the M3 audit is signed off. Applying them writes
+approved terms and creates two departments; **no stored value is rewritten**, and
+each is reversible by removing the term.
+
+| Word | Decision | What applying it does |
+|---|---|---|
+| `QAQC` / `QA / QC` | **is Quality** | approved term on the existing Quality department |
+| `HSE` / `HSE / Safety` | **is Safety / HSE** | approved term on the existing Safety / HSE department |
+| `FINANCE` | **is Commercial / Finance** | approved term on the existing Commercial / Finance department |
+| `NDT` | **a department in its own right** | new department, created; NOT treated as the `trade` discipline of the same name |
+| `HR` | **a new department** | new department, created |
+
+On `NDT`: the audit flagged that the same word exists in the `trade` master as a
+discipline. The decision is that the department is a separate thing with the same
+name — both may exist, and they do not resolve to each other.
+
+## 4. The four questions — answered above, retained for the record
 
 1. Is **QA / QC** the same department as **Quality**, or a separate one?
 2. Is **HSE / Safety** the same as **Safety / HSE**? (Almost certainly yes.)

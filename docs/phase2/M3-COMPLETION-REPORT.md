@@ -90,14 +90,19 @@ the pipeline never reduces it; a mutation that subtracts them fails the suite.
 
 **9. What happens after the first hire?**
 The requisition becomes `PARTIALLY_FILLED` with `remaining` reduced by one. It
-does **not** close. This is the §34 acceptance test and mutation M1.
+does **not** close. This is the §34 acceptance test and mutation M1. The status
+is recomputed at **every** point the counts change — the candidate stage-change
+handler, the requisition save and the candidate save — not only on the hire path
+(audit finding A1).
 
 **10. What happens after partial fulfilment?**
 It stays `PARTIALLY_FILLED` and keeps accepting candidates.
 
 **11. What happens after cancellation?**
 `cancelled_qty` rises, the vacancies are **not** counted as hires, and the status
-is re-derived. Cancelling more than are open is refused.
+is re-derived. Cancelling more than are open is refused, and the cancelled count
+is clamped to what was asked for so a later quantity cut cannot produce
+"2 requested, 6 cancelled" (audit finding A3).
 
 **12. What happens when all vacancies are fulfilled?**
 `filled + cancelled >= requested` → `HIRED`, the existing status labelled
@@ -182,10 +187,33 @@ including all 68 M3 assertions. Observed, not inferred from SQLite, which
 reported **8552 / 0** against the same tree.
 
 **30. What mutation tests prove the critical rules?**
-Seven, all caught: the first hire closing the requisition (M1); remaining always
+**Twelve**, all caught — seven from the build and five from the audit (removing
+the sync from the stage change, the quantity edit and the candidate move;
+removing the return-to-open rule; removing the cancelled clamp). The build seven: the first hire closing the requisition (M1); remaining always
 zero (M2); a cancelled vacancy counted as a hire (M6); over-cancellation;
 overruling a person's explicit closure; counting pipeline candidates as filled;
 and removing the branch-scope gate from the new route.
+
+## 4b. Post-implementation audit — five findings, all fixed
+
+M3 was audited adversarially after it shipped. The full record is `M3-AUDIT.md`;
+in short:
+
+| # | Finding | Severity |
+|---|---|---|
+| **A1** | The status recomputed on the **hire path only**. Accepting without creating a workforce record, reversing a hire, editing the quantity, or moving a candidate all left it stale — a requisition could still read `HIRED` **with a seat genuinely open** | **critical** |
+| **A2** | A requisition could not return from `PARTIALLY_FILLED` to `OPEN` when every hire was reversed | moderate |
+| **A3** | Cancelled vacancies could exceed the requirement after a quantity cut — "2 requested, 6 cancelled" | moderate |
+| **A4** | A per-request cache **I added during the audit** served stale counts; removed, because it saved 0.11 ms and cost correctness | self-inflicted |
+| **A5** | This documentation set claimed "status is now a consequence, not a moment", which A1 shows was true on one path only | documentation |
+
+**A1's root cause is mine to own:** I fixed the write at one call site instead of
+putting the rule where every change passes — the opposite of the one-chokepoint
+discipline used in M14. The counts were always correct, because they are derived
+live; it was the stored status, which is what a manager actually looks at, that
+went stale.
+
+All five are fixed, and each fix is mutation-tested individually.
 
 ## 5. A correction this milestone forced
 

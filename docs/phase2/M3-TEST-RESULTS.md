@@ -8,17 +8,21 @@
 | Engine 1 | SQLite (bundled) |
 | Engine 2 | MariaDB 10.11.14, over TCP |
 | Suite | `php tests/run.php` — the whole suite |
-| New file | `tests/test_m3_multi_vacancy.php` — **68 assertions** |
+| New file | `tests/test_m3_multi_vacancy.php` — **87 assertions** (68 from the build, 19 from the audit) |
 
 Figures are recorded from the runs themselves. Nothing is predicted from the
 other engine, and nothing is claimed for an engine that was not exercised.
 
 ## 2. Results
 
+Figures below are the **post-audit** run, against the final tree.
+
 | Engine | Passed | Failed | Skips | Duration |
 |---|---|---|---|---|
-| SQLite | **8552** | **0** | none introduced | ~6 min |
-| MariaDB 10.11.14 | **8553** | **0** | none introduced | ~9 min |
+| SQLite | _post-audit run in progress_ | | none introduced | |
+| MariaDB 10.11.14 | _post-audit run in progress_ | | none introduced | |
+
+*(The pre-audit tree reported 8552 / 0 and 8553 / 0 on the two engines.)*
 
 > **Assertions, not test cases.** One scenario usually costs several: hire three
 > people against a five-vacancy requisition, then assert the status, the filled
@@ -41,6 +45,7 @@ other engine, and nothing is claimed for an engine that was not exercised.
 | The fix is at the hire moment | 4 | the old `status='HIRED'` write is gone; `PARTIALLY_FILLED` added to the existing list |
 | Route protection | 5 | the cancel route runs the **same** branch-scope gate and permission bar, **before** reading an id |
 | Idempotency | 2 | running the migrations twice adds no column and changes no data |
+| **Audit findings** | **19** | the status is recomputed at every mutation point; a reversed hire reopens the seat and can return all the way to `OPEN`; a quantity cut completes or clamps correctly |
 
 ## 4. Mutation testing (§39)
 
@@ -53,7 +58,13 @@ other engine, and nothing is claimed for an engine that was not exercised.
 | — | A person's explicit CLOSED/CANCELLED decision is overruled | **1 failed** ✅ |
 | — | Someone in the pipeline counts as having filled a seat | **2 failed** ✅ |
 | — | Branch-scope gate removed from the cancel route | **2 failed** ✅ |
-| — | *all restored* | **68 passed, 0 failed** |
+| — | *(build mutations above; audit mutations below)* | |
+| **A1** | Sync removed from the stage-change chokepoint | **2 failed** ✅ |
+| **A1b** | Sync removed from the quantity edit | **2 failed** ✅ |
+| **A1c** | Sync removed from the candidate move (both sides) | **1 failed** ✅ |
+| **A2** | A requisition can no longer return from partly filled to open | **1 failed** ✅ |
+| **A3** | Cancelled no longer clamped to what was asked for | **1 failed** ✅ |
+| — | *all restored* | **87 passed, 0 failed** |
 
 No mutation passed silently. No existing test was weakened, and no skip was
 introduced.

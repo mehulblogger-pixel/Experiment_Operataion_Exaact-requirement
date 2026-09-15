@@ -5022,6 +5022,7 @@ function ops_requisitions($route, $method) {
                 if (function_exists('custom_save')) custom_save('requisition', (int)$req['id'], $b);
                 // 1c — deployment groups; when present, the total headcount is authoritative.
                 if (function_exists('req_groups_save')) { $gt = req_groups_save((int)$req['id'], $b); if ($gt > 0) $pdo->prepare("UPDATE requisitions SET quantity=? WHERE id=?")->execute([$gt, (int)$req['id']]); }
+                if (function_exists('reqf_sync')) reqf_sync((int)$req['id']);   // M3 — the quantity may have changed
                 flash("Requisition {$req['req_code']} updated."); redirect('/requisition?id=' . $req['id']);
             } else {
                 $code = function_exists('recruit_req_code')
@@ -5165,6 +5166,11 @@ function ops_candidates($route, $method) {
             catch (Throwable $e) { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]); }
             $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                 ->execute([$id, $cand['stage'], $to, $remark, user_name(current_user()), date('c')]);
+            // M3 — every stage move passes through here, so the requisition's
+            // standing is recomputed here rather than only on the hire path.
+            // Accepting without creating a workforce record, and reversing a hire,
+            // both change how many seats are filled.
+            if (!empty($cand['requisition_id']) && function_exists('reqf_sync')) reqf_sync((int)$cand['requisition_id']);
             $msg = 'Candidate moved to ' . lk_options_or('candidate_stage', CAND_STAGES)[$to] . '.';
             // Hired: create an inspector/resource record from the accepted candidate.
             if ($to === 'ACCEPTED' && !empty($_POST['make_inspector']) && empty($cand['inspector_id'])) {
@@ -5276,6 +5282,12 @@ function ops_candidates($route, $method) {
                 $set = implode(',', array_map(fn($f) => "$f=?", $fields));
                 $vals = array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields); $vals[] = $cand['id'];
                 $pdo->prepare("UPDATE candidates SET $set WHERE id=?")->execute($vals);
+                // M3 — a candidate can be moved to a different requisition, which
+                // changes the standing of BOTH the one it left and the one it joined.
+                if (function_exists('reqf_sync')) {
+                    foreach (array_unique(array_filter([(int)($cand['requisition_id'] ?? 0), (int)($b['requisition_id'] ?? 0)])) as $rq)
+                        reqf_sync($rq);
+                }
                 if (function_exists('custom_save')) custom_save('candidate', (int)$cand['id'], $b);
                 flash('Candidate updated.');
                 redirect('/candidate?id=' . $cand['id']);
@@ -5288,6 +5300,7 @@ function ops_candidates($route, $method) {
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO candidates (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
+                if (function_exists('reqf_sync') && !empty($b['requisition_id'])) reqf_sync((int)$b['requisition_id']);
                 if (function_exists('custom_save')) custom_save('candidate', (int)$id, $b);
                 // If the résumé text was carried through the prefill, save it and its
                 // search keywords too, so the CV is on file from the moment of intake.

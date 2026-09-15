@@ -210,6 +210,72 @@ t_ok(strpos($rfSrc, 'csrf') === false || strpos(file_get_contents(__DIR__ . '/..
      'the form posts with the workspace CSRF token');
 
 // ---------------------------------------------------------------------------
+// 10c. AUDIT FINDINGS — the status must be recomputed at EVERY point that
+//      changes the counts, not only when somebody is hired. The first cut of M3
+//      synced on the hire path alone, which left a requisition reading HIRED
+//      while a seat was genuinely open.
+// ---------------------------------------------------------------------------
+$opsAll = file_get_contents(__DIR__ . '/../lib/ops.php');
+t_ok(substr_count($opsAll, 'reqf_sync(') >= 5,
+     'the standing is recomputed at several points, not one (' . substr_count($opsAll, 'reqf_sync(') . ')');
+// Every stage move passes through the candidate-events write, so the sync sits there.
+$evPos = strpos($opsAll, 'INSERT INTO candidate_events');
+t_ok($evPos !== false && strpos(substr($opsAll, $evPos, 700), 'reqf_sync(') !== false,
+     'every candidate STAGE change recomputes it — not just the hire branch');
+t_ok(strpos($opsAll, "reqf_sync((int)\$req['id']);   // M3 — the quantity may have changed") !== false,
+     'editing the requisition QUANTITY recomputes it');
+t_ok(strpos($opsAll, "foreach (array_unique(array_filter([(int)(\$cand['requisition_id'] ?? 0), (int)(\$b['requisition_id'] ?? 0)])) as \$rq)") !== false,
+     'moving a candidate between requisitions recomputes BOTH sides');
+
+// (a) Accepting without creating a workforce record still fills a seat.
+$rA = $mkReq('M3RQ-A1', 4);
+$cA = $mkCand($rA, 41, 'INTERVIEW');
+$pdo->prepare("UPDATE candidates SET stage='ACCEPTED' WHERE id=?")->execute([$cA]);
+reqf_sync($rA);
+t_eq($st($rA), 'PARTIALLY_FILLED', 'a candidate accepted WITHOUT "make inspector" still fills a seat');
+t_eq(reqf_counts($rA)['remaining'], 3, '…and the remaining count follows');
+
+// (b) A reversed hire must give the seat back — the worst of the audit findings.
+$rB = $mkReq('M3RQ-A2', 2);
+$b1 = $mkCand($rB, 42, 'RECEIVED'); $join($b1);
+$b2 = $mkCand($rB, 43, 'RECEIVED'); $join($b2);
+t_eq($st($rB), 'HIRED', 'both seats filled');
+$pdo->prepare("UPDATE candidates SET stage='REJECTED' WHERE id=?")->execute([$b1]);
+reqf_sync($rB);
+t_eq($st($rB), 'PARTIALLY_FILLED', 'reversing a hire reopens the requisition — it does NOT stay HIRED');
+t_eq(reqf_counts($rB)['remaining'], 1, '…and the seat comes back');
+
+// (c) …all the way back to open when every hire is reversed.
+$pdo->prepare("UPDATE candidates SET stage='REJECTED' WHERE id=?")->execute([$b2]);
+reqf_sync($rB);
+t_eq($st($rB), 'OPEN', 'with every hire reversed it returns to OPEN, not stranded at partly filled');
+t_eq(reqf_counts($rB)['remaining'], 2, 'and both seats are open again');
+
+// (d) An in-flight status a person set is still never overruled.
+$rC2 = $mkReq('M3RQ-A3', 3, 'PROPOSED');
+reqf_sync($rC2);
+t_eq($st($rC2), 'PROPOSED', 'an in-flight status with nothing filled is left alone');
+
+// (e) Cutting the quantity below what is already filled completes it.
+$rD = $mkReq('M3RQ-A4', 5);
+for ($i = 44; $i <= 46; $i++) { $cd = $mkCand($rD, $i, 'RECEIVED'); $join($cd); }
+t_eq($st($rD), 'PARTIALLY_FILLED', '3 of 5 filled');
+$pdo->prepare("UPDATE requisitions SET quantity=3 WHERE id=?")->execute([$rD]);
+reqf_sync($rD);
+t_eq($st($rD), 'HIRED', 'cutting the requirement to what is already filled completes it');
+t_eq(reqf_counts($rD)['remaining'], 0, '…with nothing remaining');
+
+// (f) Cancelled can never exceed what was asked for.
+$rE = $mkReq('M3RQ-A5', 10);
+reqf_cancel($rE, 6, 'dropped');
+t_eq(reqf_counts($rE)['cancelled'], 6, 'six cancelled of ten');
+$pdo->prepare("UPDATE requisitions SET quantity=2 WHERE id=?")->execute([$rE]);
+$cE = reqf_counts($rE);
+t_eq($cE['requested'], 2, 'the requirement is cut to two');
+t_eq($cE['cancelled'], 2, '…and cancelled is clamped to it — never "2 requested, 6 cancelled"');
+t_eq($cE['remaining'], 0, 'remaining stays sane');
+
+// ---------------------------------------------------------------------------
 // 11. Idempotency (§28, §30) — running the migration again changes nothing.
 // ---------------------------------------------------------------------------
 $before = count(t_columns('requisitions'));

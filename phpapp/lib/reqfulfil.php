@@ -81,6 +81,12 @@ function reqf_requested($req) {
 // ---------------------------------------------------------------------------
 //  The counts. One query, four numbers, and the arithmetic stated once.
 // ---------------------------------------------------------------------------
+// Deliberately NOT cached. An earlier version memoised this for the life of a
+// request, to save a detail screen asking for the same numbers three times. The
+// saving measured 0.11ms per call and there is no N+1 anywhere — the requisition
+// list does not use it — while the cache introduced a far worse failure: any
+// write that did not remember to drop it served stale counts. Correct numbers
+// matter more than a tenth of a millisecond.
 function reqf_counts($req) {
     reqf_migrate();
     $r = reqf_row($req);
@@ -90,7 +96,10 @@ function reqf_counts($req) {
     $id = (int) $r['id'];
     $out['id'] = $id;
     $out['requested'] = reqf_requested($r);
-    $out['cancelled'] = max(0, (int) ($r['cancelled_qty'] ?? 0));
+    // Clamped to what was asked for: the quantity can be edited down after some
+    // vacancies were cancelled, and "2 requested, 6 cancelled" is not a number
+    // anybody can act on.
+    $out['cancelled'] = min($out['requested'], max(0, (int) ($r['cancelled_qty'] ?? 0)));
 
     $ph = implode(',', array_fill(0, count(REQF_FILLED_STAGES), '?'));
     $pa = implode(',', array_fill(0, count(REQF_ACTIVE_STAGES), '?'));
@@ -123,7 +132,12 @@ function reqf_derive_status($req) {
     if ($c['requested'] <= 0) return null;
     if ($c['filled'] + $c['cancelled'] >= $c['requested']) return 'HIRED';       // existing status, label "Hired (filled)"
     if ($c['filled'] > 0)                                  return 'PARTIALLY_FILLED';
-    return null;   // nothing filled yet — leave OPEN / PROPOSED / OFFERED alone
+    // Nothing filled. Leave an in-flight status (OPEN / PROPOSED / OFFERED) alone —
+    // but a requisition that counting itself put into HIRED or PARTIALLY_FILLED has
+    // to be able to come back when the hires behind it are reversed, or it would
+    // sit for ever saying "partly filled" with nobody in it.
+    if (in_array($cur, ['HIRED', 'PARTIALLY_FILLED'], true)) return 'OPEN';
+    return null;
 }
 
 // Recompute and persist. Called wherever a fulfilment changes, so the status is
@@ -134,11 +148,12 @@ function reqf_sync($req) {
     $want = reqf_derive_status($r);
     if ($want === null) return (string) ($r['status'] ?? '');
     if (strtoupper((string) ($r['status'] ?? '')) === $want) return $want;
+    $c = reqf_counts($r);
     try {
         db()->prepare("UPDATE requisitions SET status=? WHERE id=?")->execute([$want, (int) $r['id']]);
         if (function_exists('activity_log'))
-            activity_log('requisition', (int) $r['id'], 'status', 'Status now ' . $want
-                . ' (' . reqf_counts($r)['filled'] . ' of ' . reqf_counts($r)['requested'] . ' filled)');
+            activity_log('requisition', (int) $r['id'], 'status',
+                'Status now ' . $want . ' (' . $c['filled'] . ' of ' . $c['requested'] . ' filled)');
     } catch (Throwable $e) {}
     return $want;
 }
