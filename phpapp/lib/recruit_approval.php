@@ -306,6 +306,12 @@ function appr_delegation($id) {
 //  Returns [ok, message, id]. Validates against the real register rather than
 //  trusting the form: a dropdown is not a security boundary.
 function appr_delegation_save($id, array $post) {
+    // The right is asked HERE, at the write, and not only on the route — the
+    // discipline M1 established after branch scope was found living on the route
+    // alone. Moving approval authority is privileged; a helper called directly
+    // must not reach the table around the gate.
+    if (function_exists('hiring_admin_can') && !hiring_admin_can())
+        return [false, 'Only an administrator can configure approval delegation.', 0];
     appr_migrate();
     $id = (int) $id;
     $existing = $id > 0 ? appr_delegation($id) : null;
@@ -365,6 +371,8 @@ function appr_delegation_save($id, array $post) {
 }
 
 function appr_delegation_revoke($id) {
+    if (function_exists('hiring_admin_can') && !hiring_admin_can())
+        return [false, 'Only an administrator can revoke an approval delegation.'];
     appr_migrate();
     $d = appr_delegation($id); if (!$d) return [false, 'That delegation no longer exists.'];
     db()->prepare("UPDATE approval_delegations SET active=0, revoked_by=?, revoked_at=? WHERE id=?")
@@ -536,9 +544,30 @@ function appr_delegators_for($userId, $entity = '', $officeId = null) {
         if ($to   !== '' && $today > $to)   continue;         // expired
         $de = trim((string) ($d['entity'] ?? ''));
         if ($de !== '' && strtoupper($de) !== strtoupper((string) $entity)) continue;   // wrong entity
+
+        // M2 CORRECTION · FINDING A — a delegation that NAMES a branch must not
+        // apply where a branch cannot be established. This read
+        // "$do > 0 && $officeId !== null && ..." which treated a missing branch
+        // context as "do not filter", so a delegation scoped to one office was
+        // UNSCOPED for every entity that carries no office (offer, salary,
+        // requisition). The administrator said "my Ahmedabad work while I'm
+        // away"; they also got company-wide offer approvals.
         $do = (int) ($d['office_id'] ?? 0);
-        if ($do > 0 && $officeId !== null && (int) $officeId !== $do) continue;         // wrong branch
-        $out[] = (int) $d['delegator_user_id'];
+        if ($do > 0) {
+            if ($officeId === null) continue;                // no branch to check against → does not apply
+            if ((int) $officeId !== $do) continue;            // wrong branch
+        }
+
+        // M2 CORRECTION · FINDING B — the DELEGATOR must still be active. This
+        // was asked on the role path only, so the two paths disagreed: with the
+        // delegator switched off a role step refused and a named-user step
+        // still granted, and somebody who had left the company kept lending
+        // their approval authority. Asked ONCE here, so both paths inherit it.
+        $dl = (int) $d['delegator_user_id'];
+        try { $du = ops_one("SELECT is_active FROM users WHERE id=?", [$dl]); } catch (Throwable $e) { $du = null; }
+        if (!$du || (int) ($du['is_active'] ?? 0) !== 1) continue;
+
+        $out[] = $dl;
     }
     return array_values(array_unique($out));
 }
@@ -608,8 +637,11 @@ function appr_can_act($step, $user = null) {
     // delegator never had.
     if ($role !== '') {
         foreach (appr_delegators_for((int) $user['id'], (string) ($step['_entity'] ?? ''), $step['_office_id'] ?? null) as $dl) {
-            try { $du = ops_one("SELECT role, is_active FROM users WHERE id=?", [$dl]); } catch (Throwable $e) { $du = null; }
-            if ($du && (int) ($du['is_active'] ?? 0) === 1 && (string) $du['role'] === $role) return true;
+            // Active status is settled in appr_delegators_for() — one rule, two
+            // readers. This asks only the question that is specific to a role
+            // step: does the delegator genuinely hold the role being delegated?
+            try { $du = ops_one("SELECT role FROM users WHERE id=?", [$dl]); } catch (Throwable $e) { $du = null; }
+            if ($du && (string) $du['role'] === $role) return true;
         }
     }
     return false;

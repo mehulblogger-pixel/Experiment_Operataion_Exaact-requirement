@@ -357,6 +357,128 @@ t_ok(count(array_filter($del, fn($x) => strpos((string) $x['subject'], 'revoked'
      'M2.8 · including revocation');
 
 // ---------------------------------------------------------------------------
+//  9 · M2 CORRECTION — delegation scope and delegator authority
+//
+//  Two defects the adversarial audit found, both mine, both the same shape: a
+//  question asked on one path and not carried to its sibling.
+//
+//   A  a delegation that NAMED a branch was UNSCOPED for every entity that
+//      carries no branch — offer, salary, requisition. "$officeId !== null"
+//      treated a missing branch context as "do not filter".
+//   B  the DELEGATOR's active status was asked on the role path only, so a
+//      person who had left the company still lent their authority through a
+//      named-user step.
+// ---------------------------------------------------------------------------
+t_section('M2.9 · correction A — a delegation that names a branch');
+
+$act($uMast);
+$uA2 = $mk('m2c_appr', 'BRANCH_MANAGER', 0, 991, $HR);
+$uD2 = $mk('m2c_del',  'COORDINATOR',    0, 991, $HR);
+[$aOk, , $aId] = appr_delegation_save(0, ['delegator_user_id' => $uA2, 'delegate_user_id' => $uD2,
+    'office_id' => 991, 'effective_from' => $today]);
+if ($aOk) $mine['del'][] = $aId;
+
+t_ok(in_array($uA2, appr_delegators_for($uD2, 'HIRING_REQUEST', 991), true),
+     'M2.9 A1 · office-scoped delegation + SAME-office request → applies');
+t_ok(!in_array($uA2, appr_delegators_for($uD2, 'HIRING_REQUEST', 992), true),
+     'M2.9 A2 · office-scoped delegation + DIFFERENT-office request → does not apply');
+t_ok(!in_array($uA2, appr_delegators_for($uD2, 'OFFER', null), true),
+     'M2.9 A3 · office-scoped delegation + entity with NO branch context → does not apply');
+t_ok(!in_array($uA2, appr_delegators_for($uD2, 'SALARY', null), true),
+     'M2.9 A3 · …the same for salary, which also carries no branch');
+// An UNSCOPED delegation is untouched by the correction.
+[$uOk, , $uId] = appr_delegation_save(0, ['delegator_user_id' => $uA2, 'delegate_user_id' => $uD2,
+    'entity' => 'OFFER', 'effective_from' => $today]);
+if ($uOk) $mine['del'][] = $uId;
+t_ok(in_array($uA2, appr_delegators_for($uD2, 'OFFER', null), true),
+     'M2.9 A4 · an UNSCOPED delegation still applies where there is no branch — existing behaviour preserved');
+t_ok(in_array($uA2, appr_delegators_for($uD2, 'OFFER', 992), true),
+     'M2.9 A4 · …and in any branch');
+// No cross-branch leakage in either direction.
+[$xOk, , $xId] = appr_delegation_save(0, ['delegator_user_id' => $uAppr, 'delegate_user_id' => $uD2,
+    'office_id' => 992, 'entity' => 'HIRING_REQUEST', 'effective_from' => $today]);
+if ($xOk) $mine['del'][] = $xId;
+t_ok(!in_array($uAppr, appr_delegators_for($uD2, 'HIRING_REQUEST', 991), true),
+     'M2.9 A5 · a delegation for branch B grants nothing in branch A');
+$act($uMast); appr_delegation_revoke($xId); appr_delegation_revoke($uId);
+
+t_section('M2.9 · correction B — the delegator must still be active');
+
+$stepNamed = ['approver_user_id' => $uA2, 'approver_role' => '', 'status' => 'PENDING',
+              '_entity' => 'HIRING_REQUEST', '_office_id' => 991];
+$stepRole  = ['approver_user_id' => 0, 'approver_role' => 'BRANCH_MANAGER', 'status' => 'PENDING',
+              '_entity' => 'HIRING_REQUEST', '_office_id' => 991];
+$act($uD2);
+t_ok(in_array($uA2, appr_delegators_for($uD2, 'HIRING_REQUEST', 991), true), 'M2.9 B1 · active delegator + valid delegation → allowed');
+t_ok(appr_can_act($stepNamed), 'M2.9 B1 · …on a named-user step');
+t_ok(appr_can_act($stepRole),  'M2.9 B1 · …and on a role step');
+
+$pdo->prepare("UPDATE users SET is_active=0 WHERE id=?")->execute([$uA2]);      // delegator leaves
+t_ok(!in_array($uA2, appr_delegators_for($uD2, 'HIRING_REQUEST', 991), true),
+     'M2.9 B2 · delegator deactivated after the delegation was made → the delegate is denied');
+t_ok(!appr_can_act($stepNamed), 'M2.9 B3 · named-user delegation denied when the delegator is inactive');
+t_ok(!appr_can_act($stepRole),  'M2.9 B4 · role-based delegation denied when the delegator is inactive');
+$pdo->prepare("UPDATE users SET is_active=1 WHERE id=?")->execute([$uA2]);      // and comes back
+t_ok(appr_can_act($stepNamed), 'M2.9 B5 · reactivating the delegator restores it — the delegation was still valid');
+
+// …but only where the delegation itself is still valid.
+$pdo->prepare("UPDATE approval_delegations SET effective_to=? WHERE id=?")
+    ->execute([date('Y-m-d', strtotime('-1 day')), $aId]);
+t_ok(!appr_can_act($stepNamed), 'M2.9 B6 · an EXPIRED delegation stays denied however active the delegator is');
+$pdo->prepare("UPDATE approval_delegations SET effective_to='' WHERE id=?")->execute([$aId]);
+// Revoking is CONFIGURATION, so it needs an administrator — and the write asks,
+// not just the route. Proved here rather than assumed.
+[$noRev, $noRevMsg] = appr_delegation_revoke($aId);
+t_ok(!$noRev, 'M2.9 B7 · a delegate cannot revoke a delegation themselves: ' . $noRevMsg);
+t_ok(appr_can_act($stepNamed), 'M2.9 B7 · …and the refused revocation changed nothing');
+$act($uMast);
+t_ok(appr_delegation_revoke($aId)[0], 'M2.9 B7 · an administrator revokes it');
+$act($uD2);
+t_ok(!appr_can_act($stepNamed), 'M2.9 B7 · a REVOKED delegation stays denied too');
+
+// The rest of the chain is unchanged by the correction.
+$act($uMast);
+[$rOk3, , $aId2] = appr_delegation_save(0, ['delegator_user_id' => $uAppr, 'delegate_user_id' => $uD2,
+    'entity' => 'HIRING_REQUEST', 'effective_from' => $today]);
+if ($rOk3) $mine['del'][] = $aId2;
+$act($uReq);
+[$cOk3, , $hC3] = hreq_save(0, array_merge($form, ['job_title' => 'M2c chain']));
+if ($cOk3) $mine['h'][] = $hC3;
+hreq_submit($hC3);
+$apC3 = hreq_approval($hC3); $stC3 = appr_current_step($apC3);
+
+$act($uPlain);                                    // holds mod.hiring.view only
+t_ok(!hreq_can_create(), 'M2.9 B8 · a delegate still needs their own capability');
+$act($uD2);
+$offWas2 = setting_get('modules_off', '');
+setting_set('modules_off', 'hr'); licence_disabled(true); ua(true);
+t_ok(appr_guard($apC3) !== '', 'M2.9 B9 · a delegate still needs entitlement — HR off refuses');
+setting_set('modules_off', $offWas2); licence_disabled(true); ua(true);
+$act($uFar);
+t_ok(!in_array($uAppr, appr_delegators_for($uFar, 'HIRING_REQUEST', 991), true)
+     || appr_guard($apC3) !== '',
+     'M2.9 B10 · a delegate still needs branch scope');
+// The requestor, holding a delegation, still cannot approve their own request.
+$act($uMast);
+[$sOk3, , $sId3] = appr_delegation_save(0, ['delegator_user_id' => $uAppr, 'delegate_user_id' => $uReq,
+    'entity' => 'HIRING_REQUEST', 'effective_from' => $today]);
+if ($sOk3) $mine['del'][] = $sId3;
+$act($uReq);
+t_ok(appr_guard($apC3) !== '', 'M2.9 B11 · a delegate cannot approve the request they themselves raised');
+t_ok(!appr_act((int) $stC3['id'], 'approve')[0], 'M2.9 B11 · …refused at the engine');
+$act($uMast); appr_delegation_revoke($sId3);
+// And still cannot manufacture an authority the delegator never held.
+$uNo2 = $mk('m2c_norole', 'INSPECTOR', 0, 991, $HR);
+[$mOk3, , $mId3] = appr_delegation_save(0, ['delegator_user_id' => $uNo2, 'delegate_user_id' => $uD2,
+    'entity' => 'HIRING_REQUEST', 'effective_from' => $today]);
+if ($mOk3) $mine['del'][] = $mId3;
+$act($uD2);
+$stepRole2 = ['approver_user_id' => 0, 'approver_role' => 'SBU_HEAD', 'status' => 'PENDING',
+              '_entity' => 'HIRING_REQUEST', '_office_id' => 991];
+t_ok(!appr_can_act($stepRole2),
+     'M2.9 B12 · delegation cannot manufacture an authority the delegator never possessed');
+
+// ---------------------------------------------------------------------------
 //  Clean up.
 // ---------------------------------------------------------------------------
 $_SESSION = $origSess; current_user(true); ua(true);
