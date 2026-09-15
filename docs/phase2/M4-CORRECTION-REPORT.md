@@ -151,3 +151,86 @@ permitted, (b) disabled for selected customers, or (c) governed by a
 tenant/workspace policy — plus (d) aligning its permission with Path A's — is
 recorded as `docs/adr/ADR-001-direct-requisition-path.md`, with the trade-offs,
 a recommendation and the consequences to work through. It is **OPEN**.
+
+---
+
+## 11. The §5 code audit — what was checked, and what it found
+
+The audit read the **code**, not the documentation. Every avenue named in the
+brief was walked:
+
+| Avenue | Finding |
+|---|---|
+| Route dispatch order | `ops_dispatch()` calls `ops_module_gate()` **first**; it resolves `hiring-request(s)` → `hiring` and asks `can('mod.hiring.view')`, which asks `licence_blocks()` before anything else. Correct. |
+| Direct POST | Every POST passes the global CSRF gate (`index.php`) before any route runs. |
+| Direct URL | The request detail now asks the scope question where the record is read — **fixed**, it previously relied on the route gate alone. |
+| AJAX / API | None exists. No file outside the layer reads or writes `hiring_requests`; one dispatch point reaches it. Asserted by test D. |
+| Helper invocation | Every mutating helper now asks the right and the scope itself — **fixed**. |
+| Destination / branch / user IDs | Validated against the real registers: requestor against `users`, departments against the canonical vocabulary (including "is it actually a department" and "is it switched off"), position against `positions` (exists, active, in scope), branch against `scope_allows()`. |
+| Master bypass | Exactly **one** `is_master()` in the layer, for segregation of duties only. A master on an unbought module is still refused — mutation 4 proves it. |
+| Stale lookup caches | The request-type list is a union of the live lookup and M4's additions, so the cache cannot outlive the migration within one request. |
+| Cross-branch references | `hreq_in_scope()` on read and on every write. |
+
+**Three defects found and fixed**, none of which the documentation would have
+revealed:
+
+1. `hreq_can_decide()`, written as a role band, **opened for a master holding
+   core administration on a workspace that had not bought the module.** M10's
+   permanent gate probe caught it. The module question is now asked first.
+2. **Branch scope existed only on the route.** Disabling the gate outright broke
+   no test, because a source-level assertion was holding it in place. Scope is
+   now asked at every write and at the read, and the decision was split out of
+   the refusal so it can be tested without a redirect.
+3. **Two silent-erasure bugs in `hreq_save()`**: a partial update that omitted
+   `office_id` moved the request to *no branch* (and slipped past the scope check
+   by omission); one that omitted `requested_by_id` erased the canonical
+   requestor. Both fields are now preserved when simply absent from the post.
+
+## 12. Every Hiring Request mutation path, and the chain each passes through
+
+This is not a list written by hand. Test section **D** finds every statement in
+the layer that writes to the database, works out which function contains it, and
+**fails on any function not on the audited list** — so a sixth write added later,
+in a new function, breaks the build until it is audited. There are exactly five.
+
+| Mutation path | Entitlement | Capability | Tenant / scope | Validation | Audit |
+|---|---|---|---|---|---|
+| **create** (`hreq_save`, id 0) | `mod.hiring.view` at the route → `licence_blocks()` first | `mod.hiring.edit` | branch on the posted `office_id`; position re-checked in scope | quantity, title, requestor, both departments, position, date, priority, employment type, request type | `activity_log` create |
+| **save / edit** (`hreq_save`, id > 0) | same | `mod.hiring.edit` | `hreq_in_scope($existing)` **and** the posted branch | as above, plus: approved / rejected / cancelled cannot be edited | `activity_log` update |
+| **submit** (`hreq_submit`) | same | `mod.hiring.edit` | `hreq_in_scope` | must be `DRAFT`; quantity and title present | `activity_log` status |
+| **approve** (`hreq_decide`, true) | same | `hreq_can_decide()` = module **and** management role | `hreq_in_scope` | must be `SUBMITTED`/`UNDER_REVIEW`; **`hreq_may_decide()` — not the requestor** | `activity_log` status |
+| **reject** (`hreq_decide`, false) | same | same | same | same | `activity_log` status |
+| **cancel** (`hreq_cancel`) | same | `mod.hiring.edit` | `hreq_in_scope` | already-cancelled is a no-op | `activity_log` status |
+| **convert → requisition** (`hreq_to_requisition`) | same | `mod.hiring.edit` | `hreq_in_scope` | **`hreq_is_executable()`**, then the approved-quantity ceiling | `activity_log` requisition |
+| **any other status mutation** | — | — | — | — | **does not exist**: the three status writers above are the only ones |
+| **AJAX / API mutation** | — | — | — | — | **does not exist** |
+| **helper callable from another route** | — | — | — | — | **does not exist**: no file outside the layer touches the table |
+
+Test D asserts, for each of the five functions, that the capability, the branch
+scope and the state/input validation all appear **before the first write**, and
+that each one leaves an audit entry.
+
+## 13. Test results
+
+*(filled in from the observed runs — see `M4-TEST-RESULTS.md`)*
+
+## 14. Architectural cleanliness (§8), and what is NOT here
+
+| Checked for | Found |
+|---|---|
+| duplicate requirement tables | none — `cx_requirements` (marketplace) and `site_doc_requirements` (site-access documents, a different domain) are the only others, both pre-existing and untouched |
+| duplicate quantity fields | none — `hiring_requests.quantity` (asked) and `requisitions.quantity` (executed, M3's); no third |
+| duplicate candidate / hire tables | none — one `candidates` table |
+| duplicate approval or pipeline engines | none — `recruit_approval_requests` is reused, not replaced; M4 creates no approval table |
+| duplicate Department masters | none — M2/M3's canonical vocabulary |
+| new Job Profile tables | none — M4 did not invent one |
+| new permission engines | none — `can()` is the only choke point |
+| `is_master()` bypasses | exactly one, for segregation of duties, tested in both directions |
+| unguarded Hiring Request mutation routes | none — section 12 above, enforced by test D |
+| unscoped branch references | none |
+| hidden direct conversion paths | none — exactly one writer of `hiring_request_id`, asserted |
+| stale documentation | corrected; two wrong statements in the original report are marked **CORRECTED** |
+
+**No Phase-3 work has been started.** No approval routing, matrix, SLA,
+delegation, escalation, inbox or notification; no re-approval path; no policy
+switch; no recruiter assignment; no Marketplace change; no Job Profile master.

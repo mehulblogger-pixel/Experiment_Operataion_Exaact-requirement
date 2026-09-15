@@ -7,7 +7,8 @@
 | PHP | 8.4.19 |
 | Engine 1 | SQLite (bundled) |
 | Engine 2 | MariaDB 10.11.14, over TCP |
-| New file | `tests/test_m4_hiring_request.php` — **77 assertions** |
+| New file | `tests/test_m4_hiring_request.php` — **78 assertions** |
+| New file | `tests/test_m4_correction.php` — **79 assertions** (the correction) |
 
 ## 2. Results
 
@@ -32,26 +33,79 @@
 | Scope / permission / entitlement | 11 | gate on the module door checking **both** the request and the incoming branch; branch-B user refused branch A; `hr` off refuses list and direct URL; **a master still cannot open an unbought module** |
 | Existing behaviour | 3 | direct requisition creation still works with a NULL link; M3 fulfilment unchanged; requisition numbering unchanged |
 
-## 4. Mutation testing (§44)
+## 3b. What the CORRECTION tests cover
 
-All eight named mutations, each caught.
+`tests/test_m4_correction.php` — **79 assertions** in three groups.
 
-| # | Mutation | Result |
-|---|---|---|
-| **M1** | A branch-A user may attach a branch-B position / branch | **1 failed** ✅ |
-| **M2** | A request may reference a department that is not one | **1 failed** ✅ |
-| **M3** | **Recruitment may start from an unapproved request** | **9 failed** ✅ |
-| **M4** | HR entitlement removed from the new routes | **3 failed** ✅ |
-| **M5** | A master user bypasses HR entitlement | **3 failed** ✅ (and 4 more in the Phase-1 security suite) |
-| **M6** | The request number is no longer unique | **1 failed** ✅ |
-| **M7** | The Request → Requisition link is broken | **8 failed** ✅ |
-| **M8** | The snapshot follows the master instead of being frozen | **3 failed** ✅ |
-| — | *all restored* | **77 passed, 0 failed** |
+| Group | What is held in place |
+|---|---|
+| **A · terminology** | the three locked words; a workspace's own wording honoured and qualified only when ambiguous ("Requirement" → "Recruitment Requirement"); no bare `Requirement` object label on the hiring request, hiring request list or requisition form screens; no unexplained "Requirements" in the navigation; the hiring request layer reachable from the navigation at all; `hiring_requests`, `requisitions` and `cx_requirements` all still separate; **no `requirements` table**; one additive nullable link column |
+| **B · requestor authorization** | the capability opens the door and the role name does not (a junior role holding `mod.hiring.edit` may raise; the role literally named **Coordinator** without it may not); the old `is_coordinator_level()` band is **wider than the permission matrix** and the capability refuses where it allowed; VIEW and CREATE are separate rights; **no new permission** — both are already in the catalogue; no role-name check survives in the request layer; create does not confer decide; **the requestor may not decide their own request**, refused at the helper with nothing written; the master exception is to segregation **only** — an unbought module still refuses a master; the right is asked inside `hreq_save/submit/cancel/to_requisition/decide`, so a direct call cannot bypass the route; the route asks capability, then scope; **branch scope proved behaviourally** — another branch's user, holding every right there is to hold, is refused edit, submit, decide, cancel, convert and the record by direct URL; a partial update cannot erase the branch or the requestor |
+| **C · direct requisition path** | the direct route still exists and its gate is unchanged; a directly-raised requisition has a NULL link and M3 fulfilment reads it unchanged; `hiring_request_id` is **not browser-settable** and the requisition save path never writes it; **exactly one** function in the application writes it; an unapproved request still cannot become a requisition; the requisition screen names its provenance |
 
-M5 is worth a note: M4's own code contains **no `is_master()` call at all**, so
-the mutation had to be introduced into the shared entitlement gate. It was
-caught both by M4's own assertion and by the Phase-1 security suite that exists
-for exactly this.
+## 4. Mutation testing (§44 + the correction)
+
+Each mutation was applied to the **live source**, the guard suites re-run, the
+source restored from a byte-for-byte backup, and a clean baseline re-confirmed.
+The harness counts a suite that dies without printing a result as a **detection**,
+never as a silent zero.
+
+### 4a. The eight named mutations from §44 (original M4)
+
+| # | Protection removed | Expected | Actual | Verdict |
+|---|---|---|---|---|
+| **M1** | branch scope on the incoming position / branch | refused | 1 failed | **CAUGHT** |
+| **M2** | department identity validation | refused | 1 failed | **CAUGHT** |
+| **M3** | **the executable-state boundary** | recruitment refused from an unapproved request | 9 failed | **CAUGHT** |
+| **M4** | HR entitlement on the new routes | routes refused | 3 failed | **CAUGHT** |
+| **M5** | master bypasses HR entitlement | master still refused | 3 failed (+4 in the Phase-1 security suite) | **CAUGHT** |
+| **M6** | uniqueness of the request number | refused | 1 failed | **CAUGHT** |
+| **M7** | the request → requisition link | link preserved | 8 failed | **CAUGHT** |
+| **M8** | the frozen approval snapshot | snapshot frozen | 3 failed | **CAUGHT** |
+
+### 4b. The correction battery — re-run in full against the corrected code
+
+| # | Protection deliberately removed | Expected | Actual | Verdict |
+|---|---|---|---|---|
+| **1** | the requestor capability check in `hreq_save()` | a user without `mod.hiring.edit` is refused | 3 failed (`m4_correction`) | **CAUGHT** |
+| **2** | the branch-scope **decision** (`hreq_scope_reason()` always allows) | another branch's request refused by URL and on the way in | 2 failed | **CAUGHT** |
+| **2b** | the branch-scope **route gate wrapper** only | *expected to survive* | 0 failed | **SURVIVED — accepted, see below** |
+| **3** | module entitlement (`hreq_can_view()` always true) | an unbought module refuses, master included | 2 failed | **CAUGHT** |
+| **4** | a master bypass inserted **ahead of** the capability | the licence is still asked first | 1 failed | **CAUGHT** |
+| **5** | the executable-state guard in `hreq_to_requisition()` | recruitment refused from an unapproved request | 1 + 9 failed (both suites) | **CAUGHT** |
+| **6** | the request → requisition link (written as NULL) | provenance preserved | 8 failed | **CAUGHT** |
+| **7** | the approval snapshot (written empty) | snapshot frozen at submit | 3 failed | **CAUGHT** |
+| **8** | the direct requisition route (blocked outright) | the direct path still works | 1 failed | **CAUGHT** |
+| **9** | segregation of duties in `hreq_decide()` | the requestor cannot decide their own request | 3 failed | **CAUGHT** |
+| **10** | write-time branch scope (`hreq_in_scope()` always true) | every write refuses out-of-branch | 5 failed | **CAUGHT** |
+
+**Ten of eleven caught. One survived, and the distinction matters.**
+
+### Why mutation 2b survived, and why that is not a failed security test
+
+A mutation that survives is only acceptable if the protection it removed was
+**redundant**, and that has to be shown rather than asserted. Here it is shown
+three ways:
+
+- Mutation **2** removes the scope **decision** — the thing the gate actually
+  asks. It is **CAUGHT**.
+- Mutation **10** removes the **write-time** scope check. It is **CAUGHT**.
+- The **read** path asks the question again where the record is read, so a
+  bookmarked URL to another branch's request is refused even with the gate gone.
+
+Mutation 2b removes only the outer route wrapper. Nothing is unprotected as a
+result, because reads and writes each ask independently — which is precisely
+what the correction changed, after the **original** version of this mutation
+(removing the gate when it *was* the only check) survived and exposed the gap.
+That earlier survival was a genuine finding and is recorded as such; this one is
+the redundancy that replaced it.
+
+The rule this table follows:
+
+> **CAUGHT** = the mutation removed a protection and a test failed.
+> **SURVIVED (accepted)** = the mutation removed a *duplicate* of a protection
+> that is independently enforced and independently mutation-proved elsewhere.
+> Any other survival is a coverage gap and is fixed, not explained.
 
 ## 5. The flow, driven end to end
 

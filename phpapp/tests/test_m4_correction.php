@@ -297,6 +297,90 @@ t_ok(strpos($rdv, 'hiring_request_id') !== false && strpos($rdv, 'Raised from hi
      'C5 · the requisition screen names its provenance, so neither route reads as an accident');
 
 // ---------------------------------------------------------------------------
+//  D · EVERY MUTATION PATH, AND THE CHAIN EACH ONE PASSES THROUGH
+//
+//  It is not enough that hreq_save() asks the capability. The claim being made
+//  is that EVERY way of changing a hiring request asks it. So this section does
+//  not trust a list written by hand: it finds every statement in the layer that
+//  writes to the database, works out which function it lives in, and refuses any
+//  function that is not on the audited list. A seventh write added later, in a
+//  new function, fails this test until it is audited.
+// ---------------------------------------------------------------------------
+t_section('D · every mutation path');
+
+// Every write in the layer, and the function that contains it.
+$fnAt = function ($src, $pos) {
+    $best = ''; $off = 0;
+    if (preg_match_all('/\bfunction\s+([a-z_0-9]+)\s*\(/i', $src, $m, PREG_OFFSET_CAPTURE)) {
+        foreach ($m[1] as $i => $hit) {
+            if ($m[0][$i][1] < $pos) { $best = $hit[0]; $off = $m[0][$i][1]; }
+        }
+    }
+    return [$best, $off];
+};
+$writes = [];
+if (preg_match_all('/(INSERT INTO|UPDATE |DELETE FROM)/', $src, $wm, PREG_OFFSET_CAPTURE)) {
+    foreach ($wm[0] as $hit) {
+        [$fn, $off] = $fnAt($src, $hit[1]);
+        $writes[$fn][] = $hit[1];
+    }
+}
+$AUDITED = ['hreq_migrate', 'hreq_save', 'hreq_submit', 'hreq_decide', 'hreq_cancel', 'hreq_to_requisition'];
+$unaudited = array_values(array_diff(array_keys($writes), $AUDITED));
+t_ok(!$unaudited, 'D0 · every database write in the layer lives in an audited function'
+     . ($unaudited ? ' — audit these: ' . implode(', ', $unaudited) : ''));
+t_eq(count($writes), 5, 'D0 · and there are exactly five of them — the five mutation paths');
+
+// For each mutation path: the chain, in order, BEFORE the first write.
+//   entitlement+capability -> tenant/branch scope -> state / input validation -> mutation -> audit
+$chain = [
+    // function            capability          scope             state or input validation
+    'hreq_save'           => ['hreq_can_create()', 'hreq_in_scope(', "return [false, 'How many people are needed?"],
+    'hreq_submit'         => ['hreq_can_create()', 'hreq_in_scope(', "!== 'DRAFT'"],
+    'hreq_decide'         => ['hreq_can_decide()', 'hreq_in_scope(', "'SUBMITTED', 'UNDER_REVIEW'"],
+    'hreq_cancel'         => ['hreq_can_create()', 'hreq_in_scope(', "=== 'CANCELLED'"],
+    'hreq_to_requisition' => ['hreq_can_create()', 'hreq_in_scope(', 'hreq_is_executable($r)'],
+];
+foreach ($chain as $fn => $links) {
+    $start = strpos($src, 'function ' . $fn . '(');
+    $firstWrite = min($writes[$fn]);
+    $body = substr($src, $start, $firstWrite - $start);
+    t_ok(strpos($body, $links[0]) !== false, 'D · ' . $fn . ' — capability asked before it writes');
+    t_ok(strpos($body, $links[1]) !== false, 'D · ' . $fn . ' — branch scope asked before it writes');
+    t_ok(strpos($body, $links[2]) !== false, 'D · ' . $fn . ' — state / input validated before it writes');
+}
+// Approval authority and segregation are asked on the decision path only.
+$decBody = substr($src, strpos($src, 'function hreq_decide('), min($writes['hreq_decide']) - strpos($src, 'function hreq_decide('));
+t_ok(strpos($decBody, 'hreq_may_decide($r)') !== false,
+     'D · hreq_decide — segregation of duties asked before it writes');
+t_ok(strpos(substr($src, strpos($src, 'function hreq_save(')), 'hreq_can_decide()') === false
+     || strpos($chain['hreq_save'][0], 'decide') === false,
+     'D · creating never asks for, or grants, the decide right');
+
+// Every mutation leaves an audit trail.
+foreach (['hreq_save', 'hreq_submit', 'hreq_decide', 'hreq_cancel', 'hreq_to_requisition'] as $fn) {
+    $start = strpos($src, 'function ' . $fn . '(');
+    $end = strpos($src, "\nfunction ", $start + 10);
+    $body = substr($src, $start, ($end ?: strlen($src)) - $start);
+    t_ok(strpos($body, 'activity_log(') !== false, 'D · ' . $fn . ' — writes an audit entry');
+}
+
+// No other entry point: no AJAX/API route, and no other file touches the table.
+$routes = 0;
+foreach (glob(__DIR__ . '/../lib/*.php') as $lf) {
+    if (basename($lf) === 'hiringreq.php') continue;
+    // The table name in a SQL context. (ops_hiring_requests() contains the
+    // table name as a substring of its own name, which is not a read.)
+    if (preg_match('/(FROM|INTO|UPDATE|JOIN)\s+hiring_requests\b/i', file_get_contents($lf))) $routes++;
+}
+t_eq($routes, 0, 'D · no file outside the layer reads or writes hiring_requests');
+t_eq(substr_count(file_get_contents(__DIR__ . '/../lib/ops.php'), 'ops_hiring_requests('), 1,
+     'D · exactly one dispatch point reaches the layer');
+$opsRoute = file_get_contents(__DIR__ . '/../lib/ops.php');
+t_ok(strpos($opsRoute, "'hiring-requests'=>'hiring','hiring-request'=>'hiring'") !== false,
+     'D · and both of its routes are entitlement-mapped to the paid HR module');
+
+// ---------------------------------------------------------------------------
 //  Clean up.
 // ---------------------------------------------------------------------------
 $_SESSION = $origSess; current_user(true); ua(true);
