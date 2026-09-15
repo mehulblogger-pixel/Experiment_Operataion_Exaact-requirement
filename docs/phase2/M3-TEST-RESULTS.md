@@ -13,16 +13,16 @@
 Figures are filled in from the runs below; nothing here is claimed for an engine
 that was not actually exercised, and no figure is predicted from another run.
 
-> Earlier complete runs of this suite, before the last two assertions were added,
-> reported **8420 passed / 0 failed** on SQLite and **8421 / 0** on MariaDB. The
-> table below is refreshed from the run against the final tree.
+> Both figures below are from one run against the final tree, not carried over
+> from an earlier run. (For the record, the runs before the last two assertions
+> were added reported 8420/0 and 8421/0 — the +2 is exactly those assertions.)
 
 ## 2. Results
 
 | Engine | Passed | Failed | Skips |
 |---|---|---|---|
-| SQLite | _run in progress_ | | |
-| MariaDB 10.11.14 | _run pending_ | | |
+| SQLite | **8422** | **0** | none introduced |
+| MariaDB 10.11.14 | **8423** | **0** | none introduced |
 
 The one-assertion difference is engine-specific coverage that only runs under
 MySQL. It is not a test skipped on SQLite.

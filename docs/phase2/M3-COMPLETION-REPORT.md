@@ -50,8 +50,8 @@ Each was reproduced first. Each is pinned by tests and by a mutation.
 
 | Engine | Passed | Failed |
 |---|---|---|
-| SQLite | _run in progress_ | |
-| MariaDB 10.11.14 | _run pending_ | |
+| SQLite | **8422** | **0** |
+| MariaDB 10.11.14 | **8423** | **0** |
 
 Whole suite, both engines. M3 adds **100 assertions** (~41 scenarios). **Nine
 mutations**, all caught. No test weakened, no skip introduced. Full detail in
@@ -179,8 +179,8 @@ approval matching, the admin permission guard, and the term reconcile that keeps
 a department added the old way matchable. All nine were caught.
 
 **19. What was tested on MariaDB/MySQL?**
-The **whole suite**, on MariaDB 10.11.14 over TCP — figure recorded in
-`M3-TEST-RESULTS.md` once the run reports. Not inferred from SQLite.
+The **whole suite**, on MariaDB 10.11.14 over TCP — **8423 passed, 0 failed**,
+including every M3 assertion. Actually run, not inferred from SQLite.
 
 **20. What existing modules were regression-tested?**
 All of them, via the full suite: Operations, Quality, Reporting, Money, Sales,
