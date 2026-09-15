@@ -158,9 +158,30 @@ and do not resolve to each other.
 
 ## 5. Regression
 
+Run against the tree carrying the gate. Observed on each engine, not predicted
+from the other.
+
 | Engine | Before this review | After the gate |
 |---|---|---|
-| SQLite | 8620 passed, 0 failed | _recorded below_ |
-| MariaDB 10.11.14 | 8621 passed, 0 failed | _recorded below_ |
+| SQLite | 8620 passed, 0 failed | **8632 passed, 0 failed** |
+| MariaDB 10.11.14 | 8621 passed, 0 failed | **8633 passed, 0 failed** |
 
-Focused suites: multi-vacancy **99 assertions**, vocabulary **144**, forms **67**.
+The +12 is the assertions this review added. Focused suites: multi-vacancy
+**99 assertions**, vocabulary **144**, forms **67**.
+
+## 6. What this review changed, and what it did not
+
+**Changed:** one gate, `cand_scope_gate()`, and twelve assertions holding it and
+the movement behaviour in place.
+
+**Not changed:** no schema, no data, no existing test weakened, no skip
+introduced. The five department mappings were already applied before this review
+began, exactly as proposed — they were proven here, not re-run.
+
+**Left open deliberately:** the candidate register now has branch scope, but the
+wider question of whether every register in the product has one is not something
+this review settled — it looked at the M3 surface. `req_scope_gate()`,
+`lead_scope_gate()`, `opp_scope_gate()`, `cmp_scope_gate()`,
+`crm_quote_scope_gate()`, `pc_scope_gate()` and now `cand_scope_gate()` are the
+seven that exist. Whether anything else needs one is worth a separate, bounded
+pass rather than an assumption either way.
