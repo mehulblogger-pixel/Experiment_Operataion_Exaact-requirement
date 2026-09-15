@@ -50,7 +50,7 @@ const ROLL_TYPES = ['OWN'=>'On our roll (we pay salary)', 'AGENCY'=>'On agency r
 const FEE_STATUS = ['PROVISIONAL'=>'Provisional (within guarantee)', 'CONFIRMED'=>'Confirmed (payable)', 'WAIVED'=>'Waived (left within guarantee)'];
 // Manpower requisition (management approval for a position — mandatory before hiring).
 const REQ_TYPES  = ['NEW'=>'New position (new project / expansion)', 'REPLACEMENT'=>'Replacement (engineer who left)'];
-const REQ_STATUS = ['OPEN'=>'Open (approved, sourcing)', 'PROPOSED'=>'Candidate proposed', 'OFFERED'=>'Offer released', 'HIRED'=>'Hired (filled)', 'CLOSED'=>'Closed', 'CANCELLED'=>'Cancelled'];
+const REQ_STATUS = ['OPEN'=>'Open (approved, sourcing)', 'PROPOSED'=>'Candidate proposed', 'OFFERED'=>'Offer released', 'PARTIALLY_FILLED'=>'Partly filled (still hiring)', 'HIRED'=>'Hired (filled)', 'CLOSED'=>'Closed', 'CANCELLED'=>'Cancelled'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
 const OVERHEAD_PCT = 8; // salary overhead %
 // Built-in theme presets: primary, accent, page background, surface (cards), text.
@@ -2825,6 +2825,8 @@ function ops_dispatch($route, $method) {
             return ops_positions($route, $method);
         case $route === 'departments':                               // Department hub — designations, positions, headcount & people by department
             return ops_departments($route, $method);
+        case $route === 'requisition-cancel-vacancies':               // M3 — give up on the vacancies nobody filled
+            return ops_requisition_cancel_vacancies($route, $method);
         case $route === 'requisition-position':                      // Phase 3 — link a requisition to a position
             return ops_requisition_position($route, $method);
         case $route === 'candidate-interview':                       // Phase 4 — multi-round interviews + scorecards
@@ -5188,8 +5190,17 @@ function ops_candidates($route, $method) {
                 $pdo->prepare("UPDATE candidates SET inspector_id=? WHERE id=?")->execute([$insId, $id]);
                 // Fill the requisition this candidate was raised against.
                 if (!empty($cand['requisition_id'])) {
-                    $pdo->prepare("UPDATE requisitions SET hired_inspector_id=?, status='HIRED' WHERE id=?")->execute([$insId, (int)$cand['requisition_id']]);
-                    $msg .= ' Requisition filled.';
+                    // M3 — a requisition for ten people is not finished because one
+                    // of them joined. hired_inspector_id is kept for the screens and
+                    // reports that have always read it (it names the most recent
+                    // hire), but the STATUS is now derived from how many seats are
+                    // actually filled, so it only reaches "Hired (filled)" when the
+                    // requirement really is met.
+                    $pdo->prepare("UPDATE requisitions SET hired_inspector_id=? WHERE id=?")->execute([$insId, (int)$cand['requisition_id']]);
+                    if (function_exists('reqf_sync')) reqf_sync((int)$cand['requisition_id']);
+                    $msg .= function_exists('reqf_summary_text')
+                        ? ' Requisition: ' . reqf_summary_text((int)$cand['requisition_id']) . '.'
+                        : ' Requisition filled.';
                 }
                 $msg .= ' Added to ' . THP('engineer') . ' (' . ($roll === 'AGENCY' ? 'on agency roll' : 'on our roll') . ') — you can now allocate ' . Tlp('job') . ' to them.';
             }

@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '0273273 · 2026-09-15 09:27 UTC · 655 files';
+$RELEASE = '29a5dca · 2026-09-15 09:50 UTC · 656 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
     'cron.php' => ['s'=>23081,'h'=>'b2ebb8eff370868e'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>116797,'h'=>'bacbf2059aa66970'],
+    'index.php' => ['s'=>116907,'h'=>'b85ba45efeb726d0'],
     'lib/access.php' => ['s'=>71117,'h'=>'cb498f1e83cfa87b'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
     'lib/activity.php' => ['s'=>22744,'h'=>'2a63a2da6e0df9f5'],
@@ -119,7 +119,7 @@ $EXPECT  = [
     'lib/cvp.php' => ['s'=>60199,'h'=>'e90a428d9e8c4a71'],
     'lib/datacontrol.php' => ['s'=>37308,'h'=>'be66a03dcb445dac'],
     'lib/datatable.php' => ['s'=>15699,'h'=>'dfea30bbc69ccef3'],
-    'lib/db.php' => ['s'=>44662,'h'=>'3f2a409e39a63d8d'],
+    'lib/db.php' => ['s'=>44776,'h'=>'505a6c2efad3ba1d'],
     'lib/decisionrules.php' => ['s'=>12116,'h'=>'7f7d5a9cd6e144ef'],
     'lib/dedupe.php' => ['s'=>10889,'h'=>'89e689019ac0901e'],
     'lib/deptorg.php' => ['s'=>29983,'h'=>'b5294bec07a630d8'],
@@ -169,7 +169,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66290,'h'=>'4ff1bc5a2652ad81'],
-    'lib/ops.php' => ['s'=>590786,'h'=>'1f67ef78195461fe'],
+    'lib/ops.php' => ['s'=>591742,'h'=>'0ff35f2bc082c5ec'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -198,6 +198,7 @@ $EXPECT  = [
     'lib/recruit_offer.php' => ['s'=>38011,'h'=>'dfece6707804ac19'],
     'lib/recruitpipe.php' => ['s'=>41762,'h'=>'02f3bcea8840902f'],
     'lib/reportreview.php' => ['s'=>23222,'h'=>'ae43c4d37883823d'],
+    'lib/reqfulfil.php' => ['s'=>10602,'h'=>'5039f9b512041d0e'],
     'lib/reset.php' => ['s'=>11477,'h'=>'8d961eb9724047b9'],
     'lib/retention.php' => ['s'=>6587,'h'=>'deb6a6d4a270fa36'],
     'lib/revrecon.php' => ['s'=>13441,'h'=>'eb8777d1398cdada'],
@@ -547,7 +548,7 @@ $EXPECT  = [
     'views/ops/reimbursable_dedup.php' => ['s'=>5209,'h'=>'95ba7f96fb4ccc26'],
     'views/ops/report_reviews.php' => ['s'=>5202,'h'=>'278f5b6a228a0349'],
     'views/ops/reports.php' => ['s'=>15068,'h'=>'3be87a0f606b8d82'],
-    'views/ops/requisition_detail.php' => ['s'=>23754,'h'=>'2ba8804747655ff6'],
+    'views/ops/requisition_detail.php' => ['s'=>25737,'h'=>'e4c5618fd5827816'],
     'views/ops/requisition_form.php' => ['s'=>39371,'h'=>'973c04e3346c0319'],
     'views/ops/requisition_list.php' => ['s'=>2651,'h'=>'c15db7b60de5f2b7'],
     'views/ops/reset_data.php' => ['s'=>3978,'h'=>'227a141a70167b40'],

@@ -11,6 +11,37 @@
   <?php if (is_coordinator_level()): ?><a class="btn secondary" href="/requisition-edit?id=<?= (int)$req['id'] ?>">Edit</a><?php endif; ?>
 </div>
 
+<?php // M3 — where this requirement stands, in one line. Ten vacancies are ten
+      // vacancies: how many are filled, how many people are still in play, how
+      // many were given up on, and how many are genuinely still open.
+if (function_exists('reqf_counts')):
+  $fc = reqf_counts($req);
+  if ($fc['requested'] > 1 || $fc['cancelled'] > 0 || $fc['filled'] > 0): ?>
+  <div class="panel" style="display:flex;flex-wrap:wrap;gap:22px;align-items:center">
+    <?php foreach ([
+        ['Requested',   $fc['requested'],   ''],
+        ['Filled',      $fc['filled'],      $fc['filled'] ? 'p-ok' : ''],
+        ['In progress', $fc['in_progress'], $fc['in_progress'] ? 'p-info' : ''],
+        ['Cancelled',   $fc['cancelled'],   $fc['cancelled'] ? 'p-mut' : ''],
+        ['Remaining',   $fc['remaining'],   $fc['remaining'] ? 'p-info' : 'p-ok'],
+    ] as $box): if ($box[0] === 'In progress' && !$box[1]) continue; if ($box[0] === 'Cancelled' && !$box[1]) continue; ?>
+      <div style="min-width:86px">
+        <div style="font-size:23px;font-weight:700;line-height:1.1"><?= (int) $box[1] ?></div>
+        <div class="muted" style="font-size:11.5px"><?= e($box[0]) ?></div>
+      </div>
+    <?php endforeach; ?>
+    <div style="flex:1;min-width:220px" class="muted"><?= e(reqf_summary_text($req)) ?></div>
+    <?php if ($fc['remaining'] > 0 && is_coordinator_level()): ?>
+      <form method="post" action="/requisition-cancel-vacancies?id=<?= (int) $req['id'] ?>" style="display:flex;gap:6px;align-items:center">
+        <?= function_exists('csrf_field') ? csrf_field() : '' ?>
+        <input class="form-control" type="number" name="qty" min="1" max="<?= (int) $fc['remaining'] ?>" value="<?= (int) $fc['remaining'] ?>" style="width:74px">
+        <input class="form-control" name="reason" placeholder="Why?" style="width:150px">
+        <button class="btn small secondary" type="submit">No longer needed</button>
+      </form>
+    <?php endif; ?>
+  </div>
+<?php endif; endif; ?>
+
 <?php // Phase 3 — manpower-plan validation against the position master (§14).
 if (function_exists('position_requisition_panel')) position_requisition_panel($req); ?>
 

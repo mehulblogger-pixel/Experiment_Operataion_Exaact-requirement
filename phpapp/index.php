@@ -247,6 +247,7 @@ try {
     require __DIR__ . '/lib/rating.php';
     require __DIR__ . '/lib/inspectorprofile.php';
     require __DIR__ . '/lib/recruit.php';
+    require __DIR__ . '/lib/reqfulfil.php';      // M3 — requisition fulfilment: many vacancies, many hires
     require __DIR__ . '/lib/recruit_cc.php';
     require __DIR__ . '/lib/recruitpipe.php';      // Phase 2 — configurable pipeline / stage engine
     require __DIR__ . '/lib/position.php';         // Phase 3 — position master, org-chart, manpower validation

@@ -32,8 +32,9 @@ Two consequences for a requisition asking for, say, 5 people:
 
 1. **`status` becomes `HIRED` after the first hire.** A terminal status is
    reached with 4 seats still open.
-2. **`hired_inspector_id` holds one person.** It is a single column, so hires
-   2–5 are not recorded there at all.
+2. **`hired_inspector_id` holds one person — the MOST RECENT one.** It is a
+   single column and every hire overwrites it, so after five hires it names the
+   fifth. Hires 1–4 are not recorded there at all.
 
 ## 2. What still works
 
@@ -51,7 +52,14 @@ recruiter productivity are right even while the status says `HIRED`.
 
 - Requisition lists and filters that key off `status`.
 - Any report treating `HIRED` as "this vacancy is closed".
-- `hired_inspector_id` as a record of who was hired — only ever the first.
+- `hired_inspector_id` as a record of who was hired — only ever the latest.
+
+> **CORRECTION.** An earlier version of this document said this column holds the
+> *first* hire. It does not: the hire action runs
+> `UPDATE requisitions SET hired_inspector_id=?` every time, so the value is
+> overwritten and the column names the **most recent** hire. Verified by driving
+> three hires against one requisition. The distinction matters for anything that
+> reads the column expecting the original hire, and for how it is preserved.
 
 ## 4. Why M2 did not fix it
 
@@ -64,8 +72,8 @@ or closure rules. All four are untouched, and the M2 test battery asserts that
 A correct fix is also not a one-line change. It requires a decision on what
 `status` should mean for a partially filled requisition (a `PARTIALLY_FILLED`
 state, or deriving status from `filled` vs `quantity`), and a decision on
-whether `hired_inspector_id` is superseded by the candidate records or kept as
-"the first hire" for backward compatibility. Existing rows already carry the
+whether `hired_inspector_id` is superseded by the candidate records or kept,
+honestly labelled, as the most recent hire for backward compatibility. Existing rows already carry the
 old meaning, so any change needs a migration story.
 
 ## 5. Recommended shape of the eventual fix
@@ -74,8 +82,8 @@ old meaning, so any change needs a migration story.
    `filled >= quantity` closes the requisition; `0 < filled < quantity` is
    partially filled.
 2. Treat the `candidates` rows at stage `ACCEPTED` as the record of who was
-   hired. Keep `hired_inspector_id` populated with the first hire so existing
-   reports and documents keep working.
+   hired. Keep `hired_inspector_id` populated so existing reports and documents
+   keep working — describing it accurately as the latest hire, not the first.
 3. Migrate historical rows by recomputing status from the counts, with a
    dry-run report before anything is written.
 

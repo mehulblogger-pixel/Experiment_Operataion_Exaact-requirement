@@ -159,7 +159,9 @@ through to `req_migrate()`. That should have been caught when M2 was written.
 **Effect on the deferred defect: none.** It stands exactly as documented. If
 anything it is sharper than M1 implied — because `quantity` does exist and is
 editable on the requisition form, a user can genuinely ask for 10 people and
-still see the requisition marked `HIRED` after the first hire.
+still see the requisition marked `HIRED` after the first hire. (A later
+verification corrected one detail here: `hired_inspector_id` records the most
+recent hire, not the first — each hire overwrites it.)
 
 Full evidence, including the one path that can create a requisition before the
 column exists (`seed_demo.php`), is in `M2-QUANTITY-COLUMN-FINDING.md`. Five
