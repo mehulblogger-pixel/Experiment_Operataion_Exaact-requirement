@@ -87,7 +87,7 @@ the negative cases.
 | Engine | Full suite |
 |---|---|
 | SQLite | **8484 passed, 0 failed** |
-| MariaDB 10.11.14 | _run in progress — figure recorded when it reports_ |
+| MariaDB 10.11.14 | **8485 passed, 0 failed** |
 
 | # | Mutation | Result |
 |---|---|---|
