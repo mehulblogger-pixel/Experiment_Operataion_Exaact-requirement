@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'c946fc7 · 2026-09-15 10:05 UTC · 656 files';
+$RELEASE = '66f27dd · 2026-09-15 10:19 UTC · 656 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -122,7 +122,7 @@ $EXPECT  = [
     'lib/db.php' => ['s'=>44776,'h'=>'505a6c2efad3ba1d'],
     'lib/decisionrules.php' => ['s'=>12116,'h'=>'7f7d5a9cd6e144ef'],
     'lib/dedupe.php' => ['s'=>10889,'h'=>'89e689019ac0901e'],
-    'lib/deptorg.php' => ['s'=>29983,'h'=>'b5294bec07a630d8'],
+    'lib/deptorg.php' => ['s'=>35388,'h'=>'6517b0f59b23fe0e'],
     'lib/disclosure.php' => ['s'=>6412,'h'=>'d93ca116db60f19a'],
     'lib/doc_templates.php' => ['s'=>21517,'h'=>'3e47c3f72458f0a0'],
     'lib/engagement.php' => ['s'=>13585,'h'=>'ff1a5552554877f4'],

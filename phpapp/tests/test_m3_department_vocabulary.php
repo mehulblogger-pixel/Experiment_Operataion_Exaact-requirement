@@ -151,8 +151,110 @@ $pendU = array_map('strtoupper', $pending);
 foreach (['QAQC', 'NDT', 'HR', 'HSE', 'FINANCE'] as $legacy)
     t_ok(in_array($legacy, $pendU, true) || vocab_resolve('department', $legacy) !== null,
          "the legacy hiring value $legacy is either recorded for a decision or already resolves — never guessed");
+
+// These five now RESOLVE, because the decisions were taken — QA/QC is Quality,
+// HSE is Safety/HSE, Finance is Commercial/Finance, and NDT and HR are
+// departments in their own right. The assertion that matters is not that they
+// resolve, but WHY: an approved term recorded against a canonical department,
+// not a similarity score. Two things prove that.
 $qaqc = vocab_resolve('department', 'QAQC');
-t_eq($qaqc, null, 'QAQC is NOT silently merged into Quality — that is a business decision');
+t_ok($qaqc !== null, 'QAQC resolves, because a decision was recorded for it');
+t_eq(vocab_display($qaqc), 'Quality', '…and the decision was that QA / QC is Quality');
+$viaTerm = vocab_term_find('department', 'QAQC');
+t_ok($viaTerm !== null && (int) $viaTerm['value_id'] === (int) $qaqc['id'],
+     'it resolves through an APPROVED TERM, not through a guess');
+t_eq(vocab_match('department', 'QAQC')['level'] <= 3, true,
+     '…which is why it matches at an approved level, never at a suggestion level');
+
+// And a word nobody has decided still refuses to resolve — the engine did not
+// become permissive just because five words were answered.
+t_eq(vocab_resolve('department', 'M3 Undecided Wording'), null,
+     'a word with no decision behind it still resolves to nothing');
+
+// ---------------------------------------------------------------------------
+// 10b. THE FIVE DECISIONS, applied.
+//
+//      QA / QC is Quality · HSE is Safety / HSE · Finance is Commercial /
+//      Finance · NDT and HR are departments in their own right.
+//
+//      These reconcile EXAACT's own shipped hiring list with EXAACT's own
+//      shipped department master, so they belong in the product. Three
+//      properties matter more than the mappings themselves: every wording
+//      resolves, no stored value was rewritten, and a workspace that had already
+//      decided differently is never overruled.
+// ---------------------------------------------------------------------------
+t_ok(defined('DEPT_LEGACY_DECISIONS'), 'the decisions are recorded in one place, not scattered');
+t_eq(count(DEPT_LEGACY_DECISIONS), 5, 'all five are covered');
+
+foreach ([
+    ['QAQC',         'Quality'],
+    ['QA / QC',      'Quality'],
+    ['HSE',          'Safety / HSE'],
+    ['HSE / Safety', 'Safety / HSE'],
+    ['FINANCE',      'Commercial / Finance'],
+    ['Finance',      'Commercial / Finance'],
+    ['NDT',          'NDT'],
+    ['HR',           'Human Resources'],
+] as $w) {
+    $v = dept_of($w[0]);
+    t_ok($v !== null, "the legacy wording “{$w[0]}” resolves");
+    if ($v) t_eq(vocab_display($v), $w[1], "…to {$w[1]}");
+}
+// Spelled differently, still the same department — the point of the term layer.
+t_eq(vocab_display(dept_of('n.d.t.')), 'NDT', 'a wording written with full stops resolves too');
+t_eq(vocab_display(dept_of('hr')), 'Human Resources', '…and in lower case');
+
+// The two new departments exist once, with their own identity.
+foreach ([['NDT', 'NDT', 'TECHNICAL'], ['HR', 'Human Resources', 'SUPPORT']] as $d) {
+    $v = vocab_resolve('department', $d[0]);
+    t_ok($v !== null, "{$d[1]} exists as a department");
+    if ($v) { t_eq(vocab_display($v), $d[1], "…named {$d[1]}"); t_eq($v['attr_type'], $d[2], "…typed {$d[2]}"); }
+}
+// NDT the DEPARTMENT and NDT the TRADE discipline are different things (§3).
+$tradeT = lk_type('trade');
+t_ok($tradeT !== null, 'the trade master still exists');
+t_ok(vocab_resolve('department', 'NDT') !== null, 'NDT is a department');
+t_ok(vocab_type_id('trade') !== vocab_type_id('department'),
+     '…and remains a separate vocabulary from the trade discipline of the same name');
+
+// Nothing is left as an open question, and nothing was rewritten.
+t_eq(count(vocab_terms('department', 0, 'PENDING')), 0, 'no legacy word is left awaiting a decision');
+$pdo->prepare("INSERT INTO requisitions (req_code,department,status,created_at) VALUES ('M3DEC-1','QAQC','OPEN',?)")->execute([date('c')]);
+$decReq = (int) $pdo->lastInsertId();
+$rr = ops_one("SELECT * FROM requisitions WHERE id=?", [$decReq]);
+t_eq(dept_row_label($rr), 'Quality', 'a requisition filed under the old code now reads as its department');
+t_eq($rr['department'], 'QAQC', '…while the value it actually stores is untouched');
+$pdo->prepare("DELETE FROM requisitions WHERE id=?")->execute([$decReq]);
+
+// Applying twice creates nothing twice.
+$nBefore = count(vocab_values('department', false));
+dept_apply_legacy_decisions(true);
+t_eq(count(vocab_values('department', false)), $nBefore, 'applying the decisions again duplicates nothing');
+t_ok(dept_legacy_applied(), 'and the workspace is marked as having them applied');
+$dupCodes = ops_all("SELECT code FROM lookup_values WHERE type_id=? AND COALESCE(code,'')<>'' GROUP BY code HAVING COUNT(*)>1", [$TID]);
+t_eq(count($dupCodes), 0, 'and no two departments ever end up sharing a code');
+
+// THE property that matters most: a workspace that had already decided one of
+// these words differently must NOT be overruled by the product's decision.
+// Built with direct inserts, because dept_save() would run the reconciliation
+// before the workspace's own choice could be recorded.
+$pdo->prepare("INSERT INTO lookup_values (type_id,code,label,active,sort_order,created_at) VALUES (?,?,?,1,0,?)")
+    ->execute([$TID, 'M3EQC', 'M3 Engineering Quality Cell', date('c')]);
+$eqcId = (int) $pdo->lastInsertId(); $made[] = $eqcId;
+vocab_register_canonical('department', $eqcId);
+$pdo->prepare("DELETE FROM lookup_terms WHERE type_id=? AND term_norm=?")->execute([$TID, vocab_norm('M3OWNWORD')]);
+[$ownOk] = vocab_term_add('department', $eqcId, 'M3OWNWORD', 'CUSTOMER_TERM');
+t_ok($ownOk, 'a workspace can map a word of its own');
+t_eq((int) dept_of('M3OWNWORD')['id'], $eqcId, '…and it resolves to their choice');
+
+// Re-running the product's decisions must leave every existing mapping alone.
+$qaqcBefore = (int) vocab_resolve('department', 'QAQC')['id'];
+dept_apply_legacy_decisions(true);
+t_eq((int) dept_of('M3OWNWORD')['id'], $eqcId, 'the workspace’s own mapping survives the product’s reconciliation');
+t_eq((int) vocab_resolve('department', 'QAQC')['id'], $qaqcBefore, '…and an existing mapping is not repointed');
+$deptSrc = preg_replace('#^\s*//.*$#m', '', file_get_contents(__DIR__ . '/../lib/deptorg.php'));
+t_ok(strpos($deptSrc, "left as the customer set it") !== false,
+     'the reconciliation explicitly stands down where a decision already exists');
 
 // ---------------------------------------------------------------------------
 // 11. Approving a pending term is what makes it resolve (§17, §18).

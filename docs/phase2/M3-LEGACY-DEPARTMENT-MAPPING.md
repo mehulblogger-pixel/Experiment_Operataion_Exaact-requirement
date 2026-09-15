@@ -37,11 +37,11 @@ Welding, Painting & Coating and Instrumentation. Filing it as a *department*
 may be mixing organisation structure with professional taxonomy — the thing §3
 explicitly separates. Worth deciding deliberately rather than by default.
 
-## 3b. DECIDED — the customer's answers
+## 3b. DECIDED AND APPLIED
 
-Given, and to be applied once the M3 audit is signed off. Applying them writes
-approved terms and creates two departments; **no stored value is rewritten**, and
-each is reversible by removing the term.
+The decisions were given after the M3 audit and are now in the product.
+**No stored department value was rewritten**, and each is reversible by removing
+one term or switching one department off.
 
 | Word | Decision | What applying it does |
 |---|---|---|
@@ -53,7 +53,44 @@ each is reversible by removing the term.
 
 On `NDT`: the audit flagged that the same word exists in the `trade` master as a
 discipline. The decision is that the department is a separate thing with the same
-name — both may exist, and they do not resolve to each other.
+name — both may exist, and they do not resolve to each other. A test pins that
+they remain separate vocabularies.
+
+On `HR`: created with the canonical name **Human Resources**, with `HR` as an
+approved abbreviation pointing at it. That way both spellings resolve, and
+renaming the display wording later costs nothing. If you would rather it simply
+read "HR" on screen, that is one field on the department's edit form — the
+identity does not change.
+
+### Where this lives, and why
+
+The reconciliation sits in the **product** (`DEPT_LEGACY_DECISIONS` in
+`lib/deptorg.php`), not in one workspace's data, because both lists ship with
+EXAACT — it reconciles EXAACT's own vocabulary with itself. A word a *customer*
+has added is still entirely theirs.
+
+Three rules it obeys without exception:
+
+1. it runs **once** per workspace, and never again once anyone has touched it;
+2. it only ever acts on a word **still awaiting a decision** — a mapping a
+   workspace has already approved, rejected or changed is left exactly alone,
+   and a mutation removing that stand-down fails the suite;
+3. it **rewrites no stored value**. Every requisition and candidate keeps the
+   text it has; the mapping is what makes that text resolve.
+
+### What each word does now
+
+```
+"QAQC"  "QA / QC"                -> Quality
+"HSE"   "HSE / Safety"           -> Safety / HSE
+"FINANCE"  "Finance"             -> Commercial / Finance
+"NDT"   "n.d.t."                 -> NDT              (new department, Technical)
+"HR"    "hr"                     -> Human Resources  (new department, Support)
+```
+
+A requisition filed years ago as `QAQC` now reads **Quality** on every screen,
+in every export and in every letter — while the value it stores is still
+`QAQC`.
 
 ## 4. The four questions — answered above, retained for the record
 

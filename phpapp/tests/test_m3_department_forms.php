@@ -47,8 +47,13 @@ $opts = dept_form_options('');
 t_ok(count($opts) > 0, 'it offers the canonical departments (' . count($opts) . ')');
 $canon = array_keys(lk_options_or('department', DEPARTMENTS));
 foreach (array_keys($opts) as $k) t_ok(in_array($k, $canon, true), "every option is a canonical department ($k)");
-t_ok(!isset($opts['QAQC']) && !isset($opts['NDT']),
-     'legacy hiring-only codes are no longer offered for NEW records — they are decided on the confirm screen');
+// QAQC is a WORD for Quality, not a department, so it is never offered as one.
+// NDT, by decision, IS a department in its own right — so it is offered.
+t_ok(!isset($opts['QAQC']),
+     'a legacy word that means an existing department is not offered as a separate department');
+t_ok(isset($opts['NDT']),
+     'but NDT is offered, because the decision made it a department in its own right');
+t_ok(isset($opts['HR']), '…as is HR, for the same reason');
 
 // ---------------------------------------------------------------------------
 //  4. …but a record that already holds a legacy value keeps it. Opening an old
@@ -95,7 +100,10 @@ $new = ops_one("SELECT * FROM requisitions WHERE id=?", [$newId]);
 $old = ops_one("SELECT * FROM requisitions WHERE id=?", [$oldId]);
 t_eq((int) dept_of_row($new)['id'], (int) $deptRow['id'], 'a new record resolves through its identity');
 t_eq(dept_row_label($new), vocab_display($deptRow), '…and displays the department name');
-t_eq(dept_row_label($old), 'QA / QC', 'a legacy record with no identity still displays a readable name, not a raw code');
+// Before the decisions this read "QA / QC" — the legacy list's own label. Now
+// that QA/QC has been decided to BE Quality, it reads Quality. Either way the
+// point is the same: a legacy record never shows a raw code.
+t_eq(dept_row_label($old), 'Quality', 'a legacy record with no identity displays its department, not a raw code');
 t_eq($old['department'], 'QAQC', '…and its stored value was NOT rewritten');
 
 // ---------------------------------------------------------------------------
@@ -148,13 +156,18 @@ t_ok(strpos(file_get_contents(__DIR__ . '/../lib/careers.php'), 'department_id')
 // ---------------------------------------------------------------------------
 t_eq(dept_form_save([])['department'], '', 'a POST with no department at all is not an error');
 t_eq(dept_form_save(['department' => '   '])['department'], '', 'whitespace only is treated as blank');
-// A dangling identity must not lose the department. dept_of_row() correctly
-// returns null here — 'QAQC' is a PENDING word with no canonical row yet — so
-// what matters is that the record still reads.
-t_eq(dept_of_row(['department_id' => 999999, 'department' => 'QAQC']), null,
-     'an identity that no longer exists resolves to no canonical department');
-t_eq(dept_row_label(['department_id' => 999999, 'department' => 'QAQC']), 'QA / QC',
-     '…but the record still shows its department — a dangling id never loses it');
+// A dangling identity must not lose the department: it falls through to the
+// wording. Since QA/QC was decided to BE Quality, that wording now resolves to a
+// real department — which is a stronger outcome than before the decision, when
+// it could only fall back to the legacy list's label.
+t_eq((int) (dept_of_row(['department_id' => 999999, 'department' => 'QAQC'])['id'] ?? 0),
+     (int) vocab_resolve('department', 'Quality')['id'],
+     'an identity that no longer exists falls through to the wording, which resolves');
+t_eq(dept_row_label(['department_id' => 999999, 'department' => 'QAQC']), 'Quality',
+     '…so the record still shows its department — a dangling id never loses it');
+// And a wording nobody has decided still resolves to nothing, dangling id or not.
+t_eq(dept_of_row(['department_id' => 999999, 'department' => 'M3 Never Decided']), null,
+     'a dangling id with undecided wording resolves to no department — no guessing');
 $q = vocab_resolve('department', 'Quality');
 t_eq((int) dept_of_row(['department_id' => 999999, 'department' => 'Quality'])['id'], (int) $q['id'],
      'and where the wording IS known, a dangling id falls through to it');

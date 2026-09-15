@@ -375,6 +375,10 @@ function dept_vocab_seed() {
     // The legacy hiring-department list stays exactly where it is. Its values are
     // only offered up for a decision — INSPECTION and ENGINEERING already resolve
     // on their own, so only the genuinely unrecognised ones are recorded.
+    // The decided reconciliation runs first, so a word that now HAS an answer is
+    // never presented as a question.
+    if (function_exists('dept_apply_legacy_decisions') && !dept_legacy_applied()) dept_apply_legacy_decisions();
+
     foreach (vocab_values('hr_department', false) as $v) {
         foreach ([(string) $v['code'], (string) $v['label']] as $term) {
             if (trim($term) === '') continue;
@@ -565,4 +569,103 @@ function dept_row_label($row, $idField = 'department_id', $textField = 'departme
     $v = dept_of_row($row, $idField, $textField);
     if ($v) return vocab_display($v);
     return dept_label((string) ($row[$textField] ?? ''));
+}
+
+// ---- The decided reconciliation of the legacy hiring list ------------------
+//  EXAACT ships two department lists: the canonical master, and an older
+//  "hiring department" list that the requisition and candidate forms used to
+//  offer. Five of its values had no equivalent in the master, and the vocabulary
+//  work deliberately refused to guess what they meant — each was recorded as a
+//  word awaiting a decision.
+//
+//  Those decisions have now been taken:
+//
+//      QA / QC   is  Quality
+//      HSE       is  Safety / HSE
+//      Finance   is  Commercial / Finance
+//      NDT       is  a department in its own right
+//      HR        is  a department in its own right
+//
+//  This belongs in the product rather than in one workspace's data, because BOTH
+//  lists ship with the product — it reconciles EXAACT's own vocabulary with
+//  itself. A word a CUSTOMER has added is still theirs to decide.
+//
+//  Three rules this obeys without exception:
+//    · it runs ONCE per workspace, and never again once a person has touched it;
+//    · it only ever acts on a word still AWAITING a decision — a mapping the
+//      customer has already approved, rejected or changed is left exactly alone;
+//    · it rewrites no stored department value. Every requisition and candidate
+//      keeps the text it has; the mapping is what makes that text resolve.
+//
+//  Undoing any of it is removing one term, or switching one department off.
+const DEPT_LEGACY_DECISIONS = [
+    // legacy hr_department code => where it goes
+    'QAQC'    => ['to' => 'QUALITY'],
+    'HSE'     => ['to' => 'SAFETY'],
+    'FINANCE' => ['to' => 'COMMERCIAL'],
+    'NDT'     => ['create' => ['code' => 'NDT', 'label' => 'NDT',              'attr_type' => 'TECHNICAL',
+                               'description' => 'Non-destructive testing']],
+    'HR'      => ['create' => ['code' => 'HR',  'label' => 'Human Resources',  'attr_type' => 'SUPPORT',
+                               'description' => 'People, hiring and employment']],
+];
+
+function dept_legacy_applied() {
+    return function_exists('setting_get') && (string) setting_get('dept_legacy_decisions_applied', '') !== '';
+}
+
+// Apply the decisions. Returns a per-word report: ['QAQC' => 'mapped to Quality', …].
+function dept_apply_legacy_decisions($force = false) {
+    dept_vocab_seed();
+    $report = [];
+    if (!$force && dept_legacy_applied()) return $report;
+    if (!function_exists('vocab_term_add')) return $report;
+
+    foreach (DEPT_LEGACY_DECISIONS as $legacyCode => $rule) {
+        // Which canonical department does this word belong to?
+        $target = null;
+        if (!empty($rule['to'])) {
+            $target = vocab_resolve('department', $rule['to']);
+            if (!$target) { $report[$legacyCode] = 'skipped — ' . $rule['to'] . ' is not in this workspace'; continue; }
+        } else {
+            $spec = $rule['create'];
+            // Never create a second department for a code that already exists.
+            $target = vocab_resolve('department', $spec['code']) ?: vocab_resolve('department', $spec['label']);
+            if (!$target) {
+                [$ok, $msg, $id] = dept_save(0, $spec, true);
+                if (!$ok) { $report[$legacyCode] = 'could not be created — ' . $msg; continue; }
+                $target = vocab_value($id);
+                $report[$legacyCode] = 'created as a department';
+            } else {
+                $report[$legacyCode] = 'already a department';
+            }
+        }
+
+        // Every wording this legacy value is known by — its code and its label.
+        $words = [$legacyCode];
+        if (function_exists('lk_options_or')) {
+            $hr = lk_options_or('hr_department', defined('RCC_DEPARTMENTS') ? RCC_DEPARTMENTS : []);
+            if (isset($hr[$legacyCode])) $words[] = (string) $hr[$legacyCode];
+        }
+        $done = [];
+        foreach (array_unique($words) as $w) {
+            if (trim($w) === '') continue;
+            // Already decided by a person? Leave it exactly as it is.
+            $already = vocab_resolve('department', $w);
+            if ($already) { $done[] = (int) $already['id'] === (int) $target['id'] ? 'already mapped' : 'left as the customer set it'; continue; }
+            [$ok, $msg] = vocab_term_add('department', (int) $target['id'], $w,
+                                         strtoupper($w) === $w ? 'ABBREVIATION' : 'LEGACY');
+            $done[] = $ok ? 'mapped' : ('refused — ' . $msg);
+            // Clear the pending question now it is answered.
+            if ($ok) {
+                try {
+                    db()->prepare("DELETE FROM lookup_terms WHERE type_id=? AND term_norm=? AND status='PENDING'")
+                        ->execute([vocab_type_id('department'), vocab_norm($w)]);
+                } catch (Throwable $e) {}
+            }
+        }
+        $summary = 'to ' . vocab_display($target) . ' (' . implode(', ', $done) . ')';
+        $report[$legacyCode] = isset($report[$legacyCode]) ? $report[$legacyCode] . ', ' . $summary : $summary;
+    }
+    if (function_exists('setting_set')) setting_set('dept_legacy_decisions_applied', vocab_now());
+    return $report;
 }

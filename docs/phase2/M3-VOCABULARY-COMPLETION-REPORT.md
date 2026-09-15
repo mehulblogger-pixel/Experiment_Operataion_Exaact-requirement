@@ -61,7 +61,28 @@ Worth recording: the first full run failed on `every table-creating migration is
 wired into boot() — MISSING: vocab_migrate`. The existing suite caught an
 architectural omission in new work. Fixed and re-run.
 
-## 5. The four questions that are still yours
+## 5. RESOLVED — the decisions were taken and applied
+
+> This section originally ended the milestone with five words awaiting a
+> decision. Those decisions have since been given and applied:
+>
+> | Word | Decision |
+> |---|---|
+> | `QAQC` / `QA / QC` | **is Quality** |
+> | `HSE` / `HSE / Safety` | **is Safety / HSE** |
+> | `FINANCE` / `Finance` | **is Commercial / Finance** |
+> | `NDT` | **a department in its own right** — kept separate from the `trade` discipline of the same name |
+> | `HR` | **a new department**, canonically "Human Resources" with `HR` as an approved abbreviation |
+>
+> No stored department value was rewritten. Each mapping is one term row, and
+> removing it undoes the decision. A workspace that had already decided one of
+> these words differently is never overruled — a mutation removing that
+> stand-down fails the suite. See `M3-LEGACY-DEPARTMENT-MAPPING.md`.
+>
+> The original questions are kept below, because the reasoning for *not* guessing
+> is the part worth preserving.
+
+## 5 (as written at the time). The four questions that were still yours
 
 M3 deliberately merged nothing. Five legacy hiring-department values are waiting
 on **Departments → Words to confirm**:
