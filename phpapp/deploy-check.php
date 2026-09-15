@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '7d7fd65 · 2026-09-15 05:15 UTC · 653 files';
+$RELEASE = '22466cf · 2026-09-15 06:39 UTC · 653 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -122,7 +122,7 @@ $EXPECT  = [
     'lib/db.php' => ['s'=>43960,'h'=>'75341b2effb14bb0'],
     'lib/decisionrules.php' => ['s'=>12116,'h'=>'7f7d5a9cd6e144ef'],
     'lib/dedupe.php' => ['s'=>10889,'h'=>'89e689019ac0901e'],
-    'lib/deptorg.php' => ['s'=>11022,'h'=>'a24592adece3e267'],
+    'lib/deptorg.php' => ['s'=>13059,'h'=>'9fed8b68a12488e4'],
     'lib/disclosure.php' => ['s'=>6412,'h'=>'d93ca116db60f19a'],
     'lib/doc_templates.php' => ['s'=>21456,'h'=>'46d2d5ca90f70c77'],
     'lib/engagement.php' => ['s'=>13585,'h'=>'ff1a5552554877f4'],
@@ -149,7 +149,7 @@ $EXPECT  = [
     'lib/licenceissue.php' => ['s'=>28363,'h'=>'e750e57678199d20'],
     'lib/licencekey.php' => ['s'=>29242,'h'=>'c42b2078fe80352f'],
     'lib/licencesync.php' => ['s'=>10254,'h'=>'c17cfa585e721f62'],
-    'lib/lookups.php' => ['s'=>73979,'h'=>'d9dd346c6bcb28ea'],
+    'lib/lookups.php' => ['s'=>74591,'h'=>'3c1032ff3c020222'],
     'lib/methods.php' => ['s'=>13959,'h'=>'14969626618c15f8'],
     'lib/mghsso.php' => ['s'=>10002,'h'=>'80f043e73ff44d13'],
     'lib/mis.php' => ['s'=>23675,'h'=>'07733bc4e9241217'],
@@ -169,7 +169,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66290,'h'=>'4ff1bc5a2652ad81'],
-    'lib/ops.php' => ['s'=>589007,'h'=>'237b7916ed5bc6bc'],
+    'lib/ops.php' => ['s'=>589359,'h'=>'07fb95be0dcf6c34'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -191,7 +191,7 @@ $EXPECT  = [
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
     'lib/recruit.php' => ['s'=>69556,'h'=>'2def2879bbcc2922'],
     'lib/recruit_approval.php' => ['s'=>23571,'h'=>'d884a1da46a7fa3f'],
-    'lib/recruit_cc.php' => ['s'=>20636,'h'=>'9e5c4b7215519afe'],
+    'lib/recruit_cc.php' => ['s'=>20883,'h'=>'e6ceebec39c86640'],
     'lib/recruit_export.php' => ['s'=>7710,'h'=>'94ea44f44c4682f5'],
     'lib/recruit_iv.php' => ['s'=>36630,'h'=>'ea9e62e8603e3b38'],
     'lib/recruit_jd.php' => ['s'=>8735,'h'=>'29acfa48382e6b50'],
@@ -518,7 +518,7 @@ $EXPECT  = [
     'views/ops/pipelines.php' => ['s'=>4435,'h'=>'7af67ecc09eedeca'],
     'views/ops/portal_user_perms.php' => ['s'=>4594,'h'=>'6559eebd0116ac64'],
     'views/ops/portal_users.php' => ['s'=>12939,'h'=>'cc010a76e8beaa69'],
-    'views/ops/positions.php' => ['s'=>5973,'h'=>'3291a30f3467598c'],
+    'views/ops/positions.php' => ['s'=>6592,'h'=>'fa14eeee4bf5cc14'],
     'views/ops/positions_import.php' => ['s'=>7558,'h'=>'721b96bcf6cb0ce9'],
     'views/ops/positions_org.php' => ['s'=>4861,'h'=>'5cb74e99349f94d3'],
     'views/ops/preflight.php' => ['s'=>2904,'h'=>'d0ccc1a7191bd515'],

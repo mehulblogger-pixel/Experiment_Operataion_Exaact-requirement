@@ -31,6 +31,9 @@ function rcc_migrate() {
 
 // Configurable option maps — Masters override the shipped defaults.
 function rcc_departments()  { return lk_options_or('hr_department', RCC_DEPARTMENTS); }
+// Labels come from the live designation master, never the frozen constant,
+// so a title added in Settings renders as its label instead of a raw code.
+function rcc_designations() { return lk_options_or('designation', DESIGNATIONS); }
 function rcc_sources()      { return lk_options_or('candidate_source', CAND_SOURCES); }
 function rcc_drop_reasons() { return lk_options_or('drop_reason', RCC_DROP_REASONS); }
 function rcc_drop_points()  { return lk_options_or('drop_point', RCC_DROP_POINTS); }
@@ -262,7 +265,7 @@ function rcc_data($f) {
 
     // ---- Needs attention: biggest open demand ----
     $d['demand'] = [];
-    foreach ($reqRows as $r) { $q = max(1, (int)($r['quantity'] ?? 1)); $open = max(0, $q - (int)$r['filled']); if ($open > 0) $d['demand'][] = ['id' => (int)$r['id'], 'req' => $r['req_code'], 'dept' => ($deptOpt[$r['department']] ?? $r['department'] ?: '—'), 'role' => (DESIGNATIONS[$r['designation']] ?? $r['designation'] ?: '—'), 'vac' => $q, 'open' => $open]; }
+    foreach ($reqRows as $r) { $q = max(1, (int)($r['quantity'] ?? 1)); $open = max(0, $q - (int)$r['filled']); if ($open > 0) $d['demand'][] = ['id' => (int)$r['id'], 'req' => $r['req_code'], 'dept' => ($deptOpt[$r['department']] ?? $r['department'] ?: '—'), 'role' => (rcc_designations()[$r['designation']] ?? $r['designation'] ?: '—'), 'vac' => $q, 'open' => $open]; }
     usort($d['demand'], fn($a, $b) => $b['open'] <=> $a['open']); $d['demand'] = array_slice($d['demand'], 0, 8);
 
     // ---- Recruiter performance + manpower P&L (reuses Phase 5 commercials) ----
@@ -306,7 +309,7 @@ function rcc_tracker($reqRows, $deptOpt) {
         $perHead = $q > 0 ? ((float)($r['expected_profit'] ?? 0)) / $q : 0;
         $out[] = [
             'id' => (int)$r['id'], 'req' => $r['req_code'],
-            'posted' => (DESIGNATIONS[$r['designation']] ?? $r['designation'] ?: '—'), 'qty' => $q,
+            'posted' => (rcc_designations()[$r['designation']] ?? $r['designation'] ?: '—'), 'qty' => $q,
             'dept' => ($deptOpt[$r['department']] ?? $r['department'] ?: ''),
             'recruiter' => rcc_user_name($r['recruiter_id']), 'manager' => rcc_user_name($r['manager_id']),
             'filled' => $filled, 'status' => $r['status'],

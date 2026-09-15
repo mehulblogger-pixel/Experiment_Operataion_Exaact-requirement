@@ -2174,8 +2174,11 @@ function ops_masters() {
             'fields' => [
                 ['name','Name','text',['req'=>1]],
                 ['emp_code','Employee code','text',[]],
-                ['designation','Designation','select',['opts'=>DESIGNATIONS]],
-                ['department','Department','select',['opts'=>DEPARTMENTS]],
+                // Live masters, not the frozen constants: a designation or
+                // department added in Settings must appear here too. The const
+                // stays as the fallback for a workspace with no lookups yet.
+                ['designation','Designation','select',['opts'=>lk_options_or('designation', DESIGNATIONS)]],
+                ['department','Department','select',['opts'=>lk_options_or('department', DEPARTMENTS)]],
                 ['office_id','Office','ref',['ref'=>'offices','optfn'=>'offices_list','optlabel'=>'name']],
                 ['email','Email','text',[]],
                 ['mobile','Mobile','text',[]],
@@ -2184,7 +2187,7 @@ function ops_masters() {
                 ['status','Status','select',['opts'=>['ACTIVE'=>'Active','INACTIVE'=>'Inactive']]],
             ],
             'list' => ['name'=>'Name','designation'=>'Designation','department'=>'Department','office_id'=>'Office','status'=>'Status'],
-            'list_labels' => ['designation'=>DESIGNATIONS,'department'=>DEPARTMENTS],
+            'list_labels' => ['designation'=>lk_options_or('designation', DESIGNATIONS),'department'=>lk_options_or('department', DEPARTMENTS)],
             'ref_cols' => ['office_id'=>['offices','name']],
         ],
         // NOTE: not 'expense-heads' — that key is already taken by the voucher

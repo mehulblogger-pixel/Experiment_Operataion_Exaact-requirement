@@ -59,13 +59,49 @@ function desig_link_department($label, $dept) {
     }
 }
 
+// ---- Canonical department resolution --------------------------------------
+// One real department can reach the database spelled three ways, because three
+// shipped screens write the same column differently:
+//   Position master  (plain text box)          -> free text, e.g. "Quality"
+//   Team member      (datalist of master labels)-> label,     e.g. "Quality"
+//   Partner contact / back-office staff (select)-> CODE,      e.g. "QUALITY"
+// Grouping on the raw value therefore splits one department into several rows.
+//
+// dept_canon() maps a stored value onto the ONE label the department master
+// already defines for it. The mapping is taken from the master itself — a code
+// is resolved to its own label — so this introduces no new opinion about which
+// departments exist, and it rewrites nothing: it is a read-side resolver only.
+// A value the master does not know (genuine free text) is returned untouched,
+// so nothing can be lost.
+function dept_canon_map() {
+    static $map = null, $at = -1;
+    if ($map !== null && $at === db_epoch()) return $map;
+    $at = db_epoch(); $map = ['code' => [], 'label' => []];
+    if (!function_exists('lk_options_or')) return $map;
+    foreach (lk_options_or('department', defined('DEPARTMENTS') ? DEPARTMENTS : []) as $code => $label) {
+        $label = trim((string) $label); if ($label === '') continue;
+        $map['code'][strtoupper(trim((string) $code))] = $label;
+        $map['label'][strtolower($label)] = $label;
+    }
+    return $map;
+}
+
+// Stored department value -> its canonical label. Unknown values pass through.
+function dept_canon($stored) {
+    $v = trim((string) $stored); if ($v === '') return '';
+    $m = dept_canon_map();
+    if (isset($m['code'][strtoupper($v)]))  return $m['code'][strtoupper($v)];
+    if (isset($m['label'][strtolower($v)])) return $m['label'][strtolower($v)];
+    return $v;
+}
+
 // Every department name the workspace knows — the department master, plus any
 // department already used on a position or a person (so nothing is missed).
 function dept_names() {
     $set = [];
     if (function_exists('lk_options_or')) foreach (lk_options_or('department', []) as $l) { $l = trim((string) $l); if ($l !== '') $set[$l] = true; }
     foreach (['positions', 'users'] as $tbl) {
-        try { foreach (ops_all("SELECT DISTINCT department d FROM $tbl WHERE COALESCE(department,'')<>''") as $r) { $d = trim((string) $r['d']); if ($d !== '') $set[$d] = true; } }
+        try { foreach (ops_all("SELECT DISTINCT department d FROM $tbl WHERE COALESCE(department,'')<>''") as $r) { $d = dept_canon($r['d']); if ($d !== '') $set[$d] = true; } }
         catch (Throwable $e) {}
     }
     $names = array_keys($set); natcasesort($names); return array_values($names);
@@ -77,9 +113,10 @@ function dept_names() {
 function dept_hub() {
     $desig = desig_rows();
     $posByDept = [];
-    if (function_exists('positions_all')) foreach (positions_all(false) as $p) $posByDept[trim((string) $p['department'])][] = $p;
+    if (function_exists('positions_all')) foreach (positions_all(false) as $p) $posByDept[dept_canon($p['department'])][] = $p;
     $usrByDept = [];
-    try { foreach (ops_all("SELECT COALESCE(department,'') d, COUNT(*) n FROM users WHERE is_active=1 GROUP BY department") as $r) $usrByDept[trim((string) $r['d'])] = (int) $r['n']; }
+    // Summed, not assigned: two spellings of one department must add up, not overwrite.
+    try { foreach (ops_all("SELECT COALESCE(department,'') d, COUNT(*) n FROM users WHERE is_active=1 GROUP BY department") as $r) { $d = dept_canon($r['d']); $usrByDept[$d] = ($usrByDept[$d] ?? 0) + (int) $r['n']; } }
     catch (Throwable $e) {}
     $rows = [];
     foreach (dept_names() as $d) {
@@ -87,7 +124,7 @@ function dept_hub() {
         foreach ($pos as $p) { $sanc += (int) ($p['sanctioned_headcount'] ?? 0); $occ += (int) ($p['occupied_headcount'] ?? 0); }
         $rows[] = [
             'department' => $d,
-            'designations' => array_values(array_filter($desig, fn($x) => strcasecmp($x['department'], $d) === 0)),
+            'designations' => array_values(array_filter($desig, fn($x) => $x['department'] !== '' && strcasecmp(dept_canon($x['department']), $d) === 0)),
             'positions' => $pos, 'sanctioned' => $sanc, 'occupied' => $occ, 'vacant' => max(0, $sanc - $occ),
             'people' => $usrByDept[$d] ?? 0,
         ];
@@ -103,7 +140,7 @@ function dept_org_groups() {
     $groups = [];
     if (!function_exists('positions_all')) return $groups;
     foreach (positions_all(false) as $p) {
-        $d = trim((string) $p['department']); if ($d === '') $d = 'Unassigned';
+        $d = dept_canon($p['department']); if ($d === '') $d = 'Unassigned';
         $groups[$d]['positions'][] = $p;
     }
     foreach ($groups as $d => &$g) {

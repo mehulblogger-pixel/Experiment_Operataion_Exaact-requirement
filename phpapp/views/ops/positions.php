@@ -41,7 +41,14 @@ foreach ($positions as $p) $posName[(int)$p['id']] = $p['name'];
         <div class="ff"><label>Position name *</label><input class="form-control" name="name" value="<?= $e($sel['name'] ?? '') ?>" required></div>
         <div class="ff"><label>Position code</label><input class="form-control" name="code" value="<?= $e($sel['code'] ?? '') ?>"></div>
         <div class="ff"><label>Grade / band</label><input class="form-control" name="grade" value="<?= $e($sel['grade'] ?? '') ?>" placeholder="e.g. SENIOR"></div>
-        <div class="ff"><label>Department</label><input class="form-control" name="department" value="<?= $e($sel['department'] ?? '') ?>"></div>
+        <?php // Steered by the department master (the same list the org chart and
+              //  the Department hub group by), but still free text, so a department
+              //  already typed here is never rejected or silently changed.
+              $deptOpts = function_exists('lk_options_or') ? lk_options_or('department', []) : []; ?>
+        <div class="ff"><label>Department</label>
+          <input class="form-control" name="department" list="pos_dept_list" value="<?= $e($sel['department'] ?? '') ?>" placeholder="e.g. Quality" autocomplete="off">
+          <?php if ($deptOpts): ?><datalist id="pos_dept_list"><?php foreach ($deptOpts as $dv): ?><option value="<?= $e($dv) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
+        </div>
         <div class="ff"><label>Business unit</label><input class="form-control" name="sbu" value="<?= $e($sel['sbu'] ?? '') ?>"></div>
         <div class="ff"><label>Level</label><input class="form-control" name="level" value="<?= $e($sel['level'] ?? '') ?>" placeholder="e.g. L3 / Manager"></div>
         <div class="ff"><label>Reports to (position)</label>

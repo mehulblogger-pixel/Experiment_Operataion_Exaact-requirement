@@ -136,8 +136,12 @@ function skills_by_trade() {
 // person's discipline is shown or filtered. Cached per request; empty when the
 // installation has no Trade list yet (the feature simply stays quiet).
 function trade_options() {
-    static $cache = null;
-    if ($cache !== null) return $cache;
+    // Keyed on db_epoch(): one workspace per database, and the database is
+    // swapped inside a request when another company is entered. A cache that
+    // survived that swap would show the previous workspace's list.
+    static $cache = null, $at = -1;
+    if ($cache !== null && $at === db_epoch()) return $cache;
+    $at = db_epoch();
     $t = lk_type('trade');
     $out = [];
     if ($t) foreach (lk_root_values($t['id']) as $r) $out[(int)$r['id']] = $r['label'];
@@ -686,7 +690,12 @@ function lk_value($id) { return $id ? ops_one("SELECT * FROM lookup_values WHERE
 // Cached per request: this is called inside table loops (one label lookup per
 // row), so without the cache a 200-row list would run 400 queries.
 function lk_options_or($key, $const) {
-    static $cache = [];
+    // Per-request cache, but ONLY for as long as the database it was read from
+    // is still the current one — see trade_options() above. Without the epoch
+    // key, entering a second company in one request serves the first company's
+    // master values.
+    static $cache = [], $at = -1;
+    if ($at !== db_epoch()) { $cache = []; $at = db_epoch(); }
     if (array_key_exists($key, $cache)) return $cache[$key] ?: $const;
     $t = lk_type($key);
     if (!$t) { $cache[$key] = null; return $const; }
