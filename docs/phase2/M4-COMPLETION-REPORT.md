@@ -134,7 +134,8 @@ All eight from §44, all caught. Detail in `M4-TEST-RESULTS.md`.
 Whole suite — **8709 passed, 0 failed**, including all 77 M4 assertions.
 
 **30. MariaDB/MySQL?**
-Whole suite — figure recorded in `M4-TEST-RESULTS.md` from the run itself.
+Whole suite on MariaDB 10.11.14 over TCP — **8710 passed, 0 failed**, including
+all 77 M4 assertions. Observed, not inferred from SQLite.
 
 **31. Modules regression-tested?**
 All of them: Operations, Quality, Reporting, Money, Sales, Recruitment,

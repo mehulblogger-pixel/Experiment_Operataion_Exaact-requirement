@@ -14,7 +14,7 @@
 | Engine | Passed | Failed | Skips |
 |---|---|---|---|
 | SQLite | **8709** | **0** | none introduced |
-| MariaDB 10.11.14 | _recorded when the run reports_ | | none introduced |
+| MariaDB 10.11.14 | **8710** | **0** | none introduced |
 
 > Assertions, not test cases. M4's 77 assertions cover roughly 30 scenarios.
 
