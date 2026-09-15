@@ -2451,6 +2451,7 @@ function ops_module_family($route) {
         'candidate' => 'hiring', 'candidates' => 'hiring', 'requisition' => 'hiring',
         'requisitions' => 'hiring', 'recruit' => 'hiring', 'recruitment' => 'hiring',
         'positions' => 'hiring', 'careers' => 'hiring', 'jd' => 'hiring',
+        'hiring' => 'hiring',
         // Sales & CRM
         'lead' => 'leads', 'leads' => 'leads', 'opportunity' => 'leads', 'pipeline' => 'leads',
         'pipelines' => 'leads', 'quote' => 'quotes', 'quotes' => 'quotes', 'crm' => 'crm_reports',
@@ -2494,6 +2495,7 @@ function ops_module_gate($route, $peek = false) {
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring','candidate-link-pro'=>'hiring','candidate-unlink-pro'=>'hiring',
+        'hiring-requests'=>'hiring','hiring-request'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring','recruit-export'=>'hiring','careers-admin'=>'hiring','jd-generate'=>'hiring','positions-import'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
@@ -2825,6 +2827,8 @@ function ops_dispatch($route, $method) {
             return ops_positions($route, $method);
         case $route === 'departments':                               // Department hub — designations, positions, headcount & people by department
             return ops_departments($route, $method);
+        case $route === 'hiring-requests' || $route === 'hiring-request': // M4 — the request layer, before execution
+            return ops_hiring_requests($route, $method);
         case $route === 'requisition-cancel-vacancies':               // M3 — give up on the vacancies nobody filled
             return ops_requisition_cancel_vacancies($route, $method);
         case $route === 'requisition-position':                      // Phase 3 — link a requisition to a position

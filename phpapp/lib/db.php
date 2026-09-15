@@ -553,6 +553,7 @@ function run_schema($withSeeds = true) {
     // running it at boot is idempotent and makes the schema deterministic.
     if (function_exists('req_migrate')) req_migrate();                 // M2 finding: was route-triggered only
     if (function_exists('reqf_migrate')) reqf_migrate();               // M3 — multi-vacancy fulfilment columns
+    if (function_exists('hreq_migrate')) hreq_migrate();               // M4 — the hiring request layer
     if (function_exists('appr_migrate')) appr_migrate();               // Phase 6 — configurable approval rules/levels/requests/steps
     if (function_exists('careers_migrate')) careers_migrate();         // Phase 7 — requisitions.careers_published/careers_summary
     if (function_exists('workspace_migrate')) workspace_migrate();     // Configurable role workspaces — users.start_route

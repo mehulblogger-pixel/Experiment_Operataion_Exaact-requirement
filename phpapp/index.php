@@ -248,6 +248,7 @@ try {
     require __DIR__ . '/lib/inspectorprofile.php';
     require __DIR__ . '/lib/recruit.php';
     require __DIR__ . '/lib/reqfulfil.php';      // M3 — requisition fulfilment: many vacancies, many hires
+    require __DIR__ . '/lib/hiringreq.php';       // M4 — the hiring request layer, before execution
     require __DIR__ . '/lib/recruit_cc.php';
     require __DIR__ . '/lib/recruitpipe.php';      // Phase 2 — configurable pipeline / stage engine
     require __DIR__ . '/lib/position.php';         // Phase 3 — position master, org-chart, manpower validation
