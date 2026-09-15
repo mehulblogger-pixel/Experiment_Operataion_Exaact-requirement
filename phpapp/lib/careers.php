@@ -248,7 +248,7 @@ function careers_view_list() {
             $b .= '<a class="cx-job" href="/careers?job=' . (int)$j['id'] . '">'
                 . '<div><h2>' . e(careers_job_title($j)) . '</h2>'
                 . '<div class="cx-meta">'
-                . ($j['department'] ? '<span class="cx-pill">' . e($j['department']) . '</span>' : '')
+                . ($j['department'] ? '<span class="cx-pill">' . e(function_exists('dept_label') ? dept_label($j['department']) : $j['department']) . '</span>' : '')
                 . ($j['grade'] ? '<span class="cx-pill">' . e($j['grade']) . '</span>' : '')
                 . ($loc ? '📍 ' . e($loc) : '') . '</div></div>'
                 . '<div class="cx-btn ghost">View &amp; apply →</div></a>';
@@ -264,7 +264,7 @@ function careers_view_job($job, $err, $post) {
     $v = fn($k) => e((string)($post[$k] ?? ''));
     $b = '<p><a class="cx-muted" href="/careers" style="text-decoration:none">← All openings</a></p>';
     $b .= '<div class="cx-card"><h1>' . e(careers_job_title($job)) . '</h1><div class="cx-meta">'
-        . ($job['department'] ? '<span class="cx-pill">' . e($job['department']) . '</span>' : '')
+        . ($job['department'] ? '<span class="cx-pill">' . e(function_exists('dept_label') ? dept_label($job['department']) : $job['department']) . '</span>' : '')
         . ($job['grade'] ? '<span class="cx-pill">' . e($job['grade']) . '</span>' : '')
         . ($loc ? '📍 ' . e($loc) : '') . '</div>';
     if ($desc !== '') $b .= '<div style="margin-top:12px">' . nl2br(e($desc)) . '</div>';

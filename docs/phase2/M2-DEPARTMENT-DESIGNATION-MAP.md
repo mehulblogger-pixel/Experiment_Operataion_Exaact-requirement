@@ -88,6 +88,14 @@ fallback for a workspace whose lookups have not been seeded.
 
 ## 5. OPEN DECISION — two department vocabularies (§21)
 
+> **UPDATE (M3).** The shape of this decision has changed. M3 built the
+> controlled-vocabulary layer, so reconciling the two lists is no longer a
+> migration at all: each legacy value is now a **pending word** on
+> *Departments → Words to confirm*, and approving one creates an approved term
+> rather than rewriting any stored data. The four questions below are still
+> yours to answer, but answering them is now four clicks and is fully
+> reversible. See `M3-LEGACY-DEPARTMENT-MAPPING.md`.
+
 **This is reported, not resolved. M2 did not improvise a merge.**
 
 Two department lists exist on the one lookup engine:
@@ -118,12 +126,13 @@ recruitment data. M2's stop conditions cover exactly this case.
 with a position's department, so requisitions do not appear under their
 department in the Department hub.
 
-**Recommendation.** Treat `department` as the single master; add `NDT` and `HR`
-to it; map `QAQC → QUALITY`, `HSE → SAFETY`, `FINANCE → COMMERCIAL` in a
-one-off, reversible migration with a dry-run report; then point the requisition
-and candidate forms at the authoritative master and retire `hr_department`.
-This is a self-contained milestone. It needs a decision on the three mappings
-first.
+**Recommendation, as revised by M3.** `department` is now the single authority.
+The mappings are made as approved terms on the confirm screen — no migration and
+no dry-run needed, because no stored value changes. Pointing the requisition and
+candidate forms at the authoritative master should follow those answers, so new
+requisitions land on departments that exist. One caution M3 surfaced: **`NDT`
+already exists in the `trade` master as a discipline**, so filing it as a
+department may be mixing organisation structure with professional taxonomy.
 
 ## 6. Not addressed, and why
 

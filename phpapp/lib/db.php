@@ -417,6 +417,9 @@ function run_schema($withSeeds = true) {
     migrate();
     if (function_exists('ops_migrate')) { ops_migrate(); if ($withSeeds) ops_seed(); }
     if (function_exists('lk_migrate')) { lk_migrate(); if ($withSeeds) lk_seed(); }
+    // M3 — the controlled-vocabulary layer sits directly on the lookup engine,
+    // so it is created immediately after it.
+    if (function_exists('vocab_migrate')) vocab_migrate();
     if (function_exists('access_migrate')) access_migrate();
     if (function_exists('crm_migrate')) crm_migrate();   // after lookups exist (masters)
     if (function_exists('idems_migrate')) idems_migrate();   // IDEMS report engine

@@ -117,7 +117,22 @@ function appr_match($entity, $ctx) {
         foreach ($map as $col => $k) {
             $f = trim((string)($r[$col] ?? '')); if ($f === '') continue;
             $vals = array_map('strtolower', array_map('trim', explode(',', $f)));
-            if (in_array(strtolower(trim((string)($ctx[$k] ?? ''))), $vals, true)) $score++;
+            $have = strtolower(trim((string)($ctx[$k] ?? '')));
+            $hit  = in_array($have, $vals, true);
+            // M3 — a rule keyed on Department must match the requisition even when
+            // the two were written in different words. The rule box is free text
+            // and the requisition stores a coded value, so a rule for "Quality"
+            // never fired on a requisition filed as "QAQC". Compare through the
+            // canonical department instead. This can only ever ADD a match that
+            // the customer has APPROVED: an unrecognised term canonicalises to
+            // itself, so nothing matches by guesswork.
+            if (!$hit && $k === 'department' && $have !== '' && function_exists('dept_canon')) {
+                try {
+                    $mine = strtolower(dept_canon($have));
+                    foreach ($vals as $v) if ($v !== '' && strtolower(dept_canon($v)) === $mine) { $hit = true; break; }
+                } catch (Throwable $e) {}
+            }
+            if ($hit) $score++;
             else { $ok = false; break; }
         }
         if (!$ok) continue;

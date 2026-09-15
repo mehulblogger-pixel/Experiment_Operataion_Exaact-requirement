@@ -87,12 +87,28 @@ function dept_canon_map() {
 }
 
 // Stored department value -> its canonical label. Unknown values pass through.
+//
+// M3: this now consults the approved-term layer first, so a customer's own
+// wording and any legacy hiring-department code that has been APPROVED as a term
+// group under the one department. An unapproved term still falls through to the
+// M2 code/label map and then to the value as stored — so nothing is merged by
+// guesswork and nothing typed before today is lost.
 function dept_canon($stored) {
     $v = trim((string) $stored); if ($v === '') return '';
+    static $memo = [], $at = -1;
+    if ($at !== db_epoch()) { $memo = []; $at = db_epoch(); }
+    if (isset($memo[$v])) return $memo[$v];
+
+    if (function_exists('vocab_resolve')) {
+        try {
+            $row = dept_of($v);
+            if ($row) return $memo[$v] = vocab_display($row);
+        } catch (Throwable $e) {}
+    }
     $m = dept_canon_map();
-    if (isset($m['code'][strtoupper($v)]))  return $m['code'][strtoupper($v)];
-    if (isset($m['label'][strtolower($v)])) return $m['label'][strtolower($v)];
-    return $v;
+    if (isset($m['code'][strtoupper($v)]))  return $memo[$v] = $m['code'][strtoupper($v)];
+    if (isset($m['label'][strtolower($v)])) return $memo[$v] = $m['label'][strtolower($v)];
+    return $memo[$v] = $v;
 }
 
 // Every department name the workspace knows — the department master, plus any
@@ -110,10 +126,20 @@ function dept_names() {
 // The Department hub rollup: for each department, its designations, positions
 // (with sanctioned/occupied/vacant headcount) and active people; plus the
 // General (unassigned) designations so they can be filed.
+// Is the establishment (positions + sanctioned headcount) this workspace's to
+// see? The Position register lives behind the paid People & hiring module, and
+// /departments is a core screen with no module gate of its own — so the hub must
+// ask, rather than assume that reaching the screen means owning the data.
+function dept_hub_shows_establishment() {
+    if (!function_exists('licence_enabled')) return true;
+    try { return (bool) licence_enabled('hr'); } catch (Throwable $e) { return true; }
+}
+
 function dept_hub() {
     $desig = desig_rows();
     $posByDept = [];
-    if (function_exists('positions_all')) foreach (positions_all(false) as $p) $posByDept[dept_canon($p['department'])][] = $p;
+    $establishment = dept_hub_shows_establishment();
+    if ($establishment && function_exists('positions_all')) foreach (positions_all(false) as $p) $posByDept[dept_canon($p['department'])][] = $p;
     $usrByDept = [];
     // Summed, not assigned: two spellings of one department must add up, not overwrite.
     try { foreach (ops_all("SELECT COALESCE(department,'') d, COUNT(*) n FROM users WHERE is_active=1 GROUP BY department") as $r) { $d = dept_canon($r['d']); $usrByDept[$d] = ($usrByDept[$d] ?? 0) + (int) $r['n']; } }
@@ -130,7 +156,7 @@ function dept_hub() {
         ];
     }
     $general = array_values(array_filter($desig, fn($x) => $x['department'] === ''));
-    return ['depts' => $rows, 'general' => $general];
+    return ['depts' => $rows, 'general' => $general, 'establishment' => $establishment];
 }
 
 // ---- Org chart grouped by department --------------------------------------
@@ -240,6 +266,13 @@ function appr_user_for_department_head($dept) {
 function ops_departments($route, $method) {
     ops_require(function_exists('is_coordinator_level') && is_coordinator_level(), 'Only coordinators / administrators can manage departments.');
     deptorg_migrate();
+    if (function_exists('dept_vocab_seed')) dept_vocab_seed();
+
+    // Creating or renaming a department, or deciding what a word means, is a
+    // change to the shape of the organisation — the same bar the master lists
+    // already set. Viewing the hub stays at coordinator level.
+    $mayEdit = function_exists('is_admin_level') ? is_admin_level() : false;
+
     if ($method === 'POST') {
         $do = (string) ($_POST['do'] ?? '');
         if ($do === 'assign') {
@@ -247,8 +280,238 @@ function ops_departments($route, $method) {
             flash('Designation filed under its department.');
             redirect('/departments'); return true;
         }
+        ops_require($mayEdit, 'Only administrators can change the department list.');
+        if ($do === 'dept-save') {
+            [$ok, $msg, $id] = dept_save((int) ($_POST['id'] ?? 0), $_POST, !empty($_POST['confirm_new']));
+            if (!$ok && $id < 0) {
+                // A near-duplicate: show what exists and let them decide (§32).
+                flash($msg, 'error');
+                redirect('/departments?tab=manage&edit=' . (int) ($_POST['id'] ?? 0) . '&dupe=' . abs($id)); return true;
+            }
+            flash($msg, $ok ? 'success' : 'error');
+            redirect('/departments?tab=manage' . ($ok ? '&edit=' . $id : '')); return true;
+        }
+        if ($do === 'dept-active') {
+            dept_set_active((int) ($_POST['id'] ?? 0), (int) ($_POST['on'] ?? 0));
+            flash((int) ($_POST['on'] ?? 0) ? 'Department switched back on.' : 'Department switched off. Nothing recorded against it has been lost.');
+            redirect('/departments?tab=manage'); return true;
+        }
+        if ($do === 'term-add') {
+            [$ok, $msg] = vocab_term_add('department', (int) ($_POST['id'] ?? 0), (string) ($_POST['term'] ?? ''),
+                                         (string) ($_POST['term_type'] ?? 'SYNONYM'));
+            flash($msg, $ok ? 'success' : 'error');
+            redirect('/departments?tab=manage&edit=' . (int) ($_POST['id'] ?? 0)); return true;
+        }
+        if ($do === 'term-del')     { vocab_term_delete((int) ($_POST['term_id'] ?? 0)); flash('Term removed.'); redirect('/departments?tab=manage&edit=' . (int) ($_POST['id'] ?? 0)); return true; }
+        if ($do === 'term-approve') { [$ok, $msg] = vocab_term_approve((int) ($_POST['term_id'] ?? 0), (int) ($_POST['value_id'] ?? 0)); flash($msg, $ok ? 'success' : 'error'); redirect('/departments?tab=review'); return true; }
+        if ($do === 'term-reject')  { vocab_term_reject((int) ($_POST['term_id'] ?? 0)); flash('Term rejected.'); redirect('/departments?tab=review'); return true; }
+    }
+
+    $tab = (string) ($_GET['tab'] ?? 'hub');
+    if ($tab === 'manage' || $tab === 'review') {
+        $editId  = (int) ($_GET['edit'] ?? 0);
+        $editing = $editId > 0 ? vocab_value($editId) : null;
+        if ($editing && (int) $editing['type_id'] !== vocab_type_id('department')) $editing = null;
+        view('ops/department_admin', [
+            'tab'      => $tab,
+            'mayEdit'  => $mayEdit,
+            'tree'     => dept_tree(false),
+            'editing'  => $editing,
+            'terms'    => $editing ? vocab_terms('department', (int) $editing['id'], '') : [],
+            'pending'  => vocab_terms('department', 0, 'PENDING'),
+            'dupe'     => ((int) ($_GET['dupe'] ?? 0)) ? vocab_value((int) $_GET['dupe']) : null,
+            'all'      => vocab_values('department', false),
+        ]);
+        return true;
     }
     $hub = dept_hub();
-    view('ops/departments', ['hub' => $hub, 'deptNames' => dept_names()]);
+    view('ops/departments', ['hub' => $hub, 'deptNames' => dept_names(), 'mayEdit' => $mayEdit,
+                             'pendingCount' => count(vocab_terms('department', 0, 'PENDING'))]);
     return true;
+}
+
+// ============================================================================
+//  DEPARTMENT AS A CANONICAL VOCABULARY  (Phase 2 · M3)
+//
+//  The department master remains where it has always been: lookup_values of
+//  type "department". lookup_values.id is the canonical Department identity and
+//  never changes when the wording does. What M3 adds on top is the approved-term
+//  layer from lib/vocab.php, so a customer's own terminology resolves to that
+//  identity instead of creating another department.
+//
+//  Nothing stored is rewritten, and no value from the legacy hr_department list
+//  is merged into a canonical department by guesswork — §16. Where the two lists
+//  genuinely agree the terms already match; where they do not, the term is
+//  recorded for a person to decide.
+// ============================================================================
+
+const DEPT_TYPES = [
+    'CORPORATE'=>'Corporate', 'SUPPORT'=>'Support', 'COMMERCIAL'=>'Commercial',
+    'OPERATIONAL'=>'Operational', 'TECHNICAL'=>'Technical', 'QUALITY'=>'Quality',
+    'SAFETY'=>'Safety', 'PROJECT'=>'Project', 'SERVICE'=>'Service', 'OTHER'=>'Other',
+];
+
+// Register each department's own code and label as approved terms, and record
+// every legacy hiring-department value that does NOT already resolve, as a
+// PENDING term for an authorised person to decide on. Never merges.
+function dept_vocab_seed() {
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
+    if (!function_exists('vocab_migrate')) return;
+    vocab_migrate();
+    $tid = vocab_type_id('department'); if (!$tid) return;
+    // Self-healing, not first-run-only: a department can still be added through
+    // Settings → Masters or the organogram importer, neither of which knows about
+    // terms. Any department without a canonical term of its own would be listed
+    // but unmatchable, and would show its raw code — the exact defect this
+    // milestone exists to remove. So reconcile every time, on one query.
+    try {
+        $orphans = ops_all("SELECT v.id FROM lookup_values v
+                            WHERE v.type_id=? AND NOT EXISTS (
+                                SELECT 1 FROM lookup_terms t
+                                WHERE t.type_id=v.type_id AND t.value_id=v.id AND t.term_type='CANONICAL')", [$tid]);
+    } catch (Throwable $e) { return; }
+    foreach ($orphans as $o) vocab_register_canonical('department', (int) $o['id']);
+
+    // The legacy hiring-department list stays exactly where it is. Its values are
+    // only offered up for a decision — INSPECTION and ENGINEERING already resolve
+    // on their own, so only the genuinely unrecognised ones are recorded.
+    foreach (vocab_values('hr_department', false) as $v) {
+        foreach ([(string) $v['code'], (string) $v['label']] as $term) {
+            if (trim($term) === '') continue;
+            if (vocab_resolve('department', $term)) continue;
+            vocab_term_suggest('department', $term);
+        }
+    }
+}
+
+// Every stored department string — a code, a label, a legacy hiring code or free
+// text — resolved to its canonical Department row, or null when nothing approved
+// matches it. Read-only: it never writes, never creates and never merges.
+// Memoised for the life of one request, and only for as long as the database it
+// was read from is still the current one — the M2 rule. Without this, rendering a
+// list of departments costs one query per row.
+function dept_of($stored) {
+    $s = trim((string) $stored); if ($s === '') return null;
+    if (!function_exists('vocab_resolve')) return null;
+    static $memo = [], $at = -1;
+    if ($at !== db_epoch()) { $memo = []; $at = db_epoch(); }
+    if (array_key_exists($s, $memo)) return $memo[$s];
+    dept_vocab_seed();
+    return $memo[$s] = vocab_resolve('department', $s);
+}
+
+// What to SHOW for a stored department: the customer's own wording where they
+// have set one, else the canonical label, else the legacy list's label, else the
+// value exactly as stored. Nothing is ever lost or silently renamed.
+function dept_label($stored) {
+    $s = trim((string) $stored); if ($s === '') return '';
+    $v = dept_of($s);
+    if ($v) return vocab_display($v);
+    // Still readable for a value only the legacy hiring list knows.
+    if (function_exists('lk_options_or')) {
+        $hr = lk_options_or('hr_department', defined('RCC_DEPARTMENTS') ? RCC_DEPARTMENTS : []);
+        if (isset($hr[$s])) return (string) $hr[$s];
+        if (isset($hr[strtoupper($s)])) return (string) $hr[strtoupper($s)];
+    }
+    return $s;
+}
+
+// ---- Hierarchy -------------------------------------------------------------
+// parent_value_id already existed on lookup_values; M3 only adds the guard that
+// a department cannot be its own ancestor.
+function dept_would_loop($valueId, $parentId) {
+    $valueId = (int) $valueId; $parentId = (int) $parentId;
+    if ($valueId <= 0 || $parentId <= 0) return false;
+    if ($valueId === $parentId) return true;
+    $seen = []; $cur = $parentId;
+    while ($cur > 0 && !isset($seen[$cur])) {
+        $seen[$cur] = true;
+        if ($cur === $valueId) return true;
+        $row = vocab_value($cur);
+        $cur = $row ? (int) ($row['parent_value_id'] ?? 0) : 0;
+    }
+    return false;
+}
+
+function dept_tree($activeOnly = true) {
+    $rows = vocab_values('department', $activeOnly);
+    $byParent = [];
+    foreach ($rows as $r) $byParent[(int) ($r['parent_value_id'] ?? 0)][] = $r;
+    $out = [];
+    $walk = function ($pid, $depth) use (&$walk, &$out, $byParent) {
+        foreach ($byParent[$pid] ?? [] as $r) { $r['depth'] = $depth; $out[] = $r; $walk((int) $r['id'], $depth + 1); }
+    };
+    $walk(0, 0);
+    return $out;
+}
+
+// ---- Canonical create / update ---------------------------------------------
+// Returns [ok, message, valueId]. Refuses a duplicate code, a self-parent and a
+// circular hierarchy. A near-duplicate NAME is reported to the caller as a
+// warning, never silently blocked — a customer may legitimately need two
+// similarly named departments (§32).
+function dept_save($valueId, array $post, $allowNearDuplicate = false) {
+    dept_vocab_seed();
+    $tid = vocab_type_id('department');
+    if (!$tid) return [false, 'The department master is not set up for this workspace.', 0];
+    $valueId = (int) $valueId;
+    $name = trim((string) ($post['label'] ?? ''));
+    if ($name === '') return [false, 'Give the department a name.', 0];
+    $code = strtoupper(trim((string) ($post['code'] ?? '')));
+    if ($code === '') $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 12));
+    if ($code === '') $code = 'DEPT' . substr(md5($name), 0, 4);
+
+    $dupe = ops_one("SELECT * FROM lookup_values WHERE type_id=? AND UPPER(code)=? AND id<>?", [$tid, $code, $valueId]);
+    if ($dupe) return [false, 'The code “' . $code . '” is already used by ' . vocab_display($dupe) . '.', 0];
+
+    $parent = (int) ($post['parent_value_id'] ?? 0) ?: null;
+    if ($parent && $valueId && dept_would_loop($valueId, $parent))
+        return [false, 'That would put the department inside itself.', 0];
+    if ($parent && $parent === $valueId) return [false, 'A department cannot report to itself.', 0];
+
+    if (!$valueId && !$allowNearDuplicate) {
+        $near = vocab_duplicate_check('department', $name, $code);
+        if ($near) {
+            $first = $near[0];
+            return [false, 'This looks like ' . vocab_display($first['value']) . ' — ' . $first['why']
+                . ' Use that one, or confirm you want a separate department.', -(int) $first['value']['id']];
+        }
+    }
+
+    $cols = [
+        'label'          => $name,
+        'code'           => $code,
+        'display_name'   => trim((string) ($post['display_name'] ?? '')),
+        'description'    => trim((string) ($post['description'] ?? '')),
+        'attr_type'      => strtoupper(trim((string) ($post['attr_type'] ?? ''))),
+        'attr_owner_id'  => (int) ($post['attr_owner_id'] ?? 0) ?: null,
+        'effective_from' => trim((string) ($post['effective_from'] ?? '')),
+        'effective_to'   => trim((string) ($post['effective_to'] ?? '')),
+        'external_ref'   => trim((string) ($post['external_ref'] ?? '')),
+        'parent_value_id'=> $parent,
+        'sort_order'     => (int) ($post['sort_order'] ?? 0),
+        'active'         => isset($post['active']) ? (int) !!$post['active'] : 1,
+    ];
+    $now = vocab_now(); $who = vocab_who();
+    if ($valueId > 0) {
+        $set = implode(',', array_map(fn($c) => "$c=?", array_keys($cols)));
+        db()->prepare("UPDATE lookup_values SET $set, updated_by=?, updated_at=? WHERE id=? AND type_id=?")
+            ->execute([...array_values($cols), $who, $now, $valueId, $tid]);
+    } else {
+        $keys = array_keys($cols);
+        $ph = implode(',', array_fill(0, count($keys) + 5, '?'));   // type_id + cols + source,created_at,updated_by,updated_at
+        db()->prepare("INSERT INTO lookup_values (type_id," . implode(',', $keys) . ",source,created_at,updated_by,updated_at) VALUES ($ph)")
+            ->execute([$tid, ...array_values($cols), 'CUSTOMER', $now, $who, $now]);
+        $valueId = (int) db()->lastInsertId();
+    }
+    vocab_register_canonical('department', $valueId);
+    return [true, $valueId ? 'Department saved.' : 'Department created.', $valueId];
+}
+
+function dept_set_active($valueId, $on) {
+    dept_vocab_seed();
+    // Deactivating never deletes: historical records keep pointing at the same
+    // canonical identity, exactly as §31 requires.
+    db()->prepare("UPDATE lookup_values SET active=?, updated_by=?, updated_at=? WHERE id=?")
+        ->execute([(int) !!$on, vocab_who(), vocab_now(), (int) $valueId]);
 }

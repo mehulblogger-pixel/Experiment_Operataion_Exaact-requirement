@@ -18,11 +18,14 @@ $deptPicker = function ($valueId, $current) use ($e, $deptNames) {
 <div class="master-head">
   <div><h1>Departments</h1>
     <p class="sub" style="margin:2px 0 0">Everything organised by department — its designations, positions, headcount and people. File each designation under a department for department-wise pickers, a clear org chart and approval routing.</p></div>
-  <div class="row-actions"><a class="btn secondary" href="/positions-org">🗂️ Org chart</a> <a class="btn secondary" href="/positions-import">⬆ Import organogram</a></div>
+  <div class="row-actions">
+    <a class="btn" href="/departments?tab=manage">🏛️ Department list</a>
+    <?php if (!empty($pendingCount)): ?><a class="btn secondary" href="/departments?tab=review">❓ <?= (int) $pendingCount ?> word<?= (int) $pendingCount === 1 ? '' : 's' ?> to confirm</a><?php endif; ?>
+    <a class="btn secondary" href="/positions-org">🗂️ Org chart</a> <a class="btn secondary" href="/positions-import">⬆ Import organogram</a></div>
 </div>
 
 <?php if (!$hub['depts'] && !$hub['general']): ?>
-<div class="panel"><p class="muted">No departments yet. Add them under Masters → Department, or import an organogram.</p></div>
+<div class="panel"><p class="muted">No departments yet. <a href="/departments?tab=manage">Add your first department</a>, or import an organogram.</p></div>
 <?php endif; ?>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start">
