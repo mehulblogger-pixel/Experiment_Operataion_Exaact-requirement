@@ -19,8 +19,8 @@ Figures below are the **post-audit** run, against the final tree.
 
 | Engine | Passed | Failed | Skips | Duration |
 |---|---|---|---|---|
-| SQLite | _post-audit run in progress_ | | none introduced | |
-| MariaDB 10.11.14 | _post-audit run in progress_ | | none introduced | |
+| SQLite | **8571** | **0** | none introduced | ~6 min |
+| MariaDB 10.11.14 | **8572** | **0** | none introduced | ~9 min |
 
 *(The pre-audit tree reported 8552 / 0 and 8553 / 0 on the two engines.)*
 

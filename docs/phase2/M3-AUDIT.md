@@ -102,6 +102,8 @@ Checked and clear:
 |---|---|
 | `tests/test_m3_multi_vacancy.php` | **87 assertions** (68 + 19 for these findings) |
 | Mutations | **12**, all caught |
+| Full suite, SQLite | **8571 passed, 0 failed** |
+| Full suite, MariaDB 10.11.14 | **8572 passed, 0 failed** |
 
 The five audit fixes were each mutation-tested individually: removing the sync
 from the stage change (2 failures), from the quantity edit (2), from the

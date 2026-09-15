@@ -179,12 +179,13 @@ workflow, multi-source **allocation** to named suppliers, KPI/SLA, person
 identity convergence, and a closure workflow over the `closed_*` columns.
 
 **28. What was tested on SQLite?**
-The whole suite — **8552 passed, 0 failed** — including all 68 M3 assertions.
+The whole suite — **8571 passed, 0 failed** post-audit — including all 87 M3
+assertions.
 
 **29. What was tested on MariaDB/MySQL?**
-The whole suite on MariaDB 10.11.14 over TCP — **8553 passed, 0 failed** —
-including all 68 M3 assertions. Observed, not inferred from SQLite, which
-reported **8552 / 0** against the same tree.
+The whole suite on MariaDB 10.11.14 over TCP — **8572 passed, 0 failed**
+post-audit — including all 87 M3 assertions. Observed, not inferred from SQLite,
+which reported **8571 / 0** against the same tree.
 
 **30. What mutation tests prove the critical rules?**
 **Twelve**, all caught — seven from the build and five from the audit (removing
