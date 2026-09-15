@@ -66,6 +66,17 @@ function appr_migrate() {
         try { ensure_column('recruit_approval_rules', 'applies_office_id', 'INT NULL'); } catch (Throwable $e) {}
         try { ensure_column('recruit_approval_rules', 'effective_from', "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
         try { ensure_column('recruit_approval_rules', 'effective_to', "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
+        // Phase 3 · M3 — THREE additive columns on the EXISTING steps table, and
+        // no new table anywhere. They exist for one reason the audit proved:
+        // the SLA clock has to START when the step becomes active (§7), while the
+        // POLICY it is measured against must stay frozen at chain creation (§31).
+        // That means the step has to carry its own policy, so activation can
+        // compute a due date without re-reading a matrix that may have changed.
+        //   sla_days / reminder_days  the frozen policy
+        //   activated_at              when this step became the one being waited on
+        try { ensure_column('recruit_approval_steps', 'sla_days', 'INT DEFAULT 0'); } catch (Throwable $e) {}
+        try { ensure_column('recruit_approval_steps', 'reminder_days', 'INT DEFAULT 0'); } catch (Throwable $e) {}
+        try { ensure_column('recruit_approval_steps', 'activated_at', "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
         // Phase 3 · M2 — DELEGATION. The one new table, and the audit says why:
         // nothing in the application can represent a standing, dated, scoped
         // transfer of approval authority. IDEMS has `report_approvals.delegated_to`
@@ -90,7 +101,47 @@ function appr_migrate() {
 
 function _appr_now() { return function_exists('now_iso') ? now_iso() : date('c'); }
 function _appr_actor() { return function_exists('user_name') && function_exists('current_user') ? user_name(current_user()) : 'system'; }
-function _appr_days($n) { return date('c', strtotime('+' . max(0, (int)$n) . ' days')); }
+
+//  Phase 3 · M3 §9 — a WORKING-day clock, not a calendar one.
+//
+//  "Two days to approve" has never meant "48 hours, Sunday included". A two-day
+//  SLA issued on Friday used to expire over the weekend and escalate on Sunday
+//  morning to a manager who was not at work. The branch-aware working day
+//  already exists (lib/schedule.php: Sundays plus that branch's public holidays)
+//  so M3 reuses it rather than inventing a second calendar.
+//
+//  Where no branch can be established — offer, salary and requisition carry no
+//  office, exactly as M2 established — the company-wide holidays apply and
+//  nothing else changes. The 400-iteration guard is the same bound
+//  next_working_day() already uses.
+function appr_due_at($days, $officeId = 0, $fromTs = null) {
+    $days = max(0, (int) $days);
+    $ts = $fromTs === null ? time() : (int) $fromTs;
+    if ($days === 0) return date('c', $ts);
+    if (!function_exists('is_working_day')) return date('c', strtotime('+' . $days . ' days', $ts));
+    $added = 0; $guard = 0;
+    while ($added < $days && $guard++ < 400) {
+        $ts += 86400;
+        if (is_working_day(date('Y-m-d', $ts), (int) $officeId)) $added++;
+    }
+    return date('c', $ts);
+}
+
+//  §24 — every SLA event goes on the EXISTING activity spine. There is no second
+//  audit system: act_log() is where M1 and M2 already put approval history. The
+//  entity and its id are named in the SUBJECT as well as the entity column, so an
+//  event stays readable for the entities that are not registered on the timeline
+//  (offer and salary — see the known limitations).
+function appr_audit_sla($req, $step, $what, $detail = '') {
+    if (!function_exists('act_log') || !$req) return;
+    $entity = strtoupper((string) ($req['entity'] ?? ''));
+    $label  = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : $entity;
+    $subject = $what . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0)
+        . ' · level ' . (int) ($step['seq'] ?? 0)
+        . (trim((string) ($step['label'] ?? '')) !== '' ? ' (' . $step['label'] . ')' : '')
+        . ($detail !== '' ? ' — ' . $detail : '');
+    act_log($entity, (int) ($req['entity_id'] ?? 0), 'SYSTEM', $subject, ['auto' => 1]);
+}
 
 // ---- Rules & levels (config) -----------------------------------------------
 function appr_rules($entity = null, $activeOnly = true) {
@@ -110,8 +161,28 @@ function appr_levels($ruleId) { appr_migrate(); return ops_all("SELECT * FROM re
 //  or an effective date could be silently cleared by a form that never showed it.
 //  Now only the keys actually present in the post are written; clearing a value
 //  means posting it empty, which is a deliberate act.
+//  Phase 3 · M3 §25 — SLA AND ESCALATION POLICY IS ASKED FOR AT THE WRITE.
+//
+//  sla_days, reminder_days, escalate_role and escalate_user_id all live on an
+//  approval level, and every one of these functions used to trust the route for
+//  authorization. That is the exact shape M2's correction found in delegation: a
+//  capability asked on the screen and not at the write, so a direct POST or AJAX
+//  call reached the policy without it. A hidden button is not security.
+//
+//  One question, asked once, by everything that writes approval policy.
+//  ENTITLEMENT FIRST, then capability — the ordering is the security property,
+//  and it is why this gate stays shut for a master on a workspace that has not
+//  bought recruitment. Every rule this policy governs (hiring request, offer,
+//  salary, requisition) belongs to the People & hiring module, so a workspace
+//  without it has no approval matrix for anybody to edit. There is no master
+//  bypass of entitlement anywhere in this application and there is not one here.
+function appr_config_can() {
+    if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return false;
+    return !function_exists('hiring_admin_can') || hiring_admin_can();
+}
 function appr_rule_save($id, $post) {
     appr_migrate();
+    if (!appr_config_can()) return 0;
     $id = (int) $id;
     $existing = $id > 0 ? appr_rule($id) : null;
     $text = ['code','name','applies_department','applies_sbu','applies_grade','applies_position','effective_from','effective_to'];
@@ -158,12 +229,14 @@ function appr_audit_policy($ruleId, $what) {
 }
 function appr_rule_set_active($id, $on) {
     appr_migrate();
+    if (!appr_config_can()) return false;
     db()->prepare("UPDATE recruit_approval_rules SET active=? WHERE id=?")->execute([$on?1:0,(int)$id]);
     appr_audit_policy($id, $on ? 'Approval policy activated' : 'Approval policy deactivated');
 }
 function appr_level_save($post) {
     appr_migrate();
-    $rid = (int)($post['rule_id'] ?? 0); if (!$rid) return;
+    if (!appr_config_can()) return false;
+    $rid = (int)($post['rule_id'] ?? 0); if (!$rid) return false;
     // Validate the posted roles against the roles THIS workspace's plan uses, so a
     // switched-off module's role (Inspector, Marketing, Finance…) can never be saved.
     $roleSet = array_keys(function_exists('roles_for_licence') ? roles_for_licence() : ORG_ROLES);
@@ -183,6 +256,7 @@ function appr_level_save($post) {
 }
 function appr_level_delete($id) {
     appr_migrate();
+    if (!appr_config_can()) return false;
     $lv = ops_one("SELECT rule_id, label FROM recruit_approval_levels WHERE id=?", [(int)$id]);
     db()->prepare("DELETE FROM recruit_approval_levels WHERE id=?")->execute([(int)$id]);
     if ($lv) appr_audit_policy((int) $lv['rule_id'], 'Approval level removed: ' . ($lv['label'] ?: '#' . (int) $id));
@@ -514,13 +588,53 @@ function appr_start($entity, $entityId, $ctx, $subject = '', $amount = 0) {
         $esc = (string) $lv['escalate_role']; $euid = $lv['escalate_user_id'] ?: null;
         if (!$uid && ($rid = $orgResolve($role)) > 0) { $uid = $rid; $role = ''; }   // pinned to the resolved manager
         if (!$euid && ($eid = $orgResolve($esc)) > 0) { $euid = $eid; $esc = ''; }
-        db()->prepare("INSERT INTO recruit_approval_steps (request_id,seq,label,approver_role,approver_user_id,escalate_role,escalate_user_id,sla_due,reminder_at,status) VALUES (?,?,?,?,?,?,?,?,?, 'PENDING')")
-            ->execute([$reqId,(int)$lv['seq'],(string)$lv['label'],$role,$uid,$esc,$euid,_appr_days($lv['sla_days']),_appr_days($lv['reminder_days'])]);
+        // M3 §7 — the POLICY is frozen onto the step here; the CLOCK is not
+        // started here. A step that nobody is waiting on yet has no due date.
+        db()->prepare("INSERT INTO recruit_approval_steps (request_id,seq,label,approver_role,approver_user_id,escalate_role,escalate_user_id,sla_days,reminder_days,sla_due,reminder_at,activated_at,status) VALUES (?,?,?,?,?,?,?,?,?,'','','', 'PENDING')")
+            ->execute([$reqId,(int)$lv['seq'],(string)$lv['label'],$role,$uid,$esc,$euid,max(0,(int)$lv['sla_days']),max(0,(int)$lv['reminder_days'])]);
     }
-    // Notify the first-level approvers.
-    $first = appr_current_step(appr_request($reqId));
-    if ($first) appr_email_approver($first, appr_request($reqId), 'requested');
+    // Only the first level is being waited on, so only its clock starts.
+    $reqRow = appr_request($reqId);
+    $first = appr_current_step($reqRow);
+    if ($first) {
+        $first = appr_activate_step($first, $reqRow);
+        appr_email_approver($first, $reqRow, 'requested');
+    }
     return [true, $reqId];
+}
+
+//  Phase 3 · M3 §7 — THE SLA CLOCK STARTS HERE, AND ONLY HERE.
+//
+//  Before this, appr_start() stamped a due date on EVERY level at once, from the
+//  moment the request was raised. A three-level chain with two days per level
+//  whose first approver took three days handed level 2 to its approver ALREADY
+//  OVERDUE, and the next tick escalated it before that person had a minute to
+//  look at it; level 3 was two days overdue before anyone had seen it.
+//
+//  So the clock starts when the step becomes the one being waited on. What it is
+//  measured against was frozen onto the step at chain creation, so an
+//  administrator editing the matrix today cannot rewrite an approval that is
+//  already running (§31).
+//
+//  Idempotent by the activated_at stamp: activating twice cannot extend an
+//  approver's deadline, which would otherwise be a way to defeat the SLA.
+function appr_activate_step($step, $req = null) {
+    if (!$step) return $step;
+    $id = (int) ($step['id'] ?? 0);
+    if ($id <= 0) return $step;
+    if (trim((string) ($step['activated_at'] ?? '')) !== '') return $step;
+    $req = $req ?: appr_request((int) ($step['request_id'] ?? 0));
+    $office = (int) (appr_step_context($step, $req)['_office_id'] ?? 0);
+    $now = _appr_now();
+    $due = appr_due_at((int) ($step['sla_days'] ?? 0), $office);
+    $rem = appr_due_at((int) ($step['reminder_days'] ?? 0), $office);
+    try {
+        db()->prepare("UPDATE recruit_approval_steps SET activated_at=?, sla_due=?, reminder_at=? WHERE id=?")
+            ->execute([$now, $due, $rem, $id]);
+    } catch (Throwable $e) { return $step; }
+    $step['activated_at'] = $now; $step['sla_due'] = $due; $step['reminder_at'] = $rem;
+    appr_audit_sla($req, $step, 'SLA started', 'due ' . substr($due, 0, 10));
+    return $step;
 }
 
 // ---- Delegation (Phase 3 · M2) ---------------------------------------------
@@ -529,12 +643,24 @@ function appr_start($entity, $entityId, $ctx, $subject = '', $amount = 0) {
 //  one entity and one branch.
 //
 //  Returns the delegator user ids this person may currently act for.
-function appr_delegators_for($userId, $entity = '', $officeId = null) {
+//  Phase 3 · M3 — THE ONE PLACE DELEGATION VALIDITY IS DECIDED.
+//
+//  M3 needs to read the delegation table the other way round: not "who may this
+//  person act for" but "who is currently acting for this approver", so a reminder
+//  reaches the person the system actually expects to act. That is a second
+//  READING of the rule — it must never become a second RULE. M2's correction was
+//  precisely about two copies of a delegation rule drifting apart, and adding a
+//  reader is not a licence to repeat that.
+//
+//  So both directions come through here. $col is allow-listed, never
+//  interpolated from anything a caller could shape.
+function appr_valid_delegations($col, $userId, $entity = '', $officeId = null) {
     appr_migrate();
+    if (!in_array($col, ['delegate_user_id', 'delegator_user_id'], true)) return [];
     $userId = (int) $userId; if ($userId <= 0) return [];
     $today = date('Y-m-d');
     try {
-        $rows = ops_all("SELECT * FROM approval_delegations WHERE delegate_user_id=? AND active=1", [$userId]);
+        $rows = ops_all("SELECT * FROM approval_delegations WHERE $col=? AND active=1", [$userId]);
     } catch (Throwable $e) { return []; }
     $out = [];
     foreach ($rows as $d) {
@@ -567,8 +693,27 @@ function appr_delegators_for($userId, $entity = '', $officeId = null) {
         try { $du = ops_one("SELECT is_active FROM users WHERE id=?", [$dl]); } catch (Throwable $e) { $du = null; }
         if (!$du || (int) ($du['is_active'] ?? 0) !== 1) continue;
 
-        $out[] = $dl;
+        $out[] = $d;
     }
+    return $out;
+}
+
+//  Delegate → the delegators they may currently act for. The M2 signature and
+//  semantics are unchanged; only where the rule lives has moved.
+function appr_delegators_for($userId, $entity = '', $officeId = null) {
+    $out = [];
+    foreach (appr_valid_delegations('delegate_user_id', $userId, $entity, $officeId) as $d)
+        $out[] = (int) $d['delegator_user_id'];
+    return array_values(array_unique($out));
+}
+
+//  Delegator → the people currently acting for them. M3 uses this to decide who
+//  to NOTIFY. It decides nothing about authority: appr_can_act() remains the only
+//  thing that says who may approve, and being e-mailed is not being authorized.
+function appr_delegates_of($userId, $entity = '', $officeId = null) {
+    $out = [];
+    foreach (appr_valid_delegations('delegator_user_id', $userId, $entity, $officeId) as $d)
+        $out[] = (int) $d['delegate_user_id'];
     return array_values(array_unique($out));
 }
 
@@ -703,7 +848,11 @@ function appr_act($stepId, $decision, $remarks = '') {
     $next = ops_one("SELECT * FROM recruit_approval_steps WHERE request_id=? AND status='PENDING' AND seq>? ORDER BY seq LIMIT 1", [(int)$req['id'], (int)$step['seq']]);
     if ($next) {
         db()->prepare("UPDATE recruit_approval_requests SET current_seq=? WHERE id=?")->execute([(int)$next['seq'],(int)$req['id']]);
-        appr_email_approver($next, appr_request((int)$req['id']), 'requested');
+        // M3 §7 — the next approver's clock starts NOW, not when the request was
+        // raised. This is the line that stops a later level being born overdue.
+        $reqRow = appr_request((int)$req['id']);
+        $next = appr_activate_step($next, $reqRow);
+        appr_email_approver($next, $reqRow, 'requested');
         return [true, 'Approved — sent to the next approver.'];
     }
     db()->prepare("UPDATE recruit_approval_requests SET status='APPROVED', closed_at=? WHERE id=?")->execute([$now,(int)$req['id']]);
@@ -762,6 +911,92 @@ function appr_callback($entity, $entityId, $result, $req = null) {
     return true;
 }
 
+// ---- SLA state (Phase 3 · M3 §10) -----------------------------------------
+//
+//  DERIVED, never stored. The step already knows its status, its due date and
+//  whether it has been escalated; the only other input is the clock. Storing a
+//  seventh workflow state would mean a nightly job had to keep it true, and a
+//  stored status that nobody refreshed is worse than no status at all.
+//
+//  Before this, "overdue" was re-implemented inline in the view as
+//  strtotime($sla_due) < time(), so no two screens could agree and "due soon"
+//  did not exist anywhere.
+const APPR_SLA_STATES = [
+    'COMPLETED'   => 'Completed',
+    'NOT_STARTED' => 'Not started',
+    'ESCALATED'   => 'Escalated',
+    'OVERDUE'     => 'Overdue',
+    'DUE'         => 'Due today',
+    'DUE_SOON'    => 'Due soon',
+    'ON_TRACK'    => 'On track',
+];
+function appr_sla_state($step, $now = null) {
+    $now = $now === null ? time() : (int) $now;
+    $status = strtoupper(trim((string) ($step['status'] ?? '')));
+    if ($status !== '' && $status !== 'PENDING') return 'COMPLETED';
+    $due = trim((string) ($step['sla_due'] ?? ''));
+    if ($due === '') return 'NOT_STARTED';          // nobody is waiting on this step yet
+    if ((int) ($step['escalated'] ?? 0) === 1) return 'ESCALATED';
+    $dueTs = strtotime($due);
+    if ($dueTs === false) return 'NOT_STARTED';
+    if ($now > $dueTs) return 'OVERDUE';
+    if (date('Y-m-d', $now) === date('Y-m-d', $dueTs)) return 'DUE';
+    $rem = trim((string) ($step['reminder_at'] ?? ''));
+    if ($rem !== '' && ($remTs = strtotime($rem)) !== false && $now >= $remTs) return 'DUE_SOON';
+    return 'ON_TRACK';
+}
+function appr_sla_label($step, $now = null) {
+    $st = appr_sla_state($step, $now);
+    return APPR_SLA_STATES[$st] ?? $st;
+}
+//  Whole days late — 0 when it is not late. Used for the one sentence an
+//  approver actually reads: "Approval: Pending · SLA: Overdue by 2 days".
+function appr_sla_days_late($step, $now = null) {
+    $now = $now === null ? time() : (int) $now;
+    $due = trim((string) ($step['sla_due'] ?? ''));
+    if ($due === '') return 0;
+    $dueTs = strtotime($due);
+    if ($dueTs === false || $now <= $dueTs) return 0;
+    return (int) floor(($now - $dueTs) / 86400);
+}
+//  The one sentence, built once so every screen says the same thing.
+function appr_sla_sentence($step, $now = null) {
+    $st = appr_sla_state($step, $now);
+    if ($st === 'OVERDUE' || $st === 'ESCALATED') {
+        $d = appr_sla_days_late($step, $now);
+        $suffix = $d > 0 ? ' by ' . $d . ' day' . ($d === 1 ? '' : 's') : '';
+        return ($st === 'ESCALATED' ? 'Escalated — overdue' : 'Overdue') . $suffix;
+    }
+    return APPR_SLA_STATES[$st] ?? $st;
+}
+
+//  Phase 3 · M3 §27 — the approval backlog as five numbers, for the EXISTING
+//  Recruitment Command Centre. No second dashboard, no stored counters: it reads
+//  the same live steps the inbox reads and derives each state the same way.
+//
+//  Entitlement is asked here as well as by the screen. A KPI is a read of paid
+//  data, and "it is only a number" has never been a reason to answer it for a
+//  workspace that has not bought the module.
+function appr_sla_summary() {
+    appr_migrate();
+    $out = ['pending' => 0, 'due_today' => 0, 'overdue' => 0, 'escalated' => 0, 'due_soon' => 0];
+    if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return $out;
+    try {
+        $rows = ops_all("SELECT s.* FROM recruit_approval_steps s JOIN recruit_approval_requests r ON r.id=s.request_id
+                         WHERE r.status='PENDING' AND s.status='PENDING' AND s.seq=r.current_seq");
+    } catch (Throwable $e) { return $out; }
+    foreach ($rows as $s) {
+        $out['pending']++;
+        switch (appr_sla_state($s)) {
+            case 'ESCALATED': $out['escalated']++; $out['overdue']++; break;
+            case 'OVERDUE':   $out['overdue']++;   break;
+            case 'DUE':       $out['due_today']++; break;
+            case 'DUE_SOON':  $out['due_soon']++;  break;
+        }
+    }
+    return $out;
+}
+
 // ---- Inbox (My approvals) --------------------------------------------------
 function appr_inbox($user = null) {
     appr_migrate();
@@ -781,27 +1016,113 @@ function appr_inbox($user = null) {
 }
 function appr_inbox_count($user = null) { return count(appr_inbox($user)); }
 
+//  Phase 3 · M3 §19 — "WAITING": raised by me, sitting with somebody else.
+//
+//  appr_inbox() answers "what must I do", and that is all it has ever answered,
+//  so a requester had nowhere to see that their own request was parked with an
+//  approver. This is the other half of the same screen, and it is deliberately
+//  narrow:
+//
+//    • HIRING_REQUEST only, matched on requested_by_id — the EXACT owner. The
+//      request table's `requester` is a display name, and two people can share
+//      one, so it is not used to decide what somebody may see.
+//    • entitlement first, as everywhere else.
+//    • anything the person could act on is removed — that belongs under
+//      "My action" and must not be listed twice.
+//
+//  It widens nothing: these are the person's own requests.
+function appr_waiting_on_others($user = null) {
+    appr_migrate();
+    $user = $user ?: (function_exists('current_user') ? current_user() : null);
+    if (!$user) return [];
+    if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return [];
+    $me = (int) ($user['id'] ?? 0);
+    if ($me <= 0) return [];
+    try {
+        $rows = ops_all("SELECT s.*, r.entity, r.entity_id, r.subject, r.rule_name, r.requester, r.created_at rcreated
+                         FROM recruit_approval_steps s JOIN recruit_approval_requests r ON r.id=s.request_id
+                         WHERE r.status='PENDING' AND s.status='PENDING' AND s.seq=r.current_seq
+                           AND r.entity='HIRING_REQUEST' ORDER BY s.sla_due");
+    } catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($rows as $s) {
+        if (!function_exists('hreq_get')) break;
+        $hr = hreq_get((int) $s['entity_id']);
+        if (!$hr || (int) ($hr['requested_by_id'] ?? 0) !== $me) continue;
+        $step = appr_step_context($s, ['id' => (int) $s['request_id'], 'entity' => $s['entity'], 'entity_id' => (int) $s['entity_id']]);
+        if (appr_can_act($step, $user)) continue;          // that is "My action", not "Waiting"
+        $out[] = $s;
+    }
+    return $out;
+}
+
 // ---- Reminders + escalations (cron tick) -----------------------------------
+//  What the scheduler may and may not do (§23) is worth saying in the file
+//  itself, because the temptation is always to let it "just clear the backlog":
+//
+//    IT MAY     notice a step is overdue, remind, escalate, notify, audit
+//    IT MAY NOT approve, reject, reassign, or manufacture any authority at all
+//
+//  Nothing below writes to a step's STATUS, to a request's STATUS, or to any
+//  approver field. It writes reminder bookkeeping and it sends e-mail. The only
+//  authority in this application is appr_can_act(), and the scheduler never
+//  calls it, because the scheduler never acts.
 function appr_tick() {
     appr_migrate();
+    // §29 — cron.php already gates this on the People & hiring module, and that
+    // gate stays. Asking here too is the lesson M1 and M2 both taught: a question
+    // asked only by the caller is a question one new caller can skip.
+    if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return 0;
     $now = time(); $acted = 0;
-    $steps = ops_all("SELECT s.*, r.subject, r.entity, r.rule_name FROM recruit_approval_steps s
+    $steps = ops_all("SELECT s.*, r.subject, r.entity, r.entity_id, r.rule_name FROM recruit_approval_steps s
                       JOIN recruit_approval_requests r ON r.id=s.request_id
                       WHERE r.status='PENDING' AND s.status='PENDING' AND s.seq=r.current_seq");
     foreach ($steps as $s) {
+        $req = ['id' => (int) $s['request_id'], 'entity' => $s['entity'],
+                'entity_id' => (int) ($s['entity_id'] ?? 0), 'subject' => $s['subject'], 'status' => 'PENDING'];
+        // A step whose clock never started is not late — it is waiting to be
+        // handed over. Start it here rather than skipping it forever, so a chain
+        // cannot be stranded by a write that failed at activation time.
+        if (trim((string) $s['sla_due']) === '') {
+            $s = appr_activate_step($s, $req);
+            if (trim((string) ($s['sla_due'] ?? '')) === '') continue;
+        }
         $sla = $s['sla_due'] ? strtotime($s['sla_due']) : 0;
         if ($sla && $now >= $sla && (int)$s['escalated'] === 0) {
-            appr_email_escalate($s); db()->prepare("UPDATE recruit_approval_steps SET escalated=1 WHERE id=?")->execute([(int)$s['id']]); $acted++;
+            // §24 + §20 — this used to set escalated=1 whether or not a single
+            // person had been told, so a step could be permanently marked
+            // escalated with nobody notified and no trace. The outcome is now
+            // recorded as it actually happened.
+            [$n, $ok] = appr_email_escalate($s, $req);
+            db()->prepare("UPDATE recruit_approval_steps SET escalated=1 WHERE id=?")->execute([(int)$s['id']]);
+            appr_audit_sla($req, $s, 'Approval overdue — escalated', appr_delivery_note($n, $ok));
+            $acted++;
             continue;
         }
         $rem = $s['reminder_at'] ? strtotime($s['reminder_at']) : 0;
         if ($rem && $now >= $rem) {
-            appr_email_approver($s, ['id'=>$s['request_id'],'subject'=>$s['subject'],'entity'=>$s['entity']], 'reminder');
+            [$n, $ok] = appr_email_approver($s, $req, 'reminder');
+            // §21 — the identity of a reminder is (step, threshold). Moving the
+            // threshold forward is what makes a second run of the scheduler a
+            // no-op, however many times it runs in a day.
             db()->prepare("UPDATE recruit_approval_steps SET reminded_at=?, reminder_at=? WHERE id=?")->execute([_appr_now(), date('c', $now + 86400), (int)$s['id']]);
+            appr_audit_sla($req, $s, 'Approval reminder sent', appr_delivery_note($n, $ok));
             $acted++;
         }
     }
     return $acted;
+}
+
+//  §20 — never report a send that did not happen. ops_mail() already records
+//  every attempt in email_log with its error; this is the same truth in words,
+//  on the activity timeline.
+function appr_delivery_note($recipients, $delivered) {
+    $recipients = (int) $recipients; $delivered = (int) $delivered;
+    if ($recipients === 0) return 'NO RECIPIENT — nobody was notified';
+    $who = $recipients . ' recipient' . ($recipients === 1 ? '' : 's');
+    if ($delivered === 0) return $who . ' — not delivered (mail is not configured, or the send failed)';
+    if ($delivered < $recipients) return $who . ' — ' . $delivered . ' delivered';
+    return 'notified ' . $who;
 }
 
 // ---- Email helpers ---------------------------------------------------------
@@ -810,29 +1131,100 @@ function appr_role_emails($role, $userId = null) {
     if ((string)$role === '') return [];
     return array_values(array_filter(array_map(fn($r) => $r['email'], ops_all("SELECT email FROM users WHERE role=? AND is_active=1 AND email<>''", [$role]))));
 }
+//  Returns how many of the attempted sends were actually delivered. It still
+//  never throws: a notification failure must not break an approval (§39).
 function appr_mail($to, $subject, $body) {
-    if (!$to || !function_exists('ops_mail')) return;
-    foreach ((array)$to as $addr) if ($addr) { try { ops_mail($addr, $subject, $body, '', 'recruit_approval'); } catch (Throwable $e) {} }
+    $ok = 0;
+    if (!$to || !function_exists('ops_mail')) return 0;
+    foreach ((array)$to as $addr) if ($addr) {
+        try { $ok += ops_mail($addr, $subject, $body, '', 'recruit_approval') ? 1 : 0; } catch (Throwable $e) {}
+    }
+    return $ok;
 }
-function appr_email_approver($step, $req, $kind) {
+
+//  Phase 3 · M3 §16 — WHO IS BEING ASKED TO ACT.
+//
+//  The inbox has honoured delegation since M2, but the e-mail did not: it went
+//  to the named approver or the role and stopped there. So the queue said one
+//  thing and the notification said another, and the person the system was
+//  actually waiting for was never told. This adds the current delegates of
+//  whoever the step names.
+//
+//  It grants nothing. appr_can_act() is still the only thing that decides who
+//  may approve; a delegate appears here because M2 already gave them the
+//  authority, and an address on an e-mail has never been an authority anywhere
+//  in this application.
+function appr_step_recipients($step, $req = null) {
     $to = appr_role_emails($step['approver_role'] ?? '', $step['approver_user_id'] ?? null);
+    if (!array_key_exists('_entity', $step) && $req) $step = appr_step_context($step, $req);
+    $entity = (string) ($step['_entity'] ?? ($req['entity'] ?? ''));
+    $office = array_key_exists('_office_id', $step) ? $step['_office_id'] : null;
+
+    // Whose authority is this step asking for?
+    $principals = [];
+    $uid = (int) ($step['approver_user_id'] ?? 0);
+    if ($uid > 0) $principals[] = $uid;
+    else {
+        $role = (string) ($step['approver_role'] ?? '');
+        if ($role !== '') {
+            try { foreach (ops_all("SELECT id FROM users WHERE role=? AND is_active=1", [$role]) as $u) $principals[] = (int) $u['id']; }
+            catch (Throwable $e) {}
+        }
+    }
+    foreach ($principals as $pid) {
+        foreach (appr_delegates_of($pid, $entity, $office) as $dg) {
+            try { $e = (string) ops_val("SELECT email FROM users WHERE id=? AND is_active=1 AND email<>''", [(int) $dg]); }
+            catch (Throwable $e2) { $e = ''; }
+            if ($e !== '') $to[] = $e;
+        }
+    }
+    return array_values(array_unique(array_filter($to)));
+}
+
+//  Returns [recipients, delivered] so the caller can audit what really happened.
+function appr_email_approver($step, $req, $kind) {
+    $to = appr_step_recipients($step, $req);
     $sub = ($kind === 'reminder' ? 'Reminder: ' : '') . 'Approval needed — ' . ($req['subject'] ?? $req['entity'] ?? 'item');
     $body = '<p>An approval is awaiting your action' . ($kind === 'reminder' ? ' (reminder)' : '') . ':</p>'
         . '<p><b>' . e((string)($req['subject'] ?? '')) . '</b>' . (isset($step['label']) && $step['label'] ? ' — ' . e($step['label']) : '') . '</p>'
         . '<p>Open <b>My approvals</b> in the app to approve or reject.</p>';
-    appr_mail($to, $sub, $body);
+    return [count($to), appr_mail($to, $sub, $body)];
 }
-function appr_email_escalate($step) {
+
+//  §13 + §15 — ESCALATION IS VISIBILITY, NOT AUTHORITY.
+//
+//  Being told an approval is late does not make the recipient an approver. This
+//  function sends an e-mail and returns; it writes to no approver field, and the
+//  authority engine has never read the escalation columns. A manager who is told
+//  can approve only if appr_can_act() independently says so.
+function appr_email_escalate($step, $req = null) {
     $to = appr_role_emails($step['escalate_role'] ?? '', $step['escalate_user_id'] ?? null);
-    if (!$to) $to = array_values(array_filter(array_map(fn($r) => $r['email'], ops_all("SELECT email FROM users WHERE role IN ('MASTER_ADMIN','ADMIN','BRANCH_MANAGER','SBU_HEAD') AND is_active=1 AND email<>''"))));
-    appr_mail($to, 'ESCALATION: approval overdue — ' . ($step['subject'] ?? ''),
-        '<p>An approval step has passed its SLA and needs attention:</p><p><b>' . e((string)($step['subject'] ?? '')) . '</b> — level ' . (int)$step['seq'] . '</p>');
+    if (!$to) {
+        try { $to = array_values(array_filter(array_map(fn($r) => $r['email'], ops_all("SELECT email FROM users WHERE role IN ('MASTER_ADMIN','ADMIN','BRANCH_MANAGER','SBU_HEAD') AND is_active=1 AND email<>''")))); }
+        catch (Throwable $e) { $to = []; }
+    }
+    $late = appr_sla_days_late($step);
+    $body = '<p>An approval step has passed its SLA and needs attention:</p><p><b>' . e((string)($step['subject'] ?? '')) . '</b> — level ' . (int)$step['seq']
+        . ($late > 0 ? ' — overdue by ' . $late . ' day' . ($late === 1 ? '' : 's') : '') . '</p>'
+        . '<p>This is a notification. It does not give you authority to approve — the approver named on the step still owns the decision.</p>';
+    return [count($to), appr_mail($to, 'ESCALATION: approval overdue — ' . ($step['subject'] ?? ''), $body)];
 }
 function appr_email_requester($req, $result, $remarks = '') {
     $who = trim((string)($req['requester'] ?? '')); if ($who === '') return;
+    // Phase 3 · M3 §34 — this asked MySQL a question in SQLite's dialect. `||` is
+    // string concatenation in SQLite and LOGICAL OR in MySQL/MariaDB, so in
+    // production the comparison was against a number, never matched, and the
+    // requester was NEVER told the outcome of their own request. Silently,
+    // because the whole thing sits in a try/catch. Two portable steps instead.
     $email = '';
     try {
-        $email = (string)ops_val("SELECT email FROM users WHERE email<>'' AND (username=? OR TRIM((first_name || ' ' || last_name))=?) LIMIT 1", [$who, $who]);
+        $email = (string) ops_val("SELECT email FROM users WHERE email<>'' AND username=? LIMIT 1", [$who]);
+        if ($email === '') {
+            foreach (ops_all("SELECT email, first_name, last_name FROM users WHERE email<>'' AND is_active=1") as $u) {
+                $full = trim(((string) $u['first_name']) . ' ' . ((string) $u['last_name']));
+                if ($full !== '' && strcasecmp($full, $who) === 0) { $email = (string) $u['email']; break; }
+            }
+        }
     } catch (Throwable $e) { return; }
     if (!$email) return;
     appr_mail([$email], 'Your approval was ' . strtoupper($result) . ' — ' . ($req['subject'] ?? ''),
@@ -939,6 +1331,6 @@ function ops_my_approvals($route, $method) {
         if ($do === 'act') { [$ok, $m] = appr_act((int)($_POST['step_id'] ?? 0), (string)($_POST['decision'] ?? 'approve'), $_POST['remarks'] ?? ''); flash($m, $ok ? 'success' : 'error'); }
         redirect('/my-approvals'); return true;
     }
-    view('ops/my_approvals', ['inbox' => appr_inbox()]);
+    view('ops/my_approvals', ['inbox' => appr_inbox(), 'waiting' => appr_waiting_on_others()]);
     return true;
 }

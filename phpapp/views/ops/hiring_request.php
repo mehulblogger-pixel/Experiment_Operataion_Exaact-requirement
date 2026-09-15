@@ -87,23 +87,44 @@ $steps = ($r && function_exists('hreq_approval_steps')) ? hreq_approval_steps($r
 if ($r && ($steps || !empty($r['submitted_at']))): ?>
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Approval history</h3>
+    <?php // Phase 3 · M3 §28 — the approval status and the SLA status are two
+          // different facts, so the screen states them as two, in one sentence,
+          // rather than inventing a third status that blurs them.
+    $slaState = fn($x) => function_exists('appr_sla_state') ? appr_sla_state($x) : '';
+    $slaText  = fn($x) => function_exists('appr_sla_sentence') ? appr_sla_sentence($x) : '';
+    $live = null;
+    foreach ($steps as $st) if (strtoupper((string) $st['status']) === 'PENDING') { $live = $st; break; }
+    if ($live):
+      $ls = $slaState($live);
+      $bad = in_array($ls, ['OVERDUE', 'ESCALATED', 'DUE'], true); ?>
+      <p class="muted" style="margin:-4px 0 10px;font-size:13px">
+        Approval: <b>Pending</b><?= $live['label'] ? ' with ' . $e($live['label']) : '' ?> ·
+        SLA: <b style="<?= $bad ? 'color:#dc2626' : '' ?>"><?= $e($slaText($live)) ?></b>
+        <?php if (!empty($live['sla_due'])): ?> (due <?= $e(substr((string) $live['sla_due'], 0, 10)) ?>)<?php endif; ?>
+        <?php if ((int) ($live['escalated'] ?? 0) === 1): ?>
+          <br><span style="font-size:12px">An escalation notice has gone out. It does not change who may approve — this step still belongs to its approver.</span>
+        <?php endif; ?>
+      </p>
+    <?php endif; ?>
     <table class="table" style="font-size:13px">
-      <tr><th>What</th><th>When</th><th>Who</th><th>Decision</th><th>Reason</th></tr>
+      <tr><th>What</th><th>When</th><th>Who</th><th>Decision</th><th>SLA</th><th>Reason</th></tr>
       <?php if (!empty($r['submitted_at'])): ?>
       <tr><td>Submitted</td><td><?= $e(substr((string) $r['submitted_at'], 0, 10)) ?></td>
-          <td><?= $e($r['requested_by_name'] ?: $r['created_by']) ?></td><td>—</td><td>—</td></tr>
+          <td><?= $e($r['requested_by_name'] ?: $r['created_by']) ?></td><td>—</td><td>—</td><td>—</td></tr>
       <?php endif; ?>
       <?php foreach ($steps as $st): $sv = strtoupper((string) $st['status']); ?>
       <tr><td><?= $e($st['label'] ?: 'Approval') ?></td>
           <td><?= $e($st['acted_at'] ? substr((string) $st['acted_at'], 0, 10) : '—') ?></td>
           <td><?= $e($st['acted_by'] ?: '—') ?></td>
           <td><span class="pill <?= $sv === 'APPROVED' ? 'p-ok' : ($sv === 'REJECTED' ? 'p-bad' : 'p-mut') ?>" style="font-size:11px"><?= $e($sv === 'PENDING' ? 'Awaiting' : ucfirst(strtolower($sv))) ?></span></td>
+          <td class="muted"><?= $e($slaText($st)) ?><?php if (!empty($st['sla_due']) && $sv === 'PENDING'): ?><br><span style="font-size:11px">due <?= $e(substr((string) $st['sla_due'], 0, 10)) ?></span><?php endif; ?></td>
           <td><?= $e($st['remarks'] ?: '—') ?></td></tr>
       <?php endforeach; ?>
       <?php if (!$steps && !empty($r['decided_at'])): ?>
       <tr><td>Decision</td><td><?= $e(substr((string) $r['decided_at'], 0, 10)) ?></td>
           <td><?= $e($r['decided_by']) ?></td>
           <td><span class="pill <?= $status === 'APPROVED' ? 'p-ok' : 'p-bad' ?>" style="font-size:11px"><?= $e(ucfirst(strtolower($status))) ?></span></td>
+          <td class="muted">—</td>
           <td><?= $e($r['decision_note'] ?: '—') ?></td></tr>
       <?php endif; ?>
     </table>

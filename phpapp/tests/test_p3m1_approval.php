@@ -43,6 +43,22 @@ $uOther = $mk('m1_other', 'BRANCH_MANAGER', 0, 962, $HR);   // foreign branch
 $uMast  = $mk('m1_master','ADMIN',          1, 961, '');
 $uNone  = $mk('m1_none',  'INSPECTOR',      0, 961, 'mod.hiring.view');  // may read, not raise
 
+// Phase 3 · M3 §25 — approval POLICY (matrix, SLA, escalation) may only be written
+// by an administrator, and that is now asked at the write rather than only by the
+// screen. These fixtures used to configure policy with nobody signed in, which the
+// product has never permitted; they now do what the comment always claimed and act
+// as the administrator. The acting user is restored afterwards, so every other
+// assertion below still runs as whoever it was written for.
+$cfg = function (callable $fn) use (&$uMast) {
+    $prev = $_SESSION['uid'] ?? null;
+    $_SESSION['uid'] = $uMast; current_user(true); ua(true);
+    try { return $fn(); }
+    finally {
+        if ($prev === null) unset($_SESSION['uid']); else $_SESSION['uid'] = $prev;
+        current_user(true); ua(true);
+    }
+};
+
 // ---------------------------------------------------------------------------
 //  0 · What the audit found already existed
 // ---------------------------------------------------------------------------
@@ -60,9 +76,9 @@ t_ok(in_array('UNDER_REVIEW', array_keys(HREQ_STATUS), true),
      'M1.0 · "approval pending" is M4\'s existing UNDER_REVIEW — no second status vocabulary');
 
 // A rule an administrator would configure. Approver = the BRANCH_MANAGER role.
-$ruleId = appr_rule_save(0, ['name' => 'M1 hiring requests', 'entity' => 'HIRING_REQUEST', 'code' => 'M1HR']);
+$ruleId = $cfg(fn() => appr_rule_save(0, ['name' => 'M1 hiring requests', 'entity' => 'HIRING_REQUEST', 'code' => 'M1HR']));
 $mine['rule'][] = $ruleId;
-appr_level_save(['rule_id' => $ruleId, 'seq' => 1, 'label' => 'Branch manager', 'approver_role' => 'BRANCH_MANAGER', 'sla_days' => 2]);
+$cfg(fn() => appr_level_save(['rule_id' => $ruleId, 'seq' => 1, 'label' => 'Branch manager', 'approver_role' => 'BRANCH_MANAGER', 'sla_days' => 2]));
 t_ok($ruleId > 0 && count(appr_levels($ruleId)) === 1, 'M1.0 · a one-level chain is configured on the existing screen\'s tables');
 
 $form = fn(array $x = []) => array_merge([
@@ -215,7 +231,7 @@ t_ok(!$dOk, 'M1.8 · the direct decision stands aside while its approvers hold i
 t_eq(hreq_get($h4)['status'], 'UNDER_REVIEW', 'M1.8 · nothing was written');
 
 // With no rule matching, M4's direct path is untouched.
-appr_rule_set_active($ruleId, false);
+$cfg(fn() => appr_rule_set_active($ruleId, false));
 $act($uReq);
 [$ok5, , $h5] = hreq_save(0, $form(['job_title' => 'M1 no rule configured']));
 if ($ok5) $mine['h'][] = $h5;
@@ -224,7 +240,7 @@ t_eq(hreq_get($h5)['status'], 'SUBMITTED', 'M1.8 · with no rule configured the 
 $act($uMast);
 t_ok(hreq_decide($h5, true)[0], 'M1.8 · and is decided directly, as before');
 t_eq(hreq_get($h5)['status'], 'APPROVED', 'M1.8 · reaching the same state through the other door');
-appr_rule_set_active($ruleId, true);
+$cfg(fn() => appr_rule_set_active($ruleId, true));
 
 // ---------------------------------------------------------------------------
 //  9 · Audit

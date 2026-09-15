@@ -192,6 +192,10 @@ function rcc_data($f) {
         'filled'         => $filledSeats,
     ];
 
+    // M3 §27 — approval SLA, on the dashboard that already exists.
+    $d['appr'] = function_exists('appr_sla_summary') ? appr_sla_summary()
+        : ['pending' => 0, 'due_today' => 0, 'overdue' => 0, 'escalated' => 0, 'due_soon' => 0];
+
     // ---- Conversion, speed & cost ----
     $recv = max(1, $reached['RECEIVED']);
     $d['conv'] = [

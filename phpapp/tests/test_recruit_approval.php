@@ -8,16 +8,33 @@ t_section('approvals: matrix, chain, callback, SLA (Phase 6)');
 $pdo = db();
 appr_migrate();
 
+// Phase 3 · M3 §25 — approval POLICY (matrix, SLA, escalation) is now asked for at
+// the WRITE, not only by the screen, so configuring it requires an administrator —
+// which is what the product has always required. This fixture signs in as one and
+// restores the previous actor, changing nothing else about the test.
+$pdo->prepare("INSERT INTO users (username,first_name,role,is_active,email) VALUES (?,?, 'ADMIN',1,'')")
+    ->execute(['ap_cfg', 'Cfg']);
+$cfgAdmin = (int) $pdo->lastInsertId();
+$cfg = function (callable $fn) use ($cfgAdmin) {
+    $prev = $_SESSION['uid'] ?? null;
+    $_SESSION['uid'] = $cfgAdmin; current_user(true); ua(true);
+    try { return $fn(); }
+    finally {
+        if ($prev === null) unset($_SESSION['uid']); else $_SESSION['uid'] = $prev;
+        current_user(true); ua(true);
+    }
+};
+
 // --- Configure two rules for OFFER: a broad "Finance dept" rule and a narrower
 //     high-value band. The narrowest match must win. -------------------------
-$broad = appr_rule_save(0, ['name' => 'Finance offers', 'code' => 'FIN', 'entity' => 'OFFER',
-    'applies_department' => 'Finance', 'min_amount' => 0, 'max_amount' => 0, 'sort' => 10]);
-appr_level_save(['rule_id' => $broad, 'seq' => 10, 'label' => 'Branch Manager', 'approver_role' => 'BRANCH_MANAGER', 'sla_days' => 2, 'reminder_days' => 1, 'escalate_role' => 'SBU_HEAD']);
-appr_level_save(['rule_id' => $broad, 'seq' => 20, 'label' => 'Unit Head', 'approver_role' => 'SBU_HEAD', 'sla_days' => 3, 'reminder_days' => 1, 'escalate_role' => 'MASTER_ADMIN']);
+$broad = $cfg(fn() => appr_rule_save(0, ['name' => 'Finance offers', 'code' => 'FIN', 'entity' => 'OFFER',
+    'applies_department' => 'Finance', 'min_amount' => 0, 'max_amount' => 0, 'sort' => 10]));
+$cfg(fn() => appr_level_save(['rule_id' => $broad, 'seq' => 10, 'label' => 'Branch Manager', 'approver_role' => 'BRANCH_MANAGER', 'sla_days' => 2, 'reminder_days' => 1, 'escalate_role' => 'SBU_HEAD']));
+$cfg(fn() => appr_level_save(['rule_id' => $broad, 'seq' => 20, 'label' => 'Unit Head', 'approver_role' => 'SBU_HEAD', 'sla_days' => 3, 'reminder_days' => 1, 'escalate_role' => 'MASTER_ADMIN']));
 
-$highval = appr_rule_save(0, ['name' => 'High-value Finance offers', 'code' => 'FINHI', 'entity' => 'OFFER',
-    'applies_department' => 'Finance', 'min_amount' => 1000000, 'max_amount' => 0, 'sort' => 5]);
-appr_level_save(['rule_id' => $highval, 'seq' => 10, 'label' => 'Director', 'approver_role' => 'BUSINESS_DIRECTOR', 'sla_days' => 2, 'reminder_days' => 1, 'escalate_role' => 'MASTER_ADMIN']);
+$highval = $cfg(fn() => appr_rule_save(0, ['name' => 'High-value Finance offers', 'code' => 'FINHI', 'entity' => 'OFFER',
+    'applies_department' => 'Finance', 'min_amount' => 1000000, 'max_amount' => 0, 'sort' => 5]));
+$cfg(fn() => appr_level_save(['rule_id' => $highval, 'seq' => 10, 'label' => 'Director', 'approver_role' => 'BUSINESS_DIRECTOR', 'sla_days' => 2, 'reminder_days' => 1, 'escalate_role' => 'MASTER_ADMIN']));
 
 t_eq(count(appr_levels($broad)), 2, 'the broad rule has a two-level chain');
 

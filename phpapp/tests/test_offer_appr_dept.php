@@ -9,6 +9,23 @@ t_section('offer approval context — department dimension');
 if (function_exists('req_migrate')) req_migrate();
 $pdo = db();
 
+// Phase 3 · M3 §25 — approval POLICY (matrix, SLA, escalation) is now asked for at
+// the WRITE, not only by the screen, so configuring it requires an administrator —
+// which is what the product has always required. This fixture signs in as one and
+// restores the previous actor, changing nothing else about the test.
+$pdo->prepare("INSERT INTO users (username,first_name,role,is_active,email) VALUES (?,?, 'ADMIN',1,'')")
+    ->execute(['oad_cfg', 'Cfg']);
+$cfgAdmin = (int) $pdo->lastInsertId();
+$cfg = function (callable $fn) use ($cfgAdmin) {
+    $prev = $_SESSION['uid'] ?? null;
+    $_SESSION['uid'] = $cfgAdmin; current_user(true); ua(true);
+    try { return $fn(); }
+    finally {
+        if ($prev === null) unset($_SESSION['uid']); else $_SESSION['uid'] = $prev;
+        current_user(true); ua(true);
+    }
+};
+
 // A requisition with a DEPARTMENT but no SBU.
 $pdo->prepare("INSERT INTO requisitions (req_code,designation,department,grade,sbu,status,created_at) VALUES ('RQ-DPT','QA Engineer','Quality','M2','','OPEN', ?)")->execute([date('c')]);
 $rq = (int)$pdo->lastInsertId();
@@ -21,8 +38,8 @@ $ctx = offer_appr_ctx(offer_get($oid));
 t_eq($ctx['department'], 'Quality', "the offer context's department comes from the requisition's department, not the SBU");
 
 // End to end: a rule keyed on that department must route the offer.
-$rule = appr_rule_save(0, ['name' => 'Quality offers', 'entity' => 'OFFER', 'applies_department' => 'Quality']);
-appr_level_save(['rule_id' => $rule, 'seq' => 10, 'label' => 'Head', 'approver_role' => 'MASTER_ADMIN', 'sla_days' => 2, 'reminder_days' => 1]);
+$rule = $cfg(fn() => appr_rule_save(0, ['name' => 'Quality offers', 'entity' => 'OFFER', 'applies_department' => 'Quality']));
+$cfg(fn() => appr_level_save(['rule_id' => $rule, 'seq' => 10, 'label' => 'Head', 'approver_role' => 'MASTER_ADMIN', 'sla_days' => 2, 'reminder_days' => 1]));
 offer_submit($oid);
 t_ok(appr_open('OFFER', $oid) !== null, 'an approval rule keyed on Department routes the offer (regression)');
 

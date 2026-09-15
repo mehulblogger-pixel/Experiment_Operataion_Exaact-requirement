@@ -146,6 +146,15 @@ function office_holidays_flush() { office_holidays(-1, null, null, true); }
 
 function office_holidays($officeId, $from = null, $to = null, $flush = false) {
     static $cache = [];
+    static $epoch = -1;
+    // Phase 3 · M3 — every cache in this application must be keyed on db_epoch().
+    // One database per tenant means the connection under our feet changes between
+    // requests, and a static array that does not notice is a cross-tenant leak —
+    // exactly the class of defect proved in Phase 2 M2. This cache had no epoch,
+    // so a cron run or a test process that touched two workspaces would answer the
+    // second one with the first one's public holidays. M3 computes approval due
+    // dates from this table, so M3 fixes it.
+    if ($epoch !== db_epoch()) { $cache = []; $epoch = db_epoch(); }
     if ($flush) { $cache = []; return []; }
     $officeId = (int)$officeId;
     $key = $officeId . '|' . (string)$from . '|' . (string)$to;

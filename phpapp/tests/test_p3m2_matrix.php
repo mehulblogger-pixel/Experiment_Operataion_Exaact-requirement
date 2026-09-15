@@ -37,8 +37,24 @@ $uFar   = $mk('m2_far',   'BRANCH_MANAGER', 0, 992, $HR);
 $uMast  = $mk('m2_master','ADMIN',          1, 991, '');
 $uPlain = $mk('m2_plain', 'INSPECTOR',      0, 991, 'mod.hiring.view');
 
-$rule = function (array $x = []) use (&$mine) {
-    $id = appr_rule_save(0, array_merge(['entity' => 'HIRING_REQUEST', 'name' => 'r'], $x));
+// Phase 3 · M3 §25 — approval POLICY (matrix, SLA, escalation) may only be written
+// by an administrator, and that is now asked at the write rather than only by the
+// screen. These fixtures used to configure policy with nobody signed in, which the
+// product has never permitted; they now do what the comment always claimed and act
+// as the administrator. The acting user is restored afterwards, so every other
+// assertion below still runs as whoever it was written for.
+$cfg = function (callable $fn) use (&$uMast) {
+    $prev = $_SESSION['uid'] ?? null;
+    $_SESSION['uid'] = $uMast; current_user(true); ua(true);
+    try { return $fn(); }
+    finally {
+        if ($prev === null) unset($_SESSION['uid']); else $_SESSION['uid'] = $prev;
+        current_user(true); ua(true);
+    }
+};
+
+$rule = function (array $x = []) use (&$mine, $cfg) {
+    $id = $cfg(fn() => appr_rule_save(0, array_merge(['entity' => 'HIRING_REQUEST', 'name' => 'r'], $x)));
     $mine['rule'][] = $id; return $id;
 };
 $ctx = fn(array $x = []) => array_merge(
@@ -92,10 +108,10 @@ $ranked = appr_match_all('HIRING_REQUEST', $ctx(['grade' => 'SENIOR']));
 t_ok(count($ranked) >= 3, 'M2.2 · the runners-up are visible to the administrator, not hidden');
 
 // Inactive and out-of-date rules are ignored.
-appr_rule_set_active($rTieB, false);
+$cfg(fn() => appr_rule_set_active($rTieB, false));
 t_eq((int) appr_match('HIRING_REQUEST', $ctx(['grade' => 'SENIOR']))['id'], $rTieA,
      'M2.2 · an inactive rule is ignored');
-appr_rule_set_active($rTieB, true);
+$cfg(fn() => appr_rule_set_active($rTieB, true));
 $future = date('Y-m-d', strtotime('+30 days'));
 $past   = date('Y-m-d', strtotime('-30 days'));
 $rFuture = $rule(['name' => 'M2 not yet', 'applies_position' => 'WELDER', 'effective_from' => $future, 'sort' => 1]);
@@ -113,10 +129,10 @@ t_eq((int) appr_match('HIRING_REQUEST', $ctx(['position' => 'RIGGER']))['id'], $
 //  3 · Orphan approver roles (M1 Finding 3)
 // ---------------------------------------------------------------------------
 t_section('M2.3 · a policy nobody can action');
-appr_level_save(['rule_id' => $rGlobal, 'seq' => 1, 'label' => 'Branch manager', 'approver_role' => 'BRANCH_MANAGER']);
+$cfg(fn() => appr_level_save(['rule_id' => $rGlobal, 'seq' => 1, 'label' => 'Branch manager', 'approver_role' => 'BRANCH_MANAGER']));
 t_eq(count(appr_orphan_levels($rGlobal)), 0, 'M2.3 · a level whose role somebody holds is not an orphan');
 $rOrphan = $rule(['name' => 'M2 orphan', 'applies_grade' => 'EXEC', 'sort' => 5]);
-appr_level_save(['rule_id' => $rOrphan, 'seq' => 1, 'label' => 'Finance', 'approver_role' => 'FINANCE']);
+$cfg(fn() => appr_level_save(['rule_id' => $rOrphan, 'seq' => 1, 'label' => 'Finance', 'approver_role' => 'FINANCE']));
 // The orphan condition is created BY CONSTRUCTION rather than by assuming the
 // role is unused: the whole suite shares one database and earlier files create
 // Finance users, so a test that assumed their absence passed alone and failed in
@@ -217,8 +233,8 @@ appr_delegation_revoke($cId);
 //  6 · Delegation cannot defeat segregation of duties (§23)
 // ---------------------------------------------------------------------------
 t_section('M2.6 · delegation never beats segregation');
-appr_level_save(['rule_id' => $rGlobal, 'seq' => 1, 'label' => 'Branch manager', 'approver_role' => 'BRANCH_MANAGER',
-                 'level_id' => (appr_levels($rGlobal)[0]['id'] ?? 0)]);
+$cfg(fn() => appr_level_save(['rule_id' => $rGlobal, 'seq' => 1, 'label' => 'Branch manager', 'approver_role' => 'BRANCH_MANAGER',
+                 'level_id' => (appr_levels($rGlobal)[0]['id'] ?? 0)]));
 $act($uReq);
 $form = ['job_title' => 'M2 welder', 'quantity' => 1, 'office_id' => 991, 'priority' => 'NORMAL', 'approval_required' => 1];
 [$hOk, , $h1] = hreq_save(0, $form);
@@ -296,7 +312,7 @@ t_eq(count($ok2), 1, 'M2.6c · and it IS in the queue of somebody who may act on
 t_section('M2.6d · a live request carries its branch into the matcher');
 $act($uMast);
 $rAhm = $rule(['name' => 'M2 Ahmedabad only', 'applies_office_id' => 991, 'sort' => 2]);
-appr_level_save(['rule_id' => $rAhm, 'seq' => 1, 'label' => 'Branch manager', 'approver_role' => 'BRANCH_MANAGER']);
+$cfg(fn() => appr_level_save(['rule_id' => $rAhm, 'seq' => 1, 'label' => 'Branch manager', 'approver_role' => 'BRANCH_MANAGER']));
 $act($uReq);
 [$bOk2, , $hB] = hreq_save(0, array_merge($form, ['job_title' => 'M2 branch routed', 'office_id' => 991]));
 if ($bOk2) $mine['h'][] = $hB;
@@ -314,7 +330,7 @@ t_section('M2.7 · the applied policy is remembered');
 $apDone = hreq_approval($h1);
 t_ok((int) $apDone['rule_id'] > 0, 'M2.7 · the chain records WHICH policy required this approval');
 t_eq((string) $apDone['rule_name'], 'M2 global', 'M2.7 · …by name as well as by id, so a later rename still reads correctly');
-appr_rule_save($rGlobal, ['name' => 'M2 global RENAMED']);
+$cfg(fn() => appr_rule_save($rGlobal, ['name' => 'M2 global RENAMED']));
 $apAfter = hreq_approval($h1);
 t_eq((string) $apAfter['rule_name'], 'M2 global', 'M2.7 · renaming the rule does not rewrite the finished chain');
 t_eq((int) $apAfter['rule_id'], (int) $apDone['rule_id'], 'M2.7 · nor its policy reference');
@@ -341,7 +357,7 @@ setting_set('modules_off', $offWas); licence_disabled(true); ua(true);
 // A partial update must not erase conditions (§34).
 $act($uMast);
 $before = appr_rule($rBranch);
-appr_rule_save($rBranch, ['name' => 'M2 renamed only']);
+$cfg(fn() => appr_rule_save($rBranch, ['name' => 'M2 renamed only']));
 $after = appr_rule($rBranch);
 t_eq((string) $after['applies_department'], (string) $before['applies_department'],
      'M2.8 · a partial update keeps the department condition');

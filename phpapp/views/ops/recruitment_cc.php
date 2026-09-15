@@ -190,6 +190,19 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
     <a class="kpi" href="/availability"><div class="l">Working on site now</div><div class="v tnum"><?= (int)($PL['working'] ?? 0) ?></div><div class="dd">deployed across live projects ›</div></a>
   </div>
 
+  <!-- M3 §27 — the approval backlog, on the existing dashboard rather than a new
+       one. "Overdue" includes the escalated ones: an escalation is an overdue
+       approval that has been chased, not a different kind of item. -->
+  <?php $A = $d['appr'] ?? []; if ((int)($A['pending'] ?? 0) > 0): ?>
+  <div class="band" style="margin-top:12px"><h2>Approvals</h2><span class="bd">— who is waiting, and how late it is</span></div>
+  <div class="kpis k4">
+    <a class="kpi" href="/my-approvals"><div class="l">Awaiting approval</div><div class="v tnum"><?= (int)($A['pending'] ?? 0) ?></div><div class="dd">steps with an approver now ›</div></a>
+    <a class="kpi" href="/my-approvals"><div class="l">Due today</div><div class="v tnum"><?= (int)($A['due_today'] ?? 0) ?></div><div class="dd">last day to act ›</div></a>
+    <a class="kpi bad" href="/my-approvals"><div class="l">Overdue</div><div class="v tnum"><?= (int)($A['overdue'] ?? 0) ?></div><div class="dd">past the agreed SLA ›</div></a>
+    <a class="kpi bad" href="/my-approvals"><div class="l">Escalated</div><div class="v tnum"><?= (int)($A['escalated'] ?? 0) ?></div><div class="dd">chased to the escalation contact ›</div></a>
+  </div>
+  <?php endif; ?>
+
   <!-- 2. CONVERSION, SPEED & COST -->
   <div class="band"><h2>Conversion, speed &amp; cost</h2><span class="bd">— how well and how fast the funnel works</span></div>
   <div class="kpis k4">
