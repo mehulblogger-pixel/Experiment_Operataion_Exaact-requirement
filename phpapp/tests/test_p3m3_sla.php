@@ -371,6 +371,12 @@ $pdo->prepare("UPDATE approval_delegations SET office_id=NULL WHERE id=?")->exec
 t_ok(in_array('m3deleg@demo.test', appr_step_recipients($sD, $apD), true),
      'M3.8 · an unscoped delegation still works everywhere — existing behaviour intact');
 
+$pdo->prepare("UPDATE users SET is_active=0 WHERE id=?")->execute([$uDeleg]);
+t_ok(!in_array('m3deleg@demo.test', appr_step_recipients($sD, $apD), true),
+     'M3.8 · an INACTIVE DELEGATE is not written to either — a mailbox is not a person');
+$pdo->prepare("UPDATE users SET is_active=1 WHERE id=?")->execute([$uDeleg]);
+t_ok(in_array('m3deleg@demo.test', appr_step_recipients($sD, $apD), true), 'M3.8 · reactivating them restores it');
+
 $act($uMast); appr_delegation_revoke((int) $dId);
 t_ok(!in_array('m3deleg@demo.test', appr_step_recipients($sD, $apD), true),
      'M3.8 · a REVOKED delegation stops the notification');
@@ -410,14 +416,24 @@ t_ok(!in_array($hD, array_map(fn($w) => (int) $w['entity_id'], appr_waiting_on_o
 $act($uPlain);
 t_eq(count(appr_waiting_on_others()), 0, 'M3.9 · somebody else\'s request never appears in your waiting list');
 
-// Entitlement, on every read.
+// Entitlement, on every read. A step the scheduler WOULD act on is constructed
+// first, so "it did nothing" can only mean the gate stopped it, and never that
+// there was nothing to do.
+$hG = $raise(['job_title' => 'M3 gated']);
+$apG = hreq_approval($hG);
+$sG = appr_current_step($apG);
+$pdo->prepare("UPDATE recruit_approval_steps SET sla_due=?, reminder_at=? WHERE id=?")
+    ->execute([$ago(2), $ago(3), (int) $sG['id']]);
 $act($uReq);
 setting_set('modules_off', 'hr'); licence_disabled(true); ua(true);
 t_eq(count(appr_waiting_on_others()), 0, 'M3.9 · with the module switched off the waiting list is empty (§29)');
 t_eq(appr_sla_summary()['pending'], 0, 'M3.9 · and the dashboard KPI answers nothing (§27)');
 t_eq(appr_tick(), 0, 'M3.9 · and the scheduler does nothing for an unentitled workspace');
+t_eq((int) ops_val("SELECT escalated FROM recruit_approval_steps WHERE id=?", [(int) $sG['id']]), 0,
+     'M3.9 · …the overdue step it WOULD have escalated is untouched');
 setting_set('modules_off', $offWas); licence_disabled(true); ua(true);
 t_ok(appr_sla_summary()['pending'] >= 1, 'M3.9 · with it switched back on, the KPI answers again');
+t_ok(appr_tick() >= 1, 'M3.9 · and that same step IS acted on — entitlement was the only thing stopping it');
 
 // ---------------------------------------------------------------------------
 //  M3.10 · NOTIFICATIONS (§20, §21, §24)

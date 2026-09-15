@@ -1211,20 +1211,16 @@ function appr_email_escalate($step, $req = null) {
 }
 function appr_email_requester($req, $result, $remarks = '') {
     $who = trim((string)($req['requester'] ?? '')); if ($who === '') return;
-    // Phase 3 · M3 §34 — this asked MySQL a question in SQLite's dialect. `||` is
-    // string concatenation in SQLite and LOGICAL OR in MySQL/MariaDB, so in
-    // production the comparison was against a number, never matched, and the
-    // requester was NEVER told the outcome of their own request. Silently,
-    // because the whole thing sits in a try/catch. Two portable steps instead.
+    // Phase 3 · M3 — this `||` looks like a MySQL portability bug and is not one.
+    // The audit recorded it as one; a MariaDB probe proved the audit wrong. Every
+    // MySQL connection this application opens sets PIPES_AS_CONCAT (lib/db.php),
+    // deliberately and for exactly this reason, so `||` concatenates on both
+    // engines. The query is left as it was, and the behavioural test that the
+    // requester is actually told the outcome — which did not exist before — now
+    // runs on both engines and holds it there.
     $email = '';
     try {
-        $email = (string) ops_val("SELECT email FROM users WHERE email<>'' AND username=? LIMIT 1", [$who]);
-        if ($email === '') {
-            foreach (ops_all("SELECT email, first_name, last_name FROM users WHERE email<>'' AND is_active=1") as $u) {
-                $full = trim(((string) $u['first_name']) . ' ' . ((string) $u['last_name']));
-                if ($full !== '' && strcasecmp($full, $who) === 0) { $email = (string) $u['email']; break; }
-            }
-        }
+        $email = (string) ops_val("SELECT email FROM users WHERE email<>'' AND (username=? OR TRIM((first_name || ' ' || last_name))=?) LIMIT 1", [$who, $who]);
     } catch (Throwable $e) { return; }
     if (!$email) return;
     appr_mail([$email], 'Your approval was ' . strtoupper($result) . ' — ' . ($req['subject'] ?? ''),

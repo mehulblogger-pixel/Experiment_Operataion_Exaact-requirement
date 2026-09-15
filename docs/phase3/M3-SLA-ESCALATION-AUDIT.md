@@ -116,7 +116,7 @@ rejected in M1/M2.
 
 ## 15. Gaps that genuinely require implementation
 
-Ten, each with the evidence that it is real.
+Ten were recorded. **One (G5) was later disproved by a probe and withdrawn — see below.** Nine are real, each with the evidence.
 
 ### G1 · The SLA clock starts for EVERY step when the chain is created — §7 violation
 `appr_start()` stamps `sla_due` and `reminder_at` on **all** levels at once, from
@@ -143,12 +143,25 @@ not at the write.
 ### G4 · A delegate is never notified — §16, §11
 See §10 above. The person the system expects to act is not told to act.
 
-### G5 · The requester is never told the outcome on MariaDB — §34
-`appr_email_requester()` matches on `TRIM((first_name || ' ' || last_name))`.
-`||` is string concatenation in SQLite and **logical OR in MySQL/MariaDB**, so
-in production the comparison is against a number and never matches. Silent,
-because the call is wrapped in `try/catch`. **A production-only defect that
-SQLite testing cannot see.**
+### ~~G5 · The requester is never told the outcome on MariaDB~~ — **WITHDRAWN. THIS AUDIT WAS WRONG.**
+
+The audit originally recorded this as a production defect: `appr_email_requester()`
+matches on `TRIM((first_name || ' ' || last_name))`, and `||` is string
+concatenation in SQLite but logical OR in MySQL/MariaDB, so the comparison would
+be against a number and never match.
+
+**A MariaDB probe proved the audit wrong.** Every MySQL connection this
+application opens sets `SET SESSION sql_mode = 'PIPES_AS_CONCAT'`
+(`lib/db.php:77`) — deliberately, and with a comment giving exactly this reason.
+`||` concatenates on both engines. I had found a platform-level protection by
+reading one file and not the other.
+
+The mutation that restored the "old" query **survived on MariaDB**, which is what
+sent me to check. The change was reverted; the query is as it always was. What is
+kept is the behavioural test that the requester is genuinely told the outcome of
+their own request — which did not exist before, and now runs on both engines.
+
+**Nine genuine gaps, not ten.**
 
 ### G6 · A step is marked escalated even when nobody was notified — §24, §20
 `appr_tick()` sets `escalated=1` unconditionally after calling
