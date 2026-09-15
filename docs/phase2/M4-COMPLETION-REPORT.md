@@ -185,12 +185,16 @@ first.
 All eight from §44, plus a ninth for the new segregation rule. Detail and
 results in `M4-TEST-RESULTS.md`.
 
-**29. SQLite?**
-Whole suite — **8709 passed, 0 failed**, including all 77 M4 assertions.
+**29. SQLite? — UPDATED after the correction**
+Whole suite — **8816 passed, 0 failed**, including the 78 M4 assertions and the
+106 M4-correction assertions. (Originally 8709/0 with 77.)
 
-**30. MariaDB/MySQL?**
-Whole suite on MariaDB 10.11.14 over TCP — **8710 passed, 0 failed**, including
-all 77 M4 assertions. Observed, not inferred from SQLite.
+**30. MariaDB/MySQL? — UPDATED after the correction**
+Whole suite on MariaDB 10.11.14 over TCP, into a **freshly created database** so
+every migration ran from nothing — **8817 passed, 0 failed**, including the 78 M4
+assertions and the 106 M4-correction assertions, which were confirmed present in
+the MariaDB output rather than assumed. Observed, not inferred from SQLite.
+(Originally 8710/0 with 77.)
 
 **31. Modules regression-tested?**
 All of them: Operations, Quality, Reporting, Money, Sales, Recruitment,

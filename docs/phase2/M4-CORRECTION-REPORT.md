@@ -210,9 +210,29 @@ Test D asserts, for each of the five functions, that the capability, the branch
 scope and the state/input validation all appear **before the first write**, and
 that each one leaves an audit entry.
 
-## 13. Test results
+## 13. Test results — observed, both engines, identical source
 
-*(filled in from the observed runs — see `M4-TEST-RESULTS.md`)*
+| Engine | Whole suite | M4 correction suite |
+|---|---|---|
+| SQLite | **8816 passed, 0 failed** | 106 assertions, 0 failed |
+| **MariaDB 10.11.14** (authoritative, fresh database) | **8817 passed, 0 failed** | **106 assertions, 0 failed** |
+
+The correction suite was confirmed to have **actually executed on MariaDB** — its
+four sections appear in the MariaDB output and its assertions were counted inside
+that section on both engines. The MariaDB database was created fresh, so every
+migration ran from nothing. No existing test was weakened, deleted or skipped;
+one existing assertion was **followed** through a refactor (the scope decision
+moved into `hreq_scope_reason()`) and a second assertion added alongside it.
+
+**Mutation battery: eleven mutations, ten caught, one survived.** The full table
+— protection removed, expected, actual, verdict — is in `M4-TEST-RESULTS.md` §4.
+The single survival removes only the outer route-gate wrapper; the two mutations
+that remove the real protection (the scope **decision**, and the **write-time**
+check) are both caught. That survival is acceptable *because the redundancy is
+proved*, and it is worth being exact about the history: the **original** form of
+that mutation, when the gate genuinely was the only check, **survived and
+exposed the gap this correction fixed**. It became defence-in-depth only after
+the fix.
 
 ## 14. Architectural cleanliness (§8), and what is NOT here
 
@@ -234,3 +254,7 @@ that each one leaves an audit entry.
 **No Phase-3 work has been started.** No approval routing, matrix, SLA,
 delegation, escalation, inbox or notification; no re-approval path; no policy
 switch; no recruiter assignment; no Marketplace change; no Job Profile master.
+
+---
+
+## M4 COMPLETE — HARD STOP — READY FOR PHASE 3

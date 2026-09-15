@@ -12,12 +12,33 @@
 
 ## 2. Results
 
+### Original M4 (commit 9b0b7ef)
+
 | Engine | Passed | Failed | Skips |
 |---|---|---|---|
-| SQLite | **8709** | **0** | none introduced |
-| MariaDB 10.11.14 | **8710** | **0** | none introduced |
+| SQLite | 8709 | 0 | none introduced |
+| MariaDB 10.11.14 | 8710 | 0 | none introduced |
 
-> Assertions, not test cases. M4's 77 assertions cover roughly 30 scenarios.
+### After the correction (commit 1110fdf) — both engines, identical source
+
+| Engine | Passed | Failed | M4 correction suite | Skips |
+|---|---|---|---|---|
+| SQLite | **8816** | **0** | 106 assertions, 0 failed | none introduced |
+| **MariaDB 10.11.14** (authoritative) | **8817** | **0** | **106 assertions, 0 failed** | none introduced |
+
+The MariaDB run used a **freshly created database** (`exaact_m4d`), so every
+migration ran from nothing. The correction suite was confirmed to have actually
+executed there — its four sections (A terminology, B requestor authorization,
+C direct requisition path, D every mutation path) appear in the MariaDB output,
+and its assertions were counted inside that section on both engines: **106 on
+each**. MariaDB's total is one higher than SQLite's because of a pre-existing
+engine-specific assertion, unchanged by this work.
+
+> These are **assertions, not test cases**. The 106 correction assertions cover
+> roughly 40 scenarios; M4's own 78 cover roughly 30.
+
+An earlier MariaDB run returned 8790/0 but **started before section D existed**,
+so it is not counted and is recorded here only to say why.
 
 ## 3. What the M4 tests cover (§42)
 
