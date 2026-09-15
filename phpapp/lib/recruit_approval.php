@@ -159,6 +159,30 @@ function appr_open($entity, $entityId) {
     return ops_one("SELECT * FROM recruit_approval_requests WHERE entity=? AND entity_id=? AND status='PENDING' ORDER BY id DESC LIMIT 1", [$entity, (int)$entityId]) ?: null;
 }
 function appr_request($id) { appr_migrate(); return ops_one("SELECT * FROM recruit_approval_requests WHERE id=?", [(int)$id]) ?: null; }
+
+//  M1 CORRECTION — close any chain still open against an entity, because the
+//  entity itself has gone away (cancelled). This is not a new cancellation
+//  mechanism: every query in this engine that decides whether a chain is live
+//  already asks for status='PENDING' — appr_open(), appr_inbox(), appr_tick()
+//  and appr_act() itself — so moving the request row off PENDING closes it
+//  everywhere at once, with nothing else to change.
+//
+//  Returns the number of chains closed.
+function appr_cancel_open($entity, $entityId, $reason = '') {
+    appr_migrate();
+    $n = 0;
+    try {
+        foreach (ops_all("SELECT id FROM recruit_approval_requests WHERE entity=? AND entity_id=? AND status='PENDING'",
+                         [(string) $entity, (int) $entityId]) as $r) {
+            db()->prepare("UPDATE recruit_approval_steps SET status='CANCELLED', acted_by=?, acted_at=?, remarks=? WHERE request_id=? AND status='PENDING'")
+                ->execute([_appr_actor(), _appr_now(), substr(trim((string) $reason), 0, 400), (int) $r['id']]);
+            db()->prepare("UPDATE recruit_approval_requests SET status='CANCELLED', closed_at=? WHERE id=?")
+                ->execute([_appr_now(), (int) $r['id']]);
+            $n++;
+        }
+    } catch (Throwable $e) { /* never break the cancellation itself */ }
+    return $n;
+}
 function appr_steps($requestId) { appr_migrate(); return ops_all("SELECT * FROM recruit_approval_steps WHERE request_id=? ORDER BY seq, id", [(int)$requestId]); }
 function appr_current_step($request) {
     $s = ops_one("SELECT * FROM recruit_approval_steps WHERE request_id=? AND seq=? AND status='PENDING' ORDER BY id LIMIT 1", [(int)$request['id'], (int)$request['current_seq']]);
@@ -266,7 +290,8 @@ function appr_act($stepId, $decision, $remarks = '') {
     if ($decision === 'reject') {
         db()->prepare("UPDATE recruit_approval_steps SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE id=?")->execute([$actor,$now,substr((string)$remarks,0,400),(int)$stepId]);
         db()->prepare("UPDATE recruit_approval_requests SET status='REJECTED', closed_at=? WHERE id=?")->execute([$now,(int)$req['id']]);
-        appr_callback($req['entity'], (int)$req['entity_id'], 'REJECTED', $req);
+        $cb = appr_callback($req['entity'], (int)$req['entity_id'], 'REJECTED', $req);
+        if ($cb !== true) return appr_undo_step($stepId, $req, $cb);
         appr_email_requester($req, 'rejected', $remarks);
         return [true, 'Rejected.'];
     }
@@ -279,29 +304,59 @@ function appr_act($stepId, $decision, $remarks = '') {
         return [true, 'Approved — sent to the next approver.'];
     }
     db()->prepare("UPDATE recruit_approval_requests SET status='APPROVED', closed_at=? WHERE id=?")->execute([$now,(int)$req['id']]);
-    appr_callback($req['entity'], (int)$req['entity_id'], 'APPROVED', $req);
+    $cb = appr_callback($req['entity'], (int)$req['entity_id'], 'APPROVED', $req);
+    if ($cb !== true) return appr_undo_step($stepId, $req, $cb);
     appr_email_requester($req, 'approved', $remarks);
     return [true, 'Approved — fully cleared.'];
 }
 
+//  M1 CORRECTION — put the step and its chain back the way they were, and tell
+//  the approver what actually happened.
+//
+//  Before this, appr_act() wrote the step, closed the chain, called the callback
+//  and DISCARDED its result — so when the underlying record refused the decision
+//  (a cancelled hiring request, say) the approver was told "Approved — fully
+//  cleared" and the history kept an APPROVED step against a record that had been
+//  approved of nothing. A decision that could not be applied is not a decision,
+//  so nothing about it is left behind.
+function appr_undo_step($stepId, $req, $why) {
+    try {
+        db()->prepare("UPDATE recruit_approval_steps SET status='PENDING', acted_by='', acted_at='', remarks='' WHERE id=?")
+            ->execute([(int) $stepId]);
+        db()->prepare("UPDATE recruit_approval_requests SET status='PENDING', closed_at='' WHERE id=?")
+            ->execute([(int) $req['id']]);
+    } catch (Throwable $e) { /* the refusal below is what matters */ }
+    return [false, is_string($why) && $why !== '' ? $why : 'That decision could not be applied.'];
+}
+
 // Update the underlying entity when a chain completes.
+//
+//  M1 CORRECTION — returns TRUE when the decision was applied, or a STRING
+//  giving the reason it could not be. Only the HIRING_REQUEST branch can return
+//  a reason: the other three keep their original best-effort semantics exactly,
+//  because their SQL legitimately affects no rows in ordinary cases (an offer
+//  already approved, say) and treating that as a failure would change behaviour
+//  this correction was told not to touch.
 function appr_callback($entity, $entityId, $result, $req = null) {
     try {
+        if ($entity === 'HIRING_REQUEST') {
+            // The hiring-request layer owns its own state machine and refuses a
+            // decision on a request that is no longer open for one. That refusal
+            // must reach the approver instead of being discarded.
+            if (!function_exists('hreq_apply_decision')) return true;
+            [$ok, $msg] = hreq_apply_decision((int) $entityId, $result === 'APPROVED' ? 'APPROVED' : 'REJECTED',
+                                              _appr_actor(), (string) ($req['rule_name'] ?? ''), 'CHAIN');
+            return $ok ? true : (string) $msg;
+        }
         if ($entity === 'OFFER') {
             if ($result === 'APPROVED') db()->prepare("UPDATE job_offers SET status='APPROVED', approved_by=?, approved_at=? WHERE id=? AND status IN ('PENDING_APPROVAL','DRAFT')")->execute(['Approval chain', _appr_now(), (int)$entityId]);
             else db()->prepare("UPDATE job_offers SET status='DRAFT' WHERE id=? AND status='PENDING_APPROVAL'")->execute([(int)$entityId]);
-        } elseif ($entity === 'HIRING_REQUEST') {
-            // Hand back to the hiring-request layer rather than writing its table
-            // from here: that layer owns the state machine, the audit entry and
-            // the "may this now be executed" question. One writer, not two.
-            if (function_exists('hreq_apply_decision'))
-                hreq_apply_decision((int) $entityId, $result === 'APPROVED' ? 'APPROVED' : 'REJECTED',
-                                    _appr_actor(), (string) ($req['rule_name'] ?? ''), 'CHAIN');
         } elseif ($entity === 'REQUISITION') {
             if ($result === 'APPROVED') db()->prepare("UPDATE requisitions SET status='approved', approved_by=? WHERE id=?")->execute(['Approval chain', (int)$entityId]);
             else db()->prepare("UPDATE requisitions SET status='on_hold' WHERE id=?")->execute([(int)$entityId]);
         }
     } catch (Throwable $e) { /* callback is best-effort */ }
+    return true;
 }
 
 // ---- Inbox (My approvals) --------------------------------------------------

@@ -36,7 +36,7 @@ M1 mapped to it rather than inventing `APPROVAL_PENDING` beside it.
 | `SUBMITTED` → `UNDER_REVIEW` | the system | only where an administrator's rule matches; `approval_ref` records the chain |
 | `UNDER_REVIEW` → `APPROVED`/`REJECTED` | the step's approver, past the guard | through `appr_callback()` → the one writer |
 | `SUBMITTED` → `APPROVED`/`REJECTED` | the module + a management role, past segregation | directly; refused while a chain is open |
-| any open state → `CANCELLED` | `mod.hiring.edit` + scope | |
+| any open state → `CANCELLED` | `mod.hiring.edit` + scope | **and any open approval chain is closed with it** — the step leaves the approver's inbox, the SLA reminders stop, and the decision can no longer be taken |
 
 ## What may never happen
 
@@ -46,6 +46,7 @@ M1 mapped to it rather than inventing `APPROVAL_PENDING` beside it.
 | recruit from `DRAFT`, `SUBMITTED`, `UNDER_REVIEW`, `REJECTED` or `CANCELLED` | refused by `hreq_is_executable()` |
 | approve an already-rejected or cancelled request | refused by the one writer |
 | act on the same approval step twice (replay) | refused — the step is no longer `PENDING` |
+| approve a step whose request was cancelled | refused — the chain was closed with the request; and if a chain is ever live against an undecidable request, the refusal reaches the approver and the step is put back, so **no approved step is left behind** |
 | decide directly while a chain is open | refused — the chain is authoritative |
 | edit an `APPROVED` / `REJECTED` / `CANCELLED` request | refused (M4, preserved) |
 

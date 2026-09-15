@@ -272,6 +272,89 @@ t_ok(strpos($g, 'licence_blocks(') < strpos($g, 'hreq_in_scope('),
      'M1.10 · and asks entitlement FIRST — the order is the security property');
 
 // ---------------------------------------------------------------------------
+//  11 · M1 CORRECTION — cancelling a request closes its approval chain
+//
+//  The adversarial audit found this: hreq_cancel() knew nothing about chains, so
+//  a cancelled request left a live step in the approver's inbox, approving it
+//  reported "Approved — fully cleared", and the history kept an APPROVED step
+//  against a CANCELLED request. hreq_is_executable() held throughout, so nothing
+//  could recruit — but the record lied, which in an approval system is the part
+//  that matters.
+// ---------------------------------------------------------------------------
+t_section('M1.11 · cancelling closes the chain');
+
+$act($uReq);
+[$okC, , $hC] = hreq_save(0, $form(['job_title' => 'M1c to be cancelled mid-approval']));
+if ($okC) $mine['h'][] = $hC;
+hreq_submit($hC);
+$apC = hreq_approval($hC); $stepC = appr_current_step($apC);
+t_eq(strtoupper($apC['status']), 'PENDING', 'M1.11 · submitted — the chain is PENDING');
+$act($uAppr);
+t_eq(count(array_filter(appr_inbox(), fn($x) => (int) $x['id'] === (int) $stepC['id'])), 1,
+     'M1.11 · and the step is in the approver\'s actionable inbox');
+
+$act($uReq);
+hreq_cancel($hC, 'no longer needed');
+$apC2 = hreq_approval($hC);
+t_eq(hreq_get($hC)['status'], 'CANCELLED', 'M1.11 · the request is cancelled');
+t_ok(strtoupper($apC2['status']) !== 'PENDING', 'M1.11 · the chain is no longer open (' . $apC2['status'] . ')');
+t_eq(appr_open('HIRING_REQUEST', $hC), null, 'M1.11 · …so nothing reads it as an open chain any more');
+
+$act($uAppr);
+t_eq(count(array_filter(appr_inbox(), fn($x) => (int) $x['id'] === (int) $stepC['id'])), 0,
+     'M1.11 · it has left the approver\'s actionable inbox');
+[$okAct, $msgAct] = appr_act((int) $stepC['id'], 'approve', 'trying anyway');
+t_ok(!$okAct, 'M1.11 · and the approver cannot approve it: ' . $msgAct);
+$stepAfter = ops_one("SELECT status FROM recruit_approval_steps WHERE id=?", [(int) $stepC['id']]);
+t_ok(strtoupper($stepAfter['status']) !== 'APPROVED',
+     'M1.11 · NO approved step exists against a cancelled request (' . $stepAfter['status'] . ')');
+t_eq(hreq_get($hC)['status'], 'CANCELLED', 'M1.11 · the request is still cancelled');
+t_ok(!hreq_is_executable($hC), 'M1.11 · and still not executable');
+t_ok(!hreq_to_requisition($hC, 1)[0], 'M1.11 · so it can never become a requisition');
+// The SLA cron must not chase a withdrawn approval either.
+$pend = (int) ops_val("SELECT COUNT(*) FROM recruit_approval_steps s JOIN recruit_approval_requests r ON r.id=s.request_id
+                       WHERE r.entity='HIRING_REQUEST' AND r.entity_id=? AND r.status='PENDING' AND s.status='PENDING'", [$hC]);
+t_eq($pend, 0, 'M1.11 · and the SLA reminders have nothing left to chase');
+
+// ---------------------------------------------------------------------------
+//  12 · A failed callback is a failure — defence in depth
+//
+//  Fix A means the natural route can no longer produce a failed callback, so the
+//  guarantee is proved by FORCING one: the request is cancelled BEHIND the
+//  engine's back (straight SQL, no hreq_cancel), leaving the chain live. The one
+//  writer then refuses, and that refusal must reach the approver.
+// ---------------------------------------------------------------------------
+t_section('M1.12 · a failed callback cannot read as success');
+
+$act($uReq);
+[$okD, , $hD] = hreq_save(0, $form(['job_title' => 'M1c forced callback failure']));
+if ($okD) $mine['h'][] = $hD;
+hreq_submit($hD);
+$apD = hreq_approval($hD); $stepD = appr_current_step($apD);
+$pdo->prepare("UPDATE hiring_requests SET status='CANCELLED' WHERE id=?")->execute([$hD]);   // behind the engine's back
+t_eq(hreq_get($hD)['status'], 'CANCELLED', 'M1.12 · the request was cancelled without the chain being told');
+t_ok(appr_open('HIRING_REQUEST', $hD) !== null, 'M1.12 · so the chain is still live — the case Fix A normally prevents');
+
+$act($uAppr);
+[$okE, $msgE] = appr_act((int) $stepD['id'], 'approve', 'should not succeed');
+t_ok(!$okE, 'M1.12 · the approver is told it FAILED, not that it was approved: ' . $msgE);
+t_ok(stripos($msgE, 'approved — fully cleared') === false, 'M1.12 · …and specifically not "Approved — fully cleared"');
+$sD = ops_one("SELECT status FROM recruit_approval_steps WHERE id=?", [(int) $stepD['id']]);
+$rD = ops_one("SELECT status FROM recruit_approval_requests WHERE id=?", [(int) $apD['id']]);
+t_eq(strtoupper($sD['status']), 'PENDING', 'M1.12 · the step was put back — no approval is left behind');
+t_eq(strtoupper($rD['status']), 'PENDING', 'M1.12 · and so was the chain');
+t_eq(hreq_get($hD)['status'], 'CANCELLED', 'M1.12 · the request is untouched');
+t_ok(!hreq_is_executable($hD), 'M1.12 · and not executable');
+
+// The other approval consumers keep their original best-effort semantics.
+t_eq(appr_callback('OFFER', 999999, 'APPROVED', null), true,
+     'M1.12 · an OFFER callback still reports success even when it matches no row — behaviour preserved');
+t_eq(appr_callback('REQUISITION', 999999, 'APPROVED', null), true,
+     'M1.12 · and so does a REQUISITION callback');
+t_eq(appr_callback('SALARY', 999999, 'APPROVED', null), true,
+     'M1.12 · and SALARY, which has no branch at all');
+
+// ---------------------------------------------------------------------------
 //  Clean up.
 // ---------------------------------------------------------------------------
 $_SESSION = $origSess; current_user(true); ua(true);

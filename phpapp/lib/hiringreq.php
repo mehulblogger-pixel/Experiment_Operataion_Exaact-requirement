@@ -613,8 +613,18 @@ function hreq_cancel($id, $note = '') {
     if (strtoupper((string) $r['status']) === 'CANCELLED') return [true, 'Already cancelled.'];
     db()->prepare("UPDATE hiring_requests SET status='CANCELLED', decision_note=?, updated_by=?, updated_at=? WHERE id=?")
         ->execute([substr(trim((string) $note), 0, 400), hreq_who(), hreq_now(), (int) $id]);
+    // M1 CORRECTION — a cancelled request must not leave live approval work
+    // behind it. M4 wrote this function before approval chains existed and M1
+    // connected chains without revisiting it, so the step stayed in the
+    // approver's inbox and acting on it reported a false success. Closing the
+    // chain through the engine's own helper takes it out of the inbox, out of
+    // the SLA reminders and out of reach of a decision, all at once.
+    $closed = function_exists('appr_cancel_open')
+        ? appr_cancel_open('HIRING_REQUEST', (int) $id, 'The hiring request was cancelled.') : 0;
     if (function_exists('act_log'))
-        act_log('HIRING_REQUEST', (int) $id, 'SYSTEM', 'Cancelled', ['auto' => 1, 'outcome' => 'CANCELLED', 'body' => trim((string) $note)]);
+        act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                'Cancelled' . ($closed > 0 ? ' — approval withdrawn from its approvers' : ''),
+                ['auto' => 1, 'outcome' => 'CANCELLED', 'body' => trim((string) $note)]);
     return [true, 'Request cancelled.'];
 }
 

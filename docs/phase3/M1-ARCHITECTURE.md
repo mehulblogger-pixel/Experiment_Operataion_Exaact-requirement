@@ -41,6 +41,21 @@
                                    hreq_to_requisition()
 ```
 
+## 2b. Cancellation closes the chain (M1 correction)
+
+`hreq_cancel()` calls `appr_cancel_open('HIRING_REQUEST', id)`. That is not a new
+cancellation mechanism: **every** query in the engine that decides whether a
+chain is live already asks for `status='PENDING'` — `appr_open()`,
+`appr_inbox()`, `appr_tick()` and `appr_act()` — so moving the request row off
+`PENDING` closes it in the inbox, in the SLA reminders and at the decision, all
+at once, with nothing else to change.
+
+And `appr_act()` no longer discards its callback's result. A callback that could
+not apply the decision returns the reason; `appr_undo_step()` puts the step and
+the chain back and the approver is told it failed. The other three entities keep
+their original best-effort semantics exactly — only `HIRING_REQUEST` can report a
+reason — because their SQL legitimately matches no rows in ordinary cases.
+
 ## 3. Two doors, one writer
 
 A hiring request can be decided two ways, and they must never disagree:
