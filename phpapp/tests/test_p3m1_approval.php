@@ -308,6 +308,10 @@ t_ok(!$okAct, 'M1.11 · and the approver cannot approve it: ' . $msgAct);
 $stepAfter = ops_one("SELECT status FROM recruit_approval_steps WHERE id=?", [(int) $stepC['id']]);
 t_ok(strtoupper($stepAfter['status']) !== 'APPROVED',
      'M1.11 · NO approved step exists against a cancelled request (' . $stepAfter['status'] . ')');
+// …and it says so in the history rather than sitting there reading "Awaiting"
+// for ever. Mutation C2 survived until this assertion existed.
+t_eq(strtoupper($stepAfter['status']), 'CANCELLED',
+     'M1.11 · the step itself records that it was withdrawn, not left pending');
 t_eq(hreq_get($hC)['status'], 'CANCELLED', 'M1.11 · the request is still cancelled');
 t_ok(!hreq_is_executable($hC), 'M1.11 · and still not executable');
 t_ok(!hreq_to_requisition($hC, 1)[0], 'M1.11 · so it can never become a requisition');
@@ -345,6 +349,24 @@ t_eq(strtoupper($sD['status']), 'PENDING', 'M1.12 · the step was put back — n
 t_eq(strtoupper($rD['status']), 'PENDING', 'M1.12 · and so was the chain');
 t_eq(hreq_get($hD)['status'], 'CANCELLED', 'M1.12 · the request is untouched');
 t_ok(!hreq_is_executable($hD), 'M1.12 · and not executable');
+
+// The REJECT path carries the same discard risk and needs its own proof —
+// mutation C5 survived until this existed, because only approve was exercised.
+$act($uReq);
+[$okF, , $hF] = hreq_save(0, $form(['job_title' => 'M1c forced callback failure on reject']));
+if ($okF) $mine['h'][] = $hF;
+hreq_submit($hF);
+$apF = hreq_approval($hF); $stepF = appr_current_step($apF);
+$pdo->prepare("UPDATE hiring_requests SET status='CANCELLED' WHERE id=?")->execute([$hF]);
+$act($uAppr);
+[$okG, $msgG] = appr_act((int) $stepF['id'], 'reject', 'should not succeed either');
+t_ok(!$okG, 'M1.12 · a REJECT whose callback fails is also reported as failure: ' . $msgG);
+t_ok(stripos($msgG, 'rejected.') === false, 'M1.12 · …and not as "Rejected."');
+$sF = ops_one("SELECT status FROM recruit_approval_steps WHERE id=?", [(int) $stepF['id']]);
+$rF = ops_one("SELECT status FROM recruit_approval_requests WHERE id=?", [(int) $apF['id']]);
+t_eq(strtoupper($sF['status']), 'PENDING', 'M1.12 · the rejected step was put back too');
+t_eq(strtoupper($rF['status']), 'PENDING', 'M1.12 · and so was its chain');
+t_eq(hreq_get($hF)['status'], 'CANCELLED', 'M1.12 · the request is untouched by the failed rejection');
 
 // The other approval consumers keep their original best-effort semantics.
 t_eq(appr_callback('OFFER', 999999, 'APPROVED', null), true,
