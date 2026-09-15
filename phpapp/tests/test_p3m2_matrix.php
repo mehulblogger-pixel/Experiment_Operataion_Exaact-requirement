@@ -251,6 +251,62 @@ t_ok($yOk, 'M2.6 · so the delegate approves it: ' . $yMsg);
 t_eq(hreq_get($h1)['status'], 'APPROVED', 'M2.6 · and the request is approved');
 t_ok(hreq_is_executable($h1), 'M2.6 · and only now executable');
 
+// D12 — a delegation cannot hand over an authority the delegator never had.
+//  Mutation D12 survived until this existed: every delegation test used a
+//  delegator who genuinely held the approver's role, so dropping the role check
+//  changed nothing observable.
+t_section('M2.6b · delegation grants only what the delegator holds');
+$act($uMast);
+$uNobody = $mk('m2_nobody', 'INSPECTOR', 0, 991, $HR);   // holds no approver role
+$uVia    = $mk('m2_via',    'INSPECTOR', 0, 991, $HR);
+[$nOk, , $nId] = appr_delegation_save(0, ['delegator_user_id' => $uNobody, 'delegate_user_id' => $uVia,
+    'entity' => 'HIRING_REQUEST', 'effective_from' => $today]);
+if ($nOk) $mine['del'][] = $nId;
+$act($uReq);
+[$gOk, , $hG] = hreq_save(0, array_merge($form, ['job_title' => 'M2 authority check']));
+if ($gOk) $mine['h'][] = $hG;
+hreq_submit($hG);
+$apG = hreq_approval($hG); $stepG = appr_current_step($apG);
+$act($uVia);
+t_ok(in_array($uNobody, appr_delegators_for($uVia, 'HIRING_REQUEST', 991), true),
+     'M2.6b · the delegation itself is live');
+t_ok(!appr_can_act(appr_step_context($stepG, $apG)),
+     'M2.6b · but the delegator holds no approver role, so the delegate may NOT act');
+t_ok(!appr_act((int) $stepG['id'], 'approve')[0], 'M2.6b · and the decision is refused');
+t_eq(hreq_get($hG)['status'], 'UNDER_REVIEW', 'M2.6b · nothing was written');
+appr_delegation_revoke($nId);
+
+// D13 — the approval QUEUE must show only what the person may act on. This is
+//  M1 Finding 2, closed in M2; it survived mutation until it was a test rather
+//  than an ad-hoc probe.
+t_section('M2.6c · the queue shows only what you may act on');
+$act($uFar);                                   // holds the approver role, wrong branch
+t_ok(appr_can_act(appr_step_context($stepG, $apG)),
+     'M2.6c · the foreign-branch user does hold the approver role');
+t_ok(appr_guard($apG) !== '', 'M2.6c · but may not act on this branch\'s request');
+$far = array_filter(appr_inbox(), fn($x) => (int) $x['id'] === (int) $stepG['id']);
+t_eq(count($far), 0, 'M2.6c · so it is NOT in their queue — seeing and acting are the same question');
+$act($uAppr);                                  // right branch, right role
+$ok2 = array_filter(appr_inbox(), fn($x) => (int) $x['id'] === (int) $stepG['id']);
+t_eq(count($ok2), 1, 'M2.6c · and it IS in the queue of somebody who may act on it');
+
+// D18 — the branch really reaches the matcher from a live hiring request. The
+//  matrix tests call appr_match() with a context they build themselves, so
+//  blanking office_id in hreq_appr_ctx() changed nothing they could see.
+t_section('M2.6d · a live request carries its branch into the matcher');
+$act($uMast);
+$rAhm = $rule(['name' => 'M2 Ahmedabad only', 'applies_office_id' => 991, 'sort' => 2]);
+appr_level_save(['rule_id' => $rAhm, 'seq' => 1, 'label' => 'Branch manager', 'approver_role' => 'BRANCH_MANAGER']);
+$act($uReq);
+[$bOk2, , $hB] = hreq_save(0, array_merge($form, ['job_title' => 'M2 branch routed', 'office_id' => 991]));
+if ($bOk2) $mine['h'][] = $hB;
+hreq_submit($hB);
+$apB = hreq_approval($hB);
+t_ok($apB !== null, 'M2.6d · the request started a chain');
+t_eq((int) $apB['rule_id'], $rAhm,
+     'M2.6d · and it was routed by the BRANCH policy — the branch reached the matcher');
+t_eq((string) $apB['rule_name'], 'M2 Ahmedabad only', 'M2.6d · …recorded by name too');
+
 // ---------------------------------------------------------------------------
 //  7 · Policy history survives configuration change (§16, §17)
 // ---------------------------------------------------------------------------
