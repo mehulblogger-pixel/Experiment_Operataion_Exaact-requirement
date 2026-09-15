@@ -15,7 +15,15 @@
 //   • Every notification goes out through the platform mailer (ops_mail).
 // ============================================================================
 
-const APPR_ENTITIES = ['REQUISITION' => 'Requisition (SRF)', 'OFFER' => 'Offer', 'SALARY' => 'Salary structure'];
+//  Phase 3 · M1 — HIRING_REQUEST joins the list. The engine was already
+//  entity-agnostic (recruit_approval_requests carries entity + entity_id), so
+//  this constant is the whole of what it needed to know. No table, no column.
+const APPR_ENTITIES = [
+    'HIRING_REQUEST' => 'Hiring Request',
+    'REQUISITION'    => 'Requisition (SRF)',
+    'OFFER'          => 'Offer',
+    'SALARY'         => 'Salary structure',
+];
 
 function appr_migrate() {
     static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
@@ -198,7 +206,12 @@ function appr_start($entity, $entityId, $ctx, $subject = '', $amount = 0) {
 function appr_can_act($step, $user = null) {
     $user = $user ?: (function_exists('current_user') ? current_user() : null);
     if (!$user) return false;
-    if (function_exists('is_master') && is_master()) return true;
+    // M1 FINDING B. This was a bare is_master(), which walks straight past the
+    // module licence: a master on a workspace that had NOT bought recruitment
+    // could act on recruitment approval steps (proved with a probe). is_master_of()
+    // is the existing licence-aware master helper — master, but only for a module
+    // this installation actually has. Same rule the rest of the app already uses.
+    if (function_exists('is_master_of') ? is_master_of('hiring') : (function_exists('is_master') && is_master())) return true;
     if ((int)($step['approver_user_id'] ?? 0) > 0) return (int)$step['approver_user_id'] === (int)$user['id'];
     $role = (string)($step['approver_role'] ?? '');
     // An org-chart approver that could not be pinned to a person: a hiring admin
@@ -206,6 +219,35 @@ function appr_can_act($step, $user = null) {
     if ($role !== '' && function_exists('appr_is_org_approver') && appr_is_org_approver($role))
         return function_exists('hiring_admin_can') ? hiring_admin_can() : (function_exists('is_admin_level') && is_admin_level());
     return $role !== '' && (string)$user['role'] === $role;
+}
+
+// ---- The decision guard (Phase 3 · M1) -------------------------------------
+//  Asked at the mutation choke point, before anything is written, and returns a
+//  reason or an empty string so it can be tested without a redirect.
+//
+//  ENTITY-SCOPED ON PURPOSE. M1 was asked to secure the Hiring Request path, not
+//  to change how offers, salary structures and requisitions have behaved since
+//  Phase 6. Applying segregation of duties to every entity is a customer-visible
+//  policy change and is recorded as a Phase-3 question, not slipped in here.
+function appr_guard($req) {
+    $entity = strtoupper((string) ($req['entity'] ?? ''));
+    if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return '';
+    // 1. ENTITLEMENT first — the workspace must have bought recruitment. This is
+    //    asked before anything about the person, and a master does not escape it.
+    if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view'))
+        return 'The recruitment module is not switched on for this installation.';
+    $r = hreq_get((int) ($req['entity_id'] ?? 0));
+    if (!$r) return 'That hiring request no longer exists.';
+    // 2. BRANCH SCOPE — asked here, at the decision, not only on a route.
+    if (function_exists('hreq_in_scope') && !hreq_in_scope($r))
+        return 'This hiring request is outside your office / branch scope.';
+    // 3. SEGREGATION OF DUTIES — the requestor may not approve their own request.
+    //    One rule, two readers: the same helper the direct decision path uses,
+    //    including its single stated master exception, neither broadened nor
+    //    narrowed here.
+    if (function_exists('hreq_segregation_blocks') && hreq_segregation_blocks($r))
+        return 'You raised this request, so somebody else has to decide it.';
+    return '';
 }
 
 // Approve or reject the given step. Returns [ok, message].
@@ -217,6 +259,8 @@ function appr_act($stepId, $decision, $remarks = '') {
     if (!$req || $req['status'] !== 'PENDING') return [false, 'This request is closed.'];
     if ((int)$step['seq'] !== (int)$req['current_seq']) return [false, 'An earlier level is still pending.'];
     if (!appr_can_act($step)) return [false, 'You are not the approver for this step.'];
+    $why = appr_guard($req);
+    if ($why !== '') return [false, $why];
 
     $now = _appr_now(); $actor = _appr_actor();
     if ($decision === 'reject') {
@@ -246,6 +290,13 @@ function appr_callback($entity, $entityId, $result, $req = null) {
         if ($entity === 'OFFER') {
             if ($result === 'APPROVED') db()->prepare("UPDATE job_offers SET status='APPROVED', approved_by=?, approved_at=? WHERE id=? AND status IN ('PENDING_APPROVAL','DRAFT')")->execute(['Approval chain', _appr_now(), (int)$entityId]);
             else db()->prepare("UPDATE job_offers SET status='DRAFT' WHERE id=? AND status='PENDING_APPROVAL'")->execute([(int)$entityId]);
+        } elseif ($entity === 'HIRING_REQUEST') {
+            // Hand back to the hiring-request layer rather than writing its table
+            // from here: that layer owns the state machine, the audit entry and
+            // the "may this now be executed" question. One writer, not two.
+            if (function_exists('hreq_apply_decision'))
+                hreq_apply_decision((int) $entityId, $result === 'APPROVED' ? 'APPROVED' : 'REJECTED',
+                                    _appr_actor(), (string) ($req['rule_name'] ?? ''), 'CHAIN');
         } elseif ($entity === 'REQUISITION') {
             if ($result === 'APPROVED') db()->prepare("UPDATE requisitions SET status='approved', approved_by=? WHERE id=?")->execute(['Approval chain', (int)$entityId]);
             else db()->prepare("UPDATE requisitions SET status='on_hold' WHERE id=?")->execute([(int)$entityId]);
@@ -352,6 +403,20 @@ function ops_recruit_approvals($route, $method) {
 function ops_my_approvals($route, $method) {
     appr_migrate();
     ops_require(function_exists('current_user') && current_user(), 'Sign in.');
+    // M1 FINDING A. This route is in neither ops_module_gate()'s route map nor
+    // ops_module_family()'s prefix table, so NO module question was ever asked —
+    // the recruitment approval inbox opened on a workspace that had not bought
+    // recruitment (proved with a probe).
+    //
+    // What is asked here is the LICENCE, not mod.hiring.view. Entitlement is the
+    // tenant's contract; capability is the person's role. Requiring the hiring
+    // permission would lock out a configured approver who legitimately holds no
+    // recruitment module — a Finance approver on an offer chain, say — and
+    // narrowing the approver population is a policy change M1 was not asked for.
+    if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) {
+        if (function_exists('access_deny')) access_deny('hiring');
+        ops_require(false, 'The recruitment module is not switched on for this installation.');
+    }
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');
         if ($do === 'act') { [$ok, $m] = appr_act((int)($_POST['step_id'] ?? 0), (string)($_POST['decision'] ?? 'approve'), $_POST['remarks'] ?? ''); flash($m, $ok ? 'success' : 'error'); }

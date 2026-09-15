@@ -325,7 +325,11 @@ if (preg_match_all('/(INSERT INTO|UPDATE |DELETE FROM)/', $src, $wm, PREG_OFFSET
         $writes[$fn][] = $hit[1];
     }
 }
-$AUDITED = ['hreq_migrate', 'hreq_save', 'hreq_submit', 'hreq_decide', 'hreq_cancel', 'hreq_to_requisition'];
+// Phase 3 · M1 moved the decision WRITE out of hreq_decide() and into
+// hreq_apply_decision(), the one writer shared by the direct decision and the
+// approval chain. This guard caught that the moment it happened — which is what
+// it is for — so the list is re-established rather than patched around.
+$AUDITED = ['hreq_migrate', 'hreq_save', 'hreq_submit', 'hreq_apply_decision', 'hreq_cancel', 'hreq_to_requisition'];
 $unaudited = array_values(array_diff(array_keys($writes), $AUDITED));
 t_ok(!$unaudited, 'D0 · every database write in the layer lives in an audited function'
      . ($unaudited ? ' — audit these: ' . implode(', ', $unaudited) : ''));
@@ -337,7 +341,6 @@ $chain = [
     // function            capability          scope             state or input validation
     'hreq_save'           => ['hreq_can_create()', 'hreq_in_scope(', "return [false, 'How many people are needed?"],
     'hreq_submit'         => ['hreq_can_create()', 'hreq_in_scope(', "!== 'DRAFT'"],
-    'hreq_decide'         => ['hreq_can_decide()', 'hreq_in_scope(', "'SUBMITTED', 'UNDER_REVIEW'"],
     'hreq_cancel'         => ['hreq_can_create()', 'hreq_in_scope(', "=== 'CANCELLED'"],
     'hreq_to_requisition' => ['hreq_can_create()', 'hreq_in_scope(', 'hreq_is_executable($r)'],
 ];
@@ -349,20 +352,52 @@ foreach ($chain as $fn => $links) {
     t_ok(strpos($body, $links[1]) !== false, 'D · ' . $fn . ' — branch scope asked before it writes');
     t_ok(strpos($body, $links[2]) !== false, 'D · ' . $fn . ' — state / input validated before it writes');
 }
-// Approval authority and segregation are asked on the decision path only.
-$decBody = substr($src, strpos($src, 'function hreq_decide('), min($writes['hreq_decide']) - strpos($src, 'function hreq_decide('));
-t_ok(strpos($decBody, 'hreq_may_decide($r)') !== false,
-     'D · hreq_decide — segregation of duties asked before it writes');
+// The decision path. hreq_decide() no longer writes: it is the AUTHORITY GATE
+// that asks the questions and then delegates to the one writer. So the chain is
+// asserted up to the delegation rather than up to a write.
+$dStart = strpos($src, 'function hreq_decide(');
+$dHand  = strpos($src, 'hreq_apply_decision(', $dStart);
+$decBody = substr($src, $dStart, $dHand - $dStart);
+t_ok(strpos($decBody, 'hreq_can_decide()') !== false,   'D · hreq_decide — authority asked before it delegates');
+t_ok(strpos($decBody, 'hreq_in_scope(') !== false,      'D · hreq_decide — branch scope asked before it delegates');
+t_ok(strpos($decBody, 'hreq_may_decide($r)') !== false, 'D · hreq_decide — segregation of duties asked before it delegates');
+
+// hreq_apply_decision() is the one writer and deliberately asks NO authority
+// question — so the claim that this is safe rests entirely on every caller
+// being an audited authority gate. That is asserted here, not assumed: the set
+// of callers anywhere in lib/ must be exactly the two that are audited.
+$callers = [];
+foreach (glob(__DIR__ . '/../lib/*.php') as $lf) {
+    $lsrc = preg_replace('#^\s*//.*$#m', '', file_get_contents($lf));
+    if (!preg_match_all('/hreq_apply_decision\s*\(/', $lsrc)) continue;
+    foreach (preg_split('/\bfunction\s+([a-z_0-9]+)\s*\(/i', $lsrc, -1, PREG_SPLIT_DELIM_CAPTURE) as $i => $chunk) {
+        if ($i % 2 === 1) { $lastFn = $chunk; continue; }
+        if (isset($lastFn) && strpos($chunk, 'hreq_apply_decision(') !== false) $callers[$lastFn] = true;
+    }
+}
+unset($callers['hreq_apply_decision']);
+$expected = ['hreq_decide', 'appr_callback'];
+sort($expected); $got = array_keys($callers); sort($got);
+t_eq(implode(',', $got), implode(',', $expected),
+     'D · the one decision writer is reached ONLY from audited authority gates');
+$apdStart = strpos($src, 'function hreq_apply_decision(');
+$apdBody = substr($src, $apdStart, min($writes['hreq_apply_decision']) - $apdStart);
+t_ok(strpos($apdBody, "'SUBMITTED', 'UNDER_REVIEW'") !== false,
+     'D · hreq_apply_decision — state validated before it writes, whichever route decided');
 t_ok(strpos(substr($src, strpos($src, 'function hreq_save(')), 'hreq_can_decide()') === false
      || strpos($chain['hreq_save'][0], 'decide') === false,
      'D · creating never asks for, or grants, the decide right');
 
 // Every mutation leaves an audit trail.
-foreach (['hreq_save', 'hreq_submit', 'hreq_decide', 'hreq_cancel', 'hreq_to_requisition'] as $fn) {
+foreach (['hreq_save', 'hreq_submit', 'hreq_apply_decision', 'hreq_cancel', 'hreq_to_requisition'] as $fn) {
     $start = strpos($src, 'function ' . $fn . '(');
     $end = strpos($src, "\nfunction ", $start + 10);
     $body = substr($src, $start, ($end ?: strlen($src)) - $start);
-    t_ok(strpos($body, 'activity_log(') !== false, 'D · ' . $fn . ' — writes an audit entry');
+    // Phase 3 · M1: these called activity_log(), which does not exist anywhere in
+    // the application, so the "audit entry" was a no-op behind function_exists().
+    // The assertion was a source-string match and passed anyway — which is why
+    // the M1 suite proves the audit BEHAVIOURALLY, by reading the rows back.
+    t_ok(strpos($body, 'act_log(') !== false, 'D · ' . $fn . ' — calls the real audit spine');
 }
 
 // No other entry point: no AJAX/API route, and no other file touches the table.

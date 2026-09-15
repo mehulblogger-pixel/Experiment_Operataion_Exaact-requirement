@@ -65,6 +65,12 @@ const ACT_ENTITIES = [
     'RECEIPT'   => ['Receipt',         '/receipt?id='],
     'CONTRACT'  => ['Contract',        '/contract?id='],
     'INSPECTOR' => ['Inspector',       '/inspector-profile?id='],   // Slice P1 — Credential Vault 360
+    // Phase 3 · M1 — the hiring request and the recruitment requisition. Both
+    // were calling a function that does not exist (activity_log), so nothing
+    // they did was ever audited; registering them here is what lets act_log()
+    // label and link them on the universal timeline.
+    'HIRING_REQUEST' => ['Hiring Request',          '/hiring-request?id='],
+    'REQUISITION'    => ['Recruitment Requisition', '/requisition?id='],
 ];
 
 // A constant cannot call T(), so the two entries that name a business noun are

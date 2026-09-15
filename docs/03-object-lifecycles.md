@@ -593,8 +593,14 @@ DRAFT ─▶ SUBMITTED ─▶ UNDER_REVIEW ─▶ APPROVED ─▶ (raise a requi
 ```
 
 - Values come from the `hiring_request_status` **lookup**, created through the
-  existing lookup engine — not a hardcoded engine. `UNDER_REVIEW` is a state
-  Phase 3's approval routing will use; M4 reaches `APPROVED` directly.
+  existing lookup engine — not a hardcoded engine. **Phase 3 · M1** connected the
+  request to the existing approval engine: on submit, where an administrator has
+  configured a matching rule, a chain starts (`recruit_approval_requests`, entity
+  `HIRING_REQUEST`), the request moves to **`UNDER_REVIEW`** and `approval_ref`
+  records the chain. Where no rule matches it stays `SUBMITTED` and is decided
+  directly, exactly as M4 behaved — a workspace that configured nothing is not
+  forced into an approval process. No new status was added; `UNDER_REVIEW` **is**
+  "approval pending".
 - **`APPROVED` is the only executable state** (`HREQ_EXECUTABLE`).
   `hreq_is_executable()` is the single question, and `hreq_to_requisition()` asks
   it **before it writes anything**: recruitment cannot begin from a `DRAFT` or a
@@ -606,12 +612,20 @@ DRAFT ─▶ SUBMITTED ─▶ UNDER_REVIEW ─▶ APPROVED ─▶ (raise a requi
 - `APPROVED`, `REJECTED` and `CANCELLED` requests cannot be edited. The
   re-approval path for changing an approved request is **Phase 3**.
 - **Rights.** Create / edit / submit / cancel / convert: `can('mod.hiring.edit')`,
-  asked at each write, not only on the route. Decide: the module **and**
-  `is_admin_level()`. The **requestor may not decide their own request**
-  (`requested_by_id`), with a master the single stated exception — segregation of
-  duties, mirroring the IDEMS approver≠issuer rule. Branch scope
-  (`hreq_in_scope()`) applies on top of all of it. Adds **no new permission**;
-  see `02-permission-matrix.md` footnote 8.
+  asked at each write, not only on the route. Decide **directly** (no chain
+  matched): the module **and** `is_admin_level()`. Decide **through a chain**: be
+  that step's approver — the named user or the configured role — which is
+  configuration, not a hard-coded job title. Either way the **requestor may not
+  decide their own request** (`requested_by_id`), with a master the single stated
+  exception — segregation of duties, mirroring the IDEMS approver≠issuer rule —
+  and branch scope (`hreq_in_scope()`) applies on top. A direct decision is
+  refused while a chain is open: the chain is authoritative. Adds **no new
+  permission**; see `02-permission-matrix.md` footnote 8.
+- **One writer.** Both doors end at `hreq_apply_decision()`, which holds the state
+  rule (only `SUBMITTED` / `UNDER_REVIEW` can be decided) and writes the audit
+  entry, so a cancelled or already-decided request is refused whichever way the
+  decision arrives. Approval history lives in the existing
+  `recruit_approval_steps` — there is no second history store.
 - One request may be executed as **many** requisitions
   (`requisitions.hiring_request_id`), and never for more than the approved
   quantity. A requisition raised directly carries `NULL` there, which is a

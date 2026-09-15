@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '02f22d4 · 2026-09-15 11:39 UTC · 659 files';
+$RELEASE = '800503f · 2026-09-15 12:11 UTC · 659 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -34,7 +34,7 @@ $EXPECT  = [
     'index.php' => ['s'=>117010,'h'=>'31943462d15dddf6'],
     'lib/access.php' => ['s'=>71117,'h'=>'cb498f1e83cfa87b'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
-    'lib/activity.php' => ['s'=>22744,'h'=>'2a63a2da6e0df9f5'],
+    'lib/activity.php' => ['s'=>23186,'h'=>'7c9b54e9cd8276c1'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
     'lib/adssync.php' => ['s'=>28174,'h'=>'325142a88491bfba'],
@@ -133,7 +133,7 @@ $EXPECT  = [
     'lib/formdesign.php' => ['s'=>27024,'h'=>'0feb6ccff1be7076'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
     'lib/helpers.php' => ['s'=>21408,'h'=>'0158217e1aae4477'],
-    'lib/hiringreq.php' => ['s'=>40418,'h'=>'0d1dae01879225e1'],
+    'lib/hiringreq.php' => ['s'=>46050,'h'=>'92e7ca18362726a1'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
     'lib/idems.php' => ['s'=>786409,'h'=>'3d46d6301e9ec8e5'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
@@ -191,7 +191,7 @@ $EXPECT  = [
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
     'lib/recruit.php' => ['s'=>69782,'h'=>'98a1add9135157ea'],
-    'lib/recruit_approval.php' => ['s'=>24526,'h'=>'6a72bb1661028893'],
+    'lib/recruit_approval.php' => ['s'=>28710,'h'=>'907455a0687ef654'],
     'lib/recruit_cc.php' => ['s'=>21082,'h'=>'d87684e94f608cad'],
     'lib/recruit_export.php' => ['s'=>7887,'h'=>'70fa492cdd1a8d35'],
     'lib/recruit_iv.php' => ['s'=>36630,'h'=>'ea9e62e8603e3b38'],
@@ -199,7 +199,7 @@ $EXPECT  = [
     'lib/recruit_offer.php' => ['s'=>38011,'h'=>'dfece6707804ac19'],
     'lib/recruitpipe.php' => ['s'=>41762,'h'=>'02f3bcea8840902f'],
     'lib/reportreview.php' => ['s'=>23222,'h'=>'ae43c4d37883823d'],
-    'lib/reqfulfil.php' => ['s'=>11589,'h'=>'ba18baf4aa3fefca'],
+    'lib/reqfulfil.php' => ['s'=>11729,'h'=>'d6a5ae81a1809597'],
     'lib/reset.php' => ['s'=>11477,'h'=>'8d961eb9724047b9'],
     'lib/retention.php' => ['s'=>6587,'h'=>'deb6a6d4a270fa36'],
     'lib/revrecon.php' => ['s'=>13441,'h'=>'eb8777d1398cdada'],
@@ -426,7 +426,7 @@ $EXPECT  = [
     'views/ops/flow_gaps.php' => ['s'=>3363,'h'=>'48ceadbccf10fe16'],
     'views/ops/form_designer.php' => ['s'=>15499,'h'=>'0c60eeaec0d8f871'],
     'views/ops/hierarchy.php' => ['s'=>55996,'h'=>'0ed12718ecd77b34'],
-    'views/ops/hiring_request.php' => ['s'=>12609,'h'=>'2e2c780aa0fa35b7'],
+    'views/ops/hiring_request.php' => ['s'=>15784,'h'=>'54e32b84d7c9c50b'],
     'views/ops/hiring_request_list.php' => ['s'=>2365,'h'=>'8dfce095523d3af1'],
     'views/ops/hwpoints.php' => ['s'=>3338,'h'=>'679fdb6488397c4a'],
     'views/ops/idems/approval_rules.php' => ['s'=>6707,'h'=>'c2df5a10e140394e'],
@@ -504,7 +504,7 @@ $EXPECT  = [
     'views/ops/mkt_plans.php' => ['s'=>18544,'h'=>'93088f2c39d2ce2c'],
     'views/ops/mkt_rules.php' => ['s'=>8994,'h'=>'91a1cd66dcd297fb'],
     'views/ops/module_locked.php' => ['s'=>2419,'h'=>'82de67be8483b36c'],
-    'views/ops/my_approvals.php' => ['s'=>3559,'h'=>'b895767a252cfd64'],
+    'views/ops/my_approvals.php' => ['s'=>4221,'h'=>'25f1636aeb5b0433'],
     'views/ops/my_jobs.php' => ['s'=>15228,'h'=>'bb2e2bb4879b97c4'],
     'views/ops/my_work.php' => ['s'=>5894,'h'=>'bd095a0094c135e3'],
     'views/ops/ncr_detail.php' => ['s'=>9032,'h'=>'827310b0993e1532'],

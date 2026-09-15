@@ -2,7 +2,18 @@
 // My approvals — the current user's pending approval steps. Data: $inbox.
 $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
 $inbox = $inbox ?? [];
-$ent = function ($k) { $m = ['REQUISITION'=>'Requisition','OFFER'=>'Offer','SALARY'=>'Salary structure']; return $m[$k] ?? $k; };
+// M1 — the locked words (see docs/phase2/M4-TERMINOLOGY-LOCK.md): a Hiring
+// Request and a Recruitment Requisition are different objects and are named
+// differently here too.
+$ent = function ($k) {
+    return (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$k])) ? APPR_ENTITIES[$k] : $k;
+};
+// Where the approver goes to read the thing they are being asked to approve.
+$entLink = function ($k, $id) {
+    if ($k === 'HIRING_REQUEST') return '/hiring-request?id=' . (int) $id;
+    if ($k === 'REQUISITION')    return '/requisition?id=' . (int) $id;
+    return '';
+};
 $fdate = fn($s) => $s ? (function_exists('fdate') ? fdate($s) : date('d M Y', strtotime($s))) : '';
 $overdue = function ($s) { return $s && strtotime($s) < time(); };
 $cur = function_exists('cur_sym') ? cur_sym() : '';
@@ -30,7 +41,9 @@ $cur = function_exists('cur_sym') ? cur_sym() : '';
             <?php if ($s['label']): ?><span class="pill p-mut" style="font-size:11px"><?= $e($s['label']) ?></span><?php endif; ?>
             <?php if ($od): ?><span class="pill" style="background:#fef2f2;color:#dc2626;font-size:11px">Overdue</span><?php endif; ?>
           </div>
-          <div style="font-weight:700;font-size:16px;margin-top:6px"><?= $e($s['subject'] ?: ($ent($s['entity']).' #'.$s['entity_id'])) ?></div>
+          <div style="font-weight:700;font-size:16px;margin-top:6px"><?php $lnk = $entLink($s['entity'], $s['entity_id']);
+            if ($lnk): ?><a href="<?= $e($lnk) ?>"><?= $e($s['subject'] ?: ($ent($s['entity']).' #'.$s['entity_id'])) ?></a><?php
+            else: ?><?= $e($s['subject'] ?: ($ent($s['entity']).' #'.$s['entity_id'])) ?><?php endif; ?></div>
           <div class="muted" style="font-size:12.5px;margin-top:3px">
             <?php if ((float)$s['amount']>0): ?>Value <b><?= $e($cur) ?><?= $e(number_format((float)$s['amount'],0)) ?></b> · <?php endif; ?>
             Requested by <?= $e($s['requester'] ?: '—') ?> · <?= $e($fdate($s['rcreated'] ?? '')) ?>

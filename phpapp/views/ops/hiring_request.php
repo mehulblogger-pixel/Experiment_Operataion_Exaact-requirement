@@ -48,8 +48,23 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
       <span class="muted">All <?= (int) $r['quantity'] ?> are being recruited.</span>
     <?php endif; ?>
   </div>
+<?php elseif ($r && $status === 'REJECTED'): ?>
+  <div class="panel" style="border-left:3px solid #b42318">
+    <strong>Rejected<?= $r['decided_by'] ? ' by ' . $e($r['decided_by']) : '' ?><?= $r['decided_at'] ? ' on ' . $e(substr($r['decided_at'], 0, 10)) : '' ?>.</strong>
+    <?php if (trim((string) ($r['decision_note'] ?? '')) !== ''): ?><span class="muted">— <?= $e($r['decision_note']) ?></span><?php endif; ?>
+    <div class="muted" style="margin-top:4px">Recruitment cannot start from a rejected request. Raise a new one — changing this one back is not built yet.</div>
+  </div>
 <?php elseif ($r && in_array($status, ['SUBMITTED', 'UNDER_REVIEW'], true)): ?>
   <div class="panel" style="border-left:3px solid #0969da">
+    <?php // M1 — where the request actually is. A chain running means its
+          // approvers decide it, from My approvals, not from this screen.
+          $appr = function_exists('hreq_approval') ? hreq_approval($r['id']) : null;
+          $chainOpen = $appr && strtoupper((string) $appr['status']) === 'PENDING'; ?>
+    <?php if ($chainOpen): ?>
+      <strong>Awaiting approval</strong> — with its approvers<?= trim((string) ($appr['rule_name'] ?? '')) !== '' ? ' (' . $e($appr['rule_name']) . ')' : '' ?>.
+      Recruitment cannot start until this is approved.
+      <div class="muted" style="margin-top:4px">Approvers decide this from <a href="/my-approvals">My approvals</a>.</div>
+    <?php else: ?>
     Waiting for a decision. Recruitment cannot start until this is approved.
     <?php if (!$mayDecide && function_exists('hreq_is_own_request') && hreq_is_own_request($r)): ?>
       <span class="muted" style="margin-left:10px">You raised this request, so somebody else has to decide it.</span>
@@ -62,6 +77,36 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
         <button class="btn small secondary" type="submit" name="decision" value="reject">Reject</button>
       </form>
     <?php endif; ?>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
+<?php // M1 — approval history. Read from the EXISTING approval steps; there is
+      // no second history store. Shown only where a chain exists.
+$steps = ($r && function_exists('hreq_approval_steps')) ? hreq_approval_steps($r['id']) : [];
+if ($r && ($steps || !empty($r['submitted_at']))): ?>
+  <div class="panel">
+    <h3 class="tab-sub" style="margin-top:0">Approval history</h3>
+    <table class="table" style="font-size:13px">
+      <tr><th>What</th><th>When</th><th>Who</th><th>Decision</th><th>Reason</th></tr>
+      <?php if (!empty($r['submitted_at'])): ?>
+      <tr><td>Submitted</td><td><?= $e(substr((string) $r['submitted_at'], 0, 10)) ?></td>
+          <td><?= $e($r['requested_by_name'] ?: $r['created_by']) ?></td><td>—</td><td>—</td></tr>
+      <?php endif; ?>
+      <?php foreach ($steps as $st): $sv = strtoupper((string) $st['status']); ?>
+      <tr><td><?= $e($st['label'] ?: 'Approval') ?></td>
+          <td><?= $e($st['acted_at'] ? substr((string) $st['acted_at'], 0, 10) : '—') ?></td>
+          <td><?= $e($st['acted_by'] ?: '—') ?></td>
+          <td><span class="pill <?= $sv === 'APPROVED' ? 'p-ok' : ($sv === 'REJECTED' ? 'p-bad' : 'p-mut') ?>" style="font-size:11px"><?= $e($sv === 'PENDING' ? 'Awaiting' : ucfirst(strtolower($sv))) ?></span></td>
+          <td><?= $e($st['remarks'] ?: '—') ?></td></tr>
+      <?php endforeach; ?>
+      <?php if (!$steps && !empty($r['decided_at'])): ?>
+      <tr><td>Decision</td><td><?= $e(substr((string) $r['decided_at'], 0, 10)) ?></td>
+          <td><?= $e($r['decided_by']) ?></td>
+          <td><span class="pill <?= $status === 'APPROVED' ? 'p-ok' : 'p-bad' ?>" style="font-size:11px"><?= $e(ucfirst(strtolower($status))) ?></span></td>
+          <td><?= $e($r['decision_note'] ?: '—') ?></td></tr>
+      <?php endif; ?>
+    </table>
   </div>
 <?php endif; ?>
 

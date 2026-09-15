@@ -151,8 +151,10 @@ function reqf_sync($req) {
     $c = reqf_counts($r);
     try {
         db()->prepare("UPDATE requisitions SET status=? WHERE id=?")->execute([$want, (int) $r['id']]);
-        if (function_exists('activity_log'))
-            activity_log('requisition', (int) $r['id'], 'status',
+        // Same dead call as the hiring-request layer carried: activity_log()
+        // does not exist, so this audit never happened (M1 finding G).
+        if (function_exists('act_log'))
+            act_log('REQUISITION', (int) $r['id'], 'SYSTEM',
                 'Status now ' . $want . ' (' . $c['filled'] . ' of ' . $c['requested'] . ' filled)');
     } catch (Throwable $e) {}
     return $want;

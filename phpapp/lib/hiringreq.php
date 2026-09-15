@@ -286,10 +286,48 @@ function hreq_is_own_request($r) {
     $me = (int) ($u['id'] ?? 0);
     return $me > 0 && (int) ($r['requested_by_id'] ?? 0) === $me;
 }
+//  Phase 3 · M1 — the segregation rule alone, so the approval chain and the
+//  direct decision ask exactly the same question. One rule, two readers. The
+//  master exception is M4's, stated once, here, and neither broadened nor
+//  narrowed by M1.
+function hreq_segregation_blocks($r) {
+    if (function_exists('is_master') && is_master()) return false;
+    return hreq_is_own_request(is_array($r) ? $r : hreq_get($r));
+}
 function hreq_may_decide($r) {
     if (!hreq_can_decide()) return false;
-    if (function_exists('is_master') && is_master()) return true;
-    return !hreq_is_own_request(is_array($r) ? $r : hreq_get($r));
+    return !hreq_segregation_blocks($r);
+}
+
+// ---- The approval chain (Phase 3 · M1) -------------------------------------
+//  The chain currently open against this request, or null. The engine is
+//  entity-agnostic, so this is a read of the existing tables — not a new store.
+function hreq_approval($id) {
+    if (!function_exists('appr_open')) return null;
+    $open = appr_open('HIRING_REQUEST', (int) $id);
+    if ($open) return $open;
+    try { return ops_one("SELECT * FROM recruit_approval_requests WHERE entity='HIRING_REQUEST' AND entity_id=? ORDER BY id DESC LIMIT 1", [(int) $id]) ?: null; }
+    catch (Throwable $e) { return null; }
+}
+// Its steps, for the history panel. Empty when no chain was ever started.
+function hreq_approval_steps($id) {
+    $a = hreq_approval($id);
+    return ($a && function_exists('appr_steps')) ? appr_steps((int) $a['id']) : [];
+}
+// What the rule matcher is given. Department goes through the canonical label so
+// a rule written in the customer's own words still matches (M3).
+function hreq_appr_ctx(array $r) {
+    $deptLbl = '';
+    if (!empty($r['hiring_department_id']) && function_exists('vocab_value') && ($v = vocab_value((int) $r['hiring_department_id'])))
+        $deptLbl = (string) ($v['code'] !== '' ? $v['code'] : $v['label']);
+    return [
+        'department'  => $deptLbl,
+        'sbu'         => '',
+        'grade'       => (string) ($r['grade'] ?? ''),
+        'position'    => (string) ($r['designation'] ?? ''),
+        'position_id' => (int) ($r['position_id'] ?? 0),
+        'amount'      => 0,
+    ];
 }
 
 function hreq_get($id) {
@@ -445,7 +483,11 @@ function hreq_save($id, array $post) {
         $id = (int) db()->lastInsertId();
     }
     if (function_exists('custom_save')) custom_save('hiring_request', $id, $post);
-    if (function_exists('activity_log')) activity_log('hiring_request', $id, $existing ? 'update' : 'create', $title);
+    // AUDIT. This called activity_log() — a function that does not exist anywhere
+    // in the application — so it was a silent no-op behind function_exists() and
+    // nothing here was ever audited. act_log() is the real spine (M1 finding G).
+    if (function_exists('act_log'))
+        act_log('HIRING_REQUEST', $id, 'SYSTEM', ($existing ? 'Hiring request updated: ' : 'Hiring request raised: ') . $title, ['auto' => 1]);
     return [true, $existing ? 'Hiring request saved.' : 'Hiring request created.', $id];
 }
 
@@ -486,14 +528,68 @@ function hreq_submit($id) {
     if ((int) $r['quantity'] <= 0) return [false, 'Say how many people are needed before submitting.'];
     if (trim((string) $r['job_title']) === '') return [false, 'Say what is being requested before submitting.'];
     $next = empty($r['approval_required']) ? 'APPROVED' : 'SUBMITTED';
+    // The snapshot is taken HERE, before the chain is started, so what the
+    // approvers are shown and what the record says was approved are the same
+    // thing — and a later edit to a master cannot change it (M4 §12).
     db()->prepare("UPDATE hiring_requests SET status=?, snapshot_json=?, submitted_at=?, updated_by=?, updated_at=? WHERE id=?")
         ->execute([$next, json_encode(hreq_snapshot($r)), hreq_now(), hreq_who(), hreq_now(), (int) $id]);
-    if (function_exists('activity_log')) activity_log('hiring_request', (int) $id, 'status', 'Submitted');
+    if (function_exists('act_log'))
+        act_log('HIRING_REQUEST', (int) $id, 'SYSTEM', 'Submitted for approval', ['auto' => 1]);
+
+    // Phase 3 · M1 — hand the request to the EXISTING approval engine. A chain
+    // starts only where an administrator has configured a rule that matches; if
+    // none does, the request stays SUBMITTED and is decided directly, exactly as
+    // M4 behaved. Nothing is forced on a workspace that has configured nothing.
+    if ($next === 'SUBMITTED' && function_exists('appr_start')) {
+        $fresh = hreq_get($id) ?: $r;
+        [$started, $apprId] = appr_start('HIRING_REQUEST', (int) $id, hreq_appr_ctx($fresh),
+                                         'Hiring request ' . (string) $r['req_no'] . ' — ' . (string) $r['job_title'], 0);
+        if ($started && $apprId > 0) {
+            db()->prepare("UPDATE hiring_requests SET status='UNDER_REVIEW', approval_ref=?, updated_at=? WHERE id=?")
+                ->execute([(string) $apprId, hreq_now(), (int) $id]);
+            if (function_exists('act_log'))
+                act_log('HIRING_REQUEST', (int) $id, 'SYSTEM', 'Sent to its approvers (chain #' . (int) $apprId . ')', ['auto' => 1]);
+            return [true, 'Request submitted — it is now with its approvers.'];
+        }
+    }
     return [true, $next === 'APPROVED' ? 'Request submitted — this workspace does not require approval, so it is ready.' : 'Request submitted for approval.'];
 }
 
-// The decision itself. Phase 3 replaces the caller with the approval engine;
-// the state transition lives here so both use the same one.
+// ---- The ONE writer of a decision (Phase 3 · M1) ---------------------------
+//  Both ways of deciding a hiring request come through here — the direct
+//  decision (hreq_decide) and the approval chain (appr_callback) — so there is
+//  one place that changes the approved/rejected state, one place that stamps who
+//  decided and when, and one audit entry, whichever route was taken.
+//
+//  It deliberately does NOT ask the authority question. Its two callers each ask
+//  it in the way that is right for them: hreq_decide() asks the capability, the
+//  scope and the segregation rule; the chain asks appr_can_act() and appr_guard(),
+//  which ask entitlement, scope and the same segregation rule. Both are audited
+//  by the write-path test, and this function is not reachable from any route.
+//
+//  The STATE rule lives here, once, so neither route can approve something that
+//  is no longer open for decision — a cancelled or already-decided request is
+//  refused whichever way the decision arrives.
+function hreq_apply_decision($id, $result, $by, $note = '', $source = 'DIRECT') {
+    hreq_migrate();
+    $r = hreq_get($id); if (!$r) return [false, 'That hiring request no longer exists.'];
+    $st = strtoupper((string) $r['status']);
+    if (!in_array($st, ['SUBMITTED', 'UNDER_REVIEW'], true))
+        return [false, 'Only a submitted request can be decided (this one is ' . strtolower($st) . ').'];
+    $to = strtoupper((string) $result) === 'APPROVED' ? 'APPROVED' : 'REJECTED';
+    $who = trim((string) $by) !== '' ? (string) $by : hreq_who();
+    db()->prepare("UPDATE hiring_requests SET status=?, decided_by=?, decided_at=?, decision_note=?, updated_by=?, updated_at=? WHERE id=?")
+        ->execute([$to, $who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
+    if (function_exists('act_log'))
+        act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                $to . ' via ' . $source . ($who !== '' ? ' by ' . $who : ''),
+                ['auto' => 1, 'outcome' => $to, 'body' => trim((string) $note)]);
+    return [true, $to === 'APPROVED' ? 'Request approved.' : 'Request rejected.'];
+}
+
+// The direct decision. Where an approval chain is running, the chain is
+// authoritative and this refuses — otherwise the two could disagree about the
+// same request.
 function hreq_decide($id, $approve, $note = '') {
     hreq_migrate();
     $r = hreq_get($id); if (!$r) return [false, 'That hiring request no longer exists.'];
@@ -502,14 +598,11 @@ function hreq_decide($id, $approve, $note = '') {
     // Segregation of duties — asked here, so no caller can decide around it.
     if (!hreq_may_decide($r))
         return [false, 'You raised this request, so somebody else has to decide it.'];
-    $st = strtoupper((string) $r['status']);
-    if (!in_array($st, ['SUBMITTED', 'UNDER_REVIEW'], true))
-        return [false, 'Only a submitted request can be decided (this one is ' . strtolower($st) . ').'];
-    $to = $approve ? 'APPROVED' : 'REJECTED';
-    db()->prepare("UPDATE hiring_requests SET status=?, decided_by=?, decided_at=?, decision_note=?, updated_by=?, updated_at=? WHERE id=?")
-        ->execute([$to, hreq_who(), hreq_now(), substr(trim((string) $note), 0, 400), hreq_who(), hreq_now(), (int) $id]);
-    if (function_exists('activity_log')) activity_log('hiring_request', (int) $id, 'status', $to);
-    return [true, $approve ? 'Request approved.' : 'Request rejected.'];
+    // An open chain owns this decision. Deciding around it would leave the chain
+    // pending against a request that had already moved.
+    $open = function_exists('appr_open') ? appr_open('HIRING_REQUEST', (int) $id) : null;
+    if ($open) return [false, 'This request is with its approvers. Decide it from My approvals.'];
+    return hreq_apply_decision($id, $approve ? 'APPROVED' : 'REJECTED', hreq_who(), $note, 'DIRECT');
 }
 
 function hreq_cancel($id, $note = '') {
@@ -520,7 +613,8 @@ function hreq_cancel($id, $note = '') {
     if (strtoupper((string) $r['status']) === 'CANCELLED') return [true, 'Already cancelled.'];
     db()->prepare("UPDATE hiring_requests SET status='CANCELLED', decision_note=?, updated_by=?, updated_at=? WHERE id=?")
         ->execute([substr(trim((string) $note), 0, 400), hreq_who(), hreq_now(), (int) $id]);
-    if (function_exists('activity_log')) activity_log('hiring_request', (int) $id, 'status', 'Cancelled');
+    if (function_exists('act_log'))
+        act_log('HIRING_REQUEST', (int) $id, 'SYSTEM', 'Cancelled', ['auto' => 1, 'outcome' => 'CANCELLED', 'body' => trim((string) $note)]);
     return [true, 'Request cancelled.'];
 }
 
@@ -594,7 +688,8 @@ function hreq_to_requisition($id, $qty = 0) {
                    hreq_who(), hreq_now()]);
     $rid = (int) db()->lastInsertId();
     if (function_exists('reqf_sync')) reqf_sync($rid);
-    if (function_exists('activity_log')) activity_log('hiring_request', (int) $id, 'requisition', 'Raised ' . $code);
+    if (function_exists('act_log'))
+        act_log('HIRING_REQUEST', (int) $id, 'SYSTEM', 'Recruitment requisition ' . $code . ' raised for ' . $qty, ['auto' => 1]);
     return [true, 'Requisition ' . $code . ' raised for ' . $qty . ' of the approved headcount.', $rid];
 }
 
