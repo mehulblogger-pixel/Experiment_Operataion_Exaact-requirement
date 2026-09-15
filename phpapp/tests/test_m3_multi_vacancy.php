@@ -276,6 +276,64 @@ t_eq($cE['cancelled'], 2, '…and cancelled is clamped to it — never "2 reques
 t_eq($cE['remaining'], 0, 'remaining stays sane');
 
 // ---------------------------------------------------------------------------
+// 10d. AUTHORIZATION — candidate movement across the branch boundary.
+//
+//      A candidate has no branch of its own; it inherits the branch of the
+//      requisition it is raised against. The candidate register was the one
+//      module M14 never gave a scope gate, so a coordinator scoped to one branch
+//      could move a candidate onto another branch's requisition — and, once M3
+//      recomputed fulfilment on both sides, write a status change to a
+//      requisition they cannot even see. Proven, then closed with one gate.
+// ---------------------------------------------------------------------------
+t_ok(function_exists('cand_scope_gate'), 'the candidate register has a branch-scope gate');
+$opsSrc2 = preg_replace('#^\s*//.*$#m', '', file_get_contents(__DIR__ . '/../lib/ops.php'));
+$cp = strpos($opsSrc2, 'function ops_candidates($route, $method) {');
+t_ok($cp !== false && strpos(substr($opsSrc2, $cp, 160), 'cand_scope_gate()') !== false,
+     'and it runs on entry to the module, before any route reads an id');
+
+$origSess2 = $_SESSION;
+foreach ([[871, 'M3 Branch A'], [872, 'M3 Branch B']] as $o)
+    try { $pdo->prepare("INSERT INTO offices (id,name,is_active) VALUES (?,?,1)")->execute($o); } catch (Throwable $e) {}
+$mkReqAt = function ($code, $office) use ($pdo, &$mine, $now) {
+    $pdo->prepare("INSERT INTO requisitions (req_code,office_id,quantity,status,created_at) VALUES (?,?,3,'OPEN',?)")
+        ->execute([$code, $office, $now]);
+    $id = (int) $pdo->lastInsertId(); $mine['req'][] = $id; return $id;
+};
+$rqA = $mkReqAt('M3SC-A', 871);
+$rqA2 = $mkReqAt('M3SC-A2', 871);
+$rqB = $mkReqAt('M3SC-B', 872);
+$scCand = $mkCand($rqA, 91, 'ACCEPTED');
+reqf_sync($rqA); reqf_sync($rqA2); reqf_sync($rqB);
+
+// (a) A move WITHIN the user's own branch recalculates BOTH sides.
+t_eq(reqf_counts($rqA)['filled'], 1, 'the candidate fills a seat on its own requisition');
+t_eq(reqf_counts($rqA2)['filled'], 0, 'and none on the other one');
+$pdo->prepare("UPDATE candidates SET requisition_id=? WHERE id=?")->execute([$rqA2, $scCand]);
+reqf_sync($rqA); reqf_sync($rqA2);
+t_eq(reqf_counts($rqA)['filled'], 0, 'after the move the source gives the seat back');
+t_eq($st($rqA), 'OPEN', '…and the source reopens');
+t_eq(reqf_counts($rqA2)['filled'], 1, 'the destination takes it');
+t_eq($st($rqA2), 'PARTIALLY_FILLED', '…and the destination reflects it');
+$pdo->prepare("UPDATE candidates SET requisition_id=? WHERE id=?")->execute([$rqA, $scCand]);
+reqf_sync($rqA); reqf_sync($rqA2);
+
+// (b) The gate's decision, taken with a real branch-scoped user.
+$pdo->prepare("INSERT INTO users (username,first_name,role,is_active,is_superuser,home_office_id,scope_offices) VALUES ('m3scA','A','COORDINATOR',1,0,871,'871')")->execute();
+$_SESSION['uid'] = (int) ops_val("SELECT id FROM users WHERE username='m3scA'");
+current_user(true); ua(true);
+t_ok(scope_allows(871, null), 'the branch-A user may act on their own branch');
+t_ok(!scope_allows(872, null), '…and may NOT act on branch B');
+// The gate asks exactly that question of both ends of a move.
+$gateSrc = substr($opsSrc2, strpos($opsSrc2, 'function cand_scope_gate()'), 1800);
+t_ok(substr_count($gateSrc, 'scope_allows(') === 2,
+     'the gate checks BOTH the candidate’s own requisition and the one it is moved to');
+t_ok(strpos($gateSrc, "\$_POST['requisition_id']") !== false,
+     '…reading the destination from the POST, not from the page it came from');
+$_SESSION = $origSess2; current_user(true); ua(true);
+foreach ([871, 872] as $oid) try { $pdo->prepare("DELETE FROM offices WHERE id=?")->execute([$oid]); } catch (Throwable $e) {}
+$pdo->prepare("DELETE FROM users WHERE username='m3scA'")->execute();
+
+// ---------------------------------------------------------------------------
 // 11. Idempotency (§28, §30) — running the migration again changes nothing.
 // ---------------------------------------------------------------------------
 $before = count(t_columns('requisitions'));

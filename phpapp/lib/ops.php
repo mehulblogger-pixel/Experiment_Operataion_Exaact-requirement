@@ -5097,7 +5097,44 @@ function nzc_cand($f, $v) {
     if (in_array($f, ['experience_years','expected_rate'], true)) return $v === '' ? 0 : $v;
     return $v;
 }
+// One door for the candidate module — the M14 pattern, applied to the one register
+// it never covered. A candidate has no branch of its own; it inherits the branch of
+// the requisition it is raised against, so that is what scope is judged on.
+//
+// Two directions matter, and both are checked here rather than in each route:
+//   · the candidate being acted on must belong to a requisition in your scope;
+//   · a requisition you are MOVING it to must also be in your scope — otherwise a
+//     branch-A user could push work onto branch B, and (since M3) write a status
+//     change to a requisition they cannot even see.
+function cand_scope_gate() {
+    if (!function_exists('scope_allows')) return;
+    $reqOffice = function ($reqId) {
+        $reqId = (int) $reqId; if ($reqId <= 0) return null;
+        try { return ops_one("SELECT office_id, sbu FROM requisitions WHERE id=?", [$reqId]) ?: null; }
+        catch (Throwable $e) { return null; }
+    };
+    // The candidate named on this request.
+    $id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
+    if ($id > 0) {
+        try { $cand = ops_one("SELECT requisition_id FROM candidates WHERE id=?", [$id]); }
+        catch (Throwable $e) { $cand = null; }
+        if ($cand && !empty($cand['requisition_id'])) {
+            $r = $reqOffice($cand['requisition_id']);
+            if ($r) ops_require(scope_allows($r['office_id'] ?? null, $r['sbu'] ?? null),
+                                'This candidate belongs to a requisition outside your office / branch scope.');
+        }
+    }
+    // The requisition this request is attaching the candidate TO.
+    $to = (int) ($_POST['requisition_id'] ?? $_GET['requisition_id'] ?? 0);
+    if ($to > 0) {
+        $r = $reqOffice($to);
+        if ($r) ops_require(scope_allows($r['office_id'] ?? null, $r['sbu'] ?? null),
+                            'That requisition is outside your office / branch scope.');
+    }
+}
+
 function ops_candidates($route, $method) {
+    cand_scope_gate();   // M3 audit — branch scope, before anything reads an id
     $pdo = db();
 
     // stage transition (+ optional hire = create inspector)
