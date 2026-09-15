@@ -4,21 +4,22 @@
 
 | Engine | Version | Result |
 |---|---|---|
-| SQLite | bundled | **8317 passed, 0 failed** |
-| MySQL / MariaDB | MariaDB 10.11.14 | **8318 passed, 0 failed** |
+| SQLite | bundled | **8322 passed, 0 failed** |
+| MySQL / MariaDB | MariaDB 10.11.14 | **8323 passed, 0 failed** |
 
 Both figures are the **whole suite**, not just M2. The one-assertion
 difference is engine-specific coverage that only runs under MySQL; it is not a
 skipped test on SQLite.
 
-The new file `tests/test_m2_org_structure.php` contributes **31 checks**, all
-passing on both engines.
+The new file `tests/test_m2_org_structure.php` contributes **36 checks**, all
+passing on both engines — 31 from M2 itself, plus 5 added afterwards to pin the
+`requisitions.quantity` finding (see `M2-QUANTITY-COLUMN-FINDING.md`).
 
 > On counting: the numbers above are **assertions**, not test cases. One
 > scenario usually costs several assertions (set up two spellings of one
 > department → assert the name list, the hub row, its positions, its headcount
-> and its people = five assertions from one scenario). M2's 31 assertions cover
-> roughly 12 distinct scenarios.
+> and its people = five assertions from one scenario). M2's 36 assertions cover
+> roughly 14 distinct scenarios.
 
 ## 2. What the M2 tests actually prove
 
@@ -31,6 +32,7 @@ passing on both engines.
 | Live-master bindings | 5 | A designation added in Settings reaches the back-office form and renders as a label in the Command Centre |
 | Cross-tenant cache | 2 | The list stays cached within a request, and is rebuilt when the database changes underneath it |
 | Boundary | 4 | `hired_inspector_id`, `position_id`, and both pipeline engines are untouched |
+| `quantity` consistency | 5 | The column is absent from the base DDL, declared by `req_migrate()` as `INT DEFAULT 1`, and present in a database exactly when that migration has run |
 
 ## 3. Mutation testing
 
@@ -43,7 +45,9 @@ not merely decorative.
 | `lk_options_or` cache no longer keyed on `db_epoch()` | **5 failed** ✅ caught |
 | Back-office staff form reads the frozen constant again | **1 failed** ✅ caught |
 | Command Centre labels read the frozen constant again | **1 failed** ✅ caught |
-| *(all restored)* | **31 passed, 0 failed** |
+| `quantity` removed from `req_migrate()` | **1 failed** ✅ caught |
+| `quantity` added to the base `CREATE TABLE` (a second source for one column) | **2 failed** ✅ caught |
+| *(all restored)* | **36 passed, 0 failed** |
 
 No mutation passed silently. No test was weakened to obtain a green result, and
 no skips were introduced.
@@ -89,6 +93,19 @@ invoices or people. It required two workspaces to be touched within one PHP
 process, which happens on the login path. It is a real multi-tenancy defect and
 is now closed, but it was not a customer-data breach and is not described as
 one.
+
+## 4b. A note on what the test database does and does not prove
+
+The suite's database has **25 columns** on `requisitions` and no `quantity`,
+because no test opens a requisition route and so `req_migrate()` never runs
+there. That is a fact about test coverage, not about the product — reading it as
+a schema fact is precisely how the M1/M2 contradiction arose.
+
+The five checks added for this deliberately do **not** call `req_migrate()`:
+doing so would add ~53 columns to the shared test database for every test that
+follows. They assert the source of truth instead — that the base DDL does not
+declare the column, that the migration does, and that this database's state
+matches whether that migration has run.
 
 ## 5. Regression
 

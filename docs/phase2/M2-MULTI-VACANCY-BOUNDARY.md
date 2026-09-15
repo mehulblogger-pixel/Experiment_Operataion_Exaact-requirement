@@ -11,6 +11,15 @@ whoever owns that decision.
 A requisition can ask for several people (`requisitions.quantity`). The
 *counting* side handles that correctly. The *closure* side does not.
 
+> **On `requisitions.quantity`.** M1 recorded that this column does not exist.
+> It does — but it is created lazily by `req_migrate()` (`lib/recruit.php:44`,
+> `INT DEFAULT 1`) the first time a requisition screen is opened, so it is absent
+> from a fresh database and from the test databases. Both documents have been
+> corrected; the full evidence is in `M2-QUANTITY-COLUMN-FINDING.md`. The defect
+> described below is unaffected — if anything the column's existence makes it
+> sharper, because a user really can ask for 10 people and still see the
+> requisition close after the first hire.
+
 When the first candidate is converted to a hire, `lib/ops.php` runs:
 
 ```php

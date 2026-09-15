@@ -146,6 +146,44 @@ t_ok(t_table_exists('recruit_pipelines'), 'the Recruitment pipeline engine is un
 t_ok(t_table_exists('pipelines'), 'the Sales pipeline engine is untouched');
 
 // ---------------------------------------------------------------------------
+//  7. requisitions.quantity — the M1/M2 contradiction, pinned so it cannot recur.
+//
+//     M1 recorded "no quantity column (25 columns)". M2 wrote that the column
+//     exists. Both were describing something real: `quantity` is NOT in the base
+//     CREATE TABLE, and IS created by req_migrate() the first time a requisition
+//     screen is opened. A fresh database — and this test database, because no
+//     test opens a requisition route — therefore does not have it.
+//
+//     These checks deliberately do NOT call req_migrate(): that would add ~53
+//     columns to the shared test database for every test that follows. They pin
+//     the two facts that make the two documents agree. Full evidence:
+//     docs/phase2/M2-QUANTITY-COLUMN-FINDING.md
+// ---------------------------------------------------------------------------
+$opsSrc     = file_get_contents(__DIR__ . '/../lib/ops.php');
+$recruitSrc = file_get_contents(__DIR__ . '/../lib/recruit.php');
+
+// (a) The base table must not declare quantity — if someone adds it to the DDL,
+//     there would be two sources for one column and the docs would go stale.
+preg_match('/CREATE TABLE IF NOT EXISTS requisitions \((.*?)\)",/s', $opsSrc, $ddl);
+t_ok(!empty($ddl[1]), 'the base requisitions CREATE TABLE was located in lib/ops.php');
+t_ok(!empty($ddl[1]) && strpos($ddl[1], 'quantity') === false,
+     'quantity is NOT in the base CREATE TABLE — it is a lazily added column');
+
+// (b) The migration must still declare it, with the definition the docs quote.
+t_ok(function_exists('req_migrate'), 'req_migrate() — the lazy migration that adds it — exists');
+t_ok(strpos($recruitSrc, "['quantity','INT DEFAULT 1']") !== false,
+     "req_migrate() declares quantity as INT DEFAULT 1 (lib/recruit.php)");
+
+// (c) Consistency: in THIS database the column's presence must match whether the
+//     migration has run. Neither state is a failure — an inconsistent pair is.
+$reqCols   = t_columns('requisitions');
+$hasQty    = in_array('quantity', $reqCols, true);
+$migrated  = in_array('cost_wage', $reqCols, true);   // another column only req_migrate() adds
+t_eq($hasQty, $migrated,
+     'quantity is present exactly when req_migrate() has run (currently ' . ($hasQty ? 'present' : 'absent')
+     . ', ' . count($reqCols) . ' columns) — the two documents now agree on this');
+
+// ---------------------------------------------------------------------------
 //  Clean up — a test must leave the shared database as it found it.
 // ---------------------------------------------------------------------------
 $pdo->prepare("DELETE FROM positions WHERE id=?")->execute([$posId]);

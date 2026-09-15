@@ -40,7 +40,9 @@ This is a genuinely good piece of design and M2 left it intact.
 - `candidates.requisition_id` ties an applicant to the vacancy.
 - Seats filled are **counted**, not stored:
   `COUNT(candidates WHERE requisition_id = r.id AND stage = 'ACCEPTED')`.
-- Open seats = `quantity − filled` (`lib/recruit_cc.php`).
+- Open seats = `quantity − filled` (`lib/recruit_cc.php`). `requisitions.quantity`
+  is created lazily by `req_migrate()`, not by the base `CREATE TABLE` — see
+  `M2-QUANTITY-COLUMN-FINDING.md`.
 
 The counting side already handles multiple vacancies correctly. The closure
 side does not — see `M2-MULTI-VACANCY-BOUNDARY.md`.

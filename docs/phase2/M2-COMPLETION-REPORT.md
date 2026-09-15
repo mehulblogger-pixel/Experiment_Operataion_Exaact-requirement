@@ -90,12 +90,12 @@ the same pattern the team-member form already used.
 
 | Engine | Result |
 |---|---|
-| SQLite | **8317 passed, 0 failed** |
-| MariaDB 10.11.14 | **8318 passed, 0 failed** |
+| SQLite | **8322 passed, 0 failed** |
+| MariaDB 10.11.14 | **8323 passed, 0 failed** |
 
-Whole suite, both engines. M2 adds 31 assertions (~12 scenarios), green on
+Whole suite, both engines. M2 adds 36 assertions (~14 scenarios), green on
 both. Every fix was mutation-tested — reverted one at a time, and each
-mutation was caught (6, 5, 1 and 1 failures respectively). No test was weakened
+mutation was caught (6, 5, 1, 1, 1 and 2 failures respectively). No test was weakened
 and no skip was introduced. Details in `M2-TEST-RESULTS.md`.
 
 ## 5. STOP — one decision is yours, not mine
@@ -128,6 +128,43 @@ map `QAQC → QUALITY`, `HSE → SAFETY`, `FINANCE → COMMERCIAL` in one revers
 migration with a dry-run report first; then point the requisition and candidate
 forms at it and retire `hr_department`. That is a self-contained milestone. It
 needs your answer on the three mappings before it can start.
+
+## 5b. Correction issued after M2 was first reported
+
+A contradiction was raised between M1 and M2: M1 recorded that `requisitions`
+has **no** `quantity` column; M2 wrote that it **does**. Both were wrong, in
+different ways, and both documents have been corrected. No schema and no
+behaviour changed.
+
+**The fact.** `quantity` is not in the base `CREATE TABLE`. It is created
+lazily — `INT DEFAULT 1`, at `lib/recruit.php:44` inside `req_migrate()`,
+introduced in commit `b963490` (2026-08-27) — the first time any requisition
+screen is opened. So a fresh database has 25 columns and no `quantity`; the same
+database has 78 columns and `quantity` once that migration runs. Verified on
+SQLite and MariaDB.
+
+**Why M1 saw it that way.** M1 inspected a database in which no requisition
+screen had ever been opened, so its observation was accurate but its conclusion —
+that the fix requires *adding* a quantity column — was not. Two related M1 claims
+were wrong for the same reason: that `start_date` is absent, and that
+`recruit_req_health()` "silently falls back to 1 for every requisition ever
+raised". Both columns exist wherever requisitions exist.
+
+**Why M2 got it wrong.** The substance was right — the multi-vacancy closure
+defect is real and unchanged — but M2 stated `requisitions.quantity` as an
+unqualified schema fact and did not reconcile it against M1's explicit statement
+to the contrary. The M2 audit read the same 25-column dump and did not follow it
+through to `req_migrate()`. That should have been caught when M2 was written.
+
+**Effect on the deferred defect: none.** It stands exactly as documented. If
+anything it is sharper than M1 implied — because `quantity` does exist and is
+editable on the requisition form, a user can genuinely ask for 10 people and
+still see the requisition marked `HIRED` after the first hire.
+
+Full evidence, including the one path that can create a requisition before the
+column exists (`seed_demo.php`), is in `M2-QUANTITY-COLUMN-FINDING.md`. Five
+regression checks now pin the two facts that keep the documents consistent, and
+both were mutation-tested.
 
 ## 6. Explicitly not done
 
@@ -162,10 +199,15 @@ anywhere. See `docs/phase1/PHASE1-PENDING-WORK.md`.
 | `lib/ops.php` | Back-office staff form + list read the live masters |
 | `lib/recruit_cc.php` | `rcc_designations()` added; 2 label lookups use the live master |
 | `views/ops/positions.php` | Department steered by the master (datalist) |
-| `tests/test_m2_org_structure.php` | New — 31 assertions |
+| `tests/test_m2_org_structure.php` | New — 36 assertions (31 + 5 pinning the `quantity` finding) |
 | `deploy-check.php` | Regenerated (the suite's checksum test required it) |
-| `docs/phase2/*` | This set of six documents |
+| `docs/phase2/*` | This set of seven documents |
+| `docs/phase2/00-PHASE2-BASELINE.md` | M1 corrected in 4 places (the `quantity` finding) |
 
 ## 9. Next
 
 M3 has **not** been started, per instruction. M2 stops here.
+
+The `quantity` contradiction that was blocking M3 is now resolved: the column
+exists, the documents agree, and the multi-vacancy closure rule remains the open
+item — narrower than M1 estimated, since only the closure rule is missing.

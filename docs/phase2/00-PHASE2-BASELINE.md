@@ -13,6 +13,13 @@
 build that cannot happen, for three independent reasons:
 
 * `requisitions` has **no vacancy-count column** at all (25 columns, none of them a quantity).
+  > **CORRECTED (see `M2-QUANTITY-COLUMN-FINDING.md`).** This was what the
+  > inspected database contained, but it is not true of the product. `quantity`
+  > (`INT DEFAULT 1`) is created lazily by `req_migrate()` — `lib/recruit.php:44`,
+  > introduced in `b963490` — the first time any requisition screen is opened. It
+  > is absent only in a database where that has never happened, which is why the
+  > test database shows 25 columns. The column exists; the defect below is the
+  > closure rule, not a missing field.
 * It carries `hired_inspector_id` — **singular**. One requisition, one hire.
 * `lib/ops.php:5178` closes the whole thing on the first join:
   ```php
@@ -20,16 +27,28 @@ build that cannot happen, for three independent reasons:
   ```
 
 The concept is half-present but has nothing to read from:
-`recruit_req_health()` (lib/recruit.php:510) computes `$qty - $filled`, but reads
-`$req['quantity']`, a column `requisitions` does not have — so `$qty` silently
-falls back to `1` for every requisition ever raised. The same function reads
-`$req['start_date']`, also absent. It was written against a shape that has those
-fields (`cx_requirements` has `positions`; `cx_engagements` has `quantity`) and
-applied to one that does not.
+`recruit_req_health()` (lib/recruit.php:510) computes `$qty - $filled` from
+`$req['quantity']`.
+
+> **CORRECTED.** The original text said `quantity` is "a column `requisitions`
+> does not have — so `$qty` silently falls back to `1` for every requisition ever
+> raised", and that `start_date` is "also absent". Both columns are created by
+> `req_migrate()` (`lib/recruit.php:44` and `:48`). In any installation where the
+> Requisitions screen has been opened — which is every installation that has a
+> requisition — both are present and `recruit_req_health()` reads real values.
+> The only way to hold a requisition without them is a `seed_demo.php` seed that
+> has never been followed by a visit to Requisitions, and that visit creates them.
+> `recruit_req_health()` was **not** written against the wrong shape.
 
 **This is the single largest structural item in Phase 2** and the reason M3/M4
-exist. It is additive to fix: a quantity column, a fill count derived from
-candidates, and a closure rule that compares the two.
+exist.
+
+> **CORRECTED.** The fix is smaller than stated here: the quantity column already
+> exists, and the fill count is already derived from candidates
+> (`lib/recruit_cc.php`). What is genuinely missing is only the third item — a
+> **closure rule that compares the two**, replacing the single
+> `hired_inspector_id` and the terminal `status='HIRED'` set on the first hire.
+> See `M2-MULTI-VACANCY-BOUNDARY.md` §5 for the recommended shape.
 
 ### F2 — "Job Profile" does not exist; `positions` is not it
 
@@ -74,7 +93,7 @@ mapped, never overwritten.
 | H | Department | **No table.** Free text on 4 tables; a `department` lookup key exists | **MAP** (free text → lookup) |
 | I | Designation / job | Free text; `lookup_values` keys exist; `cx_job_families` exists in Connect taxonomy | **MAP + BUILD** (job profile, F2) |
 | J | Position | `positions` — establishment + headcount + reporting line | **REUSE** as establishment layer |
-| K | Requisition | `requisitions` (25) — links `position_id`, `recruiter_id`, `manager_id`, `office_id`, `sbu` | **EXTEND** (quantity, target dates) |
+| K | Requisition | `requisitions` (25 in a fresh DB, **78 once `req_migrate()` runs**) — links `position_id`, `recruiter_id`, `manager_id`, `office_id`, `sbu` | **EXTEND** (closure rule only — `quantity` and target dates already exist; see `M2-QUANTITY-COLUMN-FINDING.md`) |
 | L | Pipeline | `recruit_pipelines` + `recruit_stages` — configurable, with `applies_*` conditions, `responsible_role`, `mandatory`, `sla_days`, `required_docs` | **REUSE** — already the authoritative engine |
 | M | Interviews | `interviews`, `interview_scores` | **REUSE** |
 | N | Offers | `job_offers` (19) — `ctc`, `joining_date`, `letter_html`, full lifecycle dates | **REUSE** |
