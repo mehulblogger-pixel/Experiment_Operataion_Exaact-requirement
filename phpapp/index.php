@@ -855,6 +855,11 @@ if ($route === 'login') {
         if (function_exists('saas_leave_tenant')) saas_leave_tenant();
         if ($loginId !== '' && strpos($loginId, '@') !== false && function_exists('saas_login_lookup')) {
             $tk = saas_login_lookup($loginId);
+            // Not in the directory yet? Ask the companies themselves, once, and
+            // remember the answer. Only the company OWNER is ever written to the
+            // directory at creation time, so without this every colleague added
+            // afterwards is told their password is wrong. See saas_login_discover().
+            if ($tk === '' && function_exists('saas_login_discover')) $tk = saas_login_discover($loginId);
             if ($tk !== '' && function_exists('saas_enter_tenant')) {
                 saas_enter_tenant($tk);
                 // Build + stamp the workspace the first time its owner signs in

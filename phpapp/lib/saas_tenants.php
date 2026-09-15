@@ -274,6 +274,78 @@ function saas_login_lookup($email) {
     } catch (Throwable $e) { return ''; }
 }
 
+// FINDING A PERSON WHO IS NOT YET IN THE DIRECTORY.
+//
+// The directory above is written in exactly one place: when a company is created,
+// its OWNER's email is recorded. Every colleague the owner adds afterwards — from
+// the Users screen, from the org admin, from an import — is never written to it.
+// On the single shared address that means they cannot sign in at all: the lookup
+// finds nothing, the live database stays on the control store where they do not
+// exist, and they are told their password is wrong. It is not; we simply could
+// not work out which company they belong to.
+//
+// Hooking every screen that creates a user would fix today's screens and forget
+// tomorrow's. So this asks the companies themselves instead, exactly the way
+// saas_tenant_seen_alive_sweep() lets the control database learn a fact by
+// ordinary use: on a MISS, look through the registered companies for an active
+// person with this sign-in name, and remember the answer so the next sign-in
+// takes the fast path. Existing people are repaired the first time they try.
+//
+// Deliberate choices:
+//   • only on a miss — a known email never pays for this;
+//   • suspended companies are skipped, and a company that will not open is
+//     stepped over rather than breaking the sign-in for everyone else;
+//   • ALL companies are examined, not the first hit, because one e-mail that
+//     exists in two companies is ambiguous. We refuse to guess: the sign-in
+//     fails and an operator sets the directory deliberately. Guessing would put
+//     somebody in the wrong company's data, which is the one outcome worth more
+//     than the inconvenience;
+//   • the workspace is always left again, on every path, so a failed probe can
+//     never leave the request pointing at somebody else's database;
+//   • nothing here says whether an e-mail exists — the caller's message is
+//     unchanged either way.
+const SAAS_DISCOVER_MAX = 200;          // a sane ceiling on work done for one miss
+
+function saas_login_discover($loginId) {
+    if (!function_exists('ops_all') || !function_exists('saas_enter_tenant')
+        || !function_exists('saas_leave_tenant')) return '';
+    // Only from the control database: that is where both the company list and the
+    // directory live, and it is where the sign-in already stands at this point.
+    if (function_exists('current_tenant') && current_tenant() !== '') return '';
+    $loginId = strtolower(trim((string) $loginId));
+    if ($loginId === '') return '';
+
+    try { $rows = ops_all("SELECT tenant_key, status FROM saas_tenants ORDER BY tenant_key"); }
+    catch (Throwable $e) { return ''; }                     // no registry — not a SaaS install
+    if (!$rows) return '';
+
+    $hits = [];
+    $seen = 0;
+    foreach ((array) $rows as $r) {
+        if (++$seen > SAAS_DISCOVER_MAX) break;
+        $key = strtolower(trim((string) ($r['tenant_key'] ?? '')));
+        if ($key === '') continue;
+        if (strtolower(trim((string) ($r['status'] ?? 'active'))) === 'suspended') continue;
+        try {
+            if (!saas_enter_tenant($key)) { saas_leave_tenant(); continue; }
+            $hit = ops_one("SELECT id FROM users
+                            WHERE (LOWER(username) = ? OR LOWER(email) = ?) AND is_active = 1
+                            LIMIT 1", [$loginId, $loginId]);
+            saas_leave_tenant();
+            if ($hit) $hits[] = $key;
+        } catch (Throwable $e) {
+            try { saas_leave_tenant(); } catch (Throwable $e2) {}
+        }
+    }
+    if (count($hits) !== 1) return '';                      // none, or ambiguous — never guess
+
+    // Remember it, so this costs nothing next time.
+    if (function_exists('saas_login_index_set')) {
+        try { saas_login_index_set($loginId, $hits[0], true); } catch (Throwable $e) {}
+    }
+    return $hits[0];
+}
+
 // ---------------------------------------------------------------------------
 //  SUPER-ADMIN — the Companies console (route /companies)
 //
