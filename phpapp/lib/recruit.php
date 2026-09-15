@@ -42,6 +42,9 @@ function req_migrate() {
         ['contract_ref',"VARCHAR(120) DEFAULT ''"],
         // Position
         ['quantity','INT DEFAULT 1'], ['discipline',"VARCHAR(120) DEFAULT ''"], ['category',"VARCHAR(120) DEFAULT ''"],
+        // M3 — the canonical Department relationship, alongside the free-text
+        // column rather than instead of it (see docs/phase2/M3-REQUISITION-STRUCTURE.md).
+        ['department_id','INT NULL'],
         ['skills',"VARCHAR(400) DEFAULT ''"], ['qualification',"VARCHAR(200) DEFAULT ''"],
         ['experience_min',"DECIMAL(5,1) DEFAULT 0"], ['relevant_experience',"VARCHAR(200) DEFAULT ''"],
         // Deployment
@@ -226,7 +229,7 @@ function req_extra_fields() {
         // Cost build-up heads (sourcing-model aware).
         'sourcing_model','cost_wage','cost_statutory_pct','cost_agency_pct','cost_reimburse','cost_oneoff',
         // Phase 7 — ownership (Responsible 1 = recruiter, Responsible 2 = manager) + department.
-        'recruiter_id','manager_id','department',
+        'recruiter_id','manager_id','department','department_id',
         // Auto job-description — free-text key responsibilities feed the generator.
         'responsibilities'];
 }

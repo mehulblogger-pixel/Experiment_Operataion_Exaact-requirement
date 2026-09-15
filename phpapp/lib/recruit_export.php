@@ -65,7 +65,7 @@ function _rx_candidates($f) {
         $src = (string)($c['source_type'] ?? '') !== '' ? $c['source_type'] : (string)($c['source'] ?? '');
         $rows[] = [
             (string)($c['cand_code'] ?? ''), _rx_full_name($c), (string)($c['designation'] ?? ''),
-            (string)($c['department'] ?? ''), (string)($stages[$c['stage']] ?? $c['stage'] ?? ''), $src,
+            (function_exists('dept_row_label') ? dept_row_label($c) : (string)($c['department'] ?? '')), (string)($stages[$c['stage']] ?? $c['stage'] ?? ''), $src,
             (string)($users[(int)($c['recruiter_id'] ?? 0)] ?? ''),
             (string)($c['experience_years'] ?? ''), (string)($c['email'] ?? ''), (string)($c['mobile'] ?? ''),
             fdate((string)($c['cv_received_date'] ?? '')), (string)($c['req_code'] ?? ''),
@@ -88,7 +88,7 @@ function _rx_requisitions($f) {
     } catch (Throwable $e) { $q = []; }
     foreach ($q as $r) {
         $rows[] = [
-            (string)($r['req_code'] ?? ''), (string)($r['designation'] ?? ''), (string)($r['department'] ?? ''),
+            (string)($r['req_code'] ?? ''), (string)($r['designation'] ?? ''), (function_exists('dept_row_label') ? dept_row_label($r) : (string)($r['department'] ?? '')),
             (string)($r['sbu'] ?? ''), (string)($r['grade'] ?? ''), (string)($r['req_type'] ?? ''),
             (string)($r['status'] ?? ''), (string)($users[(int)($r['recruiter_id'] ?? 0)] ?? ''),
             (string)($users[(int)($r['manager_id'] ?? 0)] ?? ''), (string)($r['cand_n'] ?? '0'),
@@ -114,7 +114,7 @@ function _rx_offers($f, $salOK) {
         $decided = (string)($o['accepted_at'] ?? '') !== '' ? 'Accepted ' . fdate($o['accepted_at'])
                  : ((string)($o['declined_at'] ?? '') !== '' ? 'Declined ' . fdate($o['declined_at']) : '');
         $row = [
-            _rx_full_name($o), (string)($o['designation'] ?? ''), (string)($o['department'] ?? ''),
+            _rx_full_name($o), (string)($o['designation'] ?? ''), (function_exists('dept_row_label') ? dept_row_label($o) : (string)($o['department'] ?? '')),
             (string)($o['status'] ?? ''), fdate((string)($o['joining_date'] ?? '')),
             (string)($o['approved_by'] ?? ''), fdate((string)($o['issued_at'] ?? '')), $decided,
             fdate((string)($o['created_at'] ?? '')),

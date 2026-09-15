@@ -546,6 +546,12 @@ function run_schema($withSeeds = true) {
     if (function_exists('comp_migrate')) comp_migrate();               // Phase 5.1A — salary_component_defs (configurable compensation)
     if (function_exists('recruit_offer_migrate')) recruit_offer_migrate(); // Phase 5 — salary_structures + hr_discussions + job_offers
     if (function_exists('doc_tpl_migrate')) doc_tpl_migrate();          // Phase 5.1B — doc_templates (configurable letters)
+    // M3 — requisition structure (quantity, start_date, department_id and the rest)
+    // was created lazily, only once somebody opened a requisition route. A fresh
+    // install therefore had a requisitions table that did not yet carry the
+    // columns the requisition screens need. It is additive and epoch-guarded, so
+    // running it at boot is idempotent and makes the schema deterministic.
+    if (function_exists('req_migrate')) req_migrate();                 // M2 finding: was route-triggered only
     if (function_exists('appr_migrate')) appr_migrate();               // Phase 6 — configurable approval rules/levels/requests/steps
     if (function_exists('careers_migrate')) careers_migrate();         // Phase 7 — requisitions.careers_published/careers_summary
     if (function_exists('workspace_migrate')) workspace_migrate();     // Configurable role workspaces — users.start_route

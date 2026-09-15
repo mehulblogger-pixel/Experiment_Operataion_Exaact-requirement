@@ -4,6 +4,15 @@
 Both statements were wrong, in different ways. No schema and no behaviour was
 changed in resolving this — only the documents.
 
+> **CLOSED (Phase 2, forms milestone).** The lazy behaviour described below is
+> what this document found, and it is no longer how the application works.
+> `req_migrate()` is now called from `boot()` (`lib/db.php`), so the requisition
+> structure — `quantity`, `start_date`, `department_id` and the rest — exists in
+> any database that has simply been started, without anyone having to open a
+> requisition page first. A fresh install now reports **79 columns** on
+> `requisitions`, not 25. The finding below is kept as the record of what was
+> wrong and why; sections 1–4 describe the behaviour up to that change.
+
 ## 1. The answer
 
 `requisitions.quantity` is a **lazily created column**. It is not in the table's
@@ -104,6 +113,15 @@ requisition form, a user can genuinely ask for 10 people — and the closure rul
 will still mark the requisition `HIRED` after the first one.
 
 M2 changed none of this, as instructed.
+
+## 6b. Why it was fixed rather than documented again
+
+The next milestone's §29 requires that requisition functionality must not
+silently depend on an unrelated page being opened first — which is precisely the
+behaviour this document recorded. Since the department identity column had to be
+added to `requisitions` anyway, the migration was wired into `boot()` at the same
+time. It is additive and epoch-guarded, so running it at startup is idempotent
+and makes the schema deterministic on a fresh install.
 
 ## 7. Effect on the M2 test results
 

@@ -132,12 +132,12 @@ function careers_apply($job, $post, $files) {
     $code = function_exists('recruit_cand_code') ? recruit_cand_code($job)
           : (function_exists('ops_next_code') ? ops_next_code('candidates', 'cand_code', 'CV') : ('CV-' . date('ymdHis')));
     $cols = ['cand_code','first_name','middle_name','last_name','designation','source','email','mobile',
-             'experience_years','cv_received_date','remarks','requisition_id','recruiter_id','department','sbu',
+             'experience_years','cv_received_date','remarks','requisition_id','recruiter_id','department','department_id','sbu',
              'stage','created_by','created_at'];
     $vals = [$code, $first, trim((string)($post['middle_name'] ?? '')), $last,
              (string)($job['designation'] ?? ''), 'CAREERS', $email, $mobile,
              ($exp === '' ? 0 : (float)$exp), date('Y-m-d'), $remarks, (int)$job['id'],
-             ($job['recruiter_id'] ?? null) ?: null, (string)($job['department'] ?? ''), (string)($job['sbu'] ?? ''),
+             ($job['recruiter_id'] ?? null) ?: null, (string)($job['department'] ?? ''), ($job['department_id'] ?? null) ?: null, (string)($job['sbu'] ?? ''),
              'RECEIVED', 'Careers site', date('c')];
     $ph = implode(',', array_fill(0, count($cols), '?'));
     try {

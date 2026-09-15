@@ -515,3 +515,54 @@ function dept_set_active($valueId, $on) {
     db()->prepare("UPDATE lookup_values SET active=?, updated_by=?, updated_at=? WHERE id=?")
         ->execute([(int) !!$on, vocab_who(), vocab_now(), (int) $valueId]);
 }
+
+// ---- The canonical Department on a form ------------------------------------
+// One picker for every screen that files something under a department. Offers
+// the canonical master, indented by hierarchy, and — crucially — keeps showing
+// a legacy value a record already holds, so opening an old requisition never
+// silently blanks its department.
+//
+// Returns [value => label]; the value is the canonical CODE, which is what the
+// existing free-text column has always held.
+function dept_form_options($currentStored = '') {
+    dept_vocab_seed();
+    $out = [];
+    foreach (dept_tree(true) as $d) {
+        $out[(string) $d['code']] = str_repeat('— ', (int) ($d['depth'] ?? 0)) . vocab_display($d);
+    }
+    $cur = trim((string) $currentStored);
+    if ($cur !== '' && !isset($out[$cur])) {
+        // A value from before the canonical master, or from the legacy hiring
+        // list. Keep it selectable and readable rather than losing it.
+        $v = dept_of($cur);
+        $out[$cur] = $v ? vocab_display($v) : dept_label($cur) . ' (existing)';
+    }
+    return $out;
+}
+
+// What a form POST means for the department: the canonical identity AND the
+// code to keep in the free-text column, so no existing reader breaks.
+// Returns ['department' => code-or-original, 'department_id' => int|null].
+function dept_form_save(array $post, $field = 'department') {
+    $raw = trim((string) ($post[$field] ?? ''));
+    if ($raw === '') return ['department' => '', 'department_id' => null];
+    $v = dept_of($raw);
+    if (!$v) return ['department' => $raw, 'department_id' => null];   // unknown wording is preserved, never invented
+    return ['department' => (string) ($v['code'] !== '' ? $v['code'] : $raw), 'department_id' => (int) $v['id']];
+}
+
+// The department of a record that may carry the identity, the legacy text, or
+// both. The identity wins; the text is the fallback for everything written
+// before M3. Returns the canonical row or null.
+function dept_of_row($row, $idField = 'department_id', $textField = 'department') {
+    $id = (int) ($row[$idField] ?? 0);
+    if ($id > 0) { $v = vocab_value($id); if ($v) return $v; }
+    return dept_of((string) ($row[$textField] ?? ''));
+}
+
+// …and its display name, for a list, an export or a letter.
+function dept_row_label($row, $idField = 'department_id', $textField = 'department') {
+    $v = dept_of_row($row, $idField, $textField);
+    if ($v) return vocab_display($v);
+    return dept_label((string) ($row[$textField] ?? ''));
+}

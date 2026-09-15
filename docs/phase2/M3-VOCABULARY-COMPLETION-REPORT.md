@@ -55,7 +55,7 @@ Each was reproduced first. Each is pinned by tests and by a mutation.
 
 Whole suite, both engines. M3 adds **100 assertions** (~41 scenarios). **Nine
 mutations**, all caught. No test weakened, no skip introduced. Full detail in
-`M3-TEST-RESULTS.md`.
+`M3-VOCABULARY-TEST-RESULTS.md`.
 
 Worth recording: the first full run failed on `every table-creating migration is
 wired into boot() — MISSING: vocab_migrate`. The existing suite caught an
@@ -154,11 +154,10 @@ columns. The `department` values had their own code and label registered as
 terms — new rows, no edits.
 
 **15. What was deliberately not migrated?**
-The five ambiguous legacy values (they need your decision), and the requisition
-and candidate **forms**, which still offer `hr_department`. Moving entry to the
-canonical master should follow your answers, so new requisitions land on
-departments that exist rather than widening the split. Display and approval
-routing are already unified, so both old and new values read correctly today.
+The five ambiguous legacy values — they need your decision, and nothing was
+guessed. (The requisition and candidate **forms** were also deferred at the time
+of this report; they have since been moved onto the canonical master — see
+`M3-DEPARTMENT-FORMS.md`. No stored department value was rewritten in doing so.)
 
 **16. What remains ambiguous?**
 `QAQC`, `NDT`, `HSE`, `HR`, `FINANCE` — the four questions in §5 above. Also
@@ -201,7 +200,10 @@ vacancy quantity, fill count and closure rules are all unchanged.
 
 ## 8. Known limitations
 
-- Requisition and candidate **entry** still uses the legacy list (Q15).
+- ~~Requisition and candidate **entry** still uses the legacy list (Q15).~~
+  **CLOSED** — both forms now offer the canonical Department master and record
+  the Department identity (`department_id`) alongside the existing text column.
+  See `M3-DEPARTMENT-FORMS.md`.
 - Multi-language is a *foundation* only — `lang` exists and is matched on; no
   translation UI was built (§24 says not to).
 - Similarity scoring is deterministic (prefix / containment / Levenshtein). It

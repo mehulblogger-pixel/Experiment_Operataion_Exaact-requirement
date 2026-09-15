@@ -423,6 +423,10 @@ function ops_migrate() {
     ensure_column('inspectors', 'guarantee_upto', "VARCHAR(20) DEFAULT ''"); // fee is provisional until this date
     ensure_column('agencies', 'guarantee_days', 'INT DEFAULT 90');           // free-replacement window
     ensure_column('candidates', 'requisition_id', 'INT NULL');               // hire is against an approved requisition
+    // M3 — the canonical Department relationship. The free-text `department`
+    // column stays exactly as it is, so every existing reader keeps working;
+    // this carries the identity so a rename or a synonym cannot break the link.
+    ensure_column('candidates', 'department_id', 'INT NULL');
     ensure_column('candidates', 'group_id', 'INT NULL');                     // 1c — which deployment group (reporting person/site) this hire fills
     // CV analysis (keyword extraction for search) + client-submission / interview tracking (§20)
     ensure_column('candidates', 'cv_text', 'MEDIUMTEXT');
@@ -4953,6 +4957,12 @@ function ops_requisitions($route, $method) {
         if ($route === 'requisition-edit') { $req = ops_one("SELECT * FROM requisitions WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$req) { http_response_code(404); view('notfound'); return; } }
         if ($method === 'POST') {
             $b = $_POST;
+            // M3 — resolve what was picked to the canonical Department. The
+            // free-text column keeps the canonical CODE so every existing reader
+            // is unaffected; department_id carries the identity, which survives a
+            // rename. Wording the master does not recognise is preserved as typed
+            // rather than invented into something it is not.
+            if (function_exists('dept_form_save')) { $dsv = dept_form_save($b); $b['department'] = $dsv['department']; $b['department_id'] = $dsv['department_id']; }
             // Guard the percentage fields. Statutory and agency are a PER-CENT of
             // the wage, so a value over 100 is almost always a rupee amount typed
             // into a % box (e.g. 8000) — which would inflate the cost a hundredfold
@@ -5218,6 +5228,12 @@ function ops_candidates($route, $method) {
             // blank fields, and re-render the form for the recruiter to review & Save.
             // Never creates a candidate; only fills the form.
             $b = $_POST;
+            // M3 — resolve what was picked to the canonical Department. The
+            // free-text column keeps the canonical CODE so every existing reader
+            // is unaffected; department_id carries the identity, which survives a
+            // rename. Wording the master does not recognise is preserved as typed
+            // rather than invented into something it is not.
+            if (function_exists('dept_form_save')) { $dsv = dept_form_save($b); $b['department'] = $dsv['department']; $b['department_id'] = $dsv['department_id']; }
             $cvText = trim((string)($b['cv_text'] ?? ''));
             if (!empty($_FILES['cv_file']['tmp_name']) && (int)$_FILES['cv_file']['error'] === 0) {
                 $bytes = @file_get_contents($_FILES['cv_file']['tmp_name']);
@@ -5237,7 +5253,7 @@ function ops_candidates($route, $method) {
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
                 'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id','group_id',
-                'recruiter_id','department','drop_reason','drop_point'];   // Phase 7 — ownership + why/where lost; group_id = which deployment group (1c)
+                'recruiter_id','department','department_id','drop_reason','drop_point'];   // Phase 7 — ownership + why/where lost; group_id = which deployment group (1c)
             // §11 duplicate guard — on a NEW candidate, stop and show look-alikes
             // (same mobile / email / name) before creating a second record for the
             // same person. "Save anyway" (dup_ack) proceeds.

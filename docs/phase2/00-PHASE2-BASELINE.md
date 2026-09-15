@@ -166,7 +166,7 @@ Each will be justified again, in code, at its own milestone.
 |---|---|
 | **M2** — Organisation, Department, Designation & Job Structure | The organisation model was already sound; no table added. Fixed one real department splitting into several, two frozen-constant bindings, and a cross-tenant lookup-cache leak. `M2-COMPLETION-REPORT.md` |
 | **M2 correction** | `requisitions.quantity` — this baseline's claim that the column does not exist was wrong; it is created lazily by `req_migrate()`. `M2-QUANTITY-COLUMN-FINDING.md` |
-| **M3** — Department Vocabulary Consolidation | Canonical Department + a generic controlled-vocabulary engine (`lib/vocab.php`). Approved terms resolve a customer's own wording to one identity; nothing is merged by guesswork. Fixed approval routing that silently skipped the chain, raw codes on the public careers page, and a core route exposing paid-module data. `M3-COMPLETION-REPORT.md` |
+| **M3** — Department Vocabulary Consolidation | Canonical Department + a generic controlled-vocabulary engine (`lib/vocab.php`). Approved terms resolve a customer's own wording to one identity; nothing is merged by guesswork. Fixed approval routing that silently skipped the chain, raw codes on the public careers page, and a core route exposing paid-module data. `M3-VOCABULARY-COMPLETION-REPORT.md` |
 
 The largest structural item named in this baseline — **multi-vacancy closure** —
 remains open and is narrower than estimated here: the quantity column and the

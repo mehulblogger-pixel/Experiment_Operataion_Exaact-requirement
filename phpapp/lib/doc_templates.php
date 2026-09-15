@@ -150,7 +150,7 @@ function doc_token_map($candidate) {
     $position = (defined('DESIGNATIONS') && isset(DESIGNATIONS[$desig])) ? DESIGNATIONS[$desig] : $desig;
 
     $req = !empty($candidate['requisition_id']) ? ops_one("SELECT * FROM requisitions WHERE id=?", [(int)$candidate['requisition_id']]) : null;
-    $dept = $req['department'] ?? ''; $grade = $req['grade'] ?? '';
+    $dept = function_exists('dept_row_label') ? dept_row_label($req) : ($req['department'] ?? ''); $grade = $req['grade'] ?? '';
     if ((!$dept || !$grade) && $req && !empty($req['position_id']) && function_exists('position_get')) {
         $pos = position_get((int)$req['position_id']);
         if ($pos) { $dept = $dept ?: ($pos['department'] ?? ''); $grade = $grade ?: ($pos['grade'] ?? ''); }

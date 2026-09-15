@@ -259,13 +259,13 @@ function rcc_data($f) {
                     FROM candidates c WHERE $cw AND c.stage NOT IN ('ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED')
                     ORDER BY dt ASC LIMIT 8", $ca) as $r) {
         $age = (int)floor((strtotime(date('Y-m-d')) - strtotime($r['dt'] ?: date('Y-m-d'))) / 86400);
-        $d['waiting'][] = ['id' => (int)$r['id'], 'nm' => trim($r['nm']) ?: $r['cand_code'], 'dept' => ($deptOpt[$r['department']] ?? $r['department'] ?: '—'),
+        $d['waiting'][] = ['id' => (int)$r['id'], 'nm' => trim($r['nm']) ?: $r['cand_code'], 'dept' => (function_exists('dept_row_label') ? (dept_row_label($r) ?: '—') : ($deptOpt[$r['department']] ?? $r['department'] ?: '—')),
                            'mgr' => rcc_user_name($r['recruiter_id']) ?: '—', 'days' => max(0, $age)];
     }
 
     // ---- Needs attention: biggest open demand ----
     $d['demand'] = [];
-    foreach ($reqRows as $r) { $q = max(1, (int)($r['quantity'] ?? 1)); $open = max(0, $q - (int)$r['filled']); if ($open > 0) $d['demand'][] = ['id' => (int)$r['id'], 'req' => $r['req_code'], 'dept' => ($deptOpt[$r['department']] ?? $r['department'] ?: '—'), 'role' => (rcc_designations()[$r['designation']] ?? $r['designation'] ?: '—'), 'vac' => $q, 'open' => $open]; }
+    foreach ($reqRows as $r) { $q = max(1, (int)($r['quantity'] ?? 1)); $open = max(0, $q - (int)$r['filled']); if ($open > 0) $d['demand'][] = ['id' => (int)$r['id'], 'req' => $r['req_code'], 'dept' => (function_exists('dept_row_label') ? (dept_row_label($r) ?: '—') : ($deptOpt[$r['department']] ?? $r['department'] ?: '—')), 'role' => (rcc_designations()[$r['designation']] ?? $r['designation'] ?: '—'), 'vac' => $q, 'open' => $open]; }
     usort($d['demand'], fn($a, $b) => $b['open'] <=> $a['open']); $d['demand'] = array_slice($d['demand'], 0, 8);
 
     // ---- Recruiter performance + manpower P&L (reuses Phase 5 commercials) ----
@@ -310,7 +310,7 @@ function rcc_tracker($reqRows, $deptOpt) {
         $out[] = [
             'id' => (int)$r['id'], 'req' => $r['req_code'],
             'posted' => (rcc_designations()[$r['designation']] ?? $r['designation'] ?: '—'), 'qty' => $q,
-            'dept' => ($deptOpt[$r['department']] ?? $r['department'] ?: ''),
+            'dept' => (function_exists('dept_row_label') ? dept_row_label($r) : ($deptOpt[$r['department']] ?? $r['department'] ?: '')),
             'recruiter' => rcc_user_name($r['recruiter_id']), 'manager' => rcc_user_name($r['manager_id']),
             'filled' => $filled, 'status' => $r['status'],
             'earned' => $roll ? (float)$roll['appr_profit'] : 0.0,
