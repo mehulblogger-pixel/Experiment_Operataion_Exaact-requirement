@@ -11,6 +11,10 @@ $requisitions = $requisitions ?? []; $remaining = $remaining ?? 0;
 $people = $people ?? []; $offices = $offices ?? []; $positions = $positions ?? [];
 $v = fn($k, $d = '') => $e($r[$k] ?? $d);
 $csrf = fn() => function_exists('csrf_field') ? csrf_field() : '';
+// M4 correction §1 — the locked words. A bare "Requirement" is never printed on
+// a recruitment screen; hreq_label() qualifies the workspace's own word if it is
+// one of the ambiguous ones.
+$L  = fn($k, $pl = false) => function_exists('hreq_label') ? hreq_label($k, $pl) : ucfirst($k);
 $status = strtoupper((string) ($r['status'] ?? 'DRAFT'));
 $editable = !$r || in_array($status, ['DRAFT'], true);
 $depts = function_exists('dept_form_options') ? dept_form_options('') : [];
@@ -27,7 +31,7 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
 <div class="master-head">
   <div><h1><?= $r ? $e($r['req_no']) : 'New hiring request' ?>
     <?php if ($r): ?><span class="pill <?= $status === 'APPROVED' ? 'p-ok' : ($status === 'DRAFT' ? 'p-mut' : 'p-info') ?>" style="vertical-align:middle;font-size:12px"><?= $e((function_exists('hreq_statuses') ? hreq_statuses() : [])[$status] ?? $status) ?></span><?php endif; ?></h1>
-    <p class="sub" style="margin:2px 0 0"><?= $r ? $e($r['job_title']) . ' · ' . (int) $r['quantity'] . ' needed' : 'Tell us what you need and we will turn it into a recruitment requisition once it is approved.' ?></p></div>
+    <p class="sub" style="margin:2px 0 0"><?= $r ? $e($r['job_title']) . ' · ' . (int) $r['quantity'] . ' needed' : 'Tell us what you need. Once it is approved it becomes a ' . strtolower($L('requisition')) . ' and recruitment starts.' ?></p></div>
 </div>
 
 <?php if ($r && $status === 'APPROVED'): ?>
@@ -47,6 +51,9 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
 <?php elseif ($r && in_array($status, ['SUBMITTED', 'UNDER_REVIEW'], true)): ?>
   <div class="panel" style="border-left:3px solid #0969da">
     Waiting for a decision. Recruitment cannot start until this is approved.
+    <?php if (!$mayDecide && function_exists('hreq_is_own_request') && hreq_is_own_request($r)): ?>
+      <span class="muted" style="margin-left:10px">You raised this request, so somebody else has to decide it.</span>
+    <?php endif; ?>
     <?php if ($mayDecide): ?>
       <form method="post" style="display:inline-flex;gap:6px;align-items:center;margin-left:10px">
         <?= $csrf() ?><input type="hidden" name="do" value="decide"><input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
@@ -158,7 +165,7 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
   <h3 class="tab-sub">Recruitment raised from this request</h3>
   <div class="panel">
     <table class="grid">
-      <tr><th>Requisition</th><th>How many</th><th>Status</th></tr>
+      <tr><th><?= $e($L('requisition')) ?></th><th>How many</th><th>Status</th></tr>
       <?php foreach ($requisitions as $rq): ?>
       <tr><td><a href="/requisition?id=<?= (int) $rq['id'] ?>"><?= $e($rq['req_code']) ?></a></td>
         <td><?= (int) $rq['quantity'] ?></td>

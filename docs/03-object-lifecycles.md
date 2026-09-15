@@ -578,6 +578,46 @@ not stored. Additive.
 
 ---
 
+## Hiring request (`hiring_requests.status`) — recruitment (Phase 2 · M4)
+
+The business **ask** to recruit, held apart from the requisition that executes
+it. It answers one question: *may recruitment begin?* Not to be confused with a
+**Recruitment Requisition** (`requisitions`, approved demand being executed) or a
+**Marketplace Requirement** (`cx_requirements`, a client-posted demand) — the
+three are defined in `phase2/M4-TERMINOLOGY-LOCK.md`.
+
+```
+DRAFT ─▶ SUBMITTED ─▶ UNDER_REVIEW ─▶ APPROVED ─▶ (raise a requisition)
+  │          │             │       └─▶ REJECTED
+  └──────────┴─────────────┴─────────▶ CANCELLED
+```
+
+- Values come from the `hiring_request_status` **lookup**, created through the
+  existing lookup engine — not a hardcoded engine. `UNDER_REVIEW` is a state
+  Phase 3's approval routing will use; M4 reaches `APPROVED` directly.
+- **`APPROVED` is the only executable state** (`HREQ_EXECUTABLE`).
+  `hreq_is_executable()` is the single question, and `hreq_to_requisition()` asks
+  it **before it writes anything**: recruitment cannot begin from a `DRAFT` or a
+  `SUBMITTED` request. A workspace with `approval_required = 0` goes from
+  `DRAFT` straight to `APPROVED` on submit — the boundary still exists, it is
+  simply satisfied at once.
+- **Submitting takes a snapshot** (`snapshot_json`), so renaming a department or
+  designation master afterwards cannot change what was approved.
+- `APPROVED`, `REJECTED` and `CANCELLED` requests cannot be edited. The
+  re-approval path for changing an approved request is **Phase 3**.
+- **Rights.** Create / edit / submit / cancel / convert: `can('mod.hiring.edit')`,
+  asked at each write, not only on the route. Decide: the module **and**
+  `is_admin_level()`. The **requestor may not decide their own request**
+  (`requested_by_id`), with a master the single stated exception — segregation of
+  duties, mirroring the IDEMS approver≠issuer rule. Branch scope
+  (`hreq_in_scope()`) applies on top of all of it. Adds **no new permission**;
+  see `02-permission-matrix.md` footnote 8.
+- One request may be executed as **many** requisitions
+  (`requisitions.hiring_request_id`), and never for more than the approved
+  quantity. A requisition raised directly carries `NULL` there, which is a
+  supported route — see `phase2/M4-REQUISITION-PATHS.md` and the open decision
+  `adr/ADR-001-direct-requisition-path.md`.
+
 ## Job offer (`job_offers.status`) — recruitment (Phase 5)
 
 An offer is generated from an approved salary structure and moves through a

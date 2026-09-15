@@ -46,7 +46,11 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
 </style>
 
 <div class="crumbs"><a href="/">Home</a> › <a href="/requisitions"><?= e(TP('requisition')) ?></a> › <?= $isEdit ? 'Edit' : 'New' ?></div>
-<h1><?= $isEdit ? 'Edit requirement '.e($req['req_code']) : 'New requirement' ?></h1>
+<?php // M4 correction §1 — name the object. This screen creates an approved
+      // RECRUITMENT REQUISITION directly (the direct path); it is not the hiring
+      // request, and it is not a marketplace requirement.
+      $RL = function_exists('hreq_label') ? hreq_label('requisition') : 'Recruitment Requisition'; ?>
+<h1><?= $isEdit ? 'Edit ' . e(mb_strtolower($RL)) . ' ' . e($req['req_code']) : 'New ' . e(mb_strtolower($RL)) ?></h1>
 <p class="sub">Approved positions to recruit against. Start in <b>Simple</b> for an ordinary hire; switch to <b>Advanced</b> for full technical, deployment and commercial detail.</p>
 
 <form method="post" action="<?= $isEdit ? '/requisition-edit?id='.(int)$req['id'] : '/requisition-new' ?>" class="rq-simple" id="rqForm">
@@ -328,7 +332,7 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
     <?php endif; ?>
   </div>
 
-  <div style="margin-top:8px"><button class="btn" type="submit">Save requirement</button> <a class="btn secondary" href="/requisitions">Cancel</a></div>
+  <div style="margin-top:8px"><button class="btn" type="submit">Save <?= e(mb_strtolower($RL)) ?></button> <a class="btn secondary" href="/requisitions">Cancel</a></div>
 </form>
 <?php if (function_exists('fd_overlay_html')) echo fd_overlay_html('requisition'); // Form Designer: per-company label/order/hide overrides ?>
 

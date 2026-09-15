@@ -526,10 +526,13 @@ function ops_projcosting($route, $method) {
     if ($route === 'project-costing-to-req' && $method === 'POST') {
         $cid = (int)($_POST['costing_id'] ?? 0); $lineId = (int)($_POST['line_id'] ?? 0);
         $h = pc_get($cid); if (!$h) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
-        ops_require(function_exists('can') && can('mod.hiring.edit'), 'You cannot create a requirement.');
+        // M4 correction §1 — name the object. A costing spawns a RECRUITMENT
+        // REQUISITION (the direct path); it does not post a marketplace requirement.
+        $pcLbl = function_exists('hreq_label') ? hreq_label('requisition') : 'Recruitment Requisition';
+        ops_require(function_exists('can') && can('mod.hiring.edit'), 'You cannot create a ' . mb_strtolower($pcLbl) . '.');
         $r = pc_make_requisition($cid, $lineId);
-        if (!empty($r['id'])) { flash('Requirement ' . $r['code'] . ' created from this role — set the headcount & duration.'); redirect('/requisition?id=' . $r['id']); }
-        flash($r['err'] ?? 'Could not create the requirement.', 'error'); redirect('/project-costing?id=' . $cid);
+        if (!empty($r['id'])) { flash($pcLbl . ' ' . $r['code'] . ' created from this role — set the headcount & duration.'); redirect('/requisition?id=' . $r['id']); }
+        flash($r['err'] ?? ('Could not create the ' . mb_strtolower($pcLbl) . '.'), 'error'); redirect('/project-costing?id=' . $cid);
     }
 
     // ---- Printable sheet (PDF via the browser's Save-as-PDF) ----

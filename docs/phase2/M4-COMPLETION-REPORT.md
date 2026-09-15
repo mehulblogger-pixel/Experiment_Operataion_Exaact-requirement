@@ -1,5 +1,12 @@
 # Phase 2 · M4 — Completion Report
-### Hiring Request, Requirement & Requisition Foundation
+### Hiring Request, Recruitment Requisition & Marketplace Requirement Foundation
+
+> **This report was corrected after the first cut of M4.** Three things were made
+> unambiguous — terminology, the requestor capability model, and the direct
+> requisition path — and two statements in the original report were wrong. Both
+> corrections are marked **CORRECTED** below. The correction changed no data, no
+> schema and no lifecycle; it changed which right is asked, what the screens call
+> things, and what the documents say.
 
 ## 1. What the audit found, and what was built
 
@@ -19,10 +26,16 @@ The business request to recruit: who asked, what is needed, where, how many, by
 when and why. `hiring_requests`. It is not a requisition, a position, a
 candidate or an approval.
 
-**2. What is a Requirement?**
-In M4 it is **not a separate row** — it is what a hiring request becomes once
-approved. The audit found no business fact needing a fourth object, and §4
-forbids a competing table without a demonstrated need.
+**2. What is a "Requirement"? — CORRECTED**
+It is not one object, and the word is no longer used for one. Three different
+things could be called a requirement, and they are now formally defined and kept
+apart (`M4-TERMINOLOGY-LOCK.md`): the **Hiring Request** (`hiring_requests`, the
+ask), the **Recruitment Requisition** (`requisitions`, approved demand being
+executed) and the **Marketplace Requirement** (`cx_requirements`, a demand a
+client posts to the Connect network). No new `requirements` table was created,
+`cx_requirements` was not renamed, the two were not merged, and no fourth object
+was introduced to satisfy a word. No screen prints a bare, unexplained
+"Requirement" as the name of an object.
 
 **3. What is a Requisition?**
 The recruitment execution record — M3's object, unchanged.
@@ -43,9 +56,26 @@ Two numbers, two facts: `hiring_requests.quantity` is what was **asked for**;
 `requisitions.quantity` is what is being **executed** (M3's). No third. A test
 pins that `reqf_counts()` still reads the requisition's.
 
-**8. Requestor relationship?**
-`requested_by_id` → `users.id`, validated against the register. The display name
-is kept alongside for history, and no existing `created_by` column was rewritten.
+**8. Requestor relationship? — CORRECTED**
+`requested_by_id` → `users.id` is the **canonical** requestor relationship,
+validated against the register. It is now filled from whoever is signed in when
+nothing was chosen, and a partial update that does not carry the field can no
+longer erase it. The display name is kept alongside for history, and no existing
+`created_by` column was rewritten.
+
+The right to raise a request is a **capability, not a role name**. The original
+documentation said "coordinator to raise", and the code asked
+`is_coordinator_level()`. That was wrong twice over: it named roles instead of
+the right, and the band it names is **wider than the permission matrix** — which
+gives Asst. Manager no hiring right at all. The gate now asks the existing
+capability `can('mod.hiring.edit')`, through the existing `can()` choke point:
+
+> **Any user who holds the hiring CREATE capability and is within the applicable
+> branch scope may raise a Hiring Request.**
+
+No new permission was created and no second permission system exists. Approval
+authority is held apart from creation authority, and the requestor may not decide
+their own request. Full table in `M4-HIRING-REQUEST-ARCHITECTURE.md` §11.
 
 **9. Requesting Department?**
 `requesting_department_id` — a canonical Department identity.
@@ -118,17 +148,42 @@ date or department was invented for them (§39).
 **25. Tenant isolation?**
 One database per customer. M4 added no cross-tenant surface and no cache.
 
-**26. Branch scope?**
+**26. Branch scope? — CORRECTED**
 `hreq_scope_gate()` on the module door, checking the request **and** the branch
 named on the way in. Position and branch are re-validated on save.
 
-**27. HR entitlement?**
+The correction found the route gate was the **only** behavioural check: disabling
+it outright broke no test, because it was held in place by a source-level
+assertion and the acts that follow it trusted the route to have asked. Branch
+scope is now asked at each write as well (`hreq_in_scope()`) **and at the read**,
+the decision was split out of the refusal (`hreq_scope_reason()`) so it can be
+tested without a redirect, and the tests that hold it there are behavioural — a
+user in another branch, holding every right there is to hold, is refused submit,
+decide, cancel, convert and edit with nothing written, and is refused the record
+by direct URL. Two silent-erasure bugs were fixed alongside: a partial
+update that did not carry `office_id` moved the request to *no branch*, and one
+that did not carry `requested_by_id` erased the canonical requestor.
+
+**27. HR entitlement? — CORRECTED**
 `hiring-request(s)` → `hiring` → **hr**, in both module maps, verified with the
-module on and off. M4 contains **no `is_master()` call**, so a master cannot
-bypass it — proven by mutation M5.
+module on and off. The original report said M4 contained **no `is_master()`
+call**. That is no longer true, and the correction states it plainly: there is
+now exactly **one**, and it is an exception to **segregation of duties** only —
+a master may decide a request they raised, because a one-person workspace has
+nobody else, which is the same standing exception the application already writes
+into report finalisation. It is **not** an exception to the licence, the module
+capability or the branch scope: a master on a workspace that has not bought the
+module is still refused, and a test proves it.
+
+The correction also closed a gate the original missed. Written as a role band
+alone, `hreq_can_decide()` **opened for a master holding core administration and
+nothing else** — a role band knows nothing about what the workspace has bought.
+M10's permanent gate probe caught it; the gate now asks the module question
+first.
 
 **28. Mutation tests?**
-All eight from §44, all caught. Detail in `M4-TEST-RESULTS.md`.
+All eight from §44, plus a ninth for the new segregation rule. Detail and
+results in `M4-TEST-RESULTS.md`.
 
 **29. SQLite?**
 Whole suite — **8709 passed, 0 failed**, including all 77 M4 assertions.
@@ -145,7 +200,8 @@ Entitlement.
 **32. What remains for Phase 3?**
 Approval routing and the matrix; SLA and escalation; the approval inbox and
 notifications; recruiter assignment; the re-approval path; and the policy
-decision on whether direct requisition creation should remain available.
+decision on whether direct requisition creation should remain available — now
+written up as a formal decision record, `../adr/ADR-001-direct-requisition-path.md`.
 
 ## 3. Two things worth your attention
 
@@ -156,11 +212,27 @@ substantial master with its own CRUD, vocabulary and versioning. The Job Profile
 reusable side. Whether you want a true Job Profile master is recorded as a
 recommendation in the audit.
 
-**Two paths now exist, deliberately.** The governed path
-(request → approval → requisition) and the existing direct path
-(`/requisition-new`), which §19 required be preserved. A workspace wanting the
-governed path to be the *only* one needs a policy switch — a Phase 3 decision,
-not something M4 imposes.
+**Two paths exist, deliberately — this is architecture, not an accident.**
+
+- **Path A — GOVERNED HIRING REQUEST PATH** *(added by M4)*: Hiring Request →
+  Approval → Recruitment Requisition → Candidates. For hiring that needs
+  authorising before headcount or money is committed.
+- **Path B — LEGACY / DIRECT REQUISITION PATH** *(pre-dates M4, unchanged)*: a
+  Recruitment Requisition created straight away, `hiring_request_id = NULL`. For
+  demand already authorised outside EXAACT — a client's signed order, a won
+  quotation, a manpower-services business whose client order *is* the
+  authorisation.
+
+Both write to the **same** requisition table, use the **same** quantity and
+fulfilment model, and feed the **same** candidate pipeline. They differ only in
+how the requisition came to exist, and the requisition screen now says which.
+Provenance cannot be faked: `hiring_request_id` is not a field the requisition
+form accepts, and exactly one function in the application writes it.
+
+M4 deliberately does **not** invent the customer policy switch. Whether Path B is
+always permitted, disabled for selected customers, or governed by a
+tenant/workspace policy is recorded as `../adr/ADR-001-direct-requisition-path.md`
+for Phase 3. Full detail: `M4-REQUISITION-PATHS.md`.
 
 ## 4. Phase 1 status — unchanged
 

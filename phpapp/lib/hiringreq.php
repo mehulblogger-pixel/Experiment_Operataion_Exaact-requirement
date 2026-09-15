@@ -173,6 +173,125 @@ function hreq_who() {
     return function_exists('user_name') ? (string) user_name($u) : (string) ($u['username'] ?? '');
 }
 
+// ---- Terminology lock (M4 correction §1) -----------------------------------
+//  THREE DIFFERENT BUSINESS OBJECTS, THREE DIFFERENT WORDS. The application
+//  holds three things a person could loosely call a "requirement", and they are
+//  not the same thing, not the same table and not the same lifecycle:
+//
+//    HIRING REQUEST           hiring_requests   the business ASK to recruit
+//    RECRUITMENT REQUISITION  requisitions      the approved EXECUTION record
+//    MARKETPLACE REQUIREMENT  cx_requirements   a CLIENT-POSTED demand (Connect)
+//
+//  None of them is being renamed, merged or replaced. What is fixed here is the
+//  WORD ON THE SCREEN: a bare, unexplained "Requirement" must never appear on a
+//  recruitment screen, because a workspace that also uses the marketplace would
+//  have no way of telling which of the three it is looking at.
+//
+//  A workspace may still choose its own word for the execution record through
+//  the EXISTING terminology engine (Settings → Terminology; the recruitment
+//  industry pack does exactly that). If the word it chooses is the bare
+//  "Requirement", it is QUALIFIED here — "Recruitment Requirement" — rather than
+//  shown plain. Nothing else about its chosen vocabulary is touched.
+const HREQ_TERMS = [
+    'request'     => ['Hiring Request', 'Hiring Requests'],
+    'requisition' => ['Recruitment Requisition', 'Recruitment Requisitions'],
+    'marketplace' => ['Marketplace Requirement', 'Marketplace Requirements'],
+];
+// The words that are ambiguous on their own and must always carry a qualifier.
+const HREQ_AMBIGUOUS = ['requirement', 'requirements'];
+
+function hreq_label($what = 'request', $plural = false) {
+    $i = $plural ? 1 : 0;
+    if ($what === 'requisition') {
+        // Honour the workspace's own word, then qualify it if it is ambiguous.
+        $own = function_exists('T') ? trim((string) ($plural ? TP('requisition') : T('requisition'))) : '';
+        if ($own === '') return HREQ_TERMS['requisition'][$i];
+        if (in_array(mb_strtolower($own), HREQ_AMBIGUOUS, true)) return 'Recruitment ' . $own;
+        return $own;
+    }
+    return HREQ_TERMS[$what][$i] ?? HREQ_TERMS['request'][$i];
+}
+
+// ---- Capability model (M4 correction §2) -----------------------------------
+//  WHO MAY RAISE A HIRING REQUEST IS A CAPABILITY QUESTION, NOT A ROLE-NAME ONE.
+//
+//  M4 first shipped this gate as is_coordinator_level() — a role BAND. That was
+//  wrong twice over. It named roles rather than the right, and the band it names
+//  (the seven management roles + Asst. Manager + Coordinator) is WIDER than the
+//  permission matrix: docs/02-permission-matrix.md gives Asst. Manager no hiring
+//  right at all, yet the band let one raise a request.
+//
+//  The capability already exists and it is not a new permission. ACCESS_MODULES
+//  generates mod.<module>.view and mod.<module>.edit for every module; they are
+//  granted per role AND per user on Settings → Roles & permissions, and they are
+//  enforced through the same can() choke point as every other right — licence
+//  first, then master, then the granted set. 'hiring' is one of those modules:
+//
+//      VIEW    mod.hiring.view   already enforced for these routes by
+//                                ops_module_gate() before dispatch
+//      CREATE  mod.hiring.edit   the existing "may add / edit in recruitment"
+//      EDIT    mod.hiring.edit   right — the very capability project costing
+//      SUBMIT  mod.hiring.edit   already requires before it may create a
+//      CANCEL  mod.hiring.edit   requisition (projcosting.php)
+//      DECIDE  hreq_can_decide() — deliberately NOT the same right
+//
+//  No new permission is introduced, and no second permission system is created.
+//  Asking can() rather than a role band also means the request layer now obeys
+//  the module licence, which a role-name check never did.
+function hreq_can_view()   { return function_exists('can') && can('mod.hiring.view'); }
+function hreq_can_create() { return function_exists('can') && can('mod.hiring.edit'); }
+
+//  Approval authority is held APART from creation authority on purpose — that
+//  separation is the whole point of a request layer. Deciding therefore stays
+//  where the application already puts recruitment approval: a management act
+//  (an offer is approved by is_admin_level(), recruit_offer.php). Phase 3
+//  replaces this caller with the configured approval matrix; until it does, the
+//  right is not widened and it is not the create right.
+//
+//  The module question is asked FIRST, and that is not decoration. M10 keeps a
+//  permanent guard that signs in as a master holding core administration alone
+//  and calls every gate predicate in lib/; anything that still opens has escaped
+//  the licence. Written as is_admin_level() alone this gate opened — a role band
+//  knows nothing about what the workspace has bought. Asking can() first puts it
+//  back behind licence -> module -> capability, like every other right.
+function hreq_can_decide() {
+    if (!hreq_can_view()) return false;
+    return function_exists('is_admin_level') && is_admin_level();
+}
+
+//  Segregation of duties. The requestor must not also be the approver. The
+//  canonical requestor relationship is hiring_requests.requested_by_id → users.id,
+//  so that is what is compared — not a name, not a role.
+//
+//  There is ONE exception, and it is the one the application already states
+//  elsewhere: a master. A single-administrator workspace has nobody else to
+//  approve, and the same standing exception is written into report finalisation
+//  ("the approver and the issuer cannot be the same", idems.php). It is an
+//  exception to SEGREGATION only — the licence, the module capability and the
+//  branch scope all still apply above it.
+//  Branch scope, asked at the write as well as on the route. Found by mutation
+//  testing: disabling hreq_scope_gate() entirely broke nothing, because the only
+//  thing holding the gate in place was a source-level assertion, and the acts
+//  that follow it — submit, decide, cancel, convert — trusted the route to have
+//  asked. A route gate is the right place to REFUSE EARLY; it is not the right
+//  place to be the only check.
+function hreq_in_scope($r) {
+    if (!is_array($r) || !function_exists('scope_allows')) return true;
+    return (bool) scope_allows($r['office_id'] ?? null, null);
+}
+
+function hreq_is_own_request($r) {
+    if (!is_array($r) || !function_exists('current_user')) return false;
+    $u = current_user(); if (!$u) return false;
+    $me = (int) ($u['id'] ?? 0);
+    return $me > 0 && (int) ($r['requested_by_id'] ?? 0) === $me;
+}
+function hreq_may_decide($r) {
+    if (!hreq_can_decide()) return false;
+    if (function_exists('is_master') && is_master()) return true;
+    return !hreq_is_own_request(is_array($r) ? $r : hreq_get($r));
+}
+
 function hreq_get($id) {
     hreq_migrate();
     try { $r = ops_one("SELECT * FROM hiring_requests WHERE id=?", [(int) $id]); }
@@ -203,6 +322,11 @@ function hreq_is_executable($req) {
 // Returns [ok, message, id]. Validates against the real masters rather than
 // trusting what the browser sent — a dropdown is not a security boundary (§37).
 function hreq_save($id, array $post) {
+    // The right is asked HERE, where the write happens, and not only on the
+    // route — so a helper called directly, an AJAX handler added later or a
+    // Phase-3 caller cannot reach the table around the capability (§5).
+    if (!hreq_can_create())
+        return [false, 'You do not have the right to raise or change a hiring request.', 0];
     hreq_migrate();
     $id = (int) $id;
     $existing = $id > 0 ? hreq_get($id) : null;
@@ -214,6 +338,8 @@ function hreq_save($id, array $post) {
         return [false, 'This request is approved. Changing it needs a re-approval, which is not built yet.', 0];
     if ($existing && in_array(strtoupper((string) $existing['status']), ['REJECTED', 'CANCELLED'], true))
         return [false, 'A ' . strtolower($existing['status']) . ' request cannot be edited.', 0];
+    if ($existing && !hreq_in_scope($existing))
+        return [false, 'This hiring request is outside your office / branch scope.', 0];
 
     $qty = (int) ($post['quantity'] ?? 1);
     if ($qty <= 0) return [false, 'How many people are needed? Enter at least one.', 0];
@@ -222,7 +348,14 @@ function hreq_save($id, array $post) {
     if ($title === '') return [false, 'Say what is being requested.', 0];
 
     // Requestor — a canonical identity, checked against the register (§6, §43).
+    //  requested_by_id -> users.id IS the requestor relationship. So it is filled
+    //  from whoever is signed in when nothing was chosen, and a partial update
+    //  that simply does not carry the field cannot silently erase it.
     $byId = (int) ($post['requested_by_id'] ?? 0) ?: null;
+    if (!$byId && !array_key_exists('requested_by_id', $post) && $existing)
+        $byId = (int) ($existing['requested_by_id'] ?? 0) ?: null;
+    if (!$byId && !$existing && function_exists('current_user') && ($cu = current_user()))
+        $byId = (int) ($cu['id'] ?? 0) ?: null;
     if ($byId) {
         try { $u = ops_one("SELECT id, is_active FROM users WHERE id=?", [$byId]); } catch (Throwable $e) { $u = null; }
         if (!$u) return [false, 'That requestor is not someone in this workspace.', 0];
@@ -256,7 +389,11 @@ function hreq_save($id, array $post) {
         if (function_exists('scope_office_allows') && !scope_office_allows($p['office_id'] ?? null))
             return [false, 'That position is outside your office / branch scope.', 0];
     }
+    // A partial update that does not carry office_id must neither move the
+    // request to "no branch" nor slip past the scope check by omission.
     $office = (int) ($post['office_id'] ?? 0) ?: null;
+    if ($office === null && !array_key_exists('office_id', $post) && $existing)
+        $office = (int) ($existing['office_id'] ?? 0) ?: null;
     if ($office !== null && function_exists('scope_allows') && !scope_allows($office, null))
         return [false, 'That branch is outside your office / branch scope.', 0];
 
@@ -340,8 +477,10 @@ function hreq_snapshot(array $r) {
 }
 
 function hreq_submit($id) {
+    if (!hreq_can_create()) return [false, 'You do not have the right to submit a hiring request.'];
     hreq_migrate();
     $r = hreq_get($id); if (!$r) return [false, 'That hiring request no longer exists.'];
+    if (!hreq_in_scope($r)) return [false, 'This hiring request is outside your office / branch scope.'];
     $st = strtoupper((string) $r['status']);
     if ($st !== 'DRAFT') return [false, 'Only a draft can be submitted (this one is ' . strtolower($st) . ').'];
     if ((int) $r['quantity'] <= 0) return [false, 'Say how many people are needed before submitting.'];
@@ -358,6 +497,11 @@ function hreq_submit($id) {
 function hreq_decide($id, $approve, $note = '') {
     hreq_migrate();
     $r = hreq_get($id); if (!$r) return [false, 'That hiring request no longer exists.'];
+    if (!hreq_in_scope($r)) return [false, 'This hiring request is outside your office / branch scope.'];
+    if (!hreq_can_decide()) return [false, 'You are not permitted to approve or reject a hiring request.'];
+    // Segregation of duties — asked here, so no caller can decide around it.
+    if (!hreq_may_decide($r))
+        return [false, 'You raised this request, so somebody else has to decide it.'];
     $st = strtoupper((string) $r['status']);
     if (!in_array($st, ['SUBMITTED', 'UNDER_REVIEW'], true))
         return [false, 'Only a submitted request can be decided (this one is ' . strtolower($st) . ').'];
@@ -369,8 +513,10 @@ function hreq_decide($id, $approve, $note = '') {
 }
 
 function hreq_cancel($id, $note = '') {
+    if (!hreq_can_create()) return [false, 'You do not have the right to cancel a hiring request.'];
     hreq_migrate();
     $r = hreq_get($id); if (!$r) return [false, 'That hiring request no longer exists.'];
+    if (!hreq_in_scope($r)) return [false, 'This hiring request is outside your office / branch scope.'];
     if (strtoupper((string) $r['status']) === 'CANCELLED') return [true, 'Already cancelled.'];
     db()->prepare("UPDATE hiring_requests SET status='CANCELLED', decision_note=?, updated_by=?, updated_at=? WHERE id=?")
         ->execute([substr(trim((string) $note), 0, 400), hreq_who(), hreq_now(), (int) $id]);
@@ -410,9 +556,12 @@ function hreq_remaining_qty($id) {
 
 // Create the execution record. Returns [ok, message, requisitionId].
 function hreq_to_requisition($id, $qty = 0) {
+    if (!hreq_can_create())
+        return [false, 'You do not have the right to raise a requisition from this request.', 0];
     hreq_migrate();
     if (function_exists('req_migrate')) req_migrate();
     $r = hreq_get($id); if (!$r) return [false, 'That hiring request no longer exists.', 0];
+    if (!hreq_in_scope($r)) return [false, 'This hiring request is outside your office / branch scope.', 0];
 
     // The boundary. Nothing below runs for a request that is not ready.
     if (!hreq_is_executable($r))
@@ -452,17 +601,26 @@ function hreq_to_requisition($id, $qty = 0) {
 // ---- Scope (§35) ----------------------------------------------------------
 // One door, the pattern M14 established and M3 extended to candidates. A hiring
 // request belongs to a branch; a user may only act within their own.
-function hreq_scope_gate() {
-    if (!function_exists('scope_allows')) return;
+//  The DECISION, kept separate from the REFUSAL. ops_require() redirects and
+//  exits, which makes a gate impossible to ask a question of — so the question
+//  is asked here, and answered with a reason or an empty string. That is what
+//  the tests exercise; hreq_scope_gate() is the one-line refusal around it.
+function hreq_scope_reason() {
+    if (!function_exists('scope_allows')) return '';
     $id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
     if ($id > 0) {
         $r = hreq_get($id);
-        if ($r) ops_require(scope_allows($r['office_id'] ?? null, null),
-                            'This hiring request is outside your office / branch scope.');
+        if ($r && !scope_allows($r['office_id'] ?? null, null))
+            return 'This hiring request is outside your office / branch scope.';
     }
     // A branch named on the way in must also be one they may use.
     $to = (int) ($_POST['office_id'] ?? 0);
-    if ($to > 0) ops_require(scope_allows($to, null), 'That branch is outside your office / branch scope.');
+    if ($to > 0 && !scope_allows($to, null)) return 'That branch is outside your office / branch scope.';
+    return '';
+}
+function hreq_scope_gate() {
+    $why = hreq_scope_reason();
+    ops_require($why === '', $why);
 }
 
 // Only requests this user may see.
@@ -482,13 +640,18 @@ function hreq_list($status = '') {
 //  One dispatcher, one door. Scope first, then permission, exactly as every
 //  other register in the application does — no second access-control mechanism.
 function ops_hiring_requests($route, $method) {
+    // The house order, and the order the enforcement has to be read in:
+    //   licence + module   ops_module_gate() — already ran, before dispatch
+    //   capability         here, so a direct invocation cannot skip it
+    //   object scope       here, before anything reads an id
+    ops_require(hreq_can_view(), 'You do not have access to recruitment.');
     hreq_scope_gate();                       // M4 — branch scope, before anything reads an id
     hreq_migrate();
-    $mayRaise  = function_exists('is_coordinator_level') && is_coordinator_level();
-    $mayDecide = function_exists('is_admin_level') && is_admin_level();
+    $mayRaise  = hreq_can_create();          // CAPABILITY, not a role name (§2)
+    $mayDecide = hreq_can_decide();
 
     if ($method === 'POST') {
-        ops_require($mayRaise, 'Only coordinators / managers can raise a hiring request.');
+        ops_require($mayRaise, 'You do not have the right to raise or change a hiring request.');
         $do = (string) ($_POST['do'] ?? '');
         $id = (int) ($_POST['id'] ?? 0);
         if ($do === 'save') {
@@ -502,7 +665,9 @@ function ops_hiring_requests($route, $method) {
             // Recording a decision is an administrator's act. Phase 3 replaces
             // this with the approval engine; the state change stays here so both
             // go through one place.
-            ops_require($mayDecide, 'Only administrators can approve or reject a hiring request.');
+            ops_require($mayDecide, 'You are not permitted to approve or reject a hiring request.');
+            // Segregation of duties — the requestor is not the approver.
+            ops_require(hreq_may_decide($id), 'You raised this request, so somebody else has to decide it.');
             [$ok, $msg] = hreq_decide($id, ($_POST['decision'] ?? '') === 'approve', (string) ($_POST['note'] ?? ''));
             flash($msg, $ok ? 'success' : 'error'); redirect('/hiring-request?id=' . $id); return true;
         }
@@ -517,10 +682,17 @@ function ops_hiring_requests($route, $method) {
         $id = (int) ($_GET['id'] ?? 0);
         $r = $id > 0 ? hreq_get($id) : null;
         if ($id > 0 && !$r) { http_response_code(404); view('notfound'); return true; }
+        // Asked again where the record is actually read. The gate above refuses
+        // earlier and more kindly, but it must not be the only thing standing
+        // between a bookmarked URL and another branch's request.
+        ops_require(hreq_in_scope($r), 'This hiring request is outside your office / branch scope.');
         view('ops/hiring_request', [
             'req'        => $r,
             'mayRaise'   => $mayRaise,
-            'mayDecide'  => $mayDecide,
+            // What the screen offers is what the server would actually allow —
+            // the segregation rule included. The button is not the boundary; it
+            // simply stops offering an act that would be refused.
+            'mayDecide'  => $mayDecide && ($r ? hreq_may_decide($r) : true),
             'requisitions' => $r ? hreq_requisitions($id) : [],
             'remaining'  => $r ? hreq_remaining_qty($id) : 0,
             'people'     => function_exists('rcc_users') ? rcc_users() : [],

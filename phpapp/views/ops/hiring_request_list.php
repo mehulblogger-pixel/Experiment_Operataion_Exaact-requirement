@@ -8,10 +8,10 @@ $tone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-info','UNDER_REVIEW'=>'p-info','APPROV
 <div class="crumbs"><a href="/">Home</a> › Hiring requests</div>
 <div class="master-head">
   <div><h1>Hiring requests</h1>
-    <p class="sub" style="margin:2px 0 0">What the business has asked to recruit. A request becomes a requisition — and recruitment starts — only once it is approved.</p></div>
+    <p class="sub" style="margin:2px 0 0">What the business has asked to recruit. A hiring request becomes a <?= htmlspecialchars(strtolower(function_exists('hreq_label') ? hreq_label('requisition') : 'requisition'), ENT_QUOTES) ?> — and recruitment starts — only once it is approved.</p></div>
   <div class="row-actions">
     <?php if ($mayRaise): ?><a class="btn" href="/hiring-request">+ New request</a><?php endif; ?>
-    <a class="btn secondary" href="/requisitions">Requisitions →</a>
+    <a class="btn secondary" href="/requisitions"><?= htmlspecialchars(function_exists('hreq_label') ? hreq_label('requisition', true) : 'Requisitions', ENT_QUOTES) ?> →</a>
   </div>
 </div>
 <div class="panel">

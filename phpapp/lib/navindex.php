@@ -92,10 +92,26 @@ function ops_nav_index($fresh = false) {
         if ($can('mod.vouchers.view')) $add($thp('voucher'), '/vouchers', $A, '🧾', 'Field expenses raised against a job.');
         if ($fx('rating_can') && rating_can()) $add('Inspector ratings', '/ratings', $A, '⭐', 'Post-job quality & conduct.');
         if ($can('mod.hiring.view')) {
-            $add('Recruitment', '/recruitment-cc', $A, '🧭', 'Command centre — pipeline & requirements.');
-            $add('Requirements', '/requisitions', $A, '📌', 'Manpower requirements / requisitions.');
+            // M4 correction §1 — the locked words. "Requirement" on its own is
+            // ambiguous (a hiring request, a recruitment requisition and a
+            // marketplace requirement are three different things), so the rail
+            // names each one. hreq_label() honours a workspace's own wording and
+            // only qualifies it when the word it chose is one of the ambiguous ones.
+            $hl = fn($k, $pl = false) => $fx('hreq_label') ? hreq_label($k, $pl) : ($pl ? 'Requisitions' : 'Requisition');
+            $add('Recruitment', '/recruitment-cc', $A, '🧭', 'Command centre — pipeline & demand.');
+            // M4 correction §3 — the GOVERNED path (request → approval → requisition)
+            // and the DIRECT path (requisition raised straight away) are both real
+            // and both shown. Which one a workspace uses is its own choice.
+            $add('Hiring requests', '/hiring-requests', $A, '📝', 'What the business has asked to recruit, before it is approved.');
+            $add($hl('requisition', true), '/requisitions', $A, '📌', 'Approved demand being recruited against.');
             $add('Candidates', '/candidates', $A, '👤', 'Candidate pipeline.');
-            $add('New requirement', '/requisition-new', $A, '➕', 'Raise a new requirement.', 'action');
+            // Offer the two "create" actions only to someone who actually holds the
+            // right to create. The rail is not the boundary — the routes and the
+            // helpers refuse regardless — it simply stops offering a dead end.
+            if ($can('mod.hiring.edit'))
+                $add('New hiring request', '/hiring-request', $A, '➕', 'Ask to recruit — it becomes a ' . mb_strtolower($hl('requisition')) . ' once approved.', 'action');
+            if ($fx('is_coordinator_level') && is_coordinator_level())
+                $add('New ' . mb_strtolower($hl('requisition')), '/requisition-new', $A, '➕', 'Raise approved demand directly, without a hiring request.', 'action');
             $add('Add candidate', '/candidate-new', $A, '➕', 'Add a candidate.', 'action');
             $add('Positions', '/positions', $A, '🏷️', 'Position master — sanctioned roles & headcount.');
             $add('Departments', '/departments', $A, '🏛️', 'Designations, positions, headcount & people by department.');
@@ -104,7 +120,7 @@ function ops_nav_index($fresh = false) {
                 $add('Import org chart', '/positions-import', $A, '⬆️', 'Import an existing organogram from a spreadsheet.', 'action');
             $apc = ($fx('appr_inbox_count') ? (int)appr_inbox_count() : 0);
             $add('My approvals' . ($apc > 0 ? ' (' . $apc . ')' : ''), '/my-approvals', $A, '✅', 'Items waiting on your approval.');
-            $add('Export data', '/recruit-export?dataset=candidates', $A, '⬇️', 'Download candidates, requirements & offers as CSV.');
+            $add('Export data', '/recruit-export?dataset=candidates', $A, '⬇️', 'Download candidates, ' . mb_strtolower($hl('requisition', true)) . ' & offers as CSV.');
             if ($fx('hiring_admin_can') ? hiring_admin_can() : ($fx('is_admin_level') && is_admin_level())) {
                 $add('Hiring workflows', '/recruit-pipelines', $A, '⇥', 'Configure the recruitment pipeline & stages.');
                 $add('Compensation setup', '/comp-setup', $A, '₹', 'Configure salary headings & statutory components.');

@@ -1,20 +1,24 @@
-# Phase 2 · M4 — Request ⇄ Requirement ⇄ Requisition Map
+# Phase 2 · M4 — Hiring Request ⇄ Recruitment Requisition ⇄ Marketplace Requirement
+
+> The definitions below are **locked**. `M4-TERMINOLOGY-LOCK.md` is the record.
 
 ## 1. The three objects, and why none was merged (§4)
 
 | Object | Table | What it is | Audience |
 |---|---|---|---|
-| **Hiring Request** | `hiring_requests` *(new)* | the business asking to recruit | the requesting manager |
-| **Requisition** | `requisitions` | the recruitment execution record | the recruiter |
-| **Marketplace Requirement** | `cx_requirements` | a need posted to the Connect network | the network |
+| **Hiring Request** | `hiring_requests` *(new)* | the business **asking** to recruit | the requesting manager |
+| **Recruitment Requisition** | `requisitions` | approved demand **being executed** | the recruiter |
+| **Marketplace Requirement** | `cx_requirements` | a demand a client **posts to the Connect network** | the network |
 
 `requisitions` and `cx_requirements` **remain separate**, are not renamed, and
 have no adapter between them. A test asserts both still exist.
 
-**No third requirement table was created.** In M4 the *requirement* is not a
-separate row — it is what a hiring request becomes once approved. Introducing a
-fourth object to represent the same fact would be the "competing engine" §4
-forbids, and the audit found no business fact that needed one.
+**No new `requirements` table was created, `cx_requirements` was not renamed,
+and `requisitions` was not merged with it.** There is no fourth object: what a
+business calls "the requirement" is, at each stage of its life, one of the three
+rows above. Introducing another row to represent the same fact would be the
+"competing engine" §4 forbids, and the audit found no business fact needing one.
+Tests A7–A8 assert all of this.
 
 ## 2. Cardinality (§20)
 
@@ -83,8 +87,14 @@ Hiring Request → approval → Requisition      the governed path
 Requisition (direct)                         the existing path, unchanged
 ```
 
-A workspace that wants the governed path to be the only one will need a policy
-switch — that is a Phase 3 decision, not something M4 imposes.
+Both are supported and deliberate — see `M4-REQUISITION-PATHS.md` for what each
+is for, why both exist, and the audit showing the direct path cannot be used to
+fake provenance or escape the licence, the module or branch scope.
+
+A workspace that wants the governed path to be the **only** one needs a policy
+switch. M4 deliberately does **not** invent it. The decision — always permitted,
+disabled for selected customers, or a tenant/workspace policy — is recorded as
+`../adr/ADR-001-direct-requisition-path.md` and belongs to Phase 3.
 
 ## 6. Numbering (§21, §22)
 

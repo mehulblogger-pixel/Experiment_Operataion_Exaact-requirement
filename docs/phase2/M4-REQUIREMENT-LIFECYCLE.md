@@ -1,4 +1,10 @@
-# Phase 2 · M4 — Requirement Lifecycle
+# Phase 2 · M4 — Lifecycles of the Hiring Request and the Recruitment Requisition
+
+> **Terminology.** The file keeps its original name, but "requirement" is not a
+> word this document uses for an object. Three different things could be called
+> one, and they are defined and kept apart in `M4-TERMINOLOGY-LOCK.md`:
+> **Hiring Request** (`hiring_requests`), **Recruitment Requisition**
+> (`requisitions`) and **Marketplace Requirement** (`cx_requirements`).
 
 ## 1. Three lifecycles, not one (§16)
 
@@ -37,7 +43,7 @@ Where a workspace sets `approval_required = 0`, submitting goes straight to
 |---|---|
 | save (draft) | validates against the real masters; nothing is executable |
 | **submit** | takes the **snapshot** (§12); moves to `SUBMITTED`, or `APPROVED` where approval is not required |
-| approve / reject | records `decided_by`, `decided_at`, `decision_note` |
+| approve / reject | records `decided_by`, `decided_at`, `decision_note`. Refused unless the decider holds the module **and** a management role, and refused outright if they are the requestor (`requested_by_id`), master excepted — see `M4-HIRING-REQUEST-ARCHITECTURE.md` §11 |
 | cancel | closes the request; it can never start recruitment |
 | raise requisition | only from `APPROVED`, and never beyond the approved headcount |
 

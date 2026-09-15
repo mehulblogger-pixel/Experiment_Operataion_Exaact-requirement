@@ -196,8 +196,13 @@ $hrSrc = preg_replace('#^\s*//.*$#m', '', file_get_contents(__DIR__ . '/../lib/h
 $fp = strpos($hrSrc, 'function ops_hiring_requests(');
 t_ok($fp !== false && strpos(substr($hrSrc, $fp, 200), 'hreq_scope_gate()') !== false,
      'and it runs on entry to the module, before any route reads an id');
-$gate = substr($hrSrc, strpos($hrSrc, 'function hreq_scope_gate()'), 900);
+// The decision moved into hreq_scope_reason() so it could be asked without a
+// redirect (the M4 correction); the gate is now the one-line refusal around it.
+$gate = substr($hrSrc, strpos($hrSrc, 'function hreq_scope_reason()'), 900);
 t_ok(substr_count($gate, 'scope_allows(') === 2, 'it checks the request AND the branch named on the way in');
+$gw = substr($hrSrc, strpos($hrSrc, 'function hreq_scope_gate()'), 200);
+t_ok(strpos($gw, 'hreq_scope_reason()') !== false && strpos($gw, 'ops_require(') !== false,
+     'and the gate refuses on that decision rather than deciding for itself');
 
 // A branch-B user must not raise a request against branch A.
 $_SESSION['uid'] = $uB; current_user(true); ua(true);

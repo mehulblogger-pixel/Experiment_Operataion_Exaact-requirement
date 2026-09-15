@@ -11,6 +11,26 @@
   <?php if (is_coordinator_level()): ?><a class="btn secondary" href="/requisition-edit?id=<?= (int)$req['id'] ?>">Edit</a><?php endif; ?>
 </div>
 
+<?php // M4 correction §3 — WHERE THIS CAME FROM. Two routes reach this screen
+      //  and they are not a duplicate of each other:
+      //    GOVERNED  a hiring request was raised, approved, and converted here
+      //    DIRECT    approved demand was recorded straight away (the original
+      //              route, still supported — see docs/phase2/M4-REQUISITION-PATHS.md)
+      //  Saying which one this was is the difference between an architecture and
+      //  an accident. Requisitions raised before M4 have no request behind them
+      //  and are shown as exactly that — nothing is invented for them.
+if (!empty($req['hiring_request_id']) && function_exists('hreq_get')):
+  $hr = hreq_get((int) $req['hiring_request_id']); ?>
+  <div class="panel" style="border-left:3px solid #1a7f37;padding:10px 14px">
+    Raised from hiring request
+    <a href="/hiring-request?id=<?= (int) $req['hiring_request_id'] ?>"><strong><?= e($hr['req_no'] ?? ('#' . (int) $req['hiring_request_id'])) ?></strong></a><?php
+      if ($hr && !empty($hr['decided_by'])): ?>, approved by <?= e($hr['decided_by']) ?><?php
+        if (!empty($hr['decided_at'])): ?> on <?= e(substr((string) $hr['decided_at'], 0, 10)) ?><?php endif;
+      endif; ?>.
+    <span class="muted">Recruitment could not start before that approval.</span>
+  </div>
+<?php endif; ?>
+
 <?php // M3 — where this requirement stands, in one line. Ten vacancies are ten
       // vacancies: how many are filled, how many people are still in play, how
       // many were given up on, and how many are genuinely still open.
