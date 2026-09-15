@@ -132,11 +132,18 @@ t_ok(strtotime((string) $s2b['sla_due']) > time(),
 t_ok(appr_sla_state($s2b) !== 'OVERDUE', 'M3.1 · so it is not overdue before its approver has seen it');
 t_ok(strtotime((string) $s2b['reminder_at']) > time(), 'M3.1 · its reminder is ahead of it too, not behind');
 
-// Re-activating cannot extend a deadline — otherwise the SLA could be reset.
+// Re-activating a step that is already running must not move its deadline, or
+// the SLA could be reset simply by touching the chain again. Proved against a
+// deadline that is DIFFERENT from what a fresh activation would compute —
+// comparing two stamps taken in the same second proves nothing.
 $dueWas = (string) $s2b['sla_due'];
-appr_activate_step($s2b, appr_request((int) $ap1['id']));
+$past = $ago(3);
+$pdo->prepare("UPDATE recruit_approval_steps SET sla_due=? WHERE id=?")->execute([$past, (int) $s2['id']]);
 $s2c = ops_one("SELECT * FROM recruit_approval_steps WHERE id=?", [(int) $s2['id']]);
-t_eq((string) $s2c['sla_due'], $dueWas, 'M3.1 · activating twice does not extend the approver\'s deadline');
+appr_activate_step($s2c, appr_request((int) $ap1['id']));
+t_eq((string) ops_val("SELECT sla_due FROM recruit_approval_steps WHERE id=?", [(int) $s2['id']]), $past,
+     'M3.1 · re-activating a running step does not move its deadline — an SLA cannot be reset');
+$pdo->prepare("UPDATE recruit_approval_steps SET sla_due=? WHERE id=?")->execute([$dueWas, (int) $s2['id']]);
 
 // ---------------------------------------------------------------------------
 //  M3.2 · WORKING DAYS (§9) — reusing the calendar that already existed
@@ -162,6 +169,24 @@ t_ok(is_working_day($hol, 972),  'M3.2 · …and not at the other branch');
 t_ok(substr(appr_due_at(1, 971), 0, 10) !== $hol, 'M3.2 · so a one-day SLA at that branch skips its holiday');
 t_ok(is_working_day(substr(appr_due_at(3, 0), 0, 10), 0),
      'M3.2 · with no branch (offer, salary, requisition) the company calendar applies — behaviour M2 left alone');
+
+// The holiday cache must notice when the database under it changes. One database
+// per tenant means a process that serves two workspaces — a cron sweep, this test
+// runner — would otherwise answer the second with the first one's public
+// holidays. That is the exact class of defect that caused a proven cross-tenant
+// leak in Phase 2 M2, and M3 now computes due dates from this table.
+$epochWas = $GLOBALS['__db_epoch'] ?? 0;
+$hol2 = date('Y-m-d', strtotime('+40 days'));
+$pdo->prepare("INSERT INTO holidays (hol_date,name,office_id) VALUES (?,?,NULL)")->execute([$hol2, 'M3 epoch holiday']);
+office_holidays_flush();
+t_ok(isset(office_holidays(0)[$hol2]), 'M3.2 · a company-wide holiday is read and cached');
+$pdo->prepare("DELETE FROM holidays WHERE hol_date=? AND name='M3 epoch holiday'")->execute([$hol2]);
+t_ok(isset(office_holidays(0)[$hol2]), 'M3.2 · …and stays cached within one database, as a cache should');
+$GLOBALS['__db_epoch'] = (int) $epochWas + 1;      // the connection switched workspace
+t_ok(!isset(office_holidays(0)[$hol2]),
+     'M3.2 · BUT A NEW DATABASE GETS ITS OWN ANSWER — the cache is keyed on db_epoch()');
+$GLOBALS['__db_epoch'] = $epochWas;
+office_holidays_flush();
 
 // ---------------------------------------------------------------------------
 //  M3.3 · WHERE THE CLOCK STOPS (§8)
@@ -295,13 +320,17 @@ $apN = hreq_approval($hN);
 $sN = appr_current_step($apN);
 $pdo->prepare("UPDATE recruit_approval_steps SET sla_due=?, reminder_at='', escalate_role='', escalate_user_id=NULL WHERE id=?")
     ->execute([$ago(1), (int) $sN['id']]);
-$pdo->exec("UPDATE users SET is_active=0 WHERE role IN ('MASTER_ADMIN','ADMIN','BRANCH_MANAGER','SBU_HEAD') AND email<>''");
+// Park every user the escalation fallback could reach, so "nobody to tell" is
+// CONSTRUCTED rather than assumed — this suite shares its database with every
+// other file in the run, so absence can never be taken on trust.
+$parked = array_map(fn($r) => (int) $r['id'],
+    ops_all("SELECT id FROM users WHERE is_active=1 AND email<>'' AND role IN ('MASTER_ADMIN','ADMIN','BRANCH_MANAGER','SBU_HEAD')"));
+foreach ($parked as $pid) $pdo->prepare("UPDATE users SET is_active=0 WHERE id=?")->execute([$pid]);
 $auditWas = $actN('NO RECIPIENT');
 appr_tick();
 t_eq($actN('NO RECIPIENT'), $auditWas + 1,
      'M3.7 · an escalation nobody could receive is audited as NO RECIPIENT, not as a success');
-$pdo->exec("UPDATE users SET is_active=1 WHERE username LIKE 'm3_%'");
-$pdo->prepare("UPDATE users SET is_active=1 WHERE id IN (SELECT id FROM users WHERE username NOT LIKE 'm3_%' AND role IN ('MASTER_ADMIN','ADMIN','BRANCH_MANAGER','SBU_HEAD'))")->execute();
+foreach ($parked as $pid) $pdo->prepare("UPDATE users SET is_active=1 WHERE id=?")->execute([$pid]);
 
 // ---------------------------------------------------------------------------
 //  M3.8 · DELEGATION (§16) — M2's rules, now honoured by notification too
@@ -399,6 +428,24 @@ t_ok((int) ops_val("SELECT COUNT(*) FROM email_log WHERE kind='recruit_approval'
 t_ok((int) ops_val("SELECT COUNT(*) FROM email_log WHERE kind='recruit_approval' AND sent_ok=1") === 0,
      'M3.10 · nothing claims to have been delivered when the mailer could not deliver it');
 t_ok(function_exists('notifications_can_view'), 'M3.10 · the existing outbox screen is where these are read');
+
+// The requester is told the outcome of their own request. This is the assertion
+// that matters on MariaDB: the old lookup matched on
+// TRIM((first_name || ' ' || last_name)), and `||` is string concatenation in
+// SQLite but LOGICAL OR in MySQL/MariaDB — so in production the comparison was
+// against a number, never matched, and the requester was never told. Silently,
+// inside a try/catch. This passes on SQLite either way; on MariaDB it only passes
+// because the lookup is now portable, which is exactly why the suite must run on
+// both engines.
+$hT = $raise(['job_title' => 'M3 told']);
+$apT = hreq_approval($hT);
+$act($uAppr);
+appr_act((int) appr_current_step($apT)['id'], 'approve', 'level 1');
+$act($uAppr2);
+appr_act((int) appr_current_step(appr_request((int) $apT['id']))['id'], 'approve', 'level 2');
+t_eq(hreq_get($hT)['status'], 'APPROVED', 'M3.10 · a two-level chain completes');
+t_ok((int) ops_val("SELECT COUNT(*) FROM email_log WHERE kind='recruit_approval' AND to_addr=? AND subject LIKE '%APPROVED%'", ['m3req@demo.test']) >= 1,
+     'M3.10 · AND THE REQUESTER IS TOLD — the same on MariaDB as on SQLite');
 t_ok($actN('SLA started') >= 1, 'M3.10 · the start of an SLA is on the activity spine');
 t_ok(!t_table_exists('appr_notifications'), 'M3.10 · and no second notification store was created');
 // A mailer that throws must not break the approval workflow. (§39)
@@ -543,7 +590,7 @@ foreach ($mine['rule'] as $r) {
 foreach ($mine['del'] as $d) $pdo->prepare("DELETE FROM approval_delegations WHERE id=?")->execute([(int) $d]);
 foreach ($mine['hol'] as $d) $pdo->prepare("DELETE FROM holidays WHERE hol_date=? AND name='M3 branch holiday'")->execute([$d]);
 office_holidays_flush();
-$pdo->exec("DELETE FROM users WHERE username LIKE 'm3\\_%' ESCAPE '\\'");
+foreach ($mine['u'] as $u) $pdo->prepare("DELETE FROM users WHERE id=?")->execute([(int) $u]);
 foreach ($mine['o'] as $o) $pdo->prepare("DELETE FROM offices WHERE id=?")->execute([(int) $o]);
 $pdo->exec("DELETE FROM email_log WHERE kind='recruit_approval'");
 t_ok(true, 'M3 fixtures removed');
