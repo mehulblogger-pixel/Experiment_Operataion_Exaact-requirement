@@ -71,6 +71,10 @@ const ACT_ENTITIES = [
     // label and link them on the universal timeline.
     'HIRING_REQUEST' => ['Hiring Request',          '/hiring-request?id='],
     'REQUISITION'    => ['Recruitment Requisition', '/requisition?id='],
+    // Phase 3 · M2 — approval configuration is sensitive, so policy and
+    // delegation changes go on this same spine rather than a second one.
+    'APPROVAL_POLICY'   => ['Approval policy',     '/recruit-approvals?id='],
+    'APPROVAL_DELEGATE' => ['Approval delegation', '/approval-delegations'],
 ];
 
 // A constant cannot call T(), so the two entries that name a business noun are

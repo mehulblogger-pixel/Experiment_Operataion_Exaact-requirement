@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '7f5a27e · 2026-09-15 12:46 UTC · 659 files';
+$RELEASE = '76cd35c · 2026-09-15 13:56 UTC · 660 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -34,7 +34,7 @@ $EXPECT  = [
     'index.php' => ['s'=>117010,'h'=>'31943462d15dddf6'],
     'lib/access.php' => ['s'=>71117,'h'=>'cb498f1e83cfa87b'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
-    'lib/activity.php' => ['s'=>23186,'h'=>'7c9b54e9cd8276c1'],
+    'lib/activity.php' => ['s'=>23491,'h'=>'0b91b0544b0ae80a'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
     'lib/adssync.php' => ['s'=>28174,'h'=>'325142a88491bfba'],
@@ -133,7 +133,7 @@ $EXPECT  = [
     'lib/formdesign.php' => ['s'=>27024,'h'=>'0feb6ccff1be7076'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
     'lib/helpers.php' => ['s'=>21408,'h'=>'0158217e1aae4477'],
-    'lib/hiringreq.php' => ['s'=>46757,'h'=>'c650bf61533d9d17'],
+    'lib/hiringreq.php' => ['s'=>47058,'h'=>'7585007a2b26e23b'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
     'lib/idems.php' => ['s'=>786409,'h'=>'3d46d6301e9ec8e5'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
@@ -164,13 +164,13 @@ $EXPECT  = [
     'lib/mkt_plans.php' => ['s'=>10762,'h'=>'513801027f92ce90'],
     'lib/mkt_rules.php' => ['s'=>12129,'h'=>'f541702a11884133'],
     'lib/mkt_subs.php' => ['s'=>10123,'h'=>'7a5b146d8a81d7ce'],
-    'lib/navindex.php' => ['s'=>11953,'h'=>'24a2630c29c7d028'],
+    'lib/navindex.php' => ['s'=>12087,'h'=>'44ff31525a8f9819'],
     'lib/ncdca.php' => ['s'=>44960,'h'=>'d64c2c2e6eddc5e1'],
     'lib/ncr.php' => ['s'=>33936,'h'=>'ec00fe27bea070b0'],
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66290,'h'=>'4ff1bc5a2652ad81'],
-    'lib/ops.php' => ['s'=>595097,'h'=>'31387721dc54d2d3'],
+    'lib/ops.php' => ['s'=>595384,'h'=>'686b7677d1983d17'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -191,7 +191,7 @@ $EXPECT  = [
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
     'lib/recruit.php' => ['s'=>69782,'h'=>'98a1add9135157ea'],
-    'lib/recruit_approval.php' => ['s'=>31853,'h'=>'4267f20aa2d65dc1'],
+    'lib/recruit_approval.php' => ['s'=>54940,'h'=>'f0a04c60301597f3'],
     'lib/recruit_cc.php' => ['s'=>21082,'h'=>'d87684e94f608cad'],
     'lib/recruit_export.php' => ['s'=>7887,'h'=>'70fa492cdd1a8d35'],
     'lib/recruit_iv.php' => ['s'=>36630,'h'=>'ea9e62e8603e3b38'],
@@ -314,7 +314,8 @@ $EXPECT  = [
     'views/ops/ai_forms.php' => ['s'=>6775,'h'=>'1db181d672deb472'],
     'views/ops/ai_settings.php' => ['s'=>3976,'h'=>'85c7c7702303d4f6'],
     'views/ops/ai_topup_pay.php' => ['s'=>2522,'h'=>'d49277496bd6ae07'],
-    'views/ops/approval_rules.php' => ['s'=>9934,'h'=>'cfe9afaf1b36c60e'],
+    'views/ops/approval_delegations.php' => ['s'=>6265,'h'=>'d6eedb718e5d4758'],
+    'views/ops/approval_rules.php' => ['s'=>16619,'h'=>'c289a71a8dd1c8a8'],
     'views/ops/approvals.php' => ['s'=>6693,'h'=>'f828df72d1a093af'],
     'views/ops/area_home.php' => ['s'=>7789,'h'=>'e3516d928823295e'],
     'views/ops/asset_register.php' => ['s'=>12678,'h'=>'4e1059588b45df6f'],

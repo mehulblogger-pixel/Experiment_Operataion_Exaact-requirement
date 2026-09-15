@@ -2496,6 +2496,7 @@ function ops_module_gate($route, $peek = false) {
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring','candidate-link-pro'=>'hiring','candidate-unlink-pro'=>'hiring',
         'hiring-requests'=>'hiring','hiring-request'=>'hiring',
+        'approval-delegations'=>'hiring',   // M2 — approval delegation config rides with recruitment
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring','recruit-export'=>'hiring','careers-admin'=>'hiring','jd-generate'=>'hiring','positions-import'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
@@ -2845,6 +2846,8 @@ function ops_dispatch($route, $method) {
             return ops_doc_templates($route, $method);
         case $route === 'candidate-letter':                          // Phase 5.1B — generate a letter from a template
             return ops_candidate_letter($route, $method);
+        case $route === 'approval-delegations':                      // Phase 3 · M2 — who may act for whom, and when
+            return ops_approval_delegations($route, $method);
         case $route === 'recruit-approvals':                         // Phase 6 — configurable recruitment approval matrix + SLA
             return ops_recruit_approvals($route, $method);
         case $route === 'my-approvals':                              // Phase 6 — recruitment approver inbox (approve/reject)

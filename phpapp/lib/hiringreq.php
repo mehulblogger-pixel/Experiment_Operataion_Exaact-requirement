@@ -326,7 +326,11 @@ function hreq_appr_ctx(array $r) {
         'grade'       => (string) ($r['grade'] ?? ''),
         'position'    => (string) ($r['designation'] ?? ''),
         'position_id' => (int) ($r['position_id'] ?? 0),
-        'amount'      => 0,
+        // M2 — the branch dimension. A customer can now write "Ahmedabad hires
+        // need the branch manager", and the quantity is what an amount band
+        // reads for a hiring request: headcount, not money.
+        'office_id'   => (int) ($r['office_id'] ?? 0),
+        'amount'      => (int) ($r['quantity'] ?? 0),
     ];
 }
 

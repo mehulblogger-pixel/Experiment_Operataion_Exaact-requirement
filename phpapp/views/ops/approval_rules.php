@@ -44,6 +44,29 @@ $applySummary = function ($r) use ($e) {
     <?php if (!$sel): ?><div class="panel"><p class="muted">Pick a rule, or create one.</p></div><?php else: ?>
     <div class="panel">
       <h3 class="tab-sub">Rule — when it applies</h3>
+      <?php // M2 — the two things that quietly break an approval policy: a level
+            // nobody can action, and a rule that ties with another. Say both out loud.
+            $orphans = $orphans ?? []; $ties = $ties ?? []; ?>
+      <?php if ($orphans): ?>
+        <div class="panel" style="border-left:3px solid #b42318;margin-bottom:12px">
+          <strong>This policy cannot run as configured.</strong>
+          <ul style="margin:6px 0 0 18px">
+            <?php foreach ($orphans as $o): ?>
+              <li>Level <?= (int)$o['level']['seq'] ?> (<?= $e($o['level']['label'] ?: 'unnamed') ?>) — <?= $e($o['why']) ?>.</li>
+            <?php endforeach; ?>
+          </ul>
+          <p class="muted" style="margin:6px 0 0">A hiring request matching this policy will wait for an approver who does not exist. It will never be approved by accident, and never becomes executable — but nobody can act on it until this is fixed.</p>
+        </div>
+      <?php endif; ?>
+      <?php if ($ties): ?>
+        <div class="panel" style="border-left:3px solid #b45309;margin-bottom:12px">
+          <strong>Another policy is equally specific and has the same match order.</strong>
+          <div class="muted" style="margin-top:4px">
+            <?php foreach ($ties as $t): ?><div>· <?= $e($t['name']) ?> (match order <?= (int)$t['sort'] ?>)</div><?php endforeach; ?>
+            The older rule wins, which is predictable but probably not what you meant. Give one of them a lower match order.
+          </div>
+        </div>
+      <?php endif; ?>
       <form method="post"><input type="hidden" name="do" value="rule_save"><input type="hidden" name="id" value="<?= (int)$sel['id'] ?>">
         <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px">
           <div class="ff"><label>Rule name</label><input class="form-control" name="name" value="<?= $e($sel['name']) ?>"></div>
@@ -59,7 +82,15 @@ $applySummary = function ($r) use ($e) {
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
           <div class="ff"><label>Amount from (0 = any)</label><input class="form-control" type="number" step="any" name="min_amount" value="<?= (float)$sel['min_amount'] ?>"></div>
           <div class="ff"><label>Amount to (0 = ∞)</label><input class="form-control" type="number" step="any" name="max_amount" value="<?= (float)$sel['max_amount'] ?>"></div>
-          <div class="ff"><label>Match order</label><input class="form-control" type="number" name="sort" value="<?= (int)$sel['sort'] ?>"></div>
+          <div class="ff"><label>Branch</label>
+            <select class="form-control" name="applies_office_id">
+              <option value="0">Any branch (global policy)</option>
+              <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (int)($sel['applies_office_id'] ?? 0) === (int)$o['id'] ? 'selected' : '' ?>><?= $e($o['name']) ?></option><?php endforeach; ?>
+            </select></div>
+          <div class="ff"><label>In force from</label><input class="form-control" type="date" name="effective_from" value="<?= $e(substr((string)($sel['effective_from'] ?? ''),0,10)) ?>"></div>
+          <div class="ff"><label>In force until</label><input class="form-control" type="date" name="effective_to" value="<?= $e(substr((string)($sel['effective_to'] ?? ''),0,10)) ?>"></div>
+          <div class="ff"><label>Match order</label><input class="form-control" type="number" name="sort" value="<?= (int)$sel['sort'] ?>">
+            <small class="muted">Used only when two rules are equally specific — lower wins.</small></div>
         </div>
         <div style="margin-top:12px;display:flex;gap:8px"><button class="btn">Save rule</button><button class="btn secondary" name="do" value="rule_toggle"><?= (int)$sel['active']===1?'Disable':'Enable' ?></button></div>
       </form>
@@ -95,6 +126,63 @@ $applySummary = function ($r) use ($e) {
         </tr>
       </table></div>
       <p class="muted" style="margin-top:8px;font-size:12px">A step's approver gets an email when it's their turn; a reminder after “remind after” days; and an escalation to the escalation role once the SLA is breached. Reminders/escalations run on the daily cron.</p>
+    </div>
+    <?php endif; ?>
+
+    <?php // M2 §14 — "why this approval?". Type the facts of a request and see
+          // which policy would win, what ties with it, and who could actually act.
+    if ($sel): $pv = $preview ?? null; ?>
+    <div class="panel">
+      <h3 class="tab-sub" style="margin-top:0">Try it — which policy would apply?</h3>
+      <form method="get">
+        <input type="hidden" name="id" value="<?= (int)$sel['id'] ?>"><input type="hidden" name="pv" value="1">
+        <div class="ff-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div class="ff"><label>Department</label><input class="form-control" name="pv_department" value="<?= $e($_GET['pv_department'] ?? '') ?>"></div>
+          <div class="ff"><label>Grade</label><input class="form-control" name="pv_grade" value="<?= $e($_GET['pv_grade'] ?? '') ?>"></div>
+          <div class="ff"><label>Position / designation</label><input class="form-control" name="pv_position" value="<?= $e($_GET['pv_position'] ?? '') ?>"></div>
+          <div class="ff"><label>Branch</label>
+            <select class="form-control" name="pv_office_id"><option value="0">—</option>
+              <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (int)($_GET['pv_office_id'] ?? 0)===(int)$o['id']?'selected':'' ?>><?= $e($o['name']) ?></option><?php endforeach; ?>
+            </select></div>
+          <div class="ff"><label>How many / amount</label><input class="form-control" type="number" step="any" name="pv_amount" value="<?= $e($_GET['pv_amount'] ?? '') ?>"></div>
+          <div class="ff" style="align-self:end"><button class="btn secondary">Show me</button></div>
+        </div>
+      </form>
+      <?php if ($pv): ?>
+        <?php if ($pv['no_match']): ?>
+          <div style="margin-top:12px;border-left:3px solid #6b7280;padding-left:10px">
+            <strong>No policy matches.</strong>
+            <div class="muted">The request would not go through an approval chain. It stays <em>Submitted</em> and is decided directly by an administrator — the behaviour a workspace with no rules configured has always had.</div>
+          </div>
+        <?php else: ?>
+          <div style="margin-top:12px;border-left:3px solid #1a7f37;padding-left:10px">
+            <strong><?= $e($pv['matched']['name']) ?></strong> would apply.
+            <?php if ($pv['ambiguous']): ?><span class="pill p-warn" style="font-size:11px">ties with another rule</span><?php endif; ?>
+            <table class="table" style="font-size:13px;margin-top:8px">
+              <tr><th>Level</th><th>Authority</th><th>Who could act</th></tr>
+              <?php foreach ($pv['levels'] as $L): $el = $L['eligible']; ?>
+                <tr><td><?= (int)$L['level']['seq'] ?></td>
+                    <td><?= $e($L['level']['label'] ?: ($el['role'] ?: 'unnamed')) ?></td>
+                    <td><?php
+                      if ($el['users']) {
+                          $ns = [];
+                          foreach ($el['users'] as $u) { $n = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')); $ns[] = $e($n !== '' ? $n : ($u['username'] ?? '')); }
+                          echo implode(', ', $ns);
+                      } elseif ($el['kind'] === 'ORG') { echo '<span class="muted">resolved from the org chart when a request is raised</span>'; }
+                      else { echo '<span class="pill p-bad" style="font-size:11px">nobody</span>'; }
+                    ?></td></tr>
+              <?php endforeach; ?>
+              <?php if (!$pv['levels']): ?><tr><td colspan="3" class="muted">This policy has no levels, so it cannot start a chain.</td></tr><?php endif; ?>
+            </table>
+            <?php if (count($pv['ranked']) > 1): ?>
+              <p class="muted" style="margin:6px 0 0;font-size:12px">Also matched, in order:
+                <?php $rest = array_slice($pv['ranked'], 1); $ls = [];
+                      foreach ($rest as $r2) $ls[] = $e($r2['rule']['name']) . ' (specificity ' . (int)$r2['score'] . ')';
+                      echo implode(' · ', $ls); ?></p>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+      <?php endif; ?>
     </div>
     <?php endif; ?>
   </div>

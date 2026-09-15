@@ -126,6 +126,7 @@ function ops_nav_index($fresh = false) {
                 $add('Compensation setup', '/comp-setup', $A, '₹', 'Configure salary headings & statutory components.');
                 $add('Document templates', '/doc-templates', $A, '📄', 'Configure offer / appointment letter templates.');
                 $add('Approval rules', '/recruit-approvals', $A, '🧷', 'Configure approval matrix, SLA & escalations.');
+                $add('Approval delegation', '/approval-delegations', $A, '🤝', 'Who may approve for whom while somebody is away.');
                 $add('Careers page', '/careers-admin', $A, '🌐', 'Publish openings to a public careers page.');
             }
         }
