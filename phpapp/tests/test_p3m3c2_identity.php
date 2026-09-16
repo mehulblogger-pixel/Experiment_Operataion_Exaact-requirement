@@ -199,8 +199,18 @@ t_eq(count(appr_step_recipients($orphan, null)), 0, 'ID5 · C2-2 · a step whose
 
 //  Offer / salary / requisition behaviour is untouched — no branch requirement
 //  was introduced for entities that cannot establish one.
-$offerReq = ['entity' => 'OFFER', 'entity_id' => 4242, 'subject' => 'x'];
-t_ok(appr_visible($st6, $offerReq, $appRow), 'ID5 · a KNOWN non-hiring entity is still visible on can-act alone — unchanged');
+//  M3 correction #5 (G1) — this used a made-up offer id, and a supported TYPE is
+//  no longer a resolved RECORD. The intent was "no branch requirement is imposed
+//  on a non-hiring entity", which is still true and is now asserted against a REAL
+//  offer; the made-up id proves the other half of the same rule.
+$pdo->prepare("INSERT INTO job_offers (candidate_id,ctc,status,created_by,created_at) VALUES (0,1,'DRAFT','ID',?)")->execute([date('c')]);
+$realOffer = (int) $pdo->lastInsertId();
+$offerReq = ['entity' => 'OFFER', 'entity_id' => $realOffer, 'subject' => 'x'];
+t_ok(appr_visible($st6, $offerReq, $appRow),
+     'ID5 · a KNOWN non-hiring entity with a REAL record is visible on can-act alone — no branch requirement');
+t_ok(!appr_visible($st6, ['entity' => 'OFFER', 'entity_id' => 4242, 'subject' => 'x'], $appRow),
+     'ID5 · G1 · …but a supported TYPE with a MISSING RECORD is denied');
+$pdo->prepare("DELETE FROM job_offers WHERE id=?")->execute([$realOffer]);
 
 //  C2-5 / C2-6 / C2-7 — the existing behaviours still hold.
 //  A holder of the SAME approver role at another branch: they pass can-act, and

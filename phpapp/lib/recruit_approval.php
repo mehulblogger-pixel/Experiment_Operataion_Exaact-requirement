@@ -779,7 +779,11 @@ function appr_visible($step, $req, $user = null) {
     //  APPR_ENTITIES map the rest of the engine uses. An unknown entity is not a
     //  synonym for "some other supported entity".
     if ($entity === '' || !array_key_exists($entity, APPR_ENTITIES)) return false;
-    if ($entity !== 'HIRING_REQUEST') return true;                     // unchanged for every other entity
+    //  G1 — and a SUPPORTED TYPE is not a RESOLVED RECORD. Asked for all four, so
+    //  a chain whose source has been deleted can no longer fall through to
+    //  appr_can_act() as a generic rescue.
+    if (!appr_entity_record($entity, $req['entity_id'] ?? 0)) return false;
+    if ($entity !== 'HIRING_REQUEST') return true;                     // scope semantics unchanged for every other entity
     // For a hiring request, seeing it and deciding it are the same question, so
     // the queue asks the guard that governs the decision.
     return appr_guard($req) === '';
@@ -1256,6 +1260,48 @@ const APPR_NOTIFY_REASONS = [
     'PROVIDER_FAILURE'     => 'the mail provider could not deliver it',
 ];
 
+//  M3 CORRECTION #5 · G1 — A SUPPORTED TYPE IS NOT A RESOLVED RECORD.
+//
+//  appr_visible() asked whether the entity TYPE was known and then resolved the
+//  RECORD for the hiring request alone, so a step whose offer, salary structure
+//  or requisition had been deleted still produced recipients. C2's rule —
+//  "unknown, missing or invalid entity must DENY" — had its unknown-type half
+//  implemented for every entity and its missing-record half for one.
+//
+//  This is the one place the source record is resolved for notification, for all
+//  four. It REUSES the existing resolvers where they exist (hreq_get, offer_get)
+//  and reads the source table directly where they do not, rather than inventing a
+//  second entity framework.
+//
+//  Tenant safety needs no clause: this application keeps ONE DATABASE PER TENANT
+//  and no tenant_id column, so a record belonging to another workspace is not in
+//  this database and an id cannot resolve to it. That is asserted behaviourally
+//  rather than assumed.
+//
+//  A resolution that ERRORS is a resolution that FAILED — the catch denies.
+const APPR_ENTITY_SOURCE = [
+    'HIRING_REQUEST' => 'hiring_requests',
+    'OFFER'          => 'job_offers',
+    'SALARY'         => 'salary_structures',
+    'REQUISITION'    => 'requisitions',
+];
+function appr_entity_record($entity, $id) {
+    $entity = strtoupper(trim((string) $entity));
+    $id = (int) $id;
+    if ($id <= 0 || !array_key_exists($entity, APPR_ENTITY_SOURCE)) return null;
+    try {
+        if ($entity === 'HIRING_REQUEST')
+            return function_exists('hreq_get') ? (hreq_get($id) ?: null) : null;
+        if (function_exists('recruit_offer_migrate') && ($entity === 'OFFER' || $entity === 'SALARY'))
+            recruit_offer_migrate();
+        if ($entity === 'OFFER')
+            return function_exists('offer_get') ? (offer_get($id) ?: null) : null;
+        if ($entity === 'SALARY')
+            return ops_one("SELECT * FROM salary_structures WHERE id=?", [$id]) ?: null;
+        return ops_one("SELECT * FROM requisitions WHERE id=?", [$id]) ?: null;
+    } catch (Throwable $e) { return null; }
+}
+
 //  M3 CORRECTION #4 · E1 — WHICH MODULE EACH APPROVAL ENTITY BELONGS TO.
 //
 //  Written down rather than assumed, so the entitlement question can be asked for
@@ -1308,11 +1354,13 @@ function appr_told_reason($req, $user) {
     $why = appr_notify_gate($req, $user);          // subject · entity · entitlement
     if ($why !== '') return $why;
     $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
-    if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return '';
-    $r = appr_as_user($user, function () use ($req) {
-        $h = hreq_get((int) ($req['entity_id'] ?? 0));
-        if (!$h) return 'ENTITY_UNRESOLVED';
-        if (function_exists('hreq_in_scope') && !hreq_in_scope($h)) return 'RECIPIENT_OUT_OF_SCOPE';
+    //  G1 — informational is not a bypass. The source record must resolve here
+    //  too, for every entity, before anything else is considered.
+    $rec = appr_entity_record($entity, $req['entity_id'] ?? 0);
+    if (!$rec) return 'ENTITY_UNRESOLVED';
+    if ($entity !== 'HIRING_REQUEST') return '';
+    $r = appr_as_user($user, function () use ($rec) {
+        if (function_exists('hreq_in_scope') && !hreq_in_scope($rec)) return 'RECIPIENT_OUT_OF_SCOPE';
         return '';
     });
     return is_string($r) ? $r : 'IDENTITY_UNRESOLVED';
@@ -1446,28 +1494,14 @@ function appr_email_escalate($step, $req = null) {
 function appr_requester_id($req) {
     $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
     $eid = (int) ($req['entity_id'] ?? 0);
+    //  G1 — one resolver, the same one the notification predicates use, instead of
+    //  an inline query per entity. A record that does not resolve is
+    //  ENTITY_UNRESOLVED and never falls through to the chain.
+    $rec = appr_entity_record($entity, $eid);
+    if (!$rec) return [0, 'ENTITY_UNRESOLVED'];
     $fromEntity = 0;
-    try {
-        if ($entity === 'HIRING_REQUEST' && function_exists('hreq_get')) {
-            $r = hreq_get($eid);
-            if (!$r) return [0, 'ENTITY_UNRESOLVED'];
-            $fromEntity = (int) ($r['requested_by_id'] ?? 0);
-        } elseif ($entity === 'OFFER') {
-            // The columns these two branches read belong to another module, so its
-            // migration is ensured here rather than assumed. Without this the query
-            // raises, the catch below swallows it, and a MISSING RECORD would be
-            // reported as a MISSING IDENTITY — the very confusion D3 is about.
-            if (function_exists('recruit_offer_migrate')) recruit_offer_migrate();
-            $r = ops_one("SELECT created_by_id FROM job_offers WHERE id=?", [$eid]);
-            if (!$r) return [0, 'ENTITY_UNRESOLVED'];
-            $fromEntity = (int) ($r['created_by_id'] ?? 0);
-        } elseif ($entity === 'SALARY') {
-            if (function_exists('recruit_offer_migrate')) recruit_offer_migrate();
-            $r = ops_one("SELECT created_by_id FROM salary_structures WHERE id=?", [$eid]);
-            if (!$r) return [0, 'ENTITY_UNRESOLVED'];
-            $fromEntity = (int) ($r['created_by_id'] ?? 0);
-        }
-    } catch (Throwable $e) { $fromEntity = 0; }
+    if ($entity === 'HIRING_REQUEST')             $fromEntity = (int) ($rec['requested_by_id'] ?? 0);
+    elseif ($entity === 'OFFER' || $entity === 'SALARY') $fromEntity = (int) ($rec['created_by_id'] ?? 0);
     if ($fromEntity > 0) return [$fromEntity, ''];
     $fromChain = (int) ($req['requester_id'] ?? 0);
     if ($fromChain > 0) return [$fromChain, ''];
