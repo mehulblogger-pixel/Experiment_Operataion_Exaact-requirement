@@ -757,7 +757,18 @@ function appr_step_context($step, $req = null) {
 //  Returns true when this row belongs in this person's queue.
 function appr_visible($step, $req, $user = null) {
     if (!appr_can_act($step, $user)) return false;                     // never widens
-    $entity = strtoupper((string) ($req['entity'] ?? ''));
+    $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
+    //  M3 CORRECTION #2 · C2 — AN ENTITY WE CANNOT NAME IS NOT ONE WE MAY
+    //  DISCLOSE. When the request row could not be fetched, $req arrived null,
+    //  $entity came out '', this test read "not a hiring request" and the function
+    //  fell through to `return true` — so a missing record SKIPPED entitlement,
+    //  branch scope and segregation and notified everyone who held the role.
+    //  A missing security subject must make the answer stricter, never looser.
+    //
+    //  Known-and-supported is now required, and it is checked against the same
+    //  APPR_ENTITIES map the rest of the engine uses. An unknown entity is not a
+    //  synonym for "some other supported entity".
+    if ($entity === '' || !array_key_exists($entity, APPR_ENTITIES)) return false;
     if ($entity !== 'HIRING_REQUEST') return true;                     // unchanged for every other entity
     // For a hiring request, seeing it and deciding it are the same question, so
     // the queue asks the guard that governs the decision.
@@ -1329,20 +1340,56 @@ function appr_email_escalate($step, $req = null) {
         . '<p>This is a notification. It does not give you authority to approve — the approver named on the step still owns the decision.</p>';
     return [count($to), appr_mail($to, 'ESCALATION: approval overdue — ' . ($step['subject'] ?? ''), $body)];
 }
+//  Phase 3 · M3 CORRECTION #2 · C1 — A NAME IS NOT AN IDENTITY.
+//
+//  This used to resolve the person to tell from `recruit_approval_requests.
+//  requester`, which is a DISPLAY NAME, with LIMIT 1 and no ordering. Two people
+//  called "Ravi Sharma" and whoever held the lower id won. Proved with a probe:
+//  an inspector at another branch, holding no recruitment permission at all,
+//  received a hiring request's title and outcome, and the person who actually
+//  raised it received nothing.
+//
+//  The canonical answer already existed. M4 established
+//  `hiring_requests.requested_by_id` as the requestor of record and M4's own
+//  correction made it survive an edit that omits it. THAT is the identity. The
+//  `requester` column keeps doing what it is for — labelling a screen.
+//
+//  Only the hiring request has such an identity: an offer, a salary structure and
+//  a requisition record their raiser as text and nothing else. For those this
+//  FAILS CLOSED and says so on the timeline, because guessing a person from prose
+//  is the defect, not the fix.
+function appr_requester_user($req) {
+    $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
+    if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return null;
+    $r = hreq_get((int) ($req['entity_id'] ?? 0));
+    if (!$r) return null;                                   // no record → no recipient
+    $uid = (int) ($r['requested_by_id'] ?? 0);
+    if ($uid <= 0) return null;                             // legacy row with no id → do not guess
+    try { $u = ops_one("SELECT * FROM users WHERE id=?", [$uid]); } catch (Throwable $e) { return null; }
+    return $u ?: null;                                      // an id from elsewhere does not exist here
+}
+
+//  A decision that could not be reported is recorded, on the EXISTING spine, so
+//  "nobody was told" is visible rather than silent. It is never a guess.
+function appr_audit_requester_unresolved($req, $result) {
+    if (!function_exists('act_log')) return;
+    $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
+    $label = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : ($entity ?: 'approval');
+    act_log($entity, (int) ($req['entity_id'] ?? 0), 'SYSTEM',
+        'Decision not notified — no canonical requester identity — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0)
+        . ' ' . strtoupper((string) $result), ['auto' => 1]);
+}
+
 function appr_email_requester($req, $result, $remarks = '') {
-    $who = trim((string)($req['requester'] ?? '')); if ($who === '') return;
-    // Phase 3 · M3 — this `||` looks like a MySQL portability bug and is not one.
-    // The audit recorded it as one; a MariaDB probe proved the audit wrong. Every
-    // MySQL connection this application opens sets PIPES_AS_CONCAT (lib/db.php),
-    // deliberately and for exactly this reason, so `||` concatenates on both
-    // engines. The query is left as it was, and the behavioural test that the
-    // requester is actually told the outcome — which did not exist before — now
-    // runs on both engines and holds it there.
-    $email = '';
-    try {
-        $email = (string) ops_val("SELECT email FROM users WHERE email<>'' AND (username=? OR TRIM((first_name || ' ' || last_name))=?) LIMIT 1", [$who, $who]);
-    } catch (Throwable $e) { return; }
-    if (!$email) return;
+    $u = appr_requester_user($req);
+    if (!$u) { appr_audit_requester_unresolved($req, $result); return; }
+    //  Identity settles WHO. The existing model settles WHETHER — entitlement,
+    //  the record, branch scope and active status — at the informational level,
+    //  because telling somebody the outcome of their OWN request is not asking
+    //  them to approve anything, so segregation must not silence it.
+    if (!appr_may_be_told($req, $u)) { appr_audit_requester_unresolved($req, $result); return; }
+    $email = trim((string) ($u['email'] ?? ''));
+    if ($email === '') return;
     appr_mail([$email], 'Your approval was ' . strtoupper($result) . ' — ' . ($req['subject'] ?? ''),
         '<p>Your request <b>' . e((string)($req['subject'] ?? '')) . '</b> was <b>' . e(strtoupper($result)) . '</b>.' . ($remarks ? ' Remark: ' . e($remarks) : '') . '</p>');
 }
