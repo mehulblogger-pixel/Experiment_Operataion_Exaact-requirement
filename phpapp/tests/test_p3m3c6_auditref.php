@@ -187,6 +187,50 @@ t_ok(!ops_one("SELECT id FROM recruit_approval_rules WHERE id=?", [$foreign]),
      'C6.3 · the foreign policy id does not exist here either — the fallback is tenant-bound');
 
 // ---------------------------------------------------------------------------
+//  C6.7 · THE CONTRACTS THAT MAKE THE E2 "NEVER CAST" GUARDS EQUIVALENT TODAY
+//
+//  Four E2 mutations survive the battery: relaxing `is_string($r) ? $r : …` to
+//  `(string) $r`, and `=== true` to `(bool)`. They survive because the values
+//  reaching those lines are ALREADY of the right type — not because the guards
+//  are pointless. That is an argument about a CONTRACT, so the contract is
+//  pinned here rather than asserted in prose: if a future change ever lets one
+//  of these return something else, this section fails first and the guard's
+//  value becomes visible again.
+// ---------------------------------------------------------------------------
+t_section('C6.7 · return-type contracts behind the E2 guards');
+$act($uAppr);
+$stepC = appr_step_context(appr_current_step($E['HIRING_REQUEST']['req']), $E['HIRING_REQUEST']['req']);
+$ghost = ['id'=>0, 'is_active'=>1, 'role'=>'SBU_HEAD', 'permissions'=>$HR];   // an unresolvable subject
+$probes = [
+    'a real approver'         => $apprRow,
+    'an unresolvable subject' => $ghost,
+    'not a user at all'       => 'nonsense',
+];
+foreach ($probes as $lab => $who) {
+    foreach (['HIRING_REQUEST' => $E['HIRING_REQUEST'], 'OFFER' => $E['OFFER']] as $en => $x) {
+        $req = ['entity'=>$en, 'entity_id'=>$x['rec'], 'rule_id'=>$x['rule']];
+        $g = appr_notify_gate($req, $who);
+        t_ok(is_string($g), "C6.7 · $lab · $en · appr_notify_gate() returns a STRING, never null");
+        t_ok($g === '' || in_array($g, array_keys(APPR_NOTIFY_REASONS), true),
+             "C6.7 · $lab · $en · …and it is '' or a known reason code");
+        $t = appr_told_reason($req, $who);
+        t_ok(is_string($t), "C6.7 · $lab · $en · appr_told_reason() returns a STRING, never null");
+        $v = appr_may_be_asked($stepC, $req, $who);
+        t_ok($v === true || $v === false, "C6.7 · $lab · $en · appr_may_be_asked() returns a STRICT boolean");
+    }
+}
+//  appr_visible() is the value the actionable path compares with === true.
+$vis = appr_visible($stepC, ['entity'=>'HIRING_REQUEST','entity_id'=>$E['HIRING_REQUEST']['rec']], $apprRow);
+t_ok($vis === true || $vis === false, 'C6.7 · appr_visible() returns a STRICT boolean — what makes `=== true` equivalent to a cast');
+$vis2 = appr_visible($stepC, ['entity'=>'NOPE','entity_id'=>1], $apprRow);
+t_ok($vis2 === false, 'C6.7 · appr_visible() on an unknown entity is strictly false, not a falsy value');
+//  and the correction #6 helpers keep their own contracts
+t_ok(appr_audit_ref_ok('APPROVAL_POLICY', $E['HIRING_REQUEST']['rule']) === true, 'C6.7 · appr_audit_ref_ok() returns strict true');
+t_ok(appr_audit_ref_ok('APPROVAL_POLICY', 0) === false, 'C6.7 · appr_audit_ref_ok() returns strict false');
+[$k7, $i7, $b7] = appr_audit_subject(['entity'=>'HIRING_REQUEST','entity_id'=>$E['HIRING_REQUEST']['rec'],'rule_id'=>$E['HIRING_REQUEST']['rule']]);
+t_ok(is_string($k7) && is_int($i7) && is_bool($b7), 'C6.7 · appr_audit_subject() returns [string, int, bool]');
+
+// ---------------------------------------------------------------------------
 //  C6.4 · CASE 2 — THE DEFECT: the source record is deleted, the chain lives on
 // ---------------------------------------------------------------------------
 t_section('C6.4 · case 2 · a deleted source record never leaves a dangling reference');
