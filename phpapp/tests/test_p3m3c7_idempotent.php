@@ -25,7 +25,10 @@ $pdo = db(); hreq_migrate(); appr_migrate(); recruit_offer_migrate(); act_migrat
 $mine = ['u'=>[], 'o'=>[], 'rule'=>[], 'rq'=>[], 'cand'=>[], 'h'=>[], 'rqn'=>[]];
 $origSess = $_SESSION;
 
-t_ok(t_columns('activities', ['cond_key']), 'C7.0 · the spine carries a condition key');
+//  M3 correction #8 — this read `t_columns('activities', ['cond_key'])`, which
+//  returns the LIST of column names and is therefore truthy whether or not the
+//  column exists. It passed for no reason at all. Asked properly:
+t_ok(in_array('cond_key', t_columns('activities'), true), 'C7.0 · the spine carries a condition key');
 
 try { $pdo->prepare("INSERT INTO offices (id,name,is_active) VALUES (894,'C7',1)")->execute(); $mine['o'][]=894; } catch (Throwable $e) {}
 $mk = function ($un,$role,$su,$p,$em,$fn,$ln) use ($pdo,&$mine) {

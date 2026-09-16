@@ -90,7 +90,7 @@ function act_entities() {
 const ACT_DIRECTIONS = ['IN' => 'Incoming', 'OUT' => 'Outgoing', '' => ''];
 
 function act_migrate() {
-    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
+    static $doneAt = -1; if ($doneAt === db_epoch()) return;
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS activities (
         id $pk,
@@ -110,18 +110,60 @@ function act_migrate() {
     // Nothing else in this codebase creates an index, and MySQL will not invent
     // one. Without these, every Customer 360 page is a table scan — which is
     // survivable at 160 rows and is not at 160,000.
-    //  M3 correction #7 — a PERMANENT unresolved condition is a STATE, not a new
-    //  event on every observation. The canonical key of that state is stored on
-    //  the row that records it, so "have we already said this?" is one exact-match
-    //  question against the EXISTING spine rather than a second event engine, and
-    //  it is never derived by parsing display prose. Additive and nullable: every
-    //  other caller leaves it blank and behaves exactly as before.
-    ensure_column('activities', 'cond_key', "VARCHAR(160) DEFAULT ''");
-    act_index('activities', 'idx_act_cond', '(cond_key)');
     act_index('activities', 'idx_act_partner', '(partner_id, occurred_at)');
     act_index('activities', 'idx_act_entity',  '(entity_kind, entity_id)');
     act_index('activities', 'idx_act_when',    '(occurred_at)');
+    //  M3 CORRECTION #8 · S1 — THE GUARD IS SET HERE, AND ONLY HERE.
+    //
+    //  It used to be set on the FIRST LINE, before any of the work. So a failure
+    //  anywhere below left the guard latched: the migration was never retried,
+    //  and — because correction #7 had made act_log()'s INSERT depend on a column
+    //  added further down — EVERY module's audit trail went silently dead for the
+    //  life of the process. The core spine is complete at this point, which is
+    //  what act_log() actually needs, so this is where "done" becomes true.
+    $doneAt = db_epoch();
+    //  Optional metadata is attempted AFTER the guard, so it can never un-do the
+    //  core, and it reports rather than throws.
+    act_migrate_optional();
 }
+
+//  M3 CORRECTION #8 · S1 — OPTIONAL AUDIT METADATA, KEPT OPTIONAL.
+//
+//  cond_key carries correction #7's permanent-condition identity. Two of this
+//  application's SEVENTY-SIX act_log() call sites use it. It must therefore never
+//  be a precondition for the other seventy-four — or for these two.
+//
+//  Bounded: at most three attempts per workspace per process, so a host that
+//  refuses DDL does not run an ALTER on every audit write. Not latched on
+//  failure, so the next request (or the next workspace) tries again. Never
+//  reported as successful when it was not.
+function act_migrate_optional() {
+    static $okAt = -1; static $tries = [];
+    $e = db_epoch();
+    if ($okAt === $e) return true;
+    $n = (int) ($tries[$e] ?? 0);
+    if ($n >= 3) return false;                       // bounded, never an infinite loop
+    $tries[$e] = $n + 1;
+    try {
+        ensure_column('activities', 'cond_key', "VARCHAR(160) DEFAULT ''");
+        act_index('activities', 'idx_act_cond', '(cond_key)');
+    } catch (Throwable $ex) {
+        //  Observable, and NOT swallowed into a false success.
+        $GLOBALS['__act_optional_error'] = 'cond_key: ' . $ex->getMessage();
+        @error_log('act_migrate_optional: cond_key unavailable — ' . $ex->getMessage());
+        return false;
+    }
+    $okAt = $e; unset($tries[$e]); $GLOBALS['__act_optional_error'] = '';
+    return true;
+}
+
+//  Whether optional audit metadata is usable, and why not when it is not.
+function act_optional_ready() { return act_migrate_optional(); }
+function act_optional_error() { return (string) ($GLOBALS['__act_optional_error'] ?? ''); }
+
+//  The last CORE audit failure, so "the row was not written" can never be
+//  indistinguishable from "nothing happened".
+function act_last_error() { return (string) ($GLOBALS['__act_last_error'] ?? ''); }
 
 // CREATE INDEX IF NOT EXISTS is SQLite-only; MySQL throws on a duplicate, so
 // the error is swallowed and only that one.
@@ -185,8 +227,8 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
         $u = function_exists('current_user') ? current_user() : null;
         db()->prepare("INSERT INTO activities
             (kind,entity_kind,entity_id,partner_id,subject,body,direction,occurred_at,
-             duration_mins,outcome,with_whom,owner,office_id,sbu,auto,created_by,created_at,cond_key)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+             duration_mins,outcome,with_whom,owner,office_id,sbu,auto,created_by,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             ->execute([$kind, $entityKind, (int)$entityId ?: null, $partner,
                 substr(trim((string)$subject), 0, 255),
                 (string)($opt['body'] ?? ''),
@@ -200,11 +242,34 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
                 (string)($opt['sbu'] ?? ''),
                 !empty($opt['auto']) ? 1 : 0,
                 $u ? user_name($u) : (string)($opt['created_by'] ?? 'system'),
-                date('c'),
-                substr(trim((string)($opt['cond_key'] ?? '')), 0, 160)]);
-        return (int)db()->lastInsertId();
+                date('c')]);
+        $id = (int) db()->lastInsertId();
+        //  S1 — THE CORE ROW IS ALREADY SAFE. Optional metadata is applied
+        //  afterwards, against a column that may not exist, and its failure
+        //  cannot reach back and undo the event that has just been recorded.
+        $ck = substr(trim((string)($opt['cond_key'] ?? '')), 0, 160);
+        if ($id > 0 && $ck !== '') act_set_cond_key($id, $ck);
+        $GLOBALS['__act_last_error'] = '';
+        return $id;
     } catch (Throwable $e) {
-        return 0;   // never break the work that caused it
+        //  Still non-fatal — a timeline is a record of work, not a precondition
+        //  for it — but no longer INVISIBLE. A core failure must never be
+        //  indistinguishable from nothing having happened.
+        $GLOBALS['__act_last_error'] = $e->getMessage();
+        @error_log('act_log: core audit row NOT written — ' . $e->getMessage());
+        return 0;
+    }
+}
+
+//  Optional. Returns whether the metadata was actually stored, so a caller — and
+//  a test — can tell "stored" from "column unavailable" instead of assuming.
+function act_set_cond_key($id, $key) {
+    if ((int) $id <= 0 || (string) $key === '') return false;
+    if (!act_migrate_optional()) return false;
+    try { db()->prepare("UPDATE activities SET cond_key=? WHERE id=?")->execute([(string) $key, (int) $id]); return true; }
+    catch (Throwable $e) {
+        $GLOBALS['__act_optional_error'] = 'cond_key: ' . $e->getMessage();
+        return false;
     }
 }
 
