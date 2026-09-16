@@ -2,7 +2,7 @@
 
 ## New suite — `tests/test_p3m3c6_auditref.php`
 
-**152 assertions, 0 failed, on both engines.**
+**181 assertions, 0 failed, on both engines.**
 
 The central assertion is the one the old test did not make. It takes the
 `entity_kind` and `entity_id` each activity row **actually claims**, and tries to
@@ -16,6 +16,7 @@ it cannot inherit the mistake it is checking for.
 | **C6.3 · case 4 — cross-tenant** | A foreign source is never referenced; and when the **fallback is also foreign**, no row is written at all rather than a foreign reference |
 | **C6.4 · case 2 — deleted source** | The event survives, **nothing points at the deleted record**, it is filed under the governing policy, each row **says** the source is unavailable, and with no usable fallback **no row is written** |
 | **C6.5 · D2 / D3 preserved** | Routine outcomes are still not events; identity, entity, entitlement, scope, segregation and provider failure remain six distinct reasons with six distinct sentences |
+| **C6.7 · return-type contracts** | The contracts that make the four surviving E2 "never cast" mutations equivalent **today** — `appr_notify_gate()` and `appr_told_reason()` always return a string, `appr_may_be_asked()` and `appr_visible()` always return a strict boolean, `appr_audit_ref_ok()` / `appr_audit_subject()` keep theirs. Pinned by test rather than argued in prose, so the day one of them changes this fails first |
 | **C6.6 · the five clauses** | Each clause of `appr_audit_ref_ok()` is failed on its own — no type, id 0, negative id, a foreign id, a timeline type this module does not own, a real record of an unlinkable type, and a resolver whose table has been renamed away |
 
 ### The suite has teeth — it fails against the pre-fix library
@@ -55,12 +56,12 @@ mutation results document.
 
 | | |
 |---|---|
-| **Whole suite · SQLite** | **9910 passed, 0 failed** |
-| **Whole suite · MariaDB 10.11.14** | **9911 passed, 0 failed** |
+| **Whole suite · SQLite** | **9939 passed, 0 failed** |
+| **Whole suite · MariaDB 10.11.14** | **9940 passed, 0 failed** |
 
 | Suite | Result | Covers |
 |---|---:|---|
-| **`p3m3c6_auditref`** | **152 / 0** | J1 |
+| **`p3m3c6_auditref`** | **181 / 0** | J1 |
 | `p3m3c5_entity` | **238 / 0** | G1 + J2 / J3 / J4 |
 | `p3m3c4_gate` | 129 / 0 | E1, E2 |
 | `p3m3c3_raiser` | **54 / 0** | D1, D2, D3 |
