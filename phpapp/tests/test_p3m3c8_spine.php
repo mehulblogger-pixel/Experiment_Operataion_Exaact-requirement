@@ -163,6 +163,51 @@ t_eq((string) ops_val("SELECT cond_key FROM activities WHERE id=?", [$idD]), 'PC
      'C8.5 D · condition metadata is stored again — the retry genuinely restored the feature');
 
 // ---------------------------------------------------------------------------
+//  C8.6 · §6 / §9 — A CORE FAILURE MUST BE OBSERVABLE, AND THE GUARD MUST NOT
+//  LATCH ON ONE
+//
+//  The failure is real: the table is replaced by a VIEW of itself. A view cannot
+//  be inserted into and cannot be indexed, so the core INSERT fails the way a
+//  broken or half-restored schema makes it fail — no mock, no injected flag.
+//  cond_key is removed first, so that after the repair the ONLY way it can come
+//  back is if act_migrate() genuinely retried instead of latching.
+// ---------------------------------------------------------------------------
+t_section('C8.6 · a core audit failure is visible, and the migration retries');
+$viewOk = true;
+try { $pdo->exec($engine === 'sqlite' ? "DROP INDEX IF EXISTS idx_act_cond" : "DROP INDEX idx_act_cond ON activities"); } catch (Throwable $e) {}
+try { $pdo->exec("ALTER TABLE activities DROP COLUMN cond_key"); } catch (Throwable $e) { $viewOk = false; }
+t_ok(!$hasCond(), 'C8.6 · cond_key removed, so its return can only come from a real retry');
+try {
+    $pdo->exec($engine === 'sqlite' ? "ALTER TABLE activities RENAME TO activities_c8v" : "RENAME TABLE activities TO activities_c8v");
+    $pdo->exec("CREATE VIEW activities AS SELECT * FROM activities_c8v");
+    $GLOBALS['__db_epoch'] = db_epoch() + 1;
+
+    //  §9 CASE 2 / S1-M9 — the optional migration cannot run, and says so rather
+    //  than claiming the metadata was stored.
+    t_ok(act_migrate_optional() === false, 'C8.6 · the optional migration genuinely fails against a view');
+    t_ok(act_set_cond_key($idA, 'PC|TEST|NOPE|1') === false,
+         'C8.6 · and the optional write does NOT claim a success it did not achieve');
+
+    //  §6 / S1-M2 — the CORE write fails, and that failure is observable.
+    $GLOBALS['__act_last_error'] = '';
+    $idFail = act_log('LEAD', 880040, 'SYSTEM', 'C8 test — a write that cannot succeed', ['auto'=>1]);
+    t_eq($idFail, 0,                'C8.6 · act_log() reports the core failure rather than a row id');
+    t_ok(act_last_error() !== '',   'C8.6 · and the failure is RECORDED — it does not look like nothing happened');
+} finally {
+    try { $pdo->exec("DROP VIEW activities"); } catch (Throwable $e) {}
+    try { $pdo->exec($engine === 'sqlite' ? "ALTER TABLE activities_c8v RENAME TO activities" : "RENAME TABLE activities_c8v TO activities"); } catch (Throwable $e) {}
+}
+t_ok(t_table_exists('activities'), 'C8.6 · the real table is back');
+//  §9 CASE 3 / S1-M3 — THE EPOCH IS NOT BUMPED HERE. If act_migrate() had
+//  latched its guard during the failure it would now return early and cond_key
+//  would stay missing for ever. It comes back only because the migration retried.
+$idAfter = act_log('LEAD', 880041, 'SYSTEM', 'C8 test — after the repair', ['auto'=>1]);
+$mine['act'][] = $idAfter;
+t_ok($idAfter > 0,  'C8.6 · CASE 3 · auditing works again after the schema is repaired');
+t_eq(act_last_error(), '', 'C8.6 · and no core error is recorded any more');
+t_ok($hasCond(),    'C8.6 · CASE 3 · cond_key is BACK — the guard did not latch on the failure');
+
+// ---------------------------------------------------------------------------
 //  Clean up
 // ---------------------------------------------------------------------------
 $_SESSION = $origSess; current_user(true); ua(true);
