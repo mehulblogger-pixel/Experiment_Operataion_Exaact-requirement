@@ -3,7 +3,7 @@
 Clean baselines on **both** engines, executed against the final source, no anchor
 misses.
 
-**9 attempted · 9 caught · 0 survivors.**
+**10 attempted · 10 caught · 0 survivors.**
 
 ```
 baseline [sqlite]: 0 (no failures)
@@ -21,6 +21,7 @@ baseline [mysql] : 0 (no failures)
 | T2-M4 | index failure falsely marks the column unavailable | sqlite | **CAUGHT** | 4 |
 | T2-M5 | index migration failure latches as success | sqlite | **CAUGHT** | 3 |
 | T2-M6 | the cheap existence probe removed | sqlite | **CAUGHT** | 2 |
+| U1-M1 | observing the state spends the repair budget again | sqlite | **CAUGHT** | 4 |
 
 ## T1-M1 is the whole point, and it had to run on MariaDB
 
@@ -33,7 +34,13 @@ That is the direct evidence that T1 is fixed: **the new test fails when the core
 INSERT is no longer forced to fail.** The battery was extended to run a mutation on
 a chosen engine specifically for this.
 
-`T2-M6` is mine rather than the brief's. Nothing in §10 attacks the cheap existence
+`U1-M1` guards the defect this correction's own adversarial audit found and fixed:
+`act_optional_state()` answering by attempting, so that polling a health check
+disarmed the repair it was reporting on. Without this mutation nothing would hold
+the rule the fix finally wrote down — *only an attempt to repair may consume the
+repair budget.*
+
+`T2-M6` is also mine rather than the brief's. Nothing in §10 attacks the cheap existence
 probe, and without it a repaired schema can never be noticed once the retry budget
 is spent — the mechanism that fixed one of this correction's own first-draft
 defects would have been unprotected.
