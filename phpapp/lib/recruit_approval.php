@@ -134,6 +134,81 @@ function appr_due_at($days, $officeId = 0, $fromTs = null) {
     return date('c', $ts);
 }
 
+// ===========================================================================
+//  M3 CORRECTION #6 · J1 — WHAT MAKES AN AUDIT REFERENCE VALID
+//
+//  Correction #3 (D2) guarded the audit trail with
+//      if (!array_key_exists($entity, ACT_ENTITIES)) return;   // "never dangling"
+//  which asks whether the entity TYPE is one the timeline can link. But the
+//  reason that guard most often fires under is ENTITY_UNRESOLVED — which means,
+//  by definition, that the RECORD is gone. A supported type was written; an
+//  openable target was not. Every row it produced for that reason pointed at
+//  nothing.
+//
+//      A SUPPORTED TYPE  ≠  AN OPENABLE RECORD
+//
+//  That is the same sentence as G1, one layer in. So the five clauses live in
+//  ONE function that every writer in this module calls, rather than four-fifths
+//  of the rule being re-implemented per call site:
+//
+//    1 · the entity TYPE is supported by the timeline (ACT_ENTITIES)
+//    2 · the entity ID is valid (> 0)
+//    3 · the target RECORD exists
+//    4 · the target belongs to THIS tenant — structural: appr_entity_record()
+//        and appr_rule() read the live connection, so another workspace's row
+//        simply does not resolve here
+//    5 · it resolves through the EXISTING entity mechanism, not a private one
+// ===========================================================================
+
+//  The subjects this module is allowed to point an audit row at. APPROVAL_POLICY
+//  is already registered on the spine by M2 and /recruit-approvals?id=<rule> is
+//  already a real screen — no new audit system, no new route.
+const APPR_AUDIT_SUBJECTS = ['HIRING_REQUEST', 'OFFER', 'SALARY', 'REQUISITION', 'APPROVAL_POLICY'];
+
+function appr_audit_ref_resolve($kind, $id) {
+    $kind = strtoupper(trim((string) $kind)); $id = (int) $id;
+    if ($id <= 0) return null;
+    if ($kind === 'APPROVAL_POLICY') {
+        //  A resolution that ERRORS is a resolution that FAILED (C5.6's rule).
+        try { $r = function_exists('appr_rule') ? appr_rule($id) : null; }
+        catch (Throwable $e) { return null; }
+        return $r ?: null;
+    }
+    return appr_entity_record($kind, $id);          // G1's single resolution point
+}
+
+function appr_audit_ref_ok($kind, $id) {
+    $kind = strtoupper(trim((string) $kind)); $id = (int) $id;
+    if ($kind === '' || $id <= 0) return false;                                    // 2
+    if (!defined('ACT_ENTITIES') || !array_key_exists($kind, ACT_ENTITIES)) return false;   // 1
+    if (!in_array($kind, APPR_AUDIT_SUBJECTS, true)) return false;                 // this module's own subjects
+    return appr_audit_ref_resolve($kind, $id) !== null;                            // 3 · 4 · 5
+}
+
+//  The smallest EXISTING subject the event can safely be filed under:
+//    1 · the source record itself, when it is genuinely openable here;
+//    2 · else the approval policy that governs this chain, when that is;
+//    3 · else nothing. A row nobody can follow is worse than no row — and a
+//        blank entity_kind with a live entity_id is the orphan D2 named.
+//  Returns [kind, id, isSourceRecord].
+function appr_audit_subject($req) {
+    $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
+    $eid    = (int) ($req['entity_id'] ?? 0);
+    if (appr_audit_ref_ok($entity, $eid)) return [$entity, $eid, true];
+    $ruleId = (int) ($req['rule_id'] ?? 0);
+    if (appr_audit_ref_ok('APPROVAL_POLICY', $ruleId)) return ['APPROVAL_POLICY', $ruleId, false];
+    return ['', 0, false];
+}
+
+//  Whether the SOURCE record is genuinely gone, as opposed to merely not being
+//  linkable on the timeline. Only the first may be described as unavailable —
+//  saying so about a live offer would be the misleading event §2 forbids.
+function appr_audit_source_gone($req) {
+    $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
+    if ($entity === '' || !array_key_exists($entity, APPR_ENTITIES)) return true;
+    return appr_entity_record($entity, (int) ($req['entity_id'] ?? 0)) === null;
+}
+
 //  §24 — every SLA event goes on the EXISTING activity spine. There is no second
 //  audit system: act_log() is where M1 and M2 already put approval history. The
 //  entity and its id are named in the SUBJECT as well as the entity column, so an
@@ -143,11 +218,19 @@ function appr_audit_sla($req, $step, $what, $detail = '') {
     if (!function_exists('act_log') || !$req) return;
     $entity = strtoupper((string) ($req['entity'] ?? ''));
     $label  = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : $entity;
+    //  J1 — this writer had NO check at all, not even D2's type check, so an
+    //  offer or salary event reached act_log(), which blanks an unsupported kind
+    //  and keeps the id: a row with entity_kind='' and a live entity_id. That is
+    //  precisely the orphan D2 was raised about, produced by the audit path D2
+    //  did not touch. One rule, both writers.
+    [$kind, $id, $isSource] = appr_audit_subject($req);
+    if ($kind === '') return;
     $subject = $what . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0)
         . ' · level ' . (int) ($step['seq'] ?? 0)
         . (trim((string) ($step['label'] ?? '')) !== '' ? ' (' . $step['label'] . ')' : '')
-        . ($detail !== '' ? ' — ' . $detail : '');
-    act_log($entity, (int) ($req['entity_id'] ?? 0), 'SYSTEM', $subject, ['auto' => 1]);
+        . ($detail !== '' ? ' — ' . $detail : '')
+        . ((!$isSource && appr_audit_source_gone($req)) ? ' — source record unavailable' : '');
+    act_log($kind, $id, 'SYSTEM', $subject, ['auto' => 1]);
 }
 
 // ---- Rules & levels (config) -----------------------------------------------
@@ -1545,11 +1628,16 @@ function appr_audit_notify($req, $result, $reason) {
     if (!in_array((string) $reason, APPR_NOTIFY_AUDITED, true)) return;
     if (!function_exists('act_log') || !defined('ACT_ENTITIES')) return;
     $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
-    if ($entity === '' || !array_key_exists($entity, ACT_ENTITIES)) return;   // never a dangling reference
     $label = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : $entity;
-    act_log($entity, (int) ($req['entity_id'] ?? 0), 'SYSTEM',
+    //  J1 — the type check that used to stand here called itself "never a
+    //  dangling reference" while the commonest reason for writing was that the
+    //  record is gone. The five clauses now live in appr_audit_subject().
+    [$kind, $id, $isSource] = appr_audit_subject($req);
+    if ($kind === '') return;                       // nothing openable remains: no row
+    act_log($kind, $id, 'SYSTEM',
         'Decision not notified (' . $reason . ') — ' . (APPR_NOTIFY_REASONS[$reason] ?? $reason)
-        . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0) . ' ' . strtoupper((string) $result),
+        . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0) . ' ' . strtoupper((string) $result)
+        . ((!$isSource && appr_audit_source_gone($req)) ? ' — source record unavailable' : ''),
         ['auto' => 1, 'outcome' => substr($reason, 0, 60)]);
 }
 

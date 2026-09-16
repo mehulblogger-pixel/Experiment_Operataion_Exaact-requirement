@@ -275,7 +275,11 @@ $pdo->prepare("INSERT INTO salary_structures (id,candidate_id) VALUES (?,0)")->e
 $pdo->prepare("INSERT INTO requisitions (id,req_code,designation,status) VALUES (?,'TB-RQ','F','OPEN')")->execute([$r]);
 $chains = preg_replace('/[^0-9,]/', '', (string) getenv('C5_CHAINS'));
 if ($chains === '' ) $chains = '0';
+$cfg = require $root . '/config.php';
 echo json_encode([
+    //  J2 — the runtime database this process is ACTUALLY connected to, read
+    //  from the live connection rather than inferred from what it was handed.
+    'db'       => (db_driver() === 'sqlite') ? (string) $cfg['sqlite_path'] : (string) ops_val("SELECT DATABASE()"),
     'resolved' => [
         'HIRING_REQUEST' => appr_entity_record('HIRING_REQUEST', $h) !== null,
         'OFFER'          => appr_entity_record('OFFER', $o)          !== null,
@@ -296,6 +300,18 @@ CHILD);
         t_ok(is_array($res), 'C5.7 · tenant B booted its own database and reported back');
 
         if (is_array($res)) {
+            //  J2 — ESTABLISH THE MAPPING FIRST. Before a single security claim,
+            //  prove tenant A and tenant B are connected to different databases,
+            //  each read from its own live connection. A teardown observed after
+            //  DROP DATABASE proves nothing about runtime isolation; this does.
+            $cfgA = require $c5root . '/config.php';
+            $dbA  = (db_driver() === 'sqlite') ? (string) $cfgA['sqlite_path'] : (string) ops_val("SELECT DATABASE()");
+            $dbB  = (string) ($res['db'] ?? '');
+            t_ok($dbA !== '', 'C5.7 · J2 · tenant A names the database it is really connected to');
+            t_ok($dbB !== '', 'C5.7 · J2 · tenant B names the database it is really connected to');
+            t_ok($dbA !== $dbB, 'C5.7 · J2 · THEY ARE DIFFERENT DATABASES — checked before any security assertion');
+            t_eq($dbB, $drv === 'sqlite' ? $bFile : $bName, 'C5.7 · J2 · and tenant B is on the workspace this test created');
+
             t_eq((string) $res['title'], 'TENANT B hiring', 'C5.7 · tenant B\'s record is its own, not a copy of A\'s');
             //  The other direction: tenant A's chains and tenant A's PEOPLE are
             //  not in tenant B either. Identity is per-workspace too.
@@ -318,18 +334,14 @@ CHILD);
                 t_eq(appr_email_requester($bad, 'approved', ''), 'ENTITY_UNRESOLVED',
                      "C5.7 · $name · the decision notifier denies too");
                 t_eq($mails(), $m0, "C5.7 · $name · nothing was sent");
-                //  D2's rule is TWO-VALUED, not one. A refusal earns a row only
-                //  where the timeline can point at the entity: OFFER and SALARY
-                //  are not ACT_ENTITIES, so they earn silence — never a row with
-                //  an entity_kind nothing can follow. One expectation for four
-                //  entities would have been exactly the single-row matrix the
-                //  last audit warned about.
-                $spine = function_exists('act_log') && defined('ACT_ENTITIES') && array_key_exists($name, ACT_ENTITIES);
-                t_eq($acts(), $a0 + ($spine ? 1 : 0), $spine
-                    ? "C5.7 · $name · exactly one audit row — the refusal, logged once"
-                    : "C5.7 · $name · no audit row — the timeline cannot link this entity, so none is written");
+                //  J1 (correction #6) — this synthetic chain carries no rule_id,
+                //  so NO openable subject remains and the correct outcome is no
+                //  row at all. Until correction #6 a HIRING_REQUEST or REQUISITION
+                //  refusal wrote a permanent audit row pointing at ANOTHER
+                //  WORKSPACE'S id — a supported type with an unopenable target.
+                t_eq($acts(), $a0, "C5.7 · $name · no audit row — nothing openable remains to file it under");
                 t_eq((int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind=? AND entity_id=?", [$name, $sid2]),
-                     $spine ? 1 : 0, "C5.7 · $name · and never a row the timeline cannot follow");
+                     0, "C5.7 · $name · and NOTHING references another workspace's id");
             }
         }
     } finally {
@@ -337,8 +349,61 @@ CHILD);
         if ($bFile !== '') @unlink($bFile);
         if ($bName !== '') { try { $pdo->exec("DROP DATABASE IF EXISTS `" . $bName . "`"); } catch (Throwable $e) {} }
     }
-    t_ok($bFile === '' || !is_file($bFile), 'C5.7 · tenant B\'s database is torn down');
+    //  J2 — the old form read `$bFile === '' || !is_file($bFile)`, which on
+    //  MariaDB (where tenant B is a DATABASE, not a file) is `t_ok(true)`: a pass
+    //  reported for something never checked, on the engine that matters. Each
+    //  engine now answers for itself.
+    if ($drv === 'sqlite') {
+        t_ok(!is_file($bFile), 'C5.7 · tenant B\'s database FILE is gone');
+    } else {
+        t_eq((int) ops_val("SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=?", [$bName]), 0,
+             'C5.7 · tenant B\'s DATABASE is gone from information_schema');
+    }
 }
+
+// ---------------------------------------------------------------------------
+//  C5.8 · J3 — WHICH LAYER ACTUALLY DENIED?
+//
+//  The last audit showed that for HIRING_REQUEST the missing-record denial is
+//  ALSO covered by the branch-scope rule, so a boolean "denied" could not say
+//  which layer fired. The two protections are separated here, each proved on a
+//  case where the other cannot be the cause. Neither layer is removed.
+// ---------------------------------------------------------------------------
+t_section('C5.8 · J3 · entity-resolution and branch-scope, proved separately');
+$act($uAppr);
+try { $pdo->prepare("INSERT INTO offices (id,name,is_active) VALUES (892,'C5 B',1)")->execute(); $mine['o'][]=892; } catch (Throwable $e) {}
+$mkHR = function ($office) use ($pdo, $uRaise, &$mine) {
+    //  req_no is UNIQUE — a direct insert must carry its own, or the second one
+    //  collides with the first on the blank default.
+    $pdo->prepare("INSERT INTO hiring_requests (req_no,job_title,status,office_id,requested_by_id,quantity,created_at)
+                   VALUES (?,'C5 J3',?,?,?,1,?)")
+        ->execute(['C5J3-' . $office . '-' . random_int(100000, 999999), 'SUBMITTED', (int)$office, (int)$uRaise, date('c')]);
+    $id = (int) $pdo->lastInsertId(); $mine['h'][] = $id; return $id;
+};
+//  (B) SCOPE, isolated: the record EXISTS, so entity resolution cannot be the
+//      cause. Only the branch rule can deny — and it names itself.
+$far = $mkHR(892);
+t_ok(appr_entity_record('HIRING_REQUEST', $far) !== null, 'C5.8 B · the far-branch record genuinely exists');
+t_eq(appr_told_reason(['entity'=>'HIRING_REQUEST','entity_id'=>$far], $apprRow), 'RECIPIENT_OUT_OF_SCOPE',
+     'C5.8 B · SCOPE denies it, and says so — not ENTITY_UNRESOLVED');
+
+//  (A) ENTITY RESOLUTION, isolated: the same approver, a record in their OWN
+//      branch — scope is first shown to ALLOW it, so when the record is deleted
+//      the only remaining cause of denial is that it no longer resolves.
+$near = $mkHR(891);
+$stepJ3 = appr_step_context(appr_current_step($E['HIRING_REQUEST']['req']), $E['HIRING_REQUEST']['req']);
+$reqNear = ['entity'=>'HIRING_REQUEST','entity_id'=>$near];
+t_eq(appr_told_reason($reqNear, $apprRow), '', 'C5.8 A · scope ALLOWS this record — the branch rule is not in play');
+t_ok(appr_may_be_asked($stepJ3, $reqNear, $apprRow), 'C5.8 A · and the approver may be asked about it');
+$pdo->prepare("DELETE FROM hiring_requests WHERE id=?")->execute([$near]);
+t_ok(appr_entity_record('HIRING_REQUEST', $near) === null, 'C5.8 A · now the record is gone');
+t_eq(appr_told_reason($reqNear, $apprRow), 'ENTITY_UNRESOLVED',
+     'C5.8 A · ENTITY RESOLUTION denies it — scope had just allowed the very same subject');
+t_ok(!appr_may_be_asked($stepJ3, $reqNear, $apprRow),
+     'C5.8 A · the actionable path denies for the entity reason alone — no scope protection behind it');
+t_ok(appr_told_reason(['entity'=>'HIRING_REQUEST','entity_id'=>$far], $apprRow)
+     !== appr_told_reason($reqNear, $apprRow),
+     'C5.8 · the two layers give DIFFERENT answers — the reason discriminates, the boolean did not');
 
 // ---------------------------------------------------------------------------
 //  Clean up
@@ -358,4 +423,17 @@ foreach ($mine['cand'] as $x) $pdo->prepare("DELETE FROM candidates WHERE id=?")
 foreach ($mine['u'] as $x) $pdo->prepare("DELETE FROM users WHERE id=?")->execute([(int)$x]);
 foreach ($mine['o'] as $x) $pdo->prepare("DELETE FROM offices WHERE id=?")->execute([(int)$x]);
 $pdo->exec("DELETE FROM email_log WHERE kind='recruit_approval'");
+//  J4 — this suite writes to the activity spine (audit rows for refused
+//  notifications, SLA events). They were left behind for every later file in the
+//  same process to see. Remove exactly the ones belonging to this suite's
+//  fixtures, by id — never a LIKE sweep over somebody else's history.
+foreach (array_unique(array_merge($mine['h'], [99400001])) as $x)
+    $pdo->prepare("DELETE FROM activities WHERE entity_kind='HIRING_REQUEST' AND entity_id=?")->execute([(int)$x]);
+foreach (array_unique([$rid, 99400004]) as $x)
+    $pdo->prepare("DELETE FROM activities WHERE entity_kind='REQUISITION' AND entity_id=?")->execute([(int)$x]);
+foreach (array_unique($mine['rule']) as $x)
+    $pdo->prepare("DELETE FROM activities WHERE entity_kind='APPROVAL_POLICY' AND entity_id=?")->execute([(int)$x]);
+$leftC5 = (int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='HIRING_REQUEST' AND entity_id IN (99400001)")
+        + (int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='REQUISITION' AND entity_id IN (99400004)");
+t_eq($leftC5, 0, 'C5 · J4 · the cross-tenant audit rows this suite created are cleaned up');
 t_ok(true, 'M3 correction #5 fixtures removed');
