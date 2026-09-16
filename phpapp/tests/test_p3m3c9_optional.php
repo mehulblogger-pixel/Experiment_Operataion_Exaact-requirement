@@ -144,6 +144,11 @@ try {
     $bumpEpoch();
     t_ok($hasCol(),  'C9.4 E · the COLUMN is present');
     t_ok(!$hasIdx(), 'C9.4 E · the INDEX is genuinely absent');
+    //  U1 — act_optional_state() only OBSERVES; it never attempts, so it cannot
+    //  produce an error by itself. The attempt is made through the path the
+    //  application really uses, and the observation reports what that attempt
+    //  left behind. An error that only a health check can conjure is not evidence.
+    t_ok(act_migrate_optional() === true, 'C9.4 E · the real migration path runs and the COLUMN still succeeds');
     $st = act_optional_state();
     $blocked = ($st['index'] === false);
     t_ok($st['column'] === true,  'C9.4 E · §6 · the column reports AVAILABLE — the index failure did not roll it back');
@@ -251,6 +256,35 @@ t_ok($hasCol(), 'C9.7 · the column was there all along — only the table was o
 t_ok(act_cond_column_ready() === true,
      'C9.7 · and it is recognised at once, though the retry budget for this epoch is spent');
 t_eq(act_optional_error(), '', 'C9.7 · the recorded failure is cleared');
+
+// ---------------------------------------------------------------------------
+//  C9.8 · U1 — ASKING IS NOT ATTEMPTING
+//
+//  act_optional_state() is what a health check, a support screen or a diagnostic
+//  calls. It used to answer by running the readiness functions, each of which may
+//  spend one of the three DDL attempts reserved for REPAIRING the thing it is
+//  reporting on — so polling it during an outage disarmed the repair.
+// ---------------------------------------------------------------------------
+t_section('C9.8 · U1 · observing the state must not spend the repair budget');
+try { $pdo->exec($engine === 'sqlite' ? "DROP INDEX IF EXISTS idx_act_cond" : "DROP INDEX idx_act_cond ON activities"); } catch (Throwable $e) {}
+$pdo->exec("ALTER TABLE activities DROP COLUMN cond_key");
+$pdo->exec($engine === 'sqlite' ? "ALTER TABLE activities RENAME TO activities_c9u" : "RENAME TABLE activities TO activities_c9u");
+try {
+    $bumpEpoch();
+    //  Six health-check polls — twice the entire retry budget.
+    for ($i = 0; $i < 6; $i++) $stU = act_optional_state();
+    t_eq($stU['column'], false, 'C9.8 · during the outage the state reports the column unavailable');
+    t_eq($stU['index'],  false, 'C9.8 · and the index unavailable');
+} finally {
+    $pdo->exec($engine === 'sqlite' ? "ALTER TABLE activities_c9u RENAME TO activities" : "RENAME TABLE activities_c9u TO activities");
+}
+//  The column is genuinely missing now, so the repair needs a real DDL attempt.
+//  If the six observations had consumed the budget there would be none left.
+t_ok(!$hasCol(), 'C9.8 · the column is genuinely gone — the repair needs a real attempt');
+t_ok(act_cond_column_ready() === true,
+     'C9.8 · and the repair still succeeds — SIX observations spent none of its budget');
+t_ok($hasCol(), 'C9.8 · cond_key is back');
+t_ok(act_cond_index_ready() === true, 'C9.8 · and the index follows');
 
 // ---------------------------------------------------------------------------
 //  Clean up

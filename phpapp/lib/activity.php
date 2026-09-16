@@ -246,10 +246,29 @@ function act_optional_index_ready() { return act_cond_index_ready(); }
 function act_optional_error()       { return (string) ($GLOBALS['__act_cond_column_error'] ?? '') ?: (string) ($GLOBALS['__act_optional_error'] ?? ''); }
 function act_optional_index_error() { return (string) ($GLOBALS['__act_cond_index_error'] ?? ''); }
 
-//  The two states side by side, so a caller never has to infer one from the other.
+//  M3 CORRECTION #9 · U1 — ASKING IS NOT ATTEMPTING.
+//
+//  This function exists so that a health check, a support screen or a diagnostic
+//  can ASK whether optional metadata is usable. It used to answer by calling the
+//  readiness functions, each of which may spend one of the three DDL attempts
+//  reserved for REPAIRING it — so four polls during an outage left the feature
+//  permanently unrepairable for that workspace.
+//
+//  That is the third time one rule went unstated in this correction: the index
+//  check spent the column's budget, an already-present structure spent a slot, and
+//  now an observer spent the repairer's. The rule, written down this time:
+//
+//      ONLY AN ATTEMPT TO REPAIR MAY CONSUME THE REPAIR BUDGET.
+//
+//  So this reports from what is already known and a cheap metadata read, and
+//  attempts nothing.
 function act_optional_state() {
-    return ['column' => act_cond_column_ready(), 'index' => act_cond_index_ready(),
-            'column_error' => act_optional_error(), 'index_error' => act_optional_index_error()];
+    $col = act_has_cond_column();
+    $idx = $col ? act_has_cond_index() : false;
+    return ['column' => $col, 'index' => $idx,
+            'column_error' => $col ? '' : act_optional_error(),
+            'index_error'  => $col ? ($idx ? '' : act_optional_index_error())
+                                   : 'cond_key index: the column is unavailable'];
 }
 
 //  The last CORE audit failure, so "the row was not written" can never be
