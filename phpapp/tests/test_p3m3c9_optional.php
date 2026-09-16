@@ -211,10 +211,17 @@ $pdo->exec($engine === 'sqlite' ? "ALTER TABLE activities RENAME TO activities_c
 try {
     $bumpEpoch();
     $stC = act_optional_state();
-    t_eq($stC['column'], false, 'C9.6 C · column reports unavailable');
+    t_eq($stC['column'], false, 'C9.6 C · column is not ready');
     t_eq($stC['index'],  false, 'C9.6 C · §8 · and the index is never claimed available without it');
-    t_ok(strpos($stC['index_error'], 'column is unavailable') !== false,
-         'C9.6 C · the index says WHY — it is not pretending to have failed on its own');
+    //  M3 correction #10 · V1 — this assertion used to require the index to say
+    //  "the column is unavailable". Nothing had ATTEMPTED anything in this epoch,
+    //  so that was a claim about a failure which had not happened: it is the
+    //  defect V1 names, written into a test. The truthful answer here is that
+    //  neither has been attempted.
+    t_eq($stC['column_status'], ACT_OPT_NOT_ATTEMPTED, 'C9.6 C · and says so honestly — NOT_ATTEMPTED, not FAILED');
+    t_eq($stC['index_status'],  ACT_OPT_NOT_ATTEMPTED, 'C9.6 C · the index likewise');
+    t_ok(strpos($stC['index_error'], 'column is unavailable') === false,
+         'C9.6 C · the index does NOT assert a column failure that never occurred');
 } finally {
     $pdo->exec($engine === 'sqlite' ? "ALTER TABLE activities_c9tmp RENAME TO activities" : "RENAME TABLE activities_c9tmp TO activities");
 }

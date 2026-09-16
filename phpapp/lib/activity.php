@@ -137,12 +137,6 @@ function act_migrate() {
 //  refuses DDL does not run an ALTER on every audit write. Not latched on
 //  failure, so the next request (or the next workspace) tries again. Never
 //  reported as successful when it was not.
-function act_migrate_optional() {
-    $col = act_cond_column_ready();
-    act_cond_index_ready();          //  attempted, and NEVER allowed to affect $col
-    return $col;
-}
-
 //  M3 CORRECTION #9 · T2 — THE COLUMN IS CORRECTNESS. THE INDEX IS PERFORMANCE.
 //
 //  Correction #8 ensured both inside one function and returned one boolean. So a
@@ -185,90 +179,131 @@ function act_has_cond_index() {
     } catch (Throwable $e) { return false; }
 }
 
+// ===========================================================================
+//  M3 CORRECTION #10 · V1 — ABSENT IS NOT FAILED
+//
+//  Correction #9 made observation read-only, which was right, and then answered a
+//  THREE-valued question with a boolean. A structure that is merely absent —
+//  nothing has tried to create it yet — was reported exactly like one that was
+//  attempted and could not be made. A support screen could not tell "broken" from
+//  "nobody has asked yet", which is the only question it exists to answer.
+//
+//      NOT_ATTEMPTED · FAILED · READY
+//
+//  FAILED is never inferred from absence. It requires RECORDED EVIDENCE of a real
+//  attempt, so the attempt ledger — which used to be a static inside the retry
+//  logic — is now observable state. An observer may READ it and may never write it.
+// ===========================================================================
+const ACT_OPT_NOT_ATTEMPTED = 'NOT_ATTEMPTED';
+const ACT_OPT_FAILED        = 'FAILED';
+const ACT_OPT_READY         = 'READY';
+
+//  The ledger is per WORKSPACE EPOCH: a different company's database has not
+//  attempted anything merely because this one failed.
+function act_opt_rec($which) {
+    $r = $GLOBALS['__act_opt_' . $which] ?? null;
+    if (!is_array($r) || ($r['epoch'] ?? -1) !== db_epoch()) return ['epoch' => db_epoch(), 'tries' => 0, 'error' => ''];
+    return $r;
+}
+//  Written ONLY from inside a real migration attempt. Never from an observer.
+function act_opt_note($which, $tries, $error) {
+    $GLOBALS['__act_opt_' . $which] = ['epoch' => db_epoch(), 'tries' => (int) $tries, 'error' => (string) $error];
+}
+
+function act_cond_column_status() {
+    if (act_has_cond_column()) return ACT_OPT_READY;
+    return act_opt_rec('col')['tries'] > 0 ? ACT_OPT_FAILED : ACT_OPT_NOT_ATTEMPTED;
+}
+//  The index's state is its OWN. A missing column means the index has not been
+//  attempted — it does not mean the index failed, and it is not the index's place
+//  to report on the column.
+function act_cond_index_status() {
+    if (act_has_cond_column() && act_has_cond_index()) return ACT_OPT_READY;
+    return act_opt_rec('idx')['tries'] > 0 ? ACT_OPT_FAILED : ACT_OPT_NOT_ATTEMPTED;
+}
+//  §4 — a message describes an observed or recorded FACT, never a supposition.
+function act_opt_message($which, $status) {
+    if ($status === ACT_OPT_READY)         return 'Ready';
+    if ($status === ACT_OPT_NOT_ATTEMPTED) return 'Not attempted';
+    $e = act_opt_rec($which)['error'];
+    return 'Failed: ' . ($e !== '' ? $e : 'no reason recorded');
+}
+
 function act_cond_column_ready() {
-    static $okAt = -1; static $tries = [];
+    static $okAt = -1;
     $e = db_epoch();
     if ($okAt === $e) return true;
     if (act_has_cond_column()) {                     // already there: no DDL, no budget
-        $okAt = $e; unset($tries[$e]);
+        $okAt = $e;
         $GLOBALS['__act_cond_column_error'] = ''; $GLOBALS['__act_optional_error'] = '';
         return true;
     }
-    $n = (int) ($tries[$e] ?? 0);
-    if ($n >= 3) return false;                       // bounded, never an infinite loop
-    $tries[$e] = $n + 1;
-    try { ensure_column('activities', 'cond_key', "VARCHAR(160) DEFAULT ''"); }
-    catch (Throwable $ex) {
+    $rec = act_opt_rec('col');
+    if ($rec['tries'] >= 3) return false;            // bounded, never an infinite loop
+    try {
+        act_opt_note('col', $rec['tries'] + 1, $rec['error']);       // the ATTEMPT is recorded
+        ensure_column('activities', 'cond_key', "VARCHAR(160) DEFAULT ''");
+    } catch (Throwable $ex) {
+        act_opt_note('col', $rec['tries'] + 1, $ex->getMessage());
         $GLOBALS['__act_cond_column_error'] = 'cond_key column: ' . $ex->getMessage();
         @error_log('act_cond_column_ready: cond_key column unavailable — ' . $ex->getMessage());
         return false;
     }
-    $okAt = $e; unset($tries[$e]);
-    $GLOBALS['__act_cond_column_error'] = '';
-    $GLOBALS['__act_optional_error'] = '';
+    $okAt = $e;
+    act_opt_note('col', 0, '');
+    $GLOBALS['__act_cond_column_error'] = ''; $GLOBALS['__act_optional_error'] = '';
     return true;
 }
 
 function act_cond_index_ready() {
-    static $okAt = -1; static $tries = [];
+    static $okAt = -1;
     $e = db_epoch();
     if ($okAt === $e) return true;
-    //  An index cannot exist without its column, and saying so is not the same as
-    //  the index having failed on its own account. Asked CHEAPLY: the index has no
-    //  business spending the COLUMN's retry budget, and in correction #9's first
-    //  draft it did — which exhausted the budget before a repaired schema could be
-    //  noticed at all.
-    if (!act_has_cond_column()) {
-        $GLOBALS['__act_cond_index_error'] = 'cond_key index: the column is unavailable';
-        return false;
-    }
-    if (act_has_cond_index()) {                      // already there: no DDL, no budget
-        $okAt = $e; unset($tries[$e]); $GLOBALS['__act_cond_index_error'] = '';
-        return true;
-    }
-    $n = (int) ($tries[$e] ?? 0);
-    if ($n >= 3) return false;
-    $tries[$e] = $n + 1;
-    try { act_index('activities', 'idx_act_cond', '(cond_key)'); }
-    catch (Throwable $ex) {
+    //  Asked CHEAPLY — the index has no business spending the COLUMN's budget.
+    if (!act_has_cond_column()) return false;
+    if (act_has_cond_index()) { $okAt = $e; $GLOBALS['__act_cond_index_error'] = ''; return true; }
+    $rec = act_opt_rec('idx');
+    if ($rec['tries'] >= 3) return false;
+    try {
+        act_opt_note('idx', $rec['tries'] + 1, $rec['error']);
+        act_index('activities', 'idx_act_cond', '(cond_key)');
+    } catch (Throwable $ex) {
+        act_opt_note('idx', $rec['tries'] + 1, $ex->getMessage());
         $GLOBALS['__act_cond_index_error'] = 'cond_key index: ' . $ex->getMessage();
         @error_log('act_cond_index_ready: cond_key index unavailable — ' . $ex->getMessage());
         return false;                                 // the COLUMN is untouched by this
     }
-    $okAt = $e; unset($tries[$e]); $GLOBALS['__act_cond_index_error'] = '';
+    $okAt = $e; act_opt_note('idx', 0, '');
+    $GLOBALS['__act_cond_index_error'] = '';
     return true;
 }
 
-//  Whether optional audit metadata can be STORED. This is the column, and only
-//  the column — a missing index degrades lookup speed, not correctness.
+function act_migrate_optional() {
+    $col = act_cond_column_ready();
+    act_cond_index_ready();          //  attempted, and NEVER allowed to affect $col
+    return $col;
+}
+
 function act_optional_ready()       { return act_cond_column_ready(); }
 function act_optional_index_ready() { return act_cond_index_ready(); }
 function act_optional_error()       { return (string) ($GLOBALS['__act_cond_column_error'] ?? '') ?: (string) ($GLOBALS['__act_optional_error'] ?? ''); }
 function act_optional_index_error() { return (string) ($GLOBALS['__act_cond_index_error'] ?? ''); }
 
-//  M3 CORRECTION #9 · U1 — ASKING IS NOT ATTEMPTING.
-//
-//  This function exists so that a health check, a support screen or a diagnostic
-//  can ASK whether optional metadata is usable. It used to answer by calling the
-//  readiness functions, each of which may spend one of the three DDL attempts
-//  reserved for REPAIRING it — so four polls during an outage left the feature
-//  permanently unrepairable for that workspace.
-//
-//  That is the third time one rule went unstated in this correction: the index
-//  check spent the column's budget, an already-present structure spent a slot, and
-//  now an observer spent the repairer's. The rule, written down this time:
-//
-//      ONLY AN ATTEMPT TO REPAIR MAY CONSUME THE REPAIR BUDGET.
-//
-//  So this reports from what is already known and a cheap metadata read, and
-//  attempts nothing.
+//  READ-ONLY (U1). It attempts nothing, spends no budget and increments no
+//  counter — it reports the structures it can see and the attempts already on
+//  the ledger.
 function act_optional_state() {
-    $col = act_has_cond_column();
-    $idx = $col ? act_has_cond_index() : false;
-    return ['column' => $col, 'index' => $idx,
-            'column_error' => $col ? '' : act_optional_error(),
-            'index_error'  => $col ? ($idx ? '' : act_optional_index_error())
-                                   : 'cond_key index: the column is unavailable'];
+    $c = act_cond_column_status(); $i = act_cond_index_status();
+    return [
+        'column'        => $c === ACT_OPT_READY,
+        'index'         => $i === ACT_OPT_READY,
+        'column_status' => $c,
+        'index_status'  => $i,
+        'column_error'  => $c === ACT_OPT_READY ? '' : act_opt_message('col', $c),
+        'index_error'   => $i === ACT_OPT_READY ? '' : act_opt_message('idx', $i),
+        'column_tries'  => act_opt_rec('col')['tries'],
+        'index_tries'   => act_opt_rec('idx')['tries'],
+    ];
 }
 
 //  The last CORE audit failure, so "the row was not written" can never be
