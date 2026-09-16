@@ -95,7 +95,7 @@ $idB = act_log('LEAD', 880010, 'SYSTEM', 'C8 test B — a caller that passes a k
 $mine['act'][] = $idB;
 t_ok($idB > 0, 'C8.2 B · a caller passing cond_key still gets its core row written');
 t_eq($rows('LEAD', 880010), 1, 'C8.2 B · the core row exists even though the metadata could not be stored');
-t_ok(act_set_cond_key($idB, 'PC|TEST|B|1') === false,
+t_ok(act_set_cond_key($idB, 'PC|TEST|B|1') !== ACT_COND_STORED,
      'C8.2 B · and the system does NOT claim the metadata was stored — no false success');
 t_ok(act_optional_error() !== '',    'C8.2 B · and says why — the failure is observable, not swallowed');
 t_ok(strpos(act_optional_error(), 'cond_key') !== false, 'C8.2 B · naming the metadata that could not be stored');
@@ -196,7 +196,7 @@ try {
     //  §9 CASE 2 / S1-M9 — the optional migration cannot run, and says so rather
     //  than claiming the metadata was stored.
     t_ok(act_migrate_optional() === false, 'C8.6 · the optional migration genuinely fails against a view');
-    t_ok(act_set_cond_key($idA, 'PC|TEST|NOPE|1') === false,
+    t_ok(act_set_cond_key($idA, 'PC|TEST|NOPE|1') !== ACT_COND_STORED,
          'C8.6 · and the optional write does NOT claim a success it did not achieve');
 
     //  §6 / S1-M2 — the CORE write fails, and that failure is observable.

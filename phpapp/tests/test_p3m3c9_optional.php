@@ -162,8 +162,8 @@ try {
     t_ok($idE > 0, 'C9.4 E · the core audit row is written');
     t_eq((string) ops_val("SELECT cond_key FROM activities WHERE id=?", [$idE]), 'PC|C9|E|1',
          'C9.4 E · AND THE METADATA IS STORED — a performance structure is not a correctness precondition');
-    t_ok(act_set_cond_key($idE, 'PC|C9|E|2') === true,
-         'C9.4 E · the optional write reports the success it actually achieved');
+    t_eq(act_set_cond_key($idE, 'PC|C9|E|2'), ACT_COND_STORED,
+         'C9.4 E · the optional write reports STORED — the success it actually achieved');
 
     //  …and correction #7's idempotency still works with no index, just slower.
     t_ok(function_exists('appr_condition_seen') && appr_condition_seen('PC|C9|E|2') === true,
@@ -201,7 +201,7 @@ $mine[] = $idC;
 t_ok($idC > 0,          'C9.6 C · the core audit row is STILL written');
 t_eq($rows('LEAD', 850030), 1, 'C9.6 C · and it is really there');
 t_eq(act_last_error(), '', 'C9.6 C · with no core failure recorded');
-t_ok(act_set_cond_key($idC, 'PC|C9|C|1') === false,
+t_ok(act_set_cond_key($idC, 'PC|C9|C|1') !== ACT_COND_STORED,
      'C9.6 C · and the metadata is correctly reported as NOT stored');
 //  §8 · the impossible row — an index without its column is never claimed.
 //  The epoch is moved here ON PURPOSE, but the table is moved out of reach at the

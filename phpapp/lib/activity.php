@@ -180,6 +180,35 @@ function act_has_cond_index() {
 }
 
 // ===========================================================================
+//  M3 CORRECTION #11 · W1 — AN ERROR BELONGS TO THE WORKSPACE THAT PRODUCED IT
+//
+//  Correction #10 made the migration ATTEMPT LEDGER per workspace epoch and left
+//  every ERROR channel a plain process global. This application switches
+//  workspace IN PROCESS — "Log in as", provisioning, a cron sweeping tenants — so
+//  a failure recorded against company A was still returned after the switch to
+//  company B: a false diagnosis in B, and A's database error text handed to B.
+//
+//  The audit found FOUR such channels, not the one W1 named:
+//      core   act_log()'s core INSERT failure
+//      col    the cond_key COLUMN migration
+//      idx    the cond_key INDEX migration
+//      write  the cond_key UPDATE
+//  Fixing only the reported one would repeat the pattern every audit in this
+//  sequence has found, so all four go through the same keyed channel.
+//
+//  Keyed, NOT cleared: entering a workspace wipes nothing, it simply cannot see
+//  what belongs to another. Switching back to A still shows A's error — there is
+//  no global historical store, only per-workspace state.
+function act_err_set($ch, $msg) {
+    $GLOBALS['__act_err_' . $ch] = ['epoch' => db_epoch(), 'msg' => (string) $msg];
+}
+function act_err_get($ch) {
+    $r = $GLOBALS['__act_err_' . $ch] ?? null;
+    if (!is_array($r) || ($r['epoch'] ?? -1) !== db_epoch()) return '';
+    return (string) $r['msg'];
+}
+
+// ===========================================================================
 //  M3 CORRECTION #10 · V1 — ABSENT IS NOT FAILED
 //
 //  Correction #9 made observation read-only, which was right, and then answered a
@@ -235,7 +264,7 @@ function act_cond_column_ready() {
     if ($okAt === $e) return true;
     if (act_has_cond_column()) {                     // already there: no DDL, no budget
         $okAt = $e;
-        $GLOBALS['__act_cond_column_error'] = ''; $GLOBALS['__act_optional_error'] = '';
+        act_err_set('col', ''); act_err_set('write', '');
         return true;
     }
     $rec = act_opt_rec('col');
@@ -245,13 +274,13 @@ function act_cond_column_ready() {
         ensure_column('activities', 'cond_key', "VARCHAR(160) DEFAULT ''");
     } catch (Throwable $ex) {
         act_opt_note('col', $rec['tries'] + 1, $ex->getMessage());
-        $GLOBALS['__act_cond_column_error'] = 'cond_key column: ' . $ex->getMessage();
+        act_err_set('col', 'cond_key column: ' . $ex->getMessage());
         @error_log('act_cond_column_ready: cond_key column unavailable — ' . $ex->getMessage());
         return false;
     }
     $okAt = $e;
     act_opt_note('col', 0, '');
-    $GLOBALS['__act_cond_column_error'] = ''; $GLOBALS['__act_optional_error'] = '';
+    act_err_set('col', ''); act_err_set('write', '');
     return true;
 }
 
@@ -261,7 +290,7 @@ function act_cond_index_ready() {
     if ($okAt === $e) return true;
     //  Asked CHEAPLY — the index has no business spending the COLUMN's budget.
     if (!act_has_cond_column()) return false;
-    if (act_has_cond_index()) { $okAt = $e; $GLOBALS['__act_cond_index_error'] = ''; return true; }
+    if (act_has_cond_index()) { $okAt = $e; act_err_set('idx', ''); return true; }
     $rec = act_opt_rec('idx');
     if ($rec['tries'] >= 3) return false;
     try {
@@ -269,12 +298,12 @@ function act_cond_index_ready() {
         act_index('activities', 'idx_act_cond', '(cond_key)');
     } catch (Throwable $ex) {
         act_opt_note('idx', $rec['tries'] + 1, $ex->getMessage());
-        $GLOBALS['__act_cond_index_error'] = 'cond_key index: ' . $ex->getMessage();
+        act_err_set('idx', 'cond_key index: ' . $ex->getMessage());
         @error_log('act_cond_index_ready: cond_key index unavailable — ' . $ex->getMessage());
         return false;                                 // the COLUMN is untouched by this
     }
     $okAt = $e; act_opt_note('idx', 0, '');
-    $GLOBALS['__act_cond_index_error'] = '';
+    act_err_set('idx', '');
     return true;
 }
 
@@ -286,8 +315,8 @@ function act_migrate_optional() {
 
 function act_optional_ready()       { return act_cond_column_ready(); }
 function act_optional_index_ready() { return act_cond_index_ready(); }
-function act_optional_error()       { return (string) ($GLOBALS['__act_cond_column_error'] ?? '') ?: (string) ($GLOBALS['__act_optional_error'] ?? ''); }
-function act_optional_index_error() { return (string) ($GLOBALS['__act_cond_index_error'] ?? ''); }
+function act_optional_error()       { return act_err_get('col') ?: act_err_get('write'); }
+function act_optional_index_error() { return act_err_get('idx'); }
 
 //  READ-ONLY (U1). It attempts nothing, spends no budget and increments no
 //  counter — it reports the structures it can see and the attempts already on
@@ -308,7 +337,7 @@ function act_optional_state() {
 
 //  The last CORE audit failure, so "the row was not written" can never be
 //  indistinguishable from "nothing happened".
-function act_last_error() { return (string) ($GLOBALS['__act_last_error'] ?? ''); }
+function act_last_error() { return act_err_get('core'); }
 
 // CREATE INDEX IF NOT EXISTS is SQLite-only; MySQL throws on a duplicate, so
 // the error is swallowed and only that one.
@@ -393,28 +422,56 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
         //  afterwards, against a column that may not exist, and its failure
         //  cannot reach back and undo the event that has just been recorded.
         $ck = substr(trim((string)($opt['cond_key'] ?? '')), 0, 160);
-        if ($id > 0 && $ck !== '') act_set_cond_key($id, $ck);
-        $GLOBALS['__act_last_error'] = '';
+        if ($id > 0 && $ck !== '') act_set_cond_key($id, $ck);   // status ignored: the CORE row is what matters
+        act_err_set('core', '');
         return $id;
     } catch (Throwable $e) {
         //  Still non-fatal — a timeline is a record of work, not a precondition
         //  for it — but no longer INVISIBLE. A core failure must never be
         //  indistinguishable from nothing having happened.
-        $GLOBALS['__act_last_error'] = $e->getMessage();
+        act_err_set('core', $e->getMessage());
         @error_log('act_log: core audit row NOT written — ' . $e->getMessage());
         return 0;
     }
 }
 
-//  Optional. Returns whether the metadata was actually stored, so a caller — and
-//  a test — can tell "stored" from "column unavailable" instead of assuming.
+//  M3 CORRECTION #11 · W2 — THE WRITER ANSWERS THE SAME QUESTION AS THE OBSERVER
+//
+//  This returned a plain true/false, so "nothing has tried to create the column
+//  yet" and "the write was attempted and failed" were the same answer. That is
+//  V1's sentence — ABSENT IS NOT FAILED — on the writer side, which correction #10
+//  left standing because it only fixed the instance that had been reported.
+//
+//  §8 lists five separate questions, so the answer distinguishes four outcomes
+//  rather than collapsing them:
+//
+//      STORED         the UPDATE ran and succeeded
+//      FAILED         the UPDATE ran and failed          (the write's own failure)
+//      UNAVAILABLE    the column was attempted and cannot be made
+//      NOT_ATTEMPTED  nothing was attempted at all
+//
+//  The return is a STATUS CONSTANT, not a boolean, and callers compare against
+//  ACT_COND_STORED. A truthy 'FAILED' would be a trap for any future `if (...)`,
+//  so the one production caller and every test are explicit.
+const ACT_COND_STORED        = 'STORED';
+const ACT_COND_FAILED        = 'FAILED';
+const ACT_COND_UNAVAILABLE   = 'UNAVAILABLE';
+const ACT_COND_NOT_ATTEMPTED = 'NOT_ATTEMPTED';
+
 function act_set_cond_key($id, $key) {
-    if ((int) $id <= 0 || (string) $key === '') return false;
-    if (!act_cond_column_ready()) return false;        // T2 — the COLUMN, not the index
-    try { db()->prepare("UPDATE activities SET cond_key=? WHERE id=?")->execute([(string) $key, (int) $id]); return true; }
-    catch (Throwable $e) {
-        $GLOBALS['__act_optional_error'] = 'cond_key: ' . $e->getMessage();
-        return false;
+    if ((int) $id <= 0 || (string) $key === '') return ACT_COND_NOT_ATTEMPTED;
+    if (!act_cond_column_ready()) {                   // T2 — the COLUMN, not the index
+        //  §8 — the MIGRATION's outcome, kept distinct from the WRITE's. The column
+        //  having been attempted and refused is not the same as the update failing.
+        return act_cond_column_status() === ACT_OPT_FAILED ? ACT_COND_UNAVAILABLE : ACT_COND_NOT_ATTEMPTED;
+    }
+    try {
+        db()->prepare("UPDATE activities SET cond_key=? WHERE id=?")->execute([(string) $key, (int) $id]);
+        act_err_set('write', '');
+        return ACT_COND_STORED;
+    } catch (Throwable $e) {
+        act_err_set('write', 'cond_key: ' . $e->getMessage());
+        return ACT_COND_FAILED;                       // the WRITE failed — the column is fine
     }
 }
 
