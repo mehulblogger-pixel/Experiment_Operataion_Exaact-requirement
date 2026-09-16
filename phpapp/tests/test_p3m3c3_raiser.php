@@ -20,6 +20,11 @@
 t_section('Phase 3 · M3 CORRECTION #3 — canonical raiser identity & audit integrity');
 
 $pdo = db(); hreq_migrate(); appr_migrate(); recruit_offer_migrate();
+//  M3 correction #6 · J1 — a watermark, so the openability check at R7 can be
+//  confined to rows THIS file wrote. Rows from earlier files reference fixtures
+//  those files have already cleaned up, which would look like dangling
+//  references and are not: the record existed when the row was written.
+$c3Act0 = (int) ops_val("SELECT COALESCE(MAX(id),0) FROM activities");
 $mine = ['u'=>[], 'o'=>[], 'rule'=>[], 'rq'=>[], 'cand'=>[], 'off'=>[], 'sal'=>[], 'req'=>[], 'h'=>[]];
 $origSess = $_SESSION;
 $offWas = function_exists('setting_get') ? (string) setting_get('modules_off', '') : '';
@@ -219,8 +224,21 @@ t_eq($acts('Decision not notified'), $a1, 'R7 · D2-2 · a record with canonical
 t_ok($logged('r3raise@t.test') > 0, 'R7 · D2-4 · while every real send attempt stays observable in the existing outbox');
 t_ok((int) ops_val("SELECT COUNT(*) FROM email_log WHERE kind='recruit_approval' AND sent_ok=0 AND error<>''") >= 1,
      'R7 · D2-4 · including the ones the mailer could not deliver, with their error');
-$rowsOk = (int) ops_val("SELECT COUNT(*) FROM activities WHERE subject LIKE '%Decision not notified%' AND entity_kind NOT IN ('HIRING_REQUEST','REQUISITION')");
+//  M3 correction #6 · J1 — one more subject is now legitimate. An event whose
+//  source entity cannot be linked on the timeline is filed under the approval
+//  POLICY that governs the chain: registered by M2, with a real screen, and read
+//  from this database. Widening a list on its own would be a weakening, so the
+//  assertion is STRENGTHENED in the same breath: being on the list is no longer
+//  enough — the row must point at a record that still exists.
+$rowsOk = (int) ops_val("SELECT COUNT(*) FROM activities WHERE subject LIKE '%Decision not notified%' AND entity_kind NOT IN ('HIRING_REQUEST','REQUISITION','APPROVAL_POLICY')");
 t_eq($rowsOk, 0, 'R7 · D2-5 · every audit row that IS written points at a supported, traceable entity');
+$SRC6 = ['HIRING_REQUEST'=>'hiring_requests', 'REQUISITION'=>'requisitions', 'APPROVAL_POLICY'=>'recruit_approval_rules'];
+$unopenable = 0;
+foreach (ops_all("SELECT entity_kind, entity_id FROM activities WHERE id > ? AND subject LIKE '%Decision not notified%'", [$c3Act0]) as $r6) {
+    $t6 = $SRC6[(string) $r6['entity_kind']] ?? '';
+    if ($t6 === '' || !ops_one("SELECT id FROM " . $t6 . " WHERE id=?", [(int) $r6['entity_id']])) $unopenable++;
+}
+t_eq($unopenable, 0, 'R7 · D2-5 · J1 · and every one of them OPENS — a supported type is not an openable record');
 
 // ---------------------------------------------------------------------------
 //  R8 · D3 — the reason is the real reason
