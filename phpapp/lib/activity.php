@@ -110,6 +110,14 @@ function act_migrate() {
     // Nothing else in this codebase creates an index, and MySQL will not invent
     // one. Without these, every Customer 360 page is a table scan — which is
     // survivable at 160 rows and is not at 160,000.
+    //  M3 correction #7 — a PERMANENT unresolved condition is a STATE, not a new
+    //  event on every observation. The canonical key of that state is stored on
+    //  the row that records it, so "have we already said this?" is one exact-match
+    //  question against the EXISTING spine rather than a second event engine, and
+    //  it is never derived by parsing display prose. Additive and nullable: every
+    //  other caller leaves it blank and behaves exactly as before.
+    ensure_column('activities', 'cond_key', "VARCHAR(160) DEFAULT ''");
+    act_index('activities', 'idx_act_cond', '(cond_key)');
     act_index('activities', 'idx_act_partner', '(partner_id, occurred_at)');
     act_index('activities', 'idx_act_entity',  '(entity_kind, entity_id)');
     act_index('activities', 'idx_act_when',    '(occurred_at)');
@@ -177,8 +185,8 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
         $u = function_exists('current_user') ? current_user() : null;
         db()->prepare("INSERT INTO activities
             (kind,entity_kind,entity_id,partner_id,subject,body,direction,occurred_at,
-             duration_mins,outcome,with_whom,owner,office_id,sbu,auto,created_by,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+             duration_mins,outcome,with_whom,owner,office_id,sbu,auto,created_by,created_at,cond_key)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             ->execute([$kind, $entityKind, (int)$entityId ?: null, $partner,
                 substr(trim((string)$subject), 0, 255),
                 (string)($opt['body'] ?? ''),
@@ -192,7 +200,8 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
                 (string)($opt['sbu'] ?? ''),
                 !empty($opt['auto']) ? 1 : 0,
                 $u ? user_name($u) : (string)($opt['created_by'] ?? 'system'),
-                date('c')]);
+                date('c'),
+                substr(trim((string)($opt['cond_key'] ?? '')), 0, 160)]);
         return (int)db()->lastInsertId();
     } catch (Throwable $e) {
         return 0;   // never break the work that caused it

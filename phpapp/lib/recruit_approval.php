@@ -209,13 +209,83 @@ function appr_audit_source_gone($req) {
     return appr_entity_record($entity, (int) ($req['entity_id'] ?? 0)) === null;
 }
 
+// ===========================================================================
+//  M3 CORRECTION #7 — A PERMANENT CONDITION IS A STATE, NOT AN EVENT
+//
+//  Correction #6 gave an unresolvable approval a subject that opens. It also
+//  gave it the ability to repeat: ten identical refusals on a dead offer wrote
+//  ten rows where they had previously written none (K1), and the scheduler has
+//  written one row a day, for ever, over a chain whose record is gone (H2).
+//
+//  Those are the same rule missing on two paths, so this is ONE rule in ONE
+//  place rather than two patches:
+//
+//      OBSERVATION -> CLASSIFY -> STABLE IDENTITY -> ALREADY RECORDED? -> RECORD
+//
+//  What it is NOT: a blanket "suppress repeats". A transient failure may
+//  legitimately recur, a different reason is a different condition, and a later
+//  step of the same chain is a new subject. Only the identical permanent
+//  condition, on the identical subject, is silent the second time.
+// ===========================================================================
+
+//  §2 — PERMANENT means: re-asking cannot change the answer without the
+//  underlying DATA changing, and when the data does change the REASON changes
+//  with it, which produces a different key and therefore a new event.
+//
+//    ENTITY_UNRESOLVED    the source record does not exist here
+//    TENANT_MISMATCH      the subject names a row that is not in this workspace
+//    IDENTITY_UNRESOLVED  a legacy chain that carries no canonical raiser id
+//
+//  Everything else is TRANSIENT and is deliberately NOT suppressed:
+//  RECIPIENT_INACTIVE (a person is reactivated), RECIPIENT_UNLICENSED (a module
+//  is bought), RECIPIENT_OUT_OF_SCOPE / SEGREGATION_BLOCKED (configuration
+//  changes), NO_EMAIL (an address is added), PROVIDER_FAILURE (explicitly
+//  retryable). The brief's warning applies here: a lookup that failed once is
+//  not permanent merely because it failed.
+const APPR_PERMANENT_REASONS = ['ENTITY_UNRESOLVED', 'TENANT_MISMATCH', 'IDENTITY_UNRESOLVED'];
+
+function appr_condition_kind($reason) {
+    return in_array(strtoupper(trim((string) $reason)), APPR_PERMANENT_REASONS, true)
+        ? 'PERMANENT' : 'TRANSIENT';
+}
+
+//  §3 — the stable identity of a permanent condition. Deliberately NOT rule_id:
+//  two dead offers governed by one policy are two conditions, and a chain with
+//  no rule at all still has an identity. Deliberately no timestamp: that would
+//  make every observation unique, which is the defect. Tenant is structural —
+//  one database per workspace — so it is the connection, not a column.
+function appr_condition_key($event, $req, $step, $reason) {
+    if (appr_condition_kind($reason) !== 'PERMANENT') return '';      // transient: no suppression
+    $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
+    $eid    = (int) ($req['entity_id'] ?? 0);
+    $rq     = (int) ($req['id'] ?? 0);
+    $st     = is_array($step) ? (int) ($step['id'] ?? 0) : 0;
+    return 'PC|' . strtoupper((string) $event) . '|' . $entity . '|' . $eid
+         . '|R' . $rq . '|S' . $st . '|' . strtoupper(trim((string) $reason));
+}
+
+//  Has this exact state already been recorded? One exact-match question against
+//  the EXISTING spine — no second event engine, and no parsing of display prose.
+function appr_condition_seen($key) {
+    if ($key === '') return false;
+    try { return (bool) ops_one("SELECT id FROM activities WHERE cond_key=?", [$key]); }
+    catch (Throwable $e) { return false; }   // a check that cannot run must never
+                                             // silence a first observation
+}
+
 //  §24 — every SLA event goes on the EXISTING activity spine. There is no second
 //  audit system: act_log() is where M1 and M2 already put approval history. The
 //  entity and its id are named in the SUBJECT as well as the entity column, so an
 //  event stays readable for the entities that are not registered on the timeline
 //  (offer and salary — see the known limitations).
-function appr_audit_sla($req, $step, $what, $detail = '') {
+function appr_audit_sla($req, $step, $what, $detail = '', $event = 'SLA_EVENT') {
     if (!function_exists('act_log') || !$req) return;
+    //  §5 — the permanent condition on this path is "the source record is gone".
+    //  A chain whose record still exists is untouched: genuine reminders and
+    //  escalations for genuinely pending approvals keep working exactly as before.
+    $condKey = appr_audit_source_gone($req)
+        ? appr_condition_key($event, $req, $step, 'ENTITY_UNRESOLVED') : '';
+    if ($condKey !== '' && appr_condition_seen($condKey)) return;
     $entity = strtoupper((string) ($req['entity'] ?? ''));
     $label  = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : $entity;
     //  J1 — this writer had NO check at all, not even D2's type check, so an
@@ -230,7 +300,7 @@ function appr_audit_sla($req, $step, $what, $detail = '') {
         . (trim((string) ($step['label'] ?? '')) !== '' ? ' (' . $step['label'] . ')' : '')
         . ($detail !== '' ? ' — ' . $detail : '')
         . ((!$isSource && appr_audit_source_gone($req)) ? ' — source record unavailable' : '');
-    act_log($kind, $id, 'SYSTEM', $subject, ['auto' => 1]);
+    act_log($kind, $id, 'SYSTEM', $subject, ['auto' => 1, 'cond_key' => $condKey]);
 }
 
 // ---- Rules & levels (config) -----------------------------------------------
@@ -734,7 +804,7 @@ function appr_activate_step($step, $req = null) {
             ->execute([$now, $due, $rem, $id]);
     } catch (Throwable $e) { return $step; }
     $step['activated_at'] = $now; $step['sla_due'] = $due; $step['reminder_at'] = $rem;
-    appr_audit_sla($req, $step, 'SLA started', 'due ' . substr($due, 0, 10));
+    appr_audit_sla($req, $step, 'SLA started', 'due ' . substr($due, 0, 10), 'SLA_START');
     return $step;
 }
 
@@ -1190,12 +1260,18 @@ function appr_tick() {
     // asked only by the caller is a question one new caller can skip.
     if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return 0;
     $now = time(); $acted = 0;
-    $steps = ops_all("SELECT s.*, r.subject, r.entity, r.entity_id, r.rule_name FROM recruit_approval_steps s
+    $steps = ops_all("SELECT s.*, r.subject, r.entity, r.entity_id, r.rule_name, r.rule_id FROM recruit_approval_steps s
                       JOIN recruit_approval_requests r ON r.id=s.request_id
                       WHERE r.status='PENDING' AND s.status='PENDING' AND s.seq=r.current_seq");
     foreach ($steps as $s) {
+        //  M3 correction #7 — the scheduler used to build this row WITHOUT rule_id,
+        //  so after correction #6 an orphaned chain had no openable subject and its
+        //  SLA events were dropped entirely. That silenced H2 by accident, through
+        //  K3's lost-history branch, rather than by recording the condition once.
+        //  Carrying the rule through gives the event a subject that opens.
         $req = ['id' => (int) $s['request_id'], 'entity' => $s['entity'],
-                'entity_id' => (int) ($s['entity_id'] ?? 0), 'subject' => $s['subject'], 'status' => 'PENDING'];
+                'entity_id' => (int) ($s['entity_id'] ?? 0), 'subject' => $s['subject'],
+                'rule_id' => (int) ($s['rule_id'] ?? 0), 'status' => 'PENDING'];
         // A step whose clock never started is not late — it is waiting to be
         // handed over. Start it here rather than skipping it forever, so a chain
         // cannot be stranded by a write that failed at activation time.
@@ -1211,7 +1287,7 @@ function appr_tick() {
             // recorded as it actually happened.
             [$n, $ok] = appr_email_escalate($s, $req);
             db()->prepare("UPDATE recruit_approval_steps SET escalated=1 WHERE id=?")->execute([(int)$s['id']]);
-            appr_audit_sla($req, $s, 'Approval overdue — escalated', appr_delivery_note($n, $ok));
+            appr_audit_sla($req, $s, 'Approval overdue — escalated', appr_delivery_note($n, $ok), 'ESCALATION');
             $acted++;
             continue;
         }
@@ -1233,7 +1309,7 @@ function appr_tick() {
             // threshold forward is what makes a second run of the scheduler a
             // no-op, however many times it runs in a day.
             db()->prepare("UPDATE recruit_approval_steps SET reminded_at=?, reminder_at=? WHERE id=?")->execute([_appr_now(), date('c', $now + 86400), (int)$s['id']]);
-            appr_audit_sla($req, $s, 'Approval reminder sent', appr_delivery_note($n, $ok));
+            appr_audit_sla($req, $s, 'Approval reminder sent', appr_delivery_note($n, $ok), 'REMINDER');
             $acted++;
         }
     }
@@ -1632,13 +1708,18 @@ function appr_audit_notify($req, $result, $reason) {
     //  J1 — the type check that used to stand here called itself "never a
     //  dangling reference" while the commonest reason for writing was that the
     //  record is gone. The five clauses now live in appr_audit_subject().
+    //  §3/§6 — K1: correction #6 gave offer and salary a subject that opens, and
+    //  with it the ability to repeat. The identical permanent condition on the
+    //  identical chain is a STATE that is already on the record.
+    $condKey = appr_condition_key('DECISION', $req, null, $reason);
+    if ($condKey !== '' && appr_condition_seen($condKey)) return;
     [$kind, $id, $isSource] = appr_audit_subject($req);
     if ($kind === '') return;                       // nothing openable remains: no row
     act_log($kind, $id, 'SYSTEM',
         'Decision not notified (' . $reason . ') — ' . (APPR_NOTIFY_REASONS[$reason] ?? $reason)
         . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0) . ' ' . strtoupper((string) $result)
         . ((!$isSource && appr_audit_source_gone($req)) ? ' — source record unavailable' : ''),
-        ['auto' => 1, 'outcome' => substr($reason, 0, 60)]);
+        ['auto' => 1, 'outcome' => substr($reason, 0, 60), 'cond_key' => $condKey]);
 }
 
 //  Returns the reason code, so a caller — and a test — can see exactly which of
