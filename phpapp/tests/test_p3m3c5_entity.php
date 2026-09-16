@@ -176,6 +176,28 @@ $dangling = (int) ops_val("SELECT COUNT(*) FROM activities WHERE (entity_kind IS
 t_eq($dangling, 0, 'C5.5 · and no dangling audit reference was created along the way');
 
 // ---------------------------------------------------------------------------
+//  C5.6 · a resolution that ERRORS is a resolution that FAILED
+// ---------------------------------------------------------------------------
+//  The resolver's catch denies, and nothing in the suite was making it throw — so
+//  the condition is CONSTRUCTED rather than assumed: the source table is renamed
+//  out from under it, which is what a half-applied migration or a partial restore
+//  looks like. Renamed back in a finally, so a failure here cannot damage the
+//  files that run after this one.
+t_section('C5.6 · a resolver that errors denies');
+$act($uAppr);
+$salReq = ['entity' => 'SALARY', 'entity_id' => 4242, 'subject' => 'x'];
+try {
+    $pdo->exec("ALTER TABLE salary_structures RENAME TO salary_structures_c5tmp");
+    t_ok(appr_entity_record('SALARY', 4242) === null,
+         'C5.6 · with its source table gone, the resolver returns nothing rather than raising');
+    t_eq(appr_told_reason($salReq, $apprRow), 'ENTITY_UNRESOLVED',
+         'C5.6 · and the notification DENIES — an error is never an eligibility');
+} finally {
+    try { $pdo->exec("ALTER TABLE salary_structures_c5tmp RENAME TO salary_structures"); } catch (Throwable $e) {}
+}
+t_ok(t_table_exists('salary_structures'), 'C5.6 · the table is put back');
+
+// ---------------------------------------------------------------------------
 //  Clean up
 // ---------------------------------------------------------------------------
 $_SESSION = $origSess; current_user(true); ua(true);
