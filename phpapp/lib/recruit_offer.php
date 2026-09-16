@@ -103,6 +103,15 @@ function recruit_offer_migrate() {
         ensure_column('salary_structures', 'total_deductions', "DECIMAL(14,2) DEFAULT 0");
         ensure_column('salary_structures', 'employer_cost', "DECIMAL(14,2) DEFAULT 0");
         ensure_column('salary_structures', 'lines_json', $lt);
+        // M3 CORRECTION #3 · D1 — two additive, nullable columns so the offer and the
+        // salary structure carry WHO RAISED THEM, not only what they are called.
+        // Placed here, AFTER both CREATE TABLE statements: my first attempt put them
+        // above the job_offers table's own creation, where on a fresh workspace the
+        // column would never have been added at all and the failure would have been
+        // swallowed by the boot-safety catch.
+        // Historical rows stay NULL and fail closed, by design.
+        ensure_column('job_offers', 'created_by_id', 'INT NULL');
+        ensure_column('salary_structures', 'created_by_id', 'INT NULL');
         if (function_exists('act_index')) {
             act_index('salary_structures', 'idx_sal_cand', '(candidate_id)');
             act_index('hr_discussions', 'idx_hrd_cand', '(candidate_id)');
@@ -113,6 +122,11 @@ function recruit_offer_migrate() {
 
 function _off_now() { return function_exists('now_iso') ? now_iso() : date('c'); }
 function _off_actor() { return function_exists('user_name') && function_exists('current_user') ? user_name(current_user()) : 'system'; }
+//  Phase 3 · M3 CORRECTION #3 · D1 — the CANONICAL raiser, beside the display name.
+//  `created_by` is a label and always was; this is the identity. Null when nobody
+//  is signed in (a seed, a job), and a null identity fails closed rather than
+//  being guessed from the label.
+function _off_actor_id() { return function_exists('current_user') ? ((int) ((current_user()['id'] ?? 0)) ?: null) : null; }
 function _off_cur() { return function_exists('cur_sym') ? cur_sym() : (function_exists('setting_get') ? (setting_get('currency_symbol', '₹') ?: '₹') : '₹'); }
 
 // ============================================================================
@@ -149,11 +163,11 @@ function sal_save($candidateId, $post) {
         $inputs = [];
         foreach (comp_defs(true) as $d) if ($d['calc'] === 'FIXED') $inputs[$d['code']] = (float)($post['c_' . $d['code']] ?? 0);
         $r = comp_compute($inputs);
-        db()->prepare("INSERT INTO salary_structures (candidate_id,currency,gross_ctc,net_pay,total_deductions,employer_cost,lines_json,candidate_expected,internal_benchmark,approved_budget,notes,created_by,created_at)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        db()->prepare("INSERT INTO salary_structures (candidate_id,currency,gross_ctc,net_pay,total_deductions,employer_cost,lines_json,candidate_expected,internal_benchmark,approved_budget,notes,created_by,created_by_id,created_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             ->execute([(int)$candidateId, _off_cur(), $r['ctc'], $r['net'], $r['deductions'], $r['employer'], json_encode($r['lines']),
                 (float)($post['candidate_expected'] ?? 0), (float)($post['internal_benchmark'] ?? 0), (float)($post['approved_budget'] ?? 0),
-                trim((string)($post['notes'] ?? '')), _off_actor(), _off_now()]);
+                trim((string)($post['notes'] ?? '')), _off_actor(), _off_actor_id(), _off_now()]);
         return (int)db()->lastInsertId();
     }
     // Fallback (no comp engine): legacy fixed columns.
@@ -162,11 +176,11 @@ function sal_save($candidateId, $post) {
     $gross = array_sum($vals);
     $set = implode(',', $cols);
     $ph = implode(',', array_fill(0, count($cols), '?'));
-    db()->prepare("INSERT INTO salary_structures (candidate_id,currency,$set,gross_ctc,candidate_expected,internal_benchmark,approved_budget,notes,created_by,created_at)
-                   VALUES (?,?, $ph, ?,?,?,?,?,?,?)")
+    db()->prepare("INSERT INTO salary_structures (candidate_id,currency,$set,gross_ctc,candidate_expected,internal_benchmark,approved_budget,notes,created_by,created_by_id,created_at)
+                   VALUES (?,?, $ph, ?,?,?,?,?,?,?,?)")
         ->execute(array_merge([(int)$candidateId, _off_cur()], array_values($vals),
             [$gross, (float)($post['candidate_expected'] ?? 0), (float)($post['internal_benchmark'] ?? 0),
-             (float)($post['approved_budget'] ?? 0), trim((string)($post['notes'] ?? '')), _off_actor(), _off_now()]));
+             (float)($post['approved_budget'] ?? 0), trim((string)($post['notes'] ?? '')), _off_actor(), _off_actor_id(), _off_now()]));
     return (int)db()->lastInsertId();
 }
 // Variance vs budget / expectation (positive = over).
@@ -211,10 +225,10 @@ function offer_create($candidateId, $post) {
     recruit_offer_migrate();
     $sal = sal_current($candidateId);
     $ctc = (float)($post['ctc'] ?? 0) ?: ($sal ? (float)$sal['gross_ctc'] : 0);
-    db()->prepare("INSERT INTO job_offers (candidate_id,salary_structure_id,ctc,joining_date,offer_terms,status,expiry_date,created_by,created_at)
-                   VALUES (?,?,?,?,?, 'DRAFT', ?,?,?)")
+    db()->prepare("INSERT INTO job_offers (candidate_id,salary_structure_id,ctc,joining_date,offer_terms,status,expiry_date,created_by,created_by_id,created_at)
+                   VALUES (?,?,?,?,?, 'DRAFT', ?,?,?,?)")
         ->execute([(int)$candidateId, $sal['id'] ?? null, $ctc, trim((string)($post['joining_date'] ?? '')),
-            trim((string)($post['offer_terms'] ?? '')), trim((string)($post['expiry_date'] ?? '')), _off_actor(), _off_now()]);
+            trim((string)($post['offer_terms'] ?? '')), trim((string)($post['expiry_date'] ?? '')), _off_actor(), _off_actor_id(), _off_now()]);
     return (int)db()->lastInsertId();
 }
 // Build the matching context for the configurable approval engine (Phase 6)

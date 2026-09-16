@@ -77,6 +77,13 @@ function appr_migrate() {
         try { ensure_column('recruit_approval_steps', 'sla_days', 'INT DEFAULT 0'); } catch (Throwable $e) {}
         try { ensure_column('recruit_approval_steps', 'reminder_days', 'INT DEFAULT 0'); } catch (Throwable $e) {}
         try { ensure_column('recruit_approval_steps', 'activated_at', "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
+        // M3 CORRECTION #3 · D1 — ONE additive, nullable column: the canonical
+        // identity of the person who raised this chain, captured from the
+        // authenticated session at appr_start(). The audit's own question ("can
+        // the approval request safely retain a canonical source-user reference?")
+        // is answered yes, and it is answered once for EVERY entity rather than
+        // four times, one per table. Historical rows are NULL and fail closed.
+        try { ensure_column('recruit_approval_requests', 'requester_id', 'INT NULL'); } catch (Throwable $e) {}
         // Phase 3 · M2 — DELEGATION. The one new table, and the audit says why:
         // nothing in the application can represent a standing, dated, scoped
         // transfer of approval authority. IDEMS has `report_approvals.delegated_to`
@@ -575,8 +582,11 @@ function appr_start($entity, $entityId, $ctx, $subject = '', $amount = 0) {
     if (!$rule) return [false, 0];
     $levels = appr_levels($rule['id']);
     if (!$levels) return [false, 0];
-    db()->prepare("INSERT INTO recruit_approval_requests (entity,entity_id,rule_id,rule_name,subject,amount,status,current_seq,requester,created_at) VALUES (?,?,?,?,?,?, 'PENDING', ?,?,?)")
-        ->execute([$entity,(int)$entityId,(int)$rule['id'],(string)$rule['name'],(string)$subject,(float)$amount, (int)$levels[0]['seq'], _appr_actor(), _appr_now()]);
+    // D1 — the display name is still written, for screens; the IDENTITY is written
+    // beside it, from the session, and it is the identity that decides anything.
+    $reqUid = function_exists('current_user') ? (int) ((current_user()['id'] ?? 0)) : 0;
+    db()->prepare("INSERT INTO recruit_approval_requests (entity,entity_id,rule_id,rule_name,subject,amount,status,current_seq,requester,requester_id,created_at) VALUES (?,?,?,?,?,?, 'PENDING', ?,?,?,?)")
+        ->execute([$entity,(int)$entityId,(int)$rule['id'],(string)$rule['name'],(string)$subject,(float)$amount, (int)$levels[0]['seq'], _appr_actor(), $reqUid ?: null, _appr_now()]);
     $reqId = (int)db()->lastInsertId();
     // An org-chart approver token ("reporting manager", "HOD", …) is resolved to a
     // real person here, from the requisition's position walked up the reporting
@@ -1221,24 +1231,51 @@ function appr_may_be_asked($step, $req, $user) {
     return (bool) appr_as_user($user, fn() => appr_visible($step, $req, $user));
 }
 
+//  M3 CORRECTION #3 · D3 — WHY a notification did not go out, said accurately.
+//
+//  The previous correction logged every failure as "no canonical requester
+//  identity", including the cases where the identity resolved perfectly and the
+//  person was simply not eligible. Two different things — "we do not know who" and
+//  "we know who, and may not tell them" — recorded as one. These are the distinct
+//  reasons, and they are the vocabulary the notifier reports and the audit stores.
+const APPR_NOTIFY_REASONS = [
+    'SENT'                 => 'Notification sent',
+    'ENTITY_UNRESOLVED'    => 'the record could not be resolved',
+    'IDENTITY_UNRESOLVED'  => 'the record carries no canonical raiser identity',
+    'TENANT_MISMATCH'      => 'the identity does not exist in this workspace',
+    'RECIPIENT_INACTIVE'   => 'the recipient is no longer an active user',
+    'RECIPIENT_UNLICENSED' => 'the module is not licensed for this workspace',
+    'RECIPIENT_OUT_OF_SCOPE' => 'the recipient is outside the branch scope of the record',
+    'RECIPIENT_NOT_VISIBLE'  => 'the recipient may not see this record',
+    'SEGREGATION_BLOCKED'    => 'segregation of duties forbids it',
+    'NO_EMAIL'             => 'the recipient has no e-mail address',
+    'PROVIDER_FAILURE'     => 'the mail provider could not deliver it',
+];
+
+//  The reason a person may NOT be told, or '' when they may. appr_may_be_told()
+//  is this same rule read as a yes/no — one rule, two readers, never two rules.
+function appr_told_reason($req, $user) {
+    if (!is_array($user)) return 'IDENTITY_UNRESOLVED';
+    if ((int) ($user['is_active'] ?? 0) !== 1) return 'RECIPIENT_INACTIVE';
+    return (string) appr_as_user($user, function () use ($req) {
+        $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
+        if ($entity === '' || !array_key_exists($entity, APPR_ENTITIES)) return 'ENTITY_UNRESOLVED';
+        if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return '';
+        if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return 'RECIPIENT_UNLICENSED';
+        $r = hreq_get((int) ($req['entity_id'] ?? 0));
+        if (!$r) return 'ENTITY_UNRESOLVED';
+        if (function_exists('hreq_in_scope') && !hreq_in_scope($r)) return 'RECIPIENT_OUT_OF_SCOPE';
+        return '';
+    });
+}
+
 //  INFORMATIONAL — "this approval is late". Not a request to act, so the single
 //  clause that does not apply is SEGREGATION: telling the person who raised a
 //  request that it has gone overdue is the point of the message, not a leak.
 //  Everything else is the same guard asked the same way — entitlement, the record
 //  existing, branch scope — through the same helpers appr_guard() itself calls.
 //  It is a second disclosure LEVEL, not a second rule set.
-function appr_may_be_told($req, $user) {
-    if (!is_array($user) || (int) ($user['is_active'] ?? 0) !== 1) return false;
-    return (bool) appr_as_user($user, function () use ($req) {
-        $entity = strtoupper((string) ($req['entity'] ?? ''));
-        if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return true;
-        if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return false;
-        $r = hreq_get((int) ($req['entity_id'] ?? 0));
-        if (!$r) return false;
-        if (function_exists('hreq_in_scope') && !hreq_in_scope($r)) return false;
-        return true;
-    });
-}
+function appr_may_be_told($req, $user) { return appr_told_reason($req, $user) === ''; }
 
 //  Phase 3 · M3 §16 — WHO IS BEING ASKED TO ACT.
 //
@@ -1340,59 +1377,115 @@ function appr_email_escalate($step, $req = null) {
         . '<p>This is a notification. It does not give you authority to approve — the approver named on the step still owns the decision.</p>';
     return [count($to), appr_mail($to, 'ESCALATION: approval overdue — ' . ($step['subject'] ?? ''), $body)];
 }
-//  Phase 3 · M3 CORRECTION #2 · C1 — A NAME IS NOT AN IDENTITY.
+//  Phase 3 · M3 CORRECTION #3 · D1 — IDENTITY, THEN ELIGIBILITY, THEN NOTIFICATION.
 //
-//  This used to resolve the person to tell from `recruit_approval_requests.
-//  requester`, which is a DISPLAY NAME, with LIMIT 1 and no ordering. Two people
-//  called "Ravi Sharma" and whoever held the lower id won. Proved with a probe:
-//  an inspector at another branch, holding no recruitment permission at all,
-//  received a hiring request's title and outcome, and the person who actually
-//  raised it received nothing.
+//  Three questions, asked in that order and never conflated. Correction #2 fixed
+//  the identity question for the hiring request and, by failing closed everywhere
+//  else, silently stopped a working notification for the other entities. Both
+//  halves are now answered properly.
 //
-//  The canonical answer already existed. M4 established
-//  `hiring_requests.requested_by_id` as the requestor of record and M4's own
-//  correction made it survive an edit that omits it. THAT is the identity. The
-//  `requester` column keeps doing what it is for — labelling a screen.
-//
-//  Only the hiring request has such an identity: an offer, a salary structure and
-//  a requisition record their raiser as text and nothing else. For those this
-//  FAILS CLOSED and says so on the timeline, because guessing a person from prose
-//  is the defect, not the fix.
-function appr_requester_user($req) {
+//  RESOLUTION ORDER — strictest first, and a NAME IS NEVER CONSULTED:
+//    1. the BUSINESS OBJECT's own canonical raiser id — hiring_requests.
+//       requested_by_id (M4), job_offers.created_by_id, salary_structures.
+//       created_by_id. "Who created the thing", which is what identity means, and
+//       it survives the chain being restarted.
+//    2. the CHAIN's requester_id — the authenticated user at appr_start(). One
+//       column covering every entity, including requisitions, whose business
+//       object carries no raiser id and which no code path in this application
+//       ever starts a chain for.
+//    3. nothing at all → FAIL CLOSED, with a reason.
+function appr_requester_id($req) {
     $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
-    if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return null;
-    $r = hreq_get((int) ($req['entity_id'] ?? 0));
-    if (!$r) return null;                                   // no record → no recipient
-    $uid = (int) ($r['requested_by_id'] ?? 0);
-    if ($uid <= 0) return null;                             // legacy row with no id → do not guess
-    try { $u = ops_one("SELECT * FROM users WHERE id=?", [$uid]); } catch (Throwable $e) { return null; }
-    return $u ?: null;                                      // an id from elsewhere does not exist here
+    $eid = (int) ($req['entity_id'] ?? 0);
+    $fromEntity = 0;
+    try {
+        if ($entity === 'HIRING_REQUEST' && function_exists('hreq_get')) {
+            $r = hreq_get($eid);
+            if (!$r) return [0, 'ENTITY_UNRESOLVED'];
+            $fromEntity = (int) ($r['requested_by_id'] ?? 0);
+        } elseif ($entity === 'OFFER') {
+            // The columns these two branches read belong to another module, so its
+            // migration is ensured here rather than assumed. Without this the query
+            // raises, the catch below swallows it, and a MISSING RECORD would be
+            // reported as a MISSING IDENTITY — the very confusion D3 is about.
+            if (function_exists('recruit_offer_migrate')) recruit_offer_migrate();
+            $r = ops_one("SELECT created_by_id FROM job_offers WHERE id=?", [$eid]);
+            if (!$r) return [0, 'ENTITY_UNRESOLVED'];
+            $fromEntity = (int) ($r['created_by_id'] ?? 0);
+        } elseif ($entity === 'SALARY') {
+            if (function_exists('recruit_offer_migrate')) recruit_offer_migrate();
+            $r = ops_one("SELECT created_by_id FROM salary_structures WHERE id=?", [$eid]);
+            if (!$r) return [0, 'ENTITY_UNRESOLVED'];
+            $fromEntity = (int) ($r['created_by_id'] ?? 0);
+        }
+    } catch (Throwable $e) { $fromEntity = 0; }
+    if ($fromEntity > 0) return [$fromEntity, ''];
+    $fromChain = (int) ($req['requester_id'] ?? 0);
+    if ($fromChain > 0) return [$fromChain, ''];
+    return [0, 'IDENTITY_UNRESOLVED'];          // a legacy row. Do not guess.
 }
 
-//  A decision that could not be reported is recorded, on the EXISTING spine, so
-//  "nobody was told" is visible rather than silent. It is never a guess.
-function appr_audit_requester_unresolved($req, $result) {
-    if (!function_exists('act_log')) return;
+//  [user|null, reason]. TENANT_MISMATCH is what an id from somewhere else looks
+//  like here: one database per tenant, so the row simply is not there.
+function appr_resolve_requester($req) {
+    [$uid, $why] = appr_requester_id($req);
+    if ($uid <= 0) return [null, $why !== '' ? $why : 'IDENTITY_UNRESOLVED'];
+    try { $u = ops_one("SELECT * FROM users WHERE id=?", [$uid]); } catch (Throwable $e) { $u = null; }
+    if (!$u) return [null, 'TENANT_MISMATCH'];
+    return [$u, ''];
+}
+function appr_requester_user($req) { [$u] = appr_resolve_requester($req); return $u; }
+
+//  M3 CORRECTION #3 · D2 — AN AUDIT ROW ONLY WHEN IT MEANS SOMETHING AND POINTS
+//  AT SOMETHING.
+//
+//  Correction #2 wrote "could not identify the requester" on EVERY offer decision,
+//  with a blank entity_kind and a dangling entity_id — a permanent structural
+//  condition logged as if it were an event, in rows nobody could follow.
+//
+//    · a SUCCESSFUL send is already in email_log — nothing is added here
+//    · a DELIVERY failure is already in email_log, with its error
+//    · a BLOCKED or UNRESOLVED notification is recorded here, with its REAL
+//      reason (D3), and only for an entity the timeline can actually link
+//    · OFFER and SALARY are not ACT_ENTITIES, so nothing is written for them
+//      rather than something invalid. That limitation is documented, which is
+//      what the brief asks for in place of fabricated audit data.
+//  Which reasons earn a row, and which do not. Anything routine — it was sent,
+//  the mailer could not deliver it (already in email_log with its error), or the
+//  person simply has no e-mail address — is NOT an event. Writing one per decision
+//  for a benign configuration state is the same noise D2 was raised about, and an
+//  existing M1 assertion caught me doing exactly that with NO_EMAIL.
+const APPR_NOTIFY_AUDITED = ['ENTITY_UNRESOLVED', 'IDENTITY_UNRESOLVED', 'TENANT_MISMATCH',
+    'RECIPIENT_INACTIVE', 'RECIPIENT_UNLICENSED', 'RECIPIENT_OUT_OF_SCOPE',
+    'RECIPIENT_NOT_VISIBLE', 'SEGREGATION_BLOCKED'];
+function appr_audit_notify($req, $result, $reason) {
+    if (!in_array((string) $reason, APPR_NOTIFY_AUDITED, true)) return;
+    if (!function_exists('act_log') || !defined('ACT_ENTITIES')) return;
     $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
-    $label = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : ($entity ?: 'approval');
+    if ($entity === '' || !array_key_exists($entity, ACT_ENTITIES)) return;   // never a dangling reference
+    $label = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : $entity;
     act_log($entity, (int) ($req['entity_id'] ?? 0), 'SYSTEM',
-        'Decision not notified — no canonical requester identity — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0)
-        . ' ' . strtoupper((string) $result), ['auto' => 1]);
+        'Decision not notified (' . $reason . ') — ' . (APPR_NOTIFY_REASONS[$reason] ?? $reason)
+        . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0) . ' ' . strtoupper((string) $result),
+        ['auto' => 1, 'outcome' => substr($reason, 0, 60)]);
 }
 
+//  Returns the reason code, so a caller — and a test — can see exactly which of
+//  the three questions failed rather than inferring it from an empty inbox.
 function appr_email_requester($req, $result, $remarks = '') {
-    $u = appr_requester_user($req);
-    if (!$u) { appr_audit_requester_unresolved($req, $result); return; }
-    //  Identity settles WHO. The existing model settles WHETHER — entitlement,
-    //  the record, branch scope and active status — at the informational level,
-    //  because telling somebody the outcome of their OWN request is not asking
-    //  them to approve anything, so segregation must not silence it.
-    if (!appr_may_be_told($req, $u)) { appr_audit_requester_unresolved($req, $result); return; }
+    [$u, $why] = appr_resolve_requester($req);          // 1 · IDENTITY
+    if (!$u) { appr_audit_notify($req, $result, $why); return $why; }
+    $why = appr_told_reason($req, $u);                  // 2 · ELIGIBILITY
+    if ($why !== '') { appr_audit_notify($req, $result, $why); return $why; }
     $email = trim((string) ($u['email'] ?? ''));
-    if ($email === '') return;
-    appr_mail([$email], 'Your approval was ' . strtoupper($result) . ' — ' . ($req['subject'] ?? ''),
+    if ($email === '') { appr_audit_notify($req, $result, 'NO_EMAIL'); return 'NO_EMAIL'; }
+    $sent = appr_mail([$email], 'Your approval was ' . strtoupper($result) . ' — ' . ($req['subject'] ?? ''),
         '<p>Your request <b>' . e((string)($req['subject'] ?? '')) . '</b> was <b>' . e(strtoupper($result)) . '</b>.' . ($remarks ? ' Remark: ' . e($remarks) : '') . '</p>');
+    // A provider failure is already recorded in email_log with its error, so it is
+    // reported here and not duplicated onto the timeline.
+    return $sent >= 1 ? 'SENT' : 'PROVIDER_FAILURE';    // 3 · NOTIFICATION
 }
+
 
 // ============================================================================
 //  Admin screen — configure rules + levels

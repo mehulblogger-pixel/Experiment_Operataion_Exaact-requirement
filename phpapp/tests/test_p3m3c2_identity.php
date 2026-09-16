@@ -105,13 +105,24 @@ t_eq($mails('idreal@t.test'), $ghostBefore, 'ID2 · C1-5 · the person the TEXT 
 // ---------------------------------------------------------------------------
 t_section('ID3 · unresolvable identity fails closed');
 [$h3, $ap3, $s3] = $raise($uOther, 'ID no identity');
+//  M3 correction #3 — there are now TWO canonical sources: the business object's
+//  own raiser id, and the chain's requester_id captured at appr_start(). Clearing
+//  only one no longer means "no identity", and it should not: the chain still
+//  knows who raised it. A genuinely legacy row is one where NEITHER exists, and
+//  that is what fail-closed has to be proved against.
 $pdo->prepare("UPDATE hiring_requests SET requested_by_id=0 WHERE id=?")->execute([(int) $h3]);
 $ap3 = appr_request((int) $ap3['id']);
-t_ok(appr_requester_user($ap3) === null, 'ID3 · C1-6 · a request with no canonical id resolves to NOBODY');
-$b = $mails('idother@t.test'); $ab = $acts('no canonical requester identity');
+t_eq((int) (appr_requester_user($ap3)['id'] ?? 0), $uOther,
+     'ID3 · the chain\'s own requester_id still identifies the raiser when the record\'s id is gone');
+$pdo->prepare("UPDATE recruit_approval_requests SET requester_id=NULL WHERE id=?")->execute([(int) $ap3['id']]);
+$ap3 = appr_request((int) $ap3['id']);
+t_ok(appr_requester_user($ap3) === null, 'ID3 · C1-6 · with NEITHER source, it resolves to NOBODY');
+[, $whyNone] = appr_resolve_requester($ap3);
+t_eq($whyNone, 'IDENTITY_UNRESOLVED', 'ID3 · C1-6 · and says why, accurately');
+$b = $mails('idother@t.test'); $ab = $acts('IDENTITY_UNRESOLVED');
 $decide($s3);
 t_eq($mails('idother@t.test'), $b, 'ID3 · C1-6 · so no decision e-mail is sent — it is not guessed from the text');
-t_eq($acts('no canonical requester identity'), $ab + 1, 'ID3 · C1-6 · and the silence is recorded on the activity spine');
+t_eq($acts('IDENTITY_UNRESOLVED'), $ab + 1, 'ID3 · C1-6 · and the silence is recorded, with its real reason');
 
 [$h4, $ap4, $s4] = $raise($uOther, 'ID foreign identity');
 $foreign = 99700000 + random_int(1, 999);
@@ -137,11 +148,15 @@ t_section('ID4 · no identity means no guess, on every entity and every call');
 $legacy = ['id' => 0, 'entity' => 'OFFER', 'entity_id' => 4242, 'subject' => 'ID legacy offer', 'requester' => 'Ravi Sharma'];
 t_ok(appr_requester_user($legacy) === null,
      'ID4 · C1-9 · an entity that records its raiser only as TEXT resolves to nobody');
-$b1 = $mails('idreal@t.test'); $b2 = $mails('idghostb@t.test'); $ab = $acts('no canonical requester identity');
-appr_email_requester($legacy, 'approved', 'direct call');
+$b1 = $mails('idreal@t.test'); $b2 = $mails('idghostb@t.test');
+$dangling = fn() => (int) ops_val("SELECT COUNT(*) FROM activities WHERE (entity_kind IS NULL OR entity_kind='') AND subject LIKE '%Decision not notified%'");
+$dBefore = $dangling();
+$why9 = appr_email_requester($legacy, 'approved', 'direct call');
 t_eq($mails('idreal@t.test'), $b1, 'ID4 · C1-9 · so a historical record tells nobody rather than guessing');
 t_eq($mails('idghostb@t.test'), $b2, 'ID4 · C1-9 · …least of all a namesake');
-t_eq($acts('no canonical requester identity'), $ab + 1, 'ID4 · C1-9 · and it is recorded');
+t_eq($why9, 'ENTITY_UNRESOLVED', 'ID4 · C1-9 · and it reports exactly why');
+t_eq($dangling(), $dBefore,
+     'ID4 · D2 · and writes NO dangling audit row for an entity the timeline cannot link');
 
 $forged = ['id' => 0, 'entity' => 'HIRING_REQUEST', 'entity_id' => (int) $h1, 'subject' => 'forged', 'requester' => 'Ravi Sharma'];
 $b = $mails('idghostb@t.test');
