@@ -1227,8 +1227,12 @@ function appr_as_user($user, callable $fn) {
 //  and it is exactly the queue's: appr_visible() = appr_can_act() AND appr_guard().
 //  If the person would not see it in /my-approvals, they are not written to.
 function appr_may_be_asked($step, $req, $user) {
-    if (!is_array($user) || (int) ($user['is_active'] ?? 0) !== 1) return false;
-    return (bool) appr_as_user($user, fn() => appr_visible($step, $req, $user));
+    //  E1 — the SAME common gate the informational level uses, so an offer, a
+    //  salary structure and a requisition cannot reach "eligible to be asked"
+    //  without their module either. E2 — and the result is accepted only when it
+    //  is literally true, never by casting whatever came back.
+    if (appr_notify_gate($req, $user) !== '') return false;
+    return appr_as_user($user, fn() => appr_visible($step, $req, $user)) === true;
 }
 
 //  M3 CORRECTION #3 · D3 — WHY a notification did not go out, said accurately.
@@ -1252,21 +1256,66 @@ const APPR_NOTIFY_REASONS = [
     'PROVIDER_FAILURE'     => 'the mail provider could not deliver it',
 ];
 
+//  M3 CORRECTION #4 · E1 — WHICH MODULE EACH APPROVAL ENTITY BELONGS TO.
+//
+//  Written down rather than assumed, so the entitlement question can be asked for
+//  every entity in one place and a future entity cannot quietly arrive without
+//  one. All four approval entities are recruitment: an offer, a salary structure,
+//  a requisition and a hiring request are all People & hiring records.
+const APPR_ENTITY_MODULE = [
+    'HIRING_REQUEST' => 'mod.hiring.view',
+    'REQUISITION'    => 'mod.hiring.view',
+    'OFFER'          => 'mod.hiring.view',
+    'SALARY'         => 'mod.hiring.view',
+];
+
+//  M3 CORRECTION #4 · E1 + E2 — THE COMMON GATE.
+//
+//  Every notification, actionable or informational, passes this BEFORE any
+//  entity-specific question is asked. The audit found the entitlement check
+//  living inside the hiring-request branch, so an offer, a salary structure and a
+//  requisition reached "eligible" having never been asked — and correction #3,
+//  by restoring their notifications, made that live. A notification leaves the
+//  application, so it is the last boundary where "entitlement first" can still be
+//  true.
+//
+//      1 · a VALID SECURITY SUBJECT        (E2)
+//      2 · a KNOWN, SUPPORTED ENTITY
+//      3 · the APPLICABLE MODULE ENTITLEMENT
+//
+//  Entity-specific visibility and scope come after, and can only narrow.
+//
+//  E2 — an unusable subject is denied by an EXPLICIT test, never by a cast.
+//  appr_as_user() returns null for an id it cannot use, `(string) null` is '',
+//  and '' is this function's word for "eligible": a type conversion was deciding
+//  a security question. It is decided here instead, and the helper's result is
+//  accepted only when it is genuinely a string.
+function appr_notify_gate($req, $user) {
+    if (!is_array($user)) return 'IDENTITY_UNRESOLVED';
+    if ((int) ($user['id'] ?? 0) <= 0) return 'IDENTITY_UNRESOLVED';
+    if ((int) ($user['is_active'] ?? 0) !== 1) return 'RECIPIENT_INACTIVE';
+    $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
+    if ($entity === '' || !array_key_exists($entity, APPR_ENTITIES)) return 'ENTITY_UNRESOLVED';
+    $module = APPR_ENTITY_MODULE[$entity] ?? 'mod.hiring.view';
+    $r = appr_as_user($user, fn() => (function_exists('licence_blocks') && licence_blocks($module))
+        ? 'RECIPIENT_UNLICENSED' : '');
+    return is_string($r) ? $r : 'IDENTITY_UNRESOLVED';
+}
+
 //  The reason a person may NOT be told, or '' when they may. appr_may_be_told()
 //  is this same rule read as a yes/no — one rule, two readers, never two rules.
 function appr_told_reason($req, $user) {
-    if (!is_array($user)) return 'IDENTITY_UNRESOLVED';
-    if ((int) ($user['is_active'] ?? 0) !== 1) return 'RECIPIENT_INACTIVE';
-    return (string) appr_as_user($user, function () use ($req) {
-        $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
-        if ($entity === '' || !array_key_exists($entity, APPR_ENTITIES)) return 'ENTITY_UNRESOLVED';
-        if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return '';
-        if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return 'RECIPIENT_UNLICENSED';
-        $r = hreq_get((int) ($req['entity_id'] ?? 0));
-        if (!$r) return 'ENTITY_UNRESOLVED';
-        if (function_exists('hreq_in_scope') && !hreq_in_scope($r)) return 'RECIPIENT_OUT_OF_SCOPE';
+    $why = appr_notify_gate($req, $user);          // subject · entity · entitlement
+    if ($why !== '') return $why;
+    $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
+    if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return '';
+    $r = appr_as_user($user, function () use ($req) {
+        $h = hreq_get((int) ($req['entity_id'] ?? 0));
+        if (!$h) return 'ENTITY_UNRESOLVED';
+        if (function_exists('hreq_in_scope') && !hreq_in_scope($h)) return 'RECIPIENT_OUT_OF_SCOPE';
         return '';
     });
+    return is_string($r) ? $r : 'IDENTITY_UNRESOLVED';
 }
 
 //  INFORMATIONAL — "this approval is late". Not a request to act, so the single
