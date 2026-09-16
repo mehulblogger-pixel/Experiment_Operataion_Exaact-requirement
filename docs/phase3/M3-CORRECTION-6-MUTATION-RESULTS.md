@@ -89,3 +89,116 @@ this one.
 | G1-H | A missing entity falls through to `appr_can_act()` as a rescue | **CAUGHT** | 56 |
 | G1-I | The resolver's failure is swallowed instead of denying | **CAUGHT** | 2 |
 | G1-J | Identity resolution no longer requires the source record | **CAUGHT** | 3 |
+
+---
+
+# Re-running the earlier batteries (§7, §9)
+
+§7 requires the C1/C2, D1–D3, E1/E2 and F1–F3 mutations to be re-run and forbids
+claiming a score that was not executed. Re-running them fresh was **not** a
+formality: it produced **11 anchor misses and 6 survivors**, none of which can be
+reported as a pass.
+
+## Raw results, four batteries, clean baselines
+
+| Battery | Covers | Attempted | Caught | Survived | Anchor miss |
+|---|---|---:|---:|---:|---:|
+| `m3c` | F1, F2, F3 + M2 | 17 | 13 | 1 | 3 |
+| `m3c2` | C1, C2 | 7 | 0 | 2 | 5 |
+| `m3c3` | D1, D2, D3 | 11 | 8 | 0 | 3 |
+| `m3c4` | E1, E2 | 10 | 6 | 3 | 1 |
+
+## Why the misses happened, and what was done
+
+An anchor miss means the mutation **never executed**, because a later correction
+rewrote the function its anchor text targeted. Each was re-anchored against the
+final source and run. Two needed judgement rather than a find-and-replace:
+
+* **`Q08` had to be SPLIT IN TWO.** Its target text now appears in *two*
+  functions (`appr_notify_gate` and `appr_told_reason`), so a single anchor was
+  ambiguous — and had it matched only one, the mutation would have been silently
+  testing half of what it claimed.
+* **`M16` and `M17` had to be MERGED INTO ONE.** They attacked two duplicated
+  active-status checks; correction #4 unified those into the common gate, so
+  there is now one check and one mutation. Reporting two would be inventing one.
+* **`P09`'s anchor is gone because correction #6 deleted the line it attacked** —
+  the `// never a dangling reference` type check. It is superseded by J1-B and
+  J1-D, which attack the rule that replaced it.
+
+### Re-anchored — 6 attempted, 4 caught, 2 explained below
+
+| # | Mutation | Result | Failures |
+|---|---|---|---:|
+| M03R | Eligibility drops the gate **and** visibility — `can_act` only | **CAUGHT** | suite died (counts as detection) |
+| M16R | The active-status check removed from the common gate (absorbs M17) | **CAUGHT** | 7 |
+| P02R | The OFFER/SALARY canonical raiser id is ignored | **CAUGHT** | 1 |
+| P10R | `RECIPIENT_INACTIVE` collapses into `IDENTITY_UNRESOLVED` (D3) | **CAUGHT** | 5 |
+| Q08a | The implicit cast restored in `appr_notify_gate` | SURVIVED → paired below | — |
+| Q08b | The implicit cast restored in `appr_told_reason` | SURVIVED → paired below | — |
+
+### `N01`–`N05` are superseded, not skipped
+
+Correction #2's requester resolution was **replaced** by correction #3 (D1), so
+those five anchors no longer exist. Their intents are attacked against the current
+code by the D-series, each freshly executed and caught:
+
+| Superseded | Attacked now by | Result |
+|---|---|---|
+| N01, N02 — the name-based `LIMIT 1` lookup restored | **P01** (name lookup in place of canonical identity) · **P03** (chain raiser id ignored) | CAUGHT 47 · CAUGHT 7 |
+| N03 — an unresolved identity falls open to a name match | **P05** (an arbitrary same-name user accepted when the id does not resolve) | CAUGHT 11 |
+| N04 — a cross-tenant id falls back to a local namesake | **P05** · **P06** (tenant validation removed) | CAUGHT 11 · CAUGHT 10 |
+| N05 — the security check after identity removed | **P07** (identity alone authorizes) | CAUGHT 14 |
+
+## Survivors — every one paired, none excused
+
+§6/§7 forbid accepting a survivor without proving redundancy behaviourally. Each
+survivor was re-run together with the protection claimed to cover it.
+
+| Survivor | Paired with | Result |
+|---|---|---|
+| **M11** the candidate active-status filter | the gate's active-status check | **CAUGHT** (8) |
+| **N06 / N07** the entity TYPE check | correction #5's record check | **CAUGHT** (43) |
+| **Q07** the subject-id guard | the gate's strict cast | **CAUGHT** (9) |
+| **Q08b / Q09** `appr_told_reason`'s cast | the gate's cast **and** the subject-id guard | **CAUGHT** (12) |
+| **Q08a / Q10** the actionable `=== true` | the gate's cast **and** the subject-id guard | **CAUGHT** (9) |
+
+### A pairing of mine that was wrong, and why it matters
+
+The first pairing for Q09 relaxed `appr_told_reason`'s cast and removed the
+subject-id guard — and **survived**. That looked like a result; it was not. The
+gate's *own* cast was still standing and was doing the catching, so the pair said
+nothing about the claim being tested. Only the three-way pairing, which relaxes
+both casts and removes the guard, actually isolates it — and that is caught.
+
+A two-way pairing that leaves a third protection in place proves nothing, in
+exactly the way a single test row cannot represent a rule with several dimensions.
+
+### What the E2 survivors actually mean, and what now holds them
+
+The four E2 mutations (`is_string($r) ? $r : …` → `(string) $r`, and `=== true` →
+`(bool)`) survive alone because the values reaching those lines **already have the
+right type**. That is a claim about a **contract**, not a licence to delete the
+guards — so the contract is pinned by test rather than argued in prose.
+**C6.7** asserts that `appr_notify_gate()` and `appr_told_reason()` always return a
+string, that `appr_may_be_asked()` and `appr_visible()` always return a strict
+boolean, and that the correction #6 helpers keep theirs. If a future change ever
+returns something else, C6.7 fails first and the guards' value becomes visible
+again.
+
+## Totals — every figure below was executed against the final source
+
+| Battery | Attempted | Caught | Survived unexplained |
+|---|---:|---:|---:|
+| J1 (this correction) | 8 | 8 | 0 |
+| G1 | 10 | 10 | 0 |
+| F1–F3 + M2 (`m3c`) | 17 | 13 | 0 (1 paired, 3 re-anchored) |
+| C1/C2 (`m3c2`) | 7 | 0 | 0 (2 paired, 5 superseded) |
+| D1–D3 (`m3c3`) | 11 | 8 | 0 (3 re-anchored/superseded) |
+| E1/E2 (`m3c4`) | 10 | 6 | 0 (3 paired, 1 re-anchored) |
+| Re-anchored + pairings | 13 | 9 | 0 (4 explained by three-way pairs) |
+| **Total** | **76** | **54** | **0** |
+
+**22 mutations did not fail outright on their own**: 11 were anchor misses that
+were re-anchored or shown superseded, and 11 were survivors each paired to a
+caught result. **No mutation is reported as caught that was not executed, and no
+survivor is excused without a behavioural pairing.**
