@@ -138,28 +138,119 @@ function act_migrate() {
 //  failure, so the next request (or the next workspace) tries again. Never
 //  reported as successful when it was not.
 function act_migrate_optional() {
+    $col = act_cond_column_ready();
+    act_cond_index_ready();          //  attempted, and NEVER allowed to affect $col
+    return $col;
+}
+
+//  M3 CORRECTION #9 · T2 — THE COLUMN IS CORRECTNESS. THE INDEX IS PERFORMANCE.
+//
+//  Correction #8 ensured both inside one function and returned one boolean. So a
+//  failed CREATE INDEX — a pure performance structure — reported the whole feature
+//  unavailable, and cond_key was not written into a column that existed and worked
+//  perfectly. That is the conflation this whole sequence began with, one more time:
+//
+//      A USABLE COLUMN IS NOT AN INDEXED COLUMN.
+//
+//  They are therefore two states, two bounded retries and two error strings.
+//  Neither can mark the other as successful, and the index can never roll back
+//  the column.
+//  Cheap METADATA READS, never DDL. They are what lets a repaired schema be
+//  noticed again without hammering ALTER: if the structure is already there the
+//  answer is yes, however many earlier attempts failed. Without them the retry
+//  budget is spent by internal CHECKS rather than by real attempts, and a schema
+//  that has just been repaired can never be seen — which is how correction #9's
+//  first draft broke C8.5's retry case.
+function act_has_cond_column() {
+    try {
+        if (db_driver() === 'sqlite') {
+            foreach (db()->query("PRAGMA table_info(activities)")->fetchAll() as $c)
+                if (($c['name'] ?? '') === 'cond_key') return true;
+            return false;
+        }
+        $q = db()->prepare("SELECT 1 FROM information_schema.columns
+                            WHERE table_schema=DATABASE() AND table_name='activities' AND column_name='cond_key'");
+        $q->execute(); return (bool) $q->fetchColumn();
+    } catch (Throwable $e) { return false; }
+}
+function act_has_cond_index() {
+    try {
+        if (db_driver() === 'sqlite') {
+            $q = db()->prepare("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_act_cond'");
+            $q->execute(); return (bool) $q->fetchColumn();
+        }
+        $q = db()->prepare("SELECT 1 FROM information_schema.statistics
+                            WHERE table_schema=DATABASE() AND table_name='activities' AND index_name='idx_act_cond'");
+        $q->execute(); return (bool) $q->fetchColumn();
+    } catch (Throwable $e) { return false; }
+}
+
+function act_cond_column_ready() {
     static $okAt = -1; static $tries = [];
     $e = db_epoch();
     if ($okAt === $e) return true;
+    if (act_has_cond_column()) {                     // already there: no DDL, no budget
+        $okAt = $e; unset($tries[$e]);
+        $GLOBALS['__act_cond_column_error'] = ''; $GLOBALS['__act_optional_error'] = '';
+        return true;
+    }
     $n = (int) ($tries[$e] ?? 0);
     if ($n >= 3) return false;                       // bounded, never an infinite loop
     $tries[$e] = $n + 1;
-    try {
-        ensure_column('activities', 'cond_key', "VARCHAR(160) DEFAULT ''");
-        act_index('activities', 'idx_act_cond', '(cond_key)');
-    } catch (Throwable $ex) {
-        //  Observable, and NOT swallowed into a false success.
-        $GLOBALS['__act_optional_error'] = 'cond_key: ' . $ex->getMessage();
-        @error_log('act_migrate_optional: cond_key unavailable — ' . $ex->getMessage());
+    try { ensure_column('activities', 'cond_key', "VARCHAR(160) DEFAULT ''"); }
+    catch (Throwable $ex) {
+        $GLOBALS['__act_cond_column_error'] = 'cond_key column: ' . $ex->getMessage();
+        @error_log('act_cond_column_ready: cond_key column unavailable — ' . $ex->getMessage());
         return false;
     }
-    $okAt = $e; unset($tries[$e]); $GLOBALS['__act_optional_error'] = '';
+    $okAt = $e; unset($tries[$e]);
+    $GLOBALS['__act_cond_column_error'] = '';
+    $GLOBALS['__act_optional_error'] = '';
     return true;
 }
 
-//  Whether optional audit metadata is usable, and why not when it is not.
-function act_optional_ready() { return act_migrate_optional(); }
-function act_optional_error() { return (string) ($GLOBALS['__act_optional_error'] ?? ''); }
+function act_cond_index_ready() {
+    static $okAt = -1; static $tries = [];
+    $e = db_epoch();
+    if ($okAt === $e) return true;
+    //  An index cannot exist without its column, and saying so is not the same as
+    //  the index having failed on its own account. Asked CHEAPLY: the index has no
+    //  business spending the COLUMN's retry budget, and in correction #9's first
+    //  draft it did — which exhausted the budget before a repaired schema could be
+    //  noticed at all.
+    if (!act_has_cond_column()) {
+        $GLOBALS['__act_cond_index_error'] = 'cond_key index: the column is unavailable';
+        return false;
+    }
+    if (act_has_cond_index()) {                      // already there: no DDL, no budget
+        $okAt = $e; unset($tries[$e]); $GLOBALS['__act_cond_index_error'] = '';
+        return true;
+    }
+    $n = (int) ($tries[$e] ?? 0);
+    if ($n >= 3) return false;
+    $tries[$e] = $n + 1;
+    try { act_index('activities', 'idx_act_cond', '(cond_key)'); }
+    catch (Throwable $ex) {
+        $GLOBALS['__act_cond_index_error'] = 'cond_key index: ' . $ex->getMessage();
+        @error_log('act_cond_index_ready: cond_key index unavailable — ' . $ex->getMessage());
+        return false;                                 // the COLUMN is untouched by this
+    }
+    $okAt = $e; unset($tries[$e]); $GLOBALS['__act_cond_index_error'] = '';
+    return true;
+}
+
+//  Whether optional audit metadata can be STORED. This is the column, and only
+//  the column — a missing index degrades lookup speed, not correctness.
+function act_optional_ready()       { return act_cond_column_ready(); }
+function act_optional_index_ready() { return act_cond_index_ready(); }
+function act_optional_error()       { return (string) ($GLOBALS['__act_cond_column_error'] ?? '') ?: (string) ($GLOBALS['__act_optional_error'] ?? ''); }
+function act_optional_index_error() { return (string) ($GLOBALS['__act_cond_index_error'] ?? ''); }
+
+//  The two states side by side, so a caller never has to infer one from the other.
+function act_optional_state() {
+    return ['column' => act_cond_column_ready(), 'index' => act_cond_index_ready(),
+            'column_error' => act_optional_error(), 'index_error' => act_optional_index_error()];
+}
 
 //  The last CORE audit failure, so "the row was not written" can never be
 //  indistinguishable from "nothing happened".
@@ -265,7 +356,7 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
 //  a test — can tell "stored" from "column unavailable" instead of assuming.
 function act_set_cond_key($id, $key) {
     if ((int) $id <= 0 || (string) $key === '') return false;
-    if (!act_migrate_optional()) return false;
+    if (!act_cond_column_ready()) return false;        // T2 — the COLUMN, not the index
     try { db()->prepare("UPDATE activities SET cond_key=? WHERE id=?")->execute([(string) $key, (int) $id]); return true; }
     catch (Throwable $e) {
         $GLOBALS['__act_optional_error'] = 'cond_key: ' . $e->getMessage();
