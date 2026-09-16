@@ -384,8 +384,15 @@ function appr_delegation_save($id, array $post) {
     // discipline M1 established after branch scope was found living on the route
     // alone. Moving approval authority is privileged; a helper called directly
     // must not reach the table around the gate.
-    if (function_exists('hiring_admin_can') && !hiring_admin_can())
-        return [false, 'Only an administrator can configure approval delegation.', 0];
+    //
+    // M3 CORRECTION · F2 — and it is the SAME gate the approval matrix uses.
+    // M3 put entitlement in front of capability for policy writes and left this
+    // one asking capability alone, so a workspace that had stopped paying for
+    // recruitment could not edit its approval matrix but could still MOVE APPROVAL
+    // AUTHORITY from one person to another — the more privileged of the two. One
+    // gate, both siblings; not a second entitlement rule.
+    if (!appr_config_can())
+        return [false, 'Only an administrator on a workspace with recruitment can configure approval delegation.', 0];
     appr_migrate();
     $id = (int) $id;
     $existing = $id > 0 ? appr_delegation($id) : null;
@@ -445,8 +452,9 @@ function appr_delegation_save($id, array $post) {
 }
 
 function appr_delegation_revoke($id) {
-    if (function_exists('hiring_admin_can') && !hiring_admin_can())
-        return [false, 'Only an administrator can revoke an approval delegation.'];
+    // M3 CORRECTION · F2 — the same gate as create/edit and as the approval matrix.
+    if (!appr_config_can())
+        return [false, 'Only an administrator on a workspace with recruitment can revoke an approval delegation.'];
     appr_migrate();
     $d = appr_delegation($id); if (!$d) return [false, 'That delegation no longer exists.'];
     db()->prepare("UPDATE approval_delegations SET active=0, revoked_by=?, revoked_at=? WHERE id=?")
@@ -1099,8 +1107,19 @@ function appr_tick() {
             $acted++;
             continue;
         }
+        //  M3 CORRECTION · F3 — ONCE ESCALATED, THE ROUTINE REMINDER STOPS.
+        //
+        //  Before this the two signals ran the wrong way round: the escalation
+        //  contact was told once and never again, while the approver was reminded
+        //  every day for ever, each with an e-mail to every recipient and a row on
+        //  the activity timeline. An abandoned request nagged without limit and its
+        //  audit trail grew without bound.
+        //
+        //  The step does not go quiet — it stays PENDING and reads ESCALATED on
+        //  every screen and in the dashboard count, which is the durable signal.
+        //  What stops is the daily repetition, not the visibility.
         $rem = $s['reminder_at'] ? strtotime($s['reminder_at']) : 0;
-        if ($rem && $now >= $rem) {
+        if ($rem && $now >= $rem && (int) $s['escalated'] === 0) {
             [$n, $ok] = appr_email_approver($s, $req, 'reminder');
             // §21 — the identity of a reminder is (step, threshold). Moving the
             // threshold forward is what makes a second run of the scheduler a
@@ -1126,11 +1145,14 @@ function appr_delivery_note($recipients, $delivered) {
 }
 
 // ---- Email helpers ---------------------------------------------------------
-function appr_role_emails($role, $userId = null) {
-    if ((int)$userId > 0) { $e = ops_val("SELECT email FROM users WHERE id=? AND is_active=1 AND email<>''", [(int)$userId]); return $e ? [$e] : []; }
-    if ((string)$role === '') return [];
-    return array_values(array_filter(array_map(fn($r) => $r['email'], ops_all("SELECT email FROM users WHERE role=? AND is_active=1 AND email<>''", [$role]))));
-}
+//  M3 CORRECTION · F1 — appr_role_emails() IS GONE.
+//
+//  It answered "every active holder of this role, anywhere", and treating that
+//  answer as notification eligibility is precisely what leaked one branch's hiring
+//  request to another's. Nothing calls it now, and leaving it in place would be
+//  leaving the defect within arm's reach of the next person who needs a recipient
+//  list. Recipients come from appr_step_recipients() and appr_email_escalate(),
+//  both of which end at the existing approval model.
 //  Returns how many of the attempted sends were actually delivered. It still
 //  never throws: a notification failure must not break an approval (§39).
 function appr_mail($to, $subject, $body) {
@@ -1140,6 +1162,71 @@ function appr_mail($to, $subject, $body) {
         try { $ok += ops_mail($addr, $subject, $body, '', 'recruit_approval') ? 1 : 0; } catch (Throwable $e) {}
     }
     return $ok;
+}
+
+//  Phase 3 · M3 CORRECTION · F1 — WHO MAY BE TOLD.
+//
+//  The adversarial audit proved the notification layer contradicting the approval
+//  layer. A role-based step wrote to EVERY holder of that role in EVERY branch —
+//  including the person M1 and M2 deliberately hide the request from and refuse at
+//  the engine, and including the requestor whom segregation will never let
+//  approve. E-mail leaves the application, so that is a disclosure, and M3's
+//  reminders made it repeat on a schedule.
+//
+//  The rule is one sentence:
+//
+//      NOTIFICATION ELIGIBILITY IS NEVER BROADER THAN APPROVAL VISIBILITY.
+//
+//  It is enforced by ASKING THE EXISTING MODEL, never by a second one:
+//  appr_visible() → appr_can_act() + appr_guard(), the same chain the queue and
+//  the decision already use. Nothing here re-implements entitlement, scope,
+//  segregation or delegation; it only asks them about somebody else.
+//
+//  And that is the difficulty: appr_guard() reads the CURRENT user — entitlement,
+//  branch scope and segregation all do. Answering "may this OTHER person be told"
+//  means asking the question AS them. appr_as_user() does exactly that and puts
+//  the session back in a `finally`, so no caller can leave the session somewhere
+//  it should not be, not even on an exception.
+function appr_as_user($user, callable $fn) {
+    $uid = (int) ($user['id'] ?? 0);
+    if ($uid <= 0) return null;
+    $prev = array_key_exists('uid', $_SESSION ?? []) ? $_SESSION['uid'] : null;
+    $_SESSION['uid'] = $uid;
+    if (function_exists('current_user')) current_user(true);
+    if (function_exists('ua')) ua(true);
+    try { return $fn(); }
+    finally {
+        if ($prev === null) unset($_SESSION['uid']); else $_SESSION['uid'] = $prev;
+        if (function_exists('current_user')) current_user(true);
+        if (function_exists('ua')) ua(true);
+    }
+}
+
+//  ACTIONABLE — "this is waiting for your decision". The strictest test there is,
+//  and it is exactly the queue's: appr_visible() = appr_can_act() AND appr_guard().
+//  If the person would not see it in /my-approvals, they are not written to.
+function appr_may_be_asked($step, $req, $user) {
+    if (!is_array($user) || (int) ($user['is_active'] ?? 0) !== 1) return false;
+    return (bool) appr_as_user($user, fn() => appr_visible($step, $req, $user));
+}
+
+//  INFORMATIONAL — "this approval is late". Not a request to act, so the single
+//  clause that does not apply is SEGREGATION: telling the person who raised a
+//  request that it has gone overdue is the point of the message, not a leak.
+//  Everything else is the same guard asked the same way — entitlement, the record
+//  existing, branch scope — through the same helpers appr_guard() itself calls.
+//  It is a second disclosure LEVEL, not a second rule set.
+function appr_may_be_told($req, $user) {
+    if (!is_array($user) || (int) ($user['is_active'] ?? 0) !== 1) return false;
+    return (bool) appr_as_user($user, function () use ($req) {
+        $entity = strtoupper((string) ($req['entity'] ?? ''));
+        if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return true;
+        if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return false;
+        $r = hreq_get((int) ($req['entity_id'] ?? 0));
+        if (!$r) return false;
+        if (function_exists('hreq_in_scope') && !hreq_in_scope($r)) return false;
+        return true;
+    });
 }
 
 //  Phase 3 · M3 §16 — WHO IS BEING ASKED TO ACT.
@@ -1155,30 +1242,46 @@ function appr_mail($to, $subject, $body) {
 //  authority, and an address on an e-mail has never been an authority anywhere
 //  in this application.
 function appr_step_recipients($step, $req = null) {
-    $to = appr_role_emails($step['approver_role'] ?? '', $step['approver_user_id'] ?? null);
     if (!array_key_exists('_entity', $step) && $req) $step = appr_step_context($step, $req);
+    $req = $req ?: appr_request((int) ($step['request_id'] ?? 0));
     $entity = (string) ($step['_entity'] ?? ($req['entity'] ?? ''));
     $office = array_key_exists('_office_id', $step) ? $step['_office_id'] : null;
 
-    // Whose authority is this step asking for?
-    $principals = [];
+    //  1 · WHO THE STEP NAMES — one person, or the holders of a role. This is a
+    //      CANDIDATE list, nothing more. Holding a role is not eligibility; it was
+    //      treating it as eligibility that caused the leak.
+    $cand = [];
+    $add = function ($u) use (&$cand) {
+        if (is_array($u) && (int) ($u['is_active'] ?? 0) === 1) $cand[(int) $u['id']] = $u;
+    };
     $uid = (int) ($step['approver_user_id'] ?? 0);
-    if ($uid > 0) $principals[] = $uid;
-    else {
+    if ($uid > 0) {
+        try { $add(ops_one("SELECT * FROM users WHERE id=?", [$uid])); } catch (Throwable $e) {}
+    } else {
         $role = (string) ($step['approver_role'] ?? '');
         if ($role !== '') {
-            try { foreach (ops_all("SELECT id FROM users WHERE role=? AND is_active=1", [$role]) as $u) $principals[] = (int) $u['id']; }
+            try { foreach (ops_all("SELECT * FROM users WHERE role=? AND is_active=1", [$role]) as $u) $add($u); }
             catch (Throwable $e) {}
         }
     }
-    foreach ($principals as $pid) {
+    //  2 · PLUS whoever is currently acting for them. M2's delegation rules decide
+    //      that, unchanged — dates, entity, branch and delegator active status.
+    foreach (array_keys($cand) as $pid) {
         foreach (appr_delegates_of($pid, $entity, $office) as $dg) {
-            try { $e = (string) ops_val("SELECT email FROM users WHERE id=? AND is_active=1 AND email<>''", [(int) $dg]); }
-            catch (Throwable $e2) { $e = ''; }
-            if ($e !== '') $to[] = $e;
+            try { $add(ops_one("SELECT * FROM users WHERE id=?", [(int) $dg])); } catch (Throwable $e) {}
         }
     }
-    return array_values(array_unique(array_filter($to)));
+    //  3 · AND THEN THE EXISTING MODEL DECIDES. Every candidate — named, role
+    //      holder or delegate alike — is asked the same question /my-approvals
+    //      asks. No path skips it, because the audit showed a path that did.
+    $out = [];
+    foreach ($cand as $u) {
+        $e = trim((string) ($u['email'] ?? ''));
+        if ($e === '') continue;
+        if (!appr_may_be_asked($step, $req, $u)) continue;
+        $out[] = $e;
+    }
+    return array_values(array_unique($out));
 }
 
 //  Returns [recipients, delivered] so the caller can audit what really happened.
@@ -1198,11 +1301,28 @@ function appr_email_approver($step, $req, $kind) {
 //  authority engine has never read the escalation columns. A manager who is told
 //  can approve only if appr_can_act() independently says so.
 function appr_email_escalate($step, $req = null) {
-    $to = appr_role_emails($step['escalate_role'] ?? '', $step['escalate_user_id'] ?? null);
-    if (!$to) {
-        try { $to = array_values(array_filter(array_map(fn($r) => $r['email'], ops_all("SELECT email FROM users WHERE role IN ('MASTER_ADMIN','ADMIN','BRANCH_MANAGER','SBU_HEAD') AND is_active=1 AND email<>''")))); }
-        catch (Throwable $e) { $to = []; }
-    }
+    $req = $req ?: appr_request((int) ($step['request_id'] ?? 0));
+    //  F1 — an escalation contact is a CANDIDATE too. Being named on a policy, or
+    //  holding an escalation role, or being an administrator is not on its own a
+    //  licence to be told what another branch is hiring for.
+    $cand = [];
+    $add = function ($u) use (&$cand) {
+        if (is_array($u) && (int) ($u['is_active'] ?? 0) === 1 && trim((string) ($u['email'] ?? '')) !== '')
+            $cand[(int) $u['id']] = $u;
+    };
+    $euid = (int) ($step['escalate_user_id'] ?? 0);
+    $erole = (string) ($step['escalate_role'] ?? '');
+    try {
+        if ($euid > 0) $add(ops_one("SELECT * FROM users WHERE id=?", [$euid]));
+        elseif ($erole !== '') foreach (ops_all("SELECT * FROM users WHERE role=? AND is_active=1", [$erole]) as $u) $add($u);
+        else foreach (ops_all("SELECT * FROM users WHERE role IN ('MASTER_ADMIN','ADMIN','BRANCH_MANAGER','SBU_HEAD') AND is_active=1") as $u) $add($u);
+    } catch (Throwable $e) {}
+    //  The INFORMATIONAL disclosure level: entitlement and branch scope, without
+    //  segregation — being told a request is late is not being asked to approve it,
+    //  so the person who raised it may legitimately hear about it.
+    $to = [];
+    foreach ($cand as $u) if (appr_may_be_told($req, $u)) $to[] = trim((string) $u['email']);
+    $to = array_values(array_unique($to));
     $late = appr_sla_days_late($step);
     $body = '<p>An approval step has passed its SLA and needs attention:</p><p><b>' . e((string)($step['subject'] ?? '')) . '</b> — level ' . (int)$step['seq']
         . ($late > 0 ? ' — overdue by ' . $late . ' day' . ($late === 1 ? '' : 's') : '') . '</p>'
