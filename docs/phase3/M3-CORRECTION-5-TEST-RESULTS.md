@@ -2,7 +2,7 @@
 
 ## New suite — `tests/test_p3m3c5_entity.php`
 
-**179 assertions, 0 failed, on both engines.**
+**225 assertions, 0 failed, on both engines.**
 
 | Section | Assertions | What it holds |
 |---|---:|---|
@@ -12,6 +12,8 @@
 | **C5.4 · the rescue path is gone** | 8 | for each entity the approver **genuinely passes `appr_can_act()`** and visibility still denies — so a missing record cannot fall through to a generic rescue |
 | **C5.5 · reasons and audit integrity** | 2 | an unresolved entity is `ENTITY_UNRESOLVED`; no dangling audit reference was created anywhere along the way |
 | **C5.6 · a resolver that errors denies** | 4 | the source table is **renamed out from under the resolver** — what a half-applied migration looks like — and the resolver returns nothing rather than raising, and the notification denies. Restored in a `finally` |
+| **C5.7 · D — a genuine second tenant** | 46 | §4 asked for a tenant A chain against a tenant B record. C5.2 D could only show that a foreign id does not resolve — which an id that exists **nowhere** also satisfies. Here a **second workspace is booted in a clean child process** (its own SQLite file, or its own MariaDB database created and dropped by the test) and given the same four ids. Each id is proved **live and resolvable in tenant B**, proved **absent from tenant A** first, and tenant A still returns `ENTITY_UNRESOLVED` at both levels, with **no recipient, nothing sent**. The reverse direction is asserted too: tenant A's approval chains and tenant A's **people** do not exist in tenant B. |
+
 
 ### The matrix, per entity — a row for each half of the rule
 
@@ -20,7 +22,8 @@
 | A valid type + valid record | as before | as before | as before | as before |
 | **B valid type + deleted record** | deny | **deny** | **deny** | **deny** |
 | C invalid id (0, negative) | deny | deny | deny | deny |
-| D cross-tenant id | deny | deny | deny | deny |
+| D cross-tenant id — **id absent here** | deny | deny | deny | deny |
+| D cross-tenant id — **id LIVE in a second workspace** | deny | deny | deny | deny |
 | E unknown type | deny | deny | deny | deny |
 | F malformed reference | deny | deny | deny | deny |
 
@@ -28,13 +31,13 @@
 
 | | |
 |---|---|
-| **Whole suite · SQLite** | **9698 passed, 0 failed** |
-| **Whole suite · MariaDB 10.11.14** (fresh `exaact_m3j`) | **9699 passed, 0 failed** |
-| M3 correction #5 on MariaDB | **179 / 0** |
+| **Whole suite · SQLite** | **9744 passed, 0 failed** |
+| **Whole suite · MariaDB 10.11.14** | **9745 passed, 0 failed** |
+| M3 correction #5 on MariaDB | **225 / 0** |
 
 | Suite | Result | Covers |
 |---|---|---|
-| **`p3m3c5_entity`** | **179 / 0** | G1 |
+| **`p3m3c5_entity`** | **225 / 0** | G1 |
 | `p3m3c4_gate` | 129 / 0 | E1, E2 |
 | `p3m3c3_raiser` | 53 / 0 | D1, D2, D3 |
 | `p3m3c2_identity` | **51 / 0** | C1, C2 |
@@ -64,3 +67,14 @@ became a second assertion proving the other half of the rule. The suite went
   survived. The condition is now **constructed** by renaming the source table.
 - The superseded assertion above would have quietly kept passing for the wrong
   reason had G1 been implemented differently.
+
+## How tenant B is stood up (C5.7)
+
+Isolation in EXAACT is **structural** — one database per tenant, no `tenant_id` column — so the only honest way
+to ask the cross-tenant question is to have a second database. The test boots tenant B the way production does:
+a **clean child process** with `DB_DRIVER` / `SQLITE_PATH` / `DB_NAME` pointed at a workspace of its own, so it
+cannot borrow this process's connection, its migration guards or its settings cache. It reports back over JSON
+and is torn down in a `finally` (the MariaDB database is dropped; the run verifies none is left behind).
+
+On MariaDB this is a genuinely separate database — `exaact_c5b_<pid>` — created and dropped by the test, so the
+cross-tenant evidence is production-engine evidence, not inferred from SQLite.

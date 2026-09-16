@@ -103,3 +103,33 @@ correction #4's rewrite; their intents were re-run there and caught
 **No survivor is dismissed without a run that proves it**, and where correction #5
 *created* a new redundancy, that is stated as a consequence of this change rather
 than presented as a pre-existing fact.
+
+## Addendum — C5.7 detects G1 on its own
+
+The two-tenant section added after the first battery was checked against the core
+G1 mutation (**the record check removed from `appr_visible()`**) to confirm it has
+teeth of its own rather than riding on C5.3:
+
+```
+MUTANT G1: if (!appr_entity_record(...)) return false;   →   removed
+RESULT: 186 passed, 39 failed
+  FAIL  C5.7 · OFFER · actionable DENIES
+  FAIL  C5.7 · OFFER · nobody is asked about another workspace's record  (want 0, got 1)
+  FAIL  C5.7 · SALARY · actionable DENIES
+  FAIL  C5.7 · SALARY · nobody is asked about another workspace's record  (want 0, got 1)
+  FAIL  C5.7 · REQUISITION · actionable DENIES
+  FAIL  C5.7 · REQUISITION · nobody is asked about another workspace's record  (want 0, got 1)
+```
+
+This is the clearest statement of what G1 actually cost. With the record check
+removed, an approver in **tenant A** is offered an approval step whose subject is
+a record that lives in **tenant B** — and the failure appears for `OFFER`,
+`SALARY` and `REQUISITION` but not `HIRING_REQUEST`, which is exactly the shape
+of the original finding: the missing-record half of the rule was implemented for
+one entity only.
+
+**What C5.7 does not claim.** Its other assertions — that the same id resolves in
+B and not in A — are an architectural proof, not a branch test. One database per
+tenant means there is no conditional to mutate; the evidence is that a real second
+database behaves this way on both engines, not that a mutant was caught. It is
+recorded as a proof, not counted as mutation coverage.

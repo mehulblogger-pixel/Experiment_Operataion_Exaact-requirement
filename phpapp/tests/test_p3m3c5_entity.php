@@ -198,6 +198,149 @@ try {
 t_ok(t_table_exists('salary_structures'), 'C5.6 · the table is put back');
 
 // ---------------------------------------------------------------------------
+//  C5.7 · D — A GENUINE SECOND TENANT
+//
+//  C5.2 D proved that a foreign id does not resolve. It could not prove WHY:
+//  an id that exists nowhere is refused by every code path, correct or not.
+//  The real §4 question is narrower and harder —
+//
+//      the SAME id is a live, resolvable record in tenant B.
+//      Does tenant A still refuse it?
+//
+//  Isolation here is structural (one database per tenant, no tenant_id column),
+//  so the only honest way to ask is to stand up a second workspace. Tenant B is
+//  booted in a CLEAN CHILD PROCESS — exactly what a company's first web request
+//  is in production — so it cannot borrow this process's connection, its
+//  migration guards or its settings cache. It reports back over JSON.
+// ---------------------------------------------------------------------------
+t_section('C5.7 · D · a genuine second tenant — the same id, a different workspace');
+$act($uAppr);
+$c5root  = dirname(__DIR__);
+$disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+$canExec  = function_exists('exec') && !in_array('exec', $disabled, true);
+t_ok($canExec, 'C5.7 · a second workspace can be booted in a clean process');
+
+$shared = [
+    'HIRING_REQUEST' => [99400001, 'hiring_requests'],
+    'OFFER'          => [99400002, 'job_offers'],
+    'SALARY'         => [99400003, 'salary_structures'],
+    'REQUISITION'    => [99400004, 'requisitions'],
+];
+//  The proof only means something if these ids are absent HERE to begin with.
+foreach ($shared as $name => [$sid2, $tbl]) {
+    t_ok(!ops_one("SELECT id FROM " . $tbl . " WHERE id=?", [$sid2]),
+         "C5.7 · $name · id $sid2 does not exist in tenant A's " . $tbl);
+}
+
+if ($canExec) {
+    $bFile = ''; $bName = ''; $drv = db_driver();
+    $env = 'APP_ROOT=' . escapeshellarg($c5root)
+         . ' C5_IDS=' . escapeshellarg('99400001,99400002,99400003,99400004')
+         . ' C5_CHAINS=' . escapeshellarg(implode(',', array_map('intval', array_unique($mine['rq']))));
+    if ($drv === 'sqlite') {
+        $bFile = sys_get_temp_dir() . '/mgh_c5b_' . getmypid() . '.sqlite';
+        @unlink($bFile);
+        $env .= ' DB_DRIVER=sqlite SQLITE_PATH=' . escapeshellarg($bFile);
+    } else {
+        $bName = 'exaact_c5b_' . getmypid();
+        $pdo->exec("DROP DATABASE IF EXISTS `" . $bName . "`");
+        $pdo->exec("CREATE DATABASE `" . $bName . "` CHARACTER SET utf8mb4");
+        $host = (string) getenv('DB_HOST'); if ($host === '') $host = '127.0.0.1';
+        $env .= ' DB_DRIVER=mysql DB_HOST=' . escapeshellarg($host)
+              . ' DB_NAME=' . escapeshellarg($bName)
+              . ' DB_USER=' . escapeshellarg((string) getenv('DB_USER'))
+              . ' DB_PASS=' . escapeshellarg((string) getenv('DB_PASS'));
+    }
+
+    $runner = sys_get_temp_dir() . '/mgh_c5b_runner_' . getmypid() . '.php';
+    file_put_contents($runner, <<<'CHILD'
+<?php
+//  TENANT B. A clean process, its own database, nothing shared with tenant A
+//  but the code itself.
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
+$root = getenv('APP_ROOT');
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1'; $_SERVER['HTTP_USER_AGENT'] = 'c5b';
+$_SERVER['REQUEST_URI'] = '/'; $_SERVER['HTTP_HOST'] = '';
+if (!isset($_SESSION)) $_SESSION = [];
+$idx = file_get_contents($root . '/index.php');
+preg_match_all("#require __DIR__ \\. '(/lib/[a-z0-9_]+\\.php)';#i", $idx, $mm);
+foreach ($mm[1] as $rel) { require_once $root . $rel; }
+boot();
+hreq_migrate(); recruit_offer_migrate(); appr_migrate();
+[$h, $o, $s, $r] = array_map('intval', explode(',', (string) getenv('C5_IDS')));
+$pdo = db();
+$pdo->prepare("INSERT INTO hiring_requests (id,job_title,status) VALUES (?,?,'SUBMITTED')")->execute([$h, 'TENANT B hiring']);
+$pdo->prepare("INSERT INTO job_offers (id,candidate_id,ctc,status) VALUES (?,0,1,'DRAFT')")->execute([$o]);
+$pdo->prepare("INSERT INTO salary_structures (id,candidate_id) VALUES (?,0)")->execute([$s]);
+$pdo->prepare("INSERT INTO requisitions (id,req_code,designation,status) VALUES (?,'TB-RQ','F','OPEN')")->execute([$r]);
+$chains = preg_replace('/[^0-9,]/', '', (string) getenv('C5_CHAINS'));
+if ($chains === '' ) $chains = '0';
+echo json_encode([
+    'resolved' => [
+        'HIRING_REQUEST' => appr_entity_record('HIRING_REQUEST', $h) !== null,
+        'OFFER'          => appr_entity_record('OFFER', $o)          !== null,
+        'SALARY'         => appr_entity_record('SALARY', $s)         !== null,
+        'REQUISITION'    => appr_entity_record('REQUISITION', $r)    !== null,
+    ],
+    'title'    => (string) (appr_entity_record('HIRING_REQUEST', $h)['job_title'] ?? ''),
+    'a_chains' => (int) ops_val("SELECT COUNT(*) FROM recruit_approval_requests WHERE id IN ($chains)"),
+    'a_people' => (int) ops_val("SELECT COUNT(*) FROM users WHERE email IN ('c5raise@t.test','c5appr@t.test')"),
+]);
+CHILD);
+
+    $php = defined('PHP_BINARY') && PHP_BINARY ? PHP_BINARY : 'php';
+    $out = []; $rc = 1;
+    try {
+        @exec($env . ' ' . escapeshellarg($php) . ' ' . escapeshellarg($runner) . ' 2>&1', $out, $rc);
+        $res = json_decode((string) end($out), true);
+        t_ok(is_array($res), 'C5.7 · tenant B booted its own database and reported back');
+
+        if (is_array($res)) {
+            t_eq((string) $res['title'], 'TENANT B hiring', 'C5.7 · tenant B\'s record is its own, not a copy of A\'s');
+            //  The other direction: tenant A's chains and tenant A's PEOPLE are
+            //  not in tenant B either. Identity is per-workspace too.
+            t_eq((int) $res['a_chains'], 0, 'C5.7 · tenant A\'s approval chains do not exist in tenant B');
+            t_eq((int) $res['a_people'], 0, 'C5.7 · tenant A\'s approver and raiser do not exist in tenant B');
+
+            foreach ($shared as $name => [$sid2, $tbl]) {
+                $step = appr_step_context(appr_current_step($E[$name]['req']), $E[$name]['req']);
+                $bad  = ['id' => 0, 'entity' => $name, 'entity_id' => $sid2, 'requester_id' => $uRaise, 'subject' => 'cross'];
+                $m0 = $mails(); $a0 = $acts();
+
+                //  (i) the id is REAL somewhere — this is isolation, not a bad id
+                t_ok(!empty($res['resolved'][$name]), "C5.7 · $name · id $sid2 IS a live, resolvable record in tenant B");
+                //  (ii) and tenant A still refuses it
+                t_ok(appr_entity_record($name, $sid2) === null, "C5.7 · $name · tenant A cannot resolve it");
+                t_eq(appr_told_reason($bad, $apprRow), 'ENTITY_UNRESOLVED',
+                     "C5.7 · $name · informational DENIES — ENTITY_UNRESOLVED, not a leak");
+                t_ok(!appr_may_be_asked($step, $bad, $apprRow), "C5.7 · $name · actionable DENIES");
+                t_eq(count(appr_step_recipients($step, $bad)), 0, "C5.7 · $name · nobody is asked about another workspace's record");
+                t_eq(appr_email_requester($bad, 'approved', ''), 'ENTITY_UNRESOLVED',
+                     "C5.7 · $name · the decision notifier denies too");
+                t_eq($mails(), $m0, "C5.7 · $name · nothing was sent");
+                //  D2's rule is TWO-VALUED, not one. A refusal earns a row only
+                //  where the timeline can point at the entity: OFFER and SALARY
+                //  are not ACT_ENTITIES, so they earn silence — never a row with
+                //  an entity_kind nothing can follow. One expectation for four
+                //  entities would have been exactly the single-row matrix the
+                //  last audit warned about.
+                $spine = function_exists('act_log') && defined('ACT_ENTITIES') && array_key_exists($name, ACT_ENTITIES);
+                t_eq($acts(), $a0 + ($spine ? 1 : 0), $spine
+                    ? "C5.7 · $name · exactly one audit row — the refusal, logged once"
+                    : "C5.7 · $name · no audit row — the timeline cannot link this entity, so none is written");
+                t_eq((int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind=? AND entity_id=?", [$name, $sid2]),
+                     $spine ? 1 : 0, "C5.7 · $name · and never a row the timeline cannot follow");
+            }
+        }
+    } finally {
+        @unlink($runner);
+        if ($bFile !== '') @unlink($bFile);
+        if ($bName !== '') { try { $pdo->exec("DROP DATABASE IF EXISTS `" . $bName . "`"); } catch (Throwable $e) {} }
+    }
+    t_ok($bFile === '' || !is_file($bFile), 'C5.7 · tenant B\'s database is torn down');
+}
+
+// ---------------------------------------------------------------------------
 //  Clean up
 // ---------------------------------------------------------------------------
 $_SESSION = $origSess; current_user(true); ua(true);

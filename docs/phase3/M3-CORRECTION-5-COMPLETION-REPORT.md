@@ -78,7 +78,7 @@ unresolved entity) is caught with 25 failures.
 
 | Suite | Result | Covers |
 |---|---|---|
-| `p3m3c5_entity` | **179 / 0** | G1 |
+| `p3m3c5_entity` | **225 / 0** | G1 |
 | `p3m3c4_gate` | 129 / 0 | **E1, E2** |
 | `p3m3c3_raiser` | 53 / 0 | **D1, D2, D3** |
 | `p3m3c2_identity` | **51 / 0** | **C1, C2** |
@@ -104,8 +104,8 @@ together caught with 37 failures). Full detail in the mutation results document.
 
 | | |
 |---|---|
-| **SQLite** | **9698 passed, 0 failed** |
-| **MariaDB 10.11.14** (fresh `exaact_m3j`) | **9699 passed, 0 failed** |
+| **SQLite** | **9744 passed, 0 failed** |
+| **MariaDB 10.11.14** | **9745 passed, 0 failed** |
 
 Operations, Reporting, Quality, Money, Workforce, Marketplace and the Command
 Centre are inside those figures. Run **serially**. **Nothing skipped, weakened or
