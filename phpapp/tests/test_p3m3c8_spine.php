@@ -21,6 +21,17 @@ $pdo = db(); act_migrate(); hreq_migrate(); appr_migrate();
 $mine = ['u'=>[], 'o'=>[], 'rule'=>[], 'rq'=>[], 'h'=>[], 'act'=>[]];
 $origSess = $_SESSION;
 $engine = db_driver();
+//  This suite has to make migration guards re-evaluate, which means moving the
+//  database epoch. db() keeps its OWN counter and assigns $GLOBALS['__db_epoch']
+//  from it on every db(true); if a raw value collides with one that counter later
+//  hands out, a guard that ran against THIS database believes it has already run
+//  against the NEXT one — and a workspace switched into later in the run gets a
+//  half-built schema. That is exactly what happened: five failures in
+//  test_saas_login_as, on both engines, from "no such column: must_change_pwd".
+//  So the epoch is moved into a range that counter can never reach, and put back.
+$epoch0 = db_epoch();
+$bump = 0;
+$bumpEpoch = function () use (&$bump) { $GLOBALS['__db_epoch'] = 900000 + (++$bump); };
 
 $rows = fn($kind, $id) => (int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind=? AND entity_id=?", [$kind, (int)$id]);
 $dropIndex = function () use ($pdo, $engine) {
@@ -53,7 +64,7 @@ t_ok(act_optional_ready() === true, 'C8.1 A · optional metadata reports itself 
 t_section('C8.2 · TEST B/E-I · with the column absent, every module still writes');
 $dropIndex();
 $pdo->exec("ALTER TABLE activities DROP COLUMN cond_key");
-//  The epoch is deliberately NOT bumped. Bumping it would let the optional
+//  The epoch is deliberately NOT moved. Moving it would let the optional
 //  migration re-add the column, which models a host that CAN run DDL — the
 //  opposite of the condition under test. Leaving the caches as they are models
 //  the production case this defect is about: the process believes the column is
@@ -142,7 +153,7 @@ $pdo->exec($engine === 'sqlite'
     ? "ALTER TABLE activities RENAME TO activities_c8tmp"
     : "RENAME TABLE activities TO activities_c8tmp");
 try {
-    $GLOBALS['__db_epoch'] = db_epoch() + 1;
+    $bumpEpoch();
     t_ok(act_migrate_optional() === false, 'C8.5 C · the optional migration FAILED, and said so');
     t_ok(act_optional_error() !== '',      'C8.5 C · the failure is observable, not swallowed');
     t_ok(act_optional_ready() === false,   'C8.5 C · CASE 2 · the guard does NOT report success');
@@ -180,7 +191,7 @@ t_ok(!$hasCond(), 'C8.6 · cond_key removed, so its return can only come from a 
 try {
     $pdo->exec($engine === 'sqlite' ? "ALTER TABLE activities RENAME TO activities_c8v" : "RENAME TABLE activities TO activities_c8v");
     $pdo->exec("CREATE VIEW activities AS SELECT * FROM activities_c8v");
-    $GLOBALS['__db_epoch'] = db_epoch() + 1;
+    $bumpEpoch();
 
     //  §9 CASE 2 / S1-M9 — the optional migration cannot run, and says so rather
     //  than claiming the metadata was stored.
@@ -227,6 +238,8 @@ foreach ($mine['h'] as $x) {
 foreach (array_filter(array_unique($mine['act'])) as $a) $pdo->prepare("DELETE FROM activities WHERE id=?")->execute([(int)$a]);
 foreach ($mine['u'] as $x) $pdo->prepare("DELETE FROM users WHERE id=?")->execute([(int)$x]);
 foreach ($mine['o'] as $x) $pdo->prepare("DELETE FROM offices WHERE id=?")->execute([(int)$x]);
+$GLOBALS['__db_epoch'] = $epoch0;      // hand the epoch back exactly as it was found
+t_eq(db_epoch(), $epoch0, 'C8 · the database epoch is restored — no later suite inherits a moved guard');
 $left = (int) ops_val("SELECT COUNT(*) FROM activities WHERE subject LIKE 'C8 %'");
 t_eq($left, 0, 'C8 · every activity row this suite created has been cleaned up');
 t_ok($hasCond(), 'C8 · and the spine is left with its optional column intact');
