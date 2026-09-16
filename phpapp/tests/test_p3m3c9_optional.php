@@ -220,6 +220,39 @@ t_ok($hasCol(), 'C9.6 C · cond_key is back');
 t_ok(act_cond_index_ready() === true, 'C9.6 C · and the index follows');
 
 // ---------------------------------------------------------------------------
+//  C9.7 · the two things the mutation battery proved were NOT being asserted
+//
+//  T2-M2 survived: nothing checked that a COLUMN failure reports itself as a
+//  COLUMN error. Writing it into the index's error instead passed every test.
+//  T2-M6 survived: nothing checked that a structure which is ALREADY THERE is
+//  recognised without spending a DDL attempt — so removing the cheap existence
+//  probe changed no result, even though it is what lets a repaired schema be
+//  seen once the retry budget is gone.
+// ---------------------------------------------------------------------------
+t_section('C9.7 · a column failure is a COLUMN error, and a repaired schema is seen');
+$pdo->exec($engine === 'sqlite' ? "ALTER TABLE activities RENAME TO activities_c9r" : "RENAME TABLE activities TO activities_c9r");
+try {
+    $bumpEpoch();
+    //  T2-M2 — the failure must name the COLUMN, on the column's own channel.
+    t_ok(act_cond_column_ready() === false, 'C9.7 · with the table away the COLUMN migration fails');
+    t_ok(act_optional_error() !== '',        'C9.7 · and the failure is reported');
+    t_ok(strpos(act_optional_error(), 'cond_key column') !== false,
+         'C9.7 · on the COLUMN\'s own channel, naming the column — not filed under the index');
+    //  Spend the rest of the bounded budget while it cannot possibly succeed.
+    act_cond_column_ready(); act_cond_column_ready(); act_cond_column_ready();
+    t_ok(act_cond_column_ready() === false, 'C9.7 · repeated attempts stay bounded and keep failing');
+} finally {
+    $pdo->exec($engine === 'sqlite' ? "ALTER TABLE activities_c9r RENAME TO activities" : "RENAME TABLE activities_c9r TO activities");
+}
+//  T2-M6 — the column was never actually missing, only unreachable. Now that the
+//  table is back it IS there, and that must be recognised WITHOUT a DDL attempt —
+//  the retry budget for this epoch is already spent.
+t_ok($hasCol(), 'C9.7 · the column was there all along — only the table was out of reach');
+t_ok(act_cond_column_ready() === true,
+     'C9.7 · and it is recognised at once, though the retry budget for this epoch is spent');
+t_eq(act_optional_error(), '', 'C9.7 · the recorded failure is cleared');
+
+// ---------------------------------------------------------------------------
 //  Clean up
 // ---------------------------------------------------------------------------
 foreach (array_filter($mine) as $a) $pdo->prepare("DELETE FROM activities WHERE id=?")->execute([(int)$a]);
