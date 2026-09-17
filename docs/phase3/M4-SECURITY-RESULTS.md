@@ -1,8 +1,12 @@
 # PHASE 3 · M4 — SECURITY RESULTS
 
-Suite `phpapp/tests/test_p3m4_security.php` — **65 assertions**, **65 PASS / 0 FAIL**
+Suite `phpapp/tests/test_p3m4_security.php` — **76 assertions**, **76 PASS / 0 FAIL**
 on **SQLite and MariaDB**. Every attack calls the production function the route
 calls, with the payload a crafted POST or AJAX request would carry.
+
+**Section J was added after the first M4 verdict**, by the adversarial audit that
+found two execution paths were never asking the boundary. Both are fixed and both
+are pinned here. See M4-ADVERSARIAL-AUDIT.md.
 
 | # | Attack | Production path | Expected | Actual | Result |
 |---|---|---|---|---|---|
@@ -34,14 +38,27 @@ calls, with the payload a crafted POST or AJAX request would carry.
 | G3 | does it become a re-approval route? | — | no | state still `NONE` | **PASS** |
 | H1–H5 | a real least-privilege role (`INSPECTOR`) attempts view, create, edit, requisition, decide | the production helpers | deny each | all refused | **PASS** |
 | I1–I3 | the requestor decides their **own** request, and their **own re-approval** | `hreq_may_decide()` | deny | segregation blocks both | **PASS** |
+| J1 | a requisition exists and executes while the request is approved | `hreq_req_block_reason()` | allow | `''` | **PASS** |
+| J2 | a material change blocks the request | `hreq_is_executable()` | block | blocked | **PASS** |
+| J3 | …and the boundary refuses that requisition | `hreq_req_block_reason()` | refuse | refusal in business words | **PASS** |
+| J4 | **advance a candidate (shortlist / interview / offer) on a blocked requisition** | `candidate-stage` route | deny | the route asks the boundary **before** the stage write | **PASS** |
+| J5 | …but a candidate may still be **rejected, withdrawn, declined or held** while approval is pending | `candidate-stage` route | allow | advancing-only semantics confirmed | **PASS** |
+| J6 | **attach a candidate to a blocked requisition by EDITING it** | candidate `POST` handler | deny | the handler asks the boundary **before** it decides which fields to write | **PASS** |
+| J7 | the boundary is genuinely refusing at that moment | `hreq_req_block_reason()` | refuse | refusing | **PASS** |
+| J8 | and allows again once re-approved | `hreq_apply_decision()` → boundary | allow | `''` | **PASS** |
 
-## Two probe defects of my own, reported
+## Three probe defects of my own, reported
 
 1. **Tenant B was not fully built.** The first fixture migrated only the hiring,
    approval and activity tables, so the probe died on *"no such table:
    requisitions"* — testing the fixture, not the boundary. B is now built the way
    the application builds a tenant.
-2. **The entitlement probe used a role that does not exist.** `VIEWER` is not in
+2. **A source-scoped pin could have matched its own comment.** The two route pins
+   in section J read `lib/ops.php` between the route's start and its write. That is
+   the same shape as the M14-9 defect, where an assertion matched the comment
+   explaining it. Comments are now stripped before the pin is applied, and the
+   assertions still pass — so they are matching real code.
+3. **The entitlement probe used a role that does not exist.** `VIEWER` is not in
    `ORG_ROLES`, and an unrecognised role falls back to `ADMIN`, so the probe
    granted itself every permission and then reported the product as fail-open. It
    now uses `INSPECTOR`, a real role whose default permission set is empty.

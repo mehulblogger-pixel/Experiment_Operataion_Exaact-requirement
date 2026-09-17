@@ -5223,6 +5223,22 @@ function ops_candidates($route, $method) {
         if ($method === 'POST') {
             $to = $_POST['to_stage'] ?? '';
             if (!isset(lk_options_or('candidate_stage', CAND_STAGES)[$to])) { flash('Unknown stage.', 'error'); redirect('/candidate?id=' . $id); }
+            //  PHASE 3 · M4 §13 — THE EXECUTION BOUNDARY. Every stage move passes
+            //  through this route — shortlist, interview, offer, hire — so this is
+            //  the one place that has to ask. An adversarial probe shortlisted AND
+            //  offered a candidate on a hiring request whose approval had been
+            //  invalidated, because only candidate CREATION was gated.
+            //
+            //  Moving a candidate BACKWARDS or out of the pipeline is not
+            //  recruitment execution and is not blocked: withdrawing, rejecting or
+            //  holding a candidate while approval is pending is exactly what a
+            //  coordinator should still be able to do. Advancing is the act that
+            //  spends unapproved authority.
+            $m4Advancing = !in_array($to, ['REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD'], true);
+            if ($m4Advancing && !empty($cand['requisition_id']) && function_exists('hreq_req_block_reason')) {
+                $m4why = hreq_req_block_reason((int) $cand['requisition_id']);
+                if ($m4why !== '') { flash($m4why, 'error'); redirect('/candidate?id=' . $id); }
+            }
             $remark = trim($_POST['remark'] ?? '');
             $decided = in_array($to, ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true) ? date('c') : ($cand['decided_at'] ?: '');
             // Phase 7 — when a candidate is lost, record WHERE (drop point) and WHY
@@ -5335,6 +5351,17 @@ function ops_candidates($route, $method) {
                                      : 'Could not read much from that file — type the details in, or paste the résumé text instead.');
         } elseif ($method === 'POST') {
             $b = $_POST;
+            //  PHASE 3 · M4 §13 — attaching a candidate to a requisition is
+            //  recruitment execution whether it happens on creation or on a later
+            //  edit. Only the creation branch was gated, so an existing candidate
+            //  could be moved onto a blocked requisition by editing it.
+            if (!empty($b['requisition_id']) && function_exists('hreq_req_block_reason')) {
+                $m4why = hreq_req_block_reason((int) $b['requisition_id']);
+                if ($m4why !== '') {
+                    flash($m4why, 'error');
+                    redirect($cand ? '/candidate?id=' . (int)$cand['id'] : '/candidates');
+                }
+            }
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
                 'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id','group_id',

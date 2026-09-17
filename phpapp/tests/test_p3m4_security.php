@@ -200,6 +200,53 @@ $act($uReq);
 t_ok(!hreq_may_decide(hreq_get($hS)), 'I · *** and may not decide their own RE-approval either ***');
 $act($uMgr);
 
+// ---- J · THE EXECUTION PATHS §13 NAMED -------------------------------------
+//
+//  Found by adversarial audit AFTER M4 was first declared accepted: only
+//  candidate CREATION and requisition EDIT were gated. A probe shortlisted and
+//  then OFFERED a candidate on a hiring request whose approval had been
+//  invalidated, and attached another candidate to the blocked requisition by
+//  editing it. Both routes now ask the boundary, and both are pinned here.
+t_section('J · every execution path asks the boundary');
+$hJ = $approve(['job_title'=>'M4S Exec Paths','quantity'=>5]);
+[$jr,,$rqJ] = hreq_to_requisition($hJ, 5);
+t_ok($jr && $rqJ > 0, 'J · a requisition exists');
+$pdo->prepare("INSERT INTO candidates (cand_code,first_name,last_name,stage,requisition_id,created_at)
+               VALUES ('M4S-J1','M4S','J1','RECEIVED',?,?)")->execute([$rqJ, date('c')]);
+$cJ = (int)$pdo->lastInsertId();
+t_eq(hreq_req_block_reason($rqJ), '', 'J · and while the request is approved, execution is allowed');
+//  invalidate the approval
+hreq_save($hJ, $base(['job_title'=>'M4S Exec Paths','quantity'=>5,'designation'=>'SUPERVISOR']));
+t_ok(!hreq_is_executable(hreq_get($hJ)), 'J · a material change blocks the request');
+$whyJ = hreq_req_block_reason($rqJ);
+t_ok($whyJ !== '', 'J · and the boundary refuses this requisition: ' . $whyJ);
+
+$opsSrc = file_get_contents(dirname(__DIR__) . '/lib/ops.php');
+//  Comments are stripped first. A source pin that can be satisfied by its own
+//  explanatory comment proves nothing — that defect was found once already
+//  (M14-9) and must not be repeated here.
+$opsSrc = preg_replace('~^\s*//.*$~m', '', $opsSrc);
+//  Behavioural: the stage route reads the guard BEFORE it writes the stage.
+$stagePos = strpos($opsSrc, "if (\$route === 'candidate-stage')");
+$stageEnd = strpos($opsSrc, 'UPDATE candidates SET stage=', $stagePos);
+$stageBody = substr($opsSrc, $stagePos, max(0, $stageEnd - $stagePos));
+t_ok(strpos($stageBody, 'hreq_req_block_reason') !== false,
+     'J · *** the stage route asks the boundary BEFORE it advances a candidate ***');
+t_ok(strpos($stageBody, "['REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD']") !== false,
+     'J · …and only for ADVANCING — a candidate may still be withdrawn or rejected while approval is pending');
+//  Behavioural: the candidate POST handler asks before it writes requisition_id.
+$postPos = strpos($opsSrc, "} elseif (\$method === 'POST') {\n            \$b = \$_POST;");
+t_ok($postPos !== false, 'J · the candidate POST handler is found');
+$postBody = substr($opsSrc, $postPos, 1200);
+t_ok(strpos($postBody, 'hreq_req_block_reason') !== false,
+     'J · *** the candidate POST handler asks the boundary before writing requisition_id ***');
+t_ok(strpos($postBody, 'hreq_req_block_reason') < strpos($postBody, "\$fields = ["),
+     'J · …and asks it before it decides which fields to write');
+//  and the guard really answers for this requisition
+t_ok(hreq_req_block_reason($rqJ) !== '', 'J · the boundary is refusing right now');
+hreq_apply_decision($hJ, 'APPROVED', 'M4S Approver', 're-approved');
+t_eq(hreq_req_block_reason($rqJ), '', 'J · *** and allows again once re-approved ***');
+
 // ---- F · REPLAY -------------------------------------------------------------
 t_section('F · replay');
 $hF = $approve(['job_title'=>'M4S Replay','quantity'=>4]);

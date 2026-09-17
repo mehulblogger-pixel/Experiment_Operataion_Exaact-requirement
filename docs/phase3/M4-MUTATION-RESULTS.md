@@ -39,3 +39,16 @@ populate and return the cross-workspace cache, it is caught.
 **The battery was also moved onto MariaDB** after M5's first run, because several
 of these controls are only meaningfully exercised where writers genuinely run in
 parallel.
+
+## Re-run after the adversarial audit
+
+The whole battery was run again against the **fixed** tree, after the two
+execution-boundary defects were closed and section J was added:
+
+**baseline 0 failures · attempted 9 · caught 9 · survived 0.**
+
+Nothing inherited is claimed as newly caught — these are the same nine mutations,
+re-proved on the code that ships. **M1** (the executable boundary ignores the
+re-approval state) is now caught by both the M4 scenario suite and the `m4_` layer
+suite; **M6** (the tenant boundary is lost) still kills the suite outright, which
+counts as a detection.

@@ -2,11 +2,11 @@
 
 | Suite | SQLite | MariaDB 10.11 |
 |---|---|---|
-| `m4_` (hiring-request layer + corrections, incl. the M4 scenario suites) | **352 / 0** | **352 / 0** |
+| `m4_` (hiring-request layer + corrections, incl. the M4 scenario suites) | **363 / 0** | **363 / 0** |
 | `test_p3m4_reapproval.php` — the twelve validation scenarios | **71 / 0** | **71 / 0** |
-| `test_p3m4_security.php` — security probes | **65 / 0** | **65 / 0** |
+| `test_p3m4_security.php` — security probes (incl. section J) | **76 / 0** | **76 / 0** |
 | `test_p3m4_concurrency.php` — real-process concurrency | **24 / 0** | **24 / 0** |
-| **Complete regression** | **10720 / 0** | **10721 / 0** |
+| **Complete regression** | **10731 / 0** | **10732 / 0** |
 
 No test was weakened, deleted or skipped. No skip was introduced. The MariaDB
 total is one higher because one engine-specific assertion exists only there.
@@ -26,6 +26,13 @@ See M4-CONCURRENCY-RESULTS.md.
 | `an approved request cannot be silently changed` | the edit was refused outright | the edit is **allowed**, the approval is **invalidated**, execution **stops**, the approved snapshot is **intact** and the ceiling still uses the **approved** figure | M4 replaces immutability with control; the protection is asserted more strongly, not less |
 | `M4.3 / M4.4 re-approval state` | expected `IN_PROGRESS` | `REQUIRED` where no rule is configured | the documented behaviour, identical to a first submission; **M4.12** was added to prove the chain genuinely runs when a rule exists |
 | `M4.12 chain count` | expected a new chain row | **exactly one OPEN chain** | `appr_start()` deliberately returns an already-open chain; the open-chain count is the invariant that matters |
+
+## After the adversarial audit
+
+The counts above are the **post-audit** figures. The audit found two execution
+paths that never asked the boundary; the fixes and the eleven new section-J
+assertions are included here, and both engines were re-run from scratch afterwards.
+See M4-ADVERSARIAL-AUDIT.md.
 
 ## Test defects of my own, found and reported
 

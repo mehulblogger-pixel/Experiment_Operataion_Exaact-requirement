@@ -10,8 +10,8 @@ decision. No second approval, SLA, notification, audit, requisition or candidate
 mechanism was created, and no lifecycle status was added.
 
 ### 2 · Files changed
-`phpapp/lib/hiringreq.php` (the engine), `phpapp/lib/ops.php` (three enforcement
-points), `phpapp/tests/test_p3m4_reapproval.php`, `test_p3m4_security.php`,
+`phpapp/lib/hiringreq.php` (the engine), `phpapp/lib/ops.php` (**five** enforcement
+points — three at implementation, two added by the adversarial audit), `phpapp/tests/test_p3m4_reapproval.php`, `test_p3m4_security.php`,
 `test_p3m4_concurrency.php`, `tests/_m4_worker.php`, and four re-pointed assertions
 in `test_m4_hiring_request.php` / `test_m4_correction.php`. `deploy_check.php`
 regenerated. Documents in `docs/phase3/`.
@@ -66,7 +66,7 @@ path, and after deployment groups overwrite quantity — and measured from the
 authority.
 
 ### 11 · Security results
-**65 / 65 PASS** on both engines: stale approval URLs, rejected-re-approval flips,
+**76 / 76 PASS** on both engines: stale approval URLs, rejected-re-approval flips,
 twelve crafted POST fields, real cross-tenant attack, eight branch-scope
 operations, replay of creation / change / decision, the approval-requirement
 bypass, entitlement and segregation. See M4-SECURITY-RESULTS.md.
@@ -83,12 +83,12 @@ broken no-op mutation, and **M5** exposed a genuine gap in my own tests, closed 
 M4.13. See M4-MUTATION-RESULTS.md.
 
 ### 14 · SQLite results
-`m4_` **352/0** · scenarios **71/0** · security **65/0** · concurrency **24/0** ·
-complete regression **10720/0**.
+`m4_` **363/0** · scenarios **71/0** · security **76/0** · concurrency **24/0** ·
+complete regression **10731/0**.
 
 ### 15 · MariaDB results
-`m4_` **352/0** · scenarios **71/0** · security **65/0** · concurrency **24/0** ·
-complete regression **10721/0**. Authoritative.
+`m4_` **363/0** · scenarios **71/0** · security **76/0** · concurrency **24/0** ·
+complete regression **10732/0**. Authoritative.
 
 ### 16 · Full regression results
 Clean on both engines, including Operations, Quality, Reporting, Money, Workforce,
@@ -98,24 +98,45 @@ CRM, Marketplace, Recruitment, Dashboard, Approval, SLA and Notifications.
 **H1** and **A-2** discharged as CONNECT with gate evidence; **eleven carried
 forward**; none reopened; nothing removed. See M3-CARRIED-FORWARD-INVENTORY.md.
 
+### 17b · Independent adversarial audit — run after the first verdict
+
+The first ACCEPTED verdict was **premature and is withdrawn**. An adversarial audit
+against the committed tree found **two material execution-boundary defects**: a
+candidate could be **shortlisted, interviewed and offered** on a hiring request
+whose approval had been invalidated, and a candidate could be **attached to a
+blocked requisition by editing it**. The M4 brief named nine execution paths; three
+were connected. Both defects are proved, fixed, pinned by section J of the security
+suite, and re-verified on both engines. See **M4-ADVERSARIAL-AUDIT.md**.
+
 ### 18 · Known limitations
 1. **The ceiling compensator is pessimistic.** Two racing writers may both revert,
    refusing an allocation that could in principle have succeeded. Never an
    over-allocation; the safe direction.
 2. **Re-approval is per request, not per field.** Two material changes while one
    re-approval is open are covered by that one decision.
-3. **The candidate boundary is enforced where a requisition is named.** A candidate
+3. **A quantity decrease does not lower what may still be recruited.** A request
+   approved for 10 and later reduced to 3 can still fill 10, because the ceiling
+   reads the approved snapshot and a decrease is deliberately non-material. Safe
+   direction (never more than approved); raised as a **business** question, not
+   changed, because changing it alters the approved materiality matrix.
+4. **The candidate boundary is enforced where a requisition is named.** A candidate
    created with no requisition has no approved request to enforce against — ADR-001.
-4. **Direct requisitions (ADR-001) are unchanged.** No approved headcount is
+5. **Direct requisitions (ADR-001) are unchanged.** No approved headcount is
    invented for a requisition with no hiring request.
-5. **An unrecognised role maps to ADMIN** — pre-existing, recorded, not reopened.
-6. **Public careers-page applications** were not wired to the boundary; they create
+6. **An unrecognised role maps to ADMIN** — pre-existing, recorded, not reopened.
+7. **Public careers-page applications** were not wired to the boundary; they create
    candidates without a requisition, so item 3 applies.
 
 ### 19 · Exact remaining defects
-**None known.** The one defect found by this gate — the last-seat race on MariaDB —
-is fixed and verified.
+**None known.** Three defects were found by attacking this work and all three are
+fixed and verified: the last-seat race on MariaDB (gate), and the two
+execution-boundary gaps found by the adversarial audit — candidate **progression**
+and candidate **edit**. Nothing is left open; the limitations above are stated
+design positions, not defects.
 
 ### 20 · Final verdict
+
+Issued after the adversarial audit, its two fixes, the re-run mutation battery
+(9 attempted · 9 caught · 0 survived) and a complete regression on both engines.
 
 # M4 ACCEPTED
