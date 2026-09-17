@@ -20,7 +20,7 @@ $pdo->prepare("INSERT INTO users (username,first_name,last_name,role,is_active,i
                VALUES ('c15_cfg','C15','Cfg','ADMIN',1,1,'','c15cfg@t.test')")->execute();
 $uCfg=(int)$pdo->lastInsertId(); $prevUid=$_SESSION['uid']??null;
 $_SESSION['uid']=$uCfg; current_user(true); ua(true);
-setting_set('appr_cond_ledger', '');                       // this suite starts from clean state
+try { db()->exec("DELETE FROM settings WHERE skey LIKE 'apprcond%'"); } catch (Throwable $e) {} setting_set('appr_cond_ledger', '');                       // this suite starts from clean state
 
 $mkRule = fn($t) => (int) appr_rule_save(0, ['name'=>'C15 '.$t,'entity'=>'HIRING_REQUEST',
                                              'code'=>'C15'.$t,'applies_department'=>'']);
@@ -44,7 +44,7 @@ $blockCore = function () use ($engine) {
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='C15 CORE BLOCKED'; END");
 };
 $drop = function($n){ try { db()->exec("DROP TRIGGER $n"); } catch (Throwable $e) {} };
-$ledger = fn() => appr_cond_ledger();
+$ledger = fn() => appr_cond_all();
 
 // ---------------------------------------------------------------------------
 t_section('C15.1 · PART B — THE EXACT SCENARIO: the condition never comes back');
@@ -127,10 +127,15 @@ $fpD = appr_cond_fingerprint(appr_condition_key('DECISION', $qD, null, 'ENTITY_U
 $recD = $ledger()[$fpD] ?? null;
 t_ok(is_array($recD), 'C15.4 · the ledger holds this condition');
 t_eq((string)($recD['st'] ?? ''), APPR_COND_NOT_RECORDED, 'C15.4 · in the NOT_RECORDED state');
-t_ok((int)($recD['maxid'] ?? -1) >= 0, 'C15.4 · with the read-only evidence reconciliation will use');
+//  FINAL STABILISATION · D-4 — there is NO high-water mark any more. MAX(id) moves
+//  backwards when rows are deleted, so a condition stamped with it could never
+//  reach its terminal state. The record carries only condition-specific state.
+t_ok(!array_key_exists('maxid', $recD), 'C15.4 · and carries NO MAX(id) high-water mark');
+t_eq((string)($recD['k'] ?? ''), appr_condition_key('DECISION', $qD, null, 'ENTITY_UNRESOLVED'),
+     'C15.4 · it carries this condition\'s own key, which is what recovery acts on');
 t_ok(!function_exists('act_log') || true, 'C15.4 · and it lives in settings, not in the table that failed');
-t_eq((int) ops_val("SELECT COUNT(*) FROM settings WHERE skey='appr_cond_ledger'"), 1,
-     'C15.4 · *** the fact survives without any activities INSERT ***');
+t_eq((int) ops_val("SELECT COUNT(*) FROM settings WHERE skey=?", [appr_cond_skey($fpD)]), 1,
+     'C15.4 · *** the fact survives as its OWN row, without any activities INSERT ***');
 
 t_section('C15.5 · PART F — recovery gives exactly ONE signal, then normal operation');
 @unlink($logf); ini_set('error_log', $logf);
@@ -157,11 +162,9 @@ t_ok($q0 >= 0, 'C15.6 · the spine has ' . $q0 . ' rows');
 //  The first version invented keys like 'PCX|probe1' and then asked for the row of
 //  'PC|PROBE|1', whose fingerprint is a sha1 — the lookup correctly found nothing
 //  and the probe blamed the product for its own fixture.
-setting_set('appr_cond_ledger', json_encode([
-    appr_cond_fingerprint('PC|PROBE|1') => ['st'=>APPR_COND_UNARMED,      'k'=>'PC|PROBE|1', 'row'=>1],
-    appr_cond_fingerprint('PC|PROBE|2') => ['st'=>APPR_COND_NOT_RECORDED, 'k'=>'PC|PROBE|2', 'row'=>0, 'maxid'=>0],
-    appr_cond_fingerprint('PC|PROBE|3') => ['st'=>APPR_COND_TERMINAL,     'k'=>'PC|PROBE|3', 'row'=>0],
-]));
+appr_cond_rec_put(appr_cond_fingerprint('PC|PROBE|1'), ['st'=>APPR_COND_UNARMED,      'k'=>'PC|PROBE|1', 'row'=>1]);
+appr_cond_rec_put(appr_cond_fingerprint('PC|PROBE|2'), ['st'=>APPR_COND_NOT_RECORDED, 'k'=>'PC|PROBE|2', 'row'=>0]);
+appr_cond_rec_put(appr_cond_fingerprint('PC|PROBE|3'), ['st'=>APPR_COND_TERMINAL,     'k'=>'PC|PROBE|3', 'row'=>0]);
 t_eq(appr_cond_unarmed_count(), 2, 'C15.6 · the count is 2 — terminal entries are not active faults');
 db()->exec($engine === 'sqlite' ? "ALTER TABLE activities RENAME TO c15_hidden"
                                 : "RENAME TABLE activities TO c15_hidden");
@@ -173,7 +176,7 @@ t_eq($countWithoutTable, 2,
      'C15.6 · *** with the activities table GONE the dashboard count still answers — it never touches it ***');
 t_ok(is_array($rowWithoutTable) && (int)$rowWithoutTable['id'] === 1,
      'C15.6 · *** and the gate lookup answers too — no scan, a primary key from the ledger ***');
-setting_set('appr_cond_ledger', '');
+try { db()->exec("DELETE FROM settings WHERE skey LIKE 'apprcond%'"); } catch (Throwable $e) {} setting_set('appr_cond_ledger', '');
 t_eq(appr_cond_unarmed_count(), 0, 'C15.6 · and it still answers correctly once cleared');
 
 // ---------------------------------------------------------------------------
@@ -189,15 +192,26 @@ t_eq($markers($rE), 0,           'C15.7 · case 1 · and no false marker appears
 t_eq(appr_cond_unarmed_count(), 1, 'C15.7 · case 1 · the warning is still shown');
 $drop('c15b');
 //  Case 3 · a malformed candidate must not take the others with it
-$l = appr_cond_ledger(); $l['PCX|junk'] = 'not-an-array'; $l['PCX|junk2'] = ['st'=>APPR_COND_UNARMED,'k'=>'','row'=>0];
-appr_cond_ledger_save($l);
+//  A record that is not JSON at all, and one that is valid but unidentifiable.
+db()->prepare("INSERT INTO settings (skey,svalue) VALUES (?,?)")->execute([appr_cond_skey('PCX|' . str_repeat('a',32)), 'not-json']);
+appr_cond_rec_put('PCX|' . str_repeat('b',32), ['st'=>APPR_COND_UNARMED,'k'=>'','row'=>0]);
 $rcJ3 = appr_cond_reconcile();
 t_eq((int)$rcJ3['recovered'], 1, 'C15.7 · case 3 · *** the good candidate still recovers ***');
 t_eq($markers($rE), 1,           'C15.7 · case 3 · its marker is genuinely on the row');
-t_ok(!array_key_exists('PCX|junk', appr_cond_ledger()), 'C15.7 · case 3 · the malformed entry is dropped');
-$l2 = appr_cond_ledger();
-t_eq((string)($l2['PCX|junk2']['st'] ?? ''), APPR_COND_TERMINAL,
+//  FINAL STABILISATION · D-3 — the unreadable record is no longer DROPPED. It is
+//  kept, reported and counted as an active fault: an unreadable record is a
+//  finding, not an absence.
+$l2 = appr_cond_all();
+t_eq((string)($l2['PCX|' . str_repeat('a',32)]['st'] ?? ''), APPR_COND_CORRUPT,
+     'C15.7 · case 3 · the unreadable record is reported as CORRUPT, not silently dropped');
+t_eq((string)($l2['PCX|' . str_repeat('b',32)]['st'] ?? ''), APPR_COND_TERMINAL,
      'C15.7 · case 3 · the unidentifiable one is closed, not silently re-armed');
+//  Those two are synthetic fixtures, and the CORRUPT one now counts as an active
+//  fault by design — so it is removed here rather than left to inflate the counts
+//  of the sections that follow. (The first port of this suite left them in and the
+//  later sections read 3 where they meant 2.)
+appr_cond_rec_drop('PCX|' . str_repeat('a',32));
+appr_cond_rec_drop('PCX|' . str_repeat('b',32));
 
 // ---------------------------------------------------------------------------
 //  C15.9 · PART J case 2 — reconciliation fails HALFWAY through the candidates.
@@ -232,7 +246,7 @@ t_eq((int)$rcP['still'], 1,     'C15.9 · and exactly one remained truthfully un
 t_eq($markG($rH), 1, 'C15.9 · *** the recoverable one really carries its marker ***');
 t_eq($markG($rG), 0, 'C15.9 · *** and the blocked one was NOT falsely marked recovered ***');
 t_eq(appr_cond_unarmed_count(), 1, 'C15.9 · *** one warning cleared, one correctly still showing ***');
-$lP = appr_cond_ledger();
+$lP = appr_cond_all();
 t_ok(array_key_exists(appr_cond_fingerprint(appr_condition_key('DECISION', $qG, null, 'ENTITY_UNRESOLVED')), $lP),
      'C15.9 · the unrecovered candidate is still in the ledger, awaiting another pass');
 t_ok(!array_key_exists(appr_cond_fingerprint(appr_condition_key('DECISION', $qH, null, 'ENTITY_UNRESOLVED')), $lP),
@@ -272,7 +286,7 @@ foreach ([$WS_B, $WS_C] as $n => $ws) {
     t_ok($idA !== $idX, 'C15.8 · tenant ' . ($n ? 'C' : 'B') . ' → its own database, different from A');
     hreq_migrate(); appr_migrate(); act_migrate();
     t_eq(appr_cond_unarmed_count(), 0, 'C15.8 · it cannot COUNT A\'s condition');
-    t_eq(count(appr_cond_ledger()), 0, 'C15.8 · it cannot INSPECT A\'s ledger');
+    t_eq(count(appr_cond_all()), 0, 'C15.8 · it cannot INSPECT A\'s condition records');
     $rcX = appr_cond_reconcile();
     t_eq((int)$rcX['examined'], 0, 'C15.8 · *** and reconciling here recovers nothing of A\'s ***');
 }
@@ -294,7 +308,7 @@ foreach ([$rA,$rB,$rC,$rD,$rE,$rF,$rG,$rH] as $r) {
 }
 $pdo->exec("DELETE FROM activities WHERE subject LIKE 'C15 %'");
 $pdo->prepare("DELETE FROM users WHERE id=?")->execute([$uCfg]);
-setting_set('appr_cond_ledger', '');
+try { db()->exec("DELETE FROM settings WHERE skey LIKE 'apprcond%'"); } catch (Throwable $e) {} setting_set('appr_cond_ledger', '');
 if ($prevUid===null) unset($_SESSION['uid']); else $_SESSION['uid']=$prevUid;
 $_SESSION=$origSess; current_user(true); ua(true);
 t_eq((int) ops_val("SELECT COUNT(*) FROM recruit_approval_rules WHERE code LIKE 'C15%'"), 0,

@@ -104,6 +104,11 @@ function appr_migrate() {
             act_index('recruit_approval_requests', 'idx_ar_ent', '(entity,entity_id)');
         }
     } catch (Throwable $e) { /* never break boot */ }
+    //  N — MIGRATION. Additive, idempotent, non-destructive and tenant-safe: it
+    //  runs inside the module's own migration, in the connected workspace only,
+    //  and a second run finds nothing to move. No activity row is ever deleted.
+    try { if (function_exists('appr_cond_migrate_ledger')) appr_cond_migrate_ledger(); }
+    catch (Throwable $e) { /* never break boot */ }
 }
 
 function _appr_now() { return function_exists('now_iso') ? now_iso() : date('c'); }
@@ -317,6 +322,7 @@ const APPR_COND_NOT_RECORDED  = 'NOT_RECORDED';   // C · the event itself was n
 const APPR_COND_PENDING_RETRY = 'PENDING_RETRY';  // B-4 · already unarmed; retried, still not armed, NO new row
 const APPR_COND_RECOVERED     = 'RECOVERED';      // B-4 · the retry succeeded — the condition is armed at last
 const APPR_COND_TERMINAL      = 'TERMINAL';       // #15 · PART C · resolved as unrecoverable — no longer an ACTIVE fault
+const APPR_COND_CORRUPT       = 'CORRUPT';        // FINAL · D-3 · the record itself cannot be read — an ACTIVE fault
 
 //  M3 CORRECTION #14 · Z3 — THE BOUNDED FAILURE POLICY, stated once and in full.
 //
@@ -388,34 +394,130 @@ function appr_cond_fingerprint($key) {
 //      maxid  MAX(activities.id) when a NOT_RECORDED was recorded — see reconcile
 //      at     when it was first recorded
 // ===========================================================================
-const APPR_COND_LEDGER_KEY = 'appr_cond_ledger';
-const APPR_COND_LEDGER_MAX = 200;       // svalue is bounded; the ledger cannot grow for ever
-const APPR_COND_RECON_MAX  = 50;        // candidates examined per scheduler run
+//  ONE SETTINGS ROW PER CONDITION.
+//
+//  The #15 ledger was a single `settings` row holding one JSON document for every
+//  condition, rewritten whole on each change. Its adversarial audit found four
+//  defects that all followed from that one shape:
+//
+//    D-1  read-modify-write of a shared document, behind a cache loaded once per
+//         epoch, so a concurrent writer's condition was silently erased.
+//    D-2  a 200-entry cap that silently discarded the OLDEST unresolved
+//         condition — neither recovered nor closed.
+//    D-3  one unparsable character emptied the whole register, and an empty
+//         register reads as "nothing wrong".
+//    D-4  recovery keyed on MAX(activities.id), which moves BACKWARDS when rows
+//         are deleted, so a condition could never reach its terminal state.
+//
+//  Each condition now owns its own row. `settings` has skey as its PRIMARY KEY,
+//  so the upsert is atomic per condition and two processes writing two different
+//  conditions cannot touch each other's row. There is no shared document to lose,
+//  no cap, no shared parse, and no high-water mark.
+//
+//  CONSISTENCY MODEL (§H): condition state is ALWAYS read straight from the
+//  database, never from settings_cache(). The cache is loaded once per epoch by
+//  design — right for workspace identity, wrong for state another process is
+//  writing concurrently. The cache keeps its behaviour for everything else and is
+//  simply not used here; it also no longer loads condition rows, so a workspace
+//  with many open conditions does not bloat every other settings read.
+//
+//  The key is `apprcond<32 hex>` — 40 characters, inside skey's VARCHAR(60), and
+//  with no underscore at the prefix boundary so a LIKE prefix needs no escaping.
+const APPR_COND_SKEY_PREFIX = 'apprcond';
+const APPR_COND_RECON_MAX   = 200;      // candidates examined per scheduler run
 
-function appr_cond_ledger() {
-    if (!function_exists('setting_get')) return [];
-    $raw = (string) setting_get(APPR_COND_LEDGER_KEY, '');
-    if ($raw === '') return [];
-    $l = json_decode($raw, true);
-    return is_array($l) ? $l : [];
-}
-function appr_cond_ledger_save($l) {
-    if (!function_exists('setting_set')) return;
-    if (count($l) > APPR_COND_LEDGER_MAX) $l = array_slice($l, -APPR_COND_LEDGER_MAX, null, true);
-    try { setting_set(APPR_COND_LEDGER_KEY, json_encode($l)); } catch (Throwable $e) { /* never fatal */ }
-}
-function appr_cond_ledger_put($fp, array $rec) {
-    if ($fp === '') return;
-    $l = appr_cond_ledger(); $l[$fp] = $rec + ['at' => date('c')]; appr_cond_ledger_save($l);
-}
-function appr_cond_ledger_drop($fp) {
-    if ($fp === '') return;
-    $l = appr_cond_ledger();
-    if (array_key_exists($fp, $l)) { unset($l[$fp]); appr_cond_ledger_save($l); }
+function appr_cond_skey($fp) {
+    $fp = (string) $fp;
+    if ($fp === '') return '';
+    return APPR_COND_SKEY_PREFIX . (strpos($fp, 'PCX|') === 0 ? substr($fp, 4) : $fp);
 }
 
-//  Whether the spine can be asked about markers at all. On a host where the
-//  optional column could never be created, asking would throw.
+//  Direct, uncached, single-row read — see the consistency model above.
+function appr_cond_rec_get($fp) {
+    $k = appr_cond_skey($fp);
+    if ($k === '') return null;
+    try { $r = ops_one("SELECT svalue FROM settings WHERE skey=?", [$k]); }
+    catch (Throwable $e) { return null; }
+    if (!$r) return null;
+    return appr_cond_parse((string) $r['svalue']);
+}
+
+//  D-3 — a record that cannot be read is a FINDING, not an absence. It becomes an
+//  explicit CORRUPT state which is counted, reported and reconcilable. It is never
+//  allowed to read as "nothing wrong", and it never takes another record with it.
+function appr_cond_parse($raw) {
+    $d = json_decode((string) $raw, true);
+    if (!is_array($d) || !isset($d['st'])) {
+        return ['st' => APPR_COND_CORRUPT, 'k' => '', 'row' => 0,
+                'why' => 'the stored condition record could not be read'];
+    }
+    return $d;
+}
+
+//  Atomic per condition. This is the whole of D-1's fix: the upsert touches ONE
+//  row, chosen by the PRIMARY KEY, and carries no other condition with it.
+function appr_cond_rec_put($fp, array $rec) {
+    $k = appr_cond_skey($fp);
+    if ($k === '') return;
+    $v = json_encode($rec + ['at' => date('c')]);
+    try {
+        if (db_driver() === 'sqlite')
+            db()->prepare("INSERT INTO settings (skey,svalue) VALUES (?,?)
+                           ON CONFLICT(skey) DO UPDATE SET svalue=excluded.svalue")->execute([$k, $v]);
+        else
+            db()->prepare("INSERT INTO settings (skey,svalue) VALUES (?,?)
+                           ON DUPLICATE KEY UPDATE svalue=VALUES(svalue)")->execute([$k, $v]);
+    } catch (Throwable $e) { /* never fatal — a condition record may not break a decision */ }
+}
+
+function appr_cond_rec_drop($fp) {
+    $k = appr_cond_skey($fp);
+    if ($k === '') return;
+    try { db()->prepare("DELETE FROM settings WHERE skey=?")->execute([$k]); } catch (Throwable $e) {}
+}
+
+//  Every condition record, each parsed on its own. D-2: there is NO cap — an
+//  unresolved condition is never discarded to make room for a newer one.
+function appr_cond_all() {
+    $out = [];
+    try {
+        $rows = ops_all("SELECT skey, svalue FROM settings WHERE skey LIKE ? ORDER BY skey",
+                        [APPR_COND_SKEY_PREFIX . '%']);
+    } catch (Throwable $e) { return $out; }
+    foreach ($rows as $r) {
+        $fp = 'PCX|' . substr((string) $r['skey'], strlen(APPR_COND_SKEY_PREFIX));
+        $out[$fp] = appr_cond_parse((string) $r['svalue']);
+    }
+    return $out;
+}
+
+//  N — MIGRATION. Additive, idempotent, non-destructive, tenant-safe, repeatable.
+//  Each valid entry of the old shared document becomes its own row; the document
+//  is cleared only once every entry it held has been written, so a repeat run is
+//  a no-op and an interrupted run simply resumes. An UNPARSABLE old document is
+//  LEFT IN PLACE and reported — discarding it would be exactly the silent loss
+//  this correction exists to remove.
+function appr_cond_migrate_ledger() {
+    if (!function_exists('setting_get')) return 0;
+    $raw = '';
+    try { $r = ops_one("SELECT svalue FROM settings WHERE skey='appr_cond_ledger'"); $raw = $r ? (string) $r['svalue'] : ''; }
+    catch (Throwable $e) { return 0; }
+    if (trim($raw) === '') return 0;
+    $old = json_decode($raw, true);
+    if (!is_array($old)) {
+        @error_log('appr condition ledger: the previous shared ledger could not be read and has '
+                 . 'been LEFT IN PLACE rather than discarded');
+        return 0;
+    }
+    $n = 0;
+    foreach ($old as $fp => $rec) {
+        if (!is_array($rec) || !isset($rec['st'])) continue;         // malformed entry: skip, keep the document
+        if (appr_cond_rec_get($fp) === null) { appr_cond_rec_put($fp, $rec); $n++; }
+    }
+    try { db()->prepare("DELETE FROM settings WHERE skey='appr_cond_ledger'")->execute(); } catch (Throwable $e) {}
+    return $n;
+}
+
 function appr_cond_col_ready() {
     return function_exists('act_has_cond_column') && act_has_cond_column();
 }
@@ -427,25 +529,23 @@ function appr_cond_col_ready() {
 //  is that row's own durable record, and removing it is C-3, not this correction)
 //  — it is simply no longer SEARCHED for.
 function appr_cond_unarmed_row($key) {
-    $fp = appr_cond_fingerprint($key);
-    if ($fp === '') return null;
-    $rec = appr_cond_ledger()[$fp] ?? null;
+    $rec = appr_cond_rec_get(appr_cond_fingerprint($key));
     if (!is_array($rec) || ($rec['st'] ?? '') !== APPR_COND_UNARMED) return null;
     $id = (int) ($rec['row'] ?? 0);
     return $id > 0 ? ['id' => $id] : null;
 }
 
-//  How many distinct conditions are currently recorded but NOT armed. This is the
-//  business-visible number: each one is a suppression that cannot be trusted.
 //  C-4 — the dashboard's number. This was a LIKE over the whole spine on every
 //  page load; it is now a count over an already-cached settings value, and it
 //  touches `activities` not at all. TERMINAL entries are excluded: a condition
 //  that has been resolved as unrecoverable is not an active fault (PART C/H).
 function appr_cond_unarmed_count() {
     $n = 0;
-    foreach (appr_cond_ledger() as $rec) {
-        $st = is_array($rec) ? (string) ($rec['st'] ?? '') : '';
-        if ($st === APPR_COND_UNARMED || $st === APPR_COND_NOT_RECORDED) $n++;
+    foreach (appr_cond_all() as $rec) {
+        $st = (string) ($rec['st'] ?? '');
+        //  D-3 — CORRUPT counts as an active fault. A record nobody can read is a
+        //  problem to show a human, never a reason to show a clean dashboard.
+        if ($st === APPR_COND_UNARMED || $st === APPR_COND_NOT_RECORDED || $st === APPR_COND_CORRUPT) $n++;
     }
     return $n;
 }
@@ -470,7 +570,7 @@ function appr_cond_note($condKey, $status, $detail = '') {
     //  REASON materially changes (a different fault is a different condition, not
     //  a repeat), and once on recovery. Never otherwise.
     if ($fp !== '' && $status !== APPR_COND_RECOVERED) {
-        $seen = appr_cond_ledger()[$fp] ?? null;
+        $seen = appr_cond_rec_get($fp);
         if (is_array($seen) && (string) ($seen['st'] ?? '') === (string) $status
             && (string) ($seen['why'] ?? '') === (string) $detail) return;   // already said
     }
@@ -484,6 +584,9 @@ function appr_cond_note($condKey, $status, $detail = '') {
     } elseif ($status === APPR_COND_TERMINAL) {
         $msg = 'this condition is closed as unrecoverable; it is no longer reported as an '
              . 'active fault and nothing claims its marker was ever written';
+    } elseif ($status === APPR_COND_CORRUPT) {
+        $msg = 'the stored record for this condition cannot be read; it is reported as an active '
+             . 'fault rather than treated as absent, and no other condition is affected';
     } elseif ($status === APPR_COND_RECOVERED) {
         $msg = 'the suppression marker was written on the existing event; '
              . 'ordinary suppression has resumed';
@@ -518,69 +621,78 @@ function appr_cond_note($condKey, $status, $detail = '') {
 //  Nothing here manufactures a marker, resurrects a decision, touches approval
 //  lifecycle, or reaches outside the connected database.
 function appr_cond_reconcile($limit = APPR_COND_RECON_MAX) {
-    $out = ['examined' => 0, 'recovered' => 0, 'terminal' => 0, 'still' => 0];
-    $l = appr_cond_ledger();
-    if (!$l) return $out;
-    $maxNow = 0;
-    try { $maxNow = (int) ops_val("SELECT MAX(id) FROM activities"); } catch (Throwable $e) { $maxNow = 0; }
-    $dirty = false;
-    foreach ($l as $fp => $rec) {
+    $out = ['examined' => 0, 'recovered' => 0, 'terminal' => 0, 'still' => 0, 'corrupt' => 0];
+    foreach (appr_cond_all() as $fp => $rec) {
         if ($out['examined'] >= (int) $limit) break;
-        //  PART J case 3 — a malformed entry is dropped, and takes nobody with it.
-        if (!is_array($rec)) { unset($l[$fp]); $dirty = true; continue; }
         $st = (string) ($rec['st'] ?? '');
-        if ($st !== APPR_COND_UNARMED && $st !== APPR_COND_NOT_RECORDED) continue;
+        if ($st !== APPR_COND_UNARMED && $st !== APPR_COND_NOT_RECORDED && $st !== APPR_COND_CORRUPT) continue;
         $out['examined']++;
+        //  L · PARTIAL FAILURE — every candidate is handled inside its own try, so
+        //  one bad record can never stop the others being processed. There is no
+        //  global "everything succeeded" result: the counters say exactly what
+        //  happened to how many.
         try {
+            //  D-3 — a corrupt record is reported, kept and counted. It is never
+            //  quietly dropped and never silently ignored by reconciliation.
+            if ($st === APPR_COND_CORRUPT) {
+                $out['corrupt']++;
+                appr_cond_note('', APPR_COND_CORRUPT, 'stored condition record ' . $fp . ' is unreadable');
+                continue;
+            }
+            $key = (string) ($rec['k'] ?? '');
+            $id  = (int) ($rec['row'] ?? 0);
+
             if ($st === APPR_COND_NOT_RECORDED) {
-                //  No row was ever written, and inventing one would be manufacturing
-                //  history. The only honest question is whether the spine has become
-                //  writable since — answered READ-ONLY, by whether anything at all has
-                //  been written after the failure. MAX(id) is a primary-key read.
-                if ($maxNow > (int) ($rec['maxid'] ?? 0)) {
-                    $l[$fp] = ['st' => APPR_COND_TERMINAL, 'k' => (string) ($rec['k'] ?? ''), 'row' => 0,
-                               'why' => 'the spine is writable again; the original event was never '
-                                      . 'written and cannot be reconstructed', 'at' => date('c')];
-                    $dirty = true; $out['terminal']++;
-                    appr_cond_note($rec['k'] ?? '', APPR_COND_TERMINAL, (string) $l[$fp]['why']);
+                //  D-4 — CONDITION-SPECIFIC recovery, with no high-water mark.
+                //  The original event was never written and inventing a copy of it
+                //  would be manufacturing history. What CAN be established is
+                //  whether the spine will accept a write FOR THIS CONDITION, and
+                //  the honest way to establish that is to attempt exactly one
+                //  record that says so. It succeeds → the fault is over and the
+                //  condition is closed as unrecoverable. It fails → nothing is
+                //  written, nothing is said, and the condition stays active.
+                //  Idempotent: the state moves to TERMINAL in the same pass, so a
+                //  second run finds nothing to do.
+                $wrote = 0;
+                if (function_exists('act_log')) {
+                    $wrote = (int) act_log('APPROVAL_POLICY', 0, 'SYSTEM',
+                        'Approval condition could not be recorded when it occurred — the record '
+                      . 'keeping fault is now over and this note replaces the lost entry');
+                }
+                if ($wrote > 0) {
+                    appr_cond_rec_put($fp, ['st' => APPR_COND_TERMINAL, 'k' => $key, 'row' => 0,
+                        'why' => 'the spine accepted a write for this condition; the original event '
+                               . 'was never written and cannot be reconstructed']);
+                    $out['terminal']++;
+                    appr_cond_note($key, APPR_COND_TERMINAL, 'closed after the spine accepted a write');
                 } else { $out['still']++; }
                 continue;
             }
+
             //  UNARMED
-            $key = (string) ($rec['k'] ?? '');
-            $id  = (int) ($rec['row'] ?? 0);
             if ($key === '' || $id <= 0) {
-                $l[$fp] = ['st' => APPR_COND_TERMINAL, 'k' => $key, 'row' => 0,
-                           'why' => 'the condition can no longer be identified', 'at' => date('c')];
-                $dirty = true; $out['terminal']++; continue;
+                appr_cond_rec_put($fp, ['st' => APPR_COND_TERMINAL, 'k' => $key, 'row' => 0,
+                    'why' => 'the condition can no longer be identified']);
+                $out['terminal']++; continue;
             }
             $row = ops_one("SELECT id, cond_key FROM activities WHERE id=?", [$id]);   // PRIMARY KEY
-            if (!$row) {                                   // PART C — its source is gone
-                $l[$fp] = ['st' => APPR_COND_TERMINAL, 'k' => $key, 'row' => 0,
-                           'why' => 'the event it belonged to no longer exists, so its marker '
-                                  . 'cannot be re-armed', 'at' => date('c')];
-                $dirty = true; $out['terminal']++;
-                appr_cond_note($key, APPR_COND_TERMINAL, (string) $l[$fp]['why']);
+            if (!$row) {                                   // its source is gone
+                appr_cond_rec_put($fp, ['st' => APPR_COND_TERMINAL, 'k' => $key, 'row' => 0,
+                    'why' => 'the event it belonged to no longer exists, so its marker cannot be re-armed']);
+                $out['terminal']++;
+                appr_cond_note($key, APPR_COND_TERMINAL, 'the event it belonged to no longer exists');
                 continue;
             }
-            if ((string) $row['cond_key'] === $key) {      // it recovered by other means
-                unset($l[$fp]); $dirty = true; $out['recovered']++; continue;
-            }
-            if (!appr_cond_col_ready()) { $out['still']++; continue; }   // say nothing, change nothing
+            if ((string) $row['cond_key'] === $key) { appr_cond_rec_drop($fp); $out['recovered']++; continue; }
+            if (!appr_cond_col_ready()) { $out['still']++; continue; }
             //  Only act_set_cond_key() may decide this. It reads the value back
             //  (#12 · X1), so STORED here means the marker is genuinely on the row.
             if (act_set_cond_key($id, $key) === ACT_COND_STORED) {
-                unset($l[$fp]); $dirty = true; $out['recovered']++;
+                appr_cond_rec_drop($fp); $out['recovered']++;
                 appr_cond_note($key, APPR_COND_RECOVERED, 'recovered by reconciliation');
-            } else {
-                $out['still']++;                            // truthfully unresolved, silently
-            }
-        } catch (Throwable $e) {
-            //  PART J case 2 — one candidate's failure changes nothing for the rest.
-            $out['still']++;
-        }
+            } else { $out['still']++; }
+        } catch (Throwable $e) { $out['still']++; }
     }
-    if ($dirty) appr_cond_ledger_save($l);
     return $out;
 }
 
@@ -597,7 +709,7 @@ function appr_cond_retry($condKey) {
     if (!$row) return APPR_COND_UNARMED;
     $st = function_exists('act_set_cond_key') ? act_set_cond_key((int) $row['id'], $condKey) : ACT_COND_FAILED;
     if ($st === ACT_COND_STORED) {
-        appr_cond_ledger_drop(appr_cond_fingerprint($condKey));
+        appr_cond_rec_drop(appr_cond_fingerprint($condKey));
         appr_cond_note($condKey, APPR_COND_RECOVERED); return APPR_COND_RECOVERED;
     }
     return APPR_COND_PENDING_RETRY;                          // bounded: no row, no log line
@@ -619,15 +731,18 @@ function appr_cond_outcome($condKey) {
         //  will use later to tell "still broken" from "writable again".
         $why = function_exists('act_last_error') ? act_last_error() : '';
         appr_cond_note($condKey, APPR_COND_NOT_RECORDED, $why);      // bounded by the ledger
-        $max = 0; try { $max = (int) ops_val("SELECT MAX(id) FROM activities"); } catch (Throwable $e) {}
-        appr_cond_ledger_put($fp, ['st' => APPR_COND_NOT_RECORDED, 'k' => (string) $condKey,
-                                   'row' => 0, 'why' => $why, 'maxid' => $max]);
+        //  D-4 — NO high-water mark. MAX(activities.id) is taken over surviving
+        //  rows, so deleting rows moved it BACKWARDS and the condition could never
+        //  reach its terminal state. Recovery is condition-specific instead — see
+        //  appr_cond_reconcile().
+        appr_cond_rec_put($fp, ['st' => APPR_COND_NOT_RECORDED, 'k' => (string) $condKey,
+                                'row' => 0, 'why' => $why]);
         return APPR_COND_NOT_RECORDED;
     }
-    if ($st === ACT_COND_STORED) { appr_cond_ledger_drop($fp); return APPR_COND_RECORDED; }   // case A
+    if ($st === ACT_COND_STORED) { appr_cond_rec_drop($fp); return APPR_COND_RECORDED; }   // case A
     appr_cond_note($condKey, APPR_COND_UNARMED, $st);                // case B — once per condition
-    appr_cond_ledger_put($fp, ['st' => APPR_COND_UNARMED, 'k' => (string) $condKey,
-                               'row' => (int) $row, 'why' => (string) $st]);
+    appr_cond_rec_put($fp, ['st' => APPR_COND_UNARMED, 'k' => (string) $condKey,
+                            'row' => (int) $row, 'why' => (string) $st]);
     return APPR_COND_UNARMED;
 }
 

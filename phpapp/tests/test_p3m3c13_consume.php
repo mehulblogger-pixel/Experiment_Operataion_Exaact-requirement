@@ -239,6 +239,9 @@ $pdo->prepare("DELETE FROM users WHERE id=?")->execute([$uCfg]);
 //  activity rows a suite deletes. That is correct product behaviour (reconciliation
 //  resolves an entry whose row is gone to TERMINAL), but a suite that leaves entries
 //  behind hands them to whichever suite runs next. Clear what this one created.
+//  FINAL STABILISATION — condition records are now ONE SETTINGS ROW EACH, so a
+//  suite tidies them by removing its rows, not by blanking a shared document.
+try { db()->exec("DELETE FROM settings WHERE skey LIKE 'apprcond%'"); } catch (Throwable $e) {}
 if (function_exists('setting_set')) setting_set('appr_cond_ledger', '');
 if ($prevUid === null) unset($_SESSION['uid']); else $_SESSION['uid'] = $prevUid;
 $_SESSION = $origSess; current_user(true); ua(true);

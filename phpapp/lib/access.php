@@ -947,7 +947,13 @@ function &settings_cache() {
     if ($cache === null || $atEpoch !== $epoch) {
         $cache = [];
         $atEpoch = $epoch;
-        try { foreach (ops_all("SELECT skey, svalue FROM settings") as $r) $cache[$r['skey']] = $r['svalue']; }
+        //  M3 FINAL STABILISATION — approval condition records live in `settings`
+        //  as one row each, and are always read straight from the database because
+        //  another process may be writing them concurrently. They are excluded here
+        //  so a workspace with many open conditions does not enlarge every other
+        //  settings read, and so nothing can accidentally read them from a cache
+        //  that is loaded once per epoch.
+        try { foreach (ops_all("SELECT skey, svalue FROM settings WHERE skey NOT LIKE 'apprcond%'") as $r) $cache[$r['skey']] = $r['svalue']; }
         catch (Throwable $e) { $cache = []; }
     }
     return $cache;
@@ -972,6 +978,9 @@ function setting_change_class($k) {
     if (in_array($k, ['setup_done', 'schema_sig', 'admin_cfg_sig', 'partners_seeded',
                       'demo_seed_last_fail', 'demo_removed', 'billing_paid_until', 'audit_trim_anchor',
                       'appr_cond_ledger'], true)) return ['audit' => false, 'secret' => false];
+    //  Condition records are written directly (one row each) and never through
+    //  setting_set(), so this is belt and braces rather than the live path.
+    if (strpos($k, 'apprcond') === 0) return ['audit' => false, 'secret' => false];
     // Module 46 — the signed licence key and install id are sensitive entitlement
     // artifacts; without this they were audited on the non-secret path (value on the trail).
     $secret = (bool)preg_match('/(pass|secret|token|api_?key|ai_config|rzp_key|licence_key|licence_install)/i', $k);
