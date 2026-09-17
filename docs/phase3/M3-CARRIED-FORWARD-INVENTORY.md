@@ -23,3 +23,39 @@ correctness defect, or (c) the M4 implementation resolves it naturally.
 **Actioned in M4: two — H1 and A-2, both as CONNECT, neither as a reopening.**
 M4 will prove it does not *create* a new instance of either. Everything else is
 carried forward untouched.
+
+
+---
+
+# M4 FINAL VERIFICATION — the ledger, re-checked
+
+Re-examined at the M4 gate. **M3 was not reopened.** The question asked of each
+item was only: *does this create a genuine M4 correctness, security or dependency
+defect?*
+
+| ID | M4 action | Evidence from the M4 gate |
+|---|---|---|
+| **H1** orphan chain approved directly | **CONNECT — discharged** | M4 creates re-approval chains through `appr_start()`/`hreq_appr_ctx()`, never by reaching `appr_act()` directly. Proved by M4.12: exactly one open chain, with real steps from the configured matrix. M4 adds no new way to reach the orphan case. |
+| **A-2** a record id taken as proof | **CONNECT — discharged** | Every M4 write re-reads its row in the connected workspace and re-checks scope. Proved by security D1–D6 (tenant B cannot read, edit, approve or spend) and E1–E9 (branch B refused on all eight operations). |
+| **H3** orphans counted in the SLA summary | CARRY FORWARD | M4 changes no counting logic; re-approval chains use the existing counters unaltered. |
+| **S2** condition identity omits the decision result | CARRY FORWARD | M4 emits no condition keys. |
+| **S3** a condition key never expires | CARRY FORWARD | Same. |
+| **U2** unindexed `cond_key` lookup where the optional index is absent | CARRY FORWARD | M4 adds no condition lookups; it added no index. |
+| **C-3** the fingerprint is written to a display column | CARRY FORWARD | Untouched; M4 adds no timeline panel for these entities. |
+| **A-3** `STORED` survives a rollback | CARRY FORWARD | M4 wraps no condition write in a transaction. |
+| **A-4** engines disagree on an over-long condition key | CARRY FORWARD | M4 emits no condition keys. |
+| **A-5** byte truncation mangles a non-ASCII condition key | CARRY FORWARD | Same. |
+| **A-6** the loose-comparison mutation is unpinned | CARRY FORWARD | A gap in M3's own suite. |
+| **A-7** the column channel masks the write channel | CARRY FORWARD | Diagnostic display only. |
+| **L1–L8** the eight documented limitations of the M3 condition store | CARRY FORWARD | All named, bounded and inert for M4. |
+
+**Two discharged as CONNECT, eleven carried forward, none reopened, nothing
+removed from the ledger.**
+
+## One new observation from the M4 gate — recorded, not actioned
+
+`ua()` maps an **unrecognised** role to `ADMIN`. Custom roles resolve first through
+`role_effective_key()`, and `can()` is otherwise strict (`mod.ops.view` and an
+invented permission both returned false for the same user), so this is reached only
+by a role in no list at all. It is **pre-existing**, not introduced or touched by
+M4, and under §27/§38 it is not reopened here. Logged so it cannot be lost.

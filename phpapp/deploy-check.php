@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '494ae1a · 2026-09-17 08:45 UTC · 660 files';
+$RELEASE = '2178859 · 2026-09-17 10:02 UTC · 660 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -133,7 +133,7 @@ $EXPECT  = [
     'lib/formdesign.php' => ['s'=>27024,'h'=>'0feb6ccff1be7076'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
     'lib/helpers.php' => ['s'=>21408,'h'=>'0158217e1aae4477'],
-    'lib/hiringreq.php' => ['s'=>67963,'h'=>'1a0ceb5b1f06a9a1'],
+    'lib/hiringreq.php' => ['s'=>69605,'h'=>'01f1b597584f6198'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
     'lib/idems.php' => ['s'=>786409,'h'=>'3d46d6301e9ec8e5'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],

@@ -205,6 +205,33 @@ $pdo->prepare("DELETE FROM recruit_approval_levels WHERE rule_id=?")->execute([$
 $pdo->prepare("DELETE FROM recruit_approval_rules WHERE id=?")->execute([$ruleId]);
 
 // ---------------------------------------------------------------------------
+//  M4.13 · the ATOMIC CLAIM that stops two savers both opening a re-approval.
+//
+//  Found by mutation: making the claim always succeed ($won = true) SURVIVED the
+//  suite, because appr_start() independently refuses to open a second chain when
+//  one is already open. That protection is real and is asserted in M4.12 — but it
+//  left the claim itself unpinned, so a future change to appr_start() would remove
+//  the guarantee silently. The claim is pinned here on its own terms.
+// ---------------------------------------------------------------------------
+t_section('M4.13 · only the first saver may open a re-approval');
+$h13 = $approve(['job_title'=>'M4R Claim']);
+[$c1ok,$c1msg] = hreq_save($h13, $base(['job_title'=>'M4R Claim','grade'=>'G3']));
+t_ok($c1ok, 'M4.13 · the first material change is saved');
+t_ok(stripos($c1msg, 'already awaiting') === false,
+     'M4.13 · and it is the one that OPENS the re-approval');
+$st13 = hreq_reapproval_state(hreq_get($h13));
+t_ok(in_array($st13, ['REQUIRED','IN_PROGRESS'], true), 'M4.13 · the request is now awaiting re-approval');
+//  A second saver arrives while it is open. It must be told it is already open —
+//  it must NOT believe it opened one.
+[$c2ok,$c2msg] = hreq_require_reapproval($h13, ['grade'=>['was'=>'G3','now'=>'G4','why'=>'test']]);
+t_ok(stripos($c2msg, 'already awaiting') !== false,
+     'M4.13 · *** the second caller is told it is ALREADY awaiting re-approval — it did not open one ***');
+t_eq(hreq_reapproval_state(hreq_get($h13)), $st13, 'M4.13 · and the state did not churn');
+[$c3ok,$c3msg] = hreq_require_reapproval($h13, ['grade'=>['was'=>'G3','now'=>'G5','why'=>'test']]);
+t_ok(stripos($c3msg, 'already awaiting') !== false, 'M4.13 · a third caller is told the same');
+t_ok(!hreq_is_executable(hreq_get($h13)), 'M4.13 · execution stays blocked throughout');
+
+// ---------------------------------------------------------------------------
 t_section('M4.16 · ADR-001 — a requisition with no hiring request is unaffected');
 t_eq(hreq_req_block_reason(0), '', 'M4.16 · no requisition, nothing to enforce');
 t_eq(hreq_qty_guard(0, 999), '',   'M4.16 · *** no approved headcount is invented from nowhere ***');

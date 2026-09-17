@@ -1058,6 +1058,32 @@ function hreq_to_requisition($id, $qty = 0) {
                    (string) $r['decided_by'], (string) substr((string) $r['decided_at'], 0, 10),
                    hreq_who(), hreq_now()]);
     $rid = (int) db()->lastInsertId();
+
+    //  M4 §14/§25 — THE CEILING, RE-CHECKED AFTER THE INSERT.
+    //
+    //  The check above is check-then-insert, which is not atomic. Under real
+    //  concurrency on MariaDB two processes both passed the check and both took
+    //  the last seat: measured, 11 allocated against an approved 10. SQLite hid it
+    //  because it serialises writers with a database-level lock — which is exactly
+    //  why MariaDB is the authoritative engine.
+    //
+    //  The edit path already compensates after its write; creation now does the
+    //  same. The row is inserted, the total is re-read, and a requisition that
+    //  broke the ceiling is removed again. Two racing processes may both revert,
+    //  which refuses an allocation that could in principle have succeeded — the
+    //  safe direction for a headcount control, and never an over-allocation.
+    $approvedNow = hreq_approved_qty($r);
+    $totalNow = (int) ops_val("SELECT COALESCE(SUM(quantity),0) FROM requisitions
+                               WHERE hiring_request_id=? AND UPPER(COALESCE(status,'')) <> 'CANCELLED'", [(int) $id]);
+    if ($totalNow > $approvedNow) {
+        try { db()->prepare("DELETE FROM requisitions WHERE id=?")->execute([$rid]); } catch (Throwable $e) {}
+        if (function_exists('act_log'))
+            act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                    'Refused: a requisition that would have exceeded the approved headcount',
+                    ['auto' => 1, 'outcome' => 'OVER_ALLOCATION_REFUSED']);
+        return [false, 'Another user took the last of the approved headcount while this was being raised.', 0];
+    }
+
     if (function_exists('reqf_sync')) reqf_sync($rid);
     if (function_exists('act_log'))
         act_log('HIRING_REQUEST', (int) $id, 'SYSTEM', 'Recruitment requisition ' . $code . ' raised for ' . $qty, ['auto' => 1]);
