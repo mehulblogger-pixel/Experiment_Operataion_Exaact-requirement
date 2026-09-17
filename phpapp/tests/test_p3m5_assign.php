@@ -94,12 +94,34 @@ $GLOBALS['__m5_force_block'] = true;
 //  rasg_check(), before permission, and a master reaches it like anyone else.
 $src = file_get_contents(dirname(__DIR__) . '/lib/recruit_assign.php');
 $src = preg_replace('~^\s*//.*$~m', '', $src);          // a pin must never match its own comment
-$chk = substr($src, strpos($src, 'function rasg_check('), 1400);
+//  The caller gate lives in rasg_may_touch() — it was split out of rasg_check()
+//  when an adversarial probe showed that answering "stale" before answering
+//  "you may not" let an unauthorised caller read the current owner off the
+//  refusals. These pins follow the code to where it now lives, and assert MORE
+//  than before: the order inside the writer as well as inside the gate.
+$chk = substr($src, strpos($src, 'function rasg_may_touch('), 1400);
 t_ok(strpos($chk, 'licence_blocks') !== false, 'C1 · the door asks the licence');
 t_ok(strpos($chk, 'licence_blocks') < strpos($chk, 'is_coordinator_level'),
      'C2 · *** entitlement is asked BEFORE permission — an unlicensed workspace is refused first ***');
 t_ok(strpos($chk, 'is_master') === false,
      'C3 · *** there is no master bypass in the door ***');
+$wr = substr($src, strpos($src, 'function rasg_assign('));
+$wr = substr($wr, 0, strpos($wr, "\nfunction "));
+t_ok(strpos($wr, 'rasg_may_touch') !== false && strpos($wr, 'rasg_may_touch') < strpos($wr, "'STALE'"),
+     'C4 · *** the writer asks "may you touch this" BEFORE it answers "your screen is stale" ***');
+t_ok(strpos($wr, 'rasg_may_touch') < strpos($wr, "'NO_CHANGE'"),
+     'C5 · …and before it answers "that is already the owner"');
+//  Behavioural: the same caller, two different baselines, one answer.
+$rC = $mkReq(['recruiter_id' => $uRecA]);
+$act($uInsp);
+$wrongBase = rasg_assign('REQ_RECRUITER', $rC, $uRecA2, ['expect' => 999999])['code'];
+$rightBase = rasg_assign('REQ_RECRUITER', $rC, $uRecA2, ['expect' => $uRecA])['code'];
+$sameOwner = rasg_assign('REQ_RECRUITER', $rC, $uRecA,  ['expect' => $uRecA])['code'];
+t_eq($wrongBase, 'NO_PERMISSION', 'C6 · a caller with no permission is told so, whatever baseline they guess');
+t_eq($rightBase, 'NO_PERMISSION', 'C7 · …including the correct baseline');
+t_eq($sameOwner, 'NO_PERMISSION',
+     'C8 · *** and naming the current owner does not answer "no change" — ownership cannot be enumerated ***');
+$act($uBoss);
 unset($GLOBALS['__m5_force_block']);
 
 // ---- D · STATE MATRIX -------------------------------------------------------
@@ -362,5 +384,80 @@ t_ok(strpos($m5w, "if (\$from === \$to) return") < $posSwap,
 $rNo = $mkReq(['recruiter_id' => $uRecA]);
 t_eq(rasg_assign('REQ_RECRUITER', $rNo, $uRecA, ['expect' => $uRecA])['code'], 'NO_CHANGE',
      'M5 · …proved: setting the owner to the owner is NO_CHANGE, never a write');
+
+// ---- P · THE ADVERSARIAL AUDIT'S FINDINGS, PINNED --------------------------
+//  Four findings from attacking M5 after it was first declared accepted. Each is
+//  pinned behaviourally here so it cannot come back.
+t_section('P · findings from the adversarial audit');
+
+//  P1 — an array posted into a person field. PHP casts a non-empty array to the
+//  integer 1, so the door validated "user #1" and assigned the work to whoever
+//  that is. A person is never inferred from a type conversion.
+$rP = $mkReq();
+t_eq(rasg_apply_posted('REQ_RECRUITER', $rP, ['recruiter_id' => ['x'], 'own_base_recruiter_id' => 0], 'recruiter_id', 'test'),
+     rasg_refusal('REQ_RECRUITER', 'BAD_VALUE'),
+     'P1 · *** an ARRAY posted as the recruiter is refused, not cast into user #1 ***');
+t_eq($owner($rP), 0, 'P1b · and nothing was assigned');
+t_eq(rasg_assign('REQ_RECRUITER', $rP, ['x'], ['expect' => null])['code'], 'BAD_VALUE',
+     'P1c · the service refuses it too, not only the form path');
+//  P2 — "abc" casts to 0, which the old code read as "unassign". A typo must not
+//  silently remove the owner.
+rasg_assign('REQ_RECRUITER', $rP, $uRecA, ['expect' => null]);
+t_eq(rasg_apply_posted('REQ_RECRUITER', $rP, ['recruiter_id' => 'abc', 'own_base_recruiter_id' => $uRecA], 'recruiter_id', 'test'),
+     rasg_refusal('REQ_RECRUITER', 'BAD_VALUE'),
+     'P2 · *** a non-numeric recruiter is refused, not read as "unassign" ***');
+t_eq($owner($rP), $uRecA, 'P2b · and the owner is still there');
+t_eq(rasg_apply_posted('REQ_RECRUITER', $rP, ['recruiter_id' => '', 'own_base_recruiter_id' => $uRecA], 'recruiter_id', 'test'), '',
+     'P2c · an empty value is still a legitimate unassignment');
+t_eq($owner($rP), 0, 'P2d · …and unassigns');
+//  P3 — a corrupted baseline is not a licence to overwrite either.
+$rP3 = $mkReq(['recruiter_id' => $uRecA]);
+t_eq(rasg_apply_posted('REQ_RECRUITER', $rP3, ['recruiter_id' => $uRecA2, 'own_base_recruiter_id' => ['x']], 'recruiter_id', 'test'),
+     rasg_refusal('REQ_RECRUITER', 'BAD_VALUE'), 'P3 · an unreadable baseline is refused');
+t_eq($owner($rP3), $uRecA, 'P3b · and the owner stands');
+
+//  P4 — the destination, not the origin. One save can change the recruiter AND
+//  move the candidate to a requirement in another branch; the question must be
+//  asked about the record the save is producing.
+$rBranchA = $mkReq();
+$rBranchB = $mkReq(['office_id' => 9552]);
+$cP = $mkCand($rBranchA);
+t_eq(rasg_apply_posted('CAND_RECRUITER', $cP, ['recruiter_id' => $uRecA, 'own_base_recruiter_id' => 0], 'recruiter_id', 'test',
+                       ['requisition_id' => $rBranchB]),
+     rasg_refusal('CAND_RECRUITER', 'RECRUITER_OUT_OF_SCOPE'),
+     'P4 · *** a branch-A recruiter is refused when the SAME save moves the candidate to branch B ***');
+t_eq($cowner($cP), 0, 'P4b · and nobody was made accountable for work they cannot see');
+t_eq(rasg_apply_posted('CAND_RECRUITER', $cP, ['recruiter_id' => $uRecA, 'own_base_recruiter_id' => 0], 'recruiter_id', 'test',
+                       ['requisition_id' => $rBranchA]), '',
+     'P4c · …and is accepted when the candidate stays in branch A');
+
+//  P5 — moving the work without touching the name is still a change of
+//  accountability, and is refused the same way.
+$cP5 = $mkCand($rBranchA, ['recruiter_id' => $uRecA]);
+t_ok(rasg_move_blocks('CAND_RECRUITER', $cP5, ['requisition_id' => $rBranchB]) !== '',
+     'P5 · *** moving a candidate across a branch boundary under an owner who cannot see it is refused ***');
+t_eq(rasg_move_blocks('CAND_RECRUITER', $cP5, ['requisition_id' => $rBranchA]), '',
+     'P5b · a move within the same branch is fine');
+$cP5b = $mkCand($rBranchA);
+t_eq(rasg_move_blocks('CAND_RECRUITER', $cP5b, ['requisition_id' => $rBranchB]), '',
+     'P5c · and an unowned candidate can be moved freely — there is nobody to strand');
+
+//  P6 — ONE candidate scope rule. A candidate attached to no requirement must be
+//  counted the same way by the dashboard and by its own recruiter's workload.
+$pdo->prepare("INSERT INTO candidates (cand_code,first_name,last_name,stage,requisition_id,recruiter_id,created_at)
+               VALUES (?,'M5','Loose','RECEIVED',NULL,?,?)")->execute(['M5-LOOSE-' . bin2hex(random_bytes(3)), $uRecB, date('c')]);
+$cLoose = (int) $pdo->lastInsertId();
+$act($uRecB);
+$m5f2 = ['fy' => '', 'range' => null, 'month' => '', 'dept' => '', 'source' => '', 'manager' => ''];
+[$dw, $da] = rcc_cand_where($m5f2, 'c');
+$dashSees = (int) ops_val("SELECT COUNT(*) FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id
+                           WHERE $dw AND c.id=?", array_merge($da, [$cLoose]));
+$loadSees = rasg_workload($uRecB)['candidates'];
+t_eq($dashSees >= 1 ? 1 : 0, $loadSees >= 1 ? 1 : 0,
+     'P6 · *** the dashboard and the workload counter agree about a candidate with no requirement ***');
+t_ok(strpos(preg_replace('~^\s*//.*$~m', '', (string) file_get_contents(dirname(__DIR__) . '/lib/recruit_cc.php')),
+            'rasg_cand_scope') !== false,
+     'P6b · …because there is now one definition, read by both');
+$act($uBoss);
 
 $_SESSION = $m5orig; current_user(true); ua(true);

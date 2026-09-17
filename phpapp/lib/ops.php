@@ -5424,11 +5424,27 @@ function ops_candidates($route, $method) {
             }
             if (!$dupBlock && $cand) {
                 //  M5 — ownership before the rest of the save, refused as a whole.
+                //  M5 (adversarial audit) — THE DESTINATION, NOT THE ORIGIN.
+                //
+                //  This one save can change the recruiter AND move the candidate to a
+                //  different requirement. Asking the ownership question about where the
+                //  candidate IS, while the save is about to put it somewhere else,
+                //  let a branch-A-only recruiter end up accountable for branch-B work.
+                //  The question is now asked about the record the save is producing.
+                $m5dest = array_key_exists('requisition_id', $b)
+                    ? ['requisition_id' => ($b['requisition_id'] === '' ? 0 : (int) $b['requisition_id'])] : [];
                 if (function_exists('rasg_assign')) {
                     foreach ($m5cand as $m5col => $m5subj) {
-                        $m5r = rasg_apply_posted($m5subj, (int) $cand['id'], $b, $m5col, 'candidate-edit');
+                        $m5r = rasg_apply_posted($m5subj, (int) $cand['id'], $b, $m5col, 'candidate-edit', $m5dest);
                         if ($m5r !== '') { flash($m5r, 'error'); redirect('/candidate?id=' . (int) $cand['id']); }
                     }
+                }
+                //  And the owner who is NOT being changed still has to cover where the
+                //  candidate is going. Moving a person's work across a branch boundary
+                //  is a change of accountability even when nobody edited the name.
+                if (function_exists('rasg_move_blocks')) {
+                    $m5mv = rasg_move_blocks('CAND_RECRUITER', (int) $cand['id'], $m5dest);
+                    if ($m5mv !== '') { flash($m5mv, 'error'); redirect('/candidate?id=' . (int) $cand['id']); }
                 }
                 $m5auth = function_exists('rasg_authorised_now') ? rasg_authorised_now('candidates', (int) $cand['id']) : [];
                 $set = implode(',', array_map(fn($f) => "$f=?", $fields));
@@ -5470,7 +5486,9 @@ function ops_candidates($route, $method) {
                 if (function_exists('rasg_assign')) {
                     foreach ($m5cand as $m5col => $m5subj) {
                         if (!array_key_exists($m5col, $b)) continue;
-                        $m5res = rasg_assign($m5subj, (int) $id, $b[$m5col], ['expect' => null, 'source' => 'candidate-new']);
+                        $m5res = rasg_assign($m5subj, (int) $id, $b[$m5col],
+                            ['expect' => null, 'source' => 'candidate-new']
+                            + (array_key_exists('requisition_id', $b) ? ['requisition_id' => ($b['requisition_id'] === '' ? 0 : (int) $b['requisition_id'])] : []));
                         if (!$m5res['ok']) $m5note .= ' ' . rasg_refusal($m5subj, $m5res['code']);
                     }
                 }

@@ -4,7 +4,7 @@ Each mutation is applied to a **copy** of `phpapp/` in a scratch directory, the
 deploy checksum is regenerated, and the M5 and recruitment suites are run on
 **MariaDB**. A suite that dies without printing a result counts as a detection.
 
-**Baseline: 0 failures. Attempted 17 · Caught 17 · Survived 0.**
+**Baseline: 0 failures. Attempted 22 · Caught 22 · Survived 0.**
 
 | # | Mutation | Result | The assertion that caught it |
 |---|---|---|---|
@@ -63,7 +63,28 @@ change ownership, whether or not anybody remembers the rule. Mutations **M16** a
 M14 is now caught by J5d and J5e, and the compensator means the mutated code would
 not have changed ownership even if the probes had missed it again.
 
+## The five added by the adversarial audit
+
+| # | Mutation | Result | Caught by |
+|---|---|---|---|
+| M18 | a person id is **cast** instead of validated (an array becomes user #1) | **CAUGHT** | P1 / P1c |
+| M19 | the scope question is asked about the **origin**, not the destination | **CAUGHT** | P4 |
+| M20 | authorization is answered **after** the stale-screen test again | **CAUGHT** | C6–C8 |
+| M21 | moving a candidate across branches ignores who holds it | **CAUGHT** | P5 |
+| M22 | the workload counter keeps its **own** candidate scope rule | **CAUGHT** | P6 |
+
+## An invalid run, reported rather than discarded
+
+The first re-run after the audit's fixes reported **21 survivors**. It measured
+nothing: the database server had gone down, so the **baseline itself was FATAL**
+and every mutant "survived" against a broken run. One anchor was also stale,
+because a fix had changed the line it matched.
+
+The harness now **aborts when the baseline is not clean** — a battery that cannot
+prove its own starting point proves nothing about its mutants — the anchor was
+corrected, and the numbers above are from the re-run.
+
 ## Nothing inherited is claimed as newly caught
 
-All seventeen are M5 mutations against M5 code paths. The M4 battery is not
+All twenty-two are M5 mutations against M5 code paths. The M4 battery is not
 re-counted here.

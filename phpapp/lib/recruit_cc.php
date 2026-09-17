@@ -138,17 +138,12 @@ function rcc_month_label($ym) {
 //  a candidate that belongs to no requirement from vanishing for every branch at
 //  once. The Business-Unit half stays recruit_sbu_clause(), the module's existing
 //  candidate rule, which likewise keeps a blank Business Unit visible.
+//  The candidate scope rule is defined ONCE, in recruit_assign.php, and read here
+//  as well as by the recruiter workload counter. Shipping two copies of it is
+//  what made a candidate with no requirement appear on the dashboard and vanish
+//  from its own recruiter's workload.
 function rcc_scope_cand($alias = 'c') {
-    $w = []; $a = [];
-    if (function_exists('scope_office_clause')) {
-        [$ow, $oa] = scope_office_clause("(SELECT r2.office_id FROM requisitions r2 WHERE r2.id=$alias.requisition_id)");
-        if ($ow !== '1=1') { $w[] = $ow; $a = array_merge($a, $oa); }
-    }
-    if (function_exists('recruit_sbu_clause')) {
-        [$sw, $sa] = recruit_sbu_clause("$alias.sbu");
-        if ($sw !== '1=1') { $w[] = $sw; $a = array_merge($a, $sa); }
-    }
-    return [$w ? implode(' AND ', $w) : '1=1', $a];
+    return function_exists('rasg_cand_scope') ? rasg_cand_scope($alias) : ['1=1', []];
 }
 function rcc_scope_req($alias = 'r') {
     if (!function_exists('scope_clause')) return ['1=1', []];

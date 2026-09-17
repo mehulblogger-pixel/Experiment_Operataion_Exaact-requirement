@@ -65,9 +65,31 @@ const RASG_CODES = [
     'RECRUITER_UNKNOWN'      => 'that person does not exist in this workspace',
     'RECRUITER_INACTIVE'     => 'that person is deactivated and cannot be given new work',
     'RECRUITER_OUT_OF_SCOPE' => 'that person does not cover this office / branch',
+    'BAD_VALUE'              => 'that is not a person',
     'STALE'                  => 'somebody changed the owner while this screen was open',
     'LOST_RACE'              => 'somebody else changed the owner at the same moment',
 ];
+
+//  WHAT COUNTS AS A PERSON ID, asked before anything is cast.
+//
+//  An adversarial probe posted `recruiter_id[]` — an array — and PHP's cast
+//  turned it into the integer 1, so the door dutifully validated "user #1" and
+//  assigned the work to whoever that is. The same cast turns the string "abc"
+//  into 0, which the door reads as *unassign*: a typo, or a crafted field, would
+//  silently remove the owner.
+//
+//  So the value is examined before it is cast. Only three things are a legitimate
+//  answer to "who?": nothing at all (unassign), a run of digits, or an integer.
+//  Everything else is refused as BAD_VALUE rather than coerced into an identity.
+//  A person is never inferred from a type conversion.
+function rasg_person_id($v, &$ok) {
+    $ok = true;
+    if ($v === null || $v === '' || $v === 0 || $v === '0') return null;
+    if (is_int($v)) return $v > 0 ? $v : null;
+    if (is_string($v) && ctype_digit($v)) { $n = (int) $v; return $n > 0 ? $n : null; }
+    $ok = false;                       // arrays, objects, floats, "abc", "7x"
+    return null;
+}
 
 function rasg_now() { return function_exists('now_iso') ? now_iso() : date('c'); }
 function rasg_who() {
@@ -155,11 +177,22 @@ function rasg_row($subject, $id) {
 //  The office / Business Unit the record belongs to. A candidate has no branch of
 //  its own; it inherits the one from the requisition it is being worked against,
 //  exactly as cand_scope_gate() already does for reading.
-function rasg_row_scope($subject, $row) {
+//  $opt['requisition_id'] — the requirement the candidate is being moved ONTO in
+//  this same save, when there is one.
+//
+//  Without it the scope question is asked about where the candidate IS while the
+//  save is about to move it somewhere else. An adversarial probe did exactly
+//  that: one POST set a branch-A recruiter (checked against branch A, allowed)
+//  and moved the candidate to a branch-B requirement, leaving a branch-A-only
+//  recruiter accountable for branch-B work. The rule is the same one M4 learned —
+//  ask the question about the record the save is actually producing.
+function rasg_row_scope($subject, $row, array $opt = []) {
     $s = RASG_SUBJECTS[$subject] ?? null;
     if (!$s) return [null, null];
     if ($s['entity'] === 'REQUISITION') return [$row['office_id'] ?? null, $row['sbu'] ?? null];
-    $rq = (int) ($row['requisition_id'] ?? 0);
+    $rq = array_key_exists('requisition_id', $opt)
+        ? (int) $opt['requisition_id']                     // where it is GOING
+        : (int) ($row['requisition_id'] ?? 0);             // where it is now
     if ($rq > 0) {
         try { $r = db()->query("SELECT office_id, sbu FROM requisitions WHERE id=" . $rq)->fetch(); }
         catch (Throwable $e) { $r = null; }
@@ -185,10 +218,11 @@ function rasg_state_ok($subject, $row, &$code) {
 //  The M4 boundary, asked about the requisition behind the record. Ownership is
 //  accountability, not execution — but a requisition whose approval has been
 //  invalidated is frozen, and M5 does not become the way around that (I8).
-function rasg_m4_block($subject, $row) {
+function rasg_m4_block($subject, $row, array $opt = []) {
     if (!function_exists('hreq_req_block_reason')) return '';
     $s = RASG_SUBJECTS[$subject];
-    $rq = $s['entity'] === 'REQUISITION' ? (int) ($row['id'] ?? 0) : (int) ($row['requisition_id'] ?? 0);
+    $rq = $s['entity'] === 'REQUISITION' ? (int) ($row['id'] ?? 0)
+        : (array_key_exists('requisition_id', $opt) ? (int) $opt['requisition_id'] : (int) ($row['requisition_id'] ?? 0));
     if ($rq <= 0) return '';
     return (string) hreq_req_block_reason($rq);
 }
@@ -201,7 +235,13 @@ function rasg_m4_block($subject, $row) {
 //  This is a pure question — it writes nothing — so a screen may ask it to decide
 //  what to offer. The screen asking it is a convenience; rasg_assign() asks it
 //  again at the write, which is what actually protects anything.
-function rasg_check($subject, $id, $toUserId, array $opt = []) {
+//  MAY THIS CALLER TOUCH THIS RECORD AT ALL? — asked about the person asking,
+//  not about the change they want. It is separated from the change questions
+//  below because ORDER LEAKS: while the stale-screen test ran first, a caller
+//  with no permission could tell a wrong baseline (`STALE`) from a right one
+//  (`NO_PERMISSION`) and so read off the current owner one guess at a time. A
+//  refusal must never be a way of asking a question you are not allowed to ask.
+function rasg_may_touch($subject, $id, array $opt = []) {
     $s = RASG_SUBJECTS[$subject] ?? null;
     if (!$s) return 'NO_SUBJECT';
 
@@ -222,20 +262,30 @@ function rasg_check($subject, $id, $toUserId, array $opt = []) {
     if (!$row) return 'NO_RECORD';
 
     //  4 · THE ACTOR'S OWN SCOPE over that record.
-    [$off, $sbu] = rasg_row_scope($subject, $row);
+    [$off, $sbu] = rasg_row_scope($subject, $row, $opt);
     if (function_exists('scope_allows') && !scope_allows($off, $sbu)) return 'OUT_OF_SCOPE';
+    return 'OK';
+}
+
+function rasg_check($subject, $id, $toUserId, array $opt = []) {
+    $gate = rasg_may_touch($subject, $id, $opt);
+    if ($gate !== 'OK') return $gate;
+    $s = RASG_SUBJECTS[$subject];
+    $row = is_array($opt['row'] ?? null) ? $opt['row'] : rasg_row($subject, $id);
+    [$off, $sbu] = rasg_row_scope($subject, $row, $opt);
 
     //  5 · THE STATE.
     $code = '';
     if (!rasg_state_ok($subject, $row, $code)) return $code;
 
     //  6 · THE M4 EXECUTION BOUNDARY.
-    if (rasg_m4_block($subject, $row) !== '') return 'M4_BLOCKED';
+    if (rasg_m4_block($subject, $row, $opt) !== '') return 'M4_BLOCKED';
 
     //  7 · THE PERSON. Unassignment (NULL) has no person to check — removing
     //  accountability is always permitted to someone who passed 1–6, because the
     //  alternative is work stuck to somebody who has left.
-    $to = ($toUserId === null || $toUserId === '' || (int) $toUserId === 0) ? null : (int) $toUserId;
+    $to = rasg_person_id($toUserId, $vOk);
+    if (!$vOk) return 'BAD_VALUE';
     if ($to !== null) {
         $rs = rasg_recruiter_state($to);
         if ($rs !== 'OK') return $rs;
@@ -260,14 +310,22 @@ function rasg_assign($subject, $id, $toUserId, array $opt = []) {
     $row = rasg_row($subject, $id);
     if (!$row) return $fail('NO_RECORD');
     $from = ($row[$s['col']] ?? null) === null ? null : (int) $row[$s['col']];
-    $to   = ($toUserId === null || $toUserId === '' || (int) $toUserId === 0) ? null : (int) $toUserId;
+    $to   = rasg_person_id($toUserId, $vOk);
+    if (!$vOk) return $fail('BAD_VALUE');
 
-    //  The staleness test comes BEFORE the permission questions only in the sense
-    //  that it is about the same field: a screen that was showing a different
-    //  owner is refused outright, never merged. "Last write wins" is how the
-    //  earlier of two managers silently loses their decision.
+    //  AUTHORIZATION FIRST — before the no-change answer and before the stale
+    //  answer, because both of those are answers ABOUT THE CURRENT OWNER, and a
+    //  caller who may not touch this record must not be able to read it off by
+    //  watching which refusal comes back.
+    $gate = rasg_may_touch($subject, $id, ['row' => $row] + $opt);
+    if ($gate !== 'OK') return $fail($gate);
+
+    //  Then the stale-screen test: a screen that was showing a different owner is
+    //  refused outright, never merged. "Last write wins" is how the earlier of two
+    //  managers silently loses their decision.
     if (array_key_exists('expect', $opt)) {
-        $exp = ($opt['expect'] === null || $opt['expect'] === '' || (int) $opt['expect'] === 0) ? null : (int) $opt['expect'];
+        $exp = rasg_person_id($opt['expect'], $eOk);
+        if (!$eOk) return $fail('BAD_VALUE');
         if ($exp !== $from) return $fail('STALE');
     }
 
@@ -362,7 +420,8 @@ function rasg_guard_change($subject, $id, $posted, array $opt = []) {
     $s = RASG_SUBJECTS[$subject] ?? null; if (!$s) return '';
     $row = rasg_row($subject, $id); if (!$row) return '';       // creation: nothing to compare yet
     $from = ($row[$s['col']] ?? null) === null ? null : (int) $row[$s['col']];
-    $to   = ($posted === null || $posted === '' || (int) $posted === 0) ? null : (int) $posted;
+    $to = rasg_person_id($posted, $vOk);
+    if (!$vOk) return rasg_refusal($subject, 'BAD_VALUE');
     if ($from === $to) return '';                                // not a change
     $code = rasg_check($subject, $id, $to, ['row' => $row] + $opt);
     if ($code === 'OK') return '';
@@ -375,7 +434,7 @@ function rasg_guard_change($subject, $id, $posted, array $opt = []) {
 //  later, and it is not repeated here.
 //
 //  Returns '' when the save may proceed, or the sentence to show the person.
-function rasg_apply_posted($subject, $id, array $post, $col, $source = '') {
+function rasg_apply_posted($subject, $id, array $post, $col, $source = '', array $opt = []) {
     //  A form that does not carry the field changes nothing. Before M5 an absent
     //  field was written as NULL, so a POST that merely omitted the dropdown
     //  quietly UNASSIGNED the requirement. Silence is not an instruction.
@@ -383,8 +442,11 @@ function rasg_apply_posted($subject, $id, array $post, $col, $source = '') {
     $s = RASG_SUBJECTS[$subject] ?? null; if (!$s) return '';
     $row = rasg_row($subject, $id); if (!$row) return '';
     $from = ($row[$s['col']] ?? null) === null ? null : (int) $row[$s['col']];
-    $to   = ($post[$col] === null || $post[$col] === '' || (int) $post[$col] === 0) ? null : (int) $post[$col];
-    if ($from === $to) return '';                                   // not a change
+    $to   = rasg_person_id($post[$col], $vOk);
+    //  An array, an object or "abc" is not a person and is not silently cast into
+    //  one — nor into 0, which would read as "unassign".
+    if (!$vOk) return rasg_refusal($subject, 'BAD_VALUE');
+    if ($from === $to && !array_key_exists('requisition_id', $opt)) return '';   // not a change
 
     //  THE STALE-SCREEN TEST. The form carries the owner it was showing. If the
     //  column has moved since, this save is acting on something it never saw, and
@@ -393,7 +455,7 @@ function rasg_apply_posted($subject, $id, array $post, $col, $source = '') {
     $baseKey = 'own_base_' . $col;
     if (!array_key_exists($baseKey, $post)) return rasg_refusal($subject, 'STALE');
 
-    $r = rasg_assign($subject, $id, $to, ['expect' => $post[$baseKey], 'source' => $source]);
+    $r = rasg_assign($subject, $id, $to, ['expect' => $post[$baseKey], 'source' => $source] + $opt);
     return $r['ok'] ? '' : rasg_refusal($subject, $r['code']);
 }
 
@@ -455,7 +517,8 @@ function rasg_enforce_after_write($subject, $id, $authorised) {
     $s = RASG_SUBJECTS[$subject] ?? null; if (!$s) return '';
     $row = rasg_row($subject, $id); if (!$row) return '';
     $cur = ($row[$s['col']] ?? null) === null ? null : (int) $row[$s['col']];
-    $want = ($authorised === null || $authorised === '' || (int) $authorised === 0) ? null : (int) $authorised;
+    $want = rasg_person_id($authorised, $wOk);
+    if (!$wOk) $want = null;                    // an unreadable snapshot means nobody, never a guess
     if ($cur === $want) return '';
 
     try { db()->prepare("UPDATE {$s['table']} SET {$s['col']}=? WHERE id=?")->execute([$want, (int) $id]); }
@@ -467,6 +530,29 @@ function rasg_enforce_after_write($subject, $id, $authorised) {
                      . 'It has been put back to the authorised value.']);
     }
     return 'The ' . $s['what'] . ' was not changed — an ownership change must go through the assignment control.';
+}
+
+//  MOVING THE WORK, not the owner. A save can carry a candidate to a different
+//  requirement without touching the recruiter's name. If the destination is in a
+//  branch that recruiter does not cover, that is still a change of accountability
+//  — the same question, arriving through the other field — and it is refused
+//  rather than quietly creating cross-branch ownership.
+//
+//  Returns '' when the move is fine, or the sentence to show.
+function rasg_move_blocks($subject, $id, array $opt = []) {
+    if (!array_key_exists('requisition_id', $opt)) return '';
+    $s = RASG_SUBJECTS[$subject] ?? null; if (!$s || $s['entity'] !== 'CANDIDATE') return '';
+    $row = rasg_row($subject, $id); if (!$row) return '';
+    $holder = ($row[$s['col']] ?? null) === null ? null : (int) $row[$s['col']];
+    if ($holder === null) return '';                       // nobody to move
+    $wasRq = (int) ($row['requisition_id'] ?? 0);
+    $nowRq = (int) $opt['requisition_id'];
+    if ($wasRq === $nowRq) return '';                      // not a move
+    [$off, $sbu] = rasg_row_scope($subject, $row, $opt);   // the DESTINATION
+    if (rasg_user_covers($holder, $off, $sbu)) return '';
+    $who = function_exists('rcc_user_name') ? (rcc_user_name($holder) ?: ('user #' . $holder)) : ('user #' . $holder);
+    return 'This candidate cannot be moved to that requirement while ' . $who
+         . ' is the recruiter — they do not cover that office / branch. Change the recruiter in the same save.';
 }
 
 //  INHERITANCE, not a decision. A public careers application creates a candidate
@@ -495,6 +581,33 @@ function rasg_refusal($subject, $code) {
 
 // ---- Workload, counted once -------------------------------------------------
 
+//  THE CANDIDATE SCOPE RULE, DEFINED ONCE.
+//
+//  M5 shipped with two of them. The command centre scoped candidates through the
+//  requirement they are worked against with scope_office_clause() — whose "no
+//  office means everybody" rule keeps an unattached candidate visible — while the
+//  workload counter used scope_clause(), under which no requirement means
+//  Ahmedabad. A candidate with no requirement was therefore counted on the
+//  dashboard and NOT in its own recruiter's workload: two numbers about the same
+//  person, disagreeing, which is the exact defect this milestone exists to
+//  remove. It survived the reconciliation suite only because every fixture
+//  candidate happened to have a requirement.
+//
+//  So the rule lives here, once, and recruit_cc.php reads it. Two consumers, one
+//  definition, no room to drift.
+function rasg_cand_scope($alias = 'c') {
+    $w = []; $a = [];
+    if (function_exists('scope_office_clause')) {
+        [$ow, $oa] = scope_office_clause("(SELECT r2.office_id FROM requisitions r2 WHERE r2.id=$alias.requisition_id)");
+        if ($ow !== '1=1') { $w[] = $ow; $a = array_merge($a, $oa); }
+    }
+    if (function_exists('recruit_sbu_clause')) {
+        [$sw, $sa] = recruit_sbu_clause("$alias.sbu");
+        if ($sw !== '1=1') { $w[] = $sw; $a = array_merge($a, $sa); }
+    }
+    return [$w ? implode(' AND ', $w) : '1=1', $a];
+}
+
 //  THE counter behind every recruiter number. The command centre and the tests
 //  read this same function, so a dashboard figure and the records underneath it
 //  cannot disagree (invariant I5). Every count is scope-filtered exactly as the
@@ -512,8 +625,11 @@ function rasg_workload($uid, array $opt = []) {
 
     //  Requisitions: this person is Responsible 1.
     $req  = "FROM requisitions r WHERE $sc AND r.recruiter_id=$uid";
-    //  Candidates: this person is chasing them; scope comes from the requisition.
-    $cand = "FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id WHERE $sc AND c.recruiter_id=$uid";
+    //  Candidates use the ONE candidate scope rule, the same one the command
+    //  centre reads — not the requisition rule, which would lose every candidate
+    //  that belongs to no requirement.
+    [$cc, $ca] = empty($opt['no_scope']) ? rasg_cand_scope('c') : ['1=1', []];
+    $cand = "FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id WHERE $cc AND c.recruiter_id=$uid";
 
     $out = [];
     $out['assigned_requisitions'] = $n("SELECT COUNT(*) $req", $sa);
@@ -522,10 +638,10 @@ function rasg_workload($uid, array $opt = []) {
     $out['filled']                = $n("SELECT COUNT(*) FROM candidates c2 JOIN requisitions r ON r.id=c2.requisition_id
                                         WHERE $sc AND r.recruiter_id=$uid AND r.status IN ($live) AND c2.stage='ACCEPTED'", $sa);
     $out['open_seats']            = max(0, $out['vacancies'] - $out['filled']);
-    $out['candidates']            = $n("SELECT COUNT(*) $cand", $sa);
-    $out['active_candidates']     = $n("SELECT COUNT(*) $cand AND c.stage NOT IN ($term)", $sa);
-    $out['offers']                = $n("SELECT COUNT(*) $cand AND c.stage='OFFERED'", $sa);
-    $out['joins']                 = $n("SELECT COUNT(*) $cand AND c.stage='ACCEPTED'", $sa);
+    $out['candidates']            = $n("SELECT COUNT(*) $cand", $ca);
+    $out['active_candidates']     = $n("SELECT COUNT(*) $cand AND c.stage NOT IN ($term)", $ca);
+    $out['offers']                = $n("SELECT COUNT(*) $cand AND c.stage='OFFERED'", $ca);
+    $out['joins']                 = $n("SELECT COUNT(*) $cand AND c.stage='ACCEPTED'", $ca);
     //  Interviews arranged for the people this person is chasing. Counted from
     //  the interviews table itself, never from a stage label — a candidate can sit
     //  several rounds, and "has reached the interview stage" is a different number
@@ -534,12 +650,12 @@ function rasg_workload($uid, array $opt = []) {
     $out['interviews'] = $n("SELECT COUNT(*) FROM interviews i
                              JOIN candidates c ON c.id=i.candidate_id
                              LEFT JOIN requisitions r ON r.id=c.requisition_id
-                             WHERE $sc AND c.recruiter_id=$uid", $sa);
+                             WHERE $cc AND c.recruiter_id=$uid", $ca);
     //  Work that has been sitting still. "Overdue" is not a new status — it is the
     //  ageing rule the command centre already shows, asked per recruiter.
     $cut = date('Y-m-d', strtotime('-' . (int) ($opt['overdue_days'] ?? 30) . ' days'));
     $out['overdue']               = $n("SELECT COUNT(*) $cand AND c.stage NOT IN ($term) AND c.stage<>'ACCEPTED'
-                                        AND substr(COALESCE(NULLIF(c.cv_received_date,''),c.created_at),1,10) < " . db()->quote($cut), $sa);
+                                        AND substr(COALESCE(NULLIF(c.cv_received_date,''),c.created_at),1,10) < " . db()->quote($cut), $ca);
     return $out;
 }
 
@@ -551,12 +667,13 @@ function rasg_unassigned(array $opt = []) {
     $term = "'" . implode("','", RASG_CAND_TERMINAL) . "'";
     [$rw, $ra] = (function_exists('scope_clause') && empty($opt['no_scope']))
         ? scope_clause('r.office_id', 'r.sbu') : ['1=1', []];
+    [$cw, $ca] = empty($opt['no_scope']) ? rasg_cand_scope('c') : ['1=1', []];
     $n = function ($sql, $args) { try { return (int) ops_val($sql, $args); } catch (Throwable $e) { return 0; } };
     return [
         'requisitions' => $n("SELECT COUNT(*) FROM requisitions r
                               WHERE $rw AND r.status IN ($live) AND COALESCE(r.recruiter_id,0)=0", $ra),
         'candidates'   => $n("SELECT COUNT(*) FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id
-                              WHERE $rw AND c.stage NOT IN ($term) AND COALESCE(c.recruiter_id,0)=0", $ra),
+                              WHERE $cw AND c.stage NOT IN ($term) AND COALESCE(c.recruiter_id,0)=0", $ca),
     ];
 }
 

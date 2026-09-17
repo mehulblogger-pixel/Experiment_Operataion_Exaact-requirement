@@ -89,7 +89,7 @@ Recorded in full in M5-ASSIGNMENT-STATE-MATRIX.md § D. Each refusal is asserted
 
 ### 12 · Test results
 
-SQLite **10898 / 0** · MariaDB 10.11 **10899 / 0** (authoritative). M5 adds **167**
+SQLite **10920 / 0** · MariaDB 10.11 **10921 / 0** (authoritative). M5 adds **189**
 assertions. No test weakened, deleted or skipped. See M5-TEST-RESULTS.md.
 
 ### 13 · Concurrency results
@@ -101,12 +101,26 @@ actual move. See M5-CONCURRENCY-RESULTS.md.
 
 ### 14 · Mutation results
 
-**Attempted 17 · Caught 17 · Survived 0.** One survived the first battery (M14 —
+**Attempted 22 · Caught 22 · Survived 0**, against a clean baseline. One survived the first battery (M14 —
 ownership back in a blind field list) and it was a genuine coverage gap, not an
 excusable survivor. The answer was to stop the save paths trusting themselves: a
 compensating check now puts any unauthorised ownership write back, audits it, and
 does **not** record it as an assignment. Two further mutations (M16, M17) were then
 written to attack that new protection; both are caught. See M5-MUTATION-RESULTS.md.
+
+### 14b · Independent adversarial audit — run after the first verdict
+
+The first ACCEPTED verdict was **premature and is withdrawn**. Attacking the
+finished work found **four defects, three material**: an array posted into the
+recruiter field became *user #1* (a person inferred from a type conversion); one
+save could set a branch-A recruiter while moving the candidate to a branch-B
+requirement, because the scope question was asked about where the record **is**
+rather than where the save is **putting** it; the dashboard and the workload
+counter used **two different scope rules**, so a candidate with no requirement was
+counted by one and not the other; and the order of refusals let a caller with no
+permission read off the current owner by guessing baselines. All four are fixed,
+pinned in section **P** of the assignment suite, and covered by five new
+mutations. See **M5-ADVERSARIAL-AUDIT.md**.
 
 ### 15 · The final adversarial question
 
@@ -164,10 +178,15 @@ written to attack that new protection; both are caught. See M5-MUTATION-RESULTS.
 
 ### 17 · Exact remaining defects
 
-**None known.** Four defects were found by building this and all four are fixed and
-verified: the two reconciliation defects (§7), the concurrency defect (§13) and the
-blind-field-list gap (§14).
+**None known.** **Eight** defects were found by building this and then attacking
+it, and all eight are fixed and verified: the two reconciliation defects (§7), the
+concurrency defect (§13), the blind-field-list gap (§14), and the four the
+adversarial audit found (§14b).
 
 ### 18 · Final verdict
+
+Issued after the adversarial audit, its four fixes, a re-run mutation battery
+against a clean baseline (22 attempted · 22 caught · 0 survived) and a complete
+regression on both engines.
 
 # M5 ACCEPTED
