@@ -412,7 +412,18 @@ function ops_candidate_offer($route, $method) {
         $do = (string)($_POST['do'] ?? '');
         if ($do === 'sal_save') { sal_save($id, $_POST); flash('Salary structure saved.'); }
         elseif ($do === 'hrd_save') { hrd_save($id, $_POST); flash('HR discussion recorded.'); }
-        elseif ($do === 'offer_create') { offer_create($id, $_POST); flash('Offer drafted.'); }
+        elseif ($do === 'offer_create') {
+            //  M6 (adversarial audit) — as with the interview route above: an offer
+            //  that the gate refused used to report "Offer drafted." An offer is a
+            //  commitment to a person, and being told one exists when it does not
+            //  is how a promise gets made outside the system.
+            $offNew = offer_create($id, $_POST);
+            if ((int) $offNew > 0) flash('Offer drafted.');
+            else {
+                $offWhy = function_exists('rexec_cand_block_reason') ? rexec_cand_block_reason($id, 'OFFER') : '';
+                flash($offWhy !== '' ? $offWhy : 'The offer could not be drafted.', 'error');
+            }
+        }
         elseif ($do === 'submit') { [$ok, $m] = offer_submit((int)($_POST['offer_id'] ?? 0)); flash($m, $ok ? 'success' : 'error'); }
         elseif ($do === 'approve') { ops_require(is_admin_level(), 'Only a manager can approve an offer.'); [$ok, $m] = offer_approve((int)($_POST['offer_id'] ?? 0)); flash($m, $ok ? 'success' : 'error'); }
         elseif ($do === 'issue') { [$ok, $m] = offer_issue((int)($_POST['offer_id'] ?? 0)); flash($m, $ok ? 'success' : 'error'); }

@@ -65,8 +65,8 @@ Baseline **11091 / 0** (119 s) · final **11113 / 0**. Authoritative.
 **21 / 21**, six races, real processes, both engines. See M6-CONCURRENCY-RESULTS.md.
 
 ### 12 · Mutation evidence
-**23 attempted · 23 caught · 0 survived**, against a clean baseline, with the
-harness refusing to run on an unclean one. See M6-MUTATION-RESULTS.md.
+**31 attempted · 31 caught · 0 survived**, against a clean baseline, with the
+harness refusing to run on an unclean one — which it did once, correctly. See M6-MUTATION-RESULTS.md.
 
 ### 13 · Security evidence
 M6-NEGATIVE-SECURITY-MATRIX.md — every row executed, not reasoned about.
@@ -101,7 +101,11 @@ E9 public careers (M5 K). E8 TPIA runs on the same spine and is covered by the
 complete Operations regression.
 
 ### 25 · Adversarial findings
-Five product defects and three probe defects of my own. See M6-ADVERSARIAL-AUDIT.md.
+**Three passes.** Pass 1 (before implementation) found five product defects and one
+probe defect. Pass 2 (after the fixes) was clean at 24/24 once two of my probes
+were repaired. **Pass 3, run after M6 was first declared accepted, found five more
+product defects — all material — and that first verdict is withdrawn.**
+See M6-ADVERSARIAL-AUDIT.md.
 
 ---
 
@@ -119,6 +123,20 @@ Five product defects and three probe defects of my own. See M6-ADVERSARIAL-AUDIT
 6. The approval engine wrote requisition statuses that are not in the lifecycle,
    removing an approved requirement from the dashboard and from recruitment.
    *(MATERIAL)*
+7. The gate decided **which** requirement by type conversion: an array became
+   requisition #1, a word and a negative number became the "no requirement"
+   answer — and all three answers were **allow**. *(MATERIAL)*
+8. A malformed *"except this candidate"* value **conjured a seat** on a full
+   requirement — the one place a bad value created capacity instead of refusing
+   it. *(MATERIAL)*
+9. The interview and offer routes **announced success on a refused operation**,
+   telling a coordinator the interview was booked and the offer drafted while
+   nothing had been written. *(MATERIAL)*
+10. A cast in the caller defeated its own repair — the helper validated, the
+    caller had already destroyed the evidence. *(MATERIAL)*
+11. **Two approvers deciding one request both succeeded** — check-then-write
+    around the decision, leaving two contradictory decisions in one audit trail.
+    Intermittent on MariaDB, invisible on SQLite. *(MATERIAL)*
 
 ## HELD
 
@@ -160,6 +178,13 @@ None was reopened; none was removed; none blocks M6.
 None beyond the limitations above.
 
 ---
+
+### 29b · Why the first M6 verdict was withdrawn
+
+M6 was declared accepted after two adversarial passes. A third, independent pass
+found five more material defects — including one inside the repair for another,
+and one that only showed as an intermittent red in my own suite. That verdict was
+premature and is recorded here as withdrawn rather than quietly replaced.
 
 ### 30 · Final acceptance decision
 

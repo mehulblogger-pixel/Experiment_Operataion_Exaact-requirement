@@ -8,7 +8,7 @@ deploy checksum is regenerated, and the `p3m6`, `p3m5` and `p3m4` suites run on
 The harness **aborts** if the baseline is not clean — a battery that cannot prove
 its own starting point proves nothing about its mutants.
 
-**Attempted 23 · Caught 23 · Survived 0.**
+**Attempted 31 · Caught 31 · Survived 0.**
 
 | # | Mutation (mandatory target) | Result | Caught by |
 |---|---|---|---|
@@ -35,6 +35,36 @@ its own starting point proves nothing about its mutants.
 | M21 | **cross-module state** — the pipeline engine stops asking the gate | **CAUGHT** | L3.7 |
 | M22 | **partial-failure protection** — the joining compensator is removed | **CAUGHT** | L2.6, C1 |
 | M23 | **interview path** stops asking the gate | **CAUGHT** | L3.3 |
+
+## The eight added by the third adversarial pass
+
+| # | Mutation | Result | Caught by |
+|---|---|---|---|
+| M24 | the gate **casts** its requirement id instead of validating it | **CAUGHT** | S1 |
+| M25 | a malformed *"except this candidate"* value releases a seat again | **CAUGHT** | S1 (seat-holder probe) |
+| M26 | a negative id falls through to the ADR-001 **allow** path | **CAUGHT** | S1 |
+| M27 | the interview route announces success again | **CAUGHT** | L10 |
+| M28 | the offer route announces success again | **CAUGHT** | L10 |
+| M29 | the gate casts the candidate id **before** the validated helper | **CAUGHT** | S1 |
+| M30 | the decision goes back to check-then-write (two approvers both win) | **CAUGHT** | L11, C5 |
+| M31 | the decision stops checking whether it matched a row | **CAUGHT** | L11 |
+
+**M25 survived its first run**, and the reason was my probe, not the product: it
+compared an array against 0, and an array casts to candidate #1 — who held no seat
+on that requirement, so both answers matched and the probe passed with the
+validation removed. The malformed values are now built to coerce **onto a real
+seat-holder of that requirement**, so the probe fails deterministically whenever
+the validation is missing. Re-run: caught.
+
+## An invalid baseline, reported rather than worked around
+
+One battery run aborted with a dirty baseline (3 failures in `p3m4`). It was not
+reproducible — `p3m4` passed twelve consecutive runs alone, in reverse order, and
+on both engines — and a stray worker process from an earlier concurrency run was
+still on the machine. Classified **ENVIRONMENT FAILURE**, not a product defect and
+not a survivor: the harness refused to measure anything against it, which is what
+§3 requires. The battery was re-run on a quiet machine from a clean baseline, and
+those numbers are the ones above.
 
 ## Two mutations survived the first battery. Neither was excusable, and neither was the product's fault.
 

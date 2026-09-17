@@ -881,18 +881,37 @@ function hreq_apply_decision($id, $result, $by, $note = '', $source = 'DIRECT') 
     if ($isReapproval) {
         $to  = strtoupper((string) $result) === 'APPROVED' ? 'APPROVED' : 'REJECTED';
         $who = trim((string) $by) !== '' ? (string) $by : hreq_who();
+        //  PHASE 3 · M6 (adversarial pass 3) — THE DECISION IS A COMPARE-AND-SWAP.
+        //
+        //  The state gate above is a CHECK, and the write below used to be
+        //  "WHERE id=?" — check-then-write, which is not atomic. Two approvers
+        //  deciding the same re-approval at the same moment both passed the gate,
+        //  both wrote, and BOTH WERE TOLD THEIR DECISION WAS RECORDED. Measured on
+        //  MariaDB: two successes out of two processes, in two runs out of five,
+        //  leaving one request carrying two contradictory decisions in its audit
+        //  trail. SQLite hid it by serialising writers.
+        //
+        //  The swap adds the state the gate just checked to the WHERE, so only the
+        //  process that still finds it there may write. The loser is told plainly
+        //  and writes nothing — no state, no audit, no claim.
+        $cas = " AND UPPER(COALESCE(status,''))='APPROVED'"
+             . " AND UPPER(COALESCE(reapproval_state,'')) IN ('REQUIRED','IN_PROGRESS')";
         if ($to === 'APPROVED') {
             //  The NEW approved snapshot is captured at the decision — never when
             //  the change was merely submitted for re-approval.
-            db()->prepare("UPDATE hiring_requests SET reapproval_state='REAPPROVED', decided_by=?, decided_at=?,
-                           decision_note=?, approved_snapshot_json=?, approved_snapshot_at=?, updated_by=?, updated_at=? WHERE id=?")
-                ->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400),
+            $stw = db()->prepare("UPDATE hiring_requests SET reapproval_state='REAPPROVED', decided_by=?, decided_at=?,
+                           decision_note=?, approved_snapshot_json=?, approved_snapshot_at=?, updated_by=?, updated_at=? WHERE id=?" . $cas);
+            $stw->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400),
                            json_encode(hreq_snapshot($r)), hreq_now(), $who, hreq_now(), (int) $id]);
         } else {
-            db()->prepare("UPDATE hiring_requests SET reapproval_state='REJECTED', decided_by=?, decided_at=?,
-                           decision_note=?, updated_by=?, updated_at=? WHERE id=?")
-                ->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
+            $stw = db()->prepare("UPDATE hiring_requests SET reapproval_state='REJECTED', decided_by=?, decided_at=?,
+                           decision_note=?, updated_by=?, updated_at=? WHERE id=?" . $cas);
+            $stw->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
         }
+        //  A matched row is always a changed row here — the gate above excludes
+        //  every state this write sets — so no rows matched means one thing only.
+        if ((int) $stw->rowCount() < 1)
+            return [false, 'Somebody else decided this re-approval a moment ago. Open it again to see the decision.'];
         if (function_exists('act_log'))
             act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
                     ($to === 'APPROVED' ? 'Re-approved' : 'Re-approval rejected') . ' via ' . $source
@@ -914,17 +933,22 @@ function hreq_apply_decision($id, $result, $by, $note = '', $source = 'DIRECT') 
     //  between. It is written once per approval and never overwritten by a later
     //  edit — a subsequent material change compares against it, it does not
     //  replace it.
+    //  M6 — the same compare-and-swap on the first decision. Two approvers acting
+    //  on one submitted request must produce one decision, not two.
+    $cas1 = " AND UPPER(COALESCE(status,'')) IN ('SUBMITTED','UNDER_REVIEW')";
     if ($to === 'APPROVED') {
-        db()->prepare("UPDATE hiring_requests SET status=?, decided_by=?, decided_at=?, decision_note=?,
-                       approved_snapshot_json=?, approved_snapshot_at=?, reapproval_state=?, updated_by=?, updated_at=? WHERE id=?")
-            ->execute([$to, $who, hreq_now(), substr(trim((string) $note), 0, 400),
+        $stw1 = db()->prepare("UPDATE hiring_requests SET status=?, decided_by=?, decided_at=?, decision_note=?,
+                       approved_snapshot_json=?, approved_snapshot_at=?, reapproval_state=?, updated_by=?, updated_at=? WHERE id=?" . $cas1);
+        $stw1->execute([$to, $who, hreq_now(), substr(trim((string) $note), 0, 400),
                        json_encode(hreq_snapshot($r)), hreq_now(),
                        hreq_reapproval_state($r) === 'NONE' ? 'NONE' : 'REAPPROVED',
                        $who, hreq_now(), (int) $id]);
     } else {
-        db()->prepare("UPDATE hiring_requests SET status=?, decided_by=?, decided_at=?, decision_note=?, updated_by=?, updated_at=? WHERE id=?")
-            ->execute([$to, $who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
+        $stw1 = db()->prepare("UPDATE hiring_requests SET status=?, decided_by=?, decided_at=?, decision_note=?, updated_by=?, updated_at=? WHERE id=?" . $cas1);
+        $stw1->execute([$to, $who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
     }
+    if ((int) $stw1->rowCount() < 1)
+        return [false, 'Somebody else decided this request a moment ago. Open it again to see the decision.'];
     if (function_exists('act_log'))
         act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
                 $to . ' via ' . $source . ($who !== '' ? ' by ' . $who : ''),

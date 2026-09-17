@@ -47,18 +47,63 @@ t_eq(rexec_block_reason($rqA, 'ADVANCE', $cA), '', 'S0 · the gate allows this r
 
 // ---- S1 · MALFORMED INPUT MUST NOT BECOME AN ENTITY -------------------------
 t_section('S1 · malformed input never becomes a valid identity');
+//  '007' is NOT malformed — it is the number seven written oddly, and it must
+//  resolve to seven rather than be refused. My first version of this list put it
+//  among the attacks, which would have made the suite demand the wrong answer.
 $bad = ['array' => ['x'], 'nested' => [['x']], 'alpha' => 'abc', 'mixed' => '7x',
-        'negative' => -5, 'decimal' => '1.9', 'space' => '  ', 'huge' => '999999999999999999999',
-        'leadingzero' => '007', 'sci' => '1e3'];
+        'negative' => -5, 'decimal' => '1.9', 'space' => '  ',
+        'huge_nonnumeric' => '99999999999999999999x', 'sci' => '1e3'];
+//  THIS ASSERTION USED TO ACCEPT "ALLOWED" as a pass for a malformed id. That is
+//  the dangerous answer, not a safe one: an adversarial probe posted an array,
+//  PHP's cast turned it into requisition #1, which was live, and the gate said
+//  yes for a requirement nobody had named. The claim is now stated properly — a
+//  value that is not an id must be REFUSED, every time.
 foreach ($bad as $what => $v) {
-    //  The gate is asked about a requirement id that is not one. It must either
-    //  refuse or treat it as "no requirement" — it must NEVER resolve to some
-    //  other tenant's or branch's record by coercion.
     $r = rexec_block_reason($v, 'ADVANCE');
-    $resolved = is_scalar($v) && ctype_digit((string) $v) ? (int) $v : 0;
-    t_ok($resolved > 0 || $r === '' || strpos($r, 'no longer exists') !== false,
-         "S1 · a $what requirement id does not resolve to a live requirement");
+    t_ok($r !== '', "S1 · *** a $what requirement id is REFUSED, never resolved by coercion ***");
+    $s = rexec_seats($v);
+    t_eq($s['remaining'], 0, "S1 · …and a $what requirement id has no seats to give");
 }
+//  …while a well-formed id still behaves exactly as it did.
+t_eq(rexec_block_reason($rqA, 'ADVANCE', $cA), '', 'S1 · a real requirement is still allowed');
+t_ok(rexec_block_reason(987654, 'ADVANCE') !== '', 'S1 · a well-formed id that does not exist is refused');
+$seven = rexec_id('007', $okZ);
+t_ok($okZ && $seven === 7, 'S1 · leading zeros are a number written oddly, and resolve to it');
+$hugeOk = rexec_id('999999999999999999999', $okH2);
+t_ok($okH2, 'S1 · a very long run of digits is a well-formed id…');
+t_ok(rexec_block_reason('999999999999999999999', 'ADVANCE') !== '', 'S1 · …and is refused because no such requirement exists');
+//  THE SEAT ADJUSTMENT IS THE ONE PLACE A BAD VALUE WOULD CREATE CAPACITY, and
+//  it needs a probe that cannot pass by luck. Comparing an array against 0 does
+//  not: an array casts to candidate #1, and if candidate #1 holds no seat on this
+//  requirement both answers are the same and the probe passes even when the
+//  validation has been removed — which is exactly how a mutation survived.
+//
+//  So the malformed values here are built to coerce ONTO A REAL SEAT-HOLDER of
+//  this requirement. If the value were cast instead of validated, that person's
+//  seat would be released and the requirement would report capacity it does not
+//  have. The probe now fails whenever the validation is missing, deterministically.
+$rqFull = (function () use ($pdo, $approve, $mkCand) {
+    $hF = $approve(['job_title' => 'M6S Seats', 'quantity' => 1]);
+    [$okF,, $r] = hreq_to_requisition($hF, 1);
+    $c = $mkCand($r);
+    $pdo->prepare("UPDATE candidates SET stage='ACCEPTED' WHERE id=?")->execute([$c]);
+    if (function_exists('reqf_sync')) reqf_sync($r);
+    return [$r, $c];
+})();
+[$rqF, $holder] = $rqFull;
+t_eq(rexec_seats($rqF)['remaining'], 0, 'S1 · the requirement is full');
+t_eq(rexec_seats($rqF, $holder)['remaining'], 1,
+     'S1 · the person holding the seat does not compete with themselves');
+t_eq(rexec_seats($rqF, (string) $holder)['remaining'], 1, 'S1 · …written as digits, likewise');
+foreach ([[$holder . 'x', 'a number with a letter stuck to it'],
+          [' ' . $holder, 'a number with whitespace'],
+          [$holder . '.9', 'a decimal'],
+          [['x'], 'an array']] as [$val, $what]) {
+    t_eq(rexec_seats($rqF, $val)['remaining'], 0,
+         "S1 · *** $what does NOT release the seat it coerces onto ***");
+}
+t_ok(rexec_block_reason($rqF, 'JOIN', $holder . 'x') !== '',
+     'S1 · *** and no joining can be bought with one ***');
 //  The M5 ownership door is the strictest example, and it is asked here too.
 foreach (['array' => ['x'], 'nested' => [['x']], 'alpha' => 'abc', 'space' => ' ', 'decimal' => '1.9'] as $what => $v)
     t_eq(rasg_assign('REQ_RECRUITER', $rqA, $v, ['expect' => $uA])['code'], 'BAD_VALUE',

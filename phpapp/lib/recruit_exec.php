@@ -45,6 +45,36 @@ function rexec_filled_stages() {
     return defined('REQF_FILLED_STAGES') ? REQF_FILLED_STAGES : ['ACCEPTED'];
 }
 
+//  AN ID IS A NUMBER OR IT IS NOTHING.
+//
+//  The M5 adversarial audit found that PHP's cast turns a non-empty array into
+//  the integer 1 and a word into 0, so an identity could be decided by a type
+//  conversion before any control ran. That lesson was learned in the ownership
+//  door — and then not applied to the gate written after it. An adversarial
+//  probe posted an array as the REQUIREMENT id: it became requisition #1, which
+//  was live, and the gate answered "allowed" for a requirement nobody had named.
+//
+//  The rule is the same one, and it is asked of the SAME implementation
+//  (rasg_person_id) so the two cannot drift: nothing, a run of digits, or a
+//  positive integer. Anything else is invalid, and invalid fails closed.
+//  DELIBERATELY STRICTER THAN THE OWNERSHIP DOOR, and this is the reason:
+//  there, "nothing" means UNASSIGN, a legitimate choice, so a value that reduces
+//  to nothing is accepted. Here "nothing" means THERE IS NO REQUIREMENT — the
+//  ADR-001 direct path — and that ANSWER IS "ALLOW". A value that quietly
+//  reduces to nothing would therefore be a way of being allowed everything. So
+//  only a genuinely empty value counts as "no record"; a negative number, a
+//  word, an array or anything else is INVALID, and invalid fails closed.
+function rexec_id($v, &$ok) {
+    $ok = true;
+    if ($v === null || $v === '' || $v === 0 || $v === '0') return null;   // genuinely no record
+    if (is_int($v)) { if ($v > 0) return $v; $ok = false; return null; }   // -5 is not "nothing"
+    if (is_string($v) && ctype_digit($v)) {                                 // "007" is the number 7
+        $n = (int) $v; if ($n > 0) return $n; $ok = false; return null;
+    }
+    $ok = false;
+    return null;
+}
+
 //  THE QUESTION. Returns '' when the action may proceed, or the refusal.
 //
 //  $requisitionId  the requirement being spent. 0 / null means there is none —
@@ -57,7 +87,11 @@ function rexec_filled_stages() {
 //  $candidateId    the person, when one is involved — so that a candidate who
 //                  ALREADY holds a seat is not refused the seat they hold.
 function rexec_block_reason($requisitionId, $action = 'ADVANCE', $candidateId = 0) {
-    $rq = (int) $requisitionId;
+    //  Validated BEFORE it is used to look anything up — a malformed id must not
+    //  become a different requirement's answer.
+    $rq = rexec_id($requisitionId, $idOk);
+    if (!$idOk) return 'That requirement could not be identified, so recruitment cannot continue against it.';
+    $rq = (int) $rq;
     if ($rq <= 0) return '';                       // ADR-001: no requirement, no ceiling
     $action = isset(REXEC_ACTIONS[$action]) ? $action : 'ADVANCE';
 
@@ -83,7 +117,11 @@ function rexec_block_reason($requisitionId, $action = 'ADVANCE', $candidateId = 
     //  and refusing the fifth offer for four seats would stop normal recruitment.
     //  What must never happen is a person taking a seat that does not exist.
     if ($action === 'JOIN') {
-        $seats = rexec_seats($rq, (int) $candidateId);
+        //  Passed through WITHOUT a cast: rexec_seats() validates it, and casting
+        //  here would hand it a number that had already lost the evidence of being
+        //  malformed — the helper fixed, the caller not, which is how the same
+        //  defect survives its own repair.
+        $seats = rexec_seats($rq, $candidateId);
         if ($seats['remaining'] <= 0)
             return 'All ' . $seats['requested'] . ' approved position'
                  . ($seats['requested'] === 1 ? '' : 's') . ' on this requirement '
@@ -99,8 +137,10 @@ function rexec_block_reason($requisitionId, $action = 'ADVANCE', $candidateId = 
 //  counted against themselves. Without this, re-saving a joined candidate would
 //  refuse the seat they are sitting in.
 function rexec_seats($requisitionId, $exceptCandidateId = 0) {
-    $rq = (int) $requisitionId;
     $out = ['requested' => 0, 'filled' => 0, 'cancelled' => 0, 'remaining' => 0];
+    $rq = rexec_id($requisitionId, $idOk);
+    if (!$idOk) return $out;                       // an unidentifiable requirement has no seats
+    $rq = (int) $rq;
     if ($rq <= 0) return $out;
 
     //  The raw counts, from M3's counter where it exists. Deliberately NOT
@@ -125,11 +165,18 @@ function rexec_seats($requisitionId, $exceptCandidateId = 0) {
     //  The person being asked about does not compete with themselves: re-saving
     //  somebody who already holds a seat must not refuse them the seat they are
     //  sitting in.
-    if ((int) $exceptCandidateId > 0) {
+    //
+    //  This is the one place where a bad value would CREATE capacity rather than
+    //  refuse it, so it is the one that matters most: an adversarial probe passed
+    //  an array here, it became candidate #1, and a requirement with no seats left
+    //  reported one free. A value that is not an id releases nothing.
+    $except = rexec_id($exceptCandidateId, $exOk);
+    $except = $exOk ? (int) $except : 0;
+    if ($except > 0) {
         try {
             $ph = implode(',', array_fill(0, count(rexec_filled_stages()), '?'));
             $already = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE id=? AND requisition_id=? AND stage IN ($ph)",
-                                     array_merge([(int) $exceptCandidateId, $rq], rexec_filled_stages()));
+                                     array_merge([$except, $rq], rexec_filled_stages()));
             if ($already > 0) $out['filled'] = max(0, $out['filled'] - 1);
         } catch (Throwable $e) {}
     }
@@ -141,7 +188,9 @@ function rexec_seats($requisitionId, $exceptCandidateId = 0) {
 
 //  The same question asked about a CANDIDATE, which is how most callers hold it.
 function rexec_cand_block_reason($candidateId, $action = 'ADVANCE') {
-    $id = (int) $candidateId; if ($id <= 0) return '';
+    $id = rexec_id($candidateId, $cOk);
+    if (!$cOk) return 'That candidate could not be identified.';
+    $id = (int) $id; if ($id <= 0) return '';
     try { $c = ops_one("SELECT id, requisition_id FROM candidates WHERE id=?", [$id]); }
     catch (Throwable $e) { return ''; }
     if (!$c) return 'That candidate no longer exists.';
@@ -157,7 +206,9 @@ function rexec_cand_block_reason($candidateId, $action = 'ADVANCE') {
 //  told. A compensating revert is the only thing that holds under real
 //  concurrency without wrapping every caller in a transaction they do not own.
 function rexec_join_enforce_after_write($candidateId, $priorStage) {
-    $id = (int) $candidateId; if ($id <= 0) return '';
+    $id = rexec_id($candidateId, $cOk);
+    if (!$cOk) return '';                          // nothing identifiable was written
+    $id = (int) $id; if ($id <= 0) return '';
     try { $c = ops_one("SELECT id, requisition_id, stage FROM candidates WHERE id=?", [$id]); }
     catch (Throwable $e) { return ''; }
     if (!$c) return '';

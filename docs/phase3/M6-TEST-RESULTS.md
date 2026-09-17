@@ -19,8 +19,8 @@ its baseline is not clean.
 
 | Suite | SQLite | MariaDB 10.11 |
 |---|---|---|
-| `test_p3m6_lifecycle.php` — the integrated lifecycle | **78 / 0** | **78 / 0** |
-| `test_p3m6_security.php` — negative matrix, tenant, branch, RBAC, entitlement, input types | **58 / 0** | **58 / 0** |
+| `test_p3m6_lifecycle.php` — the integrated lifecycle | **95 / 0** | **95 / 0** |
+| `test_p3m6_security.php` — negative matrix, tenant, branch, RBAC, entitlement, input types | **80 / 0** | **80 / 0** |
 | `test_p3m6_reconcile.php` — database = service = dashboard = export | **34 / 0** | **34 / 0** |
 | `test_p3m6_concurrency.php` — real-process races | **21 / 0** | **21 / 0** |
 | `p3m5` | 189 / 0 | 189 / 0 |
@@ -30,10 +30,9 @@ its baseline is not clean.
 | `p3m1` | 114 / 0 | 114 / 0 |
 | `m4_` | 364 / 0 | 364 / 0 |
 | `recruit` | 282 / 0 | 282 / 0 |
-| **Complete regression** | **11112 / 0** | **11113 / 0** |
+| **Complete regression** | **11151 / 0** | **11152 / 0** |
 
-No test was weakened, deleted or skipped. No skip was introduced. M6 adds **191**
-assertions. The MariaDB total is one higher because one engine-specific assertion
+No test was weakened, deleted or skipped. No skip was introduced. M6 adds **230** assertions. The MariaDB total is one higher because one engine-specific assertion
 exists only there.
 
 ## Test isolation (§43)
@@ -59,6 +58,18 @@ own query instead of its top-eight slice.
 | `C4.2` fell back to re-reading the same column | **TEST DEFECT** | it compared a value with itself; the worker now reports what it asked for |
 | offers / interviews / pipeline / joining on a blocked or full requirement | **PRODUCT DEFECT** | fixed (see M6-ADVERSARIAL-AUDIT.md) |
 | approval chain writing `'approved'` / `'on_hold'` | **PRODUCT DEFECT** | fixed |
+
+## The third adversarial pass
+
+Five further product defects were found after M6 was first declared accepted, and
+all five are fixed and pinned: the gate deciding *which* requirement by type
+conversion, a malformed value conjuring a seat, two routes announcing success on a
+refused operation, a cast in the caller that defeated its own repair, and two
+approvers both recording a decision on one request. See M6-ADVERSARIAL-AUDIT.md.
+
+The concurrency suite was run **six consecutive times** on MariaDB after the
+decision fix — 21/21 each time — because the defect it caught only appeared in two
+runs out of five.
 
 ## Test defects of my own, disclosed
 

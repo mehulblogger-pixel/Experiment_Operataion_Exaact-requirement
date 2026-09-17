@@ -232,4 +232,72 @@ $apprSrc = preg_replace('~^\s*//.*$~m', '', (string) file_get_contents(dirname(_
 t_ok(strpos($apprSrc, "status='approved'") === false && strpos($apprSrc, "status='on_hold'") === false,
      'L8.8 · *** no invented requisition status remains in the approval engine ***');
 
+// ---- L10 · A REFUSED OPERATION MUST NOT REPORT SUCCESS ---------------------
+//  Found by attacking M6 after it was accepted. The interview and offer routes
+//  announced success unconditionally, so once the gate began refusing, a
+//  coordinator on a blocked requirement was told the interview was booked and
+//  the offer drafted while nothing had been written. A failed operation that
+//  reports success is worse than the gap it replaced: the person acts on it.
+t_section('L10 · the screen says what actually happened');
+$hT = $approve(['job_title' => 'M6L Truth', 'quantity' => 2]);
+[$okT,, $rqT] = hreq_to_requisition($hT, 2);
+$cT = $mkCand($rqT);
+hreq_save($hT, $base(['job_title' => 'M6L Truth', 'quantity' => 2, 'designation' => 'SUPERVISOR']));
+t_ok(rexec_cand_block_reason($cT, 'INTERVIEW') !== '', 'L10.1 · the requirement is blocked');
+//  the functions refuse …
+t_eq(iv_schedule($cT, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c')]), 0, 'L10.2 · iv_schedule() returns nothing');
+t_eq(offer_create($cT, ['ctc' => 100]), 0, 'L10.3 · offer_create() returns nothing');
+//  … and the routes report the refusal rather than a success.
+$ivSrc = preg_replace('~^\s*//.*$~m', '', (string) file_get_contents(dirname(__DIR__) . '/lib/recruit_iv.php'));
+$ivBlk = substr($ivSrc, strpos($ivSrc, "if (\$do === 'schedule')"), 420);
+//  The claim is that the result is KEPT AND TESTED — not that a substring is
+//  absent. My first version looked for the absence of "iv_schedule($id, $_POST);",
+//  which still appears inside the assignment that fixes the defect.
+t_ok(strpos($ivBlk, '$ivNew = iv_schedule(') !== false && strpos($ivBlk, 'if ((int) $ivNew > 0)') !== false,
+     'L10.4 · *** the interview route keeps the result and branches on it ***');
+t_ok(strpos($ivBlk, "rexec_cand_block_reason") !== false,
+     'L10.5 · …it asks the gate why, and says so');
+$ofSrc = preg_replace('~^\s*//.*$~m', '', (string) file_get_contents(dirname(__DIR__) . '/lib/recruit_offer.php'));
+$ofBlk = substr($ofSrc, strpos($ofSrc, "elseif (\$do === 'offer_create')"), 520);
+t_ok(strpos($ofBlk, '$offNew = offer_create(') !== false && strpos($ofBlk, 'if ((int) $offNew > 0)') !== false,
+     'L10.6 · *** the offer route keeps the result and branches on it ***');
+t_ok(strpos($ofBlk, "rexec_cand_block_reason") !== false, 'L10.7 · …and reports the real reason');
+//  and on a healthy requirement both still succeed, so the checks are not vacuous
+$hOk = $approve(['job_title' => 'M6L Truth OK']); [$okOk,, $rqOk] = hreq_to_requisition($hOk, 1);
+$cOk = $mkCand($rqOk);
+t_ok(iv_schedule($cOk, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c')]) > 0,
+     'L10.8 · an interview on a healthy requirement is still scheduled');
+t_ok(offer_create($cOk, ['ctc' => 100]) > 0, 'L10.9 · …and an offer is still drafted');
+
+// ---- L11 · ONE REQUEST, ONE DECISION --------------------------------------
+//  C5 in the concurrency suite is the behavioural detector for this, and it is a
+//  PROBABILISTIC one: two approvers deciding the same re-approval at the same
+//  moment both succeeded in two runs out of five on MariaDB, and never on SQLite,
+//  which serialises writers. The defect — check-then-write around the decision —
+//  is therefore pinned deterministically here as well.
+t_section('L11 · the decision is a compare-and-swap, not a check then a write');
+$hqSrc = preg_replace('~^\s*//.*$~m', '', (string) file_get_contents(dirname(__DIR__) . '/lib/hiringreq.php'));
+$dec = substr($hqSrc, strpos($hqSrc, 'function hreq_apply_decision('));
+$dec = substr($dec, 0, strpos($dec, "\nfunction "));
+t_ok(substr_count($dec, "reapproval_state,'')) IN ('REQUIRED','IN_PROGRESS')") >= 1,
+     'L11.1 · *** the re-approval write carries the state the gate checked ***');
+t_ok(substr_count($dec, "status,'')) IN ('SUBMITTED','UNDER_REVIEW')") >= 1,
+     'L11.2 · *** and so does the first decision ***');
+t_eq(substr_count($dec, 'rowCount() < 1'), 2,
+     'L11.3 · *** both writes check that they matched a row, and refuse when they did not ***');
+t_ok(strpos($dec, 'Somebody else decided') !== false,
+     'L11.4 · …and the loser is told plainly rather than silently ignored');
+//  Behavioural: the loser writes nothing at all — no state, no audit.
+$hD2 = $approve(['job_title' => 'M6L One Decision']);
+hreq_save($hD2, $base(['job_title' => 'M6L One Decision', 'designation' => 'SUPERVISOR']));
+t_eq(hreq_reapproval_state(hreq_get($hD2)), 'REQUIRED', 'L11.5 · a re-approval is open');
+[$d1ok, $d1msg] = hreq_apply_decision($hD2, 'APPROVED', 'M6L Approver', 'first');
+t_ok($d1ok, 'L11.6 · the first decision is recorded');
+$auditAfterFirst = (int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='HIRING_REQUEST' AND entity_id=?", [$hD2]);
+[$d2ok, $d2msg] = hreq_apply_decision($hD2, 'REJECTED', 'M6L Other', 'second');
+t_ok(!$d2ok, 'L11.7 · *** the second decision is refused: ' . $d2msg . ' ***');
+t_eq(hreq_reapproval_state(hreq_get($hD2)), 'REAPPROVED', 'L11.8 · the first decision stands');
+t_eq((int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='HIRING_REQUEST' AND entity_id=?", [$hD2]),
+     $auditAfterFirst, 'L11.9 · *** and the refused decision wrote nothing to the audit trail ***');
+
 $_SESSION = $m6o; current_user(true); ua(true);

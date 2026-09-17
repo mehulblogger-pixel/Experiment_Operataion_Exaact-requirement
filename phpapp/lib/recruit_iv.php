@@ -332,7 +332,22 @@ function ops_candidate_interview($route, $method) {
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');
-        if ($do === 'schedule') { iv_schedule($id, $_POST); flash('Interview scheduled.'); }
+        //  PHASE 3 · M6 (adversarial audit) — SAY WHAT ACTUALLY HAPPENED.
+        //
+        //  This announced "Interview scheduled." whatever came back. Once the
+        //  execution gate started refusing, a coordinator working on a blocked
+        //  requirement was told the interview was booked while nothing had been
+        //  written — a failed operation reporting success, which is the one thing
+        //  invariant I18 forbids, and worse than the original gap because the
+        //  person then acts on a meeting that does not exist.
+        if ($do === 'schedule') {
+            $ivNew = iv_schedule($id, $_POST);
+            if ((int) $ivNew > 0) flash('Interview scheduled.');
+            else {
+                $ivWhy = function_exists('rexec_cand_block_reason') ? rexec_cand_block_reason($id, 'INTERVIEW') : '';
+                flash($ivWhy !== '' ? $ivWhy : 'The interview could not be scheduled.', 'error');
+            }
+        }
         elseif ($do === 'record') { iv_record((int)($_POST['iv_id'] ?? 0), $_POST); flash('Interview outcome saved.'); }
         elseif ($do === 'delete') { iv_delete((int)($_POST['iv_id'] ?? 0)); flash('Interview removed.'); }
         elseif ($do === 'score_save') { iv_score_save($_POST); flash('Panel member score saved.'); }
