@@ -4994,6 +4994,16 @@ function ops_requisitions($route, $method) {
             }
             $base = ['office_id','sbu','designation','project_site','locations','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes','quotation_ref'];
             $fields = array_merge($base, function_exists('req_extra_fields') ? req_extra_fields() : []);
+            //  PHASE 3 · M5 — ACCOUNTABILITY NEVER RIDES IN THE BLIND FIELD LIST.
+            //
+            //  These two columns decide who is answerable for filling the
+            //  requirement. Written here they were never validated, never audited,
+            //  kept no history and lost a concurrent change silently; a POST that
+            //  simply omitted them wiped the owner. They now leave this list and go
+            //  through rasg_assign() — the one door — which asks every question in
+            //  docs/phase3/M5-ACTION-PATH-MATRIX.md before anything moves.
+            $m5own = ['recruiter_id' => 'REQ_RECRUITER', 'manager_id' => 'REQ_MANAGER'];
+            $fields = array_values(array_diff($fields, array_keys($m5own)));
             // Type coercion: ints (ids, counts, yes/no flags) and money/number fields.
             $intF = ['office_id','outgoing_inspector_id','client_id','quantity','prov_travel','prov_accommodation','prov_food',
                      'sel_client_interview','sel_tech_interview','sel_hr_interview','client_approval_req','training_req',
@@ -5029,12 +5039,31 @@ function ops_requisitions($route, $method) {
                     $m4why = hreq_req_block_reason((int) $req['id']);
                     if ($m4why !== '') { flash($m4why); redirect('/requisition?id=' . (int) $req['id']); }
                 }
+                //  M5 — ownership first, and BEFORE the rest of the save. Doing it
+                //  first means a refused ownership change refuses the whole save
+                //  instead of half-applying it; the M4 gate G2 proved that a
+                //  half-applied refusal is indistinguishable from a successful one.
+                if (function_exists('rasg_assign')) {
+                    foreach ($m5own as $m5col => $m5subj) {
+                        $m5r = rasg_apply_posted($m5subj, (int) $req['id'], $b, $m5col, 'requisition-edit');
+                        if ($m5r !== '') { flash($m5r, 'error'); redirect('/requisition?id=' . (int) $req['id']); }
+                    }
+                }
+                //  What the door left in the columns is the ONLY authorised state,
+                //  snapshotted from the service's own subject list so a mapping that
+                //  loses an entry cannot quietly drop the protection with it.
+                $m5auth = function_exists('rasg_authorised_now') ? rasg_authorised_now('requisitions', (int) $req['id']) : [];
                 //  §14 — the headcount ceiling, on the EDIT path and not only on
                 //  creation. This was the defect the M4 audit found.
                 $m4prevQty = (int) ($req['quantity'] ?? 0);
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields)) . ',' . implode(',', array_map(fn($f)=>"$f=?", $extraCols));
                 $vals = array_merge(array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), $extraVals, [$req['id']]);
                 $pdo->prepare("UPDATE requisitions SET $set WHERE id=?")->execute($vals);
+                //  M5 — defence in depth: whatever else this save wrote, ownership is
+                //  put back to what the door authorised. A blind field list that
+                //  regrows an ownership column cannot change ownership.
+                if (function_exists('rasg_enforce_table'))
+                    foreach (rasg_enforce_table('requisitions', (int) $req['id'], $m5auth) as $m5rev) flash($m5rev, 'error');
                 if (function_exists('hreq_qty_enforce_after_write')) {
                     $m4why = hreq_qty_enforce_after_write((int) $req['id'], $m4prevQty);
                     if ($m4why !== '') { flash($m4why); redirect('/requisition?id=' . (int) $req['id']); }
@@ -5065,9 +5094,25 @@ function ops_requisitions($route, $method) {
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO requisitions (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
+                //  M5 — the requisition is created UNOWNED and the owner is then set
+                //  through the one door, so creation is protected by exactly the same
+                //  controls as an edit. A refused owner leaves the requirement
+                //  unassigned and says so; it never writes ownership nobody holds.
+                //  The INSERT is not allowed to have set ownership on its way past;
+                //  only the door may, immediately below.
+                if (function_exists('rasg_enforce_table'))
+                    rasg_enforce_table('requisitions', (int) $id, rasg_unowned('requisitions'));
+                $m5note = '';
+                if (function_exists('rasg_assign')) {
+                    foreach ($m5own as $m5col => $m5subj) {
+                        if (!array_key_exists($m5col, $b)) continue;
+                        $m5res = rasg_assign($m5subj, (int) $id, $b[$m5col], ['expect' => null, 'source' => 'requisition-new']);
+                        if (!$m5res['ok']) $m5note .= ' ' . rasg_refusal($m5subj, $m5res['code']);
+                    }
+                }
                 if (function_exists('custom_save')) custom_save('requisition', (int)$id, $b);
                 if (function_exists('req_groups_save')) { $gt = req_groups_save((int)$id, $b); if ($gt > 0) $pdo->prepare("UPDATE requisitions SET quantity=? WHERE id=?")->execute([$gt, (int)$id]); }
-                flash("$code created — now add candidates against it."); redirect('/requisition?id=' . $id);
+                flash("$code created — now add candidates against it." . $m5note, $m5note !== '' ? 'error' : 'success'); redirect('/requisition?id=' . $id);
             }
         }
         view('ops/requisition_form', ['req' => $req, 'offices' => offices_list(), 'inspectors' => inspectors_list(false),
@@ -5365,7 +5410,11 @@ function ops_candidates($route, $method) {
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
                 'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id','group_id',
-                'recruiter_id','department','department_id','drop_reason','drop_point'];   // Phase 7 — ownership + why/where lost; group_id = which deployment group (1c)
+                'department','department_id','drop_reason','drop_point'];   // Phase 7 — why/where lost; group_id = which deployment group (1c)
+            //  PHASE 3 · M5 — who is chasing this person is accountability, not a
+            //  form field. It leaves the blind list for the same reasons the
+            //  requisition's two owners did, and travels the same one door.
+            $m5cand = ['recruiter_id' => 'CAND_RECRUITER'];
             // §11 duplicate guard — on a NEW candidate, stop and show look-alikes
             // (same mobile / email / name) before creating a second record for the
             // same person. "Save anyway" (dup_ack) proceeds.
@@ -5374,9 +5423,20 @@ function ops_candidates($route, $method) {
                 if ($dupBlock) $prefill = $b;
             }
             if (!$dupBlock && $cand) {
+                //  M5 — ownership before the rest of the save, refused as a whole.
+                if (function_exists('rasg_assign')) {
+                    foreach ($m5cand as $m5col => $m5subj) {
+                        $m5r = rasg_apply_posted($m5subj, (int) $cand['id'], $b, $m5col, 'candidate-edit');
+                        if ($m5r !== '') { flash($m5r, 'error'); redirect('/candidate?id=' . (int) $cand['id']); }
+                    }
+                }
+                $m5auth = function_exists('rasg_authorised_now') ? rasg_authorised_now('candidates', (int) $cand['id']) : [];
                 $set = implode(',', array_map(fn($f) => "$f=?", $fields));
                 $vals = array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields); $vals[] = $cand['id'];
                 $pdo->prepare("UPDATE candidates SET $set WHERE id=?")->execute($vals);
+                //  M5 — defence in depth, exactly as on the requisition save.
+                if (function_exists('rasg_enforce_table'))
+                    foreach (rasg_enforce_table('candidates', (int) $cand['id'], $m5auth) as $m5rev) flash($m5rev, 'error');
                 // M3 — a candidate can be moved to a different requisition, which
                 // changes the standing of BOTH the one it left and the one it joined.
                 if (function_exists('reqf_sync')) {
@@ -5402,6 +5462,18 @@ function ops_candidates($route, $method) {
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO candidates (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
+                //  M5 — the candidate is created unowned, then the recruiter is set
+                //  through the one door. Same controls as the edit path.
+                if (function_exists('rasg_enforce_table'))
+                    rasg_enforce_table('candidates', (int) $id, rasg_unowned('candidates'));
+                $m5note = '';
+                if (function_exists('rasg_assign')) {
+                    foreach ($m5cand as $m5col => $m5subj) {
+                        if (!array_key_exists($m5col, $b)) continue;
+                        $m5res = rasg_assign($m5subj, (int) $id, $b[$m5col], ['expect' => null, 'source' => 'candidate-new']);
+                        if (!$m5res['ok']) $m5note .= ' ' . rasg_refusal($m5subj, $m5res['code']);
+                    }
+                }
                 if (function_exists('reqf_sync') && !empty($b['requisition_id'])) reqf_sync((int)$b['requisition_id']);
                 if (function_exists('custom_save')) custom_save('candidate', (int)$id, $b);
                 // If the résumé text was carried through the prefill, save it and its
@@ -5413,7 +5485,7 @@ function ops_candidates($route, $method) {
                 }
                 $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                     ->execute([$id, '', 'RECEIVED', 'CV received', user_name(current_user()), date('c')]);
-                flash("$code added to the hiring pipeline.");
+                flash("$code added to the hiring pipeline." . $m5note, $m5note !== '' ? 'error' : 'success');
                 redirect('/candidate?id=' . $id);
             }
         }

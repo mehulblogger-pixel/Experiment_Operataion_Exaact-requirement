@@ -132,18 +132,30 @@ function careers_apply($job, $post, $files) {
     $code = function_exists('recruit_cand_code') ? recruit_cand_code($job)
           : (function_exists('ops_next_code') ? ops_next_code('candidates', 'cand_code', 'CV') : ('CV-' . date('ymdHis')));
     $cols = ['cand_code','first_name','middle_name','last_name','designation','source','email','mobile',
-             'experience_years','cv_received_date','remarks','requisition_id','recruiter_id','department','department_id','sbu',
+             'experience_years','cv_received_date','remarks','requisition_id','department','department_id','sbu',
              'stage','created_by','created_at'];
     $vals = [$code, $first, trim((string)($post['middle_name'] ?? '')), $last,
              (string)($job['designation'] ?? ''), 'CAREERS', $email, $mobile,
              ($exp === '' ? 0 : (float)$exp), date('Y-m-d'), $remarks, (int)$job['id'],
-             ($job['recruiter_id'] ?? null) ?: null, (string)($job['department'] ?? ''), ($job['department_id'] ?? null) ?: null, (string)($job['sbu'] ?? ''),
+             (string)($job['department'] ?? ''), ($job['department_id'] ?? null) ?: null, (string)($job['sbu'] ?? ''),
              'RECEIVED', 'Careers site', date('c')];
     $ph = implode(',', array_fill(0, count($cols), '?'));
     try {
         $pdo->prepare("INSERT INTO candidates (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
     } catch (Throwable $e) { return [false, 'We could not record your application just now. Please try again shortly.', 0]; }
     $id = (int)$pdo->lastInsertId();
+
+    //  PHASE 3 · M5 — the recruiter is INHERITED from the advertised requirement,
+    //  never copied blindly. This form is served in front of require_login(), so
+    //  before M5 a public visitor's application wrote an ownership value that
+    //  nothing had validated: if the requirement still named somebody who had left
+    //  the company, every public application landed on a desk nobody sits at.
+    //  The one door re-asks whether that person exists, is active and covers the
+    //  branch; when they do not, the application is simply left unassigned and
+    //  appears in the unassigned queue, which is a state a human can see and fix.
+    if (function_exists('rasg_inherit_from_requisition')) {
+        try { rasg_inherit_from_requisition($id, (int) $job['id'], 'careers'); } catch (Throwable $e) {}
+    }
 
     if ($cvText !== '') {
         $kw = function_exists('cv_extract_keywords') ? cv_extract_keywords($cvText) : '';

@@ -120,8 +120,44 @@ function rcc_month_label($ym) {
 }
 
 // Build a WHERE fragment + args for the candidate table from the filters.
+//  PHASE 3 · M5 · RECONCILIATION — BRANCH SCOPE ON THE RECRUITMENT NUMBERS.
+//
+//  The M5 reconciliation asked the third question this codebase requires of every
+//  figure — "dashboard number = the records = AUTHORISED SCOPE" — and the answer
+//  was no. These two WHERE builders carried the screen's own filters and nothing
+//  else, so the command centre and the CSV export (their only two callers) showed
+//  every branch's candidates, requirements and RECRUITER NAMES to anybody who
+//  could open recruitment, however narrow their office scope. The register beside
+//  them (ops_requisitions) has scoped since M14.
+//
+//  No new rule is invented here. Requirements use scope_clause(), exactly as the
+//  requisition register does. Candidates have no branch of their own, so they are
+//  scoped through the requirement they are worked against — the same derivation
+//  cand_scope_gate() already uses to decide who may open a candidate — with
+//  scope_office_clause(), whose deliberate "no office means everybody" rule keeps
+//  a candidate that belongs to no requirement from vanishing for every branch at
+//  once. The Business-Unit half stays recruit_sbu_clause(), the module's existing
+//  candidate rule, which likewise keeps a blank Business Unit visible.
+function rcc_scope_cand($alias = 'c') {
+    $w = []; $a = [];
+    if (function_exists('scope_office_clause')) {
+        [$ow, $oa] = scope_office_clause("(SELECT r2.office_id FROM requisitions r2 WHERE r2.id=$alias.requisition_id)");
+        if ($ow !== '1=1') { $w[] = $ow; $a = array_merge($a, $oa); }
+    }
+    if (function_exists('recruit_sbu_clause')) {
+        [$sw, $sa] = recruit_sbu_clause("$alias.sbu");
+        if ($sw !== '1=1') { $w[] = $sw; $a = array_merge($a, $sa); }
+    }
+    return [$w ? implode(' AND ', $w) : '1=1', $a];
+}
+function rcc_scope_req($alias = 'r') {
+    if (!function_exists('scope_clause')) return ['1=1', []];
+    return scope_clause("$alias.office_id", "$alias.sbu");
+}
+
 function rcc_cand_where($f, $alias = 'c') {
-    $w = ['1=1']; $a = [];
+    [$sw, $sa] = rcc_scope_cand($alias);
+    $w = [$sw]; $a = $sa;
     $dateCol = "COALESCE(NULLIF($alias.cv_received_date,''),$alias.created_at)";
     if (!empty($f['month'])) { $w[] = "substr($dateCol,1,7)=?"; $a[] = $f['month']; }
     elseif (!empty($f['range'])) { $w[] = "substr($dateCol,1,10) BETWEEN ? AND ?"; $a[] = $f['range'][0]; $a[] = $f['range'][1]; }
@@ -132,7 +168,8 @@ function rcc_cand_where($f, $alias = 'c') {
 }
 // WHERE for requisitions from the filters (department + owner).
 function rcc_req_where($f, $alias = 'r') {
-    $w = ['1=1']; $a = [];
+    [$sw, $sa] = rcc_scope_req($alias);
+    $w = [$sw]; $a = $sa;
     if ($f['dept'] !== '') { $w[] = "$alias.department=?"; $a[] = $f['dept']; }
     if ($f['manager'] !== '' && ctype_digit($f['manager'])) { $w[] = "($alias.recruiter_id=? OR $alias.manager_id=?)"; $a[] = (int)$f['manager']; $a[] = (int)$f['manager']; }
     if (!empty($f['range'])) { $w[] = "(substr($alias.created_at,1,10)<=? )"; $a[] = $f['range'][1]; } // opened on/before FY end
@@ -179,8 +216,20 @@ function rcc_data($f) {
     ];
 
     // ---- Demand & pipeline KPIs ----
+    //  PHASE 3 · M5 · RECONCILIATION — the live-demand states are named ONCE, in
+    //  RASG_LIVE_REQ, and both this dashboard and the recruiter workload counter
+    //  read that one definition. They used to be written out here as a literal
+    //  list that predated PARTIALLY_FILLED (added by M3 when a requirement for ten
+    //  people stopped closing on the first hire). The consequence was measurable:
+    //  a ten-seat requirement with three people hired dropped out of this query
+    //  altogether, so the dashboard reported 0 open positions where the records
+    //  said 7, and the recruiter carrying it disappeared from the performance
+    //  table. A number on a screen that the records do not support is the defect
+    //  this milestone exists to remove.
+    $m5live = defined('RASG_LIVE_REQ') ? RASG_LIVE_REQ : ['OPEN','PROPOSED','OFFERED','PARTIALLY_FILLED','HIRED'];
+    $m5in   = "'" . implode("','", $m5live) . "'";
     $reqRows = $rows("SELECT r.*, (SELECT COUNT(*) FROM candidates cc WHERE cc.requisition_id=r.id AND cc.stage='ACCEPTED') filled
-                      FROM requisitions r WHERE $rw AND r.status IN ('OPEN','PROPOSED','OFFERED','HIRED') ", $ra);
+                      FROM requisitions r WHERE $rw AND r.status IN ($m5in) ", $ra);
     $openSeats = 0; $orderedSeats = 0; $filledSeats = 0;
     foreach ($reqRows as $r) { $q = max(1, (int)($r['quantity'] ?? 1)); $fl = (int)$r['filled']; $orderedSeats += $q; $filledSeats += min($fl, $q); $openSeats += max(0, $q - $fl); }
     $d['kpi'] = [

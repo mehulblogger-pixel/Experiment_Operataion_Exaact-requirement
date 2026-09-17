@@ -114,7 +114,7 @@
     <div class="ff"><label>Source</label>
       <select class="form-control" id="cand_source" name="source"><?php foreach (lk_options_or('candidate_source', CAND_SOURCES) as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['source'] ?? 'FREELANCER')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Recruiter (Responsible 1)</label>
-      <select class="form-control searchable" name="recruiter_id"><option value="">—</option><?php foreach (($rccUsers ?? []) as $uid=>$un): ?><option value="<?= (int)$uid ?>" <?= ((int)($cand['recruiter_id'] ?? 0)===(int)$uid)?'selected':'' ?>><?= e($un) ?></option><?php endforeach; ?></select></div>
+      <?php /* M5 — the owner this screen was showing (stale-save guard). */ ?><input type="hidden" name="own_base_recruiter_id" value="<?= (int)($cand['recruiter_id'] ?? 0) ?>"><select class="form-control searchable" name="recruiter_id"><option value="">—</option><?php foreach (($rccUsers ?? []) as $uid=>$un): ?><option value="<?= (int)$uid ?>" <?= ((int)($cand['recruiter_id'] ?? 0)===(int)$uid)?'selected':'' ?>><?= e($un) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Department</label>
       <select class="form-control searchable" name="department"><option value="">—</option><?php foreach ((function_exists('dept_form_options') ? dept_form_options($cand['department'] ?? '') : ($rccDepts ?? [])) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['department'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>If lost — drop point <span class="muted">where in the pipeline</span></label>
