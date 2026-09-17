@@ -467,6 +467,34 @@ function act_set_cond_key($id, $key) {
     }
     try {
         db()->prepare("UPDATE activities SET cond_key=? WHERE id=?")->execute([(string) $key, (int) $id]);
+        //  M3 CORRECTION #12 · X1 — STORED MUST MEAN ACTUALLY PERSISTED.
+        //
+        //  An UPDATE that matches no row does not throw, so "PDO did not throw"
+        //  reported success for a nonexistent id and for a row belonging to another
+        //  workspace — nothing written, anywhere, reported as STORED.
+        //
+        //  rowCount() cannot answer this either, and would swap one lie for
+        //  another. Measured on both engines:
+        //
+        //      MariaDB  same value → 0     different value → 1   no such row → 0
+        //      SQLite   same value → 1                           no such row → 0
+        //
+        //  So on MariaDB a row that already holds the wanted value is
+        //  indistinguishable from a row that does not exist, and an idempotent
+        //  re-write would be reported as a failure. Reading the value back is the
+        //  only engine-independent answer, and it is the requirement word for word:
+        //  the value must be present on the intended record in the intended
+        //  workspace. One extra SELECT, on the two cond_key call sites only —
+        //  never on the seventy-four ordinary act_log() callers.
+        $row = ops_one("SELECT cond_key FROM activities WHERE id=?", [(int) $id]);
+        if (!$row) {
+            act_err_set('write', 'cond_key: no such activity row in this workspace');
+            return ACT_COND_FAILED;                   // nonexistent, or another workspace's
+        }
+        if ((string) $row['cond_key'] !== (string) $key) {
+            act_err_set('write', 'cond_key: the value was not persisted as given');
+            return ACT_COND_FAILED;                   // e.g. silently truncated by the column
+        }
         act_err_set('write', '');
         return ACT_COND_STORED;
     } catch (Throwable $e) {
