@@ -5023,12 +5023,36 @@ function ops_requisitions($route, $method) {
             $b['prov_accommodation'] = (($b['prov_accom_by']  ?? '') === 'US') ? 1 : 0;
             $b['prov_travel']        = (($b['prov_travel_by'] ?? '') === 'US') ? 1 : 0;
             if ($req) {
+                //  PHASE 3 · M4 §17 — an approved request awaiting re-approval may not
+                //  have its execution record edited around the boundary.
+                if (function_exists('hreq_req_block_reason')) {
+                    $m4why = hreq_req_block_reason((int) $req['id']);
+                    if ($m4why !== '') { flash($m4why); redirect('/requisition?id=' . (int) $req['id']); }
+                }
+                //  §14 — the headcount ceiling, on the EDIT path and not only on
+                //  creation. This was the defect the M4 audit found.
+                $m4prevQty = (int) ($req['quantity'] ?? 0);
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields)) . ',' . implode(',', array_map(fn($f)=>"$f=?", $extraCols));
                 $vals = array_merge(array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), $extraVals, [$req['id']]);
                 $pdo->prepare("UPDATE requisitions SET $set WHERE id=?")->execute($vals);
+                if (function_exists('hreq_qty_enforce_after_write')) {
+                    $m4why = hreq_qty_enforce_after_write((int) $req['id'], $m4prevQty);
+                    if ($m4why !== '') { flash($m4why); redirect('/requisition?id=' . (int) $req['id']); }
+                }
                 if (function_exists('custom_save')) custom_save('requisition', (int)$req['id'], $b);
                 // 1c — deployment groups; when present, the total headcount is authoritative.
-                if (function_exists('req_groups_save')) { $gt = req_groups_save((int)$req['id'], $b); if ($gt > 0) $pdo->prepare("UPDATE requisitions SET quantity=? WHERE id=?")->execute([$gt, (int)$req['id']]); }
+                if (function_exists('req_groups_save')) { $gt = req_groups_save((int)$req['id'], $b);
+                    if ($gt > 0) {
+                        //  §14 — deployment groups overwrite quantity outright, so the
+                        //  ceiling is re-checked after them too. Without this the groups
+                        //  are a second way past the control.
+                        $m4before = (int) (ops_one("SELECT quantity FROM requisitions WHERE id=?", [(int)$req['id']])['quantity'] ?? 0);
+                        $pdo->prepare("UPDATE requisitions SET quantity=? WHERE id=?")->execute([$gt, (int)$req['id']]);
+                        if (function_exists('hreq_qty_enforce_after_write')) {
+                            $m4why = hreq_qty_enforce_after_write((int)$req['id'], $m4before);
+                            if ($m4why !== '') { flash($m4why); redirect('/requisition?id=' . (int)$req['id']); }
+                        }
+                    } }
                 if (function_exists('reqf_sync')) reqf_sync((int)$req['id']);   // M3 — the quantity may have changed
                 flash("Requisition {$req['req_code']} updated."); redirect('/requisition?id=' . $req['id']);
             } else {
@@ -5336,6 +5360,13 @@ function ops_candidates($route, $method) {
                 flash('Candidate updated.');
                 redirect('/candidate?id=' . $cand['id']);
             } elseif (!$dupBlock) {
+                //  PHASE 3 · M4 §13 — the execution boundary, asked at the WRITE.
+                //  A crafted POST reaches this line exactly as the form does, so
+                //  hiding the button is not what stops it.
+                if (!empty($b['requisition_id']) && function_exists('hreq_req_block_reason')) {
+                    $m4why = hreq_req_block_reason((int) $b['requisition_id']);
+                    if ($m4why !== '') { flash($m4why); redirect('/requisition?id=' . (int) $b['requisition_id']); }
+                }
                 $cReq = ($b['requisition_id'] ?? '') !== '' ? ops_one("SELECT id, req_code FROM requisitions WHERE id=?", [(int)$b['requisition_id']]) : null;
                 $code = ($cReq && function_exists('recruit_cand_code')) ? recruit_cand_code($cReq) : ops_next_code('candidates', 'cand_code', 'CV');
                 $cols = array_merge(['cand_code'], $fields, ['stage','created_by','created_at']);

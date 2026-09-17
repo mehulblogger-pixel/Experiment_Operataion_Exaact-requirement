@@ -329,11 +329,17 @@ if (preg_match_all('/(INSERT INTO|UPDATE |DELETE FROM)/', $src, $wm, PREG_OFFSET
 // hreq_apply_decision(), the one writer shared by the direct decision and the
 // approval chain. This guard caught that the moment it happened — which is what
 // it is for — so the list is re-established rather than patched around.
-$AUDITED = ['hreq_migrate', 'hreq_save', 'hreq_submit', 'hreq_apply_decision', 'hreq_cancel', 'hreq_to_requisition'];
+//  Phase 3 · M4 implementation added a SIXTH mutation path: hreq_require_reapproval(),
+//  the one place that invalidates a standing approval after a material change. It
+//  belongs on this list for the same reason as the other five — it writes, and it
+//  audits what it writes (material change, execution blocked, chain started).
+$AUDITED = ['hreq_migrate', 'hreq_save', 'hreq_submit', 'hreq_apply_decision', 'hreq_cancel',
+            'hreq_to_requisition', 'hreq_require_reapproval', 'hreq_qty_enforce_after_write'];
 $unaudited = array_values(array_diff(array_keys($writes), $AUDITED));
 t_ok(!$unaudited, 'D0 · every database write in the layer lives in an audited function'
      . ($unaudited ? ' — audit these: ' . implode(', ', $unaudited) : ''));
-t_eq(count($writes), 5, 'D0 · and there are exactly five of them — the five mutation paths');
+t_eq(count($writes), 7, 'D0 · and there are exactly seven of them — M4 added the re-approval writer '
+     . 'and the headcount-ceiling compensator, both of which audit what they do');
 
 // For each mutation path: the chain, in order, BEFORE the first write.
 //   entitlement+capability -> tenant/branch scope -> state / input validation -> mutation -> audit

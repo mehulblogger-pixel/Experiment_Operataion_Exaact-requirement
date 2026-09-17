@@ -145,9 +145,30 @@ $GLOBALS['__db_epoch'] = (int) ($GLOBALS['__db_epoch'] ?? 0) + 1;
 // ---------------------------------------------------------------------------
 //  6. An approved request is protected from quiet edits (§33).
 // ---------------------------------------------------------------------------
+//  PHASE 3 · M4 IMPLEMENTATION re-pointed these two assertions at the contract
+//  that replaced them. The protection they encode — an approved commitment cannot
+//  be quietly enlarged — is unchanged and is now asserted MORE strongly: before,
+//  the edit was simply refused; now it is allowed, the standing approval is
+//  invalidated, recruitment stops, and the figure the approver authorised is what
+//  the headcount ceiling keeps using.
+//  Capture what the approver actually approved BEFORE the edit, so the assertions
+//  below compare with the real fixture rather than a guessed one.
+$snapWas   = hreq_approved_snapshot(hreq_get($h1));
+$titleWas  = (string) ($snapWas['fields']['job_title'] ?? '');
+$convWas   = hreq_converted_qty($h1);
 [$eOk, $eMsg] = hreq_save($h1, $base(['quantity' => 99, 'job_title' => 'Something Else']));
-t_ok(!$eOk, 'an approved request cannot be silently changed: ' . $eMsg);
-t_eq((int) hreq_get($h1)['quantity'], 10, '…and the approved figure is intact');
+t_ok($eOk, 'an approved request CAN now be changed: ' . $eMsg);
+t_ok(stripos($eMsg, 're-approval') !== false, '…but never silently — the answer says re-approval');
+$h1row = hreq_get($h1);
+t_eq(hreq_reapproval_state($h1row), 'REQUIRED', '…the standing approval is invalidated');
+t_ok(!hreq_is_executable($h1row), '…recruitment is blocked while it is unapproved');
+t_eq((int) hreq_approved_qty($h1row), 10, '…and the APPROVED figure is intact at 10, not 99');
+t_eq((int) hreq_remaining_qty($h1), max(0, 10 - $convWas),
+     '…so the headcount ceiling is still measured from the approved 10, not the typed 99');
+$snap99 = hreq_approved_snapshot($h1row);
+t_eq((int) ($snap99['fields']['quantity'] ?? 0), 10, '…the approved snapshot was not overwritten');
+t_eq((string) ($snap99['fields']['job_title'] ?? ''), $titleWas, '…nor was the approved title');
+t_ok($titleWas !== 'Something Else', '…and the approved title is not the one just typed in');
 
 // ---------------------------------------------------------------------------
 //  7. Negative and boundary input (§43).

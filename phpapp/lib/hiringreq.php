@@ -46,6 +46,53 @@ const HREQ_STATUS = [
 // that reaches APPROVED; M4 only has to make the boundary expressible.
 const HREQ_EXECUTABLE = ['APPROVED'];
 
+// ===========================================================================
+//  PHASE 3 · M4 — RE-APPROVAL & REQUISITION CONTROL
+//
+//  The lifecycle statuses above are UNCHANGED. docs/03-object-lifecycles.md is
+//  the authority for them and M4 adds none: re-approval is an additive attribute
+//  OF an approved request, so an approved request stays APPROVED throughout.
+//
+//      NONE         approved and unchanged                      executable
+//      REQUIRED     approved, then materially changed           blocked
+//      IN_PROGRESS  the re-approval chain is running            blocked
+//      REAPPROVED   re-approved against the new snapshot        executable
+//      REJECTED     the re-approval was refused                 blocked
+//
+//  Cancellation is not here — it is the lifecycle status CANCELLED.
+const HREQ_REAPPROVAL = [
+    'NONE'        => 'Approved',
+    'REQUIRED'    => 'Re-approval required',
+    'IN_PROGRESS' => 'Re-approval in progress',
+    'REAPPROVED'  => 'Re-approved',
+    'REJECTED'    => 'Re-approval rejected',
+];
+//  The states in which recruitment must NOT run.
+const HREQ_REAPPROVAL_BLOCKS = ['REQUIRED', 'IN_PROGRESS', 'REJECTED'];
+
+//  THE AUTHORITATIVE MATERIAL-CHANGE SET — docs/phase3/M4-MATERIAL-CHANGE-MATRIX.md.
+//  One rule, one place. Nothing else in the product decides materiality.
+//
+//  'quantity' is deliberately absent: it is asymmetric and is judged by
+//  hreq_material_diff() — an INCREASE spends authority nobody granted, a
+//  DECREASE stays inside the approval. Treating them alike would force a
+//  re-approval on a manager asking for fewer people, which teaches people to
+//  route around the control.
+const HREQ_MATERIAL_FIELDS = [
+    'hiring_department_id'   => 'the department the person joins',
+    'designation'            => 'the role',
+    'grade'                  => 'the pay band',
+    'position_id'            => 'the establishment seat',
+    'new_position_requested' => 'whether a new seat is being asked for',
+    'job_title'              => 'what was approved, in the approver\'s words',
+    'employment_type'        => 'permanent, contract or temporary',
+    'office_id'              => 'the branch the cost belongs to, and the approval chain',
+    'work_location'          => 'where the person actually works',
+    'client_id'              => 'the client contract it is billed against',
+    'request_type'           => 'the basis on which it was authorised',
+    'requested_by_id'        => 'the identity segregation of duties was judged against',
+];
+
 // Starter vocabularies. Each is created through the EXISTING lookup engine, so a
 // customer can extend it on day one — none of these lists existed before.
 const HREQ_PRIORITIES = [
@@ -134,6 +181,13 @@ function hreq_migrate() {
     // a requisition raised directly carries NULL, exactly as it always has (§19).
     if (function_exists('ensure_column')) {
         try { ensure_column('requisitions', 'hiring_request_id', 'INT NULL'); } catch (Throwable $e) {}
+        //  M4 §4 — additive, idempotent, non-destructive, forward-only. Nothing is
+        //  dropped or rewritten: an existing approved request keeps its status, its
+        //  decision and its submitted snapshot, and simply gains 'NONE'.
+        try { ensure_column('hiring_requests', 'reapproval_state',       "VARCHAR(20) DEFAULT 'NONE'"); } catch (Throwable $e) {}
+        try { ensure_column('hiring_requests', 'approved_snapshot_json', 'TEXT'); } catch (Throwable $e) {}
+        try { ensure_column('hiring_requests', 'approved_snapshot_at',   "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
+        try { ensure_column('hiring_requests', 'reapproval_started_at',  "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
     }
 
     // Vocabularies, through the engine that already exists.
@@ -353,11 +407,137 @@ function hreq_next_no() {
 }
 
 // May recruitment begin against this request? The whole point of the layer.
+//  M4 §13 — THE AUTHORITATIVE RUNTIME BOUNDARY. There is no second one: every
+//  execution path asks this, and it now weighs the re-approval attribute as well
+//  as the lifecycle status.
 function hreq_is_executable($req) {
     $r = is_array($req) ? $req : hreq_get($req);
     if (!$r) return false;
     if (empty($r['approval_required'])) return true;          // a workspace that does not require approval
-    return in_array(strtoupper((string) $r['status']), HREQ_EXECUTABLE, true);
+    if (!in_array(strtoupper((string) $r['status']), HREQ_EXECUTABLE, true)) return false;
+    return !in_array(hreq_reapproval_state($r), HREQ_REAPPROVAL_BLOCKS, true);
+}
+
+//  Why recruitment cannot run, in words a coordinator can act on. Returns '' when
+//  it can — so a caller can use it directly as the refusal message.
+function hreq_block_reason($req) {
+    $r = is_array($req) ? $req : hreq_get($req);
+    if (!$r) return 'That hiring request no longer exists.';
+    if (hreq_is_executable($r)) return '';
+    $st = hreq_reapproval_state($r);
+    if (in_array($st, HREQ_REAPPROVAL_BLOCKS, true)) {
+        if ($st === 'REJECTED')
+            return 'The change to this approved request was not re-approved. Recruitment stays paused.';
+        return 'This approved request has been changed in a way that needs re-approval. '
+             . 'Recruitment is paused until it is re-approved.';
+    }
+    return 'This request is ' . strtolower((string) $r['status'])
+         . '. Recruitment cannot start until it is approved.';
+}
+
+//  M4 §13/§17 — THE GATE EVERY EXECUTION PATH ASKS, given a requisition.
+//  Returns '' when recruitment may proceed, or the reason it may not.
+//
+//  §16 / ADR-001 — a requisition raised directly carries hiring_request_id NULL.
+//  It has no approved request to enforce against, and inventing an approved
+//  headcount from nowhere would be a policy change, not a control. Such a
+//  requisition proceeds, still subject to every existing RBAC, entitlement,
+//  scope and business rule.
+function hreq_req_block_reason($requisitionId) {
+    $rid = (int) $requisitionId;
+    if ($rid <= 0) return '';
+    try { $row = ops_one("SELECT hiring_request_id FROM requisitions WHERE id=?", [$rid]); }
+    catch (Throwable $e) { return ''; }
+    $hid = (int) ($row['hiring_request_id'] ?? 0);
+    if ($hid <= 0) return '';                       // ADR-001 — direct requisition
+    return hreq_block_reason($hid);
+}
+
+//  M4 §14 — THE HEADCOUNT CEILING, for every write that can change executable
+//  quantity. Returns '' when the quantity is allowed, or the refusal.
+//
+//  $exclude is the requisition being edited, so its own current seats are not
+//  counted against it.
+function hreq_qty_guard($hiringRequestId, $wantQty, $excludeRequisitionId = 0) {
+    $hid = (int) $hiringRequestId;
+    if ($hid <= 0) return '';                       // ADR-001 — nothing to enforce against
+    $r = hreq_get($hid);
+    if (!$r) return '';
+    $approved = hreq_approved_qty($r);
+    $others = 0;
+    try {
+        $others = (int) ops_val("SELECT COALESCE(SUM(quantity),0) FROM requisitions
+                                 WHERE hiring_request_id=? AND id<>? AND UPPER(COALESCE(status,'')) <> 'CANCELLED'",
+                                [$hid, (int) $excludeRequisitionId]);
+    } catch (Throwable $e) { $others = 0; }
+    $want = max(0, (int) $wantQty);
+    if ($others + $want <= $approved) return '';
+    $left = max(0, $approved - $others);
+    return 'The approved headcount for this hiring request is ' . $approved
+         . '. ' . ($others > 0 ? $others . ' already on other requisitions, so ' : '')
+         . 'only ' . $left . ' can be recruited here.';
+}
+
+//  The same ceiling, applied as a COMPENSATING check after a write that has
+//  already happened. Two processes may both write and both then see the total
+//  broken; both revert and both refuse, so the headcount is never over-allocated
+//  — the worst case is a refusal that could in principle have succeeded, which is
+//  the safe direction for a control of this kind (§25).
+function hreq_qty_enforce_after_write($requisitionId, $previousQty) {
+    $rid = (int) $requisitionId;
+    try { $row = ops_one("SELECT hiring_request_id, quantity FROM requisitions WHERE id=?", [$rid]); }
+    catch (Throwable $e) { return ''; }
+    if (!$row) return '';
+    $hid = (int) ($row['hiring_request_id'] ?? 0);
+    if ($hid <= 0) return '';
+    $why = hreq_qty_guard($hid, (int) $row['quantity'], $rid);
+    if ($why === '') return '';
+    try { db()->prepare("UPDATE requisitions SET quantity=? WHERE id=?")->execute([(int) $previousQty, $rid]); }
+    catch (Throwable $e) {}
+    if (function_exists('act_log'))
+        act_log('HIRING_REQUEST', $hid, 'SYSTEM',
+                'Refused: a requisition quantity change that would exceed the approved headcount',
+                ['auto' => 1, 'outcome' => 'OVER_ALLOCATION_REFUSED']);
+    return $why;
+}
+
+function hreq_reapproval_state($r) {
+    $v = strtoupper(trim((string) (is_array($r) ? ($r['reapproval_state'] ?? '') : '')));
+    return array_key_exists($v, HREQ_REAPPROVAL) ? $v : 'NONE';
+}
+
+//  The immutable approved snapshot — what the approver actually approved.
+function hreq_approved_snapshot($r) {
+    $raw = is_array($r) ? (string) ($r['approved_snapshot_json'] ?? '') : '';
+    if ($raw === '') return null;
+    $d = json_decode($raw, true);
+    return is_array($d) ? $d : null;
+}
+
+//  M4 §6 — MATERIALITY IS JUDGED AGAINST THE APPROVED SNAPSHOT, never against
+//  the previous edit. Ten harmless edits followed by one material one must still
+//  be compared with what the approver saw.
+//
+//  Returns the list of material differences; empty means nothing material moved.
+function hreq_material_diff($r, array $incoming = null) {
+    $snap = hreq_approved_snapshot($r);
+    if (!$snap || !is_array($snap['fields'] ?? null)) return [];   // never approved: nothing to invalidate
+    $was  = $snap['fields'];
+    $now  = is_array($incoming) ? ($incoming + (array) $r) : (array) $r;
+    $out  = [];
+    foreach (HREQ_MATERIAL_FIELDS as $f => $why) {
+        $a = $was[$f] ?? null; $b = $now[$f] ?? null;
+        //  Ids and flags compare as integers, text as trimmed strings, so a
+        //  NULL/0/'' shuffle is not reported as a business change.
+        $norm = fn($v) => is_numeric($v) ? (string) (int) $v : strtolower(trim((string) $v));
+        if ($norm($a) !== $norm($b)) $out[$f] = ['was' => $a, 'now' => $b, 'why' => $why];
+    }
+    //  §7 — quantity, asymmetrically. Up is material; down is not, and both are
+    //  audited by the caller either way.
+    $qWas = (int) ($was['quantity'] ?? 0); $qNow = (int) ($now['quantity'] ?? $qWas);
+    if ($qNow > $qWas)
+        $out['quantity'] = ['was' => $qWas, 'now' => $qNow, 'why' => 'more headcount than was authorised'];
+    return $out;
 }
 
 // ---- Save -----------------------------------------------------------------
@@ -374,10 +554,27 @@ function hreq_save($id, array $post) {
     $existing = $id > 0 ? hreq_get($id) : null;
     if ($id > 0 && !$existing) return [false, 'That hiring request no longer exists.', 0];
 
-    // Once approved, the business meaning is protected (§33). Phase 3 will add
-    // the re-approval path; M4 has to make the boundary real.
-    if ($existing && strtoupper((string) $existing['status']) === 'APPROVED')
-        return [false, 'This request is approved. Changing it needs a re-approval, which is not built yet.', 0];
+    //  PHASE 3 · M4 — THE RE-APPROVAL PATH. An approved request used to be simply
+    //  immutable ("…which is not built yet"). It can now be changed by anyone with
+    //  the edit right, and what happens next depends entirely on WHAT changed,
+    //  judged against the snapshot the approver actually approved.
+    $wasApproved = $existing && strtoupper((string) $existing['status']) === 'APPROVED';
+    if ($wasApproved) {
+        //  §8 — approval_required is not a field, it is the CONTROL. Turning it off
+        //  after approval would retire the approval entirely, so it is refused
+        //  outright and no re-approval route is offered for it. A crafted POST
+        //  reaches this line exactly as the form does.
+        if (array_key_exists('approval_required', $post)
+            && (int) !empty($post['approval_required']) !== (int) !empty($existing['approval_required'])) {
+            if (function_exists('act_log'))
+                act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                        'Refused: an attempt to change the approval requirement on an approved request',
+                        ['auto' => 1, 'outcome' => 'DENIED']);
+            return [false, 'The approval requirement of an approved request cannot be changed.', 0];
+        }
+    }
+    if ($existing && !$wasApproved && strtoupper((string) $existing['status']) === 'APPROVED')
+        return [false, 'This request is approved.', 0];
     if ($existing && in_array(strtoupper((string) $existing['status']), ['REJECTED', 'CANCELLED'], true))
         return [false, 'A ' . strtolower($existing['status']) . ' request cannot be edited.', 0];
     if ($existing && !hreq_in_scope($existing))
@@ -492,7 +689,86 @@ function hreq_save($id, array $post) {
     // nothing here was ever audited. act_log() is the real spine (M1 finding G).
     if (function_exists('act_log'))
         act_log('HIRING_REQUEST', $id, 'SYSTEM', ($existing ? 'Hiring request updated: ' : 'Hiring request raised: ') . $title, ['auto' => 1]);
+    //  M4 §9/§10 — CLASSIFY THE CHANGE, against the APPROVED snapshot.
+    if ($wasApproved) {
+        $after = hreq_get($id);
+        $diff  = hreq_material_diff($after);
+        if (!$diff) {
+            //  Non-material: allowed, still executable, and still audited. "Not
+            //  material" means no re-approval, never no record.
+            if (function_exists('act_log'))
+                act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                        'Approved request changed — nothing material; the approval still stands',
+                        ['auto' => 1, 'outcome' => 'NON_MATERIAL']);
+            return [true, 'Hiring request saved. The approval still stands.', $id];
+        }
+        [$ok, $msg] = hreq_require_reapproval($id, $diff);
+        return [true, $msg, $id];
+    }
     return [true, $existing ? 'Hiring request saved.' : 'Hiring request created.', $id];
+}
+
+//  M4 §10 — a material change invalidates the standing approval and asks the
+//  EXISTING approval engine for a new decision. It creates no approval mechanism
+//  of its own: appr_start() is the same call hreq_submit() makes, so the matrix,
+//  authority, delegation, scope, segregation, inbox, SLA and notifications are
+//  the ones M1/M2/M3 already built and proved.
+//
+//  §25 — the move to REQUIRED is an atomic compare-and-swap, so two users saving
+//  a material change at the same moment cannot both start a chain. Only the
+//  winner proceeds; the loser finds the request already in re-approval, which is
+//  the correct answer for it.
+function hreq_require_reapproval($id, array $diff) {
+    $id = (int) $id;
+    $st = db()->prepare("UPDATE hiring_requests SET reapproval_state='REQUIRED', reapproval_started_at=?,
+                         updated_at=? WHERE id=? AND COALESCE(reapproval_state,'NONE') IN ('NONE','REAPPROVED','REJECTED')");
+    $st->execute([hreq_now(), hreq_now(), $id]);
+    //  The new value always differs from the matched ones, so 0 rows can only mean
+    //  another process got there first — never "the value was already identical".
+    $won = $st->rowCount() > 0;
+
+    $names = implode(', ', array_keys($diff));
+    if (function_exists('act_log')) {
+        if ($won) {
+            act_log('HIRING_REQUEST', $id, 'SYSTEM',
+                    'Material change after approval — re-approval required (' . $names . ')',
+                    ['auto' => 1, 'outcome' => 'MATERIAL', 'body' => json_encode($diff)]);
+            act_log('HIRING_REQUEST', $id, 'SYSTEM', 'Recruitment execution blocked pending re-approval',
+                    ['auto' => 1, 'outcome' => 'BLOCKED']);
+        } else {
+            act_log('HIRING_REQUEST', $id, 'SYSTEM',
+                    'Further material change while re-approval was already open (' . $names . ')',
+                    ['auto' => 1, 'outcome' => 'MATERIAL', 'body' => json_encode($diff)]);
+        }
+    }
+    if (!$won) return [true, 'Saved. This request is already awaiting re-approval.'];
+
+    //  Hand it to the engine that already exists. If no rule matches, the request
+    //  stays REQUIRED and is decided directly through hreq_apply_decision() —
+    //  exactly the behaviour hreq_submit() has for a first approval.
+    $started = false;
+    if (function_exists('appr_start')) {
+        try {
+            //  The SAME call hreq_submit() makes, through the SAME context helper —
+            //  so the matrix, authority, delegation, scope and segregation cannot
+            //  drift apart between a first approval and a re-approval.
+            $r = hreq_get($id);
+            [$started, $apprId] = appr_start('HIRING_REQUEST', $id, hreq_appr_ctx($r),
+                'Re-approval — hiring request ' . (string) ($r['req_no'] ?? '') . ' — ' . (string) ($r['job_title'] ?? ''), 0);
+            if ($started && $apprId > 0)
+                db()->prepare("UPDATE hiring_requests SET approval_ref=? WHERE id=?")->execute([(string) $apprId, $id]);
+            $started = $started && $apprId > 0;
+        } catch (Throwable $e) { $started = false; }
+    }
+    if ($started) {
+        db()->prepare("UPDATE hiring_requests SET reapproval_state='IN_PROGRESS', updated_at=?
+                       WHERE id=? AND reapproval_state='REQUIRED'")->execute([hreq_now(), $id]);
+        if (function_exists('act_log'))
+            act_log('HIRING_REQUEST', $id, 'SYSTEM', 'Re-approval submitted to the approval chain', ['auto' => 1]);
+        return [true, 'Saved. This change needs re-approval, which has been sent to the approvers. '
+                    . 'Recruitment is paused until it is approved.'];
+    }
+    return [true, 'Saved. This change needs re-approval before recruitment can continue.'];
 }
 
 // ---- Submit — takes the snapshot (§12) ------------------------------------
@@ -504,8 +780,21 @@ function hreq_snapshot(array $r) {
     $desig = function_exists('lk_options_or') ? lk_options_or('designation', defined('DESIGNATIONS') ? DESIGNATIONS : []) : [];
     $pos = null;
     if (!empty($r['position_id'])) { try { $pos = ops_one("SELECT code, name FROM positions WHERE id=?", [(int) $r['position_id']]); } catch (Throwable $e) {} }
+    //  M4 §5 — the snapshot must answer "what exactly was approved?", so it keeps
+    //  BOTH the words the approver saw (resolved labels, below) AND the raw
+    //  comparable values materiality is judged on. It stores every user-editable
+    //  field, not only the material ones: deciding materiality is a comparison
+    //  OVER the snapshot, so the snapshot cannot be selective.
+    $fields = [];
+    foreach (['job_title','job_description','designation','grade','position_id','new_position_requested',
+              'quantity','employment_type','work_location','required_by','priority','reason',
+              'request_type','project_ref','office_id','client_id','hiring_department_id',
+              'requesting_department_id','requested_by_id','requested_by_name','approval_required'] as $f)
+        $fields[$f] = $r[$f] ?? null;
+
     return [
         'taken_at'             => hreq_now(),
+        'fields'               => $fields,
         'job_title'            => (string) ($r['job_title'] ?? ''),
         'job_description'      => (string) ($r['job_description'] ?? ''),
         'designation'          => (string) ($r['designation'] ?? ''),
@@ -578,12 +867,64 @@ function hreq_apply_decision($id, $result, $by, $note = '', $source = 'DIRECT') 
     hreq_migrate();
     $r = hreq_get($id); if (!$r) return [false, 'That hiring request no longer exists.'];
     $st = strtoupper((string) $r['status']);
-    if (!in_array($st, ['SUBMITTED', 'UNDER_REVIEW'], true))
+    //  M4 §11 — RE-APPROVAL USES THIS WRITER. There is no second decision writer:
+    //  an approved request whose re-approval is running is decided here too, so
+    //  authority, segregation, delegation and audit are the same code for both.
+    $reSt = hreq_reapproval_state($r);
+    $isReapproval = ($st === 'APPROVED' && in_array($reSt, ['REQUIRED', 'IN_PROGRESS'], true));
+    //  ONE state gate for BOTH routes, before anything is written. A first
+    //  approval is decided from SUBMITTED or UNDER_REVIEW; a re-approval is
+    //  decided from APPROVED while its re-approval is open. Nothing else is
+    //  decidable, and no write happens above this line.
+    if (!$isReapproval && !in_array($st, ['SUBMITTED', 'UNDER_REVIEW'], true))
         return [false, 'Only a submitted request can be decided (this one is ' . strtolower($st) . ').'];
+    if ($isReapproval) {
+        $to  = strtoupper((string) $result) === 'APPROVED' ? 'APPROVED' : 'REJECTED';
+        $who = trim((string) $by) !== '' ? (string) $by : hreq_who();
+        if ($to === 'APPROVED') {
+            //  The NEW approved snapshot is captured at the decision — never when
+            //  the change was merely submitted for re-approval.
+            db()->prepare("UPDATE hiring_requests SET reapproval_state='REAPPROVED', decided_by=?, decided_at=?,
+                           decision_note=?, approved_snapshot_json=?, approved_snapshot_at=?, updated_by=?, updated_at=? WHERE id=?")
+                ->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400),
+                           json_encode(hreq_snapshot($r)), hreq_now(), $who, hreq_now(), (int) $id]);
+        } else {
+            db()->prepare("UPDATE hiring_requests SET reapproval_state='REJECTED', decided_by=?, decided_at=?,
+                           decision_note=?, updated_by=?, updated_at=? WHERE id=?")
+                ->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
+        }
+        if (function_exists('act_log'))
+            act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                    ($to === 'APPROVED' ? 'Re-approved' : 'Re-approval rejected') . ' via ' . $source
+                    . ($who !== '' ? ' by ' . $who : ''),
+                    ['auto' => 1, 'outcome' => $to === 'APPROVED' ? 'REAPPROVED' : 'REAPPROVAL_REJECTED',
+                     'body' => trim((string) $note)]);
+        if (function_exists('act_log'))
+            act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                    $to === 'APPROVED' ? 'Recruitment execution restored' : 'Recruitment execution remains blocked',
+                    ['auto' => 1]);
+        return [true, $to === 'APPROVED' ? 'Change re-approved. Recruitment can continue.'
+                                         : 'Change not re-approved. Recruitment stays paused.'];
+    }
     $to = strtoupper((string) $result) === 'APPROVED' ? 'APPROVED' : 'REJECTED';
     $who = trim((string) $by) !== '' ? (string) $by : hreq_who();
-    db()->prepare("UPDATE hiring_requests SET status=?, decided_by=?, decided_at=?, decision_note=?, updated_by=?, updated_at=? WHERE id=?")
-        ->execute([$to, $who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
+    //  M4 §5/§11 — THE APPROVED SNAPSHOT IS TAKEN AT THE DECISION, not at submit.
+    //  The submitted snapshot answers "what was sent"; only this answers "what did
+    //  the approver approve?", and the two differ whenever anything moved in
+    //  between. It is written once per approval and never overwritten by a later
+    //  edit — a subsequent material change compares against it, it does not
+    //  replace it.
+    if ($to === 'APPROVED') {
+        db()->prepare("UPDATE hiring_requests SET status=?, decided_by=?, decided_at=?, decision_note=?,
+                       approved_snapshot_json=?, approved_snapshot_at=?, reapproval_state=?, updated_by=?, updated_at=? WHERE id=?")
+            ->execute([$to, $who, hreq_now(), substr(trim((string) $note), 0, 400),
+                       json_encode(hreq_snapshot($r)), hreq_now(),
+                       hreq_reapproval_state($r) === 'NONE' ? 'NONE' : 'REAPPROVED',
+                       $who, hreq_now(), (int) $id]);
+    } else {
+        db()->prepare("UPDATE hiring_requests SET status=?, decided_by=?, decided_at=?, decision_note=?, updated_by=?, updated_at=? WHERE id=?")
+            ->execute([$to, $who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
+    }
     if (function_exists('act_log'))
         act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
                 $to . ' via ' . $source . ($who !== '' ? ' by ' . $who : ''),
@@ -657,9 +998,25 @@ function hreq_converted_qty($id) {
     return $n;
 }
 
+//  M4 §14 — THE CEILING IS THE APPROVED FIGURE, not the figure on the row.
+//
+//  A material quantity increase is applied to the row immediately and invalidates
+//  the approval (§10); the row therefore says 99 while the approver authorised 10.
+//  Reading the row here would let an unapproved increase raise the ceiling the
+//  moment it was typed, which is precisely the bypass M4 exists to stop. The
+//  approved snapshot is the authority, and the row is used only where no approval
+//  has happened yet (a workspace that requires none).
+function hreq_approved_qty($r) {
+    $r = is_array($r) ? $r : hreq_get($r);
+    if (!$r) return 0;
+    $snap = hreq_approved_snapshot($r);
+    if ($snap && isset($snap['fields']['quantity'])) return max(0, (int) $snap['fields']['quantity']);
+    return max(0, (int) ($r['quantity'] ?? 0));
+}
+
 function hreq_remaining_qty($id) {
     $r = hreq_get($id); if (!$r) return 0;
-    return max(0, (int) $r['quantity'] - hreq_converted_qty($id));
+    return max(0, hreq_approved_qty($r) - hreq_converted_qty($id));
 }
 
 // Create the execution record. Returns [ok, message, requisitionId].
