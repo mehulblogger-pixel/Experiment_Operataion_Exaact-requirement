@@ -264,6 +264,62 @@ function appr_condition_key($event, $req, $step, $reason) {
          . '|R' . $rq . '|S' . $st . '|' . strtoupper(trim((string) $reason));
 }
 
+//  M3 CORRECTION #13 · Y2 — WHAT THE CALLER DOES WITH THE ANSWER.
+//
+//  #12 made act_set_cond_key() truthful. It did not make anyone listen: the sole
+//  production caller discarded the status, so the whole four-valued contract was
+//  observable only from tests. This is the missing sibling — not another channel
+//  or another observer, but the caller itself.
+//
+//  Why it is a live defect and not a tidiness point: appr_condition_seen() asks
+//  the DATABASE whether the marker is there. If the marker did not persist and
+//  nobody is told, the next identical permanent condition finds no marker,
+//  concludes it has never been seen, and records the event again — the repetition
+//  #7 was raised to stop, silently resumed.
+//
+//  THE FAIL-SAFE, stated exactly rather than invented (§3):
+//
+//    marker STORED      → suppression is ARMED. Existing behaviour, unchanged:
+//                         the identical condition will be suppressed next time.
+//    marker NOT stored  → suppression is NOT ARMED, and the application says so.
+//                         The event row still stands (S1 — an audit event is
+//                         never sacrificed to its own metadata), but nothing
+//                         anywhere claims the marker was written.
+//
+//  Fail-open is the only safe choice INSIDE THE EXISTING ARCHITECTURE, and the
+//  reasoning is recorded so it is not mistaken for an oversight:
+//
+//    · Failing CLOSED — suppressing the repeat anyway — would mean suppressing on
+//      the strength of a marker that does not exist. That is precisely "silently
+//      behaving as though the condition was recorded", which §3 forbids.
+//    · Suppressing from a second store — a cache, a session, an in-memory set —
+//      would be a second deduplication mechanism, which §3 forbids.
+//    · So the repeat is ALLOWED, and it is ATTRIBUTABLE: the caller returns
+//      APPR_COND_UNARMED and the reason goes to the error log. A duplicate
+//      timeline entry is a visible, correctable annoyance; a suppressed event
+//      that was never recorded is lost evidence. The audit trail keeps the
+//      louder failure.
+//
+//  No approval decision, authority or notification behaviour changes here.
+const APPR_COND_NONE       = 'NONE';         // no permanent condition — nothing to suppress
+const APPR_COND_SUPPRESSED = 'SUPPRESSED';   // already recorded — deliberately silent
+const APPR_COND_NO_SUBJECT = 'NO_SUBJECT';   // nothing openable remains — no row written
+const APPR_COND_RECORDED   = 'RECORDED';     // row written AND marker persisted — suppression ARMED
+const APPR_COND_UNARMED    = 'UNARMED';      // row written, marker NOT persisted — NOT armed
+
+//  Reads the status act_log() left behind and turns it into the caller's own
+//  outcome. It deliberately does NOT collapse to a boolean: a truthy 'FAILED'
+//  was the trap #11 named, and "did it store" and "is suppression armed" are two
+//  different questions that happen to share an answer today.
+function appr_cond_outcome($condKey) {
+    if ((string) $condKey === '') return APPR_COND_NONE;
+    $st = function_exists('act_last_cond_status') ? act_last_cond_status() : ACT_COND_NOT_ATTEMPTED;
+    if ($st === ACT_COND_STORED) return APPR_COND_RECORDED;
+    @error_log('appr: permanent-condition marker NOT persisted (' . $st . ') — duplicate '
+             . 'suppression is NOT armed for this condition; the event itself was recorded');
+    return APPR_COND_UNARMED;
+}
+
 //  Has this exact state already been recorded? One exact-match question against
 //  the EXISTING spine — no second event engine, and no parsing of display prose.
 function appr_condition_seen($key) {
@@ -278,14 +334,16 @@ function appr_condition_seen($key) {
 //  entity and its id are named in the SUBJECT as well as the entity column, so an
 //  event stays readable for the entities that are not registered on the timeline
 //  (offer and salary — see the known limitations).
+//  Y2 — returns its own outcome so the branch taken is observable. Every existing
+//  caller invokes this as a statement, so the added return changes nothing for them.
 function appr_audit_sla($req, $step, $what, $detail = '', $event = 'SLA_EVENT') {
-    if (!function_exists('act_log') || !$req) return;
+    if (!function_exists('act_log') || !$req) return APPR_COND_NO_SUBJECT;
     //  §5 — the permanent condition on this path is "the source record is gone".
     //  A chain whose record still exists is untouched: genuine reminders and
     //  escalations for genuinely pending approvals keep working exactly as before.
     $condKey = appr_audit_source_gone($req)
         ? appr_condition_key($event, $req, $step, 'ENTITY_UNRESOLVED') : '';
-    if ($condKey !== '' && appr_condition_seen($condKey)) return;
+    if ($condKey !== '' && appr_condition_seen($condKey)) return APPR_COND_SUPPRESSED;
     $entity = strtoupper((string) ($req['entity'] ?? ''));
     $label  = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : $entity;
     //  J1 — this writer had NO check at all, not even D2's type check, so an
@@ -294,13 +352,14 @@ function appr_audit_sla($req, $step, $what, $detail = '', $event = 'SLA_EVENT') 
     //  precisely the orphan D2 was raised about, produced by the audit path D2
     //  did not touch. One rule, both writers.
     [$kind, $id, $isSource] = appr_audit_subject($req);
-    if ($kind === '') return;
+    if ($kind === '') return APPR_COND_NO_SUBJECT;
     $subject = $what . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0)
         . ' · level ' . (int) ($step['seq'] ?? 0)
         . (trim((string) ($step['label'] ?? '')) !== '' ? ' (' . $step['label'] . ')' : '')
         . ($detail !== '' ? ' — ' . $detail : '')
         . ((!$isSource && appr_audit_source_gone($req)) ? ' — source record unavailable' : '');
     act_log($kind, $id, 'SYSTEM', $subject, ['auto' => 1, 'cond_key' => $condKey]);
+    return appr_cond_outcome($condKey);          // Y2 — the status is consumed, not dropped
 }
 
 // ---- Rules & levels (config) -----------------------------------------------
@@ -1700,9 +1759,10 @@ function appr_requester_user($req) { [$u] = appr_resolve_requester($req); return
 const APPR_NOTIFY_AUDITED = ['ENTITY_UNRESOLVED', 'IDENTITY_UNRESOLVED', 'TENANT_MISMATCH',
     'RECIPIENT_INACTIVE', 'RECIPIENT_UNLICENSED', 'RECIPIENT_OUT_OF_SCOPE',
     'RECIPIENT_NOT_VISIBLE', 'SEGREGATION_BLOCKED'];
+//  Y2 — returns its own outcome, for the same reason as appr_audit_sla().
 function appr_audit_notify($req, $result, $reason) {
-    if (!in_array((string) $reason, APPR_NOTIFY_AUDITED, true)) return;
-    if (!function_exists('act_log') || !defined('ACT_ENTITIES')) return;
+    if (!in_array((string) $reason, APPR_NOTIFY_AUDITED, true)) return APPR_COND_NONE;
+    if (!function_exists('act_log') || !defined('ACT_ENTITIES')) return APPR_COND_NO_SUBJECT;
     $entity = strtoupper(trim((string) ($req['entity'] ?? '')));
     $label = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : $entity;
     //  J1 — the type check that used to stand here called itself "never a
@@ -1712,14 +1772,15 @@ function appr_audit_notify($req, $result, $reason) {
     //  with it the ability to repeat. The identical permanent condition on the
     //  identical chain is a STATE that is already on the record.
     $condKey = appr_condition_key('DECISION', $req, null, $reason);
-    if ($condKey !== '' && appr_condition_seen($condKey)) return;
+    if ($condKey !== '' && appr_condition_seen($condKey)) return APPR_COND_SUPPRESSED;
     [$kind, $id, $isSource] = appr_audit_subject($req);
-    if ($kind === '') return;                       // nothing openable remains: no row
+    if ($kind === '') return APPR_COND_NO_SUBJECT;  // nothing openable remains: no row
     act_log($kind, $id, 'SYSTEM',
         'Decision not notified (' . $reason . ') — ' . (APPR_NOTIFY_REASONS[$reason] ?? $reason)
         . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0) . ' ' . strtoupper((string) $result)
         . ((!$isSource && appr_audit_source_gone($req)) ? ' — source record unavailable' : ''),
         ['auto' => 1, 'outcome' => substr($reason, 0, 60), 'cond_key' => $condKey]);
+    return appr_cond_outcome($condKey);          // Y2 — the status is consumed, not dropped
 }
 
 //  Returns the reason code, so a caller — and a test — can see exactly which of

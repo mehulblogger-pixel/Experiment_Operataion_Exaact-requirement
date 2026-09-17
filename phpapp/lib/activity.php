@@ -180,6 +180,25 @@ function act_has_cond_index() {
 }
 
 // ===========================================================================
+//  M3 CORRECTION #13 · Y1 — THE MARKER'S FATE MUST SURVIVE act_log().
+//
+//  act_log() returns the id of the CORE row and nothing else, and 76 call sites
+//  depend on that. So the marker's status is not bolted onto the return value;
+//  it is recorded in a workspace-keyed slot, exactly the way #11 keys the error
+//  channels, and read back through one accessor. act_log()'s contract does not
+//  change, and the 74 callers that never pass a cond_key are untouched.
+//
+//  It is keyed on db_epoch() for the same reason the channels are: a status is
+//  about the workspace that produced it and must never be read in another.
+function act_cond_status_set($st) {
+    $GLOBALS['__act_cond_status'] = ['epoch' => db_epoch(), 'st' => (string) $st];
+}
+function act_last_cond_status() {
+    $r = $GLOBALS['__act_cond_status'] ?? null;
+    if (!is_array($r) || ($r['epoch'] ?? -1) !== db_epoch()) return ACT_COND_NOT_ATTEMPTED;
+    return (string) $r['st'];
+}
+
 //  M3 CORRECTION #11 · W1 — AN ERROR BELONGS TO THE WORKSPACE THAT PRODUCED IT
 //
 //  Correction #10 made the migration ATTEMPT LEDGER per workspace epoch and left
@@ -398,6 +417,11 @@ function act_partner_for($entityKind, $entityId) {
 //   act_log('QUOTE', 42, 'EMAIL', 'Quotation Q-00042 sent to the customer',
 //           ['auto' => 1, 'direction' => 'OUT']);
 function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
+    //  Y1 — reset FIRST. Without this a call that writes no marker would leave the
+    //  PREVIOUS call's STORED standing, and the next reader would credit this event
+    //  with a marker belonging to a different one. That is the stale-read defect X2
+    //  found in the error channels, one slot along.
+    act_cond_status_set(ACT_COND_NOT_ATTEMPTED);
     try {
         act_migrate();
         if (!isset(ACT_ENTITIES[$entityKind])) $entityKind = '';
@@ -429,7 +453,15 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
         //  afterwards, against a column that may not exist, and its failure
         //  cannot reach back and undo the event that has just been recorded.
         $ck = substr(trim((string)($opt['cond_key'] ?? '')), 0, 160);
-        if ($id > 0 && $ck !== '') act_set_cond_key($id, $ck);   // status ignored: the CORE row is what matters
+        //  M3 CORRECTION #13 · Y1 — the status is no longer discarded.
+        //
+        //  S1 still holds: a marker failure never undoes the event just recorded,
+        //  and the core row is still what matters. What changes is that the failure
+        //  is no longer INVISIBLE. The duplicate-suppression guard reads this marker
+        //  back out of the database, so a marker that did not persist means
+        //  suppression is NOT armed — and the caller must be able to learn that
+        //  rather than assume it worked.
+        if ($id > 0 && $ck !== '') act_cond_status_set(act_set_cond_key($id, $ck));
         act_err_set('core', '');
         return $id;
     } catch (Throwable $e) {
