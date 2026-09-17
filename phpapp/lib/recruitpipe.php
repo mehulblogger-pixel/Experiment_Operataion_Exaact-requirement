@@ -424,6 +424,12 @@ function recruitpipe_cand_state($cand) {
 
 // Move a candidate to a specific stage id within its pipeline (with audit).
 function recruitpipe_cand_goto($cand, $targetStageId, $remark, $actor) {
+    //  PHASE 3 · M6 — the configured pipeline is a SECOND way of moving a
+    //  candidate forward, and it writes the legacy stage directly. It asks the
+    //  same integrated question the ordinary stage route asks; otherwise the
+    //  boundary holds on one screen and not on the other.
+    if (function_exists('rexec_cand_block_reason')
+        && rexec_cand_block_reason((int) ($cand['id'] ?? 0), 'ADVANCE') !== '') return false;
     [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
     if (!$pipe || !$eff) return false;
     $target = null; foreach ($eff as $s) if ((int)$s['id'] === (int)$targetStageId) { $target = $s; break; }

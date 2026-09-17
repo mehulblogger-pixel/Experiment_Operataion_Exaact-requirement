@@ -5279,10 +5279,17 @@ function ops_candidates($route, $method) {
             //  holding a candidate while approval is pending is exactly what a
             //  coordinator should still be able to do. Advancing is the act that
             //  spends unapproved authority.
+            //  PHASE 3 · M6 — the same advancing/closing split, now asking the
+            //  INTEGRATED question: M4's approval boundary, the requirement's own
+            //  state, and — for a joining — whether an approved seat is actually
+            //  free. The M6 attack recorded three people joining a two-seat
+            //  requirement, because the ceiling was enforced when the requisition
+            //  was raised and never again.
             $m4Advancing = !in_array($to, ['REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD'], true);
-            if ($m4Advancing && !empty($cand['requisition_id']) && function_exists('hreq_req_block_reason')) {
-                $m4why = hreq_req_block_reason((int) $cand['requisition_id']);
-                if ($m4why !== '') { flash($m4why, 'error'); redirect('/candidate?id=' . $id); }
+            $m6Joining   = in_array($to, function_exists('rexec_filled_stages') ? rexec_filled_stages() : ['ACCEPTED'], true);
+            if ($m4Advancing && !empty($cand['requisition_id']) && function_exists('rexec_block_reason')) {
+                $m6why = rexec_block_reason((int) $cand['requisition_id'], $m6Joining ? 'JOIN' : 'ADVANCE', $id);
+                if ($m6why !== '') { flash($m6why, 'error'); redirect('/candidate?id=' . $id); }
             }
             $remark = trim($_POST['remark'] ?? '');
             $decided = in_array($to, ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true) ? date('c') : ($cand['decided_at'] ?: '');
@@ -5293,6 +5300,14 @@ function ops_candidates($route, $method) {
             $dropReason = $lost ? substr(trim((string)($_POST['drop_reason'] ?? '')), 0, 60) : '';
             try { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?")->execute([$to, $decided, $dropPoint, $dropReason, $id]); }
             catch (Throwable $e) { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]); }
+            //  M6 — the compensating check. Check-then-write is not atomic, so two
+            //  processes recording a joining at the same instant both pass the gate
+            //  above; this puts the loser back and says so. The same shape M4 used
+            //  for the headcount ceiling and M5 for ownership.
+            if ($m6Joining && function_exists('rexec_join_enforce_after_write')) {
+                $m6rev = rexec_join_enforce_after_write($id, (string) $cand['stage']);
+                if ($m6rev !== '') { flash($m6rev, 'error'); redirect('/candidate?id=' . $id); }
+            }
             $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                 ->execute([$id, $cand['stage'], $to, $remark, user_name(current_user()), date('c')]);
             // M3 — every stage move passes through here, so the requisition's
@@ -5400,10 +5415,10 @@ function ops_candidates($route, $method) {
             //  recruitment execution whether it happens on creation or on a later
             //  edit. Only the creation branch was gated, so an existing candidate
             //  could be moved onto a blocked requisition by editing it.
-            if (!empty($b['requisition_id']) && function_exists('hreq_req_block_reason')) {
-                $m4why = hreq_req_block_reason((int) $b['requisition_id']);
-                if ($m4why !== '') {
-                    flash($m4why, 'error');
+            if (!empty($b['requisition_id']) && function_exists('rexec_block_reason')) {
+                $m6why = rexec_block_reason((int) $b['requisition_id'], 'ADVANCE', $cand ? (int) $cand['id'] : 0);
+                if ($m6why !== '') {
+                    flash($m6why, 'error');
                     redirect($cand ? '/candidate?id=' . (int)$cand['id'] : '/candidates');
                 }
             }
@@ -5466,9 +5481,9 @@ function ops_candidates($route, $method) {
                 //  PHASE 3 · M4 §13 — the execution boundary, asked at the WRITE.
                 //  A crafted POST reaches this line exactly as the form does, so
                 //  hiding the button is not what stops it.
-                if (!empty($b['requisition_id']) && function_exists('hreq_req_block_reason')) {
-                    $m4why = hreq_req_block_reason((int) $b['requisition_id']);
-                    if ($m4why !== '') { flash($m4why); redirect('/requisition?id=' . (int) $b['requisition_id']); }
+                if (!empty($b['requisition_id']) && function_exists('rexec_block_reason')) {
+                    $m6why = rexec_block_reason((int) $b['requisition_id'], 'ADVANCE');
+                    if ($m6why !== '') { flash($m6why); redirect('/requisition?id=' . (int) $b['requisition_id']); }
                 }
                 $cReq = ($b['requisition_id'] ?? '') !== '' ? ops_one("SELECT id, req_code FROM requisitions WHERE id=?", [(int)$b['requisition_id']]) : null;
                 $code = ($cReq && function_exists('recruit_cand_code')) ? recruit_cand_code($cReq) : ops_next_code('candidates', 'cand_code', 'CV');

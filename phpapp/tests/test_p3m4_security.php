@@ -230,17 +230,26 @@ $opsSrc = preg_replace('~^\s*//.*$~m', '', $opsSrc);
 $stagePos = strpos($opsSrc, "if (\$route === 'candidate-stage')");
 $stageEnd = strpos($opsSrc, 'UPDATE candidates SET stage=', $stagePos);
 $stageBody = substr($opsSrc, $stagePos, max(0, $stageEnd - $stagePos));
-t_ok(strpos($stageBody, 'hreq_req_block_reason') !== false,
+//  M6 repointed this pin. The route now asks rexec_block_reason(), the
+//  integrated gate, which asks hreq_req_block_reason() itself — so the assertion
+//  follows the call CHAIN rather than one function's name, and checks that M4's
+//  boundary is genuinely still inside it. That is strictly stronger than the
+//  original: the old pin would have passed if the route called something that
+//  merely looked like a boundary.
+$m6gate = preg_replace('~^\s*//.*$~m', '', (string) file_get_contents(dirname(__DIR__) . '/lib/recruit_exec.php'));
+t_ok(strpos($stageBody, 'rexec_block_reason') !== false,
      'J · *** the stage route asks the boundary BEFORE it advances a candidate ***');
+t_ok(strpos($m6gate, 'hreq_req_block_reason') !== false,
+     'J · …and the integrated gate asks M4 — the boundary is still in the chain');
 t_ok(strpos($stageBody, "['REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD']") !== false,
      'J · …and only for ADVANCING — a candidate may still be withdrawn or rejected while approval is pending');
 //  Behavioural: the candidate POST handler asks before it writes requisition_id.
 $postPos = strpos($opsSrc, "} elseif (\$method === 'POST') {\n            \$b = \$_POST;");
 t_ok($postPos !== false, 'J · the candidate POST handler is found');
 $postBody = substr($opsSrc, $postPos, 1200);
-t_ok(strpos($postBody, 'hreq_req_block_reason') !== false,
+t_ok(strpos($postBody, 'rexec_block_reason') !== false,
      'J · *** the candidate POST handler asks the boundary before writing requisition_id ***');
-t_ok(strpos($postBody, 'hreq_req_block_reason') < strpos($postBody, "\$fields = ["),
+t_ok(strpos($postBody, 'rexec_block_reason') < strpos($postBody, "\$fields = ["),
      'J · …and asks it before it decides which fields to write');
 //  and the guard really answers for this requisition
 t_ok(hreq_req_block_reason($rqJ) !== '', 'J · the boundary is refusing right now');

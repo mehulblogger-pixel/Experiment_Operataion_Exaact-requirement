@@ -170,8 +170,15 @@ function iv_list($candidateId) {
 }
 function iv_get($id) { recruit_iv_migrate(); return ops_one("SELECT * FROM interviews WHERE id=?", [(int)$id]) ?: null; }
 
+//  PHASE 3 · M6 — scheduling an interview spends the requirement's time and the
+//  panel's. It is asked the same integrated question as every other execution
+//  step. Recording the OUTCOME of an interview that has already happened is not
+//  gated: refusing to write down what took place would destroy information, and
+//  it advances nothing.
 function iv_schedule($candidateId, $post) {
     recruit_iv_migrate();
+    if (function_exists('rexec_cand_block_reason')
+        && rexec_cand_block_reason((int) $candidateId, 'INTERVIEW') !== '') return 0;
     $round = in_array($post['round'] ?? '', IV_ROUNDS, true) ? $post['round'] : 'L1';
     $mode  = in_array($post['mode'] ?? '', IV_MODES, true) ? $post['mode'] : 'In person';
     db()->prepare("INSERT INTO interviews (candidate_id,round,mode,location,scheduled_at,panel,competencies,result,created_by,created_at)

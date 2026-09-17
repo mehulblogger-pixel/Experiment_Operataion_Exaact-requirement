@@ -221,7 +221,24 @@ function offer_current($candidateId) {
 }
 function offer_get($id) { recruit_offer_migrate(); return ops_one("SELECT * FROM job_offers WHERE id=?", [(int)$id]) ?: null; }
 
+//  PHASE 3 · M6 — an offer is a COMMITMENT TO A PERSON, and it is made against a
+//  requirement. Before M6 nothing on this path asked whether that requirement was
+//  still approved: an offer could be drafted, approved, ISSUED and accepted on a
+//  requisition whose approval M4 had invalidated, or on one that had been
+//  cancelled outright. The gate is asked at every step, not only the first,
+//  because each step is separately reachable by a crafted POST.
+function offer_guard($candidateId, $action = 'OFFER') {
+    if (!function_exists('rexec_cand_block_reason')) return '';
+    return (string) rexec_cand_block_reason((int) $candidateId, $action);
+}
+function offer_guard_by_offer($offerId, $action = 'OFFER') {
+    $o = offer_get($offerId);
+    return $o ? offer_guard((int) $o['candidate_id'], $action) : '';
+}
+
 function offer_create($candidateId, $post) {
+    $why = offer_guard($candidateId);
+    if ($why !== '') return 0;
     recruit_offer_migrate();
     $sal = sal_current($candidateId);
     $ctc = (float)($post['ctc'] ?? 0) ?: ($sal ? (float)$sal['gross_ctc'] : 0);
@@ -256,6 +273,8 @@ function offer_appr_ctx($o) {
     ];
 }
 function offer_submit($id) {
+    $why = offer_guard_by_offer($id, 'OFFER');
+    if ($why !== '') return [false, $why];
     $o = offer_get($id); if (!$o || $o['status'] !== 'DRAFT') return [false, 'Only a draft can be submitted for approval.'];
     db()->prepare("UPDATE job_offers SET status='PENDING_APPROVAL' WHERE id=?")->execute([(int)$id]);
     // Phase 6 — if a configurable approval rule matches, route the offer through
@@ -271,11 +290,15 @@ function offer_submit($id) {
     return [true, 'Offer submitted for approval.'];
 }
 function offer_approve($id) {
+    $why = offer_guard_by_offer($id, 'OFFER');
+    if ($why !== '') return [false, $why];
     $o = offer_get($id); if (!$o || !in_array($o['status'], ['PENDING_APPROVAL','DRAFT'], true)) return [false, 'This offer is not awaiting approval.'];
     db()->prepare("UPDATE job_offers SET status='APPROVED', approved_by=?, approved_at=? WHERE id=?")->execute([_off_actor(), _off_now(), (int)$id]);
     return [true, 'Offer approved — it can now be issued.'];
 }
 function offer_issue($id) {
+    $why = offer_guard_by_offer($id, 'OFFER');
+    if ($why !== '') return [false, $why];
     $o = offer_get($id);
     // §32 — an UNAPPROVED offer can never be issued.
     if (!$o) return [false, 'Offer not found.'];
@@ -296,6 +319,8 @@ function offer_issue($id) {
     return [true, 'Offer issued. Share the letter with the candidate.'];
 }
 function offer_accept($id) {
+    $why = offer_guard_by_offer($id, 'JOIN');
+    if ($why !== '') return [false, $why];
     $o = offer_get($id); if (!$o || !in_array($o['status'], ['ISSUED','VIEWED'], true)) return [false, 'Only an issued offer can be accepted.'];
     db()->prepare("UPDATE job_offers SET status='ACCEPTED', accepted_at=? WHERE id=?")->execute([_off_now(), (int)$id]);
     return [true, 'Offer accepted — proceed to onboarding.'];

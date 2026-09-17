@@ -251,6 +251,7 @@ try {
     require __DIR__ . '/lib/hiringreq.php';       // M4 — the hiring request layer, before execution
     require __DIR__ . '/lib/recruit_cc.php';
     require __DIR__ . '/lib/recruit_assign.php';  // M5 — the one door for recruiter accountability
+    require __DIR__ . '/lib/recruit_exec.php';    // M6 — the integrated execution gate
     require __DIR__ . '/lib/recruitpipe.php';      // Phase 2 — configurable pipeline / stage engine
     require __DIR__ . '/lib/position.php';         // Phase 3 — position master, org-chart, manpower validation
     require __DIR__ . '/lib/organogram.php';       // Organogram importer (Excel/CSV/PPT/Visio/paste + AI image/PDF)

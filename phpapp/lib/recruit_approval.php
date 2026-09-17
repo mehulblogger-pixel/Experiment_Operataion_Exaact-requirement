@@ -1662,8 +1662,36 @@ function appr_callback($entity, $entityId, $result, $req = null) {
             if ($result === 'APPROVED') db()->prepare("UPDATE job_offers SET status='APPROVED', approved_by=?, approved_at=? WHERE id=? AND status IN ('PENDING_APPROVAL','DRAFT')")->execute(['Approval chain', _appr_now(), (int)$entityId]);
             else db()->prepare("UPDATE job_offers SET status='DRAFT' WHERE id=? AND status='PENDING_APPROVAL'")->execute([(int)$entityId]);
         } elseif ($entity === 'REQUISITION') {
-            if ($result === 'APPROVED') db()->prepare("UPDATE requisitions SET status='approved', approved_by=? WHERE id=?")->execute(['Approval chain', (int)$entityId]);
-            else db()->prepare("UPDATE requisitions SET status='on_hold' WHERE id=?")->execute([(int)$entityId]);
+            //  PHASE 3 · M6 — THIS CALLBACK USED TO INVENT STATUSES.
+            //
+            //  It wrote status='approved' and status='on_hold'. Neither is in the
+            //  requisition lifecycle (docs/03-object-lifecycles.md: OPEN, PROPOSED,
+            //  OFFERED, PARTIALLY_FILLED, HIRED, CLOSED, CANCELLED), so an approved
+            //  requirement fell out of every status-based query at once: measured,
+            //  it disappeared from the command centre's open demand, from the
+            //  recruiter's workload, and from the live-demand seats — and M6's
+            //  execution gate, which fails closed on a status it cannot read,
+            //  refused all recruitment against a requirement that had just been
+            //  APPROVED. A valid action in the approval module produced an invalid
+            //  state in the requisition module: exactly what M6 exists to find.
+            //
+            //  The decision is recorded where decisions live — the chain, plus the
+            //  requisition's own approved_by and the audit spine — and the STATUS is
+            //  left to the only thing entitled to derive it, M3's reqf_sync().
+            if ($result === 'APPROVED') {
+                db()->prepare("UPDATE requisitions SET approved_by=? WHERE id=?")->execute(['Approval chain', (int) $entityId]);
+                if (function_exists('reqf_sync')) { try { reqf_sync((int) $entityId); } catch (Throwable $e) {} }
+                if (function_exists('act_log'))
+                    act_log('REQUISITION', (int) $entityId, 'NOTE', 'Approved through the approval chain',
+                            ['body' => (string) ($req['rule_name'] ?? '')]);
+            } else {
+                //  A rejection does not get an invented status either. Nothing in the
+                //  lifecycle means "an approver said no", and adding one is a business
+                //  decision, not a callback's.
+                if (function_exists('act_log'))
+                    act_log('REQUISITION', (int) $entityId, 'NOTE', 'Rejected through the approval chain',
+                            ['body' => (string) ($req['rule_name'] ?? '')]);
+            }
         }
     } catch (Throwable $e) { /* callback is best-effort */ }
     return true;
