@@ -423,7 +423,10 @@ if ($m8('hiring', 'People & hiring') && function_exists('appr_tick')) {
     //  run that produced it, instead of being discarded by this caller.
     try { $ap = appr_tick(); if ($ap) echo "Approval reminders/escalations sent: $ap\n";
           $un = function_exists('appr_tick_unarmed') ? appr_tick_unarmed() : 0;
-          if ($un) echo "Approval conditions that could not be marked as recorded: $un — repeat notices cannot be held back until this is resolved\n"; }
+          if ($un) echo "Approval conditions that could not be marked as recorded: $un — repeat notices cannot be held back until this is resolved\n";
+          $rc = function_exists('appr_tick_reconciled') ? appr_tick_reconciled() : [];
+          if (!empty($rc['recovered'])) echo "Approval conditions recovered by reconciliation: " . (int)$rc['recovered'] . "\n";
+          if (!empty($rc['terminal']))  echo "Approval conditions closed as unrecoverable: " . (int)$rc['terminal'] . "\n"; }
     catch (Throwable $e) { echo "Approval tick: failed — " . $e->getMessage() . "\n"; }
 }
 

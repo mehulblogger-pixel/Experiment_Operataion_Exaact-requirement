@@ -235,6 +235,11 @@ foreach ([$rA, $rB, $rS] as $r) {
     $pdo->prepare("DELETE FROM recruit_approval_rules WHERE id=?")->execute([(int)$r]);
 }
 $pdo->prepare("DELETE FROM users WHERE id=?")->execute([$uCfg]);
+//  M3 CORRECTION #15 — the condition ledger lives in `settings`, so it OUTLIVES the
+//  activity rows a suite deletes. That is correct product behaviour (reconciliation
+//  resolves an entry whose row is gone to TERMINAL), but a suite that leaves entries
+//  behind hands them to whichever suite runs next. Clear what this one created.
+if (function_exists('setting_set')) setting_set('appr_cond_ledger', '');
 if ($prevUid === null) unset($_SESSION['uid']); else $_SESSION['uid'] = $prevUid;
 $_SESSION = $origSess; current_user(true); ua(true);
 t_eq((int) ops_val("SELECT COUNT(*) FROM recruit_approval_rules WHERE code LIKE 'C13%'"), 0,
