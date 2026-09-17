@@ -24,17 +24,17 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '3764422 · 2026-09-17 02:51 UTC · 660 files';
+$RELEASE = '2183f26 · 2026-09-17 04:18 UTC · 660 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
-    'cron.php' => ['s'=>23081,'h'=>'b2ebb8eff370868e'],
+    'cron.php' => ['s'=>23472,'h'=>'5884d1badd6e0752'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>117010,'h'=>'31943462d15dddf6'],
     'lib/access.php' => ['s'=>71117,'h'=>'cb498f1e83cfa87b'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
-    'lib/activity.php' => ['s'=>41365,'h'=>'d22707e65d2a46fc'],
+    'lib/activity.php' => ['s'=>42426,'h'=>'f372908f2101d974'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
     'lib/adssync.php' => ['s'=>28174,'h'=>'325142a88491bfba'],
@@ -191,7 +191,7 @@ $EXPECT  = [
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
     'lib/recruit.php' => ['s'=>69782,'h'=>'98a1add9135157ea'],
-    'lib/recruit_approval.php' => ['s'=>112112,'h'=>'ed1a27cfe9d9a5ba'],
+    'lib/recruit_approval.php' => ['s'=>122259,'h'=>'1e1e57ba8ee15f85'],
     'lib/recruit_cc.php' => ['s'=>21325,'h'=>'167b198aef66c593'],
     'lib/recruit_export.php' => ['s'=>7887,'h'=>'70fa492cdd1a8d35'],
     'lib/recruit_iv.php' => ['s'=>36630,'h'=>'ea9e62e8603e3b38'],
@@ -546,7 +546,7 @@ $EXPECT  = [
     'views/ops/receipts.php' => ['s'=>3431,'h'=>'92fe379c6b582e34'],
     'views/ops/receivables.php' => ['s'=>5717,'h'=>'5f0d1ef9dc366ce7'],
     'views/ops/recruit_pipelines.php' => ['s'=>11827,'h'=>'c4c1d8ad49872179'],
-    'views/ops/recruitment_cc.php' => ['s'=>37376,'h'=>'798b3ac5d4958c13'],
+    'views/ops/recruitment_cc.php' => ['s'=>38476,'h'=>'cf6d41dca55da0f1'],
     'views/ops/recruitment_home.php' => ['s'=>14367,'h'=>'c1b7927e08f8e549'],
     'views/ops/recurring.php' => ['s'=>4054,'h'=>'77137957c72ee106'],
     'views/ops/reimbursable_dedup.php' => ['s'=>5209,'h'=>'95ba7f96fb4ccc26'],

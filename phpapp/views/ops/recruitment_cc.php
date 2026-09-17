@@ -193,7 +193,23 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   <!-- M3 §27 — the approval backlog, on the existing dashboard rather than a new
        one. "Overdue" includes the escalated ones: an escalation is an overdue
        approval that has been chased, not a different kind of item. -->
-  <?php $A = $d['appr'] ?? []; if ((int)($A['pending'] ?? 0) > 0): ?>
+  <?php $A = $d['appr'] ?? [];
+        //  M3 CORRECTION #14 · B-2 — a suppression that could not be recorded is a
+        //  business fact and it is stated in business words. It sits on the approval
+        //  strip that already exists, and it is shown even when nothing is pending,
+        //  because the problem is with the record-keeping, not the backlog. No
+        //  database error, path or credential ever reaches this screen.
+        if ((int)($A['suppression_unarmed'] ?? 0) > 0): ?>
+  <div class="band" style="margin-top:12px"><h2>Approvals</h2><span class="bd">— needs attention</span></div>
+  <p class="msg msg-warn">Approval notification suppression could not be recorded for
+    <strong><?= (int)$A['suppression_unarmed'] ?></strong>
+    <?= (int)$A['suppression_unarmed'] === 1 ? 'approval condition' : 'approval conditions' ?>.
+    Repeat notices for <?= (int)$A['suppression_unarmed'] === 1 ? 'it' : 'them' ?> cannot be held back
+    until this is resolved. No approval decision is affected. Please ask your administrator to review the
+    activity log for this workspace.</p>
+  <?php endif; ?>
+
+  <?php if ((int)($A['pending'] ?? 0) > 0): ?>
   <div class="band" style="margin-top:12px"><h2>Approvals</h2><span class="bd">— who is waiting, and how late it is</span></div>
   <div class="kpis k4">
     <a class="kpi" href="/my-approvals"><div class="l">Awaiting approval</div><div class="v tnum"><?= (int)($A['pending'] ?? 0) ?></div><div class="dd">steps with an approver now ›</div></a>

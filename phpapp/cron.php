@@ -419,7 +419,11 @@ if (function_exists('iddoc_encrypt_backfill')) {
 // escalate any step that has passed its SLA. Emails go through ops_mail(). No-op
 // when nothing is pending.
 if ($m8('hiring', 'People & hiring') && function_exists('appr_tick')) {
-    try { $ap = appr_tick(); if ($ap) echo "Approval reminders/escalations sent: $ap\n"; }
+    //  M3 CORRECTION #14 · B-1 — the tick's condition outcome is reported by the
+    //  run that produced it, instead of being discarded by this caller.
+    try { $ap = appr_tick(); if ($ap) echo "Approval reminders/escalations sent: $ap\n";
+          $un = function_exists('appr_tick_unarmed') ? appr_tick_unarmed() : 0;
+          if ($un) echo "Approval conditions that could not be marked as recorded: $un — repeat notices cannot be held back until this is resolved\n"; }
     catch (Throwable $e) { echo "Approval tick: failed — " . $e->getMessage() . "\n"; }
 }
 

@@ -190,13 +190,27 @@ function act_has_cond_index() {
 //
 //  It is keyed on db_epoch() for the same reason the channels are: a status is
 //  about the workspace that produced it and must never be read in another.
-function act_cond_status_set($st) {
-    $GLOBALS['__act_cond_status'] = ['epoch' => db_epoch(), 'st' => (string) $st];
+//  M3 CORRECTION #14 · Z1 — the slot carries the ROW as well as the STATUS.
+//
+//  #13's adversarial audit found that a caller could not tell "the event was
+//  written but the marker was not" from "no event was written at all": both
+//  arrived as a non-STORED status, and the caller called both UNARMED — a word
+//  whose own definition says a row exists. A status about a row must travel with
+//  the row it is about.
+function act_cond_status_set($st, $row = 0) {
+    $GLOBALS['__act_cond_status'] = ['epoch' => db_epoch(), 'st' => (string) $st, 'row' => (int) $row];
 }
 function act_last_cond_status() {
     $r = $GLOBALS['__act_cond_status'] ?? null;
     if (!is_array($r) || ($r['epoch'] ?? -1) !== db_epoch()) return ACT_COND_NOT_ATTEMPTED;
     return (string) $r['st'];
+}
+//  The id of the activity row the last act_log() actually wrote, or 0 if it wrote
+//  none. 0 is the fact that makes "was the event recorded?" answerable at all.
+function act_last_cond_row() {
+    $r = $GLOBALS['__act_cond_status'] ?? null;
+    if (!is_array($r) || ($r['epoch'] ?? -1) !== db_epoch()) return 0;
+    return (int) ($r['row'] ?? 0);
 }
 
 //  M3 CORRECTION #11 · W1 — AN ERROR BELONGS TO THE WORKSPACE THAT PRODUCED IT
@@ -461,7 +475,10 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
         //  back out of the database, so a marker that did not persist means
         //  suppression is NOT armed — and the caller must be able to learn that
         //  rather than assume it worked.
-        if ($id > 0 && $ck !== '') act_cond_status_set(act_set_cond_key($id, $ck));
+        //  Z1 — the row id travels with the status, so a caller can tell an event
+        //  that exists without a marker from an event that was never written.
+        if ($id > 0 && $ck !== '') act_cond_status_set(act_set_cond_key($id, $ck), $id);
+        elseif ($id > 0)          act_cond_status_set(ACT_COND_NOT_ATTEMPTED, $id);
         act_err_set('core', '');
         return $id;
     } catch (Throwable $e) {

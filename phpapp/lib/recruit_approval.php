@@ -301,11 +301,126 @@ function appr_condition_key($event, $req, $step, $reason) {
 //      louder failure.
 //
 //  No approval decision, authority or notification behaviour changes here.
-const APPR_COND_NONE       = 'NONE';         // no permanent condition — nothing to suppress
-const APPR_COND_SUPPRESSED = 'SUPPRESSED';   // already recorded — deliberately silent
-const APPR_COND_NO_SUBJECT = 'NO_SUBJECT';   // nothing openable remains — no row written
-const APPR_COND_RECORDED   = 'RECORDED';     // row written AND marker persisted — suppression ARMED
-const APPR_COND_UNARMED    = 'UNARMED';      // row written, marker NOT persisted — NOT armed
+//  M3 CORRECTION #14 · Z2 — EVERY STATUS MUST DESCRIBE WHAT ACTUALLY HAPPENED.
+//
+//  #13 defined UNARMED as "row written, marker not persisted" and then returned
+//  it when the core INSERT itself had failed and NO row existed. Half the
+//  definition was false, and the diagnostic built from it ended with the words
+//  "the event itself was recorded" in the one case where it had not been. A
+//  status is a claim about the world; it may not be a guess.
+const APPR_COND_NONE          = 'NONE';           // E · no permanent condition — nothing to suppress
+const APPR_COND_NO_SUBJECT    = 'NO_SUBJECT';     // E · nothing openable remains — no row written
+const APPR_COND_SUPPRESSED    = 'SUPPRESSED';     // D · already recorded and armed — deliberately silent
+const APPR_COND_RECORDED      = 'RECORDED';       // A · event written AND marker persisted — ARMED
+const APPR_COND_UNARMED       = 'UNARMED';        // B · event written, marker NOT persisted — NOT armed
+const APPR_COND_NOT_RECORDED  = 'NOT_RECORDED';   // C · the event itself was never written
+const APPR_COND_PENDING_RETRY = 'PENDING_RETRY';  // B-4 · already unarmed; retried, still not armed, NO new row
+const APPR_COND_RECOVERED     = 'RECOVERED';      // B-4 · the retry succeeded — the condition is armed at last
+
+//  M3 CORRECTION #14 · Z3 — THE BOUNDED FAILURE POLICY, stated once and in full.
+//
+//  #13 let a permanently unwritable marker write one audit row PER SCHEDULER TICK,
+//  for ever. That is H2 under a different name. The bound cannot come from the
+//  marker — the marker is the thing that does not work — so it comes from the one
+//  fact that does persist: the event row itself.
+//
+//  Each condition event carries a FINGERPRINT of its condition in `body`, a
+//  base-schema column written by the SAME INSERT that writes the event. It is not
+//  a second suppression store and it is never treated as a marker: it is how the
+//  application recognises the row it already wrote when the marker is missing.
+//
+//    FIRST failure     · the event is written once, the marker is attempted and
+//                        fails, the row carries the fingerprint, the caller gets
+//                        UNARMED, and the diagnostic is written ONCE.
+//    LATER ticks       · the condition is recognised by its fingerprint. NO new
+//                        event, NO new diagnostic. The marker is retried on the
+//                        row that already exists. Caller gets PENDING_RETRY.
+//    RETRY STOPS       · when it succeeds, or when the condition stops occurring.
+//                        Retrying costs one UPDATE and writes nothing, so it is
+//                        bounded in rows and in log lines, which is what ran away.
+//    INTERVENTION      · while unarmed the condition is counted by
+//                        appr_cond_unarmed_count() and surfaced on the approval
+//                        summary the Recruitment Command Centre already renders.
+//    NEVER PRETENDS    · suppression is never claimed. PENDING_RETRY suppresses
+//                        the extra ROW on the strength of a row that genuinely
+//                        exists, not on the strength of a marker that does not.
+//    RECOVERY          · the moment the marker becomes writable the retry arms the
+//                        existing row, the caller gets RECOVERED, the count falls
+//                        to zero and ordinary suppression takes over unaided.
+//
+//  Nothing here changes an approval decision, an authority, a lifecycle state or
+//  who is notified.
+function appr_cond_fingerprint($key) {
+    return (string) $key === '' ? '' : 'PCX|' . substr(sha1((string) $key), 0, 32);
+}
+
+//  Whether the spine can be asked about markers at all. On a host where the
+//  optional column could never be created, asking would throw.
+function appr_cond_col_ready() {
+    return function_exists('act_has_cond_column') && act_has_cond_column();
+}
+
+//  The earliest event already written for this condition that carries NO marker.
+function appr_cond_unarmed_row($key) {
+    $fp = appr_cond_fingerprint($key);
+    if ($fp === '') return null;
+    try {
+        $sql = "SELECT id FROM activities WHERE body=?"
+             . (appr_cond_col_ready() ? " AND COALESCE(cond_key,'')=''" : '')
+             . " ORDER BY id LIMIT 1";
+        return ops_one($sql, [$fp]);
+    } catch (Throwable $e) { return null; }
+}
+
+//  How many distinct conditions are currently recorded but NOT armed. This is the
+//  business-visible number: each one is a suppression that cannot be trusted.
+function appr_cond_unarmed_count() {
+    try {
+        $sql = "SELECT COUNT(DISTINCT body) FROM activities WHERE body LIKE 'PCX|%'"
+             . (appr_cond_col_ready() ? " AND COALESCE(cond_key,'')=''" : '');
+        return (int) ops_val($sql);
+    } catch (Throwable $e) { return 0; }
+}
+
+//  B-5 — a BOUNDED diagnostic. The unbounded stream came from writing the same
+//  line on every tick; it is bounded structurally, because the only states that
+//  speak are the ones that happen once per condition: first detection, the event
+//  that could not be written, and recovery. PENDING_RETRY says nothing at all.
+//  The text is built FROM the status, never from an assumption about it.
+function appr_cond_note($condKey, $status, $detail = '') {
+    $fp = appr_cond_fingerprint($condKey);
+    $msg = '';
+    if ($status === APPR_COND_UNARMED) {
+        $msg = 'the event WAS recorded but its suppression marker was not; '
+             . 'this condition will not be suppressed until the marker can be written';
+    } elseif ($status === APPR_COND_NOT_RECORDED) {
+        $msg = 'the event itself was NOT recorded, so nothing about this condition '
+             . 'has been written anywhere';
+    } elseif ($status === APPR_COND_RECOVERED) {
+        $msg = 'the suppression marker was written on the existing event; '
+             . 'ordinary suppression has resumed';
+    } else {
+        return;                                   // PENDING_RETRY and the rest are silent
+    }
+    @error_log('appr condition ' . $fp . ' [' . $status . ']: ' . $msg
+             . ($detail !== '' ? ' — ' . $detail : ''));
+}
+
+//  Z3 — the decision taken BEFORE anything is written: write, retry, or stay quiet.
+function appr_cond_gate($condKey) {
+    if ((string) $condKey === '') return 'WRITE';            // no condition: ordinary event
+    if (appr_condition_seen($condKey))  return 'SUPPRESS';   // armed — the existing behaviour
+    return appr_cond_unarmed_row($condKey) ? 'RETRY' : 'WRITE';
+}
+
+//  Z3 — the retry. It writes NO new event; it arms the one that already exists.
+function appr_cond_retry($condKey) {
+    $row = appr_cond_unarmed_row($condKey);
+    if (!$row) return APPR_COND_UNARMED;
+    $st = function_exists('act_set_cond_key') ? act_set_cond_key((int) $row['id'], $condKey) : ACT_COND_FAILED;
+    if ($st === ACT_COND_STORED) { appr_cond_note($condKey, APPR_COND_RECOVERED); return APPR_COND_RECOVERED; }
+    return APPR_COND_PENDING_RETRY;                          // bounded: no row, no log line
+}
 
 //  Reads the status act_log() left behind and turns it into the caller's own
 //  outcome. It deliberately does NOT collapse to a boolean: a truthy 'FAILED'
@@ -313,10 +428,16 @@ const APPR_COND_UNARMED    = 'UNARMED';      // row written, marker NOT persiste
 //  different questions that happen to share an answer today.
 function appr_cond_outcome($condKey) {
     if ((string) $condKey === '') return APPR_COND_NONE;
-    $st = function_exists('act_last_cond_status') ? act_last_cond_status() : ACT_COND_NOT_ATTEMPTED;
-    if ($st === ACT_COND_STORED) return APPR_COND_RECORDED;
-    @error_log('appr: permanent-condition marker NOT persisted (' . $st . ') — duplicate '
-             . 'suppression is NOT armed for this condition; the event itself was recorded');
+    $row = function_exists('act_last_cond_row')    ? act_last_cond_row()    : 0;
+    $st  = function_exists('act_last_cond_status') ? act_last_cond_status() : ACT_COND_NOT_ATTEMPTED;
+    //  Z2 · case C — no row exists. Saying "UNARMED" here was #13's falsehood.
+    if ($row <= 0) {
+        appr_cond_note($condKey, APPR_COND_NOT_RECORDED,
+                       function_exists('act_last_error') ? act_last_error() : '');
+        return APPR_COND_NOT_RECORDED;
+    }
+    if ($st === ACT_COND_STORED) return APPR_COND_RECORDED;          // case A
+    appr_cond_note($condKey, APPR_COND_UNARMED, $st);                // case B — once per condition
     return APPR_COND_UNARMED;
 }
 
@@ -343,7 +464,10 @@ function appr_audit_sla($req, $step, $what, $detail = '', $event = 'SLA_EVENT') 
     //  escalations for genuinely pending approvals keep working exactly as before.
     $condKey = appr_audit_source_gone($req)
         ? appr_condition_key($event, $req, $step, 'ENTITY_UNRESOLVED') : '';
-    if ($condKey !== '' && appr_condition_seen($condKey)) return APPR_COND_SUPPRESSED;
+    //  Z3 — one gate for both writers: write / retry the existing row / stay quiet.
+    $gate = appr_cond_gate($condKey);
+    if ($gate === 'SUPPRESS') return APPR_COND_SUPPRESSED;
+    if ($gate === 'RETRY')    return appr_cond_retry($condKey);     // bounded: no second row
     $entity = strtoupper((string) ($req['entity'] ?? ''));
     $label  = (defined('APPR_ENTITIES') && isset(APPR_ENTITIES[$entity])) ? APPR_ENTITIES[$entity] : $entity;
     //  J1 — this writer had NO check at all, not even D2's type check, so an
@@ -358,7 +482,11 @@ function appr_audit_sla($req, $step, $what, $detail = '', $event = 'SLA_EVENT') 
         . (trim((string) ($step['label'] ?? '')) !== '' ? ' (' . $step['label'] . ')' : '')
         . ($detail !== '' ? ' — ' . $detail : '')
         . ((!$isSource && appr_audit_source_gone($req)) ? ' — source record unavailable' : '');
-    act_log($kind, $id, 'SYSTEM', $subject, ['auto' => 1, 'cond_key' => $condKey]);
+    //  Z3 — the fingerprint rides in `body`, a base-schema column written by the
+    //  SAME INSERT as the event, so the row stays recognisable when the marker
+    //  cannot be written. It is never read as a marker.
+    act_log($kind, $id, 'SYSTEM', $subject,
+        ['auto' => 1, 'cond_key' => $condKey, 'body' => appr_cond_fingerprint($condKey)]);
     return appr_cond_outcome($condKey);          // Y2 — the status is consumed, not dropped
 }
 
@@ -1224,8 +1352,15 @@ function appr_sla_sentence($step, $now = null) {
 //  workspace that has not bought the module.
 function appr_sla_summary() {
     appr_migrate();
-    $out = ['pending' => 0, 'due_today' => 0, 'overdue' => 0, 'escalated' => 0, 'due_soon' => 0];
+    //  M3 CORRECTION #14 · B-2 — a condition whose suppression marker could not be
+    //  written is a business fact, not a developer's. It is counted HERE, on the
+    //  approval summary the Recruitment Command Centre already renders, so no
+    //  second dashboard exists and none is redesigned. It is tenant-scoped by
+    //  construction: one database per tenant, and this reads the connected one.
+    $out = ['pending' => 0, 'due_today' => 0, 'overdue' => 0, 'escalated' => 0, 'due_soon' => 0,
+            'suppression_unarmed' => 0];
     if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return $out;
+    $out['suppression_unarmed'] = appr_cond_unarmed_count();
     try {
         $rows = ops_all("SELECT s.* FROM recruit_approval_steps s JOIN recruit_approval_requests r ON r.id=s.request_id
                          WHERE r.status='PENDING' AND s.status='PENDING' AND s.seq=r.current_seq");
@@ -1319,6 +1454,11 @@ function appr_tick() {
     // asked only by the caller is a question one new caller can skip.
     if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view')) return 0;
     $now = time(); $acted = 0;
+    //  M3 CORRECTION #14 · B-1 — the scheduler is the real decision maker, and it
+    //  no longer throws the condition outcome away. What it decides with it: a tick
+    //  that leaves conditions unarmed says so in its own result, so cron.php prints
+    //  it and the operator learns from the run itself, not from a log nobody reads.
+    $unarmed = 0;
     $steps = ops_all("SELECT s.*, r.subject, r.entity, r.entity_id, r.rule_name, r.rule_id FROM recruit_approval_steps s
                       JOIN recruit_approval_requests r ON r.id=s.request_id
                       WHERE r.status='PENDING' AND s.status='PENDING' AND s.seq=r.current_seq");
@@ -1346,7 +1486,9 @@ function appr_tick() {
             // recorded as it actually happened.
             [$n, $ok] = appr_email_escalate($s, $req);
             db()->prepare("UPDATE recruit_approval_steps SET escalated=1 WHERE id=?")->execute([(int)$s['id']]);
-            appr_audit_sla($req, $s, 'Approval overdue — escalated', appr_delivery_note($n, $ok), 'ESCALATION');
+            $co = appr_audit_sla($req, $s, 'Approval overdue — escalated', appr_delivery_note($n, $ok), 'ESCALATION');
+            if ($co === APPR_COND_UNARMED || $co === APPR_COND_PENDING_RETRY
+                || $co === APPR_COND_NOT_RECORDED) $unarmed++;   // B-1
             $acted++;
             continue;
         }
@@ -1368,11 +1510,24 @@ function appr_tick() {
             // threshold forward is what makes a second run of the scheduler a
             // no-op, however many times it runs in a day.
             db()->prepare("UPDATE recruit_approval_steps SET reminded_at=?, reminder_at=? WHERE id=?")->execute([_appr_now(), date('c', $now + 86400), (int)$s['id']]);
-            appr_audit_sla($req, $s, 'Approval reminder sent', appr_delivery_note($n, $ok), 'REMINDER');
+            $co = appr_audit_sla($req, $s, 'Approval reminder sent', appr_delivery_note($n, $ok), 'REMINDER');
+            if ($co === APPR_COND_UNARMED || $co === APPR_COND_PENDING_RETRY
+                || $co === APPR_COND_NOT_RECORDED) $unarmed++;   // B-1
             $acted++;
         }
     }
+    //  B-1 — the outcome reaches the run's own result. appr_tick_unarmed() is what
+    //  cron.php reports; it is per-workspace and per-run, like everything else here.
+    $GLOBALS['__appr_tick_unarmed'] = ['epoch' => function_exists('db_epoch') ? db_epoch() : 0, 'n' => $unarmed];
     return $acted;
+}
+
+//  How many conditions this run could not arm. Workspace-keyed, like every other
+//  cross-call state in this module.
+function appr_tick_unarmed() {
+    $r = $GLOBALS['__appr_tick_unarmed'] ?? null;
+    if (!is_array($r) || ($r['epoch'] ?? -1) !== (function_exists('db_epoch') ? db_epoch() : 0)) return 0;
+    return (int) ($r['n'] ?? 0);
 }
 
 //  §20 — never report a send that did not happen. ops_mail() already records
@@ -1772,26 +1927,43 @@ function appr_audit_notify($req, $result, $reason) {
     //  with it the ability to repeat. The identical permanent condition on the
     //  identical chain is a STATE that is already on the record.
     $condKey = appr_condition_key('DECISION', $req, null, $reason);
-    if ($condKey !== '' && appr_condition_seen($condKey)) return APPR_COND_SUPPRESSED;
+    $gate = appr_cond_gate($condKey);                                // Z3 — same gate
+    if ($gate === 'SUPPRESS') return APPR_COND_SUPPRESSED;
+    if ($gate === 'RETRY')    return appr_cond_retry($condKey);
     [$kind, $id, $isSource] = appr_audit_subject($req);
     if ($kind === '') return APPR_COND_NO_SUBJECT;  // nothing openable remains: no row
     act_log($kind, $id, 'SYSTEM',
         'Decision not notified (' . $reason . ') — ' . (APPR_NOTIFY_REASONS[$reason] ?? $reason)
         . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0) . ' ' . strtoupper((string) $result)
         . ((!$isSource && appr_audit_source_gone($req)) ? ' — source record unavailable' : ''),
-        ['auto' => 1, 'outcome' => substr($reason, 0, 60), 'cond_key' => $condKey]);
+        ['auto' => 1, 'outcome' => substr($reason, 0, 60), 'cond_key' => $condKey,
+         'body' => appr_cond_fingerprint($condKey)]);                // Z3 — see appr_audit_sla
     return appr_cond_outcome($condKey);          // Y2 — the status is consumed, not dropped
+}
+
+//  B-1 — the decision notifier's own consumption of the condition outcome. It is
+//  workspace-keyed and readable, so the outcome ends somewhere that can be seen
+//  rather than in an unused return value.
+function appr_email_cond_note($outcome) {
+    $GLOBALS['__appr_last_cond'] = ['epoch' => function_exists('db_epoch') ? db_epoch() : 0,
+                                    'o' => (string) $outcome];
+    return (string) $outcome;
+}
+function appr_last_cond_outcome() {
+    $r = $GLOBALS['__appr_last_cond'] ?? null;
+    if (!is_array($r) || ($r['epoch'] ?? -1) !== (function_exists('db_epoch') ? db_epoch() : 0)) return '';
+    return (string) $r['o'];
 }
 
 //  Returns the reason code, so a caller — and a test — can see exactly which of
 //  the three questions failed rather than inferring it from an empty inbox.
 function appr_email_requester($req, $result, $remarks = '') {
     [$u, $why] = appr_resolve_requester($req);          // 1 · IDENTITY
-    if (!$u) { appr_audit_notify($req, $result, $why); return $why; }
+    if (!$u) { appr_email_cond_note(appr_audit_notify($req, $result, $why)); return $why; }
     $why = appr_told_reason($req, $u);                  // 2 · ELIGIBILITY
-    if ($why !== '') { appr_audit_notify($req, $result, $why); return $why; }
+    if ($why !== '') { appr_email_cond_note(appr_audit_notify($req, $result, $why)); return $why; }
     $email = trim((string) ($u['email'] ?? ''));
-    if ($email === '') { appr_audit_notify($req, $result, 'NO_EMAIL'); return 'NO_EMAIL'; }
+    if ($email === '') { appr_email_cond_note(appr_audit_notify($req, $result, 'NO_EMAIL')); return 'NO_EMAIL'; }
     $sent = appr_mail([$email], 'Your approval was ' . strtoupper($result) . ' — ' . ($req['subject'] ?? ''),
         '<p>Your request <b>' . e((string)($req['subject'] ?? '')) . '</b> was <b>' . e(strtoupper($result)) . '</b>.' . ($remarks ? ' Remark: ' . e($remarks) : '') . '</p>');
     // A provider failure is already recorded in email_log with its error, so it is

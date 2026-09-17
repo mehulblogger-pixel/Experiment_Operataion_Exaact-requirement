@@ -113,11 +113,21 @@ t_eq($rowsOn($rB), 1,         'C13.3 · S1 holds — the EVENT itself was still 
 t_eq($markersOn($rB), 0,      'C13.3 · but it carries no marker, so suppression is genuinely not armed');
 
 //  §5 B.6 — the application must not silently claim the first marker was stored.
+//
+//  M3 CORRECTION #14 · B-4 changed what happens NEXT, and these two assertions
+//  were re-pointed at the corrected contract rather than weakened. #13's fail-safe
+//  wrote a fresh event on every tick, which its own adversarial audit showed to be
+//  H2 under another name. The rule it must still satisfy is unchanged and is
+//  asserted first: the repeat is NEVER suppressed on the strength of a marker that
+//  does not exist. What #14 adds is that it does not write a second row either —
+//  it retries the marker on the row that already exists.
 $o4 = appr_audit_notify($rqB, 'APPROVED', 'ENTITY_UNRESOLVED');
 t_ok($o4 !== APPR_COND_SUPPRESSED,
      'C13.3 · *** the repeat is NOT suppressed on the strength of a marker that was never written ***');
-t_eq($o4, APPR_COND_UNARMED,  'C13.3 · it reports UNARMED again — the failure stays visible, not silent');
-t_eq($rowsOn($rB), 2,         'C13.3 · the documented fail-safe: the event repeats rather than being lost');
+t_ok($o4 !== APPR_COND_RECORDED,
+     'C13.3 · and it is never reported as recorded');
+t_eq($o4, APPR_COND_PENDING_RETRY, 'C13.3 · it reports PENDING_RETRY — still unarmed, and it says so');
+t_eq($rowsOn($rB), 1,         'C13.3 · #14 · and NO second row was written — the loop is bounded at one');
 
 // ---------------------------------------------------------------------------
 //  C13.4 · recovery — once the marker CAN be written, suppression arms itself
@@ -125,11 +135,12 @@ t_eq($rowsOn($rB), 2,         'C13.3 · the documented fail-safe: the event repe
 t_section('C13.4 · recovery · the fail-safe is not a one-way door');
 $unblockMarker();
 $o5 = appr_audit_notify($rqB, 'APPROVED', 'ENTITY_UNRESOLVED');
-t_eq($o5, APPR_COND_RECORDED, 'C13.4 · with the obstruction gone the marker stores and the caller sees it');
-t_eq($rowsOn($rB), 3,         'C13.4 · that attempt wrote its event');
+t_eq($o5, APPR_COND_RECOVERED, 'C13.4 · #14 · the obstruction gone, the retry ARMS THE EXISTING ROW');
+t_eq($rowsOn($rB), 1,          'C13.4 · #14 · and still no new row was needed to recover');
+t_eq($markersOn($rB), 1,       'C13.4 · the row that was already there now carries its marker');
 $o6 = appr_audit_notify($rqB, 'APPROVED', 'ENTITY_UNRESOLVED');
 t_eq($o6, APPR_COND_SUPPRESSED, 'C13.4 · and every later identical refusal is suppressed again');
-t_eq($rowsOn($rB), 3,           'C13.4 · the row count stops growing');
+t_eq($rowsOn($rB), 1,           'C13.4 · the row count stops growing');
 
 // ---------------------------------------------------------------------------
 //  C13.5 · THE SIBLING — appr_audit_sla() is the second production caller
