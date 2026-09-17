@@ -173,12 +173,12 @@ $channels = [
         'repair' => function () {},
     ],
     'column' => [
-        'read' => fn() => act_optional_error(),
+        'read' => fn() => act_cond_column_error(),
         'make' => function ($mark) use ($dropIdx, $hideTable, $showTable) {
             $dropIdx();
             try { db()->exec("ALTER TABLE activities DROP COLUMN cond_key"); } catch (Throwable $e) {}
             $hideTable();
-            try { act_cond_column_ready(); $e = act_optional_error(); } finally { $showTable(); }
+            try { act_cond_column_ready(); $e = act_cond_column_error(); } finally { $showTable(); }
             return $e;
         },
         'repair' => function () { act_cond_column_ready(); act_cond_index_ready(); },
@@ -193,12 +193,12 @@ $channels = [
         'repair' => function () { act_cond_index_ready(); },
     ],
     'write' => [
-        'read' => fn() => act_optional_error(),
+        'read' => fn() => act_cond_write_error(),
         'make' => function ($mark) use ($blockUpd, $unblock) {
             $row = act_log('LEAD', 765002, 'SYSTEM', 'c12 channel write', ['auto'=>1]);
             $blockUpd($mark);
             try { act_set_cond_key($row, 'C12_CH'); } finally { $unblock('c12u'); }
-            return act_optional_error();
+            return act_cond_write_error();
         },
         'repair' => function () {},
     ],
@@ -211,9 +211,17 @@ foreach ($channels as $name => $ch) {
     $enterWs($WS_A);
     $inA = (string) $ch['make']('C12_' . strtoupper($name) . '_A');
     t_ok($inA !== '', "C12.4 $name · A really produced an error in THIS channel — the fixture is not empty");
-    $ch['repair']();
 
-    //  2 · B cannot see it. This is meaningful only because step 1 proved the
+    //      The error must still be STANDING when the workspace changes. Repairing
+    //      here — as the first version of this section did — succeeds, and a
+    //      successful attempt CLEARS the channel it just filled, so A crossed the
+    //      switch holding nothing and step 2 passed whatever the scoping did.
+    //      Mutations that made the column and index channels global survived
+    //      precisely because of this. Repair now happens at step 5, after the
+    //      isolation claims have been made against a channel that is really full.
+    t_ok((string) $ch['read']() !== '', "C12.4 $name · and the error is STILL standing in A at the moment of the switch");
+
+    //  2 · B cannot see it. This is meaningful only because steps 1 proved the
     //      channel was non-empty in A — the #11 suite skipped that and checked a
     //      channel that had never held anything.
     $enterWs($WS_B);
@@ -223,15 +231,26 @@ foreach ($channels as $name => $ch) {
     //  3 · B records its OWN in the same channel.
     $inB = (string) $ch['make']('C12_' . strtoupper($name) . '_B');
     t_ok($inB !== '', "C12.4 $name · B records its own error in the same channel");
-    $ch['repair']();
 
-    //  4 · and re-entering A never yields B's. (Per the #11 contract a real
-    //      re-entry is a new epoch, so A reads empty — asserted as such, not
-    //      assumed.)
+    //  4 · and re-entering A never yields B's. Per the #11 contract a real
+    //      re-entry is a new epoch, so A reads EMPTY — asserted exactly, not as
+    //      "does not contain B's text": a channel that leaked B's message would
+    //      fail this, and so would one that leaked A's own stale message.
     $enterWs($WS_A);
     $back = (string) $ch['read']();
-    t_ok(strpos($back, 'C12_' . strtoupper($name) . '_B') === false, "C12.4 $name · and B's never appears in A");
+    t_eq($back, '', "C12.4 $name · and re-entering A yields neither B's nor A's stale $name error");
+
+    //  5 · only now is EACH workspace put back in order. B must be repaired too:
+    //      while repair sat at step 1 the column iteration left B without its
+    //      cond_key column, and the index iteration that followed then had
+    //      nothing to index — it produced no error in B at all and the fixture
+    //      quietly stopped testing anything. Repairing B here, AFTER step 4, is
+    //      what keeps that step honest: B crosses the switch still holding its
+    //      error, so a global channel would surface it in A.
     $ch['repair']();
+    $enterWs($WS_B); $ch['repair']();
+    $enterWs($WS_A);
+    t_ok(act_has_cond_column() && act_has_cond_index(), "C12.4 $name · both workspaces are whole again");
 }
 
 // ---------------------------------------------------------------------------

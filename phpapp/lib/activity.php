@@ -315,7 +315,14 @@ function act_migrate_optional() {
 
 function act_optional_ready()       { return act_cond_column_ready(); }
 function act_optional_index_ready() { return act_cond_index_ready(); }
-function act_optional_error()       { return act_err_get('col') ?: act_err_get('write'); }
+//  M3 CORRECTION #12 · X2 — each channel must be observable ON ITS OWN.
+//  act_optional_error() folds two channels together, so a caller (or a test)
+//  reading it cannot tell which one spoke. The four readers below are one
+//  channel each; act_optional_error() keeps its combined meaning for the
+//  screens that already call it.
+function act_cond_column_error()    { return act_err_get('col'); }
+function act_cond_write_error()     { return act_err_get('write'); }
+function act_optional_error()       { return act_cond_column_error() ?: act_cond_write_error(); }
 function act_optional_index_error() { return act_err_get('idx'); }
 
 //  READ-ONLY (U1). It attempts nothing, spends no budget and increments no
