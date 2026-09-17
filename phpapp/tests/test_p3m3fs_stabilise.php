@@ -148,6 +148,7 @@ $pdo->prepare("INSERT INTO users (username,first_name,last_name,role,is_active,i
                VALUES ('fs_cfg','FS','Cfg','ADMIN',1,1,'','fscfg@t.test')")->execute();
 $uFs = (int) $pdo->lastInsertId(); $prevUid = $_SESSION['uid'] ?? null;
 $_SESSION['uid'] = $uFs; current_user(true); ua(true);
+$mkRuleFs = fn($t) => (int) appr_rule_save(0, ['name'=>'FS '.$t,'entity'=>'HIRING_REQUEST','code'=>'FSX'.$t,'applies_department'=>'']);
 $rule = (int) appr_rule_save(0, ['name'=>'FS','entity'=>'HIRING_REQUEST','code'=>'FSX','applies_department'=>'']);
 t_ok($rule > 0, 'FS.7 · the approval policy the events hang on really exists');
 $baseR = (int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='APPROVAL_POLICY' AND entity_id=?", [$rule]);
@@ -260,6 +261,117 @@ t_eq(appr_cond_migrate_ledger(), 0, 'FS.10 · an unreadable old document migrate
 t_eq((int) ops_val("SELECT COUNT(*) FROM settings WHERE skey='appr_cond_ledger'"), 1,
      'FS.10 · *** and is LEFT IN PLACE rather than silently discarded ***');
 db()->exec("DELETE FROM settings WHERE skey='appr_cond_ledger'");
+
+// ---------------------------------------------------------------------------
+//  FS.12 · THE FINAL GATE'S TWO FINDINGS, held permanently.
+//
+//  G1  The NOT_RECORDED recovery filed its note as act_log('APPROVAL_POLICY', 0,…)
+//      — a KIND with no id, which appr_audit_ref_ok() cannot open. Correction #6
+//      settled that for this module: "a row nobody can follow is worse than no
+//      row". The final stabilisation had reintroduced exactly that orphan.
+//  G2  Three concurrent reconciliation passes filed TWO notes for one condition.
+// ---------------------------------------------------------------------------
+t_section('FS.12 · the recovery note must be openable, and written once');
+$purge();
+$reqG = ['id'=>7801,'entity'=>'HIRING_REQUEST','entity_id'=>780001,'rule_id'=>$rule];
+$blockCore = function () use ($engine) {
+    if ($engine==='sqlite') db()->exec("CREATE TRIGGER fs_core BEFORE INSERT ON activities FOR EACH ROW
+        BEGIN SELECT RAISE(ABORT,'FS CORE'); END");
+    else db()->exec("CREATE TRIGGER fs_core BEFORE INSERT ON activities FOR EACH ROW BEGIN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='FS CORE'; END");
+};
+$blockCore();
+t_eq(appr_audit_notify($reqG, 'APPROVED', 'ENTITY_UNRESOLVED'), APPR_COND_NOT_RECORDED,
+     'FS.12 · a condition is left NOT_RECORDED');
+$dropT('fs_core');
+$recG = appr_cond_rec_get(appr_cond_fingerprint(appr_condition_key('DECISION', $reqG, null, 'ENTITY_UNRESOLVED')));
+t_ok(appr_audit_ref_ok((string)($recG['sk'] ?? ''), (int)($recG['si'] ?? 0)),
+     'FS.12 · the record remembers a subject that RESOLVES');
+$noteN0 = (int) ops_val("SELECT COUNT(*) FROM activities WHERE subject LIKE 'Approval condition could not be recorded%'");
+$rcG = appr_cond_reconcile();
+t_eq((int)$rcG['terminal'], 1, 'FS.12 · reconciliation closes it');
+$note = ops_one("SELECT entity_kind, entity_id FROM activities
+                 WHERE subject LIKE 'Approval condition could not be recorded%' ORDER BY id DESC");
+t_ok(!!$note, 'FS.12 · a note was filed');
+t_ok(appr_audit_ref_ok((string)$note['entity_kind'], (int)$note['entity_id']),
+     'FS.12 · *** G1 · the note CAN be opened — it is filed on a subject that resolves ***');
+t_ok((int)$note['entity_id'] > 0, 'FS.12 · and it carries a real entity id, not a bare kind');
+
+t_section('FS.12b · G2 · three REAL concurrent reconciliation passes');
+$purge();
+$reqG2 = ['id'=>7802,'entity'=>'HIRING_REQUEST','entity_id'=>780002,'rule_id'=>$rule];
+$blockCore();
+appr_audit_notify($reqG2, 'APPROVED', 'ENTITY_UNRESOLVED');
+$dropT('fs_core');
+$n0 = (int) ops_val("SELECT COUNT(*) FROM activities WHERE subject LIKE 'Approval condition could not be recorded%'");
+$reconProcs = function () use ($root, $engine) {
+    $env = $engine==='sqlite' ? 'DB_DRIVER=sqlite SQLITE_PATH=' . escapeshellarg((string)getenv('SQLITE_PATH'))
+        : 'DB_DRIVER=mysql DB_HOST=' . escapeshellarg((string)getenv('DB_HOST')) . ' DB_NAME=' . escapeshellarg((string)getenv('DB_NAME'))
+          . ' DB_USER=' . escapeshellarg((string)getenv('DB_USER')) . ' DB_PASS=' . escapeshellarg((string)getenv('DB_PASS'));
+    $procs = [];
+    for ($i = 0; $i < 3; $i++) {
+        $pipes = [];
+        $p = proc_open($env . ' php ' . escapeshellarg($root.'/tests/_gate_recon.php') . ' 300 2>&1',
+                       [1=>['pipe','w'],2=>['pipe','w']], $pipes);
+        if (is_resource($p)) $procs[] = [$p,$pipes];
+    }
+    $out = '';
+    foreach ($procs as [$p,$pipes]) { $out .= stream_get_contents($pipes[1]); fclose($pipes[1]); fclose($pipes[2]); proc_close($p); }
+    return $out;
+};
+$out = $reconProcs();
+t_ok(substr_count($out, 'RC ') === 3, 'FS.12b · three reconciliation processes ran');
+$n1 = (int) ops_val("SELECT COUNT(*) FROM activities WHERE subject LIKE 'Approval condition could not be recorded%'");
+t_eq($n1 - $n0, 1, 'FS.12b · *** G2 · three concurrent passes filed exactly ONE note ***');
+t_eq(appr_cond_unarmed_count(), 0, 'FS.12b · and the condition is closed exactly once');
+$purge();
+
+// ---------------------------------------------------------------------------
+//  FS.12c/d — two DEFENSIVE branches the gate's mutations showed were untested.
+//
+//  M-G1b (drop the "does the subject still resolve" check) and M-G2b (drop the
+//  expected-state check in the claim) both SURVIVED, because no assertion
+//  exercised either branch. M-G2b is the more instructive: the three-process
+//  test DOES catch the whole claim being removed, but whether it catches this
+//  narrower sub-bug depends on scheduling — a race that reproduces sometimes is
+//  not a detector. Both are pinned deterministically here instead.
+// ---------------------------------------------------------------------------
+t_section('FS.12c · the subject has since been deleted — close it, invent nothing');
+$purge();
+$ruleX = $mkRuleFs('X');
+$reqX = ['id'=>7803,'entity'=>'HIRING_REQUEST','entity_id'=>780003,'rule_id'=>$ruleX];
+$blockCore();
+t_eq(appr_audit_notify($reqX, 'APPROVED', 'ENTITY_UNRESOLVED'), APPR_COND_NOT_RECORDED,
+     'FS.12c · a condition is left NOT_RECORDED');
+$dropT('fs_core');
+//  The policy it would have been filed against is now gone.
+$pdo->prepare("DELETE FROM recruit_approval_levels WHERE rule_id=?")->execute([$ruleX]);
+$pdo->prepare("DELETE FROM recruit_approval_rules WHERE id=?")->execute([$ruleX]);
+$fpX = appr_cond_fingerprint(appr_condition_key('DECISION', $reqX, null, 'ENTITY_UNRESOLVED'));
+$recX = appr_cond_rec_get($fpX);
+t_ok(!appr_audit_ref_ok((string)($recX['sk'] ?? ''), (int)($recX['si'] ?? 0)),
+     'FS.12c · its remembered subject no longer resolves');
+$nBefore = (int) ops_val("SELECT COUNT(*) FROM activities WHERE subject LIKE 'Approval condition could not be recorded%'");
+$rcX = appr_cond_reconcile();
+$nAfter = (int) ops_val("SELECT COUNT(*) FROM activities WHERE subject LIKE 'Approval condition could not be recorded%'");
+t_eq((int)$rcX['terminal'], 1, 'FS.12c · it is closed as unrecoverable');
+t_eq($nAfter, $nBefore, 'FS.12c · *** and NO note was written — nothing unopenable was invented ***');
+t_eq((string)(appr_cond_rec_get($fpX)['st'] ?? ''), APPR_COND_TERMINAL, 'FS.12c · the record says so truthfully');
+t_eq(appr_cond_unarmed_count(), 0, 'FS.12c · and it is no longer an active fault');
+$purge();
+
+t_section('FS.12d · a claim made against a state that has already moved is refused');
+$fpD2 = 'PCX|' . str_repeat('c', 32);
+$stale = ['st'=>APPR_COND_NOT_RECORDED, 'k'=>'PC|CLAIM|1', 'row'=>0, 'sk'=>'APPROVAL_POLICY', 'si'=>1];
+appr_cond_rec_put($fpD2, $stale);
+t_ok(appr_cond_claim($fpD2, $stale, ['st'=>APPR_COND_TERMINAL,'k'=>'PC|CLAIM|1','row'=>0,'why'=>'first']),
+     'FS.12d · the first claimant wins');
+t_eq((string)(appr_cond_rec_get($fpD2)['st'] ?? ''), APPR_COND_TERMINAL, 'FS.12d · and the state has moved');
+t_ok(!appr_cond_claim($fpD2, $stale, ['st'=>APPR_COND_TERMINAL,'k'=>'PC|CLAIM|1','row'=>0,'why'=>'second']),
+     'FS.12d · *** a later claimant holding the OLD state is refused — it cannot file a second note ***');
+t_eq((string)(appr_cond_rec_get($fpD2)['why'] ?? ''), 'first',
+     'FS.12d · and the winner\'s record is untouched by the loser');
+$purge();
 
 // ---------------------------------------------------------------------------
 t_section('FS.11 · §I · tenant isolation of every part of the condition store');

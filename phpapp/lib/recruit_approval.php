@@ -470,6 +470,33 @@ function appr_cond_rec_put($fp, array $rec) {
     } catch (Throwable $e) { /* never fatal — a condition record may not break a decision */ }
 }
 
+//  GATE · G2 — an ATOMIC claim on one condition, so only one process may act on
+//  it. A conditional UPDATE that matches the exact value this process read is a
+//  compare-and-swap: the row changes for exactly one caller, and every other
+//  caller sees zero rows affected and stands down. It is one statement on one row
+//  chosen by the PRIMARY KEY, on both engines.
+function appr_cond_claim($fp, array $expect, array $next) {
+    $k = appr_cond_skey($fp);
+    if ($k === '') return false;
+    try {
+        $cur = ops_one("SELECT svalue FROM settings WHERE skey=?", [$k]);
+        if (!$cur) return false;
+        //  The claim must be made against the state the caller EXPECTED, not
+        //  against whatever is there now. The first version compared only against
+        //  the freshly-read value, so a process arriving AFTER the winner had
+        //  already closed the condition still matched, re-claimed it and filed a
+        //  second note. Three concurrent passes produced two notes.
+        $now = appr_cond_parse((string) $cur['svalue']);
+        if ((string) ($now['st'] ?? '') !== (string) ($expect['st'] ?? '')) return false;
+        $st = db()->prepare("UPDATE settings SET svalue=? WHERE skey=? AND svalue=?");
+        $st->execute([json_encode($next + ['at' => date('c')]), $k, (string) $cur['svalue']]);
+        //  rowCount() is safe here because the new value always differs from the old
+        //  one (the status changes), so "0 rows" can only mean another process got
+        //  there first — never "the value was already identical" (#12 · X1).
+        return $st->rowCount() > 0;
+    } catch (Throwable $e) { return false; }
+}
+
 function appr_cond_rec_drop($fp) {
     $k = appr_cond_skey($fp);
     if ($k === '') return;
@@ -653,19 +680,52 @@ function appr_cond_reconcile($limit = APPR_COND_RECON_MAX) {
                 //  written, nothing is said, and the condition stays active.
                 //  Idempotent: the state moves to TERMINAL in the same pass, so a
                 //  second run finds nothing to do.
-                $wrote = 0;
-                if (function_exists('act_log')) {
-                    $wrote = (int) act_log('APPROVAL_POLICY', 0, 'SYSTEM',
-                        'Approval condition could not be recorded when it occurred — the record '
-                      . 'keeping fault is now over and this note replaces the lost entry');
+                //  GATE · G1 — FILE IT SOMEWHERE A PERSON CAN FOLLOW.
+                //
+                //  The first version of this wrote act_log('APPROVAL_POLICY', 0, …),
+                //  which stores a KIND with no id. appr_audit_ref_ok() cannot open
+                //  such a row, and correction #6 settled that question for this
+                //  module in its own words: "a row nobody can follow is worse than
+                //  no row". The final stabilisation had reintroduced exactly that
+                //  orphan. The subject resolved when the failure was observed is
+                //  kept on the record, and the note is filed against it — but only
+                //  while it still resolves.
+                $sk = (string) ($rec['sk'] ?? ''); $si = (int) ($rec['si'] ?? 0);
+                if (!appr_audit_ref_ok($sk, $si)) {
+                    //  Nothing openable remains. Closing it is right — an event that
+                    //  was never written, against a subject that no longer exists,
+                    //  can never be recovered — and it is closed WITHOUT inventing a
+                    //  row for it.
+                    if (appr_cond_claim($fp, $rec, ['st' => APPR_COND_TERMINAL, 'k' => $key, 'row' => 0,
+                            'why' => 'the event was never written and the subject it belonged to no '
+                                   . 'longer exists; nothing can be recovered or filed'])) {
+                        $out['terminal']++;
+                        appr_cond_note($key, APPR_COND_TERMINAL, 'subject no longer exists');
+                    } else { $out['still']++; }
+                    continue;
                 }
+                //  GATE · G2 — CLAIM IT FIRST, atomically, so two concurrent
+                //  reconciliation passes cannot both write the note. The claim is a
+                //  compare-and-swap on this condition's own settings row; only the
+                //  winner writes anything.
+                if (!appr_cond_claim($fp, $rec, ['st' => APPR_COND_TERMINAL, 'k' => $key, 'row' => 0,
+                        'why' => 'pending — the recovery note is being filed'])) { $out['still']++; continue; }
+                $wrote = (int) act_log($sk, $si, 'SYSTEM',
+                    'Approval condition could not be recorded when it occurred — the record '
+                  . 'keeping fault is now over and this note replaces the lost entry');
                 if ($wrote > 0) {
                     appr_cond_rec_put($fp, ['st' => APPR_COND_TERMINAL, 'k' => $key, 'row' => 0,
                         'why' => 'the spine accepted a write for this condition; the original event '
                                . 'was never written and cannot be reconstructed']);
                     $out['terminal']++;
                     appr_cond_note($key, APPR_COND_TERMINAL, 'closed after the spine accepted a write');
-                } else { $out['still']++; }
+                } else {
+                    //  The write failed after the claim — put the condition back so a
+                    //  later pass retries it. Nothing was written and nothing claims
+                    //  it was.
+                    appr_cond_rec_put($fp, $rec);
+                    $out['still']++;
+                }
                 continue;
             }
 
@@ -719,6 +779,19 @@ function appr_cond_retry($condKey) {
 //  outcome. It deliberately does NOT collapse to a boolean: a truthy 'FAILED'
 //  was the trap #11 named, and "did it store" and "is suppression armed" are two
 //  different questions that happen to share an answer today.
+//  GATE · G1 — the subject the writer resolved for THIS event, set immediately
+//  before act_log() by both production writers and read by appr_cond_outcome().
+//  Workspace-keyed like every other cross-call value in this module.
+function appr_cond_subject_set($kind, $id) {
+    $GLOBALS['__appr_cond_subject'] = ['epoch' => function_exists('db_epoch') ? db_epoch() : 0,
+                                       'k' => (string) $kind, 'i' => (int) $id];
+}
+function appr_cond_last_subject() {
+    $r = $GLOBALS['__appr_cond_subject'] ?? null;
+    if (!is_array($r) || ($r['epoch'] ?? -1) !== (function_exists('db_epoch') ? db_epoch() : 0)) return ['', 0];
+    return [(string) $r['k'], (int) $r['i']];
+}
+
 function appr_cond_outcome($condKey) {
     if ((string) $condKey === '') return APPR_COND_NONE;
     $row = function_exists('act_last_cond_row')    ? act_last_cond_row()    : 0;
@@ -735,8 +808,14 @@ function appr_cond_outcome($condKey) {
         //  rows, so deleting rows moved it BACKWARDS and the condition could never
         //  reach its terminal state. Recovery is condition-specific instead — see
         //  appr_cond_reconcile().
+        //  GATE · G1 — remember the subject this event WAS going to be filed under.
+        //  act_log() is only reached once appr_audit_subject() has resolved one, so
+        //  a NOT_RECORDED condition always has a real, openable subject at the
+        //  moment it fails. Keeping it is what lets the recovery note be filed
+        //  somewhere a person can actually follow.
+        [$sk, $si] = function_exists('appr_audit_subject') ? appr_cond_last_subject() : ['', 0];
         appr_cond_rec_put($fp, ['st' => APPR_COND_NOT_RECORDED, 'k' => (string) $condKey,
-                                'row' => 0, 'why' => $why]);
+                                'row' => 0, 'why' => $why, 'sk' => $sk, 'si' => (int) $si]);
         return APPR_COND_NOT_RECORDED;
     }
     if ($st === ACT_COND_STORED) { appr_cond_rec_drop($fp); return APPR_COND_RECORDED; }   // case A
@@ -790,6 +869,7 @@ function appr_audit_sla($req, $step, $what, $detail = '', $event = 'SLA_EVENT') 
     //  Z3 — the fingerprint rides in `body`, a base-schema column written by the
     //  SAME INSERT as the event, so the row stays recognisable when the marker
     //  cannot be written. It is never read as a marker.
+    appr_cond_subject_set($kind, $id);      // GATE · G1
     act_log($kind, $id, 'SYSTEM', $subject,
         ['auto' => 1, 'cond_key' => $condKey, 'body' => appr_cond_fingerprint($condKey)]);
     return appr_cond_outcome($condKey);          // Y2 — the status is consumed, not dropped
@@ -2249,6 +2329,7 @@ function appr_audit_notify($req, $result, $reason) {
     if ($gate === 'RETRY')    return appr_cond_retry($condKey);
     [$kind, $id, $isSource] = appr_audit_subject($req);
     if ($kind === '') return APPR_COND_NO_SUBJECT;  // nothing openable remains: no row
+    appr_cond_subject_set($kind, $id);      // GATE · G1
     act_log($kind, $id, 'SYSTEM',
         'Decision not notified (' . $reason . ') — ' . (APPR_NOTIFY_REASONS[$reason] ?? $reason)
         . ' — ' . $label . ' #' . (int) ($req['entity_id'] ?? 0) . ' ' . strtoupper((string) $result)
