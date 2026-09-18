@@ -104,8 +104,14 @@ $grp = function ($icon, $title, $n) use ($e) {
     <?php $anyToday = ($d['counts']['today'] ?? 0) > 0; ?>
     <?php if (!empty($d['t_reqs'])): $grp('📋', TP('requisition') . ' to work', count($d['t_reqs']));
       foreach ($d['t_reqs'] as $r) {
-        $qty = max(1, (int)$r['quantity']); $filled = (int)$r['filled'];
-        $tone = $filled >= $qty ? ['filled', 'p-ok'] : ($filled > 0 ? [$filled . ' of ' . $qty, 'p-warn'] : ['sourcing', 'p-info']);
+        //  PHASE 5 — the APPROVED number, not the original ask. A requirement for
+        //  ten that gave up four is a requirement for six, and telling a
+        //  coordinator "3 of 10" when the business only wants six any more sends
+        //  them looking for four people nobody asked for.
+        $qty0 = max(1, (int)$r['quantity']);
+        $qty  = max(0, $qty0 - min($qty0, max(0, (int)($r['cancelled_qty'] ?? 0))));
+        $filled = min((int)$r['filled'], $qty0);
+        $tone = ($qty > 0 && $filled >= $qty) ? ['filled', 'p-ok'] : ($filled > 0 ? [$filled . ' of ' . $qty, 'p-warn'] : ['sourcing', 'p-info']);
         $row('/requisition?id=' . (int)$r['id'], $r['req_code'] . ' · ' . $desig($r['designation']) . ($qty > 1 ? ' × ' . $qty : ''),
              trim(($r['office'] ?? '') . ($r['project_site'] ? ' · ' . $r['project_site'] : '')), $tone);
       } endif; ?>

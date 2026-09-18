@@ -5302,6 +5302,20 @@ function ops_candidates($route, $method) {
             $dropReason = $lost ? substr(trim((string)($_POST['drop_reason'] ?? '')), 0, 60) : '';
             try { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?")->execute([$to, $decided, $dropPoint, $dropReason, $id]); }
             catch (Throwable $e) { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]); }
+            //  PHASE 5 — the ledger records the move HERE, at the moment it
+            //  happened, and not after the compensating checks below.
+            //
+            //  Two reasons, both found by reading the order rather than the code.
+            //  The M6 gate can revert a joining and then redirect, which exits —
+            //  so a move that was reverted used to leave NO ledger entry at all.
+            //  And once the revert writes its own row, a move recorded after it
+            //  would land second and the ledger would end at the joined stage
+            //  again: the exact false claim Phase 5 is here to remove.
+            if (function_exists('rkpi_stage_log'))
+                rkpi_stage_log($id, (string) $cand['stage'], $to, [
+                    'from_code' => strtoupper((string) $cand['stage']), 'to_code' => strtoupper((string) $to),
+                    'track' => 'LEGACY', 'kind' => 'MOVE',
+                    'remark' => $remark, 'actor' => user_name(current_user())]);
             //  M6 — the compensating check. Check-then-write is not atomic, so two
             //  processes recording a joining at the same instant both pass the gate
             //  above; this puts the loser back and says so. The same shape M4 used
@@ -5319,8 +5333,6 @@ function ops_candidates($route, $method) {
                 $p4rev = rful_enforce_candidate($id, (int) ($cand['allocation_id'] ?? 0));
                 if ($p4rev !== '') flash($p4rev, 'error');
             }
-            $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
-                ->execute([$id, $cand['stage'], $to, $remark, user_name(current_user()), date('c')]);
             // M3 — every stage move passes through here, so the requisition's
             // standing is recomputed here rather than only on the hire path.
             // Accepting without creating a workforce record, and reversing a hire,
@@ -5586,8 +5598,9 @@ function ops_candidates($route, $method) {
                     $kw = function_exists('cv_extract_keywords') ? cv_extract_keywords($cvText) : '';
                     try { $pdo->prepare("UPDATE candidates SET cv_text=?, cv_keywords=?, cv_analyzed_at=? WHERE id=?")->execute([$cvText, $kw, date('c'), $id]); } catch (Throwable $e) {}
                 }
-                $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
-                    ->execute([$id, '', 'RECEIVED', 'CV received', user_name(current_user()), date('c')]);
+                if (function_exists('rkpi_stage_log'))
+                    rkpi_stage_log($id, '', 'RECEIVED', ['to_code' => 'RECEIVED', 'track' => 'LEGACY',
+                        'kind' => 'MOVE', 'remark' => 'CV received', 'actor' => user_name(current_user())]);
                 flash("$code added to the hiring pipeline." . $m5note . ($p4note ?? ''),
                       ($m5note !== '' || ($p4note ?? '') !== '') ? 'error' : 'success');
                 redirect('/candidate?id=' . $id);

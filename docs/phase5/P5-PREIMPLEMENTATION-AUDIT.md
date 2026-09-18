@@ -32,9 +32,16 @@ say three**. `lib/recruit_cc.php` contains **zero** references to `reqf_counts()
 `rful_summary()` or `REQF_FILLED_STAGES`; it reads `requisitions.quantity`
 directly and counts `stage='ACCEPTED'` inline. Two specific consequences:
 
-- it ignores `cancelled_qty`, so vacancies the business gave up still show as demand;
-- it hard-codes the filled stage instead of M3's `REQF_FILLED_STAGES`, so a
-  workspace that configures its pipeline differently is miscounted.
+- it ignores `cancelled_qty`, so vacancies the business gave up still show as
+  demand. **This is the measured defect**, and it is the whole of the seven-vs-three
+  gap above;
+- it also spells out the filled stage as a literal `'ACCEPTED'` instead of reading
+  M3's `REQF_FILLED_STAGES`. **This is not a behavioural defect today** — an
+  earlier draft of this audit said a differently-configured workspace would be
+  miscounted, and that was wrong: `REQF_FILLED_STAGES` is a constant, not a
+  configurable list, so the literal and the constant are the same value. It is a
+  question of *ownership*, not of arithmetic: the definition should have one home,
+  so that the day it moves, every reader moves with it.
 
 This is the same class of defect M5 already fixed once in this very file, when
 `PARTIALLY_FILLED` was missing from the live-demand list and a ten-seat

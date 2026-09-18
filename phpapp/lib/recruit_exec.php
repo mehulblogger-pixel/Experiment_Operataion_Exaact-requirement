@@ -309,6 +309,15 @@ function rexec_join_enforce_after_write($candidateId, $priorStage, $priorDecided
         catch (Throwable $e2) { return ''; }
     }
     if (function_exists('reqf_sync')) { try { reqf_sync($rq); } catch (Throwable $e) {} }
+    //  PHASE 5 — and say so in the stage ledger. Reverting the stage without
+    //  writing here left the ledger ENDING at the joined stage: it claimed a
+    //  person had joined who had not, and any hire count read from it
+    //  over-reported. Recorded as a REVERT, never as a plain move, so a stage
+    //  duration is never computed across an undoing.
+    if (function_exists('rkpi_stage_log'))
+        rkpi_stage_log($id, (string) $c['stage'], $back, [
+            'from_code' => strtoupper((string) $c['stage']), 'to_code' => strtoupper($back), 'track' => 'LEGACY',
+            'kind' => 'REVERT', 'remark' => 'Joining reverted — no approved seat remained']);
     if (function_exists('act_log'))
         act_log('CANDIDATE', $id, 'NOTE', 'Joining reverted — no approved seat remained',
             ['body' => 'Another joining took the last approved position on requirement #' . $rq

@@ -214,6 +214,8 @@ const TAPI_SOURCE_MODULES = [
     'idems/vendor_profiles'=> 'idems',     // Inspection reporting
     'portal/client_users'  => 'portal',    // Administration (core)
     'portal/portal_audit'  => 'portal',    // Administration (core)
+    'recruit/requisitions' => 'hiring',    // People & hiring (Phase 5)
+    'recruit/candidates'   => 'hiring',    // People & hiring (Phase 5)
 ];
 
 function tapi_metric_module($key) {
@@ -944,6 +946,17 @@ function tapi_domain_metrics() {
             return (int) ops_val("SELECT COUNT(*) FROM portal_audit pa WHERE $pw", $pa);
         }],
     ];
+    //  PHASE 5 — RECRUITMENT. The recruitment metrics are DEFINED next to the
+    //  engine that owns their arithmetic (lib/recruit_kpi.php) and REGISTERED
+    //  here, so recruitment joins this one analytics layer instead of growing a
+    //  second one. Their resolvers call the authoritative recruitment functions
+    //  and recompute nothing — the same promise every metric above makes.
+    //  Their lineage is declared in TAPI_SOURCE_MODULES below, so an
+    //  installation without People & hiring is withheld them, exactly as any
+    //  other unlicensed source is.
+    if (function_exists('rkpi_metrics')) {
+        foreach (rkpi_metrics() as $k => $def) if (!isset($reg[$k])) $reg[$k] = $def;
+    }
     return $reg;
 }
 

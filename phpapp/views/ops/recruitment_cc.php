@@ -182,6 +182,31 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
     <a class="kpi" href="/candidates"><div class="l">Active now</div><div class="v tnum"><?= (int)($K['active_now'] ?? 0) ?></div><div class="dd">still live in the process ›</div></a>
     <a class="kpi" href="/candidates?stage=OFFERED"><div class="l">Offers issued</div><div class="v tnum"><?= (int)($K['offers_issued'] ?? 0) ?></div><div class="dd">reached offer stage ›</div></a>
   </div>
+
+  <!-- PHASE 5 — WHERE THE APPROVED HEADCOUNT ACTUALLY STANDS.
+       Three figures that were not on this screen before, in the words a
+       coordinator already uses. "Open positions" above answers how many people
+       are still to be found; these answer how many of them somebody has already
+       been asked to find. -->
+  <div class="kpis k3" style="margin-top:10px">
+    <a class="kpi" href="/requisitions"><div class="l">Approved headcount</div><div class="v tnum"><?= (int)($K['ordered'] ?? 0) ?></div><div class="dd">people signed off to hire ›</div></a>
+    <a class="kpi" href="/requisitions"><div class="l">Promised to a source</div><div class="v tnum"><?= (int)($K['allocated'] ?? 0) ?></div><div class="dd">agencies, transfers, own payroll ›</div></a>
+    <a class="kpi<?= (int)($K['unallocated'] ?? 0) > 0 ? ' bad' : '' ?>" href="/requisitions"><div class="l">Nobody looking yet</div><div class="v tnum"><?= (int)($K['unallocated'] ?? 0) ?></div><div class="dd">approved, but not given to anyone ›</div></a>
+  </div>
+  <?php if ((int)($K['cancelled'] ?? 0) > 0): ?>
+  <p class="sub" style="margin-top:6px"><strong><?= (int)$K['cancelled'] ?></strong> of the
+    <strong><?= (int)($K['requested'] ?? 0) ?></strong> positions originally requested
+    <?= (int)$K['cancelled'] === 1 ? 'was' : 'were' ?> given up, so
+    <strong><?= (int)($K['ordered'] ?? 0) ?></strong>
+    <?= (int)($K['ordered'] ?? 0) === 1 ? 'is' : 'are' ?> still approved to hire.
+    Every figure on this page counts the approved number, not the original ask.</p>
+  <?php endif; ?>
+  <?php if ((int)($K['over_committed'] ?? 0) > 0): ?>
+  <p class="msg msg-warn"><strong><?= (int)$K['over_committed'] ?></strong>
+    more <?= (int)$K['over_committed'] === 1 ? 'person has' : 'people have' ?> been promised to sources
+    than the approvals allow. Somebody is expecting to supply people there is no approved position for —
+    open the requirements below and reduce a promise.</p>
+  <?php endif; ?>
   <!-- Manpower P&L (added) -->
   <div class="band" style="margin-top:12px"><h2>Manpower P&amp;L</h2><span class="bd">— money made when seats are filled, and lost while they stay open</span><span class="add">added</span></div>
   <div class="kpis k3">
@@ -315,11 +340,27 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
         <div class="clegend"><span><span class="sw" style="background:var(--brand)"></span><b>Posted</b> ordered</span><span><span class="sw" style="background:var(--ok)"></span><b>Working</b> now</span><span><span class="swl"></span><b>Profit lost</b> vacant</span></div>
       </div>
       <div class="scroll"><table>
-        <thead><tr><th>Recruiter</th><th class="num">Posted</th><th class="num">Working</th><th class="num">Recruited</th><th class="num">Earned</th><th class="num">Lost</th></tr></thead>
+        <thead><tr><th>Recruiter</th><th class="num">Carrying</th><th class="num">Working</th><th class="num">Recruited</th><th class="num">Avg days</th><th class="num">Earned</th><th class="num">Lost</th></tr></thead>
         <tbody><?php foreach ($R as $x): $ini=strtoupper(substr($x['name'],0,1).(strpos($x['name'],' ')!==false?substr(strstr($x['name'],' '),1,1):'')); ?>
-          <tr><td><span class="who"><span class="av"><?= $e($ini) ?></span> <?= $e($x['name']) ?></span></td><td class="num"><?= (int)$x['posted'] ?></td><td class="num"><?= (int)$x['working'] ?></td><td class="num"><?= (int)$x['recruited'] ?></td><td class="num money-pos"><?= $m($x['earned']) ?></td><td class="num money-neg"><?= $m($x['lost']) ?></td></tr>
+          <tr><td><span class="who"><span class="av"><?= $e($ini) ?></span> <?= $e($x['name']) ?></span></td><td class="num"><?= (int)$x['posted'] ?></td><td class="num"><?= (int)$x['working'] ?></td><td class="num"><?= (int)$x['recruited'] ?></td>
+              <?php // NO DATA is shown as a dash, never as a zero somebody would read as "instant". ?>
+              <td class="num"><?= $x['tth_days'] === null ? '—' : (int)$x['tth_days'] ?></td>
+              <td class="num money-pos"><?= $m($x['earned']) ?></td><td class="num money-neg"><?= $m($x['lost']) ?></td></tr>
         <?php endforeach; ?></tbody>
-      </table></div></div>
+      </table></div>
+      <p class="sub" style="margin-top:6px"><b>Carrying</b> and <b>Working</b> are what each person is
+        responsible for today. <b>Recruited</b> and <b>Avg days</b> are what they delivered — credited from
+        the assignment history at the moment each person joined, so handing a requirement over does not
+        move last month's results to somebody else.</p>
+      <?php $UN = $d['unattributed'] ?? []; if ((int)($UN['total'] ?? 0) > 0): ?>
+      <p class="sub"><strong><?= (int)$UN['total'] ?></strong>
+        settled <?= (int)$UN['total'] === 1 ? 'outcome is' : 'outcomes are' ?> not credited to anyone here
+        <?php $bits = [];
+              if ((int)($UN['no_ledger'] ?? 0) > 0)         $bits[] = (int)$UN['no_ledger'] . ' with no recruiter on record';
+              if ((int)($UN['ambiguous_no_date'] ?? 0) > 0) $bits[] = (int)$UN['ambiguous_no_date'] . ' with no date to attribute them to';
+              echo $bits ? '(' . $e(implode(', ', $bits)) . ')' : ''; ?>.
+        They are left out rather than shared among the people above.</p>
+      <?php endif; ?></div>
     <?php endif; ?></div>
   </div>
 

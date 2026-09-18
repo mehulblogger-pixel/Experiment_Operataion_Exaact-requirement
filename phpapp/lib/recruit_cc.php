@@ -223,17 +223,66 @@ function rcc_data($f) {
     //  this milestone exists to remove.
     $m5live = defined('RASG_LIVE_REQ') ? RASG_LIVE_REQ : ['OPEN','PROPOSED','OFFERED','PARTIALLY_FILLED','HIRED'];
     $m5in   = "'" . implode("','", $m5live) . "'";
-    $reqRows = $rows("SELECT r.*, (SELECT COUNT(*) FROM candidates cc WHERE cc.requisition_id=r.id AND cc.stage='ACCEPTED') filled
+    //  "Filled" is M3's definition, read from M3, not spelled out again here. It
+    //  happens to be the single stage ACCEPTED today, so this is not a change of
+    //  behaviour — it is a change of OWNERSHIP, so that the day the definition
+    //  moves, this screen moves with it instead of quietly disagreeing.
+    $ccFill = defined('REQF_FILLED_STAGES')
+        ? "'" . implode("','", array_map(fn($x) => str_replace("'", "''", (string) $x), REQF_FILLED_STAGES)) . "'"
+        : "'ACCEPTED'";
+    $reqRows = $rows("SELECT r.*, (SELECT COUNT(*) FROM candidates cc WHERE cc.requisition_id=r.id AND cc.stage IN ($ccFill)) filled
                       FROM requisitions r WHERE $rw AND r.status IN ($m5in) ", $ra);
-    $openSeats = 0; $orderedSeats = 0; $filledSeats = 0;
-    foreach ($reqRows as $r) { $q = max(1, (int)($r['quantity'] ?? 1)); $fl = (int)$r['filled']; $orderedSeats += $q; $filledSeats += min($fl, $q); $openSeats += max(0, $q - $fl); }
+    //  PHASE 5 — THE DEMAND FIGURES ARE ASKED FOR, NOT WORKED OUT HERE.
+    //
+    //  This block used to do its own arithmetic over $reqRows: quantity summed
+    //  as "ordered", quantity minus hires as "open". It had no idea that
+    //  vacancies can be GIVEN UP (M3's cancelled_qty), and it hard-coded the
+    //  filled stage instead of reading REQF_FILLED_STAGES, so a workspace that
+    //  configures its pipeline differently was miscounted too.
+    //
+    //  The cost was measured before a line was changed. Ten people approved,
+    //  four vacancies cancelled, three joined, two promised to an agency:
+    //
+    //     the records say   authorised 6 · filled 3 · open 3 · promised 2
+    //     this screen said  ordered 10  · filled 3 · open 7 · (no idea)
+    //
+    //  Seven open positions where the records say three, on the one screen a
+    //  coordinator plans their week from.
+    //
+    //  This is the SAME defect M5 fixed here once already — the live-demand list
+    //  written out as a literal that had gone stale. That fix corrected the list;
+    //  it did not move the ownership of the calculation, so the next divergence
+    //  arrived by a different door. The calculation now has ONE owner
+    //  (lib/recruit_kpi.php) and this screen is a reader of it.
+    //
+    //  $rw already carries the scope clause, so the engine is told not to apply
+    //  it a second time.
+    $dem = function_exists('rkpi_demand')
+        ? rkpi_demand(['no_scope' => true, 'where' => $rw, 'args' => $ra])
+        : ['authorised' => 0, 'filled' => 0, 'remaining' => 0, 'requested' => 0,
+           'cancelled' => 0, 'allocated' => 0, 'unallocated' => 0, 'over_committed' => 0];
+    $d['demand_totals'] = $dem;
     $d['kpi'] = [
-        'open_positions' => $openSeats,
+        //  OPEN is what is still to be found: approved, less cancelled, less
+        //  joined — summed per requirement so one over-filled requirement never
+        //  cancels out another that is short.
+        'open_positions' => (int) $dem['remaining'],
         'pipeline'       => $total,
         'active_now'     => $sc('RECEIVED') + $sc('SUBMITTED') + $sc('SHORTLISTED') + $sc('INTERVIEW') + $sc('OFFERED'),
         'offers_issued'  => $sc('OFFERED'),
-        'ordered'        => $orderedSeats,
-        'filled'         => $filledSeats,
+        //  ORDERED now means APPROVED headcount. It used to mean "everything ever
+        //  asked for", which double-counts vacancies the business has since given
+        //  up. Both figures are published so the screen can show the difference
+        //  rather than quietly pick one.
+        'ordered'        => (int) $dem['authorised'],
+        'requested'      => (int) $dem['requested'],
+        'cancelled'      => (int) $dem['cancelled'],
+        'filled'         => (int) $dem['filled'],
+        //  Phase 4's answer to "of what is still open, how much is promised to
+        //  somebody?" — a question this screen could not ask at all before.
+        'allocated'      => (int) $dem['allocated'],
+        'unallocated'    => (int) $dem['unallocated'],
+        'over_committed' => (int) $dem['over_committed'],
     ];
 
     // M3 §27 — approval SLA, on the dashboard that already exists.
@@ -248,8 +297,18 @@ function rcc_data($f) {
         'accept'    => $reached['OFFERED'] ? round($reached['ACCEPTED'] / max(1, $reached['OFFERED']) * 100, 1) : 0,
         'tth'       => 0, 'tth_n' => 0,
     ];
-    $hires = $rows("SELECT created_at, decided_at FROM candidates c WHERE $cw AND stage='ACCEPTED' AND COALESCE(decided_at,'')<>'' AND COALESCE(created_at,'')<>''", $ca);
-    $days = []; foreach ($hires as $h) { $dd = (strtotime(substr($h['decided_at'],0,10)) - strtotime(substr($h['created_at'],0,10))) / 86400; if ($dd >= 0 && $dd < 400) $days[] = $dd; }
+    //  TIME TO HIRE, on the one published definition — CV received (or the day the
+    //  record was opened) to the day the joining was decided, in CALENDAR days.
+    //  Measured through the canonical ageing helper so this screen, the analytics
+    //  registry and the recruiter table cannot drift into three answers.
+    $hires = $rows("SELECT created_at, cv_received_date, decided_at FROM candidates c
+                    WHERE $cw AND stage IN ($ccFill) AND COALESCE(decided_at,'')<>'' AND COALESCE(created_at,'')<>''", $ca);
+    $days = [];
+    foreach ($hires as $h) {
+        $from = trim((string)($h['cv_received_date'] ?? '')) ?: trim((string)($h['created_at'] ?? ''));
+        $dd = function_exists('rkpi_age') ? rkpi_age($from, (string)$h['decided_at'], 'calendar') : null;
+        if ($dd !== null && $dd >= 0 && $dd < 400) $days[] = $dd;
+    }
     if ($days) { $d['conv']['tth'] = (int)round(array_sum($days) / count($days)); $d['conv']['tth_n'] = count($days); }
 
     // ---- Monthly trend (CVs shared / offers / joined) ----
@@ -259,7 +318,7 @@ function rcc_data($f) {
     foreach ($rows("SELECT substr(COALESCE(NULLIF(decided_at,''),created_at),1,7) m, COUNT(*) n
                     FROM candidates c WHERE $cw AND stage IN ('OFFERED','ACCEPTED') GROUP BY m ORDER BY m", $ca) as $r) $trend[$r['m']]['off'] = (int)$r['n'];
     foreach ($rows("SELECT substr(COALESCE(NULLIF(decided_at,''),created_at),1,7) m, COUNT(*) n
-                    FROM candidates c WHERE $cw AND stage='ACCEPTED' GROUP BY m ORDER BY m", $ca) as $r) $trend[$r['m']]['join'] = (int)$r['n'];
+                    FROM candidates c WHERE $cw AND stage IN ($ccFill) GROUP BY m ORDER BY m", $ca) as $r) $trend[$r['m']]['join'] = (int)$r['n'];
     ksort($trend);
     $d['trend'] = array_slice(array_map(fn($k) => ['m' => $k, 'label' => rcc_month_label($k),
         'cv' => (int)($trend[$k]['cv'] ?? 0), 'off' => (int)($trend[$k]['off'] ?? 0), 'join' => (int)($trend[$k]['join'] ?? 0)], array_keys($trend)), -8);
@@ -313,11 +372,24 @@ function rcc_data($f) {
 
     // ---- Needs attention: biggest open demand ----
     $d['demand'] = [];
-    foreach ($reqRows as $r) { $q = max(1, (int)($r['quantity'] ?? 1)); $open = max(0, $q - (int)$r['filled']); if ($open > 0) $d['demand'][] = ['id' => (int)$r['id'], 'req' => $r['req_code'], 'dept' => (function_exists('dept_row_label') ? (dept_row_label($r) ?: '—') : ($deptOpt[$r['department']] ?? $r['department'] ?: '—')), 'role' => (rcc_designations()[$r['designation']] ?? $r['designation'] ?: '—'), 'vac' => $q, 'open' => $open]; }
+    foreach ($reqRows as $r) {
+        //  Vacancies the business has GIVEN UP are not open demand. Counting them
+        //  here is what put seven open positions on this screen where the records
+        //  said three — the same rule, applied in every place that states it.
+        $q = max(1, (int)($r['quantity'] ?? 1));
+        $auth = max(0, $q - min($q, max(0, (int)($r['cancelled_qty'] ?? 0))));
+        $open = max(0, $auth - (int)$r['filled']);
+        if ($open > 0) $d['demand'][] = ['id' => (int)$r['id'], 'req' => $r['req_code'], 'dept' => (function_exists('dept_row_label') ? (dept_row_label($r) ?: '—') : ($deptOpt[$r['department']] ?? $r['department'] ?: '—')), 'role' => (rcc_designations()[$r['designation']] ?? $r['designation'] ?: '—'), 'vac' => $auth, 'open' => $open];
+    }
     usort($d['demand'], fn($a, $b) => $b['open'] <=> $a['open']); $d['demand'] = array_slice($d['demand'], 0, 8);
 
     // ---- Recruiter performance + manpower P&L (reuses Phase 5 commercials) ----
     $d['recruiters'] = rcc_recruiter_perf($f, $reqRows);
+    //  Hires and losses the ledger cannot attribute to anybody. Shown, never
+    //  distributed: a table that quietly spreads unattributable work across the
+    //  people it CAN name is a table that credits the wrong person.
+    $d['unattributed'] = function_exists('rkpi_unattributed')
+        ? rkpi_unattributed(['rows' => rkpi_settled_rows()]) : ['total' => 0];
     $pl = ['earned' => 0.0, 'lost' => 0.0, 'working' => 0];
     foreach ($d['recruiters'] as $rp) { $pl['earned'] += $rp['earned']; $pl['lost'] += $rp['lost']; $pl['working'] += $rp['working']; }
     $d['pl'] = $pl;
@@ -330,18 +402,57 @@ function rcc_data($f) {
 }
 
 // Per-recruiter (Responsible 1) posted / working / recruited + earned/lost profit.
+//  PHASE 5 — TWO QUESTIONS, KEPT APART.
+//
+//  This table answered "who delivered these hires?" using requisitions.recruiter_id
+//  — the CURRENT owner. That column cannot answer a question about the past:
+//  reassign a requirement today and every hire made under its previous recruiter
+//  moves to the new one, so last month's performance table rewrites itself, and
+//  somebody is paid or judged on work they did not do.
+//
+//  So the two are now read from the two different places that can actually
+//  answer them:
+//
+//    CARRYING NOW — posted, working, earned, lost. The current column IS the
+//      right source: it is the current state, and these are questions about what
+//      this person is responsible for today.
+//
+//    DELIVERED    — recruited, and the time it took. Read from the M5
+//      recruiter_assignments ledger, attributed at the moment each joining was
+//      DECIDED, so it survives every later reassignment.
+//
+//  Outcomes the ledger cannot attribute are NOT quietly handed to whoever holds
+//  the record now. They are returned separately, under 'unattributed', for the
+//  screen to show — a table that cannot say who delivered something must say so.
 function rcc_recruiter_perf($f, $reqRows) {
     $byUser = [];
     foreach ($reqRows as $r) {
         $uid = (int)($r['recruiter_id'] ?? 0); if (!$uid) continue;
-        $byUser[$uid] ??= ['uid' => $uid, 'name' => rcc_user_name($uid) ?: ('User #' . $uid), 'posted' => 0, 'working' => 0, 'recruited' => 0, 'earned' => 0.0, 'lost' => 0.0];
+        $byUser[$uid] ??= ['uid' => $uid, 'name' => rcc_user_name($uid) ?: ('User #' . $uid),
+                           'posted' => 0, 'working' => 0, 'recruited' => 0, 'earned' => 0.0, 'lost' => 0.0,
+                           'tth_days' => null, 'tth_n' => 0, 'credited_from' => 'ledger'];
         $q = max(1, (int)($r['quantity'] ?? 1)); $filled = (int)$r['filled'];
-        $byUser[$uid]['posted'] += $q;
-        $byUser[$uid]['recruited'] += $filled;
-        $byUser[$uid]['working'] += $filled;   // filled == currently deployed (accepted+placed)
+        //  What they are carrying: the approved ceiling, not everything ever
+        //  asked for — the same correction the headline figures above took.
+        $canc = min($q, max(0, (int)($r['cancelled_qty'] ?? 0)));
+        $byUser[$uid]['posted'] += max(0, $q - $canc);
+        $byUser[$uid]['working'] += min($filled, $q);   // people in seats they hold today
         if (function_exists('recruit_req_commercial_rollup')) {
             try { $roll = recruit_req_commercial_rollup($r); $byUser[$uid]['earned'] += (float)$roll['appr_profit'];
-                  $perHead = $q > 0 ? ((float)($r['expected_profit'] ?? 0)) / $q : 0; $byUser[$uid]['lost'] += max(0, $q - $filled) * $perHead; } catch (Throwable $e) {}
+                  $perHead = $q > 0 ? ((float)($r['expected_profit'] ?? 0)) / $q : 0; $byUser[$uid]['lost'] += max(0, $q - $canc - $filled) * $perHead; } catch (Throwable $e) {}
+        }
+    }
+    //  DELIVERED, from the ledger. Asked once per person who appears in the
+    //  table; the settled-candidate set behind it is read once and shared.
+    if (function_exists('rkpi_recruiter_credit')) {
+        //  Read the settled outcomes ONCE and hand the same rows to every person
+        //  in the table — eight recruiters must not mean eight scans.
+        $settled = ['rows' => rkpi_settled_rows()];
+        foreach ($byUser as $uid => $row) {
+            $c = rkpi_recruiter_credit($uid, $settled);
+            $byUser[$uid]['recruited'] = (int)($c['hires'] ?? 0);
+            $byUser[$uid]['tth_days']  = $c['tth_days'] ?? null;
+            $byUser[$uid]['tth_n']     = (int)($c['tth_n'] ?? 0);
         }
     }
     $out = array_values($byUser);
@@ -352,9 +463,14 @@ function rcc_recruiter_perf($f, $reqRows) {
 function rcc_tracker($reqRows, $deptOpt) {
     $out = [];
     foreach ($reqRows as $r) {
-        $q = max(1, (int)($r['quantity'] ?? 1)); $filled = (int)$r['filled'];
+        //  The approved ceiling, not everything ever asked for. A requirement
+        //  for ten that gave up four is a requirement for six, on every line of
+        //  every screen that shows it.
+        $q0 = max(1, (int)($r['quantity'] ?? 1));
+        $q = max(0, $q0 - min($q0, max(0, (int)($r['cancelled_qty'] ?? 0))));
+        $filled = min((int)$r['filled'], $q0);
         $roll = function_exists('recruit_req_commercial_rollup') ? (function () use ($r) { try { return recruit_req_commercial_rollup($r); } catch (Throwable $e) { return null; } })() : null;
-        $perHead = $q > 0 ? ((float)($r['expected_profit'] ?? 0)) / $q : 0;
+        $perHead = $q0 > 0 ? ((float)($r['expected_profit'] ?? 0)) / $q0 : 0;
         $out[] = [
             'id' => (int)$r['id'], 'req' => $r['req_code'],
             'posted' => (rcc_designations()[$r['designation']] ?? $r['designation'] ?: '—'), 'qty' => $q,
@@ -375,8 +491,9 @@ function rcc_projects($reqRows) {
     foreach ($reqRows as $r) {
         $site = trim((string)($r['project_site'] ?? '')) ?: '—';
         $proj[$site] ??= ['site' => $site, 'ordered' => 0, 'working' => 0];
-        $proj[$site]['ordered'] += max(1, (int)($r['quantity'] ?? 1));
-        $proj[$site]['working'] += (int)$r['filled'];
+        $pq = max(1, (int)($r['quantity'] ?? 1));
+        $proj[$site]['ordered'] += max(0, $pq - min($pq, max(0, (int)($r['cancelled_qty'] ?? 0))));
+        $proj[$site]['working'] += min((int)$r['filled'], $pq);
     }
     $out = array_values($proj);
     usort($out, fn($a, $b) => ($b['ordered'] - $b['working']) <=> ($a['ordered'] - $a['working']));

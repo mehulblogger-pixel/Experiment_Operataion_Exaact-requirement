@@ -437,7 +437,16 @@ function recruitpipe_cand_goto($cand, $targetStageId, $remark, $actor) {
     $fromName = $eff[$idx]['name'] ?? '';
     db()->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=? WHERE id=?")
         ->execute([(int)$pipe['id'], (int)$target['id'], (int)$cand['id']]);
-    db()->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
+    //  PHASE 5 — the same ledger, now with the stage's stable KEY beside its
+    //  display name. The name alone was ambiguous: it sat in the same column as
+    //  legacy stage codes and as "Workflow: …" strings, so grouping by it
+    //  silently split or merged stages. Renaming a stage no longer rewrites
+    //  history either — the key is what a duration is measured against.
+    if (function_exists('rkpi_stage_log'))
+        rkpi_stage_log((int)$cand['id'], $fromName, $target['name'], [
+            'from_code' => (string)($eff[$idx]['stage_key'] ?? ''), 'to_code' => (string)($target['stage_key'] ?? ''),
+            'track' => 'PIPELINE', 'kind' => 'MOVE', 'remark' => (string)$remark, 'actor' => (string)$actor]);
+    else db()->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
         ->execute([(int)$cand['id'], $fromName, $target['name'], (string)$remark, (string)$actor, date('c')]);
     // Coarse legacy sync — only at the interview/offer milestones, and never
     // over a terminal legacy stage (so hire/loss handling is never disturbed).
@@ -481,7 +490,13 @@ function ops_recruit_candidate_flow($route, $method) {
             $first = $neff[0]['id'] ?? null;
             db()->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=? WHERE id=?")
                 ->execute([(int)$np['id'], $first ? (int)$first : null, $id]);
-            db()->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
+            //  A workflow SWITCH is not a stage transition and must never be
+            //  timed as one — marked as such so no duration is measured across it.
+            if (function_exists('rkpi_stage_log'))
+                rkpi_stage_log($id, ($eff[$idx]['name'] ?? ''), 'Workflow: ' . $np['name'], [
+                    'from_code' => (string)($eff[$idx]['stage_key'] ?? ''), 'to_code' => (string)($neff[0]['stage_key'] ?? ''),
+                    'track' => 'PIPELINE', 'kind' => 'SWITCH', 'remark' => $remark, 'actor' => user_name(current_user())]);
+            else db()->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                 ->execute([$id, ($eff[$idx]['name'] ?? ''), 'Workflow: ' . $np['name'], $remark, user_name(current_user()), date('c')]);
             flash('Workflow changed to “' . $np['name'] . '”.');
         } else { flash('That workflow is not available.', 'error'); }

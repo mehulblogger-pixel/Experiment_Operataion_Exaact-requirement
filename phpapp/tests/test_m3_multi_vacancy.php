@@ -219,8 +219,24 @@ $opsAll = file_get_contents(__DIR__ . '/../lib/ops.php');
 t_ok(substr_count($opsAll, 'reqf_sync(') >= 5,
      'the standing is recomputed at several points, not one (' . substr_count($opsAll, 'reqf_sync(') . ')');
 // Every stage move passes through the candidate-events write, so the sync sits there.
-$evPos = strpos($opsAll, 'INSERT INTO candidate_events');
-t_ok($evPos !== false && strpos(substr($opsAll, $evPos, 700), 'reqf_sync(') !== false,
+//
+//  PHASE 5 RE-ANCHORED THIS PROBE, and did not weaken it. The claim is unchanged:
+//  the requisition standing must be recomputed wherever a stage moves. What moved
+//  is the WRITE this probe anchors on — Phase 5 routed every stage movement
+//  through one canonical ledger writer (rkpi_stage_log) so the ledger speaks a
+//  single vocabulary, so the raw INSERT this searched for no longer exists in
+//  ops.php and strpos() returned false. A probe that cannot find its anchor
+//  reports absence of a problem, which is the most dangerous thing a test can do.
+//  The behaviour it stands for is additionally proved end-to-end, through the
+//  real stage route, in test_p5_kpi.php (section J).
+//  Bounded by the branch itself rather than by a count of bytes: from the stage
+//  move being recorded to the sentence the user is shown afterwards. A byte
+//  window would have to be widened every time anything is inserted between them,
+//  and each widening quietly weakens the probe.
+$evPos = strpos($opsAll, 'rkpi_stage_log(');
+$endPos = $evPos !== false ? strpos($opsAll, "\$msg = 'Candidate moved to '", $evPos) : false;
+t_ok($evPos !== false && $endPos !== false
+     && strpos(substr($opsAll, $evPos, $endPos - $evPos), 'reqf_sync(') !== false,
      'every candidate STAGE change recomputes it — not just the hire branch');
 t_ok(strpos($opsAll, "reqf_sync((int)\$req['id']);   // M3 — the quantity may have changed") !== false,
      'editing the requisition QUANTITY recomputes it');

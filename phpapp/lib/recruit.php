@@ -757,7 +757,10 @@ function recruit_data() {
     $d['available']   = $one("SELECT COUNT(*) n FROM inspector_day_status s WHERE s.day=? AND s.status='AVAILABLE'", [$today]);
 
     // ---------- TODAY — needs action ----------
+    //  PHASE 5 — cancelled_qty travels with the quantity, so the screen can show
+    //  the APPROVED number rather than the original ask.
     $d['t_reqs'] = $rows("SELECT r.id, r.req_code, r.designation, r.project_site, o.name office, r.status, COALESCE(r.quantity,1) quantity,
+                                 COALESCE(r.cancelled_qty,0) cancelled_qty,
                                  (SELECT COUNT(*) FROM candidates c WHERE c.requisition_id=r.id AND c.stage IN ('OFFERED','ACCEPTED')) filled
                           FROM requisitions r LEFT JOIN offices o ON o.id=r.office_id
                           WHERE r.status IN ('OPEN','PROPOSED') AND $rw ORDER BY r.id DESC LIMIT 6", $ra);

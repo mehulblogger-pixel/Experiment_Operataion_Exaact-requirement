@@ -314,8 +314,22 @@ function offer_issue($id) {
     db()->prepare("UPDATE job_offers SET status='ISSUED', issued_by=?, issued_at=?, letter_html=? WHERE id=?")
         ->execute([_off_actor(), _off_now(), $letter, (int)$id]);
     // Coarse-sync the candidate's legacy stage to OFFERED (unless already closed).
-    if ($cand && !in_array($cand['stage'], ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true))
+    //
+    //  PHASE 5 — and RECORD it. This path moved a candidate to OFFERED and wrote
+    //  nothing to candidate_events, so the stage ledger had no trace of the most
+    //  ordinary offer there is: "days from shortlist to offer" measured from the
+    //  ledger silently missed every offer issued the normal way. Measured, not
+    //  assumed — see docs/phase5/P5-PREIMPLEMENTATION-AUDIT.md, section 5a.
+    //
+    //  The ledger write can never undo the offer: the offer is already issued and
+    //  the stage already moved. A failure to observe is not a failure to transact.
+    if ($cand && !in_array($cand['stage'], ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true)) {
         db()->prepare("UPDATE candidates SET stage='OFFERED' WHERE id=?")->execute([(int)$o['candidate_id']]);
+        if (function_exists('rkpi_stage_log'))
+            rkpi_stage_log((int)$o['candidate_id'], (string)$cand['stage'], 'OFFERED', [
+                'from_code' => (string)$cand['stage'], 'to_code' => 'OFFERED', 'track' => 'LEGACY',
+                'kind' => 'MOVE', 'actor' => _off_actor(), 'remark' => 'Offer issued']);
+    }
     return [true, 'Offer issued. Share the letter with the candidate.'];
 }
 function offer_accept($id) {

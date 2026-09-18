@@ -162,7 +162,10 @@ function careers_apply($job, $post, $files) {
         try { $pdo->prepare("UPDATE candidates SET cv_text=?, cv_keywords=?, cv_file_name=?, cv_analyzed_at=? WHERE id=?")->execute([$cvText, $kw, $cvName, date('c'), $id]); } catch (Throwable $e) {}
     }
     try {
-        $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
+        if (function_exists('rkpi_stage_log'))
+            rkpi_stage_log((int)$id, '', 'RECEIVED', ['to_code' => 'RECEIVED', 'track' => 'LEGACY',
+                'kind' => 'MOVE', 'remark' => 'Applied via careers site', 'actor' => 'Careers site']);
+        else $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
             ->execute([$id, '', 'RECEIVED', 'Applied via careers site', 'Careers site', date('c')]);
     } catch (Throwable $e) {}
 
