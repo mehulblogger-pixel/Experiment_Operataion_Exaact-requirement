@@ -82,16 +82,20 @@ The two engines differ by one assertion because one probe is driver-conditional.
 MariaDB is authoritative for production-oriented evidence; neither figure is
 inferred from the other, and both were run to completion.
 
-**Mutation testing: 38 of 38 caught.** Each mutation breaks exactly one control
-in a copy of the application; four of them break a control **and** its partner,
-to prove the pairing is real rather than assumed. The three survivors are the
-attach compensator and two compare-and-swaps, which execute only when several
-processes get past a pre-check before any of them writes. They are reported as
-**survivors, not as caught**; each has been caught in earlier runs of the same
-battery, and removing either half of the pair **together** with its partner is
-caught with 46 failures. `P4-MUTATION-RESULTS.md` gives the evidence, and states
-plainly why this container cannot force that interleaving and why a test hook in
-product code was not acceptable as a way to manufacture it.
+**Mutation testing: 38 of 38 caught** — clean baseline, zero survivors, zero
+unapplied mutants. Each mutation breaks exactly one control in a copy of the
+application; four of them break a control **and** its partner, to prove the
+pairing is real rather than assumed.
+
+An earlier draft of this report described three of them — the attach compensator
+and two compare-and-swaps — as surviving and *independently protected*. **That is
+superseded and it was wrong.** They were not protected; they survived because the
+test harness was not actually racing. Once the workers were warmed before the
+barrier, all three were caught, and two of them proved to allow genuinely
+incorrect business states. Each was then reproduced and caught in **9 of 9**
+independent MariaDB reliability runs with zero dirty baselines.
+`P4-MUTATION-VERIFICATION.md` carries the §10 evidence table and the full
+history.
 
 **Concurrency:** real separate operating-system processes on independent
 connections, synchronised on a shared wall-clock instant, with the contended
