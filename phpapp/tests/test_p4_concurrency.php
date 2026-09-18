@@ -187,8 +187,15 @@ t_ok($s6['over_committed'] <= $s6['direct_fulfilled'],
 t_eq($s6['over_committed'], max(0, $s6['allocated'] + $s6['direct_fulfilled'] - $s6['authorised']),
      'C6.6a · …and is exactly what the figures say it is, not an invented number');
 if ($s6['over_committed'] > 0) {
-    $trim = (int) rful_get($a6)['allocated_qty'] - $s6['over_committed'];
-    t_eq(rful_reallocate($a6, max(1, $trim))['code'], 'OK', 'C6.6b · a coordinator can still trim it');
+    $row6 = rful_get($a6);
+    $trim = (int) $row6['allocated_qty'] - $s6['over_committed'];
+    //  A failing assertion must say what it SAW, not merely what it wanted. The
+    //  state is carried into the label because the interesting failure here is a
+    //  refusal whose reason depends on the allocation's derived status.
+    $seen6 = 'status=' . $row6['status'] . ' qty=' . (int) $row6['allocated_qty']
+           . ' delivered=' . rful_fulfilled($a6) . ' direct=' . $s6['direct_fulfilled']
+           . ' over=' . $s6['over_committed'] . ' trim->' . max(1, $trim);
+    t_eq(rful_reallocate($a6, max(1, $trim))['code'], 'OK', 'C6.6b · a coordinator can still trim it [' . $seen6 . ']');
     t_eq(rful_summary($rq6)['over_committed'], 0, 'C6.6c · …and the requirement is square again');
 } else {
     t_eq($s6['allocated'] + $s6['direct_fulfilled'], $s6['authorised'] - ($s6['authorised'] - $s6['allocated'] - $s6['direct_fulfilled']),
@@ -328,6 +335,36 @@ for ($round = 1; $round <= 4; $round++) {
 //  would make the probe agree with the bug.
 // ============================================================================
 
+//  THE LEDGER AS A PATH, NOT AS A SEQUENCE OF ROWS.
+//
+//  Each resize writes its row change and its ledger entry as TWO separate
+//  statements, so two concurrent successful resizes can record their entries in
+//  the opposite order from the writes. Every entry is individually truthful; only
+//  the id ordering can invert. An earlier version of these probes walked the
+//  entries in id order and demanded continuity, which the system does not promise
+//  — it failed against the REAL implementation about one run in six, and worse, it
+//  was the assertion that appeared to catch mutant T26. A probe that fails at
+//  random cannot be evidence of anything.
+//
+//  What IS guaranteed is that the entries form a PATH: starting at the opening
+//  quantity, each recorded change leads to the next, every entry is used exactly
+//  once, and the path ends where the allocation actually stands. A phantom entry —
+//  a change recorded that never happened — leaves an entry that cannot be placed
+//  on that path, which is exactly what the mutations produce.
+$c4path = function (array $rows, $start, $endsAt) {
+    $left = []; foreach ($rows as $r) $left[] = [(int) $r['from_qty'], (int) $r['to_qty']];
+    $at = (int) $start; $guard = count($left) + 2;
+    while ($left && $guard-- > 0) {
+        $took = false;
+        foreach ($left as $i => $step) {
+            if ($step[0] !== $at) continue;
+            $at = $step[1]; unset($left[$i]); $left = array_values($left); $took = true; break;
+        }
+        if (!$took) break;
+    }
+    return ['unplaced' => count($left), 'ends' => $at, 'ok' => (count($left) === 0 && $at === (int) $endsAt)];
+};
+
 // ---- C10 · T6 — the attach compensator -------------------------------------
 t_section('C10 · eight arrivals, one seat at the source (the attach compensator)');
 for ($round = 1; $round <= 2; $round++) {
@@ -432,10 +469,9 @@ for ($round = 1; $round <= 4; $round++) {
          "C12.2 · round $round · the allocation holds ONE of the values asked for, never a blend");
     $chain = ops_all("SELECT from_qty, to_qty FROM requisition_allocation_events
                       WHERE allocation_id=? AND event='REALLOCATED' ORDER BY id", [$a12]);
-    $prev = 4; $broken = 0;
-    foreach ($chain as $e) { if ((int) $e['from_qty'] !== $prev) $broken++; $prev = (int) $e['to_qty']; }
-    t_eq($broken, 0, "C12.3 · round $round · the ledger chain is continuous — no entry starts from a figure that had already moved (mutant T18)");
-    t_eq($prev, $now, "C12.4 · round $round · …and it ends exactly where the allocation now stands");
+    $path = $c4path($chain, 4, $now);
+    t_eq($path['unplaced'], 0, "C12.3 · round $round · every recorded change is a change that happened — none is left unplaceable (mutant T18)");
+    t_eq($path['ends'], $now, "C12.4 · round $round · …and the recorded changes lead exactly to where the allocation now stands");
     t_ok(count($chain) <= 8, "C12.5 · round $round · no more changes recorded than processes");
     t_ok(rful_summary($rq12)['allocated'] <= 40, "C12.6 · round $round · and the approval was never exceeded");
 }
@@ -526,10 +562,9 @@ for ($round = 1; $round <= 3; $round++) {
     //  And the ledger still tells the truth about what actually happened.
     $chain14 = ops_all("SELECT from_qty, to_qty FROM requisition_allocation_events
                         WHERE allocation_id=? AND event='REALLOCATED' ORDER BY id", [$a14]);
-    $p14 = 4; $bad14 = 0;
-    foreach ($chain14 as $e) { if ((int) $e['from_qty'] !== $p14) $bad14++; $p14 = (int) $e['to_qty']; }
-    t_eq($bad14, 0, "C14.5 · round $round · the ledger chain is continuous");
-    t_eq($p14, $now14, "C14.6 · round $round · …and ends where the allocation now stands");
+    $path14 = $c4path($chain14, 4, $now14);
+    t_eq($path14['unplaced'], 0, "C14.5 · round $round · every recorded change is one that happened");
+    t_eq($path14['ends'], $now14, "C14.6 · round $round · …and they lead to where the allocation now stands");
 }
 
 $_SESSION = $c4o; current_user(true); ua(true);
