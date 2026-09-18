@@ -433,4 +433,43 @@ for ($round = 1; $round <= 4; $round++) {
     t_ok(rful_summary($rq12)['allocated'] <= 40, "C12.6 · round $round · and the approval was never exceeded");
 }
 
+
+// ---- C13 · EVERY over-committing arrival withdraws ITS OWN row ---------------
+//  The defect this gate found: the compensator withdrew an over-allocation only
+//  when its row was the LATEST live row. With two racers that looks right; with
+//  six it left five over-allocations standing, each reporting success.
+//
+//  C8 found it, but only about one run in six — a probe that catches a defect
+//  occasionally does not guard against its return, which the mutation battery
+//  proved by leaving T38 alive. This race is built to collide rather than to hope:
+//  the requirement starts with NO allocations, so every worker's ceiling check is
+//  the cheapest it can be and they all reach the write together, and each asks for
+//  the WHOLE authorised headcount, so any two that get through over-commit it.
+t_section('C13 · eight planners, one whole headcount, nothing pre-allocated');
+for ($round = 1; $round <= 4; $round++) {
+    $rq13 = $c4req(10, 'P4C WithdrawOwn r' . $round);
+    $res = $race(array_map(fn($i) => ['allocate', $rq13, 'SUPPLIER', 10], range(1, 8)));
+    t_eq(count($res), 8, "C13.1 · round $round · eight real processes reported back");
+    $s13 = rful_summary($rq13);
+    //  THE CEILING. Whatever the interleaving, the requirement is never promised
+    //  more than it was approved for.
+    t_ok($s13['allocated'] <= 10, "C13.2 · round $round · never promised more than the approved ten (got {$s13['allocated']})");
+    t_eq($s13['over_committed'], 0, "C13.3 · round $round · nothing is promised twice");
+    //  AND THE ROWS AGREE WITH THE REPORTS. A row that survives must belong to a
+    //  process that was told it succeeded; a process told it succeeded must have a
+    //  row. This is what fails when only the latest arrival withdraws itself.
+    $live = (int) ops_val("SELECT COUNT(*) FROM requisition_allocations
+                           WHERE requisition_id=? AND status NOT IN ('RELEASED','CANCELLED')", [$rq13]);
+    t_eq($live, $okN($res), "C13.4 · round $round · exactly as many promises stand as processes succeeded (mutant T38)");
+    t_ok($okN($res) <= 1, "C13.5 · round $round · at most one of the eight took the whole headcount");
+    //  Refusing every contested claim is permitted; the capacity must survive it.
+    if ($okN($res) === 0) {
+        t_eq(rful_allocate($rq13, 'OWN_PAYROLL', 10)['code'], 'OK',
+             "C13.6 · round $round · a dead heat left the whole headcount usable afterwards");
+    } else {
+        t_eq(rful_allocate($rq13, 'OWN_PAYROLL', 1)['code'], 'OVER_AUTHORISED',
+             "C13.6 · round $round · one claim took it and the next is refused");
+    }
+}
+
 $_SESSION = $c4o; current_user(true); ua(true);

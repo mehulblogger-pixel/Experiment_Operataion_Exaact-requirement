@@ -38,6 +38,21 @@ if (function_exists('rful_migrate')) {
         rful_may_touch(0);
         if (function_exists('lk_options_or')) lk_options_or('req_sourcing_model', []);
         if ($id > 0) { rful_get($id); rful_get($arg === '' ? 0 : (int) $arg); }
+        //  The ALLOCATE and RESIZE paths reach their ceiling check through M6's
+        //  gate, which asks M4 — several queries of variable cost that were still
+        //  being paid AFTER the barrier, spreading the workers out before they got
+        //  anywhere near the window they were meant to contend in. Same defect as
+        //  the schema check, same test-side remedy: pay it up front. Reads only.
+        if ($op === 'allocate' && $id > 0) {
+            if (function_exists('rexec_block_reason')) rexec_block_reason($id);
+            rful_summary($id);
+        } elseif (($op === 'reallocate' || $op === 'close') && $id > 0) {
+            $wa = rful_get($id);
+            if ($wa) {
+                if (function_exists('rexec_block_reason')) rexec_block_reason((int) $wa['requisition_id']);
+                rful_summary((int) $wa['requisition_id']);
+            }
+        }
     } catch (Throwable $e) {}
 }
 //  SYNCHRONISE ON A WALL-CLOCK INSTANT, not on a sleep.
