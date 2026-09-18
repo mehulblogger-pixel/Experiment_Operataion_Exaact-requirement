@@ -33,6 +33,33 @@ neither figure is inferred from the other.
 
 ---
 
+## The final mutation gate — probes added, and why
+
+The gate that classified T6/T18/T19 added seven probes and corrected two. Each is
+here because a mutation proved nothing was checking the claim.
+
+| Probe | The claim nothing was checking |
+|---|---|
+| **C10** | Eight arrivals against one promised seat: the surviving LINKS, not the reports |
+| **C11** | One person, eight sources at once: every source carrying a credit must hold them now or record a matching DETACHED |
+| **C12** | Eight resizes from one baseline: the ledger must be a path that ends where the allocation stands |
+| **C13** | Eight planners, one whole headcount, nothing pre-allocated: standing promises must equal successful processes |
+| **C14** | A **staggered** race: a loser must be told somebody changed it first, never that the approval is full |
+| **RT2.4–RT2.7** | The create route runs the same defence in depth the edit and stage routes run |
+| **D14–D18** | A FULFILLED source can be grown, trimmed to what it delivered, never below |
+
+Two existing probes were corrected because they asserted properties the system
+does not promise:
+
+- **C12.3/C12.4 and C14.5/C14.6** demanded that ledger entries appear in write
+  order. The CAS and the ledger INSERT are separate statements, so two concurrent
+  *successful* resizes can record entries in the opposite order — each entry
+  truthful, only the ordering inverted. They failed against the **real**
+  implementation about one run in six. They now reconstruct the ledger as a path.
+- **C6.6b** now reports the state it observed (status, quantity, delivered,
+  direct, attempted trim) rather than only what it wanted, which is what made the
+  FULFILLED-blocks-trimming defect diagnosable instead of merely intermittent.
+
 ## Every failure this work produced, classified
 
 Per §45, no failure was fixed before it was classified.
@@ -51,6 +78,14 @@ Per §45, no failure was fixed before it was classified.
 | S5.3 | **TEST DEFECT** | Inherited a requisition that section S4 had deliberately exhausted, so it tested S4's leftovers rather than its own claim. Given its own requirement |
 | RT3.1–RT3.7 | **TEST DEFECT** | The route worker posted `to` where the stage route reads `to_stage`, so it drove nothing |
 | N4–N6 | **TEST DEFECT** | Asserted an event sequence that omitted the legitimate derived `STATE` entry |
+
+| C8.2–C8.4 | **PRODUCT DEFECT** | The allocation compensator withdrew only the *latest* over-allocation. Six racers left five standing and the requirement over-promised by four. Surfaced as an intermittent dirty baseline, and **first misdiagnosed as MariaDB table-cache thrashing** — an explanation written before the failing assertions had been read |
+| T38 survived | **TEST GAP** | The probe that found the defect above caught it roughly one run in six, so it did not guard against its return. The allocate path was still paying M6's gate unwarmed after the barrier |
+| T31 anchor-miss | **HARNESS DEFECT** | The mutation was never applied — its target moved — and an unapplied mutant reads as absence of a problem |
+| C14.5/C14.6 | **TEST DEFECT** | Demanded a ledger ordering the system never promised; failed against the real implementation about one run in six; and were the assertions that appeared to catch T26, whose result was withdrawn |
+| C6.6b | **PRODUCT DEFECT** | FULFILLED treated as closed by the resize gate, so a coordinator could not trim a promise a source had not delivered — the correction refused. The same defect already fixed on the seat path |
+| D15/D16 | **TEST DEFECT** | Grew an allocation on a requisition with no headroom, so they measured the ceiling rather than the state gate |
+| P7 | **CAUGHT MY OWN BAD FIX** | The first correction to the resize gate ("refuse only CLOSED") would have let a status in no lifecycle through. A probe written in the earlier adversarial pass failed within a minute |
 
 No test was weakened, skipped or deleted to obtain a green result, and no product
 code was changed to satisfy an incorrect test.
