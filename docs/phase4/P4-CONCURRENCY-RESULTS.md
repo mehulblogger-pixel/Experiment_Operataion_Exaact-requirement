@@ -48,6 +48,58 @@ fix; all six runs clean.
 
 ---
 
+## The harness was not racing — measured, not assumed
+
+Every figure in the table above was originally produced by a harness that did not
+actually collide. Three controls (the attach compensator and two compare-and-swaps)
+survived mutation because of it, and a real over-allocation defect hid behind it.
+
+Instrumenting the workers, rather than reasoning about them, showed why:
+
+| Per worker | Time | Spread |
+|---|---|---|
+| Boot (227 libraries) | ~145 ms | ±4 ms |
+| Arrival at the barrier | — | **1–2 µs** — the barrier itself was accurate |
+| First production read → **lazy schema check** | **7.5–9.8 ms** | **±2.4 ms** |
+| Read + gate + allocation read + seat check | ~1.0 ms | ±0.5 ms |
+| **Seat check → write — the window being raced** | **~0.25 ms** | — |
+
+A one-time per-process cost of nine milliseconds sat inside a window of a quarter
+of one. Eight processes released at the same microsecond still arrived nine
+milliseconds apart and queued politely.
+
+**The remedy is test-side only** (`tests/_p4_worker.php`): the worker pays that
+idempotent migration, the lookup/licence reads, and — for the allocate and resize
+paths — M6's gate, *before* the barrier. Exactly the reason it already opened the
+database connection there. No production logic, SQL, timing or isolation level is
+altered, and there is no test hook in product code.
+
+Measured afterwards: eight workers against a one-seat source **all** pass the seat
+check and **all** write, and the compensator withdraws every one — zero winners,
+which is the ratified capacity rule working and direct proof the contested path
+now executes.
+
+### …and then the opposite lesson
+
+Tightening the barrier **concealed** a control it used to catch. Mutant T26
+(the resize same-read pre-check) needs a *stale* re-read — one process committing
+between another's two reads — and a perfect collision never produces that, because
+everyone re-reads before anyone writes.
+
+**A tighter race is not a better race; it is a different one.** The harness now
+runs both: the tight case (C10–C13) and a staggered sweep of 2–16 ms offsets
+(C14), so at least one worker lands between another's two reads.
+
+## The scenarios added by the final gate
+
+| # | Scenario | What must hold | Result |
+|---|---|---|---|
+| **C10** | Eight arrivals, one promised seat | At most one credit survives; nobody displaced; all eight keep their seats; the capacity is usable afterwards even if all are refused | **PASS** |
+| **C11** | One person, eight sources, at once | Every source carrying a credit either holds them now or records a matching DETACHED — so a serialised run passes and a phantom credit fails | **PASS** |
+| **C12** | Eight resizes from one baseline | The ledger forms a path ending where the allocation stands | **PASS** |
+| **C13** | Eight planners, one whole headcount, nothing pre-allocated | Never over-promised; standing promises equal successful processes | **PASS** |
+| **C14** | A **staggered** resize race | A loser is told somebody changed it first — never that the approval is full, which in this scenario could only be a false reason | **PASS** |
+
 ## What the races found
 
 **C4 — the resize pre-check mixed two moments.** `rful_reallocate()` took the
