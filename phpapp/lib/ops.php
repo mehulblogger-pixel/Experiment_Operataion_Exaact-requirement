@@ -2497,7 +2497,7 @@ function ops_module_gate($route, $peek = false) {
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring','candidate-link-pro'=>'hiring','candidate-unlink-pro'=>'hiring',
         'hiring-requests'=>'hiring','hiring-request'=>'hiring',
         'approval-delegations'=>'hiring',   // M2 — approval delegation config rides with recruitment
-        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring','recruit-export'=>'hiring','careers-admin'=>'hiring','jd-generate'=>'hiring','positions-import'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','requisition-allocations'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring','recruit-export'=>'hiring','careers-admin'=>'hiring','jd-generate'=>'hiring','positions-import'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
@@ -2832,6 +2832,8 @@ function ops_dispatch($route, $method) {
             return ops_hiring_requests($route, $method);
         case $route === 'requisition-cancel-vacancies':               // M3 — give up on the vacancies nobody filled
             return ops_requisition_cancel_vacancies($route, $method);
+        case $route === 'requisition-allocations':                   // Phase 4 — where this requirement's people come from
+            return ops_requisition_allocations($route, $method);
         case $route === 'requisition-position':                      // Phase 3 — link a requisition to a position
             return ops_requisition_position($route, $method);
         case $route === 'candidate-interview':                       // Phase 4 — multi-round interviews + scorecards
@@ -5308,6 +5310,15 @@ function ops_candidates($route, $method) {
                 $m6rev = rexec_join_enforce_after_write($id, (string) $cand['stage'], (string) ($cand['decided_at'] ?? ''));
                 if ($m6rev !== '') { flash($m6rev, 'error'); redirect('/candidate?id=' . $id); }
             }
+            //  PHASE 4 — the stage move is what CREDITS a source, so the source's
+            //  own ceiling is settled here too. If the allocation has no seat left,
+            //  the credit is dropped back to the direct path; the person keeps the
+            //  seat M6 just gave them on the requirement. A source is never
+            //  over-credited and an established credit is never displaced.
+            if (function_exists('rful_enforce_candidate')) {
+                $p4rev = rful_enforce_candidate($id, (int) ($cand['allocation_id'] ?? 0));
+                if ($p4rev !== '') flash($p4rev, 'error');
+            }
             $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                 ->execute([$id, $cand['stage'], $to, $remark, user_name(current_user()), date('c')]);
             // M3 — every stage move passes through here, so the requisition's
@@ -5471,6 +5482,19 @@ function ops_candidates($route, $method) {
                     $m5mv = rasg_move_blocks('CAND_RECRUITER', (int) $cand['id'], $m5dest);
                     if ($m5mv !== '') { flash($m5mv, 'error'); redirect('/candidate?id=' . (int) $cand['id']); }
                 }
+                //  PHASE 4 — WHICH SOURCE IS THIS PERSON ARRIVING THROUGH?
+                //  A capacity and accountability link, so it leaves the blind field
+                //  list exactly as ownership did and travels its own door — asked
+                //  about the requirement the save is PRODUCING, not the one the
+                //  candidate is leaving.
+                if (function_exists('rful_apply_posted')) {
+                    $p4r = rful_apply_posted((int) $cand['id'], $b,
+                        array_key_exists('requisition_id', $b)
+                            ? (($b['requisition_id'] === '' || $b['requisition_id'] === null) ? 0 : (int) $b['requisition_id'])
+                            : (int) ($cand['requisition_id'] ?? 0), 'candidate-edit');
+                    if ($p4r !== '') { flash($p4r, 'error'); redirect('/candidate?id=' . (int) $cand['id']); }
+                }
+                $p4prior = (int) ($cand['allocation_id'] ?? 0);
                 $m5auth = function_exists('rasg_authorised_now') ? rasg_authorised_now('candidates', (int) $cand['id']) : [];
                 $set = implode(',', array_map(fn($f) => "$f=?", $fields));
                 $vals = array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields); $vals[] = $cand['id'];
@@ -5484,6 +5508,14 @@ function ops_candidates($route, $method) {
                 if (function_exists('rexec_move_enforce_after_write')) {
                     $m6mv = rexec_move_enforce_after_write((int) $cand['id'], (int) ($cand['requisition_id'] ?? 0));
                     if ($m6mv !== '') flash($m6mv, 'error');
+                }
+                //  PHASE 4 — defence in depth. Whatever wrote the row, a link that
+                //  now points at another requirement's allocation, at a closed one,
+                //  or at a source with no seat left is removed. It never removes
+                //  anybody from a seat: M6 owns that, and still does.
+                if (function_exists('rful_enforce_candidate')) {
+                    $p4rev = rful_enforce_candidate((int) $cand['id'], $p4prior ?? 0);
+                    if ($p4rev !== '') flash($p4rev, 'error');
                 }
                 // M3 — a candidate can be moved to a different requisition, which
                 // changes the standing of BOTH the one it left and the one it joined.
@@ -5514,6 +5546,16 @@ function ops_candidates($route, $method) {
                 //  through the one door. Same controls as the edit path.
                 if (function_exists('rasg_enforce_table'))
                     rasg_enforce_table('candidates', (int) $id, rasg_unowned('candidates'));
+                //  PHASE 4 — the candidate is created with no source link (the INSERT
+                //  column list does not carry one), then the link is set through the
+                //  one door, so a crafted POST cannot smuggle one past the controls.
+                $p4note = '';
+                if (function_exists('rful_apply_posted')) {
+                    if (function_exists('rful_enforce_candidate')) rful_enforce_candidate((int) $id, 0);
+                    $p4note = rful_apply_posted((int) $id, $b,
+                        ($b['requisition_id'] ?? '') !== '' ? (int) $b['requisition_id'] : 0, 'candidate-new');
+                    if ($p4note !== '') $p4note = ' ' . $p4note;
+                }
                 $m5note = '';
                 if (function_exists('rasg_assign')) {
                     foreach ($m5cand as $m5col => $m5subj) {
@@ -5535,7 +5577,8 @@ function ops_candidates($route, $method) {
                 }
                 $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                     ->execute([$id, '', 'RECEIVED', 'CV received', user_name(current_user()), date('c')]);
-                flash("$code added to the hiring pipeline." . $m5note, $m5note !== '' ? 'error' : 'success');
+                flash("$code added to the hiring pipeline." . $m5note . ($p4note ?? ''),
+                      ($m5note !== '' || ($p4note ?? '') !== '') ? 'error' : 'success');
                 redirect('/candidate?id=' . $id);
             }
         }

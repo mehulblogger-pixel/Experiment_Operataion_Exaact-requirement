@@ -62,6 +62,11 @@ if (function_exists('reqf_counts')):
   </div>
 <?php endif; endif; ?>
 
+<?php // PHASE 4 — one approved demand, fulfilled from several sources. Sits right
+      // under the vacancy counts, because it answers the next question a
+      // coordinator asks: "so where are the remaining people coming from?"
+include __DIR__ . '/_allocation_panel.php'; ?>
+
 <?php // Phase 3 — manpower-plan validation against the position master (§14).
 if (function_exists('position_requisition_panel')) position_requisition_panel($req); ?>
 

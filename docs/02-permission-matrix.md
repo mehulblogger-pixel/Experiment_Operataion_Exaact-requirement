@@ -349,3 +349,61 @@ operations workspace at `/get-started` (public; off until the operator enables i
 Approve / decline / provision on the Workspaces panel reuse **`can_manage_tenants()`**
 (Master Admin, base/control domain only) — **no new permission**. See
 `03-object-lifecycles.md` → `tenant_requests.status`.
+
+
+---
+
+**Multi-source fulfilment (Phase 4)** — `recruit_fulfil.php`, route
+`requisition-allocations` (POST only), module `hiring`. An approved requirement's
+headcount can now be **promised to several sources** (own payroll, direct
+recruitment, internal transfer, manpower agency, sub-contract agency, supplier,
+freelancer, consultant, marketplace, client bench) without becoming several
+requirements. **Adds no new permission, no new route family and no new status on
+any existing object**; the one new object's lifecycle is in
+`03-object-lifecycles.md` → *Fulfilment allocation*.
+
+*Who may change sourcing.* `rful_may_touch()` asks, in this order, each failing
+closed: **entitlement first** (`licence_blocks('mod.hiring.view')`, with **no
+master bypass** — a superuser on a workspace that has not bought hiring is
+refused exactly like anyone else), then the **existing** `is_coordinator_level()`
+band the recruitment write routes already require, then the record, then the
+**actor's** branch scope (`scope_allows`). The order matters and is asserted: a
+refusal is decided about the *person* before anything that would describe the
+record, so refusals cannot be used to probe another branch's requirement or its
+remaining headcount. Promising or resizing seats is **recruitment execution**, so
+it also passes **M6's** gate (`rexec_block_reason`), which asks **M4's**
+boundary — Phase 4 adds no second opinion about whether a requirement may be
+executed. Giving seats **back** (release / cancel) is deliberately *not* gated on
+executability: tidying up after a requirement is cancelled is not execution.
+
+*Who may credit a source with a person.* The candidate↔allocation link
+(`candidates.allocation_id`, one additive nullable column) is accountability, not
+a form field, so — exactly as M5 did with ownership — it **left the blind field
+list** on the candidate save and travels one door, `rful_attach()`, asked about
+the requirement the save is **producing**, not the one the candidate is leaving.
+`rful_enforce_candidate()` re-reads the row after **every** write path (candidate
+create, candidate edit, stage move) and removes any link that points at another
+requirement's allocation, at a closed one, or at a source already credited to its
+promise — so a link written by a raw statement or by a field list somebody adds
+in future is undone, not merely refused at the door.
+
+*What Phase 4 may never do.* It never decides whether somebody holds a position
+and never removes anybody from one — that stays M6's. The worst a Phase 4 control
+can do is drop a **credit** back to the direct path. Under contention it applies
+the ratified capacity rule unchanged (invariant I21): **never overfill, never
+displace an established holder**; where simultaneous claims cannot be resolved
+without displacement the contested claims are refused and the capacity is left
+for a later valid transaction. A source entity named on an allocation (a supplier
+from `business_partners`, a marketplace requirement from `cx_requirements`, a
+professional from `cx_professionals`, a person from `inspectors`) must exist **in
+this workspace** — isolation is structural, one database per tenant, so a row
+from elsewhere is simply absent and is refused rather than written — and a source
+whose entity lives behind a module the workspace has not bought (marketplace,
+professionals → `connect`) is refused outright, because hiding the option from a
+dropdown is not a control.
+
+*Vocabulary.* The source list **extends the existing configurable
+`req_sourcing_model` lookup** already registered in Masters — no new master was
+built. A workspace may add its own sources without a line of code; the shipped
+values always stay valid so that narrowing the list never makes yesterday's
+allocations unreadable.

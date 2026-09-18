@@ -35,6 +35,18 @@ if ($dupes): ?>
     <div><span class="k">Client</span><span class="v"><?= e($cand['client_disp'] ?: $cand['client_name'] ?: '—') ?></span></div>
     <div><span class="k">Against call</span><span class="v"><?= $cand['call_id'] ? '<a href="/call?id='.(int)$cand['call_id'].'">'.e($cand['call_code']).'</a>' : '—' ?></span></div>
     <div><span class="k">Proposed site</span><span class="v"><?= e($cand['proposed_site'] ?: '—') ?></span></div>
+    <?php // PHASE 4 — which source this person is credited to. Display only; the
+          // link is set on the candidate form and re-decided by rful_attach().
+    if (function_exists('rful_get')):
+      $p4a = ($cand['allocation_id'] ?? 0) ? rful_get((int) $cand['allocation_id']) : null; ?>
+      <div><span class="k">Arriving through</span><span class="v"><?php
+        if (!$p4a) { echo '<span class="muted">found directly</span>'; }
+        else {
+          $p4n = function_exists('rful_sources') ? rful_sources() : [];
+          echo e($p4n[$p4a['source']] ?? $p4a['source']);
+          if ((string) $p4a['source_label'] !== '') echo ' <span class="muted">— ' . e($p4a['source_label']) . '</span>';
+        } ?></span></div>
+    <?php endif; ?>
     <div><span class="k"><?= e(T("sbu")) ?></span><span class="v"><?= e(lk_options_or('sbu', OPS_SBUS)[$cand['sbu']] ?? $cand['sbu'] ?: '—') ?></span></div>
     <div><span class="k">Designation</span><span class="v"><?= e(lk_options_or('designation', DESIGNATIONS)[$cand['designation']] ?? $cand['designation'] ?: '—') ?></span></div>
     <div><span class="k">Experience</span><span class="v"><?= e(rtrim(rtrim((string)($cand['experience_years'] ?? 0), '0'), '.') ?: '0') ?> yrs</span></div>

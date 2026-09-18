@@ -578,6 +578,67 @@ not stored. Additive.
 
 ---
 
+## Fulfilment allocation (`requisition_allocations.status`) — recruitment (Phase 4)
+
+**One approved demand, fulfilled from several sources, staying one demand.**
+Twenty approved positions filled ten from our own payroll, five through a
+manpower agency and five through freelancers is still **one** requirement — not
+three requirements that happen to look alike. An allocation is the promise that
+one source will supply part of that one requirement's approved headcount.
+
+An allocation **never** decides whether anybody holds a position. That is the
+requisition's own lifecycle (M3) and the execution gate (M6). An allocation
+decides only **which source is credited** with a person.
+
+```
+PLANNED ─▶ ACTIVE ─▶ FULFILLED          (states that still hold seats)
+   │          │          │
+   └──────────┴──────────┴──▶ RELEASED   (the source gives the rest back)
+   └──────────┴──────────┴──▶ CANCELLED  (the source will not deliver)
+```
+
+- **PLANNED** — seats set aside for this source; nobody has arrived yet.
+- **ACTIVE** — at least one person has arrived through this source.
+- **FULFILLED** — everybody promised has arrived. **Not a closed state**: it is a
+  live source that happens to be full, and it returns to ACTIVE by itself if a
+  credited person later leaves a filled stage.
+- **RELEASED** — the source gives its **undelivered** seats back to the
+  requirement. **CANCELLED** — the source will not deliver at all.
+
+ACTIVE and FULFILLED are **derived, never typed in** (`rful_sync_state()`): the
+state is computed from how many credited people are in a filled stage, so the
+state and the numbers cannot disagree. RELEASED and CANCELLED are chosen by a
+person and are **terminal** — a closed allocation cannot be re-opened, resized or
+credited with anybody new.
+
+**Closing keeps what was delivered.** Closing pins `allocated_qty` down to
+exactly the number of people that source has already delivered, so those seats
+stay spent (they are filled) and only the undelivered remainder returns to the
+requirement as sourceable capacity. History is never rewritten: a released
+agency keeps the credit for whoever it did place.
+
+**The quantities, and the invariant.** `AUTHORISED` is M3's approved headcount
+(quantity less cancelled vacancies) — Phase 4 never writes it. `ALLOCATED` is the
+sum of every allocation's `allocated_qty`. `SOURCED-FULFILLED` is the people in a
+filled stage carrying an allocation link; `DIRECT-FULFILLED` is those in a filled
+stage carrying none (the ADR-001 path, which stays legitimate). Then:
+
+```
+SOURCED-FULFILLED  ≤  ALLOCATED  ≤  AUTHORISED
+ALLOCATED + DIRECT-FULFILLED (= COMMITTED)  ≤  AUTHORISED
+```
+
+The second line is why a seat somebody already filled directly cannot be promised
+to a source. The one case where COMMITTED may exceed AUTHORISED is a direct
+arrival landing **after** a promise was made — Phase 4 never refuses a joining
+and never removes anybody, so the requirement is reported as **over-committed**
+and a person trims it. It is shown, never silently corrected.
+
+Adds **no new permission**: changing sourcing requires the same
+`is_coordinator_level()` band the recruitment write routes already require, with
+entitlement asked first and branch scope after. Adds no new status to any
+existing object.
+
 ## Hiring request (`hiring_requests.status`) — recruitment (Phase 2 · M4)
 
 The business **ask** to recruit, held apart from the requisition that executes

@@ -556,6 +556,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('hreq_migrate')) hreq_migrate();               // M4 — the hiring request layer
     if (function_exists('appr_migrate')) appr_migrate();               // Phase 6 — configurable approval rules/levels/requests/steps
     if (function_exists('rasg_migrate')) rasg_migrate();               // M5 — the recruiter accountability ledger
+    if (function_exists('rful_migrate')) rful_migrate();               // Phase 4 — multi-source fulfilment allocations
     if (function_exists('careers_migrate')) careers_migrate();         // Phase 7 — requisitions.careers_published/careers_summary
     if (function_exists('workspace_migrate')) workspace_migrate();     // Configurable role workspaces — users.start_route
     if (function_exists('jd_migrate')) jd_migrate();                   // Auto job-description — requisitions.responsibilities

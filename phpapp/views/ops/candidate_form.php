@@ -65,6 +65,24 @@
     </select>
     <small class="muted">Every hire must trace to an approved requisition. Not listed? <a href="/requisition-new">Raise one first</a>.</small>
   </div>
+  <?php // PHASE 4 — which of the requirement's fulfilment sources this person is
+        // arriving through. Shown only once the requirement is known, and only
+        // with sources that still have a seat, so the field can never be the
+        // reason something is refused after a long form is filled in.
+  $p4req = (int) ($cand['requisition_id'] ?? 0) ?: (int) ($preReq ?? 0);
+  $p4opts = ($p4req && function_exists('rful_picker')) ? rful_picker($p4req, (int) ($cand['allocation_id'] ?? 0)) : [];
+  if ($p4opts): ?>
+  <div class="ff ff-wide" style="margin-bottom:12px">
+    <label>Arriving through <span class="muted">— which source this person counts against</span></label>
+    <select class="form-control" name="allocation_id">
+      <option value="">— not tied to a source —</option>
+      <?php foreach ($p4opts as $p4k => $p4v): ?>
+        <option value="<?= (int) $p4k ?>" <?= (int) ($cand['allocation_id'] ?? 0) === (int) $p4k ? 'selected' : '' ?>><?= e($p4v) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <small class="muted">Leave this blank if the person was found directly. It only decides which source gets the credit — never whether they get the job.</small>
+  </div>
+  <?php endif; ?>
   <div class="form-grid">
     <div class="ff"><label>First name *</label><input class="form-control" name="first_name" required value="<?= e($cand['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Middle name</label><input class="form-control" name="middle_name" value="<?= e($cand['middle_name'] ?? '') ?>"></div>
