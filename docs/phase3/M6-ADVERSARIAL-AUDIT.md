@@ -231,3 +231,91 @@ actually given.
 The full attack battery, re-run against the fixed tree: **31 / 31**.
 The concurrency suite, six consecutive MariaDB runs: **21 / 21** each time.
 Complete regression: **SQLite 11151 / 0 · MariaDB 11152 / 0**.
+
+
+---
+
+# PASS 4 — the fourth gate
+
+Fresh vectors against the committed tree in a throwaway copy: the seat, the move,
+and the decision. **Two defects found by the attack, one more found by a probe
+written to pin a fix, and one more found by my own suite failing on MariaDB.**
+
+## H1 — MATERIAL. A move is a joining, and was asked as an advance.
+
+**Proved.** A candidate already joined on requirement A was moved onto
+requirement B, which was already full:
+
+```
+H1 · B is full
+H1 · the edit path asks ADVANCE and is told: *** ALLOWED ***
+H1 · after the move, B holds 2 joined against 1 approved seat
+```
+
+The candidate edit path asks the gate with `ADVANCE`, which does not look at
+seats — correctly, because advancing does not take one. But moving somebody who
+**already holds a seat** onto another requirement is a joining on the one they
+arrive at, and asked as an advance it put two people into one approved seat.
+
+**Fix.** `rexec_move_action()` decides which action a save is really performing,
+and the candidate save asks with it. The mover is **not** excused from the
+destination's seat count — they hold no seat there. A compensating check after the
+write puts them back where they came from if the seat filled in between.
+
+## H2 — MATERIAL. A decision that was undone left its stamp.
+
+The reverted joining restored the candidate's stage and left `decided_at` set, so
+the record said a decision had been taken at that moment when none stood — and
+time-to-hire is computed from exactly that column. The compensator now restores
+the previous stamp, or clears it when the stage it returns to carries none.
+
+## H3 — the fairness attempt, and why it was abandoned
+
+C1 then began failing on MariaDB **in the opposite direction**: two processes
+taking the last seat both wrote, both saw the requirement over-filled, and **both
+reverted** — an approved seat left empty and two candidates bounced.
+
+I twice tried to make the compensator pick a winner by ranking the seat-holders.
+Both attempts introduced a worse defect, and both were caught by tests:
+
+- ranking by decision time let a candidate **arriving** from another requirement,
+  whose decision was older, **displace somebody already established** in the seat;
+- sorting missing decision times first let an unstamped late claim outrank
+  properly stamped earlier ones; sorting them last inverted the problem.
+
+Displacing an established holder is worse than refusing a contested claim, so the
+plain rule stands and **its cost is now stated instead of hidden**: under a
+genuine dead heat both claimants are refused and the seat is left for whoever
+tries next. It is never over-filled and nobody is ever displaced. M4 recorded the
+same pessimism, for the same reason, on allocation.
+
+**C1's assertion was my over-claim, not the product's guarantee.** It demanded
+"exactly one joining succeeded". It now asserts what is actually guaranteed —
+never more than one winner, never more than the approved seats, never a
+displacement — **and** that a refused dead heat leaves the seat usable rather than
+consuming it.
+
+## What held
+
+The decision swap survives a lower-case status. The approval chain cannot overturn
+a decision the direct route already recorded, and writes no audit claiming it did.
+A seat released by a withdrawal becomes usable again. Cancelling the hiring request
+stops recruitment on its requisition.
+
+## A no-op mutation, reported rather than counted
+
+One mutation "survived": *the candidate save excuses a mover from the
+destination's seat count*. It is a **no-op** — a mover never holds a seat on the
+destination, because if they did, that would be their current requirement and the
+action would be an advance, not a joining. Proved with a direct probe rather than
+assumed. It was replaced with a mutation that genuinely changes behaviour (the
+save stops running the move compensator), which then survived for the M5-M14
+reason — no test can drive a route that ends in `redirect()` — and is now pinned
+structurally by L12.11–L12.13.
+
+## Verification after the fixes
+
+All four attack batteries against the fixed tree: **78 / 78**.
+Concurrency, five consecutive MariaDB runs: clean each time.
+Mutations: **35 attempted · 35 caught · 0 survived**, clean baseline.
+Complete regression: **SQLite 11180 / 0 · MariaDB 11181 / 0**.

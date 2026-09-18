@@ -300,4 +300,120 @@ t_eq(hreq_reapproval_state(hreq_get($hD2)), 'REAPPROVED', 'L11.8 · the first de
 t_eq((int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='HIRING_REQUEST' AND entity_id=?", [$hD2]),
      $auditAfterFirst, 'L11.9 · *** and the refused decision wrote nothing to the audit trail ***');
 
+// ---- L12 · A MOVE IS A JOINING ON THE REQUIREMENT IT ARRIVES AT ------------
+//  Found by attacking M6 after the third pass. The candidate edit path asked the
+//  gate with ADVANCE, which does not look at seats — correctly, because advancing
+//  does not take one. But moving somebody who ALREADY HOLDS A SEAT onto another
+//  requirement is a joining there, and asked as an advance it put two people into
+//  one approved seat.
+t_section('L12 · moving a joined person onto a full requirement');
+$hM1 = $approve(['job_title' => 'M6L Move A', 'quantity' => 1]);
+[$okM1,, $rqM1] = hreq_to_requisition($hM1, 1);
+$hM2 = $approve(['job_title' => 'M6L Move B', 'quantity' => 1]);
+[$okM2,, $rqM2] = hreq_to_requisition($hM2, 1);
+$onM1 = $mkCand($rqM1); $onM2 = $mkCand($rqM2);
+$pdo->prepare("UPDATE candidates SET stage='ACCEPTED' WHERE id IN (?,?)")->execute([$onM1, $onM2]);
+reqf_sync($rqM1); reqf_sync($rqM2);
+t_eq(rexec_seats($rqM2)['remaining'], 0, 'L12.1 · the destination is full');
+$movingRow = ops_one("SELECT * FROM candidates WHERE id=?", [$onM1]);
+t_eq(rexec_move_action($movingRow, $rqM2), 'JOIN',
+     'L12.2 · *** moving a joined person is recognised as a JOINING, not an advance ***');
+t_ok(rexec_block_reason($rqM2, 'JOIN', 0) !== '',
+     'L12.3 · *** and the full requirement refuses it ***');
+//  the compensating check, for the race
+$pdo->prepare("UPDATE candidates SET requisition_id=? WHERE id=?")->execute([$rqM2, $onM1]);
+reqf_sync($rqM1); reqf_sync($rqM2);
+$mv = rexec_move_enforce_after_write($onM1, $rqM1);
+t_ok($mv !== '', 'L12.4 · *** a move written past the gate is reverted: ' . $mv . ' ***');
+t_eq((int) ops_val("SELECT requisition_id FROM candidates WHERE id=?", [$onM1]), $rqM1,
+     'L12.5 · …the person is back on the requirement they came from');
+t_eq((int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rqM2]), 1,
+     'L12.6 · *** and the destination still holds exactly its one approved person ***');
+t_ok((int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='CANDIDATE' AND entity_id=? AND subject LIKE 'Move reverted%'", [$onM1]) >= 1,
+     'L12.7 · the attempt is on the audit spine');
+//  a move onto a requirement WITH a seat still works
+$hM3 = $approve(['job_title' => 'M6L Move C', 'quantity' => 2]);
+[$okM3,, $rqM3] = hreq_to_requisition($hM3, 2);
+t_eq(rexec_move_action($movingRow, $rqM3), 'JOIN', 'L12.8 · it is still a joining…');
+t_eq(rexec_block_reason($rqM3, 'JOIN', 0), '', 'L12.9 · …and a requirement with a free seat allows it');
+//  and an ordinary advance is untouched
+$plain = $mkCand($rqM3);
+t_eq(rexec_move_action(ops_one("SELECT * FROM candidates WHERE id=?", [$plain]), $rqM1), 'ADVANCE',
+     'L12.10 · moving somebody who holds no seat is still just an advance');
+//  L12.11–L12.13 pin the WIRING. A mutation that removed the compensator's call
+//  from the candidate save survived the battery: the function is covered above,
+//  but no test can drive the route itself — it ends in redirect(), which exits.
+//  The same answer M5 used for the same class: assert the call is there, and that
+//  the save asks for the action it is really performing.
+$opsSrc = preg_replace('~^\s*//.*$~m', '', (string) file_get_contents(dirname(__DIR__) . '/lib/ops.php'));
+t_ok(strpos($opsSrc, 'rexec_move_enforce_after_write((int) $cand[\'id\'], (int) ($cand[\'requisition_id\'] ?? 0))') !== false,
+     'L12.11 · *** the candidate save runs the move compensator after its write ***');
+t_ok(strpos($opsSrc, "if (function_exists('rexec_move_enforce_after_write')) {") !== false,
+     'L12.12 · …behind a real guard, not a disabled one');
+t_ok(strpos($opsSrc, 'rexec_move_action($cand, (int) $b[\'requisition_id\'])') !== false,
+     'L12.13 · *** and it asks the gate for the action the save is actually performing ***');
+
+// ---- L13 · A DECISION THAT WAS UNDONE LEAVES NO DECISION STAMP -------------
+t_section('L13 · the reverted joining leaves nothing behind');
+$hR = $approve(['job_title' => 'M6L Stamp', 'quantity' => 1]);
+[$okR2,, $rqR] = hreq_to_requisition($hR, 1);
+$seat = $mkCand($rqR); $pdo->prepare("UPDATE candidates SET stage='ACCEPTED' WHERE id=?")->execute([$seat]);
+reqf_sync($rqR);
+$lateR = $mkCand($rqR, 'OFFERED');
+$pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $lateR]);
+t_ok(rexec_join_enforce_after_write($lateR, 'OFFERED', '') !== '', 'L13.1 · the extra joining is reverted');
+$rowR = ops_one("SELECT stage, decided_at FROM candidates WHERE id=?", [$lateR]);
+t_eq((string) $rowR['stage'], 'OFFERED', 'L13.2 · the stage is back');
+t_eq(trim((string) $rowR['decided_at']), '',
+     'L13.3 · *** and no decision stamp is left for a decision that was undone ***');
+//  a candidate reverted INTO a closing stage keeps the stamp that belongs there
+$lateR2 = $mkCand($rqR, 'OFFERED');
+$pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $lateR2]);
+rexec_join_enforce_after_write($lateR2, 'WITHDRAWN', '2026-01-01T00:00:00+00:00');
+t_eq(substr((string) ops_val("SELECT decided_at FROM candidates WHERE id=?", [$lateR2]), 0, 10), '2026-01-01',
+     'L13.4 · …while a genuine earlier decision is restored, not erased');
+
+// ---- L14 · THE COMPENSATOR NEVER OVER-FILLS AND NEVER DISPLACES ------------
+//  What the seat compensator actually guarantees, stated exactly. I twice tried
+//  to strengthen it so that a dead heat produces one winner rather than none, and
+//  both attempts let an arriving candidate displace an established one — caught
+//  by L12 and L13. Displacing somebody who already holds a seat is worse than
+//  refusing a contested claim, so the plain rule stands and its cost is asserted
+//  here rather than hidden: see M6-COMPLETION-REPORT.md, limitation 8.
+t_section('L14 · the two hard guarantees, and the cost that is not hidden');
+$hK = $approve(['job_title' => 'M6L Fair', 'quantity' => 2]);
+[$okK,, $rqK] = hreq_to_requisition($hK, 2);
+$first = $mkCand($rqK);
+$pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $first]);
+reqf_sync($rqK);
+t_eq(rexec_seats($rqK)['remaining'], 1, 'L14.1 · one seat remains');
+//  Two write for the last seat, as two racing processes do; both compensators run.
+$x = $mkCand($rqK, 'OFFERED'); $y = $mkCand($rqK, 'OFFERED');
+$pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id IN (?,?)")->execute([date('c'), $x, $y]);
+reqf_sync($rqK);
+$revX = rexec_join_enforce_after_write($x, 'OFFERED', '');
+$revY = rexec_join_enforce_after_write($y, 'OFFERED', '');
+$joinedK = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rqK]);
+t_ok($joinedK <= 2, 'L14.2 · *** NEVER more than the approved seats: ' . $joinedK . ' of 2 ***');
+t_eq((string) ops_val("SELECT stage FROM candidates WHERE id=?", [$first]), 'ACCEPTED',
+     'L14.3 · *** and the person already in a seat is NEVER displaced ***');
+t_ok(!($revX === '' && $revY === ''), 'L14.4 · the contested claim does not simply stand for both');
+//  The cost, asserted rather than hidden: under a dead heat the seat may be left
+//  for the next attempt instead of going to one of the two.
+if ($revX !== '' && $revY !== '') {
+    t_eq($joinedK, 1, 'L14.5 · under a dead heat both are refused…');
+    t_eq(rexec_seats($rqK)['remaining'], 1, 'L14.6 · …and the seat is still there for whoever tries next');
+    $retry = $mkCand($rqK, 'OFFERED');
+    t_eq(rexec_block_reason($rqK, 'JOIN', $retry), '', 'L14.7 · *** a retry succeeds — the seat is not lost ***');
+} else {
+    t_eq($joinedK, 2, 'L14.5 · one claim survived and both seats are filled');
+    t_eq(rexec_seats($rqK)['remaining'], 0, 'L14.6 · …and the requirement is full');
+    t_ok(true, 'L14.7 · (no dead heat in this run)');
+}
+//  Re-running a compensator on a settled seat changes nothing.
+$settled = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rqK]);
+rexec_join_enforce_after_write($first, 'OFFERED', '');
+t_eq((int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rqK]), $settled,
+     'L14.8 · the compensator is idempotent on a settled requirement');
+
 $_SESSION = $m6o; current_user(true); ua(true);

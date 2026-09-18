@@ -5305,7 +5305,7 @@ function ops_candidates($route, $method) {
             //  above; this puts the loser back and says so. The same shape M4 used
             //  for the headcount ceiling and M5 for ownership.
             if ($m6Joining && function_exists('rexec_join_enforce_after_write')) {
-                $m6rev = rexec_join_enforce_after_write($id, (string) $cand['stage']);
+                $m6rev = rexec_join_enforce_after_write($id, (string) $cand['stage'], (string) ($cand['decided_at'] ?? ''));
                 if ($m6rev !== '') { flash($m6rev, 'error'); redirect('/candidate?id=' . $id); }
             }
             $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
@@ -5416,7 +5416,17 @@ function ops_candidates($route, $method) {
             //  edit. Only the creation branch was gated, so an existing candidate
             //  could be moved onto a blocked requisition by editing it.
             if (!empty($b['requisition_id']) && function_exists('rexec_block_reason')) {
-                $m6why = rexec_block_reason((int) $b['requisition_id'], 'ADVANCE', $cand ? (int) $cand['id'] : 0);
+                //  M6 (adversarial pass 4) — WHICH ACTION IS THIS SAVE PERFORMING?
+                //  Moving somebody who already holds a seat onto a different
+                //  requirement is a JOINING on the one they arrive at, not an
+                //  advance. Asked as an advance, it took a seat that did not
+                //  exist: measured, two people joined against one approved seat.
+                $m6act = ($cand && function_exists('rexec_move_action'))
+                    ? rexec_move_action($cand, (int) $b['requisition_id']) : 'ADVANCE';
+                //  On a MOVE the candidate holds no seat on the destination, so
+                //  they must not be excused from its count.
+                $m6self = ($m6act === 'JOIN') ? 0 : ($cand ? (int) $cand['id'] : 0);
+                $m6why = rexec_block_reason((int) $b['requisition_id'], $m6act, $m6self);
                 if ($m6why !== '') {
                     flash($m6why, 'error');
                     redirect($cand ? '/candidate?id=' . (int)$cand['id'] : '/candidates');
@@ -5468,6 +5478,13 @@ function ops_candidates($route, $method) {
                 //  M5 — defence in depth, exactly as on the requisition save.
                 if (function_exists('rasg_enforce_table'))
                     foreach (rasg_enforce_table('candidates', (int) $cand['id'], $m5auth) as $m5rev) flash($m5rev, 'error');
+                //  M6 — the compensating check for a move. The destination can fill
+                //  between the question and the write, so this puts the person back
+                //  where they came from if the seat was not there.
+                if (function_exists('rexec_move_enforce_after_write')) {
+                    $m6mv = rexec_move_enforce_after_write((int) $cand['id'], (int) ($cand['requisition_id'] ?? 0));
+                    if ($m6mv !== '') flash($m6mv, 'error');
+                }
                 // M3 — a candidate can be moved to a different requisition, which
                 // changes the standing of BOTH the one it left and the one it joined.
                 if (function_exists('reqf_sync')) {

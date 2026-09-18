@@ -186,6 +186,62 @@ function rexec_seats($requisitionId, $exceptCandidateId = 0) {
     return $out;
 }
 
+//  WHICH ACTION A SAVE IS REALLY PERFORMING.
+//
+//  An adversarial probe moved a candidate who was ALREADY JOINED on one
+//  requirement onto another that was already full. The edit path asked the gate
+//  with ADVANCE — which does not look at seats, because advancing does not take
+//  one — and the target ended up holding two people against one approved seat.
+//
+//  Moving somebody who already occupies a seat onto a different requirement is
+//  not an advance. It is a JOINING on the requirement they are arriving at, and
+//  it has to be asked as one.
+function rexec_move_action($cand, $destinationRequisitionId) {
+    if (!is_array($cand)) return 'ADVANCE';
+    $here = (int) ($cand['requisition_id'] ?? 0);
+    $dest = (int) $destinationRequisitionId;
+    if ($dest <= 0 || $dest === $here) return 'ADVANCE';                 // not a move
+    return in_array(strtoupper((string) ($cand['stage'] ?? '')), rexec_filled_stages(), true)
+        ? 'JOIN' : 'ADVANCE';
+}
+
+//  THE COMPENSATOR FOR A MOVE. The gate above is a check, and check-then-write is
+//  not atomic, so the destination can fill between the question and the answer.
+//  This runs straight after the write: if this candidate is now sitting in a seat
+//  the destination does not have, they are put back where they came from and the
+//  attempt is audited. Nothing is invented — the move simply does not stand.
+function rexec_move_enforce_after_write($candidateId, $priorRequisitionId) {
+    $id = rexec_id($candidateId, $ok); if (!$ok) return '';
+    $id = (int) $id; if ($id <= 0) return '';
+    try { $c = ops_one("SELECT id, requisition_id, stage FROM candidates WHERE id=?", [$id]); }
+    catch (Throwable $e) { return ''; }
+    if (!$c) return '';
+    $now = (int) ($c['requisition_id'] ?? 0);
+    $was = (int) $priorRequisitionId;
+    if ($now <= 0 || $now === $was) return '';                            // no move happened
+    if (!in_array(strtoupper((string) $c['stage']), rexec_filled_stages(), true)) return '';   // no seat taken
+    //  DELIBERATELY *NOT* THE RANK RULE THE JOINING COMPENSATOR USES, and the
+    //  difference matters: a joining is several people arriving at the SAME
+    //  requirement at the same moment, where ranking them is the fair way to
+    //  decide who keeps the seat. A move is one person arriving where others are
+    //  already established — and ranking would let the arriving person, whose
+    //  decision is older because it was made on a different requirement, DISPLACE
+    //  somebody who was already sitting there. A test caught exactly that.
+    //
+    //  So the question here is the plain one: was there a seat for them, not
+    //  counting themselves? If not, the move does not stand.
+    if (rexec_seats($now, $id)['remaining'] >= 1) return '';              // there was a seat
+
+    try { db()->prepare("UPDATE candidates SET requisition_id=? WHERE id=?")->execute([$was ?: null, $id]); }
+    catch (Throwable $e) { return ''; }
+    if (function_exists('reqf_sync')) { foreach (array_unique(array_filter([$now, $was])) as $r) { try { reqf_sync($r); } catch (Throwable $e) {} } }
+    if (function_exists('act_log'))
+        act_log('CANDIDATE', $id, 'NOTE', 'Move reverted — the requirement had no approved seat',
+            ['body' => 'This person already held a seat, so moving them to requirement #' . $now
+                     . ' would have taken a seat it does not have. They remain on requirement #' . $was . '.']);
+    return 'That requirement has no approved seat left, so this person was not moved onto it.';
+}
+
 //  The same question asked about a CANDIDATE, which is how most callers hold it.
 function rexec_cand_block_reason($candidateId, $action = 'ADVANCE') {
     $id = rexec_id($candidateId, $cOk);
@@ -205,7 +261,7 @@ function rexec_cand_block_reason($candidateId, $action = 'ADVANCE') {
 //  not there, the write is put back, the attempt is audited, and the caller is
 //  told. A compensating revert is the only thing that holds under real
 //  concurrency without wrapping every caller in a transaction they do not own.
-function rexec_join_enforce_after_write($candidateId, $priorStage) {
+function rexec_join_enforce_after_write($candidateId, $priorStage, $priorDecidedAt = '') {
     $id = rexec_id($candidateId, $cOk);
     if (!$cOk) return '';                          // nothing identifiable was written
     $id = (int) $id; if ($id <= 0) return '';
@@ -215,13 +271,43 @@ function rexec_join_enforce_after_write($candidateId, $priorStage) {
     $rq = (int) ($c['requisition_id'] ?? 0); if ($rq <= 0) return '';
     if (!in_array(strtoupper((string) $c['stage']), rexec_filled_stages(), true)) return '';   // no seat taken
 
-    //  Seats counted WITHOUT this candidate: "was there a seat for them?"
+    //  WAS THERE A SEAT FOR THEM, NOT COUNTING THEMSELVES?
+    //
+    //  This is deliberately the simple question, and it is the third answer I
+    //  tried. Two attempts to make it "fairer" under a dead heat — ranking the
+    //  seat-holders so that one of two simultaneous claims survives — each
+    //  introduced a worse defect than the one they fixed, and a test caught each:
+    //
+    //    · ranking by decision time let a person ARRIVING from another
+    //      requirement, whose decision was older, displace somebody already
+    //      established in the seat;
+    //    · sorting missing decision times first let an unstamped late claim
+    //      outrank properly stamped earlier ones; sorting them last inverted it.
+    //
+    //  Displacing an established holder is worse than refusing a contested claim,
+    //  so the plain question stands. Its cost is stated rather than hidden: under
+    //  a genuine dead heat both claimants may be refused and the seat is left for
+    //  whoever tries next. It is never over-filled and nobody is ever displaced —
+    //  and M4 recorded the same pessimism, for the same reason, on allocation.
     $seats = rexec_seats($rq, $id);
-    if ($seats['remaining'] >= 1) return '';       // there was; nothing to do
+    if ($seats['remaining'] >= 1) return '';       // there was a seat; nothing to do
 
     $back = (string) $priorStage !== '' ? (string) $priorStage : 'OFFERED';
-    try { db()->prepare("UPDATE candidates SET stage=? WHERE id=?")->execute([$back, $id]); }
-    catch (Throwable $e) { return ''; }
+    //  …and no decision stamp for a decision that was undone. The stage route
+    //  stamps decided_at when somebody is marked as joined; reverting the stage
+    //  and leaving the stamp behind says a decision was taken at that moment when
+    //  none stands, and "time to hire" is computed from exactly that column.
+    //  Restored to what it was, or cleared when the stage returned to is not one
+    //  that carries a decision.
+    $priorDecided = (string) $priorDecidedAt;
+    $keepStamp = in_array(strtoupper($back), ['REJECTED', 'WITHDRAWN', 'OFFER_DECLINED'], true);
+    try {
+        db()->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")
+            ->execute([$back, $keepStamp ? $priorDecided : '', $id]);
+    } catch (Throwable $e) {
+        try { db()->prepare("UPDATE candidates SET stage=? WHERE id=?")->execute([$back, $id]); }
+        catch (Throwable $e2) { return ''; }
+    }
     if (function_exists('reqf_sync')) { try { reqf_sync($rq); } catch (Throwable $e) {} }
     if (function_exists('act_log'))
         act_log('CANDIDATE', $id, 'NOTE', 'Joining reverted — no approved seat remained',

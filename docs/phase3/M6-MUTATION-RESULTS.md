@@ -8,7 +8,7 @@ deploy checksum is regenerated, and the `p3m6`, `p3m5` and `p3m4` suites run on
 The harness **aborts** if the baseline is not clean — a battery that cannot prove
 its own starting point proves nothing about its mutants.
 
-**Attempted 31 · Caught 31 · Survived 0.**
+**Attempted 35 · Caught 35 · Survived 0.**
 
 | # | Mutation (mandatory target) | Result | Caught by |
 |---|---|---|---|

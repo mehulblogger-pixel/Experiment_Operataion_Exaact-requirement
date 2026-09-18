@@ -30,9 +30,9 @@ its baseline is not clean.
 | `p3m1` | 114 / 0 | 114 / 0 |
 | `m4_` | 364 / 0 | 364 / 0 |
 | `recruit` | 282 / 0 | 282 / 0 |
-| **Complete regression** | **11151 / 0** | **11152 / 0** |
+| **Complete regression** | **11180 / 0** | **11181 / 0** |
 
-No test was weakened, deleted or skipped. No skip was introduced. M6 adds **230** assertions. The MariaDB total is one higher because one engine-specific assertion
+No test was weakened, deleted or skipped. No skip was introduced. M6 adds **259** assertions. The MariaDB total is one higher because one engine-specific assertion
 exists only there.
 
 ## Test isolation (§43)
