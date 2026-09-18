@@ -57,10 +57,17 @@ $race = function (array $ops, $delay = 600, $lead = 3.0) use ($root, $engine, $u
           . ' DB_USER=' . escapeshellarg((string) getenv('DB_USER'))
           . ' DB_PASS=' . escapeshellarg((string) getenv('DB_PASS'));
     $procs = [];
-    foreach ($ops as [$op, $id, $arg, $arg2]) {
+    foreach ($ops as $opRow) {
+        [$op, $id, $arg, $arg2] = $opRow;
+        //  An optional fifth element STAGGERS this worker by that many
+        //  milliseconds after the shared instant. A perfectly tight collision is
+        //  only one of the interleavings that happen in production, and it is not
+        //  the one that exposes a stale read: for that, one process must commit
+        //  while another is between its first read and its re-read.
+        $offMs = isset($opRow[4]) ? (int) $opRow[4] : 0;
         $cmd = $env . ' php ' . escapeshellarg($root . '/tests/_p4_worker.php') . ' '
              . escapeshellarg($op) . ' ' . (int) $id . ' ' . escapeshellarg((string) $arg) . ' '
-             . escapeshellarg((string) $arg2) . ' ' . $fireAt . ' ' . (int) $uC . ' 2>&1';
+             . escapeshellarg((string) $arg2) . ' ' . ($fireAt + $offMs) . ' ' . (int) $uC . ' 2>&1';
         $pipes = []; $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         if (is_resource($p)) $procs[] = [$p, $pipes];
     }
@@ -470,6 +477,59 @@ for ($round = 1; $round <= 4; $round++) {
         t_eq(rful_allocate($rq13, 'OWN_PAYROLL', 1)['code'], 'OVER_AUTHORISED',
              "C13.6 · round $round · one claim took it and the next is refused");
     }
+}
+
+
+// ---- C14 · A STALE RE-READ, WHICH A PERFECT COLLISION NEVER PRODUCES ---------
+//  rful_reallocate() reads the allocation, then asks M6's gate, then re-reads the
+//  requirement through rful_summary(). The same-read pre-check exists because
+//  those two reads can describe different instants. It fires only when somebody
+//  commits INSIDE that window — which a perfectly tight race never does, because
+//  every worker re-reads before anyone has written.
+//
+//  Tightening the barrier therefore made this control HARDER to observe, not
+//  easier, and mutant T26 duly survived a battery in which every other control
+//  was caught. The remedy is not a tighter race but a STAGGERED one: several
+//  offsets are swept so that at least one worker lands between another's two
+//  reads. Real processes throughout; no production timing is touched.
+t_section('C14 · a resize that re-reads after somebody else has committed');
+for ($round = 1; $round <= 3; $round++) {
+    $rq14 = $c4req(20, 'P4C Stagger r' . $round);
+    $a14  = rful_allocate($rq14, 'OWN_PAYROLL', 4)['id'];
+    //  One prompt claimant, then a spread of late ones across the window.
+    //  NO "expect" is supplied, deliberately. With one, the stale-save guard
+    //  refuses the losers first and the pre-check under test is never reached —
+    //  the probe would pass for the wrong reason. Without it, a straggler's stale
+    //  baseline reaches the arithmetic, which is exactly where the mutation bites.
+    //
+    //  The numbers are chosen so that a stale baseline OVERSHOOTS: a straggler
+    //  that still believes the allocation holds 4, while the requirement has since
+    //  committed 18, computes 18 - 4 + 12 = 26 against an approval of 20. Every
+    //  request here (12 and 18) fits the approval from any TRUTHFUL baseline, so
+    //  OVER_AUTHORISED can only ever be a false reason.
+    $ops = [['reallocate', $a14, 18, '', 0]];
+    foreach ([2, 4, 6, 8, 10, 13, 16] as $off) $ops[] = ['reallocate', $a14, 12, '', $off];
+    $res = $race($ops);
+    t_eq(count($res), 8, "C14.1 · round $round · eight real processes reported back");
+    $now14 = (int) rful_get($a14)['allocated_qty'];
+    t_ok(in_array($now14, [4, 12, 18], true),
+         "C14.2 · round $round · the allocation holds one of the values asked for (got $now14)");
+    t_ok($now14 <= 20, "C14.3 · round $round · and never exceeds the approval");
+    //  THE POINT OF THIS PROBE. A loser must be told that somebody changed it
+    //  first. It must NEVER be told it would exceed the approved headcount — that
+    //  is a false reason, and it sends the coordinator to fix the wrong thing:
+    //  they go looking for headcount that was never the problem.
+    $falseReason = 0;
+    foreach ($res as $r) if (($r['code'] ?? '') === 'OVER_AUTHORISED') $falseReason++;
+    t_eq($falseReason, 0,
+         "C14.4 · round $round · nobody is told the approval is full — every request fits it from any truthful baseline, so that reason could only be false [mutant T26]");
+    //  And the ledger still tells the truth about what actually happened.
+    $chain14 = ops_all("SELECT from_qty, to_qty FROM requisition_allocation_events
+                        WHERE allocation_id=? AND event='REALLOCATED' ORDER BY id", [$a14]);
+    $p14 = 4; $bad14 = 0;
+    foreach ($chain14 as $e) { if ((int) $e['from_qty'] !== $p14) $bad14++; $p14 = (int) $e['to_qty']; }
+    t_eq($bad14, 0, "C14.5 · round $round · the ledger chain is continuous");
+    t_eq($p14, $now14, "C14.6 · round $round · …and ends where the allocation now stands");
 }
 
 $_SESSION = $c4o; current_user(true); ua(true);
