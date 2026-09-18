@@ -173,13 +173,10 @@ Nothing. No finding was postponed.
    transaction, because the callers do not own one. Proved under real concurrency.
 7. **An unrecognised role maps to ADMIN** (`ua()`) — pre-existing, recorded since
    M4, untouched here.
-8. **A dead heat on the last seat may refuse both claimants.** The seat
-   compensator guarantees two things absolutely — never more than the approved
-   seats, and never a displacement of somebody already in one — and pays for them
-   with pessimism: when two processes claim the last seat at the same instant,
-   both may be refused and the seat is left for whoever tries next. Two attempts
-   to pick a winner instead each let an arriving candidate displace an
-   established one, so the safe rule stands. Asserted, not hidden, by L14 and C1.
+8. *(moved)* The dead-heat behaviour is **no longer carried as a limitation.** The
+   business has ratified it as policy — invariant **I21** — so it is now specified
+   behaviour and appears in M6-BUSINESS-INVARIANTS.md and the state matrix. See
+   §29c below.
 
 ## CARRIED-FORWARD FINDINGS
 
@@ -191,6 +188,24 @@ None was reopened; none was removed; none blocks M6.
 None beyond the limitations above.
 
 ---
+
+### 29c · Capacity and incumbency — ratified policy (invariant I21)
+
+The business has stated the rule this milestone was circling:
+
+> *Recruitment must never exceed approved capacity and must never displace an
+> established holder merely to manufacture a concurrency winner. Where
+> simultaneous claims cannot be deterministically resolved without risking
+> displacement, the system may refuse the contested claims and leave the capacity
+> available for a subsequent valid transaction.*
+
+The implementation already behaves exactly this way; what changed is its
+**status**. The dead-heat refusal was being carried as a known limitation — an
+apology for pessimism. It is now a **specified outcome**, recorded as invariant
+**I21** with its three parts (never over capacity, never displace an incumbent, and
+a refused dead heat must leave the capacity usable). No code changed; the tests
+that already proved it now say so in the language of the policy, and the
+documents no longer describe an approved rule as a shortfall.
 
 ### 29b · Why the first M6 verdict was withdrawn
 

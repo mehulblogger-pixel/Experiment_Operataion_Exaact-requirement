@@ -50,10 +50,14 @@ candidate/requisition unchanged, and **no audit row claiming success**.
 | 2 | 2 | 0 | 0 | **BLOCKED**, and a joining written past the gate is **reverted**, audited, and left out of the ledger |
 | 2 | 1 | 0 | 1 | ALLOW — and the person already in a seat does not compete with themselves |
 
+| 1 | 0 | 0 | 1 | **two simultaneous claims** → both may be **REFUSED**, and the seat stays available for the next valid transaction (policy **I21c**) — never over-filled, never taken from an incumbent |
+
 **Expected on the revert:** the candidate returns to their prior stage,
 `reqf_sync()` restores the requirement's status, an activity row records
 *"Joining reverted — no approved seat remained"*, and the joining is **not**
-counted anywhere.
+counted anywhere. Where both claims in a dead heat are refused, the requirement's
+remaining-seat count must return to what it was, so the capacity is released for a
+subsequent attempt rather than consumed by the refusal.
 
 ## D · Candidate stage × execution
 

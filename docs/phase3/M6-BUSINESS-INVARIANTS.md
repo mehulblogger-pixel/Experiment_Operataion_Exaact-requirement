@@ -26,6 +26,30 @@ Each names the control that enforces it and the probe that proves it.
 | **I19** | A stale screen cannot overwrite newer authoritative state | M5's baseline test; the gate re-asked at the write | S5.1–S5.4 |
 | **I20** | Database, service, dashboard and export reconcile | one WHERE builder, one counter | R1–R6 |
 
+## I21 — CAPACITY AND INCUMBENCY, ratified as policy
+
+> **Recruitment must never exceed approved capacity and must never displace an
+> established holder merely to manufacture a concurrency winner. Where
+> simultaneous claims cannot be deterministically resolved without risking
+> displacement, the system may refuse the contested claims and leave the capacity
+> available for a subsequent valid transaction.**
+
+This is the business rule, stated by the business, and it settles a question the
+engineering could not settle on its own. Two guarantees are absolute and one
+behaviour is now **specified rather than tolerated**:
+
+| | Rule | Enforced by | Proved by |
+|---|---|---|---|
+| **I21a** | **Never over capacity.** No requirement ever holds more joined people than it has approved seats | the gate's `JOIN` action, plus the compensating revert after the write | L2, L14.2, C1.4, C2.2 |
+| **I21b** | **Never displace an incumbent.** Somebody already in a seat is never removed to make room for a later or concurrent claim | the compensator asks only whether a seat was free for the arriving claim; it never re-ranks the people already seated | L12, L13, L14.3, C1.5 |
+| **I21c** | **A refused dead heat leaves the capacity available.** When two claims land simultaneously and cannot be separated without risking I21b, both may be refused — and the seat must remain usable by the next valid transaction, never consumed by the refusal | the revert restores the prior stage, re-syncs the requirement's status, and writes no joining anywhere | L14.5–L14.7, C1.8–C1.9 |
+
+**I21c is a permitted outcome, not a defect.** Two earlier attempts to guarantee a
+winner instead — ranking seat-holders so one of two simultaneous claims survives —
+each violated I21b by letting an arriving candidate displace an established one,
+and each was caught by a test. Between a contested claim that must be retried and
+a person removed from a seat they already hold, the business has chosen the retry.
+
 ## The two sentences that cost the most when false
 
 - **I11 / I12** — an offer is a commitment to a person, and a joining is a seat.

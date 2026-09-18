@@ -373,14 +373,21 @@ rexec_join_enforce_after_write($lateR2, 'WITHDRAWN', '2026-01-01T00:00:00+00:00'
 t_eq(substr((string) ops_val("SELECT decided_at FROM candidates WHERE id=?", [$lateR2]), 0, 10), '2026-01-01',
      'L13.4 · …while a genuine earlier decision is restored, not erased');
 
-// ---- L14 · THE COMPENSATOR NEVER OVER-FILLS AND NEVER DISPLACES ------------
-//  What the seat compensator actually guarantees, stated exactly. I twice tried
-//  to strengthen it so that a dead heat produces one winner rather than none, and
-//  both attempts let an arriving candidate displace an established one — caught
-//  by L12 and L13. Displacing somebody who already holds a seat is worse than
-//  refusing a contested claim, so the plain rule stands and its cost is asserted
-//  here rather than hidden: see M6-COMPLETION-REPORT.md, limitation 8.
-t_section('L14 · the two hard guarantees, and the cost that is not hidden');
+// ---- L14 · INVARIANT I21 — CAPACITY AND INCUMBENCY -------------------------
+//  The business rule, ratified:
+//
+//    "Recruitment must never exceed approved capacity and must never displace an
+//     established holder merely to manufacture a concurrency winner. Where
+//     simultaneous claims cannot be deterministically resolved without risking
+//     displacement, the system may refuse the contested claims and leave the
+//     capacity available for a subsequent valid transaction."
+//
+//  I21a never over capacity · I21b never displace an incumbent · I21c a refused
+//  dead heat leaves the capacity USABLE, never consumed. I21c is a permitted
+//  outcome, not a shortfall: two attempts to guarantee a winner instead each
+//  violated I21b by letting an arriving candidate displace an established one,
+//  and each was caught by L12 and L13.
+t_section('L14 · invariant I21 — capacity and incumbency');
 $hK = $approve(['job_title' => 'M6L Fair', 'quantity' => 2]);
 [$okK,, $rqK] = hreq_to_requisition($hK, 2);
 $first = $mkCand($rqK);
@@ -394,17 +401,25 @@ reqf_sync($rqK);
 $revX = rexec_join_enforce_after_write($x, 'OFFERED', '');
 $revY = rexec_join_enforce_after_write($y, 'OFFERED', '');
 $joinedK = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rqK]);
-t_ok($joinedK <= 2, 'L14.2 · *** NEVER more than the approved seats: ' . $joinedK . ' of 2 ***');
+t_ok($joinedK <= 2, 'L14.2 · *** I21a — never more than the approved seats: ' . $joinedK . ' of 2 ***');
 t_eq((string) ops_val("SELECT stage FROM candidates WHERE id=?", [$first]), 'ACCEPTED',
-     'L14.3 · *** and the person already in a seat is NEVER displaced ***');
+     'L14.3 · *** I21b — the person already in a seat is NEVER displaced ***');
 t_ok(!($revX === '' && $revY === ''), 'L14.4 · the contested claim does not simply stand for both');
 //  The cost, asserted rather than hidden: under a dead heat the seat may be left
 //  for the next attempt instead of going to one of the two.
 if ($revX !== '' && $revY !== '') {
-    t_eq($joinedK, 1, 'L14.5 · under a dead heat both are refused…');
-    t_eq(rexec_seats($rqK)['remaining'], 1, 'L14.6 · …and the seat is still there for whoever tries next');
+    t_eq($joinedK, 1, 'L14.5 · I21c — under a dead heat both claims are refused…');
+    t_eq(rexec_seats($rqK)['remaining'], 1, 'L14.6 · …and the capacity is still there, not consumed by the refusal');
     $retry = $mkCand($rqK, 'OFFERED');
-    t_eq(rexec_block_reason($rqK, 'JOIN', $retry), '', 'L14.7 · *** a retry succeeds — the seat is not lost ***');
+    t_eq(rexec_block_reason($rqK, 'JOIN', $retry), '',
+         'L14.7 · *** I21c — a subsequent valid transaction is permitted ***');
+    //  …and proved all the way through: the retry actually takes the seat.
+    $pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $retry]);
+    reqf_sync($rqK);
+    t_eq(rexec_join_enforce_after_write($retry, 'OFFERED', ''), '',
+         'L14.7b · …and it stands — the released capacity is genuinely reusable');
+    t_eq((int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rqK]), 2,
+         'L14.7c · *** ending at exactly the approved two, filled by a valid later claim ***');
 } else {
     t_eq($joinedK, 2, 'L14.5 · one claim survived and both seats are filled');
     t_eq(rexec_seats($rqK)['remaining'], 0, 'L14.6 · …and the requirement is full');

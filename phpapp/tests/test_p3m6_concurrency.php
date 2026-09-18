@@ -65,6 +65,10 @@ reqf_sync($rq1);
 t_eq(rexec_seats($rq1)['remaining'], 1, 'C1.1 · exactly one seat remains');
 $r1 = $race([['join', $b, ''], ['join', $c, '']]);
 t_eq(count($r1), 2, 'C1.2 · both processes reported');
+//  The business rule this asserts is invariant I21 (M6-BUSINESS-INVARIANTS.md):
+//  never over capacity, never displace an incumbent, and a refused dead heat
+//  leaves the capacity available for a subsequent valid transaction.
+//
 //  THIS ASSERTION WAS AN OVER-CLAIM OF MINE, and MariaDB proved it: it demanded
 //  "exactly one joining succeeded", and under a genuine dead heat BOTH claims are
 //  refused — the seat is left for the next attempt rather than handed to one of
@@ -73,10 +77,10 @@ t_eq(count($r1), 2, 'C1.2 · both processes reported');
 //  rule stands and what is guaranteed is asserted instead of what I hoped for.
 //  The two hard invariants are asserted as strongly as before.
 $won = array_values(array_filter($r1, fn($r) => $r['ok'] && $r['code'] === 'JOINED'));
-t_ok(count($won) <= 1, 'C1.3 · *** never more than one joining succeeds ***');
-t_ok($filled($rq1) <= 2, 'C1.4 · *** never more joined than the two approved seats ***');
+t_ok(count($won) <= 1, 'C1.3 · *** I21a — never more than one joining succeeds ***');
+t_ok($filled($rq1) <= 2, 'C1.4 · *** I21a — never more joined than the two approved seats ***');
 t_eq((string) ops_val("SELECT stage FROM candidates WHERE id=?", [$a]), 'ACCEPTED',
-     'C1.5 · *** and the person already in a seat is never displaced ***');
+     'C1.5 · *** I21b — the person already in a seat is never displaced ***');
 $lost = array_values(array_filter($r1, fn($r) => !$r['ok']));
 t_ok(count($lost) >= 1, 'C1.6 · at least one claimant was refused');
 foreach ($lost as $l)
@@ -84,8 +88,8 @@ foreach ($lost as $l)
 //  The cost is asserted, not hidden: a refused dead heat must leave the seat
 //  usable, never consume it.
 if (count($won) === 0) {
-    t_eq($filled($rq1), 1, 'C1.8 · a dead heat refused both…');
-    t_eq(rexec_seats($rq1)['remaining'], 1, 'C1.9 · …and left the seat for whoever tries next');
+    t_eq($filled($rq1), 1, 'C1.8 · I21c — a dead heat refused both claims…');
+    t_eq(rexec_seats($rq1)['remaining'], 1, 'C1.9 · …and left the capacity available for a later valid transaction');
 } else {
     t_eq($filled($rq1), 2, 'C1.8 · one claim survived and both seats are filled');
     t_eq(rexec_seats($rq1)['remaining'], 0, 'C1.9 · …and the requirement is full');
