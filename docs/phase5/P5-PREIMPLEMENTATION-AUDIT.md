@@ -98,13 +98,40 @@ correction of a live defect.
 2. **A canonical ageing helper.** `days_between()` gives calendar days; working
    days exist but are not combined into one ageing call. §7 requires calendar,
    business and SLA ageing to be distinguishable and never mixed.
-3. **Stage-transition timing.** `candidate_events` records `from_stage`,
-   `to_stage`, `created_at` — so stage ageing and conversion are derivable
-   **without new tables**. This needs confirming against real data before any
-   schema is proposed.
-4. **Recruitment target dates.** To be audited against existing fields
-   (`required_by`, `target_date` on allocations, `appr_due_at`) before inventing
-   any. §8: *a KPI is invalid if its target date is invented or ambiguous.*
+3. **A trustworthy stage ledger.** `candidate_events` exists and carries
+   `from_stage`, `to_stage`, `actor`, `created_at` — but it was measured
+   **incomplete and ambiguous** (section 5a). It must be completed before any
+   stage-duration KPI may read it.
+4. **Nothing else.** Target dates already exist and must not be invented
+   (section 9).
+
+### 5a. The stage ledger was measured, not assumed — and it is not yet trustworthy
+
+§7 wants stage performance, and the obvious source is `candidate_events`. A probe
+driven entirely through production functions found **three reasons it cannot be
+read as it stands**:
+
+| # | Measured | Consequence for a KPI |
+|---|---|---|
+| **E** | `offer_issue()` moves a candidate to **OFFERED** and writes **no ledger row** (`before === after`). Confirmed end to end through `offer_create → submit → approve → issue` | "Days from shortlist to offer" would **miss every offer issued the normal way** |
+| **F** | When the execution gate reverts a joining that had no seat, the ledger still **ends at ACCEPTED**. The candidate is back at OFFERED; the ledger says they joined | A hire count read from the ledger **over-reports hires**, and the revert is invisible |
+| **G/H** | `to_stage` holds **three vocabularies at once**: pipeline stage *names* ("Technical Interview") from `recruitpipe_cand_goto()`, legacy stage *codes* ("ACCEPTED") from the stage route, and literal `"Workflow: <name>"` strings from the pipeline-switch action | Grouping by `to_stage` **silently splits or merges stages** |
+
+The probe was a throwaway and has been removed. Every assertion ran against
+production code; no product code was changed to obtain these results.
+
+**Note what F does *not* say.** The execution gate's own source comment records
+that time-to-hire is computed from `candidates.decided_at`, and the gate
+correctly clears that stamp when it reverts. So **today's** time-to-hire is not
+wrong — the ledger is simply not the thing it reads. The exposure is
+forward-looking: Phase 5 is the first work that would treat this ledger as
+authoritative.
+
+**Consequence for the plan.** Completing the ledger is a **correctness fix to an
+existing record**, not a new feature, and it is a precondition for §7. It is
+small: write a row where the offer engine and the execution gate already write
+the stage, and record the stage in one unambiguous vocabulary alongside the
+human-readable name.
 
 ## 6. Which dashboard to extend
 
@@ -139,13 +166,28 @@ allocation absent. This is the defect Phase 5 must fix first.
 | Joined | `candidates.decided_at` at a filled stage |
 | Allocation promised | `requisition_allocations.created_at`, `target_date` |
 
+**The target date exists and must never be invented.** Measured: a requisition
+carries `hiring_request_id`; the business's own *needed by* date lives on
+`hiring_requests.required_by` and arrives unchanged. `requisitions` has **no
+target-date column of its own**. A requirement raised on the **direct path**
+carries no hiring request — and therefore **no target date at all**.
+
+So "days late against target" is **NO DATA** for a directly-raised requirement.
+Not zero, not today, not the creation date. TAPI's existing `null`-for-no-data
+convention is exactly the right instrument — one more reason to reuse it rather
+than build a parallel one.
+
 ## 10. Which historical snapshots are required
 
 Per §18, history must stay explainable when masters change. Already available:
-`recruiter_assignments` (ownership), `candidate_events` (stage), the approval
-chain, and `requisition_allocation_events` (Phase 4). **No new snapshot table is
-proposed on the evidence so far** — this is to be confirmed, not assumed, before
-any schema change.
+`recruiter_assignments` (ownership), the approval chain,
+`hiring_requests.snapshot_json` (what the request *meant* when it was approved,
+so a later master edit cannot rewrite history), and
+`requisition_allocation_events` (Phase 4).
+
+**No new snapshot table is required.** The one gap is not a missing snapshot but
+an **incomplete ledger** — `candidate_events`, per section 5a. Completing it is a
+fix to an existing record, not a new history mechanism.
 
 ---
 
@@ -157,12 +199,14 @@ any schema change.
 | Demand, fulfilment, source-wise figures | **CONNECT** to `reqf_counts()` / `rful_summary()` |
 | SLA | **REUSE** `appr_sla_*` |
 | Recruiter workload, historical ownership | **CONNECT** to the M5 ledger |
-| Stage timing and conversion | **MAP** onto `candidate_events` |
+| Stage timing and conversion | **FIX then MAP** onto `candidate_events` — it is incomplete and ambiguous today (section 5a) |
 | Working-day ageing | **REUSE** `is_working_day()` / `next_working_day()` |
 | Command Centre demand arithmetic | **DEPRECATE** — replace with the authoritative counters |
 | Recruitment metrics in TAPI | **EXTEND** the registry |
-| A canonical ageing helper | **BUILD** — the only new code contemplated so far, and small |
+| A canonical ageing helper | **BUILD** — small, and the only genuinely new calculation |
 
-**No new KPI engine. No new SLA engine. No new dashboard.** On the evidence so
-far, **no new tables** — to be confirmed against the stage-timing and target-date
-questions above before anything is built.
+**No new KPI engine. No new SLA engine. No new dashboard. No new tables.**
+
+The audit is closed. Both questions it deliberately left open — stage timing and
+target dates — were measured rather than assumed, and both answers are recorded
+above.
