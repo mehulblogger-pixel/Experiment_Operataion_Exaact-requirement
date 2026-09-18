@@ -121,6 +121,23 @@ $ph = implode(',', array_fill(0, count($ids), '?'));
 $agg = rkpi_demand(['no_scope' => true, 'where' => "r.id IN ($ph)", 'args' => $ids]);
 foreach ($sum as $k => $v) t_eq($v, (int) $agg[$k], "B1 · $k · aggregate equals the sum of reqf_counts()");
 t_eq((int) $agg['requisitions'], 3, 'B2 · three requirements were counted');
+//  B4 — the aggregate must agree with PHASE 4 as well as with M3, requirement by
+//  requirement. Section A checks one fixture; this checks every requirement the
+//  suite has built, so a rule that is right for the fixture and wrong in general
+//  cannot pass. The first cut of this engine was exactly that: right until an
+//  allocation was closed.
+$b4bad = [];
+foreach (ops_all("SELECT id FROM requisitions ORDER BY id") ?: [] as $b4r) {
+    $b4id = (int) $b4r['id'];
+    $b4d = rkpi_demand(['no_scope' => true, 'where' => 'r.id=?', 'args' => [$b4id]]);
+    if ((int) $b4d['requisitions'] !== 1) continue;          // not live demand; Phase 4 is not asked
+    $b4s = rful_summary($b4id);
+    foreach (['authorised', 'allocated', 'unallocated', 'over_committed'] as $b4k)
+        if ((int) $b4d[$b4k] !== (int) $b4s[$b4k])
+            $b4bad[] = "#$b4id $b4k engine=" . (int) $b4d[$b4k] . " phase4=" . (int) $b4s[$b4k];
+}
+t_eq(count($b4bad), 0, 'B4 · every live requirement agrees with Phase 4 on allocation'
+     . ($b4bad ? ' — ' . implode(' · ', array_slice($b4bad, 0, 4)) : ''));
 //  The one that matters most: an over-filled requirement must not pay for a
 //  short one. B2 is over-filled by one; A still has three seats open.
 t_ok((int) $agg['remaining'] >= 3, 'B3 · an over-filled requirement never cancels out a short one (K2)');
@@ -317,5 +334,164 @@ t_ok($evJ1 > $evJ0, 'J5 · the stage route wrote to the ledger');
 $lastJ = ops_one("SELECT * FROM candidate_events WHERE candidate_id=? ORDER BY id DESC", [$cJ]);
 t_eq((string) ($lastJ['to_code'] ?? ''), 'ACCEPTED', 'J6 · with the stage code');
 t_eq(    (string) ($lastJ['event_kind'] ?? ''), 'MOVE', 'J7 · recorded as a move');
+
+// ---- K · THE DEFENCES THE HAPPY PATH NEVER REACHES -------------------------
+//
+//  The first mutation battery caught 23 of 36. Every one of the twelve survivors
+//  was a gap in THESE probes, not a protection in the product — the ordinary
+//  paths simply cannot produce the states these controls exist to survive, and a
+//  battery that only walks the ordinary paths proves only that they work.
+//  Imported data, a half-finished migration and a corrupted row all can.
+t_section('K · the states the ordinary paths cannot reach');
+
+//  K1 — more people joined than the requirement has seats. Legacy imports do
+//  this; so does a requirement edited DOWN after people had already joined.
+$rqK1 = $p5req(2, ['job_title' => 'P5 Overfilled']);
+for ($i = 0; $i < 5; $i++) $p5cand($rqK1, 'ACCEPTED', null, date('c'));
+reqf_sync($rqK1);
+$dK1 = rkpi_demand($only($rqK1));
+t_eq((int) $dK1['filled'], 2, 'K1 · five people against two seats reports TWO filled — a seat cannot be filled twice');
+t_eq((int) $dK1['remaining'], 0, 'K1b · …and nothing remains, rather than going negative');
+
+//  K2 — more vacancies cancelled than were ever requested.
+$pdo->prepare("INSERT INTO requisitions (req_code,office_id,designation,status,quantity,cancelled_qty,created_at)
+               VALUES (?,?,?,?,?,?,?)")->execute(['P5K-OVERCANC', 9841, 'ENGINEER', 'OPEN', 3, 9, date('c')]);
+$rqK2 = (int) $pdo->lastInsertId();
+$dK2 = rkpi_demand($only($rqK2));
+t_eq((int) $dK2['cancelled'], 3, 'K2 · nine cancelled against three requested reports THREE — the rest is not a number anybody can act on');
+t_eq((int) $dK2['authorised'], 0, 'K2b · …and the approved headcount is zero, never negative');
+
+//  K3 — A CLOSED PROMISE KEEPS WHAT IT DELIVERED, AND RETURNS ONLY THE REST.
+//
+//  The first cut of this engine counted only LIVE allocations, and the first
+//  mutation battery could not catch the mutant that deleted that filter —
+//  because deleting it was the correct behaviour. Closing an allocation pins it
+//  down to exactly what it DELIVERED, and those people have arrived: their seats
+//  are spent, not returned. Phase 4 had already found and fixed this, and this
+//  aggregate quietly reintroduced it.
+//
+//  The probe that missed it released a promise that had delivered NOBODY, whose
+//  pinned quantity is zero either way — so it compared two numbers that agree
+//  under both the right rule and the wrong one. This one delivers somebody
+//  first, which is the only version of the case that can tell them apart.
+$rqK3 = $p5req(6, ['job_title' => 'P5 Released']);
+$aK3a = rful_allocate($rqK3, 'MANPOWER_AGENCY', 3, ['source_label' => 'Kept']);
+$aK3b = rful_allocate($rqK3, 'SUBCON_AGENCY', 2, ['source_label' => 'Delivered one, then released']);
+t_ok(!empty($aK3a['ok']) && !empty($aK3b['ok']), 'K3 · two promises, five seats, against a six-person requirement');
+t_eq((int) rkpi_demand($only($rqK3))['allocated'], 5, 'K3b · five seats are promised while both stand');
+//  One person actually arrives through the second source.
+$cK3 = $p5cand($rqK3, 'ACCEPTED', (int) $aK3b['id'], date('c'));
+reqf_sync($rqK3);
+$relK3 = rful_close((int) $aK3b['id'], 'RELEASED', []);
+t_ok(!empty($relK3['ok']), 'K3c · that promise is released through the production path — ' . (string) ($relK3['reason'] ?? ''));
+$dK3 = rkpi_demand($only($rqK3));
+t_eq((int) $dK3['allocated'], 4,
+     'K3d · the released promise KEEPS the one it delivered and returns the other — four, not five and not three');
+//  And the decisive one: whatever the answer is, it must be Phase 4's answer.
+$sK3 = rful_summary($rqK3);
+t_eq((int) $dK3['allocated'], (int) $sK3['allocated'], 'K3e · the aggregate gives Phase 4\'s figure, not one of its own');
+t_eq((int) $dK3['unallocated'], (int) $sK3['unallocated'], 'K3f · …and the same unallocated');
+t_eq((int) $dK3['over_committed'], (int) $sK3['over_committed'], 'K3g · …and the same over-commitment');
+
+//  K4 — THE DASHBOARD ITSELF. Every probe above asks the engine; this asks the
+//  screen, because the whole point of this phase is that the two cannot differ.
+$ccF = ['fy' => '', 'range' => null, 'month' => '', 'dept' => '', 'source' => '', 'manager' => ''];
+$dCC = rcc_data($ccF);
+$dEng = rkpi_demand([]);
+t_eq((int) ($dCC['kpi']['open_positions'] ?? -1), (int) $dEng['remaining'],
+     'K4 · the dashboard\'s open positions IS the engine\'s figure (K1) — not a second opinion');
+t_eq((int) ($dCC['kpi']['ordered'] ?? -1), (int) $dEng['authorised'], 'K4b · and "ordered" is the APPROVED headcount');
+t_eq((int) ($dCC['kpi']['filled'] ?? -1), (int) $dEng['filled'], 'K4c · and filled agrees');
+t_eq((int) ($dCC['kpi']['allocated'] ?? -1), (int) $dEng['allocated'], 'K4d · and what is promised to sources agrees');
+
+//  K5 — a recruiter row on that dashboard: carrying vs delivered.
+$uCarl = $p5mk('p5k_carl', 'MANAGER', 0, 9841, '9841');
+$rqK5 = $p5req(8, ['job_title' => 'P5 Carl']);
+reqf_cancel($rqK5, 3, 'trimmed');
+rasg_assign('REQ_RECRUITER', $rqK5, $uCarl, ['reason' => 'Carl carries this']);
+$cK5 = $p5cand($rqK5, 'SHORTLISTED');
+rasg_assign('CAND_RECRUITER', $cK5, $uCarl, ['reason' => 'Carl is chasing']);
+$pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $cK5]);
+//  …and a second joining on the same requirement that Carl never held.
+$cK5b = $p5cand($rqK5, 'ACCEPTED', null, date('c'));
+reqf_sync($rqK5);
+$dCC2 = rcc_data($ccF);
+$rowK5 = null; foreach ($dCC2['recruiters'] as $r) if ((int) $r['uid'] === $uCarl) $rowK5 = $r;
+t_ok($rowK5 !== null, 'K5 · Carl appears on the recruiter table');
+if ($rowK5) {
+    t_eq((int) $rowK5['posted'], 5, 'K5b · he is CARRYING five — eight approved less the three given up, not eight');
+    t_eq((int) $rowK5['recruited'], 1, 'K5c · and is credited with the ONE joining the ledger puts on him, not both');
+}
+
+//  K6 — the pipeline records the stage KEY, through its own production path.
+recruitpipe_migrate(); recruitpipe_seed();
+$cK6 = $p5cand($p5req(3, ['job_title' => 'P5 Pipe']), 'RECEIVED');
+$candK6 = ops_one("SELECT * FROM candidates WHERE id=?", [$cK6]);
+[$pipeK6, $effK6, $idxK6] = recruitpipe_cand_state($candK6);
+t_ok((bool) $pipeK6 && count((array) $effK6) > 1, 'K6 · a configured workflow applies to this candidate');
+if ($pipeK6 && count((array) $effK6) > 1) {
+    $tgtK6 = $effK6[1];
+    t_ok(recruitpipe_cand_goto($candK6, (int) $tgtK6['id'], 'k6', 'p5'), 'K6b · it is advanced through the production path');
+    $evK6 = ops_one("SELECT * FROM candidate_events WHERE candidate_id=? ORDER BY id DESC", [$cK6]);
+    t_eq((string) ($evK6['to_code'] ?? ''), (string) $tgtK6['stage_key'],
+         'K6c · the ledger carries the stage KEY — so renaming the stage cannot rewrite what was measured');
+    t_eq((string) ($evK6['track'] ?? ''), 'PIPELINE', 'K6d · on the pipeline ladder');
+}
+
+//  K7 — A RECORD THAT PREDATES THE LEDGER, REASSIGNED AFTERWARDS.
+//
+//  This is the case the ledger exists for, arriving by the back door: there is
+//  no assignment history at the moment of the hire, and the only ledger entry
+//  is a handover that happened LATER. Reading "who holds it now" would move the
+//  hire to the new owner. The first recorded change names who held it before.
+$rqK7 = $p5req(2, ['job_title' => 'P5 Predates']);
+$cK7  = $p5cand($rqK7, 'OFFERED');
+$pdo->prepare("UPDATE candidates SET recruiter_id=? WHERE id=?")->execute([$uAnn, $cK7]);   // set, as it was before M5
+$joinK7 = date('c');
+$pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([$joinK7, $cK7]);
+reqf_sync($rqK7);
+t_eq(rkpi_owner_at('CAND_RECRUITER', $cK7, $joinK7), $uAnn, 'K7 · with no history at all, the current holder is the only evidence there is');
+usleep(1100000);
+rasg_assign('CAND_RECRUITER', $cK7, $uBob, ['reason' => 'handed over long after the hire']);
+t_eq(rkpi_owner_at('CAND_RECRUITER', $cK7, $joinK7), $uAnn,
+     'K7b · after the handover the hire STILL belongs to Ann — the first recorded change names who held it before (K4)');
+t_ok(rkpi_owner_at('CAND_RECRUITER', $cK7, $joinK7) !== $uBob, 'K7c · and never to Bob, who was given it afterwards');
+[$whoK7, $basisK7] = rkpi_owner_basis('CAND_RECRUITER', $cK7, $joinK7);
+t_eq($basisK7, 'ledger_before_first_change', 'K7d · and the answer states the evidence it rests on');
+
+//  K8 — a settled outcome with no date, on a record that changed hands. There is
+//  genuinely no way to know which side of the handover it falls on.
+$rqK8 = $p5req(2, ['job_title' => 'P5 Ambiguous']);
+$cK8  = $p5cand($rqK8, 'ACCEPTED');          // no decided_at at all
+rasg_assign('CAND_RECRUITER', $cK8, $uAnn, ['reason' => 'first']);
+rasg_assign('CAND_RECRUITER', $cK8, $uBob, ['reason' => 'second']);
+[$whoK8, $basisK8] = rkpi_owner_basis('CAND_RECRUITER', $cK8, null);
+t_eq($whoK8, null, 'K8 · no date and two owners: nobody is credited — the answer is not guessed');
+t_eq($basisK8, 'ambiguous_no_date', 'K8b · …and it says why');
+$unK8 = rkpi_unattributed(['where' => 'c.id=?', 'args' => [$cK8], 'no_scope' => true]);
+t_ok((int) $unK8['ambiguous_no_date'] >= 1, 'K8c · and it is REPORTED, so the business can go and fix the record (K10)');
+
+//  K9 — the credit query obeys branch scope.
+$p5act($uOnlyB);
+$credScoped = rkpi_recruiter_credit($uAnn);
+$p5act($uBoss);
+$credAll = rkpi_recruiter_credit($uAnn, ['no_scope' => true]);
+t_ok((int) $credAll['hires'] >= 1, 'K9 · Ann has hires on record in Branch A');
+t_eq((int) $credScoped['hires'], 0, 'K9b · a Branch B user is credited none of them — scope reaches the credit query too (K8)');
+
+//  K10 — THE M4 BOUNDARY. Only the hiring-request layer may touch its table;
+//  the KPI engine asks through hreq_get(). Stated here as well as in M4's own
+//  suite, because this engine is the one that would be tempted.
+$kpiSrc = file_get_contents(__DIR__ . '/../lib/recruit_kpi.php');
+t_ok(!preg_match('/(FROM|INTO|UPDATE|JOIN)\s+hiring_requests\b/i', $kpiSrc),
+     'K10 · the KPI engine never reads the hiring-request table directly');
+t_ok(strpos($kpiSrc, 'hreq_get(') !== false, 'K10b · …it asks the layer that owns it');
+
+//  K11 — the settled set is never served from a cache that outlives a write.
+$rowsBefore = count(rkpi_settled_rows(['no_scope' => true]));
+$rqK11 = $p5req(1, ['job_title' => 'P5 Cache']);
+$p5cand($rqK11, 'ACCEPTED', null, date('c'));
+$rowsAfter = count(rkpi_settled_rows(['no_scope' => true]));
+t_ok($rowsAfter > $rowsBefore, 'K11 · a read after a write sees the write — no stale cache between them');
 
 $_SESSION = $p5sess; current_user(true); ua(true);

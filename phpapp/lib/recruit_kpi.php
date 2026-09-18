@@ -288,7 +288,6 @@ function rkpi_demand(array $opt = []) {
     $fill = rkpi_in(rkpi_filled_stages());
     $act  = rkpi_in(rkpi_active_stages());
     $lost = rkpi_in(rkpi_lost_stages());
-    $lst  = defined('RFUL_LIVE_STATES') ? rkpi_in(RFUL_LIVE_STATES) : "'PLANNED','ACTIVE','FULFILLED'";
 
     //  ONE round trip, and every figure computed PER REQUIREMENT before it is
     //  summed. That distinction is the whole correctness argument: one
@@ -302,7 +301,16 @@ function rkpi_demand(array $opt = []) {
     //            "2 requested, 6 cancelled" is not a number anybody can act on)
     //    auth  — q − canc, the approved ceiling (M4)
     //    fl    — people at a FILLED stage, clamped to q
-    //    alloc — seats promised on LIVE source allocations (Phase 4)
+    //    alloc — every allocation's promised seats, CLOSED ONES INCLUDED.
+    //            This is Phase 4's rule, and the first cut of this engine got it
+    //            wrong by filtering to live rows. Closing an allocation pins it
+    //            down to exactly what it DELIVERED, and those people have
+    //            arrived: their seats are spent, not returned. Counting only
+    //            live rows made a requirement report people joined against zero
+    //            allocated — the defect Phase 4 had already found and fixed, and
+    //            which this aggregate quietly reintroduced. The mutation battery
+    //            surfaced it: the mutant that DELETED the filter could not be
+    //            caught, because deleting it was the correct behaviour.
     //    dir   — people who arrived through no source at all
     $sql = "SELECT
               COUNT(*) reqs,
@@ -333,7 +341,7 @@ function rkpi_demand(array $opt = []) {
                   (SELECT COUNT(*) FROM candidates c3 WHERE c3.requisition_id=r.id AND c3.stage IN ($lost)) lostn,
                   COALESCE((SELECT SUM(CASE WHEN a.allocated_qty > 0 THEN a.allocated_qty ELSE 0 END)
                             FROM requisition_allocations a
-                            WHERE a.requisition_id=r.id AND UPPER(a.status) IN ($lst)),0) alloc,
+                            WHERE a.requisition_id=r.id),0) alloc,
                   (SELECT COUNT(*) FROM candidates c4 WHERE c4.requisition_id=r.id AND c4.stage IN ($fill)
                                                         AND COALESCE(c4.allocation_id,0)=0) dir
                 FROM requisitions r WHERE $where
