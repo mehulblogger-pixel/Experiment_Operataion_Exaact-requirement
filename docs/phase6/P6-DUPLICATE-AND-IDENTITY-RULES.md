@@ -58,14 +58,47 @@ and mints `P000123` from the lowest id otherwise.
 confined to `candidates`. It does not reach inspectors, professionals, users or
 back-office staff.
 
-> **DOCUMENTATION CORRECTION REPORTED, NOT APPLIED.** The addendum records **four**
-> identity mechanisms; the count is **five**. Per the working discipline, the
-> addendum is not edited here. **Owner approval requested** to add `person_ref` to
-> its mechanism table and to Q7's evidence — it is directly relevant, because it
-> means the person-hub question has *two* internal candidates (`users` and
-> `person_ref`), not one.
+### The documented inventory is now FIVE mechanisms
 
-**No decision is taken on it. Q3 and Q7 remain open.**
+**Owner-approved and applied** across `P6-PERSON-REPRESENTATION-ADDENDUM.md` and
+`P6-CANONICAL-DOMAIN-MODEL.md`:
+
+| # | Mechanism | Domain |
+|---|---|---|
+| 1 | `cx_identity_link` | Marketplace ledger — cross-domain, reversible, audited |
+| 2 | `candidates.inspector_id` | Recruitment → Operations |
+| 3 | `users.inspector_id` | Administration → Operations |
+| 4 | The legacy per-application bridge (`cx_applications`) | Marketplace, per application |
+| 5 | **`candidates.person_ref` / `person_key()` / `person_link_rows()`** | **Recruitment-internal** |
+
+> **These are five EXISTING MECHANISMS to be evaluated for convergence.**
+> They are **not** five canonical identity systems.
+>
+> **No hub is chosen. None is retired. None is merged. Nothing is implemented.**
+
+### What `person_ref` is — and what it is not
+
+**It IS** a **Recruitment-domain person grouping mechanism**, and it is evidence
+that **Recruitment already has a concept of "same human"**. That is a real and
+useful finding.
+
+**It is NOT** evidence that it should become the **universal Person identity**.
+It groups candidate rows with one another and reaches **no** inspector, no
+professional, no user and no back-office record.
+
+**Its fallback behaviour is subject to the identity authority rules in this
+document, exactly like every other mechanism.** `person_key()` falls back to
+last-10-digit mobile, then lower-cased e-mail, when `person_ref` is unset. Under
+the rules below that fallback is **rank-2 and rank-3 evidence**:
+
+- it **may** produce a candidate or a suggestion;
+- it **may not** silently establish authoritative **cross-domain** identity.
+
+A mobile number matching between a candidate and a marketplace professional is a
+**suggestion for a person to confirm** — never an automatic link, and never a
+statement that the two records are one identity.
+
+**No decision is taken. Q3, Q7 and Q13 all remain OPEN.**
 
 ---
 
@@ -302,7 +335,19 @@ duplicate or a legitimate shared advert is **Q1**, and it stays open.
 | Taxonomy term | **✔** | **✔** | ✔ | **✔** | ✔ | ✘ |
 | Requirement mapping | n/a | n/a | ✔ | ✔ | **✔** | n/a |
 
-**Department and taxonomy are complete. Inspector and organisation have nothing.**
+> **What "complete" means here, and what it does not.**
+>
+> For Department and Taxonomy, **the duplicate/matching RULE FRAMEWORK is already
+> established and reusable** — detect, suggest, confirm, link and audit all exist
+> and work today, and Phase 6 reuses them rather than building anything.
+>
+> It does **NOT** mean that **Phase 6 taxonomy convergence is implemented.**
+> Mapping the canonical Department vocabulary to the marketplace technical
+> taxonomy is **R7**, and it remains a **future implementation requirement**. The
+> framework is ready; the convergence has not been done.
+
+**Inspector and organisation have no framework at all** — no detector, no
+suggester, no database-level protection.
 
 ---
 
@@ -374,8 +419,18 @@ duplicate or a legitimate shared advert is **Q1**, and it stays open.
 
 ## New open question
 
-**Q13 — Should `candidates.person_ref` be extended beyond the recruitment pool, or
-retired in favour of one mechanism? OPEN QUESTION.**
-It is the closest thing to a person spine that exists, it is additive and safe, and
-it is confined to candidates. It gives the person-hub question a **second** internal
-answer alongside `users` (Q7). **Not decided here.**
+**Q13 — Should `candidates.person_ref` extend beyond Recruitment, or should it
+eventually be retired in favour of one controlled identity mechanism?
+OPEN QUESTION.**
+
+It is the closest thing to a person spine that exists, it is additive and safe,
+and it is confined to candidates. It gives the person-hub question a **second**
+internal answer alongside `users` (**Q7**).
+
+> **Q7 and Q13 are deliberately held open TOGETHER.** Their joint purpose is to
+> prevent a premature decision that either `users` **or** `candidates.person_ref`
+> is the canonical Person spine. Neither is. Both are existing mechanisms awaiting
+> evaluation, and option (a) — keep Person emergent and add the missing edges —
+> remains equally open.
+
+**Not decided here.**

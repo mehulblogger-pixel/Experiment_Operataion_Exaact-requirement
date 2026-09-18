@@ -51,11 +51,12 @@ The accurate position, on the audit evidence:
   formed by the existing representations and the relationship mechanisms that
   join them.
 - **`inspectors` is the structurally central existing people / workforce
-  register.** Three of the four identity mechanisms point at it:
+  register.** Three of the five identity mechanisms point at it:
   `candidates.inspector_id`, `users.inspector_id`, and the inspector axis of
-  `cx_identity_link`.
+  `cx_identity_link`. (The fifth, `candidates.person_ref`, does not — it groups
+  candidate rows with one another, inside Recruitment only.)
 - **`cx_identity_link` provides the explicit relationship mechanism** — and it is
-  the only one of the four that is reversible and audited.
+  the only one of the five that is reversible and audited.
 - **The Marketplace Professional is NOT the canonical Person hub.**
   `connect_person_resolve()` traverses *through* the professional row, which is a
   property of that function, not a statement about where person identity lives.
@@ -237,7 +238,8 @@ Two consequences follow, and neither is a decision:
 > representation the §2 audit did not cover, and `users` was understated in it.
 > Both are addressed in `P6-PERSON-REPRESENTATION-ADDENDUM.md`, which also
 > corrects the representation count from three to **five** and the identity
-> mechanism count from two to **four**. The questions of whether office staff
+> mechanism count from two to **five** (four in the addendum as first written,
+> plus `candidates.person_ref`, added after §20). The questions of whether office staff
 > belong in the identity model, and what becomes of `back_office_staff`, remain
 > **OPEN (Q8, Q9)**.
 
@@ -730,8 +732,8 @@ marketplace may not be entitled to see recruitment internals.
 
 **Q3 — The authoritative Person representation. OPEN QUESTION.**
 Today Person is *emergent*: there is no person record, and identity exists only
-as the pattern formed by the five representations and the four mechanisms that
-join them. `inspectors` is the structurally central register; `cx_identity_link`
+as the pattern formed by the five representations and the **five** mechanisms
+that join them. `inspectors` is the structurally central register; `cx_identity_link`
 is the only explicit, reversible, audited relationship mechanism. The resolver
 `connect_person_resolve()` traverses through the marketplace professional row —
 which is a property of that function, **not** a canonical hub, and which means a

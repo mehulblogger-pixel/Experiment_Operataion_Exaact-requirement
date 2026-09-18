@@ -27,10 +27,25 @@ mechanisms. Both counts were low.
 | | §2 audit said | Evidence now shows |
 |---|---|---|
 | Person representations | 3 — candidate, inspector, professional | **5** — plus `users` and `back_office_staff` |
-| Identity mechanisms | 2 | **4** — `cx_identity_link`, `candidates.inspector_id`, **`users.inspector_id`**, `cx_applications` |
-| The hub | The marketplace professional row | **Structurally it is `inspectors`** — every mechanism points at it. The *resolver* uses the professional row, which is a different thing |
+| Identity mechanisms | 2 | **5** — see below |
+| The hub | The marketplace professional row | **Structurally it is `inspectors`** — every cross-domain mechanism points at it. The *resolver* uses the professional row, which is a different thing |
 
-The last row matters most and is explained in full below.
+> **UPDATED after §20 (owner-approved).** This table first recorded **four**
+> mechanisms. Writing `P6-DUPLICATE-AND-IDENTITY-RULES.md` surfaced a fifth —
+> **`candidates.person_ref`**, with `person_key()` and `person_link_rows()`. The
+> documented inventory is now:
+>
+> 1. `cx_identity_link`
+> 2. `candidates.inspector_id`
+> 3. `users.inspector_id`
+> 4. the legacy per-application bridge (`cx_applications`)
+> 5. **`candidates.person_ref` / `person_link_rows()`**
+>
+> **These are five EXISTING MECHANISMS to be evaluated for convergence — not five
+> canonical identity systems.** No hub is chosen, none is retired, none is merged,
+> and nothing is implemented.
+
+The hub row matters most and is explained in full below.
 
 ---
 
@@ -179,7 +194,7 @@ That function calls `team_member_create()` — **which inserts a row into
 Two consequences:
 
 1. **`inspectors` is the structural hub**, not `cx_professionals`. Three of the
-   four mechanisms point at `inspectors`; only the marketplace ledger treats the
+   cross-domain mechanisms point at `inspectors`; only the marketplace ledger treats the
    professional row as the hub. The §3 canonical model's statement that the
    professional row is the hub describes **the resolver's traversal**, not the
    data. *(See §11 below — the canonical model needs a documentation correction.)*
@@ -198,7 +213,7 @@ Two consequences:
 | **Unique identifiers** | **None** | **None** | **`ux_cx_pro_email` — UNIQUE on email** | `username` UNIQUE | **None** |
 | **Tenant scope** | Structural (database per tenant) | Structural | Structural | Structural | Structural |
 | **Branch scope** | `sbu`; branch reached **through the requisition** | `home_office_id`, `sbu`, `sbus` | **NONE — tenant-global** | `home_office_id` + **defines** `scope_offices`, `scope_sbus` | `office_id`, `sbu` |
-| **Existing identity link** | `candidates.inspector_id` → inspector · `cx_identity_link.candidate_id` → professional | Target of all four mechanisms | `cx_identity_link.professional_id` | **`users.inspector_id` → inspector** | **NONE** |
+| **Existing identity link** | `candidates.inspector_id` → inspector · `cx_identity_link.candidate_id` → professional · **`person_ref` groups candidate rows as one person** | Target of every cross-domain mechanism | `cx_identity_link.professional_id` | **`users.inspector_id` → inspector** | **NONE** |
 | **Relationship to others** | → inspector, → professional. **No link to user or back-office** | ← candidate, ← user, ← professional | ← candidate, ↔ inspector | → inspector only | **None at all** |
 | **Owning module** | Recruitment | Operations | Marketplace | Administration | Operations (legacy) |
 | **Read paths** | Recruitment, Phase 4/5 KPI, careers, exports | **51 library files** | Marketplace modules, bench, match, ratings | Auth, org chart, scope, approvals, costing | 5 files — master card, migration, hierarchy view, reset, seed |
@@ -221,8 +236,15 @@ person record; `person_documents` holds **documents about** a person.
 | 2 | `candidates.inspector_id` | candidate → inspector | Column on the candidate | No | No | Stale check only. Proved: duplicate inspectors, first orphaned |
 | 3 | **`users.inspector_id`** | user → inspector | Column on the user | No | No | *"a login that already carries a link is left untouched"* — a read-then-write check |
 | 4 | `cx_applications.inspector_id` / `applicant_professional_id` | applicant → inspector or professional | Per-application columns | n/a | n/a | Per-application, not a person link |
+| **5** | **`candidates.person_ref`** · `person_key()` · `person_link_rows()` | **candidate ↔ candidate** — several applications as one person, **within Recruitment only** | Column on the candidate | No | **No** | Group read-then-write. Falls back to mobile-10, then e-mail, when `person_ref` is unset |
 
-**Only mechanism 1 is reversible and audited.** The other three are plain columns.
+**Only mechanism 1 is reversible and audited.** The other four are plain columns.
+
+**Mechanism 5 was added after §20 (owner-approved).** It is
+**Recruitment-domain** — it reaches no inspector, professional, user or
+back-office record. Its discovery is recorded in
+`P6-DUPLICATE-AND-IDENTITY-RULES.md`, and its consequence is **Q13**, which is
+**OPEN**.
 
 ---
 
@@ -283,7 +305,7 @@ link must use that same rule rather than inventing a second one.
 
 | # | What §3 says | What the evidence shows | Severity |
 |---|---|---|---|
-| **C1** | Person is resolved "with the marketplace professional row as the hub" | True of the **resolver's traversal**, but **`inspectors` is the structural hub** — three of four mechanisms point at it. §3's sentence is not wrong, but it is easy to misread as a statement about the data | Documentation clarity |
+| **C1** | Person is resolved "with the marketplace professional row as the hub" | True of the **resolver's traversal**, but **`inspectors` is the structural hub** — the cross-domain mechanisms point at it. §3's sentence is not wrong, but it is easy to misread as a statement about the data | Documentation clarity |
 | **C2** | `users` appears only as "system login accounts, carrying the security role" | Understated. `users` is **the internal people register** by the repository's own account, carries employment attributes (department, position title, office, CTC, reporting line, working days) and **holds a link to `inspectors`** | Material omission |
 
 Per this task's §1, **these are reported for owner approval, not applied.** If
