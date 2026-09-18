@@ -66,10 +66,10 @@ it is summed.
 
 | | SQLite 3.45.1 | MariaDB 10.11.14 |
 |---|---|---|
-| Full regression | **12,189 passed, 0 failed** | **12,194 passed, 0 failed** |
+| Full regression | **12,252 passed, 0 failed** | **12,255 passed, 0 failed** |
 
 Both were run to completion. MariaDB is authoritative for production-oriented
-evidence; neither figure is inferred from the other. The two differ by five
+evidence; neither figure is inferred from the other. The two differ by three
 assertions because some probes are driver-conditional.
 
 ## The clamps, against data the ordinary paths cannot produce

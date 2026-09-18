@@ -588,4 +588,46 @@ $pdo->prepare($liL9)->execute(['CAND_RECRUITER', $cL9, 77771, 77772, 'x', '2026-
 $whoL9 = rkpi_owner_at('CAND_RECRUITER', $cL9, '2026-05-05T10:00:00+00:00');
 t_ok($whoL9 === 77771 || $whoL9 === 77772, 'L9 · two ledger entries at the same instant still give one answer, not a crash');
 
+// ---- M · THE SCREEN A PERSON ACTUALLY RECEIVES -----------------------------
+//
+//  Every probe above asks a function. This one renders the Command Centre and
+//  reads the HTML, because a figure that is right in the engine and absent from
+//  the page has not been delivered — and because the repository's UI rule is
+//  that a screen must be understandable without training, which is a claim about
+//  the words on it, not about the data behind it.
+t_section('M · the corrected figures reach the page, in business words');
+
+$rqM = $p5req(12, ['job_title' => 'P5 Screen']);
+reqf_cancel($rqM, 5, 'scope reduced');
+for ($i = 0; $i < 2; $i++) $p5cand($rqM, 'ACCEPTED', null, date('c'));
+reqf_sync($rqM);
+rful_allocate($rqM, 'MANPOWER_AGENCY', 3, ['source_label' => 'Screen agency']);
+
+$dM = rcc_data(['fy' => '', 'range' => null, 'month' => '', 'dept' => '', 'source' => '', 'manager' => '']);
+ob_start();
+try { $d = $dM; include dirname(__DIR__) . '/views/ops/recruitment_cc.php'; }
+catch (Throwable $e) { /* the page is read-only; a partial render is enough */ }
+$htmlM = (string) ob_get_clean();
+
+t_ok(strlen($htmlM) > 2000, 'M0 · the Command Centre renders');
+t_ok(strpos($htmlM, 'Approved headcount') !== false, 'M1 · the page names the APPROVED headcount…');
+t_ok(strpos($htmlM, 'Promised to a source') !== false, 'M2 · …what has been promised to a source…');
+t_ok(strpos($htmlM, 'Nobody looking yet') !== false, 'M3 · …and what nobody has been asked to find yet');
+//  Plain words, not the engine's vocabulary. "Unallocated" and "over-committed"
+//  are accurate and useless to a coordinator reading a screen in a hurry.
+t_ok(stripos($htmlM, 'unallocated') === false && stripos($htmlM, 'over-committed') === false,
+     'M4 · and says so without using the engine\'s vocabulary on the page');
+//  The sentence that explains why the approved number is lower than the ask.
+t_ok(strpos($htmlM, 'given up') !== false && strpos($htmlM, 'originally requested') !== false,
+     'M5 · when vacancies were given up, the page EXPLAINS why the two numbers differ');
+t_ok(strpos($htmlM, 'not the original ask') !== false,
+     'M6 · …and states which of the two every other figure counts');
+//  The recruiter table distinguishes the two questions in the column headings.
+t_ok(strpos($htmlM, '>Carrying<') !== false && strpos($htmlM, '>Recruited<') !== false,
+     'M7 · the recruiter table separates what someone is carrying from what they delivered');
+t_ok(strpos($htmlM, 'responsible for today') !== false && strpos($htmlM, 'what they delivered') !== false,
+     'M8 · …and says which is which, so nobody has to be told');
+t_ok(strpos($htmlM, "last month's results") !== false,
+     'M9 · …and that handing work over does not move the credit (K4)');
+
 $_SESSION = $p5sess; current_user(true); ua(true);

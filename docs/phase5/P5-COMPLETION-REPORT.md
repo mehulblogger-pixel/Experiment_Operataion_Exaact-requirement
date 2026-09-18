@@ -118,8 +118,8 @@ measurement.
 
 | | Assertions | SQLite 3.45.1 | MariaDB 10.11.14 |
 |---|---|---|---|
-| Phase 5 battery | 135 | 0 failed | 0 failed |
-| Full regression | — | **12,242 passed, 0 failed** | **12,245 passed, 0 failed** |
+| Phase 5 battery | 145 | 0 failed | 0 failed |
+| Full regression | — | **12,252 passed, 0 failed** | **12,255 passed, 0 failed** |
 
 Both were run to completion. MariaDB is authoritative for production-oriented
 evidence; neither figure is inferred from the other.
@@ -134,6 +134,23 @@ caught. One survivor was the real product defect above. Two of my own mutations
 were broken: one anchored on text that appeared twice and was never applied, one
 declared a cache and never assigned it, so it "survived" by doing nothing. An
 unapplied or ineffective mutation reads exactly like a protected one.
+
+## The screen itself was tested, not just the engine
+
+The repository's UI rule is that a screen must be understandable without
+training. That is a claim about the **words on the page**, so the Command Centre
+is rendered in the suite and the HTML is read (section M): the corrected figures
+are there, the sentence explaining why the approved number differs from the
+original ask is there, the recruiter table separates *carrying* from *delivered*
+and says which is which — and **none of the engine's vocabulary reaches a user's
+eyes**. "Unallocated" and "over-committed" are accurate and useless to a
+coordinator reading a screen in a hurry; the page says *"Nobody looking yet"* and
+*"more people have been promised to sources than the approvals allow"*.
+
+No new layout was invented. The new cards and columns reuse the existing
+responsive primitives, so they collapse on a narrow screen exactly as the
+shipped ones do. The Command Centre remains desk-first, per the repository's
+phone-first / desk-first split.
 
 ## Total product change
 

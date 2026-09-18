@@ -2,7 +2,7 @@
 
 ## The Phase 5 battery
 
-**135 assertions, 0 failed**, on both engines.
+**145 assertions, 0 failed**, on both engines.
 
 | § | Section | What it establishes |
 |---|---|---|
@@ -17,6 +17,7 @@
 | J | The real route | `candidate-stage` driven in its own process; requirement recomputed, engine agrees, ledger written |
 | K | States the ordinary paths cannot reach | Over-filled, over-cancelled, released-after-delivering, dashboard identity, pipeline keys, pre-ledger records, ambiguous outcomes, scope on the credit query, the M4 boundary, and the absence of a stale cache |
 | L | What the adversarial pass found | Negative quantities, negative cancellations, corrupt promises, foreign allocations, **a ledger running backwards**, ageing at the edges, dangling links, unknown metrics, a dead heat in the ledger |
+| M | The screen a person actually receives | The Command Centre is **rendered** and the HTML read: the corrected figures are on the page, the sentence explaining why the approved number differs from the original ask is on the page, the recruiter table separates carrying from delivered — and none of the engine's vocabulary ("unallocated", "over-committed") reaches a user's eyes |
 
 ## Full regression
 
@@ -49,6 +50,11 @@ And two defects in **my own probes**:
   with no scope and their fixtures were built against requirement id 0. Both
   produced confident passes and confident failures for reasons unrelated to what
   they claimed to test.
+- **K5 asked whether a recruiter appeared in a table that is deliberately
+  truncated to the eight busiest people.** It passed alone and failed in the full
+  run, because other fixtures outranked its own — a probe measuring the *suite*,
+  not the product. It now asks through the dashboard's own recruiter filter,
+  which is both correct and a stronger path to exercise.
 
 ## One Phase 3 file was touched
 
