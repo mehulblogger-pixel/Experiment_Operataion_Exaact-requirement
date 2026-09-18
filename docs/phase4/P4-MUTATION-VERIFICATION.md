@@ -190,6 +190,31 @@ cannot be created onto a full source while the established credit is untouched.
 
 ---
 
+## §10 — Final evidence table
+
+Every cell below is backed by a measured run, not by reading the code.
+
+| Mutant | Removed control | Real business risk | Independent protection | Catching test | Reliability | Classification |
+|---|---|---|---|---|---|---|
+| **T6** | The attach compensator's withdrawal of an over-credit | A source credited with people it never had room for — eight against a one-seat promise | None for a direct `rful_attach()` caller. The seat check covers single-process only; `rful_enforce_candidate()` covers the three routes | **C10**, C2.2–C2.4 | 3/3 + battery | **CAUGHT** (was a real gap) |
+| **T18** | The resize compare-and-swap's `rowCount()` check | A change recorded in the ledger that never happened; the caller told it succeeded | The SQL predicate still protects the DATA; the same-read pre-check refuses most losers earlier | **C12.3/C12.4** | 3/3 + battery | **CAUGHT** (was a real gap) |
+| **T19** | The attach compare-and-swap's `rowCount()` check | Sources credited with a person who was never on them — seven of them, measured | The SQL predicate still protects the DATA | **C11.3** | 3/3 + battery | **CAUGHT** (was a real gap) |
+| **T22** | The resize state gate | A released or cancelled allocation resized back to life | None | F8, F12a | 2/2 | **CAUGHT** |
+| **T26** | The resize same-read pre-check | A loser told "the approval is full" when the truth is "somebody changed it" — sending a coordinator to fix the wrong thing | The CAS still protects the DATA, but not the REASON | **C14.4** | 2/2 + battery | **CAUGHT** |
+| **T31** | The allocation ceiling **and** its compensator together | The approved headcount promised more than once | None — that is the point of the pair | B1, B2, B3 (73 assertions) | 1/1 | **CAUGHT** (was never applied — see below) |
+| **T38** | Withdrawing anything but the latest over-allocation | Five over-allocations standing, requirement over-promised by four | None | **C13.4**, C8.2–C8.4 | 3/3 + battery | **CAUGHT** (was a real gap) |
+
+### The two that were not what they first appeared
+
+**T31 was an ANCHOR-MISS — it had never been applied at all.** The compensator fix
+moved the code it targeted, so the mutation silently failed and the battery
+reported nothing for it. An unapplied mutant looks exactly like absence of a
+problem. It was visible only because the harness prints `ANCHOR-MISS` explicitly;
+printing nothing would have turned 36/38 into an apparent 37/37.
+
+**T26's first "catch" was an artefact of a flaky assertion of mine** and was
+withdrawn rather than carried forward. See below.
+
 ## §14 — The final adversarial question
 
 > **With the final Phase 4 implementation, can any real user, concurrent process,
@@ -248,3 +273,61 @@ say none exists. Two specific limits are worth stating plainly:
 
 Neither is a known defect. Both are named so that the next person attacking this
 starts where the evidence stops rather than where it looks complete.
+
+---
+
+## What this gate actually found
+
+Five distinct problems, each visible only after the previous one was fixed. Two
+were defects in the product; two were defects in my own tests; one was a mutation
+that had never run. They are listed in the order they surfaced, because the order
+is the point.
+
+**1. A real over-allocation defect.** `rful_allocate()`'s compensator withdrew an
+over-allocation only when its row was the *latest* live row. With two racers that
+looks correct. With six it left **five over-allocations standing, each reporting
+success, and the requirement over-promised by four** — the ceiling this phase
+exists to defend, broken by the control meant to defend it.
+
+**2. A guard that was not guarding.** Mutant T38 reinstates exactly that defect,
+and it **survived**. The probe that had found the defect caught it roughly one run
+in six. Fixing a defect and leaving its guard ineffective would have been the
+worst outcome of this gate, because the fix would have looked finished.
+
+**3. A mutation that was never applied.** T31, above.
+
+**4. An assertion of mine that agreed with a bug.** The ledger chain probes walked
+entries in id order and demanded continuity. The CAS and the ledger INSERT are
+separate statements, so two concurrent *successful* resizes can record entries in
+the opposite order from the writes — each entry truthful, only the ordering
+inverted. The probes failed against the **real** implementation about one run in
+six, and they were **the assertions that appeared to catch T26**. That result was
+withdrawn. The replacement reads the ledger as a *path*: every recorded change
+must lead to the next, each used once, ending where the allocation stands.
+
+**5. A derived state that blocked the correction it should permit.**
+`rful_seat_block()` had already been taught that FULFILLED is a live state, not a
+closed one — the lifecycle document says so explicitly. `rful_reallocate()` was
+left asking the old question. Because FULFILLED is *derived* and can be left stale
+under concurrency, a coordinator trying to trim a promise a source had **not**
+delivered was told *"that allocation is closed"*. The same defect, on the one path
+the earlier fix was not carried to. My first correction was itself wrong — it
+would have let a status in no lifecycle through — and probe **P7**, written in the
+earlier pass for precisely that property, failed within a minute.
+
+### The common thread
+
+None of these was visible until the concurrency harness was made to genuinely
+collide. Measurement showed why it had not been: the workers paid **7.5–9.8 ms**
+of one-time cost inside a window of **0.25 ms**, so eight processes released at the
+same microsecond still arrived nine milliseconds apart and queued politely.
+
+And then the opposite lesson, immediately: tightening the barrier **concealed**
+T26, whose symptom requires a stale re-read that a perfect collision never
+produces. A tighter race is not a better race — it is a different one, and a
+harness needs both the tight case and the staggered one.
+
+**A mutation score is only as trustworthy as the assertions behind it and the
+interleavings the harness can actually produce.** Two of the five findings here
+were faults in the measuring instrument, and one of those was actively agreeing
+with a bug.
