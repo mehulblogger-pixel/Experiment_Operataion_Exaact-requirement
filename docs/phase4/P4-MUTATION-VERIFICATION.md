@@ -59,6 +59,38 @@ race and a persisting over-credit for any caller that does not go through an
 
 ---
 
+## §14 — The required classification
+
+```
+T6  = CAUGHT   (was a REAL GAP: an over-credit persisted, with no second line
+                for a direct caller. Closed by C10.)
+T18 = CAUGHT   (was a REAL GAP in the tests: the data was safe, the ledger was
+                not. Closed by C12.)
+T19 = CAUGHT   (was a REAL GAP in the tests: the data was safe, the attribution
+                was not. Closed by C11.)
+```
+
+None of the three is classified *independently protected*. Each allows an
+incorrect business state that the remaining controls do **not** prevent — an
+over-credit for T6, a false ledger for T18 and T19 — so the only honest
+classification was a real gap, and each is now closed by a probe that fails
+against the mutation and passes against the real implementation.
+
+**Reliability, measured over three independent batteries on a freshly restarted
+MariaDB — 9 runs, 9 caught, 0 survived, 0 dirty baselines:**
+
+| Mutant | Round 1 | Round 2 | Round 3 |
+|---|---|---|---|
+| T6 | CAUGHT (26 assertions) | CAUGHT (26) | CAUGHT (26) |
+| T18 | CAUGHT (1) | CAUGHT (1) | CAUGHT (2) |
+| T19 | CAUGHT (4) | CAUGHT (2) | CAUGHT (2) |
+
+T18 was caught every time, but by only one or two assertions, and the internal
+round that caught it varied — so `C12` was raised from two rounds to four before
+the final battery. More attempts at the same claim, not a weaker claim.
+
+---
+
 ## The probes, and why each asserts the database rather than the report
 
 Believing what a process *reported* is precisely how a mutation that fakes
@@ -81,6 +113,64 @@ credit for a source the person never touched fails. Deliberately not "one winner
 same baseline. Asserts the ledger is a **continuous chain**: each entry's
 `from_qty` must equal the previous entry's `to_qty`, and the chain must end
 exactly where the row now stands.
+
+---
+
+## §6 — The resize pre-check versus the resize CAS, proved rather than asserted
+
+`rful_reallocate()` carries **two** guards in front of the write, and it matters
+which one does what.
+
+**What the pre-check protects.** After reading `$was` at the top of the function,
+the code re-reads the requirement and compares the allocation's quantity as the
+summary sees it:
+
+```php
+$sum = rful_summary($rq);
+foreach ($sum['sources'] as $srcRow) if ((int) $srcRow['id'] === (int) $a['id']) $now = (int) $srcRow['allocated'];
+if ($now === null || $now !== $was) return $fail('LOST_RACE');
+```
+
+This catches a loser whose **summary read happened after the winner committed**.
+It exists because the two figures came from different instants (mutant T26), and
+it converts what would have been a false `OVER_AUTHORISED` into a truthful
+`LOST_RACE`.
+
+**What the CAS protects.** The window *between* that summary read and the
+`UPDATE`. A loser whose summary read happened **before** the winner committed
+passes the pre-check honestly — at the moment it looked, the value really was
+still 4 — and only the compare-and-swap predicate then stops it writing.
+
+**Is the pre-check alone sufficient?** No, and the proof is the measurement, not
+the reading. The interleaving that defeats it is:
+
+```
+A: reads $was = 4
+A: reads summary  → now = 4        ✔ pre-check passes
+B: reads $was = 4
+B: reads summary  → now = 4        ✔ pre-check passes  (B looked before A wrote)
+A: UPDATE … WHERE allocated_qty = 4   → 1 row, 4 becomes 9
+B: UPDATE … WHERE allocated_qty = 4   → 0 rows
+   with the CAS check    → LOST_RACE, nothing recorded
+   without it (mutant)   → reports success, writes REALLOCATED(from 4 → to 7)
+```
+
+**If the pre-check alone were sufficient, T18 could never be caught** — every
+loser would return `LOST_RACE` before reaching the mutated line, and the suite
+would stay green. T18 has been caught in **5 of 5** runs since the harness was
+fixed, each time by `C12.3` observing a ledger entry that starts from a figure
+which had already moved. Every one of those catches is a process that passed the
+pre-check and reached the CAS. The window is real, reachable, and the CAS is the
+only thing covering it.
+
+**Why one catching assertion is enough here.** `C12.3` is not a weak proxy for
+the invariant; it *is* the invariant. The ledger is a chain — each entry records
+what it moved **from** and **to** — and a chain in which two entries both claim to
+start from the same figure is a direct statement that a change was recorded which
+never happened. That is precisely and only what removing the CAS causes. `C12.4`
+(the chain must end where the row actually stands) catches the same defect from
+the other end and has fired alongside it. The probe was nevertheless raised from
+two rounds to four, because the *round* that caught it varied.
 
 ---
 

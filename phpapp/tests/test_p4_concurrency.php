@@ -408,8 +408,14 @@ for ($round = 1; $round <= 2; $round++) {
 //  actually stands. A compare-and-swap that writes safely but reports a success
 //  it did not achieve breaks the chain — several entries all claiming to start
 //  from the same baseline, only one of which happened.
+//  FOUR rounds, not two. The resize path has a SECOND independent guard in front
+//  of the compare-and-swap — the same-read check ($now !== $was) refuses most
+//  losers before they ever reach it — so the CAS is decisive only in the narrow
+//  window between that read and the write. Measured across three batteries, two
+//  rounds caught the mutation every time but by one or two assertions, and the
+//  round that caught it varied. More attempts at the same claim, not a weaker one.
 t_section('C12 · eight resizes of one allocation at the same instant (the resize CAS)');
-for ($round = 1; $round <= 2; $round++) {
+for ($round = 1; $round <= 4; $round++) {
     $rq12 = $c4req(40, 'P4C ResizeCAS r' . $round);
     $a12  = rful_allocate($rq12, 'OWN_PAYROLL', 4)['id'];
     $res = $race(array_map(fn($q) => ['reallocate', $a12, $q, 4], [6, 7, 8, 9, 10, 11, 12, 13]));

@@ -411,19 +411,28 @@ function rful_allocate($requisitionId, $source, $qty, array $opt = []) {
         $id = (int) db()->lastInsertId();
     } catch (Throwable $e) { return $fail('LOST_RACE'); }
 
-    //  THE COMPENSATING CHECK. If two planners both passed the ceiling test and
-    //  both wrote, the requirement is now over-allocated — so the later row is
-    //  withdrawn and the caller is told. Never over-allocated; the shape M4 used
-    //  for the headcount ceiling and M5 for ownership.
+    //  THE COMPENSATING CHECK. If several planners all passed the ceiling test and
+    //  all wrote, the requirement is now over-allocated, and EVERY arrival that
+    //  finds it so withdraws ITS OWN row.
+    //
+    //  This used to withdraw only the row with the highest id — an attempt to
+    //  preserve exactly one winner. With two racers that looked right. With six it
+    //  was measured leaving FIVE over-allocations standing, each reporting success,
+    //  and the requirement over-promised by four: the ceiling this whole phase
+    //  exists to defend, broken by the control meant to defend it. It was invisible
+    //  until the concurrency harness was fixed to make the processes genuinely
+    //  collide.
+    //
+    //  Withdrawing my own row can leave NO winner when several arrive together.
+    //  That is the ratified capacity rule and the same choice M4 made at its own
+    //  headcount ceiling: refusing a claim that could in principle have succeeded
+    //  is the safe direction, and the seats stay available for the next valid
+    //  transaction. Never over-allocated.
     $after = rful_summary($rq);
     if ($after['committed'] > $after['authorised']) {
-        $latest = (int) ops_val("SELECT id FROM requisition_allocations WHERE requisition_id=? AND status IN ('"
-                                . implode("','", RFUL_LIVE_STATES) . "') ORDER BY id DESC", [$rq]);
-        if ($latest === $id) {
-            try { db()->prepare("DELETE FROM requisition_allocations WHERE id=?")->execute([$id]); } catch (Throwable $e) {}
-            rful_event(0, $rq, 'ALLOCATE_REVERTED', null, $n, '', '', 'another allocation took the remaining seats first');
-            return $fail('OVER_AUTHORISED', 'another allocation took those seats a moment earlier');
-        }
+        try { db()->prepare("DELETE FROM requisition_allocations WHERE id=?")->execute([$id]); } catch (Throwable $e) {}
+        rful_event(0, $rq, 'ALLOCATE_REVERTED', null, $n, '', '', 'another allocation took the remaining seats first');
+        return $fail('OVER_AUTHORISED', 'another allocation took those seats a moment earlier');
     }
     rful_event($id, $rq, 'ALLOCATED', null, $n, '', 'PLANNED', (string) ($opt['reason'] ?? ''));
     if (function_exists('act_log'))

@@ -27,7 +27,7 @@ below; none is counted as caught, and none is excused without evidence.
 | T3 | The create compensator never withdraws an over-allocation | **CAUGHT** | C8 (multi-round race) |
 | T4 | AUTHORISED ignores cancelled vacancies | **CAUGHT** | L4–L9 |
 | T5 | A source can be credited past its promise | **CAUGHT** | M4–M6 |
-| T6 | The attach compensator never withdraws an over-credit | **SURVIVED** | see *Independently protected*, below |
+| T6 | The attach compensator never withdraws an over-credit | **CAUGHT** | C2.2–C2.4, C10 |
 | T7 | An allocation can be cut below what it delivered | **CAUGHT** | G2, G3 |
 | T8 | An allocation may be credited from another requirement | **CAUGHT** | E1, RT1.4 |
 | T9 | The link compensator stops checking the requirement | **CAUGHT** | E3, E4, C6.11 |
@@ -39,8 +39,8 @@ below; none is counted as caught, and none is excused without evidence.
 | T15 | A quantity is coerced instead of refused | **CAUGHT** | C8–C12, S4 |
 | T16 | An allocation id is coerced instead of refused | **CAUGHT** | S4 link, S4.24 |
 | T17 | The source list accepts anything | **CAUGHT** | S4 source (7 probes) |
-| T18 | The resize compare-and-swap is removed | **SURVIVED** | see *Independently protected*, below |
-| T19 | The attach compare-and-swap is removed | **SURVIVED** | see *Independently protected*, below |
+| T18 | The resize compare-and-swap is removed | **CAUGHT** | C12.3, C12.4 |
+| T19 | The attach compare-and-swap is removed | **CAUGHT** | C11.3, C6.6b |
 | T20 | A malformed stale expectation is ignored | **CAUGHT** | O1–O6, S6.6 |
 
 ## Further targets this phase added
@@ -93,23 +93,23 @@ intermediate results are the point of doing this at all.
 
 ## Every survivor, and the evidence for its treatment
 
-No survivor is excused. Each is placed in one of the two categories §57 demands,
-with the evidence that puts it there.
+No survivor was excused. Each was placed in one of the categories §57 demands,
+with the evidence that put it there.
 
-### Genuine test gaps — seven, all closed
+### Genuine test gaps — eight, all closed
 
-These exposed claims **nobody was checking**. Each produced new probes, and each
-is now caught.
+These exposed claims **nobody was checking**. Each produced new probes.
 
 | Mutant | The claim nothing was testing | Probes added |
 |---|---|---|
-| T10, T27, T30 | The three `ops.php` wiring points. Every probe called the **engine**; nothing drove the **routes** | `test_p4_routes.php` (35 assertions) |
+| T10, T27, T30 | The three `ops.php` wiring points. Every probe called the **engine**; nothing drove the **routes** | `test_p4_routes.php` |
 | T4 | Cancelling vacancies lowering the allocation ceiling | section **L** |
 | T23 | The compensator's keep-list — who keeps a credit when a source is over-credited | **RT4** |
 | T20 | A malformed stale expectation on the **create** path | section **O** |
 | T29 | The ledger, asserted by count rather than by name | section **N** |
 | T1, T3, T5 | Whether a refusal happens **before** the write or is written and withdrawn | section **M** |
-| T36 | That "still to be sourced" reads **zero**, not a negative number, while a requirement is over-committed. Every probe that read the figure did so on a square requirement | **J15–J18** |
+| T36 | That "still to be sourced" reads **zero**, not a negative number, while over-committed | **J15–J18** |
+| **T6, T18, T19** | The three contested-path controls. See `P4-MUTATION-VERIFICATION.md` | **C10, C11, C12** |
 
 ### Equivalent mutants — one, removed rather than left untestable
 
@@ -119,38 +119,73 @@ Defensive code that cannot be reached cannot be tested or trusted, so the
 redundancy was **removed** and T36 re-aimed at the clamp that does the work —
 where it was then found to be a real gap (above).
 
-### Independently protected — two, with evidence, and stated plainly
+### Independently protected — none
 
-**T6** (the attach compensator), **T18** (the resize compare-and-swap) and **T19**
-(the attach compare-and-swap) survive in this environment. They are reported as **survivors**, not as caught, and the
-determination is category 2 — an independent protection legitimately remains —
-on this evidence:
+Earlier drafts of this document classified T6, T18 and T19 as *independently
+protected*, and were internally inconsistent about it: the heading said **two**
+while three mutants were listed beneath it. Both the count and the classification
+were wrong, and the correction matters more than the tidy-up.
 
-- **T32**, which removes the per-source ceiling **and** its compensator together,
-  is caught with **46 failures**. The pair is load-bearing; neither is decoration.
-- **T19's mutation cannot corrupt data.** It deletes only the `rowCount()` check,
-  not the `WHERE allocation_id = <what I read>` predicate, so a losing process
-  still writes nothing. Its entire effect is a **false success report** and a
-  ledger line for a change that did not happen.
-- **All three have been caught** in earlier runs of this same battery — T18 by
-  C4.3/C4.4, T19 by C7.7, T6 by C9 — so the probes are capable of detecting them.
-  What varies between runs is only whether the interleaving occurs.
+They were not protected. They **survived because the test harness was not
+racing** — the workers paid a nine-millisecond one-time cost inside the window
+they were supposed to be contending in, so eight processes released at the same
+microsecond still arrived nine milliseconds apart. Once that was measured and
+fixed (test-side only), all three were caught, and two of them turned out to
+allow genuinely incorrect business states: an over-credit that persists, and
+sources credited with people they never held.
 
-**Why the interleaving cannot be forced here, stated rather than papered over.**
-`rful_attach()` performs roughly six queries between the seat check and the
-write. Two processes released at the same microsecond have drifted apart by the
-time they reach the critical section, and in this container six PHP processes —
-each loading 227 libraries — contend for CPU and disk while starting. Three
-dedicated measurement runs caught T6 **0 of 3** times and T19 **1 of 3**; T26, the
-same shape on the resize path, was caught **2 of 3** and is caught in the final
-run. Raising the synchronisation lead from 1.2s to 3.0s did not change the
-attach-path figures.
+The full evidence, the measurements and the §8 protection table are in
+**`P4-MUTATION-VERIFICATION.md`**.
 
-The compensator is also **unreachable single-process by construction**: in every
-state a single process can build, the seat check refuses first, so no probe can
-reach the compensator without a genuine race. Forcing it would require a test
-hook in product code, which is not acceptable — a control that exists to be
-tested is not the same control.
+---
 
-**What was not done, and why.** The mutants were not deleted, re-aimed or
-weakened to produce a better number. The figure reported is the one measured.
+## The honest history of this battery
+
+| Run | Caught | What the survivors meant |
+|---|---|---|
+| 1 | **23 / 34** | Seven genuine test gaps; four controls indistinguishable from their partner |
+| 2 | **31 / 34** | After `test_p4_routes.php` and sections L, M, N, O |
+| 3 | **32 / 37** | After the race harness gained a wall-clock barrier |
+| 4 | **33 / 37** | After C8 and C9 were made multi-round |
+| 5 | **34 / 37** | After the UNALLOCATED clamp gained a probe. T6/T18/T19 still survived |
+| **final** | *(see the headline figure above)* | After the workers were warmed before the barrier, so the contested paths actually execute |
+
+Reliability of the three formerly-surviving mutants, measured over three
+independent batteries on a freshly restarted MariaDB — **9 runs, 9 caught, 0
+survived, 0 dirty baselines**:
+
+| Mutant | Round 1 | Round 2 | Round 3 |
+|---|---|---|---|
+| T6 | CAUGHT (26 assertions) | CAUGHT (26) | CAUGHT (26) |
+| T18 | CAUGHT (1) | CAUGHT (1) | CAUGHT (2) |
+| T19 | CAUGHT (4) | CAUGHT (2) | CAUGHT (2) |
+
+T18 was caught every time but by only one or two assertions, and the internal
+round that caught it varied — so `C12` was raised from two rounds to four. That
+is more attempts at the same claim, not a weaker one.
+
+## A dirty baseline — and a wrong diagnosis, corrected
+
+An earlier reliability loop reported **`baseline: 3`** on four consecutive
+batteries. Those runs were **discarded, not read as catches**, per the rule that a
+dirty baseline means stop. That much was right.
+
+**The diagnosis was wrong, and it was recorded in a commit message before it was
+checked.** It was attributed to MariaDB thrashing its table cache after ~880,000
+queries. It was nothing of the sort. When the failures were finally captured by
+name rather than counted, they were:
+
+```
+C8.2 · round 3 · the requirement is NOT over-promised
+C8.3 · round 3 · nothing is promised twice          (want 0, got 4)
+C8.4 · round 3 · at most one of the six succeeded
+```
+
+A **real product defect**, and a serious one: the requirement over-promised by
+four. See the completion report and `P4-MUTATION-VERIFICATION.md` for the cause
+and the fix.
+
+The lesson is recorded because it is the more useful half: **an intermittent
+failure was explained away as environmental before its name had been read.** The
+environment was a plausible story, the numbers supported it, and it was wrong.
+A failure is not diagnosed until the failing assertion has been named.
