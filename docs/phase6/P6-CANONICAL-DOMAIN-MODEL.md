@@ -36,11 +36,35 @@ to stop at CONNECT / MAP / EXTEND.
 
 **Business meaning.** A real human being. One heartbeat.
 
-**Current system representation.** **None, as a record.** The audit found no
-person table and no person spine. What exists instead is a *resolver*
-(`connect_person_resolve()`) that answers "who is this, really?" by walking the
-link ledger `cx_identity_link` from one representation to the others, using the
-marketplace professional row as the hub.
+**Current system representation.** **None, as a record.**
+
+> **CORRECTED (C1).** An earlier draft of this document said Person was resolved
+> "using the marketplace professional row as the hub". That described the
+> *resolver's traversal*, and it read as a statement about the architecture. It
+> is superseded by the evidence in `P6-PERSON-REPRESENTATION-ADDENDUM.md`.
+
+The accurate position, on the audit evidence:
+
+- **There is no dedicated Person table or spine.** Nothing in the repository
+  holds a person as a record in their own right.
+- **Person identity is currently *emergent*** — it exists only as the pattern
+  formed by the existing representations and the relationship mechanisms that
+  join them.
+- **`inspectors` is the structurally central existing people / workforce
+  register.** Three of the four identity mechanisms point at it:
+  `candidates.inspector_id`, `users.inspector_id`, and the inspector axis of
+  `cx_identity_link`.
+- **`cx_identity_link` provides the explicit relationship mechanism** — and it is
+  the only one of the four that is reversible and audited.
+- **The Marketplace Professional is NOT the canonical Person hub.**
+  `connect_person_resolve()` traverses *through* the professional row, which is a
+  property of that function, not a statement about where person identity lives.
+  It also has a consequence worth stating: a person who is not on the marketplace
+  has no traversal path at all.
+
+**No hub is chosen here.** Which representation — if any — becomes the canonical
+Person architecture remains an **OPEN Phase 6 decision** (Q3, and Q7 in the
+addendum).
 
 Two other places in the repository use the word *person* and **neither is an
 identity spine** — this must not be mistaken for one:
@@ -164,18 +188,58 @@ What it has instead:
 | Representation | What it covers | Owner |
 |---|---|---|
 | `inspectors` | Field / technical resource, own roll or agency roll | Operations |
-| `back_office_staff` | Office staff — name, employee code, designation, department, office, CTC | Operations |
-| `users` | System login accounts, carrying the **security role** | Administration |
+| `back_office_staff` | Office staff — name, employee code, designation, department, office, CTC. **Already deprecated in the code**, with an existing migration into `users` | Operations (legacy) |
+| `users` | **An internal people register that is also the application account** — see below | Administration |
 
 **"Workforce" is therefore a *view over* these, not a record.**
 
-> **⚠ AUDIT GAP — recorded, not resolved.** `back_office_staff` is a **fourth
-> person representation** and the §2 audit did not cover it. It is stated here
-> because omitting a real representation from the canonical model would be worse
-> than admitting the audit missed it. **Before implementation begins, the §2 audit
-> must be extended** to answer, for `back_office_staff`: whether it can be the
-> same human as an inspector or candidate, whether any link mechanism reaches it,
-> and whether it belongs in the person relationship model at all.
+### USER / APPLICATION ACCOUNT versus PERSON / PEOPLE REPRESENTATION
+
+> **CORRECTED (C2).** An earlier draft described `users` as "system login
+> accounts, carrying the security role". That is **understated**, and is
+> superseded by the evidence in `P6-PERSON-REPRESENTATION-ADDENDUM.md`.
+
+`users` is **not merely** a login-account and security-role representation. On the
+audit evidence it is also an **internal people register carrying employment and
+organisational attributes**:
+
+`first_name` · `last_name` · `email` · `department` · `position_title` ·
+`home_office_id` · `scope_offices` · `scope_sbus` · `monthly_ctc` ·
+`reports_to_id` / `reports_to_name` / `reports_to_position` ·
+`weekly_working_days` · `daily_hours` · `is_production` · `is_active` ·
+`deactivated_at`
+
+**And it holds an existing relationship to `inspectors`** through
+**`users.inspector_id`**, written by `org_import_link_team()`, which creates the
+inspector row via `team_member_create()`. The repository's own comment calls this
+register *"a single source that flows through to allocation"*.
+
+**The distinction must nevertheless be preserved**, because one row serves two
+different purposes:
+
+| Facet | What it is | Why it must stay distinct |
+|---|---|---|
+| **USER / APPLICATION ACCOUNT** | A credential and a set of rights — `username`, `password_hash`, `role`, `permissions`, `is_superuser`, two-factor secrets, `scope_offices`, `scope_sbus` | It participates in **authentication, authorisation and organisational scope**. Treating an account as a person would make every access decision an identity decision |
+| **PERSON / PEOPLE REPRESENTATION** | A human being's employment facts — name, department, position, office, reporting line, working pattern | This is about who somebody *is* and what they do, not what they may open |
+
+Two consequences follow, and neither is a decision:
+
+- **Not every person is a user.** An inspector on an agency roll, a candidate, or
+  a marketplace professional may have no account at all.
+- **`users` has no mobile number** — the second-strongest matching identifier —
+  while `inspectors`, `candidates`, `cx_professionals` and `back_office_staff` all
+  do.
+
+> **`users` is NOT declared the canonical Person hub by this document.** Whether
+> it should be is **Q7**, and it remains **OPEN**.
+
+> **⚠ AUDIT GAP — now closed by the addendum.** `back_office_staff` was a person
+> representation the §2 audit did not cover, and `users` was understated in it.
+> Both are addressed in `P6-PERSON-REPRESENTATION-ADDENDUM.md`, which also
+> corrects the representation count from three to **five** and the identity
+> mechanism count from two to **four**. The questions of whether office staff
+> belong in the identity model, and what becomes of `back_office_staff`, remain
+> **OPEN (Q8, Q9)**.
 
 ---
 
@@ -665,12 +729,21 @@ see which approved demand it serves? There is a legitimate argument against: the
 marketplace may not be entitled to see recruitment internals.
 
 **Q3 — The authoritative Person representation. OPEN QUESTION.**
-Today Person is *emergent* — resolved through `cx_identity_link` with the
-marketplace professional as the hub. That works, but it means **a person who is
-not on the marketplace has no hub**. Should Phase 6 (a) keep the emergent model
-and add the missing edges, (b) promote one existing representation to hub, or
-(c) introduce a person record? **Option (c) is discouraged by §4 of the master
-prompt unless the audit proves it necessary — and the audit did not.**
+Today Person is *emergent*: there is no person record, and identity exists only
+as the pattern formed by the five representations and the four mechanisms that
+join them. `inspectors` is the structurally central register; `cx_identity_link`
+is the only explicit, reversible, audited relationship mechanism. The resolver
+`connect_person_resolve()` traverses through the marketplace professional row —
+which is a property of that function, **not** a canonical hub, and which means a
+person outside the marketplace has no traversal path.
+
+Should Phase 6 (a) keep the emergent model and add the missing edges,
+(b) promote one existing representation to hub, or (c) introduce a person record?
+**Option (c) is discouraged by §4 of the master prompt unless the audit proves it
+necessary — and the audit did not.** See also **Q7** in the addendum, which asks
+the same question of `users` specifically.
+
+**No hub is chosen in this document.**
 
 **Q4 — The authoritative organisation representation. OPEN QUESTION.**
 `business_partners` is the evident spine. The audit did not establish whether
