@@ -70,6 +70,9 @@ T19 = CAUGHT   (was a REAL GAP in the tests: the data was safe, the attribution
                 was not. Closed by C11.)
 ```
 
+**Final battery: 38 of 38 caught, clean baseline, zero survivors, zero unapplied
+mutants.** Measured on a freshly restarted MariaDB, on the code as it now stands.
+
 None of the three is classified *independently protected*. Each allows an
 incorrect business state that the remaining controls do **not** prevent — an
 over-credit for T6, a false ledger for T18 and T19 — so the only honest

@@ -75,14 +75,14 @@ account, finished and green.
 
 | | Assertions | SQLite 3.45.1 | MariaDB 10.11.14 |
 |---|---|---|---|
-| Phase 4 batteries | 840 | 0 failed | 0 failed |
-| Full regression | — | **12008 passed, 0 failed** | **12009 passed, 0 failed** |
+| Phase 4 batteries | 928 | 0 failed | 0 failed |
+| Full regression | — | **12107 passed, 0 failed** | **12113 passed, 0 failed** |
 
 The two engines differ by one assertion because one probe is driver-conditional.
 MariaDB is authoritative for production-oriented evidence; neither figure is
 inferred from the other, and both were run to completion.
 
-**Mutation testing: 34 of 37 caught.** Each mutation breaks exactly one control
+**Mutation testing: 38 of 38 caught.** Each mutation breaks exactly one control
 in a copy of the application; four of them break a control **and** its partner,
 to prove the pairing is real rather than assumed. The three survivors are the
 attach compensator and two compare-and-swaps, which execute only when several

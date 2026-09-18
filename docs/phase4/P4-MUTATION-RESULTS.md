@@ -13,8 +13,11 @@ investigated; **none is excused without evidence.**
 
 Engine: **MariaDB 10.11.14** (authoritative). Suite: the five Phase 4 batteries.
 
-**Final figure: 34 of 37 caught.** The three survivors are named and treated
-below; none is counted as caught, and none is excused without evidence.
+**Final figure: 38 of 38 caught.** Clean baseline, zero survivors, zero
+unapplied mutants. Getting there took two real product fixes and three
+corrections to the tests themselves — the history below is deliberately not
+tidied away, because the earlier "34 of 37 with three independently protected
+survivors" was wrong and looked clean.
 
 ---
 
@@ -87,7 +90,8 @@ intermediate results are the point of doing this at all.
 | 2 | **31 / 34** | After `test_p4_routes.php` and sections L, M, N, O. Two compare-and-swaps still survived |
 | 3 | **32 / 37** | After the race harness was fixed to synchronise on a wall clock. Three race-dependent survivors, plus one equivalent mutant |
 | 4 | **33 / 37** | After C8 and C9 were made multi-round |
-| **final** | **34 / 37** | After the UNALLOCATED clamp gained a probe. Three race-dependent survivors remain, treated below |
+| 6 | **36 / 38** | After the workers were warmed. One survivor (T26) and one mutant that had never been applied (T31) |
+| **final** | **38 / 38** | After the staggered race, the re-anchoring, and the ledger read as a path |
 
 ---
 

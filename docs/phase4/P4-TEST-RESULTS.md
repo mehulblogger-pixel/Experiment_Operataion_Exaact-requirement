@@ -17,7 +17,7 @@ battery drives the **actual routes** in their own processes and then reads the
 | `test_p4_reconcile.php` | 10/20/100 seats × 1/2/3/5 sources; rebalance, release, cancel; every figure re-derived from the rows; a whole-workspace sweep | 454 |
 | `test_p4_concurrency.php` | Real separate OS processes: contested allocation, contested credit, established-holder protection, colliding resizes, resize-vs-release, the whole arrival path raced, one person to two sources, six-way contention over four rounds, six-way credit contention over four rounds | 136 |
 | `test_p4_routes.php` | The real `candidate-new` / `candidate-edit` / `candidate-stage` routes, driven in their own processes | 35 |
-| **Phase 4 total** | | **840** |
+| **Phase 4 total** | | **928** |
 
 ---
 
@@ -25,8 +25,8 @@ battery drives the **actual routes** in their own processes and then reads the
 
 | Engine | Phase 4 | Full regression |
 |---|---|---|
-| **SQLite 3.45.1** | 840 passed, **0 failed** | 12008 passed, **0 failed** |
-| **MariaDB 10.11.14** | 840 passed, **0 failed** | 12009 passed, **0 failed** |
+| **SQLite 3.45.1** | 928 passed, **0 failed** | **12107 passed, 0 failed** |
+| **MariaDB 10.11.14** | 928 passed, **0 failed** | **12113 passed, 0 failed** |
 
 MariaDB is authoritative for production-oriented evidence. Both engines were run;
 neither figure is inferred from the other.
@@ -94,7 +94,7 @@ code was changed to satisfy an incorrect test.
 
 ## What the mutation battery changed about these tests
 
-The first mutation run caught 23 of 34; the final run catches **34 of 37**. Every
+The first mutation run caught 23 of 34; the final run catches **38 of 38**. Every
 survivor was investigated rather than excused; **seven were genuine test gaps**
 and produced new probes —
 `test_p4_routes.php` in its entirety (the three `ops.php` wiring points nothing
