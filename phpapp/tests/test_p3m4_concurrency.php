@@ -60,9 +60,39 @@ t_eq(hreq_remaining_qty($h1), 1, 'C1 · exactly one seat remains');
 $r1 = $race([['seat',$h1,1], ['seat',$h1,1]]);
 t_eq(count($r1), 2, 'C1 · two real processes ran');
 $won = count(array_filter($r1, fn($x) => !empty($x['ok'])));
-t_eq($won, 1, 'C1 · *** exactly ONE process took the last seat ***');
-t_eq($alloc($h1), 10, 'C1 · *** the final allocation is exactly the approved 10 ***');
-t_eq(hreq_remaining_qty($h1), 0, 'C1 · nothing remains — and it never went negative');
+//  PHASE 4 CORRECTION TO A PHASE 3 PROBE — no product code changed.
+//
+//  This asserted `$won === 1`. That contradicts BOTH the ratified capacity rule
+//  ("where simultaneous claims cannot be deterministically resolved without
+//  risking displacement, the system may refuse the contested claims and leave the
+//  capacity available for a subsequent valid transaction") AND the implementation's
+//  own stated contract, written in hiringreq.php at the compensating check:
+//  "Two racing processes may both revert, which refuses an allocation that could
+//  in principle have succeeded — the safe direction for a headcount control, and
+//  never an over-allocation."
+//
+//  So a dead heat in which BOTH processes stand down is correct behaviour, and
+//  this probe would fail on it. It was observed failing once, on MariaDB, under
+//  full-suite load. No Phase 4 code is on this path (hiringreq.php and
+//  reqfulfil.php contain no reference to the Phase 4 engine), and the
+//  pre-Phase-4 tree behaves identically.
+//
+//  What is asserted instead is what the system actually guarantees: never more
+//  than one winner, NEVER an over-allocation, and the capacity still usable
+//  afterwards by a valid transaction.
+t_ok($won <= 1, 'C1 · *** at most ONE process took the last seat (got ' . $won . ') ***');
+t_ok($alloc($h1) <= 10, 'C1 · *** the allocation NEVER exceeds the approved 10 (got ' . $alloc($h1) . ') ***');
+t_ok(hreq_remaining_qty($h1) >= 0, 'C1 · and the remainder never went negative');
+t_eq($alloc($h1) + hreq_remaining_qty($h1), 10, 'C1 · allocated plus remaining is always exactly the approval');
+//  A refusal must not CONSUME the capacity it refused.
+if ($won === 0) {
+    [$lateOk,, $lateId] = hreq_to_requisition($h1, 1);
+    t_ok($lateOk && $lateId > 0, 'C1 · a dead heat left the seat usable by the next valid transaction');
+    t_eq($alloc($h1), 10, 'C1 · …which then takes it, reaching exactly the approved 10');
+} else {
+    t_eq($alloc($h1), 10, 'C1 · one winner took it, reaching exactly the approved 10');
+    t_eq(hreq_remaining_qty($h1), 0, 'C1 · nothing remains');
+}
 foreach ($r1 as $x) if (empty($x['ok'])) t_ok(trim((string)$x['msg']) !== '', 'C1 · the loser failed cleanly, with a reason: ' . $x['msg']);
 
 t_section('C2 · two simultaneous quantity increases');

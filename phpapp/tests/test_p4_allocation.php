@@ -246,4 +246,149 @@ t_eq(rful_reallocate($k1, 5)['code'], 'OVER_AUTHORISED', 'J12 · it cannot be ma
 t_eq(rful_reallocate($k1, 3)['code'], 'OK', 'J13 · but the coordinator CAN trim it back');
 t_eq(rful_summary($rqK)['over_committed'], 0, 'J14 · …and the requirement is square again');
 
+//  WHILE over-committed, "still to be sourced" must read ZERO, never a negative
+//  number. A mutation proved nothing watched this: every probe that checked the
+//  figure did so on a requirement that was square, so the clamp was untested.
+//  A negative "still to source" is nonsense on a screen and is worse in
+//  arithmetic — anything summing it would quietly give capacity back.
+$kc2 = $p4cand($rqK, 'ACCEPTED');
+$kc3 = $p4cand($rqK, 'ACCEPTED');
+$sK2 = rful_summary($rqK);
+t_ok($sK2['over_committed'] > 0, 'J15 · the requirement is over-committed again');
+t_eq($sK2['unallocated'], 0, 'J16 · …and "still to be sourced" reads ZERO, not a negative number');
+t_ok($sK2['unallocated'] >= 0 && $sK2['remaining'] >= 0, 'J17 · no derived figure is negative (I3)');
+t_eq(rful_allocate($rqK, 'SUPPLIER', 1)['code'], 'OVER_AUTHORISED',
+     'J18 · and nothing more can be promised while it is over-committed');
+
+
+// ---- L · CANCELLED VACANCIES LOWER THE CEILING ------------------------------
+//  M3 owns cancelling vacancies; Phase 4 reads AUTHORISED as "requested less
+//  cancelled" and so must follow automatically, with no code here knowing about
+//  vacancy cancellation at all. Nothing tested this, and a mutation proved it.
+t_section('L · giving up on vacancies takes those seats off the table');
+$rqL = $p4req(10, ['job_title' => 'P4 Cancelled']);
+t_eq(rful_summary($rqL)['authorised'], 10, 'L1 · ten are approved');
+t_eq(rful_allocate($rqL, 'OWN_PAYROLL', 4)['code'], 'OK', 'L2 · four are promised to own payroll');
+[$cOk, $cMsg] = reqf_cancel($rqL, 5, 'no longer needed');
+t_ok($cOk, 'L3 · five vacancies are given up: ' . $cMsg);
+$sL = rful_summary($rqL);
+t_eq($sL['authorised'], 5, 'L4 · only five are authorised now');
+t_eq($sL['unallocated'], 1, 'L5 · …so only ONE is still sourceable, not six');
+t_eq(rful_allocate($rqL, 'SUPPLIER', 2)['code'], 'OVER_AUTHORISED',
+     'L6 · two more cannot be promised against a ceiling that just fell');
+t_eq(rful_summary($rqL)['allocated'], 4, 'L7 · …and nothing was written');
+t_eq(rful_allocate($rqL, 'SUPPLIER', 1)['code'], 'OK', 'L8 · exactly one can');
+t_eq(rful_reallocate((int) ops_val("SELECT id FROM requisition_allocations WHERE requisition_id=? ORDER BY id", [$rqL]), 6)['code'],
+     'OVER_AUTHORISED', 'L9 · nor can an existing source grow into the cancelled seats');
+
+// ---- M · THE REFUSAL HAPPENS BEFORE THE WRITE, NOT AFTER IT -----------------
+//  Two controls guard the ceiling: a check before the write and a compensator
+//  after it. Breaking either alone left every test green, because the other
+//  covered it — true defence in depth, but it meant no probe could tell a clean
+//  refusal from "written, then quietly withdrawn". The difference is real: the
+//  second consumes an id and writes a reversal to the ledger.
+t_section('M · a plainly-over-ceiling request is refused without writing anything');
+$evAll = fn($rq) => (int) ops_val("SELECT COUNT(*) FROM requisition_allocation_events WHERE requisition_id=?", [$rq]);
+$rqM2 = $p4req(4, ['job_title' => 'P4 CleanRefusal']);
+rful_allocate($rqM2, 'OWN_PAYROLL', 4);
+$mEv = $evAll($rqM2);
+t_eq(rful_allocate($rqM2, 'SUPPLIER', 1)['code'], 'OVER_AUTHORISED', 'M1 · a fifth seat is refused');
+t_eq($evAll($rqM2), $mEv, 'M2 · …with NO ledger entry at all — so it was refused BEFORE the write');
+t_eq((int) ops_val("SELECT COUNT(*) FROM requisition_allocation_events WHERE requisition_id=? AND event='ALLOCATE_REVERTED'", [$rqM2]), 0,
+     'M3 · specifically, nothing was written and then withdrawn');
+//  The same for a source's own ceiling.
+$rqM3 = $p4req(6, ['job_title' => 'P4 CleanCredit']);
+$aM = rful_allocate($rqM3, 'MANPOWER_AGENCY', 1)['id'];
+rful_attach($p4cand($rqM3, 'ACCEPTED'), $aM);
+$mEv2 = count(rful_events($aM));
+t_eq(rful_attach($p4cand($rqM3, 'ACCEPTED'), $aM)['code'], 'OVER_ALLOCATED', 'M4 · a second credit is refused');
+t_eq(count(rful_events($aM)), $mEv2, 'M5 · …with no ledger entry, so it never reached the column');
+t_eq((int) ops_val("SELECT COUNT(*) FROM requisition_allocation_events WHERE allocation_id=? AND event='ATTACH_REVERTED'", [$aM]), 0,
+     'M6 · specifically, no credit was written and then withdrawn');
+
+// ---- N · THE LEDGER IS EXACTLY WHAT HAPPENED, NO MORE ----------------------
+//  H1-H6 counted events and so could not see an extra one being written. The
+//  sequence is now asserted by name.
+t_section('N · the ledger records what happened, and only that');
+$rqN = $p4req(5, ['job_title' => 'P4 Exact']);
+$aN = rful_allocate($rqN, 'SUPPLIER', 3)['id'];
+$seq = fn($a) => implode(',', array_map(fn($e) => strtoupper((string) $e['event']), rful_events($a)));
+t_eq($seq($aN), 'ALLOCATED', 'N1 · creating a source writes exactly one entry, named ALLOCATED');
+rful_reallocate($aN, 2);
+t_eq($seq($aN), 'ALLOCATED,REALLOCATED', 'N2 · a resize adds exactly one, named REALLOCATED');
+rful_reallocate($aN, 99);                                      // refused
+rful_reallocate($aN, 0);                                       // refused
+rful_reallocate($aN, 'two');                                   // refused
+t_eq($seq($aN), 'ALLOCATED,REALLOCATED', 'N3 · three REFUSED resizes add nothing at all');
+$cN = $p4cand($rqN, 'ACCEPTED'); rful_attach($cN, $aN);
+//  Two entries, both meant: the credit itself, and the state the engine DERIVED
+//  from it (PLANNED → ACTIVE). The derived move is recorded because a state
+//  nobody can explain later is a state nobody can trust.
+t_eq($seq($aN), 'ALLOCATED,REALLOCATED,ATTACHED,STATE', 'N4 · a credit writes the credit and the state it caused');
+rful_close($aN, 'RELEASED', ['reason' => 'done']);
+t_eq($seq($aN), 'ALLOCATED,REALLOCATED,ATTACHED,STATE,RELEASED', 'N5 · a release adds exactly one, named RELEASED');
+rful_close($aN, 'CANCELLED');                                  // refused — already closed
+rful_attach($p4cand($rqN, 'ACCEPTED'), $aN);                   // refused — closed
+t_eq($seq($aN), 'ALLOCATED,REALLOCATED,ATTACHED,STATE,RELEASED', 'N6 · two more REFUSED operations add nothing');
+
+// ---- O · A MALFORMED STALE EXPECTATION ON THE CREATE PATH -------------------
+//  S6.6 covered the resize path only; the create path takes a different value
+//  (`expect_allocated`) through a different helper, and a mutation proved no
+//  probe watched it.
+t_section('O · a malformed "what I was looking at" is stale, never ignored');
+$rqO = $p4req(10, ['job_title' => 'P4 Malformed expectation']);
+rful_allocate($rqO, 'OWN_PAYROLL', 6);
+foreach ([['a word', 'six'], ['an array', [6]], ['a negative', -1], ['a fraction', '6.0'],
+          ['a boolean', true], ['a padded string', ' 6 ']] as $bad) {
+    $r = rful_allocate($rqO, 'SUPPLIER', 2, ['expect_allocated' => $bad[1]]);
+    t_eq($r['code'], 'STALE', 'O · ' . $bad[0] . ' as the expectation is refused');
+}
+t_eq(rful_summary($rqO)['allocated'], 6, 'O7 · six malformed expectations wrote nothing');
+t_eq(rful_allocate($rqO, 'SUPPLIER', 2, ['expect_allocated' => 5])['code'], 'STALE',
+     'O8 · a truthful-looking but WRONG expectation is stale too');
+t_eq(rful_allocate($rqO, 'SUPPLIER', 2, ['expect_allocated' => 6])['code'], 'OK',
+     'O9 · and the honest one is accepted');
+//  Zero must remain a real value here — "nothing allocated yet" is the normal
+//  first save, and treating it as absent would disable the guard entirely.
+$rqO2 = $p4req(4, ['job_title' => 'P4 Zero expectation']);
+t_eq(rful_allocate($rqO2, 'SUPPLIER', 1, ['expect_allocated' => 0])['code'], 'OK',
+     'O10 · zero is a real expectation, not an absent one');
+t_eq(rful_allocate($rqO2, 'SUPPLIER', 1, ['expect_allocated' => 0])['code'], 'STALE',
+     'O11 · …and is stale once something HAS been allocated');
+
+
+// ---- P · A CORRUPT ROW MUST NOT INVENT CAPACITY -----------------------------
+//  Found by the adversarial pass. The door refuses a negative quantity and an
+//  unknown status, but a manual database fix, a bad migration or a writer added
+//  in two years' time could still produce one. A derived figure must be bounded
+//  by its own definition, not by trust in the rows it reads.
+t_section('P · the arithmetic is bounded by its own definition, not by trust');
+$rqP = $p4req(5, ['job_title' => 'P4 Corrupt']);
+$aP = rful_allocate($rqP, 'SUPPLIER', 2)['id'];
+$pdo->prepare("UPDATE requisition_allocations SET allocated_qty=-5 WHERE id=?")->execute([$aP]);
+$sP = rful_summary($rqP);
+t_ok($sP['allocated'] >= 0, 'P1 · a negative quantity in the table does not make ALLOCATED negative');
+t_ok($sP['unallocated'] <= 5, 'P2 · …and does not invent capacity above the approval');
+t_eq(rful_allocate($rqP, 'OWN_PAYROLL', 6)['code'], 'OVER_AUTHORISED',
+     'P3 · so six cannot be promised against five, however corrupt the rows');
+//  Forced ABOVE the approval, the ceiling still holds and trimming still works.
+$pdo->prepare("UPDATE requisition_allocations SET allocated_qty=99 WHERE id=?")->execute([$aP]);
+t_eq(rful_allocate($rqP, 'OWN_PAYROLL', 1)['code'], 'OVER_AUTHORISED',
+     'P4 · a corrupt over-allocation still blocks new promises');
+t_eq(rful_reallocate($aP, 3)['code'], 'OK', 'P5 · …and can still be trimmed back');
+
+//  A status in no lifecycle at all must fail closed, and must give the SAME
+//  answer to every question. The seat check asked only "is it closed?" while the
+//  resize asked "is it open?", so one row could be credited with people but not
+//  resized — two answers to one question, the permissive one being the
+//  security-relevant one.
+$rqP2 = $p4req(5, ['job_title' => 'P4 Unknown state']);
+$aP2 = rful_allocate($rqP2, 'SUPPLIER', 3)['id'];
+$pdo->prepare("UPDATE requisition_allocations SET status='WEIRD' WHERE id=?")->execute([$aP2]);
+t_eq(rful_attach($p4cand($rqP2, 'ACCEPTED'), $aP2)['code'], 'BAD_STATE',
+     'P6 · a state in no lifecycle cannot be credited with anybody');
+t_eq(rful_reallocate($aP2, 4)['code'], 'BAD_STATE', 'P7 · …nor resized — the same answer, not a different one');
+t_eq(rful_fulfilled($aP2), 0, 'P8 · and nobody was credited to it');
+t_ok(rful_summary($rqP2)['allocated'] >= 3, 'P9 · but its seats are still counted, so they cannot be promised twice');
+
 $_SESSION = $p4o; current_user(true); ua(true);

@@ -296,7 +296,13 @@ function rful_summary($requisitionId) {
         //  made a requirement report one person joined against zero allocated,
         //  which breaks FULFILLED ≤ ALLOCATED. Only the UNDELIVERED remainder of a
         //  closed allocation goes back, and the pinning is what returns it.
-        $out['allocated'] += (int) $a['allocated_qty'];
+        //  A row contributes at LEAST nothing. The door refuses a negative
+        //  quantity, but a manual database fix, a bad migration or a future writer
+        //  could still produce one — and a negative here made ALLOCATED negative
+        //  and pushed UNALLOCATED above the approved headcount, so the engine
+        //  would promise more people than were ever approved. A derived figure
+        //  must be bounded by its own definition, not by trust in the rows.
+        $out['allocated'] += max(0, (int) $a['allocated_qty']);
         $out['sourced_fulfilled'] += $f;
         $out['sources'][] = [
             'id' => (int) $a['id'], 'source' => (string) $a['source'],
@@ -319,6 +325,10 @@ function rful_summary($requisitionId) {
     //  fills an approved position just as surely as an agency's placement does, so
     //  their seat is gone and must not be promised to anybody.
     $out['committed']     = $out['allocated'] + $out['direct_fulfilled'];
+    //  Never more sourceable than was approved. That is guaranteed by the row-level
+    //  clamp above (every contribution is >= 0, so COMMITTED is >= 0), not by a
+    //  second bound here — a mutation proved an extra min() was unreachable, and
+    //  defensive code that cannot be reached cannot be trusted or tested.
     $out['unallocated']   = max(0, $out['authorised'] - $out['committed']);
     $out['remaining']     = max(0, $out['authorised'] - $out['fulfilled']);
     //  Phase 4 never refuses a joining — M6 owns that — so a direct arrival can
@@ -586,7 +596,13 @@ function rful_seat_block($allocationId, $exceptCandidateId = 0) {
     //  CLOSED means released or cancelled. FULFILLED is not closed — it is a live
     //  source that happens to be full, and telling somebody their source was
     //  "closed" when it is simply full is a false answer, even though both refuse.
-    if (in_array(strtoupper((string) $a['status']), RFUL_CLOSED_STATES, true)) return 'BAD_STATE';
+    //
+    //  Anything OUTSIDE the lifecycle fails closed. This asked only whether the
+    //  status was closed, so a row carrying a state in no lifecycle at all could
+    //  still be credited with people — while rful_reallocate(), asking the open
+    //  states, refused to resize that very same row. Two answers to one question,
+    //  and the permissive one was the security-relevant one.
+    if (!in_array(strtoupper((string) $a['status']), RFUL_LIVE_STATES, true)) return 'BAD_STATE';
     $done = rful_fulfilled((int) $a['id']);
     $self = rful_id($exceptCandidateId, $sOk);
     if ($sOk && $self !== null) {

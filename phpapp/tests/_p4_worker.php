@@ -17,7 +17,17 @@ $op    = (string) ($argv[1] ?? ''); $id = (int) ($argv[2] ?? 0);
 $arg   = (string) ($argv[3] ?? ''); $arg2 = (string) ($argv[4] ?? '');
 $delay = (int) ($argv[5] ?? 0);     $uid = (int) ($argv[6] ?? 0);
 if ($uid > 0) { $_SESSION['uid'] = $uid; current_user(true); ua(true); }
-if ($delay > 0) usleep($delay * 1000);
+//  SYNCHRONISE ON A WALL-CLOCK INSTANT, not on a sleep.
+//
+//  Sleeping a fixed interval after start does not make a race: PHP's own boot
+//  takes a few hundred milliseconds and varies, so the processes ended up queued
+//  rather than collided, and a compare-and-swap could be removed without a single
+//  probe noticing. Every worker now spins until the SAME microsecond the parent
+//  named, so they enter the critical section together whatever their start-up
+//  cost. $delay is that absolute epoch-microsecond target when it is large, and
+//  a plain millisecond sleep when it is small (the older call sites).
+if ($delay > 1000000000) { while (microtime(true) * 1000 < $delay) { } }
+elseif ($delay > 0) { usleep($delay * 1000); }
 
 $out = ['op' => $op, 'arg' => $arg, 'ok' => false, 'code' => '', 'msg' => ''];
 try {
@@ -52,6 +62,30 @@ try {
             $out['code'] = $rev !== '' ? 'SEAT_REVERTED' : ($p4 !== '' ? 'CREDIT_REVOKED' : 'JOINED');
             $out['msg'] = $rev !== '' ? $rev : $p4;
         }
+    }
+    elseif ($op === 'route_cand_edit' || $op === 'route_cand_new' || $op === 'route_cand_stage') {
+        //  THE REAL ROUTE, in its own process — because redirect() exits, and
+        //  because a route is exactly where a control gets forgotten. The parent
+        //  reads the DATABASE afterwards, so nothing here has to be believed.
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_SESSION['csrf'] = 'p4test'; $_POST['_csrf'] = 'p4test';
+        $parts = json_decode($arg2 !== '' ? $arg2 : '{}', true);
+        if (is_array($parts)) foreach ($parts as $k => $v) $_POST[$k] = $v;
+        if ($op === 'route_cand_stage') {
+            $_GET['id'] = $id; $_POST['to_stage'] = $arg !== '' ? $arg : 'ACCEPTED';
+            $out['code'] = 'DISPATCHED';
+            echo json_encode($out) . "\n";
+            ops_dispatch('candidate-stage', 'POST');
+            exit;
+        }
+        $cand = $id > 0 ? ops_one("SELECT * FROM candidates WHERE id=?", [$id]) : null;
+        if ($op === 'route_cand_edit') { $_GET['id'] = $id; $_POST['id'] = $id; }
+        //  The verdict is printed BEFORE dispatching, because the route will
+        //  redirect() and exit. What matters is the database the parent then reads.
+        $out['code'] = 'DISPATCHED'; $out['ok'] = true;
+        echo json_encode($out) . "\n";
+        ops_dispatch($op === 'route_cand_edit' ? 'candidate-edit' : 'candidate-new', 'POST');
+        exit;
     }
 } catch (Throwable $e) { $out['code'] = 'EX'; $out['msg'] = $e->getMessage(); }
 echo json_encode($out) . "\n";

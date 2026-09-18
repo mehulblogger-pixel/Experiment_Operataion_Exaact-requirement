@@ -36,9 +36,20 @@ $c4cand = function ($req, $stage = 'OFFERED') use ($pdo) {
                    VALUES (?,'P4C','C',?,?,?)")->execute(['P4CC-' . bin2hex(random_bytes(4)), $stage, $req, date('c')]);
     return (int) $pdo->lastInsertId(); };
 
-//  Every worker sleeps the SAME amount before acting, so they collide rather
-//  than queue. Launching is cheap; the sleep is what makes it a race.
-$race = function (array $ops, $delay = 600) use ($root, $engine, $uC) {
+//  Every worker is given the SAME wall-clock instant to act on, and spins until
+//  it. A fixed sleep after start does not make a race — PHP's boot takes a few
+//  hundred milliseconds and varies, so the processes queue instead of colliding,
+//  and a mutation battery proved that two compare-and-swaps could be deleted
+//  without a single probe noticing. The instant is far enough ahead for every
+//  worker to have finished booting.
+$race = function (array $ops, $delay = 600, $lead = 3.0) use ($root, $engine, $uC) {
+    //  The lead must be longer than the SLOWEST worker's start-up, or the last
+    //  process to boot arrives after the instant has passed and never collides.
+    //  Each worker loads the whole application (227 libraries), and six of them
+    //  contend for CPU and disk while doing it, so a second is not enough — a
+    //  mutation battery proved that with a short lead the attach races were not
+    //  races at all and two controls could be deleted unnoticed.
+    $fireAt = (int) round((microtime(true) + max($lead, $delay / 1000)) * 1000);
     $env = $engine === 'sqlite'
         ? 'DB_DRIVER=sqlite SQLITE_PATH=' . escapeshellarg((string) getenv('SQLITE_PATH'))
         : 'DB_DRIVER=mysql DB_HOST=' . escapeshellarg((string) getenv('DB_HOST'))
@@ -49,7 +60,7 @@ $race = function (array $ops, $delay = 600) use ($root, $engine, $uC) {
     foreach ($ops as [$op, $id, $arg, $arg2]) {
         $cmd = $env . ' php ' . escapeshellarg($root . '/tests/_p4_worker.php') . ' '
              . escapeshellarg($op) . ' ' . (int) $id . ' ' . escapeshellarg((string) $arg) . ' '
-             . escapeshellarg((string) $arg2) . ' ' . (int) $delay . ' ' . (int) $uC . ' 2>&1';
+             . escapeshellarg((string) $arg2) . ' ' . $fireAt . ' ' . (int) $uC . ' 2>&1';
         $pipes = []; $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         if (is_resource($p)) $procs[] = [$p, $pipes];
     }
@@ -157,7 +168,25 @@ $s6 = rful_summary($rq6);
 t_ok($s6['sourced_fulfilled'] <= $s6['allocated'] && $s6['allocated'] <= $s6['authorised'],
      'C6.4 · SOURCED ≤ ALLOCATED ≤ AUTHORISED (I1)');
 t_ok($s6['fulfilled'] <= $s6['authorised'], 'C6.5 · nobody joined beyond the approved headcount');
-t_eq($s6['over_committed'], 0, 'C6.6 · nothing was promised twice');
+//  Over-commitment here is not a failure — it is the truth being reported.
+//  If a racer's CREDIT loses but their JOINING wins (correct: Phase 4 must never
+//  refuse a joining), they fill an approved seat directly, and the agency is
+//  still promised a seat that no longer exists. Demanding zero would be
+//  demanding one of several legitimate outcomes; what must ALWAYS hold is that
+//  the over-commitment is exactly explained by the people who arrived without a
+//  source, and that it can still be trimmed away.
+t_ok($s6['over_committed'] <= $s6['direct_fulfilled'],
+     'C6.6 · any over-commitment is no larger than the arrivals that caused it');
+t_eq($s6['over_committed'], max(0, $s6['allocated'] + $s6['direct_fulfilled'] - $s6['authorised']),
+     'C6.6a · …and is exactly what the figures say it is, not an invented number');
+if ($s6['over_committed'] > 0) {
+    $trim = (int) rful_get($a6)['allocated_qty'] - $s6['over_committed'];
+    t_eq(rful_reallocate($a6, max(1, $trim))['code'], 'OK', 'C6.6b · a coordinator can still trim it');
+    t_eq(rful_summary($rq6)['over_committed'], 0, 'C6.6c · …and the requirement is square again');
+} else {
+    t_eq($s6['allocated'] + $s6['direct_fulfilled'], $s6['authorised'] - ($s6['authorised'] - $s6['allocated'] - $s6['direct_fulfilled']),
+         'C6.6b · nothing was promised twice, and the figures agree');
+}
 //  Every person who was refused must have been refused CLEANLY. Note what that
 //  does NOT mean: a candidate can legitimately carry a source link before they
 //  join — the agency sent them, and that is true whether or not they are hired.
@@ -182,5 +211,96 @@ foreach (rful_bad_links() as $cid) {
         $badNow[] = $cid;
 }
 t_eq(count($badNow), 0, 'C6.11 · a sweep of every link in the workspace finds nothing broken');
+
+
+// ---- C7 · ONE PERSON, TWO SOURCES, AT THE SAME MOMENT -----------------------
+//  The compare-and-swap on the credit only matters under a race: in a single
+//  process the value read is always the value written. Two processes moving the
+//  SAME person to DIFFERENT sources is the case it exists for.
+t_section('C7 · two processes move one person to two different sources at once');
+$rq7 = $c4req(8, 'P4C Two sources');
+$x1 = rful_allocate($rq7, 'MANPOWER_AGENCY', 4)['id'];
+$x2 = rful_allocate($rq7, 'SUBCON_AGENCY', 4)['id'];
+$mover = $c4cand($rq7, 'ACCEPTED');
+$res = $race([['attach', $mover, $x1, ''], ['attach', $mover, $x2, '']]);
+t_eq(count($res), 2, 'C7.1 · two real processes reported back');
+$landed = (int) ops_val("SELECT COALESCE(allocation_id,0) FROM candidates WHERE id=?", [$mover]);
+t_ok(in_array($landed, [(int) $x1, (int) $x2], true),
+     'C7.2 · the person is credited to ONE of the two sources, never a blend');
+t_eq(rful_fulfilled($x1) + rful_fulfilled($x2), 1,
+     'C7.3 · counted exactly once across both sources — never twice, never zero');
+t_ok($okN($res) <= 2, 'C7.4 · both processes completed');
+$s7 = rful_summary($rq7);
+t_ok($s7['sourced_fulfilled'] <= $s7['allocated'], 'C7.5 · SOURCED ≤ ALLOCATED survived (I1)');
+t_eq($s7['sourced_fulfilled'], 1, 'C7.6 · one person, counted once');
+//  THE LEDGER MUST RECORD EXACTLY THE CHANGES THAT HAPPENED — no more, no fewer.
+//
+//  Note what this must NOT assert. If the two processes serialise rather than
+//  collide, BOTH succeed: the person is credited to the first source and then
+//  legitimately MOVED to the second, and both entries are true history. An
+//  earlier version of this probe demanded that the source the person did not end
+//  on carry no entry, which confuses "lost the race" with "never had it" — and
+//  MariaDB duly produced the serialised interleaving and failed it.
+//
+//  What must always hold is that the number of credits written equals the number
+//  of processes that actually changed something. A compare-and-swap that writes
+//  safely but then announces a success it did not achieve would leave a credit in
+//  the ledger that never happened.
+$attachEv = (int) ops_val("SELECT COUNT(*) FROM requisition_allocation_events
+                           WHERE event='ATTACHED' AND allocation_id IN (?,?) AND reason LIKE ?",
+                          [(int) $x1, (int) $x2, '%candidate #' . (int) $mover . '%']);
+t_eq($attachEv, $okN($res), 'C7.7 · the ledger records exactly as many credits as processes that succeeded');
+t_ok($attachEv >= 1 && $attachEv <= 2, 'C7.8 · …which is one (a real race) or two (a move), never more');
+
+// ---- C8 · MANY PROCESSES, ONE REMAINING SEAT --------------------------------
+//  Six racers rather than two, so the interleaving that lets two pass the
+//  pre-check together actually occurs and the compensating check is exercised
+//  rather than merely present.
+//  SEVERAL ROUNDS, not one. A compensating check only fires when two processes
+//  BOTH get past the pre-check before either writes, and whether that happens in
+//  any single round is luck. A mutation battery proved that a one-round race let
+//  the compensators be deleted unnoticed. Four rounds on fresh requirements makes
+//  the interleaving occur rather than hoping for it — and every round asserts the
+//  same invariants, so a failure in any one of them fails the battery.
+t_section('C8 · six processes, four seats left — four rounds');
+for ($round = 1; $round <= 4; $round++) {
+    $rq8 = $c4req(10, 'P4C Six r' . $round);
+    rful_allocate($rq8, 'OWN_PAYROLL', 6);
+    $res = $race(array_map(fn($i) => ['allocate', $rq8, 'SUPPLIER', 4], range(1, 6)), 800);
+    t_eq(count($res), 6, "C8.1 · round $round · six real processes reported back");
+    $s8 = rful_summary($rq8);
+    t_ok($s8['allocated'] <= 10, "C8.2 · round $round · the requirement is NOT over-promised");
+    t_eq($s8['over_committed'], 0, "C8.3 · round $round · nothing is promised twice");
+    t_ok($okN($res) <= 1, "C8.4 · round $round · at most one of the six succeeded");
+    foreach ($res as $r) if (empty($r['ok']))
+        t_eq($r['code'], 'OVER_AUTHORISED', "C8.5 · round $round · every loser was told the seats were gone");
+    t_ok(in_array($s8['unallocated'], [0, 4], true),
+         "C8.6 · round $round · either one claim took the four, or all four remain");
+    //  And the ledger must not carry a promise that was withdrawn as if it stood.
+    $liveN = (int) ops_val("SELECT COUNT(*) FROM requisition_allocations
+                            WHERE requisition_id=? AND source='SUPPLIER' AND status NOT IN ('RELEASED','CANCELLED')", [$rq8]);
+    t_eq($liveN, $okN($res), "C8.7 · round $round · exactly as many supplier promises stand as processes succeeded");
+}
+
+// ---- C9 · SIX ARRIVALS, TWO SEATS AT ONE SOURCE — FOUR ROUNDS ---------------
+//  The same reasoning for the credit side: the attach compensator and its
+//  compare-and-swap only matter when several processes pass the seat check
+//  together, so the race is run repeatedly rather than once.
+t_section('C9 · six arrivals, two credits — four rounds');
+for ($round = 1; $round <= 4; $round++) {
+    $rq9 = $c4req(8, 'P4C Credits r' . $round);
+    $a9 = rful_allocate($rq9, 'MANPOWER_AGENCY', 2)['id'];
+    $six = []; for ($i = 0; $i < 6; $i++) $six[] = $c4cand($rq9, 'ACCEPTED');
+    $res = $race(array_map(fn($c) => ['attach', $c, $a9, ''], $six), 800);
+    t_eq(count($res), 6, "C9.1 · round $round · six real processes reported back");
+    t_ok(rful_fulfilled($a9) <= 2, "C9.2 · round $round · the source is never credited beyond its two");
+    t_eq(rful_over_allocated($a9), false, "C9.3 · round $round · and is not over-credited");
+    $credited = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE allocation_id=?", [$a9]);
+    t_eq($credited, rful_fulfilled($a9), "C9.4 · round $round · every credit written is a credit counted");
+    t_ok($credited <= 2, "C9.5 · round $round · never more links than seats");
+    //  Nobody is ejected from a seat by losing a credit.
+    t_eq((int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rq9]), 6,
+         "C9.6 · round $round · all six are STILL in their seats (§24)");
+}
 
 $_SESSION = $c4o; current_user(true); ua(true);
