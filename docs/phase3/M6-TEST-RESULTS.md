@@ -32,7 +32,7 @@ its baseline is not clean.
 | `recruit` | 282 / 0 | 282 / 0 |
 | **Complete regression** | **11180 / 0** | **11181 / 0** |
 
-No test was weakened, deleted or skipped. No skip was introduced. M6 adds **259** assertions. The MariaDB total is one higher because one engine-specific assertion
+No test was weakened, deleted or skipped. No skip was introduced. M6 adds **259** assertions, including invariant **I21** (capacity and incumbency), ratified by the business and proved end to end. The MariaDB total is one higher because one engine-specific assertion
 exists only there.
 
 ## Test isolation (§43)

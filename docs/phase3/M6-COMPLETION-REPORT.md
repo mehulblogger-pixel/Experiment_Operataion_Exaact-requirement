@@ -65,7 +65,7 @@ Baseline **11091 / 0** (119 s) · final **11181 / 0**. Authoritative.
 **21 / 21**, six races, real processes, both engines. See M6-CONCURRENCY-RESULTS.md.
 
 ### 12 · Mutation evidence
-**35 attempted · 35 caught · 0 survived**, against a clean baseline, with the
+**36 attempted · 36 caught · 0 survived**, against a clean baseline, with the
 harness refusing to run on an unclean one — which it did once, correctly. See M6-MUTATION-RESULTS.md.
 
 ### 13 · Security evidence

@@ -8,7 +8,7 @@ deploy checksum is regenerated, and the `p3m6`, `p3m5` and `p3m4` suites run on
 The harness **aborts** if the baseline is not clean — a battery that cannot prove
 its own starting point proves nothing about its mutants.
 
-**Attempted 35 · Caught 35 · Survived 0.**
+**Attempted 36 · Caught 36 · Survived 0.**
 
 | # | Mutation (mandatory target) | Result | Caught by |
 |---|---|---|---|
@@ -35,6 +35,18 @@ its own starting point proves nothing about its mutants.
 | M21 | **cross-module state** — the pipeline engine stops asking the gate | **CAUGHT** | L3.7 |
 | M22 | **partial-failure protection** — the joining compensator is removed | **CAUGHT** | L2.6, C1 |
 | M23 | **interview path** stops asking the gate | **CAUGHT** | L3.3 |
+
+## M36 — the mutation that attacks the ratified policy (I21c)
+
+| # | Mutation | Result | Caught by |
+|---|---|---|---|
+| M36 | a refused dead heat **consumes** the capacity it refused — the revert cancels a vacancy on its way out | **CAUGHT** | L2.10, L7.4 |
+
+I21c says a refused dead heat must leave the capacity **usable by a subsequent
+valid transaction**, never consumed by the refusal. That is easy to state and easy
+to break by accident: a compensator that "tidies up" by cancelling the vacancy it
+just refused would satisfy every other invariant and quietly destroy capacity the
+business had approved. M36 does exactly that, and it is caught.
 
 ## The eight added by the third adversarial pass
 
