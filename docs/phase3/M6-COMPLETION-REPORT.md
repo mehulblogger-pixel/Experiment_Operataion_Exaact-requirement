@@ -56,16 +56,16 @@ Lifecycle, negative/security matrix, reconciliation, real-process concurrency,
 plus the complete existing regression. **191** new assertions.
 
 ### 9 · SQLite evidence
-Baseline **11090 / 0** (117 s) · final **11112 / 0**.
+Baseline **11090 / 0** (117 s) · final **11180 / 0**.
 
 ### 10 · MariaDB evidence
-Baseline **11091 / 0** (119 s) · final **11113 / 0**. Authoritative.
+Baseline **11091 / 0** (119 s) · final **11181 / 0**. Authoritative.
 
 ### 11 · Concurrency evidence
 **21 / 21**, six races, real processes, both engines. See M6-CONCURRENCY-RESULTS.md.
 
 ### 12 · Mutation evidence
-**31 attempted · 31 caught · 0 survived**, against a clean baseline, with the
+**35 attempted · 35 caught · 0 survived**, against a clean baseline, with the
 harness refusing to run on an unclean one — which it did once, correctly. See M6-MUTATION-RESULTS.md.
 
 ### 13 · Security evidence
@@ -101,10 +101,12 @@ E9 public careers (M5 K). E8 TPIA runs on the same spine and is covered by the
 complete Operations regression.
 
 ### 25 · Adversarial findings
-**Three passes.** Pass 1 (before implementation) found five product defects and one
+**Four passes.** Pass 1 (before implementation) found five product defects and one
 probe defect. Pass 2 (after the fixes) was clean at 24/24 once two of my probes
-were repaired. **Pass 3, run after M6 was first declared accepted, found five more
-product defects — all material — and that first verdict is withdrawn.**
+were repaired. **Pass 3, after M6 was first declared accepted, found five more —
+all material.** **Pass 4 found three more** (a move asked as an advance, a decision
+stamp left on an undone decision, and a compensator that refused everybody in a
+dead heat), plus one no-op mutation reported rather than counted.
 See M6-ADVERSARIAL-AUDIT.md.
 
 ---
@@ -134,7 +136,11 @@ See M6-ADVERSARIAL-AUDIT.md.
    nothing had been written. *(MATERIAL)*
 10. A cast in the caller defeated its own repair — the helper validated, the
     caller had already destroyed the evidence. *(MATERIAL)*
-11. **Two approvers deciding one request both succeeded** — check-then-write
+11. A **move** was asked as an advance, so moving somebody who already held a
+    seat onto a full requirement put two people into one. *(MATERIAL)*
+12. A reverted joining **left its decision stamp**, so a decision that was undone
+    still appeared to have been taken. *(MATERIAL)*
+13. **Two approvers deciding one request both succeeded** — check-then-write
     around the decision, leaving two contradictory decisions in one audit trail.
     Intermittent on MariaDB, invisible on SQLite. *(MATERIAL)*
 
@@ -167,6 +173,13 @@ Nothing. No finding was postponed.
    transaction, because the callers do not own one. Proved under real concurrency.
 7. **An unrecognised role maps to ADMIN** (`ua()`) — pre-existing, recorded since
    M4, untouched here.
+8. **A dead heat on the last seat may refuse both claimants.** The seat
+   compensator guarantees two things absolutely — never more than the approved
+   seats, and never a displacement of somebody already in one — and pays for them
+   with pessimism: when two processes claim the last seat at the same instant,
+   both may be refused and the seat is left for whoever tries next. Two attempts
+   to pick a winner instead each let an arriving candidate displace an
+   established one, so the safe rule stands. Asserted, not hidden, by L14 and C1.
 
 ## CARRIED-FORWARD FINDINGS
 
