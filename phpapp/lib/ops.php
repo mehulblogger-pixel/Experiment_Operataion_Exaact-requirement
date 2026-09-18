@@ -5551,10 +5551,21 @@ function ops_candidates($route, $method) {
                 //  one door, so a crafted POST cannot smuggle one past the controls.
                 $p4note = '';
                 if (function_exists('rful_apply_posted')) {
-                    if (function_exists('rful_enforce_candidate')) rful_enforce_candidate((int) $id, 0);
                     $p4note = rful_apply_posted((int) $id, $b,
                         ($b['requisition_id'] ?? '') !== '' ? (int) $b['requisition_id'] : 0, 'candidate-new');
                     if ($p4note !== '') $p4note = ' ' . $p4note;
+                    //  …and the same defence in depth the edit and stage paths have.
+                    //  This ran BEFORE the link was set, where it could only ever be a
+                    //  no-op — the INSERT column list carries no allocation_id, so
+                    //  there was never anything for it to find. Afterwards it is the
+                    //  second line the other two paths already had: whatever wrote to
+                    //  the row, a link that should not exist is removed. Found while
+                    //  classifying the attach compensator; the same rule applied where
+                    //  somebody remembered to apply it.
+                    if (function_exists('rful_enforce_candidate')) {
+                        $p4rev = rful_enforce_candidate((int) $id, 0);
+                        if ($p4rev !== '' && $p4note === '') $p4note = ' ' . $p4rev;
+                    }
                 }
                 $m5note = '';
                 if (function_exists('rasg_assign')) {

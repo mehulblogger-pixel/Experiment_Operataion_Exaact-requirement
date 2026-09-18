@@ -303,4 +303,128 @@ for ($round = 1; $round <= 4; $round++) {
          "C9.6 · round $round · all six are STILL in their seats (§24)");
 }
 
+
+// ============================================================================
+//  C10-C12 — THE THREE CONTROLS THE MUTATION BATTERY COULD NOT REACH
+//
+//  T6 (the attach compensator), T18 (the resize compare-and-swap) and T19 (the
+//  attach compare-and-swap) execute ONLY when several processes get past a
+//  pre-check before any of them writes. They survived every earlier battery
+//  because the workers were not colliding: the lazy schema check cost each
+//  process 7.5-9.8 ms on its first production read, varying by 2.4 ms, while the
+//  window being raced is about 250 microseconds. Warming that before the barrier
+//  (see tests/_p4_worker.php) closed the gap; eight workers now enter together.
+//
+//  Each probe below asserts the DATABASE and the LEDGER, never what a process
+//  reported. A control that writes safely but announces a success it did not
+//  achieve is exactly what these mutations produce, and believing the report
+//  would make the probe agree with the bug.
+// ============================================================================
+
+// ---- C10 · T6 — the attach compensator -------------------------------------
+t_section('C10 · eight arrivals, one seat at the source (the attach compensator)');
+for ($round = 1; $round <= 2; $round++) {
+    $rq10 = $c4req(12, 'P4C Compensator r' . $round);
+    $a10  = rful_allocate($rq10, 'MANPOWER_AGENCY', 1)['id'];
+    $eight = []; for ($i = 0; $i < 8; $i++) $eight[] = $c4cand($rq10, 'ACCEPTED');
+    $res = $race(array_map(fn($c) => ['attach', $c, $a10, ''], $eight));
+    t_eq(count($res), 8, "C10.1 · round $round · eight real processes reported back");
+    //  THE BUSINESS STATE. One promised seat means at most one credited person —
+    //  whether the door refused them or the compensator withdrew them afterwards.
+    $links = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE allocation_id=?", [$a10]);
+    t_ok($links <= 1, "C10.2 · round $round · at most ONE credit survives against one promised seat (got $links)");
+    t_ok(rful_fulfilled($a10) <= 1, "C10.3 · round $round · the source is never credited beyond its one");
+    t_eq(rful_over_allocated($a10), false, "C10.4 · round $round · and is not left over-credited");
+    //  Refusing every contested claim is permitted; over-crediting is not.
+    t_ok($okN($res) <= 1, "C10.5 · round $round · at most one process actually took it");
+    //  Nobody is ejected from a seat by losing a credit.
+    t_eq((int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rq10]), 8,
+         "C10.6 · round $round · all eight are STILL in their seats (§24)");
+    //  And the capacity is still usable by a later valid transaction.
+    if ($links === 0) {
+        $late = $c4cand($rq10, 'ACCEPTED');
+        t_eq(rful_attach($late, $a10)['code'], 'OK',
+             "C10.7 · round $round · a dead heat left the seat usable by the next valid transaction");
+    } else {
+        t_eq(rful_attach($c4cand($rq10, 'ACCEPTED'), $a10)['code'], 'OVER_ALLOCATED',
+             "C10.7 · round $round · one claim took it, and a ninth is refused");
+    }
+}
+
+// ---- C11 · T19 — the attach compare-and-swap --------------------------------
+//  Eight processes move the SAME person to EIGHT DIFFERENT sources at once. Only
+//  one can move them from "no source"; the rest must find the link already
+//  changed and report a refusal.
+//
+//  The compare-and-swap's SQL predicate keeps the DATA safe on its own — a losing
+//  UPDATE matches no row. What the rowCount() check adds is TRUTHFULNESS: without
+//  it a loser announces success and writes a credit to the ledger for a source
+//  the person never touched. So the assertion is on the LEDGER against the
+//  DATABASE, and it is deliberately not "one winner": if the processes serialise
+//  instead of colliding, each move is real and each entry is true history.
+t_section('C11 · one person, eight sources, at the same instant (the attach CAS)');
+for ($round = 1; $round <= 2; $round++) {
+    $rq11 = $c4req(12, 'P4C AttachCAS r' . $round);
+    $allocs = [];
+    foreach (['OWN_PAYROLL', 'MANPOWER_AGENCY', 'SUBCON_AGENCY', 'FREELANCER',
+              'SUPPLIER', 'CONSULTANT', 'CLIENT_BENCH', 'INTERNAL_TRANSFER'] as $src)
+        $allocs[] = (int) rful_allocate($rq11, $src, 1)['id'];
+    $who = $c4cand($rq11, 'ACCEPTED');
+    $res = $race(array_map(fn($al) => ['attach', $who, $al, ''], $allocs));
+    t_eq(count($res), 8, "C11.1 · round $round · eight real processes reported back");
+    $landed = (int) ops_val("SELECT COALESCE(allocation_id,0) FROM candidates WHERE id=?", [$who]);
+    t_ok(in_array($landed, $allocs, true) || $landed === 0,
+         "C11.2 · round $round · the person is on one source or none, never a blend");
+    //  EVERY credit in the ledger must be one the person actually held: either
+    //  they are on it now, or a matching DETACHED records that they left it.
+    $phantom = [];
+    foreach ($allocs as $al) {
+        $att = (int) ops_val("SELECT COUNT(*) FROM requisition_allocation_events
+                              WHERE allocation_id=? AND event='ATTACHED' AND reason LIKE ?",
+                             [$al, '%candidate #' . $who . '%']);
+        if ($att === 0) continue;
+        $det = (int) ops_val("SELECT COUNT(*) FROM requisition_allocation_events
+                              WHERE allocation_id=? AND event='DETACHED' AND reason LIKE ?",
+                             [$al, '%candidate #' . $who . '%']);
+        if ($al === $landed) continue;                    // they are on it now — true
+        if ($det >= 1) continue;                          // they passed through it — true
+        $phantom[] = $al;                                 // credited to a source they never held
+    }
+    t_eq(count($phantom), 0,
+         "C11.3 · round $round · no source is credited with a person it never held (mutant T19)");
+    //  A source that lost must also not be counted as having delivered anybody.
+    $credited = 0;
+    foreach ($allocs as $al) $credited += rful_fulfilled($al);
+    t_eq($credited, $landed === 0 ? 0 : 1,
+         "C11.4 · round $round · the person counts once across all eight sources, or not at all");
+    t_eq((string) ops_val("SELECT stage FROM candidates WHERE id=?", [$who]), 'ACCEPTED',
+         "C11.5 · round $round · and they are still in their seat (§24)");
+}
+
+// ---- C12 · T18 — the resize compare-and-swap --------------------------------
+//  Eight processes resize the same allocation from the same baseline to eight
+//  different quantities. The ledger is a CHAIN: each change records what it moved
+//  from and to, so the chain must be continuous and must end where the row
+//  actually stands. A compare-and-swap that writes safely but reports a success
+//  it did not achieve breaks the chain — several entries all claiming to start
+//  from the same baseline, only one of which happened.
+t_section('C12 · eight resizes of one allocation at the same instant (the resize CAS)');
+for ($round = 1; $round <= 2; $round++) {
+    $rq12 = $c4req(40, 'P4C ResizeCAS r' . $round);
+    $a12  = rful_allocate($rq12, 'OWN_PAYROLL', 4)['id'];
+    $res = $race(array_map(fn($q) => ['reallocate', $a12, $q, 4], [6, 7, 8, 9, 10, 11, 12, 13]));
+    t_eq(count($res), 8, "C12.1 · round $round · eight real processes reported back");
+    $now = (int) rful_get($a12)['allocated_qty'];
+    t_ok(in_array($now, [4, 6, 7, 8, 9, 10, 11, 12, 13], true),
+         "C12.2 · round $round · the allocation holds ONE of the values asked for, never a blend");
+    $chain = ops_all("SELECT from_qty, to_qty FROM requisition_allocation_events
+                      WHERE allocation_id=? AND event='REALLOCATED' ORDER BY id", [$a12]);
+    $prev = 4; $broken = 0;
+    foreach ($chain as $e) { if ((int) $e['from_qty'] !== $prev) $broken++; $prev = (int) $e['to_qty']; }
+    t_eq($broken, 0, "C12.3 · round $round · the ledger chain is continuous — no entry starts from a figure that had already moved (mutant T18)");
+    t_eq($prev, $now, "C12.4 · round $round · …and it ends exactly where the allocation now stands");
+    t_ok(count($chain) <= 8, "C12.5 · round $round · no more changes recorded than processes");
+    t_ok(rful_summary($rq12)['allocated'] <= 40, "C12.6 · round $round · and the approval was never exceeded");
+}
+
 $_SESSION = $c4o; current_user(true); ua(true);

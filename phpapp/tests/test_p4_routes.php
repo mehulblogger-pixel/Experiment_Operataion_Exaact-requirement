@@ -124,6 +124,21 @@ $drive('route_cand_new', 0, '', ['requisition_id' => $rqA, 'allocation_id' => $a
 $newId2 = (int) ops_val("SELECT id FROM candidates ORDER BY id DESC");
 t_eq($linkOf($newId2), (int) $aOK, 'RT2.3 · a legitimate credit IS set by the create route');
 
+//  …and the create route runs the SAME defence in depth the edit and stage routes
+//  run: whatever wrote to the row, a link that cannot be held is removed. The
+//  compensator used to run BEFORE the link was set, where it could only ever be a
+//  no-op, so the create path was the one route with no second line behind it.
+$rqN = $t4req(6, 'P4T CreateComp');
+$aN  = rful_allocate($rqN, 'SUPPLIER', 1)['id'];
+$n1  = $t4cand($rqN, 'ACCEPTED'); rful_attach($n1, $aN);
+t_eq(rful_fulfilled($aN), 1, 'RT2.4 · a one-seat source is full');
+$drive('route_cand_new', 0, '', ['requisition_id' => $rqN, 'allocation_id' => $aN,
+    'first_name' => 'P4T', 'last_name' => 'Second', 'dup_ack' => 1]);
+$newId3 = (int) ops_val("SELECT id FROM candidates ORDER BY id DESC");
+t_eq($linkOf($newId3), 0, 'RT2.5 · a second person cannot be created onto it');
+t_eq(rful_fulfilled($aN), 1, 'RT2.6 · and the source is still credited with exactly one');
+t_eq($linkOf($n1), (int) $aN, 'RT2.7 · the established credit is untouched');
+
 // ---- RT3 · THE STAGE ROUTE SETTLES THE SOURCE'S CEILING ---------------------
 //  The mutation battery's T27. Two people are credited to a two-seat source and
 //  join; a third is credited by a raw write and then joins through the route.

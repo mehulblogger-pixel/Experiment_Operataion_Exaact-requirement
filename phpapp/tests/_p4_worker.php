@@ -17,6 +17,29 @@ $op    = (string) ($argv[1] ?? ''); $id = (int) ($argv[2] ?? 0);
 $arg   = (string) ($argv[3] ?? ''); $arg2 = (string) ($argv[4] ?? '');
 $delay = (int) ($argv[5] ?? 0);     $uid = (int) ($argv[6] ?? 0);
 if ($uid > 0) { $_SESSION['uid'] = $uid; current_user(true); ua(true); }
+//  WARM THE ONE-TIME PER-PROCESS COSTS BEFORE THE BARRIER.
+//
+//  Measured: the lazy, idempotent schema check fires inside the first production
+//  read and costs 7.5-9.8 ms, varying by 2.4 ms between workers — while the
+//  window this race is supposed to happen inside (the seat check to the write) is
+//  about 250 microseconds. The processes were therefore arriving nine
+//  milliseconds apart and queueing politely; they were never racing, and two
+//  compare-and-swaps and a compensator could be deleted without a single probe
+//  noticing.
+//
+//  This is test-side only. No production logic, timing or SQL is altered: these
+//  are ordinary reads plus an idempotent migration that every worker pays for in
+//  the same place, for exactly the reason the database connection is opened here
+//  rather than after the barrier. With it, eight workers now enter the critical
+//  section within a few hundred microseconds of one another.
+if (function_exists('rful_migrate')) {
+    try {
+        db(); rful_migrate();
+        rful_may_touch(0);
+        if (function_exists('lk_options_or')) lk_options_or('req_sourcing_model', []);
+        if ($id > 0) { rful_get($id); rful_get($arg === '' ? 0 : (int) $arg); }
+    } catch (Throwable $e) {}
+}
 //  SYNCHRONISE ON A WALL-CLOCK INSTANT, not on a sleep.
 //
 //  Sleeping a fixed interval after start does not make a race: PHP's own boot
