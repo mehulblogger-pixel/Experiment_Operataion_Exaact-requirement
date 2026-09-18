@@ -187,3 +187,64 @@ Not a live defect while T6 is present, but the same "a rule applied where somebo
 remembered to apply it" family this programme keeps meeting. The call was moved
 after the attach (`lib/ops.php`), and **RT2.4–RT2.7** now prove a second person
 cannot be created onto a full source while the established credit is untouched.
+
+---
+
+## §14 — The final adversarial question
+
+> **With the final Phase 4 implementation, can any real user, concurrent process,
+> direct function call, POST, AJAX path, API path, import path, background path,
+> candidate workflow, allocation workflow, fulfilment workflow, or sibling
+> workflow violate the Phase 4 quantity, source-credit, ownership, attachment,
+> allocation, or concurrency invariants?**
+
+**Answer: no path found, and the search is documented below rather than
+asserted.** What follows is what was actually exercised, not what was assumed.
+
+### Every writer of the Phase 4 tables, enumerated
+
+`requisition_allocations` has exactly three writers — `rful_allocate()`,
+`rful_reallocate()`, `rful_close()` — plus `rful_sync_state()`, which writes only
+a derived status. `candidates.allocation_id` has exactly one door,
+`rful_attach()`. Verified by grep across `lib/` and `views/`: no other file
+writes either. The route `/requisition-allocations` is a thin shell that decides
+nothing; a crafted POST reaches the same three functions the form does.
+
+### How each surface was exercised
+
+| Surface | How it was tested | Evidence |
+|---|---|---|
+| **POST / AJAX / the routes** | The real `candidate-new`, `candidate-edit` and `candidate-stage` routes driven in their own processes, then the **database** read | `test_p4_routes.php`, 39 assertions |
+| **Direct function call** | Every probe in the invariant, security and reconciliation batteries calls the production function with no screen in the way | 877 assertions |
+| **Concurrent processes** | Real separate OS processes on independent connections, synchronised to a wall-clock instant, warmed so they genuinely collide | C1–C12 |
+| **Raw SQL past the door** | Links and quantities written straight to the tables, then the compensators run | E3–E4, RT1.7–RT1.13, RT3.4–RT3.9, RT4, section P |
+| **Import / background** | No Phase 4 importer or background job exists; the cron touches nothing in these tables | grep of `cron.php`, `api.php` |
+| **Sibling workflows** | Offers, interviews, the configured pipeline and the careers intake were checked for writes to either table — there are none; they are gated by M6, which Phase 4 asks rather than duplicates | `P4-ACTION-PATH-SWEEP.md` |
+
+### The invariants, and what proves each
+
+| Invariant | Proof |
+|---|---|
+| ALLOCATED ≤ AUTHORISED | B1–B6, C1, C8 (six-way), mutants T1/T3/T31/T38 |
+| COMMITTED ≤ AUTHORISED (a seat filled directly cannot be promised) | J1–J7, mutant T2 |
+| SOURCED-FULFILLED ≤ ALLOCATED | D5–D8, C2, C9, C10, mutants T5/T6/T32 |
+| No phantom credit or false attribution | C11, mutant T19 |
+| Ledger equals committed state | C12, N1–N6, mutants T18/T29 |
+| One allocation, one requirement | E1–E4, S7.4, mutants T8/T9/T34 |
+| No established holder displaced | C3, C10.6, RT4, mutant T23 |
+| No negative figure | G6, J15–J18, section P, mutants T35/T36 |
+| Entitlement, permission, scope, executability | S1–S3, S8, mutants T11/T12/T13/T14 |
+
+### What I am *not* claiming
+
+This says no violating path was **found** by the work recorded here. It does not
+say none exists. Two specific limits are worth stating plainly:
+
+1. **Scale is unmeasured beyond 100 seats and eight concurrent processes.** The
+   derivation is `O(allocations × candidates)` per summary.
+2. **The `connect` entitlement transition is untested.** A workspace that buys the
+   marketplace module mid-flight inherits allocations that were refused before it
+   did. Nothing is wrong today; the transition has no probe.
+
+Neither is a known defect. Both are named so that the next person attacking this
+starts where the evidence stops rather than where it looks complete.
