@@ -415,9 +415,16 @@ $pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")
 //  …and a second joining on the same requirement that Carl never held.
 $cK5b = $p5cand($rqK5, 'ACCEPTED', null, date('c'));
 reqf_sync($rqK5);
-$dCC2 = rcc_data($ccF);
+//  Asked through the dashboard's OWN recruiter filter rather than by scanning the
+//  whole table. The table is deliberately truncated to the eight busiest people,
+//  so a probe that simply looks for a name in it passes or fails depending on how
+//  many other fixtures the suite happened to build first — which is exactly what
+//  it did: green on its own, red in the full run. That is a probe measuring the
+//  suite, not the product.
+$ccCarl = $ccF; $ccCarl['manager'] = (string) $uCarl;
+$dCC2 = rcc_data($ccCarl);
 $rowK5 = null; foreach ($dCC2['recruiters'] as $r) if ((int) $r['uid'] === $uCarl) $rowK5 = $r;
-t_ok($rowK5 !== null, 'K5 · Carl appears on the recruiter table');
+t_ok($rowK5 !== null, 'K5 · Carl appears on the recruiter table when it is filtered to him');
 if ($rowK5) {
     t_eq((int) $rowK5['posted'], 5, 'K5b · he is CARRYING five — eight approved less the three given up, not eight');
     t_eq((int) $rowK5['recruited'], 1, 'K5c · and is credited with the ONE joining the ledger puts on him, not both');
@@ -493,5 +500,92 @@ $rqK11 = $p5req(1, ['job_title' => 'P5 Cache']);
 $p5cand($rqK11, 'ACCEPTED', null, date('c'));
 $rowsAfter = count(rkpi_settled_rows(['no_scope' => true]));
 t_ok($rowsAfter > $rowsBefore, 'K11 · a read after a write sees the write — no stale cache between them');
+
+// ---- L · WHAT AN ADVERSARIAL PASS FOUND ------------------------------------
+//
+//  These come from attacking the finished work rather than confirming it. Every
+//  one is a state no screen can create and every real database eventually
+//  contains: a corrupted row, a half-finished import, two servers whose clocks
+//  disagree. A derived figure must be bounded by its own definition, not by
+//  trust in the rows underneath it.
+t_section('L · corrupt and impossible data cannot make a figure lie');
+
+$mkRaw = function ($q, $canc = 0) use ($pdo) {
+    $pdo->prepare("INSERT INTO requisitions (req_code,office_id,designation,status,quantity,cancelled_qty,created_at)
+                   VALUES (?,?,?,?,?,?,?)")
+        ->execute(['P5L-' . bin2hex(random_bytes(3)), 9841, 'ENGINEER', 'OPEN', $q, $canc, date('c')]);
+    return (int) $pdo->lastInsertId(); };
+
+//  L1 — a negative quantity, and a negative cancellation.
+$dL1 = rkpi_demand($only($mkRaw(-5)));
+t_ok((int) $dL1['authorised'] >= 0 && (int) $dL1['remaining'] >= 0, 'L1 · a negative quantity cannot produce a negative figure');
+$dL2 = rkpi_demand($only($mkRaw(5, -4)));
+t_eq((int) $dL2['cancelled'], 0, 'L2 · a negative cancellation cancels nothing…');
+t_eq((int) $dL2['authorised'], 5, 'L2b · …and cannot inflate the approved headcount');
+
+//  L3 — a corrupt negative promise must not invent capacity. Phase 4 fixed
+//  exactly this on its own path; the aggregate must hold the same line.
+$rqL3 = $mkRaw(5);
+$pdo->prepare("INSERT INTO requisition_allocations (requisition_id,source,source_label,allocated_qty,status,created_at)
+               VALUES (?,?,?,?,?,?)")->execute([$rqL3, 'MANPOWER_AGENCY', 'Corrupt', -9, 'ACTIVE', date('c')]);
+$dL3 = rkpi_demand($only($rqL3));
+t_ok((int) $dL3['allocated'] >= 0 && (int) $dL3['unallocated'] <= 5, 'L3 · a negative promise cannot invent capacity');
+t_eq((int) $dL3['allocated'], (int) rful_summary($rqL3)['allocated'], 'L3b · …and Phase 4 is still agreed with');
+
+//  L4 — an allocation belonging to ANOTHER requirement lends no seats here.
+$rqL4a = $mkRaw(4); $rqL4b = $mkRaw(4);
+$pdo->prepare("INSERT INTO requisition_allocations (requisition_id,source,source_label,allocated_qty,status,created_at)
+               VALUES (?,?,?,?,?,?)")->execute([$rqL4b, 'MANPOWER_AGENCY', 'Elsewhere', 2, 'ACTIVE', date('c')]);
+$alL4 = (int) $pdo->lastInsertId();
+$pdo->prepare("INSERT INTO candidates (cand_code,first_name,last_name,stage,requisition_id,allocation_id,created_at,decided_at)
+               VALUES (?,'P5','L','ACCEPTED',?,?,?,?)")
+    ->execute(['P5LC-' . bin2hex(random_bytes(3)), $rqL4a, $alL4, date('c'), date('c')]);
+t_eq((int) rkpi_demand($only($rqL4a))['allocated'], 0, 'L4 · a foreign allocation lends no seats to this requirement');
+
+//  L5 — A LEDGER WHOSE TIMESTAMPS RUN BACKWARDS.
+//
+//  Clock skew between two servers, an import, or a manual fix all produce this.
+//  A negative duration is not a fast stage, it is a broken record: left in, it
+//  drags an average down and can make a stage look instantaneous. It is excluded
+//  and COUNTED — not clamped to zero, which would turn a data fault into a
+//  plausible measurement.
+$cL5 = $p5cand($mkRaw(2), 'RECEIVED');
+$insL5 = "INSERT INTO candidate_events (candidate_id,from_stage,to_stage,created_at,from_code,to_code,track,event_kind)
+          VALUES (?,?,?,?,?,?,?,?)";
+$pdo->prepare($insL5)->execute([$cL5, '', 'One', '2026-06-10T00:00:00+00:00', '', 'S1', 'PIPELINE', 'MOVE']);
+$pdo->prepare($insL5)->execute([$cL5, 'One', 'Two', '2026-06-01T00:00:00+00:00', 'S1', 'S2', 'PIPELINE', 'MOVE']);
+$pdo->prepare($insL5)->execute([$cL5, 'Two', 'Three', '2026-06-20T00:00:00+00:00', 'S2', 'S3', 'PIPELINE', 'MOVE']);
+$durL5 = rkpi_stage_durations($cL5, 'PIPELINE', 'calendar');
+$negL5 = 0; foreach ($durL5['steps'] as $stL5) if ((int) $stL5['days'] < 0) $negL5++;
+t_eq($negL5, 0, 'L5 · a ledger running backwards yields NO negative step duration');
+t_ok((int) $durL5['out_of_order'] >= 1, 'L5b · …and the broken step is counted, so somebody can go and fix the record');
+t_eq(count($durL5['steps']), 1, 'L5c · the sound step is still measured — one bad row does not discard the rest');
+
+//  L6 — ageing at the edges.
+t_ok(rkpi_age('2026-12-28', '2027-01-04', 'business') !== null, 'L6 · working days cross a year boundary');
+t_eq(rkpi_age('1990-01-01', '2026-01-01', 'business'), null, 'L6b · an absurd span is refused rather than counted day by day');
+t_ok(rkpi_age('2026-03-09', '2026-03-02', 'business') < 0, 'L6c · a backwards span reads negative rather than silently zero');
+
+//  L7 — dangling and missing references.
+$rqL7 = $mkRaw(3);
+$pdo->prepare("UPDATE requisitions SET hiring_request_id=999999 WHERE id=?")->execute([$rqL7]);
+t_eq(rkpi_target($rqL7)['state'], 'NO_TARGET', 'L7 · a dangling hiring-request link yields NO TARGET — not a crash, not a date');
+t_eq(rkpi_target(999999)['state'], 'NO_TARGET', 'L7b · an unknown requirement has no target either');
+t_eq((int) rkpi_demand(['no_scope' => true, 'where' => 'r.id=?', 'args' => [999999]])['requisitions'], 0, 'L7c · …and counts as nothing');
+
+//  L8 — a metric that does not exist, and one that could not be entitled.
+t_eq(tapi_metric_value('hiring.does.not.exist', []), null, 'L8 · an unknown metric is NO DATA — not an error and not a zero');
+$leakL8 = 0;
+foreach (tapi_metrics() as $kL8 => $vL8)
+    if (strpos($kL8, 'hiring.') === 0 && (($vL8['source'] ?? '') === '' || tapi_metric_module($kL8) === null)) $leakL8++;
+t_eq($leakL8, 0, 'L8b · no recruitment metric can be published without a lineage to be entitled by (K7)');
+
+//  L9 — a dead heat in the assignment ledger still yields ONE answer.
+$cL9 = $p5cand($mkRaw(2), 'ACCEPTED', null, '2026-05-05T10:00:00+00:00');
+$liL9 = "INSERT INTO recruiter_assignments (subject,entity_id,from_user_id,to_user_id,actor,created_at) VALUES (?,?,?,?,?,?)";
+$pdo->prepare($liL9)->execute(['CAND_RECRUITER', $cL9, null, 77771, 'x', '2026-05-05T10:00:00+00:00']);
+$pdo->prepare($liL9)->execute(['CAND_RECRUITER', $cL9, 77771, 77772, 'x', '2026-05-05T10:00:00+00:00']);
+$whoL9 = rkpi_owner_at('CAND_RECRUITER', $cL9, '2026-05-05T10:00:00+00:00');
+t_ok($whoL9 === 77771 || $whoL9 === 77772, 'L9 · two ledger entries at the same instant still give one answer, not a crash');
 
 $_SESSION = $p5sess; current_user(true); ua(true);

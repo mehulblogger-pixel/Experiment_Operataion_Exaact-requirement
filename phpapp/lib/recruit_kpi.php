@@ -580,7 +580,8 @@ function rkpi_unattributed(array $opt = []) {
 // ---------------------------------------------------------------------------
 function rkpi_stage_durations($candidateId, $track = 'PIPELINE', $basis = 'calendar', $officeId = null) {
     $hist = rkpi_stage_history($candidateId);
-    $out = ['track' => $track, 'basis' => $basis, 'steps' => [], 'uncoded' => 0, 'reverted' => 0];
+    $out = ['track' => $track, 'basis' => $basis, 'steps' => [], 'uncoded' => 0,
+            'reverted' => 0, 'out_of_order' => 0];
     $prev = null;
     foreach ($hist as $h) {
         $kind = strtoupper((string) ($h['event_kind'] ?? ''));
@@ -594,7 +595,18 @@ function rkpi_stage_durations($candidateId, $track = 'PIPELINE', $basis = 'calen
         if ($code === '') { $out['uncoded']++; continue; }
         if ($prev !== null) {
             $d = rkpi_age($prev['at'], (string) $h['created_at'], $basis, $officeId);
-            if ($d !== null) $out['steps'][] = ['code' => $prev['code'], 'label' => $prev['label'], 'days' => $d];
+            //  A NEGATIVE duration is not a fast stage — it is a broken record.
+            //  Found by attacking the finished work with a ledger whose
+            //  timestamps ran backwards, which clock skew between two servers, an
+            //  import, or a manual data fix can all produce. Left in, it would
+            //  drag an average down and could make a stage look instantaneous.
+            //
+            //  It is EXCLUDED rather than clamped to zero, and counted. Clamping
+            //  would silently turn a data fault into a plausible measurement;
+            //  counting it puts the fault where somebody can go and fix it — the
+            //  same choice this engine makes for uncoded and reverted rows.
+            if ($d !== null && $d < 0) $out['out_of_order']++;
+            elseif ($d !== null) $out['steps'][] = ['code' => $prev['code'], 'label' => $prev['label'], 'days' => $d];
         }
         $prev = ['code' => $code, 'label' => (string) ($h['to_stage'] ?? $code), 'at' => (string) $h['created_at']];
     }
@@ -603,6 +615,9 @@ function rkpi_stage_durations($candidateId, $track = 'PIPELINE', $basis = 'calen
     //  average drift downwards the moment somebody stalls.
     if ($prev !== null) {
         $d = rkpi_age($prev['at'], null, $basis, $officeId);
+        //  A stage entered in the FUTURE is the same fault seen from the other
+        //  end: "−4 days in this stage" is not a number anybody can act on.
+        if ($d !== null && $d < 0) { $out['out_of_order']++; $d = null; }
         $out['current'] = ['code' => $prev['code'], 'label' => $prev['label'], 'days' => $d, 'since' => $prev['at']];
     }
     return $out;
