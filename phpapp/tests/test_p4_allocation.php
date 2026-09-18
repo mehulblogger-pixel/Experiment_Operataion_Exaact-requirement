@@ -135,6 +135,23 @@ t_ok($sD['fulfilled'] <= $sD['authorised'], 'D12b · and nobody joined beyond th
 t_eq($sD['over_committed'], 0, 'D12c · nothing is promised twice');
 t_eq(rful_sync_state($d1), 'FULFILLED', 'D13 · the agency allocation reports itself complete');
 
+//  A FULFILLED source is LIVE, not closed — the lifecycle says so, the seat check
+//  agrees, and the resize path must agree too. It was the odd one out, and the
+//  practical cost was that a coordinator could not trim a promise while the
+//  derived status happened to read FULFILLED — refusing the correction itself.
+//  Its OWN requirement, with headroom. $rqD is fully allocated, so growing
+//  anything there is refused for an unrelated and perfectly correct reason —
+//  the first version of this probe tested the ceiling, not the state gate.
+$rqF2 = $p4req(6, ['job_title' => 'P4 Full source']);
+$f2 = rful_allocate($rqF2, 'MANPOWER_AGENCY', 2)['id'];
+rful_attach($p4cand($rqF2, 'ACCEPTED'), $f2);
+rful_attach($p4cand($rqF2, 'ACCEPTED'), $f2);
+t_eq(rful_sync_state($f2), 'FULFILLED', 'D14 · a source that delivered all it promised reads FULFILLED');
+t_eq(rful_reallocate($f2, 3)['code'], 'OK', 'D15 · a FULFILLED source can still be GROWN');
+t_eq(rful_reallocate($f2, 2)['code'], 'OK', 'D16 · …and trimmed back to what it delivered');
+t_eq(rful_reallocate($f2, 1)['code'], 'BELOW_FULFILLED', 'D17 · but never below it');
+t_eq((int) rful_get($f2)['allocated_qty'], 2, 'D18 · …and the refusal wrote nothing');
+
 // ---- E · AN ALLOCATION BELONGS TO ONE REQUIREMENT (I4) ----------------------
 t_section('E · one allocation, one requirement');
 $rqE1 = $p4req(4, ['job_title' => 'P4 Alpha']); $rqE2 = $p4req(4, ['job_title' => 'P4 Beta']);

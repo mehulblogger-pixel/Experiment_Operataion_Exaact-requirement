@@ -451,7 +451,26 @@ function rful_reallocate($allocationId, $newQty, array $opt = []) {
     $rq = (int) $a['requisition_id'];
     $gate = rful_may_touch($rq, $opt); if ($gate !== 'OK') return $fail($gate);
     $why = rful_exec_block($rq); if ($why !== '') return $fail('EXECUTION_BLOCKED', $why);
-    if (!in_array(strtoupper((string) $a['status']), RFUL_OPEN_STATES, true)) return $fail('BAD_STATE');
+    //  CLOSED means released or cancelled — the same answer the seat check gives.
+    //
+    //  This asked whether the allocation was OPEN, which excludes FULFILLED, while
+    //  rful_seat_block() asks whether it is LIVE, which includes it. Two answers to
+    //  one question again, and the lifecycle document has said all along that
+    //  FULFILLED is "not a closed state: a live source that happens to be full".
+    //
+    //  The consequence was not theoretical. FULFILLED is DERIVED, and under
+    //  concurrency it can be left stale — one process syncs it to FULFILLED while
+    //  another has just reverted a joining. A coordinator trying to trim a promise
+    //  the source had not actually delivered was then refused with "that allocation
+    //  is closed", which is both false and the exact thing the negative matrix
+    //  forbids: the correction must never be the thing that is refused. Cutting
+    //  below what was genuinely delivered is still refused, by BELOW_FULFILLED.
+    //
+    //  Stated as "allow only LIVE", character for character the same test the seat
+    //  check makes — not as "refuse only CLOSED", which would let a status in no
+    //  lifecycle at all through. A probe written in an earlier pass caught exactly
+    //  that mistake here within a minute of it being made.
+    if (!in_array(strtoupper((string) $a['status']), RFUL_LIVE_STATES, true)) return $fail('BAD_STATE');
 
     $n = rful_qty($newQty, $qOk); if (!$qOk) return $fail('BAD_QUANTITY');
     $was = (int) $a['allocated_qty'];
