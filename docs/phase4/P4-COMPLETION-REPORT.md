@@ -127,6 +127,53 @@ demonstrate that a dead heat leaves the seat usable by the next valid
 transaction. This is flagged here because it touches a Phase 3 file and is
 therefore the owner's to review.
 
+## The final mutation gate
+
+Phase 4 was reported complete once before, at 34 of 37 mutations caught with
+three survivors classified as *independently protected*. That classification was
+wrong, and the gate that re-examined it is the most productive thing in this
+phase.
+
+**The three survivors were not protected.** They survived because the test
+harness was not racing. Measuring the workers rather than reasoning about them
+showed each was paying **7.5–9.8 ms** of one-time cost inside the **0.25 ms**
+window it was supposed to be contending in — so eight processes released at the
+same microsecond still arrived nine milliseconds apart and queued politely. The
+remedy was entirely test-side: pay that cost before the barrier, exactly as the
+database connection already was.
+
+With the processes genuinely colliding, the gate produced **two real product
+defects, two defects in my own tests, and one mutation that had never run**:
+
+| # | Finding | Kind |
+|---|---|---|
+| 1 | The allocation compensator withdrew only the *latest* over-allocation. Six racers left **five standing and the requirement over-promised by four** | **product** |
+| 2 | The probe that found (1) caught it about one run in six — it would not have stopped the defect returning | test gap |
+| 3 | A combined mutant had never been applied; its target moved when (1) was fixed | harness |
+| 4 | My ledger probes demanded an ordering the system never promised. They failed against the **real** implementation one run in six — and were the assertions that appeared to catch T26 | **my test, agreeing with a bug** |
+| 5 | FULFILLED treated as closed by the resize gate, so a coordinator could not trim a promise a source had not delivered — the correction itself refused. The same defect already fixed on the seat path | **product** |
+
+And the inverse lesson, immediately after: tightening the barrier **concealed**
+T26, whose symptom needs a stale re-read that a perfect collision never produces.
+A tighter race is not a better race. The harness now runs both the tight case and
+a staggered one.
+
+**What was corrected in the product:** the compensator now withdraws its own row
+rather than only the latest (which can leave no winner — the ratified rule, and
+the same choice M4 made at its headcount ceiling); the resize gate now allows
+only LIVE states, character for character the test the seat gate makes; and the
+candidate create route runs the same defence in depth the edit and stage routes
+already ran.
+
+**What was corrected in the tests:** the ledger is read as a *path* rather than a
+sequence of rows; the workers warm their one-time costs before the barrier; the
+races run staggered as well as tight; and a failing assertion now reports the
+state it observed rather than only what it wanted — which is what turned an
+intermittent failure into a diagnosable one.
+
+Full detail, including the §10 evidence table and the §14 answer, is in
+`P4-MUTATION-VERIFICATION.md`.
+
 ## Documents
 
 `P4-PREIMPLEMENTATION-AUDIT.md` · `P4-TERMINOLOGY.md` · `P4-DATA-MODEL.md` ·
