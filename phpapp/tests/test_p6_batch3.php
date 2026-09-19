@@ -152,6 +152,15 @@ if ($cIxOk) {
     //      and leaves nothing behind.
     $cOwn = $b3one('join', 0, json_encode(['name' => $cBlock, 'email' => 'c5@blockade.test']));
     t_ok(!($cOwn['ok'] ?? false), 'C5 . a failure part way through is reported, not swallowed');
+    //  AND IT MUST SAY THE RIGHT THING. A database failure is not a duplicate:
+    //  telling somebody their organisation may already work with us sends them
+    //  down a claim path that does not apply and hides a fault nobody then
+    //  investigates.
+    $cMsg = strtolower((string)($cOwn['msg'] ?? ''));
+    t_ok(strpos($cMsg, 'nothing has been saved') !== false,
+         'C5b . and it says nothing was saved, in its own words');
+    t_ok(strpos($cMsg, 'already works with us') === false,
+         'C5c . it does NOT borrow the duplicate wording for a system failure');
     t_eq($b3parts($cBlock), 0, 'C6 . and the half-written organisation is rolled back - no orphan party');
     t_eq($b3accts('c5@blockade.test'), 0, 'C7 . and no orphan account');
 
@@ -229,6 +238,20 @@ if (is_array($dFld)) {
     t_eq((string)$dFld[2], 'ref', 'D7 · as a pick-from-the-list, not a typed id');
     t_ok(empty($dFld[3]['req']), 'D8 · and it is OPTIONAL — an agency with no mapping is valid');
 }
+//  A cross-reference must point at a company that is really there. Blank stays
+//  valid - the mapping is optional - and no other master screen gains a rule.
+t_ok(function_exists('master_row_problem'), 'D13 . the rule can be asked on its own, not only through the screen');
+if (function_exists('master_row_problem')) {
+    t_eq(master_row_problem('agencies', ['name','party_id'], ['Sterling', $dPid]), '',
+         'D14 . a cross-reference to a real company is accepted');
+    t_ok(master_row_problem('agencies', ['name','party_id'], ['Sterling', 987654321]) !== '',
+         'D15 . a cross-reference to a company that does not exist is REFUSED');
+    t_eq(master_row_problem('agencies', ['name','party_id'], ['Sterling', null]), '',
+         'D16 . and leaving it blank is perfectly valid');
+    t_eq(master_row_problem('offices', ['name','party_id'], ['Somewhere', 987654321]), '',
+         'D17 . no other master screen gains a rule from this');
+}
+
 //  Setting it is an identity statement, so it is recorded against the company.
 $dBefore = (int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='PARTNER' AND entity_id=?", [$dPid]);
 master_audit_agency_map('agencies', ['name','party_id'], ['Sterling Manpower Pvt Ltd', $dPid], $dA1);
@@ -327,6 +350,19 @@ t_eq((string)($f6['confidence'] ?? ''), 'EXACT', 'F6 · a TAN match is EXACT');
 t_ok(find_duplicate_partner('No Such Company Anywhere Ltd', '', '', '', 0) === null, 'F7 · no match still returns null');
 t_ok(find_duplicate_partner('Ferrous Metals Ltd', '', '', '', $fPid) === null, 'F8 · the exclude-id argument still works');
 
+//  PRECEDENCE. When a NAME matches one organisation and an authoritative
+//  identifier matches a DIFFERENT one, the identifier wins — whichever comes
+//  first in the register. A name that outranked a tax number would report
+//  POSSIBLE where the truth is EXACT, and the staff path would warn where it
+//  should refuse.
+$fNameOnly = $b3partner('Ferrous Metals Ltd');                       // same name, no identifiers
+$f8a = find_duplicate_partner('Ferrous Metals Ltd', '24JJJKK5555J1Z9', '', '', 0);
+t_eq((string)($f8a['confidence'] ?? ''), 'EXACT', 'F9 . an identifier outranks a name match on another record');
+t_eq((int)($f8a['row']['id'] ?? 0), $fPid, 'F10 . and it points at the organisation the IDENTIFIER names');
+$f8b = partner_find_or_problem('Ferrous Metals Ltd', '24JJJKK5555J1Z9', '', '');
+t_eq((string)($f8b['confidence'] ?? ''), 'EXACT', 'F11 . the staff guard agrees');
+
+
 // =============================================================================
 t_section('P6-B3 · G — at most one primary contact per organisation (Q22)');
 // =============================================================================
@@ -354,6 +390,32 @@ if (function_exists('partner_contact_add')) {
          'G7 · ONE PERSON MAY BE A CONTACT AT SEVERAL ORGANISATIONS — no global e-mail rule');
 }
 
+//  WHAT IF THE DEMOTE ITSELF FAILS? The rule is only as good as its unhappy
+//  path, so the failure is injected for real: a trigger that refuses the
+//  demoting UPDATE. Whatever the function does then, the organisation must not
+//  be left with two primary contacts.
+$gTrg = false;
+$gDrv = function_exists('t_driver') ? t_driver() : '';
+try {
+    if ($gDrv === 'sqlite')
+        db()->exec("CREATE TRIGGER tmp_no_demote BEFORE UPDATE OF is_primary ON partner_contacts
+                    BEGIN SELECT RAISE(ABORT, 'demote refused'); END");
+    else
+        db()->exec("CREATE TRIGGER tmp_no_demote BEFORE UPDATE ON partner_contacts FOR EACH ROW
+                    BEGIN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'demote refused'; END");
+    $gTrg = true;
+} catch (Throwable $e) {}
+if ($gTrg) {
+    $gBefore = (int)ops_val("SELECT COUNT(*) FROM partner_contacts WHERE partner_id=? AND COALESCE(is_primary,0)=1", [$gPid]);
+    $gRes = 0;
+    try { $gRes = partner_contact_add($gPid, ['name' => 'Third Person', 'email' => 'third@g.test', 'is_primary' => 1]); }
+    catch (Throwable $e) { $gRes = 0; }
+    t_eq((int)ops_val("SELECT COUNT(*) FROM partner_contacts WHERE partner_id=? AND COALESCE(is_primary,0)=1", [$gPid]),
+         $gBefore, 'G8 . when the existing primary cannot be stood down, NO second primary appears');
+    t_eq((int)$gRes, 0, 'G9 . and the caller is told it did not happen - no false success');
+    try { db()->exec("DROP TRIGGER tmp_no_demote"); } catch (Throwable $e) {}
+} else { t_ok(false, 'G8 . the failure could not be injected'); t_ok(false, 'G9 . same'); }
+
 // =============================================================================
 t_section('P6-B3 · H — the portal account boundary (Q23)');
 // =============================================================================
@@ -378,6 +440,25 @@ db()->prepare("INSERT INTO vendor_users (vendor_id,email,name,password_hash,is_a
     ->execute([$hV, $hMail, 'Same Human', password_hash('x', PASSWORD_DEFAULT), date('c')]);
 t_eq((int)ops_val("SELECT COUNT(*) FROM vendor_users WHERE LOWER(email)=?", [$hMail]), 1,
      'H6 · THE SAME ADDRESS MAY ALSO HOLD A VENDOR ACCOUNT — no universal identity rule');
+
+//  THE CONFLICT ITSELF. Inviting an address that already has an account is
+//  answered by the check at the TOP of the invite, before the write - so
+//  nothing above ever reaches the database rule, and nothing above proves that
+//  hitting it produces a business answer rather than a crash. Only a race gets
+//  there, so a race is what is used.
+$hRaceMail = 'race@harbour.test';
+$hRacePid  = $b3partner('Harbour Race Ltd');
+$hRes = $b3race([['invite', $hRacePid, $hRaceMail, $uAdmin],
+                 ['invite', $hRacePid, $hRaceMail, $uAdmin],
+                 ['invite', $hRacePid, $hRaceMail, $uAdmin]]);
+t_eq(count($hRes), 3, 'H7 . all three invitations reported a verdict');
+t_eq($b3accts($hRaceMail), 1, 'H8 . three simultaneous invitations leave exactly ONE account');
+$hOk = 0; $hCrash = 0;
+foreach ($hRes as $r) { if (!empty($r['ok'])) $hOk++; if (($r['code'] ?? '') === 'EX') $hCrash++; }
+t_eq($hOk, 1, 'H9 . exactly one succeeded');
+t_eq($hCrash, 0, 'H10 . and NO process crashed - the database conflict became a business answer');
+foreach ($hRes as $r)
+    if (empty($r['ok'])) t_ok(trim((string)($r['msg'] ?? '')) !== '', 'H11 . a losing invitation was told something useful');
 
 // =============================================================================
 t_section('P6-B3 · I — organisation creation is audited (F8)');
@@ -407,12 +488,49 @@ t_ok(in_array('PARTNER_DUPLICATE_TAXID', $jKinds, true), 'J1 · two organisation
 $jOne = null; foreach ($jRows as $r) if (($r['kind'] ?? '') === 'PARTNER_DUPLICATE_TAXID') { $jOne = $r; break; }
 if (is_array($jOne)) foreach (['kind','what','records','why','safe_to_repair','needs_human'] as $k)
     t_ok(array_key_exists($k, $jOne), "J2 · the finding states '$k'");
+//  Having the keys is not the same as giving the right answers. Deciding that
+//  two organisations are one company is a business judgement with invoices,
+//  jobs and contracts hanging off it: this finding must never say it is safe to
+//  put right on its own, and must always say a person is needed.
+if (is_array($jOne)) {
+    t_ok(empty($jOne['safe_to_repair']), 'J2a . a duplicate tax identifier is NEVER safe to repair automatically');
+    t_ok(!empty($jOne['needs_human']),   'J2b . and it always says a person must decide');
+}
+//  Across the whole report: nothing that merges organisations may be marked
+//  safe to do without a person.
+foreach ($jRows as $r)
+    if (in_array((string)($r['kind'] ?? ''), ['PARTNER_DUPLICATE_TAXID','PARTNER_POSSIBLE_DUPLICATE_NAME',
+                                              'MARKETPLACE_MULTIPLE_FOR_PARTY','CONTACT_DUPLICATE',
+                                              'CONTACT_MULTIPLE_PRIMARY','ACCOUNT_DUPLICATE_ACTIVE'], true)) {
+        t_ok(empty($r['safe_to_repair']) && !empty($r['needs_human']),
+             'J2c . every finding that would merge or choose between records needs a person: ' . (string)$r['kind']);
+        break;
+    }
 t_eq((int)ops_val("SELECT COUNT(*) FROM business_partners"), $jSnap, 'J3 · DETECTION CHANGED NOTHING');
 t_eq((int)ops_val("SELECT COUNT(*) FROM business_partners WHERE id IN (?,?)", [$jA, $jB]), 2,
      'J4 · both organisations are still there — nothing was merged');
-// Legitimate multiples must NOT be reported as duplicates.
-t_ok(!in_array('AGENCY_DUPLICATE', $jKinds, true),
-     'J5 · two agency contracts for one organisation are not reported as a duplicate');
+//  LEGITIMATE MULTIPLES MUST NOT BE REPORTED AS DUPLICATES.
+//
+//  The first version of this assertion looked for the kind 'AGENCY_DUPLICATE',
+//  which no code anywhere produces — so it could never fail, whatever the
+//  report did. Mutation M26 proved that by planting exactly this defect and
+//  walking past it. What matters is the PROPERTY, not one spelling: two agency
+//  contracts for one organisation are two contracts, and nothing that names an
+//  agency may be reported as a duplicate at all.
+$jAgencyBad = []; $jAgencyKinds = [];
+foreach ($jRows as $r) {
+    $rec = (array)($r['records'] ?? []);
+    if (!array_key_exists('agency', $rec)) continue;
+    $jAgencyKinds[] = (string)($r['kind'] ?? '');
+    if (stripos((string)($r['kind'] ?? ''), 'DUPLICATE') !== false) $jAgencyBad[] = (string)$r['kind'];
+}
+t_eq(count($jAgencyBad), 0, 'J5 · NOTHING that names an agency contract is reported as a duplicate'
+     . ($jAgencyBad ? ' [' . implode(',', $jAgencyBad) . ']' : ''));
+foreach ($jAgencyKinds as $k)
+    t_eq($k, 'AGENCY_POSSIBLE_ORGANISATION', 'J5b · the only thing said about an agency is that it MIGHT be one we know');
+//  And the two contracts planted in section D are both still whole.
+t_eq((int)ops_val("SELECT COUNT(*) FROM agencies WHERE party_id=?", [$dPid]), 2,
+     'J5c · both agency contracts survive the report untouched');
 
 // =============================================================================
 t_section('P6-B3 · K — authorisation and forged ids');
@@ -433,6 +551,33 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE partner_id=?", [$kPid
 $k3 = $b3one('invite', 987654321, 'ghost@nowhere.test', $uAdmin);
 t_ok(!($k3['ok'] ?? false), 'K3 · a forged organisation id is refused  [' . ($k3['msg'] ?? '') . ']');
 t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE partner_id=987654321"), 0, 'K4 · and nothing was written');
+
+//  THE OTHER AUTHORITY. A client's own admin may invite a colleague - into
+//  THEIR OWN organisation and nowhere else. Nothing above ever acts as one, so
+//  nothing above proves the boundary; this does, by becoming one.
+$kOrgA = $b3partner('Kepler Marine Ltd');
+$kOrgB = $b3partner('Larkspur Shipping Ltd');
+db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,is_org_admin,created_at)
+               VALUES (?,?,?,?,1,1,?)")
+    ->execute([$kOrgA, 'admin@kepler.test', 'Kepler Admin', password_hash('x', PASSWORD_DEFAULT), date('c')]);
+$kAdminId = (int)db()->lastInsertId();
+
+unset($_SESSION['uid']); current_user(true); ua(true);   // no longer staff
+$_SESSION['cuid'] = $kAdminId;
+t_ok(function_exists('cvp_client_is_admin') && cvp_client_is_admin(), 'K5 . the probe really is signed in as a client admin');
+t_ok(!portal_can_manage(), 'K6 . and is NOT staff - so only the client-admin authority is in play');
+
+$kOwn = portal_invite($kOrgA, 'colleague@kepler.test', 'A Colleague', 0);
+t_ok(empty($kOwn['err']), 'K7 . a client admin CAN invite a colleague into their own organisation  [' . (string)($kOwn['err'] ?? '') . ']');
+t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE partner_id=? AND LOWER(email)='colleague@kepler.test'", [$kOrgA]), 1,
+     'K8 . and the account belongs to their organisation');
+
+$kOther = portal_invite($kOrgB, 'intruder@larkspur.test', 'Not Theirs', 0);
+t_ok(!empty($kOther['err']), 'K9 . but NOT into somebody else organisation');
+t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE partner_id=?", [$kOrgB]), 0,
+     'K10 . and nothing was written there - state, not return code');
+
+unset($_SESSION['cuid']); $b3act($uAdmin);               // back to staff for what follows
 
 // =============================================================================
 t_section('P6-B3 · L — the duplicate detector is tenant-bounded');

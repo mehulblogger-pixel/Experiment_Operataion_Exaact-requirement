@@ -1054,7 +1054,9 @@ function partner_contact_add($partnerId, array $in) {
     $name = substr(trim((string)($in['name'] ?? '')), 0, 150);
     if ($name === '') return 0;
     $primary = !empty($in['is_primary']) ? 1 : 0;
-    if ($primary) partner_contact_clear_primary($partnerId);
+    //  No false success: if the existing primary cannot be stood down, this
+    //  contact is not written as primary at all.
+    if ($primary && !partner_contact_clear_primary($partnerId)) return 0;
     $data = ['partner_id' => $partnerId, 'name' => $name,
              'email' => substr(trim((string)($in['email'] ?? '')), 0, 200),
              'mobile' => substr(trim((string)($in['mobile'] ?? '')), 0, 40),
@@ -1070,11 +1072,30 @@ function partner_contact_add($partnerId, array $in) {
 }
 
 /** Stand every other contact on this organisation down from primary. Never deletes. */
+//  Returns TRUE only when the organisation really has no other primary left.
+//
+//  This used to swallow its own failure. That is the quiet half of a broken
+//  rule: the demote fails, nobody hears about it, the new primary is written
+//  anyway, and the organisation ends up with TWO primary contacts — which is
+//  exactly what the one-primary decision exists to prevent. A rule that cannot
+//  be applied must say so, so the caller can refuse rather than report a
+//  success that is not true.
 function partner_contact_clear_primary($partnerId, $exceptId = 0) {
+    $partnerId = (int)$partnerId;
+    //  An older install without the column has no notion of a primary at all;
+    //  there is nothing to demote and nothing is wrong.
+    if (function_exists('column_exists') && !column_exists('partner_contacts', 'is_primary')) return true;
     try {
         db()->prepare("UPDATE partner_contacts SET is_primary=0 WHERE partner_id=? AND id<>? AND COALESCE(is_primary,0)=1")
-            ->execute([(int)$partnerId, (int)$exceptId]);
-    } catch (Throwable $e) {}
+            ->execute([$partnerId, (int)$exceptId]);
+    } catch (Throwable $e) { return false; }
+    //  Read it back. The UPDATE reporting success is not the same as the
+    //  organisation having one primary, and it is the second that matters.
+    try {
+        return (int)ops_val("SELECT COUNT(*) FROM partner_contacts
+                             WHERE partner_id=? AND id<>? AND COALESCE(is_primary,0)=1",
+                            [$partnerId, (int)$exceptId]) === 0;
+    } catch (Throwable $e) { return false; }
 }
 // Link inspector-role logins to a team-member row so they are deputable.
 // The allocate list reads `inspectors`; a login without a linked team member
@@ -4026,6 +4047,22 @@ function ops_quick_add() {
 }
 
 // ---- Generic master handler ------------------------------------------------
+//  Batch 3 (F4) — what would be WRONG about this row, in one sentence, or ''.
+//  Asked by the master screen before it writes, and answerable on its own by
+//  anything that wants to check. Only the agency cross-reference has a rule
+//  today: it must point at a company that is really there, because a reference
+//  to a record that is not there is how a report starts lying.
+function master_row_problem($table, array $cols, array $vals) {
+    if ($table !== 'agencies') return '';
+    $pi = array_search('party_id', $cols, true);
+    if ($pi === false) return '';
+    $v = $vals[$pi] ?? null;
+    if ($v === null || $v === '' || (int)$v === 0) return '';      // blank is valid: the mapping is optional
+    if ((int)ops_val("SELECT COUNT(*) FROM business_partners WHERE id=?", [(int)$v]) === 0)
+        return 'That company record no longer exists. Pick one from the list, or leave it blank.';
+    return '';
+}
+
 //  Batch 3 (F8) — connecting an agency contract to a company record is an
 //  identity statement, so it is recorded against that company. Nothing else in
 //  the generic master screens is audited by this: it checks the table first.
@@ -4056,15 +4093,9 @@ function ops_master_handle($key, $cfg, $action, $method) {
         }
         //  Phase 6 · Batch 3 (F4) — a cross-reference must point at something.
         //  A dangling party_id is how a report starts lying; refused here rather
-        //  than repaired later. Only this one master is affected.
-        if ($table === 'agencies') {
-            $pi = array_search('party_id', $cols, true);
-            if ($pi !== false && $vals[$pi] !== null && $vals[$pi] !== ''
-                && (int)ops_val("SELECT COUNT(*) FROM business_partners WHERE id=?", [(int)$vals[$pi]]) === 0) {
-                flash('That company record no longer exists. Pick one from the list, or leave it blank.', 'warning');
-                redirect("/m/$key");
-            }
-        }
+        //  than repaired later.
+        $problem = master_row_problem($table, $cols, $vals);
+        if ($problem !== '') { flash($problem, 'warning'); redirect("/m/$key"); }
         if ($action === 'edit') {
             $id = (int)($_GET['id'] ?? 0);
             $set = implode(',', array_map(fn($c) => "$c=?", $cols));

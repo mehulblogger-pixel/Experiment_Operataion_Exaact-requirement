@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'c3d558d · 2026-09-19 08:48 UTC · 665 files';
+$RELEASE = '982b9a0 · 2026-09-19 09:12 UTC · 665 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -93,7 +93,7 @@ $EXPECT  = [
     'lib/connect_market.php' => ['s'=>39876,'h'=>'0fd3332b96bb74f5'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
     'lib/connect_msg.php' => ['s'=>16414,'h'=>'37fd232a1fba99cc'],
-    'lib/connect_org.php' => ['s'=>22412,'h'=>'6fc57f6d0dd36045'],
+    'lib/connect_org.php' => ['s'=>23081,'h'=>'5b822a52c3c2678a'],
     'lib/connect_passport.php' => ['s'=>11025,'h'=>'651b739f219f52b4'],
     'lib/connect_person.php' => ['s'=>7701,'h'=>'7210f0cae01d84e9'],
     'lib/connect_privacy.php' => ['s'=>17610,'h'=>'74640b7aef0d480c'],
@@ -170,7 +170,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66290,'h'=>'4ff1bc5a2652ad81'],
-    'lib/ops.php' => ['s'=>627928,'h'=>'ffd4240e9fc86877'],
+    'lib/ops.php' => ['s'=>629847,'h'=>'96edd3b4ffac4372'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],

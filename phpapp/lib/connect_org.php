@@ -206,7 +206,7 @@ function connect_org_register(array $in) {
     try { $own = !db()->inTransaction(); } catch (Throwable $e) { $own = true; }
     $tx = false;
     if ($own) { try { $tx = (bool)db()->beginTransaction(); } catch (Throwable $e) { $tx = false; } }
-    $partyId = 0;
+    $partyId = 0; $acctTaken = false;
     try {
         // 1) Party
         //  An identifier the company GAVE US is kept. It was being read for the
@@ -236,9 +236,21 @@ function connect_org_register(array $in) {
         // 3) A working client-portal login (blank perms = full marketplace access).
         //    The database derives the uniqueness key itself, so this race is
         //    settled there; the check at the top is only the friendly message.
-        db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,perms,created_by,created_at)
-                       VALUES (?,?,?,?,1,0,'', 'self-service', ?)")
-            ->execute([$partyId, $email, $person, password_hash($pass, PASSWORD_DEFAULT), $now]);
+        //  The account conflict is translated HERE, at the write that can cause
+        //  it — not in the catch below. Asking a generic "was that a duplicate?"
+        //  of any failure in this whole transaction tells somebody whose
+        //  ORGANISATION collided that their e-mail is already registered, which
+        //  is simply untrue and sends them to a sign-in page that will not have
+        //  them. Every unique index reports the same SQLSTATE, so only the
+        //  statement itself knows which rule was hit.
+        try {
+            db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,perms,created_by,created_at)
+                           VALUES (?,?,?,?,1,0,'', 'self-service', ?)")
+                ->execute([$partyId, $email, $person, password_hash($pass, PASSWORD_DEFAULT), $now]);
+        } catch (Throwable $e) {
+            if (function_exists('portal_acct_is_duplicate') && portal_acct_is_duplicate($e)) $acctTaken = true;
+            throw $e;
+        }
 
         // 4) Multi-capability onboarding — persist the business capabilities the
         //    company ticked (additive; the single org_type above stays the primary
@@ -255,8 +267,7 @@ function connect_org_register(array $in) {
         //  already work with us" to somebody whose registration hit a database
         //  error sends them down a claim path that does not apply, and hides a
         //  fault nobody then investigates. Different fact, different sentence.
-        $dup = function_exists('portal_acct_is_duplicate') && portal_acct_is_duplicate($e);
-        return [false, $dup ? 'That e-mail is already registered — sign in instead.'
+        return [false, $acctTaken ? 'That e-mail is already registered — sign in instead.'
                             : 'We could not complete your registration just now. Nothing has been saved. '
                             . 'Please try again in a moment.', null];
     }
