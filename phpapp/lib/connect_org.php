@@ -209,8 +209,21 @@ function connect_org_register(array $in) {
     $partyId = 0;
     try {
         // 1) Party
-        db()->prepare("INSERT INTO business_partners (legal_name,display_name,is_client,is_vendor,is_subcontractor,status,created_at) VALUES (?,?,?,?,?, 'ACTIVE',?)")
-            ->execute([$name, $name, $isAgency ? 0 : 1, 0, $isAgency ? 1 : 0, $now]);
+        //  An identifier the company GAVE US is kept. It was being read for the
+        //  duplicate check and then thrown away, so the organisation that had
+        //  just proved who it was could be duplicated afterwards by anyone
+        //  typing a slightly different name — the one check that cannot be
+        //  argued with was left with nothing to match against.
+        $pCols = ['legal_name', 'display_name', 'is_client', 'is_vendor', 'is_subcontractor', 'status', 'created_at'];
+        $pVals = [$name, $name, $isAgency ? 0 : 1, 0, $isAgency ? 1 : 0, 'ACTIVE', $now];
+        foreach (['gstin' => clean_gstin((string)($in['gstin'] ?? '')),
+                  'pan'   => strtoupper(trim((string)($in['pan'] ?? '')))] as $c => $v) {
+            if ($v !== '' && (!function_exists('column_exists') || column_exists('business_partners', $c))) {
+                $pCols[] = $c; $pVals[] = $v;
+            }
+        }
+        db()->prepare("INSERT INTO business_partners (" . implode(',', $pCols) . ") VALUES ("
+                      . implode(',', array_fill(0, count($pCols), '?')) . ")")->execute($pVals);
         $partyId = (int)db()->lastInsertId();
         if ($partyId <= 0) throw new RuntimeException('the organisation could not be created');
 

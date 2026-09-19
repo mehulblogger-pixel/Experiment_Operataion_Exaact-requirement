@@ -80,7 +80,7 @@ Every invariant carries four things, because a rule without a test is a wish:
 | **I28** | **A live relationship requiring uniqueness is protected at database level**, not by a PHP check | Identity | Insert the same active link twice directly via SQL; assert the second is rejected by a constraint | **HOLDS** *(Batch 1)* — U1/U2/U3 over three NULL-able live-key columns; raw SQL duplicates rejected on both engines (`F0–F8`, mutants `M9`, `M17`). Residual: the key is set by the writer — see adversarial Finding C |
 | **I29** | **Two processes creating the same relationship simultaneously produce one relationship** | Identity | Two concurrent processes, one barrier, same pair; assert exactly one live link and a deterministic refusal for the other | **HOLDS** *(Batch 1)* — four real processes, one live link, no crash, and every process told it succeeded names a link that really is live (`G1–G7`, mutants `M12`, `M13`). **R31** (portal e-mail) is untouched |
 | **I30** | **A person representation cannot be duplicated by an ordinary business action** | Operations + Recruitment | Run the hiring conversion twice for one candidate; assert one inspector, no orphan | **VIOLATED** — two inspector rows accepted, candidate points at the second, **first stays live and orphaned** (§2 audit; **R2**). The same failure mode exists on the read path (**R22**) |
-| **I31** | Where a duplicate cannot be prevented, it is **detected and surfaced** | All | For each person pool, assert a detector exists and returns the known duplicate | **PARTIAL** — professionals ✔ (e-mail + mobile at source), candidates ✔ (`candpool`, `person_applications`), **inspectors ✘ nothing** (**R20**), `partner_contacts` ✘ nothing (**R30**) |
+| **I31** | Where a duplicate cannot be prevented, it is **detected and surfaced** | All | For each person pool, assert a detector exists and returns the known duplicate | **PARTIAL** — professionals ✔, candidates ✔, **inspectors ✘** (**R20**, deferred). `partner_contacts` and the organisation pools ✔ *(Batch 3)*: duplicate contacts, ambiguous primaries, duplicate tax identifiers, shared names, unmapped and dangling representations and duplicate active accounts are all reported by `identity_state_findings()` — detection only, nothing repaired (**R30** *surfaced*, its uniqueness still deferred by **Q22**) |
 | **I32** | **"Keep separate" is a recordable decision** | Identity | Reject a suggestion; assert it does not reappear | **VIOLATED** — no mechanism anywhere (§20 rule 9; **R21**) |
 | **I33** | A confirmed link is **reversible**, and the reversal is audited | Identity | Link, then unlink; assert both recorded and the source records unchanged | **PARTIAL** — `cx_identity_link` ✔. `person_ref` has **no unlink route at all** (§26; **R18**); the three column mechanisms have none |
 
@@ -89,8 +89,8 @@ Every invariant carries four things, because a rule without a test is a wish:
 | # | Invariant | Owning domain | Testable condition | Status |
 |---|---|---|---|---|
 | **I8** | **One organisation may hold multiple business roles without becoming multiple organisations** | Organisation | Mark an existing client as a vendor; assert `business_partners` row count is unchanged and both flags are set | **HOLDS** — roles are flags on one row |
-| **I34** | **Organisation identity is not duplicated merely because its business role differs** | Organisation | Create a supplier whose GSTIN matches an existing client; assert the existing organisation is offered, not a second row created | **PARTIAL** — `find_duplicate_partner()` (GSTIN→PAN→TAN→name) covers the business-partner paths; **`/join` and `agencies` have none** (§20 corrected; **R27**) |
-| **I35** | Every organisation representation **resolves to the organisation spine** | Organisation | For each `cx_organisations` and `agencies` row, assert a cross-reference to `business_partners` exists or is explicitly absent-and-reported | **VIOLATED** — `agencies` has **no cross-reference at all**; `cx_organisations.party_id` exists but nothing enforces or suggests it (§2 audit; **R4**) |
+| **I34** | **Organisation identity is not duplicated merely because its business role differs** | Organisation | Create a supplier whose GSTIN matches an existing client; assert the existing organisation is offered, not a second row created | **PARTIAL → substantially closed** *(Batch 3)* — the detector now reports EXACT (GSTIN/PAN/TAN) vs POSSIBLE (name) and is wired to **every** creating door: `/join` (refuse, neutrally), the quotation path (attach, never duplicate), the lead conversion (refuse and name it). Probes `A1–A10`, `E4–E8`, `M1–M12`; mutants M1, M7–M12. **Still PARTIAL**, deliberately: two *simultaneous* registrations of one name are detected but not prevented, because that needs a uniqueness rule on `business_partners` (**Q1–Q18 open**) |
+| **I35** | Every organisation representation **resolves to the organisation spine** | Organisation | For each `cx_organisations` and `agencies` row, assert a cross-reference to `business_partners` exists or is explicitly absent-and-reported | **VIOLATED → PARTIAL** *(Batch 3, **R4** closed)* — `agencies.party_id` now exists: optional, never inferred, never unique, set by a person on the agency screen and audited (**Q19**). Every representation that is *not* resolved is now **explicitly reported** — `MARKETPLACE_UNMAPPED`, `MARKETPLACE_PARTY_MISSING`, `AGENCY_POSSIBLE_ORGANISATION`. It stays PARTIAL because the cross-reference is a map, not a constraint: nothing *enforces* resolution, by decision |
 
 # Family E — Taxonomy
 
@@ -154,16 +154,41 @@ rule now would be deciding the question by the back door.
 
 ## The register, at a glance
 
-*Post-Batch 1. The "before" column is what this document recorded when it was
-written, so the movement is visible rather than overwritten.*
+*The "before" column is what this document recorded when it was written, so the
+movement stays visible rather than being overwritten.*
 
-| Status | Before Batch 1 | Now | Invariants now |
+| Status | Before Batch 1 | After Batch 2 | **After Batch 3** | Invariants now |
+|---|---|---|---|---|
+| **HOLDS** | 16 | 27 | **27** | I1, I3, I4, I5, I8, I9, I10, I11, I12, I13, I14, I15, I17, I18, I19, I20, I21, I23, I25, I26, I27, I28, I29, I36, I37, I38, I40 |
+| **PARTIAL** | 6 | 10 | **11** | I2, I6, I7, I16, I22, I31, I33, I34, **I35**, I41, I42 |
+| **VIOLATED** | 14 | 4 | **3** | I24, I30, I32 |
+| **NOT ESTABLISHED** | 6 | 1 | **1** | I39 |
+| | **42** | **42** | **42** | every invariant I1–I42 appears exactly once |
+
+Batch 3 moves exactly one invariant between buckets: **I35**, out of VIOLATED,
+because the agency cross-reference now exists and every unresolved representation
+is reported. **I39 stays NOT ESTABLISHED** — Batch 3 made no identity
+convergence, so there is still nothing to measure, and "we did not break it" is
+not the same as "it was proved".
+
+## Batch 3 — what moved, and what deliberately did not
+
+| Invariant | Before | After | Why |
 |---|---|---|---|
-| **HOLDS** | 16 | **27** | I1, I3, I4, I5, I8, I9, I10, I11, I12, I13, I14, I15, I17, I18, I19, I20, I21, I23, I25, I26, I27, I28, I29, I36, I37, I38, I40 |
-| **PARTIAL** | 6 | **10** | I2, I6, I7, I16, I22, I31, I33, I34, I41, I42 |
-| **VIOLATED** | 14 | **4** | I24, I30, I32, I35 |
-| **NOT ESTABLISHED** | 6 | **1** | I39 |
-| | **42** | **42** | every invariant I1–I42 appears exactly once |
+| **I25** a record id is never proof of authorisation | HOLDS *(identity routes)* | **HOLDS**, now also on the organisation routes | a posted organisation id is checked at the function; probes `K3` `K4`, mutant M19 |
+| **I27** protection belongs to the action | HOLDS *(identity routes)* | **HOLDS**, now also for `portal_invite()` | it asks its own authority — **both** of the two that legitimately exist; probes `K1` `K2`, mutants M17 M18 |
+| **I34** organisation not duplicated by role | PARTIAL | **PARTIAL** *(substantially closed)* | every door now asks; simultaneous same-name registration still needs Q1–Q18 |
+| **I35** every representation resolves to the spine | **VIOLATED** | **PARTIAL** | **R4 closed** — the agency cross-reference exists and unresolved rows are reported |
+| **I31** duplicates detected where not prevented | PARTIAL | **PARTIAL** *(wider)* | organisation and contact states now reported; inspectors (**R20**) still open |
+| **I41** an audit failure never fails a business write | HOLDS | **HOLDS** | organisation audit is outside the transaction and silent on failure |
+
+**Not moved, on purpose:** I2 · I6 · I7 · I16 · I22 · I24 · I30 · I32 · I33 ·
+I42. Batch 3 touched none of them, and none is upgraded on the strength of work
+that did not test it. **Q1–Q18 remain open.**
+
+**Register after Batch 3:** HOLDS **27** · PARTIAL **11** · VIOLATED **3**
+(I24 · I30 · I32) · NOT ESTABLISHED **1** (I39) — 42 in total. I35 moves out of
+VIOLATED into PARTIAL; nothing else changes bucket.
 
 **Moved by Batch 1's own work (11):** I15 · I23 · I25 · I26 · I27 · I28 · I29 to
 HOLDS; I6 · I16 · I22 · I42 to PARTIAL. **I41 stays PARTIAL**: it holds for the
@@ -195,7 +220,7 @@ made.
 | I30 · I22, I42 | **R2**, **R20** | Hiring conversion can orphan an inspector — **deferred**; Batch 1 closed only the read-path and two-write cases |
 | I6 | **R18** | Three of five mechanisms write no audit — **the ledger now audits attributably; the other three still do not** |
 | I32 | **R21** | "Keep separate" cannot be recorded — **still open** |
-| I35 | **R4** | `agencies` has no organisation cross-reference — **still open** |
+| I35 | **R4** | `agencies` has no organisation cross-reference — **CLOSED, Batch 3** (optional, never inferred, never unique; **Q19**) |
 
 **No VIOLATED invariant lacks a requirement, and no requirement was invented
 here.**

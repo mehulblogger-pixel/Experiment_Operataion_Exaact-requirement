@@ -132,9 +132,47 @@ $cExisting = $b3partner('Halfway Existing Ltd');
 db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,created_at) VALUES (?,?,?,?,1,?)")
     ->execute([$cExisting, 'taken@halfway.test', 'Taken', password_hash('x', PASSWORD_DEFAULT), date('c')]);
 $c1 = $b3one('join', 0, json_encode(['name' => $cName, 'email' => 'taken@halfway.test']));
-t_ok(!($c1['ok'] ?? false), 'C1 · a registration whose account cannot be created is refused');
+t_ok(!($c1['ok'] ?? false), 'C1 · a registration whose account is already taken is refused');
 t_eq($b3parts($cName), $cPartsBefore, 'C2 · and NO orphan business partner was left behind');
 t_eq($b3orgs($cName), $cOrgsBefore, 'C3 · and NO orphan marketplace organisation was left behind');
+
+//  C1-C3 are answered by the check at the TOP of the route, before a single row
+//  is written - worth having, but they prove nothing about the transaction.
+//  These force a failure PART WAY THROUGH, which is what the transaction is for:
+//  a unique index placed on the organisation name for the length of the probe
+//  makes step 2 fail after step 1 has already written a row.
+$cBlock = 'Blockade Industries Ltd';
+$cIxOk = false;
+try { db()->exec("CREATE UNIQUE INDEX tmp_uq_cxorg_name ON cx_organisations (name)"); $cIxOk = true; } catch (Throwable $e) {}
+if ($cIxOk) {
+    db()->prepare("INSERT INTO cx_organisations (name,org_type,status,created_at) VALUES (?, 'ENTERPRISE','ACTIVE',?)")
+        ->execute([$cBlock, date('c')]);
+
+    //  (a) ON ITS OWN - it owns the transaction, so it answers in business terms
+    //      and leaves nothing behind.
+    $cOwn = $b3one('join', 0, json_encode(['name' => $cBlock, 'email' => 'c5@blockade.test']));
+    t_ok(!($cOwn['ok'] ?? false), 'C5 . a failure part way through is reported, not swallowed');
+    t_eq($b3parts($cBlock), 0, 'C6 . and the half-written organisation is rolled back - no orphan party');
+    t_eq($b3accts('c5@blockade.test'), 0, 'C7 . and no orphan account');
+
+    //  (b) INSIDE A CALLER TRANSACTION - it must NEVER commit or roll back
+    //      somebody else's work. It re-throws so the caller unwinds. Returning a
+    //      polite failure here would leave the caller committing the wreckage.
+    $cThrew = false;
+    db()->beginTransaction();
+    try { connect_org_register(['name' => $cBlock, 'org_type' => 'ENTERPRISE', 'contact_name' => 'C Eight',
+                                'contact_email' => 'c8@blockade.test', 'password' => 'blockade123']); }
+    catch (Throwable $e) { $cThrew = true; }
+    $cStillIn = db()->inTransaction();
+    try { if ($cStillIn) db()->rollBack(); } catch (Throwable $e) {}
+    t_ok($cThrew, 'C8 . inside a caller transaction a failure is RE-THROWN, so the caller unwinds');
+    t_ok($cStillIn, 'C9 . and it neither committed nor rolled back the transaction it borrowed');
+    t_eq($b3parts($cBlock), 0, 'C10 . after the caller rolls back, nothing survives');
+    t_eq($b3accts('c8@blockade.test'), 0, 'C11 . including the account');
+
+    try { db()->exec("DROP INDEX tmp_uq_cxorg_name ON cx_organisations"); }
+    catch (Throwable $e) { try { db()->exec("DROP INDEX tmp_uq_cxorg_name"); } catch (Throwable $e2) {} }
+} else { foreach (['C5','C6','C7','C8','C9','C10','C11'] as $c) t_ok(false, $c . ' . the probe index could not be built'); }
 
 //  C4 — THE FIRST REGISTRATION IN A FRESH PROCESS.
 //
@@ -407,5 +445,50 @@ t_ok(strpos($lSrc, 'function find_duplicate_partner') !== false, 'L1 · the dete
 $lDetector = substr($lSrc, strpos($lSrc, 'function find_duplicate_partner'), 2000);
 t_ok(strpos($lDetector, 'new PDO') === false && strpos($lDetector, 'db(true)') === false,
      'L2 · it opens no second connection and switches no tenant');
+
+// =============================================================================
+t_section('P6-B3 · M — the public route under attack');
+// =============================================================================
+//  The refusal must not become an ORACLE. Whatever matched — a tax identifier
+//  or a name — the visitor must read the same sentence, or the difference
+//  itself tells them which of the two they hit.
+$mPid = $b3partner('Maybury Chemicals Ltd', ['gstin' => '24MMMNN6666M1Z9']);
+$mExact  = $b3one('join', 0, json_encode(['name' => 'Some Other Name Ltd', 'email' => 'm1@mb.test', 'gstin' => '24MMMNN6666M1Z9']));
+$mByName = $b3one('join', 0, json_encode(['name' => 'Maybury Chemicals Ltd', 'email' => 'm2@mb.test']));
+t_ok(!($mExact['ok'] ?? false) && !($mByName['ok'] ?? false), 'M1 · both kinds of match are refused');
+t_eq((string)($mByName['msg'] ?? 'x'), (string)($mExact['msg'] ?? 'y'),
+     'M2 · and the visitor reads the SAME sentence — the reply is not an oracle');
+
+//  A public visitor must not be able to award themselves a role, a status or an
+//  approval by adding fields to the form.
+$mName = 'Quarry Logistics Pvt Ltd';
+$b3one('join', 0, json_encode(['name' => $mName, 'email' => 'm3@quarry.test',
+       'org_type' => 'ENTERPRISE', 'is_vendor' => 1, 'is_subcontractor' => 1,
+       'status' => 'PREMIUM', 'party_id' => 999999, 'approved_by' => 'me', 'perms' => 'admin']));
+$mRow = ops_one("SELECT * FROM business_partners WHERE legal_name=? ORDER BY id DESC LIMIT 1", [$mName]);
+t_ok(is_array($mRow), 'M3 · the organisation registered');
+if (is_array($mRow)) {
+    t_eq((int)$mRow['is_vendor'], 0, 'M4 · it could not award itself the vendor role');
+    t_eq((int)$mRow['is_subcontractor'], 0, 'M5 · nor the sub-contractor role');
+    t_eq((string)$mRow['status'], 'ACTIVE', 'M6 · nor a status of its own choosing');
+    $mAcct = ops_one("SELECT * FROM client_users WHERE LOWER(email)='m3@quarry.test'");
+    t_ok(is_array($mAcct) && (string)($mAcct['perms'] ?? '') !== 'admin', 'M7 · nor permissions of its own choosing');
+    t_eq((int)($mAcct['partner_id'] ?? 0), (int)$mRow['id'], 'M8 · the account belongs to the organisation that was created, not the one it named');
+}
+
+//  An identifier the company gives us is KEPT, or the one check that cannot be
+//  argued with has nothing to match against next time.
+$mKeep = 'Redhill Ceramics Pvt Ltd';
+$b3one('join', 0, json_encode(['name' => $mKeep, 'email' => 'm11@redhill.test', 'gstin' => '24RRRSS7777R1Z9']));
+t_eq((string)ops_val("SELECT gstin FROM business_partners WHERE legal_name=? ORDER BY id DESC LIMIT 1", [$mKeep]),
+     '24RRRSS7777R1Z9', 'M11 · a tax identifier given at registration is stored, not read and discarded');
+$mAgain = $b3one('join', 0, json_encode(['name' => 'Redhill Ceramics Limited Trading', 'email' => 'm12@redhill.test', 'gstin' => '24RRRSS7777R1Z9']));
+t_ok(!($mAgain['ok'] ?? false), 'M12 · so the SAME company under another name is refused the next time');
+
+//  A name is data, never instruction — on both engines.
+$mSqlName = "Bobby'); DROP TABLE business_partners;--";
+$mInj = $b3one('join', 0, json_encode(['name' => $mSqlName, 'email' => 'm9@inj.test']));
+t_ok((int)ops_val("SELECT COUNT(*) FROM business_partners") > 0, 'M9 · the table is still there');
+t_eq($b3parts($mSqlName), ($mInj['ok'] ?? false) ? 1 : 0, 'M10 · the name was stored literally, as data');
 
 $_SESSION = $b3sess; current_user(true); ua(true);   // restored LAST, deliberately

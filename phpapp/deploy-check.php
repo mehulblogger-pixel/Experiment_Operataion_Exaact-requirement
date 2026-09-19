@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '42c2c42 · 2026-09-19 08:18 UTC · 665 files';
+$RELEASE = 'c3d558d · 2026-09-19 08:48 UTC · 665 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -93,7 +93,7 @@ $EXPECT  = [
     'lib/connect_market.php' => ['s'=>39876,'h'=>'0fd3332b96bb74f5'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
     'lib/connect_msg.php' => ['s'=>16414,'h'=>'37fd232a1fba99cc'],
-    'lib/connect_org.php' => ['s'=>21545,'h'=>'09cf07d353b747b0'],
+    'lib/connect_org.php' => ['s'=>22412,'h'=>'6fc57f6d0dd36045'],
     'lib/connect_passport.php' => ['s'=>11025,'h'=>'651b739f219f52b4'],
     'lib/connect_person.php' => ['s'=>7701,'h'=>'7210f0cae01d84e9'],
     'lib/connect_privacy.php' => ['s'=>17610,'h'=>'74640b7aef0d480c'],
