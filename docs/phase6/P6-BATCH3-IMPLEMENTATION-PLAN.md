@@ -165,6 +165,43 @@ taken before the transaction opens — and the system-failure message no longer
 borrows the duplicate wording. Test **C4** reproduces the live first-run by
 bumping the migration epoch; it fails on MariaDB without the fix.
 
+## Gate 3 · no schema work inside a transaction we did not open
+
+| | |
+|---|---|
+| Owner decision | **Option 1**, after the Gate 3 regression exposed the defect |
+| Files | `lib/connect_org.php` · `lib/activity.php` · `lib/connect_capability.php` |
+
+Moving the schema steps before the route's **own** transaction stopped it
+destroying that one. It did not stop the same steps running inside a
+**caller's** transaction — and MariaDB commits implicitly on any DDL, the no-op
+`CREATE TABLE IF NOT EXISTS` kind included. The caller's transaction ended
+unannounced, and the route then believed it owned what it had just destroyed.
+
+**One rule, applied where the DDL actually is:**
+
+* `connect_org_prepare_schema($caps)` — prepares everything this route can reach
+  when it owns the connection, and records nothing but the fact that it did.
+  Inside a borrowed transaction it performs **no schema work at all**: it only
+  reports whether what is needed is already there, and refuses before a single
+  row is written if it is not. Refusing is safe precisely *because* nothing has
+  been written: the caller's transaction is untouched and the decision is theirs.
+* `connect_org_schema_ready($caps)` — the readiness question, asked without
+  touching anything, so it is safe to ask from anywhere.
+* `act_migrate()` and `connect_cap_migrate()` — the two run-once migrations this
+  route reaches through other people's functions — carry the same rule at their
+  own door, and deliberately do **not** mark themselves done when they decline,
+  so the real preparation still happens later, outside.
+
+**A stricter first attempt was wrong and is recorded.** It proceeded only when
+*this function* had done the warming; the mutation baseline came back dirty with
+7 failures in `onboarding_engines`, a legitimate caller that wraps the route in
+its own transaction. Safety that breaks a working feature is not safety.
+
+**The transaction contract is unchanged.** A failure after the writes begin is
+re-thrown; the callee neither commits nor rolls back what it borrowed. C8/C9
+stand as written.
+
 ---
 
 ## Deliberately not done

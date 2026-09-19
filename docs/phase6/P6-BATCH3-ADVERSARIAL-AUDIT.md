@@ -175,10 +175,38 @@ It is **Batch 3's own code failing Batch 3's own contract**: before this batch
 the route had no transaction at all. No production caller wraps it in a
 transaction today, so there is no known live data loss — latent, not harmless.
 
-C8/C9 are correct as written and are **left failing**. Weakening them would
-falsify the evidence. Three options are put to the owner in §5a of the
-completion report; my recommendation is to refuse schema work inside somebody
-else's transaction.
+C8/C9 are correct as written and were **left failing** pending the owner's
+decision. Weakening them would have falsified the evidence.
+
+### Resolution — owner chose option 1
+
+**The rule now lives where the DDL is**, stated once and applied at each door:
+
+* `connect_org_prepare_schema()` prepares everything this route can reach when
+  it owns the connection. Inside a borrowed transaction it does **nothing** — it
+  only establishes whether what is needed is already there, and refuses *before
+  a single row is written* if it is not, so the caller's transaction is exactly
+  as they left it and the decision stays theirs.
+* The **audit trail** and the **capability table** carry the same rule at their
+  own door, because the route reaches them through other people's functions.
+  Without that, the route's own care would count for nothing.
+
+**The first attempt was stricter and wrong, and is recorded rather than
+hidden.** It proceeded only when *this function* had done the warming. The
+mutation baseline came back **dirty — 7 failures in `onboarding_engines`** — a
+legitimate existing caller that wraps the route in its own transaction, which
+the stricter rule refused. Safety that breaks a working feature is not safety.
+The rule above breaks nobody, and the mistake was caught by a dirty baseline
+rather than by review.
+
+**The transaction contract is untouched.** A failure after the writes begin is
+still re-thrown; the callee still neither commits nor rolls back what it
+borrowed. C8/C9 are unchanged — only C8's *precondition* was made valid, which
+is the same thing a real caller must do.
+
+Twelve cases now cover warm schema, stale schema, success, failure, borrowed
+transaction and function-owned transaction (C12–C25), and the new protection is
+mutation-tested by M5, M29–M34.
 
 ## What would still worry me on the morning of a release
 
