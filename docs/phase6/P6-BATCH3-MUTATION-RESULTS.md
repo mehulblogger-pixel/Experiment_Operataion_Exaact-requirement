@@ -208,17 +208,59 @@ the statement still returns `true`:
 different facts, and only the second is the rule. **G10/G11** install exactly
 that condition and require one primary and an honest answer to the caller.
 
+## Run 4 — after the Gate 3 fix, from `8de9607`
+
+The Gate 3 regression exposed a defect the batch battery could not see, the fix
+changed three files, and **new code earns new mutants rather than old ones
+re-pointed**. Six were written for the protection itself:
+
+| # | Defect planted | Result | Caught by |
+|---|---|---|---|
+| **M5** | the schema steps are not taken at all | **CAUGHT** | C24 C24b C25 C25b |
+| **M29** | schema work runs inside a transaction it did not open | **CAUGHT** | C15 C15c C20 |
+| **M30** | a missing table inside a borrowed transaction is waved through | **CAUGHT** | C20 |
+| **M31** | the AUDIT schema step does DDL inside a borrowed transaction | **CAUGHT** | C15 C21 C22 |
+| **M32** | the audit schema is left out of the preparation | **EQUIVALENT** | — see below |
+| **M33** | the refusal writes anyway instead of stopping | **CAUGHT** | C24 C24b |
+| **M34** | the CAPABILITY schema step does DDL inside a borrowed transaction | **CAUGHT** | C22 |
+
+Two corrections along the way, both recorded rather than tidied away:
+
+* **M5 first came back FATAL, which is never a catch.** Probe C25c read the very
+  table the mutant removes, so the mutant killed the suite instead of failing an
+  assertion. The probe now reads defensively, and M5 is caught honestly.
+* **M13's anchor had moved** when the Gate-2 fix rewrote its line — reported as
+  an anchor miss, re-aimed, and caught (6 assertions).
+
+### M32 is an equivalent mutant — proved, not argued
+
+The tempting reasoning is that warming the audit schema "must matter". It was
+tested instead. With the `activities` table genuinely dropped and the guards
+stale, the mutated code **still registered the organisation and still wrote the
+audit row**:
+
+```
+registered=true | audit rows=1 | Your account is ready.
+```
+
+Every `act_log` on this route runs **outside** a transaction — the refusal audit
+before the transaction opens, the success audit after commit — so `act_migrate()`
+runs fine when it is reached, and pre-warming it changes nothing observable on
+any reachable path. The call stays as explicit intent. It is belt-and-braces,
+not load-bearing, and it is **not counted as a kill**.
+
 ---
 
-## Final result — from commit `d012543`
+## Final result — from the final application tree `8de9607`
 
 | | |
 |---|---|
-| **Mutants** | **28** |
-| **Killed** | **28** |
-| **Survived** | **0** |
-| **FATAL (not counted as catches)** | **0** |
-| **Anchor misses (not counted as catches)** | **0** |
+| **Mutants** | **34** |
+| **Killed** | **33** |
+| **Equivalent (proved, not assumed)** | **1** — M32 |
+| **Genuine survivors** | **0** |
+| **FATAL (never counted as catches)** | **0** |
+| **Anchor misses (never counted as catches)** | **0** |
 
 ## What this battery says about the tests
 

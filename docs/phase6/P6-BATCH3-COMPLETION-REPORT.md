@@ -6,7 +6,7 @@
 |---|---|
 | Branch | `claude/testing-branch-setup-0gqe8n` |
 | Baseline commit | `42c2c42` |
-| **Final commit measured** | **`d012543`** — the application tree is byte-identical in `9468057`, which adds documents only (`git diff d012543 9468057 -- phpapp` is empty) |
+| **Final commit measured** | **`8de9607`** — the application under test. `b59134a` adds documents only; `git diff 8de9607 b59134a -- phpapp` is empty |
 | Engines | MariaDB 10.11.14 **(authoritative)** · SQLite 3.45.1 (supplementary) · PHP 8.4.19 |
 
 **Status: implementation and validation complete. Batch 3 is NOT declared
@@ -85,13 +85,16 @@ identity report, in plain words, each saying whether a person must decide.
 
 | Gate | Status | Evidence |
 |---|---|---|
-| **Gate 1** — adversarial mutation validation | **CLOSED** | **28 mutants, 28 killed, 0 survivors, 0 FATAL, 0 anchor misses** |
+| **Gate 1** — adversarial mutation validation | **CLOSED** | **34 mutants · 33 killed · 1 proved equivalent · 0 genuine survivors · 0 FATAL · 0 anchor misses** |
 | **Gate 2** — primary-contact integrity | **CLOSED** | fixed at the cause; failure injected for real with a trigger; its own mutants M27/M28 both killed |
+| **Gate 3** — final regression, four runs | **CLOSED** | 189/0 · 189/0 · 12 649/0 · **12 653/0 authoritative** |
 
-### Gate 3 — **NOT CLOSED**
+### Gate 3 — **CLOSED**
 
-The authoritative MariaDB **full** regression found a real defect in Batch 3's
-own code. It is described in §5 and §5a. **Batch 3 is NOT ready for acceptance.**
+The authoritative MariaDB full regression *did* find a real defect in Batch 3's
+own code on the first attempt. It was reported rather than repaired mid-run, the
+owner chose the remedy, and all four measurements were re-taken from the fixed
+tree. §5a records what it was and how it was closed.
 
 ---
 
@@ -138,109 +141,77 @@ G10/G11 install exactly that condition.
 
 ## 5 · Gate 3 — final regression, all four measurements
 
-Measured on the application tree of `d012543`. The harness (`tests/run.php`)
+Measured on the application tree of `8de9607`. The harness (`tests/run.php`)
 requires every `tests/test_*.php` and prints one `RESULT` line; **it has no skip
-facility and emits no duration**, so SKIPPED is structurally 0 and duration is
-reported as externally measured wall-clock where it was taken. FATAL is detected
-by a missing `RESULT` line or a PHP fatal in the log — both were checked.
+facility and emits no duration**, so SKIPPED is structurally 0 and no duration is
+invented here. FATAL is detected by a missing `RESULT` line or a PHP fatal in the
+log — both were checked and both are zero.
 
 | # | Run | TOTAL | PASSED | FAILED | SKIPPED | FATAL |
 |---|---|---:|---:|---:|---:|---:|
-| 1 | Batch 3 battery · SQLite | 155 | **155** | **0** | 0 | 0 |
-| 2 | Batch 3 battery · MariaDB | 155 | **155** | **0** | 0 | 0 |
-| 3 | **Full regression · SQLite** | 12 615 | **12 615** | **0** | 0 | 0 |
-| 4 | **Full regression · MariaDB (authoritative)** | 12 621 | 12 619 | **2** | 0 | 0 |
+| 1 | Batch 3 battery · SQLite | 189 | **189** | **0** | 0 | 0 |
+| 2 | Batch 3 battery · MariaDB | 189 | **189** | **0** | 0 | 0 |
+| 3 | **Full regression · SQLite** | 12 649 | **12 649** | **0** | 0 | 0 |
+| 4 | **Full regression · MariaDB (authoritative)** | 12 653 | **12 653** | **0** | 0 | 0 |
 
-508 test files executed in each full run; `grep -ci "fatal error"` returns 0 in
-both logs.
+508 test files executed in each full run. The engines do not disagree anywhere.
 
 ```
---- 4of4 full MariaDB ---
-RESULT: 12619 passed, 2 failed
-  FAIL  C8 . inside a caller transaction a failure is RE-THROWN, so the caller unwinds
-  FAIL  C9 . and it neither committed nor rolled back the transaction it borrowed
+=== GATE 3 (final) · application tree 8de9607 ===
+--- 1of4 batch SQLite ---    RESULT: 189 passed, 0 failed
+--- 2of4 batch MariaDB ---   RESULT: 189 passed, 0 failed
+--- 3of4 full SQLite ---     RESULT: 12649 passed, 0 failed
+--- 4of4 full MariaDB ---    RESULT: 12653 passed, 0 failed
 ```
 
-**The two engines disagree, so the MariaDB result stands.** It was not averaged,
-not re-run until green, and not explained away.
-
-## 5a · The Gate 3 defect — root cause established, NOT repaired
+## 5a · The Gate 3 defect — found, reported, then closed
 
 | | |
 |---|---|
-| **Failing tests** | `C8`, `C9` in `phpapp/tests/test_p6_batch3.php` |
-| **Module / function** | `phpapp/lib/connect_org.php` → `connect_org_register()` |
-| **Engine** | **MariaDB only.** SQLite cannot show it: its DDL is transactional |
-| **Condition** | the **full** suite only — the batch battery alone passes on both engines |
-| **Status** | **REPORTED, NOT FIXED.** The candidate tree is unchanged |
+| **Found by** | the authoritative MariaDB **full** regression (C8, C9) |
+| **Module** | `lib/connect_org.php` → `connect_org_register()` |
+| **Invisible to** | SQLite (its DDL is transactional) **and** to the batch battery alone |
+| **Handling** | reported, **not repaired mid-run**; owner chose the remedy; fixed in `8de9607` |
 
-### What happens
+**What it was.** Taking the schema steps before the route's *own* transaction
+stopped it destroying that one. It did not stop the same steps running inside a
+**caller's** transaction — and MariaDB commits implicitly on any DDL, the no-op
+`CREATE TABLE IF NOT EXISTS` kind included. The caller's transaction ended
+unannounced, and the route then believed it owned what it had just destroyed.
 
-`connect_org_register()` runs its schema steps at the top — deliberately, to fix
-the earlier defect where a migration inside its *own* transaction made MariaDB
-commit half way through. But when a **caller** already has a transaction open,
-those same migrations run **inside the caller's transaction**, and MariaDB
-commits it implicitly on the first DDL. The function then sees
-`inTransaction() === false`, concludes it owns the transaction, and answers in
-business terms instead of re-throwing. **The caller's transaction is gone, and
-nothing says so.**
+**How it was closed — one rule, applied where the DDL actually is:**
 
-### Proved, not deduced
+* `connect_org_prepare_schema($caps)` prepares everything this route can reach
+  when it owns the connection. Inside a borrowed transaction it does **nothing**:
+  it only reports whether what is needed is already there, and refuses *before a
+  single row is written* if it is not — safe precisely because nothing has been
+  written.
+* `act_migrate()` and `connect_cap_migrate()`, reached through other people's
+  functions, carry the same rule at their own door and deliberately do **not**
+  mark themselves done when they decline, so the real preparation still happens
+  later, outside.
 
-Run against a scratch copy on MariaDB — the candidate tree was not touched:
+**A stricter first attempt was wrong, and is recorded.** It proceeded only when
+*this function* had done the warming. The mutation baseline came back **dirty —
+7 failures in `onboarding_engines`** — a legitimate existing caller that wraps
+the route in its own transaction. Safety that breaks a working feature is not
+safety, and it was a dirty baseline, not review, that caught it.
 
-```
-A · guards WARM  (migrations already done this epoch)
-      in-transaction before=true | re-threw=true PDOException | still in transaction after=true
-B · guards STALE (a previous test switched database, as db_epoch does)
-      in-transaction before=true | re-threw=false            | still in transaction after=false
-```
+**The transaction contract is untouched.** A failure after the writes begin is
+still re-thrown; the callee still neither commits nor rolls back what it
+borrowed. **C8 and C9 are unchanged** — only C8's *precondition* was made valid,
+which is what a real caller must do.
 
-The only difference between A and B is whether the run-once migration guards are
-warm. They are keyed to `db_epoch()`, which is bumped by `db(true)` — what the
-product does when a company is chosen at login, when one is provisioned, and on
-"log in as". **24 test files that run before `test_p6_batch3.php` touch
-`db(true)` or the epoch**, `test_db_epoch.php` among them, which is why the
-defect appears in the full suite and not in the batch battery.
-
-### Honest assessment of impact
-
-* **This is Batch 3's own code failing Batch 3's own contract.** Before this
-  batch `connect_org_register()` had no transaction at all; the borrowed-
-  transaction contract, and the migration placement that breaks it, are both
-  mine.
-* **No production caller wraps `connect_org_register()` in a transaction today**,
-  so there is no known live data loss — the fault is **latent**, not harmless.
-* The earlier fix is therefore **incomplete**: it stops the callee destroying its
-  *own* transaction, but not a *caller's*.
-* **C8/C9 are correct as written.** They assert the Batch 2 contract, and they
-  are failing because the contract is genuinely not honoured under a stale-guard
-  condition — which is exactly the first-request-after-switch case the epoch
-  mechanism exists for. **Weakening or deleting them would be falsifying the
-  evidence.**
-
-### Options for owner decision — none applied
-
-1. **Refuse to do schema work inside somebody else's transaction.** When
-   `inTransaction()` is true on entry, skip the migrations and require the
-   caller to have prepared the schema (boot already does). Smallest change;
-   makes the contract true.
-2. **Fail fast and loudly.** If migrations would be needed while a caller's
-   transaction is open, throw before writing anything, so the caller unwinds.
-3. **Accept and document** that this route must not be called inside a caller's
-   transaction, and state the contract as *own-transaction only*. Cheapest, but
-   it weakens what Batch 2 established.
-
-My recommendation is **option 1**, but per the Gate 3 freeze it is not applied
-and the candidate tree is untouched pending your decision.
+**Twelve cases** now cover the six required combinations and more: warm schema,
+stale schema, success, failure, borrowed transaction, function-owned
+transaction, the rule at each of the two other doors, and a table that is
+genuinely absent (C12–C25). Mutation-tested by M5 and M29–M34.
 
 ## 6 · Protected regression areas
 
 Attributed from the **existing** canonical suite — no duplicate regression suite
-was created for this table. Areas overlap deliberately (Batch 3's own file sits
-inside *Organisation / account*; seats inside both *Money* and *Phase 5*), so the
-rows sum to more than the total; the TOTAL row is the authoritative count of the
-single run.
+was created for this table. Areas overlap deliberately, so the rows sum to more
+than the total; the TOTAL row is the authoritative count of the single run.
 
 | Area | Files | SQLite passed / failed | MariaDB passed / failed |
 |---|---:|---:|---:|
@@ -250,20 +221,17 @@ single run.
 | Workforce | 12 | 177 / 0 | 177 / 0 |
 | Marketplace | 77 | 1441 / 0 | 1441 / 0 |
 | Recruitment | 34 | 958 / 0 | 958 / 0 |
-| Phase 4 allocation | 5 | 924 / 0 | 929 / 0 |
+| Phase 4 allocation | 5 | 924 / 0 | 927 / 0 |
 | Phase 5 KPI / seats | 2 | 152 / 0 | 152 / 0 |
 | **Phase 6 Batch 1** | 1 | 115 / 0 | 115 / 0 |
 | **Phase 6 Batch 2** | 1 | 78 / 0 | 78 / 0 |
-| **Phase 6 Batch 3** | 1 | 155 / 0 | **153 / 2** |
+| **Phase 6 Batch 3** | 1 | 189 / 0 | 189 / 0 |
 | SaaS entitlement / permissions | 27 | 1112 / 0 | 1112 / 0 |
 | Tenant isolation | 11 | 251 / 0 | 251 / 0 |
-| Organisation / account integrity | 19 | 369 / 0 | **367 / 2** |
-| **TOTAL (all files)** | **508** | **12 615 / 0** | **12 619 / 2** |
+| Organisation / account integrity | 19 | 403 / 0 | 403 / 0 |
+| **TOTAL (all files)** | **508** | **12 649 / 0** | **12 653 / 0** |
 
-**Every protected area outside Batch 3 itself is clean on both engines.** The
-two failures are Batch 3's own C8/C9, and they are the defect in §5a — no
-Operations, Money, Recruitment, Marketplace, Phase 4, Phase 5, Batch 1, Batch 2,
-entitlement or tenant-isolation test was damaged.
+**Every protected area is clean on both engines**, Batch 1 and Batch 2 included.
 
 ## 7 · F1–F9 closure matrix
 
@@ -273,7 +241,7 @@ entitlement or tenant-isolation test was damaged.
 |---|---|---|---|---|---|
 | **F1** | `/join` creates organisations with no duplicate check | detector called before any write; neutral refusal; refusal audited | a new company still registers; an EXACT match creates nothing, not even an account; a similar-but-different company is not blocked | A1–A10, M1–M2 | **CLOSED** |
 | **F2** | `/join` has no concurrency protection | settled by the database key on the account | 3 simultaneous registrations → 1 partner, 1 organisation, 1 account, 1 success, 0 crashes | B0–B6 | **CLOSED within the approved uniqueness boundary** (limitation 1) |
-| **F3** | `/join` writes three tables unguarded | one transaction; Batch 2 borrowed-transaction contract | a failure part way through leaves no orphan; first-run-in-fresh-process reports truthfully | C1–C7, C10, C11, C4–C4d | **NOT CLOSED** — C8/C9 fail on MariaDB; see §5a |
+| **F3** | `/join` writes three tables unguarded | one transaction; Batch 2 borrowed-transaction contract; **and no schema work inside a transaction it did not open** | a failure part way through leaves no orphan; a failure inside a caller's transaction is re-thrown; stale schema never commits a borrowed transaction; a missing table is refused, not built | C1–C25 | **CLOSED** — see §5a |
 | **F4** | `agencies` has no cross-reference | one nullable `party_id`, set by a person, never inferred | no inference from identical name or GSTIN; two contracts may share one organisation; dangling reference refused; no other master gains a rule | D1–D17 | **CLOSED** |
 | **F5** | CRM and lead writers create blind | both call the shared guard | quotation attaches on a tax identifier; lead conversion refuses and names the record; lead untouched | E1–E8 | **CLOSED** |
 | **F6** | the detector cannot say how confident it is | EXACT / POSSIBLE / NONE, backward-compatible | original shape preserved; identifier outranks a name on an earlier record | F1–F12 | **CLOSED** |
@@ -335,6 +303,10 @@ mutation, none by reading, and all are recorded rather than quietly corrected.
 | **M26** | the planted finding carried **empty records**, so no assertion about agency records could ever have seen it — a defective mutant, not a survivor | re-reading it after it "survived" twice |
 | **precedence probe** | put the identifier's record **earlier** in the register, so the scan met the identifier first and answered correctly whatever the rule said | M7 surviving twice |
 
+| **C1–C3** *(named again)* | the transaction test answered by the check at the top of the route | M4 surviving |
+| **C25c** | read the very table its own mutant removes, so the mutant killed the suite — a FATAL, which is never a catch | M5 reporting FATAL |
+| **the first Gate 3 rule** | stricter than it needed to be; refused a legitimate caller that wraps the route in its own transaction | a **dirty mutation baseline** (7 failures in `onboarding_engines`) |
+
 > **An assertion without a valid subject or premise is not evidence.**
 
 And the finding that justifies the whole exercise:
@@ -374,28 +346,41 @@ ESTABLISHED** rather than claimed.
 | | |
 |---|---|
 | Baseline before implementation (batch file, unmodified code) | 25 passed, **31 failed** |
-| Batch 3 assertions, final | **155** |
-| Full suite, SQLite | **12 615 passed, 0 failed** (508 files) |
-| Full suite, MariaDB (authoritative) | **12 619 passed, 2 failed** (508 files) |
-| Mutants | **28 planted, 28 killed, 0 survivors, 0 FATAL, 0 anchor misses** |
+| Batch 3 assertions, final | **189** |
+| Full suite, SQLite | **12 649 passed, 0 failed** (508 files) |
+| Full suite, MariaDB (authoritative) | **12 653 passed, 0 failed** (508 files) |
+| Mutants | **34 planted · 33 killed · 1 proved equivalent · 0 genuine survivors** |
+| FATAL / anchor misses counted as catches | **0** — by rule, neither ever is |
 | Skipped tests | **0** — the harness has no skip facility |
 | PHP fatals | **0** in both full logs |
-| Defects found by validation and fixed at the cause | **3** (dual authority · MariaDB implicit commit · duplicate wording on a system failure) |
-| Defects found by validation and **left open for owner decision** | **1** (§5a) |
-| Instruments found defective and corrected | **4** |
+| Defects found by validation and fixed at the cause | **4** — dual authority · MariaDB implicit commit (own transaction) · duplicate wording on a system failure · **borrowed-transaction schema work** |
+| Instruments found defective and corrected | **7** |
+| Schema added, in total | one nullable column · one generated column per account table |
 
 ## 13 · Final disposition
 
-> ## NOT READY — DEFECTS REMAIN
+> ## READY FOR OWNER ACCEPTANCE
 >
-> Gate 1 **CLOSED** · Gate 2 **CLOSED** · **Gate 3 NOT CLOSED.**
+> Gate 1 **CLOSED** · Gate 2 **CLOSED** · Gate 3 **CLOSED**
 
-The authoritative MariaDB full regression fails two assertions, and they are
-failing for a real reason: Batch 3's own borrowed-transaction contract is not
-honoured when the migration guards are stale. The candidate tree has **not** been
-changed, the failing tests have **not** been weakened or removed, and the two
-approved limitations are unchanged.
+All four Gate 3 measurements are clean from the final application tree
+`8de9607`, the authoritative MariaDB run included. Mutation stands at 34
+planted, 33 killed and one **proved** equivalent. Every protected area is clean
+on both engines, Batch 1 and Batch 2 among them. F1–F9 and Q19–Q23 are
+reconciled. The two approved limitations are retained, unchanged and unsolved,
+exactly as agreed.
 
-Batch 3 is **not** presented for acceptance, Batch 3 is **not** locked, and
-Batch 4 has **not** been started. The next action is the owner's: choose among
-the three options in §5a, or direct otherwise.
+**This is not a claim that Batch 3 is accepted.** Acceptance and locking are the
+owner's, and Batch 4 has not been started.
+
+Two things the owner should weigh before locking:
+
+1. **The borrowed-transaction defect was found by the full MariaDB regression,
+   not by 189 clean batch assertions.** That is the second time in this batch a
+   clean battery said nothing about a real defect. The four-run gate earned its
+   place.
+2. **A defect exists outside this batch's scope**, found while capturing product
+   screenshots: `lib/recruitpipe.php:529` closes its PHP block one line early, so
+   a line of template code is printed on every candidate screen and the
+   administrator's "Edit workflow" link never renders. It is **not** Batch 3's,
+   it is **not** fixed, and it is raised here so it is not lost.

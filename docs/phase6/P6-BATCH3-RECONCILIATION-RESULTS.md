@@ -66,13 +66,14 @@ they were "not touched":
 | Client portal · vendor portal | green | green |
 | CRM — leads, inquiries, quotations | green | green |
 | APIs & exports | green | green |
-| **Totals** | **12 615 / 0** | **12 619 / 2** |
+| **Totals** | **12 649 / 0** | **12 653 / 0** |
 
-**The MariaDB totals are not clean.** The two failures are Batch 3's own C8/C9
-(the borrowed-transaction contract under a stale migration guard) — reported, not
-repaired, and not weakened. Every other protected area is clean on both engines.
+Both engines are clean from the final tree `8de9607`. An earlier run of this
+gate was not: C8/C9 failed on MariaDB and exposed the borrowed-transaction
+defect, which was reported rather than repaired mid-run and then fixed on the
+owner's decision.
 
-Three regressions were found along the way and fixed at the cause, not by
+Four regressions were found along the way and fixed at the cause, not by
 weakening a test: the `portal_invite()` authority (13 assertions), a test with
 no authorised actor (1), and the MariaDB implicit-commit defect (1). All are
 described in the test results and the adversarial audit.

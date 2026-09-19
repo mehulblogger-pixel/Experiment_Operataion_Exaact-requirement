@@ -28,13 +28,14 @@ weaker.)
 
 | Suite | SQLite | MariaDB (authoritative) |
 |---|---|---|
-| `p6_batch3` (batch tests) | **155 passed, 0 failed** | **155 passed, 0 failed** |
-| **Full regression** | **12 615 passed, 0 failed** | **12 619 passed, 2 failed** |
+| `p6_batch3` (batch tests) | **189 passed, 0 failed** | **189 passed, 0 failed** |
+| **Full regression** | **12 649 passed, 0 failed** | **12 653 passed, 0 failed** |
 
-**The full MariaDB run is NOT clean.** `C8` and `C9` fail — Batch 3's own
-borrowed-transaction contract is not honoured when the migration guards are
-stale. Root cause established, **not repaired**; see §5a of the completion
-report. The two engines disagree and the MariaDB result stands.
+Taken from the final application tree `8de9607`. An earlier run of this same
+gate was **not** clean — `C8` and `C9` failed on MariaDB, exposing the
+borrowed-transaction defect described in §5a of the completion report. It was
+reported rather than repaired mid-run, fixed on the owner's decision, and all
+four measurements were re-taken.
 
 The two totals differ because a handful of assertions are engine-specific
 (driver behaviour, generated-column support); no assertion is skipped to make an
