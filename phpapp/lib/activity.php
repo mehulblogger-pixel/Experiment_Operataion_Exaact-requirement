@@ -104,6 +104,13 @@ const ACT_DIRECTIONS = ['IN' => 'Incoming', 'OUT' => 'Outgoing', '' => ''];
 
 function act_migrate() {
     static $doneAt = -1; if ($doneAt === db_epoch()) return;
+    //  Phase 6 · Batch 3 (Gate 3) — NEVER run DDL inside a transaction this
+    //  function did not open. MariaDB commits implicitly on any DDL, including
+    //  a no-op `CREATE TABLE IF NOT EXISTS`, so doing schema work here would
+    //  silently commit somebody else's transaction half way through their work.
+    //  The marker is deliberately NOT set: the schema step simply happens later,
+    //  outside, the way it always would have.
+    try { if (db()->inTransaction()) return; } catch (Throwable $e) {}
     $pdo = db(); $pk = pk_clause();
     $pdo->exec("CREATE TABLE IF NOT EXISTS activities (
         id $pk,

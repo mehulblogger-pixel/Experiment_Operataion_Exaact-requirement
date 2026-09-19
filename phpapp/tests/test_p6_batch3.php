@@ -168,6 +168,11 @@ if ($cIxOk) {
     //      somebody else's work. It re-throws so the caller unwinds. Returning a
     //      polite failure here would leave the caller committing the wreckage.
     $cThrew = false;
+    //  A caller that wants this route inside its own transaction prepares the
+    //  schema first, outside it — the route will not do schema work it cannot do
+    //  safely (C15). This is the caller's side of that contract, not a softening
+    //  of what C8/C9 assert: the assertions below are unchanged.
+    connect_org_prepare_schema(false);
     db()->beginTransaction();
     try { connect_org_register(['name' => $cBlock, 'org_type' => 'ENTERPRISE', 'contact_name' => 'C Eight',
                                 'contact_email' => 'c8@blockade.test', 'password' => 'blockade123']); }
@@ -182,6 +187,189 @@ if ($cIxOk) {
     try { db()->exec("DROP INDEX tmp_uq_cxorg_name ON cx_organisations"); }
     catch (Throwable $e) { try { db()->exec("DROP INDEX tmp_uq_cxorg_name"); } catch (Throwable $e2) {} }
 } else { foreach (['C5','C6','C7','C8','C9','C10','C11'] as $c) t_ok(false, $c . ' . the probe index could not be built'); }
+
+// -----------------------------------------------------------------------------
+//  C12–C20 — SCHEMA PREPARATION MUST NEVER TOUCH A TRANSACTION IT DID NOT OPEN.
+//
+//  The earlier fix moved the schema steps before this route's OWN transaction.
+//  It did not stop them running inside a CALLER'S transaction, where MariaDB
+//  commits implicitly on the first DDL — the caller's transaction ends
+//  unannounced and the route then believes it owns the one it just destroyed.
+//  Found by the full MariaDB regression, invisible to SQLite, and invisible to
+//  this file alone because the guards happen to be warm here.
+//
+//  "Stale guards" below is not a contrivance: the run-once markers are keyed to
+//  db_epoch(), which moves whenever the product switches database — choosing a
+//  company at login, provisioning one, "log in as". Bumping the epoch is
+//  exactly what a fresh process looks like.
+$cReg = function ($name, $mail, $caps = []) {
+    return connect_org_register(['name' => $name, 'org_type' => 'ENTERPRISE', 'contact_name' => 'Case',
+                                 'contact_email' => $mail, 'password' => 'schemaguard123'] + ($caps ? ['caps' => $caps] : []));
+};
+$cStale = function () { $GLOBALS['__db_epoch'] = db_epoch() + 1; };
+
+//  (1) WARM SCHEMA · route owns the transaction · SUCCESS
+$c12 = $cReg('Casework Alpha Ltd', 'c12@case.test');
+t_ok(($c12[0] ?? false) === true, 'C12 . warm schema, own transaction, success  [' . (string)($c12[1] ?? '') . ']');
+t_eq($b3parts('Casework Alpha Ltd'), 1, 'C12b . exactly one organisation');
+
+//  (2) STALE SCHEMA · route owns the transaction · SUCCESS
+//      The migrations must still run — this is the live first-request case.
+$cStale();
+$c13 = $cReg('Casework Beta Ltd', 'c13@case.test', ['TPIA']);
+t_ok(($c13[0] ?? false) === true, 'C13 . STALE schema, own transaction, success  [' . (string)($c13[1] ?? '') . ']');
+t_eq($b3parts('Casework Beta Ltd'), 1, 'C13b . exactly one organisation');
+t_ok((int)ops_val("SELECT COUNT(*) FROM cx_org_capabilities WHERE org_party_id=?",
+     [(int)ops_val("SELECT id FROM business_partners WHERE legal_name='Casework Beta Ltd' ORDER BY id DESC LIMIT 1")]) > 0,
+     'C13c . and the capability schema really was prepared, not merely skipped');
+
+//  (3) WARM SCHEMA · BORROWED transaction · SUCCESS
+//      The caller's transaction must still be the caller's afterwards.
+$c14ok = false; $c14in = false;
+db()->beginTransaction();
+try { $c14 = $cReg('Casework Gamma Ltd', 'c14@case.test'); $c14ok = ($c14[0] ?? false) === true; }
+catch (Throwable $e) { $c14ok = false; }
+$c14in = db()->inTransaction();
+try { if ($c14in) db()->rollBack(); } catch (Throwable $e) {}
+t_ok($c14ok, 'C14 . warm schema, borrowed transaction, success');
+t_ok($c14in, 'C14b . and the caller STILL owns its transaction');
+t_eq($b3parts('Casework Gamma Ltd'), 0, 'C14c . which the caller then rolled back — nothing survives');
+
+//  (4) STALE SCHEMA · BORROWED transaction   ← the defect this fix exists for
+//
+//      Not one statement of DDL may run here, and that includes the no-op kind:
+//      CREATE TABLE IF NOT EXISTS on a table that is already there is still DDL,
+//      and MariaDB still commits on it. The route cannot warm what it needs
+//      without doing exactly that, so it REFUSES — before a single row is
+//      written, leaving the caller's transaction precisely as they left it.
+//
+//      Refusing is the honest outcome, not a lesser one: the alternative is to
+//      commit somebody else's transaction without telling them.
+$cStale();
+$c15ok = false; $c15in = false; $c15msg = '';
+db()->beginTransaction();
+try { $c15 = $cReg('Casework Delta Ltd', 'c15@case.test');
+      $c15ok = ($c15[0] ?? false) === true; $c15msg = (string)($c15[1] ?? ''); }
+catch (Throwable $e) { $c15ok = false; $c15msg = 'threw ' . get_class($e); }
+$c15in = db()->inTransaction();
+try { if ($c15in) db()->rollBack(); } catch (Throwable $e) {}
+t_ok($c15in, 'C15 . *** STALE schema inside a BORROWED transaction does NOT commit it ***');
+t_ok($c15ok, 'C15b . and the registration still goes through — no schema work was needed  [' . $c15msg . ']');
+t_eq($b3parts('Casework Delta Ltd'), 0, 'C15c . the caller rolled back, so nothing survives');
+//      The same call, with the schema warmed first as a caller is meant to do,
+//      goes straight through — the refusal is about SAFETY, not capability.
+connect_org_prepare_schema(false);                      // outside any transaction
+db()->beginTransaction();
+$c15d = $cReg('Casework Delta Two Ltd', 'c15d@case.test');
+$c15din = db()->inTransaction();
+try { if ($c15din) db()->rollBack(); } catch (Throwable $e) {}
+t_ok(($c15d[0] ?? false) === true, 'C15d . warmed first by the caller, the same call succeeds');
+t_ok($c15din, 'C15e . and the caller still owns its transaction');
+
+//  (5) WARM SCHEMA · BORROWED transaction · FAILURE
+//      The Batch 2 contract is unchanged: re-throw, commit nothing, roll back
+//      nothing. (With the schema COLD the route never reaches a write at all —
+//      case 4 — so this is the case where a failure can actually happen.)
+connect_org_prepare_schema(false);
+$c16threw = false; $c16in = false;
+$c16Ix = false;
+try { db()->exec("CREATE UNIQUE INDEX tmp_uq_cxorg_c16 ON cx_organisations (name)"); $c16Ix = true; } catch (Throwable $e) {}
+if ($c16Ix) {
+    db()->prepare("INSERT INTO cx_organisations (name,org_type,status,created_at) VALUES (?, 'ENTERPRISE','ACTIVE',?)")
+        ->execute([$cBlock . ' C16', date('c')]);
+    db()->beginTransaction();
+    try { $cReg($cBlock . ' C16', 'c16@case.test'); } catch (Throwable $e) { $c16threw = true; }
+    $c16in = db()->inTransaction();
+    try { if ($c16in) db()->rollBack(); } catch (Throwable $e) {}
+    t_ok($c16threw, 'C16 . warm schema, borrowed transaction, failure — still RE-THROWN');
+    t_ok($c16in, 'C16b . and it neither committed nor rolled back what it borrowed');
+    t_eq($b3parts($cBlock . ' C16'), 0, 'C16c . nothing survives the caller rollback');
+    try { db()->exec("DROP INDEX tmp_uq_cxorg_c16 ON cx_organisations"); }
+    catch (Throwable $e) { try { db()->exec("DROP INDEX tmp_uq_cxorg_c16"); } catch (Throwable $e2) {} }
+} else { foreach (['C16','C16b','C16c'] as $c) t_ok(false, $c . ' . needs the probe index'); }
+
+//  (6) The rule itself, asked directly.
+t_ok(function_exists('connect_org_prepare_schema'), 'C17 . schema preparation is a rule that can be asked on its own');
+if (function_exists('connect_org_prepare_schema')) {
+    t_eq(connect_org_prepare_schema(true), '', 'C18 . outside a transaction it prepares and reports ready');
+    db()->beginTransaction();
+    $c19 = connect_org_prepare_schema(true);
+    $c19in = db()->inTransaction();
+    try { if ($c19in) db()->rollBack(); } catch (Throwable $e) {}
+    t_eq($c19, '', 'C19 . inside one it reports ready WITHOUT touching the schema');
+    t_ok($c19in, 'C19b . and the transaction it was handed is still open');
+}
+//  And when the schema is genuinely absent inside a borrowed transaction, it
+//  must REFUSE rather than build it — the refusal is safe because nothing has
+//  been written, so the caller's transaction is exactly as it was.
+if (function_exists('connect_org_schema_ready')) {
+    db()->exec("DROP TABLE IF EXISTS cx_org_capabilities");          // outside any transaction
+    db()->beginTransaction();
+    $c20 = connect_org_prepare_schema(true);
+    $c20in = db()->inTransaction();
+    $c20exists = connect_org_schema_ready(true);      // never throws: it catches its own probe
+    try { if ($c20in) db()->rollBack(); } catch (Throwable $e) {}
+    t_ok($c20 !== '', 'C20 . a missing table inside a borrowed transaction is REFUSED, not built');
+    t_ok(!$c20exists, 'C20b . and it really was still missing — no DDL was smuggled in');
+    t_ok($c20in, 'C20c . the borrowed transaction survived the refusal');
+    $cStale(); connect_cap_migrate();     // put it back: a fresh process is what rebuilds schema
+    t_ok(connect_org_schema_ready(true), 'C20d . and normal preparation restores it');
+}
+
+//  (7) THE RULE WHERE THE DDL ACTUALLY IS. The route reaches two run-once
+//      migrations through other people's functions — the audit trail and the
+//      capability table. Each must refuse to do schema work inside a
+//      transaction it did not open, or the route's own care counts for nothing.
+$cStale();
+db()->beginTransaction();
+$c21in = true;
+try { if (function_exists('act_migrate')) act_migrate(); } catch (Throwable $e) {}
+$c21in = db()->inTransaction();
+try { if (function_exists('connect_cap_migrate')) connect_cap_migrate(); } catch (Throwable $e) {}
+$c22in = db()->inTransaction();
+try { if ($c22in) db()->rollBack(); } catch (Throwable $e) {}
+t_ok($c21in, 'C21 . the AUDIT schema step does no DDL inside a borrowed transaction');
+t_ok($c22in, 'C22 . nor does the CAPABILITY schema step');
+//      And they must not mark themselves done, or the real preparation would be
+//      skipped for the rest of the process.
+$cStale(); connect_cap_migrate();
+t_ok(connect_org_schema_ready(true), 'C23 . once outside, the schema step still runs properly');
+
+//  (8) A TABLE GENUINELY ABSENT — the two halves of the rule, observed from the
+//      outside rather than through the helper.
+if (function_exists('connect_org_schema_ready')) {
+    //      (a) BORROWED: refuse. Not attempt-and-unwind — REFUSE, so nothing is
+    //          written and the caller is never handed an exception for a
+    //          condition we could see before we started.
+    db()->exec("DROP TABLE IF EXISTS cx_org_capabilities");        // outside any transaction
+    db()->beginTransaction();
+    $c24threw = false; $c24 = null;
+    try { $c24 = $cReg('Casework Epsilon Ltd', 'c24@case.test', ['TPIA']); }
+    catch (Throwable $e) { $c24threw = true; }
+    $c24in = db()->inTransaction();
+    try { if ($c24in) db()->rollBack(); } catch (Throwable $e) {}
+    t_ok(!$c24threw, 'C24 . a missing table inside a borrowed transaction is REFUSED, not attempted');
+    t_ok(($c24[0] ?? true) === false, 'C24b . the answer is a refusal, not a success');
+    t_eq($b3parts('Casework Epsilon Ltd'), 0, 'C24c . and nothing was written');
+    t_ok($c24in, 'C24d . the caller still owns its transaction');
+
+    //      (b) NOT BORROWED: prepare it. This is the live first-run, and the
+    //          route must build what it needs rather than fail.
+    $cStale();
+    $c25 = $cReg('Casework Zeta Ltd', 'c25@case.test', ['TPIA']);
+    t_ok(($c25[0] ?? false) === true,
+         'C25 . with the table absent and no caller transaction, the route PREPARES it and succeeds  ['
+         . (string)($c25[1] ?? '') . ']');
+    t_ok(connect_org_schema_ready(true), 'C25b . the schema really was prepared, not worked around');
+    //  Read defensively: when this assertion is the one FAILING, the table it
+    //  reads is the very thing that is missing. A probe that crashes proves
+    //  nothing — the harness would report a dead suite, not a caught defect.
+    $c25n = 0;
+    try { $c25n = (int)ops_val("SELECT COUNT(*) FROM cx_org_capabilities WHERE org_party_id=?",
+              [(int)ops_val("SELECT id FROM business_partners WHERE legal_name='Casework Zeta Ltd' ORDER BY id DESC LIMIT 1")]); }
+    catch (Throwable $e) { $c25n = 0; }
+    t_ok($c25n > 0, 'C25c . and the capability it was given was actually stored');
+}
 
 //  C4 — THE FIRST REGISTRATION IN A FRESH PROCESS.
 //

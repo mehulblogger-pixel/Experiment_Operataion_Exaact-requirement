@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'b9950e2 · 2026-09-19 10:11 UTC · 665 files';
+$RELEASE = '0bf70c4 · 2026-09-19 14:37 UTC · 665 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -34,7 +34,7 @@ $EXPECT  = [
     'index.php' => ['s'=>117438,'h'=>'dad114b8390a3aef'],
     'lib/access.php' => ['s'=>73324,'h'=>'ae53aa05db9f7da2'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
-    'lib/activity.php' => ['s'=>43341,'h'=>'517a1ad743964ac0'],
+    'lib/activity.php' => ['s'=>43860,'h'=>'f50c2abb6660e12e'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
     'lib/adssync.php' => ['s'=>28174,'h'=>'325142a88491bfba'],
@@ -71,7 +71,7 @@ $EXPECT  = [
     'lib/connect_analytics.php' => ['s'=>10322,'h'=>'55ce5e2749ea0bda'],
     'lib/connect_bench.php' => ['s'=>19261,'h'=>'452adce3bb2a9900'],
     'lib/connect_bridge.php' => ['s'=>8142,'h'=>'0cb82ce64f386984'],
-    'lib/connect_capability.php' => ['s'=>16087,'h'=>'289fbc3197361214'],
+    'lib/connect_capability.php' => ['s'=>16610,'h'=>'84e2c581bc36e29c'],
     'lib/connect_channels.php' => ['s'=>16526,'h'=>'41d69896e83b8919'],
     'lib/connect_client_bench.php' => ['s'=>10478,'h'=>'793a2fd9e8dc13e3'],
     'lib/connect_client_dash.php' => ['s'=>9295,'h'=>'c35365dd188acd9a'],
@@ -93,7 +93,7 @@ $EXPECT  = [
     'lib/connect_market.php' => ['s'=>39876,'h'=>'0fd3332b96bb74f5'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
     'lib/connect_msg.php' => ['s'=>16414,'h'=>'37fd232a1fba99cc'],
-    'lib/connect_org.php' => ['s'=>23081,'h'=>'5b822a52c3c2678a'],
+    'lib/connect_org.php' => ['s'=>26018,'h'=>'2b7c53356ff969eb'],
     'lib/connect_passport.php' => ['s'=>11025,'h'=>'651b739f219f52b4'],
     'lib/connect_person.php' => ['s'=>7701,'h'=>'7210f0cae01d84e9'],
     'lib/connect_privacy.php' => ['s'=>17610,'h'=>'74640b7aef0d480c'],

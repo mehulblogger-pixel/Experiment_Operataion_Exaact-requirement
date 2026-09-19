@@ -120,8 +120,66 @@ function connect_org_apply(array $in) {
  * Every type gets a marketplace portal login (post work, review vouchers); the
  * full operations workspace for a TPIA/enterprise stays a controlled step.
  */
+//  Is everything this route writes to actually there? Asked WITHOUT touching the
+//  schema, so it is safe to ask from anywhere, including inside somebody else's
+//  transaction. `$caps` widens it to the capability table, which only a sign-up
+//  that ticked something needs.
+function connect_org_schema_ready($caps = false) {
+    $need = ['business_partners', 'cx_organisations', 'client_users'];
+    if ($caps) $need[] = 'cx_org_capabilities';
+    foreach ($need as $t) {
+        try { ops_val("SELECT COUNT(*) FROM $t"); } catch (Throwable $e) { return false; }
+    }
+    return true;
+}
+
+//  SCHEMA PREPARATION THAT CANNOT DAMAGE A TRANSACTION IT DID NOT OPEN.
+//
+//  Taking the schema steps before this route's own transaction fixed half the
+//  problem. The other half: when a CALLER already has a transaction open, those
+//  same steps run inside IT — and MariaDB commits implicitly on the first DDL.
+//  The caller's transaction would end here, unannounced, and this function would
+//  then believe it owned the one it had just destroyed.
+//
+//  So the rule is simple and absolute: **no schema work inside a transaction we
+//  did not open.** When we own the connection we prepare normally. When we do
+//  not, we prepare NOTHING and merely report whether what we need is already
+//  there — which it is in every normal run, because boot prepares it.
+//
+//  Returns '' when the route may proceed, or the reason it may not.
+function connect_org_prepare_schema($caps = false) {
+    static $warmedAt = -1;
+    $borrowed = false;
+    try { $borrowed = db()->inTransaction(); } catch (Throwable $e) { $borrowed = false; }
+
+    if (!$borrowed) {
+        //  We own the connection, so this is the place to do it — and we prepare
+        //  EVERYTHING this route can reach, not only the tables it writes
+        //  itself. The audit trail and the capability table are reached through
+        //  other people's functions, each with its own run-once marker that
+        //  would otherwise fire later, at the worst possible moment.
+        connect_org_migrate();
+        if (function_exists('portal_migrate'))      portal_migrate();
+        if (function_exists('connect_cap_migrate')) connect_cap_migrate();
+        if (function_exists('act_migrate'))         act_migrate();
+        $warmedAt = db_epoch();
+        return '';
+    }
+
+    //  BORROWED — not one statement of DDL from here, no-op kind included.
+    //
+    //  The two migrations this route reaches through other people's functions
+    //  (the audit trail, the capability table) carry the same rule at their own
+    //  door, so nothing downstream can fire DDL inside this transaction either.
+    //  What is left to establish is simply whether what we need is already
+    //  there. If it is, proceed and write not one schema statement. If it is
+    //  not, refuse — before a single row is written, so the caller's
+    //  transaction is exactly as they left it and the decision stays theirs.
+    if (connect_org_schema_ready($caps)) return '';
+    return 'SCHEMA_NOT_READY';
+}
+
 function connect_org_register(array $in) {
-    connect_org_migrate();
     $name    = trim((string)($in['name'] ?? ''));
     $orgType = strtoupper((string)($in['org_type'] ?? ''));
     $email   = strtolower(trim((string)($in['contact_email'] ?? '')));
@@ -136,20 +194,19 @@ function connect_org_register(array $in) {
     if ($name === '') return [false, 'Please give your organisation a name.', null];
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return [false, 'Enter a valid work e-mail.', null];
     if (strlen($pass) < 8) return [false, 'Choose a password of at least 8 characters.', null];
-    // A login is one per e-mail across the client-portal world.
-    if (function_exists('portal_migrate')) portal_migrate();
-    //  EVERY schema step this route can touch is taken HERE, before the
-    //  transaction below opens.
+    //  Prepare the schema — or, inside somebody else's transaction, prove it is
+    //  already prepared and touch nothing. Before the first query, because the
+    //  very next line reads a table this route owns.
     //
-    //  MariaDB commits implicitly on any DDL. A migration that runs inside a
-    //  business transaction therefore ENDS it half way through: the rows written
-    //  so far are committed where the code believes they are still provisional,
-    //  and the commit that follows fails with "there is no active transaction" —
-    //  so the person was told their registration had failed while their account
-    //  actually existed. It only appeared on MariaDB, and only on the first
-    //  registration in a fresh process, which is exactly the live first-run.
-    //  SQLite hides it because its DDL is transactional.
-    if (function_exists('connect_cap_migrate')) connect_cap_migrate();
+    //  Refusing here is safe for a borrowed transaction in a way that throwing
+    //  would not be: NOTHING has been written yet, so the caller's transaction
+    //  is exactly as it was and the caller decides what to do next. The re-throw
+    //  contract below governs a failure AFTER the writes begin, and is unchanged.
+    if (connect_org_prepare_schema($capsIn !== []) !== '')
+        return [false, 'We could not complete your registration just now. Nothing has been saved. '
+                     . 'Please try again in a moment.', null];
+
+    // A login is one per e-mail across the client-portal world.
     if ((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(email)=? AND is_active=1", [$email]) > 0)
         return [false, 'That e-mail is already registered — sign in instead.', null];
 
