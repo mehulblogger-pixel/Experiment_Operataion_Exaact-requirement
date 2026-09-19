@@ -5388,28 +5388,29 @@ function ops_candidates($route, $method) {
             // both change how many seats are filled.
             if (!empty($cand['requisition_id']) && function_exists('reqf_sync')) reqf_sync((int)$cand['requisition_id']);
             $msg = 'Candidate moved to ' . lk_options_or('candidate_stage', CAND_STAGES)[$to] . '.';
-            // Hired: create an inspector/resource record from the accepted candidate.
-            if ($to === 'ACCEPTED' && !empty($_POST['make_inspector']) && empty($cand['inspector_id'])) {
-                $name = candidate_name($cand);
-                $agId = ($_POST['agency_id'] ?? '') !== '' ? (int)$_POST['agency_id'] : null;
-                $ag = $agId ? agency_get($agId) : null;
-                $roll = ($_POST['roll_type'] ?? '') === 'AGENCY' ? 'AGENCY' : 'OWN';
-                $agName = $ag['name'] ?? '';
-                $placement = ($_POST['placement_fee'] ?? '') !== '' ? (float)$_POST['placement_fee'] : 0;
-                $agCost = ($_POST['agency_cost'] ?? '') !== '' ? (float)$_POST['agency_cost'] : 0;
-                // On agency roll → costed as a sub-con (monthly agency charge); on our own roll → asset (salary).
-                $kind = ($roll === 'AGENCY') ? 'SUBCON' : 'ASSET';
-                // Recruitment placement fee is provisional until the agency's guarantee window passes.
-                $gd = (int)($ag['guarantee_days'] ?? 90) ?: 90;
-                $feeStatus = $placement > 0 ? 'PROVISIONAL' : '';
-                $guarUpto  = $placement > 0 ? date('Y-m-d', strtotime("+$gd days")) : '';
-                $pdo->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,status,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
-                    ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
-                        $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $kind,
-                        $agId, $roll, $agName, $agCost, $placement, $feeStatus, $guarUpto, date('c')]);
-                $insId = $pdo->lastInsertId();
-                $pdo->prepare("UPDATE candidates SET inspector_id=? WHERE id=?")->execute([$insId, $id]);
+            //  Hired: create a team-member record from the accepted application.
+            //
+            //  Phase 6 · Batch 2 — this was twenty lines of raw SQL here, with no
+            //  transaction and no ceiling: three browsers accepting the same person
+            //  at the same instant produced three staff records, two of them
+            //  belonging to nobody. It is now one atomic operation that asks its own
+            //  gates, resolves the branch deliberately (BD1) and says whether the
+            //  identity relationship was recorded (BD2).
+            if ($to === 'ACCEPTED' && !empty($_POST['make_inspector']) && empty($cand['inspector_id'])
+                && function_exists('rcv_convert')) {
+                $cv = rcv_convert($id, [
+                    'agency_id'     => ($_POST['agency_id'] ?? '') !== '' ? (int)$_POST['agency_id'] : 0,
+                    'roll_type'     => (string)($_POST['roll_type'] ?? ''),
+                    'placement_fee' => ($_POST['placement_fee'] ?? '') !== '' ? (float)$_POST['placement_fee'] : 0,
+                    'agency_cost'   => ($_POST['agency_cost'] ?? '') !== '' ? (float)$_POST['agency_cost'] : 0,
+                ]);
+                if (!$cv['ok']) {
+                    //  The stage move already happened and stands; only the
+                    //  conversion was refused, and it says exactly why.
+                    flash($msg . ' ' . $cv['message'], 'error');
+                    redirect('/candidate?id=' . $id);
+                }
+                $insId = (int)$cv['inspector_id'];
                 // Fill the requisition this candidate was raised against.
                 if (!empty($cand['requisition_id'])) {
                     // M3 — a requisition for ten people is not finished because one
@@ -5424,7 +5425,10 @@ function ops_candidates($route, $method) {
                         ? ' Requisition: ' . reqf_summary_text((int)$cand['requisition_id']) . '.'
                         : ' Requisition filled.';
                 }
-                $msg .= ' Added to ' . THP('engineer') . ' (' . ($roll === 'AGENCY' ? 'on agency roll' : 'on our roll') . ') — you can now allocate ' . Tlp('job') . ' to them.';
+                $msg .= ' Added to ' . THP('engineer') . ' (' . ($cv['branch_source'] === 'requisition' ? 'branch from the requirement' : 'branch from the recruiter') . ') — you can now allocate ' . Tlp('job') . ' to them.';
+                //  BD2 — STATE B is never dressed up as STATE A.
+                if (($cv['identity'] ?? '') === 'NOT_ENTITLED')
+                    $msg .= ' The cross-system identity record was not created (the marketplace add-on is not active); it can be linked later.';
             }
             flash($msg);
         }

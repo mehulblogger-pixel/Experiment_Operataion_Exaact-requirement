@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'db02289 · 2026-09-19 03:29 UTC · 665 files';
+$RELEASE = 'c617a40 · 2026-09-19 06:28 UTC · 665 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -88,14 +88,14 @@ $EXPECT  = [
     'lib/connect_geo.php' => ['s'=>15539,'h'=>'5a1f51ac70ec64d2'],
     'lib/connect_govern.php' => ['s'=>7181,'h'=>'22ce5ad54e44ce2a'],
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
-    'lib/connect_identity.php' => ['s'=>34082,'h'=>'2c1796d607700219'],
+    'lib/connect_identity.php' => ['s'=>46283,'h'=>'5d4aa7c51c362d4a'],
     'lib/connect_kpi.php' => ['s'=>25262,'h'=>'3d44c0796425cb27'],
     'lib/connect_market.php' => ['s'=>39876,'h'=>'0fd3332b96bb74f5'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
     'lib/connect_msg.php' => ['s'=>16414,'h'=>'37fd232a1fba99cc'],
     'lib/connect_org.php' => ['s'=>15830,'h'=>'626fdf913d82ba09'],
     'lib/connect_passport.php' => ['s'=>11025,'h'=>'651b739f219f52b4'],
-    'lib/connect_person.php' => ['s'=>6710,'h'=>'d57da3e1e9249c23'],
+    'lib/connect_person.php' => ['s'=>7701,'h'=>'7210f0cae01d84e9'],
     'lib/connect_privacy.php' => ['s'=>17610,'h'=>'74640b7aef0d480c'],
     'lib/connect_pro.php' => ['s'=>62286,'h'=>'e807b7400ce28688'],
     'lib/connect_qualtax.php' => ['s'=>24094,'h'=>'26af62b7d906d441'],
@@ -170,7 +170,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66290,'h'=>'4ff1bc5a2652ad81'],
-    'lib/ops.php' => ['s'=>620029,'h'=>'76e7f5ac63dc3e42'],
+    'lib/ops.php' => ['s'=>619824,'h'=>'482fa7c03a0dc5b6'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -190,7 +190,7 @@ $EXPECT  = [
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
-    'lib/recruit.php' => ['s'=>70000,'h'=>'7af0afde87863083'],
+    'lib/recruit.php' => ['s'=>86405,'h'=>'7178b8a343dd146d'],
     'lib/recruit_approval.php' => ['s'=>147839,'h'=>'732ae4559975ab0c'],
     'lib/recruit_assign.php' => ['s'=>39386,'h'=>'57d29dfa58c1fc33'],
     'lib/recruit_cc.php' => ['s'=>30990,'h'=>'58dcf5cd677eb27c'],

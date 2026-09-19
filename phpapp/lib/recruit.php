@@ -1091,9 +1091,287 @@ function person_link_rows(array $ids) {
         $rows = ops_all("SELECT id, person_ref FROM candidates WHERE id IN ($ph)", $ids) ?: [];
     } catch (Throwable $e) { return 'Could not read those records.'; }
     if (count($rows) !== count($ids)) return 'One of those records no longer exists.';
-    $ref = '';
-    foreach ($rows as $r) if (trim((string)$r['person_ref']) !== '') { $ref = trim((string)$r['person_ref']); break; }
-    if ($ref === '') $ref = 'P' . str_pad((string)min($ids), 6, '0', STR_PAD_LEFT);
-    db()->prepare("UPDATE candidates SET person_ref=? WHERE id IN ($ph)")->execute(array_merge([$ref], $ids));
+
+    //  PHASE 6 · BATCH 2 — LINKING MUST NEVER SPLIT A GROUP (invariant I43).
+    //
+    //  This used to UPDATE only the ids it was handed. Saying "B and C are the
+    //  same person", where C already shared a group with D, moved C and left D
+    //  behind: a record previously recorded as the same person silently became a
+    //  different one, with no audit entry anywhere. Proved in
+    //  P6-BATCH2-PREIMPLEMENTATION-AUDIT.md, Finding B.
+    //
+    //  The operation is a closure, so it is computed as one. Every member of
+    //  every group being joined comes along. This uses ONLY the groupings the
+    //  system itself already recorded — never a name, never an e-mail, never a
+    //  similarity. It is not an identity inference.
+    $refs = [];
+    foreach ($rows as $r) { $v = trim((string)$r['person_ref']); if ($v !== '') $refs[$v] = 1; }
+    $ref = $refs ? (string)array_key_first($refs) : 'P' . str_pad((string)min($ids), 6, '0', STR_PAD_LEFT);
+
+    $all = $ids;
+    if ($refs) {
+        $rph = implode(',', array_fill(0, count($refs), '?'));
+        try {
+            foreach (ops_all("SELECT id FROM candidates WHERE person_ref IN ($rph)", array_keys($refs)) ?: [] as $r)
+                $all[] = (int)$r['id'];
+        } catch (Throwable $e) { return 'Could not read the existing person groups.'; }
+    }
+    $all = array_values(array_unique($all));
+    $aph = implode(',', array_fill(0, count($all), '?'));
+    db()->prepare("UPDATE candidates SET person_ref=? WHERE id IN ($aph)")->execute(array_merge([$ref], $all));
+
+    $extra = count($all) - count($ids);
+    foreach ($ids as $cid)
+        rcv_log($cid, 'IDENTITY_LINKED', 'Recorded as one person with ' . (count($all) - 1) . ' other application(s)'
+            . ($extra > 0 ? ' (' . $extra . ' brought in from an existing group)' : '') . ' — reference ' . $ref);
     return '';
+}
+
+/**
+ * Restore person groups that the OLD person_link_rows() split (owner decision BD4).
+ *
+ *  STRICT LIMITS, and they are the point:
+ *   · deterministic — it reads only groupings the system itself recorded
+ *   · never fuzzy — no name, no e-mail, no mobile, no similarity of any kind
+ *   · never silent — every repair writes an audit entry
+ *   · never a merge of unrelated people — it only rejoins groups that a single
+ *     recorded link operation is proven to have separated
+ *   · if the previous state cannot be proven from existing data, it REPORTS and
+ *     does not touch anything
+ *
+ *  The proof it requires: a candidate whose group was absorbed elsewhere leaves
+ *  behind siblings that still carry the OLD reference while at least one former
+ *  member of that same old reference now carries a different one. That pattern
+ *  is only producible by the split, and the two references are both the
+ *  system's own records.
+ *
+ *  $opt['dry_run'] reports without changing anything.
+ *  Returns a list of findings: [['old_ref'=>…, 'new_ref'=>…, 'ids'=>[…], 'repaired'=>bool], …]
+ */
+function person_group_repair(array $opt = []) {
+    person_migrate();
+    $dry = !empty($opt['dry_run']);
+    $out = [];
+    try {
+        //  The evidence: the activity spine's own record of which applications a
+        //  link operation named together. Without that record the previous state
+        //  cannot be PROVEN, and nothing is repaired.
+        $links = ops_all("SELECT entity_id, subject FROM activities
+                          WHERE entity_kind='CANDIDATE' AND kind='IDENTITY_LINKED'
+                            AND subject LIKE '%reference %' ORDER BY id") ?: [];
+    } catch (Throwable $e) { return $out; }
+    $seen = [];
+    foreach ($links as $l) {
+        if (!preg_match('/reference\s+(\S+)$/', (string)$l['subject'], $m)) continue;
+        $ref = $m[1];
+        $cid = (int)$l['entity_id'];
+        if (isset($seen[$cid . '|' . $ref])) continue;
+        $seen[$cid . '|' . $ref] = 1;
+        $now = (string)ops_val("SELECT person_ref FROM candidates WHERE id=?", [$cid]);
+        if ($now === '' || $now === $ref) continue;              // still where the record says
+        //  Anyone still carrying the OLD reference was left behind by a later link.
+        $left = array_map(fn($r) => (int)$r['id'], ops_all("SELECT id FROM candidates WHERE person_ref=?", [$ref]) ?: []);
+        if (!$left) continue;                                     // nothing stranded
+        $out[] = ['old_ref' => $ref, 'new_ref' => $now, 'ids' => $left, 'repaired' => !$dry];
+        if ($dry) continue;
+        $ph = implode(',', array_fill(0, count($left), '?'));
+        db()->prepare("UPDATE candidates SET person_ref=? WHERE id IN ($ph)")->execute(array_merge([$now], $left));
+        foreach ($left as $lid)
+            rcv_log($lid, 'IDENTITY_LINKED',
+                'Person group restored — rejoined reference ' . $now . ' after an earlier link separated it from ' . $ref);
+    }
+    return $out;
+}
+
+// ============================================================================
+//  PHASE 6 · BATCH 2 — CANDIDATE → TEAM MEMBER CONVERSION
+//
+//  This used to be twenty lines inline in the /candidate-stage route, with no
+//  transaction and no ceiling. Three browsers accepting the same person at the
+//  same instant produced three staff records, two of them belonging to nobody
+//  and reported by nothing (P6-BATCH2-PREIMPLEMENTATION-AUDIT.md, Finding A).
+//
+//  It lives here now so it can be tested and attacked directly rather than only
+//  through a route, and so every gate is asked by the action rather than
+//  inherited from whatever page called it (invariant I27).
+//
+//  IT CREATES NO PERSON HUB AND MERGES NOTHING. `candidates.inspector_id` keeps
+//  working unchanged for every existing reader; the identity-ledger row is
+//  additive.
+// ============================================================================
+
+/** Refusal codes — deterministic, testable, and safe to show. */
+const RCV_CODES = [
+    'CONVERTED'      => 'Added to the team.',
+    'ALREADY'        => 'This application has already been converted.',
+    'NO_CANDIDATE'   => 'No such application for this record.',
+    'NOT_ALLOWED'    => 'You cannot convert this application.',
+    'NO_BRANCH'      => 'This conversion has no branch: the requirement carries none and neither does the recruiter. Set a branch on the requirement, or on the recruiter, and try again.',
+    'BLOCKED'        => 'The requirement does not allow this right now.',
+    'RACE_LOST'      => 'Somebody else converted this application a moment ago.',
+    'FAILED'         => 'The conversion could not be completed. Nothing was changed.',
+];
+
+/**
+ * WHICH BRANCH does a converted team member belong to? (owner decision BD1)
+ *
+ *    1. the requirement's branch
+ *    2. failing that, the recruiter's branch — the candidate's assigned
+ *       recruiter if there is one, otherwise the person performing the
+ *       conversion, who is by definition a recruiter doing recruitment work
+ *    3. failing both, NOTHING — and the conversion is refused
+ *
+ *  There is deliberately no fallback to the platform's generic "no office means
+ *  Ahmedabad" rule. That rule is right for reading a register and wrong for
+ *  creating a person: it silently filed every hire under a branch nobody chose.
+ *
+ *  Returns [officeId|null, source].
+ */
+function rcv_branch_for($candId, $actorId = 0) {
+    $cand = ops_one("SELECT id, requisition_id, recruiter_id FROM candidates WHERE id=?", [(int)$candId]);
+    if (!$cand) return [null, 'no_candidate'];
+    $valid = function ($id) {
+        $id = (int)$id; if ($id <= 0) return 0;
+        return (int)ops_val("SELECT COUNT(*) FROM offices WHERE id=?", [$id]) > 0 ? $id : 0;
+    };
+    if (!empty($cand['requisition_id'])) {
+        $o = $valid(ops_val("SELECT office_id FROM requisitions WHERE id=?", [(int)$cand['requisition_id']]));
+        if ($o) return [$o, 'requisition'];
+    }
+    if (!empty($cand['recruiter_id'])) {
+        $o = $valid(ops_val("SELECT home_office_id FROM users WHERE id=?", [(int)$cand['recruiter_id']]));
+        if ($o) return [$o, 'recruiter'];
+    }
+    $actorId = (int)$actorId ?: (int)(current_user()['id'] ?? 0);
+    if ($actorId) {
+        $o = $valid(ops_val("SELECT home_office_id FROM users WHERE id=?", [$actorId]));
+        if ($o) return [$o, 'actor'];
+    }
+    return [null, 'none'];
+}
+
+/** Audit a conversion outcome against the candidate — the record it is about. */
+function rcv_log($candId, $kind, $subject) {
+    if (!function_exists('act_log')) return;
+    try { act_log('CANDIDATE', (int)$candId, $kind, $subject, ['auto' => 0]); } catch (Throwable $e) {}
+}
+
+/**
+ * Convert an accepted application into a team member.
+ *
+ * Returns a result that always corresponds to COMMITTED business state:
+ *   ['ok'=>bool, 'code'=>string, 'message'=>string, 'inspector_id'=>int,
+ *    'identity'=>'LINKED'|'NOT_ENTITLED'|'NONE', 'branch'=>int|null, 'branch_source'=>string]
+ *
+ *  'identity' is owner decision BD2 made explicit:
+ *     LINKED        — STATE A: converted AND the identity relationship recorded
+ *     NOT_ENTITLED  — STATE B: converted, and the relationship deliberately NOT
+ *                     recorded because the marketplace capability is unavailable
+ *  The two are never reported as the same thing, and STATE B is reported by
+ *  identity_state_findings() so it can be linked later through the proper path.
+ */
+function rcv_convert($candId, array $opt = []) {
+    $candId = (int)$candId;
+    $fail = function ($code, $extra = '') use ($candId) {
+        return ['ok' => false, 'code' => $code, 'message' => (RCV_CODES[$code] ?? $code) . ($extra ? ' ' . $extra : ''),
+                'inspector_id' => 0, 'identity' => 'NONE', 'branch' => null, 'branch_source' => 'none'];
+    };
+
+    //  1 PERMISSION — asked here, not inherited from the route.
+    if (function_exists('is_coordinator_level') && !is_coordinator_level()) return $fail('NOT_ALLOWED');
+    //  2 TENANT — structural: db() is this tenant's database and nothing else is reachable.
+    $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$candId]);
+    if (!$cand) return $fail('NO_CANDIDATE');
+    //  3 SCOPE — the actor must be able to open this application.
+    if (function_exists('connect_identity_scope_ok') && !connect_identity_scope_ok('candidate', $candId))
+        return $fail('NO_CANDIDATE');       // same words as "not there": no enumeration
+    //  4 STATE — already converted is a refusal, not a second conversion.
+    if ((int)($cand['inspector_id'] ?? 0) > 0) return $fail('ALREADY');
+    //  5 THE LOCKED BOUNDARIES still decide first — M4's execution boundary and
+    //     M6's seat gate are authoritative and are not re-implemented here.
+    if (!empty($cand['requisition_id']) && function_exists('rexec_block_reason')) {
+        $why = rexec_block_reason((int)$cand['requisition_id'], 'JOIN', $candId);
+        if ($why !== '') { rcv_log($candId, 'IDENTITY_REFUSED', 'Conversion refused — ' . $why); return $fail('BLOCKED', $why); }
+    }
+    //  6 BRANCH — BD1. No branch, no conversion. Never a silent Ahmedabad.
+    [$office, $src] = rcv_branch_for($candId, (int)($opt['actor_id'] ?? 0));
+    if (!$office) {
+        rcv_log($candId, 'IDENTITY_REFUSED', 'Conversion refused — no branch on the requirement or the recruiter');
+        return $fail('NO_BRANCH');
+    }
+    //  7 IDENTITY CAPABILITY — decided BEFORE the write so the outcome is known,
+    //     and never a blocker on recruitment (BD2).
+    $mayLink = function_exists('connect_identity_conversion_allowed') && connect_identity_conversion_allowed();
+
+    $name = function_exists('candidate_name') ? candidate_name($cand)
+          : trim(((string)($cand['first_name'] ?? '')) . ' ' . ((string)($cand['last_name'] ?? '')));
+    $ag   = (!empty($opt['agency_id']) && function_exists('agency_get')) ? agency_get((int)$opt['agency_id']) : null;
+    $roll = (($opt['roll_type'] ?? '') === 'AGENCY') ? 'AGENCY' : 'OWN';
+    $kind = ($roll === 'AGENCY') ? 'SUBCON' : 'ASSET';
+    $placement = (float)($opt['placement_fee'] ?? 0);
+    $gd = (int)($ag['guarantee_days'] ?? 90) ?: 90;
+
+    //  8 THE TRANSACTION — the smallest correct business boundary: the team
+    //     member, the relationship this conversion exists to create, and the
+    //     ledger row that constrains it. Nothing downstream is dragged in to
+    //     make it larger.
+    //  If a caller already opened a transaction we JOIN it rather than opening a
+    //  second one — and then we may neither commit nor roll back, because that
+    //  work is not ours. Getting this wrong is not theoretical: catching the
+    //  nested-begin exception and carrying on meant a failure inside a caller's
+    //  transaction rolled back NOTHING and left the half-made team member for the
+    //  caller to commit, while this function reported failure. A reported failure
+    //  that commits a row is the exact defect this batch exists to remove, so on
+    //  a borrowed transaction the failure is RE-THROWN and the caller unwinds.
+    $own = true;
+    try { $own = !db()->inTransaction(); } catch (Throwable $e) { $own = true; }
+    $tx = false; $insId = 0; $identity = $mayLink ? 'LINKED' : 'NOT_ENTITLED';
+    if ($own) { try { $tx = (bool)db()->beginTransaction(); } catch (Throwable $e) { $tx = false; } }
+    try {
+        //  A — the team member
+        db()->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,emp_code,home_office_id,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,status,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
+            ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
+                       $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $kind,
+                       function_exists('next_emp_code') ? next_emp_code($kind) : '', $office,
+                       $ag ? (int)$opt['agency_id'] : null, $roll, (string)($ag['name'] ?? ''), (float)($opt['agency_cost'] ?? 0),
+                       $placement, $placement > 0 ? 'PROVISIONAL' : '', $placement > 0 ? date('Y-m-d', strtotime("+$gd days")) : '',
+                       date('c')]);
+        $insId = (int)db()->lastInsertId();
+        if ($insId <= 0) throw new RuntimeException('the team member could not be created');
+
+        //  B — the relationship, claimed CONDITIONALLY. This is what makes the
+        //      race safe with or without the marketplace: a second process that
+        //      got this far a microsecond ago has already set the column, so
+        //      this matches nothing and the whole transaction goes back.
+        $st = db()->prepare("UPDATE candidates SET inspector_id=? WHERE id=? AND (inspector_id IS NULL OR inspector_id=0)");
+        $st->execute([$insId, $candId]);
+        if ($st->rowCount() < 1) throw new RuntimeException('RACE_LOST');
+
+        //  C — the identity ledger, only when the workspace may record identity.
+        if ($mayLink) {
+            [$lok, $lmsg] = connect_identity_conversion_link_create($candId, $insId, 'conversion', '', 'recruitment conversion');
+            if (!$lok) throw new RuntimeException('RACE_LOST');
+        }
+        if ($own && $tx) db()->commit();
+    } catch (Throwable $e) {
+        if ($tx) { try { db()->rollBack(); } catch (Throwable $e2) {} }
+        $lost = strpos($e->getMessage(), 'RACE_LOST') !== false
+             || (function_exists('connect_identity_is_duplicate') && connect_identity_is_duplicate($e));
+        rcv_log($candId, 'IDENTITY_REFUSED', 'Conversion rolled back — ' . ($lost ? 'another process converted it first' : $e->getMessage()));
+        //  Borrowed transaction: we could not undo the half-made work, so we must
+        //  not pretend it is gone. The caller owns the rollback and is told.
+        if (!$own) throw $e;
+        return $fail($lost ? 'RACE_LOST' : 'FAILED');
+    }
+
+    //  9 AUDIT — outside the transaction. A failed observation is never a failed
+    //     transaction (invariant I41): the hire stands whatever the audit does.
+    rcv_log($candId, 'IDENTITY_LINKED',
+        'Converted to team member #' . $insId . ' (branch from ' . $src . ')'
+        . ($identity === 'LINKED' ? ' — identity relationship recorded'
+                                  : ' — identity relationship NOT recorded (marketplace capability unavailable)'));
+
+    return ['ok' => true, 'code' => 'CONVERTED', 'message' => RCV_CODES['CONVERTED'], 'inspector_id' => $insId,
+            'identity' => $identity, 'branch' => $office, 'branch_source' => $src];
 }

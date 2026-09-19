@@ -47,6 +47,19 @@ function connect_person_resolve($kind, $id) {
             if ((int)$r['inspector_id'] > 0) $insps[(int)$r['inspector_id']] = 1;
             if ((int)$r['candidate_id'] > 0) $cands[(int)$r['candidate_id']] = 1;
         }
+    //  3) Phase 6 · Batch 2 — the RECRUITMENT CONVERSION axis. A person hired
+    //     through recruitment has no marketplace professional to climb through,
+    //     so the traversal above could never reach them: the resolver's answer
+    //     for the commonest case in the product was "not linked to anything".
+    //     Both directions, because the question is asked from either end.
+    foreach (array_keys($cands) as $c)
+        foreach ($all("SELECT inspector_id FROM cx_identity_link
+                        WHERE candidate_id=? AND status='LINKED' AND COALESCE(inspector_id,0)>0", [$c]) as $r)
+            if ((int)$r['inspector_id'] > 0) $insps[(int)$r['inspector_id']] = 1;
+    foreach (array_keys($insps) as $i)
+        foreach ($all("SELECT candidate_id FROM cx_identity_link
+                        WHERE inspector_id=? AND status='LINKED' AND COALESCE(candidate_id,0)>0", [$i]) as $r)
+            if ((int)$r['candidate_id'] > 0) $cands[(int)$r['candidate_id']] = 1;
     return ['professional_ids' => array_keys($pros), 'inspector_ids' => array_keys($insps), 'candidate_ids' => array_keys($cands)];
 }
 

@@ -64,9 +64,10 @@ function connect_identity_migrate() {
 // may point at the same professional. Constraining it would make I3
 // unenforceable — the one place here where the obvious constraint is wrong.
 const CXID_UNIQUE = [
-    'uq_pro_insp' => 'ux_cx_idlink_pro_insp',   // U1 · one live inspector-axis row per professional
-    'uq_insp'     => 'ux_cx_idlink_insp',       // U2 · one live inspector-axis row per inspector
-    'uq_cand'     => 'ux_cx_idlink_cand',       // U3 · one live candidate-axis row per candidate
+    'uq_pro_insp'  => 'ux_cx_idlink_pro_insp',  // U1 · one live inspector-axis row per professional
+    'uq_insp'      => 'ux_cx_idlink_insp',      // U2 · one live inspector-axis row per inspector
+    'uq_cand'      => 'ux_cx_idlink_cand',      // U3 · one live candidate-axis row per candidate
+    'uq_cand_insp' => 'ux_cx_idlink_cand_insp', // U4 · one live CONVERSION row per candidate (Batch 2)
 ];
 
 /**
@@ -76,21 +77,31 @@ const CXID_UNIQUE = [
  * uniqueness bug would get in.
  */
 function connect_identity_keys($proId, $inspId, $candId, $live = true) {
-    if (!$live) return ['uq_pro_insp' => null, 'uq_insp' => null, 'uq_cand' => null];
-    if ((int)$candId > 0)                                          // candidate axis
-        return ['uq_pro_insp' => null, 'uq_insp' => null, 'uq_cand' => (int)$candId];
-    return ['uq_pro_insp' => ((int)$proId ?: null),                // inspector axis
-            'uq_insp'     => ((int)$inspId ?: null), 'uq_cand' => null];
+    $none = ['uq_pro_insp' => null, 'uq_insp' => null, 'uq_cand' => null, 'uq_cand_insp' => null];
+    if (!$live) return $none;
+    if ((int)$candId > 0 && (int)$inspId > 0)                      // CONVERSION axis (Batch 2)
+        return ['uq_pro_insp' => null, 'uq_insp' => null, 'uq_cand' => null, 'uq_cand_insp' => (int)$candId];
+    if ((int)$candId > 0)                                          // candidate↔professional axis
+        return ['uq_pro_insp' => null, 'uq_insp' => null, 'uq_cand' => (int)$candId, 'uq_cand_insp' => null];
+    return ['uq_pro_insp' => ((int)$proId ?: null),                // professional↔inspector axis
+            'uq_insp'     => ((int)$inspId ?: null), 'uq_cand' => null, 'uq_cand_insp' => null];
 }
 
 /** Stamp the live keys onto rows that pre-date them. Additive; no business field is touched. */
 function connect_identity_backfill_keys() {
     $live = "status='LINKED'";
     $insp = "COALESCE(candidate_id,0)=0";
+    //  Batch 2 — the candidate axis splits in two. A row carrying BOTH a
+    //  candidate and an inspector is a CONVERSION, and must not take the
+    //  candidate↔professional slot: one person may legitimately hold both
+    //  (invariant I1), and sharing one key would forbid it.
+    $candPro  = "COALESCE(candidate_id,0)>0 AND COALESCE(inspector_id,0)=0";
+    $candInsp = "COALESCE(candidate_id,0)>0 AND COALESCE(inspector_id,0)>0";
     foreach ([
-        'uq_pro_insp' => "CASE WHEN $live AND $insp AND COALESCE(professional_id,0)>0 THEN professional_id ELSE NULL END",
-        'uq_insp'     => "CASE WHEN $live AND $insp AND COALESCE(inspector_id,0)>0    THEN inspector_id    ELSE NULL END",
-        'uq_cand'     => "CASE WHEN $live AND COALESCE(candidate_id,0)>0              THEN candidate_id    ELSE NULL END",
+        'uq_pro_insp'  => "CASE WHEN $live AND $insp AND COALESCE(professional_id,0)>0 THEN professional_id ELSE NULL END",
+        'uq_insp'      => "CASE WHEN $live AND $insp AND COALESCE(inspector_id,0)>0    THEN inspector_id    ELSE NULL END",
+        'uq_cand'      => "CASE WHEN $live AND $candPro  THEN candidate_id ELSE NULL END",
+        'uq_cand_insp' => "CASE WHEN $live AND $candInsp THEN candidate_id ELSE NULL END",
     ] as $col => $expr) {
         try { db()->exec("UPDATE cx_identity_link SET $col = $expr"); } catch (Throwable $e) {}
     }
@@ -244,8 +255,13 @@ function connect_identity_log($entityKind, $entityId, $kind, $subject) {
 // Each resolver now names its axis. Nothing is merged and no third ledger is
 // introduced; the rows were always distinguishable, they were simply not being
 // distinguished.
-const CXID_AXIS_INSPECTOR = "COALESCE(candidate_id,0)=0";
-const CXID_AXIS_CANDIDATE = "COALESCE(candidate_id,0)>0";
+//  Batch 2 adds a THIRD axis — candidate↔inspector, the recruitment conversion.
+//  The candidate predicate is narrowed accordingly: without that, a conversion
+//  row would answer as a candidate↔professional link and the two would collide,
+//  which is the same class of defect Batch 1 fixed between the first two axes.
+const CXID_AXIS_INSPECTOR  = "COALESCE(candidate_id,0)=0";
+const CXID_AXIS_CANDIDATE  = "COALESCE(candidate_id,0)>0 AND COALESCE(inspector_id,0)=0";
+const CXID_AXIS_CONVERSION = "COALESCE(candidate_id,0)>0 AND COALESCE(inspector_id,0)>0";
 
 /** The active INSPECTOR-AXIS link for a professional (→ inspector_id), or null. */
 function connect_identity_of_professional($proId) {
@@ -452,6 +468,76 @@ function connect_identity_candidate_link_create($candId, $proId, $method = 'manu
     return [true, 'Confirmed — this candidate and marketplace professional are recorded as one person (nothing merged; you can unlink any time).', $id];
 }
 
+// ---- The CONVERSION axis (Phase 6 · Batch 2) -------------------------------
+//
+//  "This application became this team member." It is the same "one person across
+//  identities" concept as the other two axes and reuses the same ledger — a
+//  relationship, never a merge. `candidates.inspector_id` keeps working exactly
+//  as before for every existing reader; this row is ADDITIVE, and it is what
+//  brings the conversion under U4, the resolver, the audit and the unlink that
+//  Batch 1 built.
+
+/** The active CONVERSION link for a candidate (→ inspector_id), or null. */
+function connect_identity_of_candidate_inspector($candId) {
+    connect_identity_migrate();
+    return ops_one("SELECT * FROM cx_identity_link
+                     WHERE candidate_id=? AND status='LINKED' AND " . CXID_AXIS_CONVERSION . "
+                     ORDER BY id DESC LIMIT 1", [(int)$candId]) ?: null;
+}
+
+/** Every candidate whose conversion points at this team member (a re-hire may give several). */
+function connect_identity_candidates_of_inspector($inspId) {
+    connect_identity_migrate();
+    return ops_all("SELECT * FROM cx_identity_link
+                     WHERE inspector_id=? AND status='LINKED' AND " . CXID_AXIS_CONVERSION . "
+                     ORDER BY id DESC", [(int)$inspId]) ?: [];
+}
+
+/**
+ * Record that a candidate became a team member.
+ *
+ * Called from INSIDE the recruitment conversion's transaction, which is why it
+ * does not open one of its own. It deliberately does NOT ask
+ * connect_identity_admin_can(): owner decision BD2 — recruitment must remain
+ * usable without the marketplace, so the CALLER decides whether the ledger row
+ * is written at all, and says which state it produced. What this function will
+ * not do is write a row it is not entitled to: the caller asks
+ * connect_identity_conversion_allowed() first.
+ *
+ * U4 is the protection. The PHP pre-check is the courtesy that gives the good
+ * message.
+ */
+function connect_identity_conversion_link_create($candId, $inspId, $method = 'conversion', $by = '', $note = '') {
+    connect_identity_migrate();
+    $candId = (int)$candId; $inspId = (int)$inspId;
+    if ($candId <= 0 || $inspId <= 0) return [false, 'A candidate and a team member are both required.', 0];
+    $ex = connect_identity_of_candidate_inspector($candId);
+    if ($ex && (int)$ex['inspector_id'] === $inspId) return [true, 'Already recorded.', (int)$ex['id']];
+    if ($ex) return [false, 'This application is already recorded against another team member.', 0];
+    if ($by === '' && function_exists('current_user')) { $u = current_user(); $by = (string)($u['name'] ?? $u['username'] ?? ''); }
+    $k = connect_identity_keys(0, $inspId, $candId, true);
+    try {
+        db()->prepare("INSERT INTO cx_identity_link (professional_id,inspector_id,candidate_id,method,status,note,linked_by,linked_at,uq_pro_insp,uq_insp,uq_cand,uq_cand_insp)
+                       VALUES (0,?,?,?,'LINKED',?,?,?,?,?,?,?)")
+            ->execute([$inspId, $candId, substr((string)$method, 0, 20), substr((string)$note, 0, 200),
+                       substr((string)$by, 0, 120), date('c'), $k['uq_pro_insp'], $k['uq_insp'], $k['uq_cand'], $k['uq_cand_insp']]);
+    } catch (Throwable $e) {
+        if (!connect_identity_is_duplicate($e)) throw $e;
+        $w = connect_identity_of_candidate_inspector($candId);
+        if ($w && (int)$w['inspector_id'] === $inspId) return [true, 'Already recorded.', (int)$w['id']];
+        return [false, 'This application is already recorded against another team member.', 0];
+    }
+    $id = (int)db()->lastInsertId();
+    connect_identity_log('IDENTITY_LINK', $id, 'IDENTITY_LINKED',
+        'Recorded candidate #' . $candId . ' ↔ team member #' . $inspId . ' (recruitment conversion)');
+    return [true, 'Recorded.', $id];
+}
+
+/** May this workspace record identity relationships right now? (BD2 — never a hiring blocker.) */
+function connect_identity_conversion_allowed() {
+    return function_exists('connect_identity_admin_can') ? (bool)connect_identity_admin_can() : false;
+}
+
 // ---- Suggestions — the same person, not yet linked -------------------------
 
 /**
@@ -586,4 +672,109 @@ function ops_connect_identity($method) {
         'suggestions' => connect_identity_suggestions(),
     ]);
     return true;
+}
+
+// ============================================================================
+//  PHASE 6 · BATCH 2 — CONTRADICTORY IDENTITY STATES: DETECTION ONLY.
+//
+//  The Batch 2 audit found sixteen states an identity relationship can be in and
+//  eleven of them undetectable. This reports them. It REPAIRS NOTHING — deciding
+//  which of two records is the human is exactly what this programme never does
+//  silently, and the one approved repair (a person group the old linker split)
+//  lives in the recruitment layer that owns person groups.
+//
+//  Every finding states what is wrong, which records are involved, why it was
+//  detected, whether a repair is safe, and whether a person must look at it.
+//  Read-only, and cheap enough for the system-status page.
+// ============================================================================
+function identity_state_findings($limit = 200) {
+    connect_identity_migrate();
+    $out = [];
+    $add = function ($kind, $what, $records, $why, $safe, $human) use (&$out) {
+        $out[] = ['kind' => $kind, 'what' => $what, 'records' => $records,
+                  'why' => $why, 'safe_to_repair' => $safe, 'needs_human' => $human];
+    };
+    $all = function ($sql, $a = []) { try { return ops_all($sql, $a) ?: []; } catch (Throwable $e) { return []; } };
+    $lim = max(1, (int)$limit);
+
+    // 1 — a candidate points at a team member that is not there.
+    foreach ($all("SELECT c.id, c.inspector_id FROM candidates c
+                    WHERE COALESCE(c.inspector_id,0)>0
+                      AND NOT EXISTS (SELECT 1 FROM inspectors i WHERE i.id=c.inspector_id) LIMIT $lim") as $r)
+        $add('CANDIDATE_INSPECTOR_MISSING',
+             'An application is recorded against a team member that no longer exists.',
+             ['candidate' => (int)$r['id'], 'inspector' => (int)$r['inspector_id']],
+             'candidates.inspector_id names a row that is not in inspectors.',
+             false, true);
+
+    // 2 — a login points at a team member that is not there.
+    foreach ($all("SELECT u.id, u.inspector_id FROM users u
+                    WHERE COALESCE(u.inspector_id,0)>0
+                      AND NOT EXISTS (SELECT 1 FROM inspectors i WHERE i.id=u.inspector_id) LIMIT $lim") as $r)
+        $add('USER_INSPECTOR_MISSING',
+             'A login is linked to a team member that no longer exists.',
+             ['user' => (int)$r['id'], 'inspector' => (int)$r['inspector_id']],
+             'users.inspector_id names a row that is not in inspectors.',
+             false, true);
+
+    // 3 — converted, but the identity relationship was never recorded. This is
+    //     owner decision BD2's STATE B, and it is a QUESTION, not a fault: a
+    //     workspace without the marketplace add-on produces it legitimately.
+    foreach ($all("SELECT c.id, c.inspector_id FROM candidates c
+                    WHERE COALESCE(c.inspector_id,0)>0
+                      AND EXISTS (SELECT 1 FROM inspectors i WHERE i.id=c.inspector_id)
+                      AND NOT EXISTS (SELECT 1 FROM cx_identity_link l
+                                       WHERE l.candidate_id=c.id AND l.status='LINKED'
+                                         AND COALESCE(l.inspector_id,0)>0) LIMIT $lim") as $r)
+        $add('CONVERTED_NO_LEDGER',
+             'An application was converted to a team member without a cross-system identity record.',
+             ['candidate' => (int)$r['id'], 'inspector' => (int)$r['inspector_id']],
+             'Expected while the marketplace add-on is inactive. It can be recorded later through the identity screen.',
+             true, false);
+
+    // 4 — the ledger and the column disagree about which team member it is.
+    foreach ($all("SELECT c.id, c.inspector_id, l.inspector_id led FROM candidates c
+                    JOIN cx_identity_link l ON l.candidate_id=c.id AND l.status='LINKED' AND COALESCE(l.inspector_id,0)>0
+                    WHERE COALESCE(c.inspector_id,0)>0 AND c.inspector_id <> l.inspector_id LIMIT $lim") as $r)
+        $add('CONVERSION_DISAGREES',
+             'An application names one team member and the identity record names another.',
+             ['candidate' => (int)$r['id'], 'inspector' => (int)$r['inspector_id'], 'ledger_inspector' => (int)$r['led']],
+             'Two recorded relationships contradict each other; which one is the person is a business question.',
+             false, true);
+
+    // 5 — one team member claimed by two active logins.
+    foreach ($all("SELECT inspector_id, COUNT(*) n FROM users
+                    WHERE COALESCE(inspector_id,0)>0 AND is_active=1
+                    GROUP BY inspector_id HAVING COUNT(*)>1 LIMIT $lim") as $r)
+        $add('INSPECTOR_TWO_LOGINS',
+             'One team member is linked to more than one active login.',
+             ['inspector' => (int)$r['inspector_id'], 'logins' => (int)$r['n']],
+             'Each login would see that person\'s jobs and schedule.',
+             false, true);
+
+    // 6 — a person reachable as two different team members: one through the
+    //     conversion, another through the marketplace professional.
+    foreach ($all("SELECT cv.candidate_id, cv.inspector_id conv_insp, pi.inspector_id pro_insp
+                     FROM cx_identity_link cv
+                     JOIN cx_identity_link cp ON cp.candidate_id=cv.candidate_id AND cp.status='LINKED'
+                                             AND COALESCE(cp.inspector_id,0)=0 AND COALESCE(cp.professional_id,0)>0
+                     JOIN cx_identity_link pi ON pi.professional_id=cp.professional_id AND pi.status='LINKED'
+                                             AND COALESCE(pi.candidate_id,0)=0 AND COALESCE(pi.inspector_id,0)>0
+                    WHERE cv.status='LINKED' AND COALESCE(cv.candidate_id,0)>0 AND COALESCE(cv.inspector_id,0)>0
+                      AND cv.inspector_id <> pi.inspector_id LIMIT $lim") as $r)
+        $add('TWO_INSPECTORS_ONE_PERSON',
+             'One person resolves to two different team members.',
+             ['candidate' => (int)$r['candidate_id'], 'inspector_a' => (int)$r['conv_insp'], 'inspector_b' => (int)$r['pro_insp']],
+             'Legitimate for a re-hire on different terms; a duplicate otherwise. Only a person can tell.',
+             false, true);
+
+    // 7 — live duplicate relationships the uniqueness protection could not build over.
+    foreach (connect_identity_duplicates() as $d)
+        $add('DUPLICATE_RELATIONSHIP',
+             'Two live identity relationships describe the same thing.',
+             ['key' => $d['key'], 'value' => $d['value'], 'rows' => $d['rows']],
+             'The database protection for this relationship is held back until it is resolved.',
+             false, true);
+
+    return $out;
 }
