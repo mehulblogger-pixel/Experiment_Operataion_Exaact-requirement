@@ -981,21 +981,65 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
 // user missing the link, create the team member and set users.inspector_id.
 // Cheap to call repeatedly: when there is nothing unlinked the guard query
 // returns no rows and it does no work.
-function link_inspector_users() {
-    if (!function_exists('team_member_create')) return;
+// The active inspector-role logins that carry no team-member row — the
+// historical backlog, reported so a person can see and act on it.
+//
+// Phase 6 · Batch 1 replaced a silent self-heal with this. Every CURRENT path
+// that creates such a login already links it explicitly (the register import via
+// org_import_link_team(), and the single-user form inline), so what remains is a
+// finite backlog of older logins, not an ongoing need. Visibility is the point:
+// a person who never appears for allocation should be a question on a screen,
+// not a row quietly invented while somebody read a list.
+function team_unlinked_logins() {
     try {
-        $rows = ops_all("SELECT id, first_name, last_name, username, email, home_office_id
-                         FROM users
-                         WHERE role='INSPECTOR' AND is_active=1
-                           AND (inspector_id IS NULL OR inspector_id=0)");
-    } catch (\Throwable $e) { return; }                 // older schema without the column
+        return ops_all("SELECT id, username, first_name, last_name, email, home_office_id
+                        FROM users
+                        WHERE role='INSPECTOR' AND is_active=1
+                          AND (inspector_id IS NULL OR inspector_id=0)
+                        ORDER BY username") ?: [];
+    } catch (\Throwable $e) { return []; }              // older schema without the column
+}
+
+// Give every unlinked active inspector-role login a team-member row and link it.
+//
+// R22 · I23 · I27 — this used to run INSIDE inspectors_list(), so merely READING
+// any of seventeen screens created people. It is now an explicit action that
+// checks its own authority rather than inheriting whatever gate the calling page
+// happened to have, and it is transactional: the INSERT and the UPDATE either
+// both land or neither does, so a failure can no longer leave a live team member
+// that belongs to nobody and that the next pass would duplicate.
+//
+// Still idempotent: a login that already carries a link is not selected.
+// Returns the number of logins linked.
+function link_inspector_users() {
+    if (!function_exists('team_member_create')) return 0;
+    //  AUTHORITY — asked by the function, not by the caller. No new permission:
+    //  this is the right the People screen already requires to link a login to a
+    //  team member by hand.
+    if (function_exists('can') && !(can('users.manage.branch') || can('users.manage.global'))) return 0;
+    $rows = team_unlinked_logins();
+    $done = 0;
     foreach ($rows as $u) {
         $name = trim(((string)($u['first_name'] ?? '')) . ' ' . ((string)($u['last_name'] ?? '')));
         if ($name === '') $name = trim((string)($u['username'] ?? ''));
         if ($name === '') continue;
-        $insId = team_member_create($name, 'FIELD', $u['home_office_id'] ?: null, (string)($u['email'] ?? ''));
-        if ($insId) db()->prepare("UPDATE users SET inspector_id=? WHERE id=?")->execute([$insId, (int)$u['id']]);
+        $tx = false;
+        try { $tx = db()->beginTransaction(); } catch (\Throwable $e) { $tx = false; }
+        try {
+            $insId = team_member_create($name, 'FIELD', $u['home_office_id'] ?: null, (string)($u['email'] ?? ''));
+            //  The UPDATE must actually land on the login this row is about. A
+            //  match of nothing means the login has gone since it was read, and
+            //  the team member created a moment ago must go with it.
+            $st = db()->prepare("UPDATE users SET inspector_id=? WHERE id=? AND (inspector_id IS NULL OR inspector_id=0)");
+            $st->execute([$insId, (int)$u['id']]);
+            if (!$insId || $st->rowCount() < 1) throw new \RuntimeException('login vanished before the link could be written');
+            if ($tx) db()->commit();
+            $done++;
+        } catch (\Throwable $e) {
+            if ($tx) { try { db()->rollBack(); } catch (\Throwable $e2) {} }
+        }
     }
+    return $done;
 }
 function inspectors_list($activeOnly = true) {
     // Field inspectors first (they go to site), then coordinators, then office
@@ -1012,13 +1056,18 @@ function inspectors_list($activeOnly = true) {
     // trade_id (the person's discipline) is read below for the allocate picker;
     // self-heal it too so an install that never gained the column does not throw.
     if (function_exists('ensure_column')) ensure_column('inspectors', 'trade_id', 'INT NULL');
-    // Self-heal the "imported people don't show for allocation" gap: a field
-    // person brought in via the Excel register (or created as a login some other
-    // way) lands in `users` but, unlike the single-user form, never gets a
-    // team-member row — so they are absent from this list. Give every active
-    // inspector-role login a matching team-member row and link it, once per
-    // request, before the list is read. No-op when there is nothing to link.
-    link_inspector_users();
+    //  READ → READ ONLY (R22 · I23).
+    //
+    //  This function used to call link_inspector_users() here, which created
+    //  `inspectors` rows and wrote `users.inspector_id` while somebody was merely
+    //  reading a list — at seventeen call sites, inheriting each one's gate, and
+    //  repeating any orphan it made on every subsequent page load.
+    //
+    //  It is gone, and nothing lazy replaces it. The gap it was covering — a
+    //  login that never gained a team member — is closed at the two paths that
+    //  CREATE such logins (org_import_link_team() on the register import, and the
+    //  single-user form inline), reported by team_unlinked_logins() so the
+    //  backlog is visible, and cleared by an explicit authorised reconciliation.
     $rows = ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id, trade_id,
                             COALESCE(team_role,'FIELD') team_role
                      FROM inspectors" . ($activeOnly ? " WHERE COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE'" : "") . " ORDER BY name");
@@ -5664,10 +5713,22 @@ function ops_candidates($route, $method) {
     }
 
     // Phase 6 — thread two application rows together as the same person.
+    //
+    // Batch 1 adds the anchor scope check and the refusal ordering only. This
+    // route writes candidates.person_ref, a DIFFERENT mechanism from the identity
+    // ledger; its own audit, reversal and duplicate gaps are R18/R21 and are
+    // deliberately not addressed here.
     if ($route === 'candidate-link-person') {
         ops_require(is_coordinator_level(), 'Only coordinators and admins can link applications.');
         $id    = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
         $other = (int)($_POST['other_id'] ?? 0);
+        //  SCOPE — both applications must be ones this person may open. A record
+        //  id is not authorisation, here as anywhere else.
+        if ($method === 'POST' && function_exists('connect_identity_scope_ok')
+            && !(connect_identity_scope_ok('candidate', $id) && connect_identity_scope_ok('candidate', $other))) {
+            flash('No such application for this record.', 'error');
+            redirect('/candidate?id=' . $id);
+        }
         if ($method === 'POST' && $id && $other && function_exists('person_link_rows')) {
             $why = person_link_rows([$id, $other]);
             flash($why !== '' ? $why : 'Applications linked — they are now recorded as the same person.', $why !== '' ? 'error' : 'success');
@@ -5681,6 +5742,8 @@ function ops_candidates($route, $method) {
         ops_require(is_coordinator_level(), 'Only coordinators and admins can confirm a marketplace match.');
         $id  = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
         $pro = (int)($_POST['pro_id'] ?? 0);
+        //  Entitlement and scope are enforced by the ledger itself, so this route
+        //  cannot be weaker than the marketplace console that writes the same rows.
         if ($method === 'POST' && $id && $pro && function_exists('connect_identity_candidate_link_create')) {
             [$ok, $msg] = connect_identity_candidate_link_create($id, $pro, 'manual');
             flash($msg, $ok ? 'success' : 'error');
@@ -5691,8 +5754,13 @@ function ops_candidates($route, $method) {
         ops_require(is_coordinator_level(), 'Only coordinators and admins can remove a marketplace match.');
         $id   = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
         $link = (int)($_POST['link_id'] ?? 0);
+        //  R24 — the posted link id is a REQUEST, not a permission. The ledger is
+        //  told which candidate this screen is acting for and refuses any link
+        //  that is not that candidate's, with the same words it uses for a link
+        //  that does not exist. Until Batch 1 this removed ANY link in the
+        //  workspace, including professional↔inspector links.
         if ($method === 'POST' && $link && function_exists('connect_identity_unlink')) {
-            [$ok, $msg] = connect_identity_unlink($link);
+            [$ok, $msg] = connect_identity_unlink($link, '', ['candidate_id' => $id]);
             flash($msg, $ok ? 'success' : 'error');
         }
         redirect('/candidate?id=' . $id);
@@ -7923,6 +7991,28 @@ function system_status() {
             }
         } catch (Throwable $e) {}
     }
+    //  Phase 6 · Batch 1 — the two things that used to be handled silently.
+    //
+    //  Reading a list no longer invents a team member, and the migration no
+    //  longer forces a unique index over data it found duplicated. Both of those
+    //  are only safe if the resulting backlog is VISIBLE, so both are reported
+    //  here rather than being fixed behind somebody's back.
+    if (function_exists('team_unlinked_logins')) {
+        try { $n = count(team_unlinked_logins());
+            $add('team_links', 'Team member links', $n > 0 ? 'warn' : 'ok',
+                 $n > 0 ? $n . ' login(s) not on the team list' : 'Every login is on the team list',
+                 $n > 0 ? 'They will not be offered for inspection allocation until they are linked.'
+                        : 'Every active inspector login has a team-member record.', '/users');
+        } catch (Throwable $e) {}
+    }
+    if (function_exists('connect_identity_duplicates')) {
+        try { $d = connect_identity_duplicates();
+            $add('identity_dups', 'Identity relationships', $d ? 'warn' : 'ok',
+                 $d ? count($d) . ' duplicate relationship(s)' : 'Protected',
+                 $d ? 'Two live links describe the same person. Resolve them by hand — nothing is merged automatically — and the database protection rebuilds itself.'
+                    : 'One live relationship per person, enforced by the database.', '/connect-identity');
+        } catch (Throwable $e) {}
+    }
     // Email delivery.
     if (function_exists('email_failed_count')) {
         try { $f = email_failed_count(7);
@@ -8541,6 +8631,17 @@ function ops_users($route, $method) {
             'sbuOpts'=>lk_options_or('sbu', OPS_SBUS),'globalMgr'=>$globalMgr,'managers'=>$mgrs,
             'defaults'=>role_defaults($user['role'] ?? 'COORDINATOR')] + user_cost_vars($user)); return;
     }
+    //  Phase 6 · Batch 1 — the EXPLICIT reconciliation that replaced the silent
+    //  one. Reading this screen no longer creates anybody; pressing this does,
+    //  deliberately, by somebody who holds the right to manage people.
+    if ($method === 'POST' && ($_POST['action'] ?? '') === 'link_team_members') {
+        $n = function_exists('link_inspector_users') ? (int)link_inspector_users() : 0;
+        flash($n > 0
+            ? $n . ' login(s) added to the team list — they can now be allocated to inspections.'
+            : 'Nothing to do: every active inspector login is already on the team list.',
+            $n > 0 ? 'success' : 'info');
+        redirect('/users');
+    }
     $where = $globalMgr ? "1=1" : "home_office_id = " . (int)$myOffice;
     // Deactivated people drop to the bottom rather than sitting among the staff
     // who are actually here. They are never hidden: their work is still on file
@@ -8548,7 +8649,8 @@ function ops_users($route, $method) {
     $rows = ops_all("SELECT * FROM users WHERE $where ORDER BY is_active DESC, username");
     $seats = getenv('SEAT_LIMIT') ?: '';
     view('ops/users', ['rows'=>$rows,'seats'=>$seats,'active'=>(int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"),
-        'globalMgr'=>$globalMgr, 'defaults'=>accounts_on_default_password(), 'locked'=>accounts_locked_now()]);
+        'globalMgr'=>$globalMgr, 'defaults'=>accounts_on_default_password(), 'locked'=>accounts_locked_now(),
+        'unlinked'=>function_exists('team_unlinked_logins') ? team_unlinked_logins() : []]);
 }
 
 // ---- System settings (financial year, etc.) --------------------------------

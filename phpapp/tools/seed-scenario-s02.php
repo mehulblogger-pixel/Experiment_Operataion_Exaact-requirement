@@ -10,6 +10,15 @@ if ($idx && preg_match_all('#require\s+__DIR__\s*\.\s*\'(/lib/[a-zA-Z0-9_]+\.php
 foreach ($libs as $rel) { $f = __DIR__ . '/..' . $rel; if (is_file($f)) require_once $f; }
 try { boot(); } catch (Throwable $e) { fwrite(STDERR, 'DB unreachable: ' . $e->getMessage() . "\n"); exit(1); }
 
+// Phase 6 · Batch 1 — act as the Master Admin, exactly as the admin button does.
+// The scenario writes identity relationships, and those writers now ask their own
+// authority question rather than trusting whoever called them. Without an actor
+// there is no authority, and the seed would quietly produce a scenario missing
+// its links. The in-app route is already master-only; this says the same thing
+// on the command line.
+$suid = (int) (ops_val("SELECT id FROM users WHERE is_superuser=1 AND is_active=1 ORDER BY id LIMIT 1") ?: 0);
+if ($suid) { $_SESSION['uid'] = $suid; current_user(true); ua(true); }
+
 $arg = $argv[1] ?? '';
 if ($arg === '--status') { $s = seed_s02_status(); foreach ($s as $k => $v) echo str_pad($k, 8) . ': ' . (is_bool($v) ? ($v ? 'yes' : 'no') : $v) . "\n"; exit(0); }
 if ($arg === '--remove') { echo 'Removed ' . seed_s02_remove() . " DEMO-S02 records.\n"; exit(0); }

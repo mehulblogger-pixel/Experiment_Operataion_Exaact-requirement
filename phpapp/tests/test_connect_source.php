@@ -1,6 +1,11 @@
 <?php
 // Inspection request → unified manpower sourcing across pools (K0+).
 t_section('connect inspection sourcing (K0+)');
+
+// Phase 6 · Batch 1 — these actions now check their own authority, so the test
+// must say who is performing them. No assertion below is changed.
+t_as_admin();
+
 $own = !db()->inTransaction();
 if ($own) db()->beginTransaction();
 try {
@@ -67,3 +72,5 @@ try {
     [$cok] = connect_source_assign($job, 'inspector', $insp);
     t_ok(!$cok, 'a closed job cannot be re-sourced');
 } finally { if ($own && db()->inTransaction()) db()->rollBack(); }
+
+t_as_nobody();   // the suite shares one process — never leave a session behind

@@ -7,6 +7,11 @@
 // and a self-heal links any inspector-role login that slipped through.
 t_section('imported people flow through to inspection allocation');
 
+// Phase 6 · Batch 1 — these actions now check their own authority, so the test
+// must say who is performing them. No assertion below is changed.
+t_as_admin();
+
+
 // --- The import links every non-master login to a team member ---------------
 $rows = [
     ['skip' => 0, 'user_id' => 0, 'username' => 'ravi.field', 'first_name' => 'Ravi', 'last_name' => 'Kumar',
@@ -52,3 +57,5 @@ $before = (int) ops_val("SELECT COUNT(*) FROM inspectors");
 link_inspector_users();
 $after = (int) ops_val("SELECT COUNT(*) FROM inspectors");
 t_eq($after, $before, 'running the heal again is a no-op (single source, no duplicates)');
+
+t_as_nobody();   // the suite shares one process — never leave a session behind

@@ -41,19 +41,228 @@ function connect_identity_migrate() {
     // (additive column; a candidate-axis row carries inspector_id=0).
     if (function_exists('ensure_column')) ensure_column('cx_identity_link', 'candidate_id', 'INT DEFAULT 0');
     try { db()->exec("CREATE INDEX ix_cx_idlink_cand ON cx_identity_link (candidate_id)"); } catch (Throwable $e) {}
+
+    // ---- Phase 6 · Batch 1 — uniqueness the DATABASE enforces (R3 · I28) ----
+    //
+    // Three NULL-able "live key" columns, one per relationship that must be
+    // unique, each carrying its value only while the row is LINKED and NULL
+    // otherwise. A plain UNIQUE index over a column full of NULLs is the same
+    // thing on SQLite and on MySQL — both allow unlimited NULLs — so one
+    // statement gives identical semantics on both engines with no driver
+    // branch, and unlinking releases the slot simply by nulling the key.
+    // History is therefore never constrained: a pair may be linked and unlinked
+    // as often as the business needs, and every one of those rows is kept.
+    foreach (array_keys(CXID_UNIQUE) as $c)
+        if (function_exists('ensure_column')) ensure_column('cx_identity_link', $c, 'INT NULL');
+    connect_identity_backfill_keys();
+    connect_identity_build_unique();
+}
+
+// Which relationships are unique, and the index that enforces each. There is
+// deliberately NO key on the candidate axis's professional_id: one person may
+// legitimately hold several candidate records (locked invariant I3), and each
+// may point at the same professional. Constraining it would make I3
+// unenforceable — the one place here where the obvious constraint is wrong.
+const CXID_UNIQUE = [
+    'uq_pro_insp' => 'ux_cx_idlink_pro_insp',   // U1 · one live inspector-axis row per professional
+    'uq_insp'     => 'ux_cx_idlink_insp',       // U2 · one live inspector-axis row per inspector
+    'uq_cand'     => 'ux_cx_idlink_cand',       // U3 · one live candidate-axis row per candidate
+];
+
+/**
+ * The live-key values for one relationship — the single definition of "this slot
+ * is occupied". The INSERT, the UNLINK and the back-fill all ask this, so they
+ * cannot drift apart; three copies of this rule is exactly how a subtle
+ * uniqueness bug would get in.
+ */
+function connect_identity_keys($proId, $inspId, $candId, $live = true) {
+    if (!$live) return ['uq_pro_insp' => null, 'uq_insp' => null, 'uq_cand' => null];
+    if ((int)$candId > 0)                                          // candidate axis
+        return ['uq_pro_insp' => null, 'uq_insp' => null, 'uq_cand' => (int)$candId];
+    return ['uq_pro_insp' => ((int)$proId ?: null),                // inspector axis
+            'uq_insp'     => ((int)$inspId ?: null), 'uq_cand' => null];
+}
+
+/** Stamp the live keys onto rows that pre-date them. Additive; no business field is touched. */
+function connect_identity_backfill_keys() {
+    $live = "status='LINKED'";
+    $insp = "COALESCE(candidate_id,0)=0";
+    foreach ([
+        'uq_pro_insp' => "CASE WHEN $live AND $insp AND COALESCE(professional_id,0)>0 THEN professional_id ELSE NULL END",
+        'uq_insp'     => "CASE WHEN $live AND $insp AND COALESCE(inspector_id,0)>0    THEN inspector_id    ELSE NULL END",
+        'uq_cand'     => "CASE WHEN $live AND COALESCE(candidate_id,0)>0              THEN candidate_id    ELSE NULL END",
+    ] as $col => $expr) {
+        try { db()->exec("UPDATE cx_identity_link SET $col = $expr"); } catch (Throwable $e) {}
+    }
+}
+
+/** The live values that appear on more than one row — the ones a UNIQUE index would reject. */
+function cxid_dup_rows($col) {
+    try {
+        return ops_all("SELECT $col AS v, COUNT(*) n FROM cx_identity_link
+                        WHERE $col IS NOT NULL GROUP BY $col HAVING COUNT(*) > 1 ORDER BY $col") ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
+/**
+ * Build each unique index — but only over data that is already clean.
+ *
+ * A database that already carries two live rows for one pair cannot have the
+ * index built over it, and failing the boot for data we found there would be
+ * worse than the gap. So the affected index is SKIPPED and the duplicates are
+ * surfaced for a person to resolve (connect_identity_duplicates()), after which
+ * a later boot builds it. Nothing is merged, unlinked or deleted to make the
+ * constraint fit: choosing which of two live links survives is a judgement
+ * about who a person is, and that is never made silently.
+ *
+ * Each index is decided on its own, so duplicates on one axis do not leave the
+ * other axis unprotected.
+ */
+function connect_identity_build_unique() {
+    foreach (CXID_UNIQUE as $col => $name) {
+        if (cxid_dup_rows($col)) continue;
+        try { db()->exec("CREATE UNIQUE INDEX $name ON cx_identity_link ($col)"); } catch (Throwable $e) {}
+    }
+}
+
+/** Live duplicate relationships this database still carries, for the health report. */
+function connect_identity_duplicates() {
+    connect_identity_migrate();
+    $out = [];
+    foreach (CXID_UNIQUE as $col => $name)
+        foreach (cxid_dup_rows($col) as $r)
+            $out[] = ['key' => $col, 'value' => (int)$r['v'], 'rows' => (int)$r['n'], 'index' => $name];
+    return $out;
+}
+
+// ---- Axis, scope and authority (Phase 6 · Batch 1) --------------------------
+
+/** The refusal shown whenever the actor was not allowed to get this far. */
+const CXID_DENY = 'You cannot change identity relationships here.';
+
+/**
+ * ONE gate for every writer of this ledger (R25 · I26 · I27).
+ *
+ * It is asked by the ledger functions themselves, not by the routes, so a
+ * caller cannot inherit a weaker gate than the one this ledger requires — which
+ * is exactly what happened before: the marketplace console asked for Connect
+ * while the recruitment route wrote the same rows asking only for Recruitment.
+ * No new permission and no second entitlement engine: connect_identity_admin_can()
+ * already composes the licence and the staff right.
+ */
+function connect_identity_guard() {
+    return function_exists('connect_identity_admin_can') ? (bool)connect_identity_admin_can() : false;
+}
+
+/**
+ * PER-END VISIBILITY (R15 · I16): you may not build or break a relationship out
+ * of a record you are not allowed to open. This is not a new rule — it is the
+ * one scope_allows() already applies to every detail page — applied to a
+ * relationship endpoint.
+ *
+ * It deliberately says NOTHING about the relationship's own scope. Whether a
+ * link between a branch-scoped inspector and a tenant-global professional
+ * itself belongs to a branch is Q5/Q11, and is NOT decided here. I16 therefore
+ * remains PARTIAL after this batch, by design.
+ */
+function connect_identity_scope_ok($kind, $id) {
+    $id = (int)$id;
+    if ($kind === 'inspector') {
+        $r = ops_one("SELECT home_office_id, sbu FROM inspectors WHERE id=?", [$id]);
+        if (!$r) return false;
+        return !function_exists('scope_allows') || scope_allows($r['home_office_id'] ?? null, (string)($r['sbu'] ?? ''));
+    }
+    if ($kind === 'candidate') {
+        //  A candidate carries a business unit and NO branch, so it is guarded by
+        //  the SBU-only twin. scope_allows(null, ...) would read the missing
+        //  office as Ahmedabad and refuse every branch-scoped user a record that
+        //  has no branch at all.
+        $r = ops_one("SELECT sbu FROM candidates WHERE id=?", [$id]);
+        if (!$r) return false;
+        return !function_exists('scope_sbu_allows') || scope_sbu_allows((string)($r['sbu'] ?? ''));
+    }
+    // A marketplace professional is TENANT-GLOBAL: it carries no branch and no
+    // business unit. Filtering it by the actor's branch would be inventing the
+    // decision Q5/Q11 has not made, so it is checked for existence only.
+    return (int)ops_val("SELECT COUNT(*) FROM cx_professionals WHERE id=?", [$id]) > 0;
+}
+
+/** Was this exception the database refusing a duplicate, or something else entirely? */
+function connect_identity_is_duplicate(Throwable $e) {
+    $code = (string)$e->getCode();
+    if ($code === '23000' || $code === '23505') return true;
+    $m = strtolower($e->getMessage());
+    return strpos($m, 'unique') !== false || strpos($m, 'duplicate') !== false;
+}
+
+/**
+ * The database refused the row. That is a CORRECT outcome, not a failure: two
+ * people confirmed the same person in the same instant and exactly one had to
+ * win. Re-read the winner and tell the loser the truth — the same answer the
+ * PHP pre-check would have given had it run a moment later.
+ *
+ * Anything that is not a uniqueness conflict is re-thrown. An exception is never
+ * swallowed, and the INSERT is never blindly retried.
+ */
+function connect_identity_conflict($axis, $proId, $inspId, $candId, Throwable $e) {
+    if (!connect_identity_is_duplicate($e)) throw $e;
+    if ($axis === 'CANDIDATE') {
+        $w = connect_identity_of_candidate($candId);
+        if ($w && (int)$w['professional_id'] === (int)$proId) return [true, 'Already confirmed as the same person.', (int)$w['id']];
+        return [false, 'This candidate is already linked to another professional — unlink it first.', 0];
+    }
+    $w = connect_identity_of_professional($proId);
+    if ($w && (int)$w['inspector_id'] === (int)$inspId) return [true, 'Already linked.', (int)$w['id']];
+    if ($w) return [false, 'That professional is already linked to another inspector — unlink it first.', 0];
+    if (connect_identity_of_inspector($inspId)) return [false, 'That inspector is already linked to another professional — unlink it first.', 0];
+    return [false, 'That identity relationship could not be recorded — please try again.', 0];
+}
+
+/**
+ * An audited refusal (owner decision 3C). Only refusals that have actually
+ * identified a real record are recorded: a refusal that never got as far as
+ * naming one has no entity to attach to, and inventing an entity id would
+ * recreate the dangling-reference defect this batch exists to remove.
+ */
+function connect_identity_log($entityKind, $entityId, $kind, $subject) {
+    if (!function_exists('act_log') || (int)$entityId <= 0) return;
+    try { act_log($entityKind, (int)$entityId, $kind, $subject, ['auto' => 0]); } catch (Throwable $e) {}
 }
 
 // ---- Resolvers — "who is this, really?" ------------------------------------
 
-/** The active link row for a professional (→ inspector_id), or null. */
+// THE TWO AXES ARE INDEPENDENT (owner decision 2).
+//
+// One ledger carries two different relationships: professional↔inspector (rows
+// with candidate_id = 0) and candidate↔professional (rows with inspector_id = 0).
+// Until Batch 1 none of these resolvers said which one it was asking about, so a
+// candidate-axis row was returned as "the professional's active link" and the
+// writer refused an unrelated inspector link with a message naming an inspector
+// that did not exist — the people most likely to need it, recruited AND
+// deployed, were exactly the ones who could not be linked.
+//
+// Each resolver now names its axis. Nothing is merged and no third ledger is
+// introduced; the rows were always distinguishable, they were simply not being
+// distinguished.
+const CXID_AXIS_INSPECTOR = "COALESCE(candidate_id,0)=0";
+const CXID_AXIS_CANDIDATE = "COALESCE(candidate_id,0)>0";
+
+/** The active INSPECTOR-AXIS link for a professional (→ inspector_id), or null. */
 function connect_identity_of_professional($proId) {
     connect_identity_migrate();
-    return ops_one("SELECT * FROM cx_identity_link WHERE professional_id=? AND status='LINKED' ORDER BY id DESC LIMIT 1", [(int)$proId]) ?: null;
+    return ops_one("SELECT * FROM cx_identity_link
+                     WHERE professional_id=? AND status='LINKED' AND " . CXID_AXIS_INSPECTOR . "
+                     ORDER BY id DESC LIMIT 1", [(int)$proId]) ?: null;
 }
 /** The active link row for an inspector (→ professional_id), or null. */
 function connect_identity_of_inspector($inspId) {
     connect_identity_migrate();
-    return ops_one("SELECT * FROM cx_identity_link WHERE inspector_id=? AND status='LINKED' ORDER BY id DESC LIMIT 1", [(int)$inspId]) ?: null;
+    // An inspector id is only ever present on the inspector axis, but the
+    // predicate is stated anyway: this resolver must not start answering about a
+    // different axis if the ledger ever grows a third one.
+    return ops_one("SELECT * FROM cx_identity_link
+                     WHERE inspector_id=? AND status='LINKED' AND " . CXID_AXIS_INSPECTOR . "
+                     ORDER BY id DESC LIMIT 1", [(int)$inspId]) ?: null;
 }
 
 /**
@@ -98,36 +307,97 @@ function connect_identity_roles(array $ref) {
 function connect_identity_link_create($proId, $inspId, $method = 'manual', $by = '', $note = '') {
     connect_identity_migrate();
     $proId = (int)$proId; $inspId = (int)$inspId;
+    //  1 ENTITLEMENT · 2 PERMISSION — asked first, and answered with one generic
+    //  refusal, so that being turned away never tells the caller whether the
+    //  records they named exist.
+    if (!connect_identity_guard()) return [false, CXID_DENY, 0];
     if ($proId <= 0 || $inspId <= 0) return [false, 'A professional and an inspector are both required.', 0];
-    if ((int)ops_val("SELECT COUNT(*) FROM cx_professionals WHERE id=?", [$proId]) === 0) return [false, 'That professional record does not exist.', 0];
-    if ((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE id=?", [$inspId]) === 0) return [false, 'That inspector record does not exist.', 0];
+    //  3 TENANT — structural: db() is this tenant's own database and no identity
+    //  path can reach another. Proved by tests/_p6_tenant_worker.php.
+    //  4 SCOPE — the actor must be able to open both ends. Existence is folded in
+    //  here deliberately: a record you cannot see and a record that is not there
+    //  must be indistinguishable from the outside.
+    if (!connect_identity_scope_ok('professional', $proId)) return [false, CXID_DENY, 0];
+    if (!connect_identity_scope_ok('inspector', $inspId))   return [false, CXID_DENY, 0];
+    //  5 STATE — axis-aware, so a candidate link cannot masquerade as this one.
     $ep = connect_identity_of_professional($proId);
     if ($ep && (int)$ep['inspector_id'] === $inspId) return [true, 'Already linked.', (int)$ep['id']];
     if ($ep) return [false, 'That professional is already linked to another inspector — unlink it first.', 0];
-    $ei = connect_identity_of_inspector($inspId);
-    if ($ei) return [false, 'That inspector is already linked to another professional — unlink it first.', 0];
+    if (connect_identity_of_inspector($inspId)) return [false, 'That inspector is already linked to another professional — unlink it first.', 0];
     if ($by === '' && function_exists('current_user')) { $u = current_user(); $by = (string)($u['name'] ?? $u['username'] ?? ''); }
-    db()->prepare("INSERT INTO cx_identity_link (professional_id,inspector_id,method,status,note,linked_by,linked_at) VALUES (?,?,?,'LINKED',?,?,?)")
-        ->execute([$proId, $inspId, substr((string)$method,0,20), substr((string)$note,0,200), substr((string)$by,0,120), date('c')]);
-    $id = (int)db()->lastInsertId();
-    if (function_exists('act_log')) {
-        $roles = connect_identity_roles(['professional_id' => $proId]);
-        try { act_log('cx_identity_link', $id, 'IDENTITY_LINKED', 'Linked ' . ($roles['name'] ?: 'a professional') . ' (pro #' . $proId . ' ↔ inspector #' . $inspId . ')', ['auto' => ($method !== 'manual') ? 1 : 0]); } catch (Throwable $e) {}
+    //  6 DUPLICATE · 7 WRITE — the checks above are the courtesy that gives a good
+    //  message; U1/U2 are the protection. A second process that got past the same
+    //  checks a microsecond ago is stopped here, by the database, and told the truth.
+    $k = connect_identity_keys($proId, $inspId, 0, true);
+    try {
+        db()->prepare("INSERT INTO cx_identity_link (professional_id,inspector_id,candidate_id,method,status,note,linked_by,linked_at,uq_pro_insp,uq_insp,uq_cand)
+                       VALUES (?,?,0,?,'LINKED',?,?,?,?,?,?)")
+            ->execute([$proId, $inspId, substr((string)$method,0,20), substr((string)$note,0,200),
+                       substr((string)$by,0,120), date('c'), $k['uq_pro_insp'], $k['uq_insp'], $k['uq_cand']]);
+    } catch (Throwable $e) {
+        return connect_identity_conflict('INSPECTOR', $proId, $inspId, 0, $e);
     }
+    $id = (int)db()->lastInsertId();
+    //  8 AUDIT — attributable: a registered entity kind and a registered activity
+    //  kind, pointing at the row it describes. Before Batch 1 this passed the TABLE
+    //  name, which act_log() blanked, so every identity event was stored as an
+    //  untyped note with a dangling id that no timeline could show.
+    $roles = connect_identity_roles(['professional_id' => $proId]);
+    connect_identity_log('IDENTITY_LINK', $id, 'IDENTITY_LINKED',
+        'Linked ' . ($roles['name'] ?: 'a professional') . ' (pro #' . $proId . ' ↔ inspector #' . $inspId . ')');
     return [true, 'Linked — this is now one person across the marketplace and Operations.', $id];
 }
 
-/** Remove an active link (by link id). Records provenance. */
-function connect_identity_unlink($linkId, $by = '') {
+/**
+ * Remove an active link. Records provenance.
+ *
+ * $expect states WHICH record the caller is acting on behalf of — e.g.
+ * ['candidate_id' => 71] from the candidate screen. A record id posted by a
+ * browser is not a passport (R24 · I25): before this, any link id in the
+ * workspace could be removed from the candidate screen, including a
+ * professional↔inspector link that had nothing to do with candidates.
+ *
+ * A link that exists but is not this record's is refused with the SAME words as
+ * one that does not exist, so the refusal cannot be used to enumerate other
+ * people's relationships.
+ */
+function connect_identity_unlink($linkId, $by = '', array $expect = []) {
     connect_identity_migrate();
-    $row = ops_one("SELECT * FROM cx_identity_link WHERE id=? AND status='LINKED'", [(int)$linkId]);
-    if (!$row) return [false, 'No such active link.'];
-    if ($by === '' && function_exists('current_user')) { $u = current_user(); $by = (string)($u['name'] ?? $u['username'] ?? ''); }
-    db()->prepare("UPDATE cx_identity_link SET status='UNLINKED', unlinked_at=? WHERE id=?")->execute([date('c'), (int)$linkId]);
-    if (function_exists('act_log')) {
-        $other = (int)($row['candidate_id'] ?? 0) > 0 ? 'candidate #' . (int)$row['candidate_id'] : 'inspector #' . (int)$row['inspector_id'];
-        try { act_log('cx_identity_link', (int)$linkId, 'IDENTITY_UNLINKED', 'Unlinked pro #' . (int)$row['professional_id'] . ' ↔ ' . $other, ['auto' => 0]); } catch (Throwable $e) {}
+    $linkId = (int)$linkId;
+    //  1 ENTITLEMENT · 2 PERMISSION
+    if (!connect_identity_guard()) return [false, CXID_DENY];
+    $row = ops_one("SELECT * FROM cx_identity_link WHERE id=? AND status='LINKED'", [$linkId]);
+    $miss = 'No active identity link for this record.';
+    if (!$row) return [false, $miss];
+    //  6 RELATIONSHIP OWNERSHIP — established from the business relationship, not
+    //  from the fact that a row with that id happens to exist.
+    foreach (['candidate_id', 'professional_id', 'inspector_id'] as $f) {
+        if (!isset($expect[$f])) continue;
+        if ((int)$expect[$f] !== (int)($row[$f] ?? 0)) {
+            connect_identity_log('IDENTITY_LINK', $linkId, 'IDENTITY_REFUSED',
+                'Unlink refused — link #' . $linkId . ' does not belong to ' . $f . ' #' . (int)$expect[$f]);
+            return [false, $miss];
+        }
     }
+    //  4 SCOPE — both ends, per-end visibility only (Q5/Q11 stay open).
+    if ((int)$row['inspector_id'] > 0 && !connect_identity_scope_ok('inspector', (int)$row['inspector_id'])) {
+        connect_identity_log('IDENTITY_LINK', $linkId, 'IDENTITY_REFUSED', 'Unlink refused — inspector out of scope');
+        return [false, CXID_DENY];
+    }
+    if ((int)($row['candidate_id'] ?? 0) > 0 && !connect_identity_scope_ok('candidate', (int)$row['candidate_id'])) {
+        connect_identity_log('IDENTITY_LINK', $linkId, 'IDENTITY_REFUSED', 'Unlink refused — candidate out of scope');
+        return [false, CXID_DENY];
+    }
+    if ($by === '' && function_exists('current_user')) { $u = current_user(); $by = (string)($u['name'] ?? $u['username'] ?? ''); }
+    //  7 WRITE — one statement. Nulling the live keys is what RELEASES the slot,
+    //  so the pair can be linked again later while every historical row is kept.
+    db()->prepare("UPDATE cx_identity_link SET status='UNLINKED', unlinked_at=?,
+                        uq_pro_insp=NULL, uq_insp=NULL, uq_cand=NULL WHERE id=?")
+        ->execute([date('c'), $linkId]);
+    //  8 AUDIT
+    $other = (int)($row['candidate_id'] ?? 0) > 0 ? 'candidate #' . (int)$row['candidate_id'] : 'inspector #' . (int)$row['inspector_id'];
+    connect_identity_log('IDENTITY_LINK', $linkId, 'IDENTITY_UNLINKED',
+        'Unlinked pro #' . (int)$row['professional_id'] . ' ↔ ' . $other);
     return [true, 'Unlinked.'];
 }
 
@@ -136,7 +406,9 @@ function connect_identity_unlink($linkId, $by = '') {
 /** The active candidate↔professional link row for a candidate (→ professional_id), or null. */
 function connect_identity_of_candidate($candId) {
     connect_identity_migrate();
-    return ops_one("SELECT * FROM cx_identity_link WHERE candidate_id=? AND status='LINKED' ORDER BY id DESC LIMIT 1", [(int)$candId]) ?: null;
+    return ops_one("SELECT * FROM cx_identity_link
+                     WHERE candidate_id=? AND status='LINKED' AND " . CXID_AXIS_CANDIDATE . "
+                     ORDER BY id DESC LIMIT 1", [(int)$candId]) ?: null;
 }
 
 /**
@@ -148,17 +420,35 @@ function connect_identity_of_candidate($candId) {
 function connect_identity_candidate_link_create($candId, $proId, $method = 'manual', $by = '', $note = '') {
     connect_identity_migrate();
     $candId = (int)$candId; $proId = (int)$proId;
+    //  1 ENTITLEMENT · 2 PERMISSION — the SAME gate the marketplace console asks.
+    //  One ledger, one rule: before Batch 1 this route wrote these rows while
+    //  asking only whether Recruitment was bought.
+    if (!connect_identity_guard()) return [false, CXID_DENY, 0];
     if ($candId <= 0 || $proId <= 0) return [false, 'A candidate and a professional are both required.', 0];
-    if ((int)ops_val("SELECT COUNT(*) FROM candidates WHERE id=?", [$candId]) === 0) return [false, 'That candidate record does not exist.', 0];
-    if ((int)ops_val("SELECT COUNT(*) FROM cx_professionals WHERE id=?", [$proId]) === 0) return [false, 'That professional record does not exist.', 0];
+    //  3 TENANT (structural) · 4 SCOPE — both ends, existence folded in.
+    if (!connect_identity_scope_ok('candidate', $candId))       return [false, CXID_DENY, 0];
+    if (!connect_identity_scope_ok('professional', $proId))     return [false, CXID_DENY, 0];
+    //  5 STATE — candidate axis only. Note there is deliberately NO check that the
+    //  professional is free: one person may hold several candidate records
+    //  (invariant I3), and each may point at the same professional.
     $ex = connect_identity_of_candidate($candId);
     if ($ex && (int)$ex['professional_id'] === $proId) return [true, 'Already confirmed as the same person.', (int)$ex['id']];
     if ($ex) return [false, 'This candidate is already linked to another professional — unlink it first.', 0];
     if ($by === '' && function_exists('current_user')) { $u = current_user(); $by = (string)($u['name'] ?? $u['username'] ?? ''); }
-    db()->prepare("INSERT INTO cx_identity_link (professional_id,inspector_id,candidate_id,method,status,note,linked_by,linked_at) VALUES (?,0,?,?,'LINKED',?,?,?)")
-        ->execute([$proId, $candId, substr((string)$method, 0, 20), substr((string)$note, 0, 200), substr((string)$by, 0, 120), date('c')]);
+    //  6 DUPLICATE · 7 WRITE — U3 is the protection.
+    $k = connect_identity_keys($proId, 0, $candId, true);
+    try {
+        db()->prepare("INSERT INTO cx_identity_link (professional_id,inspector_id,candidate_id,method,status,note,linked_by,linked_at,uq_pro_insp,uq_insp,uq_cand)
+                       VALUES (?,0,?,?,'LINKED',?,?,?,?,?,?)")
+            ->execute([$proId, $candId, substr((string)$method,0,20), substr((string)$note,0,200),
+                       substr((string)$by,0,120), date('c'), $k['uq_pro_insp'], $k['uq_insp'], $k['uq_cand']]);
+    } catch (Throwable $e) {
+        return connect_identity_conflict('CANDIDATE', $proId, 0, $candId, $e);
+    }
     $id = (int)db()->lastInsertId();
-    if (function_exists('act_log')) { try { act_log('cx_identity_link', $id, 'IDENTITY_LINKED', 'Linked candidate #' . $candId . ' ↔ professional #' . $proId . ' (same person)', ['auto' => ($method !== 'manual') ? 1 : 0]); } catch (Throwable $e) {} }
+    //  8 AUDIT
+    connect_identity_log('IDENTITY_LINK', $id, 'IDENTITY_LINKED',
+        'Linked candidate #' . $candId . ' ↔ professional #' . $proId . ' (same person)');
     return [true, 'Confirmed — this candidate and marketplace professional are recorded as one person (nothing merged; you can unlink any time).', $id];
 }
 
@@ -279,7 +569,14 @@ function ops_connect_identity($method) {
             [$ok, $msg] = connect_identity_link_create((int)($_POST['professional_id'] ?? 0), (int)($_POST['inspector_id'] ?? 0), (string)($_POST['method'] ?? 'manual'));
             flash($msg, $ok ? 'success' : 'error');
         } elseif ($act === 'unlink') {
-            [$ok, $msg] = connect_identity_unlink((int)($_POST['id'] ?? 0));
+            //  The console lists professional↔inspector links, so that is the axis
+            //  it may act on. Stating the expectation means a posted id belonging
+            //  to a candidate link cannot be removed from here.
+            $lid = (int)($_POST['id'] ?? 0);
+            $row = $lid > 0 ? ops_one("SELECT professional_id FROM cx_identity_link WHERE id=? AND status='LINKED' AND " . CXID_AXIS_INSPECTOR, [$lid]) : null;
+            [$ok, $msg] = $row
+                ? connect_identity_unlink($lid, '', ['professional_id' => (int)$row['professional_id']])
+                : [false, 'No active identity link for this record.'];
             flash($msg, $ok ? 'success' : 'error');
         }
         redirect('/connect-identity');

@@ -87,7 +87,64 @@ permission. The **professional-identity console** (`/connect-identity`, linking 
 internal `inspectors` record to a marketplace `cx_professionals` record — a
 relationship, never a merge) reuses the **same** coordinator/manager/master gate
 (`connect_identity_admin_can` → `connect_market_can`) and adds **no new
-permission**. The **award→deployment bridge** (the "Create deployment" action on
+permission**.
+
+**Phase 6 · Batch 1 — one entitlement for every writer of the identity ledger
+(R25 · invariant I26). This CHANGES who can do what, and is the only such change
+in the batch.** `cx_identity_link` is written from two places: the marketplace
+console above, and the recruitment candidate screen (`/candidate-link-pro`,
+`/candidate-unlink-pro`). The console asked for Connect; the recruitment routes
+asked only whether Recruitment was bought, so the same ledger was protected by
+two different questions and a workspace without Connect could still create,
+change and remove marketplace-professional identity relationships. Every writer —
+`connect_identity_link_create()`, `connect_identity_candidate_link_create()` and
+`connect_identity_unlink()` — now asks `connect_identity_admin_can()` **itself**,
+so a route cannot inherit a weaker gate than the ledger requires. **No new
+permission and no new entitlement engine**: the existing composition
+(`licence_module_live('connect')` + the coordinator/manager/master band) is
+reused unchanged. **Consequence:** a customer entitled to Recruitment but *not*
+to Connect can no longer link a candidate to a marketplace professional. This was
+approved by the owner on the explicit ground that such a customer has no
+marketplace professional to link to, so the capability was unusable in any case
+and permitting the write was entitlement leakage. The coordinator/manager/master
+band itself is unchanged.
+
+**Scope on identity relationships (R15 · invariant I16 — PARTIAL, deliberately).**
+No identity path evaluated branch scope at all. Each writer now applies
+**per-end visibility**: you may not build or break a relationship out of a record
+you are not allowed to open — an inspector by `scope_allows()` on its
+`home_office_id` + `sbu`, a candidate by the new `scope_sbu_allows()` (candidates
+carry a business unit and **no** branch, so `scope_allows(null, …)` would read
+the missing office as Ahmedabad and wrongly refuse every branch-scoped user), and
+a marketplace professional by existence alone, because it is **tenant-global** and
+carries neither. This grants nothing: it applies an existing rule where it was
+missing. Whether the *relationship itself* carries a branch — a branch-scoped
+inspector linked to a tenant-global professional — is **open (Q5/Q11)** and is
+**not** decided here. `scope_sbu_allows()` is the SBU-only scalar twin of
+`scope_allows()`/`scope_office_allows()` and confers no rights of its own.
+
+**A record id is never authorisation (R24 · invariant I25).**
+`/candidate-unlink-pro` passed the posted `link_id` straight to the ledger, so any
+live link in the workspace — including a professional↔inspector link with no
+connection to candidates — could be removed from a candidate screen. The ledger
+now takes the record the caller is acting for and refuses any link that is not
+that record's, using the **same words** it uses for a link that does not exist, so
+the refusal cannot be used to enumerate other people's relationships. The
+marketplace console states the same expectation for its own axis. **No permission
+changes**; the population that may unlink is identical.
+
+**Reading is not creating (R22 · invariant I23).** `inspectors_list()` called
+`link_inspector_users()`, which created `inspectors` rows and wrote
+`users.inspector_id` — at seventeen call sites, inheriting whatever gate the
+calling page had. The call is removed and nothing lazy replaces it.
+`link_inspector_users()` survives as an **explicit** reconciliation on the People
+screen that asks for `users.manage.branch` / `users.manage.global` **itself**
+rather than inheriting the caller's gate (invariant I27), and is transactional so
+a failure cannot leave a team member belonging to nobody. **No new permission** —
+this is the right the People screen already required to link a login to a team
+member by hand. The residual backlog is reported by `team_unlinked_logins()` on
+the People screen and in system status, so it is visible rather than silently
+healed. The **award→deployment bridge** (the "Create deployment" action on
 the awarded requirement desk, which creates a PDSO `jobs` deputation from a
 marketplace award — assigning the internal inspector the awarded person is linked
 to) runs inside that same coordinator/master requirement desk and adds **no new

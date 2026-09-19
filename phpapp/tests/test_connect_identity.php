@@ -1,6 +1,11 @@
 <?php
 // Unified professional identity — link inspector ↔ marketplace pro (K0+).
 t_section('connect unified professional identity (K0+)');
+
+// Phase 6 · Batch 1 — these actions now check their own authority, so the test
+// must say who is performing them. No assertion below is changed.
+t_as_admin();
+
 $own = !db()->inTransaction();
 if ($own) db()->beginTransaction();
 try {
@@ -70,3 +75,5 @@ try {
     $ded2 = connect_identity_dedupe_rows($rows);
     t_eq(count($ded2), 3, 'with no link, the matcher keeps both rows');
 } finally { if ($own && db()->inTransaction()) db()->rollBack(); }
+
+t_as_nobody();   // the suite shares one process — never leave a session behind

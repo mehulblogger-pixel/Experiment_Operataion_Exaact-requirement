@@ -5,6 +5,11 @@
 // the two pools. Reuses the cx_identity_link ledger (candidate-axis row: inspector_id=0).
 t_section('candidate ↔ professional confirm/link (P11)');
 
+// Phase 6 · Batch 1 — these actions now check their own authority, so the test
+// must say who is performing them. No assertion below is changed.
+t_as_admin();
+
+
 $own = !db()->inTransaction();
 if ($own) db()->beginTransaction();
 try {
@@ -63,3 +68,5 @@ try {
     if ($own && db()->inTransaction()) db()->rollBack();
     if (function_exists('candpool_pro_index')) candpool_pro_index(true);
 }
+
+t_as_nobody();   // the suite shares one process — never leave a session behind

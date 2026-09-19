@@ -42,6 +42,13 @@ const ACT_KINDS = [
     'WHATSAPP'  => 'WhatsApp',
     'TASK'      => 'Task',
     'SYSTEM'    => 'Recorded by the system',
+    // Phase 6 · Batch 1 — identity relationship events. They were already being
+    // logged, but act_log() normalises an unregistered kind to NOTE, so every
+    // identity event was stored as an untyped note nobody could filter for.
+    // Registering them here is what makes the identity trail queryable.
+    'IDENTITY_LINKED'   => 'Identity linked',
+    'IDENTITY_UNLINKED' => 'Identity unlinked',
+    'IDENTITY_REFUSED'  => 'Identity change refused',
 ];
 
 // What an activity can be about. Kept as a short code plus the route that opens
@@ -75,6 +82,12 @@ const ACT_ENTITIES = [
     // delegation changes go on this same spine rather than a second one.
     'APPROVAL_POLICY'   => ['Approval policy',     '/recruit-approvals?id='],
     'APPROVAL_DELEGATE' => ['Approval delegation', '/approval-delegations'],
+    // Phase 6 · Batch 1 — the identity link ledger. connect_identity.php was
+    // passing the TABLE name ('cx_identity_link') where this map holds ENTITY
+    // kinds, so act_log() blanked it and the entry became unattributable: a
+    // note with a dangling id, absent from every timeline. One registration
+    // fixes the whole trail; no second audit engine is involved.
+    'IDENTITY_LINK'     => ['Identity link',        '/connect-identity'],
 ];
 
 // A constant cannot call T(), so the two entries that name a business noun are

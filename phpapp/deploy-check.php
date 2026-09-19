@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '706e04f · 2026-09-18 14:51 UTC · 665 files';
+$RELEASE = '708806b · 2026-09-19 01:54 UTC · 665 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -32,9 +32,9 @@ $EXPECT  = [
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>117438,'h'=>'dad114b8390a3aef'],
-    'lib/access.php' => ['s'=>72219,'h'=>'44f6dafd16ae2b0e'],
+    'lib/access.php' => ['s'=>73324,'h'=>'ae53aa05db9f7da2'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
-    'lib/activity.php' => ['s'=>42426,'h'=>'f372908f2101d974'],
+    'lib/activity.php' => ['s'=>43341,'h'=>'517a1ad743964ac0'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
     'lib/adssync.php' => ['s'=>28174,'h'=>'325142a88491bfba'],
@@ -88,7 +88,7 @@ $EXPECT  = [
     'lib/connect_geo.php' => ['s'=>15539,'h'=>'5a1f51ac70ec64d2'],
     'lib/connect_govern.php' => ['s'=>7181,'h'=>'22ce5ad54e44ce2a'],
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
-    'lib/connect_identity.php' => ['s'=>18062,'h'=>'63c4f28bce150082'],
+    'lib/connect_identity.php' => ['s'=>34082,'h'=>'2c1796d607700219'],
     'lib/connect_kpi.php' => ['s'=>25262,'h'=>'3d44c0796425cb27'],
     'lib/connect_market.php' => ['s'=>39876,'h'=>'0fd3332b96bb74f5'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
@@ -170,7 +170,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66290,'h'=>'4ff1bc5a2652ad81'],
-    'lib/ops.php' => ['s'=>613698,'h'=>'1556694da46cb7dd'],
+    'lib/ops.php' => ['s'=>620029,'h'=>'76e7f5ac63dc3e42'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -282,8 +282,8 @@ $EXPECT  = [
     'tools/sbom.php' => ['s'=>5314,'h'=>'7da7803dd8b6a816'],
     'tools/seed-connect.php' => ['s'=>2576,'h'=>'f60af657b9feb4fe'],
     'tools/seed-demo.php' => ['s'=>3956,'h'=>'f2cf2d0bb5d680f0'],
-    'tools/seed-scenario-s01.php' => ['s'=>2079,'h'=>'ba293239a674bd65'],
-    'tools/seed-scenario-s02.php' => ['s'=>1975,'h'=>'abead3460517be53'],
+    'tools/seed-scenario-s01.php' => ['s'=>2695,'h'=>'c1b2cdafec9b4705'],
+    'tools/seed-scenario-s02.php' => ['s'=>2591,'h'=>'62a71ad01f79be96'],
     'tools/seed-scenario-s03.php' => ['s'=>1412,'h'=>'7bbc4dd8ac4f0398'],
     'tools/seed-scenario-s04.php' => ['s'=>1412,'h'=>'9e0e6ea7ecea379d'],
     'tools/seed-scenario-s05.php' => ['s'=>1483,'h'=>'23b5f892caeda2d4'],
@@ -609,7 +609,7 @@ $EXPECT  = [
     'views/ops/trace_thread.php' => ['s'=>4700,'h'=>'bbcce6ab3f5dedda'],
     'views/ops/two_factor.php' => ['s'=>7555,'h'=>'93b61f4ae4310265'],
     'views/ops/user_form.php' => ['s'=>37930,'h'=>'e0148fce95febac9'],
-    'views/ops/users.php' => ['s'=>7431,'h'=>'9eab33a56cf5769d'],
+    'views/ops/users.php' => ['s'=>8775,'h'=>'204b1b963fcf37a5'],
     'views/ops/vendor.php' => ['s'=>5170,'h'=>'64920720e59c0caa'],
     'views/ops/vendor_users.php' => ['s'=>8944,'h'=>'772219bec83410a7'],
     'views/ops/verify.php' => ['s'=>8818,'h'=>'985a249a4ed58388'],

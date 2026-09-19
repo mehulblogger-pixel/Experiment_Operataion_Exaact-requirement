@@ -8,6 +8,30 @@
   <div class="msg msg-error">You have reached your licensed seat limit (<?= e($seats) ?>). Deactivate a user before adding a new one.</div>
 <?php endif; ?>
 
+<?php // Phase 6 · Batch 1 — the backlog that used to be fixed silently while
+      // somebody read a list. Now it is stated in plain words, with the one
+      // button that fixes it, to the person who is allowed to press it. ?>
+<?php if (!empty($unlinked)): ?>
+<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
+  <b>Not yet on the team list</b>
+  <div class="muted" style="margin-top:4px">
+    These people can sign in, but they are not offered when you allocate an inspection, because they have
+    no team-member record yet. Everyone added from now on gets one automatically — this is the older backlog.
+  </div>
+  <div style="margin-top:6px">
+    <?php foreach ($unlinked as $u): ?>
+      <a class="pill p-warn" href="/user-edit?id=<?= (int)$u['id'] ?>" style="text-decoration:none"><?= e($u['username']) ?></a>
+    <?php endforeach; ?>
+  </div>
+  <?php // No CSRF field here on purpose: csrf_stamp_forms() stamps every form on
+        // the way out, exactly as it does for the other forms on this screen. ?>
+  <form method="post" action="/users" style="margin-top:10px">
+    <input type="hidden" name="action" value="link_team_members">
+    <button class="btn" type="submit">Add all <?= count($unlinked) ?> to the team list</button>
+  </form>
+</div>
+<?php endif; ?>
+
 <?php // An account still on the password it was handed is how a small system is
       // usually broken into — not by anything clever. It is named here, to the
       // one person who can do something about it, rather than sitting quietly. ?>

@@ -1,6 +1,11 @@
 <?php
 // Award → deployment bridge: a marketplace award becomes a PDSO deputation job.
 t_section('connect award → deployment bridge (K0+)');
+
+// Phase 6 · Batch 1 — these actions now check their own authority, so the test
+// must say who is performing them. No assertion below is changed.
+t_as_admin();
+
 $own = !db()->inTransaction();
 if ($own) db()->beginTransaction();
 try {
@@ -68,3 +73,5 @@ try {
     [$nok,$nmsg] = connect_deploy_from_engagement($rOpen);
     t_ok(!$nok, 'a non-awarded requirement cannot be deployed');
 } finally { if ($own && db()->inTransaction()) db()->rollBack(); }
+
+t_as_nobody();   // the suite shares one process — never leave a session behind

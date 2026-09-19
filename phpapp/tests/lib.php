@@ -25,6 +25,35 @@ function t_nothrow($msg, callable $fn) {
 }
 
 // ============================================================================
+//  Phase 6 · Batch 1 — an AUTHORISED ACTOR for tests of guarded actions.
+//
+//  Batch 1 moved several authority questions from the route into the function
+//  that performs the action, because a route is exactly where a control gets
+//  forgotten (invariant I27). Tests that call such a function directly must
+//  therefore say who is doing it — with no session there is no actor, and the
+//  correct answer is "no".
+//
+//  This is a FIXTURE, not a relaxation: it establishes a real signed-in master
+//  exactly as the application would, and every assertion in every test using it
+//  is unchanged. t_as_nobody() puts the session back, so one file cannot leave a
+//  session behind for the next — the suite shares one process.
+// ============================================================================
+function t_as_admin() {
+    $GLOBALS['__t_prev_session'] = $_SESSION ?? [];
+    $uid = (int) (ops_val("SELECT id FROM users WHERE is_superuser=1 AND is_active=1 ORDER BY id LIMIT 1") ?: 0);
+    if (!$uid) $uid = (int) (ops_val("SELECT id FROM users WHERE is_active=1 ORDER BY id LIMIT 1") ?: 0);
+    $_SESSION['uid'] = $uid;
+    if (function_exists('current_user')) current_user(true);
+    if (function_exists('ua')) ua(true);
+    return $uid;
+}
+function t_as_nobody() {
+    $_SESSION = $GLOBALS['__t_prev_session'] ?? [];
+    if (function_exists('current_user')) current_user(true);
+    if (function_exists('ua')) ua(true);
+}
+
+// ============================================================================
 //  M15 — engine-aware schema introspection for tests.
 //
 //  Production is MySQL/MariaDB; SQLite is the local stand-in. Tests written

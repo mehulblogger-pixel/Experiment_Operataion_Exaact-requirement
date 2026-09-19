@@ -858,6 +858,28 @@ function scope_office_allows($officeId) {
     return in_array((int)$officeId, array_map('intval', $off), true);
 }
 
+// Phase 6 · Batch 1 — the SBU-ONLY scalar guard, the third member of the family
+// beside scope_allows() and scope_office_allows().
+//
+// It exists because some registers record a business unit and no branch at all:
+// `candidates` carries `sbu` and has no office column. Guarding one of those
+// with scope_allows(null, $sbu) would silently apply the office half of that
+// rule — a NULL office is read as Ahmedabad — and refuse every branch-scoped
+// user a record that has no branch to be wrong about. That is the same trap
+// documented above between scope_clause() and scope_office_clause(), one table
+// along.
+//
+// Same SBU semantics as scope_allows(): a record with no SBU is not filtered,
+// and masters and ALL-scope roles are unaffected.
+function scope_sbu_allows($sbu) {
+    if (function_exists('is_master') && is_master()) return true;
+    $sbu = (string)$sbu;
+    if ($sbu === '') return true;
+    $sc = function_exists('scope_sbus') ? scope_sbus() : 'ALL';
+    if ($sc === 'ALL' || !is_array($sc) || !$sc) return true;
+    return in_array($sbu, array_map('strval', $sc), true);
+}
+
 // Field-finding #22 — segregation of inspectors. A "team member" (an `inspectors` row) must belong to at
 // most ONE active login: two logins sharing one inspector_id would each see that inspector's jobs and
 // schedule (a leak between people). This returns the username of a DIFFERENT active login already linked
