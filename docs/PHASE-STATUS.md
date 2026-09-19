@@ -16,7 +16,7 @@ Updated at each phase lock.*
 | **Phase 3** | **ACCEPTED / LOCKED** | `docs/phase3/` |
 | **Phase 4** | **ACCEPTED / LOCKED** | `docs/phase4/P4-COMPLETION-REPORT.md` |
 | **Phase 5** | **ACCEPTED / LOCKED** | `docs/phase5/P5-COMPLETION-REPORT.md` |
-| **Phase 6** | **ACTIVE — Batch 1 ACCEPTED / LOCKED; Batch 2 complete, pending review** | 2026-09-19 |
+| **Phase 6** | **ACTIVE — Batches 1 & 2 done; Batch 3 audit + plan pending review** | 2026-09-19 |
 
 ## Phase 6 — where it stands
 
@@ -30,7 +30,8 @@ Updated at each phase lock.*
 | Foundational implementation plan | ACCEPTED as the Batch 1 contract |
 | **Batch 1 — identity write safety, authority, scope** | **ACCEPTED / LOCKED** — 2026-09-19 · `db02289`, `03d805b` |
 | **Batch 2 — person relationship integrity & conversion safety** | **COMPLETE, pending owner review** — battery 78/0 (baseline 19/30) · SQLite 12 460/0 · MariaDB 12 467/0 · mutation 18/18 |
-| **Batch 3** | **NOT STARTED.** Not to be begun without an explicit owner instruction |
+| **Batch 3 — organisation representation, duplicate safety & cross-reference** | **AUDIT + PLAN COMPLETE, pending owner review.** Documentation only; no product code changed |
+| **Batch 4** | **NOT STARTED.** Not to be begun without an explicit owner instruction |
 
 **Batch 1 delivered:** R22 · R24 · R25 · R15 (scoped) · R16 · R3 · R11, plus the
 two defects the audit uncovered and the owner approved — the cross-axis resolver
