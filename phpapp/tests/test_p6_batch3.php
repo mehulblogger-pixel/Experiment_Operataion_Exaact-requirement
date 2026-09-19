@@ -527,6 +527,22 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM business_partners WHERE id IN (?,?)", [$
 //  walking past it. What matters is the PROPERTY, not one spelling: two agency
 //  contracts for one organisation are two contracts, and nothing that names an
 //  agency may be reported as a duplicate at all.
+//  THE PROBE MUST HAVE SOMETHING TO LOOK AT. Section D maps both of its agency
+//  contracts to their organisation, and the suggestion only fires for an
+//  UNMAPPED one — so the loop below had nothing to walk and passed whatever the
+//  report said. Mutation M26 went through it twice. An agency that really does
+//  look like an organisation we know is planted here, and its presence is
+//  asserted BEFORE anything is concluded from its absence.
+$jAgGst = '24TTTUU1212T1Z9';
+$jAgParty = $b3partner('Juniper Manpower Services Ltd', ['gstin' => $jAgGst]);
+db()->prepare("INSERT INTO agencies (name,agency_type,gstin,active,created_at) VALUES (?, 'MANPOWER', ?, 1, ?)")
+    ->execute(['Juniper Manpower Services Ltd', $jAgGst, date('c')]);
+$jAgId = (int)db()->lastInsertId();
+$jRows = identity_state_findings();                       // re-read, now that there is one
+$jKinds = array_column($jRows, 'kind');
+t_ok(in_array('AGENCY_POSSIBLE_ORGANISATION', $jKinds, true),
+     'J5a · an unmapped agency that matches an organisation IS reported — the probe has something to judge');
+
 $jAgencyBad = []; $jAgencyKinds = [];
 foreach ($jRows as $r) {
     $rec = (array)($r['records'] ?? []);
@@ -538,6 +554,8 @@ t_eq(count($jAgencyBad), 0, 'J5 · NOTHING that names an agency contract is repo
      . ($jAgencyBad ? ' [' . implode(',', $jAgencyBad) . ']' : ''));
 foreach ($jAgencyKinds as $k)
     t_eq($k, 'AGENCY_POSSIBLE_ORGANISATION', 'J5b · the only thing said about an agency is that it MIGHT be one we know');
+t_eq((int)ops_val("SELECT COALESCE(party_id,0) FROM agencies WHERE id=?", [$jAgId]), 0,
+     'J5d · and reporting it did NOT map it — a suggestion is not an action');
 //  And the two contracts planted in section D are both still whole.
 t_eq((int)ops_val("SELECT COUNT(*) FROM agencies WHERE party_id=?", [$dPid]), 2,
      'J5c · both agency contracts survive the report untouched');
