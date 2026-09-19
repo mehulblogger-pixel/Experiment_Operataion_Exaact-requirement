@@ -426,6 +426,36 @@ if ($gTrg) {
     try { db()->exec("DROP TRIGGER tmp_no_demote"); } catch (Throwable $e) {}
 } else { t_ok(false, 'G8 . the failure could not be injected'); t_ok(false, 'G9 . same'); }
 
+//  AND WHAT IF THE DEMOTE SAYS IT WORKED, BUT IT DID NOT?
+//
+//  "The UPDATE returned true" is not the same fact as "this organisation now
+//  has one primary", and it is the second that the rule is about. Proved on
+//  both engines with a trigger that quietly keeps the old primary: the
+//  statement still reports success. Whatever else happens, two primaries must
+//  not be the result.
+$gTrg2 = false;
+try {
+    if ($gDrv === 'sqlite')
+        db()->exec("CREATE TRIGGER tmp_restore_primary AFTER UPDATE OF is_primary ON partner_contacts
+                    WHEN NEW.is_primary=0 BEGIN UPDATE partner_contacts SET is_primary=1 WHERE id=NEW.id; END");
+    else
+        db()->exec("CREATE TRIGGER tmp_restore_primary BEFORE UPDATE ON partner_contacts FOR EACH ROW
+                    BEGIN SET NEW.is_primary = 1; END");
+    $gTrg2 = true;
+} catch (Throwable $e) {}
+if ($gTrg2) {
+    $gPid3 = $b3partner('Granite Three Ltd');
+    db()->prepare("INSERT INTO partner_contacts (partner_id,name,email,is_primary) VALUES (?,?,?,1)")
+        ->execute([$gPid3, 'Sitting Primary', 'sitting@g3.test']);
+    $gRes2 = 0;
+    try { $gRes2 = partner_contact_add($gPid3, ['name' => 'Would Be Primary', 'email' => 'would@g3.test', 'is_primary' => 1]); }
+    catch (Throwable $e) { $gRes2 = 0; }
+    t_eq((int)ops_val("SELECT COUNT(*) FROM partner_contacts WHERE partner_id=? AND COALESCE(is_primary,0)=1", [$gPid3]), 1,
+         'G10 . a demote that REPORTS success but did not happen still leaves ONE primary');
+    t_eq((int)$gRes2, 0, 'G11 . and the caller is told so, rather than given a success that is not true');
+    try { db()->exec("DROP TRIGGER tmp_restore_primary"); } catch (Throwable $e) {}
+} else { t_ok(false, 'G10 . the silent-restore probe could not be installed'); t_ok(false, 'G11 . same'); }
+
 // =============================================================================
 t_section('P6-B3 · H — the portal account boundary (Q23)');
 // =============================================================================
