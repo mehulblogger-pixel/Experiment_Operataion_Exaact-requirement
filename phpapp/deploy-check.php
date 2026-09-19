@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '0bf70c4 · 2026-09-19 14:37 UTC · 665 files';
+$RELEASE = 'c38d243 · 2026-09-19 16:26 UTC · 665 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -201,7 +201,7 @@ $EXPECT  = [
     'lib/recruit_jd.php' => ['s'=>8735,'h'=>'29acfa48382e6b50'],
     'lib/recruit_kpi.php' => ['s'=>43621,'h'=>'d9267e844dd99993'],
     'lib/recruit_offer.php' => ['s'=>41997,'h'=>'7fd9534ac1e37f55'],
-    'lib/recruitpipe.php' => ['s'=>43507,'h'=>'ea7373c7cb441a67'],
+    'lib/recruitpipe.php' => ['s'=>43688,'h'=>'a403eafbaa3dcb32'],
     'lib/reportreview.php' => ['s'=>23222,'h'=>'ae43c4d37883823d'],
     'lib/reqfulfil.php' => ['s'=>11729,'h'=>'d6a5ae81a1809597'],
     'lib/reset.php' => ['s'=>11477,'h'=>'8d961eb9724047b9'],

@@ -527,7 +527,9 @@ function recruitpipe_candidate_panel($cand) {
     $closed = in_array((string)$cand['stage'], recruitpipe_legacy_terminal(), true);
     $can = function_exists('is_coordinator_level') && is_coordinator_level();
     $cur = $eff[$idx] ?? null;
-    ?>
+    //  Visibility only — the workflow screen and the switch action each ask the
+    //  same question again on the server, so this decides what is DRAWN, never
+    //  what is allowed.
     $isAdmin = function_exists('hiring_admin_can') && hiring_admin_can();
     ?>
     <div class="panel" style="border-left:4px solid var(--brand,#1e40af);padding:13px 16px;margin-bottom:14px">
