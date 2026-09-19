@@ -351,16 +351,26 @@ t_ok(find_duplicate_partner('No Such Company Anywhere Ltd', '', '', '', 0) === n
 t_ok(find_duplicate_partner('Ferrous Metals Ltd', '', '', '', $fPid) === null, 'F8 · the exclude-id argument still works');
 
 //  PRECEDENCE. When a NAME matches one organisation and an authoritative
-//  identifier matches a DIFFERENT one, the identifier wins — whichever comes
-//  first in the register. A name that outranked a tax number would report
-//  POSSIBLE where the truth is EXACT, and the staff path would warn where it
-//  should refuse.
-$fNameOnly = $b3partner('Ferrous Metals Ltd');                       // same name, no identifiers
-$f8a = find_duplicate_partner('Ferrous Metals Ltd', '24JJJKK5555J1Z9', '', '', 0);
-t_eq((string)($f8a['confidence'] ?? ''), 'EXACT', 'F9 . an identifier outranks a name match on another record');
-t_eq((int)($f8a['row']['id'] ?? 0), $fPid, 'F10 . and it points at the organisation the IDENTIFIER names');
-$f8b = partner_find_or_problem('Ferrous Metals Ltd', '24JJJKK5555J1Z9', '', '');
+//  identifier matches a DIFFERENT one, the identifier wins. A name that
+//  outranked a tax number would report POSSIBLE where the truth is EXACT, and
+//  the staff path would warn where it should refuse.
+//
+//  THE ORDER MATTERS, and the first version of this probe got it wrong: it put
+//  the identifier's record EARLIER in the register, so the scan met the
+//  identifier first and answered EXACT whatever the precedence rule said. The
+//  probe passed while proving nothing — mutation M7 walked straight through it.
+//  The name-only record must come FIRST, so that a detector which returned on a
+//  name would return the wrong answer before ever seeing the identifier.
+$fName1 = $b3partner('Cobalt Works Ltd');                                  // name only, earlier
+$fName2 = $b3partner('Cobalt Holdings Ltd', ['gstin' => '24PPPQQ8888P1Z9']); // identifier, later
+$f8a = find_duplicate_partner('Cobalt Works Ltd', '24PPPQQ8888P1Z9', '', '', 0);
+t_eq((string)($f8a['confidence'] ?? ''), 'EXACT', 'F9 . an identifier outranks a name match on an EARLIER record');
+t_eq((int)($f8a['row']['id'] ?? 0), $fName2, 'F10 . and it points at the organisation the IDENTIFIER names');
+$f8b = partner_find_or_problem('Cobalt Works Ltd', '24PPPQQ8888P1Z9', '', '');
 t_eq((string)($f8b['confidence'] ?? ''), 'EXACT', 'F11 . the staff guard agrees');
+//  And with no identifier in play, the same name is still only POSSIBLE.
+t_eq((string)(find_duplicate_partner('Cobalt Works Ltd', '', '', '', 0)['confidence'] ?? ''), 'POSSIBLE',
+     'F12 . the name on its own remains a POSSIBLE match, never proof');
 
 
 // =============================================================================
