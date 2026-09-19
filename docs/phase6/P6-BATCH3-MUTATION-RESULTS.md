@@ -136,7 +136,89 @@ the business actually fears: the agency suggestion reported as a duplicate.
 
 ## Run 2 — the seven, against the repaired tests
 
-*(Filled from the re-run.)*
+| # | Result | Caught by |
+|---|---|---|
+| M6 | **CAUGHT** | C5b C5c |
+| M7 | *survived again* | — *(probe re-aimed, see below)* |
+| M18 | **CAUGHT** | K9 K10 |
+| M20 | **CAUGHT** | H10 |
+| M21 | **CAUGHT** | D15 |
+| M25 | **CAUGHT** | J2a J2b J2c |
+| M26 | *survived again* | — *(probe re-aimed, see below)* |
+
+Two probes had been written that still could not fail, and both were the same
+mistake in different clothes — **an assertion with no subject to judge**:
+
+* **M7's probe put the identifier's record EARLIER in the register** than the
+  one sharing the name, so the scan met the identifier first and answered
+  correctly whatever the precedence rule said. The name-only record now comes
+  first, so a detector that returns on a name gives the wrong answer before it
+  ever sees the identifier.
+* **M26's probe walked an empty list.** Section D maps both of its agency
+  contracts to their organisation, and the agency suggestion only fires for an
+  *unmapped* one — so there was nothing to judge. An agency that really does
+  look like an organisation we know is now planted, and **J5a asserts it is
+  there before anything is concluded from its absence**.
+
+Both were then verified the only way that means anything: by planting the
+mutant and watching the assertions go red.
+
+## Run 3 — the whole battery, from the final commit
+
+Fourteen mutants had been killed against code that later changed —
+`master_row_problem()` was extracted, the registration's conflict handling was
+rewritten, the test file grew by thirty assertions. A mutant caught *before* a
+refactor is not evidence about the code *after* it, so the reported number comes
+from one uninterrupted pass over the final tree.
+
+```
+caught: 25 of 26
+ANCHOR-MISS: M13 the one-primary-contact rule is dropped
+```
+
+**M13's anchor had moved**: the Gate-2 fix rewrote the line it aimed at. An
+anchor miss is not a catch — the mutant did not exist — so it was re-aimed and
+run again rather than counted.
+
+The Gate-2 fix also **created failure modes of its own**, and new code deserves
+new probes rather than old ones re-pointed:
+
+* **M27** — the demote reports trouble and the write goes ahead anyway. That is
+  exactly the state the one-primary rule exists to prevent.
+* **M28** — the demote trusts the UPDATE's return instead of reading back that
+  no other primary survives.
+
+```
+M13  CAUGHT   ·  M27  CAUGHT   ·  M28  CAUGHT
+```
+
+### M28 was nearly dismissed as equivalent
+
+The tempting argument: *if the UPDATE succeeded, the demote happened, so reading
+back adds nothing.* That claim was tested rather than asserted — and it is
+**false on both engines**. A trigger can leave the old primary standing while
+the statement still returns `true`:
+
+| Engine | Silent restore installed | `UPDATE` returned | primaries left |
+|---|---|---|---|
+| SQLite 3.45.1 | `AFTER UPDATE … SET is_primary=1` | `true` | **1** |
+| MariaDB 10.11.14 | `BEFORE UPDATE … SET NEW.is_primary = 1` | `true` | **1** |
+
+"The statement succeeded" and "this organisation now has one primary" are
+different facts, and only the second is the rule. **G10/G11** install exactly
+that condition and require one primary and an honest answer to the caller.
+
+---
+
+## Final result — from commit `d012543`
+
+| | |
+|---|---|
+| **Mutants** | **28** |
+| **Killed** | **28** |
+| **Survived** | **0** |
+| **FATAL (not counted as catches)** | **0** |
+| **Anchor misses (not counted as catches)** | **0** |
 
 ## What this battery says about the tests
 
@@ -146,6 +228,10 @@ matters: **M6's repair found a live defect that the batch's own tests, the full
 regression on both engines, and my adversarial read had all missed.** That is
 the argument for mutation testing in one line.
 
-Two of my own instruments were wrong and are recorded as such rather than
-quietly corrected: **J5**, an assertion that could never fail, and **M26**, a
-mutant that could never be caught.
+**Four** of my own instruments were wrong, and all four are recorded here rather
+than quietly corrected: **C1–C3**, answered by an early check instead of the
+transaction they were named after; **J5**, an assertion looking for a finding
+kind no code produces; **M26**, a mutant planting a finding with empty records;
+and **the precedence probe**, which met the identifier before the name. Every
+one of them passed while proving nothing, and every one was found by mutation
+rather than by reading.
