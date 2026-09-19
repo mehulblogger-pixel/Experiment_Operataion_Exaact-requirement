@@ -343,6 +343,20 @@ t_eq($rGhost2, $rNoEnt, 'B2c · and "no such professional"');
 t_ok(stripos($rNoEnt, 'inspector') === false && stripos($rNoEnt, 'exist') === false,
      'B2d · the shared refusal names neither the record nor its absence  [' . $rNoEnt . ']');
 
+// B2e · BOTH ends are checked, and by an actor whose scope hides nothing — so a
+// pass here cannot be the branch rule refusing on the other end's behalf. An id
+// that names no professional in THIS database (a stale id, another tenant's id,
+// a guess) must be refused and must write nothing.
+$b2Insp = $p6insp('Both Ends', 1, 'IND');
+$b2Before = $p6links();
+[$b2ok, $b2msg] = connect_identity_link_create(987654321, $b2Insp, 'manual', 'p6');
+t_ok(!$b2ok, 'B2e · an unknown professional is refused even for an all-scope actor  [' . $b2msg . ']');
+t_eq($p6links(), $b2Before, 'B2f · and no relationship was written');
+$b2Cand = $p6cand('Both', 'Ends');
+[$b2ok2] = connect_identity_candidate_link_create($b2Cand, 987654321, 'manual', 'p6');
+t_ok(!$b2ok2, 'B2g · the candidate axis refuses an unknown professional too');
+t_eq($p6links(), $b2Before, 'B2h · still nothing written');
+
 // M — the guard belongs to the function, not to the page that called it.
 $mRef = new ReflectionFunction('connect_identity_unlink');
 t_ok($mRef->getNumberOfParameters() >= 3,
@@ -371,6 +385,26 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM cx_identity_link WHERE professional_id=?
      'F4 · exactly one live inspector-axis row survives');
 t_eq((int)ops_val("SELECT COUNT(*) FROM cx_identity_link WHERE candidate_id=? AND status='LINKED'", [$fCand]), 1,
      'F5 · exactly one live candidate-axis row survives');
+
+// F8 · THE WRITER sets the live key, not the back-fill.
+//
+// connect_identity_backfill_keys() re-stamps every row whenever the migration
+// runs, which is a good safety net and a bad witness: a writer that forgot its
+// keys would look protected the moment any other process touched the database,
+// while being completely unprotected in its own request. So this reads the row
+// back IMMEDIATELY, in the same process, with no migration in between.
+$kPro = $p6pro('Key At Write', 'kaw@p6.test'); $kInsp = $p6insp('Key At Write', 1, 'IND');
+$kCand = $p6cand('KeyAt', 'Write');
+[, , $kId1] = connect_identity_link_create($kPro, $kInsp, 'manual', 'p6');
+[, , $kId2] = connect_identity_candidate_link_create($kCand, $kPro, 'manual', 'p6');
+$kRow1 = ops_one("SELECT uq_pro_insp, uq_insp, uq_cand FROM cx_identity_link WHERE id=?", [(int)$kId1]);
+$kRow2 = ops_one("SELECT uq_pro_insp, uq_insp, uq_cand FROM cx_identity_link WHERE id=?", [(int)$kId2]);
+t_eq((int)($kRow1['uq_pro_insp'] ?? 0), $kPro,  'F8a · the inspector-axis writer stamps U1 at the moment of the write');
+t_eq((int)($kRow1['uq_insp'] ?? 0),     $kInsp, 'F8b · and U2');
+t_eq($kRow1['uq_cand'], null,                   'F8c · and leaves the candidate key empty on that axis');
+t_eq((int)($kRow2['uq_cand'] ?? 0),     $kCand, 'F8d · the candidate-axis writer stamps U3 at the moment of the write');
+t_eq($kRow2['uq_pro_insp'], null,               'F8e · and leaves the inspector-axis keys empty');
+t_eq($kRow2['uq_insp'], null,                   'F8f · (both of them)');
 
 // History is NOT constrained: link/unlink the same pair repeatedly.
 $hPro = $p6pro('History Person', 'hist@p6.test'); $hInsp = $p6insp('History Person', 1, 'IND');
@@ -407,6 +441,14 @@ foreach ($gRes as $r) {
     if ($lid <= 0 || (int)ops_val("SELECT COUNT(*) FROM cx_identity_link WHERE id=? AND status='LINKED'", [$lid]) !== 1) $gLies++;
 }
 t_eq($gLies, 0, 'G6 · every process told it succeeded names a link that really is live');
+
+// G7 · a uniqueness conflict is a business answer; ANYTHING ELSE is a fault and
+// must surface as one. A disk error reported as "Linked." is the worst possible
+// outcome: the screen says the relationship exists and nothing does.
+$g7 = 'no exception';
+try { connect_identity_conflict('INSPECTOR', $gPro, $gInsp, 0, new RuntimeException('the disk is on fire')); }
+catch (Throwable $e) { $g7 = $e->getMessage(); }
+t_eq($g7, 'the disk is on fire', 'G7 · a non-duplicate failure is re-thrown, never answered as a link');
 
 // The same race on two DIFFERENT inspectors for one professional: U1 must let
 // exactly one through, and the loser must get the business refusal.
@@ -462,6 +504,23 @@ if (function_exists('link_inspector_users')) {
 $iOrphans = (int)ops_val("SELECT COUNT(*) FROM inspectors i WHERE i.name='Half Fail'
                             AND NOT EXISTS (SELECT 1 FROM users u WHERE u.inspector_id=i.id)");
 t_eq($iOrphans, 0, 'I1 · a reconciliation whose second write cannot land leaves no orphan team member');
+
+// I2 · TWO ADMINISTRATORS, ONE BUTTON, ONE INSTANT.
+//
+// Both processes read the same unlinked login and both create a team member;
+// only one UPDATE can claim it. The loser must take its half-made record back
+// with it, or the team list grows a person who belongs to nobody — and, before
+// Batch 1, the next page load would have made another.
+$rcUser = $p6user('p6.raceheal', 'INSPECTOR', ['office' => 1, 'first' => 'Race', 'last' => 'Heal']);
+$rcBefore = (int)ops_val("SELECT COUNT(*) FROM inspectors WHERE name='Race Heal'");
+$p6race([['reconcile', 0, 0, '', $uMaster], ['reconcile', 0, 0, '', $uMaster]]);
+$rcAfter = (int)ops_val("SELECT COUNT(*) FROM inspectors WHERE name='Race Heal'");
+t_eq($rcAfter - $rcBefore, 1, 'I2 · two simultaneous reconciliations created exactly ONE team member');
+$rcLinked = (int)ops_val("SELECT COALESCE(inspector_id,0) FROM users WHERE id=?", [$rcUser]);
+t_ok($rcLinked > 0, 'I3 · and the login really is linked to it');
+t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors i WHERE i.name='Race Heal'
+                     AND NOT EXISTS (SELECT 1 FROM users u WHERE u.inspector_id=i.id)"), 0,
+     'I4 · no orphan was left behind by the process that lost');
 
 // =============================================================================
 t_section('P6-B1 · E — cross-tenant isolation, actually tested (R16 · I15)');
@@ -557,5 +616,40 @@ $fPro2 = $p6pro('Audit Resilience', 'ar@p6.test'); $fInsp2 = $p6insp('Audit Resi
 t_ok($arOk, 'I41b · a link with an oversized note still succeeds');
 t_eq((int)ops_val("SELECT COUNT(*) FROM cx_identity_link WHERE id=? AND status='LINKED'", [(int)$arId]), 1,
      'I41c · and the relationship is really there, whatever the audit did');
+
+// =============================================================================
+t_section('P6-B1 · W — one writer owns the ledger (the structural boundary)');
+// =============================================================================
+// The live-key columns are what U1/U2/U3 constrain, and they are set by the
+// canonical writers. A raw INSERT elsewhere therefore produces a live
+// relationship the database cannot keep unique — protection that looks present
+// and is not. The Batch 1 adversarial pass found exactly that in the DEMO-S06
+// seed, which had been writing the ledger directly since before this batch.
+//
+// This is a source-level assertion on purpose: no behavioural probe can see a
+// writer that does not exist yet, and "a rule applied where somebody remembered
+// to apply it" is the defect family this whole programme keeps finding.
+$wRoot = dirname(__DIR__);
+$wOffenders = [];
+foreach (array_merge(glob($wRoot . '/lib/*.php') ?: [], glob($wRoot . '/views/ops/*.php') ?: [],
+                     glob($wRoot . '/tools/*.php') ?: []) as $wf) {
+    if (basename($wf) === 'connect_identity.php') continue;          // the ledger owns itself
+    $src = (string)@file_get_contents($wf);
+    if (preg_match('/INSERT\s+INTO\s+cx_identity_link/i', $src)) $wOffenders[] = basename($wf);
+}
+t_eq($wOffenders, [], 'W1 · no file outside lib/connect_identity.php inserts into the identity ledger');
+
+// And the reverse: every production caller of the unlink states WHICH record it
+// is acting for. An unlink with no stated expectation performs no ownership
+// check at all, which is precisely the defect R24 exists to remove.
+$wBare = [];
+foreach (array_merge(glob($wRoot . '/lib/*.php') ?: [], glob($wRoot . '/views/ops/*.php') ?: []) as $wf) {
+    foreach (explode("\n", (string)@file_get_contents($wf)) as $ln => $line) {
+        if (strpos($line, 'connect_identity_unlink(') === false) continue;
+        if (strpos($line, 'function connect_identity_unlink') !== false) continue;
+        if (strpos($line, '[') === false) $wBare[] = basename($wf) . ':' . ($ln + 1);
+    }
+}
+t_eq($wBare, [], 'W2 · every production unlink states the record it is acting for');
 
 $_SESSION = $p6sess; current_user(true); ua(true);   // restored LAST, deliberately

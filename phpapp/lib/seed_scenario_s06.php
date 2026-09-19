@@ -76,9 +76,14 @@ function seed_s06_load() {
     $insp = (int)db()->lastInsertId();
     db()->prepare("INSERT INTO candidates (cand_code,first_name,last_name,mobile,email,stage,client_id,created_at) VALUES ('DEMO-S06-CAND','Farooq','Alam','9820060001','farooq.s06pro@demo.test','INTERVIEW',?,?)")->execute([$client, $now]);
     $cand = (int)db()->lastInsertId();
-    // link them (pro hub); reversible, no merge
-    db()->prepare("INSERT INTO cx_identity_link (professional_id,inspector_id,status,linked_at) VALUES (?,?, 'LINKED', ?)")->execute([$pro, $insp, $now]);
-    db()->prepare("INSERT INTO cx_identity_link (professional_id,candidate_id,status,linked_at) VALUES (?,?, 'LINKED', ?)")->execute([$pro, $cand, $now]);
+    // Link them; reversible, no merge. Phase 6 · Batch 1 — through the CANONICAL
+    // writers, not a raw INSERT. A direct INSERT here skipped the live-key columns,
+    // so the rows it made were invisible to the U1/U2/U3 uniqueness protection:
+    // demo data that the database could not keep unique. Found by the Batch 1
+    // adversarial pass; the structural test in tests/test_p6_batch1.php now keeps
+    // any future writer on this path.
+    connect_identity_link_create($pro, $insp, 'manual', 'DEMO-S06');
+    connect_identity_candidate_link_create($cand, $pro, 'manual', 'DEMO-S06');
     // a verified cert in EACH pool → the unified ladder reads both
     db()->prepare("INSERT INTO cx_pro_certs (pro_id,name,expiry_date,verified) VALUES (?, 'CSWIP 3.1', ?, 1)")->execute([$pro, $future]);
     db()->prepare("INSERT INTO inspector_certs (inspector_id,name,valid_to,verify_status) VALUES (?, 'ASNT NDT II', ?, 'VERIFIED')")->execute([$insp, $future]);

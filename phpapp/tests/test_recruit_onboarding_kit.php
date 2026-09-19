@@ -2,6 +2,15 @@
 // Extra ready-made letters + the one-click "Recruitment-only company" preset.
 t_section('extra letters + recruitment-only preset');
 
+// Phase 6 · Batch 1 — snapshot the marketplace switch before applying a package
+// that turns it off. Applying RECRUITMENT_HR sets connect_enabled='0' (correct:
+// the package has no marketplace), and applying ENTERPRISE afterwards does NOT
+// turn it back on, because that setting records the TENANT's own choice and a
+// package apply must not presume to reverse it. That is right for a customer and
+// wrong for a shared test process: every later test inherited a workspace with
+// the marketplace switched off. Restored at the end of this file.
+$okSnapConnect = setting_get('connect_enabled', null);
+
 // --- Extra letter templates are seeded (idempotently) ---
 doc_tpl_migrate();
 foreach (['CONFIRMATION', 'RELIEVING', 'INTERNSHIP'] as $code)
@@ -42,3 +51,13 @@ $pdo->prepare("DELETE FROM users WHERE id=?")->execute([$uid]);
 unset($_SESSION['uid']); current_user(true); ua(true);
 if (function_exists('product_package_apply')) product_package_apply('ENTERPRISE');
 setting_set('role_access', '');   // clear the test's role override
+
+// ...and put the marketplace switch back exactly as it was found.
+if ($okSnapConnect === null) {
+    try { db()->prepare("DELETE FROM settings WHERE skey='connect_enabled'")->execute(); } catch (Throwable $e) {}
+    $okCache = &settings_cache(); unset($okCache['connect_enabled']);
+} else {
+    setting_set('connect_enabled', $okSnapConnect);
+}
+if (function_exists('licence_disabled')) licence_disabled(true);
+t_ok(connect_enabled(), 'the shared workspace is left with the marketplace switch as it was found');

@@ -4,6 +4,11 @@
 // 10-point dashboard stays all-pass — i.e. every gap closure still holds end to end.
 t_section('DEMO-S06 gap-closure showcase dashboard');
 
+// Phase 6 · Batch 1 — the scenario now links identities through the canonical
+// writers, which check their own authority. The admin button already ran as
+// Master Admin; the test must say so too. No assertion below is changed.
+t_as_admin();
+
 $own = !db()->inTransaction();
 if ($own) db()->beginTransaction();
 try {
@@ -27,3 +32,5 @@ try {
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }
+
+t_as_nobody();   // the suite shares one process — never leave a session behind

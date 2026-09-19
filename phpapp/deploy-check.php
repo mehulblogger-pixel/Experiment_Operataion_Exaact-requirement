@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '708806b · 2026-09-19 01:54 UTC · 665 files';
+$RELEASE = 'db02289 · 2026-09-19 03:29 UTC · 665 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -227,7 +227,7 @@ $EXPECT  = [
     'lib/seed_scenario_s03.php' => ['s'=>28140,'h'=>'fb92e0808d12db0e'],
     'lib/seed_scenario_s04.php' => ['s'=>15797,'h'=>'afbaeeaef614756d'],
     'lib/seed_scenario_s05.php' => ['s'=>10982,'h'=>'77ae3daf8c427816'],
-    'lib/seed_scenario_s06.php' => ['s'=>13231,'h'=>'be2313ba45069404'],
+    'lib/seed_scenario_s06.php' => ['s'=>13472,'h'=>'7e7c02ab15233f58'],
     'lib/services.php' => ['s'=>28398,'h'=>'46e5e2c5fc65a39f'],
     'lib/settingmeta.php' => ['s'=>12701,'h'=>'092392a858cc10d8'],
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
@@ -287,7 +287,7 @@ $EXPECT  = [
     'tools/seed-scenario-s03.php' => ['s'=>1412,'h'=>'7bbc4dd8ac4f0398'],
     'tools/seed-scenario-s04.php' => ['s'=>1412,'h'=>'9e0e6ea7ecea379d'],
     'tools/seed-scenario-s05.php' => ['s'=>1483,'h'=>'23b5f892caeda2d4'],
-    'tools/seed-scenario-s06.php' => ['s'=>1497,'h'=>'1bec7d4dda66cf5d'],
+    'tools/seed-scenario-s06.php' => ['s'=>1921,'h'=>'8f8d70cf53e84b5b'],
     'tools/smoke-router.php' => ['s'=>636,'h'=>'098054abc53c9c16'],
     'tools/trace-audit.php' => ['s'=>2789,'h'=>'d95c97624d3d470e'],
     'tools/trace-thread.php' => ['s'=>4962,'h'=>'cb20d74d1a6eb46e'],

@@ -16,11 +16,37 @@ Updated at each phase lock.*
 | **Phase 3** | **ACCEPTED / LOCKED** | `docs/phase3/` |
 | **Phase 4** | **ACCEPTED / LOCKED** | `docs/phase4/P4-COMPLETION-REPORT.md` |
 | **Phase 5** | **ACCEPTED / LOCKED** | `docs/phase5/P5-COMPLETION-REPORT.md` |
-| **Phase 6** | **NOT STARTED** | — |
+| **Phase 6** | **IN PROGRESS — Batch 1 complete, pending owner review** | 2026-09-19 |
 
-**Phase 6 has not begun.** No Phase 6 design, implementation, schema change or
-test exists. The next development activity is Phase 6, and only after the owner
-explicitly authorises it.
+## Phase 6 — where it stands
+
+| Stage | Status |
+|---|---|
+| §2 Pre-implementation audit · §2 Person addendum | ACCEPTED / LOCKED |
+| §3 Canonical domain model (+ C1/C2 corrections) | ACCEPTED / LOCKED |
+| §20 Duplicate & identity rules (+ organisation correction) | ACCEPTED / LOCKED |
+| §26 Action-path matrix · R26 external-account addendum | ACCEPTED / LOCKED |
+| §27 Business invariants | ACCEPTED / LOCKED, **updated with Batch 1 evidence** |
+| Foundational implementation plan | ACCEPTED as the Batch 1 contract |
+| **Batch 1 — identity write safety, authority, scope** | **COMPLETE, pending owner review** |
+| Batch 2 and beyond | not started, not scoped |
+
+**Batch 1 delivered:** R22 · R24 · R25 · R15 (scoped) · R16 · R3 · R11, plus the
+two defects the audit uncovered and the owner approved — the cross-axis resolver
+and the unattributable audit trail.
+
+**Batch 1 evidence:** 115 new assertions (baseline against unmodified code:
+35 passed / 39 failed) · full regression **12 382 passed / 0 failed on SQLite**
+and **12 387 passed / 0 failed on MariaDB** · **mutation 23 of 23 caught**, no
+survivors, no FATALs · one adversarial pass, two material defects found and
+fixed, three residuals recorded.
+
+**Deliberately still open after Batch 1:** Q1–Q18 unanswered · R20 deferred
+(so I22/I42 are PARTIAL) · R18 registered only (so I6/I41 are PARTIAL) ·
+Q5/Q11 open (so I16 is PARTIAL) · R23 untouched (so I24 is VIOLATED) ·
+**no identity convergence, no Person hub, nothing merged.**
+
+**Phase 6 is NOT complete.** Batch 1 is the foundation it was scoped to be.
 
 ---
 

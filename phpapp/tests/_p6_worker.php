@@ -38,6 +38,8 @@ try {
     if (function_exists('connect_identity_of_professional')) connect_identity_of_professional($a);
     if (function_exists('connect_identity_of_candidate')) connect_identity_of_candidate($a);
     if (function_exists('connect_identity_admin_can')) connect_identity_admin_can();
+    if (function_exists('can')) can('users.manage.global');
+    if (function_exists('team_unlinked_logins')) team_unlinked_logins();
     ops_val("SELECT COUNT(*) FROM cx_identity_link");
 } catch (Throwable $e) {}
 
@@ -72,6 +74,12 @@ try {
         }
         db()->prepare("INSERT INTO cx_identity_link (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")->execute($vals);
         $out['ok'] = true; $out['id'] = (int)db()->lastInsertId();
+    } elseif ($op === 'reconcile') {
+        //  Two administrators pressing "add them to the team list" at the same
+        //  instant. Both read the same unlinked login; only one UPDATE can land.
+        //  The loser must take its half-made team member back with it.
+        $out['id'] = function_exists('link_inspector_users') ? (int)link_inspector_users() : -1;
+        $out['ok'] = true;
     } elseif ($op === 'route_unlink' || $op === 'route_link') {
         $_SERVER['REQUEST_METHOD'] = 'POST';
         $_SESSION['csrf'] = 'p6test'; $_POST['_csrf'] = 'p6test';
