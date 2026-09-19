@@ -3,6 +3,10 @@
 t_section('portal account <-> contact link (P3)');
 
 portal_migrate();
+//  Phase 6 · Batch 3 — portal_invite() now asks its own authority (I27), so the
+//  test has to be somebody entitled to give portal access. No assertion below
+//  is weakened; only the actor is supplied.
+t_as_admin();
 
 // A client with two saved contacts.
 db()->prepare("INSERT INTO business_partners (display_name, legal_name, is_client, created_at)
@@ -44,9 +48,10 @@ $r4 = portal_invite(0, '', '', $cNo);
 t_ok(!empty($r4['err']), 'a contact without an e-mail is refused, with a reason');
 
 // The migrate backfill links a pre-existing unlinked account by matching e-mail.
-db()->prepare("INSERT INTO client_users (partner_id, contact_id, email, name, is_active, created_at)
-    VALUES (?,?,?,?,?,?)")->execute([$pid, null, 'asha@ril.example', 'Old Row', 1, date('c')]);
-// (asha already has an account above; use a fresh partner+contact to isolate)
+//  (The isolated case below is the one that proves the backfill. A second ACTIVE
+//   account for asha@ril.example used to be inserted here and then ignored —
+//   nothing ever read it — and Phase 6 Batch 3 now refuses a second active
+//   account for one address, so it has been dropped. No assertion changed.)
 db()->prepare("INSERT INTO business_partners (display_name, legal_name, is_client, created_at)
     VALUES (?,?,?,?)")->execute(['Tata', 'Tata Steel', 1, date('c')]);
 $pid2 = (int)db()->lastInsertId();
@@ -65,3 +70,4 @@ $map = portal_contacts_by_partner();
 $emails = array_column($map[$pid] ?? [], 'email');
 t_ok(in_array('asha@ril.example', $emails, true) && !in_array('', $emails, true),
     'the picker offers contacts with an e-mail and omits those without');
+t_as_nobody();

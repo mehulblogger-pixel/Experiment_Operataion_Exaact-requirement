@@ -45,6 +45,7 @@ const PORTAL_REQ_STATUS = [
 
 function portal_migrate() {
     static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
+
     $pdo = db(); $pk = pk_clause();
     // A person at the client company. Deliberately its own table: a row here
     // can never be mistaken for staff by any query anywhere in the app.
@@ -79,6 +80,10 @@ function portal_migrate() {
         action VARCHAR(40) DEFAULT '', detail VARCHAR(300) DEFAULT '',
         ip VARCHAR(60) DEFAULT '', at VARCHAR(30) DEFAULT '')");
     portal_backfill_contact_links();
+    //  Batch 3 · Q23 — the account boundary. Safe to call more than once; the
+    //  vendor table may not exist yet at this point, and cvp_migrate() calls it
+    //  again once it does.
+    portal_acct_migrate();
 }
 
 // Link portal accounts back to the contacts on the client record wherever the
@@ -628,6 +633,22 @@ function portal_invite($partnerId, $email, $name, $contactId = 0) {
         $email = strtolower(trim((string)$email));
     }
     if (!$partnerId) return ['err' => 'Choose the client company.'];
+    //  Batch 3 — the invite asks its OWN authority and its OWN target, rather
+    //  than trusting whichever screen called it (invariant I27), and a posted
+    //  organisation id is a request, not a permission (invariant I25).
+    //
+    //  TWO legitimate authorities, because this one function serves two doors:
+    //    · STAFF, through the portal register — the established gate for that
+    //      screen, reused rather than invented (no new permission).
+    //    · A CLIENT'S OWN ADMIN, inviting a colleague — allowed only into THEIR
+    //      OWN organisation. Asked here as well as in the calling screen, so a
+    //      future caller cannot skip it.
+    $mayStaff = function_exists('portal_can_manage') && portal_can_manage();
+    $mayOwn   = !$mayStaff && function_exists('cvp_client_is_admin') && cvp_client_is_admin()
+                && (int)((function_exists('portal_user') ? (portal_user()['partner_id'] ?? 0) : 0)) === $partnerId;
+    if (!$mayStaff && !$mayOwn) return ['err' => 'You cannot give portal access.'];
+    if ((int)ops_val("SELECT COUNT(*) FROM business_partners WHERE id=?", [$partnerId]) === 0)
+        return ['err' => 'Choose the client company.'];      // same words: no enumeration
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) return ['err' => 'A valid e-mail address is needed.'];
     $exists = portal_try(fn() => ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(email)=?", [$email]), 0);
     if ((int)$exists > 0) return ['err' => 'That address already has portal access.'];
@@ -638,10 +659,19 @@ function portal_invite($partnerId, $email, $name, $contactId = 0) {
         if ($match) $contactId = (int)$match['id'];
     }
     $token = bin2hex(random_bytes(24));
-    db()->prepare("INSERT INTO client_users (partner_id,contact_id,email,name,password_hash,is_active,must_change,
-                   invite_token,invite_expires,created_by,created_at) VALUES (?,?,?,?,'',1,1,?,?,?,?)")
-        ->execute([$partnerId, $contactId ?: null, $email, substr(trim((string)$name), 0, 150), $token,
-                   date('c', time() + 7 * 86400), user_name(current_user()), date('c')]);
+    //  Batch 3 · Q23 — the PHP check above is the courtesy that gives the good
+    //  message; the database is what actually decides, so two people inviting the
+    //  same address in the same instant produce one account and the loser is told
+    //  the truth rather than shown a crash.
+    try {
+        db()->prepare("INSERT INTO client_users (partner_id,contact_id,email,name,password_hash,is_active,must_change,
+                       invite_token,invite_expires,created_by,created_at) VALUES (?,?,?,?,'',1,1,?,?,?,?)")
+            ->execute([$partnerId, $contactId ?: null, $email, substr(trim((string)$name), 0, 150), $token,
+                       date('c', time() + 7 * 86400), user_name(current_user()), date('c')]);
+    } catch (Throwable $e) {
+        if (portal_acct_is_duplicate($e)) return ['err' => 'That address already has portal access.'];
+        throw $e;
+    }
     return ['id' => (int)db()->lastInsertId(), 'token' => $token,
             'link' => portal_base_url() . '/portal/accept?t=' . $token];
 }
@@ -1736,4 +1766,104 @@ function portal_perms_save($clientUserId, array $b) {
             ->execute([implode(',', $keys), implode(',', $sites),
                        substr(trim((string)($b['role_preset'] ?? '')), 0, 30), (int)$clientUserId]);
     }
+}
+
+// ============================================================================
+//  PHASE 6 · BATCH 3 — THE PORTAL ACCOUNT BOUNDARY (owner decision Q23).
+//
+//  The boundary was established FROM THE CODE, not assumed. Both login routes
+//  resolve an account like this:
+//
+//      SELECT * FROM client_users WHERE LOWER(email)=? AND is_active=1
+//      SELECT * FROM vendor_users WHERE LOWER(email)=? AND is_active=1
+//
+//  Each takes the FIRST row. So two ACTIVE accounts sharing an address mean the
+//  sign-in silently picks one, and the person may land in the wrong company's
+//  portal. That is the rule the code already believes; it simply was not
+//  enforced. The index makes the database believe it too.
+//
+//  WHAT THIS IS NOT:
+//   · not global — client_users and vendor_users are separate tables behind
+//     separate doors, so one person may legitimately hold BOTH a buyer account
+//     and a supplier account. Nothing here connects them.
+//   · not a person rule — an address is not a human, and no Person record,
+//     hub or identity engine is created or implied.
+//   · not retrospective — a DEACTIVATED account keeps its address as history.
+//     Somebody leaves, their access is switched off, and later the address is
+//     re-invited: all three states stay legal.
+//
+//  The live key is the Batch 1 pattern: the address while the account is ACTIVE,
+//  NULL otherwise. Both engines allow unlimited NULLs in a UNIQUE index, so one
+//  statement gives identical semantics on SQLite and MariaDB with no driver
+//  branch, and deactivating an account releases the address.
+// ============================================================================
+
+const PORTAL_ACCT_TABLES = ['client_users' => 'ux_client_users_active_email',
+                            'vendor_users' => 'ux_vendor_users_active_email'];
+
+/**
+ * THE KEY IS COMPUTED BY THE DATABASE, NOT BY A WRITER.
+ *
+ * Batch 1 and Batch 2 maintain their live keys in PHP, and Batch 2's adversarial
+ * pass recorded the residual that follows from it: a future writer can forget
+ * the key, and the row it inserts is then invisible to the constraint. A seed
+ * had already done exactly that once.
+ *
+ * This is a NEW index on a NEW column, so it does not touch either locked batch
+ * and can take the stronger form from the start: a GENERATED column. The
+ * database derives it from `email` and `is_active` on every write, by anyone, by
+ * any path — including a raw INSERT that knows nothing about this rule. There is
+ * nothing to remember and nothing to maintain on an is_active flip.
+ *
+ * Measured on both engines before use: SQLite 3.45.1 and MariaDB 10.11.14 both
+ * accept ALTER TABLE ADD COLUMN ... GENERATED ALWAYS AS (...) VIRTUAL, both
+ * index it, both reject the duplicate, and both release the address when the
+ * account is deactivated.
+ */
+function portal_acct_migrate() {
+    $expr = "CASE WHEN COALESCE(is_active,0)=1 AND COALESCE(email,'')<>'' THEN LOWER(email) ELSE NULL END";
+    foreach (PORTAL_ACCT_TABLES as $t => $ix) {
+        try { ops_val("SELECT COUNT(*) FROM $t"); } catch (Throwable $e) { continue; }   // table not built yet
+        if (!in_array('uq_active_email', t_cols_of($t), true)) {
+            try { db()->exec("ALTER TABLE $t ADD COLUMN uq_active_email VARCHAR(200)
+                              GENERATED ALWAYS AS ($expr) VIRTUAL"); } catch (Throwable $e) { continue; }
+        }
+        //  A workspace that already holds two active accounts on one address
+        //  cannot have the index built over it, and failing the boot for data we
+        //  found there would be worse than the gap. Skip that one index and
+        //  report it; nothing is deactivated or deleted to make it fit.
+        if (portal_acct_duplicates($t)) continue;
+        try { db()->exec("CREATE UNIQUE INDEX $ix ON $t (uq_active_email)"); } catch (Throwable $e) {}
+    }
+}
+
+/** Column names on a table, on either engine. */
+function t_cols_of($table) {
+    try {
+        if ((string)db()->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite')
+            return array_column(ops_all("PRAGMA table_info(" . $table . ")") ?: [], 'name');
+        return array_column(ops_all("SELECT column_name AS name FROM information_schema.columns
+                                     WHERE table_schema = DATABASE() AND table_name = ?", [$table]) ?: [], 'name');
+    } catch (Throwable $e) { return []; }
+}
+
+/** Addresses held by more than one ACTIVE account in one table. */
+function portal_acct_duplicates($table = null) {
+    $out = [];
+    foreach (($table ? [$table] : array_keys(PORTAL_ACCT_TABLES)) as $t) {
+        try {
+            foreach (ops_all("SELECT uq_active_email AS v, COUNT(*) n FROM $t
+                              WHERE uq_active_email IS NOT NULL GROUP BY uq_active_email HAVING COUNT(*) > 1") ?: [] as $r)
+                $out[] = ['table' => $t, 'email' => (string)$r['v'], 'rows' => (int)$r['n']];
+        } catch (Throwable $e) {}
+    }
+    return $out;
+}
+
+/** Was this exception the database refusing a duplicate account? */
+function portal_acct_is_duplicate(Throwable $e) {
+    $c = (string)$e->getCode();
+    if ($c === '23000' || $c === '23505') return true;
+    $m = strtolower($e->getMessage());
+    return strpos($m, 'unique') !== false || strpos($m, 'duplicate') !== false;
 }

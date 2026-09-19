@@ -102,6 +102,9 @@ function cvp_migrate() {
         ensure_column('client_users', 'is_org_admin',  'INT DEFAULT 0');
         ensure_column('vendor_users', 'access_expires', "VARCHAR(20) DEFAULT ''");
     }
+    //  Batch 3 · Q23 — both account tables exist by now, so the boundary can
+    //  be applied to each of them. Idempotent.
+    if (function_exists('portal_acct_migrate')) portal_acct_migrate();
 }
 
 // Shared expiry test — an account is live when it has no expiry date or the date
@@ -378,10 +381,19 @@ function cvp_vendor_invite($vendorId, $email, $name, $contactId = 0) {
         if ($match) $contactId = (int)$match['id'];
     }
     $token = bin2hex(random_bytes(24));
-    db()->prepare("INSERT INTO vendor_users (vendor_id,contact_id,email,name,password_hash,is_active,must_change,
-                   invite_token,invite_expires,created_by,created_at) VALUES (?,?,?,?,'',1,1,?,?,?,?)")
-        ->execute([$vendorId, $contactId ?: null, $email, substr(trim((string)$name), 0, 150), $token,
-                   date('c', time() + 7 * 86400), function_exists('user_name') ? user_name(current_user()) : '', date('c')]);
+    //  Batch 3 · Q23 — same boundary, its own table. A supplier account and a
+    //  buyer account may share an address: they are separate doors, and nothing
+    //  here connects them.
+    try {
+        db()->prepare("INSERT INTO vendor_users (vendor_id,contact_id,email,name,password_hash,is_active,must_change,
+                       invite_token,invite_expires,created_by,created_at) VALUES (?,?,?,?,'',1,1,?,?,?,?)")
+            ->execute([$vendorId, $contactId ?: null, $email, substr(trim((string)$name), 0, 150), $token,
+                       date('c', time() + 7 * 86400), function_exists('user_name') ? user_name(current_user()) : '', date('c')]);
+    } catch (Throwable $e) {
+        if (function_exists('portal_acct_is_duplicate') && portal_acct_is_duplicate($e))
+            return ['err' => 'That address already has portal access.'];
+        throw $e;
+    }
     return ['id' => (int)db()->lastInsertId(), 'token' => $token,
             'link' => portal_base_url() . '/vendor/accept?t=' . $token];
 }

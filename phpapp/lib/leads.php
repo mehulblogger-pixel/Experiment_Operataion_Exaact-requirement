@@ -364,7 +364,11 @@ function lead_possible_duplicate($company, $email = '') {
     if ($company === '') return null;
     if (function_exists('find_duplicate_partner')) {
         $hit = find_duplicate_partner($company, '', '', '', 0);
-        if ($hit) return ['kind' => 'partner', 'by' => $hit['by'], 'row' => $hit['row']];
+        //  Batch 3 (F6) — the confidence travels with the answer so a caller can
+        //  tell "this IS them" from "this might be them". Additive: the existing
+        //  three keys are unchanged.
+        if ($hit) return ['kind' => 'partner', 'by' => $hit['by'], 'row' => $hit['row'],
+                          'confidence' => (string)($hit['confidence'] ?? 'POSSIBLE')];
     }
     $l = leads_try(fn() => ops_one(
         "SELECT id, ref, company_name, status FROM leads WHERE LOWER(company_name)=? AND status='OPEN' LIMIT 1",
@@ -651,12 +655,30 @@ function lead_convert($leadId, array $b = []) {
     if (!$partnerId) {
         $name = trim((string)($b['company_name'] ?? $l['company_name']));
         if ($name === '') return ['err' => 'The customer needs a name.'];
+        //  Phase 6 · Batch 3 (F5) — the same guard the rest of the application
+        //  uses. Unlike the quotation path, a PERSON is standing here, so an
+        //  authoritative identifier stops and names the record: they can point
+        //  the lead at the existing customer, which the lead screen already
+        //  offers, and convert again. Converting anyway would build a parallel
+        //  relationship — two records, two sets of calls, two sets of figures.
+        $near = null;
+        if (function_exists('partner_find_or_problem')) {
+            $hit = partner_find_or_problem($name, (string)($b['gstin'] ?? ''), (string)($b['pan'] ?? ''), '', 0);
+            if (($hit['confidence'] ?? 'NONE') === 'EXACT') return ['err' => $hit['message']];
+            //  A name is evidence, not proof: allowed, and recorded.
+            if (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') $near = $hit['row'];
+        }
         $code = 'C-' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 8)) . '-'
               . str_pad((string)((int)ops_val("SELECT COUNT(*) FROM business_partners") + 1), 4, '0', STR_PAD_LEFT);
         $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,state,created_at)
                        VALUES (?,?,?,1,0,'ACTIVE',?,?)")
             ->execute([$code, $name, $name, (string)($b['state'] ?? ''), date('c')]);
         $partnerId = (int)$pdo->lastInsertId();
+        if (function_exists('partner_audit_created'))
+            partner_audit_created($partnerId, 'Created by converting lead ' . (string)$l['ref']
+                . ($near ? '. It looks similar to ' . trim((string)($near['code'] ?? '')) . ' — '
+                           . (string)($near['legal_name'] ?? '') . ', which was already on file'
+                         : ''));
         // The contact comes across too, or somebody types it again tomorrow.
         if (trim((string)$l['contact_name']) !== '') {
             try {

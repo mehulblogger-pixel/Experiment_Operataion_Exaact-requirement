@@ -2621,6 +2621,31 @@ function crm_register_client_for_quote($q) {
     $name = trim($q['client_name'] ?? ''); if ($name === '') return null;
     $ex = ops_val("SELECT id FROM business_partners WHERE is_client=1 AND (legal_name=? OR display_name=?) LIMIT 1", [$name, $name]);
     if ($ex) return (int)$ex;
+    //  Phase 6 · Batch 3 (F5) — the same guard the staff "add a company" screen
+    //  uses, rather than a second rule that drifts away from it.
+    //
+    //  An EXACT match means an AUTHORITATIVE identifier — a GSTIN, PAN or TAN —
+    //  already belongs to a company on file. There is no judgement to make and
+    //  nobody standing here to make one: attach the quotation to the record that
+    //  exists. That is not a merge and nothing is rewritten; it is simply the
+    //  refusal to type the same company in twice.
+    //
+    //  A NAME match is not proof. Two real companies do share a name, so the
+    //  second record is allowed — and the fact that it looked like an existing
+    //  one is written down, so it can be reviewed rather than discovered later.
+    $near = null;
+    if (function_exists('partner_find_or_problem')) {
+        $hit = partner_find_or_problem($name, (string)($q['gstin'] ?? ''), (string)($q['pan'] ?? ''), '', 0);
+        if (($hit['confidence'] ?? 'NONE') === 'EXACT') {
+            $pid = (int)$hit['row']['id'];
+            if (function_exists('partner_audit_created'))
+                partner_audit_created($pid, 'A quotation for "' . $name . '" was attached to this organisation '
+                                          . '(matched by ' . $hit['by'] . ') instead of creating a second record');
+            partner_carry_from_crm($pid, $name);
+            return $pid;
+        }
+        if (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') $near = $hit['row'];
+    }
     $token = function_exists('short_token') ? short_token($name) : strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $name), 0, 4));
     $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["GEN-$token-%"]);
     $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
@@ -2628,6 +2653,11 @@ function crm_register_client_for_quote($q) {
     db()->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,created_at) VALUES (?,?,?,1,0,'ACTIVE',?)")
         ->execute([$code, $name, $name, date('c')]);
     $pid = (int)db()->lastInsertId();
+    if (function_exists('partner_audit_created'))
+        partner_audit_created($pid, 'Created from an accepted quotation'
+            . ($near ? '. It looks similar to ' . trim((string)($near['code'] ?? '')) . ' — '
+                       . (string)($near['legal_name'] ?? '') . ', which was already on file'
+                     : ''));
     // Bring the sales conversation with it rather than leaving a bare name.
     partner_carry_from_crm($pid, $name);
     return $pid;

@@ -768,6 +768,107 @@ function identity_state_findings($limit = 200) {
              'Legitimate for a re-hire on different terms; a duplicate otherwise. Only a person can tell.',
              false, true);
 
+    // ---- Phase 6 · Batch 3 — ORGANISATION states (detection only) ----------
+    //
+    //  Extends the report Batch 2 built rather than adding a second one. Every
+    //  finding below is REPORTED and nothing is repaired: deciding that two
+    //  organisations are one company is a business judgement, and a shared tax
+    //  identifier is strong evidence of it but not a licence to merge.
+
+    // 8 — two organisations carrying the same authoritative tax identifier.
+    foreach (['gstin', 'pan', 'tan'] as $idf) {
+        foreach ($all("SELECT $idf AS v, COUNT(*) n FROM business_partners
+                        WHERE COALESCE($idf,'')<>'' GROUP BY $idf HAVING COUNT(*)>1 LIMIT $lim") as $r) {
+            $ids = array_column($all("SELECT id FROM business_partners WHERE $idf=? LIMIT 20", [$r['v']]) ?: [], 'id');
+            $add('PARTNER_DUPLICATE_TAXID',
+                 'Two or more organisations carry the same ' . strtoupper($idf) . '.',
+                 ['identifier' => strtoupper($idf), 'organisations' => array_map('intval', $ids)],
+                 'A tax identifier names one legal entity, so these are very likely one organisation with two records.',
+                 false, true);
+        }
+    }
+
+    // 9 — organisations sharing only a name. Evidence, not proof: two real
+    //     companies share a name often enough that this is a question.
+    foreach ($all("SELECT LOWER(TRIM(legal_name)) AS v, COUNT(*) n FROM business_partners
+                    WHERE COALESCE(legal_name,'')<>'' GROUP BY LOWER(TRIM(legal_name)) HAVING COUNT(*)>1 LIMIT $lim") as $r) {
+        $ids = array_column($all("SELECT id FROM business_partners WHERE LOWER(TRIM(legal_name))=? LIMIT 20", [$r['v']]) ?: [], 'id');
+        $add('PARTNER_POSSIBLE_DUPLICATE_NAME',
+             'Two or more organisations share a name.',
+             ['organisations' => array_map('intval', $ids)],
+             'A name is not an identifier. These may be separate legal entities in one group, or one organisation entered twice.',
+             false, true);
+    }
+
+    // 10 — several marketplace organisations pointing at one party.
+    foreach ($all("SELECT party_id AS v, COUNT(*) n FROM cx_organisations
+                    WHERE COALESCE(party_id,0)>0 GROUP BY party_id HAVING COUNT(*)>1 LIMIT $lim") as $r) {
+        $add('MARKETPLACE_MULTIPLE_FOR_PARTY',
+             'One organisation has more than one marketplace representation.',
+             ['organisation' => (int)$r['v'], 'representations' => (int)$r['n']],
+             'May be legitimate where the audiences genuinely differ; more often it is the same company registered twice.',
+             false, true);
+    }
+
+    // 11 — a marketplace organisation with no link to the spine at all.
+    foreach ($all("SELECT id, name FROM cx_organisations WHERE COALESCE(party_id,0)=0 LIMIT $lim") as $r)
+        $add('MARKETPLACE_UNMAPPED',
+             'A marketplace organisation is not connected to the organisation register.',
+             ['marketplace_organisation' => (int)$r['id'], 'name' => (string)$r['name']],
+             'Expected for an application that has not been approved yet.',
+             true, false);
+
+    // 12 — a marketplace organisation naming a party that is not there.
+    foreach ($all("SELECT o.id, o.party_id FROM cx_organisations o
+                    WHERE COALESCE(o.party_id,0)>0
+                      AND NOT EXISTS (SELECT 1 FROM business_partners b WHERE b.id=o.party_id) LIMIT $lim") as $r)
+        $add('MARKETPLACE_PARTY_MISSING',
+             'A marketplace organisation names an organisation that no longer exists.',
+             ['marketplace_organisation' => (int)$r['id'], 'organisation' => (int)$r['party_id']],
+             'A dangling reference.', false, true);
+
+    // 13 — an agency that MIGHT be an organisation already on the register.
+    //      A question for a person; the mapping is never inferred (Q19).
+    foreach ($all("SELECT a.id, a.name, b.id AS pid FROM agencies a
+                    JOIN business_partners b ON COALESCE(a.gstin,'')<>'' AND UPPER(b.gstin)=UPPER(a.gstin)
+                   WHERE COALESCE(a.party_id,0)=0 LIMIT $lim") as $r)
+        $add('AGENCY_POSSIBLE_ORGANISATION',
+             'An agency contract carries the same GSTIN as an organisation on the register.',
+             ['agency' => (int)$r['id'], 'organisation' => (int)$r['pid']],
+             'An agency is a CONTRACT and an organisation is a LEGAL IDENTITY, so this is a suggestion to connect them, never a duplicate.',
+             false, true);
+
+    // 14 — duplicate contacts, and the ambiguous primary.
+    foreach ($all("SELECT partner_id, LOWER(email) AS v, COUNT(*) n FROM partner_contacts
+                    WHERE COALESCE(email,'')<>'' GROUP BY partner_id, LOWER(email) HAVING COUNT(*)>1 LIMIT $lim") as $r)
+        $add('CONTACT_DUPLICATE',
+             'One organisation holds the same contact address more than once.',
+             ['organisation' => (int)$r['partner_id'], 'email' => (string)$r['v'], 'rows' => (int)$r['n']],
+             'The same person entered twice on one organisation.', false, true);
+    foreach ($all("SELECT partner_id, COUNT(*) n FROM partner_contacts
+                    WHERE COALESCE(is_primary,0)=1 GROUP BY partner_id HAVING COUNT(*)>1 LIMIT $lim") as $r)
+        $add('CONTACT_MULTIPLE_PRIMARY',
+             'One organisation has more than one primary contact.',
+             ['organisation' => (int)$r['partner_id'], 'primaries' => (int)$r['n']],
+             'Historical data from before the one-primary rule. "The primary contact" is ambiguous until it is resolved.',
+             false, true);
+
+    // 15 — portal accounts: duplicates within the boundary, and orphans.
+    if (function_exists('portal_acct_duplicates'))
+        foreach (portal_acct_duplicates() as $d)
+            $add('ACCOUNT_DUPLICATE_ACTIVE',
+                 'Two active portal accounts share one address in the same account list.',
+                 ['table' => $d['table'], 'email' => $d['email'], 'rows' => $d['rows']],
+                 'Sign-in resolves one of them, so the person may land in the wrong organisation. The database protection for this list is held back until it is resolved.',
+                 false, true);
+    foreach ($all("SELECT u.id, u.partner_id FROM client_users u
+                    WHERE COALESCE(u.partner_id,0)>0
+                      AND NOT EXISTS (SELECT 1 FROM business_partners b WHERE b.id=u.partner_id) LIMIT $lim") as $r)
+        $add('ACCOUNT_ORGANISATION_MISSING',
+             'A portal account belongs to an organisation that no longer exists.',
+             ['account' => (int)$r['id'], 'organisation' => (int)$r['partner_id']],
+             'A dangling reference.', false, true);
+
     // 7 — live duplicate relationships the uniqueness protection could not build over.
     foreach (connect_identity_duplicates() as $d)
         $add('DUPLICATE_RELATIONSHIP',

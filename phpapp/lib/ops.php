@@ -422,6 +422,14 @@ function ops_migrate() {
     ensure_column('inspectors', 'fee_status', "VARCHAR(20) DEFAULT ''");     // PROVISIONAL | CONFIRMED | WAIVED
     ensure_column('inspectors', 'guarantee_upto', "VARCHAR(20) DEFAULT ''"); // fee is provisional until this date
     ensure_column('agencies', 'guarantee_days', 'INT DEFAULT 90');           // free-replacement window
+    //  Phase 6 · Batch 3 (owner decision Q19) — an OPTIONAL cross-reference from
+    //  an agency contract to the organisation spine. Nullable, additive, never
+    //  populated automatically and never unique: an agency row carries a
+    //  CONTRACT (fee, rate, guarantee window, renewal date) while a business
+    //  partner carries a LEGAL IDENTITY, and one company may legitimately hold
+    //  several agency contracts over time. This is a MAP, not a merge, and it
+    //  does not make agency = business_partner.
+    ensure_column('agencies', 'party_id', 'INT NULL');
     ensure_column('candidates', 'requisition_id', 'INT NULL');               // hire is against an approved requisition
     // M3 — the canonical Department relationship. The free-text `department`
     // column stays exactly as it is, so every existing reader keeps working;
@@ -964,15 +972,109 @@ function resolve_new_lookup($typeKey, $val, $newText) {
     return $code;
 }
 // Find an existing company by GSTIN / PAN / TAN / normalized name (avoids duplicates).
+/**
+ * Does this company already exist? Returns ['row','by','confidence'] or null.
+ *
+ * Phase 6 · Batch 3 (owner decision Q20) — the result now says HOW SURE it is,
+ * because the callers need to treat the two cases differently and could not:
+ *
+ *   EXACT     an authoritative identifier matched — GSTIN, PAN or TAN. The tax
+ *             authority has already decided these name one legal entity, so a
+ *             caller may refuse on them.
+ *   POSSIBLE  only the normalised NAME matched. Two genuinely different
+ *             companies share a name often enough that this may warn, suggest
+ *             or ask — but it must never be treated as proof, and it must never
+ *             become an absolute blocker.
+ *
+ * ADDITIVE: 'row' and 'by' are unchanged, so every existing caller keeps
+ * working exactly as before. No second detector is introduced.
+ */
 function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
     $g = strtoupper(clean_gstin($gstin)); $p = strtoupper(trim($pan)); $t = strtoupper(trim($tan)); $norm = normalize_name($name);
+    $nameHit = null;
     foreach (ops_all("SELECT id, code, legal_name, gstin, pan, tan FROM business_partners WHERE id <> ?", [$excludeId]) as $r) {
-        if ($g && $r['gstin'] && strtoupper($r['gstin']) === $g) return ['row' => $r, 'by' => 'GSTIN'];
-        if ($p && $r['pan'] && strtoupper($r['pan']) === $p) return ['row' => $r, 'by' => 'PAN'];
-        if ($t && ($r['tan'] ?? '') && strtoupper($r['tan']) === $t) return ['row' => $r, 'by' => 'TAN'];
-        if ($norm !== '' && normalize_name($r['legal_name']) === $norm) return ['row' => $r, 'by' => 'name'];
+        if ($g && $r['gstin'] && strtoupper($r['gstin']) === $g) return ['row' => $r, 'by' => 'GSTIN', 'confidence' => 'EXACT'];
+        if ($p && $r['pan'] && strtoupper($r['pan']) === $p) return ['row' => $r, 'by' => 'PAN', 'confidence' => 'EXACT'];
+        if ($t && ($r['tan'] ?? '') && strtoupper($r['tan']) === $t) return ['row' => $r, 'by' => 'TAN', 'confidence' => 'EXACT'];
+        //  A name hit is remembered but NOT returned yet: an authoritative
+        //  identifier further down the list outranks it, and returning the name
+        //  first would report POSSIBLE for something the tax id proves EXACT.
+        if ($nameHit === null && $norm !== '' && normalize_name($r['legal_name']) === $norm)
+            $nameHit = ['row' => $r, 'by' => 'name', 'confidence' => 'POSSIBLE'];
     }
-    return null;
+    return $nameHit;
+}
+
+/**
+ * The shared guard for every staff-side organisation writer (Batch 3 · F5).
+ *
+ * One place asks the detector and turns its answer into a decision, so a writer
+ * cannot forget — which is how `crm.php` came to create organisations with no
+ * check at all, and `leads.php` to check the name only. It adds NO detection
+ * logic of its own.
+ *
+ * Returns ['confidence'=>'EXACT'|'POSSIBLE'|'NONE', 'row'=>…|null, 'by'=>…,
+ *          'message'=>a sentence a staff user can act on].
+ */
+function partner_find_or_problem($name, $gstin = '', $pan = '', $tan = '', $excludeId = 0) {
+    $hit = find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId);
+    if (!$hit) return ['confidence' => 'NONE', 'row' => null, 'by' => '', 'message' => ''];
+    $row = $hit['row']; $conf = (string)($hit['confidence'] ?? 'POSSIBLE');
+    //  Staff see the record, because they are entitled to: this is the internal
+    //  register. The PUBLIC path never uses this wording — see connect_org.php.
+    $who = trim((string)($row['code'] ?? '')) . ' — ' . (string)($row['legal_name'] ?? '');
+    return ['confidence' => $conf, 'row' => $row, 'by' => (string)$hit['by'],
+            'message' => $conf === 'EXACT'
+                ? 'This company already exists as ' . $who . ' (matched by ' . $hit['by'] . '). Open it and add the extra role instead of creating a second record.'
+                : 'A company with this name already exists as ' . $who . '. Check it before adding another.'];
+}
+
+/**
+ * Add a contact to an organisation, honouring the one-primary rule (Q22).
+ *
+ * At most ONE primary contact per organisation. Setting a new primary clears the
+ * previous one — it is never deleted, because it is still a real contact.
+ *
+ * It deliberately imposes NO e-mail uniqueness: one person may legitimately be
+ * the contact at several organisations, and inferring a human from an address is
+ * exactly what this programme does not do.
+ */
+//  Phase 6 · Batch 3 (F8) — one place that records an organisation coming into
+//  existence, or a near-duplicate being allowed through. Deliberately silent on
+//  failure and deliberately OUTSIDE any transaction (invariant I41): an audit
+//  that can fail a business write is worse than no audit at all.
+function partner_audit_created($partnerId, $subject) {
+    $partnerId = (int)$partnerId; if ($partnerId <= 0 || !function_exists('act_log')) return;
+    try { act_log('PARTNER', $partnerId, 'SYSTEM', $subject); } catch (Throwable $e) { /* never fail the write */ }
+}
+
+function partner_contact_add($partnerId, array $in) {
+    $partnerId = (int)$partnerId;
+    if ($partnerId <= 0) return 0;
+    $name = substr(trim((string)($in['name'] ?? '')), 0, 150);
+    if ($name === '') return 0;
+    $primary = !empty($in['is_primary']) ? 1 : 0;
+    if ($primary) partner_contact_clear_primary($partnerId);
+    $data = ['partner_id' => $partnerId, 'name' => $name,
+             'email' => substr(trim((string)($in['email'] ?? '')), 0, 200),
+             'mobile' => substr(trim((string)($in['mobile'] ?? '')), 0, 40),
+             'designation' => substr(trim((string)($in['designation'] ?? '')), 0, 120),
+             'department' => substr(trim((string)($in['department'] ?? '')), 0, 120),
+             'is_primary' => $primary];
+    $cols = function_exists('existing_columns_only') ? existing_columns_only('partner_contacts', array_keys($data)) : array_keys($data);
+    if (!$cols) return 0;
+    $ph = implode(',', array_fill(0, count($cols), '?'));
+    db()->prepare("INSERT INTO partner_contacts (" . implode(',', $cols) . ") VALUES ($ph)")
+        ->execute(array_map(fn($c) => $data[$c], $cols));
+    return (int)db()->lastInsertId();
+}
+
+/** Stand every other contact on this organisation down from primary. Never deletes. */
+function partner_contact_clear_primary($partnerId, $exceptId = 0) {
+    try {
+        db()->prepare("UPDATE partner_contacts SET is_primary=0 WHERE partner_id=? AND id<>? AND COALESCE(is_primary,0)=1")
+            ->execute([(int)$partnerId, (int)$exceptId]);
+    } catch (Throwable $e) {}
 }
 // Link inspector-role logins to a team-member row so they are deputable.
 // The allocate list reads `inspectors`; a login without a linked team member
@@ -2280,11 +2382,19 @@ function ops_masters() {
                 ['one_time_fee','One-time placement fee (recruitment) ₹','money',[]],
                 ['monthly_rate','Monthly charge (manpower) ₹','money',[]],
                 ['guarantee_days','Free-replacement guarantee (days)','text',[]],
+                //  Phase 6 · Batch 3 (Q19) — OPTIONAL. An agency row is a CONTRACT;
+                //  a customer/vendor record is a LEGAL IDENTITY. Connecting the
+                //  two lets reporting see that they are the same company. It is
+                //  never inferred, never required, and two agency contracts may
+                //  legitimately point at one company.
+                ['party_id','Company record this contract is with (optional)','ref',
+                    ['ref'=>'vendors','optfn'=>'vendors_list','optlabel'=>'partner']],
                 ['notes','Notes','text',[]],
                 ['active','Active','check',[]],
             ],
             'list' => ['name'=>'Agency','agency_type'=>'Type','contract_number'=>'Contract','contract_end'=>'Renewal due','active'=>'Active'],
             'list_labels' => ['agency_type'=>AGENCY_TYPES],
+            'ref_cols' => ['party_id'=>['vendors','partner']],
         ],
         'inspectors' => [
             'label' => 'Inspectors', 'table' => 'inspectors', 'code' => null, 'access' => 'admin',
@@ -3916,6 +4026,18 @@ function ops_quick_add() {
 }
 
 // ---- Generic master handler ------------------------------------------------
+//  Batch 3 (F8) — connecting an agency contract to a company record is an
+//  identity statement, so it is recorded against that company. Nothing else in
+//  the generic master screens is audited by this: it checks the table first.
+function master_audit_agency_map($table, array $cols, array $vals, $rowId) {
+    if ($table !== 'agencies') return;
+    $pi = array_search('party_id', $cols, true); if ($pi === false) return;
+    $pid = (int)($vals[$pi] ?? 0); if ($pid <= 0) return;
+    $ni = array_search('name', $cols, true);
+    partner_audit_created($pid, 'Agency contract "' . (string)($ni !== false ? $vals[$ni] : $rowId)
+                              . '" was linked to this organisation');
+}
+
 function ops_master_handle($key, $cfg, $action, $method) {
     $pdo = db(); $table = $cfg['table'];
     if ($action === 'delete' && $method === 'POST') {
@@ -3932,12 +4054,24 @@ function ops_master_handle($key, $cfg, $action, $method) {
             elseif (($type === 'ref' || $type === 'money' || $type === 'number') && $v === '') $v = null;
             $cols[] = $name; $vals[] = $v;
         }
+        //  Phase 6 · Batch 3 (F4) — a cross-reference must point at something.
+        //  A dangling party_id is how a report starts lying; refused here rather
+        //  than repaired later. Only this one master is affected.
+        if ($table === 'agencies') {
+            $pi = array_search('party_id', $cols, true);
+            if ($pi !== false && $vals[$pi] !== null && $vals[$pi] !== ''
+                && (int)ops_val("SELECT COUNT(*) FROM business_partners WHERE id=?", [(int)$vals[$pi]]) === 0) {
+                flash('That company record no longer exists. Pick one from the list, or leave it blank.', 'warning');
+                redirect("/m/$key");
+            }
+        }
         if ($action === 'edit') {
             $id = (int)($_GET['id'] ?? 0);
             $set = implode(',', array_map(fn($c) => "$c=?", $cols));
             $vals[] = $id;
             $pdo->prepare("UPDATE $table SET $set WHERE id=?")->execute($vals);
             custom_save($key, $id, $_POST);
+            master_audit_agency_map($table, $cols, $vals, $id);
             flash("{$cfg['label']}: saved.");
         } else {
             $ph = implode(',', array_fill(0, count($cols), '?'));
@@ -3945,7 +4079,9 @@ function ops_master_handle($key, $cfg, $action, $method) {
                 $cols[] = 'created_at'; $vals[] = date('c'); $ph .= ',?';
             }
             $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
-            custom_save($key, $pdo->lastInsertId(), $_POST);
+            $newId = (int)$pdo->lastInsertId();
+            custom_save($key, $newId, $_POST);
+            master_audit_agency_map($table, $cols, $vals, $newId);
             flash("{$cfg['label']}: added.");
         }
         redirect("/m/$key");

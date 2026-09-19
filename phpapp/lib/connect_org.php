@@ -138,34 +138,121 @@ function connect_org_register(array $in) {
     if (strlen($pass) < 8) return [false, 'Choose a password of at least 8 characters.', null];
     // A login is one per e-mail across the client-portal world.
     if (function_exists('portal_migrate')) portal_migrate();
-    if ((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(email)=?", [$email]) > 0)
+    //  EVERY schema step this route can touch is taken HERE, before the
+    //  transaction below opens.
+    //
+    //  MariaDB commits implicitly on any DDL. A migration that runs inside a
+    //  business transaction therefore ENDS it half way through: the rows written
+    //  so far are committed where the code believes they are still provisional,
+    //  and the commit that follows fails with "there is no active transaction" —
+    //  so the person was told their registration had failed while their account
+    //  actually existed. It only appeared on MariaDB, and only on the first
+    //  registration in a fresh process, which is exactly the live first-run.
+    //  SQLite hides it because its DDL is transactional.
+    if (function_exists('connect_cap_migrate')) connect_cap_migrate();
+    if ((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(email)=? AND is_active=1", [$email]) > 0)
         return [false, 'That e-mail is already registered — sign in instead.', null];
+
+    // ------------------------------------------------------------------------
+    //  PHASE 6 · BATCH 3 — DUPLICATE ORGANISATION PROTECTION (F1 · Q20 · Q21).
+    //
+    //  This route is PUBLIC and unauthenticated, and it used to create a
+    //  business partner and a marketplace organisation with no check at all: a
+    //  company that is already a customer could be registered again by anyone
+    //  who knew its name. The detector the business already owns was simply
+    //  never called from here.
+    //
+    //  Owner decision Q21: an anonymous visitor must not take ownership of an
+    //  existing organisation, AND must not be told that it exists. So the reply
+    //  is NEUTRAL — the same sentence whatever matched — and it names no
+    //  organisation, no code, no identifier and no account.
+    //
+    //  EXACT (GSTIN / PAN / TAN, or the same legal name) → refuse, create nothing.
+    //  POSSIBLE                                          → see below.
+    //  NONE                                              → register normally.
+    // ------------------------------------------------------------------------
+    $claimMsg = 'We could not complete this registration online. If your organisation already works with us, '
+              . 'please ask your account contact to invite you, or contact us to request access.';
+    if (function_exists('find_duplicate_partner')) {
+        $hit = find_duplicate_partner($name, (string)($in['gstin'] ?? ''), (string)($in['pan'] ?? ''), (string)($in['tan'] ?? ''), 0);
+        if ($hit) {
+            //  A NAME-only match is POSSIBLE, not proof — but on a public route
+            //  there is nobody to ask, and letting it through is how a shadow
+            //  organisation lands beside a real customer. Both confidences stop
+            //  here; the difference is that an EXACT match could never be
+            //  anything else, while a POSSIBLE one is a genuinely distinct
+            //  company often enough that the message must invite contact rather
+            //  than accuse. Staff paths treat the two differently — see
+            //  partner_find_or_problem().
+            if (function_exists('act_log')) {
+                try { act_log('PARTNER', (int)($hit['row']['id'] ?? 0), 'SYSTEM',
+                    'Public registration refused — ' . (string)($hit['confidence'] ?? '') . ' match by ' . (string)$hit['by']); } catch (Throwable $e) {}
+            }
+            return [false, $claimMsg, null];
+        }
+    }
 
     $isAgency = in_array($orgType, ['MANPOWER_AGENCY', 'RECRUITMENT_AGENCY'], true);
     $now = date('c');
 
-    // 1) Party
-    db()->prepare("INSERT INTO business_partners (legal_name,display_name,is_client,is_vendor,is_subcontractor,status,created_at) VALUES (?,?,?,?,?, 'ACTIVE',?)")
-        ->execute([$name, $name, $isAgency ? 0 : 1, 0, $isAgency ? 1 : 0, $now]);
-    $partyId = (int)db()->lastInsertId();
+    // ------------------------------------------------------------------------
+    //  ONE TRANSACTION (F3). Three tables were written unguarded, so a failure
+    //  after the first left an organisation nobody could sign in to and nothing
+    //  reported it. Batch 2's contract applies: if a caller already opened a
+    //  transaction we JOIN it and may neither commit nor roll it back, so a
+    //  failure is re-thrown and the caller unwinds.
+    // ------------------------------------------------------------------------
+    $own = true;
+    try { $own = !db()->inTransaction(); } catch (Throwable $e) { $own = true; }
+    $tx = false;
+    if ($own) { try { $tx = (bool)db()->beginTransaction(); } catch (Throwable $e) { $tx = false; } }
+    $partyId = 0;
+    try {
+        // 1) Party
+        db()->prepare("INSERT INTO business_partners (legal_name,display_name,is_client,is_vendor,is_subcontractor,status,created_at) VALUES (?,?,?,?,?, 'ACTIVE',?)")
+            ->execute([$name, $name, $isAgency ? 0 : 1, 0, $isAgency ? 1 : 0, $now]);
+        $partyId = (int)db()->lastInsertId();
+        if ($partyId <= 0) throw new RuntimeException('the organisation could not be created');
 
-    // 2) ACTIVE organisation (auto-approved — verify later)
-    $pkg = connect_org_types()[$orgType]['package'];
-    db()->prepare("INSERT INTO cx_organisations (name,org_type,package_key,party_id,status,contact_name,contact_email,contact_mobile,approved_by,approved_at,created_at)
-                   VALUES (?,?,?,?, 'ACTIVE', ?,?,?, 'self-service', ?, ?)")
-        ->execute([$name, $orgType, $pkg, $partyId, $person, $email, trim((string)($in['contact_mobile'] ?? '')), $now, $now]);
+        // 2) ACTIVE organisation (auto-approved — verify later)
+        $pkg = connect_org_types()[$orgType]['package'];
+        db()->prepare("INSERT INTO cx_organisations (name,org_type,package_key,party_id,status,contact_name,contact_email,contact_mobile,approved_by,approved_at,created_at)
+                       VALUES (?,?,?,?, 'ACTIVE', ?,?,?, 'self-service', ?, ?)")
+            ->execute([$name, $orgType, $pkg, $partyId, $person, $email, trim((string)($in['contact_mobile'] ?? '')), $now, $now]);
 
-    // 3) A working client-portal login (blank perms = full marketplace access)
-    db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,perms,created_by,created_at)
-                   VALUES (?,?,?,?,1,0,'', 'self-service', ?)")
-        ->execute([$partyId, $email, $person, password_hash($pass, PASSWORD_DEFAULT), $now]);
+        // 3) A working client-portal login (blank perms = full marketplace access).
+        //    The database derives the uniqueness key itself, so this race is
+        //    settled there; the check at the top is only the friendly message.
+        db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,perms,created_by,created_at)
+                       VALUES (?,?,?,?,1,0,'', 'self-service', ?)")
+            ->execute([$partyId, $email, $person, password_hash($pass, PASSWORD_DEFAULT), $now]);
 
-    // 4) Multi-capability onboarding — persist the business capabilities the
-    //    company ticked (additive; the single org_type above stays the primary
-    //    audience). Optional: none ticked → behaves exactly as before.
-    if (function_exists('connect_org_cap_bulk_set')) {
-        $caps = array_values(array_filter(array_map('strval', (array)($in['caps'] ?? []))));
-        if ($caps) connect_org_cap_bulk_set($partyId, $caps, 'self-service');
+        // 4) Multi-capability onboarding — persist the business capabilities the
+        //    company ticked (additive; the single org_type above stays the primary
+        //    audience). Optional: none ticked → behaves exactly as before.
+        if (function_exists('connect_org_cap_bulk_set')) {
+            $caps = array_values(array_filter(array_map('strval', (array)($in['caps'] ?? []))));
+            if ($caps) connect_org_cap_bulk_set($partyId, $caps, 'self-service');
+        }
+        if ($own && $tx) db()->commit();
+    } catch (Throwable $e) {
+        if ($tx) { try { db()->rollBack(); } catch (Throwable $e2) {} }
+        if (!$own) throw $e;                       // the caller owns the unwind
+        //  A SYSTEM failure is not a duplicate. Saying "your organisation may
+        //  already work with us" to somebody whose registration hit a database
+        //  error sends them down a claim path that does not apply, and hides a
+        //  fault nobody then investigates. Different fact, different sentence.
+        $dup = function_exists('portal_acct_is_duplicate') && portal_acct_is_duplicate($e);
+        return [false, $dup ? 'That e-mail is already registered — sign in instead.'
+                            : 'We could not complete your registration just now. Nothing has been saved. '
+                            . 'Please try again in a moment.', null];
+    }
+
+    //  AUDIT — outside the transaction. A failed observation is never a failed
+    //  transaction (invariant I41): the registration stands whatever this does.
+    if (function_exists('act_log')) {
+        try { act_log('PARTNER', $partyId, 'SYSTEM', 'Organisation registered through public sign-up (' . $orgType . ')'); }
+        catch (Throwable $e) {}
     }
 
     return [true, 'Your account is ready.', ['email' => $email, 'login_url' => $isAgency ? '/portal/login' : '/portal/login?for=hire', 'is_agency' => $isAgency]];
