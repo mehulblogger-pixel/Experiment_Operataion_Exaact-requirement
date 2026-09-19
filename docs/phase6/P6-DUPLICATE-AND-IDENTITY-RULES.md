@@ -245,17 +245,46 @@ R2 — MATERIAL.
 
 ## 5 · Duplicate ORGANISATION
 
+> **CORRECTED after §26.** This class first stated *"No organisation duplicate
+> detector exists."* **That was wrong**, and the §26 action-path sweep proved it.
+> A detector exists, it is well built, and it is already wired to the confirmed
+> business-partner paths. The corrected position is below.
+
 | | |
 |---|---|
-| **DETECT** | **No organisation duplicate detector exists.** `dd_key()` exists and is *built for* company names (it strips *india, group, industries, corporation, enterprises, international, technologies, services, solutions, systems*) but nothing applies it to `business_partners` |
-| **SUGGEST** | — |
-| **CONFIRM** | — |
+| **DETECT** | **A detector EXISTS for `business_partners`:** `find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId)`. It checks **GSTIN → PAN → TAN → normalised legal name** — statutory identifiers first, name last, which is exactly the evidence ordering this document prescribes |
+| **SUGGEST** | ✔ on the covered paths — it returns the matched row **and what matched it** (`by`: GSTIN / PAN / TAN / name) |
+| **CONFIRM** | ✔ a person decides on the covered paths |
 | **LINK** | `cx_organisations.party_id` → `business_partners`. **`agencies` has no cross-reference at all** (R4) |
-| **AUDIT** | — |
+| **AUDIT** | ✔ on the covered paths |
 | **Merge?** | **Never.** `parent_id` already expresses group structure without merging |
 
-**The evidence is unusually good and unused:** `business_partners` carries
-**GSTIN, PAN, CIN, TAN, MSME/Udyam** — rank-1 evidence — and nothing compares them.
+### Where the detector IS applied — confirmed by §26
+
+| Path | Coverage |
+|---|---|
+| Interactive partner create (`ops.php`) | **Full** — name, GSTIN, PAN, TAN |
+| Partner import (`partnerimport.php`) | **Full**, plus GSTIN format validation |
+| Lead conversion (`leads.php`) | **Partial — company name only**; no statutory identifier is passed |
+
+### Where it is NOT applied — the remaining gap
+
+| Path | Creates | Duplicate control |
+|---|---|---|
+| **`/join`** — public organisation onboarding | `cx_organisations` | **None.** A public route can create unlimited rows. The PENDING-approval step is an *approval* control, not a *duplicate* control, and the approver is shown no possible matches |
+| **`agencies`** — generic master editor | `agencies` | **None** |
+| Any other creation path not listed above | — | **Not established** — §26 enumerated the paths it found; absence elsewhere is not claimed |
+
+> **Organisation duplicate control is NOT complete.** It is a good control applied
+> where somebody remembered to apply it — the recurring pattern of this
+> programme. Closing the remaining paths is **R27**, and it is **not implemented**.
+
+**The evidence is unusually good, and used on some paths but not others:**
+`business_partners` carries **GSTIN, PAN, CIN, TAN, MSME/Udyam** — rank-1
+evidence. `dd_key()` is additionally *built for* company names (it strips *india,
+group, industries, corporation, enterprises, international, technologies,
+services, solutions, systems*) and is available should name matching need
+strengthening, though `find_duplicate_partner()` uses `normalize_name()` today.
 
 > **A role is not a duplicate.** One organisation that becomes a supplier as well
 > as a client sets `is_vendor` on the existing row. Creating a second row is the
@@ -329,7 +358,8 @@ duplicate or a legitimate shared advert is **Q1**, and it stays open.
 | Person (cross-representation) | **partial** | partial | ✔ | ✔ | partial | **✘** |
 | Professional | ✔ e-mail only | ✘ | partial | partial | partial | **✔ e-mail** |
 | **Inspector** | **✘** | **✘** | partial | partial | ✘ | **✘** |
-| Organisation | **✘** | **✘** | **✘** | partial | ✘ | ✘ |
+| Organisation — `business_partners` paths | **✔** | **✔** | **✔** | partial | ✔ | ✘ |
+| Organisation — `/join`, `agencies` | **✘** | **✘** | **✘** | **✘** | partial | ✘ |
 | Department | **✔** | **✔** | **✔** | **✔** | **✔** | ✘ |
 | Designation | ✔ | ✔ | ✔ | ✔ | ✔ | ✘ |
 | Taxonomy term | **✔** | **✔** | ✔ | **✔** | ✔ | ✘ |
@@ -346,8 +376,10 @@ duplicate or a legitimate shared advert is **Q1**, and it stays open.
 > taxonomy is **R7**, and it remains a **future implementation requirement**. The
 > framework is ready; the convergence has not been done.
 
-**Inspector and organisation have no framework at all** — no detector, no
-suggester, no database-level protection.
+**Inspector has no framework at all** — no detector, no suggester, no
+database-level protection.
+**Organisation has a good framework on its business-partner paths** and **none**
+on `/join` and `agencies` (see class 5, corrected after §26).
 
 ---
 
@@ -413,7 +445,7 @@ suggester, no database-level protection.
 | # | Requirement | Source |
 |---|---|---|
 | **R18** | `person_link_rows()` must record an **audit entry** and support **reversal**, as the identity ledger already does | Class 1 |
-| **R19** | An **organisation duplicate detector** using the statutory identifiers already stored, reusing `dd_key()` / `dd_similar()` | Class 5 |
+| **R19** | ~~An organisation duplicate detector~~ — **SUPERSEDED by §26.** The detector exists (`find_duplicate_partner()`). What remains is coverage, which is **R27** | Class 5, corrected |
 | **R20** | An **inspector duplicate detector** — the class with proven consequences and no protection at all | Class 4 |
 | **R21** | A recordable **"keep separate"** decision, so a rejected suggestion does not return indefinitely | Rule 9 |
 
