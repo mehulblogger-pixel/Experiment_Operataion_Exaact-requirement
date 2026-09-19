@@ -145,6 +145,41 @@ than given a second way to do the same thing.
   all the ones that already existed.
 * No change to the permission matrix, and no new permission.
 
+## Finding A10 — the borrowed-transaction contract is not honoured when the migration guards are stale
+**Severity: HIGH as a contract violation, latent in production today. REPORTED, NOT FIXED.**
+
+Finding A2 fixed a migration running inside the route's **own** transaction. It
+did not fix the same migration running inside a **caller's** transaction, which
+is what happens whenever the run-once guards are stale — the first request after
+`db(true)`, which the product does when a company is chosen at login, when one is
+provisioned, and on "log in as".
+
+MariaDB commits implicitly on the first DDL, so the caller's transaction ends
+mid-call. `connect_org_register()` then sees `inTransaction() === false`,
+believes it owns the transaction, and returns a business answer instead of
+re-throwing. **The caller's transaction is gone and nothing says so.**
+
+Proved on a scratch copy, warm guards versus stale guards, with only that
+difference between the two runs:
+
+```
+A · guards WARM   re-threw=true  PDOException   still in transaction after=true
+B · guards STALE  re-threw=false                still in transaction after=false
+```
+
+SQLite cannot show it — its DDL is transactional — so this is exactly the
+MariaDB-authoritative case, found by the **full** suite and invisible to the
+batch battery, where the guards happen to be warm.
+
+It is **Batch 3's own code failing Batch 3's own contract**: before this batch
+the route had no transaction at all. No production caller wraps it in a
+transaction today, so there is no known live data loss — latent, not harmless.
+
+C8/C9 are correct as written and are **left failing**. Weakening them would
+falsify the evidence. Three options are put to the owner in §5a of the
+completion report; my recommendation is to refuse schema work inside somebody
+else's transaction.
+
 ## What would still worry me on the morning of a release
 
 1. **A5** — two strangers registering the same company name in the same second.
@@ -154,5 +189,7 @@ than given a second way to do the same thing.
 3. The e-mail-in-use reply on `/join` still confirms that an address has an
    account (pre-existing; see the security results).
 
-None of these is introduced by this batch. All three are written down rather
-than smoothed over.
+Of these three, none is introduced by this batch. **Finding A10 above is**, and
+it is the one that stops Batch 3 being ready: it is my code, failing my own
+contract, and it is reported rather than smoothed over or quietly patched during
+a frozen validation run.

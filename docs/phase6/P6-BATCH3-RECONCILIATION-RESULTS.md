@@ -66,7 +66,11 @@ they were "not touched":
 | Client portal · vendor portal | green | green |
 | CRM — leads, inquiries, quotations | green | green |
 | APIs & exports | green | green |
-| **Totals** | **12 562 / 0** | **12 566 / 0** |
+| **Totals** | **12 615 / 0** | **12 619 / 2** |
+
+**The MariaDB totals are not clean.** The two failures are Batch 3's own C8/C9
+(the borrowed-transaction contract under a stale migration guard) — reported, not
+repaired, and not weakened. Every other protected area is clean on both engines.
 
 Three regressions were found along the way and fixed at the cause, not by
 weakening a test: the `portal_invite()` authority (13 assertions), a test with
