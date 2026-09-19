@@ -170,6 +170,10 @@ HOLDS; I6 · I16 · I22 · I42 to PARTIAL. **I41 stays PARTIAL**: it holds for t
 identity ledger and cannot hold generally while R18 is open.
 **Moved by its regression evidence (4):** I18 · I19 · I20 · I21 to HOLDS.
 
+> **LOCKED on Batch 1 acceptance (2026-09-19).** These statuses are the accepted
+> record. The PARTIALs below are not to be re-argued upward, and Q1–Q18 stay
+> open, until a new owner instruction changes the underlying facts.
+
 **Deliberately still PARTIAL, not rounded up:** I16 (Q5/Q11 open) · I22 and I42
 (R20 deferred) · I6 and I41 (R18 only registered). Mutant `M8` exists specifically to
 stop I16 being closed by answering Q5/Q11 quietly.

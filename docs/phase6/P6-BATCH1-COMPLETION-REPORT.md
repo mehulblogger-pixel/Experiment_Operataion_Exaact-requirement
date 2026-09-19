@@ -204,9 +204,56 @@ unchanged.
 
 ## 9. Verdict
 
-Every acceptance condition in the owner's gate is met, with the four PARTIALs
-above stated rather than rounded up.
+Every acceptance condition in the owner's gate is met, with the PARTIALs above
+stated rather than rounded up.
 
-**PHASE 6 — BATCH 1: COMPLETE, PENDING OWNER REVIEW.**
+---
+
+# ACCEPTED / LOCKED
+
+| | |
+|---|---|
+| **Status** | **PHASE 6 · BATCH 1 — ACCEPTED / LOCKED** |
+| **Accepted** | 2026-09-19, by the owner, on the evidence in this report and its four companions |
+| **Commits** | `db02289` (implementation) · `03d805b` (adversarial pass, mutation closure, documents) |
+| **Branch** | `claude/testing-branch-setup-0gqe8n` |
+| **Scope locked** | Identity write safety · authority · scope foundation |
+
+**Locked on acceptance — do not change without a new owner instruction:**
+
+- The four **PARTIAL** statuses stand as recorded: **I16** (Q5/Q11 open),
+  **I22** and **I42** (R20 deferred), **I6** and **I41** (R18 registered only).
+  They are not to be re-argued upward.
+- **Q1–Q18 remain open.** Nothing in Batch 1 answers any of them.
+- **R20 remains deferred. R23 remains untouched.**
+- No further Batch 1 changes are to be made.
+
+**Owner's note on the evidence**, recorded because it sets the standard for the
+next batch: the mutation sequence — 18/23, then root-causing each survivor,
+then 23/23 with no crash counted as a catch — was accepted as *stronger*
+evidence than a green percentage would have been, precisely because four of the
+five survivors turned out to be defective probes rather than defective code.
+
+---
+
+## 10. Future architecture consideration — NOT a Batch 1 defect
+
+**Database-computed (generated) uniqueness keys.** The adversarial pass recorded
+that the three live-key columns are populated by the writer, so a future writer
+could omit them (Finding C), and measured a `GENERATED ALWAYS AS (…) VIRTUAL`
+alternative working on both SQLite 3.45.1 and MariaDB 10.11.14.
+
+**The owner has ruled: this is recorded as a future architecture improvement,
+not a current defect, and is NOT to be implemented now.** The present mechanism
+has passed the full regression and the complete mutation gate, and replacing the
+fundamental protection without a demonstrated defect would start an
+implementation/correction cycle for no measured gain.
+
+It is written down here so that it is a *choice already considered* rather than
+something rediscovered later. Current mitigations remain in force: probe `W1`
+(only the ledger's own file may insert), probe `F8` (each writer stamps its keys
+at the moment of the write) and mutant `M17` (which proves `F8` has teeth).
+
+---
 
 Phase 6 is **not** complete. Batch 1 is the foundation it was scoped to be.

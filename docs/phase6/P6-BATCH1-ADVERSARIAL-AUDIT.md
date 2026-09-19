@@ -113,7 +113,13 @@ Tested directly on both engines:
 **Not done in this batch, deliberately.** It replaces the core protection after
 12 000+ assertions and 23 mutants have already proved the current design green on
 both engines, which is a redesign, not the "smallest targeted fix" this gate
-allows. **Recommended as a named follow-up for owner decision.**
+allows. Recommended as a named follow-up for owner decision.
+
+> **Owner ruling, 2026-09-19 (Batch 1 acceptance).** Recorded as a **future
+> architecture improvement, NOT a Batch 1 defect**, and **not to be implemented
+> now**: changing the fundamental protection mechanism without a demonstrated
+> current defect would start an implementation/correction cycle for no measured
+> gain. The mitigations below stand as the answer to Finding C.
 
 ## Finding D — **RESIDUAL, accepted** · an unlink with no stated expectation
 
