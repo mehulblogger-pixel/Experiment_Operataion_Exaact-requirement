@@ -5,6 +5,9 @@ Identity · Organisation · Public registration · Primary contact · Merge safe
 **Status: implementation complete, evidence recorded, AWAITING OWNER ACCEPTANCE.**
 Not accepted. Not locked. That decision is the owner's.
 
+Final source state: `939de8a`. Mutation gate: **19 caught · 1 proven equivalent ·
+0 unexplained survivors**. Full evidence in `P6-BATCH3-CORRECTIVE-EVIDENCE.md`.
+
 Baseline: `8de9607` (Batch 3) → `aef8974` (recruitment fix) → `cdc6f30` (corrective
 adversarial audit) → `713a3ca` (status-semantics audit) → this work.
 

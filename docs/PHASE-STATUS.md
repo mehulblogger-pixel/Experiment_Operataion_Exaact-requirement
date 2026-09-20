@@ -30,7 +30,8 @@ Updated at each phase lock.*
 | Foundational implementation plan | ACCEPTED as the Batch 1 contract |
 | **Batch 1 — identity write safety, authority, scope** | **ACCEPTED / LOCKED** — 2026-09-19 · `db02289`, `03d805b` |
 | **Batch 2 — person relationship integrity & conversion safety** | **COMPLETE, pending owner review** — battery 78/0 (baseline 19/30) · SQLite 12 460/0 · MariaDB 12 467/0 · mutation 18/18 |
-| **Batch 3 — organisation representation, duplicate safety & cross-reference** | **AUDIT + PLAN COMPLETE, pending owner review.** Documentation only; no product code changed |
+| **Batch 3 — organisation representation, duplicate safety & cross-reference** | **ACCEPTED / LOCKED** — then **REOPENED** by a post-gate adversarial pass |
+| **Batch 3 CORRECTIVE — A1–A6, Q24–Q28, R1–R6** | **COMPLETE, pending owner acceptance** — `939de8a` · focused 160/0 both engines · SQLite 12 834/0 · MariaDB 12 839/0 · mutation 19 caught / 1 proven equivalent / **0 unexplained survivors** · HTTP oracle byte-identical · browser 18/18 |
 | **Batch 4** | **NOT STARTED.** Not to be begun without an explicit owner instruction |
 
 **Batch 1 delivered:** R22 · R24 · R25 · R15 (scoped) · R16 · R3 · R11, plus the
