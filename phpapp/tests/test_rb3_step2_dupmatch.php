@@ -131,17 +131,35 @@ t_eq((string)rcv_convert($x7, ['actor_id' => $s2me])['code'], 'WORKFORCE_MATCH',
 // ---------------------------------------------------------------------------
 t_section('RB3S2 · X8 / X9 / X10 / X11 — the tick cannot be moved, forged or aged');
 // ---------------------------------------------------------------------------
-$sShare = $mkStaff('Meena', 'Iyer', '9820033333', 'meena.iyer@s2.test');
-$x8a = $mkCand('Meena', 'Iyer', '9820033333', '');
-$x8b = $mkCand('Meena', 'Twin', '9820033333', '');
+//  ISOLATING THE CANDIDATE BINDING, which is harder than it looks.
+//
+//  The first version of this probe gave A and B different e-mail addresses and
+//  converted A BEFORE trying A's tick on B. Both mistakes hid the thing it was
+//  meant to prove: converting A created a second team member on the same mobile,
+//  so B's duplicate picture had CHANGED by then, and the refusal came from the
+//  evidence binding rather than the candidate binding. Mutant S4 — which removes
+//  the candidate binding entirely — survived it untouched.
+//
+//  So A and B are given IDENTICAL contact details, A's tick is tried on B while
+//  NOTHING has changed, and the probe asserts the two evidence fingerprints are
+//  the same before drawing any conclusion. Then the only difference left between
+//  them is which application it is.
+$sShare = $mkStaff('Meena', 'Iyer', '9820033333', 'meena.shared@s2.test');
+$x8a = $mkCand('Meena', 'Iyer', '9820033333', 'meena.shared@s2.test');
+$x8b = $mkCand('Meena', 'Twin', '9820033333', 'meena.shared@s2.test');
 t_eq($strongN($x8a), 1, 'X8a · application A raises a strong match — armed');
 t_eq($strongN($x8b), 1, 'X8b · so does application B — armed');
+t_eq(workforce_ack_evidence(workforce_matches($row($x8a)), $row($x8a)),
+     workforce_ack_evidence(workforce_matches($row($x8b)), $row($x8b)),
+     'X8c · A and B have the SAME evidence fingerprint — so nothing but the application itself can tell them apart');
 $tokA = $tokenFor($x8a);
-t_ok($tokA !== '', 'X8c · A has a genuine tick');
-t_ok(!empty(rcv_convert($x8a, ['actor_id' => $s2me, 'dup_ack' => $tokA])['ok']), 'X8d · A\'s tick works on A');
+t_ok($tokA !== '', 'X8d · A has a genuine tick');
+//  Tried on B FIRST, before anything about either of them changes.
 t_eq((string)rcv_convert($x8b, ['actor_id' => $s2me, 'dup_ack' => $tokA])['code'], 'WORKFORCE_MATCH',
      'X8 · A\'s tick does NOT authorise B — the application is inside the signature');
 t_eq($linked($x8b), 0, 'X8e · …and B was not converted');
+t_ok(!empty(rcv_convert($x8a, ['actor_id' => $s2me, 'dup_ack' => $tokA])['ok']),
+     'X8f · …and that very same tick DOES work on A, so the refusal was about the application and not a dud tick');
 
 $x9 = $mkCand('Nikhil', 'Rao', '9820044444', '');
 $s9 = $mkStaff('Nikhil', 'Rao', '9820044444', '');
@@ -267,6 +285,38 @@ t_ok(!csrf_ok('not-the-token'), 'X19a · a wrong CSRF token is rejected by the c
 t_ok(csrf_ok(csrf_token()), 'X19b · …and the right one is accepted, so the checker is not simply always-false');
 t_ok(strpos((string)@file_get_contents($s2root . '/index.php'), "if (\$method === 'POST' && !csrf_ok(") !== false,
      'X19 · every POST passes that checker centrally before any route runs');
+
+// ---------------------------------------------------------------------------
+t_section('RB3S2 · X-scope — a match you may not open is COUNTED, never NAMED');
+// ---------------------------------------------------------------------------
+//  A record id is never proof of authorisation (invariant I25). But a match the
+//  recruiter cannot see must still STOP the hire — otherwise "I cannot open that
+//  branch" would be the way round the gate.
+$offA = (int)ops_val("SELECT id FROM offices ORDER BY id LIMIT 1");
+$offB = (int)ops_val("SELECT id FROM offices WHERE id<>? ORDER BY id LIMIT 1", [$offA]);
+if (!$offB) { db()->prepare("INSERT INTO offices (code,name) VALUES ('RB3B','RB3 Far Branch')")->execute(); $offB = (int)db()->lastInsertId(); }
+db()->prepare("INSERT INTO inspectors (name,first_name,last_name,mobile,status,home_office_id,created_at)
+               VALUES ('Far Branch Twin','Far','Twin','9820099999','ACTIVE',?,?)")->execute([$offB, date('c')]);
+$sFar = (int)db()->lastInsertId();
+$xsc  = $mkCand('Far', 'Twin', '9820099999', '');
+//  A coordinator who can only see branch A.
+db()->prepare("INSERT INTO users (username,password_hash,first_name,last_name,role,is_superuser,is_active,home_office_id,scope_offices,scope_sbus,permissions)
+               VALUES ('rb3s2.scoped',?, 'Scoped','Recruiter','COORDINATOR',0,1,?,?, 'ALL','')")
+    ->execute([password_hash('x', PASSWORD_DEFAULT), $offA, (string)$offA]);
+$uScoped = (int)db()->lastInsertId();
+$_SESSION['uid'] = $uScoped; current_user(true); ua(true);
+t_ok(is_coordinator_level(), 'Xsc-a · the scoped user may convert at all — so a refusal below is about scope, not authority');
+t_ok(!connect_identity_scope_ok('inspector', $sFar),
+     'Xsc-b · …and genuinely CANNOT open that team member — the trap is ARMED');
+$mSc = workforce_matches($row($xsc));
+$sSc = workforce_strong_matches($mSc);
+t_eq(count($sSc), 1, 'Xsc-c · the hidden team member is still FOUND — scope does not hide a duplicate');
+t_ok(empty($sSc[0]['visible']), 'Xsc-d · …but is marked not-visible');
+t_eq((string)$sSc[0]['name'], '', 'Xsc · …and is NOT NAMED — a record id is never proof of authorisation');
+t_eq((string)$sSc[0]['emp_code'], '', 'Xsc-e · nor is their employee number leaked');
+t_eq((string)rcv_convert($xsc, ['actor_id' => $uScoped])['code'], 'WORKFORCE_MATCH',
+     'Xsc-f · and it STILL blocks — not being able to see it is not a way round the gate');
+$_SESSION['uid'] = $s2me; current_user(true); ua(true);
 
 // ---------------------------------------------------------------------------
 t_section('RB3S2 · X14 — two recruiters at the same instant');
