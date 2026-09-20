@@ -104,24 +104,45 @@ $c2a = next_emp_code('ASSET', 0); $c2b = next_emp_code('ASSET', 1);
 t_ok($c2a !== '' && $c2b !== '' && $c2a !== $c2b,
      'C2 · the generator can be asked for the NEXT free number, not only the first guess (' . $c2a . ' then ' . $c2b . ')');
 
-// Take the number the generator is about to hand out, then claim. The claim must
-// step past it rather than hand back something already held.
-$c3want = next_emp_code('ASSET');
-$c3block = $rbRaw($c3want, 'RB3 Squatter');
-t_ok($c3block > 0, 'C3 · the number the generator would issue is taken by somebody else — the probe has a subject');
-$c4id = team_member_create('RB3 Claimer', 'FIELD', null, '');
-$c4code = (string)ops_val("SELECT emp_code FROM inspectors WHERE id=?", [$c4id]);
-t_ok($c4id > 0, 'C4 · the hire still succeeds');
+//  The RETRY has to be forced, and forcing it is not obvious.
+//
+//  An earlier version of this group simply let somebody take the number the
+//  generator was about to issue, and asserted the next hire got a different one.
+//  It passed — and proved nothing, because next_emp_code() re-reads the highest
+//  code each time, so it had already moved past the squatter on its own and the
+//  retry never ran. Mutant M9 ($tries = 1, i.e. never retry) survived that
+//  version untouched. Recorded rather than quietly replaced.
+//
+//  To reach the retry the squatter must be INVISIBLE to the generator and
+//  VISIBLE to the database. A LEADING space does both: ' EMP07' does not match
+//  the generator's `emp_code LIKE 'EMP%'` scan, and the key normalises it to
+//  EMP07, so the first attempt is refused and the claim must ask for the next.
+$c3want  = next_emp_code('ASSET');
+$c3block = $rbRaw(' ' . $c3want, 'RB3 Squatter');
+t_ok($c3block > 0, 'C3 · a hidden squatter holds " ' . $c3want . '" — the probe has a subject');
+t_eq(next_emp_code('ASSET'), $c3want,
+     'C3b · the generator STILL offers ' . $c3want . ', because it cannot see the squatter — so the first attempt MUST be refused');
+$c4id = 0; $c4threw = '';
+try { $c4id = team_member_create('RB3 Claimer', 'FIELD', null, ''); }
+catch (Throwable $e) { $c4threw = $e->getMessage(); }       // a give-up must FAIL this test, never kill the run
+t_ok($c4id > 0, 'C4 · the hire still succeeds' . ($c4threw !== '' ? ' — instead it gave up: ' . $c4threw : ''));
+$c4code = $c4id ? (string)ops_val("SELECT emp_code FROM inspectors WHERE id=?", [$c4id]) : '';
 t_ok($c4code !== '' && strtoupper(trim($c4code)) !== strtoupper(trim($c3want)),
-     'C5 · …with a DIFFERENT number (' . $c4code . ', not the taken ' . $c3want . ') — the claim stepped past it');
+     'C5 · …with a DIFFERENT number (' . ($c4code ?: 'none') . ', not the refused ' . $c3want
+     . ') — the claim was REFUSED once and asked again');
 
 // Decision 5 — a rolled-back acceptance must consume no number.
 $c6before = next_emp_code('ASSET');
 db()->beginTransaction();
-$c6id = team_member_create('RB3 Rolled Back', 'FIELD', null, '');
+//  Guarded for the same reason C4 is: a claim that gives up THROWS, and an
+//  unprotected call here would kill the whole run before the result line — which
+//  a mutation harness reads as FATAL, and FATAL is not a catch. A test must be
+//  able to FAIL, not only to die.
+$c6id = 0;
+try { $c6id = team_member_create('RB3 Rolled Back', 'FIELD', null, ''); } catch (Throwable $e) { $c6id = 0; }
 t_ok($c6id > 0, 'C6 · a team member is created inside a transaction — the probe has a subject');
-db()->rollBack();
-t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE id=?", [$c6id]), 0, 'C7 · the rollback really removed it');
+try { db()->rollBack(); } catch (Throwable $e) {}
+t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE id=?", [$c6id ?: -1]), 0, 'C7 · the rollback really removed it');
 t_eq(next_emp_code('ASSET'), $c6before,
      'C8 · …and the number it had is free again — a refused acceptance consumes NO employee number (decision 5)');
 

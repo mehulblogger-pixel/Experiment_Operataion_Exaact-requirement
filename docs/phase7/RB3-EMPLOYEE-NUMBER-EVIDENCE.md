@@ -147,12 +147,12 @@ already learned, and now for a stronger reason.
 
 | Engine | Result |
 |---|---|
-| **SQLite 3.45.1** | **12,890 passed · 0 failed** |
-| **MariaDB 10.11.14** (authoritative) | **12,896 passed · 0 failed** |
+| **SQLite 3.45.1** | **12,891 passed · 0 failed** |
+| **MariaDB 10.11.14** (authoritative) | **12,894 passed · 0 failed** |
 
 `php tools/make_deploy_check.php` re-run; the shipped-code checksum matches.
 
-### `tests/test_rb3_emp_code.php` — 56 assertions, both engines
+### `tests/test_rb3_emp_code.php` — 57 assertions, both engines
 
 | Group | What it establishes |
 |---|---|
@@ -192,7 +192,59 @@ single number. The guard assertion `X1c` failed and exposed it.*
 
 ---
 
-## 8. What is NOT done yet
+## 8. Mutation — 11 of 11 caught, no survivors
+
+Fresh copy of the whole repository and a fresh database per mutant. **FATAL is
+not a catch. ANCHOR-MISS is not a catch. A dirty baseline aborts the run.**
+Baseline verified clean on all three configurations first: SQLite targeted
+57/0 · SQLite full 12,891/0 · MariaDB targeted 57/0.
+
+| | Mutant | Result | Killed by |
+|---|---|---|---|
+| **M1** | the unique index is never created | **CAUGHT** | A4, A5, A7 (12 assertions) |
+| **M2** | the key stops folding case | **CAUGHT** | A9, B11 |
+| **M3** | the key stops trimming whitespace | **CAUGHT** | A8, C5, B11 |
+| **M4** | blank employee codes are pulled into the key | **CAUGHT** | A13 |
+| **M5** | uniqueness restricted to live rows — **decision 1 reversed** | **CAUGHT** | A12, B11 |
+| **M6** | a `DIRTY` install builds the index anyway | **CAUGHT** | B3, B5 |
+| **M8** | the generator reverts to read-max | **CAUGHT** | C2, C4, C5 (10 assertions) |
+| **M9** | the claim gives up instead of retrying | **CAUGHT** | C4, C5, C6 (9 assertions) |
+| **M10** | the lock ordering is removed — the deadlock returns | **CAUGHT** (MariaDB) | X2d |
+| **M11** | any duplicate is treated as ours | **CAUGHT** | C10 |
+| **M12** | the demo seed reverts to its hardcoded numbers | **CAUGHT** (full suite) | the AMD-office assertion |
+
+**CAUGHT 11 · SURVIVED 0 · FATAL 0 · ANCHOR-MISS 0.**
+
+### Two defective instruments the battery exposed — published, not quietly repaired
+
+**D1 · `C3`–`C5` proved nothing.** The first version let somebody take the number
+the generator was about to issue, then asserted the next hire got a different
+one. It passed — and tested nothing, because `next_emp_code()` re-reads the
+highest code every time, so it had already moved past the squatter on its own and
+**the retry never ran**. Mutant **M9** (`$tries = 1`, never retry) survived it
+untouched.
+
+Reaching the retry needs a squatter the generator **cannot see** but the database
+**can**. A **leading space** does both: `' EMP07'` does not match the generator's
+`emp_code LIKE 'EMP%'` scan, and the key normalises it to `EMP07`. New assertion
+`C3b` now proves the generator still offers the taken number, so the first attempt
+*must* be refused — the probe states it has a subject before it states a result.
+
+**D2 · a test that could only die, not fail.** With M8 and M9 applied, `C4` and
+`C5` correctly failed — and then an **unguarded** `team_member_create()` at `C6`
+threw and killed the run before the result line. The harness read that as
+**FATAL**, which is not a catch. `C6` is now guarded, and both mutants are caught
+properly. *A test must be able to fail, not only to die.*
+
+**D3 · the harness itself was wrong once.** The first battery copied only
+`phpapp/`, but `test_books_receiver.php` requires a sibling directory outside it,
+so the full-suite mutant died for a reason that had nothing to do with the
+mutation. The harness now copies the whole repository. The FATAL verdict it
+produced was **not** evidence about M12 and was not counted as one.
+
+---
+
+## 9. What is NOT done yet
 
 This is **step 1 of RB-3** and nothing beyond it was touched.
 
