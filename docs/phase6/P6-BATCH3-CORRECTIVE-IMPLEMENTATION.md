@@ -2,11 +2,54 @@
 
 Identity · Organisation · Public registration · Primary contact · Merge safety
 
-**Status: implementation complete, evidence recorded, AWAITING OWNER ACCEPTANCE.**
-Not accepted. Not locked. That decision is the owner's.
+# BATCH 3 CORRECTIVE — ACCEPTED / LOCKED · 2026-09-20
 
-Final source state: `939de8a`. Mutation gate: **19 caught · 1 proven equivalent ·
-0 unexplained survivors**. Full evidence in `P6-BATCH3-CORRECTIVE-EVIDENCE.md`.
+**Accepted by the owner on 2026-09-20.** Source state `939de8a`; evidence
+`c3042b6`. Mutation gate: **19 caught · 1 proven equivalent · 0 unexplained
+survivors**. Full evidence in `P6-BATCH3-CORRECTIVE-EVIDENCE.md`.
+
+## Locked on acceptance — not to be changed without a new owner instruction
+
+**The mechanisms.** The rules below now live in the database and are not to be
+moved back into application code:
+
+- `partner_contacts.uq_primary` + `uq_pcont_primary` UNIQUE — one main contact
+  per organisation, enforced against every writer including raw SQL.
+- `client_users`/`vendor_users.uq_active_email` computed as `LOWER(TRIM(email))`
+  — one active account per address, on the same rule PHP uses.
+- `business_partners.merged_into_id` — the explicit successor pointer. It is
+  never inferred from a name, tax identifier, e-mail or fuzzy match.
+- `schema_guards` — the ledger that says whether each protection is actually
+  installed. A guard that cannot be installed reports `FAILED`, never `OK`.
+
+**The decisions.** Q24 (database-level primary contact), Q25 (`LOWER(TRIM())`),
+Q26 (neutral claim/access-request flow), Q27 (security evidence kept apart from
+customer activity) and Q28/R1–R6 (status may make the system say less, never
+allow more) stand as implemented.
+
+**The behaviours.**
+
+- The public sign-up form returns **one answer** whatever the outcome; the
+  difference is carried by e-mail. It is not to be given a message that
+  distinguishes an existing organisation from a new one.
+- Approving an access request **grants nothing**. Access is given only by the
+  existing invitation, which asks for its own authority. There is deliberately
+  no approve-and-let-them-in control.
+- An unauthenticated request never writes to a customer-visible activity feed.
+- Identifiers on a retired organisation are **not** wiped; they are the evidence
+  of why the merge happened.
+- Migrations never run DDL inside a transaction they did not open.
+- `MERGED` is the only status excluded from the two organisation-duplicate
+  findings. Unknown, invented, blank and NULL statuses all count as live.
+
+**The limitations recorded in §5 stand as accepted**, including that a second
+step can still distinguish a genuine sign-up from a matched one, that timing is
+levelled rather than equalised, and that `BLACKLISTED` blocks nothing.
+
+**Not done, and still not to be begun without an instruction:** Batch 4,
+identity convergence, a Person hub, and Q1–Q18 / R20 / R21 / R23.
+
+---
 
 Baseline: `8de9607` (Batch 3) → `aef8974` (recruitment fix) → `cdc6f30` (corrective
 adversarial audit) → `713a3ca` (status-semantics audit) → this work.

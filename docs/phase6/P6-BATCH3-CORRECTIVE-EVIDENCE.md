@@ -350,6 +350,12 @@ had a subject before asserting the behaviour.
 
 ## 10 · Status
 
-**BATCH 3 CORRECTIVE IMPLEMENTATION COMPLETE — AWAITING OWNER ACCEPTANCE.**
+**BATCH 3 CORRECTIVE IMPLEMENTATION — ACCEPTED / LOCKED, 2026-09-20.**
 
-Not accepted. Not locked. That decision belongs to the owner.
+Accepted by the owner on the evidence above. Source state `939de8a`, evidence
+`c3042b6`. What is locked, and what remains deliberately open, is recorded in
+`P6-BATCH3-CORRECTIVE-IMPLEMENTATION.md`.
+
+The eight limitations in §9 were accepted **as stated**, not resolved. They
+remain true of the product and are the honest starting position for whatever
+comes next.

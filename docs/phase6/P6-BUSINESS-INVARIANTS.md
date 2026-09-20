@@ -77,8 +77,8 @@ Every invariant carries four things, because a rule without a test is a wish:
 
 | # | Invariant | Owning domain | Testable condition | Status |
 |---|---|---|---|---|
-| **I28** | **A live relationship requiring uniqueness is protected at database level**, not by a PHP check | Identity | Insert the same active link twice directly via SQL; assert the second is rejected by a constraint | **HOLDS** *(Batch 1)* — U1/U2/U3 over three NULL-able live-key columns; raw SQL duplicates rejected on both engines (`F0–F8`, mutants `M9`, `M17`). Residual: the key is set by the writer — see adversarial Finding C |
-| **I29** | **Two processes creating the same relationship simultaneously produce one relationship** | Identity | Two concurrent processes, one barrier, same pair; assert exactly one live link and a deterministic refusal for the other | **HOLDS** *(Batch 1)* — four real processes, one live link, no crash, and every process told it succeeded names a link that really is live (`G1–G7`, mutants `M12`, `M13`). **R31** (portal e-mail) is untouched |
+| **I28** | **A live relationship requiring uniqueness is protected at database level**, not by a PHP check | Identity | Insert the same active link twice directly via SQL; assert the second is rejected by a constraint | **HOLDS** *(Batch 1; residual closed by Batch 3 corrective)* — U1/U2/U3 over three NULL-able live-key columns; raw SQL duplicates rejected on both engines (`F0–F8`, mutants `M9`, `M17`). The Batch 1 residual — *the key is set by the writer* — is **closed for the keys introduced since**: `partner_contacts.uq_primary` and `client_users`/`vendor_users.uq_active_email` are **generated columns, computed by the database**, so no writer can set, forget or bypass them. Proven by a raw `INSERT` claiming to be primary being refused (`CA6`), a raw padded-address `INSERT` being refused with no application code involved (`CB12`), and mutants `CM1`, `CM2`, `CM8`, `CM20` |
+| **I29** | **Two processes creating the same relationship simultaneously produce one relationship** | Identity | Two concurrent processes, one barrier, same pair; assert exactly one live link and a deterministic refusal for the other | **HOLDS** *(Batch 1; widened by Batch 3 corrective)* — four real processes, one live link, no crash, and every process told it succeeded names a link that really is live (`G1–G7`, mutants `M12`, `M13`). Batch 3 corrective widens it to two more relationships, each with real operating-system processes on a wall-clock barrier: two, three and three **raw** concurrent writers each leave exactly one main contact (`CA10–CA16`), and three concurrent boots installing the same protection all succeed with none reporting failure (`CG13–CG18`). **R31** (portal e-mail) is **no longer untouched** — the account key exists and is database-enforced |
 | **I30** | **A person representation cannot be duplicated by an ordinary business action** | Operations + Recruitment | Run the hiring conversion twice for one candidate; assert one inspector, no orphan | **VIOLATED** — two inspector rows accepted, candidate points at the second, **first stays live and orphaned** (§2 audit; **R2**). The same failure mode exists on the read path (**R22**) |
 | **I31** | Where a duplicate cannot be prevented, it is **detected and surfaced** | All | For each person pool, assert a detector exists and returns the known duplicate | **PARTIAL** — professionals ✔, candidates ✔, **inspectors ✘** (**R20**, deferred). `partner_contacts` and the organisation pools ✔ *(Batch 3)*: duplicate contacts, ambiguous primaries, duplicate tax identifiers, shared names, unmapped and dangling representations and duplicate active accounts are all reported by `identity_state_findings()` — detection only, nothing repaired (**R30** *surfaced*, its uniqueness still deferred by **Q22**) |
 | **I32** | **"Keep separate" is a recordable decision** | Identity | Reject a suggestion; assert it does not reappear | **VIOLATED** — no mechanism anywhere (§20 rule 9; **R21**) |
@@ -269,3 +269,26 @@ before the hidden write paths were found.
   `P6-BATCH1-SECURITY-RESULTS.md` and `P6-BATCH1-MUTATION-RESULTS.md`. Every
   other status is still a statement about what a future probe will assert, and is
   left that way deliberately.
+
+---
+
+# Batch 3 CORRECTIVE — what the evidence moved
+
+*Recorded on owner acceptance, 2026-09-20. Source state `939de8a`; evidence
+`P6-BATCH3-CORRECTIVE-EVIDENCE.md`. Six defects were found by a post-gate
+adversarial pass on work that had already been accepted and locked; five of the
+six were introduced by Batch 3 itself.*
+
+| Invariant | Movement |
+|---|---|
+| **I28** — uniqueness protected at database level, not by a PHP check | Batch 1's recorded residual (*the key is set by the writer*) is **closed for the keys introduced since**: they are generated columns the database computes. A raw `INSERT` cannot bypass them |
+| **I29** — concurrent creators produce one relationship | **Widened** from identity links to the primary contact and to the installation of the protection itself. Three concurrent writers previously produced **three** main contacts, 3 runs out of 3; they now produce one |
+| **I31** — duplicates detected where not prevented | **Improved, still PARTIAL.** A duplicate that a human has already resolved by merging no longer reports for ever: `MERGED` is excluded from the two organisation-duplicate findings and only those. Inspectors (**R20**) remain open |
+| **I34** — organisation not duplicated by role | **Unchanged (PARTIAL).** Simultaneous same-name registration is still detected and not prevented; that needs Q1–Q18, which stay open |
+| **I35** — every representation resolves to the spine | **Unchanged (PARTIAL).** The cross-reference is still a map, not a constraint, by decision. A retired organisation now carries an explicit machine-readable pointer to its survivor (**R4**), so a match on a retired record resolves to the company that trades |
+| **I41** — a failed observation is never a failed transaction | **Unchanged (HOLDS).** Reinforced by Q27: security evidence from an unauthenticated request is written outside the customer's activity feed, and a failure to write it still never fails the business action |
+
+**Deliberately not moved.** No invariant was advanced on the strength of this
+batch alone where the evidence does not reach it. Identity convergence did not
+begin, no Person hub was created, nothing was merged, and Q1–Q18, R20, R21 and
+R23 remain open. A register that flatters the work it records is not a register.

@@ -3,7 +3,7 @@
 *The single place that records which phases are locked and which have not begun.
 Updated at each phase lock.*
 
-**Last updated:** 2026-09-18 · commit `c63fa88` · branch
+**Last updated:** 2026-09-20 · commit `c3042b6` · branch
 `claude/testing-branch-setup-0gqe8n`
 
 ---
@@ -16,7 +16,7 @@ Updated at each phase lock.*
 | **Phase 3** | **ACCEPTED / LOCKED** | `docs/phase3/` |
 | **Phase 4** | **ACCEPTED / LOCKED** | `docs/phase4/P4-COMPLETION-REPORT.md` |
 | **Phase 5** | **ACCEPTED / LOCKED** | `docs/phase5/P5-COMPLETION-REPORT.md` |
-| **Phase 6** | **ACTIVE — Batches 1 & 2 done; Batch 3 audit + plan pending review** | 2026-09-19 |
+| **Phase 6** | **ACTIVE — Batches 1, 2 and 3 (incl. corrective) ACCEPTED / LOCKED. Batch 4 NOT STARTED** | 2026-09-20 |
 
 ## Phase 6 — where it stands
 
@@ -31,7 +31,7 @@ Updated at each phase lock.*
 | **Batch 1 — identity write safety, authority, scope** | **ACCEPTED / LOCKED** — 2026-09-19 · `db02289`, `03d805b` |
 | **Batch 2 — person relationship integrity & conversion safety** | **COMPLETE, pending owner review** — battery 78/0 (baseline 19/30) · SQLite 12 460/0 · MariaDB 12 467/0 · mutation 18/18 |
 | **Batch 3 — organisation representation, duplicate safety & cross-reference** | **ACCEPTED / LOCKED** — then **REOPENED** by a post-gate adversarial pass |
-| **Batch 3 CORRECTIVE — A1–A6, Q24–Q28, R1–R6** | **COMPLETE, pending owner acceptance** — `939de8a` · focused 160/0 both engines · SQLite 12 834/0 · MariaDB 12 839/0 · mutation 19 caught / 1 proven equivalent / **0 unexplained survivors** · HTTP oracle byte-identical · browser 18/18 |
+| **Batch 3 CORRECTIVE — A1–A6, Q24–Q28, R1–R6** | **ACCEPTED / LOCKED** — 2026-09-20 · `939de8a` (docs `c3042b6`) · focused 160/0 both engines · SQLite 12 834/0 · MariaDB 12 839/0 · mutation 19 caught / 1 proven equivalent / **0 unexplained survivors** · HTTP oracle byte-identical · browser 18/18 |
 | **Batch 4** | **NOT STARTED.** Not to be begun without an explicit owner instruction |
 
 **Batch 1 delivered:** R22 · R24 · R25 · R15 (scoped) · R16 · R3 · R11, plus the
