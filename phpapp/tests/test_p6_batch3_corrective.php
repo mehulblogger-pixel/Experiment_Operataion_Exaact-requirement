@@ -179,6 +179,73 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE email='bob@garrick.te
 t_ok(is_array(portal_login('  BOB@garrick.test ', 'password123')) || portal_login('bob@garrick.test', 'password123') !== null,
      'CB10 · the person can sign in however they type their own address');
 
+//  CM8 · §6 — THE DATABASE, ON ITS OWN.
+//
+//  Everything above goes through the application, so it proves email_key() works
+//  — which was never in doubt. The battery showed that removing TRIM from the
+//  DATABASE key broke nothing any test could see, because no probe ever wrote to
+//  the table without the application's help. The database key exists precisely
+//  for the writer who forgets, so it is tested without the writer.
+//
+//  A LEADING space, deliberately: MariaDB ignores TRAILING spaces when comparing
+//  strings, so a trailing-space probe would pass on that engine for a reason
+//  that has nothing to do with our key.
+$cbRaw = 'raw.backstop@example.test';
+db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,created_at)
+               VALUES (?,?,?,'',1,?)")->execute([$cbP, $cbRaw, 'Genuine', date('c')]);
+t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(TRIM(email))=?", [$cbRaw]), 1,
+     'CB11 · the backstop probe has a subject — one genuine account exists');
+$cbRefused = false;
+try {
+    db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,created_at)
+                   VALUES (?,?,?,'',1,?)")->execute([$cbP, ' ' . $cbRaw, 'Impostor', date('c')]);
+} catch (Throwable $e) { $cbRefused = true; }
+t_ok($cbRefused, 'CB12 · *** the DATABASE ITSELF refuses a padded duplicate written straight to the table ***');
+t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(TRIM(email))=?", [$cbRaw]), 1,
+     'CB13 · so still exactly one account for that address, with no application code involved');
+
+//  The upgrade case: a workspace that already holds a padded row written before
+//  this rule existed. The protection must still hold when the clean form arrives.
+$cbLegacy = 'legacy.padded@example.test';
+try { db()->exec(t_driver() === 'sqlite' ? "DROP INDEX ux_client_users_active_email"
+                                         : "DROP INDEX ux_client_users_active_email ON client_users"); } catch (Throwable $e) {}
+db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,created_at)
+               VALUES (?,?,?,'',1,?)")->execute([$cbP, ' ' . $cbLegacy, 'Legacy', date('c')]);
+t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE email=?", [' ' . $cbLegacy]), 1,
+     'CB14 · the legacy probe has a subject — a padded row really is on file');
+//  The guard is rebuilt through the helper, NOT through portal_acct_migrate():
+//  that door keeps a static epoch marker and has already run in this file, so it
+//  would return without doing anything and leave this probe with no subject —
+//  which is exactly what it did on the first attempt.
+$cbExpr = "CASE WHEN COALESCE(is_active,0)=1 AND TRIM(COALESCE(email,''))<>'' THEN LOWER(TRIM(email)) ELSE NULL END";
+$cbGuard = ensure_unique_generated_index('client_users', 'uq_active_email', $cbExpr, 'ux_client_users_active_email');
+t_eq((string)$cbGuard, 'OK', 'CB14a · and the uniqueness key really was rebuilt over that data');
+$cbLegacyRefused = false;
+try {
+    db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,created_at)
+                   VALUES (?,?,?,'',1,?)")->execute([$cbP, $cbLegacy, 'Clean', date('c')]);
+} catch (Throwable $e) { $cbLegacyRefused = true; }
+t_ok($cbLegacyRefused,
+     'CB15 · *** a legacy padded row still blocks the clean duplicate — the key reads both the same ***');
+//  Put the workspace back as it was found, so later sections are not judging a
+//  database this probe dirtied.
+db()->prepare("DELETE FROM client_users WHERE email IN (?,?)")->execute([' ' . $cbLegacy, $cbLegacy]);
+ensure_unique_generated_index('client_users', 'uq_active_email', $cbExpr, 'ux_client_users_active_email');
+
+//  §8 — the vendor door uses the same rule as every other door. The battery
+//  cannot see a difference today, because the hand-rolled copy agreed with the
+//  canonical rule character for character. That is what made it worth removing:
+//  the next change to email_key() would have moved every other call site and
+//  quietly left this one behind.
+$cbVend = $ccPartner('Halifax Supplies Ltd');
+db()->prepare("UPDATE business_partners SET is_vendor=1 WHERE id=?")->execute([$cbVend]);
+$cbV1 = cvp_vendor_invite($cbVend, 'buyer@halifax.test', 'Buyer', 0);
+t_ok(empty($cbV1['err']), 'CB16 · a vendor invitation is accepted — the probe has a subject  [' . ($cbV1['err'] ?? '') . ']');
+$cbV2 = cvp_vendor_invite($cbVend, '  BUYER@halifax.test ', 'Impostor', 0);
+t_ok(!empty($cbV2['err']), 'CB17 · and the same address padded and capitalised is recognised as the same person');
+t_eq((int)ops_val("SELECT COUNT(*) FROM vendor_users WHERE LOWER(TRIM(email))=?", ['buyer@halifax.test']), 1,
+     'CB18 · so the vendor door creates exactly one account, like every other door');
+
 // =============================================================================
 t_section('P6-B3C · CC — the public form is not a lookup service (A3 · Q26)');
 // =============================================================================
@@ -363,15 +430,110 @@ $cgFake = ensure_unique_generated_index('a_table_that_is_not_there', 'x', '1', '
 t_eq((string)$cgFake, 'ABSENT', 'CG5 · a table that does not exist is reported as absent, not as success');
 t_eq((string)(schema_guard_read('uq_pcont_primary')['state'] ?? ''), 'OK', 'CG6 · and the ledger still reflects the real state of the real guard');
 
-//  §7 — the DDL rule that Batch 3 established must not have regressed.
-$cgOwn = !db()->inTransaction();
-if ($cgOwn) db()->beginTransaction();
-$cgBefore = table_index_names('partner_contacts');
+//  §7 · CM6 — DDL MUST NOT RUN INSIDE A TRANSACTION THE MIGRATION DID NOT OPEN.
+//
+//  The probe this replaces compared index names before and after, in this
+//  process, and proved nothing twice over. partner_contact_migrate() keeps a
+//  static epoch marker and had already run in this file, so it returned at once
+//  and the guarded path was never entered; and even had it run, an index list
+//  cannot show an implicit commit, which is the actual danger. The mutation
+//  battery caught that: CM6 removed the guard and every assertion still passed.
+//
+//  This asks the question that matters. A business row is written inside a
+//  caller-owned transaction, the migration is invited in, the caller rolls back,
+//  and the row must be gone. On MariaDB, DDL inside that transaction would
+//  commit it implicitly and the row would survive. A fresh process is used so no
+//  static marker can make the probe vacuous a second time.
+$cgTx = $ccRace([['txddl', 0, 'Rollback Probe Ltd']], 300);
+t_eq(count($cgTx), 1, 'CG7 · the transaction-safety worker reported a verdict');
+if ($cgTx) {
+    t_ok(strpos((string)($cgTx[0]['code'] ?? ''), 'WORK:') === 0,
+         'CG7a · and it had a real subject — the protection was removed first, so DDL was genuinely pending'
+         . '  [' . (string)($cgTx[0]['msg'] ?? '') . ']');
+    t_ok(!empty($cgTx[0]['ok']),
+         'CG7b · *** a business row written in a caller-owned transaction does NOT survive its rollback ***'
+         . '  [' . (string)($cgTx[0]['code'] ?? '') . ']');
+}
 partner_contact_migrate();
-portal_acct_migrate();
-t_eq(implode(',', table_index_names('partner_contacts')), implode(',', $cgBefore),
-     'CG7 · *** no DDL is run inside a transaction the migration did not open ***');
-if ($cgOwn && db()->inTransaction()) db()->rollBack();
+ensure_unique_generated_index('partner_contacts', 'uq_primary', PARTNER_PRIMARY_KEY_EXPR,
+                              'uq_pcont_primary', 'partner_contact_reconcile_primaries');
+t_ok(in_array('uq_pcont_primary', table_index_names('partner_contacts'), true),
+     'CG7c · and the protection is restored afterwards, so later sections still have it');
+
+//  CM3 · §4 — A GUARD THAT CANNOT INSTALL ITS PROTECTION MUST SAY SO.
+//
+//  Everything above proves the guard works when the database co-operates.
+//  Nothing proved the other half: the battery removed the verification step and
+//  every test still passed, because no probe ever put the guard in a position
+//  where CREATE UNIQUE INDEX fails. A guard that cannot fail out loud can lie.
+//
+//  The failure is forced at the real operation, for a reason each engine
+//  genuinely has: MariaDB rejects an identifier longer than 64 characters;
+//  SQLite keeps indexes and tables in one namespace, so an index cannot take a
+//  name a table already holds.
+//  The guard name is kept short on purpose. The first version of this probe used
+//  a 70-character name to make MariaDB reject the index — and MariaDB then also
+//  rejected the LEDGER row, because schema_guards.guard is VARCHAR(64). The
+//  probe proved FAILED was returned but destroyed the very record it was
+//  checking for. An instrument must not disturb what it measures.
+db()->exec("CREATE TABLE IF NOT EXISTS cg_guard_probe (id INTEGER, flag INT DEFAULT 0, owner INT DEFAULT 0)");
+$cgBadName = 'ux_cg_probe_cannot_exist';
+$cgFail = ensure_unique_generated_index('cg_guard_probe', 'uq_probe',
+            "CASE WHEN COALESCE(no_such_column_anywhere,0)<>0 THEN owner ELSE NULL END", $cgBadName);
+t_eq((string)$cgFail, 'FAILED', 'CG8 · *** a guard whose index cannot be created reports FAILED, never OK ***');
+t_eq((string)(schema_guard_read($cgBadName)['state'] ?? ''), 'FAILED',
+     'CG9 · and the ledger records it where an operator can read it');
+t_ok(trim((string)(schema_guard_read($cgBadName)['detail'] ?? '')) !== '',
+     'CG10 · with a reason, so the failure is diagnosable rather than merely known');
+t_ok(!in_array($cgBadName, table_index_names('cg_guard_probe'), true),
+     'CG11 · and the index really is absent — the probe had a genuine failure to observe');
+t_ok(in_array($cgBadName, array_column(schema_guards_not_ok(), 'guard'), true),
+     'CG12 · a failed safety migration is visible in the not-OK list, never silently skipped');
+//  The probe above fails while CREATING THE KEY. On SQLite the failure can also
+//  be forced one step later, at the INDEX itself, because indexes and tables
+//  share one namespace there — so an index cannot take a name a table holds.
+//  MariaDB scopes index names per table and has no equivalent short-name
+//  refusal, so that half is asserted on SQLite alone rather than faked.
+if (t_driver() === 'sqlite') {
+    db()->exec("CREATE TABLE IF NOT EXISTS cg_name_taken_by_a_table (id INTEGER)");
+    $cgIxFail = ensure_unique_generated_index('cg_guard_probe', 'uq_probe2',
+                  "CASE WHEN COALESCE(flag,0)<>0 THEN owner ELSE NULL END", 'cg_name_taken_by_a_table');
+    t_eq((string)$cgIxFail, 'FAILED', 'CG12a · a guard whose INDEX cannot be created also reports FAILED');
+    t_eq((string)(schema_guard_read('cg_name_taken_by_a_table')['state'] ?? ''), 'FAILED',
+         'CG12b · and that failure is recorded too');
+} else {
+    t_ok(true, 'CG12a · index-step refusal asserted on SQLite, which can force it with a legal name');
+    t_ok(true, 'CG12b · (MariaDB scopes index names per table, so it has no equivalent short-name refusal)');
+}
+
+//  CM20 · §5 — THE LOSING SIDE OF A CONCURRENT BOOT.
+//
+//  Two processes start together, both find the uniqueness key missing, both run
+//  the ALTER, and one loses with "duplicate column". The loser's column is
+//  present all the same, and the index behind it still has to be built — so the
+//  loser must ask the schema rather than believe the error. Nothing tested that
+//  path, so a mutant that made a failed ALTER give up immediately survived.
+try { db()->exec(t_driver() === 'sqlite' ? "DROP INDEX uq_pcont_primary"
+                                         : "DROP INDEX uq_pcont_primary ON partner_contacts"); } catch (Throwable $e) {}
+try { db()->exec("ALTER TABLE partner_contacts DROP COLUMN uq_primary"); } catch (Throwable $e) {}
+t_ok(!in_array('uq_primary', table_columns_incl_generated('partner_contacts'), true),
+     'CG13 · the key was removed, so the racing boots have something to install');
+$cgRace = $ccRace([['guardrace', 0, ''], ['guardrace', 0, ''], ['guardrace', 0, '']]);
+t_eq(count($cgRace), 3, 'CG14 · three concurrent boots reported a verdict');
+$cgSaw = 0; $cgFailed = 0; $cgOk = 0;
+foreach ($cgRace as $r) {
+    if (strpos((string)($r['msg'] ?? ''), 'missing on entry') !== false) $cgSaw++;
+    if ((string)($r['code'] ?? '') === 'FAILED') $cgFailed++;
+    if ((string)($r['code'] ?? '') === 'OK') $cgOk++;
+}
+t_ok($cgSaw >= 2, 'CG15 · at least two of them really did race the same ALTER — the probe has its subject  [' . $cgSaw . ' saw it missing]');
+t_eq($cgFailed, 0, 'CG16 · *** losing the ALTER race is not a failure — no boot reported FAILED ***');
+t_ok($cgOk >= 1, 'CG17 · and at least one reported the protection installed');
+partner_contact_migrate();
+ensure_unique_generated_index('partner_contacts', 'uq_primary', PARTNER_PRIMARY_KEY_EXPR,
+                              'uq_pcont_primary', 'partner_contact_reconcile_primaries');
+t_ok(in_array('uq_pcont_primary', table_index_names('partner_contacts'), true),
+     'CG18 · and the protection is in place after the race, however it was won');
 
 //  The portal account guard is installed by the same mechanism.
 portal_acct_migrate();

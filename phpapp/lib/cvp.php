@@ -366,7 +366,11 @@ function cvp_vendor_invite($vendorId, $email, $name, $contactId = 0) {
         $email = email_key($c['email']);
         if (trim((string)$name) === '') $name = (string)$c['name'];
     } else {
-        $email = strtolower(trim((string)$email));
+        //  Q25 · §8 — one canonical rule, not a second hand-rolled copy of it.
+        //  This line agreed with email_key() character for character, which is
+        //  precisely what made it dangerous: the next change to the rule would
+        //  have moved the other call sites and quietly left this door behind.
+        $email = email_key($email);
     }
     if (!$vendorId) return ['err' => 'Choose the vendor company.'];
     // The partner must actually be a vendor — a client id must not be onboarded

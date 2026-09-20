@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '713a3ca · 2026-09-20 04:41 UTC · 666 files';
+$RELEASE = 'a97997a · 2026-09-20 05:19 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -116,7 +116,7 @@ $EXPECT  = [
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>18815,'h'=>'62cf444263106e61'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
-    'lib/cvp.php' => ['s'=>60819,'h'=>'d87233139353098c'],
+    'lib/cvp.php' => ['s'=>61127,'h'=>'d51dac70fda3b174'],
     'lib/datacontrol.php' => ['s'=>37308,'h'=>'be66a03dcb445dac'],
     'lib/datatable.php' => ['s'=>15699,'h'=>'dfea30bbc69ccef3'],
     'lib/db.php' => ['s'=>56340,'h'=>'6e9375c6656e8f6e'],

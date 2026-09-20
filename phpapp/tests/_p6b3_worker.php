@@ -13,6 +13,10 @@
 //    setprimary  a=partner b=contact name             — partner_contact_add(), primary
 //    rawprimary  a=partner b=contact name             — a raw INSERT claiming primary,
 //                                                       bypassing every PHP guard there is
+//    txddl       a=unused  b=marker name              — the §7 DDL-inside-a-borrowed-
+//                                                       transaction invariant, behaviourally
+//    guardrace   a=unused  b=unused                   — a concurrent boot installing the
+//                                                       guard, for the losing-ALTER path
 // ============================================================================
 error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
 $root = dirname(__DIR__);
@@ -34,7 +38,11 @@ try {
     if (function_exists('portal_migrate')) portal_migrate();
     if (function_exists('cvp_migrate')) cvp_migrate();
     if (function_exists('find_duplicate_partner')) find_duplicate_partner('warm', '', '', '', 0);
-    if (function_exists('partner_contact_migrate')) partner_contact_migrate();
+    //  'guardrace' is the one op that must NOT warm this up: it exists to race the
+    //  installation itself, and warming it here would put the key back before the
+    //  barrier and leave the probe with nothing to race — the "no valid subject"
+    //  failure this batch keeps finding.
+    if ($op !== 'guardrace' && function_exists('partner_contact_migrate')) partner_contact_migrate();
     ops_val("SELECT COUNT(*) FROM partner_contacts");
     ops_val("SELECT COUNT(*) FROM business_partners");
     ops_val("SELECT COUNT(*) FROM client_users");
@@ -63,6 +71,48 @@ try {
         //  code involved at all. If the rule only lives in PHP this wins.
         db()->prepare("INSERT INTO partner_contacts (partner_id,name,is_primary) VALUES (?,?,1)")->execute([$a, $b]);
         $out['ok'] = true;
+    } elseif ($op === 'txddl') {
+        //  §7 — the invariant, tested by BEHAVIOUR rather than by index names.
+        //
+        //  MariaDB commits implicitly on ANY DDL. A migration that runs DDL inside
+        //  a transaction it did not open therefore commits the caller's
+        //  half-written business data with it, and a later rollback cannot take it
+        //  back. That is the whole danger, and it is invisible to a probe that
+        //  compares index lists.
+        //
+        //  This runs in a FRESH PROCESS on purpose: partner_contact_migrate() keeps
+        //  a static epoch marker, so in the parent it returns immediately and the
+        //  guarded path is never entered — which is exactly why the first version
+        //  of this probe had no subject and let mutant CM6 survive.
+        try { db()->exec(db_driver() === 'sqlite'
+                ? "DROP INDEX uq_pcont_primary"
+                : "DROP INDEX uq_pcont_primary ON partner_contacts"); } catch (Throwable $e) {}
+        try { db()->exec("ALTER TABLE partner_contacts DROP COLUMN uq_primary"); } catch (Throwable $e) {}
+        $hadWork = !in_array('uq_primary', table_columns_incl_generated('partner_contacts'), true);
+
+        db()->beginTransaction();
+        db()->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,status,created_at)
+                       VALUES (?,?,?,1,'ACTIVE',?)")->execute(['TXD', $b, $b, date('c')]);
+        partner_contact_migrate();                      // invited in, inside somebody else's transaction
+        try { db()->rollBack(); } catch (Throwable $e) {}
+
+        $survived = (int)ops_val("SELECT COUNT(*) FROM business_partners WHERE legal_name=?", [$b]);
+        $out['ok']   = ($survived === 0);
+        $out['code'] = ($hadWork ? 'WORK' : 'NOWORK') . ':' . $survived;
+        $out['msg']  = $hadWork ? 'the migration had real DDL to do'
+                                : 'NO SUBJECT — the protection was still present, so nothing would have run';
+    } elseif ($op === 'guardrace') {
+        //  The losing side of a concurrent boot. Both processes find the key
+        //  missing, both ALTER, one loses with "duplicate column" — and the loser
+        //  must ASK THE SCHEMA rather than believe the error, because its column
+        //  is present all the same and the index behind it still has to be built.
+        //  Reports what it saw on entry, so the parent can prove the race happened.
+        $missingAtEntry = !in_array('uq_primary', table_columns_incl_generated('partner_contacts'), true);
+        $r = ensure_unique_generated_index('partner_contacts', 'uq_primary', PARTNER_PRIMARY_KEY_EXPR,
+                                           'uq_pcont_primary', 'partner_contact_reconcile_primaries');
+        $out['ok']   = ($r === 'OK');
+        $out['code'] = (string)$r;
+        $out['msg']  = $missingAtEntry ? 'saw the key missing on entry' : 'the key was already there on entry';
     } elseif ($op === 'rawacct') {
         db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,created_at) VALUES (?,?,?,?,1,?)")
             ->execute([$a, $b, 'Raw', password_hash('x', PASSWORD_DEFAULT), date('c')]);
