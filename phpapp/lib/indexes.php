@@ -210,4 +210,10 @@ function indexes_migrate() {
     //  being quietly absent.
     if (function_exists('partner_contact_migrate')) partner_contact_migrate();
     if (function_exists('portal_acct_migrate'))     portal_acct_migrate();
+    //  The employee number (owner decision 1, 2026-09-20) — permanently unique,
+    //  never re-issued, and until now protected by nothing at all: `inspectors`
+    //  carried no index of any kind, and four concurrent hires each received
+    //  EMP01 on MariaDB. Lifetime uniqueness, so a retired person's number is
+    //  constrained exactly like a live one.
+    if (function_exists('emp_code_migrate'))        emp_code_migrate();
 }

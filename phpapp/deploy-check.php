@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '70b5e22 · 2026-09-20 05:58 UTC · 666 files';
+$RELEASE = 'b2338df · 2026-09-20 10:15 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -88,7 +88,7 @@ $EXPECT  = [
     'lib/connect_geo.php' => ['s'=>15539,'h'=>'5a1f51ac70ec64d2'],
     'lib/connect_govern.php' => ['s'=>7181,'h'=>'22ce5ad54e44ce2a'],
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
-    'lib/connect_identity.php' => ['s'=>54054,'h'=>'bfb8880d90a425b6'],
+    'lib/connect_identity.php' => ['s'=>56021,'h'=>'eba2f299f711df82'],
     'lib/connect_kpi.php' => ['s'=>25262,'h'=>'3d44c0796425cb27'],
     'lib/connect_market.php' => ['s'=>39876,'h'=>'0fd3332b96bb74f5'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
@@ -139,7 +139,7 @@ $EXPECT  = [
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
     'lib/identity.php' => ['s'=>44820,'h'=>'bd78e87f5794938e'],
     'lib/impartiality.php' => ['s'=>18224,'h'=>'70a0c7b051724178'],
-    'lib/indexes.php' => ['s'=>12768,'h'=>'1c574ce6ae89fcda'],
+    'lib/indexes.php' => ['s'=>13206,'h'=>'b5b0d500c6faed82'],
     'lib/industry.php' => ['s'=>30759,'h'=>'ddb3f3afbd4600db'],
     'lib/inspectorprofile.php' => ['s'=>3920,'h'=>'f995d0ac6cff433f'],
     'lib/install_mode.php' => ['s'=>4935,'h'=>'0c1d5ab96ff54b68'],
@@ -170,7 +170,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66290,'h'=>'4ff1bc5a2652ad81'],
-    'lib/ops.php' => ['s'=>641231,'h'=>'44b29f7cc41d494a'],
+    'lib/ops.php' => ['s'=>649358,'h'=>'86746be4718cba22'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -190,7 +190,7 @@ $EXPECT  = [
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
-    'lib/recruit.php' => ['s'=>86405,'h'=>'7178b8a343dd146d'],
+    'lib/recruit.php' => ['s'=>90252,'h'=>'69969aabb7029802'],
     'lib/recruit_approval.php' => ['s'=>147839,'h'=>'732ae4559975ab0c'],
     'lib/recruit_assign.php' => ['s'=>39386,'h'=>'57d29dfa58c1fc33'],
     'lib/recruit_cc.php' => ['s'=>30990,'h'=>'58dcf5cd677eb27c'],
@@ -219,7 +219,7 @@ $EXPECT  = [
     'lib/security.php' => ['s'=>38300,'h'=>'59c69d7c557f1016'],
     'lib/seed_connect.php' => ['s'=>22943,'h'=>'06f835c70073b5b5'],
     'lib/seed_costing.php' => ['s'=>7626,'h'=>'d377be1adc35b4da'],
-    'lib/seed_demo.php' => ['s'=>109046,'h'=>'b108775c3e881d88'],
+    'lib/seed_demo.php' => ['s'=>110095,'h'=>'670452da57b0807a'],
     'lib/seed_demo_c.php' => ['s'=>125521,'h'=>'7765694ba131b91c'],
     'lib/seed_recruit_cc.php' => ['s'=>10345,'h'=>'b2ead314e97b24a3'],
     'lib/seed_scenario_s01.php' => ['s'=>34921,'h'=>'37246a2099961d2a'],

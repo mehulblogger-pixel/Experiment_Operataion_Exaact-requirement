@@ -768,6 +768,38 @@ function identity_state_findings($limit = 200) {
              'Legitimate for a re-hire on different terms; a duplicate otherwise. Only a person can tell.',
              false, true);
 
+    // ---- RB-3 — the EMPLOYEE NUMBER (owner decision 1, 2026-09-20) ---------
+    //
+    //  "Permanently unique and never re-issued to another person, even after the
+    //   employee leaves." The database now enforces that, so nothing NEW can
+    //   collide — but an install that already carried a collision cannot have the
+    //   index built over it, and that is exactly the case a person must see.
+    //
+    //  Nothing here repairs anything. Renumbering somebody is precisely the
+    //  historical ambiguity decision 1 exists to prevent: the number is already
+    //  in their inspection reports, attendance, vouchers and audit records.
+    if (function_exists('emp_code_collisions')) {
+        foreach (emp_code_collisions($lim) as $r)
+            $add('EMP_CODE_SHARED',
+                 'More than one team member carries the same employee number.',
+                 ['employee_number' => (string)$r['v'], 'team_members' => (int)$r['n']],
+                 'An employee number identifies one person for life — it appears in reports, attendance, expenses and audit records. '
+                 . 'Until this is resolved the protection cannot be switched on for this workspace. '
+                 . 'Give the newer record a fresh number; never re-issue the old one.',
+                 false, true);
+    }
+    //  And the protection's own state, so "it is installed" is never assumed.
+    if (function_exists('schema_guards_not_ok')) {
+        foreach (schema_guards_not_ok() as $g) {
+            if ((string)($g['table_name'] ?? '') !== 'inspectors') continue;
+            $add('EMP_CODE_UNPROTECTED',
+                 'The employee-number rule is not yet switched on for this workspace.',
+                 ['state' => (string)($g['state'] ?? ''), 'detail' => (string)($g['detail'] ?? '')],
+                 'Resolve the shared employee numbers above; the rule installs itself on the next start-up.',
+                 false, true);
+        }
+    }
+
     // ---- Phase 6 · Batch 3 — ORGANISATION states (detection only) ----------
     //
     //  Extends the report Batch 2 built rather than adding a second one. Every

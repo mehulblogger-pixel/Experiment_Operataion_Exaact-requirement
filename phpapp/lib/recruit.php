@@ -1210,6 +1210,8 @@ const RCV_CODES = [
     'BLOCKED'        => 'The requirement does not allow this right now.',
     'RACE_LOST'      => 'Somebody else converted this application a moment ago.',
     'FAILED'         => 'The conversion could not be completed. Nothing was changed.',
+    'EMP_CODE'       => 'An employee number could not be issued, so nobody was added. Try again; if it keeps happening, ask an administrator to check the employee-number report.',
+    'BUSY'           => 'Somebody else was saving at the same moment, so nothing was changed. Please try again.',
 ];
 
 /**
@@ -1328,16 +1330,58 @@ function rcv_convert($candId, array $opt = []) {
     $tx = false; $insId = 0; $identity = $mayLink ? 'LINKED' : 'NOT_ENTITLED';
     if ($own) { try { $tx = (bool)db()->beginTransaction(); } catch (Throwable $e) { $tx = false; } }
     try {
-        //  A — the team member
-        db()->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,emp_code,home_office_id,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,status,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
-            ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
-                       $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $kind,
-                       function_exists('next_emp_code') ? next_emp_code($kind) : '', $office,
-                       $ag ? (int)$opt['agency_id'] : null, $roll, (string)($ag['name'] ?? ''), (float)($opt['agency_cost'] ?? 0),
-                       $placement, $placement > 0 ? 'PROVISIONAL' : '', $placement > 0 ? date('Y-m-d', strtotime("+$gd days")) : '',
-                       date('c')]);
-        $insId = (int)db()->lastInsertId();
+        //  A0 — TAKE THE APPLICATION'S ROW FIRST. Lock ordering, and it is not
+        //       theoretical: with the employee number now protected by a unique
+        //       index, four processes converting ONE application contended for
+        //       two resources — the application row and the same employee-number
+        //       key, which they all compute at the same instant — and acquired
+        //       them in whatever order they arrived. InnoDB found a cycle and
+        //       killed one transaction outright: a DEADLOCK in 3 runs out of 3,
+        //       reported to the recruiter as a bare "could not be completed".
+        //
+        //       Everybody now queues on the SAME lock FIRST, so the order is the
+        //       same for everybody and there is no cycle to find. The three who
+        //       lose discover it here and leave without creating anything —
+        //       which is also three team members and three employee numbers that
+        //       are no longer made only to be rolled back.
+        //
+        //       SQLite has no row locks and needs none: it serialises writers
+        //       across the whole database, so the first writer in is the only
+        //       one inside this block at all.
+        if (db_driver() !== 'sqlite') {
+            $held = ops_one("SELECT COALESCE(inspector_id,0) ins FROM candidates WHERE id=? FOR UPDATE", [$candId]);
+            if (!$held) throw new RuntimeException('RACE_LOST');
+            if ((int)$held['ins'] > 0) throw new RuntimeException('RACE_LOST');
+        }
+
+        //  A — the team member.
+        //
+        //  The employee number is CLAIMED, not guessed (owner decision 1). Before
+        //  this, next_emp_code() read the highest code and added one with nothing
+        //  reserving the answer: four real processes hiring four different people
+        //  at one wall-clock microsecond each received EMP01 on MariaDB, four
+        //  times out of four, and all four reported success. Now the database
+        //  holds the rule, and a number somebody took a microsecond ago simply
+        //  costs this INSERT one more attempt.
+        //
+        //  Retrying inside this transaction is safe on BOTH engines — measured,
+        //  not assumed: a UNIQUE violation rolls back the statement only and
+        //  leaves the transaction open. And because nothing is reserved outside
+        //  the row, a rollback below consumes no number at all.
+        $writeInspector = function ($code) use ($name, $cand, $kind, $office, $ag, $opt, $roll, $placement, $gd) {
+            db()->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,emp_code,home_office_id,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,status,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
+                ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
+                           $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $kind,
+                           $code, $office,
+                           $ag ? (int)$opt['agency_id'] : null, $roll, (string)($ag['name'] ?? ''), (float)($opt['agency_cost'] ?? 0),
+                           $placement, $placement > 0 ? 'PROVISIONAL' : '', $placement > 0 ? date('Y-m-d', strtotime("+$gd days")) : '',
+                           date('c')]);
+            return (int)db()->lastInsertId();
+        };
+        $insId = function_exists('emp_code_claim')
+               ? (int)emp_code_claim($kind, $writeInspector)
+               : (int)$writeInspector(function_exists('next_emp_code') ? next_emp_code($kind) : '');
         if ($insId <= 0) throw new RuntimeException('the team member could not be created');
 
         //  B — the relationship, claimed CONDITIONALLY. This is what makes the
@@ -1358,11 +1402,21 @@ function rcv_convert($candId, array $opt = []) {
         if ($tx) { try { db()->rollBack(); } catch (Throwable $e2) {} }
         $lost = strpos($e->getMessage(), 'RACE_LOST') !== false
              || (function_exists('connect_identity_is_duplicate') && connect_identity_is_duplicate($e));
+        //  The claim gave up rather than hand out a number somebody already has.
+        //  It is a different thing from a lost race and says so (decision 5).
+        $noCode = strpos($e->getMessage(), 'free employee number') !== false;
+        //  A deadlock or a lock-wait timeout aborts the WHOLE transaction, so no
+        //  retry inside it can help. It is not a defect in the hire and must not
+        //  read like one: the work is intact, it simply has to be done again.
+        $busy = strpos($e->getMessage(), '40001') !== false
+             || stripos($e->getMessage(), 'deadlock') !== false
+             || stripos($e->getMessage(), 'lock wait timeout') !== false
+             || stripos($e->getMessage(), 'database is locked') !== false;
         rcv_log($candId, 'IDENTITY_REFUSED', 'Conversion rolled back — ' . ($lost ? 'another process converted it first' : $e->getMessage()));
         //  Borrowed transaction: we could not undo the half-made work, so we must
         //  not pretend it is gone. The caller owns the rollback and is told.
         if (!$own) throw $e;
-        return $fail($lost ? 'RACE_LOST' : 'FAILED');
+        return $fail($lost ? 'RACE_LOST' : ($noCode ? 'EMP_CODE' : ($busy ? 'BUSY' : 'FAILED')));
     }
 
     //  9 AUDIT — outside the transaction. A failed observation is never a failed

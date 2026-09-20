@@ -124,8 +124,22 @@ function seed_demo($force = false) {
         ];
         // row indices: 0 name,1 first,2 last,3 emp,4 sbu,5 sbus,6 skills,7 email,
         //              8 mobile,9 ctc,10 designation,11 staff_kind,12 agency,13 agency_cost
+        //  Idempotent by employee number — the same lesson the offices above
+        //  already learned, and now for a stronger reason.
+        //
+        //  Since owner decision 1 (2026-09-20) an employee number is permanently
+        //  unique and the DATABASE enforces it. These demo people carry EMP01,
+        //  EMP02, EMP03 — which are exactly the numbers a workspace's first real
+        //  hires are issued. A plain INSERT into such a workspace is refused, and
+        //  because this whole seed is one transaction it took the offices, the
+        //  clients and everything else down with it, silently. Reusing the row
+        //  that already holds the number keeps the demo loadable AND stops the
+        //  demo creating a second person carrying somebody else's number.
         $iid = [];
         foreach ($inspectors as $r) {
+            $have = (int) ops_val("SELECT id FROM inspectors WHERE UPPER(TRIM(COALESCE(emp_code,'')))=? ORDER BY id LIMIT 1",
+                                  [strtoupper(trim((string)$r[3]))]);
+            if ($have) { $iid[$r[3]] = $have; continue; }
             $insI->execute([$r[0],$r[1],$r[2],$r[3],$r[4],$r[5],$r[6],$r[7],$r[8],$r[9],$r[10],$r[11],$r[12],$r[13],$now]);
             $iid[$r[3]] = (int)$pdo->lastInsertId();
         }

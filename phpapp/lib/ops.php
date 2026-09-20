@@ -1422,13 +1422,20 @@ function team_member_create($name, $teamRole = 'FIELD', $officeId = null, $email
     $data = ['name' => $name, 'staff_kind' => 'ASSET', 'status' => 'ACTIVE',
              'home_office_id' => $officeId ?: null, 'team_role' => $tr,
              'email' => $email, 'created_at' => date('c')];
-    if (function_exists('next_emp_code')) $data['emp_code'] = next_emp_code('ASSET');
+    $data['emp_code'] = '';
     $cols = function_exists('existing_columns_only') ? existing_columns_only('inspectors', array_keys($data)) : array_keys($data);
     if (!$cols) return 0;
     $ph = implode(',', array_fill(0, count($cols), '?'));
-    db()->prepare("INSERT INTO inspectors (" . implode(',', $cols) . ") VALUES ($ph)")
-        ->execute(array_map(fn($c) => $data[$c], $cols));
-    return (int)db()->lastInsertId();
+    //  The number is CLAIMED, not guessed: if the database says somebody took it
+    //  a microsecond ago, the next one is claimed and this INSERT runs again.
+    $write = function ($code) use ($cols, $ph, $data) {
+        $data['emp_code'] = $code;
+        db()->prepare("INSERT INTO inspectors (" . implode(',', $cols) . ") VALUES ($ph)")
+            ->execute(array_map(fn($c) => $data[$c], $cols));
+        return (int)db()->lastInsertId();
+    };
+    if (!function_exists('emp_code_claim')) return (int)$write(function_exists('next_emp_code') ? next_emp_code('ASSET') : '');
+    return (int)emp_code_claim('ASSET', $write);
 }
 
 // ---- Smart inspector suggestion for allocation (#2) ------------------------
@@ -1543,14 +1550,147 @@ function emp_code_prefix($kind) {
 // Next free auto code for a kind. Scans existing codes that share the prefix and
 // bumps the highest trailing number. Regular staff pad to 2 digits (EMP07), the
 // contractor series to 3 (SC-014) — either way the running number never collides.
-function next_emp_code($kind) {
+function next_emp_code($kind, $skip = 0) {
     $prefix = emp_code_prefix($kind);
     $pad = ($prefix === 'EMP') ? 2 : 3;
     $max = 0;
     foreach (ops_all("SELECT emp_code FROM inspectors WHERE emp_code LIKE ?", [$prefix . '%']) as $r) {
         if (preg_match('/(\d+)\s*$/', (string)$r['emp_code'], $m)) $max = max($max, (int)$m[1]);
     }
-    return $prefix . str_pad((string)($max + 1), $pad, '0', STR_PAD_LEFT);
+    return $prefix . str_pad((string)($max + 1 + max(0, (int)$skip)), $pad, '0', STR_PAD_LEFT);
+}
+
+// ---------------------------------------------------------------------------
+//  THE EMPLOYEE NUMBER — owner decision 1, 2026-09-20
+//
+//  "An employee number must be permanently unique and never re-issued to
+//   another person, even after the employee leaves."
+//
+//  It is not decoration. The number travels into inspection reports, attendance,
+//  timesheets, expenses, billing support and audit records, so two people
+//  sharing one makes historical documents ambiguous for ever.
+//
+//  It was not protected at all. `inspectors` carried NO index — not on emp_code,
+//  not on email, not on mobile — and next_emp_code() above reads the highest
+//  code and adds one, with nothing reserving the answer. Four real processes
+//  hiring four different people at one wall-clock microsecond each received
+//  EMP01, on MariaDB, four times out of four
+//  (P6-BATCH2-PREIMPLEMENTATION-AUDIT-R2.md, finding N1).
+//
+//  TWO HALVES, and both are needed. The unique index alone would turn a silent
+//  collision into a failed hire, which is better but not good. The claim below
+//  is what people experience; the index is what makes the claim true.
+// ---------------------------------------------------------------------------
+
+//  LIFETIME uniqueness, deliberately. There is no "is this row still employed"
+//  predicate: a retired person keeps their number for ever, so retired rows are
+//  constrained exactly like live ones. That is decision 1, and it is also the
+//  simpler rule — there is no liveness test to get wrong.
+//
+//  UPPER(TRIM(...)) so ' emp01', 'EMP01 ' and 'EMP01' cannot coexist. NULL for a
+//  blank code, so the many historical rows that never had one stay unconstrained.
+const EMP_CODE_KEY_EXPR = "CASE WHEN TRIM(COALESCE(emp_code,'')) <> '' THEN UPPER(TRIM(emp_code)) ELSE NULL END";
+const EMP_CODE_KEY_COL  = 'uq_emp_code';
+const EMP_CODE_KEY_IX   = 'ux_inspectors_emp_code';
+
+/**
+ * Install the employee-number rule. Idempotent; safe on every boot.
+ *
+ * NO RECONCILER, on purpose. Deciding which of two people keeps a number is a
+ * decision about somebody's history, and decision 1 exists precisely to stop
+ * that being made silently. An install that already carries a collision is
+ * recorded DIRTY and reported by identity_state_findings(); the index is left
+ * off until a person resolves it, and NOTHING is renumbered.
+ */
+function emp_code_migrate() {
+    static $doneAt = -1;
+    if ($doneAt === db_epoch()) return;
+    //  Batch 3 (Gate 3) rule: never run DDL inside a transaction this function
+    //  did not open — MariaDB commits implicitly on any DDL, which would
+    //  silently commit somebody else's half-written business data. The marker is
+    //  deliberately NOT set here, so the first call outside a transaction still
+    //  installs the guard.
+    try { if (db()->inTransaction()) return; } catch (Throwable $e) {}
+    if (!function_exists('ensure_unique_generated_index')) return;
+    ensure_unique_generated_index('inspectors', EMP_CODE_KEY_COL, EMP_CODE_KEY_EXPR, EMP_CODE_KEY_IX);
+    $doneAt = db_epoch();
+}
+
+/**
+ * Was this exception OUR employee-number key refusing the row?
+ *
+ * Deliberately narrow. A duplicate on any other unique key — the identity
+ * ledger's, a portal account's — is somebody else's business and must be
+ * re-thrown, never retried: blindly retrying an INSERT that failed for an
+ * unknown reason is how a swallowed exception becomes a data defect.
+ */
+function emp_code_is_taken(Throwable $e) {
+    $m = strtolower($e->getMessage());
+    return strpos($m, strtolower(EMP_CODE_KEY_IX)) !== false            // MySQL names the index
+        || strpos($m, 'inspectors.' . EMP_CODE_KEY_COL) !== false;      // SQLite names table.column
+}
+
+/**
+ * Claim a free employee number and write the row under it.
+ *
+ * $write receives the code and performs the INSERT; it returns whatever the
+ * caller wants back. If the database refuses the number because somebody else
+ * took it a microsecond ago, the NEXT number is claimed and $write runs again.
+ *
+ * SAFE INSIDE AN OPEN TRANSACTION, and that was measured rather than assumed:
+ * on both SQLite and MariaDB a UNIQUE violation rolls back the STATEMENT only,
+ * the transaction stays open, and a retry within it commits normally. So a
+ * caller that has already begun a transaction — rcv_convert() does — may use
+ * this without the failed attempt costing it the transaction.
+ *
+ * A rolled-back caller CONSUMES NO NUMBER: nothing is reserved anywhere but in
+ * the row itself, so when the row goes, the number is free again. That is owner
+ * decision 5's "no employee number consumed".
+ *
+ * $write MUST be safe to run more than once. Every caller here performs exactly
+ * one INSERT and nothing else.
+ */
+function emp_code_claim($kind, callable $write, $tries = 25) {
+    $tries = max(1, (int)$tries);
+    for ($i = 0; $i < $tries; $i++) {
+        try { return $write(next_emp_code($kind, $i)); }
+        catch (Throwable $e) { if (!emp_code_is_taken($e)) throw $e; }
+    }
+    //  Refusing beats handing back a number somebody else already has.
+    throw new RuntimeException('Could not claim a free employee number.');
+}
+
+/**
+ * Who already holds this employee number, if anybody? Returns a name, or ''.
+ *
+ * This is the SENTENCE a person reads, not the protection — the unique index is
+ * the protection. Matching is UPPER(TRIM(...)), the same rule the database
+ * computes, so the two can never disagree about what "already taken" means.
+ */
+function emp_code_taken_by($code, $exceptId = 0) {
+    $code = strtoupper(trim((string)$code));
+    if ($code === '') return '';
+    try {
+        $r = ops_one("SELECT name, status FROM inspectors
+                       WHERE UPPER(TRIM(COALESCE(emp_code,''))) = ? AND id <> ? LIMIT 1",
+                     [$code, (int)$exceptId]);
+    } catch (Throwable $e) { return ''; }
+    if (!$r) return '';
+    $who = trim((string)($r['name'] ?? '')) ?: 'another team member';
+    //  Decision 1 is about people who have LEFT as much as people who are here,
+    //  so say so — otherwise "but they left years ago" looks like a bug.
+    $live = strtoupper(trim((string)($r['status'] ?? 'ACTIVE')));
+    return $who . (($live !== '' && $live !== 'ACTIVE') ? ' (no longer active)' : '');
+}
+
+/** Team members sharing one employee number — for the data-integrity board. */
+function emp_code_collisions($limit = 20) {
+    try {
+        return ops_all("SELECT UPPER(TRIM(emp_code)) v, COUNT(*) n FROM inspectors
+                         WHERE TRIM(COALESCE(emp_code,'')) <> ''
+                         GROUP BY UPPER(TRIM(emp_code)) HAVING COUNT(*) > 1
+                         ORDER BY n DESC, v LIMIT " . max(1, (int)$limit)) ?: [];
+    } catch (Throwable $e) { return []; }
 }
 function subcons_list($activeOnly = true) { return ops_all("SELECT id, agency, inspector_name, skill FROM subcons" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY agency"); }
 function agencies_list($activeOnly = true) { return ops_all("SELECT id, name, agency_type, one_time_fee, monthly_rate FROM agencies" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY name"); }
@@ -4461,6 +4601,19 @@ function ops_inspectors($action, $method) {
             $desig = $b['designation'] ?? ''; $kind = in_array($b['staff_kind'] ?? '', ['ASSET','FREELANCER','SUBCON'], true) ? $b['staff_kind'] : 'ASSET';
             $empCode = trim($b['emp_code'] ?? '');
             if ($empCode === '' && !$ins) $empCode = next_emp_code($kind); // auto: SC-/FL- for contractors, EMP for staff
+            //  OWNER DECISION 1 — an employee number is permanently unique and is
+            //  never re-issued, not even after somebody leaves. A typed number
+            //  that is already held is refused HERE, in a sentence, rather than
+            //  by the database with a stack trace. The unique index remains the
+            //  real protection; this is only the part a person reads.
+            if ($empCode !== '' && function_exists('emp_code_taken_by')) {
+                $empClash = emp_code_taken_by($empCode, (int)($ins['id'] ?? 0));
+                if ($empClash !== '') {
+                    flash('Employee number ' . $empCode . ' already belongs to ' . $empClash
+                        . '. Employee numbers are never re-used, even after someone leaves. Please choose another.', 'error');
+                    redirect($ins ? '/m/inspectors/edit?id=' . $ins['id'] : '/m/inspectors/new');
+                }
+            }
             // Workforce fields: posted office, weekly working days (5/5.5/6), reporting manager.
             $homeOff  = ($b['home_office_id'] ?? '') !== '' ? (int)$b['home_office_id'] : null;
             $wwd      = in_array((string)($b['weekly_working_days'] ?? ''), ['5','5.5','6'], true) ? (float)$b['weekly_working_days'] : 6;
