@@ -1,6 +1,8 @@
 # Q32 — Workforce vs Inspector · Business Decision
 
-**Status: ANALYSIS ONLY. Awaiting owner decision.**
+**Status: OWNER HAS ANSWERED — model revised. Still analysis only; nothing implemented.**
+See §19 (owner decisions) and §20 (the revised model) at the end, which supersede
+the recommendation in §12 where they differ.
 No production code, schema, migration, test or data was changed.
 
 Baseline `8793b91` · 2026-09-20
@@ -369,3 +371,113 @@ cannot be created (e.g. no branch resolvable, duplicate detected)?
 ---
 
 **HARD STOP. Nothing will be implemented until Q32 is answered.**
+
+---
+
+# 19 · OWNER DECISIONS — ANSWERED 2026-09-20
+
+| Question | Answer |
+|---|---|
+| Every ACCEPTED (Hired) candidate → workforce record | **YES** |
+| Workforce continues to use the existing `inspectors` table | **YES** |
+| `team_role` deliberately selected/derived, never silently defaulted to `FIELD` | **YES** |
+| Every hire automatically becomes an Inspector | **"Depends on the type of user using our application — recruiter, technical manpower supplier, etc."** |
+| Inspector applicability determined by `FIELD`/`COORD`/`OFFICE` | **"Something else"** |
+| ACCEPTED and workforce conversion succeed or fail together | **YES — atomic.** A candidate does not reach ACCEPTED if the workforce record cannot be created |
+
+## The two answers that changed the model
+
+The owner rejected a single global rule and rejected `team_role` as *the*
+determinant. Both point at the same thing: **Inspector applicability is a
+property of the customer's business, not of the product.**
+
+**FACT — that mechanism already exists and is already load-bearing.**
+
+`connect_cap_catalog()` (`lib/connect_capability.php:26+`) holds **27 business
+capabilities**, each mapped to a group and to the coarse modules it makes
+relevant. `connect_cap_modules()` unions them for a workspace;
+`connect_cap_shows()` gates the specialist modules; `connect_cap_owner_shows()`
+already drives the left-hand navigation (`views/layout_top.php:144,155`).
+
+| Capability group | Modules |
+|---|---|
+| **Recruitment** (Technical Recruitment, Permanent Placement, Executive Search, Contract Recruitment) | **`hr` only — no `operations`** |
+| **Inspection & Technical Services** (TPIA, TIC, Vendor/Shop/Resident/Site Inspection, Expediting, Vendor Surveillance, QA/QC, NDT) | `operations` (+ `reporting`) |
+| **Resource Supply** (Technical Manpower, Contract/Project/Shutdown/Turnaround Staffing, Freelance & Specialist Supply) | `operations` + `hr` (+ `reporting`) |
+| **Project Services** (Project Management/Engineering, Commissioning, Construction Support, Technical Consultancy) | `operations` |
+
+**INFERENCE:** a pure recruitment workspace has **no Operations module**, so
+inspection, deployment and utilisation do not exist there. Every hire is
+workforce and *nobody is an Inspector* — correctly, because that customer places
+people into other companies. A TPIA or manpower supplier has Operations, so the
+Inspector concept applies and the question becomes *which* of their people are
+deployable.
+
+# 20 · REVISED MODEL — capability decides whether, `team_role` decides who
+
+**Model D′.** Two levels, both reusing mechanisms that already exist. No new
+table, no new column, no new engine, no migration.
+
+```
+LEVEL 1 — WORKSPACE     Does the Inspector concept exist here at all?
+                        Derived from the declared capabilities:
+                        `operations` in connect_cap_modules(workspace)?
+                          NO  → recruitment-only workspace.
+                                Every hire is workforce. Nobody is an Inspector.
+                                team_role is not even asked.
+                          YES → inspection / supply / project workspace.
+                                Continue to Level 2.
+
+LEVEL 2 — PERSON        Which of our people are deployable?
+                        team_role, chosen deliberately at hire:
+                          FIELD  → deployable Inspector
+                          COORD  → workforce, not deployable
+                          OFFICE → workforce, not deployable
+```
+
+**Why this is the answer to the owner's words rather than a reinterpretation of
+them.** "It depends on the type of user" is Level 1. "Something else" — not
+`team_role` alone — is satisfied because `team_role` is now the *second* filter,
+applied only where capability says the concept exists.
+
+## What each answer now means for the blockers
+
+**RB-1 — closes completely, and atomically.**
+Every ACCEPTED candidate gets an `inspectors` row (the workforce record). Because
+the owner chose atomic, acceptance is refused when that record cannot be created,
+so ACCEPTED will *always* mean a workforce record exists. The hidden checkbox
+disappears: conversion is no longer optional, only the classification is a choice.
+
+*Consequence the owner should see:* a recruiter can now be blocked at the final
+step by a data problem — most likely an unresolvable branch. The refusal messages
+already exist in `rcv_convert()` (`NO_BRANCH`, `BLOCKED`, `ALREADY`), so this is
+a wording and routing question, not new machinery.
+
+**RB-2 — largely closes as a consequence.**
+With conversion unconditional, `filled` and `joined` converge, so "filled" stops
+being able to mean "accepted but nobody joined". What remains is presentational:
+showing both numbers. `PARTIALLY_FILLED` already exists; **no new status value is
+required.**
+
+**RB-3 — becomes more important, and the target is now precise.**
+Conversion becomes the highest-volume creator of `inspectors` rows, so duplicate
+prevention matters more. The minimum rule is unchanged: reuse
+`ensure_unique_generated_index()` from Batch 3 over employee code and e-mail,
+detection first, prevention second.
+
+**Where `team_role` is asked.** In a Level-1 workspace it must be chosen at the
+point of conversion. In a recruitment-only workspace it is not asked at all, and
+the column keeps its default harmlessly — nothing reads it there, because
+Operations is not present.
+
+## Still required before implementation
+
+| # | Item | Why it cannot be assumed |
+|---|---|---|
+| 1 | **Confirm Model D′** as the reading of "depends on the type of user" | It is my inference from the owner's words plus the capability catalogue, not their literal instruction |
+| 2 | **Where `team_role` is captured at hire** — the stage-move form, the offer, or the requisition/position | A UX decision with different training consequences |
+| 3 | **Default when a workspace has not configured capabilities** | `connect_cap_configured()` returns false → everything shows. Should such a workspace behave as Level 1 = YES (today's behaviour) or be asked to configure first? |
+| 4 | **What a recruiter sees when acceptance is refused** | Atomicity was chosen; the wording and the recovery path are a product decision |
+
+**Nothing is implemented. These four items are the remaining input needed to
+write the RB-1/RB-2/RB-3 implementation prompt.**
