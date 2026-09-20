@@ -450,15 +450,22 @@ if ($cgTx) {
     t_ok(strpos((string)($cgTx[0]['code'] ?? ''), 'WORK:') === 0,
          'CG7a · and it had a real subject — the protection was removed first, so DDL was genuinely pending'
          . '  [' . (string)($cgTx[0]['msg'] ?? '') . ']');
+    //  The positive half. "Work was pending" is not the same fact as "the
+    //  migration was actually asked and said no" — the first corrected probe
+    //  asserted only the former, and CM6 survived it because a static marker made
+    //  the call return before it could refuse anything.
+    t_ok(strpos((string)($cgTx[0]['code'] ?? ''), ':REFUSED:') !== false,
+         'CG7b · *** the migration REFUSED to run DDL inside the caller\'s transaction ***'
+         . '  [' . (string)($cgTx[0]['code'] ?? '') . ']');
     t_ok(!empty($cgTx[0]['ok']),
-         'CG7b · *** a business row written in a caller-owned transaction does NOT survive its rollback ***'
+         'CG7c · and the caller\'s business row does not survive the rollback'
          . '  [' . (string)($cgTx[0]['code'] ?? '') . ']');
 }
 partner_contact_migrate();
 ensure_unique_generated_index('partner_contacts', 'uq_primary', PARTNER_PRIMARY_KEY_EXPR,
                               'uq_pcont_primary', 'partner_contact_reconcile_primaries');
 t_ok(in_array('uq_pcont_primary', table_index_names('partner_contacts'), true),
-     'CG7c · and the protection is restored afterwards, so later sections still have it');
+     'CG7d · and the protection is restored afterwards, so later sections still have it');
 
 //  CM3 · §4 — A GUARD THAT CANNOT INSTALL ITS PROTECTION MUST SAY SO.
 //
@@ -496,15 +503,29 @@ t_ok(in_array($cgBadName, array_column(schema_guards_not_ok(), 'guard'), true),
 //  refusal, so that half is asserted on SQLite alone rather than faked.
 if (t_driver() === 'sqlite') {
     db()->exec("CREATE TABLE IF NOT EXISTS cg_name_taken_by_a_table (id INTEGER)");
-    $cgIxFail = ensure_unique_generated_index('cg_guard_probe', 'uq_probe2',
-                  "CASE WHEN COALESCE(flag,0)<>0 THEN owner ELSE NULL END", 'cg_name_taken_by_a_table');
-    t_eq((string)$cgIxFail, 'FAILED', 'CG12a · a guard whose INDEX cannot be created also reports FAILED');
-    t_eq((string)(schema_guard_read('cg_name_taken_by_a_table')['state'] ?? ''), 'FAILED',
-         'CG12b · and that failure is recorded too');
+    $cgIxName = 'cg_name_taken_by_a_table';
 } else {
-    t_ok(true, 'CG12a · index-step refusal asserted on SQLite, which can force it with a legal name');
-    t_ok(true, 'CG12b · (MariaDB scopes index names per table, so it has no equivalent short-name refusal)');
+    //  MariaDB scopes index names per table, so a name cannot be made to clash.
+    //  InnoDB does cap a table at 64 keys, though — so the table is filled to its
+    //  limit. The generated key is then added quite happily and the UNIQUE INDEX
+    //  behind it is refused, which is the step this mutant deletes the check for.
+    for ($i = 0; $i < 64; $i++) { try { db()->exec("CREATE INDEX ix_cg_fill_$i ON cg_guard_probe (id)"); } catch (Throwable $e) { break; } }
+    $cgIxName = 'ux_cg_index_step';
 }
+//  Prove the engine really will refuse it, so this probe cannot pass by accident.
+$cgCanIndex = true;
+try { db()->exec("CREATE INDEX ix_cg_subject_check ON cg_guard_probe (flag)"); }
+catch (Throwable $e) { $cgCanIndex = false; }
+t_ok(!$cgCanIndex || t_driver() === 'sqlite',
+     'CG12s · the probe table really cannot take another index — the index-step failure is genuine');
+$cgIxFail = ensure_unique_generated_index('cg_guard_probe', 'uq_probe2',
+              "CASE WHEN COALESCE(flag,0)<>0 THEN owner ELSE NULL END", $cgIxName);
+t_eq((string)$cgIxFail, 'FAILED',
+     'CG12a · *** a guard whose INDEX cannot be created reports FAILED, not OK ***');
+t_eq((string)(schema_guard_read($cgIxName)['state'] ?? ''), 'FAILED',
+     'CG12b · and that failure is recorded where an operator can read it');
+t_ok(in_array('uq_probe2', table_columns_incl_generated('cg_guard_probe'), true) || t_driver() === 'sqlite',
+     'CG12c · the KEY was added successfully — only the index failed, so the check under test was reached');
 
 //  CM20 · §5 — THE LOSING SIDE OF A CONCURRENT BOOT.
 //

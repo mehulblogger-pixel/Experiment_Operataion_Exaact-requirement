@@ -42,7 +42,13 @@ try {
     //  installation itself, and warming it here would put the key back before the
     //  barrier and leave the probe with nothing to race — the "no valid subject"
     //  failure this batch keeps finding.
-    if ($op !== 'guardrace' && function_exists('partner_contact_migrate')) partner_contact_migrate();
+    //  'guardrace' and 'txddl' are the two ops that must NOT warm this up. Both
+    //  exist to watch the migration DO something, and partner_contact_migrate()
+    //  keeps a static epoch marker: warming it here would make the call in the op
+    //  body return immediately, so the probe would watch nothing happen and pass
+    //  whether or not the rule it tests still exists. That is precisely how
+    //  mutants CM6 and CM20 survived their first corrected probes.
+    if ($op !== 'guardrace' && $op !== 'txddl' && function_exists('partner_contact_migrate')) partner_contact_migrate();
     ops_val("SELECT COUNT(*) FROM partner_contacts");
     ops_val("SELECT COUNT(*) FROM business_partners");
     ops_val("SELECT COUNT(*) FROM client_users");
@@ -94,11 +100,18 @@ try {
         db()->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,status,created_at)
                        VALUES (?,?,?,1,'ACTIVE',?)")->execute(['TXD', $b, $b, date('c')]);
         partner_contact_migrate();                      // invited in, inside somebody else's transaction
+        //  The POSITIVE observation. "The row did not survive" is an absence, and
+        //  an absence is also what you get when nothing ran at all. This says
+        //  what the migration actually did: with the rule in force the key is
+        //  still missing, because the migration refused; without it, the ALTER
+        //  ran and the key is there — and on MariaDB that ALTER has already
+        //  committed the caller's row behind their back.
+        $ddlRan = in_array('uq_primary', table_columns_incl_generated('partner_contacts'), true);
         try { db()->rollBack(); } catch (Throwable $e) {}
 
         $survived = (int)ops_val("SELECT COUNT(*) FROM business_partners WHERE legal_name=?", [$b]);
-        $out['ok']   = ($survived === 0);
-        $out['code'] = ($hadWork ? 'WORK' : 'NOWORK') . ':' . $survived;
+        $out['ok']   = ($survived === 0 && !$ddlRan);
+        $out['code'] = ($hadWork ? 'WORK' : 'NOWORK') . ':' . ($ddlRan ? 'DDL_RAN' : 'REFUSED') . ':' . $survived;
         $out['msg']  = $hadWork ? 'the migration had real DDL to do'
                                 : 'NO SUBJECT — the protection was still present, so nothing would have run';
     } elseif ($op === 'guardrace') {
