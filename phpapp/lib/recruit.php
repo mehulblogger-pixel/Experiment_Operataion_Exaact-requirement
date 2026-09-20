@@ -1200,6 +1200,199 @@ function person_group_repair(array $opt = []) {
 //  additive.
 // ============================================================================
 
+// ===========================================================================
+//  RB-3 · STEP 2 — IS THIS PERSON ALREADY ON OUR TEAM?   (owner decision 2)
+//
+//  "Do not refuse automatically. Do not silently continue. Show the match and
+//   require the recruiter to explicitly acknowledge it."
+//
+//  THE GAP THIS FILLS: nothing in this application ever compared an applicant
+//  against the existing workforce. cand_find_duplicates() compares applicants to
+//  applicants; connect_identity_suggestions() bridges marketplace professionals
+//  to team members. This file contained no query against `inspectors` at all
+//  (P6-BATCH2-PREIMPLEMENTATION-AUDIT-R2.md, finding N4), so "we already employ
+//  this person" was a question the system could not ask.
+//
+//  THE EMPLOYEE NUMBER IS NEVER A MATCHING SIGNAL. It identifies an employment
+//  record, not a human, and Step 1 already made it unique for life.
+//
+//  The rules live in docs/phase7/RB3-STEP2-DUPLICATE-MATCH-RULES.md and the
+//  scale is the one cand_find_duplicates() has used since Phase 3 — a second
+//  scoring model would mean one screen calling something 96 and another calling
+//  the same thing 80.
+// ===========================================================================
+
+/** Strong enough that a human must look: things a person chooses and owns. */
+const WORKFORCE_STRONG_MIN = 90;      // mobile 96 · e-mail 94
+/** How long an acknowledgement stays usable. Long enough to read, short enough
+ *  that it cannot be pocketed and replayed tomorrow. */
+const WORKFORCE_ACK_TTL = 1800;       // 30 minutes
+
+/**
+ * Team members who may be the person in this application.
+ *
+ * Read-only. It never links, never merges and never writes. It returns a list
+ * and a question; a human answers it.
+ */
+function workforce_matches(array $cand) {
+    $mobile = preg_replace('/\D+/', '', (string)($cand['mobile'] ?? ''));
+    $email  = strtolower(trim((string)($cand['email'] ?? '')));
+    $first  = strtolower(trim((string)($cand['first_name'] ?? '')));
+    $last   = strtolower(trim((string)($cand['last_name'] ?? '')));
+    if ($mobile === '' && $email === '' && ($first === '' || $last === '')) return [];
+    try {
+        //  LIVE team members only. Somebody who has left is history, not a
+        //  duplicate, and warning about them would teach recruiters to click
+        //  past the warning next to it.
+        //
+        //  NO `LIMIT`, deliberately and permanently. cand_find_duplicates() has
+        //  one (500) and never says the check was partial; a check that quietly
+        //  becomes partial is worse than one that is absent (finding N5).
+        $rows = ops_all("SELECT id, name, first_name, last_name, emp_code, email, mobile, home_office_id, sbu
+                           FROM inspectors
+                          WHERE COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE'") ?: [];
+    } catch (Throwable $e) { return []; }
+
+    $out = [];
+    foreach ($rows as $r) {
+        $conf = 0; $basis = '';
+        $rm = preg_replace('/\D+/', '', (string)($r['mobile'] ?? ''));
+        if ($mobile !== '' && $rm !== '' && substr($rm, -10) === substr($mobile, -10)) { $conf = 96; $basis = 'mobile'; }
+        $re = strtolower(trim((string)($r['email'] ?? '')));
+        if ($conf < 94 && $email !== '' && $re !== '' && $re === $email) { $conf = 94; $basis = 'email'; }
+        if ($conf < 72) {
+            $rf = strtolower(trim((string)($r['first_name'] ?? '')));
+            $rl = strtolower(trim((string)($r['last_name'] ?? '')));
+            //  Older rows carry only `name`; split it so they are not invisible.
+            if ($rf === '' && $rl === '') {
+                $bits = preg_split('/\s+/', strtolower(trim((string)($r['name'] ?? ''))));
+                $rf = (string)($bits[0] ?? ''); $rl = (string)(count($bits) > 1 ? end($bits) : '');
+            }
+            if ($first !== '' && $last !== '' && $rf === $first && $rl === $last) { $conf = 72; $basis = 'name'; }
+            elseif ($conf < 46 && $last !== '' && $rl === $last && $first !== '' && $rf !== '' && $rf[0] === $first[0]) { $conf = 46; $basis = 'similar name'; }
+        }
+        if ($conf < 46) continue;
+
+        //  A match the actor may not open is COUNTED but NEVER NAMED — a record
+        //  id is never proof of authorisation (invariant I25). It still blocks:
+        //  otherwise "I cannot see that branch" would be a way round the gate.
+        $visible = !function_exists('connect_identity_scope_ok') || connect_identity_scope_ok('inspector', (int)$r['id']);
+        $out[] = [
+            'inspector_id' => (int)$r['id'],
+            'class'   => $conf >= WORKFORCE_STRONG_MIN ? 'STRONG' : 'WEAK',
+            'basis'   => $basis,
+            'confidence' => $conf,
+            'visible' => $visible,
+            'name'     => $visible ? (string)($r['name'] ?: trim(((string)$r['first_name']) . ' ' . ((string)$r['last_name']))) : '',
+            'emp_code' => $visible ? (string)($r['emp_code'] ?? '') : '',
+            'email'    => $visible ? workforce_mask_email((string)($r['email'] ?? '')) : '',
+            'mobile'   => $visible ? workforce_mask_mobile((string)($r['mobile'] ?? '')) : '',
+        ];
+    }
+    usort($out, fn($a, $b) => $b['confidence'] <=> $a['confidence'] ?: $a['inspector_id'] <=> $b['inspector_id']);
+    return $out;
+}
+
+/** Only the matches strong enough to stop a hire. */
+function workforce_strong_matches(array $matches) {
+    return array_values(array_filter($matches, fn($m) => ($m['class'] ?? '') === 'STRONG'));
+}
+
+//  Shown so a recruiter can recognise the person, masked so a screen does not
+//  become a contact-details export (§7 — do not expose more than the decision needs).
+function workforce_mask_mobile($m) {
+    $d = preg_replace('/\D+/', '', (string)$m);
+    return $d === '' ? '' : str_repeat('X', max(0, strlen($d) - 2)) . substr($d, -2);
+}
+function workforce_mask_email($e) {
+    $e = trim((string)$e); if ($e === '' || strpos($e, '@') === false) return '';
+    [$u, $d] = explode('@', $e, 2);
+    return (strlen($u) <= 2 ? substr($u, 0, 1) : substr($u, 0, 2)) . str_repeat('*', max(1, strlen($u) - 2)) . '@' . $d;
+}
+
+/**
+ * The per-workspace key the acknowledgement is signed with.
+ *
+ * NO NEW TABLE. It lives in the `settings` store this application already has,
+ * which is already per-tenant — which is also what makes an acknowledgement
+ * signed in one workspace unverifiable in another.
+ */
+function workforce_ack_secret() {
+    $k = (string)(function_exists('setting_get') ? setting_get('rb3_ack_key', '') : '');
+    if (strlen($k) >= 32) return $k;
+    if (!function_exists('setting_set')) return '';
+    try {
+        setting_set('rb3_ack_key', bin2hex(random_bytes(32)));
+        //  Read back from the DATABASE, not from the in-memory cache: two boots
+        //  creating the key at the same instant both write, one wins, and the
+        //  loser must sign with the winner's value or every token it issues will
+        //  be rejected a moment later.
+        $live = (string)ops_val("SELECT svalue FROM settings WHERE skey=?", ['rb3_ack_key']);
+        return strlen($live) >= 32 ? $live : '';
+    } catch (Throwable $e) { return ''; }
+}
+
+/**
+ * A fingerprint of EXACTLY what is being acknowledged.
+ *
+ * It covers the strong matches AND the applicant's own contact identity, because
+ * if their mobile changes the question is a different question and yesterday's
+ * answer does not answer it (§10).
+ */
+function workforce_ack_evidence(array $matches, array $cand) {
+    $ids = [];
+    foreach (workforce_strong_matches($matches) as $m) $ids[] = (int)$m['inspector_id'] . ':' . (string)$m['basis'];
+    sort($ids);
+    $who = strtolower(trim((string)($cand['email'] ?? '')))
+         . '|' . substr(preg_replace('/\D+/', '', (string)($cand['mobile'] ?? '')), -10);
+    return hash('sha256', $who . '#' . implode(',', $ids));
+}
+
+/**
+ * Issue an acknowledgement for this candidate, this user, this evidence, now.
+ *
+ * Returns '' when there is nothing to acknowledge — so a screen with no strong
+ * match cannot render a tick at all, and the default state is always NOT
+ * ACKNOWLEDGED because an unticked checkbox sends nothing.
+ */
+function workforce_ack_issue($candId, array $matches, array $cand, $userId = 0) {
+    if (!workforce_strong_matches($matches)) return '';
+    $sec = workforce_ack_secret(); if ($sec === '') return '';
+    $uid = (int)$userId ?: (int)(function_exists('current_user') ? (current_user()['id'] ?? 0) : 0);
+    $iat = time();
+    $mac = hash_hmac('sha256', implode('|', [(int)$candId, $uid, workforce_ack_evidence($matches, $cand), $iat]), $sec);
+    return $iat . '.' . $mac;
+}
+
+/**
+ * Is this acknowledgement real, for THIS candidate, from THIS user, about THIS
+ * evidence, and still fresh?
+ *
+ * Every one of those is a separate way the gate could be walked around, and each
+ * is closed by being inside the signature rather than beside it.
+ */
+function workforce_ack_ok($token, $candId, array $matches, array $cand, $userId = 0) {
+    $token = trim((string)$token); if ($token === '') return false;
+    $parts = explode('.', $token);
+    if (count($parts) !== 2) return false;
+    [$iat, $mac] = $parts;
+    if ($iat === '' || !ctype_digit($iat) || !preg_match('/^[0-9a-f]{64}$/', (string)$mac)) return false;
+    $age = time() - (int)$iat;
+    if ($age > WORKFORCE_ACK_TTL || $age < -60) return false;     // stale, or issued in the future
+    $sec = workforce_ack_secret(); if ($sec === '') return false;
+    $uid = (int)$userId ?: (int)(function_exists('current_user') ? (current_user()['id'] ?? 0) : 0);
+    $want = hash_hmac('sha256', implode('|', [(int)$candId, $uid, workforce_ack_evidence($matches, $cand), (int)$iat]), $sec);
+    return hash_equals($want, (string)$mac);
+}
+
+/** One line naming what the recruiter was shown, for the audit trail. */
+function workforce_ack_note(array $matches) {
+    $bits = [];
+    foreach (workforce_strong_matches($matches) as $m)
+        $bits[] = '#' . $m['inspector_id'] . ($m['emp_code'] !== '' ? ' (' . $m['emp_code'] . ')' : '') . ' by ' . $m['basis'];
+    return implode(', ', $bits);
+}
+
 /** Refusal codes — deterministic, testable, and safe to show. */
 const RCV_CODES = [
     'CONVERTED'      => 'Added to the team.',
@@ -1212,6 +1405,7 @@ const RCV_CODES = [
     'FAILED'         => 'The conversion could not be completed. Nothing was changed.',
     'EMP_CODE'       => 'An employee number could not be issued, so nobody was added. Try again; if it keeps happening, ask an administrator to check the employee-number report.',
     'BUSY'           => 'Somebody else was saving at the same moment, so nothing was changed. Please try again.',
+    'WORKFORCE_MATCH'=> 'This person may already be on your team. Open the application, check the possible match shown there, and tick to confirm before accepting.',
 ];
 
 /**
@@ -1304,6 +1498,37 @@ function rcv_convert($candId, array $opt = []) {
     //  7 IDENTITY CAPABILITY — decided BEFORE the write so the outcome is known,
     //     and never a blocker on recruitment (BD2).
     $mayLink = function_exists('connect_identity_conversion_allowed') && connect_identity_conversion_allowed();
+
+    //  7a IS THIS PERSON ALREADY ON THE TEAM? — owner decision 2, RB-3 Step 2.
+    //
+    //     Asked HERE, in the action, and not by the page: a forged POST that
+    //     never rendered the warning must fail exactly as the screen does
+    //     (invariant I27, and the instruction's "do not trust the UI").
+    //
+    //     Refusing writes NOTHING and leaves the application untouched — the
+    //     refusal happens before the transaction is even opened.
+    //
+    //     Only a STRONG match stops a hire: a shared mobile number or a shared
+    //     e-mail address, which are things a person chooses and owns. A shared
+    //     NAME never stops anything. Rajesh Patel does not block Rajesh Patel.
+    $wfAckNote = '';
+    if (function_exists('workforce_matches')) {
+        $wfAll    = workforce_matches($cand);
+        $wfStrong = workforce_strong_matches($wfAll);
+        if ($wfStrong) {
+            $wfActor = (int)($opt['actor_id'] ?? 0);
+            if (!workforce_ack_ok((string)($opt['dup_ack'] ?? ''), $candId, $wfAll, $cand, $wfActor)) {
+                rcv_log($candId, 'IDENTITY_REFUSED',
+                    'Conversion refused — ' . count($wfStrong) . ' possible existing team member(s) and no confirmation: '
+                    . workforce_ack_note($wfAll));
+                return $fail('WORKFORCE_MATCH');
+            }
+            //  Acknowledged. Record WHICH matches the recruiter was shown, not
+            //  merely that a box was ticked — "they confirmed" is not evidence
+            //  unless it says what they confirmed.
+            $wfAckNote = ' — possible existing team member(s) reviewed and confirmed: ' . workforce_ack_note($wfAll);
+        }
+    }
 
     $name = function_exists('candidate_name') ? candidate_name($cand)
           : trim(((string)($cand['first_name'] ?? '')) . ' ' . ((string)($cand['last_name'] ?? '')));
@@ -1424,7 +1649,8 @@ function rcv_convert($candId, array $opt = []) {
     rcv_log($candId, 'IDENTITY_LINKED',
         'Converted to team member #' . $insId . ' (branch from ' . $src . ')'
         . ($identity === 'LINKED' ? ' — identity relationship recorded'
-                                  : ' — identity relationship NOT recorded (marketplace capability unavailable)'));
+                                  : ' — identity relationship NOT recorded (marketplace capability unavailable)')
+        . $wfAckNote);
 
     return ['ok' => true, 'code' => 'CONVERTED', 'message' => RCV_CODES['CONVERTED'], 'inspector_id' => $insId,
             'identity' => $identity, 'branch' => $office, 'branch_source' => $src];

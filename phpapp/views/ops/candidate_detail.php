@@ -375,6 +375,38 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
         </select></div>
       <div class="ff ff-wide"><label>Remark (decision note, interview feedback…)</label><input class="form-control" name="remark" placeholder="e.g. Client shortlisted; interview on 25th"></div>
     </div>
+    <?php // RB-3 Step 2 — this person may already be on the team.
+    $wfStrong = $wfStrong ?? []; $wfMatches = $wfMatches ?? []; $wfAckTok = $wfAckTok ?? '';
+    $wfWeak = array_values(array_filter($wfMatches, fn($m) => ($m['class'] ?? '') !== 'STRONG'));
+    if ($wfStrong): ?>
+    <div style="border-left:4px solid #b45309;background:#fffbeb;border-radius:8px;padding:11px 14px;margin:10px 0">
+      <b style="color:#92400e">⚠ Possible existing team member</b>
+      <p class="muted" style="font-size:12.5px;margin:4px 0 8px">Somebody already on the team shares this person's contact details. That is normal for a re-hire — please check it is not the same person being added twice.</p>
+      <?php foreach ($wfStrong as $m): ?>
+        <div style="font-size:13px;margin-top:4px">
+          <?php if ($m['visible']): ?>
+            <b><?= e($m['name'] ?: 'Team member #' . $m['inspector_id']) ?></b>
+            <?= $m['emp_code'] !== '' ? ' · Employee No. <b>' . e($m['emp_code']) . '</b>' : '' ?>
+            <?= $m['mobile']   !== '' ? ' · ' . e($m['mobile']) : '' ?>
+            <?= $m['email']    !== '' ? ' · ' . e($m['email'])  : '' ?>
+            <span class="muted">— same <?= e($m['basis']) ?></span>
+          <?php else: ?>
+            <span class="muted">A team member in a branch you cannot open shares this person's <?= e($m['basis']) ?>. Ask an administrator to check before continuing.</span>
+          <?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+      <?php if ($wfAckTok !== ''): ?>
+      <label class="chk" style="display:inline-flex;gap:7px;margin:10px 0 0;align-items:flex-start">
+        <input type="checkbox" name="dup_ack" value="<?= e($wfAckTok) ?>">
+        <span>I have reviewed the possible existing record and confirm that I want to continue with this candidate.</span>
+      </label>
+      <?php endif; ?>
+    </div>
+    <?php elseif ($wfWeak): ?>
+    <div style="border-left:4px solid var(--line,#cbd5e1);background:var(--soft,#f8fafc);border-radius:8px;padding:9px 13px;margin:10px 0">
+      <span class="muted" style="font-size:12.5px">For information: <?= count($wfWeak) ?> team member<?= count($wfWeak) === 1 ? '' : 's' ?> share this person's name. A name on its own is not a duplicate, so this does not stop anything.</span>
+    </div>
+    <?php endif; ?>
     <?php if (empty($cand['inspector_id'])): ?>
     <label class="chk" id="hire_chk" style="margin:8px 2px;display:none"><input type="checkbox" name="make_inspector" id="mk_insp" value="1"> On <strong>Accept</strong>, also add this person to Inspectors</label>
     <div id="hire_details" class="panel" style="display:none;background:var(--soft);margin-top:6px">

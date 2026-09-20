@@ -5928,6 +5928,10 @@ function ops_candidates($route, $method) {
             if ($to === 'ACCEPTED' && !empty($_POST['make_inspector']) && empty($cand['inspector_id'])
                 && function_exists('rcv_convert')) {
                 $cv = rcv_convert($id, [
+                    //  RB-3 Step 2 — the tick, carried to the action that decides.
+                    //  The route is a courier here, not a gate: it neither checks
+                    //  the acknowledgement nor trusts it.
+                    'dup_ack'       => (string)($_POST['dup_ack'] ?? ''),
                     'agency_id'     => ($_POST['agency_id'] ?? '') !== '' ? (int)$_POST['agency_id'] : 0,
                     'roll_type'     => (string)($_POST['roll_type'] ?? ''),
                     'placement_fee' => ($_POST['placement_fee'] ?? '') !== '' ? (float)$_POST['placement_fee'] : 0,
@@ -6338,7 +6342,15 @@ function ops_candidates($route, $method) {
         $proLink = function_exists('connect_identity_of_candidate') ? connect_identity_of_candidate((int)$cand['id']) : null;
         // Gap-8 — the unified person across every linked pool (resolve-view, no merge).
         $person = function_exists('connect_person_summary') ? connect_person_summary('candidate', (int)$cand['id']) : null;
+        //  RB-3 Step 2 — is this person already on the team? The token is issued
+        //  HERE, bound to this application, this user and this evidence, and is
+        //  carried as the tick's own value: an unticked box sends nothing, so
+        //  the default state is always NOT ACKNOWLEDGED.
+        $wfMatches = (function_exists('workforce_matches') && empty($cand['inspector_id'])) ? workforce_matches($cand) : [];
+        $wfStrong  = $wfMatches ? workforce_strong_matches($wfMatches) : [];
+        $wfAckTok  = $wfStrong ? workforce_ack_issue((int)$cand['id'], $wfMatches, $cand) : '';
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
+            'wfMatches' => $wfMatches, 'wfStrong' => $wfStrong, 'wfAckTok' => $wfAckTok,
             'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket,
             'personApps' => $personApps, 'proMatches' => $proMatches, 'proLink' => $proLink, 'person' => $person,
             'rccDropPoints' => function_exists('rcc_drop_points') ? rcc_drop_points() : [], 'rccDropReasons' => function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : []]);

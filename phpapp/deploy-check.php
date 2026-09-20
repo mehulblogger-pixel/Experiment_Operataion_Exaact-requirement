@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '4f93329 · 2026-09-20 10:59 UTC · 666 files';
+$RELEASE = '1be25de · 2026-09-20 12:37 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -170,7 +170,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66290,'h'=>'4ff1bc5a2652ad81'],
-    'lib/ops.php' => ['s'=>649358,'h'=>'86746be4718cba22'],
+    'lib/ops.php' => ['s'=>650349,'h'=>'8ee01159d22d26c7'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -190,7 +190,7 @@ $EXPECT  = [
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
-    'lib/recruit.php' => ['s'=>90252,'h'=>'69969aabb7029802'],
+    'lib/recruit.php' => ['s'=>102271,'h'=>'3f57f27b5d970af2'],
     'lib/recruit_approval.php' => ['s'=>147839,'h'=>'732ae4559975ab0c'],
     'lib/recruit_assign.php' => ['s'=>39386,'h'=>'57d29dfa58c1fc33'],
     'lib/recruit_cc.php' => ['s'=>30990,'h'=>'58dcf5cd677eb27c'],
@@ -339,7 +339,7 @@ $EXPECT  = [
     'views/ops/call_form.php' => ['s'=>67751,'h'=>'a8af3f71f77a2107'],
     'views/ops/call_profit.php' => ['s'=>10827,'h'=>'9ceb75929d00146d'],
     'views/ops/calls.php' => ['s'=>11306,'h'=>'d906595ec4d7ae6d'],
-    'views/ops/candidate_detail.php' => ['s'=>43498,'h'=>'d6ca50fe326abd18'],
+    'views/ops/candidate_detail.php' => ['s'=>45820,'h'=>'635841440479315c'],
     'views/ops/candidate_form.php' => ['s'=>20322,'h'=>'d15b43537dd06a3f'],
     'views/ops/candidate_list.php' => ['s'=>2784,'h'=>'1e2c041b86f7e74d'],
     'views/ops/candidate_pool.php' => ['s'=>4450,'h'=>'6434745c74e6751f'],
