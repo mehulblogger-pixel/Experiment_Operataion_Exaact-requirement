@@ -800,6 +800,23 @@ function identity_state_findings($limit = 200) {
         }
     }
 
+    // ---- RB-3 Step 3 — audit entries that could not be written -------------
+    //
+    //  Invariant I41 keeps the hire: a failed note never undoes completed work.
+    //  Owner decision 2 removes the other half of the old behaviour — that the
+    //  loss was SILENT. If a note could not be written, say so here.
+    if (function_exists('setting_get')) {
+        $lostN = (int)setting_get('audit_writes_lost', 0);
+        if ($lostN > 0)
+            $add('AUDIT_WRITES_LOST',
+                 'Some acceptance entries could not be written to the activity trail.',
+                 ['entries' => $lostN],
+                 'The hires themselves stand — a failed note never undoes completed work. '
+                 . 'But this many entries are missing from the trail, so the record is incomplete. '
+                 . 'Check the server error log for the affected applications.',
+                 false, true);
+    }
+
     // ---- Phase 6 · Batch 3 — ORGANISATION states (detection only) ----------
     //
     //  Extends the report Batch 2 built rather than adding a second one. Every

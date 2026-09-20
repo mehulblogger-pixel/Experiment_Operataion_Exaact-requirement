@@ -5878,6 +5878,135 @@ function ops_candidates($route, $method) {
             $lost = in_array($to, ['REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD'], true);
             $dropPoint  = $lost ? substr(trim((string)($_POST['drop_point'] ?? '')), 0, 30) : '';
             $dropReason = $lost ? substr(trim((string)($_POST['drop_reason'] ?? '')), 0, 60) : '';
+
+            // ================================================================
+            //  RB-3 · STEP 3 — A JOINING IS ONE TRANSACTION, OR IT IS NOTHING
+            //
+            //  Owner decision: every refusable check happens before the
+            //  transaction; the stage transition, the KPI stage ledger, the
+            //  workforce record, the employee number, the requirement's
+            //  standing and the source credit all happen inside it.
+            //
+            //  Only a JOINING takes this path. Every other stage move —
+            //  shortlist, interview, offer, reject, withdraw, hold — keeps the
+            //  behaviour it has always had, a few lines down, untouched.
+            // ================================================================
+            $rqId     = (int)($cand['requisition_id'] ?? 0);
+            $wantHire = ($to === 'ACCEPTED' && !empty($_POST['make_inspector'])
+                         && empty($cand['inspector_id']) && function_exists('rcv_convert'));
+            $msg = 'Candidate moved to ' . lk_options_or('candidate_stage', CAND_STAGES)[$to] . '.';
+
+            if ($m6Joining) {
+                //  BEFORE the transaction: every schema migration this path can
+                //  reach. MariaDB commits implicitly on any DDL, so one firing
+                //  inside would silently commit a half-finished acceptance.
+                if (function_exists('rcv_prewarm_migrations')) rcv_prewarm_migrations();
+
+                $tx = false; $cv = null; $insId = 0; $p4rev = '';
+                try { $tx = (bool)$pdo->beginTransaction(); } catch (Throwable $e) { $tx = false; }
+                try {
+                    //  1 · THE SEAT, decided under a lock on the requirement.
+                    //
+                    //  LOCK ORDER — requirement, then candidate, then the
+                    //  workforce insert. One direction, everywhere. Step 1 paid
+                    //  for this lesson: inconsistent ordering between the
+                    //  candidate row and the employee-number key produced an
+                    //  InnoDB deadlock in three runs out of three.
+                    //
+                    //  SQLite needs no row lock: it serialises writers across
+                    //  the whole database, so the first writer in is the only
+                    //  one inside this block.
+                    if ($rqId > 0) {
+                        if (db_driver() !== 'sqlite')
+                            $pdo->prepare("SELECT id FROM requisitions WHERE id=? FOR UPDATE")->execute([$rqId]);
+                        $seatWhy = function_exists('rexec_block_reason')
+                                 ? (string)rexec_block_reason($rqId, 'JOIN', $id) : '';
+                        //  Re-asked HERE, holding the lock. The identical check a
+                        //  few lines above is only an early courtesy refusal; this
+                        //  is the one that decides, and it is why the loser is
+                        //  stopped at the save rather than unwound after it.
+                        if ($seatWhy !== '') throw new RuntimeException('SEAT|' . $seatWhy);
+                    }
+
+                    //  2 · THE STAGE.
+                    try {
+                        $stw = $pdo->prepare("UPDATE candidates SET stage=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?");
+                        $stw->execute([$to, $decided, $dropPoint, $dropReason, $id]);
+                    } catch (Throwable $e) {
+                        $stw = $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?");
+                        $stw->execute([$to, $decided, $id]);
+                    }
+                    if ($stw->rowCount() < 1 && (string)$cand['stage'] !== (string)$to)
+                        throw new RuntimeException('GONE|That application is no longer there.');
+
+                    //  3 · THE KPI STAGE LEDGER, inside — the owner named it
+                    //      explicitly, so a ledger this path cannot write is an
+                    //      acceptance that does not happen.
+                    if (function_exists('rkpi_stage_log')
+                        && !rkpi_stage_log($id, (string)$cand['stage'], $to, [
+                               'from_code' => strtoupper((string)$cand['stage']), 'to_code' => strtoupper((string)$to),
+                               'track' => 'LEGACY', 'kind' => 'MOVE',
+                               'remark' => $remark, 'actor' => user_name(current_user())]))
+                        throw new RuntimeException('LEDGER|The stage history could not be recorded, so nothing was changed.');
+
+                    //  4 · THE WORKFORCE RECORD and its employee number.
+                    //      rcv_convert() sees it is inside somebody else's
+                    //      transaction, joins it, commits nothing, and RE-THROWS
+                    //      on failure so this unwinds — the contract Batch 2 built.
+                    if ($wantHire) {
+                        $cv = rcv_convert($id, [
+                            //  RB-3 Step 2 — the tick, carried to the action that
+                            //  decides. The route is a courier, not a gate.
+                            'dup_ack'       => (string)($_POST['dup_ack'] ?? ''),
+                            'agency_id'     => ($_POST['agency_id'] ?? '') !== '' ? (int)$_POST['agency_id'] : 0,
+                            'roll_type'     => (string)($_POST['roll_type'] ?? ''),
+                            'placement_fee' => ($_POST['placement_fee'] ?? '') !== '' ? (float)$_POST['placement_fee'] : 0,
+                            'agency_cost'   => ($_POST['agency_cost'] ?? '') !== '' ? (float)$_POST['agency_cost'] : 0,
+                        ]);
+                        if (empty($cv['ok'])) throw new RuntimeException('CONV|' . (string)($cv['message'] ?? 'The hire could not be completed.'));
+                        $insId = (int)$cv['inspector_id'];
+                        if ($rqId > 0)
+                            $pdo->prepare("UPDATE requisitions SET hired_inspector_id=? WHERE id=?")->execute([$insId, $rqId]);
+                    }
+
+                    //  5 · THE SOURCE CREDIT (Phase 4) and 6 · THE REQUIREMENT'S
+                    //      STANDING (M3), both inside, so a rollback takes them
+                    //      back with everything else.
+                    if (function_exists('rful_enforce_candidate'))
+                        $p4rev = (string)rful_enforce_candidate($id, (int)($cand['allocation_id'] ?? 0));
+                    if ($rqId > 0 && function_exists('reqf_sync')) reqf_sync($rqId);
+
+                    if ($tx) $pdo->commit();
+                } catch (Throwable $e) {
+                    if ($tx) { try { $pdo->rollBack(); } catch (Throwable $e2) {} }
+                    //  NOTHING happened: no stage move, no team member, no
+                    //  employee number consumed, no ledger row. The application
+                    //  is exactly where it was.
+                    $parts = explode('|', $e->getMessage(), 2);
+                    $why = count($parts) === 2 ? $parts[1] : 'The acceptance could not be completed, so nothing was changed.';
+                    //  Audited OUTSIDE the transaction that just disappeared —
+                    //  a refusal nobody can see is not a refusal (decision 2).
+                    if (function_exists('rcv_audit_or_report'))
+                        rcv_audit_or_report($id, 'IDENTITY_REFUSED', 'Acceptance refused, nothing changed — ' . $why);
+                    flash('Candidate could not be accepted. ' . $why, 'error');
+                    redirect('/candidate?id=' . $id);
+                }
+
+                //  COMMITTED. Everything below only describes what happened.
+                if ($p4rev !== '') flash($p4rev, 'error');
+                if ($wantHire && $cv) {
+                    if ($rqId > 0)
+                        $msg .= function_exists('reqf_summary_text')
+                              ? ' Requisition: ' . reqf_summary_text($rqId) . '.' : ' Requisition filled.';
+                    $msg .= ' Added to ' . THP('engineer') . ' (' . ($cv['branch_source'] === 'requisition' ? 'branch from the requirement' : 'branch from the recruiter') . ') — you can now allocate ' . Tlp('job') . ' to them.';
+                    //  BD2 — STATE B is never dressed up as STATE A.
+                    if (($cv['identity'] ?? '') === 'NOT_ENTITLED')
+                        $msg .= ' The cross-system identity record was not created (the marketplace add-on is not active); it can be linked later.';
+                }
+                flash($msg);
+                redirect('/candidate?id=' . $id);
+            }
+
             try { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?")->execute([$to, $decided, $dropPoint, $dropReason, $id]); }
             catch (Throwable $e) { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]); }
             //  PHASE 5 — the ledger records the move HERE, at the moment it
@@ -5898,6 +6027,10 @@ function ops_candidates($route, $method) {
             //  processes recording a joining at the same instant both pass the gate
             //  above; this puts the loser back and says so. The same shape M4 used
             //  for the headcount ceiling and M5 for ownership.
+            //  A JOINING never reaches here any more — it returned above, having
+            //  settled its seat inside the transaction under a lock. This
+            //  compensating revert stays exactly as it was for every other path
+            //  that can still reach it.
             if ($m6Joining && function_exists('rexec_join_enforce_after_write')) {
                 $m6rev = rexec_join_enforce_after_write($id, (string) $cand['stage'], (string) ($cand['decided_at'] ?? ''));
                 if ($m6rev !== '') { flash($m6rev, 'error'); redirect('/candidate?id=' . $id); }
@@ -5916,53 +6049,11 @@ function ops_candidates($route, $method) {
             // Accepting without creating a workforce record, and reversing a hire,
             // both change how many seats are filled.
             if (!empty($cand['requisition_id']) && function_exists('reqf_sync')) reqf_sync((int)$cand['requisition_id']);
-            $msg = 'Candidate moved to ' . lk_options_or('candidate_stage', CAND_STAGES)[$to] . '.';
-            //  Hired: create a team-member record from the accepted application.
-            //
-            //  Phase 6 · Batch 2 — this was twenty lines of raw SQL here, with no
-            //  transaction and no ceiling: three browsers accepting the same person
-            //  at the same instant produced three staff records, two of them
-            //  belonging to nobody. It is now one atomic operation that asks its own
-            //  gates, resolves the branch deliberately (BD1) and says whether the
-            //  identity relationship was recorded (BD2).
-            if ($to === 'ACCEPTED' && !empty($_POST['make_inspector']) && empty($cand['inspector_id'])
-                && function_exists('rcv_convert')) {
-                $cv = rcv_convert($id, [
-                    //  RB-3 Step 2 — the tick, carried to the action that decides.
-                    //  The route is a courier here, not a gate: it neither checks
-                    //  the acknowledgement nor trusts it.
-                    'dup_ack'       => (string)($_POST['dup_ack'] ?? ''),
-                    'agency_id'     => ($_POST['agency_id'] ?? '') !== '' ? (int)$_POST['agency_id'] : 0,
-                    'roll_type'     => (string)($_POST['roll_type'] ?? ''),
-                    'placement_fee' => ($_POST['placement_fee'] ?? '') !== '' ? (float)$_POST['placement_fee'] : 0,
-                    'agency_cost'   => ($_POST['agency_cost'] ?? '') !== '' ? (float)$_POST['agency_cost'] : 0,
-                ]);
-                if (!$cv['ok']) {
-                    //  The stage move already happened and stands; only the
-                    //  conversion was refused, and it says exactly why.
-                    flash($msg . ' ' . $cv['message'], 'error');
-                    redirect('/candidate?id=' . $id);
-                }
-                $insId = (int)$cv['inspector_id'];
-                // Fill the requisition this candidate was raised against.
-                if (!empty($cand['requisition_id'])) {
-                    // M3 — a requisition for ten people is not finished because one
-                    // of them joined. hired_inspector_id is kept for the screens and
-                    // reports that have always read it (it names the most recent
-                    // hire), but the STATUS is now derived from how many seats are
-                    // actually filled, so it only reaches "Hired (filled)" when the
-                    // requirement really is met.
-                    $pdo->prepare("UPDATE requisitions SET hired_inspector_id=? WHERE id=?")->execute([$insId, (int)$cand['requisition_id']]);
-                    if (function_exists('reqf_sync')) reqf_sync((int)$cand['requisition_id']);
-                    $msg .= function_exists('reqf_summary_text')
-                        ? ' Requisition: ' . reqf_summary_text((int)$cand['requisition_id']) . '.'
-                        : ' Requisition filled.';
-                }
-                $msg .= ' Added to ' . THP('engineer') . ' (' . ($cv['branch_source'] === 'requisition' ? 'branch from the requirement' : 'branch from the recruiter') . ') — you can now allocate ' . Tlp('job') . ' to them.';
-                //  BD2 — STATE B is never dressed up as STATE A.
-                if (($cv['identity'] ?? '') === 'NOT_ENTITLED')
-                    $msg .= ' The cross-system identity record was not created (the marketplace add-on is not active); it can be linked later.';
-            }
+            //  Only NON-JOINING moves reach here. A joining returned above from
+            //  the single transaction that performs it, so the conversion block
+            //  that used to sit here — running AFTER the stage move had already
+            //  committed, which is the defect this step removes — is gone rather
+            //  than left behind to drift out of step with the path replacing it.
             flash($msg);
         }
         redirect('/candidate?id=' . $id);

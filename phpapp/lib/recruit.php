@@ -1446,6 +1446,78 @@ function rcv_branch_for($candId, $actorId = 0) {
     return [null, 'none'];
 }
 
+// ===========================================================================
+//  RB-3 · STEP 3 — THE ACCEPTANCE TRANSACTION
+//
+//  Owner decision (2026-09-20): every refusable check happens BEFORE the
+//  transaction; the stage transition, the KPI stage ledger, the workforce
+//  record, the employee number and every other acceptance-related write happen
+//  INSIDE one transaction. Either the whole acceptance happens or none of it
+//  does.
+//
+//  Two things had to be settled before this could be built, and both were put
+//  to the owner rather than decided here
+//  (docs/phase7/RB3-STEP3-TRANSACTION-BOUNDARY-STOP-REPORT.md):
+//
+//    · THE SEAT CEILING moves inside the transaction, under a lock on the
+//      requirement. M6 used to let two recruiters both pass and then put the
+//      loser BACK after the write — which was safe only because the revert ran
+//      before the workforce record was created. Inside one transaction that
+//      ordering disappears, and the revert (which undoes the stage and must
+//      never delete a person) would have left a real team member holding a
+//      permanent employee number for a hire that was undone. So the second
+//      recruiter is now stopped AT THE SAVE instead of being unwound after it.
+//
+//    · THE AUDIT stays OUTSIDE, because invariant I41 says a failed observation
+//      is never a failed transaction — a database hiccup while writing a note
+//      must not cost somebody a completed hire. What changes is that the gap is
+//      no longer silent: see rcv_audit_or_report().
+// ===========================================================================
+
+//  MariaDB COMMITS IMPLICITLY ON ANY DDL. Every one of these runs schema
+//  changes on a process whose epoch marker is not yet warm — that is, the first
+//  acceptance after any restart or deploy — so one firing inside the
+//  transaction would silently commit a half-finished acceptance. They are run
+//  BEFORE it opens, every time. Cheap when warm; essential when cold.
+const RCV_ACCEPT_MIGRATIONS = [
+    'rkpi_migrate', 'reqf_migrate', 'rful_migrate', 'asg_migrate', 'person_migrate',
+    'connect_identity_migrate', 'emp_code_migrate', 'act_migrate',
+];
+
+/** Run every migration the acceptance path can reach, outside any transaction. */
+function rcv_prewarm_migrations() {
+    try { if (db()->inTransaction()) return false; } catch (Throwable $e) {}
+    foreach (RCV_ACCEPT_MIGRATIONS as $fn)
+        if (function_exists($fn)) { try { $fn(); } catch (Throwable $e) {} }
+    return true;
+}
+
+/**
+ * Write an acceptance audit entry OUTSIDE the transaction — and never silently
+ * lose it (owner decision 2).
+ *
+ * I41 stands: the hire is already committed and a failed note does not undo it.
+ * But until now a failed audit write simply returned false and nobody ever
+ * learned the note was gone. A lost entry is now COUNTED, and the count is
+ * reported by identity_state_findings() so somebody can see it.
+ *
+ * The counter is best-effort by nature — if the database is refusing writes it
+ * may refuse this one too — so the error log is the last resort. Neither can
+ * fail the hire.
+ */
+function rcv_audit_or_report($candId, $kind, $subject) {
+    $ok = false;
+    try { $ok = function_exists('act_log') && (int)act_log('CANDIDATE', (int)$candId, $kind, $subject, ['auto' => 0]) > 0; }
+    catch (Throwable $e) { $ok = false; }
+    if ($ok) return true;
+    try {
+        if (function_exists('setting_get') && function_exists('setting_set'))
+            setting_set('audit_writes_lost', (string)(((int)setting_get('audit_writes_lost', 0)) + 1));
+    } catch (Throwable $e) {}
+    @error_log('EXAACT: acceptance audit entry could not be written for candidate #' . (int)$candId . ' (' . $kind . ')');
+    return false;
+}
+
 /** Audit a conversion outcome against the candidate — the record it is about. */
 function rcv_log($candId, $kind, $subject) {
     if (!function_exists('act_log')) return;

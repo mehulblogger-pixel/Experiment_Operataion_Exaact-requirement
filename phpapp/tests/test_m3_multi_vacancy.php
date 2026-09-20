@@ -233,8 +233,24 @@ t_ok(substr_count($opsAll, 'reqf_sync(') >= 5,
 //  move being recorded to the sentence the user is shown afterwards. A byte
 //  window would have to be widened every time anything is inserted between them,
 //  and each widening quietly weakens the probe.
-$evPos = strpos($opsAll, 'rkpi_stage_log(');
-$endPos = $evPos !== false ? strpos($opsAll, "\$msg = 'Candidate moved to '", $evPos) : false;
+//  RB-3 Step 3 — a JOINING is now one transaction and returns before the
+//  ordinary stage move, so there are TWO regions to inspect rather than one.
+//  The old single-region probe anchored on "$msg = 'Candidate moved to '"
+//  appearing AFTER the ledger write; that assignment now happens earlier,
+//  before the branch, so the anchor was no longer found. It failed rather than
+//  passing — which is the behaviour its own comment above asks for — and the
+//  rule it stands for is unchanged: recomputation must not live only in the
+//  hire branch. Both regions are now checked, so the probe is stricter than
+//  the one it replaces, not looser.
+$atomPos = strpos($opsAll, 'if ($m6Joining) {');
+$atomEnd = $atomPos !== false ? strpos($opsAll, 'if ($tx) $pdo->commit();', $atomPos) : false;
+$evPos   = strpos($opsAll, 'rkpi_stage_log(', $atomEnd !== false ? $atomEnd : 0);
+$endPos  = $evPos !== false ? strpos($opsAll, 'flash($msg);', $evPos) : false;
+t_ok($atomPos !== false && $atomEnd !== false && $evPos !== false && $endPos !== false,
+     'the recomputation probe found both of its regions — it has something to inspect');
+t_ok($atomPos !== false && $atomEnd !== false
+     && strpos(substr($opsAll, $atomPos, $atomEnd - $atomPos), 'reqf_sync(') !== false,
+     'the atomic acceptance recomputes the requirement INSIDE its own transaction');
 t_ok($evPos !== false && $endPos !== false
      && strpos(substr($opsAll, $evPos, $endPos - $evPos), 'reqf_sync(') !== false,
      'every candidate STAGE change recomputes it — not just the hire branch');
