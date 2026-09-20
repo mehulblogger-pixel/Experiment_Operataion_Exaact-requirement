@@ -481,3 +481,78 @@ Operations is not present.
 
 **Nothing is implemented. These four items are the remaining input needed to
 write the RB-1/RB-2/RB-3 implementation prompt.**
+
+---
+
+# §21 — LOCKED. The owner's final decision set (2026-09-20)
+
+*Supersedes "Still required before implementation" above. All five items are
+answered. Model D′ is **CONFIRMED**.*
+
+## The five locked decisions
+
+| # | Decision | Locked answer |
+|---|---|---|
+| **1** | May an employee number ever be re-issued? | **NO — never.** Uniqueness is **lifetime and tenant-wide**, not merely among active employees. The number stays attached to the historical record for ever. **Database-level backstop, not PHP validation** |
+| **2** | An applicant matches existing staff | **Show the match and require an explicit acknowledgement tick.** Never refuse automatically, never continue silently. Until the tick, Accept is blocked. **The tick is an acknowledgement, not a merge** |
+| **3** | Where `team_role` is chosen | **At the requisition / position**, inherited by the candidate, **confirmed at acceptance** subject to permission and audit. **Never a silent `FIELD` default** |
+| **4** | A workspace with capabilities not configured | **Do not infer Inspector applicability.** Preserve today's navigation behaviour for backward compatibility, but never let an unconfigured state become an employment-classification rule. Require explicit classification |
+| **5** | Acceptance refused | **Candidate stays at the previous stage.** Inline, actionable message naming what to correct. No partial workforce record, no retry-created duplicate, no misleading "Accepted (Hired)" |
+
+## Model D′ — CONFIRMED as locked
+
+**Level 1 — workspace capability decides whether "Inspector" exists at all**
+
+| Workspace kind | `operations` capability | Inspector concept |
+|---|---|---|
+| Recruitment-only | absent | **does not apply** — every hire is workforce, nobody is an Inspector |
+| Inspection & Technical Services (TPIA) | present | **applies** |
+| Technical manpower / resource supply | present | **applies** |
+| Any other Operations-enabled business | present | **applies** |
+| **Not configured / unknown** | unresolved | **cannot be inferred** — explicit classification required (decision 4) |
+
+**Level 2 — the person, only where Level 1 says the concept exists**
+
+| `team_role` | Meaning |
+|---|---|
+| `FIELD` | deployable **Inspector** |
+| `COORD` · `OFFICE` | **workforce employee, not a deployable Inspector** |
+
+Workspace-capability-driven first, person-role-driven second. **No new Employee
+table, no Person Hub, no parallel workforce engine.**
+
+## The two invariants this produces
+
+> **ACCEPTED (Hired)** = a workforce record exists · the employee number is valid
+> and permanently unique · the person's workforce classification is explicitly
+> known.
+
+> **Inspector** = an Operations-enabled workspace **and** a person explicitly
+> classified `FIELD`.
+
+Both replace the current hidden-checkbox and silent-`FIELD` model.
+
+## Acceptance of decision 1, and its one consequence
+
+Decision 1 is **explicitly accepted**. The reasoning is right: an employee number
+travels into inspection reports, attendance, timesheets, expenses, billing
+support and audit records, and re-issuing it makes historical documents
+ambiguous. Lifetime uniqueness is also the *simpler* rule to enforce — the key
+covers every row that carries a number, with no "is this row live" predicate to
+get wrong.
+
+**The consequence, stated plainly:** because retired and inactive records now
+count, an install whose historical data already contains a collision is **more**
+likely to be found dirty than under a live-only rule. That is the rule working,
+not failing. The protection is then reported and left un-installed until a human
+resolves it; **nothing is renumbered automatically**, because renumbering
+somebody is exactly the historical ambiguity decision 1 exists to prevent.
+
+## Locked scope
+
+Reuse the existing capability catalogue · `inspectors` · `team_role` ·
+the recruitment conversion · approval and entitlement mechanisms.
+**No new workforce table, no Person Hub, no duplicate engine.**
+
+**This section is the authoritative input to the consolidated RB-1 + RB-2 + RB-3
+implementation prompt. Nothing is implemented by this document.**

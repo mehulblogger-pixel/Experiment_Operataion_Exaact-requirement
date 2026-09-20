@@ -614,3 +614,19 @@ code merely compiles.
 
 *Nothing in this document has been implemented. Batch 2's shipped work is
 untouched.*
+
+---
+
+## Addendum — §25's five decisions are LOCKED (2026-09-20)
+
+| | Question | Locked answer | Effect on this plan |
+|---|---|---|---|
+| **B1** | employee-number re-issue | **NO — never. Lifetime, tenant-wide** | §10's key loses its "is this row live" predicate entirely. `key = CASE WHEN TRIM(COALESCE(emp_code,''))<>'' THEN UPPER(TRIM(emp_code)) ELSE NULL END`. Simpler and stronger; **`DIRTY` becomes more likely**, because retired rows now count |
+| **B2** | applicant matches staff | **Show + require an explicit acknowledgement tick** | §10B's assumption (b) is confirmed. The tick is an acknowledgement, **not a merge** |
+| **B3** | where `team_role` is chosen | **Requisition / position, confirmed at acceptance** | Needs an additive column on **two** masters — neither has one today |
+| **B4** | unconfigured capabilities | **Do not infer.** Preserve navigation; require explicit classification | A new refusal, `NEEDS_CLASSIFICATION` |
+| **B5** | acceptance refused | **Candidate stays at the previous stage**, inline actionable message | Restructures the stage-move route's write ordering — see the consolidated prompt §0.2 |
+
+**Superseded by** `docs/phase7/RB-CONSOLIDATED-IMPLEMENTATION-PROMPT.md`, which
+carries this plan forward together with RB-1 and RB-2. This plan remains the
+record of how R20 was split and why.
