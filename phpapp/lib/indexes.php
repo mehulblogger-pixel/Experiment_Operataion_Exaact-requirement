@@ -195,4 +195,19 @@ function indexes_migrate() {
 
     // ---- Email log ----------------------------------------------------------
     idx_add('email_log', 'ix_email_when', '(created_at)');
+
+    // ---- Rules the database ENFORCES, not merely lookups it keeps fast -------
+    //  Everything above is an index: it makes a query quick and stops nothing.
+    //  ix_pcont_partner, a few lines up, is exactly that — and the Phase 6
+    //  Batch 3 adversarial audit showed three concurrent writers creating three
+    //  main contacts straight through it. These two are different in kind: a
+    //  generated key plus a UNIQUE index, so the illegal row cannot be written
+    //  at all. They are installed last, for the same reason the indexes are:
+    //  every table they guard exists by now.
+    //
+    //  Each keeps its own epoch marker and records its outcome in schema_guards,
+    //  so one that cannot be installed on a given workspace says so instead of
+    //  being quietly absent.
+    if (function_exists('partner_contact_migrate')) partner_contact_migrate();
+    if (function_exists('portal_acct_migrate'))     portal_acct_migrate();
 }

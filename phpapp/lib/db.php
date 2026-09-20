@@ -244,6 +244,228 @@ function ensure_column($table, $col, $def) {
     }
 }
 
+
+// ===========================================================================
+//  DATABASE-ENFORCED UNIQUENESS OVER A COMPUTED KEY
+//  Phase 6 · Batch 3 corrective (A1 · A6 · Q24 · §5 · §6)
+//
+//  A rule kept in PHP is a rule a second writer can race, a retry can repeat and
+//  a future caller can forget. These helpers move the rule into the database: a
+//  GENERATED column computes the key from the row itself, and a UNIQUE index over
+//  it makes the illegal state unrepresentable. No writer has to remember.
+//
+//  Why this lives here rather than in each module: the same three mistakes were
+//  made independently in two places, so the mechanism is written once.
+//
+//  A6 — the defect these helpers exist to end. SQLite's `PRAGMA table_info` does
+//  NOT list generated columns. Code that asked it "is my column already there?"
+//  was told "no" on every boot, re-ran the ALTER, the ALTER failed with
+//  "duplicate column", the handler said `continue` — and the UNIQUE INDEX behind
+//  it was skipped forever. The protection silently never existed.
+//  `PRAGMA table_xinfo` does list them. So:
+//    · detection and repair are separate steps, never one `try`;
+//    · a failed ALTER is re-checked before it is believed;
+//    · the index is verified to EXIST before the guard reports success;
+//    · the outcome of every guard is recorded where a human can read it.
+//  A safety migration that cannot be completed must be visible. It must never
+//  report success.
+// ===========================================================================
+
+/**
+ * Column names on a table INCLUDING generated/virtual columns, on either engine.
+ *
+ * Deliberately NOT merged into table_columns(): that one feeds write paths,
+ * which must keep NOT seeing generated columns — you cannot INSERT into one.
+ * This is for schema migration only.
+ */
+function table_columns_incl_generated($table) {
+    $pdo = db(); $out = [];
+    try {
+        if (db_driver() === 'sqlite') {
+            //  table_xinfo, not table_info: the latter omits generated columns,
+            //  which is the whole of defect A6.
+            foreach ($pdo->query("PRAGMA table_xinfo(`$table`)")->fetchAll() as $c) $out[] = (string)$c['name'];
+        } else {
+            $q = $pdo->prepare("SELECT column_name AS name FROM information_schema.columns
+                                 WHERE table_schema = DATABASE() AND table_name = ?");
+            $q->execute([$table]);
+            foreach ($q->fetchAll() as $c) $out[] = (string)$c['name'];
+        }
+    } catch (Throwable $e) { return []; }
+    return $out;
+}
+
+/** Does this table exist and can it be read? */
+function table_is_readable($table) {
+    try { db()->query("SELECT COUNT(*) FROM `$table`")->fetchColumn(); return true; }
+    catch (Throwable $e) { return false; }
+}
+
+/** Index names on a table, on either engine. */
+function table_index_names($table) {
+    $pdo = db(); $out = [];
+    try {
+        if (db_driver() === 'sqlite') {
+            foreach ($pdo->query("PRAGMA index_list(`$table`)")->fetchAll() as $r) $out[] = (string)$r['name'];
+        } else {
+            $q = $pdo->prepare("SELECT DISTINCT index_name AS n FROM information_schema.statistics
+                                 WHERE table_schema = DATABASE() AND table_name = ?");
+            $q->execute([$table]);
+            foreach ($q->fetchAll() as $r) $out[] = (string)$r['n'];
+        }
+    } catch (Throwable $e) { return []; }
+    return $out;
+}
+
+/**
+ * The ledger of database-enforced guards.
+ *
+ * Its purpose is honesty. Without it a skipped constraint is invisible: the boot
+ * succeeds, the screens work, and nothing anywhere says that the rule protecting
+ * the data is not actually installed. Each guard records what it wanted, what
+ * happened, and when — so "is the primary-contact rule really enforced on this
+ * workspace?" has an answer that is read rather than assumed.
+ */
+function schema_guard_migrate() {
+    static $doneAt = -1;
+    if ($doneAt === db_epoch()) return;
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS schema_guards (
+            guard VARCHAR(64) PRIMARY KEY, table_name VARCHAR(64) DEFAULT '',
+            column_name VARCHAR(64) DEFAULT '', expr_hash VARCHAR(40) DEFAULT '',
+            state VARCHAR(12) DEFAULT '', detail VARCHAR(400) DEFAULT '',
+            checked_at VARCHAR(40) DEFAULT '')");
+        $doneAt = db_epoch();
+    } catch (Throwable $e) { /* recorded on the next attempt */ }
+}
+
+/** Read one guard's last recorded outcome, or null. */
+function schema_guard_read($guard) {
+    schema_guard_migrate();
+    try {
+        $q = db()->prepare("SELECT * FROM schema_guards WHERE guard=?");
+        $q->execute([$guard]);
+        return $q->fetch() ?: null;
+    } catch (Throwable $e) { return null; }
+}
+
+/** Record what a guard actually achieved. */
+function schema_guard_write($guard, $table, $col, $hash, $state, $detail = '') {
+    schema_guard_migrate();
+    try {
+        db()->prepare("DELETE FROM schema_guards WHERE guard=?")->execute([$guard]);
+        db()->prepare("INSERT INTO schema_guards (guard,table_name,column_name,expr_hash,state,detail,checked_at)
+                       VALUES (?,?,?,?,?,?,?)")
+            ->execute([$guard, $table, $col, $hash, $state, substr((string)$detail, 0, 400), date('c')]);
+    } catch (Throwable $e) { /* the guard's own bookkeeping must never break a boot */ }
+}
+
+/** Every guard that is not fully installed — for an operator, and for tests. */
+function schema_guards_not_ok() {
+    schema_guard_migrate();
+    try {
+        $r = db()->query("SELECT * FROM schema_guards WHERE state <> 'OK'")->fetchAll();
+        return $r ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
+/** Values of $col held by more than one row — i.e. what blocks the unique index. */
+function generated_key_collisions($table, $col, $limit = 20) {
+    $limit = max(1, (int)$limit);
+    try {
+        return db()->query("SELECT `$col` AS v, COUNT(*) n FROM `$table`
+                             WHERE `$col` IS NOT NULL GROUP BY `$col` HAVING COUNT(*) > 1 LIMIT $limit")->fetchAll() ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
+/**
+ * Make $table carry generated column $col computing $expr, with a UNIQUE index
+ * $index over it. Idempotent: run it once, twice, after a partial failure or
+ * after a restart and it converges on the same schema.
+ *
+ * $reconcile is an optional callable invoked ONCE when existing rows collide.
+ * It is the caller's deterministic, non-destructive repair — this helper never
+ * invents one, never deletes a row and never picks a survivor by itself.
+ *
+ * Returns:
+ *   'OK'       column and unique index are both verified present
+ *   'ABSENT'   the table does not exist yet — nothing to guard, not a failure
+ *   'DIRTY'    the key exists but live rows collide, so the index was NOT built
+ *   'FAILED'   the protection could not be established
+ * Every outcome but 'ABSENT' is recorded in schema_guards.
+ */
+function ensure_unique_generated_index($table, $col, $expr, $index, ?callable $reconcile = null) {
+    $pdo  = db();
+    $hash = sha1(strtolower(preg_replace('/\s+/', ' ', trim($expr))));
+    if (!table_is_readable($table)) return 'ABSENT';
+
+    $haveCol = in_array($col, table_columns_incl_generated($table), true);
+
+    //  The stored key was computed by an older rule (e.g. before e-mail keys
+    //  learned to TRIM). Rebuild it rather than leave a key that no longer means
+    //  what the code thinks it means. Dropping a GENERATED column destroys no
+    //  data: every value in it is derived from columns that stay.
+    //  No ledger entry means this key predates the ledger, so nothing records
+    //  which rule computed it — and a key whose rule is unknown cannot be
+    //  trusted to mean what the code now thinks it means. Rebuild it once; from
+    //  then on the entry answers the question.
+    $prev = schema_guard_read($index);
+    if ($haveCol && (!$prev || (string)$prev['expr_hash'] !== $hash)) {
+        try { $pdo->exec("DROP INDEX " . (db_driver() === 'sqlite' ? "`$index`" : "`$index` ON `$table`")); } catch (Throwable $e) {}
+        try { $pdo->exec("ALTER TABLE `$table` DROP COLUMN `$col`"); $haveCol = false; } catch (Throwable $e) {}
+        if ($haveCol && in_array($col, table_columns_incl_generated($table), true) === false) $haveCol = false;
+    }
+
+    if (!$haveCol) {
+        $type = db_driver() === 'sqlite' ? 'TEXT' : 'VARCHAR(255)';
+        try {
+            $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$col` $type GENERATED ALWAYS AS ($expr) VIRTUAL");
+        } catch (Throwable $e) {
+            //  A6: do NOT believe the exception. Two boots racing each other both
+            //  ALTER, one loses, and the loser's column is present all the same.
+            //  Ask the schema, not the error — and carry on to the index, which
+            //  is the part that actually protects anything.
+            if (!in_array($col, table_columns_incl_generated($table), true)) {
+                schema_guard_write($index, $table, $col, $hash, 'FAILED',
+                    'The uniqueness key could not be added: ' . $e->getMessage());
+                return 'FAILED';
+            }
+        }
+        if (!in_array($col, table_columns_incl_generated($table), true)) {
+            schema_guard_write($index, $table, $col, $hash, 'FAILED', 'The uniqueness key is still not present after ALTER.');
+            return 'FAILED';
+        }
+    }
+
+    //  Rows that already collide. The index cannot be built over them, and
+    //  failing the boot for data we found here would be worse than the gap — so
+    //  the caller gets one chance to repair it deterministically, and if it
+    //  still collides the guard says so out loud instead of pretending.
+    $bad = generated_key_collisions($table, $col);
+    if ($bad && $reconcile !== null) {
+        try { $reconcile($table, $col, $bad); } catch (Throwable $e) {}
+        $bad = generated_key_collisions($table, $col);
+    }
+    if ($bad) {
+        schema_guard_write($index, $table, $col, $hash, 'DIRTY',
+            count($bad) . ' existing key(s) are held by more than one row, so the rule is not yet enforced here.');
+        return 'DIRTY';
+    }
+
+    if (!in_array($index, table_index_names($table), true)) {
+        try { $pdo->exec("CREATE UNIQUE INDEX `$index` ON `$table` (`$col`)"); }
+        catch (Throwable $e) { /* verified below — the error is not the evidence */ }
+    }
+    //  Verify. "CREATE INDEX did not throw" is not the same fact as "the index is
+    //  there", and it is the second one that protects the data.
+    if (!in_array($index, table_index_names($table), true)) {
+        schema_guard_write($index, $table, $col, $hash, 'FAILED', 'The unique index could not be created.');
+        return 'FAILED';
+    }
+    schema_guard_write($index, $table, $col, $hash, 'OK', '');
+    return 'OK';
+}
+
 // Idempotent: create tables, apply column migrations.
 function migrate() {
     ensure_schema();
@@ -579,6 +801,10 @@ function run_schema($withSeeds = true) {
     // SaaS control plane — the cross-company directory used by single-URL login
     // and the super-admin console. Additive; empty on a single-company install.
     if (function_exists('saas_tenants_migrate')) saas_tenants_migrate();
+    //  Batch 3 · Q26 — the queue a public sign-up lands in when the organisation
+    //  is already ours. Built here rather than on first use, so a workspace that
+    //  has never had such a sign-up still has somewhere to put the first one.
+    if (function_exists('connect_access_request_migrate')) connect_access_request_migrate();
     // Secondary indexes, last of all: every table it references now exists.
     if (function_exists('indexes_migrate')) indexes_migrate();
     ensure_admin();

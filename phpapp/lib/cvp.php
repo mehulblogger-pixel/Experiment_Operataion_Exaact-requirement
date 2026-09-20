@@ -201,11 +201,11 @@ function cvp_vendor_log($action, $detail = '') {
 }
 
 function cvp_vendor_login($email, $password) {
-    $email = strtolower(trim((string)$email));
+    $email = email_key($email);
     if ($email === '') return 'Enter your e-mail address.';
     $wait = function_exists('login_locked_for') ? login_locked_for('vendor:' . $email) : 0;
     if ($wait > 0) return 'Too many attempts. Try again in ' . $wait . ' minute(s).';
-    $u = portal_try(fn() => ops_one("SELECT * FROM vendor_users WHERE LOWER(email)=? AND is_active=1", [$email]), null);
+    $u = portal_try(fn() => ops_one("SELECT * FROM vendor_users WHERE LOWER(TRIM(email))=? AND is_active=1", [$email]), null);
     if (!$u || (string)$u['password_hash'] === '' || !password_verify((string)$password, (string)$u['password_hash'])) {
         if (function_exists('login_fail')) login_fail('vendor:' . $email);
         return 'That e-mail address and password do not match.';
@@ -363,7 +363,7 @@ function cvp_vendor_invite($vendorId, $email, $name, $contactId = 0) {
         if (!$c) return ['err' => 'That contact no longer exists.'];
         $vendorId = (int)$c['partner_id'];
         if (trim((string)($c['email'] ?? '')) === '') return ['err' => 'That contact has no e-mail on the vendor record — add one first, or type the address.'];
-        $email = strtolower(trim((string)$c['email']));
+        $email = email_key($c['email']);
         if (trim((string)$name) === '') $name = (string)$c['name'];
     } else {
         $email = strtolower(trim((string)$email));
@@ -374,10 +374,10 @@ function cvp_vendor_invite($vendorId, $email, $name, $contactId = 0) {
     $isVendor = portal_try(fn() => ops_val("SELECT COALESCE(is_vendor,0) FROM business_partners WHERE id=?", [$vendorId]), 0);
     if (!(int)$isVendor) return ['err' => 'That company is not marked as a vendor. Mark it as a vendor in the directory first.'];
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) return ['err' => 'A valid e-mail address is needed.'];
-    $exists = portal_try(fn() => ops_val("SELECT COUNT(*) FROM vendor_users WHERE LOWER(email)=?", [$email]), 0);
+    $exists = portal_try(fn() => ops_val("SELECT COUNT(*) FROM vendor_users WHERE LOWER(TRIM(email))=?", [$email]), 0);
     if ((int)$exists > 0) return ['err' => 'That address already has vendor portal access.'];
     if ($contactId === 0) {
-        $match = portal_try(fn() => ops_one("SELECT id FROM partner_contacts WHERE partner_id=? AND LOWER(email)=? ORDER BY is_primary DESC, id LIMIT 1", [$vendorId, $email]), null);
+        $match = portal_try(fn() => ops_one("SELECT id FROM partner_contacts WHERE partner_id=? AND LOWER(TRIM(email))=? ORDER BY is_primary DESC, id LIMIT 1", [$vendorId, $email]), null);
         if ($match) $contactId = (int)$match['id'];
     }
     $token = bin2hex(random_bytes(24));

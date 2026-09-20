@@ -32,7 +32,16 @@ try {
     $ap = ops_one("SELECT bp.* FROM business_partners bp JOIN client_users cu ON cu.partner_id=bp.id WHERE cu.email='ops@vector.test'");
     t_ok($ap && (int)$ap['is_subcontractor'] === 1, 'an agency party is a subcontractor');
 
-    // Duplicate e-mail is refused
-    [$dup] = connect_org_register(['name'=>'Zephyr Two','org_type'=>'COMPANY','contact_email'=>'ravi@zephyr.test','password'=>'Another@2026']);
-    t_ok($dup === false, 'a duplicate e-mail is refused');
+    //  Duplicate e-mail: nothing is created, and the person is told the same
+    //  thing everybody is told (Q26 · A3). "That address is already registered"
+    //  was a free lookup service — type addresses until one comes back taken and
+    //  you know who our customers are. The person who owns the address is told,
+    //  by e-mail, which only they can read.
+    $accBefore = (int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(TRIM(email))=?", ['ravi@zephyr.test']);
+    [$dup, $dupMsg] = connect_org_register(['name'=>'Zephyr Two','org_type'=>'COMPANY','contact_email'=>'ravi@zephyr.test','password'=>'Another@2026']);
+    t_eq((string)$dupMsg, CONNECT_JOIN_NEUTRAL_MSG, 'a duplicate e-mail reads exactly like any other sign-up');
+    t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(TRIM(email))=?", ['ravi@zephyr.test']), $accBefore,
+         'and no second account was created for it');
+    t_eq((int)ops_val("SELECT COUNT(*) FROM business_partners WHERE legal_name=?", ['Zephyr Two']), 0,
+         'and no organisation was created for it either');
 } finally { if ($own && db()->inTransaction()) db()->rollBack(); }

@@ -10,6 +10,9 @@
 //    invite      a=partner b=email                   — portal_invite()
 //    vinvite     a=vendor  b=email                   — the vendor-portal invite
 //    rawacct     a=partner b=email                   — a raw INSERT, no guard at all
+//    setprimary  a=partner b=contact name             — partner_contact_add(), primary
+//    rawprimary  a=partner b=contact name             — a raw INSERT claiming primary,
+//                                                       bypassing every PHP guard there is
 // ============================================================================
 error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED);
 $root = dirname(__DIR__);
@@ -31,6 +34,8 @@ try {
     if (function_exists('portal_migrate')) portal_migrate();
     if (function_exists('cvp_migrate')) cvp_migrate();
     if (function_exists('find_duplicate_partner')) find_duplicate_partner('warm', '', '', '', 0);
+    if (function_exists('partner_contact_migrate')) partner_contact_migrate();
+    ops_val("SELECT COUNT(*) FROM partner_contacts");
     ops_val("SELECT COUNT(*) FROM business_partners");
     ops_val("SELECT COUNT(*) FROM client_users");
 } catch (Throwable $e) {}
@@ -49,6 +54,15 @@ try {
     } elseif ($op === 'invite') {
         $r = function_exists('portal_invite') ? portal_invite($a, $b, 'Worker', 0) : ['err' => 'absent'];
         $out['ok'] = empty($r['err']); $out['msg'] = (string)($r['err'] ?? '');
+    } elseif ($op === 'setprimary') {
+        //  The ordinary way a person is made the main contact.
+        $id = partner_contact_add($a, ['name' => $b, 'is_primary' => 1]);
+        $out['ok'] = $id > 0; $out['code'] = (string)$id;
+    } elseif ($op === 'rawprimary') {
+        //  Straight to the table, claiming to be primary, with no application
+        //  code involved at all. If the rule only lives in PHP this wins.
+        db()->prepare("INSERT INTO partner_contacts (partner_id,name,is_primary) VALUES (?,?,1)")->execute([$a, $b]);
+        $out['ok'] = true;
     } elseif ($op === 'rawacct') {
         db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,created_at) VALUES (?,?,?,?,1,?)")
             ->execute([$a, $b, 'Raw', password_hash('x', PASSWORD_DEFAULT), date('c')]);

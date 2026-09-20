@@ -172,6 +172,26 @@ function short_token($name) {
 const CLIENT_TYPES = ['OWNER'=>'Owner / End Client','EPC'=>'EPC Contractor','PMC'=>'PMC / Project Management','CONSULTANT'=>'Consultant','MANUFACTURER'=>'Manufacturer / Supplier','TRADER'=>'Trader / Distributor','SUBVENDOR'=>'Sub-vendor','OTHER'=>'Other'];
 const INDUSTRIES = ['POWER'=>'Power / Transmission','RENEWABLE'=>'Renewable (Solar / Wind)','OIL_GAS'=>'Oil & Gas','WATER'=>'Water & Infrastructure','MINING'=>'Mining & Metals','STEEL'=>'Steel','CEMENT'=>'Cement','MANUFACTURING'=>'Manufacturing','INFRA'=>'Infrastructure / Construction','RAIL'=>'Railways','CHEMICAL'=>'Chemical / Fertiliser','OTHER'=>'Other'];
 const OWNERSHIP = ['PVT_LTD'=>'Private Limited','PUB_LTD'=>'Public Limited','LLP'=>'LLP','PARTNERSHIP'=>'Partnership','PROPRIETOR'=>'Proprietorship','PSU'=>'Government / PSU','TRUST'=>'Trust / Society','MNC'=>'MNC / Foreign','OTHER'=>'Other'];
+// ===========================================================================
+//  THE CANONICAL FORM OF AN E-MAIL ADDRESS  (Phase 6 · Batch 3 · Q25 · A2)
+//
+//  "user@example.com", " USER@example.com" and "user@example.com " are one
+//  person. Treated as three, they become three identities: the audit showed a
+//  leading space creating a second account that the real owner could never sign
+//  in to, because the sign-in door trims what it is given and the stored row
+//  does not match.
+//
+//  Identity comparisons use this. Display keeps whatever the person typed.
+//
+//  It is deliberately the SAME rule the database applies in its uniqueness keys
+//  — LOWER(TRIM(...)) — so PHP and the constraint can never disagree about who
+//  is who. PHP's trim() also removes tabs and newlines, which SQL TRIM() does
+//  not; that is harmless because every writer normalises through here first and
+//  then validates, so a stored address carries no surrounding whitespace at all
+//  and the two rules agree on every row we write.
+// ===========================================================================
+function email_key($e) { return strtolower(trim((string)$e)); }
+
 const STATUSES = ['ACTIVE'=>'Active','INACTIVE'=>'Inactive','ON_HOLD'=>'On hold','BLACKLISTED'=>'Blacklisted','PROSPECT'=>'Prospect'];
 const ADDRESS_TYPES = ['REGISTERED'=>'Registered Office','CORPORATE'=>'Corporate Office','BRANCH'=>'Branch Office','PURCHASE'=>'Purchase Office','BILLING'=>'Billing Address','PLANT'=>'Plant','FACTORY'=>'Factory','WAREHOUSE'=>'Warehouse','PROJECT_SITE'=>'Project Site','SITE_OFFICE'=>'Site Office'];
 const REG_TYPES = ['GSTIN'=>'GSTIN','PAN'=>'PAN','TAN'=>'TAN','CIN'=>'CIN','MSME'=>'MSME / Udyam','ISO'=>'ISO Certificate','PQ'=>'Pre-Qualification','OTHER'=>'Other'];

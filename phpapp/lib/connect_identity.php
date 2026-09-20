@@ -775,11 +775,24 @@ function identity_state_findings($limit = 200) {
     //  organisations are one company is a business judgement, and a shared tax
     //  identifier is strong evidence of it but not a licence to merge.
 
+    //  R1 — a record RETIRED BY A MERGE is left out of these two findings, and
+    //  only these two. Before that, merging two duplicates — the exact remedy
+    //  this dashboard asks for — did not clear the warning it raised: the pair
+    //  was reported for ever, because the merge leaves the retired record's
+    //  identifiers in place as evidence. A warning no action can clear teaches
+    //  people to ignore the warnings next to it.
+    //
+    //  ONLY 'MERGED' is excluded. INACTIVE, ON_HOLD, BLACKLISTED, PROSPECT, a
+    //  code a tenant invented, a blank or a NULL all still count (R2 · R5): an
+    //  unrecognised status must never quietly switch a protection off, and a
+    //  dormant company with two records is still two records.
+    $live = PARTNER_LIVE_SQL;
+
     // 8 — two organisations carrying the same authoritative tax identifier.
     foreach (['gstin', 'pan', 'tan'] as $idf) {
         foreach ($all("SELECT $idf AS v, COUNT(*) n FROM business_partners
-                        WHERE COALESCE($idf,'')<>'' GROUP BY $idf HAVING COUNT(*)>1 LIMIT $lim") as $r) {
-            $ids = array_column($all("SELECT id FROM business_partners WHERE $idf=? LIMIT 20", [$r['v']]) ?: [], 'id');
+                        WHERE COALESCE($idf,'')<>'' AND $live GROUP BY $idf HAVING COUNT(*)>1 LIMIT $lim") as $r) {
+            $ids = array_column($all("SELECT id FROM business_partners WHERE $idf=? AND $live LIMIT 20", [$r['v']]) ?: [], 'id');
             $add('PARTNER_DUPLICATE_TAXID',
                  'Two or more organisations carry the same ' . strtoupper($idf) . '.',
                  ['identifier' => strtoupper($idf), 'organisations' => array_map('intval', $ids)],
@@ -791,8 +804,8 @@ function identity_state_findings($limit = 200) {
     // 9 — organisations sharing only a name. Evidence, not proof: two real
     //     companies share a name often enough that this is a question.
     foreach ($all("SELECT LOWER(TRIM(legal_name)) AS v, COUNT(*) n FROM business_partners
-                    WHERE COALESCE(legal_name,'')<>'' GROUP BY LOWER(TRIM(legal_name)) HAVING COUNT(*)>1 LIMIT $lim") as $r) {
-        $ids = array_column($all("SELECT id FROM business_partners WHERE LOWER(TRIM(legal_name))=? LIMIT 20", [$r['v']]) ?: [], 'id');
+                    WHERE COALESCE(legal_name,'')<>'' AND $live GROUP BY LOWER(TRIM(legal_name)) HAVING COUNT(*)>1 LIMIT $lim") as $r) {
+        $ids = array_column($all("SELECT id FROM business_partners WHERE LOWER(TRIM(legal_name))=? AND $live LIMIT 20", [$r['v']]) ?: [], 'id');
         $add('PARTNER_POSSIBLE_DUPLICATE_NAME',
              'Two or more organisations share a name.',
              ['organisations' => array_map('intval', $ids)],
@@ -839,8 +852,10 @@ function identity_state_findings($limit = 200) {
              false, true);
 
     // 14 — duplicate contacts, and the ambiguous primary.
-    foreach ($all("SELECT partner_id, LOWER(email) AS v, COUNT(*) n FROM partner_contacts
-                    WHERE COALESCE(email,'')<>'' GROUP BY partner_id, LOWER(email) HAVING COUNT(*)>1 LIMIT $lim") as $r)
+    //  Q25 — the same rule the sign-in door and the database use, so a contact
+    //  saved as " Ann@x.com " is found as the duplicate of "ann@x.com" that it is.
+    foreach ($all("SELECT partner_id, LOWER(TRIM(email)) AS v, COUNT(*) n FROM partner_contacts
+                    WHERE TRIM(COALESCE(email,''))<>'' GROUP BY partner_id, LOWER(TRIM(email)) HAVING COUNT(*)>1 LIMIT $lim") as $r)
         $add('CONTACT_DUPLICATE',
              'One organisation holds the same contact address more than once.',
              ['organisation' => (int)$r['partner_id'], 'email' => (string)$r['v'], 'rows' => (int)$r['n']],

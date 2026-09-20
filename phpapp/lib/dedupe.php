@@ -136,6 +136,12 @@ function dd_merge($keepId, $dropId, $reason = '') {
     $keep = ops_one("SELECT * FROM business_partners WHERE id=?", [$keepId]);
     $drop = ops_one("SELECT * FROM business_partners WHERE id=?", [$dropId]);
     if (!$keep || !$drop) return ['ok' => false, 'error' => 'One of those records no longer exists.'];
+    //  R4 — a record that has itself been retired cannot be the survivor of
+    //  another merge. Allowing it would build a chain pointing at something that
+    //  does not trade, which is the very thing the pointer exists to prevent.
+    if (function_exists('partner_is_retired') && partner_is_retired($keep['status'] ?? ''))
+        return ['ok' => false, 'error' => 'That record has already been merged into another one. '
+                                        . 'Merge into the record that is still in use instead.'];
 
     $moved = [];
     foreach (dd_reference_columns() as [$t, $c]) {
@@ -168,6 +174,13 @@ function dd_merge($keepId, $dropId, $reason = '') {
     db()->prepare("UPDATE business_partners SET status='MERGED', legal_name=?, description=? WHERE id=?")
         ->execute([$drop['legal_name'] . ' [merged]',
                    trim(($drop['description'] ?? '') . "\n" . $note), $dropId]);
+    //  R4 — and say so in a way a machine can read. The sentence above is for a
+    //  person; this is what lets the duplicate detector send somebody who
+    //  matched the retired company to the one that actually trades. Identifiers
+    //  on the retired record are deliberately left untouched: they are the
+    //  evidence of why these two were ever thought to be the same company.
+    try { db()->prepare("UPDATE business_partners SET merged_into_id=? WHERE id=?")->execute([$keepId, $dropId]); }
+    catch (Throwable $e) { /* older install without the column — prose note above still stands */ }
     db()->prepare("INSERT INTO partner_notes (partner_id,note,author_name,created_at) VALUES (?,?,?,?)")
         ->execute([$keepId, $drop['code'] . ' — ' . $drop['legal_name'] . ' was merged into this record. '
                    . ($reason !== '' ? $reason : ''), user_name(current_user()), date('c')]);

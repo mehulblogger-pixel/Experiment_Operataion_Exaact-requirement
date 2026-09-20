@@ -42,14 +42,21 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
 <?php if ($done): ?>
   <div class="card" style="text-align:center;padding:40px 22px">
     <div style="font-size:44px">✅</div>
-    <h1 style="margin:12px 0 6px">Your account is ready</h1>
-    <p class="muted" style="margin:0 0 4px">You can sign in now with</p>
+    <?php /*  Phase 6 · Batch 3 corrective (A3 · Q26) — ONE PANEL, ONE SIZE.
+              This page is what a stranger sees after they submit the form, and
+              it must look the same whether the organisation they typed is
+              already a customer or has never been heard of. So it says the same
+              words, in the same layout, with the same number of bytes, every
+              time. What actually happened goes by e-mail to the address below,
+              which only its owner can read.                                   */ ?>
+    <h1 style="margin:12px 0 6px">Thanks — we have your details</h1>
+    <p class="muted" style="margin:0 0 4px">We have sent the next step to</p>
     <p style="font-size:17px;font-weight:600;margin:0 0 18px"><?= e($acct['email'] ?? '') ?></p>
     <a class="btn" href="<?= e($acct['login_url'] ?? '/portal/login') ?>" style="max-width:280px;margin:0 auto">Sign in →</a>
     <p class="muted" style="margin:16px 0 0;font-size:13px">
       <?= !empty($acct['is_agency'])
-          ? 'As an agency you can manage your own bench under “My bench”, put your people forward to open jobs, and review vouchers — all from your portal.'
-          : 'Post work, shortlist and award people, and review their vouchers — all from your portal.' ?>
+          ? 'Check your inbox — it has everything you need. Agencies manage their own bench, put people forward for open jobs, and review vouchers from the portal.'
+          : 'Check your inbox — it has everything you need. From the portal you can post work, shortlist and award people, and review their vouchers.' ?>
     </p>
   </div>
 <?php else: ?>

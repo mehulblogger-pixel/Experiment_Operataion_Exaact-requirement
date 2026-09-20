@@ -70,6 +70,10 @@ function ops_area_def($area) {
                 $t(true, '📊', 'Market analytics', '/connect-analytics', 'Supply vs demand, fill funnel, time-to-award, rate benchmarks, pool growth.');
                 $t(is_master(), '🏢', 'Organisations', '/connect-orgs', 'Register organisations and their module entitlements (TPIA / agency / company).',
                     $num(fn() => $fx('connect_org_pending_count') ? connect_org_pending_count() : 0), 'amber');
+                //  Batch 3 · Q26 — a public sign-up for a company we already hold creates
+                //  nothing and tells the person nothing. It lands here instead, for a human.
+                $t(is_master(), '🔑', 'Access requests', '/access-requests', 'People who signed up for a company we already work with — decide, then invite them the usual way.',
+                    $num(fn() => $fx('connect_access_requests_count') ? connect_access_requests_count() : 0), 'amber');
             }
             break;
         case 'sales':

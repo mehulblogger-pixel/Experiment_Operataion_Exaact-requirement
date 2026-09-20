@@ -378,6 +378,13 @@ function ops_migrate() {
     // reads `status` is affected. Empty = ordinary (no hold).
     ensure_column('business_partners', 'hold_status', "VARCHAR(20) DEFAULT ''");
     ensure_column('business_partners', 'hold_reason', "VARCHAR(400) DEFAULT ''");
+    //  R4 — where a retired record went. Set only by the merge, which is the one
+    //  action that retires a record. Before this the merge wrote a sentence into
+    //  the description ("Merged into ACME-01 — Acme Ltd") and nothing could read
+    //  it back: a new registration matching the retired company's GSTIN was sent
+    //  to the record that no longer trades. A pointer, not prose — no name, tax
+    //  id or e-mail is ever used to guess where a company went.
+    ensure_column('business_partners', 'merged_into_id', 'INT NULL');
     // richer address (town/village + district) and contact (department + project)
     ensure_column('partner_addresses', 'town_village', "VARCHAR(150) DEFAULT ''");
     ensure_column('partner_addresses', 'district', "VARCHAR(150) DEFAULT ''");
@@ -989,20 +996,122 @@ function resolve_new_lookup($typeKey, $val, $newText) {
  * ADDITIVE: 'row' and 'by' are unchanged, so every existing caller keeps
  * working exactly as before. No second detector is introduced.
  */
+// ===========================================================================
+//  RETIRED ORGANISATIONS AND WHERE THEY WENT
+//  Phase 6 · Batch 3 corrective (R1 · R4 · R5 · Q28)
+//
+//  `MERGED` is the one company status the dropdown cannot produce. It is written
+//  by the merge screen alone, and it means: a human already decided this record
+//  was a duplicate and retired it in favour of another.
+//
+//  The duplicate detector had never heard of it, and both consequences were
+//  user-visible. The dashboard kept reporting the pair as duplicates after the
+//  merge, so the product's own remedy could not clear its own warning — for
+//  ever. And because the merge leaves the retired record's tax identifiers in
+//  place (deliberately: erasing them would destroy the evidence of why the two
+//  were ever linked), a new registration carrying that GSTIN was matched
+//  against the dead record rather than the live one.
+//
+//  The rule these functions serve, in one line:
+//      STATUS MAY MAKE THE SYSTEM SAY LESS. IT MUST NEVER MAKE IT ALLOW MORE.
+//  So a retired record is still MATCHED (R3 — a dormant, on-hold or blacklisted
+//  company must not be able to re-register itself as a clean new record), and
+//  only the WARNING is suppressed (R1). Anything unrecognised counts as live
+//  (R5): a tenant renaming a status code must never switch protection off.
+// ===========================================================================
+
+//  The only status that means "already resolved". Everything else — ACTIVE,
+//  INACTIVE, ON_HOLD, BLACKLISTED, PROSPECT, a code a tenant invented, a blank,
+//  a NULL — is live as far as identity is concerned.
+const PARTNER_STATUS_RETIRED = 'MERGED';
+
+//  The same rule, written for SQL. One definition, two languages — so a finding
+//  and a check can never disagree about which records still count.
+const PARTNER_LIVE_SQL = "UPPER(TRIM(COALESCE(status,''))) <> '" . PARTNER_STATUS_RETIRED . "'";
+
+/** Has this record been retired by a merge? Unknown or missing = NO (fail safe). */
+function partner_is_retired($status) {
+    return strtoupper(trim((string)$status)) === PARTNER_STATUS_RETIRED;
+}
+
+/**
+ * Follow a retired organisation to the record that replaced it.
+ *
+ * Returns the surviving organisation's id, or the id it was given when that
+ * record is live (or when the trail cannot be followed). Chains are followed —
+ * A merged into B, B later merged into C answers C — and a cycle, which no
+ * legitimate merge can create but a hand-edited database can, terminates
+ * instead of hanging.
+ *
+ * Tenant safety (§15): every read is db(), which IS this tenant's database.
+ * One database per tenant means a pointer cannot even name another tenant's
+ * record, and an id is never treated as permission to see anything.
+ */
+function partner_survivor($id) {
+    $id = (int)$id;
+    if ($id <= 0) return 0;
+    $seen = [];
+    while ($id > 0 && !isset($seen[$id])) {
+        $seen[$id] = true;
+        try { $r = ops_one("SELECT id, merged_into_id FROM business_partners WHERE id=?", [$id]); }
+        catch (Throwable $e) { return $id; }            // no column on an older install
+        if (!$r) return 0;                               // the record is gone
+        $next = (int)($r['merged_into_id'] ?? 0);
+        if ($next <= 0 || $next === $id) return $id;
+        $id = $next;
+    }
+    return $id;
+}
+
 function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
     $g = strtoupper(clean_gstin($gstin)); $p = strtoupper(trim($pan)); $t = strtoupper(trim($tan)); $norm = normalize_name($name);
     $nameHit = null;
-    foreach (ops_all("SELECT id, code, legal_name, gstin, pan, tan FROM business_partners WHERE id <> ?", [$excludeId]) as $r) {
-        if ($g && $r['gstin'] && strtoupper($r['gstin']) === $g) return ['row' => $r, 'by' => 'GSTIN', 'confidence' => 'EXACT'];
-        if ($p && $r['pan'] && strtoupper($r['pan']) === $p) return ['row' => $r, 'by' => 'PAN', 'confidence' => 'EXACT'];
-        if ($t && ($r['tan'] ?? '') && strtoupper($r['tan']) === $t) return ['row' => $r, 'by' => 'TAN', 'confidence' => 'EXACT'];
+    //  R3 · R5 — EVERY record is scanned, whatever its status. Narrowing this to
+    //  ACTIVE would be the whole defect in one line: a company that is dormant,
+    //  on hold, blacklisted or retired could then register itself again as a
+    //  clean new record, and status is a tenant-editable dropdown that nothing
+    //  else enforces. Status never widens what is allowed.
+    $cols = 'id, code, legal_name, gstin, pan, tan, status';
+    $rows = null;
+    try { $rows = ops_all("SELECT $cols, merged_into_id FROM business_partners WHERE id <> ?", [$excludeId]); }
+    catch (Throwable $e) { $rows = ops_all("SELECT $cols FROM business_partners WHERE id <> ?", [$excludeId]); }
+    foreach ($rows ?: [] as $r) {
+        if ($g && $r['gstin'] && strtoupper($r['gstin']) === $g) return dup_hit($r, 'GSTIN', 'EXACT');
+        if ($p && $r['pan'] && strtoupper($r['pan']) === $p) return dup_hit($r, 'PAN', 'EXACT');
+        if ($t && ($r['tan'] ?? '') && strtoupper($r['tan']) === $t) return dup_hit($r, 'TAN', 'EXACT');
         //  A name hit is remembered but NOT returned yet: an authoritative
         //  identifier further down the list outranks it, and returning the name
         //  first would report POSSIBLE for something the tax id proves EXACT.
         if ($nameHit === null && $norm !== '' && normalize_name($r['legal_name']) === $norm)
-            $nameHit = ['row' => $r, 'by' => 'name', 'confidence' => 'POSSIBLE'];
+            $nameHit = dup_hit($r, 'name', 'POSSIBLE');
     }
     return $nameHit;
+}
+
+/**
+ * Package a matched row, resolving a retired record to the one that replaced it.
+ *
+ * R4 — the match is made against the record that carries the identifier (which
+ * may be a retired one, because a merge deliberately leaves its identifiers
+ * intact as evidence), but what the caller is HANDED is the organisation that
+ * actually trades. Without this, everyone who matched a merged company was sent
+ * to a dead record: staff were told to "open it and add the role", and a public
+ * applicant would be offered a claim on an organisation that no longer exists.
+ *
+ * `matched` keeps the record the identifier was actually found on, so the trail
+ * still shows what was recognised and why. Nothing is inferred from names or tax
+ * identifiers — only the explicit pointer the merge wrote.
+ */
+function dup_hit(array $r, $by, $confidence) {
+    $hit = ['row' => $r, 'by' => $by, 'confidence' => $confidence,
+            'retired' => partner_is_retired($r['status'] ?? ''), 'matched' => $r];
+    if (!$hit['retired']) return $hit;
+    $live = partner_survivor((int)$r['id']);
+    if ($live > 0 && $live !== (int)$r['id']) {
+        $row = ops_one("SELECT id, code, legal_name, gstin, pan, tan, status FROM business_partners WHERE id=?", [$live]);
+        if ($row) $hit['row'] = $row;
+    }
+    return $hit;
 }
 
 /**
@@ -1048,17 +1157,103 @@ function partner_audit_created($partnerId, $subject) {
     try { act_log('PARTNER', $partnerId, 'SYSTEM', $subject); } catch (Throwable $e) { /* never fail the write */ }
 }
 
+// ===========================================================================
+//  ONE PRIMARY CONTACT PER ORGANISATION — ENFORCED BY THE DATABASE
+//  Phase 6 · Batch 3 corrective (A1 · Q24)
+//
+//  The previous implementation demoted the old primary in PHP and then inserted
+//  the new one. Between those two statements another request can do the same
+//  thing, and the adversarial audit showed exactly that: three concurrent
+//  writers produced THREE primary contacts on MariaDB, 3 runs out of 3. There
+//  was no transaction, no lock and no constraint — only a non-unique index.
+//
+//  A sequence of correct statements is not an invariant. The rule now lives in
+//  the database: a generated column carries the organisation's id for exactly
+//  those rows that claim to be primary, and a unique index over it means a
+//  second primary cannot be written by anybody — not by a racing request, not
+//  by a retry, not by a future writer that forgets, not by hand in SQL.
+// ===========================================================================
+
+//  NULL for every non-primary row, so ordinary contacts stay unlimited; the
+//  organisation's id for a primary one, so a second primary collides with the
+//  first. `<>0` rather than `=1` on purpose: any truthy flag means primary, so
+//  an unexpected value fails SAFE (caught) rather than open (ignored).
+const PARTNER_PRIMARY_KEY_EXPR = "CASE WHEN COALESCE(is_primary,0)<>0 THEN partner_id ELSE NULL END";
+
+/**
+ * Install the one-primary guard. Idempotent and safe to call on every path that
+ * touches a contact.
+ */
+function partner_contact_migrate() {
+    static $doneAt = -1;
+    if ($doneAt === db_epoch()) return;
+    //  Batch 3 (Gate 3) rule, unchanged: NEVER run DDL inside a transaction this
+    //  function did not open — MariaDB commits implicitly on any DDL, which would
+    //  silently commit somebody else's half-written business data. The marker is
+    //  deliberately NOT set here, so the first call outside a transaction still
+    //  installs the guard.
+    try { if (db()->inTransaction()) return; } catch (Throwable $e) {}
+    if (!function_exists('ensure_unique_generated_index')) return;
+    ensure_unique_generated_index('partner_contacts', 'uq_primary', PARTNER_PRIMARY_KEY_EXPR,
+                                  'uq_pcont_primary', 'partner_contact_reconcile_primaries');
+    $doneAt = db_epoch();
+}
+
+/**
+ * Existing data that already breaks the rule (A1 · Scenario C).
+ *
+ * A workspace upgraded from before the guard may already hold two primaries for
+ * one organisation. The index cannot be built over that, and three things must
+ * not happen: the boot must not fail over data we found there; no contact may be
+ * deleted; and no survivor may be picked at random.
+ *
+ * So the repair is deterministic and non-destructive: the contact that was
+ * primary FIRST — the lowest id, the earliest record — keeps the flag, and the
+ * others are demoted. Nobody is removed, no field but the flag is touched, an
+ * administrator can set a different primary afterwards in one click, and every
+ * demotion is written to the organisation's trail so the change is not silent.
+ */
+function partner_contact_reconcile_primaries($table, $col, array $collisions) {
+    foreach ($collisions as $c) {
+        $pid = (int)($c['v'] ?? 0);
+        if ($pid <= 0) continue;
+        $keep = (int)ops_val("SELECT MIN(id) FROM partner_contacts
+                               WHERE partner_id=? AND COALESCE(is_primary,0)<>0", [$pid]);
+        if ($keep <= 0) continue;
+        $demoted = ops_all("SELECT id, name FROM partner_contacts
+                             WHERE partner_id=? AND id<>? AND COALESCE(is_primary,0)<>0 ORDER BY id", [$pid, $keep]) ?: [];
+        if (!$demoted) continue;
+        db()->prepare("UPDATE partner_contacts SET is_primary=0
+                        WHERE partner_id=? AND id<>? AND COALESCE(is_primary,0)<>0")->execute([$pid, $keep]);
+        if (function_exists('act_log')) {
+            try {
+                act_log('PARTNER', $pid, 'SYSTEM',
+                    'More than one main contact was on file. The earliest (#' . $keep . ') was kept as the main contact and '
+                    . count($demoted) . ' other(s) were changed to ordinary contacts — nobody was removed.',
+                    ['kept' => $keep, 'demoted' => array_map(fn($d) => (int)$d['id'], $demoted)]);
+            } catch (Throwable $e) {}
+        }
+    }
+}
+
+/** Was this exception the database refusing a second primary contact? */
+function partner_contact_is_primary_clash(Throwable $e) {
+    $m = $e->getMessage();
+    return stripos($m, 'uq_pcont_primary') !== false || stripos($m, 'uq_primary') !== false;
+}
+
 function partner_contact_add($partnerId, array $in) {
     $partnerId = (int)$partnerId;
     if ($partnerId <= 0) return 0;
     $name = substr(trim((string)($in['name'] ?? '')), 0, 150);
     if ($name === '') return 0;
     $primary = !empty($in['is_primary']) ? 1 : 0;
+    partner_contact_migrate();
     //  No false success: if the existing primary cannot be stood down, this
     //  contact is not written as primary at all.
     if ($primary && !partner_contact_clear_primary($partnerId)) return 0;
     $data = ['partner_id' => $partnerId, 'name' => $name,
-             'email' => substr(trim((string)($in['email'] ?? '')), 0, 200),
+             'email' => email_key($in['email'] ?? ''),
              'mobile' => substr(trim((string)($in['mobile'] ?? '')), 0, 40),
              'designation' => substr(trim((string)($in['designation'] ?? '')), 0, 120),
              'department' => substr(trim((string)($in['department'] ?? '')), 0, 120),
@@ -1066,8 +1261,20 @@ function partner_contact_add($partnerId, array $in) {
     $cols = function_exists('existing_columns_only') ? existing_columns_only('partner_contacts', array_keys($data)) : array_keys($data);
     if (!$cols) return 0;
     $ph = implode(',', array_fill(0, count($cols), '?'));
-    db()->prepare("INSERT INTO partner_contacts (" . implode(',', $cols) . ") VALUES ($ph)")
-        ->execute(array_map(fn($c) => $data[$c], $cols));
+    $write = fn() => db()->prepare("INSERT INTO partner_contacts (" . implode(',', $cols) . ") VALUES ($ph)")
+                         ->execute(array_map(fn($c) => $data[$c], $cols));
+    //  A1 · Scenario A/B — two requests may each demote the old primary and then
+    //  insert. The database now refuses the second, so exactly one of them is
+    //  holding the flag when the dust settles. The loser does not crash and does
+    //  not silently write a non-primary contact: it stands the winner down and
+    //  tries once more, which is the caller's stated intent. If it loses again
+    //  the answer is no, not a second primary.
+    try { $write(); }
+    catch (Throwable $e) {
+        if (!$primary || !partner_contact_is_primary_clash($e)) throw $e;
+        if (!partner_contact_clear_primary($partnerId)) return 0;
+        try { $write(); } catch (Throwable $e2) { return 0; }
+    }
     return (int)db()->lastInsertId();
 }
 
@@ -3711,6 +3918,8 @@ function ops_dispatch($route, $method) {
             return ops_connect_talent($method);
         case $route === 'connect-orgs':         // Connect B0 — organisation accounts (master-only)
             return ops_connect_orgs($method);
+        case $route === 'access-requests':     // Batch 3 · Q26 — people asking to join an organisation we already hold
+            return ops_connect_access_requests($method);
         case $route === 'connect-capabilities': // Connect — company business capabilities (master-only)
             return ops_connect_capabilities($method);
         case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board

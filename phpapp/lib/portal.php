@@ -230,6 +230,35 @@ function portal_require() {
         redirect('/portal/password');
 }
 
+// ===========================================================================
+//  SECURITY EVIDENCE FROM AN UNAUTHENTICATED REQUEST
+//  Phase 6 · Batch 3 corrective (A4 · Q27)
+//
+//  A public sign-up that was refused used to be written to the matched
+//  organisation's ACTIVITY trail — the feed their own dashboard shows. That feed
+//  reads the latest 8 entries, so ten anonymous POSTs pushed every genuine entry
+//  off a customer's screen. A stranger with no account could rewrite what a
+//  customer saw about their own business.
+//
+//  The evidence is worth keeping; the place was wrong. It goes to portal_audit,
+//  which is the access trail staff already have for the portal, and which no
+//  customer-facing screen reads. Same infrastructure, correct side of the line:
+//    · customer-facing BUSINESS activity  -> activities  (act_log)
+//    · security / system EVIDENCE         -> portal_audit (here)
+//
+//  Kept: when, what happened, the outcome, where it came from, and the tenant
+//  context when it is legitimately known. Not kept: anything that would tell the
+//  stranger something — and nothing here is ever shown back to them.
+// ===========================================================================
+function portal_security_event($action, $detail = '', $partnerId = 0) {
+    try {
+        db()->prepare("INSERT INTO portal_audit (client_user_id,partner_id,action,detail,ip,at) VALUES (?,?,?,?,?,?)")
+            ->execute([null, $partnerId > 0 ? (int)$partnerId : null,
+                       substr((string)$action, 0, 40), substr((string)$detail, 0, 300),
+                       function_exists('client_ip') ? client_ip() : '', date('c')]);
+    } catch (Throwable $e) { /* evidence must never break the screen, or reveal that it failed */ }
+}
+
 function portal_log($action, $detail = '') {
     $u = portal_user();
     try {
@@ -241,11 +270,11 @@ function portal_log($action, $detail = '') {
 }
 
 function portal_login($email, $password) {
-    $email = strtolower(trim((string)$email));
+    $email = email_key($email);
     if ($email === '') return 'Enter your e-mail address.';
     $wait = function_exists('login_locked_for') ? login_locked_for('portal:' . $email) : 0;
     if ($wait > 0) return 'Too many attempts. Try again in ' . $wait . ' minute(s).';
-    $u = portal_try(fn() => ops_one("SELECT * FROM client_users WHERE LOWER(email)=? AND is_active=1", [$email]), null);
+    $u = portal_try(fn() => ops_one("SELECT * FROM client_users WHERE LOWER(TRIM(email))=? AND is_active=1", [$email]), null);
     if (!$u || (string)$u['password_hash'] === ''
             || !password_verify((string)$password, (string)$u['password_hash'])) {
         if (function_exists('login_fail')) login_fail('portal:' . $email);
@@ -627,10 +656,10 @@ function portal_invite($partnerId, $email, $name, $contactId = 0) {
         if (!$c) return ['err' => 'That contact no longer exists.'];
         $partnerId = (int)$c['partner_id'];
         if (trim((string)($c['email'] ?? '')) === '') return ['err' => 'That contact has no e-mail on the client record — add one first, or type the address.'];
-        $email = strtolower(trim((string)$c['email']));
+        $email = email_key($c['email']);
         if (trim((string)$name) === '') $name = (string)$c['name'];
     } else {
-        $email = strtolower(trim((string)$email));
+        $email = email_key($email);
     }
     if (!$partnerId) return ['err' => 'Choose the client company.'];
     //  Batch 3 — the invite asks its OWN authority and its OWN target, rather
@@ -650,12 +679,12 @@ function portal_invite($partnerId, $email, $name, $contactId = 0) {
     if ((int)ops_val("SELECT COUNT(*) FROM business_partners WHERE id=?", [$partnerId]) === 0)
         return ['err' => 'Choose the client company.'];      // same words: no enumeration
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) return ['err' => 'A valid e-mail address is needed.'];
-    $exists = portal_try(fn() => ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(email)=?", [$email]), 0);
+    $exists = portal_try(fn() => ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(TRIM(email))=?", [$email]), 0);
     if ((int)$exists > 0) return ['err' => 'That address already has portal access.'];
     // Even a typed address is linked back to the client record when it matches a
     // saved contact, so the two lists never drift apart.
     if ($contactId === 0) {
-        $match = portal_try(fn() => ops_one("SELECT id FROM partner_contacts WHERE partner_id=? AND LOWER(email)=? ORDER BY is_primary DESC, id LIMIT 1", [$partnerId, $email]), null);
+        $match = portal_try(fn() => ops_one("SELECT id FROM partner_contacts WHERE partner_id=? AND LOWER(TRIM(email))=? ORDER BY is_primary DESC, id LIMIT 1", [$partnerId, $email]), null);
         if ($match) $contactId = (int)$match['id'];
     }
     $token = bin2hex(random_bytes(24));
@@ -1821,30 +1850,45 @@ const PORTAL_ACCT_TABLES = ['client_users' => 'ux_client_users_active_email',
  * account is deactivated.
  */
 function portal_acct_migrate() {
-    $expr = "CASE WHEN COALESCE(is_active,0)=1 AND COALESCE(email,'')<>'' THEN LOWER(email) ELSE NULL END";
+    static $doneAt = -1;
+    if ($doneAt === db_epoch()) return;
+    //  Batch 3 (Gate 3) rule: never run DDL inside a transaction this function
+    //  did not open — MariaDB commits implicitly on any DDL. The marker is
+    //  deliberately NOT set, so the next call outside a transaction still runs.
+    try { if (db()->inTransaction()) return; } catch (Throwable $e) {}
+    if (!function_exists('ensure_unique_generated_index')) return;
+
+    //  Q25 · A2 — TRIM as well as LOWER. Without it " user@x.com" and
+    //  "user@x.com" computed two different keys, so the database happily held
+    //  both: a second account on one address that its owner could never sign in
+    //  to, because the sign-in door trims what it is typed and the stored row
+    //  did not match. The key the database computes and the key PHP computes
+    //  (email_key()) are now the same rule.
+    //
+    //  An install whose key was built by the older rule is rebuilt automatically
+    //  — ensure_unique_generated_index() notices the rule has changed.
+    $expr = "CASE WHEN COALESCE(is_active,0)=1 AND TRIM(COALESCE(email,''))<>'' THEN LOWER(TRIM(email)) ELSE NULL END";
     foreach (PORTAL_ACCT_TABLES as $t => $ix) {
-        try { ops_val("SELECT COUNT(*) FROM $t"); } catch (Throwable $e) { continue; }   // table not built yet
-        if (!in_array('uq_active_email', t_cols_of($t), true)) {
-            try { db()->exec("ALTER TABLE $t ADD COLUMN uq_active_email VARCHAR(200)
-                              GENERATED ALWAYS AS ($expr) VIRTUAL"); } catch (Throwable $e) { continue; }
-        }
-        //  A workspace that already holds two active accounts on one address
-        //  cannot have the index built over it, and failing the boot for data we
-        //  found there would be worse than the gap. Skip that one index and
-        //  report it; nothing is deactivated or deleted to make it fit.
-        if (portal_acct_duplicates($t)) continue;
-        try { db()->exec("CREATE UNIQUE INDEX $ix ON $t (uq_active_email)"); } catch (Throwable $e) {}
+        //  No reconciler. Two live accounts on one address cannot be repaired
+        //  without deactivating somebody's login, and that is a decision for a
+        //  human, not a migration. The guard records DIRTY and says which
+        //  address — which is the part that used to be invisible.
+        ensure_unique_generated_index($t, 'uq_active_email', $expr, $ix);
     }
+    $doneAt = db_epoch();
 }
 
-/** Column names on a table, on either engine. */
+/**
+ * Column names on a table, on either engine — generated columns included.
+ *
+ * A6: this used to ask SQLite's `PRAGMA table_info`, which does not list
+ * generated columns. It therefore reported the uniqueness key as missing on
+ * every single boot, the ALTER that followed failed as a duplicate, and the
+ * UNIQUE INDEX behind it was skipped for the life of the install. The
+ * protection was never there and nothing said so.
+ */
 function t_cols_of($table) {
-    try {
-        if ((string)db()->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite')
-            return array_column(ops_all("PRAGMA table_info(" . $table . ")") ?: [], 'name');
-        return array_column(ops_all("SELECT column_name AS name FROM information_schema.columns
-                                     WHERE table_schema = DATABASE() AND table_name = ?", [$table]) ?: [], 'name');
-    } catch (Throwable $e) { return []; }
+    return function_exists('table_columns_incl_generated') ? table_columns_incl_generated($table) : [];
 }
 
 /** Addresses held by more than one ACTIVE account in one table. */

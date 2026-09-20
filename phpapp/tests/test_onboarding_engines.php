@@ -33,9 +33,19 @@ try {
     t_ok(strpos($codes, 'TECHNICAL_MANPOWER') !== false, 'the manpower-supply capability persists');
     t_ok(strpos($codes, 'FREELANCE_SUPPLY') !== false, 'the freelance-supply capability persists (multi, not single-select)');
 
-    // A duplicate registration on the same e-mail is refused (sign in instead).
-    t_ok(connect_org_register(['name' => 'Dup', 'org_type' => 'ENTERPRISE', 'contact_name' => 'D', 'contact_email' => $email, 'password' => 'onboard123'])[0] === false,
-        'a second company on the same e-mail is refused');
+    //  A second company on the same e-mail creates nothing.
+    //
+    //  CORRECTIVE (Q26 · A3): this used to assert that the ATTEMPT was refused,
+    //  and being refused was itself the leak — "that address is already
+    //  registered" lets anybody test addresses until one comes back taken. The
+    //  answer is now the same one everybody gets, and the fact that matters is
+    //  asserted directly against the database instead of inferred from a verdict.
+    $dupBefore = (int)ops_val("SELECT COUNT(*) FROM business_partners WHERE legal_name='Dup'");
+    connect_org_register(['name' => 'Dup', 'org_type' => 'ENTERPRISE', 'contact_name' => 'D', 'contact_email' => $email, 'password' => 'onboard123']);
+    t_eq((int)ops_val("SELECT COUNT(*) FROM business_partners WHERE legal_name='Dup'"), $dupBefore,
+        'a second company on the same e-mail creates nothing');
+    t_eq((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(TRIM(email))=?", [strtolower(trim($email))]), 1,
+        'and the address still has exactly one account');
 
     // A professional self-registers on the marketplace passport.
     $proEmail = 'pro.' . $sfx . '@onb.test';

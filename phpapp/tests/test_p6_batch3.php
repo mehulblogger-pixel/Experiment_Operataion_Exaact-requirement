@@ -83,7 +83,14 @@ t_eq($b3parts('Southgate Marine Pvt Ltd'), 1, 'A2 · exactly one organisation wa
 
 // EXACT by GSTIN — refuse, create nothing.
 $a3 = $b3one('join', 0, json_encode(['name' => 'Totally Different Name Ltd', 'email' => 'a3@nw.test', 'gstin' => $aGst]));
-t_ok(!($a3['ok'] ?? false), 'A3 · an EXACT GSTIN match is refused  [' . ($a3['msg'] ?? '') . ']');
+//  CORRECTIVE (A3 · Q26) — the old assertion was "refused", and being refused
+//  was itself the disclosure: a refusal looked nothing like a success, so a
+//  stranger learned whether a company was ours without reading a word. The
+//  assertion is now STRONGER. The reply must be the very same reply a brand-new
+//  company gets — while A4/A5 below still prove that nothing was created.
+t_eq((string)($a3['msg'] ?? 'x'), (string)($a1['msg'] ?? 'y'),
+     'A3 · an EXACT GSTIN match reads EXACTLY like a new company registering  [' . ($a3['msg'] ?? '') . ']');
+t_eq((bool)($a3['ok'] ?? false), (bool)($a1['ok'] ?? false), 'A3b · and reports the same verdict, so the shape cannot be read either');
 t_eq($b3parts('Totally Different Name Ltd'), 0, 'A4 · and NO second organisation was created');
 t_eq($b3accts('a3@nw.test'), 0, 'A5 · and no portal account was created either');
 
@@ -94,7 +101,14 @@ foreach (['northwind', strtolower($aGst), 'aaabb1111a', (string)$aPid] as $secre
 
 // EXACT by name — the same company registering again.
 $a7 = $b3one('join', 0, json_encode(['name' => 'Northwind Energy Ltd', 'email' => 'a7@nw.test']));
-t_ok(!($a7['ok'] ?? false), 'A7 · registering an existing organisation by name is refused  [' . ($a7['msg'] ?? '') . ']');
+t_eq((string)($a7['msg'] ?? 'x'), (string)($a1['msg'] ?? 'y'),
+     'A7 · registering an existing organisation by name reads the same  [' . ($a7['msg'] ?? '') . ']');
+//  Refusing quietly must not mean losing the request. Somebody asked for access
+//  to a company we hold; that is recorded for a human, and grants nothing.
+t_ok((int)ops_val("SELECT COUNT(*) FROM cx_access_requests WHERE email=?", ['a7@nw.test']) === 1,
+     'A7b · and a controlled access request was raised for a person to deal with');
+t_eq((string)ops_val("SELECT status FROM cx_access_requests WHERE email=?", ['a7@nw.test']), 'PENDING',
+     'A7c · which grants nothing by itself — it waits for a human');
 t_eq($b3parts('Northwind Energy Ltd'), 1, 'A8 · still exactly one Northwind');
 t_eq($b3orgs('Northwind Energy Ltd'), 0, 'A9 · and no marketplace organisation was created for it');
 
@@ -114,8 +128,14 @@ t_eq(count($bRes), 3, 'B0 · all three processes reported a verdict');
 t_eq($b3accts($bMail), 1, 'B1 · three simultaneous registrations left exactly ONE portal account');
 t_eq($b3parts($bName), 1, 'B2 · exactly ONE business partner');
 t_eq($b3orgs($bName), 1, 'B3 · exactly ONE marketplace organisation');
-$bOk = 0; foreach ($bRes as $r) if (!empty($r['ok'])) $bOk++;
-t_eq($bOk, 1, 'B4 · exactly one process reported success');
+//  CORRECTIVE (A3) — "exactly one reported success" was a correct invariant for
+//  a route that answered the loser differently, and that difference is exactly
+//  what the oracle read. The invariant that actually matters is unchanged and is
+//  proved by B1-B3: one account, one partner, one organisation. What is asserted
+//  here now is that the three processes could not tell each other apart.
+$bMsgs = [];
+foreach ($bRes as $r) $bMsgs[(string)($r['msg'] ?? '')] = true;
+t_eq(count($bMsgs), 1, 'B4 · all three processes read the SAME answer — the race is not an oracle either');
 $bCrash = 0; foreach ($bRes as $r) if (($r['code'] ?? '') === 'EX') $bCrash++;
 t_eq($bCrash, 0, 'B5 · no process crashed — the conflict was translated into a business answer');
 foreach ($bRes as $i => $r)
@@ -132,7 +152,9 @@ $cExisting = $b3partner('Halfway Existing Ltd');
 db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,created_at) VALUES (?,?,?,?,1,?)")
     ->execute([$cExisting, 'taken@halfway.test', 'Taken', password_hash('x', PASSWORD_DEFAULT), date('c')]);
 $c1 = $b3one('join', 0, json_encode(['name' => $cName, 'email' => 'taken@halfway.test']));
-t_ok(!($c1['ok'] ?? false), 'C1 · a registration whose account is already taken is refused');
+t_eq((string)($c1['msg'] ?? 'x'), CONNECT_JOIN_NEUTRAL_MSG,
+     'C1 · a registration whose account is already taken reads like every other one');
+t_eq($b3accts('taken@halfway.test'), 1, 'C1b · and no second account was created for that address');
 t_eq($b3parts($cName), $cPartsBefore, 'C2 · and NO orphan business partner was left behind');
 t_eq($b3orgs($cName), $cOrgsBefore, 'C3 · and NO orphan marketplace organisation was left behind');
 
@@ -698,11 +720,31 @@ t_ok($iPid > 0, 'I0 · the organisation was created');
 $iRow = ops_one("SELECT * FROM activities WHERE entity_kind='PARTNER' AND entity_id=? ORDER BY id DESC LIMIT 1", [$iPid]);
 t_ok(is_array($iRow), 'I1 · it wrote an attributable activity against the organisation');
 if (is_array($iRow)) t_ok(isset(ACT_KINDS[(string)$iRow['kind']]), 'I2 · with a registered activity kind');
-// A refused registration is audited too — against the organisation it matched.
-$iBefore = (int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='PARTNER' AND entity_id=?", [$aPid]);
+//  CORRECTIVE (A4 · Q27) — this assertion used to REQUIRE the defect.
+//
+//  It demanded that an unauthenticated stranger's refused sign-up be written to
+//  the matched organisation's activity trail. That trail is the feed the
+//  customer's own dashboard shows, eight entries at a time, so ten anonymous
+//  posts wiped every genuine entry off a paying customer's screen. The test was
+//  agreeing with the code rather than checking it.
+//
+//  The evidence is still kept — it is simply kept where staff read it and no
+//  customer screen does. Both halves are asserted, so neither can be lost.
+$iBefore    = (int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='PARTNER' AND entity_id=?", [$aPid]);
+$iSecBefore = (int)ops_val("SELECT COUNT(*) FROM portal_audit WHERE action='JOIN_BLOCKED'");
 $b3one('join', 0, json_encode(['name' => 'Northwind Energy Ltd', 'email' => 'i3@nw.test']));
-t_ok((int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='PARTNER' AND entity_id=?", [$aPid]) > $iBefore,
-     'I3 · a REFUSED public registration is audited against the organisation it matched');
+t_eq((int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='PARTNER' AND entity_id=?", [$aPid]), $iBefore,
+     'I3 · *** a stranger cannot write into a customer-visible activity feed ***');
+t_ok((int)ops_val("SELECT COUNT(*) FROM portal_audit WHERE action='JOIN_BLOCKED'") > $iSecBefore,
+     'I3b · but the security evidence IS kept, where staff can investigate it');
+t_ok((int)ops_val("SELECT COUNT(*) FROM portal_audit WHERE action='JOIN_BLOCKED' AND partner_id=?", [$aPid]) > 0,
+     'I3c · and it names the organisation, for the person who will handle it');
+//  The flood that evicted a customer's history in the audit.
+$iFlood = (int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='PARTNER' AND entity_id=?", [$aPid]);
+for ($i = 0; $i < 10; $i++)
+    $b3one('join', 0, json_encode(['name' => 'Northwind Energy Ltd', 'email' => 'flood' . $i . '@nw.test']));
+t_eq((int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='PARTNER' AND entity_id=?", [$aPid]), $iFlood,
+     'I3d · *** ten anonymous attempts change nothing on the customer\'s dashboard ***');
 
 // =============================================================================
 t_section('P6-B3 · J — historical states are detected, never repaired (F9)');
@@ -846,7 +888,8 @@ t_section('P6-B3 · M — the public route under attack');
 $mPid = $b3partner('Maybury Chemicals Ltd', ['gstin' => '24MMMNN6666M1Z9']);
 $mExact  = $b3one('join', 0, json_encode(['name' => 'Some Other Name Ltd', 'email' => 'm1@mb.test', 'gstin' => '24MMMNN6666M1Z9']));
 $mByName = $b3one('join', 0, json_encode(['name' => 'Maybury Chemicals Ltd', 'email' => 'm2@mb.test']));
-t_ok(!($mExact['ok'] ?? false) && !($mByName['ok'] ?? false), 'M1 · both kinds of match are refused');
+t_eq($b3parts('Some Other Name Ltd'), 0, 'M1 · an EXACT tax-identifier match creates no organisation');
+t_eq($b3parts('Maybury Chemicals Ltd'), 1, 'M1b · and a name match leaves the one that was already there');
 t_eq((string)($mByName['msg'] ?? 'x'), (string)($mExact['msg'] ?? 'y'),
      'M2 · and the visitor reads the SAME sentence — the reply is not an oracle');
 
@@ -874,7 +917,8 @@ $b3one('join', 0, json_encode(['name' => $mKeep, 'email' => 'm11@redhill.test', 
 t_eq((string)ops_val("SELECT gstin FROM business_partners WHERE legal_name=? ORDER BY id DESC LIMIT 1", [$mKeep]),
      '24RRRSS7777R1Z9', 'M11 · a tax identifier given at registration is stored, not read and discarded');
 $mAgain = $b3one('join', 0, json_encode(['name' => 'Redhill Ceramics Limited Trading', 'email' => 'm12@redhill.test', 'gstin' => '24RRRSS7777R1Z9']));
-t_ok(!($mAgain['ok'] ?? false), 'M12 · so the SAME company under another name is refused the next time');
+t_eq($b3parts('Redhill Ceramics Limited Trading'), 0,
+     'M12 · so the SAME company under another name creates nothing the next time');
 
 //  A name is data, never instruction — on both engines.
 $mSqlName = "Bobby'); DROP TABLE business_partners;--";

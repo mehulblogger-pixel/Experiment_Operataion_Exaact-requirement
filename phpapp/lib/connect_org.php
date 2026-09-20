@@ -92,6 +92,102 @@ function connect_org_migrate() {
     }
 }
 
+// ===========================================================================
+//  ACCESS REQUESTS — THE CONTROLLED WAY IN WHEN THE ORGANISATION IS ALREADY OURS
+//  Phase 6 · Batch 3 corrective (Q26 · A3 · R4)
+//
+//  Someone signs up for a company we already work with. Two things must both be
+//  true, and before this they could not be:
+//
+//    · They must not be told. "That company already exists" turns the public
+//      sign-up form into a lookup service for who our customers are — and the
+//      audit showed it worked 200 times out of 200, by response size and timing
+//      alone, without even reading the words.
+//    · They must not simply be let in. An anonymous stranger who types a
+//      customer's name must never end up holding that customer's organisation.
+//
+//  So the request is RECORDED and nothing is granted. No account, no
+//  organisation, no permission, no ownership, no merge. A human decides, and the
+//  way they grant access is the invitation that already exists and already asks
+//  for its own authority — this queue starts no new road into a customer's data.
+//
+//  What the applicant sees is exactly what a brand-new company sees. The
+//  difference is carried by e-mail, to the address they gave, which only its
+//  owner can read.
+// ===========================================================================
+function connect_access_request_migrate() {
+    static $doneAt = -1; if ($doneAt === db_epoch()) return;
+    try { if (db()->inTransaction()) return; } catch (Throwable $e) {}
+    $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    db()->exec("CREATE TABLE IF NOT EXISTS cx_access_requests (
+        id $pk, partner_id INT NULL, org_name VARCHAR(200) DEFAULT '',
+        contact_name VARCHAR(150) DEFAULT '', email VARCHAR(200) DEFAULT '',
+        mobile VARCHAR(40) DEFAULT '', matched_by VARCHAR(20) DEFAULT '',
+        confidence VARCHAR(12) DEFAULT '', status VARCHAR(16) DEFAULT 'PENDING',
+        handled_by VARCHAR(150) DEFAULT '', handled_at VARCHAR(30) DEFAULT '',
+        note VARCHAR(400) DEFAULT '', ip VARCHAR(60) DEFAULT '',
+        created_at VARCHAR(30) DEFAULT '')");
+    $doneAt = db_epoch();
+}
+
+/**
+ * Record that somebody asked for access to an organisation we already hold.
+ *
+ * `$partnerId` is the SURVIVING organisation (R4) — never the retired record the
+ * identifier happened to sit on, or staff would be sent to a company that no
+ * longer trades. It is stored for the person who will handle the request and is
+ * never returned to the applicant.
+ */
+function connect_access_request_add($partnerId, array $in, $matchedBy = '', $confidence = '') {
+    connect_access_request_migrate();
+    try {
+        db()->prepare("INSERT INTO cx_access_requests
+            (partner_id,org_name,contact_name,email,mobile,matched_by,confidence,status,ip,created_at)
+            VALUES (?,?,?,?,?,?,?,'PENDING',?,?)")
+            ->execute([(int)$partnerId ?: null,
+                       substr(trim((string)($in['name'] ?? '')), 0, 200),
+                       substr(trim((string)($in['contact_name'] ?? '')), 0, 150),
+                       email_key($in['contact_email'] ?? ''),
+                       substr(trim((string)($in['contact_mobile'] ?? '')), 0, 40),
+                       substr((string)$matchedBy, 0, 20), substr((string)$confidence, 0, 12),
+                       function_exists('client_ip') ? client_ip() : '', date('c')]);
+        return (int)db()->lastInsertId();
+    } catch (Throwable $e) { return 0; }
+}
+
+/** Access requests waiting for a person to deal with. Staff only — see the screen. */
+function connect_access_requests_all($status = 'PENDING') {
+    connect_access_request_migrate();
+    try {
+        $sql = "SELECT r.*, COALESCE(NULLIF(p.display_name,''), p.legal_name) AS partner_name, p.code AS partner_code
+                  FROM cx_access_requests r LEFT JOIN business_partners p ON p.id = r.partner_id";
+        $a = [];
+        if ($status !== '') { $sql .= " WHERE r.status = ?"; $a[] = $status; }
+        return ops_all($sql . " ORDER BY r.id DESC LIMIT 200", $a) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
+/** How many are waiting — for the admin tile. */
+function connect_access_requests_count() { return count(connect_access_requests_all('PENDING')); }
+
+/**
+ * A person deals with a request. This CLOSES the request and nothing else: it
+ * grants no access by itself. Access is given by inviting the person through the
+ * portal invitation that already exists, which asks for its own authority and
+ * writes its own trail. Deliberately not automatic — Q26.
+ */
+function connect_access_request_close($id, $status, $note = '') {
+    connect_access_request_migrate();
+    $status = in_array($status, ['APPROVED', 'REJECTED'], true) ? $status : 'REJECTED';
+    try {
+        db()->prepare("UPDATE cx_access_requests SET status=?, handled_by=?, handled_at=?, note=?
+                        WHERE id=? AND status='PENDING'")
+            ->execute([$status, function_exists('user_name') ? user_name(current_user()) : '',
+                       date('c'), substr(trim((string)$note), 0, 400), (int)$id]);
+        return true;
+    } catch (Throwable $e) { return false; }
+}
+
 /**
  * B1 — an organisation applies for itself (public onboarding). Lands as PENDING
  * for a platform admin to approve. Returns the id, or 0 on bad input.
@@ -182,7 +278,7 @@ function connect_org_prepare_schema($caps = false) {
 function connect_org_register(array $in) {
     $name    = trim((string)($in['name'] ?? ''));
     $orgType = strtoupper((string)($in['org_type'] ?? ''));
-    $email   = strtolower(trim((string)($in['contact_email'] ?? '')));
+    $email   = email_key($in['contact_email'] ?? '');
     $person  = trim((string)($in['contact_name'] ?? '')) ?: $name;
     $pass    = (string)($in['password'] ?? '');
     // Capabilities lead the flow now: a company simply ticks what it does, and we
@@ -194,6 +290,22 @@ function connect_org_register(array $in) {
     if ($name === '') return [false, 'Please give your organisation a name.', null];
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return [false, 'Enter a valid work e-mail.', null];
     if (strlen($pass) < 8) return [false, 'Choose a password of at least 8 characters.', null];
+    //  These three refusals are about the FORM THE PERSON JUST FILLED IN. They
+    //  describe their own typing back to them and reveal nothing about anybody
+    //  else, so they stay — a sign-up that cannot say "that e-mail is not valid"
+    //  is a worse product for no security gain.
+    $isAgency = in_array($orgType, ['MANPOWER_AGENCY', 'RECRUITMENT_AGENCY'], true);
+
+    //  A3 — hash the password HERE, before anything is decided.
+    //
+    //  Hashing is far and away the most expensive thing this route does, and it
+    //  used to happen only on the path that created an account. That left a
+    //  21ms answer for "this company is already ours" beside a 284ms answer for
+    //  "it is not" — a clock is all anybody needed to read our customer list.
+    //  Paying the same cost before the question is asked is not padding; it is
+    //  simply doing the work in an order that does not answer a question we
+    //  refuse to answer.
+    $hash = password_hash($pass, PASSWORD_DEFAULT);
     //  Prepare the schema — or, inside somebody else's transaction, prove it is
     //  already prepared and touch nothing. Before the first query, because the
     //  very next line reads a table this route owns.
@@ -207,8 +319,15 @@ function connect_org_register(array $in) {
                      . 'Please try again in a moment.', null];
 
     // A login is one per e-mail across the client-portal world.
-    if ((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(email)=? AND is_active=1", [$email]) > 0)
-        return [false, 'That e-mail is already registered — sign in instead.', null];
+    //  The answer is the same one everybody gets. Telling a stranger "that
+    //  address is already registered" lets them test addresses one by one to
+    //  find out who banks with us; the person who actually owns the address is
+    //  told, by e-mail, which only they can read.
+    if ((int)ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(TRIM(email))=? AND is_active=1", [$email]) > 0) {
+        connect_join_mail($email, 'account-exists', $person, $name);
+        portal_security_event('JOIN_BLOCKED', 'Public sign-up for an address that already has an account.');
+        return connect_join_neutral($email, $isAgency);
+    }
 
     // ------------------------------------------------------------------------
     //  PHASE 6 · BATCH 3 — DUPLICATE ORGANISATION PROTECTION (F1 · Q20 · Q21).
@@ -228,8 +347,6 @@ function connect_org_register(array $in) {
     //  POSSIBLE                                          → see below.
     //  NONE                                              → register normally.
     // ------------------------------------------------------------------------
-    $claimMsg = 'We could not complete this registration online. If your organisation already works with us, '
-              . 'please ask your account contact to invite you, or contact us to request access.';
     if (function_exists('find_duplicate_partner')) {
         $hit = find_duplicate_partner($name, (string)($in['gstin'] ?? ''), (string)($in['pan'] ?? ''), (string)($in['tan'] ?? ''), 0);
         if ($hit) {
@@ -241,15 +358,35 @@ function connect_org_register(array $in) {
             //  company often enough that the message must invite contact rather
             //  than accuse. Staff paths treat the two differently — see
             //  partner_find_or_problem().
-            if (function_exists('act_log')) {
-                try { act_log('PARTNER', (int)($hit['row']['id'] ?? 0), 'SYSTEM',
-                    'Public registration refused — ' . (string)($hit['confidence'] ?? '') . ' match by ' . (string)$hit['by']); } catch (Throwable $e) {}
-            }
-            return [false, $claimMsg, null];
+            //  A4 · Q27 — where this is written down.
+            //
+            //  It used to go to the matched organisation's ACTIVITY trail: the
+            //  feed their own dashboard shows, which displays the latest eight
+            //  entries. Ten anonymous posts therefore pushed every real entry
+            //  off a paying customer's screen. A stranger with no account could
+            //  decide what a customer saw about their own business.
+            //
+            //  The evidence is worth keeping and the place was wrong. It goes to
+            //  the portal access trail, which staff read and no customer screen
+            //  does. The organisation's id is recorded for the person who will
+            //  handle it, and is never sent back to whoever typed the form.
+            //
+            //  R4 — the request names the SURVIVING organisation. `row` has
+            //  already been resolved through any merge, so nobody is sent to a
+            //  record that was retired years ago.
+            $liveId = (int)($hit['row']['id'] ?? 0);
+            connect_access_request_add($liveId, $in, (string)$hit['by'], (string)($hit['confidence'] ?? ''));
+            portal_security_event('JOIN_BLOCKED',
+                'Public sign-up matched an existing organisation — ' . (string)($hit['confidence'] ?? '')
+                . ' by ' . (string)$hit['by'] . '. Access request raised; nothing was created.', $liveId);
+            connect_join_mail($email, 'access-requested', $person, $name);
+            //  The same answer a brand-new company gets. No name, no code, no
+            //  identifier, no status, no confidence, no id — and, because the
+            //  caller returns TRUE, the same page of the same size as a success.
+            return connect_join_neutral($email, $isAgency);
         }
     }
 
-    $isAgency = in_array($orgType, ['MANPOWER_AGENCY', 'RECRUITMENT_AGENCY'], true);
     $now = date('c');
 
     // ------------------------------------------------------------------------
@@ -303,7 +440,7 @@ function connect_org_register(array $in) {
         try {
             db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,perms,created_by,created_at)
                            VALUES (?,?,?,?,1,0,'', 'self-service', ?)")
-                ->execute([$partyId, $email, $person, password_hash($pass, PASSWORD_DEFAULT), $now]);
+                ->execute([$partyId, $email, $person, $hash, $now]);
         } catch (Throwable $e) {
             if (function_exists('portal_acct_is_duplicate') && portal_acct_is_duplicate($e)) $acctTaken = true;
             throw $e;
@@ -324,9 +461,16 @@ function connect_org_register(array $in) {
         //  already work with us" to somebody whose registration hit a database
         //  error sends them down a claim path that does not apply, and hides a
         //  fault nobody then investigates. Different fact, different sentence.
-        return [false, $acctTaken ? 'That e-mail is already registered — sign in instead.'
-                            : 'We could not complete your registration just now. Nothing has been saved. '
-                            . 'Please try again in a moment.', null];
+        //  Losing the account race is the same fact as the check at the top, so
+        //  it gets the same neutral answer. A genuine system failure is a
+        //  different fact and says so — it happens to new and existing
+        //  organisations alike, so it tells a stranger nothing.
+        if ($acctTaken) {
+            connect_join_mail($email, 'account-exists', $person, $name);
+            return connect_join_neutral($email, $isAgency);
+        }
+        return [false, 'We could not complete your registration just now. Nothing has been saved. '
+                     . 'Please try again in a moment.', null];
     }
 
     //  AUDIT — outside the transaction. A failed observation is never a failed
@@ -336,7 +480,48 @@ function connect_org_register(array $in) {
         catch (Throwable $e) {}
     }
 
-    return [true, 'Your account is ready.', ['email' => $email, 'login_url' => $isAgency ? '/portal/login' : '/portal/login?for=hire', 'is_agency' => $isAgency]];
+    connect_join_mail($email, 'welcome', $person, $name);
+    return connect_join_neutral($email, $isAgency);
+}
+
+//  THE ONE ANSWER THE PUBLIC FORM GIVES.
+//
+//  Every outcome a stranger can steer — account created, address already in use,
+//  organisation already ours — ends here, with the same words, the same fields
+//  and the same page. What differs is the e-mail, which goes to the address they
+//  typed and which only its owner can read. `login_url` is derived from what THEY
+//  asked to be, never from anything we know, so it carries nothing back.
+const CONNECT_JOIN_NEUTRAL_MSG = 'Thanks — we have your details.';
+
+function connect_join_neutral($email, $isAgency) {
+    return [true, CONNECT_JOIN_NEUTRAL_MSG,
+            ['email' => $email,
+             'login_url' => $isAgency ? '/portal/login' : '/portal/login?for=hire',
+             'is_agency' => $isAgency]];
+}
+
+/** The part of the answer that only the address's owner gets to read. */
+function connect_join_mail($email, $kind, $person, $orgName) {
+    if (!function_exists('ops_mail')) return;
+    $app  = function_exists('app_name') ? app_name() : 'the portal';
+    $hi   = 'Hello ' . ($person !== '' ? $person : 'there') . ",\n\n";
+    $bye  = "\n\nThank you,\n" . $app;
+    if ($kind === 'welcome') {
+        $sub = 'Your ' . $app . ' account is ready';
+        $msg = $hi . 'Your account for ' . $orgName . " is set up and you can sign in now with the e-mail address "
+             . "and password you chose." . $bye;
+    } elseif ($kind === 'access-requested') {
+        $sub = 'About your ' . $app . ' sign-up';
+        $msg = $hi . 'Thanks for signing up. We could not finish setting you up online, so we have passed your '
+             . "request to the team who look after this account. Somebody will be in touch.\n\n"
+             . "If you were expecting to be added by a colleague, ask them to send you an invitation." . $bye;
+    } else {
+        $sub = 'About your ' . $app . ' sign-up';
+        $msg = $hi . 'Somebody just tried to sign up using this e-mail address, which already has an account. '
+             . "If that was you, simply sign in — or use \"forgotten password\" if you need a new one.\n\n"
+             . "If it was not you, you do not need to do anything; nothing has changed." . $bye;
+    }
+    try { ops_mail($email, $sub, $msg, '', 'join'); } catch (Throwable $e) {}
 }
 
 /** A platform admin approves a pending organisation → ACTIVE. */
@@ -423,6 +608,42 @@ function connect_org_can_module($orgId, $moduleKey) {
 }
 
 /** Master-only admin screen: register organisations and see their entitlements. */
+
+/**
+ * The queue a person works through (Q26).
+ *
+ * Authorisation is the SAME gate that already guards the organisations screen
+ * next door — this queue is about organisations, and no new permission was
+ * invented for it (§16). Looking at the queue is all this screen does; giving
+ * somebody access is still the portal invitation, which asks for its own
+ * authority and writes its own trail. There is deliberately no "approve and let
+ * them in" button: approving here records a decision, it does not hand over an
+ * organisation.
+ */
+function ops_connect_access_requests($method) {
+    ops_require(function_exists('is_master') && is_master(),
+                'Only a master admin can see access requests.');
+    connect_access_request_migrate();
+    if ($method === 'POST') {
+        $id  = (int)($_POST['id'] ?? 0);
+        $act = (string)($_POST['action'] ?? '');
+        if ($id > 0 && ($act === 'APPROVED' || $act === 'REJECTED')) {
+            connect_access_request_close($id, $act, (string)($_POST['note'] ?? ''));
+            flash($act === 'APPROVED'
+                ? 'Noted. Invite them from the client record to actually give them access.'
+                : 'Request closed.');
+        } else {
+            flash('Nothing to do.', 'error');
+        }
+        redirect('/access-requests');
+    }
+    view('ops/connect_access_requests', [
+        'rows'   => connect_access_requests_all('PENDING'),
+        'closed' => connect_access_requests_all('APPROVED'),
+    ]);
+    return true;
+}
+
 function ops_connect_orgs($method) {
     ops_require(function_exists('is_master') && is_master(), 'Only a master admin can manage organisations.');
     connect_org_migrate();
