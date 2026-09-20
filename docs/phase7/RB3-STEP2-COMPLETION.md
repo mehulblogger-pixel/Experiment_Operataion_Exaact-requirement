@@ -118,4 +118,7 @@ transaction is opened.
 | | |
 |---|---|
 | Working implementation, before mutation testing | **`eff3e5b`** |
-| Final, after the mutation corrections | *see the final report* |
+| Final, after the mutation corrections | **`47fabb7`** |
+
+*(This line is recorded by a doc-only commit that follows `47fabb7`; `47fabb7` is
+the commit the test and mutation figures above were produced from.)*
