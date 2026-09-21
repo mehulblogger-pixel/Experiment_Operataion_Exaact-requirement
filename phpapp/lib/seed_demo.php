@@ -1,4 +1,39 @@
 <?php
+
+// ============================================================================
+//  WHAT THE DEMO CREATED — so the unload can remove exactly that.
+//
+//  The demo carries EMP01..EMP03. Since owner decision 1 an employee number is
+//  permanently unique and never re-issued, so those are the very numbers a
+//  workspace's first three real hires receive. Deleting "the rows holding
+//  EMP01" is therefore deleting PEOPLE, which is how a demo unload could remove
+//  a real employee. The seed records the ids it genuinely inserted instead —
+//  in the existing settings table, no new table, no new column — and the unload
+//  deletes by those ids.
+//
+//  Rows the seed REUSED (because they already held the number) are not the
+//  demo's and are never recorded, so the unload leaves them alone.
+// ============================================================================
+function demo_inspector_ids() {
+    if (!function_exists('setting_get')) return [];
+    $raw = (string) setting_get('demo_inspector_ids', '');
+    if ($raw === '') return [];
+    $ids = json_decode($raw, true);
+    if (!is_array($ids)) return [];
+    $out = [];
+    foreach ($ids as $i) { $i = (int) $i; if ($i > 0) $out[$i] = true; }
+    return array_keys($out);
+}
+function demo_inspector_ids_add(array $ids) {
+    if (!function_exists('setting_set')) return;
+    $all = array_merge(demo_inspector_ids(), array_map('intval', $ids));
+    $all = array_values(array_unique(array_filter($all, fn($i) => $i > 0)));
+    try { setting_set('demo_inspector_ids', json_encode($all)); } catch (Throwable $e) {}
+}
+function demo_inspector_ids_clear() {
+    if (!function_exists('setting_set')) return;
+    try { setting_set('demo_inspector_ids', ''); } catch (Throwable $e) {}
+}
 // ============================================================================
 //  Demo / sample dataset — one-click loader (Master Admin only).
 //  Inserts a complete, coherent lifecycle so every screen shows live figures:
@@ -135,19 +170,31 @@ function seed_demo($force = false) {
         //  clients and everything else down with it, silently. Reusing the row
         //  that already holds the number keeps the demo loadable AND stops the
         //  demo creating a second person carrying somebody else's number.
-        $iid = [];
+        //  AND THE UNLOAD MUST DELETE WHAT THIS LOADED — NOTHING ELSE.
+        //  Reusing a row above means the demo did not create that person, so the
+        //  unload must not remove them either. Only the ids this run genuinely
+        //  INSERTED are recorded, in the existing settings table; the unload
+        //  deletes by those ids and never by employee number.
+        $iid = []; $mine = [];
         foreach ($inspectors as $r) {
             $have = (int) ops_val("SELECT id FROM inspectors WHERE UPPER(TRIM(COALESCE(emp_code,'')))=? ORDER BY id LIMIT 1",
                                   [strtoupper(trim((string)$r[3]))]);
             if ($have) { $iid[$r[3]] = $have; continue; }
             $insI->execute([$r[0],$r[1],$r[2],$r[3],$r[4],$r[5],$r[6],$r[7],$r[8],$r[9],$r[10],$r[11],$r[12],$r[13],$now]);
             $iid[$r[3]] = (int)$pdo->lastInsertId();
+            $mine[] = $iid[$r[3]];
         }
+        demo_inspector_ids_add($mine);
         $c['inspectors'] = count($inspectors);
 
         // Entitlements: allow Bike/Car modes + Food/Hotel/Auto heads for each
         $insA = $pdo->prepare("INSERT INTO inspector_allowances(inspector_id,kind,code,allowed,rate_override) VALUES(?,?,?,1,NULL)");
-        foreach ($iid as $ins) {
+        //  ONLY ON THE PEOPLE THIS SEED CREATED. Where the demo reused a row
+        //  because a real employee already held that number, attaching the
+        //  demo's entitlements to them would leave demo data on a real person's
+        //  record — and the unload, which correctly removes only what the seed
+        //  created, would never take it back off again.
+        foreach ($mine as $ins) {
             foreach (['BIKE','CAR'] as $mc) $insA->execute([$ins,'MODE',$mc]);
             foreach (['FOOD','HOTEL','AUTO'] as $hc) $insA->execute([$ins,'HEAD',$hc]);
         }
@@ -681,11 +728,46 @@ function seed_demo_remove() {
         $del("DELETE FROM expenses WHERE job_id IN (SELECT id FROM jobs WHERE created_by='demo')");
         $del("DELETE FROM jobs WHERE created_by='demo'");
         $del("DELETE FROM calls WHERE created_by='demo'");
-        // Masters the seed created, by their known codes
-        $emps = "('EMP01','EMP02','EMP03','EMP04','SC-001')";
-        $del("DELETE FROM inspector_allowances WHERE inspector_id IN (SELECT id FROM inspectors WHERE emp_code IN $emps)");
-        $del("DELETE FROM vendor_km_memory WHERE inspector_id IN (SELECT id FROM inspectors WHERE emp_code IN $emps)");
-        $del("DELETE FROM inspectors WHERE emp_code IN $emps");
+        // Masters the seed created.
+        //
+        //  NEVER BY EMPLOYEE NUMBER. The demo people carry EMP01..EMP03, which
+        //  are exactly the numbers a workspace's first real hires are issued —
+        //  and since owner decision 1 a number is permanently unique and never
+        //  re-issued, so "the row holding EMP01" is a PERSON, not a demo marker.
+        //  Unloading the demo by employee number could therefore delete a real
+        //  employee, their allowances and their travel memory, in a workspace
+        //  that had merely hired three people before anyone tried the demo.
+        //
+        //  The seed records the ids it actually inserted (reused rows are not
+        //  its own and are left alone). The unload removes exactly those.
+        $demoIns = demo_inspector_ids();
+        if ($demoIns) {
+            $in = implode(',', array_map('intval', $demoIns));
+            $del("DELETE FROM inspector_allowances WHERE inspector_id IN ($in)");
+            $del("DELETE FROM vendor_km_memory WHERE inspector_id IN ($in)");
+            $del("DELETE FROM inspectors WHERE id IN ($in)");
+            demo_inspector_ids_clear();
+        } else {
+            //  A demo loaded BEFORE this fix left no record of what it created.
+            //  Rather than fall back to the unsafe selector, match the employee
+            //  number AND the demo's own e-mail together: a real employee who
+            //  merely holds EMP01 does not also carry ravi@example.com, so this
+            //  cannot reach them.
+            $emps = ['EMP01', 'EMP02', 'EMP03', 'EMP04', 'SC-001'];
+            $mails = ['ravi@example.com', 'anil@example.com', 'priya@example.com', 'mohan@example.com'];
+            $qe = implode(',', array_fill(0, count($emps), '?'));
+            $qm = implode(',', array_fill(0, count($mails), '?'));
+            $legacy = "SELECT id FROM inspectors WHERE UPPER(TRIM(COALESCE(emp_code,''))) IN ($qe) AND LOWER(TRIM(COALESCE(email,''))) IN ($qm)";
+            $ids = [];
+            try { $st = $pdo->prepare($legacy); $st->execute(array_merge($emps, $mails));
+                  foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $x) $ids[] = (int)$x; } catch (Throwable $e) {}
+            if ($ids) {
+                $in = implode(',', $ids);
+                $del("DELETE FROM inspector_allowances WHERE inspector_id IN ($in)");
+                $del("DELETE FROM vendor_km_memory WHERE inspector_id IN ($in)");
+                $del("DELETE FROM inspectors WHERE id IN ($in)");
+            }
+        }
         $del("DELETE FROM boss_numbers WHERE boss_number IN ('40231','40198','40155') OR boss_number LIKE '5090%'");
         $del("DELETE FROM agencies WHERE name IN ('TalentFirst Recruitment','SiteForce Manpower')");
         $del("DELETE FROM requisitions WHERE created_by='demo'");

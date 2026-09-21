@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '857124f · 2026-09-21 10:49 UTC · 666 files';
+$RELEASE = '48f370d · 2026-09-21 17:47 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -119,7 +119,7 @@ $EXPECT  = [
     'lib/cvp.php' => ['s'=>61127,'h'=>'d51dac70fda3b174'],
     'lib/datacontrol.php' => ['s'=>37308,'h'=>'be66a03dcb445dac'],
     'lib/datatable.php' => ['s'=>15699,'h'=>'dfea30bbc69ccef3'],
-    'lib/db.php' => ['s'=>56340,'h'=>'6e9375c6656e8f6e'],
+    'lib/db.php' => ['s'=>58443,'h'=>'1e101a13c10c4e66'],
     'lib/decisionrules.php' => ['s'=>12116,'h'=>'7f7d5a9cd6e144ef'],
     'lib/dedupe.php' => ['s'=>12027,'h'=>'de5bdc1c0769610b'],
     'lib/deptorg.php' => ['s'=>35388,'h'=>'6517b0f59b23fe0e'],
@@ -219,7 +219,7 @@ $EXPECT  = [
     'lib/security.php' => ['s'=>38300,'h'=>'59c69d7c557f1016'],
     'lib/seed_connect.php' => ['s'=>22943,'h'=>'06f835c70073b5b5'],
     'lib/seed_costing.php' => ['s'=>7626,'h'=>'d377be1adc35b4da'],
-    'lib/seed_demo.php' => ['s'=>110095,'h'=>'670452da57b0807a'],
+    'lib/seed_demo.php' => ['s'=>114790,'h'=>'2ac4084f42c85800'],
     'lib/seed_demo_c.php' => ['s'=>125521,'h'=>'7765694ba131b91c'],
     'lib/seed_recruit_cc.php' => ['s'=>10345,'h'=>'b2ead314e97b24a3'],
     'lib/seed_scenario_s01.php' => ['s'=>34921,'h'=>'37246a2099961d2a'],

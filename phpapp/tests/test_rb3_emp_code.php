@@ -302,3 +302,51 @@ t_ok(in_array('ux_cx_idlink_insp', table_index_names('cx_identity_link'), true)
      'J3 · the identity ledger\'s own unique keys are untouched');
 t_eq((string)ops_val("SELECT COALESCE(team_role,'') FROM inspectors WHERE id=?", [$c4id]), 'FIELD',
      'J4 · team_role still behaves exactly as before — RB-3 changes the NUMBER, not the classification');
+
+// ---------------------------------------------------------------------------
+t_section('RB3 · K — the number is unique per TENANT, not across the world');
+// ---------------------------------------------------------------------------
+//  Decision 1 says an employee number is unique TENANT-WIDE. The word matters
+//  in both directions: one customer may never re-use it, and another customer
+//  must be free to use the same number for somebody else entirely. EXAACT gives
+//  every tenant its own database, so the second half is not a filter that could
+//  be forgotten — it is structural. That is exactly why it is worth proving:
+//  a claim nobody tests is a claim nobody notices breaking.
+//
+//  The probe uses RAW INSERTs on both sides, so what answers is the database
+//  backstop rather than any application validation.
+$kA = sys_get_temp_dir() . '/rb3_ten_a_' . getmypid() . '.sqlite';
+$kB = sys_get_temp_dir() . '/rb3_ten_b_' . getmypid() . '.sqlite';
+@unlink($kA); @unlink($kB);
+if (t_driver() === 'sqlite') { $kSpecA = 'sqlite:' . $kA; $kSpecB = 'sqlite:' . $kB; }
+else {
+    $kSpecA = 'mysql:rb3_ten_a_' . getmypid(); $kSpecB = 'mysql:rb3_ten_b_' . getmypid();
+    foreach ([$kSpecA, $kSpecB] as $sp) { $n = explode(':', $sp, 2)[1];
+        try { db()->exec("DROP DATABASE IF EXISTS `$n`"); db()->exec("CREATE DATABASE `$n`"); } catch (Throwable $e) {} }
+}
+$kEnv = '';
+foreach (['DB_HOST', 'DB_USER', 'DB_PASS'] as $k) { $v = getenv($k); if ($v !== false && $v !== '') $kEnv .= $k . '=' . escapeshellarg($v) . ' '; }
+$kRaw = (string)shell_exec($kEnv . 'php ' . escapeshellarg($rbRoot . '/tests/_rb3_tenant_emp.php') . ' '
+      . escapeshellarg($kSpecA) . ' ' . escapeshellarg($kSpecB) . ' 2>&1');
+$kJ = null; foreach (explode("\n", trim($kRaw)) as $l) { $j = json_decode(trim($l), true); if (is_array($j)) { $kJ = $j; break; } }
+if (!is_array($kJ) || empty($kJ['ok'])) {
+    t_ok(false, 'K · the two-tenant employee-number probe ran (' . substr(preg_replace('/\s+/', ' ', $kRaw), 0, 200) . ')');
+} else {
+    $ks = $kJ['steps'];
+    //  Arming: the rule must actually be switched on in BOTH tenants, or the
+    //  allowance below would only mean the guard was missing over there.
+    t_ok(!empty($ks['a_guard_on']), 'K1a · the rule is installed in tenant A — armed');
+    t_ok(!empty($ks['b_guard_on']), 'K1b · …and independently in tenant B — armed');
+    t_ok(!empty($ks['a_first']),    'K1c · tenant A took the number');
+    t_ok(empty($ks['a_second']),    'K1d · …and tenant A cannot hand the same number to a second person');
+    t_ok(!empty($ks['b_first']),    'K1 · tenant B may use THE SAME number for somebody else — uniqueness is tenant-wide, not global');
+    t_ok(empty($ks['b_second']),    'K2 · …yet a second holder inside tenant B is still refused, so B is protected too, not exempt');
+    t_eq((int)$ks['b_count'], 1,    'K2a · exactly one holder in tenant B');
+    t_eq((int)$ks['a_count'], 1,    'K3 · tenant A still has exactly one holder — B\'s hire changed nothing here');
+    t_eq((string)$ks['a_holder'], 'Tenant A Holder',
+         'K3a · …and it is still A\'s own person, by name — no bleed between customers');
+}
+@unlink($kA); @unlink($kB);
+if (t_driver() !== 'sqlite') foreach ([$kSpecA, $kSpecB] as $sp) {
+    try { db()->exec("DROP DATABASE IF EXISTS `" . explode(':', $sp, 2)[1] . "`"); } catch (Throwable $e) {}
+}

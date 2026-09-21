@@ -11,6 +11,22 @@
 // its login broken on multi-worker hosting right after a deploy.
 function db_epoch() { return (int) ($GLOBALS['__db_epoch'] ?? 0); }
 
+// How long a SQLite writer waits for the single database-wide write lock before
+// giving up. SQLite's own default is ZERO — it does not wait at all — which is
+// why two writers that never truly conflicted could still produce "database is
+// locked". Five seconds is far longer than any write this application makes and
+// far shorter than any human would notice.
+//
+// SQLITE ONLY. MariaDB is the authoritative production engine and has its own
+// lock-wait handling; nothing here touches it. The value can be overridden with
+// the SQLITE_BUSY_TIMEOUT environment variable so a test can prove the setting
+// is really being applied rather than assumed.
+if (!defined('SQLITE_BUSY_TIMEOUT_SEC')) {
+    $__sbt = getenv('SQLITE_BUSY_TIMEOUT');
+    define('SQLITE_BUSY_TIMEOUT_SEC', ($__sbt !== false && $__sbt !== '' && (int) $__sbt >= 0) ? (int) $__sbt : 5);
+    unset($__sbt);
+}
+
 function db($reset = false) {
     static $pdo = null;
     static $epoch = 0;
@@ -25,6 +41,22 @@ function db($reset = false) {
     $d = $cfg['db'];
     if ($d['driver'] === 'sqlite') {
         $pdo = new PDO('sqlite:' . $cfg['sqlite_path']);
+        // SQLITE TAKES ONE DATABASE-WIDE WRITE LOCK, AND WITHOUT A BUSY TIMEOUT
+        // IT DOES NOT WAIT FOR IT. A second writer that arrives while the first
+        // is mid-transaction is refused instantly with "database is locked",
+        // even though the first would have finished in milliseconds. That is
+        // not a real conflict — it is impatience, and it made concurrent tests
+        // report failures that say nothing about the code under test.
+        //
+        // A timeout makes the second writer WAIT for the lock instead of giving
+        // up on it. It changes nothing about who wins or what is written: the
+        // writes still serialise exactly as before. MariaDB is unaffected — it
+        // has its own lock-wait handling and is the authoritative engine.
+        //  ONE mechanism, not two. PDO's ATTR_TIMEOUT *is* SQLite's busy
+        //  timeout — setting the PRAGMA as well was a duplicate that changed
+        //  nothing, and two interchangeable lines mean neither can be tested:
+        //  removing either one left the behaviour intact. A mutation proved it.
+        try { $pdo->setAttribute(PDO::ATTR_TIMEOUT, SQLITE_BUSY_TIMEOUT_SEC); } catch (Throwable $e) {}
     } else {
         $dsn = "mysql:host={$d['host']};dbname={$d['name']};charset=utf8mb4";
         // Every CREATE TABLE in this application omits a charset, so each table
