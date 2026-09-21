@@ -40,6 +40,40 @@ $s3race = function (array $specs, $leadMs = 1100) use ($s3root, $s3env) {
     }
 };
 
+//  Spawn WITHOUT waiting, so the parent can change the world while the child is
+//  still in flight. That is what makes the next three probes deterministic
+//  instead of hoping two processes happen to overlap.
+$s3spawn = function ($op, $cid, $extra, $uid, $leadMs) use ($s3root, $s3env) {
+    $target = round(microtime(true) * 1000) + $leadMs;
+    $cmd = $s3env() . 'php ' . escapeshellarg($s3root . '/tests/_rb3s3_worker.php') . ' '
+         . escapeshellarg($op) . ' ' . (int)$cid . ' ' . escapeshellarg((string)$extra) . ' '
+         . escapeshellarg((string)$target) . ' ' . (int)$uid . ' 2>&1';
+    $p = proc_open($cmd, [1 => ['pipe','w'], 2 => ['pipe','w']], $pipes);
+    return [$p, $pipes];
+};
+$s3reap = function ($h) {
+    [$p, $pipes] = $h;
+    stream_get_contents($pipes[1]); fclose($pipes[1]);
+    stream_get_contents($pipes[2]); fclose($pipes[2]);
+    return proc_close($p);
+};
+//  Take the stage ledger away, and put it back. Renaming rather than dropping,
+//  so the rows other tests wrote come back untouched.
+$evRename = function ($away) {
+    $sq = t_driver() === 'sqlite';
+    try {
+        if ($away) {
+            db()->exec($sq ? "ALTER TABLE candidate_events RENAME TO candidate_events_bak"
+                           : "RENAME TABLE candidate_events TO candidate_events_bak");
+        } else {
+            try { db()->exec("DROP TABLE IF EXISTS candidate_events"); } catch (Throwable $e) {}
+            db()->exec($sq ? "ALTER TABLE candidate_events_bak RENAME TO candidate_events"
+                           : "RENAME TABLE candidate_events_bak TO candidate_events");
+        }
+        return true;
+    } catch (Throwable $e) { return false; }
+};
+
 $s3off = (int)ops_val("SELECT id FROM offices ORDER BY id LIMIT 1");
 $s3me  = (int)(current_user()['id'] ?? 0);
 db()->prepare("UPDATE users SET home_office_id=? WHERE id=?")->execute([$s3off, $s3me]);
@@ -173,6 +207,140 @@ t_ok(in_array('AUDIT_WRITES_LOST', $kinds, true),
 setting_set('audit_writes_lost', (string)$lost0);
 t_ok(!in_array('AUDIT_WRITES_LOST', array_column(identity_state_findings(300), 'kind'), true),
      'T6c · …and the report clears once there is nothing to report');
+
+// ---------------------------------------------------------------------------
+t_section('RB3S3 · T7 — the seat is decided INSIDE, proved without hoping for a race');
+// ---------------------------------------------------------------------------
+//  T1 races two real processes, and that is worth having — but it can pass for
+//  the WRONG REASON. Both processes run the identical pre-check before the
+//  transaction, so when the winner finishes quickly the PRE-CHECK refuses the
+//  loser and the in-transaction check never fires at all. Mutations that delete
+//  the in-transaction check (A2) or make it ask the wrong question (A9) both
+//  survived T1 untouched.
+//
+//  So the overlap is MANUFACTURED here instead of hoped for. The parent takes
+//  the seat inside its own uncommitted transaction; the child therefore passes
+//  its pre-check (nothing is committed yet), reaches the lock, and waits. Only
+//  then does the parent commit. The child wakes to find the seat gone — and the
+//  only thing that can refuse it now is the check inside the transaction.
+//
+//  The proof is the AUDIT ENTRY: the in-transaction refusal writes one, and the
+//  pre-check writes none. If the pre-check had refused, there would be no row
+//  and this probe would fail rather than quietly pass.
+if (t_driver() === 'sqlite') {
+    t_ok(true, 'T7 (sqlite) · skipped by design — SQLite has no row locks and serialises writers, so this overlap cannot be staged; it is proved on MariaDB');
+} else {
+    $rqD  = $mkReq(1);
+    $cWin = $mkCand('DetWin', $rqD);
+    $cLos = $mkCand('DetLose', $rqD);
+    $h = $s3spawn('accept', $cLos, '', $s3me, 2600);      // child fires at +2.6s
+    usleep(1200000);
+    db()->beginTransaction();
+    db()->prepare("SELECT id FROM requisitions WHERE id=? FOR UPDATE")->execute([$rqD]);
+    db()->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $cWin]);
+    usleep(2000000);                                       // child pre-checks, passes, then BLOCKS on our lock
+    db()->commit();                                        // now the seat is really gone
+    $s3reap($h);
+
+    t_eq($stageOf($cWin), 'ACCEPTED', 'T7a · the seat really was taken while the loser was in flight — the trap is armed');
+    t_eq($stageOf($cLos), 'OFFER', 'T7 · the loser was refused — the seat was decided INSIDE the transaction');
+    t_eq($inspOf($cLos), 0, 'T7b · …and no workforce record was created for them');
+    t_ok((int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='CANDIDATE' AND entity_id=? AND kind='IDENTITY_REFUSED'", [$cLos]) >= 1,
+         'T7c · …and the refusal carries an audit entry, which ONLY the in-transaction check writes — the pre-check writes none');
+}
+
+// ---------------------------------------------------------------------------
+t_section('RB3S3 · T10 — accepting WITHOUT a conversion is guarded too');
+// ---------------------------------------------------------------------------
+//  T7 proves the loser is refused, but NOT that MY check refused them.
+//  rcv_convert() re-asks the same seat gate itself (lib/recruit.php:1560), so
+//  whenever a conversion is requested the protection is doubled — and deleting
+//  the check in the route (mutant A2) or making it ask the wrong question (A9)
+//  changed nothing that T7 could see.
+//
+//  The case that is NOT doubled is accepting somebody WITHOUT creating a
+//  workforce record — the hidden checkbox left unticked. rcv_convert never runs,
+//  so the check inside the transaction is the only thing standing between two
+//  recruiters and one seat. That is what this probe exercises, with the same
+//  manufactured overlap.
+if (t_driver() === 'sqlite') {
+    t_ok(true, 'T10 (sqlite) · skipped by design — the overlap cannot be staged without row locks; proved on MariaDB');
+} else {
+    $rqN  = $mkReq(1);
+    $nWin = $mkCand('NoConvWin', $rqN);
+    $nLos = $mkCand('NoConvLose', $rqN);
+    //  op 'move' sends to_stage=ACCEPTED with NO make_inspector — a joining that
+    //  creates no workforce record.
+    $hN = $s3spawn('move', $nLos, 'ACCEPTED', $s3me, 2600);
+    usleep(1200000);
+    db()->beginTransaction();
+    db()->prepare("SELECT id FROM requisitions WHERE id=? FOR UPDATE")->execute([$rqN]);
+    db()->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $nWin]);
+    usleep(2000000);
+    db()->commit();
+    $s3reap($hN);
+
+    t_eq($stageOf($nWin), 'ACCEPTED', 'T10a · the one seat was taken while the other was in flight — the trap is armed');
+    t_eq($inspOf($nLos), 0, 'T10b · the loser asked for no workforce record, so rcv_convert never ran to guard them');
+    t_eq($stageOf($nLos), 'OFFER',
+         'T10 · they were still refused — the seat check INSIDE the transaction is the only thing that could have done it');
+    t_eq((int)ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rqN]), 1,
+         'T10c · one approved seat, exactly one person in it');
+}
+
+// ---------------------------------------------------------------------------
+t_section('RB3S3 · T8 — a ledger this path cannot write stops the acceptance');
+// ---------------------------------------------------------------------------
+//  The owner named the KPI stage ledger as a write that must participate. That
+//  means more than "it is inside the transaction": a ledger that CANNOT be
+//  written must stop the acceptance. Nothing exercised that, so the mutation
+//  removing the check (A5) survived.
+//
+//  The ledger is made unwritable AFTER the child has warmed its migrations, so
+//  the route's own warm-up cannot quietly put the table back.
+$rqL = $mkReq(3);
+$cLed = $mkCand('Ledger', $rqL);
+$hL = $s3spawn('accept', $cLed, '', $s3me, 2600);
+usleep(1300000);
+$ledgerGone = $evRename(true);
+$s3reap($hL);
+$ledgerBack = $evRename(false);
+t_ok($ledgerGone, 'T8a · the stage ledger was taken away while the acceptance was in flight — the trap is armed');
+t_ok($ledgerBack, 'T8b · …and put back afterwards, so the rest of the suite is unaffected');
+t_eq($stageOf($cLed), 'OFFER', 'T8 · an acceptance whose stage history cannot be written does NOT happen');
+t_eq($inspOf($cLed), 0, 'T8c · …and creates no workforce record');
+
+// ---------------------------------------------------------------------------
+t_section('RB3S3 · T9 — the warm-up has an EFFECT, not merely a position');
+// ---------------------------------------------------------------------------
+//  T5 proved the warm-up call exists and sits before the transaction. That is a
+//  position, not an effect: disabling it (A6) left the call text in place and
+//  T5 passed regardless.
+//
+//  This proves the effect. A COLD process meets an absent ledger table. Done
+//  correctly, the warm-up creates it BEFORE the transaction opens. Done wrongly,
+//  the migration fires INSIDE — and MariaDB commits implicitly on any DDL, so
+//  the stage move is committed there and then. A refusal that comes afterwards
+//  (an unacknowledged duplicate) can no longer undo it, and the candidate is
+//  left Accepted for a hire that was refused.
+if (t_driver() === 'sqlite') {
+    t_ok(true, 'T9 (sqlite) · skipped by design — SQLite DDL is transactional, so the implicit-commit hazard exists only on MariaDB, where it is proved');
+} else {
+    db()->prepare("INSERT INTO inspectors (name,first_name,last_name,mobile,status,created_at) VALUES ('Cold Twin','Cold','Twin','9440022222','ACTIVE',?)")
+        ->execute([date('c')]);
+    $rqC  = $mkReq(3);
+    $cCold = $mkCand('Cold', $rqC, 'OFFER', '9440022222');
+    t_eq(count(workforce_strong_matches(workforce_matches(ops_one("SELECT * FROM candidates WHERE id=?", [$cCold])))), 1,
+         'T9a · the acceptance will be refused AFTER the ledger step, by an unacknowledged duplicate — the trap is armed');
+    $gone = $evRename(true);
+    t_ok($gone, 'T9b · …and the ledger table is absent, so a cold process really must create it');
+    $hC = $s3spawn('acceptcold', $cCold, '', $s3me, 1200);
+    $s3reap($hC);
+    $evRename(false);
+    t_eq($stageOf($cCold), 'OFFER',
+         'T9 · nothing was committed before the refusal — the migration ran BEFORE the transaction, not inside it');
+    t_eq($inspOf($cCold), 0, 'T9c · …and no workforce record exists');
+}
 
 // ---------------------------------------------------------------------------
 t_section('RB3S3 · J — nothing else moved');
