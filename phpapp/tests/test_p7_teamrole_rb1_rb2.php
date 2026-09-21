@@ -216,6 +216,29 @@ t_ok(strpos($view, 'name="dup_ack"') !== false,
      'RB1g · but the DUPLICATE acknowledgement is still there — it is a different control, and the owner requires it');
 
 // ---------------------------------------------------------------------------
+t_section('P7 · RB2UI — the Mark-as-joined control is REACHABLE');
+// ---------------------------------------------------------------------------
+//  A DEFECT THE BROWSER GATE CAUGHT that every route test missed.
+//
+//  The panel was first placed inside the screen's "Move this candidate" block —
+//  which is hidden once a candidate is ACCEPTED. Its own condition requires the
+//  candidate to BE accepted, so the two could never both be true and the button
+//  was unreachable. The route worked perfectly; nobody could press it.
+//
+//  Route tests cannot see that. This asserts the structure directly: the panel
+//  must come BEFORE the guard that hides everything for an accepted candidate.
+$cdSrc  = (string) @file_get_contents(dirname(__DIR__) . '/views/ops/candidate_detail.php');
+$posPanel = strpos($cdSrc, 'action="/candidate-joined');
+$posGuard = strpos($cdSrc, "!in_array(\$cur, ['ACCEPTED','WITHDRAWN'], true)");
+t_ok($posPanel !== false, 'RB2UI0 · the screen carries a Mark-as-joined control — armed');
+t_ok($posGuard !== false, 'RB2UI1 · …and the screen still hides the move panel for an accepted candidate — armed');
+t_ok($posPanel !== false && $posGuard !== false && $posPanel < $posGuard,
+     'RB2UI · the control sits OUTSIDE that guard, so an accepted candidate can actually reach it');
+//  …and it is shown only for somebody who is both hired and has a team record.
+t_ok(strpos($cdSrc, "=== 'ACCEPTED' && !empty(\$cand['inspector_id'])") !== false,
+     'RB2UI2 · …and only for a hired person who has a workforce record');
+
+// ---------------------------------------------------------------------------
 t_section('P7 · RB2 — hired is not joined');
 // ---------------------------------------------------------------------------
 $rq2 = $p7req(3, 'FIELD');

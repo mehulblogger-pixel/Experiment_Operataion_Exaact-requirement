@@ -364,33 +364,34 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
 </div>
 <?php endif; ?>
 
+<?php // RB-2 — HIRED IS NOT JOINED. Accepted (Hired) means the requirement was
+      // filled by a hired person; it says nothing about whether they started.
+      // Recorded by somebody who knows, never derived from the stage. ?>
+<?php if (strtoupper((string)($cand['stage'] ?? '')) === 'ACCEPTED' && !empty($cand['inspector_id'])): ?>
+  <?php $joinedOn = trim((string)($cand['joined_at'] ?? '')); ?>
+  <div class="panel" style="background:var(--soft);margin:10px 0;padding:11px 14px">
+    <?php if ($joinedOn !== ''): ?>
+      <form method="post" action="/candidate-joined?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <strong>Joined on <?= e($joinedOn) ?></strong>
+        <span class="muted" style="font-size:12.5px">This person is counted as having actually joined.</span>
+        <input type="hidden" name="undo" value="1">
+        <button class="btn btn-sm" type="submit">Not joined after all</button>
+      </form>
+    <?php else: ?>
+      <form method="post" action="/candidate-joined?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="ff" style="margin:0"><label>Have they actually joined?
+            <span class="muted">— hired is not the same as started</span></label>
+          <input class="form-control" type="date" name="joined_on" max="<?= e(date('Y-m-d')) ?>" value="<?= e(date('Y-m-d')) ?>"></div>
+        <button class="btn btn-sm btn-primary" type="submit">Mark as joined</button>
+      </form>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
+
 <?php if (is_coordinator_level() && !in_array($cur, ['ACCEPTED','WITHDRAWN'], true)): ?>
 <div class="panel">
   <h3 class="tab-sub">Move this candidate</h3>
-  <?php // RB-2 — HIRED IS NOT JOINED. Accepted (Hired) means the requirement was
-        // filled by a hired person; it says nothing about whether they started.
-        // Recorded by somebody who knows, never derived from the stage. ?>
-  <?php if (strtoupper((string)($cand['stage'] ?? '')) === 'ACCEPTED' && !empty($cand['inspector_id'])): ?>
-    <?php $joinedOn = trim((string)($cand['joined_at'] ?? '')); ?>
-    <div class="panel" style="background:var(--soft);margin:10px 0;padding:11px 14px">
-      <?php if ($joinedOn !== ''): ?>
-        <form method="post" action="/candidate-joined?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <strong>Joined on <?= e($joinedOn) ?></strong>
-          <span class="muted" style="font-size:12.5px">This person is counted as having actually joined.</span>
-          <input type="hidden" name="undo" value="1">
-          <button class="btn btn-sm" type="submit">Not joined after all</button>
-        </form>
-      <?php else: ?>
-        <form method="post" action="/candidate-joined?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
-          <div class="ff" style="margin:0"><label>Have they actually joined?
-              <span class="muted">— hired is not the same as started</span></label>
-            <input class="form-control" type="date" name="joined_on" max="<?= e(date('Y-m-d')) ?>" value="<?= e(date('Y-m-d')) ?>"></div>
-          <button class="btn btn-sm btn-primary" type="submit">Mark as joined</button>
-        </form>
-      <?php endif; ?>
-    </div>
-  <?php endif; ?>
-
   <form method="post" action="/candidate-stage?id=<?= (int)$cand['id'] ?>">
     <div class="form-grid">
       <div class="ff"><label>New stage</label>
