@@ -81,7 +81,7 @@ $x1 = $mkCand('Unique', 'Newcomer', '9000000101', 'unique.newcomer@s2.test');
 t_eq($strongN($x1), 0, 'X1a · no strong match — the probe is starting from "nobody like this"');
 t_eq(workforce_ack_issue($x1, workforce_matches($row($x1)), $row($x1), $s2me), '',
      'X1b · no acknowledgement is even offered, so there is no tick to render');
-$r1 = rcv_convert($x1, ['actor_id' => $s2me]);
+$r1 = rcv_convert($x1, ['team_role' => 'FIELD', 'actor_id' => $s2me]);
 t_ok(!empty($r1['ok']), 'X1 · the hire goes through untouched (' . ($r1['code'] ?? '?') . ')');
 
 // ---------------------------------------------------------------------------
@@ -97,14 +97,14 @@ t_ok(strpos((string)workforce_strong_matches($m3)[0]['mobile'], 'XXXX') === 0,
      'X2c · the number is MASKED on the way to the screen (' . workforce_strong_matches($m3)[0]['mobile'] . ')');
 
 $before = $staffN();
-$r3 = rcv_convert($x3, ['actor_id' => $s2me]);                      // no tick at all
+$r3 = rcv_convert($x3, ['team_role' => 'FIELD', 'actor_id' => $s2me]);                      // no tick at all
 t_eq((string)($r3['code'] ?? ''), 'WORKFORCE_MATCH', 'X3 · without the tick the hire is REFUSED');
 t_eq($linked($x3), 0, 'X3b · …and the application was not converted');
 t_eq($staffN(), $before, 'X3c · …and NOTHING was written — no half-made team member');
 
 $tok3 = $tokenFor($x3);
 t_ok($tok3 !== '', 'X4a · a tick is offered for this application — the probe has something to submit');
-$r4 = rcv_convert($x3, ['actor_id' => $s2me, 'dup_ack' => $tok3]);
+$r4 = rcv_convert($x3, ['team_role' => 'FIELD', 'actor_id' => $s2me, 'dup_ack' => $tok3]);
 t_ok(!empty($r4['ok']), 'X4 · with the tick the recruiter may proceed (' . ($r4['code'] ?? '?') . ')');
 t_ok($linked($x3) > 0, 'X4b · …and the team member really was created');
 
@@ -115,17 +115,17 @@ $sName = $mkStaff('Suresh', 'Kumar', '9820022222', 'suresh.kumar@s2.test');
 $x5 = $mkCand('Suresh', 'Kumar', '', '');                            // same name, no contact at all
 t_ok($weakN($x5) >= 1, 'X5a · the name really does match somebody — the trap is armed');
 t_eq($strongN($x5), 0, 'X5b · …but a shared NAME is never strong');
-$r5 = rcv_convert($x5, ['actor_id' => $s2me]);
+$r5 = rcv_convert($x5, ['team_role' => 'FIELD', 'actor_id' => $s2me]);
 t_ok(!empty($r5['ok']), 'X5 · Suresh Kumar does not block Suresh Kumar (' . ($r5['code'] ?? '?') . ')');
 
 $x6 = $mkCand('Suresh', 'Kumar', '9999900006', 'other.suresh@s2.test'); // same name, DIFFERENT mobile
 t_ok($weakN($x6) >= 1, 'X6a · the name matches — the trap is armed');
 t_eq($strongN($x6), 0, 'X6b · a different mobile keeps it weak');
-t_ok(!empty(rcv_convert($x6, ['actor_id' => $s2me])['ok']), 'X6 · same name + different mobile proceeds');
+t_ok(!empty(rcv_convert($x6, ['team_role' => 'FIELD', 'actor_id' => $s2me])['ok']), 'X6 · same name + different mobile proceeds');
 
 $x7 = $mkCand('Completely', 'Different', '9820022222', '');            // same mobile, DIFFERENT name
 t_eq($strongN($x7), 1, 'X7a · a shared mobile is strong even when the names differ — the trap is armed');
-t_eq((string)rcv_convert($x7, ['actor_id' => $s2me])['code'], 'WORKFORCE_MATCH',
+t_eq((string)rcv_convert($x7, ['team_role' => 'FIELD', 'actor_id' => $s2me])['code'], 'WORKFORCE_MATCH',
      'X7 · same mobile + different name is REFUSED until acknowledged');
 
 // ---------------------------------------------------------------------------
@@ -155,10 +155,10 @@ t_eq(workforce_ack_evidence(workforce_matches($row($x8a)), $row($x8a)),
 $tokA = $tokenFor($x8a);
 t_ok($tokA !== '', 'X8d · A has a genuine tick');
 //  Tried on B FIRST, before anything about either of them changes.
-t_eq((string)rcv_convert($x8b, ['actor_id' => $s2me, 'dup_ack' => $tokA])['code'], 'WORKFORCE_MATCH',
+t_eq((string)rcv_convert($x8b, ['team_role' => 'FIELD', 'actor_id' => $s2me, 'dup_ack' => $tokA])['code'], 'WORKFORCE_MATCH',
      'X8 · A\'s tick does NOT authorise B — the application is inside the signature');
 t_eq($linked($x8b), 0, 'X8e · …and B was not converted');
-t_ok(!empty(rcv_convert($x8a, ['actor_id' => $s2me, 'dup_ack' => $tokA])['ok']),
+t_ok(!empty(rcv_convert($x8a, ['team_role' => 'FIELD', 'actor_id' => $s2me, 'dup_ack' => $tokA])['ok']),
      'X8f · …and that very same tick DOES work on A, so the refusal was about the application and not a dud tick');
 
 $x9 = $mkCand('Nikhil', 'Rao', '9820044444', '');
@@ -172,7 +172,7 @@ $s9b = $mkStaff('Nikhil', 'Rao Junior', '9820044444', '');
 t_eq($strongN($x9), 2, 'X9c · the duplicate picture really did change — two strong matches now');
 t_ok(!workforce_ack_ok($tok9, $x9, workforce_matches($row($x9)), $row($x9), $s2me),
      'X9 · the earlier tick no longer answers the new question');
-t_eq((string)rcv_convert($x9, ['actor_id' => $s2me, 'dup_ack' => $tok9])['code'], 'WORKFORCE_MATCH',
+t_eq((string)rcv_convert($x9, ['team_role' => 'FIELD', 'actor_id' => $s2me, 'dup_ack' => $tok9])['code'], 'WORKFORCE_MATCH',
      'X9d · …and the hire is refused with the stale tick');
 
 $x10 = $mkCand('Forge', 'Attempt', '9820033333', '');
@@ -188,7 +188,7 @@ foreach (['1', 'yes', 'on', 'true', '0.' . str_repeat('a', 64), str_repeat('f', 
 }
 t_ok(!workforce_ack_ok('1', $x10, workforce_matches($row($x10)), $row($x10), $s2me),
      'X10 · a hand-made tick ("1", the shape the old hidden field used) is rejected');
-t_eq((string)rcv_convert($x10, ['actor_id' => $s2me, 'dup_ack' => '1'])['code'], 'WORKFORCE_MATCH',
+t_eq((string)rcv_convert($x10, ['team_role' => 'FIELD', 'actor_id' => $s2me, 'dup_ack' => '1'])['code'], 'WORKFORCE_MATCH',
      'X10b · …and posting it directly to the action changes nothing');
 
 //  A second real login. The throwaway database has only the administrator, so
@@ -227,13 +227,13 @@ $x15 = $mkCand('Departed', 'Person', '9820055555', 'departed@s2.test');
 t_eq((string)ops_val("SELECT status FROM inspectors WHERE id=?", [$sGone]), 'INACTIVE',
      'X15a · that person really has left — the probe has the state it is about');
 t_eq($strongN($x15), 0, 'X15b · a leaver is history, not a duplicate');
-t_ok(!empty(rcv_convert($x15, ['actor_id' => $s2me])['ok']), 'X15 · re-hiring a leaver is not obstructed');
+t_ok(!empty(rcv_convert($x15, ['team_role' => 'FIELD', 'actor_id' => $s2me])['ok']), 'X15 · re-hiring a leaver is not obstructed');
 
 $sHere = $mkStaff('Rehire', 'Candidate', '9820066666', 'rehire@s2.test');
 $x16 = $mkCand('Rehire', 'Candidate', '9820066666', 'rehire@s2.test');
 t_eq($strongN($x16), 1, 'X16a · a LIVE team member shares the details — armed');
-t_eq((string)rcv_convert($x16, ['actor_id' => $s2me])['code'], 'WORKFORCE_MATCH', 'X16b · refused without the tick');
-$r16 = rcv_convert($x16, ['actor_id' => $s2me, 'dup_ack' => $tokenFor($x16)]);
+t_eq((string)rcv_convert($x16, ['team_role' => 'FIELD', 'actor_id' => $s2me])['code'], 'WORKFORCE_MATCH', 'X16b · refused without the tick');
+$r16 = rcv_convert($x16, ['team_role' => 'FIELD', 'actor_id' => $s2me, 'dup_ack' => $tokenFor($x16)]);
 t_ok(!empty($r16['ok']), 'X16 · a legitimate second engagement proceeds once a person says so');
 t_ok((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE mobile='9820066666'") === 2,
      'X16c · …and it really is a SECOND record — nothing was merged');
@@ -275,7 +275,7 @@ if (!$noRight) {
 $_SESSION['uid'] = $noRight; current_user(true); ua(true);
 t_ok(!is_coordinator_level(),
      'X18c · the actor genuinely has no right to convert (role ' . user_role() . ') — the trap is ARMED');
-t_eq((string)rcv_convert($x18, ['dup_ack' => $tok18])['code'], 'NOT_ALLOWED',
+t_eq((string)rcv_convert($x18, ['team_role' => 'FIELD', 'dup_ack' => $tok18])['code'], 'NOT_ALLOWED',
      'X18 · somebody without the right cannot convert, tick or no tick');
 $_SESSION['uid'] = $s2me; current_user(true); ua(true);
 t_ok(is_coordinator_level(), 'X18d · …and the right is back, so the refusal was about authority and not a broken session');
@@ -314,7 +314,7 @@ t_eq(count($sSc), 1, 'Xsc-c · the hidden team member is still FOUND — scope d
 t_ok(empty($sSc[0]['visible']), 'Xsc-d · …but is marked not-visible');
 t_eq((string)$sSc[0]['name'], '', 'Xsc · …and is NOT NAMED — a record id is never proof of authorisation');
 t_eq((string)$sSc[0]['emp_code'], '', 'Xsc-e · nor is their employee number leaked');
-t_eq((string)rcv_convert($xsc, ['actor_id' => $uScoped])['code'], 'WORKFORCE_MATCH',
+t_eq((string)rcv_convert($xsc, ['team_role' => 'FIELD', 'actor_id' => $uScoped])['code'], 'WORKFORCE_MATCH',
      'Xsc-f · and it STILL blocks — not being able to see it is not a way round the gate');
 $_SESSION['uid'] = $s2me; current_user(true); ua(true);
 

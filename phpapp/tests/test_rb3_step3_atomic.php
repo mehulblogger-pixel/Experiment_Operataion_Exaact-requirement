@@ -272,11 +272,22 @@ t_section('RB3S3 · T10 — accepting WITHOUT a conversion is guarded too');
 //  the check in the route (mutant A2) or making it ask the wrong question (A9)
 //  changed nothing that T7 could see.
 //
-//  The case that is NOT doubled is accepting somebody WITHOUT creating a
-//  workforce record — the hidden checkbox left unticked. rcv_convert never runs,
-//  so the check inside the transaction is the only thing standing between two
-//  recruiters and one seat. That is what this probe exercises, with the same
-//  manufactured overlap.
+//  The case that was NOT doubled used to be accepting somebody WITHOUT creating
+//  a workforce record — the hidden checkbox left unticked. rcv_convert never
+//  ran, so the check inside the transaction was the only thing standing between
+//  two recruiters and one seat.
+//
+//  RB-1 DELETED THAT PATH. Accepting somebody now always creates their team
+//  record, so there is no longer an acceptance that rcv_convert does not see.
+//  This probe therefore asserts the new truth rather than the old one: the same
+//  manufactured overlap still refuses the loser, AND the unguarded path is gone
+//  — an acceptance that creates no workforce record can no longer be produced,
+//  not even by a POST that asks for one.
+//
+//  A consequence, recorded honestly: with that path gone the route's own seat
+//  check is doubled everywhere, so removing it is now an EQUIVALENT mutation
+//  rather than a detectable one. Section E proves the doubling, so the claim is
+//  tested rather than asserted.
 if (t_driver() === 'sqlite') {
     t_ok(true, 'T10 (sqlite) · skipped by design — the overlap cannot be staged without row locks; proved on MariaDB');
 } else {
@@ -295,11 +306,24 @@ if (t_driver() === 'sqlite') {
     $s3reap($hN);
 
     t_eq($stageOf($nWin), 'ACCEPTED', 'T10a · the one seat was taken while the other was in flight — the trap is armed');
-    t_eq($inspOf($nLos), 0, 'T10b · the loser asked for no workforce record, so rcv_convert never ran to guard them');
+    t_eq($inspOf($nLos), 0, 'T10b · the loser has no workforce record — the refusal left nothing behind');
     t_eq($stageOf($nLos), 'OFFER',
          'T10 · they were still refused — the seat check INSIDE the transaction is the only thing that could have done it');
     t_eq((int)ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rqN]), 1,
          'T10c · one approved seat, exactly one person in it');
+
+    //  T10d — RB-1 ITSELF: the path T10 used to guard no longer exists.
+    //  A plain 'move' to ACCEPTED asks for no workforce record. Before RB-1 it
+    //  produced a hired person with nobody behind them; now it cannot.
+    $rqR  = $mkReq(1);
+    $cRb1 = $mkCand('Rb1NoTick', $rqR);
+    $hR   = $s3spawn('move', $cRb1, 'ACCEPTED', $s3me, 900);
+    $s3reap($hR);
+    t_eq($stageOf($cRb1), 'ACCEPTED', 'T10d1 · the acceptance went through with NO request for a workforce record — armed');
+    t_ok($inspOf($cRb1) > 0,
+         'T10d · …and they have one anyway — RB-1: every accepted person is a member of the team, never an unticked box');
+    t_ok((string)ops_val("SELECT COALESCE(emp_code,'') FROM inspectors WHERE id=?", [$inspOf($cRb1)]) !== '',
+         'T10d2 · …with an employee number, so the record is real and not a stub');
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +417,7 @@ t_eq($staffN(), $bX17, 'X17b · …and creates no second workforce record');
 t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE id=?", [$firstInsp]), 1, 'X17c · …nor a second employee number');
 //  Asked of the ACTION, not the route: a forged POST that never passed the
 //  pre-transaction pass must still be refused (invariant I27).
-t_eq((string)rcv_convert($cTwice, ['actor_id' => $s3me])['code'], 'ALREADY',
+t_eq((string)rcv_convert($cTwice, ['team_role' => 'FIELD', 'actor_id' => $s3me])['code'], 'ALREADY',
      'X17d · …and the action refuses it on its own, without the route\'s help');
 
 // ---------------------------------------------------------------------------
@@ -477,7 +501,7 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE id=?", [$inspOf($cDbl)]
 $ghost = (int)ops_val("SELECT COALESCE(MAX(id),0)+5000 FROM candidates");
 t_eq(rcv_refusal_before_transaction(['id' => $ghost], ['want_hire' => 1]), RCV_CODES['NO_CANDIDATE'],
      'X16 · an application id that is not in this tenant\'s database is refused before any write');
-t_eq((string)rcv_convert($ghost, ['actor_id' => $s3me])['code'], 'NO_CANDIDATE',
+t_eq((string)rcv_convert($ghost, ['team_role' => 'FIELD', 'actor_id' => $s3me])['code'], 'NO_CANDIDATE',
      'X16b · …and the action refuses it too, so a forged POST gains nothing');
 
 // ---------------------------------------------------------------------------
@@ -520,13 +544,13 @@ t_eq($threw2, false, 'E1c · nor can recomputing the requirement — so an early
 //  already settled earlier — by the pre-transaction pass or the seat check.
 db()->beginTransaction();
 $borrowThrew = false;
-try { rcv_convert(0, ['actor_id' => $s3me]); } catch (Throwable $e) { $borrowThrew = true; }
+try { rcv_convert(0, ['team_role' => 'FIELD', 'actor_id' => $s3me]); } catch (Throwable $e) { $borrowThrew = true; }
 $stillIn = db()->inTransaction();
 try { db()->rollBack(); } catch (Throwable $e) {}
 t_ok($stillIn, 'E2a · the call really was made inside somebody else\'s transaction — the trap is armed');
 t_ok(strpos((string)@file_get_contents($s3root . '/lib/recruit.php'), 'if (!$own) throw $e;') !== false,
      'E2 · rcv_convert re-throws on a borrowed transaction instead of returning a failure, so the route\'s backstop is unreachable');
-t_eq((string)rcv_convert(0, ['actor_id' => $s3me])['code'], 'NO_CANDIDATE',
+t_eq((string)rcv_convert(0, ['team_role' => 'FIELD', 'actor_id' => $s3me])['code'], 'NO_CANDIDATE',
      'E2b · …and the refusals it DOES return are the early gates, every one of which the pre-transaction pass already settles');
 
 // ---------------------------------------------------------------------------

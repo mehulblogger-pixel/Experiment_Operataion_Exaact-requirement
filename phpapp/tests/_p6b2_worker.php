@@ -52,7 +52,7 @@ try {
         $_SERVER['REQUEST_METHOD'] = 'POST';
         $_SESSION['csrf'] = 'p6b2'; $_POST['_csrf'] = 'p6b2';
         $_GET['id'] = $a; $_POST['id'] = $a;
-        $_POST['to_stage'] = 'ACCEPTED'; $_POST['make_inspector'] = '1';
+        $_POST['to_stage'] = 'ACCEPTED'; $_POST['make_inspector'] = '1'; $_POST['team_role'] = 'FIELD';
         //  The route redirect()s and exits, so the verdict is printed FIRST and
         //  the parent reads the DATABASE afterwards. Nothing here is believed.
         $out['code'] = 'DISPATCHED'; $out['ok'] = true;
@@ -62,7 +62,7 @@ try {
     } elseif ($op === 'convert') {
         if (!function_exists('rcv_convert')) { $out['code'] = 'ABSENT'; }
         else {
-            $r = rcv_convert($a, []);
+            $r = rcv_convert($a, ['team_role' => 'FIELD', ]);
             $out['ok'] = (bool)($r['ok'] ?? false); $out['code'] = (string)($r['code'] ?? '');
             $out['msg'] = (string)($r['message'] ?? ''); $out['inspector_id'] = (int)($r['inspector_id'] ?? 0);
             $out['linked'] = (string)($r['identity'] ?? '');

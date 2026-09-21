@@ -107,7 +107,18 @@ function reqf_counts($req) {
     try {
         $out['filled']      = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage IN ($ph)",
                                             array_merge([$id], REQF_FILLED_STAGES));
-        $out['joined']      = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage IN ($ph) AND inspector_id IS NOT NULL",
+        //  RB-2 — JOINED MEANS JOINED.
+        //
+        //  This used to count accepted people who had a team record, and call
+        //  that "joined". It was never joining: it was paperwork. Worse, now
+        //  that every accepted candidate gets a team record (RB-1) it would have
+        //  become arithmetically identical to `filled`, so a screen printing it
+        //  would report "10 of 10 joined" on the strength of ten acceptances.
+        //
+        //  It now counts the people somebody has explicitly marked as having
+        //  joined. On existing data that is zero, which is the honest answer:
+        //  the system genuinely does not know when anybody arrived.
+        $out['joined']      = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage IN ($ph) AND COALESCE(joined_at,'') <> ''",
                                             array_merge([$id], REQF_FILLED_STAGES));
         $out['in_progress'] = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage IN ($pa)",
                                             array_merge([$id], REQF_ACTIVE_STAGES));

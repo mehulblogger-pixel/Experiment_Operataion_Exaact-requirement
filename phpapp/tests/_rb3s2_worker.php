@@ -46,7 +46,7 @@ $out = ['op' => $op, 'ok' => false, 'code' => '', 'inspector_id' => 0, 'token' =
 try {
     $cand = $cid ? ops_one("SELECT * FROM candidates WHERE id=?", [$cid]) : null;
     if ($op === 'convert') {
-        $r = rcv_convert($cid, ['dup_ack' => $tok, 'actor_id' => $uid]);
+        $r = rcv_convert($cid, ['team_role' => 'FIELD', 'dup_ack' => $tok, 'actor_id' => $uid]);
         $out['ok'] = (bool)($r['ok'] ?? false); $out['code'] = (string)($r['code'] ?? '');
         $out['inspector_id'] = (int)($r['inspector_id'] ?? 0);
     } elseif ($op === 'issue') {

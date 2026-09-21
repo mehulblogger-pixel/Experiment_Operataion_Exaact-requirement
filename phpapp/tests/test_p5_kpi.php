@@ -319,7 +319,7 @@ $cJ  = $p5cand($rqJ, 'OFFERED');
 t_eq((string) ops_val("SELECT status FROM requisitions WHERE id=?", [$rqJ]), 'OPEN', 'J0 · the requirement starts OPEN with two seats');
 $evJ0 = (int) ops_val("SELECT COUNT(*) FROM candidate_events WHERE candidate_id=?", [$cJ]);
 
-$p5drive('route_cand_stage', $cJ, 'ACCEPTED');
+$p5drive('route_cand_stage', $cJ, 'ACCEPTED', ['team_role' => 'FIELD']);
 
 t_eq((string) ops_val("SELECT stage FROM candidates WHERE id=?", [$cJ]), 'ACCEPTED', 'J1 · the route really moved the candidate');
 //  The claim the M3 probe stands for: the standing was recomputed, not left.

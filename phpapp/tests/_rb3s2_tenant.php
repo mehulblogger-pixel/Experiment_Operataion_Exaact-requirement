@@ -75,13 +75,13 @@ try {
     db()->prepare("UPDATE inspectors SET mobile=? WHERE id=?")->execute([$MOB, $aInsp]);
     $aMatch2 = workforce_matches(ops_one("SELECT * FROM candidates WHERE id=?", [$aCand]));
     $out['steps']['a_strong_after'] = count(workforce_strong_matches($aMatch2));
-    $rB = rcv_convert($aCand, ['dup_ack' => $bToken, 'actor_id' => $uidA]);
+    $rB = rcv_convert($aCand, ['team_role' => 'FIELD', 'dup_ack' => $bToken, 'actor_id' => $uidA]);
     $out['steps']['foreign_token_code'] = (string)($rB['code'] ?? '');
     $out['steps']['a_converted_by_foreign_token'] = (int)ops_val("SELECT COALESCE(inspector_id,0) FROM candidates WHERE id=?", [$aCand]);
     //  …and A's own token still works, so the refusal above was about the token
     //  and not about the gate being broken.
     $aToken = workforce_ack_issue($aCand, $aMatch2, ops_one("SELECT * FROM candidates WHERE id=?", [$aCand]), $uidA);
-    $rA = rcv_convert($aCand, ['dup_ack' => $aToken, 'actor_id' => $uidA]);
+    $rA = rcv_convert($aCand, ['team_role' => 'FIELD', 'dup_ack' => $aToken, 'actor_id' => $uidA]);
     $out['steps']['own_token_code'] = (string)($rA['code'] ?? '');
     $out['ok'] = true;
 } catch (Throwable $e) { $out['error'] = $e->getMessage(); }

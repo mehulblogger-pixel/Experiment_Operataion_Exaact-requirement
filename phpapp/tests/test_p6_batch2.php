@@ -248,7 +248,7 @@ connect_identity_conversion_link_create($a17Cand, $a17Other, 'conversion', 'p6b2
 $a17Before = $b2count('Borrowed Person%');
 $a17Threw = false;
 db()->beginTransaction();
-try { rcv_convert($a17Cand, []); } catch (Throwable $e) { $a17Threw = true; }
+try { rcv_convert($a17Cand, ['team_role' => 'FIELD', ]); } catch (Throwable $e) { $a17Threw = true; }
 t_ok($a17Threw, 'A17 · a failure inside a caller\'s transaction reaches the caller');
 t_ok(db()->inTransaction(), 'A18 · and the caller\'s transaction is still its own to unwind');
 db()->rollBack();

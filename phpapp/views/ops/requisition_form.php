@@ -117,6 +117,19 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
       <div class="ff"><label>Department</label><select class="form-control searchable" name="department"><option value="">—</option><?php foreach ((function_exists('dept_form_options') ? dept_form_options($req['department'] ?? '') : ($rccDepts ?? [])) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= $sel('department',$dk) ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label><?= e(T("sbu")) ?></label><select class="form-control" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('sbu',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Designation / position *</label><select class="form-control searchable" name="designation"><option value="">—</option><?php foreach (lk_options_or('designation', DESIGNATIONS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('designation',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
+      <?php // WHICH TEAM this requirement is for. It travels with the requirement
+            // to acceptance, where it is confirmed, so nobody is classified by a
+            // database default. A workspace that does no site work has no such
+            // distinction to make, so the question is not asked there. ?>
+      <?php if (!function_exists('wf_ops_capability') || wf_ops_capability() !== 'NO'): ?>
+      <div class="ff"><label>Which team <span class="muted">— confirmed again when somebody is accepted</span></label>
+        <select class="form-control" name="team_role">
+          <option value="">— not decided yet —</option>
+          <?php foreach (WF_TEAM_ROLES as $trK => $trV): ?>
+            <option value="<?= e($trK) ?>" <?= $sel('team_role', $trK) ?>><?= e($trV) ?></option>
+          <?php endforeach; ?>
+        </select></div>
+      <?php endif; ?>
       <div class="ff"><label>How many? *</label><input class="form-control" type="number" min="1" step="1" name="quantity" id="rq_qty" value="<?= e($r['quantity'] ?? '1') ?>"></div>
       <div class="ff"><label>Project / site</label><input class="form-control" name="project_site" value="<?= $v('project_site') ?>" placeholder="Client works / project"></div>
       <div class="ff ff-wide"><label>Locations required <span class="muted">— one per line; add as many as you need</span></label>

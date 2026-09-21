@@ -194,7 +194,7 @@ if (t_driver() === 'sqlite') {
     $seq = [];
     foreach ($x1ids as $id) {
         if ((int)ops_val("SELECT COALESCE(inspector_id,0) FROM candidates WHERE id=?", [$id]) > 0) continue;
-        $r = rcv_convert($id, []);
+        $r = rcv_convert($id, ['team_role' => 'FIELD', ]);
         if (!empty($r['ok'])) $seq[] = strtoupper(trim((string)ops_val("SELECT emp_code FROM inspectors WHERE id=?", [(int)$r['inspector_id']])));
     }
     $all = array_merge($x1codes, $seq);

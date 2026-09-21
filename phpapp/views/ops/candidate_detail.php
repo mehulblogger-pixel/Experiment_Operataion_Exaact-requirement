@@ -367,6 +367,30 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
 <?php if (is_coordinator_level() && !in_array($cur, ['ACCEPTED','WITHDRAWN'], true)): ?>
 <div class="panel">
   <h3 class="tab-sub">Move this candidate</h3>
+  <?php // RB-2 — HIRED IS NOT JOINED. Accepted (Hired) means the requirement was
+        // filled by a hired person; it says nothing about whether they started.
+        // Recorded by somebody who knows, never derived from the stage. ?>
+  <?php if (strtoupper((string)($cand['stage'] ?? '')) === 'ACCEPTED' && !empty($cand['inspector_id'])): ?>
+    <?php $joinedOn = trim((string)($cand['joined_at'] ?? '')); ?>
+    <div class="panel" style="background:var(--soft);margin:10px 0;padding:11px 14px">
+      <?php if ($joinedOn !== ''): ?>
+        <form method="post" action="/candidate-joined?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <strong>Joined on <?= e($joinedOn) ?></strong>
+          <span class="muted" style="font-size:12.5px">This person is counted as having actually joined.</span>
+          <input type="hidden" name="undo" value="1">
+          <button class="btn btn-sm" type="submit">Not joined after all</button>
+        </form>
+      <?php else: ?>
+        <form method="post" action="/candidate-joined?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+          <div class="ff" style="margin:0"><label>Have they actually joined?
+              <span class="muted">— hired is not the same as started</span></label>
+            <input class="form-control" type="date" name="joined_on" max="<?= e(date('Y-m-d')) ?>" value="<?= e(date('Y-m-d')) ?>"></div>
+          <button class="btn btn-sm btn-primary" type="submit">Mark as joined</button>
+        </form>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
+
   <form method="post" action="/candidate-stage?id=<?= (int)$cand['id'] ?>">
     <div class="form-grid">
       <div class="ff"><label>New stage</label>
@@ -408,9 +432,38 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
     </div>
     <?php endif; ?>
     <?php if (empty($cand['inspector_id'])): ?>
-    <label class="chk" id="hire_chk" style="margin:8px 2px;display:none"><input type="checkbox" name="make_inspector" id="mk_insp" value="1"> On <strong>Accept</strong>, also add this person to Inspectors</label>
+    <?php // RB-1 — the old "also add this person to Inspectors" checkbox is gone.
+          // Accepting somebody IS hiring them, so the team record is no longer
+          // optional and no longer something a recruiter can forget. What the
+          // panel asks for now is the one thing the system genuinely cannot
+          // decide on its own: which team they join. ?>
     <div id="hire_details" class="panel" style="display:none;background:var(--soft);margin-top:6px">
       <div class="form-grid">
+        <?php
+          //  Owner decision 2 — visible and explicitly confirmed at acceptance,
+          //  pre-filled from the requirement where it was decided. A workspace
+          //  that does no site work has no such distinction, so the question is
+          //  not asked there and OFFICE is recorded explicitly.
+          $trCap  = function_exists('wf_ops_capability') ? wf_ops_capability() : 'YES';
+          $trFrom = '';
+          if (!empty($cand['requisition_id'])) {
+            try { $trFrom = (string) ops_val("SELECT team_role FROM requisitions WHERE id=?", [(int)$cand['requisition_id']]); }
+            catch (Throwable $e) { $trFrom = ''; }
+          }
+          $trFrom = function_exists('wf_team_role_normalise') ? wf_team_role_normalise($trFrom) : '';
+        ?>
+        <?php if ($trCap === 'NO'): ?>
+          <input type="hidden" name="team_role" value="OFFICE">
+        <?php else: ?>
+        <div class="ff"><label>Which team do they join? *
+            <span class="muted"><?= $trFrom !== '' ? 'from the requirement — confirm or change' : 'not set on the requirement — choose one' ?></span></label>
+          <select class="form-control" name="team_role" required>
+            <?php if ($trFrom === ''): ?><option value="">— choose —</option><?php endif; ?>
+            <?php foreach (WF_TEAM_ROLES as $trK => $trV): ?>
+              <option value="<?= e($trK) ?>" <?= $trFrom === $trK ? 'selected' : '' ?>><?= e($trV) ?></option>
+            <?php endforeach; ?>
+          </select></div>
+        <?php endif; ?>
         <div class="ff"><label>Supplied by agency <span class="muted">(optional)</span></label>
           <select class="form-control" name="agency_id" id="ag_sel"><option value="" data-type="" data-fee="0" data-monthly="0">— none / direct —</option>
             <?php foreach (agencies_list() as $a): ?><option value="<?= (int)$a['id'] ?>" data-type="<?= e($a['agency_type']) ?>" data-fee="<?= e($a['one_time_fee']) ?>" data-monthly="<?= e($a['monthly_rate']) ?>"><?= e($a['name']) ?> · <?= e(lk_options_or('agency_type', AGENCY_TYPES)[$a['agency_type']] ?? $a['agency_type']) ?></option><?php endforeach; ?>
@@ -439,17 +492,20 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
 </div>
 <script>
   (function(){
-    var sel = document.getElementById('cand_stage'), chk = document.getElementById('hire_chk');
+    var sel = document.getElementById('cand_stage');
     if (!sel) return;
     // Phase 6 — the installation's engagement mode defaults the direct (no-agency) hire.
     var engMode = <?= json_encode(function_exists('recruit_engagement_mode') ? recruit_engagement_mode() : 'BOTH') ?>;
-    var mk = document.getElementById('mk_insp'), det = document.getElementById('hire_details');
+    var det = document.getElementById('hire_details');
     var ag = document.getElementById('ag_sel'), roll = document.getElementById('roll_sel');
     var feeOne = document.getElementById('fee_one'), feeMonth = document.getElementById('fee_month');
     var lost = document.getElementById('lost_details');
     var LOST_STAGES = {REJECTED:1, WITHDRAWN:1, OFFER_DECLINED:1, HOLD:1};
-    function syncStage(){ if (chk) chk.style.display = (sel.value === 'ACCEPTED') ? 'inline-flex' : 'none'; if (sel.value!=='ACCEPTED' && det) det.style.display='none'; if (lost) lost.style.display = LOST_STAGES[sel.value] ? 'block' : 'none'; }
-    function syncHire(){ if (det) det.style.display = (mk && mk.checked && sel.value==='ACCEPTED') ? 'block' : 'none'; }
+    // RB-1 — the hire details follow the STAGE. Accepting somebody hires them,
+    // so the panel is shown whenever Accept is chosen and there is no checkbox
+    // standing between a hired person and their team record.
+    function syncStage(){ if (det) det.style.display = (sel.value === 'ACCEPTED') ? 'block' : 'none'; if (lost) lost.style.display = LOST_STAGES[sel.value] ? 'block' : 'none'; }
+    function syncHire(){ syncStage(); }
     function syncAgency(){
       if (!ag) return; var o = ag.options[ag.selectedIndex], t = o.getAttribute('data-type');
       // No agency picked → fall back to the engagement mode (MANPOWER acts like a supply hire).
@@ -462,7 +518,7 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
       if (m && t==='MANPOWER' && !m.value) m.value = o.getAttribute('data-monthly')||'';
     }
     sel.addEventListener('change', function(){ syncStage(); syncHire(); });
-    if (mk) mk.addEventListener('change', syncHire);
+    
     if (ag) ag.addEventListener('change', syncAgency);
     syncStage(); syncHire(); syncAgency();
   })();

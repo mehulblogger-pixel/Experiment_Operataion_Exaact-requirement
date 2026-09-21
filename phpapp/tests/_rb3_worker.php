@@ -55,7 +55,7 @@ if ($target > 1000000000) { while (microtime(true) * 1000 < $target) { } }
 $out = ['op' => $op, 'ok' => false, 'code' => '', 'msg' => '', 'inspector_id' => 0, 'emp' => ''];
 try {
     if ($op === 'convert') {
-        $r = rcv_convert($a, []);
+        $r = rcv_convert($a, ['team_role' => 'FIELD', ]);
         $out['ok'] = (bool)($r['ok'] ?? false); $out['code'] = (string)($r['code'] ?? '');
         $out['msg'] = (string)($r['message'] ?? ''); $out['inspector_id'] = (int)($r['inspector_id'] ?? 0);
         if ($out['inspector_id'] > 0)

@@ -43,6 +43,9 @@ $_SESSION['csrf'] = 'rb3s3'; $_POST['_csrf'] = 'rb3s3';
 $_GET['id'] = $cid; $_POST['id'] = $cid;
 $_POST['to_stage'] = ($op === 'move') ? $extra : 'ACCEPTED';
 if ($op === 'accept' || $op === 'acceptcold') $_POST['make_inspector'] = '1';
+//  Owner decision 2: which team is now an explicit part of every acceptance,
+//  exactly as the screen sends it. Never left to the database's FIELD default.
+$_POST['team_role'] = 'FIELD';
 if ($extra !== '' && $op !== 'move') $_POST['dup_ack'] = $extra;
 
 //  The route redirect()s and exits, so the verdict is printed FIRST and the

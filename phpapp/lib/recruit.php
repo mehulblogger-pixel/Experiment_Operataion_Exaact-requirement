@@ -79,6 +79,17 @@ function req_migrate() {
         ['cost_oneoff',"DECIMAL(14,2) DEFAULT 0"],        // one-time per person (medical/PCC/training/mobilisation)
     ];
     foreach ($cols as $c) ensure_column('requisitions', $c[0], $c[1]);
+    //  WHAT KIND OF TEAM MEMBER THIS REQUIREMENT IS FOR — decided here, at the
+    //  requirement, and confirmed again when somebody is accepted.
+    //
+    //  DELIBERATELY NULLABLE AND WITHOUT A DEFAULT. `inspectors.team_role`
+    //  carries DEFAULT 'FIELD', and that default is precisely the problem: a
+    //  recruited person was classified as a deployable field inspector because
+    //  nobody had said otherwise, not because anybody decided it. NULL here
+    //  means "not decided yet", which acceptance can detect and ask about. A
+    //  default would make "not decided" indistinguishable from "decided FIELD",
+    //  and the question could never be asked again.
+    ensure_column('requisitions', 'team_role', "VARCHAR(10) NULL");
     // Track the source paperwork against the requirement.
     ensure_column('requisitions', 'quotation_ref', "VARCHAR(80) DEFAULT ''");
     // 1d — PO reference and Contract number are DIFFERENT things, so they get
@@ -1406,6 +1417,7 @@ const RCV_CODES = [
     'EMP_CODE'       => 'An employee number could not be issued, so nobody was added. Try again; if it keeps happening, ask an administrator to check the employee-number report.',
     'BUSY'           => 'Somebody else was saving at the same moment, so nothing was changed. Please try again.',
     'WORKFORCE_MATCH'=> 'This person may already be on your team. Open the application, check the possible match shown there, and tick to confirm before accepting.',
+    'TEAM_ROLE'      => 'Nobody has said which team this person joins. Choose Field, Coordinator or Back office on the requirement, or confirm it on the application, and try again.',
 ];
 
 /**
@@ -1482,6 +1494,11 @@ function rcv_branch_for($candId, $actorId = 0) {
 const RCV_ACCEPT_MIGRATIONS = [
     'rkpi_migrate', 'reqf_migrate', 'rful_migrate', 'asg_migrate', 'person_migrate',
     'connect_identity_migrate', 'emp_code_migrate', 'act_migrate',
+    //  Owner decision 3 asks the capability catalogue during acceptance, and
+    //  that catalogue installs its own table on first use. Warmed here so the
+    //  DDL can never land inside the transaction, where MariaDB would commit it
+    //  — and the caller's work with it.
+    'cockpit_migrate',
 ];
 
 /** Run every migration the acceptance path can reach, outside any transaction. */
@@ -1533,6 +1550,119 @@ function rcv_audit_or_report($candId, $kind, $subject) {
  * so an honest refusal never has to open a transaction, write a stage and a
  * ledger row, and then throw all of it away.
  */
+// ============================================================================
+//  WHAT KIND OF TEAM MEMBER — decided, never defaulted
+//
+//  `inspectors.team_role` carries DEFAULT 'FIELD'. Until now nothing on the
+//  recruitment path ever set it, so every recruited person became a deployable
+//  field inspector by omission — including the office and coordination hires.
+//  The owner's decision is that this classification is chosen at the
+//  requirement, confirmed at acceptance, and NEVER silently defaulted.
+//
+//  Nothing new is invented here. The vocabulary is the existing FIELD / COORD /
+//  OFFICE. The question "does this workspace deploy people to site at all?" is
+//  answered by the SAME check the Add-a-person form has always used —
+//  licence_enabled('operations') — so the two screens cannot disagree.
+// ============================================================================
+
+const WF_TEAM_ROLES = [
+    'FIELD'  => 'Field — goes to site',
+    'COORD'  => 'Coordinator / office-based',
+    'OFFICE' => 'Back office',
+];
+
+/** One of the three, or '' when the value is absent or not a real role. */
+function wf_team_role_normalise($v) {
+    $v = strtoupper(trim((string)$v));
+    return isset(WF_TEAM_ROLES[$v]) ? $v : '';
+}
+
+/**
+ * Does the Inspector / site-deployment concept exist in this workspace?
+ *
+ *   'NO'            a recruitment-only workspace. It does no site work, so a
+ *                   hire is a workforce employee and nothing more. Inspector
+ *                   functionality is NOT invented because somebody was hired.
+ *   'YES'           Operations is on and the company has said what it does.
+ *   'UNCONFIGURED'  Operations is on but the company has never chosen its
+ *                   business activities. The owner's rule is that applicability
+ *                   must NOT be inferred from silence — so acceptance asks
+ *                   instead of guessing.
+ */
+function wf_ops_capability() {
+    $opsOn = !function_exists('licence_enabled') || licence_enabled('operations');
+    if (!$opsOn) return 'NO';
+
+    //  NEVER MIGRATE INSIDE SOMEBODY ELSE'S TRANSACTION.
+    //
+    //  cockpit_capabilities() installs its table on first use, and on MariaDB
+    //  ANY DDL commits the open transaction implicitly — so asking this question
+    //  from inside a caller's transaction would silently commit that caller's
+    //  half-written work and leave them with nothing to roll back. A conversion
+    //  running inside a borrowed transaction hit exactly that, and the caller's
+    //  rollBack() then failed because there was no longer a transaction to undo.
+    //
+    //  Inside a transaction the question is therefore answered by READING the
+    //  table directly. If it does not exist yet, nothing has ever been
+    //  configured, which is precisely 'UNCONFIGURED'.
+    $inTx = false;
+    try { $inTx = db()->inTransaction(); } catch (Throwable $e) {}
+    if ($inTx) {
+        try {
+            $n = (int) ops_val("SELECT COUNT(*) FROM company_capabilities WHERE enabled=1");
+            return $n > 0 ? 'YES' : 'UNCONFIGURED';
+        } catch (Throwable $e) { return 'UNCONFIGURED'; }
+    }
+
+    if (function_exists('cockpit_capabilities')) {
+        try { if (!cockpit_capabilities()) return 'UNCONFIGURED'; } catch (Throwable $e) {}
+    }
+    return 'YES';
+}
+
+/**
+ * The role a given acceptance should record, and where it came from.
+ *
+ *   ['role' => 'FIELD'|'COORD'|'OFFICE'|'', 'source' => '…', 'why' => '…']
+ *
+ * An empty role is a REFUSAL, not a licence to fall back to FIELD. `why` is the
+ * sentence the recruiter is shown, and it says what to do about it.
+ */
+function wf_team_role_resolve(array $cand, $posted = '') {
+    $cap = wf_ops_capability();
+
+    //  A workspace that does no site work has no field/office distinction to
+    //  make. The Add-a-person form already records such people as OFFICE with
+    //  an explicit hidden value rather than letting the database default decide;
+    //  recruitment now does exactly the same thing, for the same reason.
+    if ($cap === 'NO') return ['role' => 'OFFICE', 'source' => 'no-operations', 'why' => ''];
+
+    //  The recruiter's confirmation at acceptance wins — that is the "visible
+    //  and explicitly confirmed" half of the decision.
+    $p = wf_team_role_normalise($posted);
+    if ($p !== '') return ['role' => $p, 'source' => 'acceptance', 'why' => ''];
+
+    //  Otherwise the requirement's own decision carries.
+    $rqId = (int)($cand['requisition_id'] ?? 0);
+    if ($rqId > 0) {
+        $r = '';
+        try { $r = (string)ops_val("SELECT team_role FROM requisitions WHERE id=?", [$rqId]); } catch (Throwable $e) {}
+        $r = wf_team_role_normalise($r);
+        if ($r !== '') return ['role' => $r, 'source' => 'requisition', 'why' => ''];
+    }
+
+    //  Nobody has decided. This is where the old code quietly wrote FIELD.
+    return ['role' => '', 'source' => 'none',
+            'why' => $cap === 'UNCONFIGURED'
+                ? 'This workspace has not yet recorded what kind of business it does, so the system cannot tell whether this person is a field inspector or office staff. Choose which team they join, or set the workspace\'s business activities under Workspace setup.'
+                : 'Nobody has said which team this person joins. Choose Field, Coordinator or Back office on the requirement, or confirm it here, and try again.'];
+}
+
+/** Is this hire a deployable Inspector? Only ever true where site work exists. */
+function wf_inspector_applies($role) {
+    return wf_ops_capability() === 'YES' && wf_team_role_normalise($role) === 'FIELD';
+}
+
 function rcv_refusal_before_transaction(array $cand, array $opt = []) {
     $candId = (int)($cand['id'] ?? 0);
     if ($candId <= 0) return RCV_CODES['NO_CANDIDATE'];
@@ -1551,6 +1681,14 @@ function rcv_refusal_before_transaction(array $cand, array $opt = []) {
     if (function_exists('rcv_branch_for')) {
         [$office, ] = rcv_branch_for($candId, (int)($opt['actor_id'] ?? 0));
         if (!$office) return RCV_CODES['NO_BRANCH'];
+    }
+
+    //  WHICH TEAM (owner decision 2) — decided at the requirement, confirmed
+    //  here, and never allowed to fall through to the database's FIELD default.
+    //  Settled BEFORE the transaction like every other refusable question.
+    if (function_exists('wf_team_role_resolve')) {
+        $tr = wf_team_role_resolve($cand, (string)($opt['team_role'] ?? ''));
+        if ($tr['role'] === '') return $tr['why'];
     }
 
     //  DUPLICATE STAFF + THE TICK — Step 2's canonical functions, called.
@@ -1612,6 +1750,24 @@ function rcv_convert($candId, array $opt = []) {
         rcv_log($candId, 'IDENTITY_REFUSED', 'Conversion refused — no branch on the requirement or the recruiter');
         return $fail('NO_BRANCH');
     }
+    //  6a WHICH TEAM — owner decision 2. Decided at the requirement, confirmed
+    //     at acceptance, and NEVER allowed to fall through to the FIELD default
+    //     that `inspectors.team_role` carries. Asked HERE as well as in the
+    //     route's pre-transaction pass, because the action asks its own gates
+    //     (invariant I27) and a forged POST must fail exactly as the screen does.
+    //
+    //     Like every other refusable question, it is settled BEFORE the
+    //     transaction opens, so refusing writes nothing at all.
+    $teamRole = 'OFFICE';
+    if (function_exists('wf_team_role_resolve')) {
+        $trR = wf_team_role_resolve($cand, (string)($opt['team_role'] ?? ''));
+        if ($trR['role'] === '') {
+            rcv_log($candId, 'IDENTITY_REFUSED', 'Conversion refused — no team was chosen for this hire');
+            return $fail('TEAM_ROLE');
+        }
+        $teamRole = $trR['role'];
+    }
+
     //  7 IDENTITY CAPABILITY — decided BEFORE the write so the outcome is known,
     //     and never a blocker on recruitment (BD2).
     $mayLink = function_exists('connect_identity_conversion_allowed') && connect_identity_conversion_allowed();
@@ -1710,14 +1866,15 @@ function rcv_convert($candId, array $opt = []) {
         //  not assumed: a UNIQUE violation rolls back the statement only and
         //  leaves the transaction open. And because nothing is reserved outside
         //  the row, a rollback below consumes no number at all.
-        $writeInspector = function ($code) use ($name, $cand, $kind, $office, $ag, $opt, $roll, $placement, $gd) {
-            db()->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,emp_code,home_office_id,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,status,created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
+        $writeInspector = function ($code) use ($name, $cand, $kind, $office, $ag, $opt, $roll, $placement, $gd, $teamRole) {
+            db()->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,emp_code,home_office_id,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,team_role,status,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
                 ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
                            $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $kind,
                            $code, $office,
                            $ag ? (int)$opt['agency_id'] : null, $roll, (string)($ag['name'] ?? ''), (float)($opt['agency_cost'] ?? 0),
                            $placement, $placement > 0 ? 'PROVISIONAL' : '', $placement > 0 ? date('Y-m-d', strtotime("+$gd days")) : '',
+                           $teamRole,
                            date('c')]);
             return (int)db()->lastInsertId();
         };

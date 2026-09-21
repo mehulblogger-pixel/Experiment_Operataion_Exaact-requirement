@@ -455,6 +455,18 @@ function ops_migrate() {
     ensure_column('candidates', 'interview_required', 'INT DEFAULT 0');
     ensure_column('candidates', 'interview_date', "VARCHAR(20) DEFAULT ''");         // planned
     ensure_column('candidates', 'interview_done_date', "VARCHAR(20) DEFAULT ''");
+    //  RB-2 — WHEN THIS PERSON ACTUALLY JOINED.
+    //
+    //  ACCEPTED (Hired) means the recruitment requirement was fulfilled by a
+    //  hired person. It does NOT mean anybody turned up for work, and the system
+    //  had no way of knowing the difference: a figure called "joined" counted
+    //  accepted people who had a team record, which is paperwork, not arrival.
+    //
+    //  NULLABLE AND WITHOUT A DEFAULT, because "we do not know yet" is the
+    //  honest state for every existing row and must stay distinguishable from
+    //  "joined on this date". Set only by an explicit "Mark as joined" action —
+    //  never derived, never inferred from the stage.
+    ensure_column('candidates', 'joined_at', "VARCHAR(30) NULL");
     ensure_column('candidates', 'interview_outcome', "VARCHAR(20) DEFAULT ''");      // SELECTED / REJECTED / HOLD
     ensure_column('candidates', 'credential_requested', 'INT DEFAULT 0');
     // job type (inspection vs project deputation) + lifecycle stage
@@ -3021,7 +3033,7 @@ function ops_module_gate($route, $peek = false) {
         // to this person. One module gate here would either hide the whole screen
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
-        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring','candidate-link-pro'=>'hiring','candidate-unlink-pro'=>'hiring',
+        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-joined'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring','candidate-link-pro'=>'hiring','candidate-unlink-pro'=>'hiring',
         'hiring-requests'=>'hiring','hiring-request'=>'hiring',
         'approval-delegations'=>'hiring',   // M2 — approval delegation config rides with recruitment
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','requisition-allocations'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring','recruit-export'=>'hiring','careers-admin'=>'hiring','jd-generate'=>'hiring','positions-import'=>'hiring',
@@ -3323,7 +3335,7 @@ function ops_dispatch($route, $method) {
         // Bills backing the expenses the client is being charged for.
         case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
             return ops_job_bill($route, $method);
-        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial' || $route === 'candidate-link-person' || $route === 'candidate-link-pro' || $route === 'candidate-unlink-pro':
+        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-joined' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial' || $route === 'candidate-link-person' || $route === 'candidate-link-pro' || $route === 'candidate-unlink-pro':
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit' || $route === 'inquiry-delete':
             ops_crm_inquiries($route, $method); return true;
@@ -5572,7 +5584,12 @@ function ops_requisitions($route, $method) {
                     'cfvals' => $req ? custom_values_map('requisition', $req['id']) : []]);
                 return;
             }
-            $base = ['office_id','sbu','designation','project_site','locations','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes','quotation_ref'];
+            //  'team_role' — WHICH TEAM this requirement is for (owner decision 2).
+            //  It rides in the ordinary field list because it is an ordinary
+            //  attribute of the requirement; what makes it safe is that it has no
+            //  database default, so "not decided" stays visibly not decided and
+            //  acceptance asks rather than assuming.
+            $base = ['office_id','sbu','designation','project_site','locations','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes','quotation_ref','team_role'];
             $fields = array_merge($base, function_exists('req_extra_fields') ? req_extra_fields() : []);
             //  PHASE 3 · M5 — ACCOUNTABILITY NEVER RIDES IN THE BLIND FIELD LIST.
             //
@@ -5840,6 +5857,67 @@ function ops_candidates($route, $method) {
         flash($ok ? 'Credential-request e-mail sent to the candidate.' : ('Logged; ' . $msg), $ok ? 'success' : 'warning');
         redirect('/candidate?id=' . $id);
     }
+    // ========================================================================
+    //  RB-2 — MARK AS JOINED
+    //
+    //  Accepted (Hired) means the requirement was filled by a hired person. It
+    //  says nothing about whether they actually turned up, and the business
+    //  needs both numbers: "8 of 10 hired, 6 of them joined" is a sentence a
+    //  manager can act on; "10 of 10 filled" when six people have started is
+    //  not. Joining is therefore recorded by somebody who knows it happened,
+    //  never derived from the stage.
+    //
+    //  Reversible, because people are marked joined by mistake and a date that
+    //  cannot be corrected is worse than no date at all.
+    // ========================================================================
+    if ($route === 'candidate-joined') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can record a joining.');
+        $id   = (int)($_GET['id'] ?? 0);
+        $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
+        if (!$cand) { http_response_code(404); view('notfound'); return; }
+        //  A record id is never proof of authorisation (invariant I25).
+        if (function_exists('connect_identity_scope_ok') && !connect_identity_scope_ok('candidate', $id)) {
+            http_response_code(404); view('notfound'); return;
+        }
+        if ($method !== 'POST') redirect('/candidate?id=' . $id);
+
+        $undo = !empty($_POST['undo']);
+        if ($undo) {
+            db()->prepare("UPDATE candidates SET joined_at=NULL WHERE id=?")->execute([$id]);
+            if (function_exists('act_log')) { try { act_log('CANDIDATE', $id, 'JOINING_CLEARED', 'Joining record removed'); } catch (Throwable $e) {} }
+            if (function_exists('reqf_sync') && !empty($cand['requisition_id'])) { try { reqf_sync((int)$cand['requisition_id']); } catch (Throwable $e) {} }
+            flash('Joining removed. This person is still recorded as hired.');
+            redirect('/candidate?id=' . $id);
+        }
+
+        //  Only a hired person can have joined, and only one who actually has a
+        //  team record — otherwise "joined" would again mean something the
+        //  system cannot back up.
+        if (strtoupper((string)($cand['stage'] ?? '')) !== 'ACCEPTED') {
+            flash('Only an accepted (hired) person can be marked as joined.', 'error');
+            redirect('/candidate?id=' . $id);
+        }
+        if ((int)($cand['inspector_id'] ?? 0) <= 0) {
+            flash('This person has no team record yet, so their joining cannot be recorded.', 'error');
+            redirect('/candidate?id=' . $id);
+        }
+        $when = trim((string)($_POST['joined_on'] ?? ''));
+        if ($when === '') $when = date('Y-m-d');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $when)) {
+            flash('That joining date could not be read. Use the date picker and try again.', 'error');
+            redirect('/candidate?id=' . $id);
+        }
+        if (strtotime($when) > strtotime(date('Y-m-d'))) {
+            flash('A joining date in the future cannot be recorded — mark them joined on the day they start.', 'error');
+            redirect('/candidate?id=' . $id);
+        }
+        db()->prepare("UPDATE candidates SET joined_at=? WHERE id=?")->execute([$when, $id]);
+        if (function_exists('act_log')) { try { act_log('CANDIDATE', $id, 'JOINED', 'Recorded as joined on ' . $when); } catch (Throwable $e) {} }
+        if (function_exists('reqf_sync') && !empty($cand['requisition_id'])) { try { reqf_sync((int)$cand['requisition_id']); } catch (Throwable $e) {} }
+        flash('Recorded as joined on ' . $when . '.');
+        redirect('/candidate?id=' . $id);
+    }
+
     if ($route === 'candidate-stage') {
         ops_require(is_coordinator_level(), 'Only coordinators and admins can move a candidate.');
         $id = (int)($_GET['id'] ?? 0);
@@ -5892,7 +5970,18 @@ function ops_candidates($route, $method) {
             //  behaviour it has always had, a few lines down, untouched.
             // ================================================================
             $rqId     = (int)($cand['requisition_id'] ?? 0);
-            $wantHire = ($to === 'ACCEPTED' && !empty($_POST['make_inspector'])
+            //  RB-1 — EVERY ACCEPTED CANDIDATE GETS A WORKFORCE RECORD.
+            //
+            //  This used to test a posted "make inspector" flag: a hidden
+            //  checkbox decided whether a hired person existed as a member of the
+            //  team at all. Leave it unticked and the business had somebody marked
+            //  Accepted (Hired) with nobody behind them — no employee number, no
+            //  record, nothing for payroll, operations or reporting to work from.
+            //  Whether a hire becomes a person was never a recruiter preference.
+            //
+            //  The checkbox is gone. `dup_ack` is NOT this checkbox and stays: it
+            //  is the duplicate-match acknowledgement, which the owner requires.
+            $wantHire = ($to === 'ACCEPTED'
                          && empty($cand['inspector_id']) && function_exists('rcv_convert'));
             $msg = 'Candidate moved to ' . lk_options_or('candidate_stage', CAND_STAGES)[$to] . '.';
 
@@ -5906,6 +5995,7 @@ function ops_candidates($route, $method) {
                     $pre = rcv_refusal_before_transaction($cand, [
                         'want_hire' => $wantHire,
                         'dup_ack'   => (string)($_POST['dup_ack'] ?? ''),
+                        'team_role' => (string)($_POST['team_role'] ?? ''),
                         'actor_id'  => (int)(current_user()['id'] ?? 0),
                     ]);
                     if ($pre !== '') {
@@ -5976,6 +6066,7 @@ function ops_candidates($route, $method) {
                             //  RB-3 Step 2 — the tick, carried to the action that
                             //  decides. The route is a courier, not a gate.
                             'dup_ack'       => (string)($_POST['dup_ack'] ?? ''),
+                            'team_role'     => (string)($_POST['team_role'] ?? ''),
                             'agency_id'     => ($_POST['agency_id'] ?? '') !== '' ? (int)$_POST['agency_id'] : 0,
                             'roll_type'     => (string)($_POST['roll_type'] ?? ''),
                             'placement_fee' => ($_POST['placement_fee'] ?? '') !== '' ? (float)$_POST['placement_fee'] : 0,
