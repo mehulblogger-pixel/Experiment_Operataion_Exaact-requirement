@@ -157,3 +157,27 @@ recruitment-only workspace they are not asked at all.
 An acceptance can now be refused for a new reason: nobody has decided which team
 the person joins. The message says exactly that and what to do about it, and the
 candidate stays where they were.
+
+## J · Browser / HTTP (§18) — what was and was not verified
+
+**Verified over real HTTP** against a throwaway workspace served by `php -S`:
+the application boots, `GET /login` renders (200), signing in as the
+administrator succeeds and establishes a session, and the authenticated landing
+page renders.
+
+**Not completed over TCP:** the acceptance walk itself. With the workspace
+configured (capabilities set to TPIA, Operations on — `wf_ops_capability()`
+returns `YES`), the ops screens still answer `302 → login` for this session
+while `/` correctly resolves to the signed-in landing page. That behaviour
+**predates this cycle** — it was observed before any of the team_role, RB-1 or
+RB-2 work — so it is a property of this headless harness's session handling, not
+of the changes reported here. The project's own browser harness
+(`phpapp/tools/auto-walk.sh`, Playwright) is the right instrument for that layer;
+no new harness was built for it.
+
+**What covers the route instead.** The route handler is exercised by real
+separate processes that call `ops_dispatch('candidate-stage', 'POST')` — the same
+entry point a web request reaches — in `_rb3s3_worker.php`, `_p4_worker.php` and
+`_p6b2_worker.php`. That is where **T10d** proves RB-1 through the route (a POST
+that asks for no workforce record produces one anyway, with an employee number),
+and where the concurrency proofs run. The gap is the TCP layer, not the route.
