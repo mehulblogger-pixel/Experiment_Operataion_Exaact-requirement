@@ -1518,6 +1518,51 @@ function rcv_audit_or_report($candId, $kind, $subject) {
     return false;
 }
 
+/**
+ * EVERY condition that can legitimately refuse an acceptance, asked BEFORE the
+ * transaction opens (owner §7). Returns '' to proceed, or the sentence to show.
+ *
+ * It re-implements NOTHING. Each answer comes from the function that already
+ * owns that question — rcv_branch_for() for the branch, and Step 2's
+ * workforce_matches() / workforce_ack_ok() for the duplicate and its
+ * acknowledgement. Step 2's design is used, not copied.
+ *
+ * rcv_convert() asks these same questions AGAIN inside the transaction, and
+ * that duplication is deliberate: a forged POST that never came through this
+ * route must fail exactly as the screen does (invariant I27). This pass exists
+ * so an honest refusal never has to open a transaction, write a stage and a
+ * ledger row, and then throw all of it away.
+ */
+function rcv_refusal_before_transaction(array $cand, array $opt = []) {
+    $candId = (int)($cand['id'] ?? 0);
+    if ($candId <= 0) return RCV_CODES['NO_CANDIDATE'];
+    if (function_exists('is_coordinator_level') && !is_coordinator_level()) return RCV_CODES['NOT_ALLOWED'];
+    //  Scope: a record id is never proof of authorisation, and "not yours" is
+    //  answered in the same words as "not there" so nothing can be enumerated.
+    if (function_exists('connect_identity_scope_ok') && !connect_identity_scope_ok('candidate', $candId))
+        return RCV_CODES['NO_CANDIDATE'];
+    if (empty($opt['want_hire'])) return '';
+
+    //  IDEMPOTENCY (§13) — nothing new is built for it. The application already
+    //  records which team member it produced, and that column is the guard.
+    if ((int)($cand['inspector_id'] ?? 0) > 0) return RCV_CODES['ALREADY'];
+
+    //  BRANCH (BD1) — no branch, no hire, and never a silent default.
+    if (function_exists('rcv_branch_for')) {
+        [$office, ] = rcv_branch_for($candId, (int)($opt['actor_id'] ?? 0));
+        if (!$office) return RCV_CODES['NO_BRANCH'];
+    }
+
+    //  DUPLICATE STAFF + THE TICK — Step 2's canonical functions, called.
+    if (function_exists('workforce_matches') && function_exists('workforce_ack_ok')) {
+        $mm = workforce_matches($cand);
+        if (workforce_strong_matches($mm)
+            && !workforce_ack_ok((string)($opt['dup_ack'] ?? ''), $candId, $mm, $cand, (int)($opt['actor_id'] ?? 0)))
+            return RCV_CODES['WORKFORCE_MATCH'];
+    }
+    return '';
+}
+
 /** Audit a conversion outcome against the candidate — the record it is about. */
 function rcv_log($candId, $kind, $subject) {
     if (!function_exists('act_log')) return;

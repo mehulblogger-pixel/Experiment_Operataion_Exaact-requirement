@@ -74,6 +74,20 @@ $evRename = function ($away) {
     } catch (Throwable $e) { return false; }
 };
 
+$inspRename = function ($away) {
+    $sq = t_driver() === 'sqlite';
+    try {
+        if ($away) db()->exec($sq ? "ALTER TABLE inspectors RENAME TO inspectors_bak3"
+                                  : "RENAME TABLE inspectors TO inspectors_bak3");
+        else {
+            try { db()->exec("DROP TABLE IF EXISTS inspectors"); } catch (Throwable $e) {}
+            db()->exec($sq ? "ALTER TABLE inspectors_bak3 RENAME TO inspectors"
+                           : "RENAME TABLE inspectors_bak3 TO inspectors");
+        }
+        return true;
+    } catch (Throwable $e) { return false; }
+};
+
 $s3off = (int)ops_val("SELECT id FROM offices ORDER BY id LIMIT 1");
 $s3me  = (int)(current_user()['id'] ?? 0);
 db()->prepare("UPDATE users SET home_office_id=? WHERE id=?")->execute([$s3off, $s3me]);
@@ -313,34 +327,207 @@ t_eq($inspOf($cLed), 0, 'T8c · …and creates no workforce record');
 // ---------------------------------------------------------------------------
 t_section('RB3S3 · T9 — the warm-up has an EFFECT, not merely a position');
 // ---------------------------------------------------------------------------
-//  T5 proved the warm-up call exists and sits before the transaction. That is a
-//  position, not an effect: disabling it (A6) left the call text in place and
-//  T5 passed regardless.
-//
-//  This proves the effect. A COLD process meets an absent ledger table. Done
-//  correctly, the warm-up creates it BEFORE the transaction opens. Done wrongly,
-//  the migration fires INSIDE — and MariaDB commits implicitly on any DDL, so
-//  the stage move is committed there and then. A refusal that comes afterwards
-//  (an unacknowledged duplicate) can no longer undo it, and the candidate is
-//  left Accepted for a hire that was refused.
+//  NOTE — this probe used to force its late failure with an unacknowledged
+//  duplicate. Once the refusable conditions moved in FRONT of the transaction
+//  (§7) that candidate never reached the transaction at all, and the probe
+//  stopped testing anything: mutant A6 walked straight through it. The late
+//  failure is now a genuine DATABASE failure, which cannot be refused early.
 if (t_driver() === 'sqlite') {
     t_ok(true, 'T9 (sqlite) · skipped by design — SQLite DDL is transactional, so the implicit-commit hazard exists only on MariaDB, where it is proved');
 } else {
-    db()->prepare("INSERT INTO inspectors (name,first_name,last_name,mobile,status,created_at) VALUES ('Cold Twin','Cold','Twin','9440022222','ACTIVE',?)")
-        ->execute([date('c')]);
-    $rqC  = $mkReq(3);
-    $cCold = $mkCand('Cold', $rqC, 'OFFER', '9440022222');
-    t_eq(count(workforce_strong_matches(workforce_matches(ops_one("SELECT * FROM candidates WHERE id=?", [$cCold])))), 1,
-         'T9a · the acceptance will be refused AFTER the ledger step, by an unacknowledged duplicate — the trap is armed');
-    $gone = $evRename(true);
-    t_ok($gone, 'T9b · …and the ledger table is absent, so a cold process really must create it');
-    $hC = $s3spawn('acceptcold', $cCold, '', $s3me, 1200);
+    $rqC   = $mkReq(3);
+    $cCold = $mkCand('Cold', $rqC);
+    $goneE = $evRename(true);
+    t_ok($goneE, 'T9a · the ledger table is absent, so a COLD process really must create it — armed');
+    $hC = $s3spawn('acceptcold', $cCold, '', $s3me, 2600);
+    usleep(1300000);
+    $goneI = $inspRename(true);
+    t_ok($goneI, 'T9b · …and the team-member table is taken away, so the failure lands AFTER the ledger step');
     $s3reap($hC);
+    $inspRename(false);
     $evRename(false);
     t_eq($stageOf($cCold), 'OFFER',
-         'T9 · nothing was committed before the refusal — the migration ran BEFORE the transaction, not inside it');
+         'T9 · nothing was committed before that failure — the migration ran BEFORE the transaction, not inside it');
     t_eq($inspOf($cCold), 0, 'T9c · …and no workforce record exists');
 }
+
+// ---------------------------------------------------------------------------
+t_section('RB3S3 · X2 / X4 / X17 — the tick, and accepting twice');
+// ---------------------------------------------------------------------------
+$mkTwin = function ($mob) { db()->prepare("INSERT INTO inspectors (name,first_name,last_name,mobile,status,created_at) VALUES (?,?,?,?, 'ACTIVE',?)")
+    ->execute(['Twin ' . $mob, 'Twin', 'S3', $mob, date('c')]); return (int)db()->lastInsertId(); };
+$tokFor = function ($cid) use ($s3me) { $c = ops_one("SELECT * FROM candidates WHERE id=?", [$cid]);
+    return workforce_ack_issue($cid, workforce_matches($c), $c, $s3me); };
+
+//  X2 — a real duplicate, acknowledged: everything commits.
+$mkTwin('9550011111');
+$cAck = $mkCand('AckOk', $mkReq(3), 'OFFER', '9550011111');
+$tk = $tokFor($cAck);
+t_ok($tk !== '', 'X2a · a strong duplicate exists and a genuine tick was issued — the trap is armed');
+$bX2 = $staffN();
+$s3race([['accept', $cAck, $tk, $s3me]]);
+t_eq($stageOf($cAck), 'ACCEPTED', 'X2 · an acknowledged duplicate is accepted');
+t_ok($inspOf($cAck) > 0, 'X2b · …and the workforce record was created');
+t_eq($staffN(), $bX2 + 1, 'X2c · exactly one');
+
+//  X4 — an INVALID tick refuses, and does so before the transaction is opened.
+$mkTwin('9550022222');
+$cBad = $mkCand('AckBad', $mkReq(3), 'OFFER', '9550022222');
+$bX4 = $staffN(); $evX4 = $evN($cBad);
+$s3race([['accept', $cBad, '1', $s3me]]);            // "1" — the shape the old hidden field used
+t_eq($stageOf($cBad), 'OFFER', 'X4 · a forged tick is refused');
+t_eq($staffN(), $bX4, 'X4b · …nothing was created');
+t_eq($evN($cBad), $evX4, 'X4c · …and no stage-history entry');
+t_ok((int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='CANDIDATE' AND entity_id=? AND kind='IDENTITY_REFUSED' AND subject LIKE '%before any change%'", [$cBad]) >= 1,
+     'X4d · …refused BEFORE the transaction was opened, not rolled back out of one (§7)');
+
+//  X17 — accepting somebody who is already accepted.
+$cTwice = $mkCand('Twice', $mkReq(3));
+$s3race([['accept', $cTwice, '', $s3me]]);
+$firstInsp = $inspOf($cTwice);
+t_ok($firstInsp > 0, 'X17a · the first acceptance succeeded — the trap is armed');
+$bX17 = $staffN();
+$s3race([['accept', $cTwice, '', $s3me]]);
+t_eq($inspOf($cTwice), $firstInsp, 'X17 · a second acceptance changes nothing — the same team member');
+t_eq($staffN(), $bX17, 'X17b · …and creates no second workforce record');
+t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE id=?", [$firstInsp]), 1, 'X17c · …nor a second employee number');
+//  Asked of the ACTION, not the route: a forged POST that never passed the
+//  pre-transaction pass must still be refused (invariant I27).
+t_eq((string)rcv_convert($cTwice, ['actor_id' => $s3me])['code'], 'ALREADY',
+     'X17d · …and the action refuses it on its own, without the route\'s help');
+
+// ---------------------------------------------------------------------------
+t_section('RB3S3 · X6 / X11 — the workforce write itself fails');
+// ---------------------------------------------------------------------------
+//  The hardest failure to fake honestly: the team-member INSERT itself. The
+//  table is taken away while the acceptance is in flight, exactly as T8 does
+//  with the ledger, so the failure lands AFTER the stage move and the ledger
+//  write and BEFORE the commit.
+$rqF = $mkReq(3);
+$cFail = $mkCand('WorkFail', $rqF);
+$evF = $evN($cFail);
+$hF = $s3spawn('accept', $cFail, '', $s3me, 2600);
+usleep(1300000);
+$gone = $inspRename(true);
+$s3reap($hF);
+$back = $inspRename(false);
+t_ok($gone && $back, 'X6a · the team-member table was taken away mid-flight and restored — the trap is armed');
+t_eq($stageOf($cFail), 'OFFER', 'X6 · the workforce write failed, so the STAGE MOVE rolled back with it');
+t_eq($inspOf($cFail), 0, 'X6b · …no workforce record');
+t_eq($evN($cFail), $evF, 'X11 · …and no stage-history entry: a database exception rolls everything back');
+//  A failure INSIDE the transaction is audited after the rollback, by a
+//  different call site from the pre-transaction refusal — so this asserts the
+//  entry that does NOT say "before any change".
+t_ok((int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='CANDIDATE' AND entity_id=? AND kind='IDENTITY_REFUSED' AND subject NOT LIKE '%before any change%'", [$cFail]) >= 1,
+     'X11b · …and the rolled-back failure was recorded, outside the transaction that vanished');
+
+//  X12 — RETRY. The same candidate, once the problem is gone, accepts cleanly.
+$bR = $staffN();
+$s3race([['accept', $cFail, '', $s3me]]);
+t_eq($stageOf($cFail), 'ACCEPTED', 'X12 · the recruiter retried and it worked');
+t_ok($inspOf($cFail) > 0, 'X12b · …with a workforce record');
+t_eq($staffN(), $bR + 1, 'X12c · …exactly one, with nothing left over from the failed attempt');
+
+// ---------------------------------------------------------------------------
+t_section('RB3S3 · X8 — the employee number cannot be issued');
+// ---------------------------------------------------------------------------
+//  Every number the claim would try is taken, so it gives up rather than hand
+//  out one somebody already holds. The acceptance must go back with it.
+$rqE = $mkReq(3);
+$cEmp = $mkCand('NoNumber', $rqE);
+//  The blockers must be INVISIBLE to the generator and REAL to the database, or
+//  the generator simply starts past them and nothing is blocked at all. The
+//  first version of this probe did exactly that, and its own arming assertion
+//  showed it. A LEADING SPACE does both: ' EMP07' does not match the
+//  generator's `emp_code LIKE 'EMP%'` scan, and Step 1's key normalises it to
+//  EMP07, so the database holds it.
+$wanted = next_emp_code('ASSET');
+$base   = (int)preg_replace('/[^0-9]/', '', $wanted);
+for ($i = 0; $i < 30; $i++)
+    db()->prepare("INSERT INTO inspectors (name,emp_code,status,created_at) VALUES (?,?, 'ACTIVE', ?)")
+        ->execute(['Blocker ' . $i, ' EMP' . str_pad((string)($base + $i), 2, '0', STR_PAD_LEFT), date('c')]);
+t_eq(next_emp_code('ASSET'), $wanted,
+     'X8a · the generator still offers ' . $wanted . ', unaware that it and the next 29 are taken — the trap is armed');
+$bE = $staffN(); $evE = $evN($cEmp);
+$s3race([['accept', $cEmp, '', $s3me]]);
+t_eq($stageOf($cEmp), 'OFFER', 'X8 · no employee number, no acceptance');
+t_eq($inspOf($cEmp), 0, 'X8b · …no workforce record');
+t_eq($staffN(), $bE, 'X8c · …nothing created at all');
+t_eq($evN($cEmp), $evE, 'X8d · …and no stage-history entry');
+//  Clear the blockers. Without this they keep every later probe's claim
+//  exhausted too — which is exactly what happened the first time this section
+//  ran, and X13 below failed for a reason that had nothing to do with X13.
+db()->exec("DELETE FROM inspectors WHERE name LIKE 'Blocker %'");
+t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE name LIKE 'Blocker %'"), 0,
+     'X8e · the blockers were cleared, so what follows starts from clean numbering');
+
+// ---------------------------------------------------------------------------
+t_section('RB3S3 · X13 / X16 — double submit, and an id from another tenant');
+// ---------------------------------------------------------------------------
+$cDbl = $mkCand('DoubleSubmit', $mkReq(3));
+$bD = $staffN();
+$s3race([['accept', $cDbl, '', $s3me], ['accept', $cDbl, '', $s3me], ['accept', $cDbl, '', $s3me]]);
+t_eq($stageOf($cDbl), 'ACCEPTED', 'X13a · the candidate was accepted');
+t_eq($staffN(), $bD + 1, 'X13 · three simultaneous submissions of the SAME acceptance produce ONE workforce record');
+t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE id=?", [$inspOf($cDbl)]), 1, 'X13b · …and one employee number');
+
+//  X16 — tenancy is structural: one database per tenant, proved against two real
+//  databases in Step 2. Here the question is narrower — an id that is not in
+//  THIS database must be refused before anything is written.
+$ghost = (int)ops_val("SELECT COALESCE(MAX(id),0)+5000 FROM candidates");
+t_eq(rcv_refusal_before_transaction(['id' => $ghost], ['want_hire' => 1]), RCV_CODES['NO_CANDIDATE'],
+     'X16 · an application id that is not in this tenant\'s database is refused before any write');
+t_eq((string)rcv_convert($ghost, ['actor_id' => $s3me])['code'], 'NO_CANDIDATE',
+     'X16b · …and the action refuses it too, so a forged POST gains nothing');
+
+// ---------------------------------------------------------------------------
+t_section('RB3S3 · E — why two mutations are EQUIVALENT, not missed');
+// ---------------------------------------------------------------------------
+//  Two mutations survive the battery. Neither is a hole; both are unreachable,
+//  and that is asserted here rather than claimed in prose — so if the code ever
+//  changes to make them reachable, THESE assertions fail and the equivalence
+//  claim is withdrawn automatically.
+
+//  E1 · "commit immediately after the workforce record is created" survives
+//  because NOTHING AFTER IT CAN FAIL. Both remaining writes swallow their own
+//  errors by existing design, so committing there or at the end leaves exactly
+//  the same committed state.
+$cE = $mkCand('Equiv', null, 'OFFER');
+$raGone = false;
+try { db()->exec(t_driver() === 'sqlite' ? "ALTER TABLE requisition_allocations RENAME TO ra_bak_e"
+                                         : "RENAME TABLE requisition_allocations TO ra_bak_e"); $raGone = true; } catch (Throwable $e) {}
+t_ok($raGone, 'E1a · the source-credit table was taken away — the trap is armed');
+$threw = false;
+try { rful_enforce_candidate($cE, 0); } catch (Throwable $e) { $threw = true; }
+try { db()->exec(t_driver() === 'sqlite' ? "ALTER TABLE ra_bak_e RENAME TO requisition_allocations"
+                                         : "RENAME TABLE ra_bak_e TO requisition_allocations"); } catch (Throwable $e) {}
+t_eq($threw, false, 'E1 · the source credit cannot fail the transaction — it swallows its own errors');
+
+$rqGone = false;
+try { db()->exec(t_driver() === 'sqlite' ? "ALTER TABLE requisitions RENAME TO rq_bak_e"
+                                         : "RENAME TABLE requisitions TO rq_bak_e"); $rqGone = true; } catch (Throwable $e) {}
+t_ok($rqGone, 'E1b · the requirement table was taken away — the trap is armed');
+$threw2 = false;
+try { reqf_sync(1); } catch (Throwable $e) { $threw2 = true; }
+try { db()->exec(t_driver() === 'sqlite' ? "ALTER TABLE rq_bak_e RENAME TO requisitions"
+                                         : "RENAME TABLE rq_bak_e TO requisitions"); } catch (Throwable $e) {}
+t_eq($threw2, false, 'E1c · nor can recomputing the requirement — so an early commit there is indistinguishable');
+
+//  E2 · "a failed workforce creation no longer stops the acceptance" survives
+//  because rcv_convert() RE-THROWS inside a borrowed transaction rather than
+//  returning a failure, so the route's own `if (empty($cv['ok'])) throw` is a
+//  backstop nothing can currently reach. Every refusal that DOES return is
+//  already settled earlier — by the pre-transaction pass or the seat check.
+db()->beginTransaction();
+$borrowThrew = false;
+try { rcv_convert(0, ['actor_id' => $s3me]); } catch (Throwable $e) { $borrowThrew = true; }
+$stillIn = db()->inTransaction();
+try { db()->rollBack(); } catch (Throwable $e) {}
+t_ok($stillIn, 'E2a · the call really was made inside somebody else\'s transaction — the trap is armed');
+t_ok(strpos((string)@file_get_contents($s3root . '/lib/recruit.php'), 'if (!$own) throw $e;') !== false,
+     'E2 · rcv_convert re-throws on a borrowed transaction instead of returning a failure, so the route\'s backstop is unreachable');
+t_eq((string)rcv_convert(0, ['actor_id' => $s3me])['code'], 'NO_CANDIDATE',
+     'E2b · …and the refusals it DOES return are the early gates, every one of which the pre-transaction pass already settles');
 
 // ---------------------------------------------------------------------------
 t_section('RB3S3 · J — nothing else moved');

@@ -5897,6 +5897,24 @@ function ops_candidates($route, $method) {
             $msg = 'Candidate moved to ' . lk_options_or('candidate_stage', CAND_STAGES)[$to] . '.';
 
             if ($m6Joining) {
+                //  §7 — EVERY REFUSABLE CONDITION, SETTLED BEFORE THE TRANSACTION.
+                //  An honest refusal should never have to open a transaction,
+                //  write a stage and a ledger row, and then throw it all away.
+                //  Nothing here is re-implemented: it calls the functions that
+                //  already own each question, Step 2's included.
+                if (function_exists('rcv_refusal_before_transaction')) {
+                    $pre = rcv_refusal_before_transaction($cand, [
+                        'want_hire' => $wantHire,
+                        'dup_ack'   => (string)($_POST['dup_ack'] ?? ''),
+                        'actor_id'  => (int)(current_user()['id'] ?? 0),
+                    ]);
+                    if ($pre !== '') {
+                        if (function_exists('rcv_audit_or_report'))
+                            rcv_audit_or_report($id, 'IDENTITY_REFUSED', 'Acceptance refused before any change — ' . $pre);
+                        flash('Candidate could not be accepted. ' . $pre, 'error');
+                        redirect('/candidate?id=' . $id);
+                    }
+                }
                 //  BEFORE the transaction: every schema migration this path can
                 //  reach. MariaDB commits implicitly on any DDL, so one firing
                 //  inside would silently commit a half-finished acceptance.
