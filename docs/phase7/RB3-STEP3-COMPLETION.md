@@ -146,7 +146,7 @@ while I was here":
 |---|---|
 | `938c279` | acceptance is one transaction, or it is nothing |
 | `857124f` | the four mutation survivors closed, 9 of 9 caught |
-| _(this commit)_ | §7 refusal hoist, the X / E matrix, 15-target mutation battery, the three documents |
+| `da64ffc` | §7 refusal hoist, the X / E matrix, 15-target mutation battery, the three documents |
 
 ## 15. Status
 
