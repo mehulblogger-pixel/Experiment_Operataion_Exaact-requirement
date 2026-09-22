@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '1a8b001 · 2026-09-22 00:38 UTC · 666 files';
+$RELEASE = '295e5d8 · 2026-09-22 03:07 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -378,7 +378,7 @@ $EXPECT  = [
     'views/ops/connect_capabilities.php' => ['s'=>5566,'h'=>'2ff076b5ea38c2bb'],
     'views/ops/connect_channels.php' => ['s'=>8554,'h'=>'1ce310de2a4a57e1'],
     'views/ops/connect_concierge.php' => ['s'=>8245,'h'=>'59099c8a4dbe8e50'],
-    'views/ops/connect_front.php' => ['s'=>9981,'h'=>'196052913e44fe4b'],
+    'views/ops/connect_front.php' => ['s'=>10653,'h'=>'8ee62fca290044c4'],
     'views/ops/connect_identity.php' => ['s'=>5849,'h'=>'14b648589596fcad'],
     'views/ops/connect_join.php' => ['s'=>8819,'h'=>'90938cf57917e368'],
     'views/ops/connect_match_weights.php' => ['s'=>3856,'h'=>'14f2f37f5872848b'],

@@ -62,6 +62,18 @@ $freeLaunch = true; // platform is free during launch
   .signin .btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
   .foot{text-align:center;color:var(--muted);font-size:13px;margin-top:34px}
   .foot a{color:var(--muted);text-decoration:underline}
+  /*  TOUCH TARGETS. Measured on a phone, these three were 15–16px tall: the
+      header "Sign in", "join as a professional" and "Staff sign-in". They are
+      the secondary ways into the product, and a 16px tap target on a 390px
+      screen is a link you miss. Given a 44px tappable height WITHOUT changing
+      how they read — still inline links, same size, same colour, just with
+      somewhere to land. Phone widths only; the desktop layout is untouched. */
+  @media(max-width:760px){
+    .bar .si, .under a, .foot a{
+      display:inline-flex; align-items:center; justify-content:center;
+      min-height:44px; padding-top:4px; padding-bottom:4px;
+    }
+  }
   :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 </style></head><body>
 
