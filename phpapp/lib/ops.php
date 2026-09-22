@@ -5720,11 +5720,17 @@ function ops_requisitions($route, $method) {
             $numF = ['budgeted_cost','billing_rate','target_margin','negotiation_floor','duration_months','experience_min',
                      'cost_wage','cost_statutory_pct','cost_agency_pct','cost_reimburse','cost_oneoff'];
             $norm = function($f, $v) use ($intF, $numF) {
-                if (in_array($f, ['office_id','outgoing_inspector_id','client_id','recruiter_id','manager_id'], true)) return $v === '' ? null : (int)$v;
+                if (in_array($f, ['office_id','outgoing_inspector_id','client_id','recruiter_id','manager_id','trade_id','skill_id'], true)) return $v === '' ? null : (int)$v;
                 if (in_array($f, $intF, true)) return $v === '' ? 0 : (int)$v;
                 if (in_array($f, $numF, true)) return $v === '' ? 0 : (float)$v;
                 return $v;
             };
+            //  Discipline / speciality: when one was picked from the master, write
+            //  its LABEL to the old free-text column as well, so every existing
+            //  reader (list screen, exports, job-description generator, careers
+            //  posting) keeps showing words and needs no change. A value typed by
+            //  hand is passed through untouched and stores no link.
+            if (function_exists('req_vocab_sync')) $b = req_vocab_sync($b);
             // If the cost heads were filled but the flat "Est. cost/person/month"
             // was left blank (e.g. JS off), persist the built-up monthly figure so
             // the stored budgeted_cost matches the build-up shown on the form.

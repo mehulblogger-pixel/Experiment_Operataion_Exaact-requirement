@@ -535,6 +535,17 @@ table.dt.qlines .btn.small{white-space:nowrap}
   .app .container{margin:18px auto;padding:0 16px}
 }
 @media(max-width:560px){
+  /* EVERY page could be dragged 6px sideways on a phone — against the
+     blueprint's "no sideways scrolling" rule. The cause is here, not in the
+     navigation drawer: the top bar is a non-wrapping flex row with 20px side
+     padding, and its right-hand cluster (the user chip and Logout) has no room
+     to give, so it ran past the edge. Trimming the padding and letting the
+     cluster shrink puts it back inside. min-width:0 is what actually permits a
+     flex item to shrink below its content width. */
+  .topbar-slim{padding:10px 12px;gap:8px 10px;flex-wrap:wrap}
+  .tb-user{gap:8px 10px;flex-wrap:wrap;justify-content:flex-end}
+  .tb-user a{font-size:12.5px}
+  .tb-spacer{flex-basis:100%;height:0}   /* pushes the user cluster onto its own row */
   .kpi-row{grid-template-columns:1fr}
   .qcards{grid-template-columns:repeat(2,1fr)}
   .tb-chip{display:none}

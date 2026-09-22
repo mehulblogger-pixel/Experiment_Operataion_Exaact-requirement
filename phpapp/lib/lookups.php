@@ -75,6 +75,10 @@ function lk_migrate() {
         'RATES'       => 'Agree rates',
         'PO_CHASE'    => 'Chase the purchase order',
     ]);
+    // Requirement vocabulary — duty hours and allowances were free-text boxes,
+    // so one roster was written a dozen ways and no report could group them.
+    if (defined('REQ_DUTY_HOURS')) lk_ensure_type_map('req_duty_hours', 'Duty hours / roster', REQ_DUTY_HOURS, 'People');
+    if (defined('REQ_ALLOWANCES')) lk_ensure_type_map('req_allowance', 'Allowance', REQ_ALLOWANCES, 'People');
     if (defined('IDDOC_KINDS')) lk_ensure_type_map('identity_doc', 'Identity document', IDDOC_KINDS);
     if (defined('AUDIT_CLAUSES')) lk_ensure_type_map('audit_clause', 'Standard clause (internal audit)', AUDIT_CLAUSES);
     // back-fill any newly-added coded values into existing lists (idempotent)

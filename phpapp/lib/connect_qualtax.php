@@ -286,9 +286,22 @@ function connect_qualtax_bands() {
     return ['SCHOOL','ITI','APPRENTICE','VOCATIONAL','DIPLOMA','DEGREE','PG','DOCTORATE','PROFESSIONAL'];
 }
 
-/** Manage gate — mirrors Lookups: admins configure the masters. No new permission. */
+/**
+ * Manage gate — mirrors Lookups: admins configure the masters. No new permission.
+ *
+ * These masters (certifications, qualification levels, trades, roles, families)
+ * are seeded into EVERY workspace at boot, and recruitment now reads the
+ * certification and qualification ladders on the requirement form — so a company
+ * that runs recruitment without the Marketplace must still be able to maintain
+ * them. Gating on Marketplace alone left them read-only for exactly the people
+ * who use them most, and pushed recruitment into keeping a second, divergent
+ * copy of the same certificate names. Either module opens the editor; neither
+ * grants a new permission — it is still admin-level only.
+ */
 function connect_qualtax_manage_can() {
-    if (function_exists('connect_enabled') && !connect_enabled()) return false;
+    $viaConnect = !function_exists('connect_enabled') || connect_enabled();
+    $viaHr      = function_exists('licence_enabled') ? licence_enabled('hr') : true;
+    if (!$viaConnect && !$viaHr) return false;
     return function_exists('is_admin_level') && is_admin_level();
 }
 

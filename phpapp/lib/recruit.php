@@ -42,6 +42,15 @@ function req_migrate() {
         ['contract_ref',"VARCHAR(120) DEFAULT ''"],
         // Position
         ['quantity','INT DEFAULT 1'], ['discipline',"VARCHAR(120) DEFAULT ''"], ['category',"VARCHAR(120) DEFAULT ''"],
+        //  The SAME masters the people register uses. Until now a requirement
+        //  typed its discipline as free text while every engineer on the books
+        //  carried a trade_id from the Trade list, so "who on our books fits
+        //  this requirement?" could never be answered — the words never lined
+        //  up. These two columns link the requirement to those masters.
+        //  Additive and nullable: the free-text columns above are kept in step
+        //  (the label is written to both), so every existing requirement still
+        //  loads, still saves, and nothing that reads `discipline` breaks.
+        ['trade_id','INT NULL'], ['skill_id','INT NULL'],
         // M3 — the canonical Department relationship, alongside the free-text
         // column rather than instead of it (see docs/phase2/M3-REQUISITION-STRUCTURE.md).
         ['department_id','INT NULL'],
@@ -231,7 +240,7 @@ function recruit_cand_code($req) {
 // form, the handler and the detail stay in step.
 function req_extra_fields() {
     return ['client_id','contact_name','contact_email','contact_phone','contract_ref','po_ref',
-        'quantity','discipline','category','skills','qualification','experience_min','relevant_experience',
+        'quantity','discipline','category','trade_id','skill_id','skills','qualification','experience_min','relevant_experience',
         'start_date','end_date','duty_hours','shift','work_model','deploy_location',
         'prov_travel','prov_accommodation','prov_food','prov_food_by','prov_accom_by','prov_travel_by','prov_local_by','other_allowances',
         'sel_client_interview','sel_tech_interview','sel_hr_interview','client_approval_req','training_req',
@@ -243,6 +252,144 @@ function req_extra_fields() {
         'recruiter_id','manager_id','department','department_id',
         // Auto job-description — free-text key responsibilities feed the generator.
         'responsibilities'];
+}
+
+// ============================================================================
+//  REQUIREMENT VOCABULARY — one set of words for a requirement and a person
+//
+//  A requirement asks for a discipline, a speciality, certificates and a
+//  qualification. So does every engineer's record. Until now the requirement
+//  typed those four as free text while the people register picked them from
+//  masters, so the two could never be compared: one recruiter wrote "Welding",
+//  the next "welding insp", a third "CSWIP", and the matching engine — which
+//  ranks people by trade_id (see workforce_matches()) — had nothing to match
+//  against.
+//
+//  Nothing new is invented here. Every list below already exists in the
+//  product and is already seeded in every workspace:
+//     Discipline   → the "Trade / discipline" lookup   (9 disciplines)
+//     Speciality   → the "Skill" lookup, child of it   (~80, cascading)
+//     Certificates → cx_prof_certifications            (30, with issuing body)
+//     Qualification→ cx_qualification_levels           (20, NSQF-banded)
+//
+//  The last two were reachable only through the Marketplace module. They are
+//  seeded at boot for every workspace regardless (db.php → connect_qualtax_seed),
+//  so reading them here adds no data and no dependency — it stops a recruitment
+//  workspace from keeping a second, divergent copy of the same certificate names.
+//
+//  Every one of these stays TYPEABLE on the form. Requirements raised before
+//  this hold free text; a strict list would either reject that or silently drop
+//  it, and the rule for this codebase is no destructive migration. So the list
+//  is offered, the typed value is still accepted, and old records are untouched.
+// ============================================================================
+
+// Discipline — [value-id => label] from the Trade list. Same keying as
+// inspectors.trade_id, which is the whole point.
+function req_trade_options() { return function_exists('trade_options') ? trade_options() : []; }
+
+// Speciality — skills grouped under their parent discipline, for the cascading
+// second dropdown. [trade-value-id => [ ['id'=>…, 'label'=>…], … ]]
+function req_skills_by_trade() { return function_exists('skills_by_trade') ? skills_by_trade() : []; }
+
+// Professional certificates — [code => "Name (issuing body)"]. Read straight
+// from the taxonomy master; empty (so the field simply stays free text) on an
+// install where the seed has not run.
+function req_cert_options() {
+    static $cache = null, $at = -1;
+    if ($cache !== null && $at === db_epoch()) return $cache;
+    $at = db_epoch(); $out = [];
+    try {
+        foreach (db()->query("SELECT code,name,body FROM cx_prof_certifications WHERE COALESCE(is_active,1)=1 ORDER BY sort_order, id")->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+            $code = trim((string)($r['code'] ?? '')); $name = trim((string)($r['name'] ?? ''));
+            if ($code === '' || $name === '') continue;
+            $body = trim((string)($r['body'] ?? ''));
+            $out[$code] = $body !== '' ? "$name — $body" : $name;
+        }
+    } catch (Throwable $e) { /* taxonomy not present on this install — stay quiet */ }
+    return $cache = $out;
+}
+
+// Certificate code → its plain name, for turning stored codes back into words.
+function req_cert_label($code) {
+    $code = trim((string)$code);
+    if ($code === '') return '';
+    $o = req_cert_options();
+    if (!isset($o[$code])) return $code;              // typed, not from the list
+    $l = $o[$code];
+    $cut = strpos($l, ' — ');
+    return $cut === false ? $l : substr($l, 0, $cut);
+}
+
+// Qualification level — [code => "Name (band)"], NSQF-banded ladder.
+function req_qual_options() {
+    static $cache = null, $at = -1;
+    if ($cache !== null && $at === db_epoch()) return $cache;
+    $at = db_epoch(); $out = [];
+    try {
+        foreach (db()->query("SELECT code,name,band FROM cx_qualification_levels WHERE COALESCE(is_active,1)=1 ORDER BY sort_order, id")->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+            $code = trim((string)($r['code'] ?? '')); $name = trim((string)($r['name'] ?? ''));
+            if ($code === '' || $name === '') continue;
+            $out[$code] = $name;
+        }
+    } catch (Throwable $e) { /* taxonomy not present on this install — stay quiet */ }
+    return $cache = $out;
+}
+
+// Duty hours and allowances were free-text boxes, so the same roster was
+// written a dozen ways and no report could group them. Short editable lists,
+// seeded on first run; the field stays typeable for the roster nobody foresaw.
+const REQ_DUTY_HOURS = [
+    '8H6D'  => '8 hours / 6 days',  '8H5D'  => '8 hours / 5 days',
+    '9H6D'  => '9 hours / 6 days',  '10H6D' => '10 hours / 6 days',
+    '12H6D' => '12 hours / 6 days', '12H7D' => '12 hours / 7 days (rotating)',
+    'SHIFT' => 'As per site shift roster',
+];
+const REQ_ALLOWANCES = [
+    'SITE'     => 'Site allowance',       'OT'       => 'Overtime as per policy',
+    'SHIFT'    => 'Shift allowance',      'OFFSHORE' => 'Offshore / hardship allowance',
+    'PER_DIEM' => 'Per diem',             'MOBILE'   => 'Mobile / communication',
+    'NONE'     => 'None',
+];
+function req_duty_hours_options() { return function_exists('lk_options_or') ? lk_options_or('req_duty_hours', REQ_DUTY_HOURS) : REQ_DUTY_HOURS; }
+function req_allowance_options()  { return function_exists('lk_options_or') ? lk_options_or('req_allowance',  REQ_ALLOWANCES)  : REQ_ALLOWANCES; }
+
+/**
+ * Keep the free-text columns in step with the new linked ones.
+ *
+ * Called on every requirement save. When the form posted a discipline or
+ * speciality from the list, the LABEL is written to the old text column too, so
+ * every existing reader (the list screen, exports, the job-description
+ * generator, the careers posting) keeps working untouched and shows words
+ * rather than a number. When nothing was picked from the list — an old record
+ * being re-saved, or a value typed by hand — the text is left exactly as it
+ * came in and the link column is cleared rather than guessed at.
+ */
+function req_vocab_sync(array $b) {
+    $tradeId = (int)($b['trade_id'] ?? 0);
+    $skillId = (int)($b['skill_id'] ?? 0);
+
+    if ($tradeId > 0) {
+        $label = req_trade_options()[$tradeId] ?? '';
+        if ($label !== '') $b['discipline'] = $label;
+        else $tradeId = 0;                       // id no longer in the list — do not store a dangling link
+    }
+    if ($skillId > 0) {
+        $found = '';
+        foreach (req_skills_by_trade() as $parent => $rows) {
+            foreach ($rows as $r) if ((int)$r['id'] === $skillId) {
+                // A speciality belonging to a different discipline is not a
+                // speciality of THIS requirement — refuse it rather than store
+                // a pairing the master says is impossible.
+                if ($tradeId > 0 && (int)$parent !== $tradeId) break 2;
+                $found = (string)$r['label']; break 2;
+            }
+        }
+        if ($found !== '') $b['category'] = $found;
+        else $skillId = 0;
+    }
+    $b['trade_id'] = $tradeId ?: null;
+    $b['skill_id'] = $skillId ?: null;
+    return $b;
 }
 
 // Duration in months from an explicit value, else derived from start/end dates.

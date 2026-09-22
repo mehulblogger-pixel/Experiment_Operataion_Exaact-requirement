@@ -1,8 +1,13 @@
 <?php
-// Requirement form — Simple / Advanced progressive disclosure (Phase 2).
-// Essential fields are always visible; the Advanced switch reveals the full
-// position / deployment / selection / compliance detail. Every field is
-// backward-compatible: an old requisition simply has the new fields empty.
+// Requirement form — five steps, phone first.
+//   Position · Where & when · Selection · Commercial · Approval
+// Only the first step is needed to save; a requirement with a designation and a
+// headcount is a usable draft. Within each step, genuinely rare fields sit
+// behind that step's own "More detail" button. This replaced a Simple/Advanced
+// switch that still put ~60 fields, the whole cost build-up and a required
+// approval reference on one page with the only Save button below all of them.
+// Every field is backward-compatible: an old requisition simply has the newer
+// fields empty, and typed values are never rewritten into coded ones.
 $r = $req ?? [];
 $isEdit = !empty($req['id']);
 $v = fn($k, $d = '') => e($r[$k] ?? $d);
@@ -12,24 +17,102 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
 ?>
 <?php if (!empty($form_err)): ?><div class="msg msg-error" style="margin:10px 0"><?= e($form_err) ?></div><?php endif; ?>
 <style>
-  .rq-modebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 16px}
-  .rq-seg{display:inline-flex;border:1px solid var(--line,#e5e7eb);border-radius:9px;overflow:hidden;background:var(--card,#fff)}
-  .rq-seg button{border:0;background:transparent;padding:8px 16px;font-size:13px;font-weight:600;color:var(--muted,#656e7a);cursor:pointer}
-  .rq-seg button.on{background:var(--brand,#1e40af);color:#fff}
-  .rq-modebar .hint{font-size:12.5px;color:var(--muted,#656e7a)}
-  .rq-sec{border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:4px 16px 16px;margin:14px 0;background:var(--card,#fff)}
-  .rq-sec > h3{font-size:13.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted,#656e7a);margin:14px 0 4px;display:flex;align-items:center;gap:8px}
-  .rq-sec > h3 .num{font-family:ui-monospace,monospace;font-size:11px;background:var(--soft,#eef2f7);border-radius:20px;padding:1px 8px;color:var(--brand,#1e40af)}
-  .rq-chk{display:flex;flex-wrap:wrap;gap:8px 18px}
-  .rq-chk label{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:500;color:var(--ink,#1f2937)}
-  .rq-chk input{width:16px;height:16px}
-  /* Advanced-only sections/fields hidden until the Advanced mode is on */
-  form.rq-simple .rq-adv{display:none}
+  /* ---------------------------------------------------------------------
+     REQUIREMENT FORM — five steps, phone first.
+     Was one page of ~60 fields with the Save button below all of them.
+     docs/05-ui-ux-blueprint.md: "Break long forms into steps. Always show
+     progress." and "Never reduce body text below 16px on mobile."
+     The stepper is a PROGRESSIVE ENHANCEMENT: the .rq-wiz class is added by
+     script, so with scripting off every step stays visible and the form
+     still saves exactly as it always did.
+     --------------------------------------------------------------------- */
+
+  /* ---- step rail ---- */
+  .rq-steps{display:flex;gap:4px;margin:14px 0 6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .rq-steps::-webkit-scrollbar{display:none}
+  .rq-steps button{flex:1 0 auto;min-width:104px;min-height:56px;border:0;background:transparent;
+    padding:6px 10px;cursor:pointer;text-align:left;border-bottom:3px solid var(--line,#e5e7eb);
+    display:flex;flex-direction:column;gap:2px;color:var(--muted,#656e7a);font:inherit}
+  .rq-steps button .k{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .rq-steps button .t{font-size:14.5px;font-weight:600;color:var(--ink,#1f2937);white-space:nowrap}
+  .rq-steps button.on{border-bottom-color:var(--brand,#1e40af);color:var(--brand,#1e40af)}
+  .rq-steps button.on .t{color:var(--brand,#1e40af)}
+  .rq-steps button.done .k::after{content:" ✓";color:var(--green,#16a34a)}
+  .rq-bar{height:4px;border-radius:4px;background:var(--line,#e5e7eb);overflow:hidden;margin:0 0 4px}
+  .rq-bar i{display:block;height:100%;background:var(--brand,#1e40af);transition:width .2s ease;width:20%}
+  .rq-count{font-size:13px;color:var(--muted,#656e7a);margin:0 0 12px}
+  @media (prefers-reduced-motion: reduce){ .rq-bar i{transition:none} }
+
+  /* ---- sections ---- */
+  .rq-sec{border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:4px 16px 18px;margin:14px 0;background:var(--card,#fff)}
+  .rq-sec > h3{font-size:13.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted,#656e7a);margin:16px 0 4px;display:flex;align-items:center;gap:8px}
+  .rq-sec > h3 .num{font-family:ui-monospace,monospace;font-size:11.5px;background:var(--soft,#eef2f7);border-radius:20px;padding:2px 9px;color:var(--brand,#1e40af)}
+  .rq-sec .optional{margin-left:auto;font-size:11.5px;letter-spacing:0;text-transform:none;color:var(--muted,#656e7a);font-weight:400}
+  form.rq-wiz .rq-sec[data-step]{display:none}
+  form.rq-wiz .rq-sec[data-step].on{display:block}
+
+  /* ---- readable on a phone (blueprint: never below 16px) ---- */
+  @media(max-width:760px){
+    .rq-sec label,.rq-chk label{font-size:16px}
+    .rq-sec .form-control{font-size:16px}          /* also stops iOS zooming on focus */
+    .rq-sec small.muted,.rq-sec .muted{font-size:13.5px}
+    .rq-sec{padding:4px 13px 16px;border-radius:12px}
+  }
+
+  .rq-chk{display:flex;flex-wrap:wrap;gap:10px 18px}
+  .rq-chk label{display:inline-flex;align-items:center;gap:9px;font-size:14.5px;font-weight:500;color:var(--ink,#1f2937);
+    min-height:44px;padding:2px 0}                  /* gloves: a tappable row, not a 16px box */
+  .rq-chk input{width:20px;height:20px;flex:0 0 auto}
+
+  /* ---- footer: Save is reachable from step 1, and always in reach ---- */
+  .rq-foot{position:sticky;bottom:0;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    margin-top:14px;padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px));
+    background:linear-gradient(to top,var(--bg,#f7f9fc) 62%,transparent)}
+  .rq-foot .btn{min-height:48px;font-size:15px}
+  /* .btn declares its own display, which beats the [hidden] attribute's
+     UA rule — so "Back" stayed on screen on step 1 until this said otherwise. */
+  .rq-foot .btn[hidden]{display:none}
+  .rq-foot .spacer{flex:1 1 auto}
+  .rq-foot .why{font-size:13px;color:var(--muted,#656e7a);flex-basis:100%;margin:0}
+  @media(max-width:560px){
+    .rq-foot .btn{flex:1 1 46%}
+    .rq-foot .spacer{display:none}
+  }
+
+  /* ---- certificate chips ---- */
+  .rq-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;min-height:4px}
+  .rq-chips .chip{display:inline-flex;align-items:center;gap:7px;background:var(--soft,#eef2f7);
+    border:1px solid var(--line,#e5e7eb);border-radius:20px;padding:5px 7px 5px 12px;font-size:13.5px}
+  .rq-chips .chip button{border:0;background:transparent;cursor:pointer;color:var(--muted,#656e7a);
+    font-size:16px;line-height:1;min-width:28px;min-height:28px;border-radius:50%}
+  .rq-chips .chip button:hover{background:var(--line,#e5e7eb);color:var(--red,#dc2626)}
+
+  /* ---- deployment groups: a table on a laptop, cards on a phone ---- */
+  #rq_groups{width:100%}
+  @media(max-width:760px){
+    #rq_groups thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+    #rq_groups,#rq_groups tbody,#rq_groups tr,#rq_groups td{display:block;width:auto}
+    #rq_groups tr.rqg-row{border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:10px 12px;margin:0 0 10px;position:relative;background:var(--card,#fff)}
+    #rq_groups td{border:0;padding:6px 0}
+    #rq_groups td::before{content:attr(data-l);display:block;font-size:12.5px;font-weight:600;
+      color:var(--muted,#656e7a);margin-bottom:4px}
+    #rq_groups td.num{position:absolute;top:6px;right:8px;padding:0}
+    #rq_groups td.num::before{content:none}
+    #rq_groups input[name="group_headcount[]"]{width:100%!important}
+  }
+
+  /* ---- rare fields, tucked behind each step's own "More detail" ----
+     Scoped to the section, so opening detail on Commercial does not also
+     unfold it on Position. Only applies once scripting has added .rq-wiz —
+     with scripting off every field is visible, as it was before. */
+  form.rq-wiz .rq-sec:not(.rq-show-adv) .rq-adv{display:none}
+
+  /* ---- commercial preview ---- */
   .rq-calc{background:var(--soft,#f5f8fc);border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:14px 16px;margin-top:6px}
   .rq-calc .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-  .rq-calc .c{text-align:left} .rq-calc .c .l{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted,#656e7a)}
+  .rq-calc .c{text-align:left} .rq-calc .c .l{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted,#656e7a)}
   .rq-calc .c .n{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums} .rq-calc .c .n.good{color:var(--green,#16a34a)} .rq-calc .c .n.bad{color:var(--red,#dc2626)}
-  .rq-calc .note{font-size:12px;color:var(--muted,#656e7a);margin-top:8px}
+  .rq-calc .note{font-size:12.5px;color:var(--muted,#656e7a);margin-top:8px}
   @media(max-width:720px){ .rq-calc .row{grid-template-columns:repeat(2,1fr)} }
   /* Cost build-up */
   .rq-cost{border:1px dashed var(--line,#e5e7eb);border-radius:12px;padding:12px 14px;background:var(--soft,#f7f9fc)}
@@ -38,9 +121,9 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   .rq-cost .ff[data-head][hidden]{display:none}
   .rq-bu{margin-top:10px;border-top:1px solid var(--line,#e5e7eb);padding-top:10px}
   .rq-bu .bu-lines{display:flex;flex-direction:column;gap:3px}
-  .rq-bu .bu-lines .li{display:flex;justify-content:space-between;font-size:13px;color:var(--ink,#334155)}
+  .rq-bu .bu-lines .li{display:flex;justify-content:space-between;font-size:13.5px;color:var(--ink,#334155)}
   .rq-bu .bu-lines .li i{color:var(--muted,#656e7a);font-style:normal}
-  .rq-bu .bu-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:7px;font-size:13.5px;font-weight:600}
+  .rq-bu .bu-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:7px;font-size:14px;font-weight:600}
   .rq-bu .bu-total b{font-size:18px;color:var(--brand,#1e40af);font-variant-numeric:tabular-nums}
   #rq_cost_auto{cursor:pointer;text-decoration:underline;color:var(--brand,#1e40af)}
 </style>
@@ -51,17 +134,26 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
       // request, and it is not a marketplace requirement.
       $RL = function_exists('hreq_label') ? hreq_label('requisition') : 'Recruitment Requisition'; ?>
 <h1><?= $isEdit ? 'Edit ' . e(mb_strtolower($RL)) . ' ' . e($req['req_code']) : 'New ' . e(mb_strtolower($RL)) ?></h1>
-<p class="sub">Approved positions to recruit against. Start in <b>Simple</b> for an ordinary hire; switch to <b>Advanced</b> for full technical, deployment and commercial detail.</p>
+<p class="sub">Approved positions to recruit against. Five short steps — only the first is needed to save; the rest can follow.</p>
 
-<form method="post" action="<?= $isEdit ? '/requisition-edit?id='.(int)$req['id'] : '/requisition-new' ?>" class="rq-simple" id="rqForm">
-  <div class="rq-modebar">
-    <span class="rq-seg"><button type="button" class="on" data-mode="simple">Simple</button><button type="button" data-mode="advanced">Advanced</button></span>
-    <span class="hint">Simple asks only the essentials. Advanced reveals discipline, deployment, selection, compliance and commercials.</span>
+<form method="post" action="<?= $isEdit ? '/requisition-edit?id='.(int)$req['id'] : '/requisition-new' ?>" id="rqForm">
+  <?php // Five named steps. Only the first is required to save — a requirement
+        // with a designation and a headcount is a usable draft, and the rest can
+        // follow. Steps 3-5 are marked optional on the rail itself so nobody
+        // hunts for a field that was never needed. ?>
+  <div class="rq-steps" role="tablist" aria-label="Requirement steps">
+    <button type="button" class="on" data-step="1" role="tab" aria-selected="true"><span class="k">Step 1</span><span class="t">Position</span></button>
+    <button type="button" data-step="2" role="tab" aria-selected="false"><span class="k">Step 2</span><span class="t">Where &amp; when</span></button>
+    <button type="button" data-step="3" role="tab" aria-selected="false"><span class="k">Step 3</span><span class="t">Selection</span></button>
+    <button type="button" data-step="4" role="tab" aria-selected="false"><span class="k">Step 4</span><span class="t">Commercial</span></button>
+    <button type="button" data-step="5" role="tab" aria-selected="false"><span class="k">Step 5</span><span class="t">Approval</span></button>
   </div>
+  <div class="rq-bar" aria-hidden="true"><i id="rq_bar_i"></i></div>
+  <p class="rq-count" id="rq_count">Step 1 of 5 — Position. You can save after this step; the rest can follow.</p>
 
   <?php // §15 — paste a requirement, let AI extract the fields (human always reviews).
   if (function_exists('ai_enabled') && ai_enabled()): ?>
-  <div class="rq-sec" style="border-color:#c7d2fe;background:#eef2ff">
+  <div class="rq-sec on" data-step="1" style="border-color:#c7d2fe;background:#eef2ff">
     <h3 style="color:#3730a3"><span class="num" style="background:#e0e7ff;color:#3730a3">✨</span> Paste a requirement — let AI fill the form</h3>
     <p class="sub" style="margin:0 0 8px">Paste the client's email, job description or WhatsApp message. AI extracts the fields for you to <b>review before saving</b> — it never creates the requirement itself.</p>
     <textarea class="form-control" id="ai_src" rows="4" placeholder="e.g. We need 5 senior welding inspectors (CSWIP 3.1) at our Dahej site for 12 months, day shift; gate pass and medical required; rate around 90k per month…"></textarea>
@@ -88,7 +180,9 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
         if(!d||!d.ok){ msg.textContent=(d&&d.error)||'Could not extract — fill the form manually.'; return; }
         var f=d.fields||{}, n=0;
         ['designation','quantity','discipline','category','skills','qualification','experience_min','project_site','deploy_location','work_model','start_date','end_date','duty_hours','shift','billing_rate','rate_basis','contact_name','contact_phone','notes'].forEach(function(k){ if(f[k]!==undefined&&String(f[k])!==''){ setField(k,f[k]); n++; } });
-        form.classList.remove('rq-simple'); var segs=form.querySelectorAll('.rq-seg button'); for(var j=0;j<segs.length;j++){ segs[j].classList.toggle('on', segs[j].dataset.mode==='advanced'); }
+        // AI fills fields across several steps — show the detail fields and
+        // let the reviewer walk every step rather than land on one of them.
+        if (form.rqShowAllSteps) form.rqShowAllSteps();
         msg.innerHTML='<b style="color:#3730a3">AI filled '+n+' field(s)</b> — please review every field before saving.';
       }).catch(function(){ go.disabled=false; msg.textContent='Network error — try again.'; });
     });
@@ -97,15 +191,23 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   <?php endif; ?>
 
   <!-- ===== 1 · Client & position ===== -->
-  <div class="rq-sec">
+  <div class="rq-sec on" data-step="1">
     <h3><span class="num">1</span> Client &amp; position</h3>
+    <p class="sub" style="margin:0 0 4px;font-size:13.5px">Who it is for, and what you are recruiting.</p>
     <div class="form-grid">
       <div class="ff"><label>Type *</label><select class="form-control" name="req_type" id="rq_type"><?php foreach (lk_options_or('requisition_type', REQ_TYPES) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('req_type',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
       <div class="ff rq-adv" id="rq_out" style="<?= (($r['req_type'] ?? '')==='REPLACEMENT')?'':'display:none' ?>"><label>Replacing (engineer who left)</label>
         <select class="form-control searchable" name="outgoing_inspector_id"><option value="">—</option><?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" <?= $sel('outgoing_inspector_id',$i['id']) ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?></option><?php endforeach; ?></select></div>
       <div class="ff rq-adv"><label>Client <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label><select class="form-control searchable" name="client_id"><option value="">—</option><?php foreach (($clients ?? []) as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= $sel('client_id',$cl['id']) ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?></select>
         <small class="muted">No PO yet? Add the client here — details can follow.</small></div>
-      <div class="ff rq-adv"><label>Client contact</label><input class="form-control" name="contact_name" value="<?= $v('contact_name') ?>" placeholder="Name at the client"></div>
+      <?php // The client's own contacts are already on file and already fetched for
+        // the deployment-groups table below. Offering them here stops the same
+        // person being re-typed (and misspelled) at the top of the form.
+        $rqCC = []; foreach (($clientContacts ?? []) as $cc) $rqCC[] = (string)$cc['name']; ?>
+      <div class="ff rq-adv"><label>Client contact</label>
+        <input class="form-control" name="contact_name" id="rq_contact_name" value="<?= $v('contact_name') ?>" list="rq_cc_list" placeholder="Name at the client">
+        <datalist id="rq_cc_list"><?php foreach ($rqCC as $n): ?><option value="<?= e($n) ?>"></option><?php endforeach; ?></datalist>
+      </div>
       <div class="ff rq-adv"><label>Contact email</label><input class="form-control" type="email" name="contact_email" value="<?= $v('contact_email') ?>"></div>
       <div class="ff rq-adv"><label>Contact phone</label><input class="form-control" name="contact_phone" value="<?= $v('contact_phone') ?>"></div>
       <div class="ff rq-adv"><label>Contract number</label><input class="form-control" name="contract_ref" value="<?= $v('contract_ref') ?>" placeholder="Contract no. (if any)"></div>
@@ -146,8 +248,8 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
             <?php $gs = $groups ?? []; if (!$gs) $gs = [[]];
                   foreach ($gs as $g): ?>
               <tr class="rqg-row">
-                <td><input class="form-control" type="number" min="0" name="group_headcount[]" value="<?= e($g['headcount'] ?? '') ?>" style="width:76px"></td>
-                <td>
+                <td data-l="How many"><input class="form-control" type="number" min="0" name="group_headcount[]" value="<?= e($g['headcount'] ?? '') ?>" style="width:76px"></td>
+                <td data-l="Reports to (client contact)">
                   <select class="form-control rqg-contact" name="group_contact_id[]">
                     <option value="">— pick, or type below —</option>
                     <?php foreach (($clientContacts ?? []) as $cc): ?><option value="<?= (int)$cc['id'] ?>" <?= (int)($g['report_contact_id'] ?? 0)===(int)$cc['id']?'selected':'' ?>><?= e($cc['name']) ?><?= $cc['designation']?' · '.e($cc['designation']):'' ?><?= $cc['mobile']?' · '.e($cc['mobile']):'' ?></option><?php endforeach; ?>
@@ -158,8 +260,8 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
                     <input class="form-control" name="group_report_email[]" value="<?= e($g['report_email'] ?? '') ?>" placeholder="email">
                   </div>
                 </td>
-                <td><input class="form-control" name="group_site[]" value="<?= e($g['site'] ?? '') ?>" placeholder="site"></td>
-                <td><input class="form-control" name="group_notes[]" value="<?= e($g['notes'] ?? '') ?>"></td>
+                <td data-l="Site / location"><input class="form-control" name="group_site[]" value="<?= e($g['site'] ?? '') ?>" placeholder="site"></td>
+                <td data-l="Notes"><input class="form-control" name="group_notes[]" value="<?= e($g['notes'] ?? '') ?>"></td>
                 <td class="num"><button type="button" class="btn small secondary rqg-del" title="Remove">✕</button></td>
               </tr>
             <?php endforeach; ?>
@@ -206,28 +308,121 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
         });
         recomputeTotal();
       })();</script>
-      <div class="ff rq-adv"><label>Discipline</label><input class="form-control" name="discipline" value="<?= $v('discipline') ?>" placeholder="e.g. Welding, NDT, Coating"></div>
-      <div class="ff rq-adv"><label>Category / sub-category</label><input class="form-control" name="category" value="<?= $v('category') ?>" placeholder="e.g. Static equipment"></div>
-      <div class="ff rq-adv"><label>Qualification</label><input class="form-control" name="qualification" value="<?= $v('qualification') ?>" placeholder="e.g. B.E. Mechanical"></div>
-      <div class="ff rq-adv"><label>Skills / certifications</label><input class="form-control" name="skills" value="<?= $v('skills') ?>" placeholder="e.g. CSWIP 3.1, NDT UT-II"></div>
+      <?php
+        //  DISCIPLINE & SPECIALITY — the two fields that decide whether this
+        //  requirement can ever be matched against the people on our books.
+        //  Both come from the SAME masters the people register uses, so
+        //  "Welding" on a requirement is the same "Welding" on an engineer.
+        //  They are no longer Advanced-only: without them the match is blind.
+        //
+        //  Every list here stays TYPEABLE. Requirements raised before this hold
+        //  free text, and a strict list would either reject it or drop it — so
+        //  choosing "Something else" reveals the old box, the typed words are
+        //  saved exactly as before, and no historical record is touched.
+        $rqTrades   = function_exists('req_trade_options')   ? req_trade_options()   : [];
+        $rqSkills   = function_exists('req_skills_by_trade') ? req_skills_by_trade() : [];
+        $rqTradeId  = (int)($r['trade_id'] ?? 0);
+        $rqSkillId  = (int)($r['skill_id'] ?? 0);
+        // An older requirement carries words but no link — keep the words visible.
+        $rqFreeDisc = ($rqTradeId === 0 && trim((string)($r['discipline'] ?? '')) !== '');
+        $rqFreeCat  = ($rqSkillId === 0 && trim((string)($r['category']   ?? '')) !== '');
+      ?>
+      <?php if ($rqTrades): ?>
+      <div class="ff"><label>Discipline <span class="muted">— what kind of work</span></label>
+        <select class="form-control" name="trade_id" id="rq_trade">
+          <option value="">— choose —</option>
+          <?php foreach ($rqTrades as $tid => $tlabel): ?>
+            <option value="<?= (int)$tid ?>" <?= $rqTradeId === (int)$tid ? 'selected' : '' ?>><?= e($tlabel) ?></option>
+          <?php endforeach; ?>
+          <option value="0" <?= $rqFreeDisc ? 'selected' : '' ?>>Something else — type it</option>
+        </select>
+        <div id="rq_disc_free" style="<?= $rqFreeDisc ? 'margin-top:6px' : 'display:none' ?>">
+          <input class="form-control" name="discipline" value="<?= $v('discipline') ?>" placeholder="e.g. Welding, NDT, Coating">
+          <small class="muted">Not on the list? Type it here, then ask your administrator to add it under Masters.</small>
+        </div>
+      </div>
+      <div class="ff"><label>Speciality <span class="muted">— narrows the discipline</span></label>
+        <select class="form-control" name="skill_id" id="rq_skill">
+          <option value="">— choose a discipline first —</option>
+        </select>
+        <div id="rq_cat_free" style="<?= $rqFreeCat ? 'margin-top:6px' : 'display:none' ?>">
+          <input class="form-control" name="category" value="<?= $v('category') ?>" placeholder="e.g. Pressure Vessels">
+        </div>
+      </div>
+      <script>window.RQ_SKILLS = <?= json_encode($rqSkills, JSON_UNESCAPED_UNICODE) ?>;
+              window.RQ_SKILL_SEL = <?= (int)$rqSkillId ?>;</script>
+      <?php else: /* no Trade list configured on this workspace — the old boxes, unchanged */ ?>
+      <div class="ff"><label>Discipline</label><input class="form-control" name="discipline" value="<?= $v('discipline') ?>" placeholder="e.g. Welding, NDT, Coating"></div>
+      <div class="ff"><label>Category / sub-category</label><input class="form-control" name="category" value="<?= $v('category') ?>" placeholder="e.g. Static equipment"></div>
+      <?php endif; ?>
+
+      <?php // Qualification — the NSQF-banded ladder already seeded in every
+            // workspace. Typeable, for the degree nobody listed. ?>
+      <?php $rqQuals = function_exists('req_qual_options') ? req_qual_options() : []; ?>
+      <div class="ff rq-adv"><label>Minimum qualification</label>
+        <input class="form-control" name="qualification" value="<?= $v('qualification') ?>" list="rq_qual_list" placeholder="e.g. B.E. Mechanical">
+        <?php if ($rqQuals): ?><datalist id="rq_qual_list"><?php foreach ($rqQuals as $qlabel): ?><option value="<?= e($qlabel) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
+      </div>
+
+      <?php
+        //  CERTIFICATES — was one free-text box, so "CSWIP 3.1", "cswip3.1" and
+        //  "CSWIP Level 3.1" were three different requirements to the system.
+        //  Now picked from the certification master (30 certificates with their
+        //  issuing bodies), shown as removable chips. Still stored in the same
+        //  `skills` text column, comma-separated, so every existing reader —
+        //  the job-description generator, the careers posting, exports — keeps
+        //  working with no change, and anything typed before is left alone.
+        $rqCerts = function_exists('req_cert_options') ? req_cert_options() : [];
+        $rqHave  = array_values(array_filter(array_map('trim', explode(',', (string)($r['skills'] ?? '')))));
+      ?>
+      <div class="ff ff-wide rq-adv"><label>Certificates required</label>
+        <?php if ($rqCerts): ?>
+          <select class="form-control" id="rq_cert_pick">
+            <option value="">+ add a certificate…</option>
+            <?php foreach ($rqCerts as $ccode => $clabel): ?><option value="<?= e($clabel) ?>"><?= e($clabel) ?></option><?php endforeach; ?>
+          </select>
+          <div class="rq-chips" id="rq_cert_chips"></div>
+          <input type="hidden" name="skills" id="rq_skills_val" value="<?= $v('skills') ?>">
+          <script>window.RQ_CERTS_HAVE = <?= json_encode($rqHave, JSON_UNESCAPED_UNICODE) ?>;</script>
+          <small class="muted">Pick as many as the role needs. Maintained under Admin → Qualifications &amp; certifications.</small>
+        <?php else: ?>
+          <input class="form-control" name="skills" value="<?= $v('skills') ?>" placeholder="e.g. CSWIP 3.1, NDT UT-II">
+        <?php endif; ?>
+      </div>
       <div class="ff rq-adv"><label>Experience (min years)</label><input class="form-control" type="number" step="0.5" name="experience_min" value="<?= $v('experience_min') ?>"></div>
       <div class="ff rq-adv"><label>Relevant experience</label><input class="form-control" name="relevant_experience" value="<?= $v('relevant_experience') ?>" placeholder="in the required scope"></div>
       <div class="ff rq-adv" style="grid-column:1/-1"><label>Key responsibilities</label><textarea class="form-control" name="responsibilities" rows="3" placeholder="One responsibility per line — feeds the auto-generated job description &amp; careers posting."><?= $v('responsibilities') ?></textarea></div>
     </div>
   </div>
 
-  <!-- ===== 2 · Deployment (advanced) ===== -->
-  <div class="rq-sec rq-adv">
+  <!-- ===== 2 · Deployment ===== -->
+  <div class="rq-sec" data-step="2">
     <h3><span class="num">2</span> Deployment — where &amp; when</h3>
     <div class="form-grid">
       <div class="ff"><label>Work model</label><select class="form-control" name="work_model"><option value="">—</option><?php foreach (lk_options_or('req_work_model', REQ_WORK_MODELS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('work_model',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
-      <div class="ff"><label>Deployment location</label><input class="form-control" name="deploy_location" value="<?= $v('deploy_location') ?>"></div>
+      <?php // Offer the places this workspace already deploys to, rather than asking
+        // everyone to re-type "Dahej" in four spellings. Still free text.
+        $rqLocs = [];
+        try { foreach (ops_all("SELECT DISTINCT deploy_location FROM requisitions WHERE COALESCE(deploy_location,'')<>'' ORDER BY deploy_location") as $lr) $rqLocs[] = $lr['deploy_location']; }
+        catch (Throwable $e) {} ?>
+      <div class="ff"><label>Deployment location</label>
+        <input class="form-control" name="deploy_location" value="<?= $v('deploy_location') ?>" list="rq_loc_list" placeholder="e.g. Dahej">
+        <?php if ($rqLocs): ?><datalist id="rq_loc_list"><?php foreach ($rqLocs as $l): ?><option value="<?= e($l) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
+      </div>
       <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date" id="rq_start" value="<?= $v('start_date') ?>"></div>
       <div class="ff"><label>End date</label><input class="form-control" type="date" name="end_date" id="rq_end" value="<?= $v('end_date') ?>"></div>
       <div class="ff"><label>Duration (months)</label><input class="form-control" type="number" step="0.5" name="duration_months" id="rq_months" value="<?= e(($r['duration_months'] ?? 0) ?: '') ?>" placeholder="auto from dates"></div>
-      <div class="ff"><label>Duty hours</label><input class="form-control" name="duty_hours" value="<?= $v('duty_hours') ?>" placeholder="e.g. 8 hrs / 6 days"></div>
+      <?php $rqDuty = function_exists('req_duty_hours_options') ? req_duty_hours_options() : []; ?>
+      <div class="ff"><label>Duty hours</label>
+        <input class="form-control" name="duty_hours" value="<?= $v('duty_hours') ?>" list="rq_duty_list" placeholder="e.g. 8 hours / 6 days">
+        <?php if ($rqDuty): ?><datalist id="rq_duty_list"><?php foreach ($rqDuty as $dlabel): ?><option value="<?= e($dlabel) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
+      </div>
       <div class="ff"><label>Shift</label><select class="form-control" name="shift"><option value="">—</option><?php foreach (lk_options_or('req_shift', REQ_SHIFTS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('shift',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
-      <div class="ff"><label>Other allowances</label><input class="form-control" name="other_allowances" value="<?= $v('other_allowances') ?>"></div>
+      <?php $rqAllow = function_exists('req_allowance_options') ? req_allowance_options() : []; ?>
+      <div class="ff"><label>Other allowances</label>
+        <input class="form-control" name="other_allowances" value="<?= $v('other_allowances') ?>" list="rq_allow_list" placeholder="e.g. Site allowance">
+        <?php if ($rqAllow): ?><datalist id="rq_allow_list"><?php foreach ($rqAllow as $alabel): ?><option value="<?= e($alabel) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
+      </div>
     </div>
     <?php // 1f — who provides each facility on deployment: not applicable / we provide /
           //  the client provides. Covers Food, Accommodation, Travel and Local conveyance. ?>
@@ -251,9 +446,9 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
     </div>
   </div>
 
-  <!-- ===== 3 · Selection & compliance (advanced) ===== -->
-  <div class="rq-sec rq-adv">
-    <h3><span class="num">3</span> Selection &amp; compliance</h3>
+  <!-- ===== 3 · Selection & compliance ===== -->
+  <div class="rq-sec" data-step="3">
+    <h3><span class="num">3</span> Selection &amp; compliance <span class="optional">optional — skip if not required</span></h3>
     <div class="rq-chk" style="margin-bottom:6px">
       <label><input type="checkbox" name="sel_client_interview" value="1" <?= $chk('sel_client_interview') ?>> Client interview</label>
       <label><input type="checkbox" name="sel_tech_interview" value="1" <?= $chk('sel_tech_interview') ?>> Technical interview</label>
@@ -273,8 +468,8 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   </div>
 
   <!-- ===== 4 · Commercial ===== -->
-  <div class="rq-sec">
-    <h3><span class="num">4</span> Commercial</h3>
+  <div class="rq-sec" data-step="4">
+    <h3><span class="num">4</span> Commercial <span class="optional">optional — usually finance or the manager</span></h3>
 
     <?php // ---- Cost build-up (sourcing-model aware) --------------------------
           //  How WE source this person decides which cost heads apply. The
@@ -330,11 +525,17 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   </div>
 
   <!-- ===== 5 · Approval ===== -->
-  <div class="rq-sec">
-    <h3><span class="num">5</span> Approval &amp; status</h3>
+  <div class="rq-sec" data-step="5">
+    <h3><span class="num">5</span> Approval &amp; status <span class="optional">optional — fill when the approval comes through</span></h3>
     <div class="form-grid">
-      <div class="ff"><label>Approval reference *</label><input class="form-control" name="approval_ref" value="<?= $v('approval_ref') ?>" placeholder="e.g. HR-APP-2026-014"></div>
-      <div class="ff"><label>Approved by</label><input class="form-control" name="approved_by" value="<?= $v('approved_by') ?>"></div>
+      <div class="ff"><label>Approval reference</label><input class="form-control" name="approval_ref" value="<?= $v('approval_ref') ?>" placeholder="e.g. HR-APP-2026-014"></div>
+      <?php // Who approved this. Was free text, so the same manager appeared under
+        // four spellings and no approval report could count them. The user list
+        // is offered; a name from outside the system is still accepted. ?>
+      <div class="ff"><label>Approved by</label>
+        <input class="form-control" name="approved_by" value="<?= $v('approved_by') ?>" list="rq_appr_list" placeholder="Name of the approver">
+        <?php if (!empty($rccUsers)): ?><datalist id="rq_appr_list"><?php foreach ($rccUsers as $un): ?><option value="<?= e($un) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
+      </div>
       <div class="ff"><label>Approval date</label><input class="form-control" type="date" name="approval_date" value="<?= $v('approval_date') ?>"></div>
       <div class="ff"><label>Status</label><select class="form-control" name="status"><?php foreach (lk_options_or('requisition_status', REQ_STATUS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= ($req ? $sel('status',$k) : ($k==='OPEN'?'selected':'')) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
       <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= $v('notes') ?>"></div>
@@ -345,27 +546,176 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
     <?php endif; ?>
   </div>
 
-  <div style="margin-top:8px"><button class="btn" type="submit">Save <?= e(mb_strtolower($RL)) ?></button> <a class="btn secondary" href="/requisitions">Cancel</a></div>
+  <?php //  Save is reachable from step 1. A requirement with a designation and a
+        //  headcount is a usable draft; the previous form put the only Save
+        //  button below ~60 fields, so a coordinator on a phone had to scroll
+        //  the whole form before anything could be kept. The bar is sticky so
+        //  the primary action is never off-screen. ?>
+  <div class="rq-foot">
+    <button type="button" class="btn secondary" id="rq_prev" hidden>← Back</button>
+    <button class="btn" type="submit" id="rq_save">Save <?= e(mb_strtolower($RL)) ?></button>
+    <button type="button" class="btn" id="rq_next">Next →</button>
+    <span class="spacer"></span>
+    <a class="btn secondary" href="/requisitions">Cancel</a>
+    <p class="why" id="rq_why">You can save now and add the rest later.</p>
+  </div>
 </form>
 <?php if (function_exists('fd_overlay_html')) echo fd_overlay_html('requisition'); // Form Designer: per-company label/order/hide overrides ?>
 
 <script>(function(){
   var form = document.getElementById('rqForm');
-  // Simple / Advanced toggle (remembers choice for the session).
-  var seg = form.querySelector('.rq-seg');
-  function setMode(m){ form.classList.toggle('rq-simple', m!=='advanced');
-    seg.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.dataset.mode===m); });
-    try{ sessionStorage.setItem('rqMode', m); }catch(e){} }
-  seg.addEventListener('click', function(e){ var b=e.target.closest('button'); if(b) setMode(b.dataset.mode); });
-  var saved; try{ saved = sessionStorage.getItem('rqMode'); }catch(e){}
-  // Open in Advanced automatically when editing a requirement that already has advanced data.
-  var hasAdv = <?= (!empty($r['quantity']) && (int)($r['quantity']??1) > 1) || !empty($r['work_model']) || !empty($r['billing_rate']) || !empty($r['discipline']) ? 'true':'false' ?>;
-  setMode(saved || (hasAdv ? 'advanced' : 'simple'));
+  var rail = form.querySelector('.rq-steps');
+  var secs = [].slice.call(form.querySelectorAll('.rq-sec[data-step]'));
+  var tabs = rail ? [].slice.call(rail.querySelectorAll('button')) : [];
+  var bar  = document.getElementById('rq_bar_i'),  count = document.getElementById('rq_count');
+  var prev = document.getElementById('rq_prev'),   next  = document.getElementById('rq_next');
+  var why  = document.getElementById('rq_why'),    MAX   = 5, cur = 1;
+  var TITLES = {1:'Position',2:'Where & when',3:'Selection',4:'Commercial',5:'Approval'};
+  var OPTIONAL = {3:1,4:1,5:1};
+
+  // PROGRESSIVE ENHANCEMENT. The stepping classes are added here, by script, so
+  // a browser with scripting off still renders every field on one page and the
+  // form saves exactly as it did before.
+  if (secs.length) form.classList.add('rq-wiz');
+
+  // --- per-step "More detail" -------------------------------------------
+  // The steps are the disclosure; within a step, genuinely rare fields (PO and
+  // contract references, negotiation floor, relevant experience) stay tucked
+  // behind one button rather than being a second mode the user has to know about.
+  secs.forEach(function(sec){
+    if (!sec.querySelector('.rq-adv')) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn small secondary'; b.style.marginTop = '10px';
+    b.textContent = '+ More detail';
+    b.addEventListener('click', function(){
+      b.textContent = sec.classList.toggle('rq-show-adv') ? '− Less detail' : '+ More detail';
+    });
+    sec.appendChild(b);
+  });
+
+  // --- stepping ----------------------------------------------------------
+  function show(n){
+    n = Math.min(MAX, Math.max(1, n)); cur = n;
+    secs.forEach(function(sec){ sec.classList.toggle('on', sec.getAttribute('data-step') === String(n)); });
+    tabs.forEach(function(t){
+      var tn = parseInt(t.getAttribute('data-step'), 10);
+      t.classList.toggle('on', tn === n);
+      t.classList.toggle('done', tn < n);
+      t.setAttribute('aria-selected', tn === n ? 'true' : 'false');
+    });
+    if (bar) bar.style.width = Math.round(n / MAX * 100) + '%';
+    if (count) count.textContent = 'Step ' + n + ' of ' + MAX + ' — ' + TITLES[n] +
+      (OPTIONAL[n] ? '. Optional — you can skip this.' : '.');
+    if (prev) prev.hidden = (n === 1);
+    if (next) next.textContent = (n === MAX) ? 'Done' : (OPTIONAL[n + 1] ? 'Skip for now →' : 'Next →');
+    if (why)  why.textContent = (n === 1)
+      ? 'You can save now and add the rest later.'
+      : 'Saving keeps everything filled in so far, on every step.';
+    // Keep the active step in view on a phone without yanking the whole page.
+    var t = tabs[n - 1]; if (t && t.scrollIntoView) t.scrollIntoView({block:'nearest', inline:'center'});
+  }
+  if (rail) rail.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if (b) show(parseInt(b.getAttribute('data-step'), 10));
+  });
+  if (next) next.addEventListener('click', function(){
+    if (cur === MAX) { form.requestSubmit ? form.requestSubmit() : form.submit(); return; }
+    show(cur + 1);
+    form.scrollIntoView({block:'start', behavior:'smooth'});
+  });
+  if (prev) prev.addEventListener('click', function(){ show(cur - 1); form.scrollIntoView({block:'start', behavior:'smooth'}); });
+
+  // A required field left blank on another step must not fail silently — the
+  // browser cannot focus what is hidden, so jump to its step first.
+  form.addEventListener('invalid', function(e){
+    var sec = e.target.closest('.rq-sec[data-step]');
+    if (sec) { var n = parseInt(sec.getAttribute('data-step'), 10); if (n !== cur) show(n); }
+  }, true);
+
+  // Used by the AI extractor: it fills fields across several steps, so the
+  // reviewer is shown all of them rather than dropped on one.
+  form.rqShowAllSteps = function(){
+    form.classList.remove('rq-wiz');
+    secs.forEach(function(s){ s.classList.add('on'); s.classList.add('rq-show-adv'); });
+    if (count) count.textContent = 'All steps shown — review every field before saving.';
+  };
+
+  show(1);
 
   // Replacement-only "replacing" field.
   var t=document.getElementById('rq_type'), o=document.getElementById('rq_out');
-  function so(){ if(o) o.style.display=(t.value==='REPLACEMENT' && !form.classList.contains('rq-simple'))?'':'none'; }
+  function so(){ if(o) o.style.display=(t && t.value==='REPLACEMENT')?'':'none'; }
   if(t){ t.addEventListener('change',so); }
+
+  // --- Discipline → Speciality, from the same masters the people register uses.
+  //  Choosing a discipline narrows the speciality list to that discipline's own
+  //  specialities, so "Pressure Vessels" can never be filed under "Electrical".
+  //  "Something else" (value 0) reveals the free-text box instead, for the
+  //  discipline nobody has added to Masters yet.
+  var trSel = document.getElementById('rq_trade'), skSel = document.getElementById('rq_skill'),
+      discFree = document.getElementById('rq_disc_free'), catFree = document.getElementById('rq_cat_free');
+  if (trSel && skSel) {
+    var SK = window.RQ_SKILLS || {}, wantSkill = window.RQ_SKILL_SEL || 0;
+    function fillSkills(keep){
+      var tid = trSel.value, rows = (tid && tid !== '0') ? (SK[tid] || []) : [];
+      skSel.innerHTML = '';
+      var first = document.createElement('option');
+      first.value = '';
+      first.textContent = rows.length ? '— choose —'
+                        : (tid === '0' ? '— type it below —' : '— choose a discipline first —');
+      skSel.appendChild(first);
+      rows.forEach(function(r){
+        var op = document.createElement('option');
+        op.value = r.id; op.textContent = r.label;
+        if (String(r.id) === String(keep)) op.selected = true;
+        skSel.appendChild(op);
+      });
+      if (rows.length) {
+        var other = document.createElement('option');
+        other.value = '0'; other.textContent = 'Something else — type it';
+        skSel.appendChild(other);
+      }
+      skSel.disabled = !rows.length && tid !== '0';
+      // A picker enhanced into a searchable widget must be told to redraw.
+      syncFree();
+    }
+    function syncFree(){
+      // The free-text box is shown only when the list cannot express the answer.
+      if (discFree) discFree.style.display = (trSel.value === '0') ? '' : 'none';
+      if (catFree)  catFree.style.display  = (trSel.value === '0' || skSel.value === '0') ? '' : 'none';
+    }
+    trSel.addEventListener('change', function(){ fillSkills(0); });
+    skSel.addEventListener('change', syncFree);
+    fillSkills(wantSkill);
+  }
+
+  // --- Certificates as chips -------------------------------------------
+  //  Still stored in the same comma-separated `skills` column, so the job
+  //  description generator, the careers posting and every export keep working
+  //  untouched — only the way it is entered has changed.
+  var certPick = document.getElementById('rq_cert_pick'), certBox = document.getElementById('rq_cert_chips'),
+      certVal = document.getElementById('rq_skills_val');
+  if (certPick && certBox && certVal) {
+    var have = (window.RQ_CERTS_HAVE || []).slice();
+    function paint(){
+      certBox.innerHTML = '';
+      have.forEach(function(name, i){
+        var chip = document.createElement('span'); chip.className = 'chip';
+        var txt = document.createElement('span'); txt.textContent = name; chip.appendChild(txt);
+        var x = document.createElement('button');
+        x.type = 'button'; x.textContent = '×';
+        x.setAttribute('aria-label', 'Remove ' + name);
+        x.addEventListener('click', function(){ have.splice(i, 1); paint(); });
+        chip.appendChild(x); certBox.appendChild(chip);
+      });
+      certVal.value = have.join(', ');
+    }
+    certPick.addEventListener('change', function(){
+      var v = certPick.value;
+      if (v && have.indexOf(v) < 0) { have.push(v); paint(); }
+      certPick.selectedIndex = 0;
+    });
+    paint();
+  }
 
   // Live commercial preview (mirrors req_commercials()/req_cost_buildup() server-side).
   var qty=document.getElementById('rq_qty'), rate=document.getElementById('rq_rate'),
