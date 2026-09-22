@@ -25,6 +25,27 @@ function fd_migrate() {
             req        VARCHAR(8)   DEFAULT '',   -- '', 'yes' or 'no' (tri-state override)
             updated_at VARCHAR(30)  DEFAULT '')");
     } catch (Throwable $e) { /* never block the boot chain */ }
+    //  WHERE an added field goes. Until now every field an admin added landed
+    //  in a "More details" block at the very bottom of the form, in creation
+    //  order, with nothing on screen to say so — the screen asked for a name,
+    //  a type and "required", and never asked where it belonged. Additive and
+    //  nullable: a field added before this keeps its old behaviour (empty =
+    //  the end of the form), so nothing already captured moves.
+    if (function_exists('ensure_column')) ensure_column('custom_fields', 'section', "VARCHAR(80) DEFAULT ''");
+}
+
+// The sections a given form offers, as [name => name], for the "where should it
+// go?" picker. Read from the same registry that drives the standard-field list,
+// so the choices are always the sections the form actually has.
+function fd_sections($form) {
+    $f = fd_forms()[$form] ?? null;
+    if (!$f) return [];
+    $out = [];
+    foreach (($f['fields'] ?? []) as $fld) {
+        $sec = trim((string)($fld['section'] ?? ''));
+        if ($sec !== '') $out[$sec] = $sec;
+    }
+    return $out;
 }
 
 // Load every override for a form as [field_key => row]. Cached per request; pass
@@ -95,9 +116,130 @@ function fd_flush() { /* caches are request-scoped statics; nothing persistent t
 function fd_forms() {
     $forms = [];
     if (function_exists('fd_forms_recruitment')) $forms += fd_forms_recruitment();
+    if (function_exists('fd_forms_quality'))     $forms += fd_forms_quality();
     // Company-built custom forms are designed on their own screen already, so we
     // only surface the built-in forms here.
     return $forms;
+}
+
+// ---------------------------------------------------------------------------
+//  Quality, reporting and operations forms.
+//
+//  The Form Designer offered exactly two forms, while the engine underneath
+//  already supported eleven entities and fourteen form views already accepted
+//  added fields. Nothing was missing architecturally — the registry simply
+//  stopped at recruitment, so an admin could tailor a requirement but not a
+//  sample, a method or a controlled document.
+//
+//  A form appears here only when it is genuinely designable: it must render
+//  custom fields and carry fd_overlay_html(). Declaring one that does not would
+//  give an admin a screen whose changes do nothing.
+// ---------------------------------------------------------------------------
+function fd_forms_quality() {
+    $rep = !function_exists('licence_enabled') || licence_enabled('reporting');
+    $ops = !function_exists('licence_enabled') || licence_enabled('operations');
+    $F = fn($label, $type, $section, $locked = false) => ['label' => $label, 'type' => $type, 'section' => $section, 'locked' => $locked];
+    $out = [];
+
+    if ($ops) {
+        $out['sample'] = [
+            //  TP() returns the company's own word, which is stored lower-case
+            //  ("sample"). Every other card here is a heading, so it is headed
+            //  the same way rather than sitting in the row in lower case.
+            'label' => function_exists('THP') ? THP('sample') : (function_exists('TP') ? ucfirst(TP('sample')) : 'Items received'), 'icon' => '📦',
+            'help'  => 'The item-received form',
+            'fields' => [
+                'description'    => $F('Description of the item', 'text', 'The item', true),
+                'item_type'      => $F('Type', 'dropdown', 'The item'),
+                'maker_ref'      => $F('Maker / heat / batch ref', 'text', 'The item'),
+                'quantity'       => $F('Quantity', 'text', 'The item'),
+                'unit'           => $F('Unit', 'text', 'The item'),
+                'received_on'    => $F('Received on', 'date', 'Receipt'),
+                'received_by'    => $F('Received by', 'text', 'Receipt'),
+                'condition_code' => $F('Condition on receipt', 'dropdown', 'Receipt'),
+                'condition_note' => $F('Condition note', 'text', 'Receipt'),
+                'storage_code'   => $F('Storage location', 'dropdown', 'Receipt'),
+                'partner_id'     => $F('Client / owner', 'dropdown', 'Receipt'),
+                'notes'          => $F('Notes', 'text', 'Receipt'),
+            ],
+        ];
+        $out['satisfaction'] = [
+            'label' => 'Client satisfaction', 'icon' => '⭐',
+            'help'  => 'The feedback form',
+            'fields' => [
+                'client_id' => $F('Client', 'dropdown', 'Feedback', true),
+                'about'     => $F('What this is about', 'text', 'Feedback'),
+            ],
+        ];
+    }
+
+    if ($rep) {
+        $out['method'] = [
+            'label' => 'Test method', 'icon' => '🧪',
+            'help'  => 'The method register form',
+            'fields' => [
+                'title'          => $F('Title', 'text', 'The method', true),
+                'standard_ref'   => $F('Standard reference', 'text', 'The method'),
+                'revision'       => $F('Revision', 'text', 'The method'),
+                'category'       => $F('Category', 'dropdown', 'The method'),
+                'discipline'     => $F('Discipline / business unit', 'text', 'The method'),
+                'effective_date' => $F('Effective date', 'date', 'Control'),
+                'review_due'     => $F('Review due', 'date', 'Control'),
+                'owner'          => $F('Owner / custodian', 'text', 'Control'),
+                'method_file'    => $F('Method document', 'text', 'Control'),
+                'description'    => $F('Description / scope', 'text', 'Control'),
+            ],
+        ];
+        $out['risk'] = [
+            'label' => 'Risk / opportunity', 'icon' => '⚠️',
+            'help'  => 'The risk register form',
+            'fields' => [
+                'kind'        => $F('This is a…', 'dropdown', 'What it is', true),
+                'category'    => $F('Category', 'dropdown', 'What it is'),
+                'title'       => $F('Title', 'text', 'What it is', true),
+                'context'     => $F('Area / context', 'text', 'What it is'),
+                'description' => $F('Description', 'text', 'What it is'),
+                'likelihood'  => $F('Likelihood', 'dropdown', 'Assessment'),
+                'impact'      => $F('Impact', 'dropdown', 'Assessment'),
+                'treatment'   => $F('Treatment — how it is addressed', 'text', 'Assessment'),
+                'owner'       => $F('Owner', 'text', 'Assessment'),
+                'review_due'  => $F('Review due', 'date', 'Assessment'),
+            ],
+        ];
+        $out['decision_rule'] = [
+            'label' => 'Decision rule', 'icon' => '⚖️',
+            'help'  => 'The pass / fail rule form',
+            'fields' => [
+                'title'            => $F('Title', 'text', 'The rule', true),
+                'method_id'        => $F('Belongs to method', 'dropdown', 'The rule'),
+                'characteristic'   => $F('Characteristic judged', 'text', 'The rule'),
+                'accept_criteria'  => $F('Acceptance criteria', 'text', 'Criteria'),
+                'reject_criteria'  => $F('Rejection criteria', 'text', 'Criteria'),
+                'decision_basis'   => $F('Decision basis', 'dropdown', 'Criteria'),
+                'uncertainty_rule' => $F('How uncertainty is applied', 'text', 'Criteria'),
+                'owner'            => $F('Owner / custodian', 'text', 'Criteria'),
+                'notes'            => $F('Notes', 'text', 'Criteria'),
+            ],
+        ];
+        $out['controlled_doc'] = [
+            'label' => 'Controlled document', 'icon' => '📄',
+            'help'  => 'The document register form',
+            'fields' => [
+                'title'          => $F('Title', 'text', 'The document', true),
+                'doc_type'       => $F('Type', 'dropdown', 'The document'),
+                'revision'       => $F('Revision', 'text', 'The document'),
+                'owner'          => $F('Owner / custodian', 'text', 'The document'),
+                'approved_by'    => $F('Approved by', 'text', 'Approval'),
+                'approved_on'    => $F('Approved on', 'date', 'Approval'),
+                'effective_date' => $F('Effective date', 'date', 'Approval'),
+                'review_due'     => $F('Review due', 'date', 'Approval'),
+                'cdoc_file'      => $F('Document file', 'text', 'Distribution'),
+                'distribution'   => $F('Distribution (who holds a copy)', 'text', 'Distribution'),
+                'description'    => $F('Description / purpose', 'text', 'Distribution'),
+            ],
+        ];
+    }
+    return $out;
 }
 
 // The two recruitment forms and their built-in fields. Each field:
@@ -199,7 +341,20 @@ function fd_forms_recruitment() {
 function fd_overlay_html($form) {
     if (!function_exists('fd_overrides')) return '';
     $ov = fd_overrides($form);
-    if (!$ov) return '';
+    //  An admin who only ADDS a field and places it in a section sets no label,
+    //  hide or order override at all. Bailing out on an empty $ov therefore
+    //  emitted nothing, and the placement they had just chosen was silently
+    //  ignored — the field stayed at the bottom under "More details".
+    $placed = [];
+    if (function_exists('custom_fields_for')) {
+        try {
+            foreach (custom_fields_for($form) as $cf) {
+                $sec = trim((string) ($cf['section'] ?? ''));
+                if ($sec !== '') $placed['cf_' . $cf['field_key']] = $sec;
+            }
+        } catch (Throwable $e) { /* older install without the column — nothing to move */ }
+    }
+    if (!$ov && !$placed) return '';
     $map = [];
     foreach ($ov as $key => $r) {
         $map[$key] = [
@@ -210,6 +365,7 @@ function fd_overlay_html($form) {
         ];
     }
     $json = json_encode($map, JSON_UNESCAPED_UNICODE);
+    $placedJson = json_encode($placed, JSON_UNESCAPED_UNICODE);
     // The applier is display-only and defensive: it only touches fields it finds,
     // renames labels, hides fields (kept in the DOM so their value still submits
     // and is never blanked), toggles required, and reorders the managed fields
@@ -217,7 +373,7 @@ function fd_overlay_html($form) {
     $js = <<<JS
 <script>
 (function(){
-  var O = $json;
+  var O = $json, PLACED = $placedJson;
   function fieldEl(name){
     return document.querySelector('[name="'+name+'"]') || document.querySelector('[name="'+name+'[]"]');
   }
@@ -251,6 +407,55 @@ function fd_overlay_html($form) {
       else { parent.insertBefore(ff, parent.firstChild); }
       anchor = ff;
     });
+  });
+
+  // ---- Move added fields into the section they were placed in -------------
+  //  A field the admin added renders once, in the form's "More details" block,
+  //  and is moved here. Moving rather than rendering in place means a field
+  //  whose section has since been renamed simply stays where it was rendered —
+  //  still on the form, still saving — instead of vanishing along with the data
+  //  it already holds.
+  function norm(t){ return (t||'').replace(/\s+/g,' ').replace(/[^a-z0-9 &\/-]/gi,'').trim().toLowerCase(); }
+  function sectionBody(name){
+    var want = norm(name);
+    if(!want) return null;
+    var heads = document.querySelectorAll('h2, h3, h4, legend');
+    for(var i=0;i<heads.length;i++){
+      var h = heads[i];
+      // The numbered badge ("1", "4") is part of the heading text — compare on
+      // the words, so "1 Client & position" matches the section "Client & position".
+      var t = norm(h.textContent);
+      if(t !== want && t.indexOf(want) < 0) continue;
+      // Prefer the grid that follows the heading; fall back to the heading's own
+      // container, which is where a form without a .form-grid keeps its fields.
+      var sib = h.nextElementSibling;
+      while(sib){
+        if(sib.classList && (sib.classList.contains('form-grid') || sib.classList.contains('rq-chk'))) return sib;
+        if(/^H[234]$/.test(sib.tagName) || sib.tagName === 'LEGEND') break;
+        sib = sib.nextElementSibling;
+      }
+      var g = h.parentElement && h.parentElement.querySelector('.form-grid');
+      if(g) return g;
+      return h.parentElement || null;
+    }
+    return null;
+  }
+  Object.keys(PLACED).forEach(function(name){
+    var el = fieldEl(name); if(!el) return;
+    var ff = ffOf(el); if(!ff) return;
+    var target = sectionBody(PLACED[name]);
+    if(!target || target === ff.parentElement) return;
+    if(target.contains(ff)) return;
+    target.appendChild(ff);
+  });
+  // A "More details" heading left with nothing under it is noise — hide it, but
+  // only when its block is genuinely empty.
+  document.querySelectorAll('h3, h4').forEach(function(h){
+    if(norm(h.textContent) !== 'more details') return;
+    var g = h.nextElementSibling;
+    if(g && g.classList && g.classList.contains('form-grid') && !g.querySelector('.ff')){
+      h.style.display='none'; g.style.display='none';
+    }
   });
 })();
 </script>
@@ -387,10 +592,15 @@ function fd_field_add($form) {
     $fkey = $base; $n = 1;
     while ((int) ops_val("SELECT COUNT(*) FROM custom_fields WHERE entity=? AND field_key=?", [(string) $form, $fkey]) > 0) $fkey = $base . '_' . (++$n);
     $sort = (int) ops_val("SELECT COALESCE(MAX(sort_order),0)+1 FROM custom_fields WHERE entity=?", [(string) $form]);
-    db()->prepare("INSERT INTO custom_fields (entity,field_key,label,field_type,lookup_type_id,required,sort_order,active,created_at)
-                   VALUES (?,?,?,?,?,?,?,1,?)")
-        ->execute([(string) $form, $fkey, $label, $type, $lt, $req, $sort, date('c')]);
-    flash('Added the field “' . $label . '” to your form.');
+    //  Where it goes. Only a section this form really has is accepted — a typed
+    //  or stale name would send the field to a container that does not exist,
+    //  and it would silently vanish from the form.
+    $sec = trim((string) ($_POST['nf_section'] ?? ''));
+    if ($sec !== '' && !isset(fd_sections($form)[$sec])) $sec = '';
+    db()->prepare("INSERT INTO custom_fields (entity,field_key,label,field_type,lookup_type_id,required,sort_order,section,active,created_at)
+                   VALUES (?,?,?,?,?,?,?,?,1,?)")
+        ->execute([(string) $form, $fkey, $label, $type, $lt, $req, $sort, $sec, date('c')]);
+    flash('Added “' . $label . '” to your form' . ($sec !== '' ? ', under “' . $sec . '”.' : ', at the end under “More details”.'));
 }
 
 // Rename a custom field / toggle required. The type and its list are kept as-is
@@ -403,9 +613,15 @@ function fd_field_edit($form) {
     $label = trim((string) ($_POST['ef_label'] ?? ''));
     if ($label === '') { flash('The field needs a name.', 'error'); return; }
     $req = !empty($_POST['ef_required']) ? 1 : 0;
-    db()->prepare("UPDATE custom_fields SET label=?, required=? WHERE id=? AND entity=?")
-        ->execute([$label, $req, $id, (string) $form]);
-    flash('Updated “' . $label . '”.');
+    //  A field can be moved to another section later — the same validation as on
+    //  add, so it can never be sent to a container the form does not have.
+    //  Absent from the post (an older form, or a form with no sections) means
+    //  "leave it where it is" rather than "move it to the end".
+    $sec = array_key_exists('ef_section', $_POST) ? trim((string) $_POST['ef_section']) : (string) ($cur['section'] ?? '');
+    if ($sec !== '' && !isset(fd_sections($form)[$sec])) $sec = '';
+    db()->prepare("UPDATE custom_fields SET label=?, required=?, section=? WHERE id=? AND entity=?")
+        ->execute([$label, $req, $sec, $id, (string) $form]);
+    flash('Updated “' . $label . '”' . ($sec !== '' ? ' — it now sits under “' . $sec . '”.' : '.'));
 }
 
 // Delete a custom field the admin added, and its captured values (no orphans).

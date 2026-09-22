@@ -44,3 +44,7 @@ $sel = function ($opts, $cur) { foreach ($opts as $code => $label) {
   <div style="margin-top:16px"><button class="btn" type="submit"><?= $r ? 'Save changes' : 'Add as draft' ?></button>
     <a class="btn secondary" href="<?= $r ? '/drule?id=' . (int)$r['id'] : '/drules' ?>">Cancel</a></div>
 </form>
+
+<?php // Form Designer — apply this company's label / order / hide / required overrides,
+      // and move any field they added into the section they chose.
+      if (function_exists("fd_overlay_html")) echo fd_overlay_html("decision_rule"); ?>

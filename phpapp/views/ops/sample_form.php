@@ -56,3 +56,7 @@ $clients = ops_all("SELECT id, COALESCE(display_name, legal_name) nm FROM busine
   <div style="margin-top:16px"><button class="btn" type="submit"><?= $s ? 'Save changes' : 'Receive &amp; log item' ?></button>
     <a class="btn secondary" href="<?= $s ? '/sample?id=' . (int)$s['id'] : '/samples' ?>">Cancel</a></div>
 </form>
+
+<?php // Form Designer — apply this company's label / order / hide / required overrides,
+      // and move any field they added into the section they chose.
+      if (function_exists("fd_overlay_html")) echo fd_overlay_html("sample"); ?>

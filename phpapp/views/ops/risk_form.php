@@ -46,3 +46,7 @@ $sel = function ($opts, $cur) { foreach ($opts as $code => $label) {
   <div style="margin-top:16px"><button class="btn" type="submit"><?= $r ? 'Save changes' : 'Add to register' ?></button>
     <a class="btn secondary" href="<?= $r ? '/risk?id=' . (int)$r['id'] : '/risks' ?>">Cancel</a></div>
 </form>
+
+<?php // Form Designer — apply this company's label / order / hide / required overrides,
+      // and move any field they added into the section they chose.
+      if (function_exists("fd_overlay_html")) echo fd_overlay_html("risk"); ?>

@@ -130,3 +130,133 @@ if (function_exists('fd_field_add') && function_exists('custom_fields_for')) {
 } else {
     t_ok(true, 'fd_field_add / custom fields not present — skipped');
 }
+
+// ============================================================================
+//  WHERE AN ADDED FIELD GOES.
+//
+//  The screen asked for a name, a type and "required", and nothing else. Every
+//  field an admin added landed in a "More details" block at the very foot of
+//  the form, in creation order, with nothing on screen to say so — the owner's
+//  report was simply that a field they had added was nowhere to be seen.
+// ============================================================================
+t_section('Form Designer — placing a field in a section');
+t_as_admin();
+fd_migrate();
+
+$fdSecs = fd_sections('requisition');
+t_ok(count($fdSecs) >= 4, 'FS1 ARMING — the Requirement form offers its real sections (' . count($fdSecs) . ')');
+$fdSec = (string) array_key_first($fdSecs);
+t_ok($fdSec !== '', 'FS2 ARMING — a section name to place a field in: "' . $fdSec . '"');
+
+// Add a field INTO a section.
+$_POST = ['form' => 'requisition', 'nf_label' => 'Placed Field UAT', 'nf_type' => 'text', 'nf_section' => $fdSec];
+fd_field_add('requisition');
+$fdRow = ops_one("SELECT * FROM custom_fields WHERE entity='requisition' AND label=?", ['Placed Field UAT']);
+t_ok($fdRow !== null, 'FS3 — the field was added');
+t_eq((string) $fdRow['section'], $fdSec, 'FS4 — and it remembers which section it belongs to');
+
+// A section the form does not have must not be stored: the overlay would look
+// for a container that does not exist and the field would vanish from the form.
+$_POST = ['form' => 'requisition', 'nf_label' => 'Bogus Section UAT', 'nf_type' => 'text', 'nf_section' => 'Not A Real Section'];
+fd_field_add('requisition');
+$fdBogus = ops_one("SELECT * FROM custom_fields WHERE entity='requisition' AND label=?", ['Bogus Section UAT']);
+t_ok($fdBogus !== null, 'FS5 — a field with an unknown section is still ADDED, not lost');
+t_eq((string) $fdBogus['section'], '', 'FS6 — but the unknown section is refused, so it falls back to the end of the form');
+
+// Moving an existing field to another section.
+$fdSec2 = (string) array_keys($fdSecs)[1];
+t_ok($fdSec2 !== $fdSec, 'FS7 ARMING — a genuinely different second section: "' . $fdSec2 . '"');
+$_POST = ['form' => 'requisition', 'field_id' => (int) $fdRow['id'], 'ef_label' => 'Placed Field UAT', 'ef_section' => $fdSec2];
+fd_field_edit('requisition');
+$fdMoved = ops_one("SELECT * FROM custom_fields WHERE id=?", [(int) $fdRow['id']]);
+t_eq((string) $fdMoved['section'], $fdSec2, 'FS8 — the field moved to the other section');
+t_eq((string) $fdMoved['label'], 'Placed Field UAT', 'FS9 — and keeps its name');
+
+// A post that carries no section at all (an older browser, a form with no
+// sections) must LEAVE IT WHERE IT IS, not quietly send it to the end.
+$_POST = ['form' => 'requisition', 'field_id' => (int) $fdRow['id'], 'ef_label' => 'Placed Field UAT'];
+fd_field_edit('requisition');
+t_eq((string) ops_val("SELECT section FROM custom_fields WHERE id=?", [(int) $fdRow['id']]), $fdSec2,
+     'FS10 — a save that says nothing about the section does not move the field');
+
+// The overlay must now be emitted for placement ALONE. It used to bail out when
+// there were no rename/hide/order overrides, so a freshly placed field never
+// moved and the admin's choice was silently dropped.
+db()->exec("DELETE FROM form_field_layout WHERE form_key='requisition'");
+fd_overrides('requisition', true);
+$fdOv = fd_overlay_html('requisition');
+t_ok(trim($fdOv) !== '', 'FS11 — with no other overrides at all, the overlay is still emitted for the placement');
+t_ok(strpos($fdOv, 'cf_placed_field_uat') !== false, 'FS12 — and it names the placed field');
+t_ok(strpos($fdOv, $fdSec2) !== false, 'FS13 — and the section to move it to');
+t_ok(strpos($fdOv, 'cf_bogus_section_uat') === false, 'FS14 — a field with no section is not in the move list');
+
+// The form still renders, and carries the section in its markup.
+$_POST = [];
+ob_start(); render_custom_fields('requisition', []); $fdHtml = ob_get_clean();
+t_ok(strpos($fdHtml, 'data-cf-section="' . $fdSec2 . '"') !== false,
+     'FS15 — the rendered field carries its section, for the overlay to act on');
+t_ok(strpos($fdHtml, 'Bogus Section UAT') !== false,
+     'FS16 — and the unplaced field still renders, rather than disappearing');
+
+// Clean up so the next run starts where this one did.
+foreach ([(int) $fdRow['id'], (int) $fdBogus['id']] as $fdDel) {
+    $_POST = ['form' => 'requisition', 'field_id' => $fdDel];
+    fd_field_delete('requisition');
+}
+$_POST = [];
+t_eq((int) ops_val("SELECT COUNT(*) FROM custom_fields WHERE entity='requisition' AND label LIKE '%UAT'"), 0,
+     'FS17 — the test fields are cleaned up');
+t_as_nobody();
+
+// ============================================================================
+//  EVERY DECLARED FORM MUST ACTUALLY BE DESIGNABLE.
+//
+//  The registry and the form view are two separate files, and nothing made them
+//  agree. A form declared here but missing the one fd_overlay_html() line gives
+//  an admin a full design screen whose every change is silently discarded —
+//  worse than not offering the form at all. A field key that no longer exists
+//  in the view is the same failure one row down: it renames nothing.
+// ============================================================================
+t_section('Form Designer — a declared form is a wired form');
+t_as_admin();
+
+$fdViews = [
+    'requisition'    => 'views/ops/requisition_form.php',
+    'candidate'      => 'views/ops/candidate_form.php',
+    'sample'         => 'views/ops/sample_form.php',
+    'method'         => 'views/ops/method_form.php',
+    'risk'           => 'views/ops/risk_form.php',
+    'decision_rule'  => 'views/ops/drule_form.php',
+    'controlled_doc' => 'views/ops/cdoc_form.php',
+    'satisfaction'   => 'views/ops/satisfaction_form.php',
+];
+$fdAll = fd_forms();
+t_ok(count($fdAll) >= 8, 'FW1 ARMING — the designer offers more than the original two forms (' . count($fdAll) . ')');
+
+foreach ($fdAll as $fdKey => $fdDef) {
+    $fdPath = $fdViews[$fdKey] ?? '';
+    if (!t_ok($fdPath !== '', "FW2 · '$fdKey' is a form this test knows where to find")) continue;
+    $fdSrc = @file_get_contents(__DIR__ . '/../' . $fdPath);
+    if (!t_ok($fdSrc !== false, "FW3 · $fdPath exists")) continue;
+
+    // The one line without which every design change is discarded.
+    t_ok(strpos($fdSrc, 'fd_overlay_html') !== false,
+         "FW4 · '$fdKey' — its view applies the design overrides");
+    // And the form must accept added fields, or "add a field" goes nowhere.
+    t_ok(strpos($fdSrc, 'render_custom_fields') !== false,
+         "FW5 · '$fdKey' — its view renders fields the admin adds");
+
+    // Every declared key must be a control that really exists on that form.
+    $fdMissing = [];
+    foreach (array_keys($fdDef['fields'] ?? []) as $fdF) {
+        if (strpos($fdSrc, 'name="' . $fdF . '"') === false
+            && strpos($fdSrc, "name=\"{$fdF}[]\"") === false
+            && strpos($fdSrc, "'" . $fdF . "'") === false) $fdMissing[] = $fdF;
+    }
+    t_eq($fdMissing, [], "FW6 · '$fdKey' — every declared field exists on the form");
+
+    // Sections must be offered, or the "where should it go?" picker is empty
+    // and an added field can only ever land at the foot of the form.
+    t_ok(count(fd_sections($fdKey)) >= 1, "FW7 · '$fdKey' — offers at least one section to place a field in");
+}
+t_as_nobody();

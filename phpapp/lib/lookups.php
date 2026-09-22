@@ -1129,7 +1129,14 @@ function render_custom_fields($entity, $vals = []) {
     foreach (custom_fields_for($entity) as $f) {
         $key = 'cf_' . $f['field_key'];
         $cur = $vals[$f['field_key']] ?? null;
-        echo '<div class="ff">';
+        //  The section this field was placed in, carried into the markup so the
+        //  Form Designer overlay can move it there. Every added field is still
+        //  RENDERED here, in one block — moving it is a display step that runs
+        //  afterwards, so a field whose section has since been renamed away
+        //  stays on the form (at the end) instead of disappearing with the data
+        //  it holds.
+        $cfSec = trim((string) ($f['section'] ?? ''));
+        echo '<div class="ff"' . ($cfSec !== '' ? ' data-cf-section="' . e($cfSec) . '"' : '') . '>';
         echo '<label>' . e($f['label']) . ($f['required'] ? ' *' : '') . '</label>';
         if ($f['field_type'] === 'text' || $f['field_type'] === 'number' || $f['field_type'] === 'date') {
             $type = $f['field_type'] === 'text' ? 'text' : $f['field_type'];

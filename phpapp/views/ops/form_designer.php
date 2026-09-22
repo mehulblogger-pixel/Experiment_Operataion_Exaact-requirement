@@ -7,6 +7,24 @@ $e   = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 $csrf = fn() => function_exists('csrf_field') ? csrf_field() : '';
 $types = $types ?? (function_exists('fd_field_types') ? fd_field_types() : []);
 ?>
+<style>
+  /* On a phone the table header scrolls out of sight, so the Required and Hide
+     columns lost their labels entirely — a bare dropdown and a bare tick box
+     with nothing to say what they did. Below 760px each row becomes a card and
+     every cell carries its own label. */
+  @media(max-width:760px){
+    #fdForm .tbl thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+    #fdForm .tbl,#fdForm .tbl tbody,#fdForm .tbl tr,#fdForm .tbl td{display:block;width:auto}
+    #fdForm .tbl{min-width:0!important}
+    #fdForm .tbl tr.fd-row{border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;margin:0 0 10px;background:#fff}
+    #fdForm .tbl td{border:0;padding:6px 0!important;text-align:left!important}
+    #fdForm .tbl td::before{content:attr(data-l);display:block;font-size:12.5px;font-weight:600;color:#64748b;margin-bottom:4px}
+    #fdForm .tbl td[data-l="Order"]::before{margin-bottom:6px}
+    #fdForm .tbl .form-control{width:100%;min-width:0!important;font-size:16px}
+    #fdForm div[style*="overflow-x"]{overflow-x:visible!important}
+    .fd-up,.fd-down{min-width:46px;min-height:44px}
+  }
+</style>
 <div class="crumbs"><a href="/">Home</a> › <a href="/admin">Admin</a> › Form Designer</div>
 <h1 style="margin:.2em 0">Form Designer</h1>
 <p class="muted" style="margin-top:0">Build your forms end to end — rename a field, change its order, hide one you don’t use, make it required, <strong>add a new field</strong>, <strong>delete a field you added</strong>, or <strong>create a dropdown with its own options</strong>. No coding, and it never changes data already captured.</p>
@@ -31,6 +49,8 @@ $types = $types ?? (function_exists('fd_field_types') ? fd_field_types() : []);
   $editId = (int) ($editId ?? 0);
   // A friendly type word for a stored custom field.
   $typeWord = function ($t) use ($types) { return $types[$t] ?? ucfirst((string) $t); };
+  // The sections this form really has — the only places a field may be put.
+  $secs = function_exists('fd_sections') ? fd_sections($sel) : [];
 ?>
   <p><a href="/form-designer">‹ All forms</a></p>
   <h2 style="margin:.2em 0"><?= $e($form['icon'] ?? '📝') ?> <?= $e($form['label'] ?? $sel) ?></h2>
@@ -38,7 +58,15 @@ $types = $types ?? (function_exists('fd_field_types') ? fd_field_types() : []);
   <!-- ============ CARD 1 — STANDARD (built-in) FIELDS ============ -->
   <div class="card" style="padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;margin-top:12px">
     <h3 style="margin:.1em 0 .1em">Standard fields</h3>
-    <p class="muted" style="margin-top:0;font-size:13px">These come built in. Rename them, drag their order with ▲ ▼, make them required, or hide the ones you don’t use. (Essential fields can’t be hidden — the form needs them to save.)</p>
+    <p class="muted" style="margin-top:0;font-size:13px">These come built in. Rename them, reorder them with ▲ ▼, make them required or optional, or <strong>hide</strong> the ones you don’t use.</p>
+    <p class="muted" style="margin:6px 0 0;font-size:13px;background:#f6f8fb;border-left:3px solid #cbd5e1;padding:8px 11px;border-radius:0 7px 7px 0">
+      <strong>Why is there no Delete here?</strong> A standard field is a column in your
+      database that the system writes to every time this form is saved. Deleting it would
+      stop the form saving. <strong>Hide</strong> does what you want: the field disappears
+      from the form, and anything already recorded in it is kept. A few fields can’t even be
+      hidden — the form genuinely cannot save without them, and those are marked
+      <em>Essential</em>. Fields <em>you</em> add can be deleted, in the next card down.
+    </p>
     <form method="post" action="/form-designer-save" id="fdForm">
       <input type="hidden" name="form" value="<?= $e($sel) ?>">
       <?= $csrf() ?>
@@ -57,17 +85,17 @@ $types = $types ?? (function_exists('fd_field_types') ? fd_field_types() : []);
             $req = (string) ($o['req'] ?? '');
             $locked = !empty($f['locked']); ?>
           <tr class="fd-row" style="border-bottom:1px solid #f0f0f0">
-            <td style="padding:6px;white-space:nowrap">
+            <td data-l="Order" style="padding:6px;white-space:nowrap">
               <button type="button" class="btn xs ghost fd-up" title="Move up">▲</button>
               <button type="button" class="btn xs ghost fd-down" title="Move down">▼</button>
               <input type="hidden" name="field_key[]" value="<?= $e($key) ?>">
             </td>
-            <td style="padding:6px">
+            <td data-l="Field label (what staff see)" style="padding:6px">
               <input class="form-control" name="label[]" value="<?= $e($lbl) ?>" style="min-width:180px">
               <?php if (!empty($f['section'])): ?><div class="muted" style="font-size:12px">Section: <?= $e($f['section']) ?></div><?php endif; ?>
             </td>
-            <td style="padding:6px;white-space:nowrap"><span class="pill"><?= $e($f['type'] ?? 'text') ?></span></td>
-            <td style="padding:6px">
+            <td data-l="Type" style="padding:6px;white-space:nowrap"><span class="pill"><?= $e($f['type'] ?? 'text') ?></span></td>
+            <td data-l="Required?" style="padding:6px">
               <?php if ($locked): ?>
                 <span class="muted" style="font-size:12px">Always required</span>
               <?php else: ?>
@@ -78,11 +106,18 @@ $types = $types ?? (function_exists('fd_field_types') ? fd_field_types() : []);
                 </select>
               <?php endif; ?>
             </td>
-            <td style="padding:6px;text-align:center">
+            <td data-l="Hide from the form?" style="padding:6px;text-align:center">
               <?php if ($locked): ?>
-                <span class="muted" style="font-size:12px" title="This field is essential and cannot be hidden">—</span>
+                <span class="pill" style="background:#f1f5f9;color:#64748b;font-size:11.5px"
+                      title="The form cannot save without this field, so it cannot be hidden">Essential</span>
               <?php else: ?>
-                <input type="checkbox" name="hidden[<?= $e($key) ?>]" value="1" <?= !empty($o['hidden'])?'checked':'' ?>>
+                <?php // The word travels with the box. The table header scrolls out of
+                      // sight on a phone, which left this column with no label at all. ?>
+                <label style="display:inline-flex;align-items:center;gap:7px;min-height:44px;cursor:pointer">
+                  <input type="checkbox" name="hidden[<?= $e($key) ?>]" value="1" <?= !empty($o['hidden'])?'checked':'' ?>
+                         style="width:20px;height:20px">
+                  <span style="font-size:13px"><?= !empty($o['hidden']) ? 'Hidden' : 'Hide' ?></span>
+                </label>
               <?php endif; ?>
             </td>
           </tr>
@@ -118,6 +153,12 @@ $types = $types ?? (function_exists('fd_field_types') ? fd_field_types() : []);
                 <?= $csrf() ?>
                 <input class="form-control" name="ef_label" value="<?= $e($cf['label']) ?>" style="min-width:180px;flex:1 1 180px">
                 <span class="pill" title="Field type"><?= $e($typeWord($cf['field_type'])) ?></span>
+                <?php if ($secs): $curSec = (string) ($cf['section'] ?? ''); ?>
+                <select class="form-control" name="ef_section" title="Which section of the form this field sits in" style="min-width:150px;flex:0 1 180px">
+                  <?php foreach ($secs as $sname): ?><option value="<?= $e($sname) ?>" <?= $curSec === $sname ? 'selected' : '' ?>><?= $e($sname) ?></option><?php endforeach; ?>
+                  <option value="" <?= $curSec === '' ? 'selected' : '' ?>>At the end (More details)</option>
+                </select>
+                <?php endif; ?>
                 <label style="font-size:13px;display:flex;align-items:center;gap:5px;white-space:nowrap"><input type="checkbox" name="ef_required" value="1" <?= !empty($cf['required'])?'checked':'' ?>> Required</label>
                 <button class="btn xs" type="submit">Save</button>
               </form>
@@ -179,6 +220,17 @@ $types = $types ?? (function_exists('fd_field_types') ? fd_field_types() : []);
             <?php foreach ($types as $tk => $tl): ?><option value="<?= $e($tk) ?>"><?= $e($tl) ?></option><?php endforeach; ?>
           </select>
         </div>
+        <?php // WHERE IT GOES. Without this the field landed in a "More details"
+              // block at the foot of the form and nothing on screen said so. ?>
+        <?php if ($secs): ?>
+        <div style="flex:1 1 200px">
+          <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Where should it go?</label>
+          <select class="form-control" name="nf_section" style="width:100%">
+            <?php foreach ($secs as $sname): ?><option value="<?= $e($sname) ?>"><?= $e($sname) ?></option><?php endforeach; ?>
+            <option value="">At the end, under “More details”</option>
+          </select>
+        </div>
+        <?php endif; ?>
         <div style="flex:0 0 auto">
           <label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-bottom:8px"><input type="checkbox" name="nf_required" value="1"> Required</label>
         </div>
