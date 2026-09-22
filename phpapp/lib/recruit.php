@@ -1551,6 +1551,47 @@ function rcv_audit_or_report($candId, $kind, $subject) {
  * ledger row, and then throw all of it away.
  */
 // ============================================================================
+//  R20 — THE OTHER DOOR INTO THE TEAM REGISTER
+//
+//  Recruitment has asked "is this person already on your team?" since RB-3
+//  Step 2. Add-a-person — the user form, the org-chart import, linking a login
+//  to a team record — did not ask at all. It went straight to an INSERT, so the
+//  same person could be added twice from there without anybody being told,
+//  which is how two Inspector records for one human reach utilisation and
+//  billing.
+//
+//  The SAME engine answers on both doors. Nothing new is matched, no second
+//  duplicate-detection rule exists, and a shared NAME still stops nothing:
+//  only a shared mobile number or a shared e-mail address — things a person
+//  owns — are strong enough to interrupt anybody.
+// ============================================================================
+
+/** Strong matches for somebody being added directly, by name / e-mail / mobile. */
+function workforce_direct_matches($name, $email = '', $mobile = '') {
+    $name  = trim((string)$name);
+    $parts = preg_split('/\s+/', $name, 2);
+    $cand  = ['first_name' => (string)($parts[0] ?? ''),
+              'last_name'  => (string)($parts[1] ?? ''),
+              'email'      => (string)$email,
+              'mobile'     => (string)$mobile];
+    if (!function_exists('workforce_matches')) return [];
+    return workforce_strong_matches(workforce_matches($cand));
+}
+
+/**
+ * Why the last direct creation refused, or '' if it did not.
+ *
+ * team_member_create() has always answered with an id or 0, and every caller
+ * already treats 0 as "not created". Keeping that contract means no caller
+ * breaks; this is how they can say WHY instead of a shrug.
+ */
+function team_member_last_refusal($set = null) {
+    static $why = '';
+    if ($set !== null) $why = (string)$set;
+    return $why;
+}
+
+// ============================================================================
 //  WHAT KIND OF TEAM MEMBER — decided, never defaulted
 //
 //  `inspectors.team_role` carries DEFAULT 'FIELD'. Until now nothing on the
@@ -1866,15 +1907,20 @@ function rcv_convert($candId, array $opt = []) {
         //  not assumed: a UNIQUE violation rolls back the statement only and
         //  leaves the transaction open. And because nothing is reserved outside
         //  the row, a rollback below consumes no number at all.
-        $writeInspector = function ($code) use ($name, $cand, $kind, $office, $ag, $opt, $roll, $placement, $gd, $teamRole) {
-            db()->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,emp_code,home_office_id,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,team_role,status,created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
+        //  R20 — a hire that was let through BECAUSE somebody acknowledged a
+        //  possible existing team member is marked as such, so the e-mail key
+        //  (which refuses unacknowledged twins outright) lets it through and an
+        //  operator can see that a person decided this rather than a race.
+        $dupAck = $wfAckNote !== '' ? 1 : 0;
+        $writeInspector = function ($code) use ($name, $cand, $kind, $office, $ag, $opt, $roll, $placement, $gd, $teamRole, $dupAck) {
+            db()->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,emp_code,home_office_id,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,team_role,dup_ack,status,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
                 ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
                            $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $kind,
                            $code, $office,
                            $ag ? (int)$opt['agency_id'] : null, $roll, (string)($ag['name'] ?? ''), (float)($opt['agency_cost'] ?? 0),
                            $placement, $placement > 0 ? 'PROVISIONAL' : '', $placement > 0 ? date('Y-m-d', strtotime("+$gd days")) : '',
-                           $teamRole,
+                           $teamRole, $dupAck,
                            date('c')]);
             return (int)db()->lastInsertId();
         };

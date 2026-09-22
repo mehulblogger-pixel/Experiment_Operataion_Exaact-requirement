@@ -216,4 +216,5 @@ function indexes_migrate() {
     //  EMP01 on MariaDB. Lifetime uniqueness, so a retired person's number is
     //  constrained exactly like a live one.
     if (function_exists('emp_code_migrate'))        emp_code_migrate();
+    if (function_exists('email_key_migrate'))       email_key_migrate();
 }

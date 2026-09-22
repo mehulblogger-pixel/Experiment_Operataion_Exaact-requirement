@@ -1395,6 +1395,7 @@ function inspectors_list($activeOnly = true) {
     // triggered the migration hits exactly that, so add the column here (cheap
     // and idempotent) before it is selected.
     if (function_exists('ensure_column')) ensure_column('inspectors', 'team_role', "VARCHAR(10) DEFAULT 'FIELD'");
+    if (function_exists('email_key_migrate')) email_key_migrate();
     // trade_id (the person's discipline) is read below for the allocate picker;
     // self-heal it too so an install that never gained the column does not throw.
     if (function_exists('ensure_column')) ensure_column('inspectors', 'trade_id', 'INT NULL');
@@ -1426,14 +1427,45 @@ function inspectors_list($activeOnly = true) {
 // belong to one of these — the user form creates one inline when a new person
 // is added rather than picked. FIELD / COORD / OFFICE drives where they sit in
 // the allocate list; all three are deputable.
-function team_member_create($name, $teamRole = 'FIELD', $officeId = null, $email = '') {
+function team_member_create($name, $teamRole = 'FIELD', $officeId = null, $email = '', array $opt = []) {
     $name = trim((string)$name);
     if ($name === '') return 0;
+    if (function_exists('team_member_last_refusal')) team_member_last_refusal('');
+    //  R20 — IS THIS PERSON ALREADY ON THE TEAM?
+    //
+    //  Recruitment has asked this since RB-3 Step 2. This door — the user form,
+    //  the org-chart import, linking a login to a team record — never did, so
+    //  the same human could be added twice from here and reach utilisation and
+    //  billing as two people. The SAME engine answers, so the two doors cannot
+    //  disagree, and a shared name still stops nothing.
+    //
+    //  Acknowledging is not merging (owner decision): it records that somebody
+    //  looked at the match and said to proceed anyway.
+    if (function_exists('workforce_direct_matches') && empty($opt['dup_ack'])) {
+        $hit = workforce_direct_matches($name, (string)$email, (string)($opt['mobile'] ?? ''));
+        if ($hit) {
+            $who = [];
+            foreach (array_slice($hit, 0, 3) as $h)
+                $who[] = trim((string)($h['name'] ?? '')) . (($h['emp_code'] ?? '') !== '' ? ' (' . $h['emp_code'] . ')' : '');
+            if (function_exists('team_member_last_refusal'))
+                team_member_last_refusal('This person may already be on your team: ' . implode('; ', $who)
+                    . '. Open the team register and check before adding them again.');
+            if (function_exists('act_log')) {
+                try { act_log('INSPECTOR', 0, 'DUPLICATE_REFUSED',
+                      'Direct add refused — ' . count($hit) . ' possible existing team member(s): ' . implode('; ', $who)); }
+                catch (Throwable $e) {}
+            }
+            return 0;
+        }
+    }
     if (function_exists('ensure_column')) ensure_column('inspectors', 'team_role', "VARCHAR(10) DEFAULT 'FIELD'");
     $tr = in_array($teamRole, ['FIELD', 'COORD', 'OFFICE'], true) ? $teamRole : 'FIELD';
+    //  An acknowledged second engagement is MARKED as one, so the e-mail key
+    //  lets it through and an operator can see that somebody decided this.
     $data = ['name' => $name, 'staff_kind' => 'ASSET', 'status' => 'ACTIVE',
              'home_office_id' => $officeId ?: null, 'team_role' => $tr,
-             'email' => $email, 'created_at' => date('c')];
+             'email' => $email, 'dup_ack' => empty($opt['dup_ack']) ? 0 : 1,
+             'created_at' => date('c')];
     $data['emp_code'] = '';
     $cols = function_exists('existing_columns_only') ? existing_columns_only('inspectors', array_keys($data)) : array_keys($data);
     if (!$cols) return 0;
@@ -1446,8 +1478,23 @@ function team_member_create($name, $teamRole = 'FIELD', $officeId = null, $email
             ->execute(array_map(fn($c) => $data[$c], $cols));
         return (int)db()->lastInsertId();
     };
-    if (!function_exists('emp_code_claim')) return (int)$write(function_exists('next_emp_code') ? next_emp_code('ASSET') : '');
-    return (int)emp_code_claim('ASSET', $write);
+    //  THE E-MAIL KEY CAN REFUSE THIS, and a refusal is an answer, not a crash.
+    //  The detector above catches the ordinary case; the key catches the race it
+    //  cannot. Either way the person pressing "add" gets a sentence they can act
+    //  on rather than a stack trace, and every caller still sees the 0 it has
+    //  always understood.
+    try {
+        if (!function_exists('emp_code_claim')) return (int)$write(function_exists('next_emp_code') ? next_emp_code('ASSET') : '');
+        return (int)emp_code_claim('ASSET', $write);
+    } catch (Throwable $e) {
+        if (function_exists('email_key_is_taken') && email_key_is_taken($e)) {
+            if (function_exists('team_member_last_refusal'))
+                team_member_last_refusal('Somebody with that e-mail address is already on your team. '
+                    . 'Open the team register and check before adding them again.');
+            return 0;
+        }
+        throw $e;
+    }
 }
 
 // ---- Smart inspector suggestion for allocation (#2) ------------------------
@@ -1601,6 +1648,71 @@ function next_emp_code($kind, $skip = 0) {
 //
 //  UPPER(TRIM(...)) so ' emp01', 'EMP01 ' and 'EMP01' cannot coexist. NULL for a
 //  blank code, so the many historical rows that never had one stay unconstrained.
+// ============================================================================
+//  R20 — THE E-MAIL KEY.  Detection alone is read-then-write.
+//
+//  Three processes adding the same person at the same microsecond all read
+//  "nobody there" before any of them writes, and all three succeed. Measured:
+//  3 records created in 2 of 3 runs on MariaDB. A check that loses a race is
+//  not a protection, and §7 is explicit that SELECT-then-INSERT is not enough.
+//
+//  So the database decides — WITHOUT taking away the owner's acknowledgement.
+//  The key covers only records nobody has acknowledged:
+//
+//      unacknowledged + has an e-mail   ->  the normalised e-mail  (unique)
+//      acknowledged, or no e-mail       ->  NULL                   (unconstrained)
+//
+//  A second unacknowledged record carrying that address is therefore refused by
+//  the database, which no race can get past; a deliberate second engagement
+//  that somebody has explicitly acknowledged is exempt and still allowed. The
+//  tick remains an acknowledgement, never a merge.
+//
+//  Where a workspace ALREADY has two live people sharing an address, the
+//  installer reports DIRTY and does not build the key over data that breaks it
+//  — history is reported, never rewritten.
+// ============================================================================
+//  LIVE PEOPLE ONLY — the key says exactly what the matcher says.
+//  workforce_matches() ignores anybody who has left: "somebody who has left is
+//  history, not a duplicate". A key that did not agree would refuse to re-hire
+//  a returning employee, which is a normal and welcome thing to do. The first
+//  version of this key did exactly that, and X15 caught it.
+const EMAIL_KEY_EXPR = "CASE WHEN COALESCE(dup_ack,0)=0 AND COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE' AND TRIM(COALESCE(email,'')) <> '' THEN LOWER(TRIM(email)) ELSE NULL END";
+const EMAIL_KEY_COL  = 'uq_email_key';
+const EMAIL_KEY_IX   = 'ux_inspectors_email';
+
+function email_key_migrate() {
+    static $doneAt = -1;
+    if ($doneAt === db_epoch()) return;
+    //  Never DDL inside a transaction this function did not open — MariaDB
+    //  commits implicitly on any DDL. The marker is deliberately NOT set here,
+    //  so the first call outside a transaction still installs the key.
+    try { if (db()->inTransaction()) return; } catch (Throwable $e) {}
+    if (function_exists('ensure_column')) ensure_column('inspectors', 'dup_ack', 'INT DEFAULT 0');
+    if (!function_exists('ensure_unique_generated_index')) return;
+    ensure_unique_generated_index('inspectors', EMAIL_KEY_COL, EMAIL_KEY_EXPR, EMAIL_KEY_IX);
+    $doneAt = db_epoch();
+}
+
+/** Was this exception our e-mail key refusing a duplicate? */
+function email_key_is_taken(Throwable $e) {
+    $m = strtolower($e->getMessage());
+    return strpos($m, strtolower(EMAIL_KEY_IX)) !== false
+        || strpos($m, 'inspectors.' . EMAIL_KEY_COL) !== false
+        || strpos($m, EMAIL_KEY_COL) !== false;
+}
+
+/** Live people already sharing an address — reported, never merged. */
+function email_collisions($limit = 20) {
+    try {
+        return ops_all("SELECT LOWER(TRIM(email)) AS k, COUNT(*) AS n
+                          FROM inspectors
+                         WHERE TRIM(COALESCE(email,'')) <> ''
+                           AND COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE'
+                      GROUP BY LOWER(TRIM(email)) HAVING COUNT(*)>1
+                      ORDER BY n DESC, k LIMIT " . max(1, (int)$limit)) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
 const EMP_CODE_KEY_EXPR = "CASE WHEN TRIM(COALESCE(emp_code,'')) <> '' THEN UPPER(TRIM(emp_code)) ELSE NULL END";
 const EMP_CODE_KEY_COL  = 'uq_emp_code';
 const EMP_CODE_KEY_IX   = 'ux_inspectors_emp_code';
