@@ -120,3 +120,53 @@ $dbSrc = file_get_contents($bRoot . '/lib/db.php');
 $mysqlHalf = substr($dbSrc, strpos($dbSrc, "\$dsn = \"mysql:host"));
 t_ok(stripos($mysqlHalf, 'busy_timeout') === false && stripos($mysqlHalf, 'ATTR_TIMEOUT') === false,
      'BUSY3b · nothing was added to the MariaDB connection — the authoritative engine is untouched');
+
+// ---------------------------------------------------------------------------
+t_section('RB3 · BUSY4 — transaction contention, and what a rollback leaves');
+// ---------------------------------------------------------------------------
+//  The timeout makes a second writer WAIT. It must not make it WIN: the writes
+//  still serialise, a rollback still undoes everything, and nothing is half
+//  applied because somebody waited for a lock.
+db()->beginTransaction();
+db()->prepare("INSERT INTO holidays (hol_date,name,region) VALUES ('2099-03-01','busy-tx','X')")->execute();
+$seen = (int) ops_val("SELECT COUNT(*) FROM holidays WHERE name='busy-tx'");
+t_eq($seen, 1, 'BUSY4a · the row is visible inside its own transaction — armed');
+db()->rollBack();
+t_eq((int) ops_val("SELECT COUNT(*) FROM holidays WHERE name='busy-tx'"), 0,
+     'BUSY4 · a rollback removes it completely — waiting for a lock changes nothing about atomicity');
+
+//  A writer that waits and then commits leaves exactly one row, not two.
+$before4 = (int) ops_val("SELECT COUNT(*) FROM holidays WHERE name='busy-commit'");
+db()->beginTransaction();
+db()->prepare("INSERT INTO holidays (hol_date,name,region) VALUES ('2099-03-02','busy-commit','X')")->execute();
+db()->commit();
+t_eq((int) ops_val("SELECT COUNT(*) FROM holidays WHERE name='busy-commit'"), $before4 + 1,
+     'BUSY4b · …and a commit after waiting adds exactly one row');
+try { db()->prepare("DELETE FROM holidays WHERE name IN ('busy-commit','busy-hold','busy-write')")->execute(); } catch (Throwable $e) {}
+
+// ---------------------------------------------------------------------------
+t_section('RB3 · BUSY5 — the timeout is not a licence to lose a write');
+// ---------------------------------------------------------------------------
+//  Two real processes, both COMMITTING, staggered so each boots alone. Both
+//  writes must survive: serialised, not dropped.
+$bPath2 = sys_get_temp_dir() . '/rb3_busy5_' . getmypid() . '.sqlite';
+@unlink($bPath2);
+$cmd5 = function ($role, $hold, $at) use ($bRoot, $bPath2) {
+    return 'SQLITE_BUSY_TIMEOUT=5 php ' . escapeshellarg($bRoot . '/tests/_rb3_busy_worker.php') . ' '
+         . escapeshellarg($bPath2) . ' ' . escapeshellarg($role) . ' ' . (int)$hold . ' '
+         . escapeshellarg((string)$at) . ' 2>&1';
+};
+shell_exec($cmd5('warm', 0, 0));
+$t05 = round(microtime(true) * 1000);
+$p5a = proc_open($cmd5('hold', 1200, $t05 + 2600), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pi5a);
+usleep(1200000);
+$p5b = proc_open($cmd5('write', 0, $t05 + 3000), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pi5b);
+foreach ([[$p5a, $pi5a], [$p5b, $pi5b]] as [$pp, $pi]) {
+    stream_get_contents($pi[1]); stream_get_contents($pi[2]);
+    foreach ($pi as $fh) @fclose($fh); @proc_close($pp);
+}
+putenv('SQLITE_PATH_KEEP=' . (string)getenv('SQLITE_PATH'));
+$both = (int) shell_exec('php -r ' . escapeshellarg(
+    'try { $p=new PDO("sqlite:' . $bPath2 . '"); echo (int)$p->query("SELECT COUNT(*) FROM holidays WHERE name IN (\'busy-hold\',\'busy-write\')")->fetchColumn(); } catch (Throwable $e) { echo -1; }'));
+t_eq($both, 2, 'BUSY5 · BOTH writes survived — the waiter was serialised behind the holder, not dropped');
+@unlink($bPath2);
