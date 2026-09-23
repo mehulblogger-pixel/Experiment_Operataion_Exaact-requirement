@@ -191,7 +191,7 @@ consequence. C7 should **add forward links, not rewrite the words**.
 | F-A5-2 | Office pre-filled on 3 forms, current user on 2; assumptions rarely stated | cosmetic | MEDIUM |
 | F-A5-3 | No shared next-action component; 14 views mention one | structural | MEDIUM |
 | F-A5-4 | 3 bare empty states, 2 in shared components | cosmetic | LOW |
-| F-A5-5 | 7 raw exception messages, 6 admin-only — **but see F-A7-1: an UNCAUGHT one reaches users on a routine screen** | cosmetic | ~~LOW~~ see A7 |
+| F-A5-5 | 7 raw exception messages, 6 admin-only — **but see F-A7-1: an UNCAUGHT one reaches users on a routine screen** | cosmetic | ~~LOW~~ see A7 — **F-A7-1 fixed** |
 
 **Retired as false alarms:** workflow continuity (already correct), message
 quality (already good), empty states at scale (3, not 18).

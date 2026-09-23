@@ -4637,6 +4637,24 @@ function inspector_cert_add($inspectorId, $b, $fileKey = 'cert_file') {
                    $f['name'] ?? '', $f['mime'] ?? '', $f['data'] ?? null, user_name(current_user()), date('c')]);
 }
 
+
+//  The lookups the team-member form needs besides the row itself. Extracted so
+//  the "this may be a duplicate" re-render shows the SAME form as the ordinary
+//  one — a second, hand-copied variable list is how a re-rendered form quietly
+//  loses its office dropdown six months later.
+function inspector_form_extra_vars($ins = null) {
+    return [
+        'agencies'     => function_exists('agencies_list') ? agencies_list() : [],
+        'personDocs'   => null,
+        'personAssets' => null,
+        'offices'      => ops_all("SELECT id, name FROM offices ORDER BY is_ahmedabad DESC, name"),
+        'managers'     => ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name, last_name"),
+        'expHeads'     => ops_all("SELECT * FROM expense_heads WHERE active=1 ORDER BY sort_order, id"),
+        'travelModes'  => ops_all("SELECT * FROM travel_modes WHERE active=1 ORDER BY id"),
+        'allowMap'     => ['HEAD' => [], 'MODE' => []],
+    ];
+}
+
 function ops_inspectors($action, $method) {
     $pdo = db();
     // Serve a stored certificate scan.
@@ -4765,9 +4783,64 @@ function ops_inspectors($action, $method) {
                 flash('Inspector saved.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             } else {
-                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_id,agency_name,home_office_id,weekly_working_days,reports_to_id,team_role,agency_cost,salary_ctc,status,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyId, $agencyName, $homeOff, $wwd, $reportTo, $teamRole, $agencyCost ?: 0, $salary ?: 0, ($b['status'] ?? '') ?: 'ACTIVE', date('c')]);
+                //  R20 · F-A7-1 — IS THIS PERSON ALREADY ON THE TEAM?
+                //
+                //  Three doors create a workforce record: hiring a candidate
+                //  (rcv_convert), the user form / org import (team_member_create)
+                //  and this one. The first two have asked this question since
+                //  RB-3; this one never did, because it writes its own INSERT
+                //  rather than going through team_member_create(). The data was
+                //  still safe — the e-mail key refused the second row — but the
+                //  refusal arrived as an uncaught PDOException, so the person
+                //  adding a colleague was shown a raw SQLSTATE.
+                //
+                //  The SAME engine answers here, so the three doors cannot
+                //  disagree. A shared name alone still stops nothing.
+                //
+                //  Acknowledging is NOT merging (owner decision): it records
+                //  that somebody looked and chose to proceed, and marks the row
+                //  so the e-mail key admits it deliberately.
+                $dupAck = !empty($b['dup_ack']) ? 1 : 0;
+                if (!$dupAck && function_exists('workforce_direct_matches')) {
+                    $hit = workforce_direct_matches($full, (string)($b['email'] ?? ''), (string)($b['mobile'] ?? ''));
+                    if ($hit) {
+                        $who = [];
+                        foreach (array_slice($hit, 0, 3) as $h)
+                            $who[] = trim((string)($h['name'] ?? '')) . (($h['emp_code'] ?? '') !== '' ? ' (' . $h['emp_code'] . ')' : '');
+                        $why = implode('; ', $who) . '. Open the team register and check before adding them again.';
+                        if (function_exists('act_log')) {
+                            try { act_log('INSPECTOR', 0, 'DUPLICATE_REFUSED',
+                                  'Masters add refused — ' . count($hit) . ' possible existing team member(s): ' . implode('; ', $who)); }
+                            catch (Throwable $e) {}
+                        }
+                        //  Re-render with what they typed, so a second engagement
+                        //  is one tick away rather than a re-type. $ins carries no
+                        //  id, which is why the view now keys "edit" off the id.
+                        view('ops/inspector_form', ['ins' => $b, 'certs' => [], 'dupWarn' => $why,
+                            'skillsByTrade' => skills_by_trade(),
+                            'sbuOpts' => lk_options_or('sbu', OPS_SBUS)] + inspector_form_extra_vars());
+                        return true;
+                    }
+                }
+                try {
+                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_id,agency_name,home_office_id,weekly_working_days,reports_to_id,team_role,agency_cost,salary_ctc,status,dup_ack,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyId, $agencyName, $homeOff, $wwd, $reportTo, $teamRole, $agencyCost ?: 0, $salary ?: 0, ($b['status'] ?? '') ?: 'ACTIVE', $dupAck, date('c')]);
+                } catch (Throwable $e) {
+                    //  A REFUSAL IS AN ANSWER, NOT A CRASH. The e-mail key is the
+                    //  last line of defence against the race the check above cannot
+                    //  see; without this catch it reached the global handler and
+                    //  printed SQLSTATE[23000] at the person adding a colleague.
+                    if (function_exists('email_key_is_taken') && email_key_is_taken($e)) {
+                        view('ops/inspector_form', ['ins' => $b, 'certs' => [],
+                            'dupWarn' => 'Somebody on your team already uses the e-mail address '
+                                       . trim((string)($b['email'] ?? '')) . '.',
+                            'skillsByTrade' => skills_by_trade(),
+                            'sbuOpts' => lk_options_or('sbu', OPS_SBUS)] + inspector_form_extra_vars());
+                        return true;
+                    }
+                    throw $e;   // anything else is genuinely unexpected — do not swallow it
+                }
                 // Field-finding #26 — a new team member (incl. a contractor) is ACTIVE unless a real
                 // status is chosen. Before, an empty status field created a blank status, and the person
                 // then vanished from the allocate picker and the operational dashboard (which filter on

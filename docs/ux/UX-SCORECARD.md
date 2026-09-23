@@ -19,7 +19,7 @@ Rel = data-relationship clarity.
 
 | Screen | Nav | Vis | Act | Den | Mob | Err | Flow | Sta | Rel | Worst |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|---|
-| **Masters → Add a person** | 4 | 4 | 4 | 3 | – | **1** | 3 | – | 2 | **Err — raw SQLSTATE (F-A7-1)** |
+| **Masters → Add a person** | 4 | 4 | 4 | 3 | – | ~~1~~ **4** | 3 | – | 2 | ~~Err — raw SQLSTATE~~ **F-A7-1 fixed** |
 | **Recruitment Command Centre** | **2** | 3 | **2** | **1** | – | – | 3 | 4 | 2 | Den — 2,643px, 43 links |
 | **Test request (record)** | **2** | 3 | **1** | 2 | – | – | 4 | 4 | 3 | Act — 6 primaries, no breadcrumb |
 | **Requirement (record)** | 4 | 4 | **2*** | 3 | – | – | 4 | 4 | 2 | Act — 0 primary (*sparse data) |
@@ -57,7 +57,7 @@ Counting every score of **1 or 2**:
 | **Mobile** | 4 | F-A4-3 — 249 of 251 tables |
 | **Action clarity** | 4 | F-A6-3 — both too many and too few |
 | **Navigation** | 2 | F-A2-5, F-A3-3 |
-| **Error clarity** | 2 | F-A7-1 |
+| **Error clarity** | ~~2~~ 4 | F-A7-1 — **fixed**; this was the single screen holding the dimension down |
 
 **Data-relationship clarity is the weakest dimension across the product** — nine
 screens at 2 or below — and it is also the cheapest to lift: 30 definitions that

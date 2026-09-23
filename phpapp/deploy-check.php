@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '4d4e7d5 · 2026-09-23 03:27 UTC · 666 files';
+$RELEASE = '56d0f99 · 2026-09-23 07:25 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -170,7 +170,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66367,'h'=>'a72d0b3a6f354b7c'],
-    'lib/ops.php' => ['s'=>670337,'h'=>'2a6dc69ebc33cb08'],
+    'lib/ops.php' => ['s'=>675179,'h'=>'a2de8dda0d191534'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -474,7 +474,7 @@ $EXPECT  = [
     'views/ops/incident_form.php' => ['s'=>5632,'h'=>'4153f74a53b9790f'],
     'views/ops/incidents.php' => ['s'=>2969,'h'=>'a8f2e53178bd649c'],
     'views/ops/industry.php' => ['s'=>4753,'h'=>'4570c1fa07664b54'],
-    'views/ops/inspector_form.php' => ['s'=>23472,'h'=>'b47db355b299321f'],
+    'views/ops/inspector_form.php' => ['s'=>24849,'h'=>'499f769f07b5586f'],
     'views/ops/inspector_list.php' => ['s'=>2162,'h'=>'f6f7abf64150c70b'],
     'views/ops/inspector_profile.php' => ['s'=>7341,'h'=>'b2cd86e7959a880a'],
     'views/ops/integrations.php' => ['s'=>2285,'h'=>'ba2e5d07e0408e82'],

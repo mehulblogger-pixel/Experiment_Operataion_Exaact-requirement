@@ -1,14 +1,20 @@
 <?php
+  //  EDIT means "this row exists", not "$ins is truthy". When the add is
+  //  refused as a possible duplicate the form is re-rendered with the values
+  //  just typed, so $ins is populated but has no id — and the old truthiness
+  //  test would have posted it to /m/inspectors/edit?id=0.
+  $isEdit = !empty($ins['id']);
+  $dupWarn = trim((string)($dupWarn ?? ''));
   $selSbus = ($ins && !empty($ins['sbus'])) ? explode(',', $ins['sbus']) : [];
   $selSkills = ($ins && !empty($ins['skill_ids'])) ? explode(',', $ins['skill_ids']) : [];
   $curTrade = $ins['trade_id'] ?? '';
   $trades = lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/m/inspectors"><?= e(TP('engineer')) ?></a> › <?= $ins ? 'Edit' : 'Add' ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/m/inspectors"><?= e(TP('engineer')) ?></a> › <?= $isEdit ? 'Edit' : 'Add' ?></div>
 <div class="master-head">
-  <div><h1><?= $ins ? 'Edit — ' . e($ins['name']) : 'Add ' . Tl('engineer') ?></h1></div>
+  <div><h1><?= $isEdit ? 'Edit — ' . e($ins['name']) : 'Add ' . Tl('engineer') ?></h1></div>
   <div style="display:flex;gap:8px">
-    <?php if ($ins && function_exists('iddoc_can_view') && iddoc_can_view()): ?>
+    <?php if ($isEdit && function_exists('iddoc_can_view') && iddoc_can_view()): ?>
       <a class="btn secondary" href="/identity?i=<?= (int)$ins['id'] ?>">Documents &amp; KYC →</a>
     <?php endif; ?>
     <a class="btn secondary" href="/m/inspectors">← Back to <?= e(THP('engineer')) ?></a>
@@ -16,13 +22,28 @@
 </div>
 
 <div data-tabs data-tabs-key="inspector">
-<form method="post" action="/m/inspectors/<?= $ins ? 'edit?id=' . (int)$ins['id'] : 'new' ?>" class="panel" data-tab="Details" enctype="multipart/form-data">
+<form method="post" action="/m/inspectors/<?= $isEdit ? 'edit?id=' . (int)$ins['id'] : 'new' ?>" class="panel" data-tab="Details" enctype="multipart/form-data">
+  <?php //  R20 — the SAME refusal the hiring path and the user form already give.
+        //  Acknowledging is NOT merging (owner decision): the tick records that a
+        //  human looked at the match and chose to proceed, and the second record
+        //  is marked so the e-mail key lets it through deliberately. ?>
+  <?php if ($dupWarn !== ''): ?>
+    <div class="msg msg-warning" style="margin:0 0 14px">
+      <div style="font-weight:700;margin-bottom:4px">This person may already be on your team</div>
+      <div><?= e($dupWarn) ?></div>
+      <label style="display:flex;align-items:flex-start;gap:9px;margin-top:11px;min-height:44px;cursor:pointer">
+        <input type="checkbox" name="dup_ack" value="1" style="width:20px;height:20px;margin-top:2px">
+        <span>I have checked the team register — this is a different person, or a
+              second engagement of the same person. Add them anyway.</span>
+      </label>
+    </div>
+  <?php endif; ?>
   <div class="form-grid">
     <div class="ff"><label>First name *</label><input class="form-control" name="first_name" required value="<?= e($ins['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Middle name</label><input class="form-control" name="middle_name" value="<?= e($ins['middle_name'] ?? '') ?>"></div>
     <div class="ff"><label>Last name</label><input class="form-control" name="last_name" value="<?= e($ins['last_name'] ?? '') ?>"></div>
     <div class="ff"><label>Employee code</label><input class="form-control" id="emp_code" name="emp_code" value="<?= e($ins['emp_code'] ?? '') ?>" placeholder="auto">
-      <small class="muted" id="emp_code_hint"><?= $ins ? 'Leave as-is to keep this code.' : 'Leave blank to auto-generate. Sub-contractors get <b>SC-###</b>, freelancers <b>FL-###</b>, staff <b>EMP##</b>.' ?></small></div>
+      <small class="muted" id="emp_code_hint"><?= $isEdit ? 'Leave as-is to keep this code.' : 'Leave blank to auto-generate. Sub-contractors get <b>SC-###</b>, freelancers <b>FL-###</b>, staff <b>EMP##</b>.' ?></small></div>
     <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($ins['email'] ?? '') ?>"></div>
     <div class="ff"><label>Mobile</label><input class="form-control" name="mobile" value="<?= e($ins['mobile'] ?? '') ?>"></div>
     <div class="ff"><label>Designation</label>
@@ -87,7 +108,7 @@
     <?php // Document checklist (gap 3) — presence-only, so it shows here without
           //   the identity-document permission. What is missing is one click from
           //   being filed. Only meaningful once the person exists. ?>
-    <?php if ($ins && !empty($personDocs) && (int)$personDocs['total'] > 0): $pd = $personDocs; ?>
+    <?php if ($isEdit && !empty($personDocs) && (int)$personDocs['total'] > 0): $pd = $personDocs; ?>
     <div class="ff ff-wide"><label>Document checklist
         <span class="muted">— <?= (int)$pd['have'] ?>/<?= (int)$pd['total'] ?> on file<?= $pd['complete'] ? ', complete' : '' ?></span></label>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px">
@@ -100,7 +121,7 @@
     <?php endif; ?>
 
     <?php // Assets issued to this person (stamps, safety gear, devices…). ?>
-    <?php if ($ins && !empty($personAssets)): $pa = $personAssets; ?>
+    <?php if ($isEdit && !empty($personAssets)): $pa = $personAssets; ?>
     <div class="ff ff-wide"><label>Assets issued
         <span class="muted">— <?= (int)$pa['out'] ?> currently held<?= $pa['noack'] ? ', '.(int)$pa['noack'].' not acknowledged' : '' ?></span></label>
       <div>
@@ -115,7 +136,7 @@
     <?php endif; ?>
   </div>
 
-  <?php if (!$ins): // §WO-7 — attach a first certificate (with its scan) right while adding ?>
+  <?php if (!$isEdit): // §WO-7 — attach a first certificate (with its scan) right while adding ?>
   <fieldset style="margin-top:16px;border:1px solid var(--line);border-radius:8px;padding:12px">
     <legend style="padding:0 6px;font-weight:600">First certificate <span class="muted" style="font-weight:400">— optional; add more after saving</span></legend>
     <div class="form-grid">
@@ -134,12 +155,12 @@
         // label / order / hide / required overrides to the built-in ones.
         if (function_exists('fd_extra_fields')) echo fd_extra_fields('inspector', $ins['id'] ?? 0); ?>
   <div style="margin-top:16px;">
-    <button class="btn" type="submit"><?= $ins ? 'Save ' . Tl('engineer') : 'Add ' . Tl('engineer') ?></button>
+    <button class="btn" type="submit"><?= $isEdit ? 'Save ' . Tl('engineer') : 'Add ' . Tl('engineer') ?></button>
     <a class="btn secondary" href="/m/inspectors">Cancel</a>
   </div>
 </form>
 
-<?php if ($ins): ?>
+<?php if ($isEdit): ?>
 <div class="panel" data-tab="Signature">
   <h3 class="tab-sub" style="margin-top:0">Digital signature <span class="muted">— added automatically to this <?= e(Tl('engineer')) ?>'s reports (IDEMS)</span></h3>
   <?php if (!empty($ins['signature'])): ?><div style="margin-bottom:8px"><img src="<?= e($ins['signature']) ?>" alt="signature" style="max-width:240px;border:1px solid var(--line);border-radius:8px;background:#fff"></div><?php endif; ?>
@@ -155,7 +176,7 @@
   <script>(function(){var c=document.getElementById('inspSig'),x=c.getContext('2d'),d=false,dy=false;x.lineWidth=2.2;x.lineCap='round';function p(e){var r=c.getBoundingClientRect();var t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)};}function s(e){d=true;var q=p(e);x.beginPath();x.moveTo(q.x,q.y);e.preventDefault();}function m(e){if(!d)return;var q=p(e);x.lineTo(q.x,q.y);x.stroke();dy=true;e.preventDefault();}function en(){d=false;if(dy)document.getElementById('inspSigV').value=c.toDataURL('image/png');}c.addEventListener('mousedown',s);c.addEventListener('mousemove',m);window.addEventListener('mouseup',en);c.addEventListener('touchstart',s);c.addEventListener('touchmove',m);c.addEventListener('touchend',en);window.inspSigClear=function(){x.clearRect(0,0,c.width,c.height);document.getElementById('inspSigV').value='';};})();</script>
 </div>
 
-<?php if ($ins): ?>
+<?php if ($isEdit): ?>
 <div class="panel" id="certs" data-tab="Certificates">
   <h3 class="tab-sub" style="margin-top:0">Certifications &amp; validity</h3>
   <p class="sub">The system e-mails the <?= e(Tl('engineer')) ?> and the QA/QC nominee when a certificate is within a month of expiry. Once the hard copy is received, update the validity date here.
@@ -209,7 +230,7 @@
 <?php endif; ?>
 <?php endif; ?>
 
-<?php if ($ins && is_master()): ?>
+<?php if ($isEdit && is_master()): ?>
 <div class="panel" data-tab="Allowances &amp; rates" style="border:1px solid #d9b38c;background:#fffaf3">
   <h3 class="tab-sub" style="margin-top:0">Allowances &amp; rates <span class="muted">— Super Admin only. Not visible to anyone else.</span></h3>
   <p class="sub">Tick what this <?= e(Tl('engineer')) ?> is entitled to claim on the monthly voucher, and set their personal rate where it differs from the default. Blank rate = use the master default.</p>
@@ -251,7 +272,7 @@
 <script>
 window.SKILLS = <?= json_encode(skills_by_trade()) ?>;
 window.SKILLS_SELECTED = <?= json_encode(array_map('intval', $selSkills)) ?>;
-<?php if (!$ins): ?>
+<?php if (!$isEdit): ?>
 (function(){
   var kindSel=document.querySelector('select[name="staff_kind"]'), code=document.getElementById('emp_code'), hint=document.getElementById('emp_code_hint');
   var PFX={ASSET:'EMP##',SUBCON:'SC-###',FREELANCER:'FL-###'};

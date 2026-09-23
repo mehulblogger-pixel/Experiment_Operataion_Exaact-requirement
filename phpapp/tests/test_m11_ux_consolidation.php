@@ -152,7 +152,30 @@ t_ok(strpos($gate, 'module is not switched on for this installation') !== false,
      'G · "your company has not got this module" is said in those words');
 t_ok(strpos($gate, 'Ask your administrator') !== false,
      'G · and "you personally may not" is a different sentence');
-t_ok(strpos($gate, 'SQLSTATE') === false, 'G · no database error text reaches a user from the gate');
+//  This asked whether the string "SQLSTATE" appears ANYWHERE in a 10,000-line
+//  file. That is the right intent measured the wrong way, and it bit: F-A7-1's
+//  fix added a comment explaining that a raw SQLSTATE used to reach the person
+//  adding a colleague, and the guard failed on the explanation rather than on
+//  any behaviour. A rule that forbids naming a defect in a comment discourages
+//  exactly the documentation that stops it coming back — and it would equally
+//  forbid a legitimate `catch` that RECOGNISES a SQLSTATE, which is the
+//  defensive code we want.
+//
+//  So: strip comments and strings-in-comments first, then assert the word
+//  appears in nothing the user is shown. Stronger than the original, because
+//  it now checks the emitting calls rather than the file.
+$gateCode = preg_replace('#/\*.*?\*/#s', '', $gate);        // block comments
+$gateCode = preg_replace('#^\s*//.*$#m', '', $gateCode);     // line comments
+$gateEmits = [];
+if (preg_match_all('#(?:flash|echo|print|view)\s*\((?:[^()]|\([^()]*\))*\)#', $gateCode, $mEmit))
+    $gateEmits = $mEmit[0];
+t_ok(count($gateEmits) > 200,
+     'G ARMING · the emit scan found ' . count($gateEmits) . ' flash/echo/view calls to check');
+$gateLeak = array_values(array_filter($gateEmits, fn($c) => stripos($c, 'SQLSTATE') !== false));
+t_eq($gateLeak, [], 'G · no database error text reaches a user from the gate');
+//  And prove the scan would catch one, so a pass means something.
+t_ok(stripos("flash('SQLSTATE[23000] oh dear')", 'SQLSTATE') !== false,
+     'G ARMING · the check does detect SQLSTATE inside an emitting call');
 
 // ---- H · Consolidation removed no screen and no action --------------------
 foreach (['ops_recruitment_home', 'ops_area_home', 'workspace_landing_for', 'cockpit_can',

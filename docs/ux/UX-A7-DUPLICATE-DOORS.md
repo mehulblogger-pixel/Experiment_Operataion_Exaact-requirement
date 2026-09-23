@@ -37,6 +37,7 @@ The raw counts badly overstate the problem: 8 of the 11 inspector inserts are
 
 ## F-A7-1 · Three doors create a workforce record, and one shows the user a raw SQL error
 **Class: workflow · Severity: CRITICAL · Confidence: reproduced in a browser**
+**Status: FIXED — see "How it was fixed" at the end of this finding.**
 
 | Door | Entry point | Pre-submit duplicate check |
 |---|---|---|
@@ -102,6 +103,73 @@ The fix is to make them behave the same, not to remove any:
 permission, lifecycle or schema changes. It belongs early in C-phase, ahead of
 cosmetic work.
 
+### How it was fixed
+
+Fixed ahead of C-phase on the owner's instruction, using only machinery that
+already existed. **The person/workforce model was not changed** — the
+`dup_ack` column and the `ux_inspectors_email` unique key were both built for
+R20; this door simply was not using them.
+
+| Before | After |
+|---|---|
+| No check before the insert | Asks `workforce_direct_matches()` first, exactly as door B does |
+| Raw `INSERT`, no `try/catch` | Wrapped; `email_key_is_taken()` recognises the key violation and answers in words |
+| `SQLSTATE[23000]…` on screen | *"This person may already be on your team — Arun Verma (EMP01). Open the team register and check before adding them again."* |
+| No way to proceed deliberately | A tick — *"I have checked; this really is a different person"* — writes `dup_ack`, as door B does |
+| Typed values lost | The refused page re-renders the same form with every value the user typed |
+
+Three supporting repairs came with it, all found by testing rather than reading:
+
+1. `inspector_form_extra_vars()` was extracted so the **refused** re-render is
+   given the same agencies, offices, managers and document lists as the normal
+   form. Without it the refusal page would have been a degraded form — a second
+   defect hidden behind the first.
+2. The form's new/edit switches keyed off `$ins` being set. On a refused add,
+   `$ins` **is** set (it holds what the user typed), so the page would have
+   claimed to be an edit and posted to `/edit?id=0`. It now keys off
+   `$isEdit = !empty($ins['id'])`.
+3. **A correction to point 2, caught in review before this was committed.**
+   Switching the title, the breadcrumb and the main form action was not enough.
+   The page carries five further sections that only make sense for a row that
+   exists — the signature pad, the certificate register, the Super-Admin
+   allowances form, the document checklist and the "Documents & KYC" button —
+   and every one of them was still keyed off `$ins` being truthy. On a refused
+   add they would each have rendered against **record 0**: three more forms
+   posting to `/m/inspectors/edit?id=0` and a KYC link to `/identity?i=0`. The
+   same mistake ran the other way too: the "First certificate" section, which
+   belongs to *adding*, was hidden by `if (!$ins)` on a page that is still an
+   add.
+
+   This was my own fix being half-done, and the first round of tests passed
+   over it because they asked *"does the main form post to /new?"* rather than
+   *"does anything on this page point at a record that does not exist?"*. The
+   rule is now the stronger one: **`$ins` is for reading values back; `$isEdit`
+   decides what the page is** — and both the server battery (E8) and the browser
+   walk (U3d/U3e/U3f) enforce it, each proven to fail when one switch is put
+   back.
+
+**Acknowledging is not merging.** Ticking the box creates a *second* record, as
+it does on door B. The owner's rule — the system never decides two people are
+one — is untouched.
+
+#### Proof
+
+| Check | Result |
+|---|---|
+| `tests/test_fa7_masters_duplicate_door.php` (new, 29 assertions) | pass — the three doors are asserted to agree, and arming assertions prove each trap was set |
+| `tools/fa7-door-check.js` (new, 16 checks in Chromium) | pass — no SQLSTATE on screen; the existing person is named; the tick is offered; typed values survive; **nothing on the page points at record 0**; acknowledging leaves **two** records, not one |
+| Mutation test | one `$isEdit` switch put back to `$ins` — E8 and U3d both fail; restored, both pass |
+| Full regression, SQLite and MariaDB (authoritative) | see commit message |
+
+One existing test had to be strengthened rather than satisfied:
+`test_m11_ux_consolidation.php`'s rule *"no SQL error text reaches a user"*
+asked whether the word `SQLSTATE` appeared anywhere in a 10,000-line file, so it
+failed on the **comment** explaining this defect. A rule that forbids naming a
+defect in a comment discourages the documentation that stops it returning — and
+would equally forbid a legitimate `catch` that *recognises* a SQLSTATE, which is
+precisely the defensive code wanted here. It now strips comments and inspects
+the 259 emitting calls instead. Stronger, not looser.
+
 ---
 
 ## F-A7-2 · Two doors create a candidate, and they agree
@@ -136,12 +204,13 @@ missed the SQLSTATE entirely.
 
 | ID | Finding | Class | Severity |
 |---|---|---|---|
-| F-A7-1 | Masters "add a person" bypasses the duplicate guard and shows a raw SQLSTATE | workflow | **CRITICAL** |
+| F-A7-1 | Masters "add a person" bypasses the duplicate guard and shows a raw SQLSTATE | workflow | ~~**CRITICAL**~~ **FIXED** |
 | F-A7-2 | Candidate creation: two doors, consistent | — | none |
 | — | Multi-screen links to create routes | — | legitimate, keep |
 
 **Corrections issued:** UX-A5's error finding was too comfortable; the business
 UAT playbook's DUP-003 is wrong and must be amended before the owner runs it.
 
-**No product decision required.** F-A7-1 needs a code fix using helpers that
-already exist.
+**No product decision required.** F-A7-1 needed a code fix using helpers that
+already existed, and has been made. The UAT playbook's DUP-003 correction block
+has been lifted: the test may now be run as written.

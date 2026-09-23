@@ -230,11 +230,44 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors i WHERE i.name LIKE 'RB3Same%
 //  the write lock before they get near it, so they are told the honest generic
 //  thing instead. Both are deterministic refusals; only one of them can be
 //  RACE_LOST, and asserting RACE_LOST on SQLite would be asserting a fiction.
+//
+//  CORRECTION — this assertion used to demand RACE_LOST from all three on
+//  MariaDB, and went red roughly one full-suite run in three. That was the
+//  test over-specifying, not the product misbehaving. Traced to the source:
+//  a LATE straggler reads the application AFTER the winner has committed, so
+//  the idempotency guard (recruit.php, "already been converted") answers it
+//  BEFORE the transaction is even opened, and it never reaches the conditional
+//  UPDATE that produces RACE_LOST. Reproduced deliberately: convert an
+//  application, then convert it again — the second call returns ALREADY.
+//
+//  Both answers are specific, deterministic, and say the same thing to the
+//  person: somebody else has already hired this applicant. What must be true
+//  is the GUARANTEE (one hire, no orphan — X2a/b/c above) and that every
+//  loser was given a NAMED reason rather than a generic failure. A test that
+//  is red one run in three for a correct outcome trains people to ignore a red
+//  suite, which is worse than having no test at all.
+$x2codes = array_map(fn($r) => (string)($r['code'] ?? '?'), $x2res);
 if (t_driver() === 'sqlite') {
     t_eq(count(array_filter($x2res, fn($r) => empty($r['ok']))), 3,
          'X2d (sqlite) · the other three were all refused, none of them silently succeeding');
 } else {
-    t_eq($x2lost, 3, 'X2d · the other three were told RACE_LOST — the specific, deterministic refusal');
+    $x2named = array_values(array_filter($x2res,
+        fn($r) => empty($r['ok']) && in_array((string)($r['code'] ?? ''), ['RACE_LOST', 'ALREADY'], true)));
+    t_eq(count($x2named), 3,
+         'X2d · the other three were each given a NAMED reason — RACE_LOST (lost the write) or '
+         . 'ALREADY (the winner had already committed); never a generic failure [' . implode(' ', $x2codes) . ']');
+    //  ARMING — run the SAME filter over a synthetic set that contains the
+    //  refusals this must never accept. If widening the set had made the
+    //  assertion toothless, this would pass 3 and give the game away.
+    $x2probe = [['ok' => false, 'code' => 'RACE_LOST'], ['ok' => false, 'code' => 'FAILED'],
+                ['ok' => false, 'code' => 'BUSY'],      ['ok' => true,  'code' => 'CONVERTED']];
+    t_eq(count(array_values(array_filter($x2probe,
+             fn($r) => empty($r['ok']) && in_array((string)($r['code'] ?? ''), ['RACE_LOST', 'ALREADY'], true)))), 1,
+         'X2d ARMING · the same filter accepts only 1 of a set holding FAILED, BUSY and a success — '
+         . 'a generic failure still fails this assertion');
+    t_ok($x2lost >= 0 && $x2lost <= 3,
+         'X2d · of those, ' . $x2lost . ' lost the conditional UPDATE and ' . (3 - $x2lost)
+         . ' were stopped by idempotency before it — both are correct outcomes of the same race');
 }
 
 // ---------------------------------------------------------------------------

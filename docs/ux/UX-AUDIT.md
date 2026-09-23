@@ -31,7 +31,7 @@ architecture · **cosmetic** = presentation only.
 
 | ID | Screen / area | Problem | Why it confuses | Class | Sev | Risk of fixing |
 |---|---|---|---|---|---|---|
-| **F-A7-1** | Masters → Add a person | Bypasses the duplicate guard; uncaught exception prints `SQLSTATE[23000]` | Two other doors name the person you may already have; this one shows a database error | workflow | **CRIT** | low — helpers exist |
+| **F-A7-1** | Masters → Add a person | Bypasses the duplicate guard; uncaught exception prints `SQLSTATE[23000]` | Two other doors name the person you may already have; this one shows a database error | workflow | ~~CRIT~~ **FIXED** | done — see A7 |
 | **F-A2-2** | Every page | Theme engine overrides a compliant `--muted` (5.17:1) with a derived grey measuring **2.46:1** | Most secondary text in the product fails WCAG AA, by default | cosmetic | HIGH | low |
 | **F-A3-1** | 8 area homes | 103 tiles, **0** carry a count — the badge is built, rendered, and unused | Every area answers "what can I do" and none answers "what needs attention" | structural | HIGH | low |
 | **F-A4-1** | `/search` | Excludes candidates, requisitions, hiring requests, samples, methods, controlled docs, risks | Screen promises "every register you are allowed to see"; a candidate is findable once hired, invisible before | structural | HIGH | low |
@@ -95,8 +95,9 @@ caused wasted work. They are corrected in place in the source documents:
 | "18 views with a bare no-records message" | **3** — the rest was prose beginning "Nothing here…" | A5 |
 | "Errors substantially handled — 7 reachable, 6 admin-only" | **Wrong.** An *uncaught* exception shows a SQLSTATE on a routine screen | A7 |
 
-A fifth correction went to the owner's own documents: **UAT test DUP-003 is
-wrong** and now carries a warning not to run it until F-A7-1 is fixed.
+A fifth correction went to the owner's own documents: **UAT test DUP-003 was
+wrong.** F-A7-1 has since been fixed on the owner's instruction, so DUP-003 now
+describes what the product does and the warning has been lifted.
 
 ---
 
