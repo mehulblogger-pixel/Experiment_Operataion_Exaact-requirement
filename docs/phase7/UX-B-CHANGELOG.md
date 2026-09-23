@@ -17,7 +17,7 @@ of one — and must be verified on populated data.
 
 ---
 
-## B1 — Accessibility and global visual tokens · commit `74d72c3`
+## B1 — Accessibility and global visual tokens · commit `0c02577`
 
 ### Source changes
 
