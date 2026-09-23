@@ -39,11 +39,13 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   .rcc .kpi .v{font-size:32px;font-weight:800;line-height:1;padding:15px 14px 0;letter-spacing:-.5px}
   .rcc .kpi .dd{font-size:11.5px;color:var(--muted);padding:6px 14px 14px;margin-top:auto}
   /* A gentle multi-colour header cycle across a row, echoing a live wall board. */
+  /* Same five hues, contrast-corrected so white band text clears 4.5:1 —
+     teal was 2.92, green 3.35, orange 2.67. Matches the global palette. */
   .rcc .kpis .kpi:nth-child(5n+1){--kh:#3b6fb0}
-  .rcc .kpis .kpi:nth-child(5n+2){--kh:#3aa6a6}
-  .rcc .kpis .kpi:nth-child(5n+3){--kh:#4a9d5b}
+  .rcc .kpis .kpi:nth-child(5n+2){--kh:#2d8181}
+  .rcc .kpis .kpi:nth-child(5n+3){--kh:#3e844c}
   .rcc .kpis .kpi:nth-child(5n+4){--kh:#7d5ba6}
-  .rcc .kpis .kpi:nth-child(5n+5){--kh:#e08a3c}
+  .rcc .kpis .kpi:nth-child(5n+5){--kh:#a6662c}
   /* Semantic state always wins over the decorative cycle. */
   .rcc .kpi.good{--kh:var(--ok)}.rcc .kpi.good .v{color:var(--ok)}
   .rcc .kpi.bad{--kh:var(--bad)}.rcc .kpi.bad .v{color:var(--bad)}

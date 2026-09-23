@@ -420,31 +420,66 @@ body.app{background:var(--bg)}
    render as three lines of plain body text with no hierarchy at all. Both
    names now resolve to the same rules, so no screen can be left unstyled and
    either name is safe to write. */
+/* ============================================================
+   ONE KPI CARD — the colour-headed, big-number card proven on
+   the Recruitment Command Centre, promoted to the whole product.
+
+   Three designs existed: this one (global .kpi, grey label on
+   top), the Recruitment one (a coloured header band), and the
+   dashboard's .qcard / .tile (label BELOW the number). Same
+   job, three looks, so moving between modules felt like moving
+   between products.
+
+   DESIGN ONLY. No markup changed, no metric changed, no card
+   added or removed. Every existing class name still works:
+   .k/.k-lab is the band, .v/.k-val the number, .d/.k-sub the
+   note, .kic the icon.
+
+   Header colours: the Recruitment palette rotates five hues.
+   Three of them did not carry white text safely —
+   teal 2.92:1, green 3.35:1, orange 2.67:1 against the 4.5:1
+   that 10.5px bold needs. Rolling those out unchanged would
+   have spread one screen's contrast fault across the product,
+   so each was darkened along its own hue until it cleared:
+   teal #3aa6a6 -> #2d8181 (4.60), green #4a9d5b -> #3e844c
+   (4.56), orange #e08a3c -> #a6662c (4.61). Blue and purple
+   already passed and are untouched. At a glance the palette
+   reads the same; it is simply legible.
+   ============================================================ */
 .kpi-row{display:grid;gap:16px;grid-template-columns:repeat(4,1fr);margin-bottom:16px}
-.kpi{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-  padding:16px 18px;box-shadow:var(--shadow-sm);overflow:hidden}
-.kpi .k, .kpi .k-lab{display:block;font-size:11.5px;font-weight:700;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.4px;line-height:1.35;padding-right:26px}
-.kpi .v, .kpi .k-val{display:block;font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.1;
-  margin:6px 0 3px;font-variant-numeric:tabular-nums}
-.kpi .v a, .kpi .k-val a{color:var(--ink)}
-.kpi .d, .kpi .k-sub{display:block;font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.35}
-.kpi .kic{position:absolute;right:16px;top:14px;font-size:17px;opacity:.55;line-height:1}
-/* A card that is a link behaves like one. */
-a.kpi{text-decoration:none;color:var(--ink);transition:transform .12s,box-shadow .16s}
-a.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow);text-decoration:none}
-/* Semantic tone: a 3px rail down the left edge, plus a tinted value. Kept
-   separate from the accent colour so "won" and "lost" read at a glance. */
-.kpi.tone-ok, .kpi.tone-warn, .kpi.tone-bad, .kpi.tone-info{padding-left:21px}
-.kpi.tone-ok::before, .kpi.tone-warn::before, .kpi.tone-bad::before, .kpi.tone-info::before{
-  content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
-.kpi.tone-ok::before{background:var(--ok)}
-.kpi.tone-warn::before{background:var(--warn)}
-.kpi.tone-bad::before{background:var(--bad)}
-.kpi.tone-info::before{background:var(--info)}
+.kpi{position:relative;background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:0;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 1px 2px rgba(16,24,40,.05),0 8px 22px -18px rgba(16,24,40,.28)}
+/* The label becomes a solid header band. */
+.kpi .k, .kpi .k-lab, .kpi .l{display:block;background:var(--kh,var(--brand));color:#fff;
+  font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;
+  line-height:1.3;padding:8px 13px;padding-right:34px}
+.kpi .v, .kpi .k-val{display:block;font-size:32px;font-weight:800;letter-spacing:-.5px;line-height:1;
+  padding:15px 14px 0;margin:0;font-variant-numeric:tabular-nums}
+.kpi .v a, .kpi .k-val a{color:inherit}
+.kpi .d, .kpi .k-sub, .kpi .dd{display:block;font-size:11.5px;font-weight:600;color:var(--muted);
+  line-height:1.35;padding:6px 14px 14px;margin-top:auto}
+/* The icon sits in the band, not over the number. */
+.kpi .kic{position:absolute;right:11px;top:6px;font-size:15px;opacity:.85;line-height:1;color:#fff}
+a.kpi{text-decoration:none;color:var(--ink);transition:transform .1s ease,box-shadow .1s ease}
+a.kpi:hover{transform:translateY(-1px);text-decoration:none;
+  box-shadow:0 2px 4px rgba(16,24,40,.08),0 12px 26px -16px rgba(16,24,40,.36)}
+/* Rotating header hues, contrast-corrected (see note above). */
+.kpi-row .kpi:nth-child(5n+1),.qcards .qcard:nth-child(5n+1),.stats .tile:nth-child(5n+1){--kh:#3b6fb0}
+.kpi-row .kpi:nth-child(5n+2),.qcards .qcard:nth-child(5n+2),.stats .tile:nth-child(5n+2){--kh:#2d8181}
+.kpi-row .kpi:nth-child(5n+3),.qcards .qcard:nth-child(5n+3),.stats .tile:nth-child(5n+3){--kh:#3e844c}
+.kpi-row .kpi:nth-child(5n+4),.qcards .qcard:nth-child(5n+4),.stats .tile:nth-child(5n+4){--kh:#7d5ba6}
+.kpi-row .kpi:nth-child(5n+5),.qcards .qcard:nth-child(5n+5),.stats .tile:nth-child(5n+5){--kh:#a6662c}
+/* Semantic tone now colours the BAND, so meaning is carried by the same
+   element everywhere rather than by a rail on one design and a tint on
+   another. The value keeps its tint so a number reads at a glance. */
+.kpi.tone-ok{--kh:var(--ok)} .kpi.tone-warn{--kh:var(--warn)}
+.kpi.tone-bad{--kh:var(--bad)} .kpi.tone-info{--kh:var(--info)}
 .kpi.tone-ok .k-val, .kpi.tone-ok .v{color:var(--ok)}
 .kpi.tone-bad .k-val, .kpi.tone-bad .v{color:var(--bad)}
 .kpi.tone-warn .k-val, .kpi.tone-warn .v{color:var(--warn)}
+
+
 .up{color:var(--ok)}.down{color:var(--bad)}
 
 /* ---- Action / queue cards (money desk, coordinator queue) ---- */
@@ -456,6 +491,35 @@ a.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow);text-decoration:
 .qcard .qic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:18px;margin-bottom:10px}
 .qcard .qn{font-size:24px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
 .qcard .ql{color:var(--muted);font-size:13px;margin-top:3px;font-weight:600}
+
+/*  Placed AFTER the original .qcard rules on purpose. When this block sat with
+    the rest of the KPI card design further up the file, the originals won on
+    source order: `display:block` killed the flex ordering that lifts the label
+    into the band, and `color:var(--muted)` kept the band text grey — measured
+    at 1.7-2.0:1 on the new backgrounds, worse than what it replaced. Same
+    specificity means the later rule wins, so position is the fix, not !important. */
+/* ---- The dashboard's .qcard, same design, markup untouched ----
+   Its children are ordered icon, number, label; `order` lifts the
+   label into the band without touching a single view. */
+.qcard{padding:0!important;overflow:hidden;display:flex;flex-direction:column;border-radius:13px;
+  box-shadow:0 1px 2px rgba(16,24,40,.05),0 8px 22px -18px rgba(16,24,40,.28)}
+.qcard .ql{order:1;background:var(--kh,var(--brand));color:#fff;font-size:10.5px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.6px;line-height:1.3;padding:8px 13px;padding-right:34px;margin:0}
+.qcard .qn{order:2;font-size:32px;font-weight:800;line-height:1;padding:15px 14px 14px;letter-spacing:-.5px}
+.qcard .qic{order:0;position:absolute;right:11px;top:6px;width:auto;height:auto;margin:0;
+  background:none!important;font-size:15px;opacity:.85;color:#fff;z-index:1}
+.qcard{position:relative}
+.qcard.tone-ok{--kh:var(--ok)} .qcard.tone-warn{--kh:var(--warn)}
+.qcard.tone-bad{--kh:var(--bad)} .qcard.tone-info{--kh:var(--info)}
+.qcard:hover{transform:translateY(-1px)}
+
+/* ---- The plain .tile, same design ---- */
+.tile{padding:0;overflow:hidden;display:flex;flex-direction:column;border-radius:13px;
+  box-shadow:0 1px 2px rgba(16,24,40,.05),0 8px 22px -18px rgba(16,24,40,.28)}
+.tile .l{order:1;background:var(--kh,var(--brand));color:#fff;font-size:10.5px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.6px;line-height:1.3;padding:8px 13px;margin:0}
+.tile .n{order:2;font-size:32px;font-weight:800;line-height:1;padding:15px 14px 14px;letter-spacing:-.5px}
+.tile.red{--kh:var(--bad)} .tile.amber{--kh:var(--warn)} .tile.green{--kh:var(--ok)}
 .tone-ok .qic{background:var(--ok-bg);color:var(--ok)}
 .tone-warn .qic{background:var(--warn-bg);color:var(--warn)}
 .tone-bad .qic{background:var(--bad-bg);color:var(--bad)}

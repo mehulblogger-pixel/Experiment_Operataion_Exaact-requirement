@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '31942a2 · 2026-09-23 02:21 UTC · 666 files';
+$RELEASE = '4d4e7d5 · 2026-09-23 03:27 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -89,7 +89,7 @@ $EXPECT  = [
     'lib/connect_govern.php' => ['s'=>7181,'h'=>'22ce5ad54e44ce2a'],
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
     'lib/connect_identity.php' => ['s'=>56947,'h'=>'7b47484ccb30c52b'],
-    'lib/connect_kpi.php' => ['s'=>25262,'h'=>'3d44c0796425cb27'],
+    'lib/connect_kpi.php' => ['s'=>25816,'h'=>'6822491cfb7498be'],
     'lib/connect_market.php' => ['s'=>39876,'h'=>'0fd3332b96bb74f5'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
     'lib/connect_msg.php' => ['s'=>16414,'h'=>'37fd232a1fba99cc'],
@@ -552,7 +552,7 @@ $EXPECT  = [
     'views/ops/receipts.php' => ['s'=>3431,'h'=>'92fe379c6b582e34'],
     'views/ops/receivables.php' => ['s'=>5717,'h'=>'5f0d1ef9dc366ce7'],
     'views/ops/recruit_pipelines.php' => ['s'=>11827,'h'=>'c4c1d8ad49872179'],
-    'views/ops/recruitment_cc.php' => ['s'=>41803,'h'=>'15f46b432e7ae2c0'],
+    'views/ops/recruitment_cc.php' => ['s'=>41955,'h'=>'2299dcf43b6a3fd7'],
     'views/ops/recruitment_home.php' => ['s'=>14787,'h'=>'4b4fbb36b41e80f8'],
     'views/ops/recurring.php' => ['s'=>4054,'h'=>'77137957c72ee106'],
     'views/ops/reimbursable_dedup.php' => ['s'=>5209,'h'=>'95ba7f96fb4ccc26'],

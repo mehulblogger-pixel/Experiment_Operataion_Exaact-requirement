@@ -341,19 +341,25 @@ function connect_kpi_render($board) {
         // self-contained portals still get the identical universal card.
         echo '<style>'
            . ':where(.kpi-row){display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:12px 0}'
-           . ':where(.kpi){position:relative;background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:var(--radius,14px);padding:16px 18px;box-shadow:var(--shadow-sm,0 1px 2px rgba(18,32,60,.06));overflow:hidden}'
-           . ':where(a.kpi){text-decoration:none;color:var(--ink,#12201f);transition:transform .12s,box-shadow .16s}'
-           . ':where(a.kpi:hover){transform:translateY(-2px);box-shadow:var(--shadow,0 10px 30px rgba(18,32,60,.12))}'
-           . ':where(.kpi .kic){position:absolute;right:16px;top:14px;font-size:17px;opacity:.55;line-height:1}'
-           . ':where(.kpi .k){display:block;font-size:11.5px;font-weight:700;color:var(--muted,#5b6b6a);text-transform:uppercase;letter-spacing:.4px;line-height:1.35;padding-right:26px}'
-           . ':where(.kpi .v){display:block;font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.1;margin:6px 0 3px;color:var(--ink,#12201f);font-variant-numeric:tabular-nums}'
-           . ':where(.kpi .d){display:block;font-size:12.5px;font-weight:600;color:var(--muted,#5b6b6a);line-height:1.35}'
-           . ':where(.kpi.tone-ok,.kpi.tone-warn,.kpi.tone-bad,.kpi.tone-info){padding-left:21px}'
-           . ':where(.kpi.tone-ok,.kpi.tone-warn,.kpi.tone-bad,.kpi.tone-info)::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}'
-           . ':where(.kpi.tone-ok)::before{background:var(--ok,#15803d)}:where(.kpi.tone-ok .v){color:var(--ok,#15803d)}'
-           . ':where(.kpi.tone-warn)::before{background:var(--warn,#b45309)}:where(.kpi.tone-warn .v){color:var(--warn,#b45309)}'
-           . ':where(.kpi.tone-bad)::before{background:var(--bad,#b91c1c)}:where(.kpi.tone-bad .v){color:var(--bad,#b91c1c)}'
-           . ':where(.kpi.tone-info)::before{background:var(--info,#0369a1)}:where(.kpi.tone-info .v){color:var(--info,#0369a1)}'
+           //  The SAME colour-headed card app.css now defines, repeated here only
+           //  so a self-contained portal that never loads app.css still gets it.
+           //  Kept at :where() (zero specificity) so the stylesheet always wins
+           //  where both are present — this is the fallback, not the source of
+           //  truth. Header hues are the contrast-corrected five.
+           . ':where(.kpi){position:relative;background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:13px;padding:0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 1px 2px rgba(16,24,40,.05),0 8px 22px -18px rgba(16,24,40,.28)}'
+           . ':where(a.kpi){text-decoration:none;color:var(--ink,#12201f);transition:transform .1s ease,box-shadow .1s ease}'
+           . ':where(a.kpi:hover){transform:translateY(-1px);box-shadow:0 2px 4px rgba(16,24,40,.08),0 12px 26px -16px rgba(16,24,40,.36)}'
+           . ':where(.kpi .kic){position:absolute;right:11px;top:6px;font-size:15px;opacity:.85;line-height:1;color:#fff}'
+           . ':where(.kpi .k){display:block;background:var(--kh,var(--brand,#1f7a73));color:#fff;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;line-height:1.3;padding:8px 13px;padding-right:34px}'
+           . ':where(.kpi .v){display:block;font-size:32px;font-weight:800;letter-spacing:-.5px;line-height:1;padding:15px 14px 0;margin:0;color:var(--ink,#12201f);font-variant-numeric:tabular-nums}'
+           . ':where(.kpi .d){display:block;font-size:11.5px;font-weight:600;color:var(--muted,#5b6b6a);line-height:1.35;padding:6px 14px 14px;margin-top:auto}'
+           . ':where(.kpi-row .kpi:nth-child(5n+1)){--kh:#3b6fb0}:where(.kpi-row .kpi:nth-child(5n+2)){--kh:#2d8181}'
+           . ':where(.kpi-row .kpi:nth-child(5n+3)){--kh:#3e844c}:where(.kpi-row .kpi:nth-child(5n+4)){--kh:#7d5ba6}'
+           . ':where(.kpi-row .kpi:nth-child(5n+5)){--kh:#a6662c}'
+           . ':where(.kpi.tone-ok){--kh:var(--ok,#15803d)}:where(.kpi.tone-ok .v){color:var(--ok,#15803d)}'
+           . ':where(.kpi.tone-warn){--kh:var(--warn,#b45309)}:where(.kpi.tone-warn .v){color:var(--warn,#b45309)}'
+           . ':where(.kpi.tone-bad){--kh:var(--bad,#b91c1c)}:where(.kpi.tone-bad .v){color:var(--bad,#b91c1c)}'
+           . ':where(.kpi.tone-info){--kh:var(--info,#0369a1)}:where(.kpi.tone-info .v){color:var(--info,#0369a1)}'
            . ':where(.pill){display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap}'
            . ':where(.pill.p-ok){background:color-mix(in srgb,var(--ok,#15803d) 14%,transparent);color:var(--ok,#15803d)}'
            . ':where(.pill.p-warn){background:color-mix(in srgb,var(--warn,#b45309) 14%,transparent);color:var(--warn,#b45309)}'
