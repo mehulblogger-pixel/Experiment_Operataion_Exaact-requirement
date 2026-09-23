@@ -27,7 +27,7 @@ const section = t => console.log('\n== ' + t + ' ==');
   await pg.click('button[type=submit]'); await pg.waitForLoadState('networkidle');
   await pg.goto(BASE + '/form-designer'); await pg.waitForLoadState('networkidle');
   const cards = await pg.locator('a.card').count();
-  ok(cards >= 8, 'F1a · the designer now offers ' + cards + ' forms (it offered 2)');
+  ok(cards >= 22, 'F1a · the designer now offers ' + cards + ' forms (it offered 2)');
   const names = (await pg.locator('a.card div[style*="font-weight:700"]').allTextContents()).map(t => t.trim());
   ok(names.length === cards && names.every(n => n !== ''),
      'F1b · they are: ' + names.join(' · ').slice(0, 140));
@@ -154,6 +154,58 @@ const section = t => console.log('\n== ' + t + ' ==');
     ]);
     ok(/Removed the field/.test(await pg.locator('body').innerText()), 'F7i[' + key + '] · and cleaned up');
   }
+
+  // ---- Every newly designable form must still RENDER ---------------------
+  //  Twelve views gained a line and twelve save paths gained a call. A view
+  //  that throws after that is the one failure no server test can see.
+  section('F8 · every designable form still opens');
+  for (const [nm, route] of [
+    ['inspector','/m/inspectors/new'], ['user','/user-new'], ['equipment','/equip-new'],
+    ['lead','/lead-new'], ['opportunity','/opportunity-new'], ['complaint','/complaint-new'],
+    ['incident','/incident-new'], ['ncr','/ncr-new'], ['capa','/capa-new'],
+    ['audit','/internal-audit-new'], ['invoice','/invoice-new'], ['receipt','/receipt-new'],
+  ]) {
+    const resp = await pg.goto(BASE + route).catch(() => null);
+    await pg.waitForLoadState('networkidle').catch(() => {});
+    const txt = await pg.locator('body').innerText().catch(() => '');
+    const broke = /Fatal error|SQLSTATE|Parse error|Warning:/i.test(txt);
+    const hasForm = await pg.locator('form').count() > 0;
+    ok(resp && resp.status() === 200 && !broke && hasForm,
+       'F8[' + nm + '] · ' + route + (broke ? ' — BROKEN' : hasForm ? '' : ' — no form'));
+  }
+
+  // ---- The round trip: rendering it and STORING it are different wirings ---
+  section('F9 · a value typed into an added field is actually saved');
+  const RLBL = 'Asset Tag UAT', RVAL = 'AT-' + Date.now().toString().slice(-5);
+  await pg.goto(BASE + '/form-designer?form=equipment'); await pg.waitForLoadState('networkidle');
+  await pg.fill('input[name=nf_label]', RLBL);
+  await pg.selectOption('select[name=nf_section]', 'Custody');
+  await pg.locator('#fdAdd button[type=submit]').last().click();
+  await pg.waitForLoadState('networkidle');
+  ok((await pg.locator('body').innerText()).includes(RLBL), 'F9a · the field was added');
+
+  await pg.goto(BASE + '/equip-new'); await pg.waitForLoadState('networkidle');
+  const rCell = pg.locator('.ff[data-cf-section="Custody"]');
+  ok(await rCell.count() === 1, 'F9b · it renders in its section');
+  //  SCOPED to this form. A bare form button[type=submit] picks up the layout's
+  //  search box, which is how this walk first "saved" onto /search.
+  const rForm = pg.locator('form[action="/equip-new"]');
+  ok(await rForm.count() === 1, 'F9z ARMING — the instrument form is the one being submitted');
+  await rForm.locator('input[name=code]').fill('UAT-EQ-' + Date.now().toString().slice(-6));
+  await rForm.locator('input[name=name]').fill('UAT Micrometer');
+  await rCell.locator('input,select,textarea').first().fill(RVAL);
+  await rForm.locator('button[type=submit]').first().click();
+  await pg.waitForLoadState('networkidle');
+  ok(/equip-edit/.test(pg.url()), 'F9c · the instrument saved (' + pg.url().replace(BASE, '') + ')');
+  const rBack = await pg.locator('.ff[data-cf-section="Custody"] input').first().inputValue().catch(() => '');
+  ok(rBack === RVAL, 'F9d · reopening reads it back: "' + rBack + '" (typed "' + RVAL + '")');
+
+  await pg.goto(BASE + '/form-designer?form=equipment'); await pg.waitForLoadState('networkidle');
+  await Promise.all([
+    pg.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {}),
+    pg.locator('form[action="/form-designer-field-del"]').last().locator('button').click(),
+  ]);
+  ok(/Removed the field/.test(await pg.locator('body').innerText()), 'F9e · and cleaned up');
 
   section('F6 · nothing threw');
   ok(jsErrors.length === 0, 'F6 · no JavaScript errors' + (jsErrors.length ? ': ' + jsErrors.join(' | ') : ''));

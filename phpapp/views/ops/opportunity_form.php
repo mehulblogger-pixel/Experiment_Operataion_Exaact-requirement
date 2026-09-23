@@ -52,6 +52,9 @@
   </div>
   <button class="btn" style="margin-top:14px">Open the opportunity</button>
   <a class="btn secondary" href="/opportunities" style="margin-left:8px">Cancel</a>
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('opportunity', 0); ?>
 </form>
 <?php // Pick a customer and their contact flows in from the client master — the
       // same details entered under the Directory, so nobody re-types them here. ?>

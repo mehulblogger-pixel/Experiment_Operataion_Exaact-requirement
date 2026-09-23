@@ -44,6 +44,9 @@
         <small class="muted">§8.7.1 — react to it and deal with the consequences. That is not the same as fixing the cause, and the standard asks for both.</small></div>
     </div>
   </div>
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('capa', 0); ?>
   <div class="form-actions"><button class="btn" type="submit">Raise it</button>
     <a class="btn secondary" href="/capa">Cancel</a></div>
 </form>

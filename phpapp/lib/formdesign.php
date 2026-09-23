@@ -118,6 +118,7 @@ function fd_forms() {
     if (function_exists('fd_forms_recruitment')) $forms += fd_forms_recruitment();
     if (function_exists('fd_forms_quality'))     $forms += fd_forms_quality();
     if (function_exists('fd_forms_operations'))  $forms += fd_forms_operations();
+    if (function_exists('fd_forms_rest'))        $forms += fd_forms_rest();
     // Company-built custom forms are designed on their own screen already, so we
     // only surface the built-in forms here.
     return $forms;
@@ -259,8 +260,10 @@ function fd_forms_operations() {
             'other_cost_note' => $F('What was it for?', 'text', $j2),
             // order & dates
             'quotation_id'             => $F($T('quote'), 'dropdown', $j3),
-            'call_received_date'       => $F($TH('call') . ' received', 'date', $j3),
-            'inspection_required_date' => $F($TH('client') . "'s required date", 'date', $j3),
+            //  NOT declared here: the two dates carried from the Test request.
+            //  They render read-only, with no name attribute at all, so the
+            //  overlay could never find them — a design row for either would
+            //  have looked like it worked and silently renamed nothing.
             'scheduled_date'           => $F('Actual scheduled date', 'date', $j3, true),
             'engagement_type'          => $F('Shape of the engagement', 'dropdown', $j3),
             'days_count'               => $F('How many days, continuously?', 'number', $j3),
@@ -271,8 +274,11 @@ function fd_forms_operations() {
             'schedule_end_date'        => $F('Repeat until', 'date', $j3),
             'mandays'                  => $F('Man-days', 'number', $j3),
             // money
-            'billable_rate'   => $F('Unit rate', 'number', $j4),
-            'billable_value'  => $F('Invoice value to the ' . $Tl('client') . ' (' . $cur . ', ex-GST)', 'number', $j4),
+            //  On the Job these two are NOT the call's columns: the unit rate
+            //  is a read-only mirror under its own display name, and the value
+            //  the branch is judged on is invoice_value.
+            'billable_rate_display' => $F('Unit rate', 'number', $j4),
+            'invoice_value'         => $F('Invoice value to the ' . $Tl('client') . ' (' . $cur . ', ex-GST)', 'number', $j4),
             'credit_rate'     => $F('Credit per man-day to the executing ' . $Tl('office') . ' (' . $cur . ')', 'number', $j4),
             'expected_credit' => $F('Total credit (' . $cur . ')', 'number', $j4),
             'credit_type'     => $F('Credit type', 'dropdown', $j4),
@@ -281,6 +287,274 @@ function fd_forms_operations() {
             'reporting_frequency' => $F('Reporting frequency', 'dropdown', $j5),
             'report_custom_days'  => $F('…every how many days?', 'number', $j5),
             'folder_link'         => $F('Shared folder / drive link', 'text', $j5),
+        ],
+    ];
+    return $out;
+}
+
+// ---------------------------------------------------------------------------
+//  THE REMAINING TWELVE.
+//
+//  These could not be offered before for a reason that had nothing to do with
+//  the registry: their views could not render an added field at all, and their
+//  save paths did not store one. Declaring them then would have given an admin
+//  a design screen where renaming worked and "add a field" went nowhere — half
+//  working, which is worse than not offered. Each now renders the extras
+//  through fd_extra_fields() and stores them through custom_save().
+//
+//  Labels were read from each form rather than scraped: an extractor pairs the
+//  wrong <label> with a control whenever help text or a nested block sits
+//  between them, and several here do (the NCR severity radios, the invoice
+//  payment terms). Where a form builds its wording from the company's
+//  terminology, so does this.
+//
+//  Deliberately NOT declared: repeating sub-forms (an engineer's certificate
+//  rows, an invoice's line items) and the inline "create one while you are
+//  here" helpers on the user form. They are not header fields of the record,
+//  and a design row for one would rename a box that appears many times.
+// ---------------------------------------------------------------------------
+function fd_forms_rest() {
+    $F = fn($label, $type, $section, $locked = false) => ['label' => $label, 'type' => $type, 'section' => $section, 'locked' => $locked];
+    $T  = fn($k) => function_exists('T')  ? T($k)  : ucfirst($k);
+    $Tl = fn($k) => function_exists('Tl') ? Tl($k) : $k;
+    $TH = fn($k) => function_exists('TH') ? TH($k) : ucfirst($k);
+    $TP = fn($k) => function_exists('TP') ? TP($k) : ucfirst($k) . 's';
+    $on = fn($m) => !function_exists('licence_enabled') || licence_enabled($m);
+    $cur = function_exists('cur_sym') ? cur_sym() : '';
+    $out = [];
+
+    if ($on('operations')) {
+        $out['inspector'] = [
+            'label' => $TP('engineer'), 'icon' => '👷',
+            'help'  => 'The ' . $Tl('engineer') . ' record',
+            'fields' => [
+                'first_name'          => $F('First name', 'text', 'Who they are', true),
+                'middle_name'         => $F('Middle name', 'text', 'Who they are'),
+                'last_name'           => $F('Last name', 'text', 'Who they are'),
+                'emp_code'            => $F('Employee code', 'text', 'Who they are', true),
+                'email'               => $F('Email', 'text', 'Who they are'),
+                'mobile'              => $F('Mobile', 'text', 'Who they are'),
+                'designation'         => $F('Designation', 'dropdown', 'Their role'),
+                'staff_kind'          => $F($TH('engineer') . ' type', 'dropdown', 'Their role'),
+                'agency_id'           => $F('Engaged via agency', 'dropdown', 'Their role'),
+                'team_role'           => $F('Team', 'dropdown', 'Their role', true),
+                'trade_id'            => $F('Trade / discipline', 'dropdown', 'Their role'),
+                'status'              => $F('Status', 'dropdown', 'Their role', true),
+                'home_office_id'      => $F('Posted ' . $Tl('office'), 'dropdown', 'Where they sit'),
+                'weekly_working_days' => $F('Weekly working days', 'dropdown', 'Where they sit'),
+                'reports_to_id'       => $F('Reporting manager', 'dropdown', 'Where they sit'),
+                'salary_ctc'          => $F('Annual CTC (' . $cur . ')', 'number', 'Allowances & rates'),
+                'agency_cost'         => $F('Agency hiring cost (' . $cur . '/yr)', 'number', 'Allowances & rates'),
+            ],
+        ];
+    }
+
+    if ($on('reporting')) {
+        $out['equipment'] = [
+            'label' => 'Instruments', 'icon' => '📐',
+            'help'  => 'The instrument register',
+            'fields' => [
+                'code'                => $F('Identification code', 'text', 'The instrument', true),
+                'name'                => $F('Instrument', 'text', 'The instrument', true),
+                'kind'                => $F('Type / method', 'text', 'The instrument'),
+                'make'                => $F('Make', 'text', 'The instrument'),
+                'model'               => $F('Model', 'text', 'The instrument'),
+                'serial_no'           => $F('Serial number', 'text', 'The instrument'),
+                'range_spec'          => $F('Range', 'text', 'The instrument'),
+                'accuracy'            => $F('Accuracy / uncertainty', 'text', 'The instrument'),
+                'office_id'           => $F($TH('office') . ' that owns it', 'dropdown', 'Custody'),
+                'inspector_id'        => $F('Held by', 'dropdown', 'Custody'),
+                'status'              => $F('State', 'dropdown', 'Custody'),
+                'cal_interval_months' => $F('Calibration interval (months)', 'number', 'Custody'),
+                'owned_by'            => $F('Ownership', 'dropdown', 'Custody'),
+                'notes'               => $F('Notes', 'text', 'Custody'),
+            ],
+        ];
+        $out['complaint'] = [
+            'label' => 'Complaints', 'icon' => '📣',
+            'help'  => 'The complaint / appeal form',
+            'fields' => [
+                'kind'              => $F('What is it?', 'dropdown', 'How it reached us', true),
+                'received_on'       => $F('Received on', 'date', 'How it reached us'),
+                'channel'           => $F('How it reached us', 'dropdown', 'How it reached us'),
+                'source'            => $F('Who from', 'dropdown', 'How it reached us'),
+                'complainant_name'  => $F('Their name', 'text', 'Who complained'),
+                'complainant_email' => $F('E-mail', 'email', 'Who complained'),
+                'complainant_phone' => $F('Telephone', 'text', 'Who complained'),
+                'partner_id'        => $F('Which ' . $Tl('client') . ' or party', 'dropdown', 'Who complained'),
+                'inspector_id'      => $F('Which ' . $Tl('engineer'), 'dropdown', 'What it is about'),
+                'job_id'            => $F($TH('job') . ' number', 'text', 'What it is about'),
+                'report_irn'        => $F($TH('report') . ' number (IRN)', 'text', 'What it is about'),
+                'subject'           => $F('Subject', 'text', 'What it is about', true),
+                'description'       => $F('What they told us', 'text', 'What it is about', true),
+            ],
+        ];
+        $out['incident'] = [
+            'label' => 'Security incidents', 'icon' => '🚨',
+            'help'  => 'The incident record',
+            'fields' => [
+                'detected_at'      => $F('When it was noticed', 'text', 'What happened', true),
+                'kind'             => $F('What kind', 'dropdown', 'What happened', true),
+                'severity'         => $F('How bad', 'dropdown', 'What happened'),
+                'summary'          => $F('In your own words, what happened', 'text', 'What happened', true),
+                'systems'          => $F('What was affected', 'text', 'What happened'),
+                'people_affected'  => $F("Roughly how many people's data", 'number', 'What happened'),
+                'data_kinds'       => $F('What sort of data', 'text', 'What happened'),
+                'immediate_action' => $F('What you did straight away', 'text', 'What happened'),
+                'root_cause'       => $F('Why it happened', 'text', 'What happened'),
+                'certin_reported_at' => $F('Reported to CERT-In at', 'text', 'Who has been told'),
+                'certin_ref'         => $F('Their reference', 'text', 'Who has been told'),
+                'dpb_reported_at'    => $F('Reported to the Data Protection Board at', 'text', 'Who has been told'),
+                'people_told_at'     => $F('The people affected were told at', 'text', 'Who has been told'),
+                'status'             => $F('Status', 'dropdown', 'Who has been told', true),
+            ],
+        ];
+        $out['ncr'] = [
+            'label' => 'Non-conformities', 'icon' => '❗',
+            'help'  => 'The NCR form',
+            'fields' => [
+                'source'      => $F('Where it came from', 'dropdown', 'The finding', true),
+                'source_note' => $F('Reference at the source', 'text', 'The finding'),
+                //  The extractor paired this with the severity heading above it —
+                //  it is the description box, and "How serious" is the radio group.
+                'description' => $F('What was found', 'text', 'The finding', true),
+                'severity'    => $F('How serious', 'dropdown', 'The finding'),
+                'job_id'      => $F('Against a ' . $Tl('job'), 'dropdown', 'Where and who'),
+                'office_id'   => $F($TH('office'), 'dropdown', 'Where and who'),
+                'detected_on' => $F('Detected on', 'date', 'Where and who'),
+                'clause'      => $F('Clause', 'text', 'Where and who'),
+                'owner'       => $F('Owner', 'text', 'Where and who'),
+                'due_on'      => $F('Due by', 'date', 'Where and who'),
+                'containment' => $F('What was done immediately', 'text', 'Where and who'),
+            ],
+        ];
+        $out['capa'] = [
+            'label' => 'Corrective actions', 'icon' => '🛠️',
+            'help'  => 'The CAPA form',
+            'fields' => [
+                'title'            => $F('In one line', 'text', 'What went wrong', true),
+                'description'      => $F('What went wrong', 'text', 'What went wrong', true),
+                'source_ref'       => $F('Their reference', 'text', 'What went wrong'),
+                'severity'         => $F('How serious', 'dropdown', 'What went wrong'),
+                'clause'           => $F('Clause it touches', 'dropdown', 'Ownership'),
+                'raised_on'        => $F('Raised on', 'date', 'Ownership'),
+                'owner'            => $F('Whose job it is', 'text', 'Ownership'),
+                'due_on'           => $F('Action due by', 'date', 'Ownership'),
+                'immediate_action' => $F('What we did straight away', 'text', 'Ownership'),
+            ],
+        ];
+        $out['audit'] = [
+            'label' => 'Internal audits', 'icon' => '🔎',
+            'help'  => 'The audit plan form',
+            'fields' => [
+                'planned_on' => $F('Planned for', 'date', 'The plan', true),
+                'auditor'    => $F('Auditor', 'text', 'The plan', true),
+                'area_owner' => $F('Who runs this area', 'text', 'The plan'),
+                'scope'      => $F('Scope — what is being looked at', 'text', 'The plan'),
+                'method'     => $F('How', 'text', 'The plan'),
+            ],
+        ];
+    }
+
+    if ($on('sales')) {
+        $out['lead'] = [
+            'label' => 'Leads', 'icon' => '🎯',
+            'help'  => 'The new-lead form',
+            'fields' => [
+                'partner_id'      => $F('Company or person', 'dropdown', 'Who they are', true),
+                'contact_name'    => $F('Contact name', 'text', 'Who they are'),
+                'contact_email'   => $F('E-mail', 'email', 'Who they are'),
+                'contact_phone'   => $F('Telephone', 'text', 'Who they are'),
+                'source'          => $F('Where they came from', 'dropdown', 'Who they are'),
+                'requirement'     => $F('The requirement', 'text', 'What they want'),
+                'value'           => $F('Value they are worth', 'number', 'What they want'),
+                'expected_close'  => $F('Expected to close', 'date', 'What they want'),
+                'deputation_kind' => $F('Type of deputation', 'dropdown', 'Manpower deputation'),
+                'manpower_count'  => $F('How many people', 'number', 'Manpower deputation'),
+                'manpower_skills' => $F('Skills / qualifications needed', 'text', 'Manpower deputation'),
+                'site_location'   => $F('Site details', 'text', 'Manpower deputation'),
+                'owner_user_id'   => $F('Allocated to', 'dropdown', 'Who chases it'),
+                'office_id'       => $F($TH('office'), 'dropdown', 'Who chases it'),
+                'pipeline_id'     => $F('Pipeline', 'dropdown', 'Who chases it'),
+                'next_action'     => $F('Next thing to do', 'text', 'Who chases it'),
+                'next_action_on'  => $F('By when', 'date', 'Who chases it'),
+            ],
+        ];
+        $out['opportunity'] = [
+            'label' => 'Opportunities', 'icon' => '💡',
+            'help'  => 'The new-opportunity form',
+            'fields' => [
+                'name'           => $F('What is the opportunity?', 'text', 'The opportunity', true),
+                'partner_id'     => $F($T('client'), 'dropdown', 'The opportunity'),
+                'partner_name'   => $F('…or who it is for', 'text', 'The opportunity'),
+                'pipeline_id'    => $F('Pipeline', 'dropdown', 'The opportunity'),
+                'value'          => $F('Estimated value', 'number', 'The opportunity'),
+                'expected_close' => $F('Expected close', 'date', 'The opportunity'),
+                'office_id'      => $F($TH('office'), 'dropdown', 'The opportunity'),
+                'source'         => $F('Where it came from', 'dropdown', 'The opportunity'),
+                'competitor'     => $F('Competing against', 'text', 'The opportunity'),
+                'contact_name'   => $F('Contact', 'text', 'Contact & next step'),
+                'contact_email'  => $F('Contact e-mail', 'email', 'Contact & next step'),
+                'contact_phone'  => $F('Contact phone', 'text', 'Contact & next step'),
+                'next_action'    => $F('Next action', 'text', 'Contact & next step'),
+                'next_action_on' => $F('By when', 'date', 'Contact & next step'),
+                'requirement'    => $F('What they need', 'text', 'Contact & next step'),
+            ],
+        ];
+    }
+
+    if ($on('money')) {
+        $out['invoice'] = [
+            'label' => 'Invoices', 'icon' => '🧾',
+            'help'  => 'The invoice header',
+            'fields' => [
+                'partner_id'      => $F($T('client'), 'dropdown', 'Who it is for', true),
+                'office_id'       => $F($TH('office'), 'dropdown', 'Who it is for', true),
+                'invoice_date'    => $F('Invoice date', 'date', 'Who it is for', true),
+                //  Paired with the "Payment terms" heading by the extractor; it
+                //  is the PO number box further down the Terms block.
+                'po_number'       => $F('PO number', 'text', 'Terms'),
+                'contract_number' => $F('Contract number', 'text', 'Terms'),
+                'notes'           => $F('Notes on the invoice', 'text', 'Terms'),
+            ],
+        ];
+        $out['receipt'] = [
+            'label' => 'Receipts', 'icon' => '💵',
+            'help'  => 'The money-received form',
+            'fields' => [
+                'office_id'     => $F($TH('office'), 'dropdown', 'The receipt', true),
+                'receipt_date'  => $F('Date received', 'date', 'The receipt', true),
+                'mode'          => $F('How it came', 'dropdown', 'The receipt'),
+                'amount'        => $F('Amount in the bank', 'number', 'The receipt', true),
+                'tds_amount'    => $F('TDS the customer withheld', 'number', 'Deductions'),
+                'bank_charges'  => $F('Bank charges', 'number', 'Deductions'),
+                'bank'          => $F('Bank', 'text', 'Deductions'),
+                'reference'     => $F('Reference', 'text', 'Deductions'),
+            ],
+        ];
+    }
+
+    $out['user'] = [
+        'label' => 'Users', 'icon' => '🔑',
+        'help'  => 'The login record',
+        'fields' => [
+            'username'            => $F('Username', 'text', 'Who they are', true),
+            'first_name'          => $F('First name', 'text', 'Who they are'),
+            'last_name'           => $F('Last name', 'text', 'Who they are'),
+            'email'               => $F('Email', 'text', 'Who they are'),
+            'role'                => $F('Role', 'dropdown', 'Who they are', true),
+            'home_office_id'      => $F('Home ' . $Tl('office'), 'dropdown', 'Who they are'),
+            'inspector_id'        => $F('Team member', 'dropdown', 'Who they are'),
+            'team_member_role'    => $F('Which team', 'dropdown', 'Who they are'),
+            'position_title'      => $F('Position title', 'dropdown', 'Who they are'),
+            'weekly_working_days' => $F('Working days a week', 'dropdown', 'Working pattern'),
+            'daily_hours'         => $F('Working hours a full day', 'number', 'Working pattern'),
+            'half_day_hours'      => $F('Hours on the half day', 'number', 'Working pattern'),
+            'monthly_ctc'         => $F('Cost to the company, per month (' . $cur . ')', 'number', 'Cost & where it belongs'),
+            'reports_to_id'       => $F('Reports to', 'dropdown', 'Cost & where it belongs'),
+            'reports_to_name'     => $F('Manager name', 'text', 'Cost & where it belongs'),
+            'reports_to_position' => $F('Manager position', 'text', 'Cost & where it belongs'),
+            'reports_to_email'    => $F('Manager e-mail', 'email', 'Cost & where it belongs'),
         ],
     ];
     return $out;
@@ -484,6 +758,49 @@ function fd_forms_recruitment() {
     ];
 }
 
+/**
+ * ONE LINE makes a form designable.
+ *
+ * A form needs three things to be tailorable: it must render the fields an
+ * admin added, read back what was captured in them, and apply the company's
+ * label / order / hide / required overrides. Doing that as three separate
+ * edits — view, route and save — is how the first twelve forms ended up
+ * half-wired: several rendered added fields but applied no overrides, so a
+ * rename in the Form Designer silently did nothing.
+ *
+ * This does the first and the third together, and reads its own values, so a
+ * view needs no new variables from its route:
+ *
+ *     <?= fd_extra_fields('inspector', $ins['id'] ?? 0) ?>
+ *
+ * Saving is deliberately NOT hidden in here. custom_save() must be called by
+ * the code that owns the record, inside whatever transaction it uses, and a
+ * helper that appeared to save from the view would be a lie the day one of
+ * them rolls back.
+ *
+ * The heading is only emitted when there is something under it, and the
+ * overlay hides it again if every field beneath was moved into a section.
+ */
+function fd_extra_fields($entity, $recordId = 0, $heading = 'More details') {
+    $out = '';
+    if (function_exists('custom_fields_for')) {
+        try {
+            if (custom_fields_for($entity)) {
+                $vals = ($recordId && function_exists('custom_values_map'))
+                    ? custom_values_map($entity, (int) $recordId) : [];
+                ob_start();
+                echo '<h3>' . e($heading) . '</h3><div class="form-grid">';
+                render_custom_fields($entity, $vals);
+                echo '</div>';
+                $out = ob_get_clean();
+            }
+        } catch (Throwable $e) { /* a form is never taken down by its extras */ }
+    }
+    // The overrides apply whether or not anything was added — renaming and
+    // hiding a BUILT-IN field is the commoner case by far.
+    return $out . (function_exists('fd_overlay_html') ? fd_overlay_html($entity) : '');
+}
+
 // Emit a small, SAFE overlay script for a built-in form: it renames labels,
 // hides fields (kept in the DOM so their value is never blanked on save), and
 // reorders fields WITHIN their own container — all display-only, because the
@@ -617,7 +934,8 @@ function fd_overlay_html($form) {
   // A "More details" heading left with nothing under it is noise — hide it, but
   // only when its block is genuinely empty.
   document.querySelectorAll('h3, h4').forEach(function(h){
-    if(norm(h.textContent) !== 'more details') return;
+    var ht = norm(h.textContent);
+    if(ht !== 'more details' && ht !== 'additional details') return;
     var g = h.nextElementSibling;
     if(g && g.classList && g.classList.contains('form-grid') && !g.querySelector('.ff')){
       h.style.display='none'; g.style.display='none';

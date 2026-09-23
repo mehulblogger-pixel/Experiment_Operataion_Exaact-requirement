@@ -450,6 +450,7 @@ function lead_create(array $b) {
             (string)($b['next_action_on'] ?? ''), substr(trim((string)($b['next_action'] ?? '')), 0, 255),
             $u ? user_name($u) : 'system', date('c'), date('c')]);
     $id = (int)db()->lastInsertId();
+    if (function_exists('custom_save')) custom_save('lead', $id, $b);
     if (function_exists('act_log'))
         act_log('LEAD', $id, 'SYSTEM', 'Lead ' . $ref . ' created — ' . $company,
                 ['auto' => 1, 'partner_id' => (int)($b['partner_id'] ?? 0) ?: null,

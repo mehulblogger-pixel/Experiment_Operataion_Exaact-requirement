@@ -4761,6 +4761,7 @@ function ops_inspectors($action, $method) {
                         flash((int)$pa['out'] . ' asset(s) issued to ' . $full . ' are still not returned. '
                             . 'Record their return in the asset register before they are forgotten.', 'warning');
                 }
+                if (function_exists('custom_save')) custom_save('inspector', (int)$ins['id'], $b);
                 flash('Inspector saved.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             } else {
@@ -4775,6 +4776,7 @@ function ops_inspectors($action, $method) {
                 // §WO-7 — a first certificate (with its scan and validity) can be
                 // attached right here while adding the team member.
                 inspector_cert_add((int)$id, $b, 'cert_file');
+                if (function_exists('custom_save')) custom_save('inspector', (int)$id, $b);
                 flash('Inspector added.' . (trim((string)($b['cert_name'] ?? '')) !== '' ? ' First certificate saved.' : ' You can now add certifications and upload the scans.'));
                 redirect('/m/inspectors/edit?id=' . $id . '#certs');
             }
@@ -9419,6 +9421,7 @@ function ops_users($route, $method) {
                 }
                 $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=?,daily_hours=?,half_day_hours=? WHERE id=?")
                     ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, $user['id']]);
+                if (function_exists('custom_save')) custom_save('user', (int)$user['id'], $b);
                 // Module 02 (A) — record the access change on the sealed audit chain:
                 // who granted whom which permission / role / scope, and when. Only when
                 // something that affects authorization actually changed.
@@ -9469,6 +9472,7 @@ function ops_users($route, $method) {
                 $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days,daily_hours,half_day_hours,pwd_changed_at,must_change_pwd)
                     VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, date('c'), $newPw === '' ? 1 : $mustChange]);
                 $newId = (int)$pdo->lastInsertId();
+                if (function_exists('custom_save')) custom_save('user', $newId, $b);
                 try { $pdo->prepare("UPDATE users SET department=? WHERE id=?")->execute([trim((string)($b['department'] ?? '')), $newId]); } catch (Throwable $e) {}
                 // Module 02 (A) — record the new login's initial access on the audit chain.
                 $adiff = function_exists('access_diff') ? access_diff(null,

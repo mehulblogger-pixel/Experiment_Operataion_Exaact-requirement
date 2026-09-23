@@ -228,6 +228,11 @@ function ops_books($route, $method) {
         if ($method === 'POST') {
             $r = books_invoice_create($_POST);
             if (!empty($r['err'])) { flash($r['err'], 'error'); redirect_back('/invoices'); }
+            //  Any field this company added to the invoice header. Saved only
+            //  once books_invoice_create() has SUCCEEDED and returned an id —
+            //  attaching extras to a refused document would leave values
+            //  belonging to an invoice that does not exist.
+            if (function_exists('custom_save')) custom_save('invoice', (int)$r['id'], $_POST);
             // Starting an invoice from the to-bill list carries the work straight
             // onto it. Re-keying the deputation numbers is exactly where the
             // second version of a figure comes from.
@@ -346,6 +351,7 @@ function ops_books($route, $method) {
         if ($method === 'POST') {
             $r = books_receipt_create($_POST);
             if (!empty($r['err'])) { flash($r['err'], 'error'); redirect_back('/receipts'); }
+            if (function_exists('custom_save')) custom_save('receipt', (int)$r['id'], $_POST);
             flash('Receipt ' . $r['no'] . ' recorded. Now say which invoices it settles.');
             redirect('/receipt?id=' . $r['id']);
         }

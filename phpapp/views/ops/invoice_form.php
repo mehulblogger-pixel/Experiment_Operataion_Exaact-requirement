@@ -118,6 +118,9 @@ $src = function ($k) use ($from) {
     </div>
   <?php endif; ?>
 
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('invoice', 0); ?>
   <div class="form-actions">
     <button class="btn" type="submit">Start the draft</button>
     <a class="btn secondary" href="/invoices">Cancel</a>

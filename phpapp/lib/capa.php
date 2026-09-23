@@ -335,6 +335,7 @@ function capa_create($b) {
                    (string)($b['immediate_action'] ?? ''),
                    substr(trim((string)($b['owner'] ?? '')), 0, 150), $due, date('c')]);
     $id = (int)db()->lastInsertId();
+    if (function_exists('custom_save')) custom_save('capa', $id, $b);
     capa_log($id, 'RAISED', $ref . ' — ' . $title);
     return $id;
 }

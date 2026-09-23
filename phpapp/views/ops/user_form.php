@@ -503,6 +503,9 @@
 
 </section>
 </div><!-- /.form-tabs -->
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('user', $user['id'] ?? 0); ?>
   <div class="fs-actions" style="margin-top:16px;">
     <button class="btn" type="submit">Save user</button>
     <a class="btn secondary" href="/users">Cancel</a>

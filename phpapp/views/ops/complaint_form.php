@@ -63,6 +63,9 @@
                   placeholder="in their words as far as possible, not a summary of your view of it"></textarea></div>
     </div>
   </div>
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('complaint', 0); ?>
   <div class="form-actions"><button class="btn" type="submit">Record it</button>
     <a class="btn secondary" href="/complaints">Cancel</a></div>
 </form>

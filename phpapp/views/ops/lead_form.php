@@ -176,6 +176,9 @@ $me  = current_user();
   <p class="t-sm t-mut mt-3">A lead with no e-mail and no telephone number scores badly on purpose — it is a lead
     nobody can chase.</p>
 
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('lead', 0); ?>
   <div class="form-actions">
     <button class="btn" type="submit">Create it</button>
     <a class="btn secondary" href="/leads">Cancel</a>

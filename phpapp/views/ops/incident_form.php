@@ -73,6 +73,9 @@
   </div>
 
   <div style="display:flex;gap:8px">
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('incident', $inc['id'] ?? 0); ?>
     <button class="btn" type="submit"><?= $isEdit ? 'Save' : 'Record it' ?></button>
     <a class="btn secondary" href="/incidents">Cancel</a>
   </div>

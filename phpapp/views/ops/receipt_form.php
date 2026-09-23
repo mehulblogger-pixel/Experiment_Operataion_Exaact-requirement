@@ -44,6 +44,9 @@
     </table>
   <?php endif; ?>
 
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('receipt', 0); ?>
   <button class="btn" style="margin-top:14px">Record it</button>
   <a class="btn secondary" href="/receipts" style="margin-left:8px">Cancel</a>
 </form>

@@ -523,8 +523,10 @@ function ops_audits($route, $method) {
                            substr($owner, 0, 150), substr($auditor, 0, 150),
                            substr(trim((string)($_POST['method'] ?? '')), 0, 400),
                            user_name(current_user()), date('c')]);
+            $auditNewId = (int) db()->lastInsertId();
+            if (function_exists('custom_save')) custom_save('audit', $auditNewId, $_POST);
             flash('Planned as ' . $ref . '.');
-            redirect('/internal-audit?id=' . (int)db()->lastInsertId());
+            redirect('/internal-audit?id=' . $auditNewId);
         }
         view('ops/audit_form', ['clauses' => audit_clause_options()]);
         return true;

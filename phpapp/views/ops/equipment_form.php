@@ -48,6 +48,9 @@
       </select></div>
     <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= e($e['notes'] ?? '') ?>"></div>
   </div>
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('equipment', $e['id'] ?? 0); ?>
   <button class="btn" type="submit"><?= $isEdit ? 'Save' : 'Add instrument' ?></button>
 </form>
 

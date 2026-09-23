@@ -231,9 +231,21 @@ $fdViews = [
     'satisfaction'   => 'views/ops/satisfaction_form.php',
     'call'           => 'views/ops/call_form.php',
     'job'            => 'views/ops/job_form.php',
+    'inspector'      => 'views/ops/inspector_form.php',
+    'user'           => 'views/ops/user_form.php',
+    'equipment'      => 'views/ops/equipment_form.php',
+    'lead'           => 'views/ops/lead_form.php',
+    'opportunity'    => 'views/ops/opportunity_form.php',
+    'complaint'      => 'views/ops/complaint_form.php',
+    'incident'       => 'views/ops/incident_form.php',
+    'ncr'            => 'views/ops/ncr_form.php',
+    'capa'           => 'views/ops/capa_form.php',
+    'audit'          => 'views/ops/audit_form.php',
+    'invoice'        => 'views/ops/invoice_form.php',
+    'receipt'        => 'views/ops/receipt_form.php',
 ];
 $fdAll = fd_forms();
-t_ok(count($fdAll) >= 10, 'FW1 ARMING — the designer offers more than the original two forms (' . count($fdAll) . ')');
+t_ok(count($fdAll) >= 22, 'FW1 ARMING — the designer offers more than the original two forms (' . count($fdAll) . ')');
 
 foreach ($fdAll as $fdKey => $fdDef) {
     $fdPath = $fdViews[$fdKey] ?? '';
@@ -242,18 +254,26 @@ foreach ($fdAll as $fdKey => $fdDef) {
     if (!t_ok($fdSrc !== false, "FW3 · $fdPath exists")) continue;
 
     // The one line without which every design change is discarded.
-    t_ok(strpos($fdSrc, 'fd_overlay_html') !== false,
+    //  fd_extra_fields() does both jobs in one line; the older forms call the
+    //  two functions separately. Either is correct — what is not correct is a
+    //  form declared here with neither.
+    $fdOneLine = strpos($fdSrc, 'fd_extra_fields') !== false;
+    t_ok($fdOneLine || strpos($fdSrc, 'fd_overlay_html') !== false,
          "FW4 · '$fdKey' — its view applies the design overrides");
-    // And the form must accept added fields, or "add a field" goes nowhere.
-    t_ok(strpos($fdSrc, 'render_custom_fields') !== false,
+    t_ok($fdOneLine || strpos($fdSrc, 'render_custom_fields') !== false,
          "FW5 · '$fdKey' — its view renders fields the admin adds");
 
     // Every declared key must be a control that really exists on that form.
+    //  A CONTROL, not merely the word. The first version of this also accepted
+    //  the field name appearing as any quoted PHP string in the view — and
+    //  'status', 'source' and 'notes' appear as array keys in nearly every one,
+    //  so that branch would have passed for a field with no control at all.
+    //  The overlay works by document.querySelector('[name="…"]'), so a name= in
+    //  the markup is exactly the thing that has to be there.
     $fdMissing = [];
     foreach (array_keys($fdDef['fields'] ?? []) as $fdF) {
         if (strpos($fdSrc, 'name="' . $fdF . '"') === false
-            && strpos($fdSrc, "name=\"{$fdF}[]\"") === false
-            && strpos($fdSrc, "'" . $fdF . "'") === false) $fdMissing[] = $fdF;
+            && strpos($fdSrc, "name=\"{$fdF}[]\"") === false) $fdMissing[] = $fdF;
     }
     t_eq($fdMissing, [], "FW6 · '$fdKey' — every declared field exists on the form");
 

@@ -643,6 +643,7 @@ function cmp_create($b) {
                    ($b['office_id'] ?? '') !== '' ? (int)$b['office_id'] : ($parent['office_id'] ?? null),
                    date('c')]);
     $id = (int)db()->lastInsertId();
+    if (function_exists('custom_save')) custom_save('complaint', $id, $b);
     cmp_log($id, 'RECEIVED', $ref . ' — ' . $subject);
     if (function_exists('act_log'))
         act_log('COMPLAINT', $id, 'SYSTEM', ($kind === 'APPEAL' ? 'Appeal ' : 'Complaint ') . $ref . ' received',

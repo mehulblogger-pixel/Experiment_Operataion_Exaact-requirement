@@ -351,14 +351,20 @@ function ops_equipment($route, $method) {
                 $set = implode(',', array_map(fn($k) => "$k=?", $f));
                 db()->prepare("UPDATE equipment SET $set, office_id=?, inspector_id=?, cal_interval_months=? WHERE id=?")
                     ->execute(array_merge($vals, [$office, $insp, $months, $e['id']]));
+                if (function_exists('custom_save')) custom_save('equipment', (int)$e['id'], $_POST);
                 flash('Instrument updated.');
                 redirect('/equip-edit?id=' . $e['id']);
             }
             db()->prepare("INSERT INTO equipment (" . implode(',', $f) . ",office_id,inspector_id,cal_interval_months,created_by,created_at)
                            VALUES (" . implode(',', array_fill(0, count($f), '?')) . ",?,?,?,?,?)")
                 ->execute(array_merge($vals, [$office, $insp, $months, user_name(current_user()), date('c')]));
+            //  Read the new id ONCE. lastInsertId() inside the redirect was fine
+            //  while nothing else ran between; anything inserting after it — a
+            //  custom field value, for instance — would change what it returns.
+            $equipNewId = (int) db()->lastInsertId();
+            if (function_exists('custom_save')) custom_save('equipment', $equipNewId, $_POST);
             flash('Instrument added. Now upload its calibration certificate — until one is on file it cannot be used on a report.');
-            redirect('/equip-edit?id=' . db()->lastInsertId());
+            redirect('/equip-edit?id=' . $equipNewId);
         }
         view('ops/equipment_form', equipment_form_vars($e, null));
         return true;

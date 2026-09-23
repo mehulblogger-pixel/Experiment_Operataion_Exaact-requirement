@@ -368,6 +368,7 @@ function ncr_create(array $b) {
             (string)($b['containment'] ?? ''),
             user_name(current_user()), date('c')]);
     $id = (int)db()->lastInsertId();
+    if (function_exists('custom_save')) custom_save('ncr', $id, $b);
     // Phase 8 (NCDCA): let the universal issue layer stamp the issue type /
     // classification / responsibility / visibility if provided. Additive and
     // guarded — absent keys leave the record exactly as before (a plain NCR).

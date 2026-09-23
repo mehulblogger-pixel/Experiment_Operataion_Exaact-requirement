@@ -669,6 +669,16 @@ function cf_target_module($entity) {
         'sample' => 'reporting', 'method' => 'reporting', 'risk' => 'reporting',
         'decision_rule' => 'reporting', 'controlled_doc' => 'reporting', 'satisfaction' => 'operations',
         'requisition' => 'hr', 'candidate' => 'hr',
+        //  The twelve forms that could not be tailored at all until now. The
+        //  module decides whether the form's custom-field target is offered on
+        //  a copy that has not bought that module — a Recruitment-only install
+        //  should not be asked about invoices.
+        'inspector' => 'operations', 'equipment' => 'reporting',
+        'lead' => 'sales', 'opportunity' => 'sales',
+        'complaint' => 'reporting', 'incident' => 'reporting',
+        'ncr' => 'reporting', 'capa' => 'reporting', 'audit' => 'reporting',
+        'invoice' => 'money', 'receipt' => 'money',
+        'user' => 'admin',
     ];
     if (isset($m[$entity])) return $m[$entity];
     return function_exists('master_card_module') ? master_card_module($entity) : 'admin';

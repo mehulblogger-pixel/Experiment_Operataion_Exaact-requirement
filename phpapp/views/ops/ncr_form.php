@@ -54,6 +54,9 @@
     <div class="ff-wide"><label>What was done immediately <span class="muted">(can be added later)</span></label>
       <textarea class="form-control" name="containment" rows="2" placeholder="e.g. the report was recalled from the client the same day"><?= e($p['containment'] ?? '') ?></textarea></div>
   </div>
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('ncr', 0); ?>
   <div style="margin-top:14px;display:flex;gap:10px">
     <button class="btn">Raise it</button>
     <a class="btn secondary" href="/ncr">Cancel</a>

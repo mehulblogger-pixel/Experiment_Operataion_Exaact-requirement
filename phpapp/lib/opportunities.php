@@ -358,6 +358,7 @@ function opp_create(array $b) {
                  date('c'), (string)($b['next_action_on'] ?? ''), (string)($b['next_action'] ?? ''),
                  $u ? user_name($u) : '', date('c'), date('c')]);
     $id = (int)db()->lastInsertId();
+    if (function_exists('custom_save')) custom_save('opportunity', $id, $b);
     if (function_exists('act_log'))
         act_log('OPPORTUNITY', $id, 'SYSTEM', 'Opportunity ' . $ref . ' opened — ' . $name,
                 ['auto' => 1, 'partner_id' => $pid ?: null]);

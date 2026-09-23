@@ -647,6 +647,7 @@ function ops_incidents($route, $method) {
                 $sets = implode(',', array_map(function ($k) { return "$k=?"; }, array_keys($f)));
                 $pdo->prepare("UPDATE security_incidents SET $sets WHERE id=?")
                     ->execute(array_merge(array_values($f), [$inc['id']]));
+                if (function_exists('custom_save')) custom_save('incident', (int)$inc['id'], $_POST);
                 flash('Incident updated.');
                 redirect('/incident?id=' . (int)$inc['id']);
             }
@@ -657,6 +658,7 @@ function ops_incidents($route, $method) {
             $qs   = implode(',', array_fill(0, count($f), '?'));
             $pdo->prepare("INSERT INTO security_incidents ($cols) VALUES ($qs)")->execute(array_values($f));
             $id = (int)$pdo->lastInsertId();
+            if (function_exists('custom_save')) custom_save('incident', $id, $_POST);
             idems_log('incident', $id, 'INCIDENT', ['field'=>$f['ref'], 'new'=>$f['kind']]);
             flash('Incident ' . $f['ref'] . ' recorded. The six-hour clock started when it was detected, not now.', 'warning');
             redirect('/incident?id=' . $id);

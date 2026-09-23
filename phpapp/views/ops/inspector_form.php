@@ -130,6 +130,9 @@
   </fieldset>
   <?php endif; ?>
 
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('inspector', $ins['id'] ?? 0); ?>
   <div style="margin-top:16px;">
     <button class="btn" type="submit"><?= $ins ? 'Save ' . Tl('engineer') : 'Add ' . Tl('engineer') ?></button>
     <a class="btn secondary" href="/m/inspectors">Cancel</a>

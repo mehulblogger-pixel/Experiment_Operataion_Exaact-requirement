@@ -29,6 +29,9 @@
         <small class="muted">The coverage board on the previous screen is built from these, so being honest here is what makes it useful.</small></div>
     </div>
   </div>
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('audit', 0); ?>
   <div class="form-actions"><button class="btn" type="submit">Plan it</button>
     <a class="btn secondary" href="/internal-audits">Cancel</a></div>
 </form>
