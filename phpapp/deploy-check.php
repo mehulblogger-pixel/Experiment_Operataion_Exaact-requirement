@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'bad3251 · 2026-09-23 11:06 UTC · 666 files';
+$RELEASE = 'bc3b60a · 2026-09-23 12:40 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -552,7 +552,7 @@ $EXPECT  = [
     'views/ops/receipts.php' => ['s'=>3431,'h'=>'92fe379c6b582e34'],
     'views/ops/receivables.php' => ['s'=>5717,'h'=>'5f0d1ef9dc366ce7'],
     'views/ops/recruit_pipelines.php' => ['s'=>11827,'h'=>'c4c1d8ad49872179'],
-    'views/ops/recruitment_cc.php' => ['s'=>44086,'h'=>'e03409224f1665a6'],
+    'views/ops/recruitment_cc.php' => ['s'=>44085,'h'=>'63f25dd6d74a35e3'],
     'views/ops/recruitment_home.php' => ['s'=>14787,'h'=>'4b4fbb36b41e80f8'],
     'views/ops/recurring.php' => ['s'=>4054,'h'=>'77137957c72ee106'],
     'views/ops/reimbursable_dedup.php' => ['s'=>5209,'h'=>'95ba7f96fb4ccc26'],

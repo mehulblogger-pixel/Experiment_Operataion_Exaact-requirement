@@ -119,7 +119,7 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
             //  business decision; this sentence deliberately does not take it.
             //  It only stops the user guessing which door exists. ?>
       <?php if (function_exists('hreq_can_view') && hreq_can_view()): ?>
-      <p class="sub" style="margin-top:-6px">Hiring starts either way: raise a
+      <p class="sub" style="margin-top:6px">Hiring starts either way: raise a
         <a href="/hiring-requests">hiring request</a> when the headcount has to be approved first,
         or create a <a href="/requisition-new">requirement</a> directly when it does not.</p>
       <?php endif; ?>
