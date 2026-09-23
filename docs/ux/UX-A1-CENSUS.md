@@ -134,9 +134,13 @@ still be tidied, but it is not the emergency the raw count implies.
 | `pill insp` | 3 |
 | `pill bad` | 3 |
 
-One generic class does 497 jobs while the semantic ones are barely used — so
-status colour is effectively decorative rather than meaningful, and there is no
-icon+label+colour convention (Part 8).
+> **CORRECTED in UX-A6 — this table is wrong, and so was the conclusion I drew
+> from it.** The regex `pill[- ][a-z]+` collapsed `pill p-ok`, `pill p-warn`,
+> `pill p-mut`, `pill p-bad` and `pill p-info` into a phantom class "pill p".
+> Counted properly: p-ok 148, p-warn 103, p-mut 96, p-bad 91, p-info 54 — **492
+> uses of a proper five-tone semantic vocabulary**, with a legacy tail of ~42.
+> Status colour is **not** decorative; it is 92 % consistent already. The real
+> Part 8 gap is the missing **icon** (752 pills, 4 icons). See F-A6-1.
 
 ## 7 · Mobile
 
