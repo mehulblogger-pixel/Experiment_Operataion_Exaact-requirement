@@ -906,6 +906,14 @@ html.cmdk-open{overflow:hidden}
 @media (pointer:coarse){
   .btn,.tabs a,.dt th a,select.form-control,input.form-control{min-height:44px}
   .btn.small{min-height:36px}
+  /*  B6 — a panel tab is how a form is navigated on a phone, so it is a primary
+      touch target and was 33px. Centring rather than padding keeps the bar the
+      same height on a mouse, where the rule does not apply.  */
+  .tabbtn,details.fold>summary{min-height:44px;display:flex;align-items:center}
+  /*  …and let a fold's title and its explanation wrap onto separate lines
+      rather than squeezing the title into a narrow column beside it.  */
+  details.fold>summary{flex-wrap:wrap;gap:0 8px}
+  details.fold>summary .sub{flex:1 1 100%;margin-left:18px}
 }
 
 /* ============================================================================

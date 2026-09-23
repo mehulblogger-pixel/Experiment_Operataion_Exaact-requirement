@@ -54,6 +54,17 @@
 <form method="post" action="/<?= $isEdit ? 'candidate-edit?id=' . (int)$cand['id'] : 'candidate-new' ?>" class="panel">
 <?php if ($dupes): ?><input type="hidden" name="dup_ack" value="1"><?php endif; ?>
 <?php if (!$isEdit && !empty($cand['cv_text'])): ?><input type="hidden" name="cv_text" value="<?= e($cand['cv_text']) ?>"><?php endif; ?>
+<?php //  B6 — progressive disclosure, on the same panel engine (initSectionTabs) the
+      //  allocate, test-request and user forms already use. Nothing is removed
+      //  and nothing is optional-made-required: every field stays in the DOM on
+      //  every panel, so a value typed on one panel is still submitted from
+      //  another, and Save sits OUTSIDE the panels so a candidate can still be
+      //  saved from the first one. With scripting off all four panels render as
+      //  one page, exactly as before. ?>
+<div data-tabs data-tabs-key="candform">
+<section class="fs-pane" data-tab="Requirement &amp; person">
+  <h3 class="tab-sub" style="margin-top:0">Requirement &amp; person</h3>
+  <div class="form-grid">
   <div class="ff ff-wide" style="background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
     <label>Against requisition (management approval) *</label>
     <select class="form-control searchable" name="requisition_id" id="cand_req" required>
@@ -83,11 +94,17 @@
     <small class="muted">Leave this blank if the person was found directly. It only decides which source gets the credit — never whether they get the job.</small>
   </div>
   <?php endif; ?>
-  <div class="form-grid">
     <div class="ff"><label>First name *</label><input class="form-control" name="first_name" required value="<?= e($cand['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Middle name</label><input class="form-control" name="middle_name" value="<?= e($cand['middle_name'] ?? '') ?>"></div>
     <div class="ff"><label>Last name</label><input class="form-control" name="last_name" value="<?= e($cand['last_name'] ?? '') ?>"></div>
-
+    <div class="ff"><label>Experience (years)</label><input class="form-control" type="number" step="0.5" name="experience_years" value="<?= e($cand['experience_years'] ?? '') ?>"></div>
+    <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($cand['email'] ?? '') ?>"></div>
+    <div class="ff"><label>Mobile</label><input class="form-control" name="mobile" value="<?= e($cand['mobile'] ?? '') ?>"></div>
+  </div>
+</section>
+<section class="fs-pane" data-tab="Role &amp; where">
+  <h3 class="tab-sub" style="margin-top:0">Role &amp; where</h3>
+  <div class="form-grid">
     <div class="ff"><label>Client (who needs the resource) <a href="#" class="addlink" data-qa="client">+ Add new</a></label>
       <select class="form-control searchable" id="client_sel" name="client_id"><option value="">—</option>
         <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)($cand['client_id'] ?? '')===(string)$cl['id']?'selected':'' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?>
@@ -111,7 +128,6 @@
         <?php endforeach; endif; ?>
       </select>
       <small class="muted" id="cand_group_hint"></small></div>
-
     <div class="ff"><label>Trade / discipline</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
         <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>" <?= (string)$curTrade===(string)$t['id']?'selected':'' ?>><?= e($t['label']) ?></option><?php endforeach; ?>
@@ -124,21 +140,21 @@
       <select class="form-control searchable" name="designation"><option value="">—</option>
         <?php foreach (lk_options_or('designation', DESIGNATIONS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['designation'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
-
     <div class="ff"><label><?= e(T("sbu")) ?></label>
       <select class="form-control searchable" name="sbu"><option value="">—</option>
         <?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['sbu'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
+    <div class="ff"><label>Department</label>
+      <select class="form-control searchable" name="department"><option value="">—</option><?php foreach ((function_exists('dept_form_options') ? dept_form_options($cand['department'] ?? '') : ($rccDepts ?? [])) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['department'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
+  </div>
+</section>
+<section class="fs-pane" data-tab="Sourcing &amp; money">
+  <h3 class="tab-sub" style="margin-top:0">Sourcing &amp; money</h3>
+  <div class="form-grid">
     <div class="ff"><label>Source</label>
       <select class="form-control" id="cand_source" name="source"><?php foreach (lk_options_or('candidate_source', CAND_SOURCES) as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['source'] ?? 'FREELANCER')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Recruiter (Responsible 1)</label>
       <?php /* M5 — the owner this screen was showing (stale-save guard). */ ?><input type="hidden" name="own_base_recruiter_id" value="<?= (int)($cand['recruiter_id'] ?? 0) ?>"><select class="form-control searchable" name="recruiter_id"><option value="">—</option><?php foreach (($rccUsers ?? []) as $uid=>$un): ?><option value="<?= (int)$uid ?>" <?= ((int)($cand['recruiter_id'] ?? 0)===(int)$uid)?'selected':'' ?>><?= e($un) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Department</label>
-      <select class="form-control searchable" name="department"><option value="">—</option><?php foreach ((function_exists('dept_form_options') ? dept_form_options($cand['department'] ?? '') : ($rccDepts ?? [])) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['department'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>If lost — drop point <span class="muted">where in the pipeline</span></label>
-      <select class="form-control" name="drop_point"><option value="">— not lost —</option><?php foreach (($rccDropPoints ?? []) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['drop_point'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>If lost — reason <span class="muted">why</span></label>
-      <select class="form-control" name="drop_reason"><option value="">—</option><?php foreach (($rccDropReasons ?? []) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['drop_reason'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label id="agency_lbl">Agency (sub-con / HR agency) <a href="#" class="addlink" data-qa="agency">+ Add new</a></label>
       <?php $curAgency = $cand['agency'] ?? ''; $inList = in_array($curAgency, $agencies, true); ?>
       <select class="form-control searchable" id="agency_sel" name="agency">
@@ -147,18 +163,24 @@
         <?php foreach ($agencies as $a): ?><option value="<?= e($a) ?>" <?= $curAgency===$a?'selected':'' ?>><?= e($a) ?></option><?php endforeach; ?>
       </select></div>
 
-    <div class="ff"><label>Experience (years)</label><input class="form-control" type="number" step="0.5" name="experience_years" value="<?= e($cand['experience_years'] ?? '') ?>"></div>
-    <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($cand['email'] ?? '') ?>"></div>
-    <div class="ff"><label>Mobile</label><input class="form-control" name="mobile" value="<?= e($cand['mobile'] ?? '') ?>"></div>
-
     <div class="ff"><label>Expected rate (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="expected_rate" value="<?= e($cand['expected_rate'] ?? '') ?>"></div>
     <div class="ff"><label>Rate type</label>
       <select class="form-control" name="rate_type"><?php foreach (lk_options_or('rate_type', RATE_TYPES) as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['rate_type'] ?? 'MANDAY')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+  </div>
+</section>
+<section class="fs-pane" data-tab="Paperwork &amp; outcome">
+  <h3 class="tab-sub" style="margin-top:0">Paperwork &amp; outcome</h3>
+  <div class="form-grid">
     <div class="ff"><label>CV received date</label><input class="form-control" type="date" name="cv_received_date" value="<?= e($cand['cv_received_date'] ?? '') ?>"></div>
-
     <div class="ff ff-wide"><label>CV link (Drive / SharePoint URL)</label><input class="form-control" name="cv_link" value="<?= e($cand['cv_link'] ?? '') ?>" placeholder="https://…"></div>
     <div class="ff ff-wide"><label>Remarks</label><input class="form-control" name="remarks" value="<?= e($cand['remarks'] ?? '') ?>"></div>
+    <div class="ff"><label>If lost — drop point <span class="muted">where in the pipeline</span></label>
+      <select class="form-control" name="drop_point"><option value="">— not lost —</option><?php foreach (($rccDropPoints ?? []) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['drop_point'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>If lost — reason <span class="muted">why</span></label>
+      <select class="form-control" name="drop_reason"><option value="">—</option><?php foreach (($rccDropReasons ?? []) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['drop_reason'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
   </div>
+</section>
+</div>
   <?php if (function_exists('custom_fields_for') && custom_fields_for('candidate')): ?>
     <h3 class="tab-sub">More details</h3>
     <div class="form-grid"><?php render_custom_fields('candidate', $cfvals ?? []); ?></div>

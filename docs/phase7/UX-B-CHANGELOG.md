@@ -193,3 +193,47 @@ conversion race was refused by the **duplicate guard** — the winner's team
 record now existed and matched the candidate's e-mail. Specific, deterministic,
 and correct. The accepted set (widened once before on `ALREADY` evidence) now
 includes it. Pre-existing behaviour; unrelated to B5.
+
+## B6 — Forms and progressive disclosure
+
+**Correction first.** F-A5-1 said Job, Test request, Engineer and User show
+"every field at once — Disclosure: none", and that Candidate was "disclosed".
+Measured: Job, Test request and User have had tabbed disclosure since `b963490`
+(27 Aug), an **ancestor** of the commit that added the audit — so the finding was
+wrong when written, not out of date. Candidate had no disclosure at all and was
+the densest form in the product. Only the Engineer *add* screen matched the
+finding. `docs/ux/UX-A5-FORMS-STATES.md` and `docs/ux/UX-AUDIT.md` now carry that
+correction; `docs/phase7/UX-B6-IMPLEMENTATION.md` §1 is authoritative.
+
+**Changed**
+* `views/ops/inspector_form.php` — the add screen's single column split into a
+  core block plus four `details.fold` groups. **33 → 13** controls on open,
+  1162px → 900px. No field removed; the field inventory is identical.
+* `views/ops/candidate_form.php` — four panels on the existing `[data-tabs]`
+  engine, deliberately **not** `.form-tabs`, so Save stays reachable from panel
+  one. **29 → 11** controls on open, 1436px → 936px.
+* `assets/js/app.js` — `activateTabForField()` → `revealField()`, which now opens
+  every `<details>` above a field as well as bringing its panel to the front. The
+  submit guard used to let a box it judged off screen go to the server unchecked;
+  a folded box would have been ringed red inside a closed fold, because a closed
+  `<details>` still reports a layout box. Now the box is revealed first. This
+  reaches the Job, Test request and User forms too.
+* `assets/css/app.css` — one line in the existing `@media (pointer:coarse)` block:
+  panel tabs and fold summaries reach the blueprint's 44px (they were 33px).
+
+**Not changed** — no database, permission, status, transition or action handler.
+No field deleted. No second form, validation, wizard or configuration engine: the
+product already has `[data-tabs]`, `details.fold` and the Form Designer overlay,
+and all three were reused as they are. Required stays required: `' required'`
+occurs 5 times in the team-member form and twice in the candidate form, before
+and after.
+
+**Evidence** — 113 PHP assertions, 26 desktop browser assertions, 6 phone
+assertions, all green; 8 mutations caught. One mutation **survived** (M1: an
+explicit `revealField()` call added to the guard proved redundant, because
+`checkValidity()` already fires `invalid`) — that line was removed rather than
+kept. Two faults in this stage's own tooling were found and corrected: a closed
+`<details>` leaves `offsetParent` non-null, and a `fullPage` screenshot corrupts
+the next page's measurements.
+
+**ADR-001 remains OPEN.**

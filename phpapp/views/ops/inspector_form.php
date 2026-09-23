@@ -59,6 +59,14 @@
       </label>
     </div>
   <?php endif; ?>
+  <?php //  B6 — progressive disclosure. NOTHING IS REMOVED: the fields that used
+        //  to follow this block moved into the same fold component (details.fold)
+        //  that 46 other views already use. Adding a team member went from 33
+        //  boxes in one column to 13, and every other field is one click away.
+        //  Folding is display only — a folded field stays in the DOM, still
+        //  posts its value, and is still checked by the server. If one ever
+        //  fails validation, app.js opens its fold rather than ringing it red
+        //  where nobody can see it. ?>
   <div class="form-grid">
     <div class="ff"><label>First name *</label><input class="form-control" name="first_name" required value="<?= e($ins['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Middle name</label><input class="form-control" name="middle_name" value="<?= e($ins['middle_name'] ?? '') ?>"></div>
@@ -73,18 +81,6 @@
       </select></div>
     <div class="ff"><label>Engineer type</label>
       <select class="form-control" name="staff_kind"><?php foreach (['ASSET'=>'Own employee','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['staff_kind'] ?? 'ASSET')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <?php // The sub-contracting / manpower agency this person is engaged through.
-          //   A real link to the Agencies master (not a typed name), so a freelancer
-          //   sits under an agency and the roster can group by it. Left "none" for
-          //   an own employee. ?>
-    <div class="ff"><label>Engaged via agency <span class="muted">— for a freelancer / sub-contractor</span></label>
-      <select class="form-control searchable" name="agency_id">
-        <option value="">— none / own employee —</option>
-        <?php foreach (($agencies ?? []) as $ag): ?>
-          <option value="<?= (int)$ag['id'] ?>" <?= ((int)($ins['agency_id'] ?? 0)===(int)$ag['id'])?'selected':'' ?>><?= e($ag['name']) ?><?= !empty($ag['agency_type']) ? ' ('.e($ag['agency_type']).')' : '' ?></option>
-        <?php endforeach; ?>
-      </select>
-      <small class="muted">Add or edit agencies under <a href="/m/agencies" target="_blank">Masters → Agencies</a>.</small></div>
     <?php // Where this person sits for deputation. A FIELD inspector goes to site
           // and is ranked to the top of every allocate list; a coordinator or
           // office person can still be deputed but sits below the field inspectors. ?>
@@ -107,31 +103,6 @@
       </select><small class="muted">Manage under <a href="/lookup?key=trade">Trade</a> / <a href="/lookup?key=skill">Skill</a>.</small></div>
     <div class="ff"><label>Status</label>
       <select class="form-control" name="status"><?php foreach (['ACTIVE'=>'Active','INACTIVE'=>'Inactive'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['status'] ?? 'ACTIVE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Posted office <span class="muted">— shows on that office's availability board</span></label>
-      <select class="form-control searchable" name="home_office_id"><option value="">—</option>
-        <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ((int)($ins['home_office_id'] ?? 0)===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
-      </select></div>
-    <div class="ff"><label>Weekly working days <span class="muted">— or leave at 6 to inherit the designation/office norm</span></label>
-      <select class="form-control" name="weekly_working_days"><?php foreach (['6'=>'6 days (Mon–Sat) / inherit norm','5.5'=>'5.5 days (alternate Sat off)','5'=>'5 days (Mon–Fri)'] as $k=>$v): ?><option value="<?= $k ?>" <?= ((string)($ins['weekly_working_days'] ?? '6')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Reporting manager <span class="muted">— for approvals & hierarchy</span></label>
-      <select class="form-control searchable" name="reports_to_id"><option value="">—</option>
-        <?php foreach (($managers ?? []) as $m): $nm=trim(($m['first_name']??'').' '.($m['last_name']??'')) ?: $m['username']; ?><option value="<?= (int)$m['id'] ?>" <?= ((int)($ins['reports_to_id'] ?? 0)===(int)$m['id'])?'selected':'' ?>><?= e($nm) ?> · <?= e(ORG_ROLES[$m['role']] ?? $m['role']) ?></option><?php endforeach; ?>
-      </select></div>
-    <?php if (can_see_salary()): ?>
-    <div class="ff"><label>Annual CTC (<?= e(cur_sym()) ?>) <span class="muted">— cost split across <?= e(Tlp("sbu")) ?></span></label><input class="form-control" type="number" step="0.01" name="salary_ctc" value="<?= e($ins['salary_ctc'] ?? '') ?>"></div>
-    <div class="ff"><label>Agency hiring cost (<?= e(cur_sym()) ?>/yr) <span class="muted">— extra cost paid to the agency</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value="<?= e($ins['agency_cost'] ?? '') ?>"></div>
-    <?php endif; ?>
-
-    <div class="ff ff-wide"><label><?= e(TP("sbu")) ?> (multi — monthly cost is distributed across these)</label>
-      <div class="checkgrid">
-        <?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?>
-          <label class="chk"><input type="checkbox" name="sbus[]" value="<?= e($k) ?>" <?= in_array($k, $selSbus, true)?'checked':'' ?>> <?= e($v) ?></label>
-        <?php endforeach; ?>
-      </div></div>
-
-    <div class="ff ff-wide"><label>Skills (from the chosen trade)</label>
-      <div class="skill-box" id="skills_box"><span class="muted">Pick a trade to see its skills.</span></div>
-      <small class="muted">Skills come from the Trade you select. Add more under <a href="/lookup?key=skill">Skill</a>.</small></div>
 
     <?php // Document checklist (gap 3) — presence-only, so it shows here without
           //   the identity-document permission. What is missing is one click from
@@ -163,11 +134,61 @@
       <?php if (function_exists('asset_can_view') && asset_can_view()): ?><small class="muted"><a href="/asset-register?person=<?= (int)$ins['id'] ?>">Issue / return assets →</a></small><?php endif; ?></div>
     <?php endif; ?>
   </div>
+  <details class="fold" style="margin-top:12px">
+    <summary><b>Skills and <?= e(TP("sbu")) ?></b> <span class="sub">— what they are qualified for, and whose cost they sit against</span></summary>
+    <div class="fold-body"><div class="form-grid">
+    <div class="ff ff-wide"><label><?= e(TP("sbu")) ?> (multi — monthly cost is distributed across these)</label>
+      <div class="checkgrid">
+        <?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?>
+          <label class="chk"><input type="checkbox" name="sbus[]" value="<?= e($k) ?>" <?= in_array($k, $selSbus, true)?'checked':'' ?>> <?= e($v) ?></label>
+        <?php endforeach; ?>
+      </div></div>
+    <div class="ff ff-wide"><label>Skills (from the chosen trade)</label>
+      <div class="skill-box" id="skills_box"><span class="muted">Pick a trade to see its skills.</span></div>
+      <small class="muted">Skills come from the Trade you select. Add more under <a href="/lookup?key=skill">Skill</a>.</small></div>
+    </div></div>
+  </details>
+  <details class="fold" style="margin-top:12px">
+    <summary><b>Agency, posting and reporting line</b> <span class="sub">— leave these as they are for an own employee at the default office</span></summary>
+    <div class="fold-body"><div class="form-grid">
+    <?php // The sub-contracting / manpower agency this person is engaged through.
+          //   A real link to the Agencies master (not a typed name), so a freelancer
+          //   sits under an agency and the roster can group by it. Left "none" for
+          //   an own employee. ?>
+    <div class="ff"><label>Engaged via agency <span class="muted">— for a freelancer / sub-contractor</span></label>
+      <select class="form-control searchable" name="agency_id">
+        <option value="">— none / own employee —</option>
+        <?php foreach (($agencies ?? []) as $ag): ?>
+          <option value="<?= (int)$ag['id'] ?>" <?= ((int)($ins['agency_id'] ?? 0)===(int)$ag['id'])?'selected':'' ?>><?= e($ag['name']) ?><?= !empty($ag['agency_type']) ? ' ('.e($ag['agency_type']).')' : '' ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted">Add or edit agencies under <a href="/m/agencies" target="_blank">Masters → Agencies</a>.</small></div>
+    <div class="ff"><label>Posted office <span class="muted">— shows on that office's availability board</span></label>
+      <select class="form-control searchable" name="home_office_id"><option value="">—</option>
+        <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ((int)($ins['home_office_id'] ?? 0)===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
+      </select></div>
+    <div class="ff"><label>Weekly working days <span class="muted">— or leave at 6 to inherit the designation/office norm</span></label>
+      <select class="form-control" name="weekly_working_days"><?php foreach (['6'=>'6 days (Mon–Sat) / inherit norm','5.5'=>'5.5 days (alternate Sat off)','5'=>'5 days (Mon–Fri)'] as $k=>$v): ?><option value="<?= $k ?>" <?= ((string)($ins['weekly_working_days'] ?? '6')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Reporting manager <span class="muted">— for approvals & hierarchy</span></label>
+      <select class="form-control searchable" name="reports_to_id"><option value="">—</option>
+        <?php foreach (($managers ?? []) as $m): $nm=trim(($m['first_name']??'').' '.($m['last_name']??'')) ?: $m['username']; ?><option value="<?= (int)$m['id'] ?>" <?= ((int)($ins['reports_to_id'] ?? 0)===(int)$m['id'])?'selected':'' ?>><?= e($nm) ?> · <?= e(ORG_ROLES[$m['role']] ?? $m['role']) ?></option><?php endforeach; ?>
+      </select></div>
+    </div></div>
+  </details>
+  <?php if (can_see_salary()): ?>
+  <details class="fold" style="margin-top:12px">
+    <summary><b>Cost</b> <span class="sub">— annual CTC and any agency fee — only people with pay access see this</span></summary>
+    <div class="fold-body"><div class="form-grid">
+    <div class="ff"><label>Annual CTC (<?= e(cur_sym()) ?>) <span class="muted">— cost split across <?= e(Tlp("sbu")) ?></span></label><input class="form-control" type="number" step="0.01" name="salary_ctc" value="<?= e($ins['salary_ctc'] ?? '') ?>"></div>
+    <div class="ff"><label>Agency hiring cost (<?= e(cur_sym()) ?>/yr) <span class="muted">— extra cost paid to the agency</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value="<?= e($ins['agency_cost'] ?? '') ?>"></div>
+    </div></div>
+  </details>
+  <?php endif; ?>
 
   <?php if (!$isEdit): // §WO-7 — attach a first certificate (with its scan) right while adding ?>
-  <fieldset style="margin-top:16px;border:1px solid var(--line);border-radius:8px;padding:12px">
-    <legend style="padding:0 6px;font-weight:600">First certificate <span class="muted" style="font-weight:400">— optional; add more after saving</span></legend>
-    <div class="form-grid">
+  <details class="fold" style="margin-top:12px">
+    <summary><b>First certificate</b> <span class="sub">— optional; you can add certificates after saving</span></summary>
+    <div class="fold-body"><div class="form-grid">
       <div class="ff"><label>Certificate name</label><input class="form-control" name="cert_name" placeholder="e.g. CSWIP 3.1"></div>
       <div class="ff"><label>Number</label><input class="form-control" name="cert_number"></div>
       <div class="ff"><label>Valid from</label><input class="form-control" type="date" name="cert_valid_from"></div>
@@ -176,7 +197,8 @@
       <div class="ff" style="align-self:end"><label class="chk"><input type="checkbox" name="cert_mandatory" value="1"> Required for work</label></div>
     </div>
     <small class="muted">The system warns the <?= e(Tl('engineer')) ?> and the QA/QC nominee a month before the "valid to" date.</small>
-  </fieldset>
+    </div>
+  </details>
   <?php endif; ?>
 
   <?php // Form Designer — render any field this company added, and apply their

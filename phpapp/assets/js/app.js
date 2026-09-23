@@ -826,6 +826,11 @@
       b.mark.addEventListener('change', clear);
       b.el.addEventListener('change', clear);
     });
+    //  Several boxes on several panels can fail at once, and the guard opened
+    //  each one's panel as it went — so the LAST would be in front while the
+    //  message names the first. Re-reveal the first, BEFORE scrolling, so the
+    //  panel change cannot shift the page out from under the scroll.
+    revealField(bad[0].el);
     box.scrollIntoView({ behavior: 'smooth', block: 'center' });
     var first = bad[0].mark;
     setTimeout(function () { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }, 350);
@@ -843,9 +848,19 @@
         Array.prototype.forEach.call(f.elements, function (el) {
           if (el.disabled || el.type === 'hidden' || el.type === 'submit'
               || el.type === 'button' || el.type === 'reset') return;
+          //  The checkValidity() call on the next line is what brings a failing
+          //  box back on screen, and it is deliberate. Calling it FIRES the
+          //  element's own 'invalid' event, which revealField() listens for
+          //  (see initTabValidation) — so by the time shownAs() runs, the box's
+          //  fold has been opened and its panel brought to the front. Do not
+          //  "tidy" this into a cached validity flag: that would stop the event
+          //  firing, and a box that is folded away or on another panel would go
+          //  back to being posted blind for the server to refuse. A mutation
+          //  test proved an explicit revealField(el) here is redundant, so it
+          //  is not repeated.
           if (!el.checkValidity || el.checkValidity()) return;
           var mark = shownAs(el);
-          if (!mark) return;                 // not on screen: the server judges it
+          if (!mark) return;                 // genuinely unreachable: the server judges it
           bad.push({ el: el, mark: mark });
         });
         if (!bad.length) return;             // let it save
@@ -1531,17 +1546,28 @@
       if (!tgt) return;
       var pane = tgt.closest && tgt.closest('[data-tab]');
       if (!pane || !pane.hidden) return;         // already visible — let the browser handle it
-      activateTabForField(tgt);
+      revealField(tgt);
       setTimeout(function () { try { tgt.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} }, 60);
     });
   }
 
-  // A required box on a tab that is not the open one would fail the browser's
-  // own check with nothing on screen to show why — the Save button just does
-  // nothing. Catch that: when a field reports itself invalid, bring its tab to
-  // the front first, so the person is looking at the box being complained about.
-  function activateTabForField(el) {
-    var pane = el.closest && el.closest('[data-tab]');
+  // A required box that is not on screen would fail its check with nothing to
+  // show why — the Save button just does nothing. Catch that: when a field
+  // reports itself invalid, bring it back into view first, so the person is
+  // looking at the box being complained about. "Not on screen" has two causes
+  // and this handles both: a panel that is not the open one, and a fold that is
+  // not open.
+  function revealField(el) {
+    if (!el || !el.closest) return;
+    //  B6 — a required control inside a CLOSED <details> cannot be focused, so
+    //  the browser's own check fails with nothing on screen and the Save button
+    //  simply does nothing ("An invalid form control is not focusable"). Open
+    //  every <details> above the field first. This guards the folds added to the
+    //  team-member form, every other details.fold on a form, and a field an
+    //  admin makes required through the Form Designer after folding it away.
+    var d = el.closest('details');
+    while (d) { if (!d.open) d.open = true; d = d.parentElement && d.parentElement.closest('details'); }
+    var pane = el.closest('[data-tab]');
     if (!pane) return;
     var wrap = pane.closest('[data-tabs]');
     var bar = wrap ? wrap.previousElementSibling : null;
@@ -1558,7 +1584,7 @@
     // every invalid control then focuses the first — switching its tab here,
     // before that focus lands, is what makes the field visible to receive it.
     document.addEventListener('invalid', function (e) {
-      if (e.target && e.target.closest) activateTabForField(e.target);
+      if (e.target && e.target.closest) revealField(e.target);
     }, true);
   }
 

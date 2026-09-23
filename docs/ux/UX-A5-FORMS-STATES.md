@@ -40,6 +40,29 @@ should not be used to justify rewriting copy that is already good.
 ## F-A5-1 · Four heavy forms present every field at once
 **Class: structural · Severity: HIGH**
 
+> ### ⚠ CORRECTED BY B6 — this finding was wrong about four of its six rows
+>
+> Measured in a browser against the running application (B6, 23 Sep 2026), the
+> table below is wrong in **both** directions:
+>
+> * **Job, Test request and User already had full tabbed disclosure.** They open
+>   showing 9, 8 and 13 controls respectively, on 5, 6 and 4 panels, with Back /
+>   Next and "Step N of M". This is not staleness: the engine and its use on all
+>   three arrived in `b963490` (27 Aug), which `git merge-base --is-ancestor`
+>   confirms is an **ancestor** of `0b1d58d`, the commit that added this audit.
+>   The disclosure was in the tree when this finding said it was absent.
+> * **Candidate, listed here as "disclosed", had none at all** — 29 of 38
+>   controls on one 1436px page. It was the densest undisclosed form in the
+>   product, and this finding pointed the other way.
+> * **Engineer is the one row that was right**, and only on the ADD screen: its
+>   panels are all `$isEdit`-only.
+>
+> The control counts below (57 / 54 / 48 / 40 / 77 / 32) are also not what the
+> rendered pages contain (146 / 154 / 37 / 179 / 82 / 38).
+>
+> **Treat `docs/phase7/UX-B6-IMPLEMENTATION.md` §1 as authoritative for this
+> finding.** The table below is kept as written, for the record.
+
 | Form | Controls | Disclosure |
 |---|---:|---|
 | Job | 57 | **none** |
