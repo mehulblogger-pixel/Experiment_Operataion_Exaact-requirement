@@ -56,3 +56,28 @@ lifecycle · database. **Zero** migrations, columns or tables.
 Gold accent → **B10** (`--accent` is wired to `--info`; changing it would change
 a status meaning). `--line` at 3:1 → B10. Nine duplicated status-tone helpers →
 B10. 16px mobile type floor → B7. Dead `.topbar` CSS → B10.
+
+---
+
+## B2 — Navigation + Recruitment Command Centre · commit `__B2_COMMIT__`
+
+### Source changes
+
+| File | Component | Problem | Change | Reason | Risk | Test |
+|---|---|---|---|---|---|---|
+| `views/ops/recruitment_cc.php` | section order | "Needs attention today" was 14th of 20 headings — **2,018px** of scrolling, past six analytics sections, before the page said anything actionable | Action sections moved above analysis; an `Analysis` divider marks the break | The page is a recruiter's daily screen, not a monthly report | low — markup moved only; each block verified to depend solely on variables defined in the page header | B2 B1–B5; browser N1 |
+| `views/ops/recruitment_cc.php` | hiring-request door | `/hiring-requests` had **no** entry in the rail, in any area tile, or on this page — reachable only from inside an individual request | Added behind `hreq_can_view()` | The register for step one of the chain was unreachable unless you were already in it | low — same gate as the handler | B2 D1–D3; browser N2 |
+| `views/ops/recruitment_cc.php` | the two paths | The page offered "New requirement" and never mentioned hiring requests | One neutral sentence naming both, **declaring neither preferred** | ADR-001 is open and is the owner's decision | low | B2 D4–D5 (asserts no preference is claimed) |
+| `views/layout_top.php` | rail icons | 🧭 shared by Owner home **and Recruitment**; 📑 by "My reports" **and the Reporting module** | Recruitment → 🧑‍💼, My reports → 📄, What to fix → 🩺 | Two different destinations must not look alike | low — one character each | B2 E1 |
+
+### What was NOT changed
+
+Routes · permissions · entitlements · lifecycle · KPI engine · search registry ·
+area-tile builder · dashboard · area homes · forms · tables · workflow
+redirects · breadcrumbs · database. **Zero destinations removed** — asserted.
+
+### Deferred
+
+ADR-001 preferred path → **owner decision** · rail route restructure → B9 ·
+duplicate `Approvals` heading → B10 · next-action block → B3 · relationship
+line → B4 · area-home counts → B5 · heading count → B10.

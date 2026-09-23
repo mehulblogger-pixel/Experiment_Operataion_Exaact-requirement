@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'b22c1ce · 2026-09-23 09:51 UTC · 666 files';
+$RELEASE = 'bad3251 · 2026-09-23 11:06 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -299,7 +299,7 @@ $EXPECT  = [
     'views/layout_bottom.php' => ['s'=>880,'h'=>'e6b33e19b84eb59f'],
     'views/layout_embed_bottom.php' => ['s'=>65,'h'=>'63f4c118c80caf4b'],
     'views/layout_embed_top.php' => ['s'=>730,'h'=>'b20991bedef34be0'],
-    'views/layout_top.php' => ['s'=>31725,'h'=>'b93fc5172d79e5a1'],
+    'views/layout_top.php' => ['s'=>31732,'h'=>'65af1f4354d12628'],
     'views/list.php' => ['s'=>3275,'h'=>'b234af3a9590aae2'],
     'views/login.php' => ['s'=>602,'h'=>'ff266c37dfd19bb0'],
     'views/login_page.php' => ['s'=>10767,'h'=>'c18991133beffa78'],
@@ -552,7 +552,7 @@ $EXPECT  = [
     'views/ops/receipts.php' => ['s'=>3431,'h'=>'92fe379c6b582e34'],
     'views/ops/receivables.php' => ['s'=>5717,'h'=>'5f0d1ef9dc366ce7'],
     'views/ops/recruit_pipelines.php' => ['s'=>11827,'h'=>'c4c1d8ad49872179'],
-    'views/ops/recruitment_cc.php' => ['s'=>41955,'h'=>'2299dcf43b6a3fd7'],
+    'views/ops/recruitment_cc.php' => ['s'=>44086,'h'=>'e03409224f1665a6'],
     'views/ops/recruitment_home.php' => ['s'=>14787,'h'=>'4b4fbb36b41e80f8'],
     'views/ops/recurring.php' => ['s'=>4054,'h'=>'77137957c72ee106'],
     'views/ops/reimbursable_dedup.php' => ['s'=>5209,'h'=>'95ba7f96fb4ccc26'],

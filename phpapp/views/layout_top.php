@@ -95,7 +95,7 @@
             // It sits above the module groups on purpose: it is cross-module, and a
             // person who only opens one screen a day should open this one. ?>
       <?php if (function_exists('adv_can') && adv_can()): ?>
-        <a class="s-item<?= $navOn(['advisor']) ?>" href="/advisor"><span class="s-ic">🧭</span><span>What to fix</span></a>
+        <a class="s-item<?= $navOn(['advisor']) ?>" href="/advisor"><span class="s-ic">🩺</span><span>What to fix</span></a>
       <?php endif; ?>
 
       <?php // Every label below is the first words of the page heading it opens,
@@ -108,7 +108,7 @@
         <?php $grp('My work'); ?>
         <a class="s-item<?= $navOn(['my-jobs']) ?>" href="/my-jobs"><span class="s-ic">🗂</span><span>My <?= e(Tlp('job')) ?></span></a>
         <?php if (can('mod.idems.view')): ?>
-          <a class="s-item<?= $navOn(['documents','document','document-edit','document-fill']) ?>" href="/documents"><span class="s-ic">📑</span><span>My <?= e(Tlp('report')) ?></span></a>
+          <a class="s-item<?= $navOn(['documents','document','document-edit','document-fill']) ?>" href="/documents"><span class="s-ic">📄</span><span>My <?= e(Tlp('report')) ?></span></a>
           <?php if (can('mod.idems.edit')): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span><?= e(ucfirst(T_NEW('report'))) ?></span></a><?php endif; ?>
           <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(THP('endorsement')) ?></span></a>
         <?php endif; ?>
@@ -153,7 +153,7 @@
               // supply/recruitment (the 'hr' module); a pure inspection body without
               // staffing/recruitment capabilities does not see it. Permissive default. ?>
         <?php if (can('mod.hiring.view') && (!function_exists('connect_cap_owner_shows')||connect_cap_owner_shows('hr'))): ?>
-        <a class="s-item<?= $navOn(['recruitment-cc','recruitment','requisitions','requisition','requisition-new','requisition-edit','candidates','candidate','recruit-config','req-ai-extract']) ?>" href="/recruitment-cc"><span class="s-ic">🧭</span><span>Recruitment</span></a>
+        <a class="s-item<?= $navOn(['recruitment-cc','recruitment','requisitions','requisition','requisition-new','requisition-edit','candidates','candidate','recruit-config','req-ai-extract']) ?>" href="/recruitment-cc"><span class="s-ic">🧑‍💼</span><span>Recruitment</span></a>
         <?php endif; ?>
 
         <?php if (ops_area_has('quality')): ?>

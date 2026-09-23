@@ -28,6 +28,12 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   .rcc .rfilters select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink,inherit);font-size:13px}
   .rcc .rfacts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .rcc .band{background:var(--band);border:1px solid var(--line);border-radius:9px;padding:7px 13px;margin:20px 0 12px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  /*  The one break in the page: above it is work to do, below it is the analysis
+      of how that work is going. A rule and a wider gap, not a new colour --
+      the point is a pause, not decoration. */
+  .rcc .band.rcc-analysis{margin-top:38px;border-top:3px solid var(--line);border-radius:9px;
+    padding-top:12px;background:transparent}
+  .rcc .band.rcc-analysis h2{color:var(--muted);font-weight:600}
   .rcc .band h2{margin:0;font-size:13px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
   .rcc .band .bd{font-size:12px;color:var(--muted)}
   .rcc .add{font-size:9.5px;font-weight:800;letter-spacing:.4px;color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);border-radius:20px;padding:1px 8px;text-transform:uppercase}
@@ -107,13 +113,29 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
     <div>
       <h1>Recruitment Command Centre</h1>
-      <p class="sub">Live hiring pipeline, funnel health and open demand — every number below responds to the filters.</p>
+      <p class="sub">What needs attention today, then the analysis behind it — every number responds to the filters.</p>
+      <?php //  B2 — the two supported ways in, stated neutrally. Which one a
+            //  workspace SHOULD prefer is ADR-001, open since Phase 2 and a
+            //  business decision; this sentence deliberately does not take it.
+            //  It only stops the user guessing which door exists. ?>
+      <?php if (function_exists('hreq_can_view') && hreq_can_view()): ?>
+      <p class="sub" style="margin-top:-6px">Hiring starts either way: raise a
+        <a href="/hiring-requests">hiring request</a> when the headcount has to be approved first,
+        or create a <a href="/requisition-new">requirement</a> directly when it does not.</p>
+      <?php endif; ?>
       <div class="refreshed"><?= $e($f['dept'] ? ($f['opts']['dept'][$f['dept']] ?? $f['dept']) : 'All departments') ?> · <?= $e($f['fy'] ?: '') ?> · Refreshed <?= date('d-M-Y') ?></div>
     </div>
     <div class="rfacts" style="display:flex;gap:8px;flex-wrap:wrap">
       <a class="btn primary" href="/requisition-new">＋ New requirement</a>
       <a class="btn secondary" href="/candidate-new">＋ Add candidate</a>
       <a class="btn secondary" href="/requisitions">Requirements</a>
+      <?php //  B2 — the hiring-request REGISTER had no door anywhere: not in the
+            //  rail, not an area tile, and not on this page. It was reachable only
+            //  from an individual request's own detail screen, so you had to be
+            //  inside it already to find it. Same permission gate as the handler. ?>
+      <?php if (function_exists('hreq_can_view') && hreq_can_view()): ?>
+      <a class="btn secondary" href="/hiring-requests">Hiring requests</a>
+      <?php endif; ?>
       <a class="btn secondary" href="/candidates">Candidates</a>
       <?php if (function_exists('pc_can') && pc_can()): ?><a class="btn secondary" href="/project-costings">🧮 Project costing</a><?php endif; ?>
       <a class="btn secondary" href="/recruitment">Action view</a>
@@ -176,6 +198,85 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   </form>
   <p class="sub" style="margin-top:6px">Every dropdown is driven by Masters &amp; Settings — an admin edits Department, Source, Stages and FY there with no code.</p>
 
+  <!-- 6. NEEDS ATTENTION -->
+  <div class="band"><h2>Needs attention today</h2><span class="bd">— longest-waiting candidates and the biggest open demand</span></div>
+  <div class="g2">
+    <div class="panel"><div class="ph"><h3>Longest-waiting candidates</h3><span class="note">chase these first</span></div>
+      <div class="pb scroll"><?php if (!$d['waiting']): ?><div class="empty">Nobody is waiting — pipeline is clear.</div><?php else: ?>
+        <table><thead><tr><th>Candidate</th><th>Department</th><th>Owner</th><th class="num">Days</th><th></th></tr></thead>
+        <tbody><?php foreach ($d['waiting'] as $w): ?>
+          <tr><td><?= $e($w['nm']) ?></td><td><?= $e($w['dept']) ?></td><td><?= $e($w['mgr']) ?></td><td class="num"><?= (int)$w['days'] ?></td><td><a href="/candidate?id=<?= (int)$w['id'] ?>#ct=Timeline">Timeline ›</a></td></tr>
+        <?php endforeach; ?></tbody></table>
+      <?php endif; ?></div>
+    </div>
+    <div class="panel"><div class="ph"><h3>Biggest open demand</h3><span class="note">most vacancies still open</span></div>
+      <div class="pb scroll"><?php if (!$d['demand']): ?><div class="empty">No open demand — every seat is filled.</div><?php else: ?>
+        <table><thead><tr><th>Department</th><th>Role / grade</th><th class="num">Ordered</th><th class="num">Open</th><th></th></tr></thead>
+        <tbody><?php foreach ($d['demand'] as $x): ?>
+          <tr><td><?= $e($x['dept']) ?></td><td><?= $e($x['role']) ?></td><td class="num"><?= (int)$x['vac'] ?></td><td class="num"><?= (int)$x['open'] ?></td><td><a href="/requisition?id=<?= (int)$x['id'] ?>">Open ›</a></td></tr>
+        <?php endforeach; ?></tbody></table>
+      <?php endif; ?></div>
+    </div>
+  </div>
+
+  <!-- M3 §27 — the approval backlog, on the existing dashboard rather than a new
+       one. "Overdue" includes the escalated ones: an escalation is an overdue
+       approval that has been chased, not a different kind of item. -->
+  <?php $A = $d['appr'] ?? [];
+        //  M3 CORRECTION #14 · B-2 — a suppression that could not be recorded is a
+        //  business fact and it is stated in business words. It sits on the approval
+        //  strip that already exists, and it is shown even when nothing is pending,
+        //  because the problem is with the record-keeping, not the backlog. No
+        //  database error, path or credential ever reaches this screen.
+        if ((int)($A['suppression_unarmed'] ?? 0) > 0): ?>
+  <div class="band" style="margin-top:12px"><h2>Approvals</h2><span class="bd">— needs attention</span></div>
+  <p class="msg msg-warn">Approval notification suppression could not be recorded for
+    <strong><?= (int)$A['suppression_unarmed'] ?></strong>
+    <?= (int)$A['suppression_unarmed'] === 1 ? 'approval condition' : 'approval conditions' ?>.
+    Repeat notices for <?= (int)$A['suppression_unarmed'] === 1 ? 'it' : 'them' ?> cannot be held back
+    until this is resolved. No approval decision is affected. Please ask your administrator to review the
+    activity log for this workspace.</p>
+  <?php endif; ?>
+
+  <?php if ((int)($A['pending'] ?? 0) > 0): ?>
+  <div class="band" style="margin-top:12px"><h2>Approvals</h2><span class="bd">— who is waiting, and how late it is</span></div>
+  <div class="kpis k4">
+    <a class="kpi" href="/my-approvals"><div class="l">Awaiting approval</div><div class="v tnum"><?= (int)($A['pending'] ?? 0) ?></div><div class="dd">steps with an approver now ›</div></a>
+    <a class="kpi" href="/my-approvals"><div class="l">Due today</div><div class="v tnum"><?= (int)($A['due_today'] ?? 0) ?></div><div class="dd">last day to act ›</div></a>
+    <a class="kpi bad" href="/my-approvals"><div class="l">Overdue</div><div class="v tnum"><?= (int)($A['overdue'] ?? 0) ?></div><div class="dd">past the agreed SLA ›</div></a>
+    <a class="kpi bad" href="/my-approvals"><div class="l">Escalated</div><div class="v tnum"><?= (int)($A['escalated'] ?? 0) ?></div><div class="dd">chased to the escalation contact ›</div></a>
+  </div>
+  <?php endif; ?>
+
+  <!-- 7. TRACKER + PROJECTS (added) -->
+  <div class="band"><h2>Ownership, deployment &amp; the requirement tracker</h2><span class="add">added</span></div>
+  <div class="g2 wide">
+    <div class="panel"><div class="ph"><h3>Requirement tracker</h3><span class="note">Resp 1 = Recruiter · Resp 2 = Reporting manager</span></div>
+      <div class="pb scroll"><?php if (!$d['tracker']): ?><div class="empty">No open requirements for these filters.</div><?php else: ?>
+        <table><thead><tr><th>Req #</th><th>Posted</th><th>Resp 1</th><th>Resp 2</th><th>Working</th><th>Status</th><th class="num">Earned</th><th class="num">Lost</th><th></th></tr></thead>
+        <tbody><?php foreach ($d['tracker'] as $t): $tone=$t['filled']>=$t['qty']?'var(--ok)':($t['filled']>0?'var(--warn)':'var(--bad)'); ?>
+          <tr>
+            <td><a href="/requisition?id=<?= (int)$t['id'] ?>"><?= $e($t['req']) ?></a></td>
+            <td><?= $e($t['posted']) ?> <span class="sub2">×<?= (int)$t['qty'] ?></span></td>
+            <td><?= $t['recruiter']!=='' ? $e($t['recruiter']) : '<span class="sub2">—</span>' ?></td>
+            <td><?= $t['manager']!=='' ? $e($t['manager']) : '<span class="sub2">—</span>' ?></td>
+            <td><span class="fillb"><span class="fbar"><i style="width:<?= round($t['filled']/max(1,$t['qty'])*100) ?>%;background:<?= $tone ?>"></i></span><span class="sub2"><?= (int)$t['filled'] ?>/<?= (int)$t['qty'] ?></span></span></td>
+            <td><span class="sub2"><?= $e(REQ_STATUS[$t['status']] ?? $t['status']) ?></span></td>
+            <td class="num money-pos"><?= $m($t['earned']) ?></td><td class="num money-neg"><?= $t['lost']>0?$m($t['lost']):'—' ?></td>
+            <td><a href="/requisition?id=<?= (int)$t['id'] ?>">Open ›</a></td>
+          </tr>
+        <?php endforeach; ?></tbody></table>
+      <?php endif; ?></div>
+    </div>
+    <div class="panel"><div class="ph"><h3>People working per project</h3><span class="note">deployed now vs ordered</span></div>
+      <div class="pb"><?php if (!$d['projects']): ?><div class="empty">No projects with deployed manpower yet.</div><?php else: ?>
+        <div class="proj"><?php foreach ($d['projects'] as $p): $w2=$p['ordered']>0?round($p['working']/$p['ordered']*100):0; ?>
+          <div><div class="ptop"><span class="pn"><?= $e($p['site']) ?></span><span class="pc"><?= (int)$p['working'] ?> / <?= (int)$p['ordered'] ?></span></div>
+            <div class="ptrack"><span class="ord" style="width:100%"></span><span class="wrk" style="width:<?= $w2 ?>%"></span><span class="lab"><?= (int)$p['working'] ?> working</span></div></div>
+        <?php endforeach; ?></div>
+      <?php endif; ?></div>
+    </div>
+  </div>
   <!-- 1. HIRING DEMAND & PIPELINE VOLUME -->
   <div class="band"><h2>Hiring demand &amp; pipeline volume</h2><span class="bd">— where the workload sits right now</span></div>
   <div class="kpis k4">
@@ -217,34 +318,13 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
     <a class="kpi" href="/availability"><div class="l">Working on site now</div><div class="v tnum"><?= (int)($PL['working'] ?? 0) ?></div><div class="dd">deployed across live projects ›</div></a>
   </div>
 
-  <!-- M3 §27 — the approval backlog, on the existing dashboard rather than a new
-       one. "Overdue" includes the escalated ones: an escalation is an overdue
-       approval that has been chased, not a different kind of item. -->
-  <?php $A = $d['appr'] ?? [];
-        //  M3 CORRECTION #14 · B-2 — a suppression that could not be recorded is a
-        //  business fact and it is stated in business words. It sits on the approval
-        //  strip that already exists, and it is shown even when nothing is pending,
-        //  because the problem is with the record-keeping, not the backlog. No
-        //  database error, path or credential ever reaches this screen.
-        if ((int)($A['suppression_unarmed'] ?? 0) > 0): ?>
-  <div class="band" style="margin-top:12px"><h2>Approvals</h2><span class="bd">— needs attention</span></div>
-  <p class="msg msg-warn">Approval notification suppression could not be recorded for
-    <strong><?= (int)$A['suppression_unarmed'] ?></strong>
-    <?= (int)$A['suppression_unarmed'] === 1 ? 'approval condition' : 'approval conditions' ?>.
-    Repeat notices for <?= (int)$A['suppression_unarmed'] === 1 ? 'it' : 'them' ?> cannot be held back
-    until this is resolved. No approval decision is affected. Please ask your administrator to review the
-    activity log for this workspace.</p>
-  <?php endif; ?>
 
-  <?php if ((int)($A['pending'] ?? 0) > 0): ?>
-  <div class="band" style="margin-top:12px"><h2>Approvals</h2><span class="bd">— who is waiting, and how late it is</span></div>
-  <div class="kpis k4">
-    <a class="kpi" href="/my-approvals"><div class="l">Awaiting approval</div><div class="v tnum"><?= (int)($A['pending'] ?? 0) ?></div><div class="dd">steps with an approver now ›</div></a>
-    <a class="kpi" href="/my-approvals"><div class="l">Due today</div><div class="v tnum"><?= (int)($A['due_today'] ?? 0) ?></div><div class="dd">last day to act ›</div></a>
-    <a class="kpi bad" href="/my-approvals"><div class="l">Overdue</div><div class="v tnum"><?= (int)($A['overdue'] ?? 0) ?></div><div class="dd">past the agreed SLA ›</div></a>
-    <a class="kpi bad" href="/my-approvals"><div class="l">Escalated</div><div class="v tnum"><?= (int)($A['escalated'] ?? 0) ?></div><div class="dd">chased to the escalation contact ›</div></a>
-  </div>
-  <?php endif; ?>
+  <?php //  B2 — everything above this line is work to DO; everything below is
+        //  the analysis of how that work is going. The split is presentational:
+        //  no number, query, filter or permission changed, and every section that
+        //  existed still exists, in the same order within its own group. It uses
+        //  the .band heading this page already uses ten times over. ?>
+  <div class="band rcc-analysis"><h2>Analysis</h2><span class="bd">— how hiring is performing. Nothing here needs action today.</span></div>
 
   <!-- 2. CONVERSION, SPEED & COST -->
   <div class="band"><h2>Conversion, speed &amp; cost</h2><span class="bd">— how well and how fast the funnel works</span></div>
@@ -397,56 +477,6 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
     </div>
   </div>
 
-  <!-- 6. NEEDS ATTENTION -->
-  <div class="band"><h2>Needs attention today</h2><span class="bd">— longest-waiting candidates and the biggest open demand</span></div>
-  <div class="g2">
-    <div class="panel"><div class="ph"><h3>Longest-waiting candidates</h3><span class="note">chase these first</span></div>
-      <div class="pb scroll"><?php if (!$d['waiting']): ?><div class="empty">Nobody is waiting — pipeline is clear.</div><?php else: ?>
-        <table><thead><tr><th>Candidate</th><th>Department</th><th>Owner</th><th class="num">Days</th><th></th></tr></thead>
-        <tbody><?php foreach ($d['waiting'] as $w): ?>
-          <tr><td><?= $e($w['nm']) ?></td><td><?= $e($w['dept']) ?></td><td><?= $e($w['mgr']) ?></td><td class="num"><?= (int)$w['days'] ?></td><td><a href="/candidate?id=<?= (int)$w['id'] ?>#ct=Timeline">Timeline ›</a></td></tr>
-        <?php endforeach; ?></tbody></table>
-      <?php endif; ?></div>
-    </div>
-    <div class="panel"><div class="ph"><h3>Biggest open demand</h3><span class="note">most vacancies still open</span></div>
-      <div class="pb scroll"><?php if (!$d['demand']): ?><div class="empty">No open demand — every seat is filled.</div><?php else: ?>
-        <table><thead><tr><th>Department</th><th>Role / grade</th><th class="num">Ordered</th><th class="num">Open</th><th></th></tr></thead>
-        <tbody><?php foreach ($d['demand'] as $x): ?>
-          <tr><td><?= $e($x['dept']) ?></td><td><?= $e($x['role']) ?></td><td class="num"><?= (int)$x['vac'] ?></td><td class="num"><?= (int)$x['open'] ?></td><td><a href="/requisition?id=<?= (int)$x['id'] ?>">Open ›</a></td></tr>
-        <?php endforeach; ?></tbody></table>
-      <?php endif; ?></div>
-    </div>
-  </div>
-
-  <!-- 7. TRACKER + PROJECTS (added) -->
-  <div class="band"><h2>Ownership, deployment &amp; the requirement tracker</h2><span class="add">added</span></div>
-  <div class="g2 wide">
-    <div class="panel"><div class="ph"><h3>Requirement tracker</h3><span class="note">Resp 1 = Recruiter · Resp 2 = Reporting manager</span></div>
-      <div class="pb scroll"><?php if (!$d['tracker']): ?><div class="empty">No open requirements for these filters.</div><?php else: ?>
-        <table><thead><tr><th>Req #</th><th>Posted</th><th>Resp 1</th><th>Resp 2</th><th>Working</th><th>Status</th><th class="num">Earned</th><th class="num">Lost</th><th></th></tr></thead>
-        <tbody><?php foreach ($d['tracker'] as $t): $tone=$t['filled']>=$t['qty']?'var(--ok)':($t['filled']>0?'var(--warn)':'var(--bad)'); ?>
-          <tr>
-            <td><a href="/requisition?id=<?= (int)$t['id'] ?>"><?= $e($t['req']) ?></a></td>
-            <td><?= $e($t['posted']) ?> <span class="sub2">×<?= (int)$t['qty'] ?></span></td>
-            <td><?= $t['recruiter']!=='' ? $e($t['recruiter']) : '<span class="sub2">—</span>' ?></td>
-            <td><?= $t['manager']!=='' ? $e($t['manager']) : '<span class="sub2">—</span>' ?></td>
-            <td><span class="fillb"><span class="fbar"><i style="width:<?= round($t['filled']/max(1,$t['qty'])*100) ?>%;background:<?= $tone ?>"></i></span><span class="sub2"><?= (int)$t['filled'] ?>/<?= (int)$t['qty'] ?></span></span></td>
-            <td><span class="sub2"><?= $e(REQ_STATUS[$t['status']] ?? $t['status']) ?></span></td>
-            <td class="num money-pos"><?= $m($t['earned']) ?></td><td class="num money-neg"><?= $t['lost']>0?$m($t['lost']):'—' ?></td>
-            <td><a href="/requisition?id=<?= (int)$t['id'] ?>">Open ›</a></td>
-          </tr>
-        <?php endforeach; ?></tbody></table>
-      <?php endif; ?></div>
-    </div>
-    <div class="panel"><div class="ph"><h3>People working per project</h3><span class="note">deployed now vs ordered</span></div>
-      <div class="pb"><?php if (!$d['projects']): ?><div class="empty">No projects with deployed manpower yet.</div><?php else: ?>
-        <div class="proj"><?php foreach ($d['projects'] as $p): $w2=$p['ordered']>0?round($p['working']/$p['ordered']*100):0; ?>
-          <div><div class="ptop"><span class="pn"><?= $e($p['site']) ?></span><span class="pc"><?= (int)$p['working'] ?> / <?= (int)$p['ordered'] ?></span></div>
-            <div class="ptrack"><span class="ord" style="width:100%"></span><span class="wrk" style="width:<?= $w2 ?>%"></span><span class="lab"><?= (int)$p['working'] ?> working</span></div></div>
-        <?php endforeach; ?></div>
-      <?php endif; ?></div>
-    </div>
-  </div>
 
   <p class="foot">Source of every number: the Candidates, Requirements and Placement records inside this app — nothing external is linked. Cards, bars and rows open the live detail screen. Money figures reuse the approved placement commercials.</p>
 </div>
