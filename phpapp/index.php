@@ -255,6 +255,7 @@ try {
     require __DIR__ . '/lib/recruit_fulfil.php';  // Phase 4 — multi-source fulfilment of ONE approved demand
     require __DIR__ . '/lib/recruit_kpi.php';     // Phase 5 — the ONE authoritative recruitment KPI, SLA & ageing engine
     require __DIR__ . '/lib/recruitpipe.php';      // Phase 2 — configurable pipeline / stage engine
+    require __DIR__ . '/lib/nextaction.php';       // B3 — "what should I do now?" read out of the lifecycle engines above
     require __DIR__ . '/lib/position.php';         // Phase 3 — position master, org-chart, manpower validation
     require __DIR__ . '/lib/organogram.php';       // Organogram importer (Excel/CSV/PPT/Visio/paste + AI image/PDF)
     require __DIR__ . '/lib/deptorg.php';           // Department⇄designation masters, Department hub, org-driven approvals

@@ -34,8 +34,14 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
     <p class="sub" style="margin:2px 0 0"><?= $r ? $e($r['job_title']) . ' · ' . (int) $r['quantity'] . ' needed' : 'Tell us what you need. Once it is approved it becomes a ' . strtolower($L('requisition')) . ' and recruitment starts.' ?></p></div>
 </div>
 
+<?php //  B3 — what happens next to THIS request. Read out of HREQ_STATUS and the
+      //  same gates the buttons below already use; it decides nothing and it
+      //  offers no action this user is not already allowed. $remaining is the
+      //  screen's own number, handed over rather than recomputed. ?>
+<?php if ($r && function_exists('na_html')) echo na_html('hiring_request', $r + ['__remaining' => (int) $remaining]); ?>
+
 <?php if ($r && $status === 'APPROVED'): ?>
-  <div class="panel" style="border-left:3px solid #1a7f37">
+  <div class="panel" id="na-recruit" style="border-left:3px solid #1a7f37">
     <strong>Approved<?= $r['decided_by'] ? ' by ' . $e($r['decided_by']) : '' ?><?= $r['decided_at'] ? ' on ' . $e(substr($r['decided_at'], 0, 10)) : '' ?>.</strong>
     <?php if ($remaining > 0 && $mayRaise): ?>
       <form method="post" style="display:inline-flex;gap:6px;align-items:center;margin-left:10px">
@@ -70,7 +76,7 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
       <span class="muted" style="margin-left:10px">You raised this request, so somebody else has to decide it.</span>
     <?php endif; ?>
     <?php if ($mayDecide): ?>
-      <form method="post" style="display:inline-flex;gap:6px;align-items:center;margin-left:10px">
+      <form method="post" id="na-decide" style="display:inline-flex;gap:6px;align-items:center;margin-left:10px">
         <?= $csrf() ?><input type="hidden" name="do" value="decide"><input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
         <input class="form-control" name="note" placeholder="Note (optional)" style="width:200px">
         <button class="btn small" type="submit" name="decision" value="approve">Approve</button>
@@ -203,7 +209,7 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
 </div>
 
 <?php if ($r && $status === 'DRAFT'): ?>
-  <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <div class="panel" id="na-submit" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <form method="post" style="display:inline"><?= $csrf() ?>
       <input type="hidden" name="do" value="submit"><input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
       <button class="btn" type="submit">Submit for approval</button></form>

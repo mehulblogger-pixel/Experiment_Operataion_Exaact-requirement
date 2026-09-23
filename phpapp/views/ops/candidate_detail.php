@@ -14,6 +14,11 @@
   </div>
 </div>
 
+<?php //  B3 — the next stage comes from recruitpipe_cand_state(), the configured
+      //  pipeline this workspace actually uses. An ACCEPTED candidate with no
+      //  joining date is shown as exactly that: accepted is not joined (RB-2). ?>
+<?php if (function_exists('na_html')) echo na_html('candidate', $cand); ?>
+
 <?php // Phase 2b — the configured hiring-workflow tracker (primary journey view).
 if (function_exists('recruitpipe_candidate_panel')) recruitpipe_candidate_panel($cand); ?>
 
@@ -369,7 +374,9 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
       // Recorded by somebody who knows, never derived from the stage. ?>
 <?php if (strtoupper((string)($cand['stage'] ?? '')) === 'ACCEPTED' && !empty($cand['inspector_id'])): ?>
   <?php $joinedOn = trim((string)($cand['joined_at'] ?? '')); ?>
-  <div class="panel" style="background:var(--soft);margin:10px 0;padding:11px 14px">
+  <?php //  B3 anchor — the next-action band at the top links here, so its button
+        //  jumps to this control instead of reloading the same page. ?>
+  <div class="panel" id="na-joined" style="background:var(--soft);margin:10px 0;padding:11px 14px">
     <?php if ($joinedOn !== ''): ?>
       <form method="post" action="/candidate-joined?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
         <strong>Joined on <?= e($joinedOn) ?></strong>

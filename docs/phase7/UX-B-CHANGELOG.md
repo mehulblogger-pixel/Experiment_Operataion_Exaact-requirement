@@ -81,3 +81,36 @@ redirects · breadcrumbs · database. **Zero destinations removed** — asserted
 ADR-001 preferred path → **owner decision** · rail route restructure → B9 ·
 duplicate `Approvals` heading → B10 · next-action block → B3 · relationship
 line → B4 · area-home counts → B5 · heading count → B10.
+
+---
+
+## B3 — Next Action · commit `__B3_COMMIT__`
+
+### Source changes
+
+| File | Component | Problem | Change | Reason | Risk | Test |
+|---|---|---|---|---|---|---|
+| `lib/nextaction.php` | **new** | Candidate, requirement and hiring request told a user nothing about what to do next | Three resolvers, each reading the module's own state + own allowed-next + own permission gate, and recording which helper answered | A record screen should answer "what now?" without a second engine deciding anything | low — reads only; never writes, never permits | B3 A–G, 55 assertions |
+| `views/ops/hiring_request.php` | band + anchors | — | Renders the band; `#na-submit`, `#na-decide`, `#na-recruit` anchors so the button reaches the control | A button that reloads the page you are on is noise | low | B3 G, D7 |
+| `views/ops/requisition_detail.php` | band | — | Renders the band from `reqf_counts()` | | low | B3 G |
+| `views/ops/candidate_detail.php` | band + anchor | — | Renders the band; `#na-joined` anchor | | low | B3 G |
+| `index.php` | load order | — | Registers the library **after** the engines it reads from | It is a consumer, not a peer | low | boot |
+
+### What was NOT built
+
+`app.css` is **unchanged**: `.nowband` already existed. No workflow, KPI, SLA,
+notification or business-rule engine. No status, transition, permission,
+entitlement or database change. The work order keeps its own richer band — no
+second one was stacked on it.
+
+### Correction
+
+F-A5-3's "no shared next-action component" was **wrong** — `.nowband` is used by
+nine record screens. ~40 lines of a competing `.na-block` component were written
+and then deleted once that was checked. The real gap was Recruitment.
+
+### Deferred
+
+`.btn.small` is 36px on touch, blueprint asks 44px → **B7/B10** · hiring request
+has no `allowed_next()` helper → product/later · relationship line on the band →
+**B4** · consolidating the nine hand-written bands onto `na_state()` → **B10**.

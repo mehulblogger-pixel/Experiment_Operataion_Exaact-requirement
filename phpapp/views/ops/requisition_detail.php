@@ -11,6 +11,11 @@
   <?php if (is_coordinator_level()): ?><a class="btn secondary" href="/requisition-edit?id=<?= (int)$req['id'] ?>">Edit</a><?php endif; ?>
 </div>
 
+<?php //  B3 — what happens next on THIS requirement. Every number comes from
+      //  reqf_counts(), the fulfilment engine that already owns them; nothing
+      //  is recounted here and no status is changed. ?>
+<?php if (function_exists('na_html')) echo na_html('requisition', $req); ?>
+
 <?php // M4 correction §3 — WHERE THIS CAME FROM. Two routes reach this screen
       //  and they are not a duplicate of each other:
       //    GOVERNED  a hiring request was raised, approved, and converted here
