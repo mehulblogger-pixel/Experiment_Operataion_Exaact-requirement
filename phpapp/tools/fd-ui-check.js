@@ -96,6 +96,65 @@ const section = t => console.log('\n== ' + t + ' ==');
   ok(!stillThere, 'F5a · a field you added can be deleted');
   ok(/Removed the field/.test(await pg.locator('body').innerText()), 'F5b · and the screen confirms it');
 
+  // ---- The two Operations forms -----------------------------------------
+  //  Their labels are built from the company's own terminology, so this checks
+  //  the designer shows the SAME words the form does, and that a field placed
+  //  on the largest form in the product genuinely lands in its section.
+  //  The Job form only opens for an existing job (a job is created from a test
+  //  request, not from a bare route), so the walk needs one to exist. JOB_ID is
+  //  passed in by whoever seeded it; without it the job placement is SKIPPED and
+  //  said so out loud, rather than quietly counted as a pass.
+  const JOB_ID = process.env.JOB_ID || '';
+  for (const [key, view, secName, label] of [
+    ['call', '/call-new',  'When',  'Site Contact Name UAT'],
+    ['job',  JOB_ID ? '/job-edit?id=' + JOB_ID : null, 'Money', 'Cost Centre UAT'],
+  ]) {
+    section('F7 · ' + key + ' — the designer and the form agree');
+    await pg.goto(BASE + '/form-designer?form=' + key); await pg.waitForLoadState('networkidle');
+    ok(await pg.locator('#fdForm tr.fd-row').count() >= 30,
+       'F7a[' + key + '] · ' + (await pg.locator('#fdForm tr.fd-row').count()) + ' standard fields are designable');
+    const opts = await pg.locator('select[name=nf_section] option').allTextContents();
+    ok(opts.length >= 5, 'F7b[' + key + '] · sections offered: ' + opts.slice(0, 3).join(' · '));
+    ok(opts.some(t => t.trim() === secName), 'F7c[' + key + '] · including "' + secName + '"');
+
+    // The designer's own labels must match what the form renders. Comparing the
+    // client label is the sharpest check: it is terminology-driven on both sides.
+    const designerLabels = await pg.locator('#fdForm input[name="label[]"]').evaluateAll(
+      els => els.map(e => e.value));
+    ok(designerLabels.every(l => l.trim() !== ''), 'F7d[' + key + '] · every field has a readable label');
+    ok(!designerLabels.some(l => /<\?|\?>|e\(T/.test(l)),
+       'F7e[' + key + '] · no raw template code leaked into a label');
+
+    if (!view) {
+      console.log('  SKIP  F7f[' + key + '] · placement not checked — no JOB_ID given to open the form with');
+      continue;
+    }
+    await pg.fill('input[name=nf_label]', label);
+    await pg.selectOption('select[name=nf_section]', secName);
+    await pg.locator('#fdAdd button[type=submit]').last().click();
+    await pg.waitForLoadState('networkidle');
+    ok((await pg.locator('body').innerText()).includes(label), 'F7f[' + key + '] · the field was added');
+
+    await pg.goto(BASE + view); await pg.waitForLoadState('networkidle');
+    ok(pg.url().includes(view.split('?')[0]),
+       'F7f2[' + key + '] · the form opened (' + pg.url().replace(BASE, '') + ')');
+    const cell = pg.locator('.ff[data-cf-section="' + secName + '"]');
+    ok(await cell.count() === 1, 'F7g[' + key + '] · it renders on the form, carrying its section');
+    const head = await cell.evaluate(el => {
+      let n = el.closest('.ff'), h = null, p = n;
+      while (p && !h) { p = p.parentElement; h = p && p.querySelector && p.querySelector('h3'); }
+      return h ? h.textContent.replace(/\s+/g, ' ').trim() : '(none)';
+    });
+    ok(new RegExp(secName, 'i').test(head), 'F7h[' + key + '] · under the heading "' + head.slice(0, 44) + '"');
+
+    await pg.goto(BASE + '/form-designer?form=' + key); await pg.waitForLoadState('networkidle');
+    await Promise.all([
+      pg.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {}),
+      pg.locator('form[action="/form-designer-field-del"]').last().locator('button').click(),
+    ]);
+    ok(/Removed the field/.test(await pg.locator('body').innerText()), 'F7i[' + key + '] · and cleaned up');
+  }
+
   section('F6 · nothing threw');
   ok(jsErrors.length === 0, 'F6 · no JavaScript errors' + (jsErrors.length ? ': ' + jsErrors.join(' | ') : ''));
 

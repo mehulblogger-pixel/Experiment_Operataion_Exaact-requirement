@@ -117,6 +117,7 @@ function fd_forms() {
     $forms = [];
     if (function_exists('fd_forms_recruitment')) $forms += fd_forms_recruitment();
     if (function_exists('fd_forms_quality'))     $forms += fd_forms_quality();
+    if (function_exists('fd_forms_operations'))  $forms += fd_forms_operations();
     // Company-built custom forms are designed on their own screen already, so we
     // only surface the built-in forms here.
     return $forms;
@@ -135,6 +136,156 @@ function fd_forms() {
 //  custom fields and carry fd_overlay_html(). Declaring one that does not would
 //  give an admin a screen whose changes do nothing.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  OPERATIONS — the Test request and the Job.
+//
+//  The two largest forms in the product (roughly 45 and 40 designable controls).
+//  They could not be declared the way the quality forms were, because their
+//  labels are not English constants: nearly every one is built from the
+//  company's own terminology — T('client'), Tl('quote'), TP('office') — so a
+//  workspace that calls a client a "Customer" and a call a "Service request"
+//  reads those words throughout. A hardcoded registry would have shown an
+//  admin one set of words on the Form Designer and a different set on the form
+//  itself, and the label they typed would have replaced the wrong thing.
+//
+//  So every label and every section name below is built from the same helpers
+//  the form uses. The section names matter twice over: the overlay finds a
+//  section by matching the heading text on the page, so a name that stopped
+//  tracking the terminology would quietly stop matching, and a field placed
+//  there would never move.
+// ---------------------------------------------------------------------------
+function fd_forms_operations() {
+    if (function_exists('licence_enabled') && !licence_enabled('operations')) return [];
+    $F = fn($label, $type, $section, $locked = false) => ['label' => $label, 'type' => $type, 'section' => $section, 'locked' => $locked];
+    // The company's own words, resolved once.
+    $T  = fn($k) => function_exists('T')   ? T($k)   : ucfirst($k);
+    $Tl = fn($k) => function_exists('Tl')  ? Tl($k)  : $k;
+    $TH = fn($k) => function_exists('TH')  ? TH($k)  : ucfirst($k);
+    $TP = fn($k) => function_exists('TP')  ? TP($k)  : ucfirst($k) . 's';
+    $Tlp= fn($k) => function_exists('Tlp') ? Tlp($k) : $k . 's';
+    $cur = function_exists('cur_sym') ? cur_sym() : '';
+
+    //  Section names are the words the heading renders, WITHOUT the leading
+    //  number — the overlay matches on a substring of the heading, so
+    //  "Client & quotation" finds "1. Client & quotation".
+    $s1 = $T('client') . ' & ' . $Tl('quote');
+    $s2 = 'What is being inspected';
+    $s3 = 'When';
+    $s4 = 'Which ' . $TP('office') . ', and the money between them';
+    $s5 = "Against the " . $Tl('client') . "'s purchase order";
+    $s6 = 'Reporting owed to the ' . $Tl('client');
+
+    $out = [];
+    $out['call'] = [
+        'label' => $TP('call'), 'icon' => '📞',
+        'help'  => 'The new ' . $Tl('call') . ' form',
+        'fields' => [
+            // 1 — who it is for
+            'client_id'       => $F($T('client'), 'dropdown', $s1, true),
+            'quotation_id'    => $F($T('quote'), 'dropdown', $s1),
+            'contract_number' => $F('Contract number', 'text', $s1),
+            //  NB: this control appears TWICE on this form — here, and again
+            //  under the purchase-order section. It is declared once; the
+            //  overlay applies a rename or a hide to both copies.
+            'quote_line_id'   => $F('Line item on the ' . $Tl('quote'), 'dropdown', $s1),
+            'vendor_id'       => $F($T('vendor') . ' / ' . $Tl('manufacturer') . ' (site)', 'dropdown', $s1),
+            'folder_link'     => $F('Shared folder / drive link', 'text', $s1),
+            // 2 — what is being inspected
+            'sbu'              => $F($T('sbu'), 'dropdown', $s2),
+            'activity_id'      => $F('Activity code', 'dropdown', $s2),
+            'service_code'     => $F('Service line', 'dropdown', $s2),
+            'inspection_type'  => $F('Type of inspection', 'dropdown', $s2, true),
+            'product_category' => $F('Product category', 'dropdown', $s2),
+            'product_other'    => $F('Product (if "Others")', 'text', $s2),
+            'site_address_id'  => $F('Site (' . $Tl('client') . "'s site)", 'dropdown', $s2),
+            // 3 — when
+            'call_received_date'       => $F($TH('call') . ' received', 'date', $s3),
+            'inspection_required_date' => $F($TH('client') . "'s required date", 'date', $s3),
+            'engagement_type'          => $F('Shape of the engagement', 'dropdown', $s3),
+            'days_count'               => $F('How many days, continuously?', 'number', $s3),
+            'months_count'             => $F('How many months on site?', 'number', $s3),
+            'manmonth_basis'           => $F('Man-month basis', 'dropdown', $s3),
+            'manmonth_min_days'        => $F('Minimum working days', 'number', $s3),
+            'pattern_kind'             => $F('How does it repeat?', 'dropdown', $s3),
+            'pattern_n'                => $F('How many', 'number', $s3),
+            'schedule_end_date'        => $F('Repeat until', 'date', $s3),
+            // 4 — offices and the money between them
+            'ibo_office_id'       => $F('Contracting ' . $T('office'), 'dropdown', $s4, true),
+            'executing_office_id' => $F('Executing ' . $T('office'), 'dropdown', $s4, true),
+            'coordinator_id'      => $F('Forward to coordinator', 'dropdown', $s4),
+            'region'              => $F('Region', 'dropdown', $s4),
+            'billable_rate'       => $F('Unit rate — excluding GST (' . $cur . ')', 'number', $s4),
+            'billable_basis'      => $F('Basis', 'dropdown', $s4),
+            'billable_qty'        => $F('Quantity', 'number', $s4),
+            'billable_value'      => $F('Value billable to the ' . $Tl('client') . ' (' . $cur . ', ex-GST)', 'number', $s4),
+            'credit_rate'         => $F('Credit per man-day to the executing ' . $T('office') . ' (' . $cur . ')', 'number', $s4),
+            'expected_credit'     => $F('Total credit (' . $cur . ')', 'number', $s4),
+            'credit_type'         => $F('Credit basis', 'dropdown', $s4),
+            'billable_value_x'    => $F('Total invoice value to the ' . $Tl('client') . ' (' . $cur . ', ex-GST)', 'number', $s4),
+            // 5 — against the purchase order
+            'po_id'           => $F('Purchase order', 'dropdown', $s5),
+            'po_line_item_id' => $F('PO line item', 'dropdown', $s5),
+            'notes'           => $F('Notes', 'text', $s5),
+            // 6 — reporting owed
+            'reporting_frequency' => $F('Reporting frequency', 'dropdown', $s6),
+            'report_custom_days'  => $F('…every how many days?', 'number', $s6),
+        ],
+    ];
+
+    $j1 = 'Assignment';
+    $j2 = 'Who does it';
+    $j3 = 'Order & dates';
+    $j4 = 'Money';
+    $j5 = 'Reporting & closure';
+    $out['job'] = [
+        'label' => $TP('job'), 'icon' => '🛠️',
+        'help'  => 'The ' . $Tl('job') . ' form',
+        'fields' => [
+            'executing_office_id' => $F('Executing ' . $T('office'), 'dropdown', $j1, true),
+            'stage'               => $F('Stage', 'dropdown', $j1, true),
+            'job_type'            => $F('How it is worked', 'dropdown', $j1),
+            'service_code'        => $F('Service line', 'dropdown', $j1),
+            'inspection_type'     => $F('Type of inspection', 'dropdown', $j1),
+            'sbu'                 => $F($T('sbu'), 'dropdown', $j1),
+            'activity_id'         => $F('Activity code', 'dropdown', $j1),
+            // who does it
+            'req_trade_id'    => $F('Required trade / discipline', 'dropdown', $j2),
+            'staff_kind_pick' => $F('Who does it', 'dropdown', $j2),
+            'non_asset_kind'  => $F('…which kind', 'dropdown', $j2),
+            'inspector_id'    => $F($T('engineer'), 'dropdown', $j2),
+            'subcon_id'       => $F('Sub-contracting agency', 'dropdown', $j2),
+            'subcon_cost'     => $F('Sub-con cost (' . $cur . ')', 'number', $j2),
+            'other_cost'      => $F('Any other cost (' . $cur . ')', 'number', $j2),
+            'other_cost_note' => $F('What was it for?', 'text', $j2),
+            // order & dates
+            'quotation_id'             => $F($T('quote'), 'dropdown', $j3),
+            'call_received_date'       => $F($TH('call') . ' received', 'date', $j3),
+            'inspection_required_date' => $F($TH('client') . "'s required date", 'date', $j3),
+            'scheduled_date'           => $F('Actual scheduled date', 'date', $j3, true),
+            'engagement_type'          => $F('Shape of the engagement', 'dropdown', $j3),
+            'days_count'               => $F('How many days, continuously?', 'number', $j3),
+            'months_count'             => $F('How many months on site?', 'number', $j3),
+            'manmonth_basis'           => $F('Man-month basis', 'dropdown', $j3),
+            'manmonth_min_days'        => $F('Minimum working days', 'number', $j3),
+            'pattern_kind'             => $F('How does it repeat?', 'dropdown', $j3),
+            'schedule_end_date'        => $F('Repeat until', 'date', $j3),
+            'mandays'                  => $F('Man-days', 'number', $j3),
+            // money
+            'billable_rate'   => $F('Unit rate', 'number', $j4),
+            'billable_value'  => $F('Invoice value to the ' . $Tl('client') . ' (' . $cur . ', ex-GST)', 'number', $j4),
+            'credit_rate'     => $F('Credit per man-day to the executing ' . $Tl('office') . ' (' . $cur . ')', 'number', $j4),
+            'expected_credit' => $F('Total credit (' . $cur . ')', 'number', $j4),
+            'credit_type'     => $F('Credit type', 'dropdown', $j4),
+            'credit_direction'=> $F('Credit direction', 'dropdown', $j4),
+            // reporting & closure
+            'reporting_frequency' => $F('Reporting frequency', 'dropdown', $j5),
+            'report_custom_days'  => $F('…every how many days?', 'number', $j5),
+            'folder_link'         => $F('Shared folder / drive link', 'text', $j5),
+        ],
+    ];
+    return $out;
+}
+
 function fd_forms_quality() {
     $rep = !function_exists('licence_enabled') || licence_enabled('reporting');
     $ops = !function_exists('licence_enabled') || licence_enabled('operations');
@@ -374,23 +525,38 @@ function fd_overlay_html($form) {
 <script>
 (function(){
   var O = $json, PLACED = $placedJson;
-  function fieldEl(name){
-    return document.querySelector('[name="'+name+'"]') || document.querySelector('[name="'+name+'[]"]');
+  //  ALL matches, not the first. A field name can legitimately appear more than
+  //  once on one form — the Test request form asks for the quotation line in two
+  //  places — and hiding only the first left the field half-hidden: gone from one
+  //  section, still sitting in the other. Radio groups share a name too, so the
+  //  containers are de-duplicated below rather than the elements.
+  function fieldEls(name){
+    var a = document.querySelectorAll('[name="'+name+'"]');
+    if (a.length) return Array.prototype.slice.call(a);
+    return Array.prototype.slice.call(document.querySelectorAll('[name="'+name+'[]"]'));
   }
+  function fieldEl(name){ return fieldEls(name)[0] || null; }
   function ffOf(el){ return el.closest('.ff') || el.closest('.form-field') || el.parentElement; }
   var byParent = new Map();
   Object.keys(O).forEach(function(name){
-    var el = fieldEl(name); if(!el) return;
-    var ff = ffOf(el); var o = O[name];
-    if(o.label){ var lab = ff && ff.querySelector('label'); if(lab){ lab.childNodes.length ? (lab.firstChild.nodeType===3 ? lab.firstChild.nodeValue=o.label : lab.textContent=o.label) : lab.textContent=o.label; } }
-    if(o.hidden){ el.removeAttribute('required'); if(ff) ff.style.display='none'; }
-    else if(o.req==='yes'){ el.setAttribute('required','required'); }
-    else if(o.req==='no'){ el.removeAttribute('required'); }
-    if(ff && ff.parentElement){
-      var p = ff.parentElement;
-      if(!byParent.has(p)) byParent.set(p, []);
-      byParent.get(p).push({ff:ff, order:o.order});
-    }
+    var els = fieldEls(name); if(!els.length) return;
+    var o = O[name], done = [];
+    els.forEach(function(el){
+      var ff = ffOf(el);
+      if(ff){ if(done.indexOf(ff) >= 0) return; done.push(ff); }
+      if(o.label && ff){ var lab = ff.querySelector('label'); if(lab){ lab.childNodes.length ? (lab.firstChild.nodeType===3 ? lab.firstChild.nodeValue=o.label : lab.textContent=o.label) : lab.textContent=o.label; } }
+      if(o.hidden){ el.removeAttribute('required'); if(ff) ff.style.display='none'; }
+      else if(o.req==='yes'){ el.setAttribute('required','required'); }
+      else if(o.req==='no'){ el.removeAttribute('required'); }
+      // Ordering is per container, and only the FIRST placement of a repeated
+      // field takes part — reordering a field that appears twice would otherwise
+      // drag the second copy across the form.
+      if(ff && ff.parentElement && done.length === 1){
+        var p = ff.parentElement;
+        if(!byParent.has(p)) byParent.set(p, []);
+        byParent.get(p).push({ff:ff, order:o.order});
+      }
+    });
   });
   // Reorder the managed fields into their saved order, placed where the managed
   // block currently starts, leaving every non-managed field where it is.
@@ -463,8 +629,12 @@ JS;
     return $js;
 }
 
-// Save posted overrides for one form. $rows is a list of
-// [field_key, label, hidden(0/1), req('','yes','no'), sort_order].
+// Save posted overrides for one form. $rows is a list of ASSOCIATIVE rows —
+//   ['field_key' => …, 'label' => …, 'hidden' => 0|1, 'req' => ''|'yes'|'no',
+//    'sort_order' => int]
+// — not positional ones. The old wording here read like a positional list, which
+// is a silent failure when believed: every row saves with an empty field_key and
+// the overlay then carries nothing at all.
 function fd_save($form, array $rows) {
     fd_migrate();
     $pdo = db();

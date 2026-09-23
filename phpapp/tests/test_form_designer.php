@@ -229,9 +229,11 @@ $fdViews = [
     'decision_rule'  => 'views/ops/drule_form.php',
     'controlled_doc' => 'views/ops/cdoc_form.php',
     'satisfaction'   => 'views/ops/satisfaction_form.php',
+    'call'           => 'views/ops/call_form.php',
+    'job'            => 'views/ops/job_form.php',
 ];
 $fdAll = fd_forms();
-t_ok(count($fdAll) >= 8, 'FW1 ARMING — the designer offers more than the original two forms (' . count($fdAll) . ')');
+t_ok(count($fdAll) >= 10, 'FW1 ARMING — the designer offers more than the original two forms (' . count($fdAll) . ')');
 
 foreach ($fdAll as $fdKey => $fdDef) {
     $fdPath = $fdViews[$fdKey] ?? '';
@@ -259,4 +261,70 @@ foreach ($fdAll as $fdKey => $fdDef) {
     // and an added field can only ever land at the foot of the form.
     t_ok(count(fd_sections($fdKey)) >= 1, "FW7 · '$fdKey' — offers at least one section to place a field in");
 }
+t_as_nobody();
+
+// ============================================================================
+//  THE OPERATIONS FORMS SPEAK THE COMPANY'S OWN WORDS.
+//
+//  These two forms could not be declared the way the quality forms were. Almost
+//  every label on them is built from the company's terminology — a workspace
+//  that calls a client a "Customer" reads "Customer" throughout. A registry with
+//  the English words hardcoded would show an admin one set of words in the Form
+//  Designer and a different set on the form itself, and the label they typed
+//  would land on the wrong row.
+//
+//  It matters twice for SECTIONS: the overlay finds a section by matching the
+//  heading text on the page, so a section name that stopped tracking the
+//  terminology would quietly stop matching, and a field placed there would
+//  never move — with nothing on screen to say why.
+// ============================================================================
+t_section('Form Designer — Operations forms follow the company’s wording');
+t_as_admin();
+
+$fdTermsBefore = term_overrides();
+$fdCallBefore  = fd_forms()['call']['fields']['client_id']['label'] ?? '';
+t_ok($fdCallBefore !== '', 'OT1 ARMING — the Test request form declares a client field, labelled "' . $fdCallBefore . '"');
+
+// Rename the two words these forms lean on hardest.
+term_overrides(['client' => ['Customer', 'Customers'], 'office' => ['Branch', 'Branches']]);
+$fdCall = fd_forms()['call'] ?? [];
+$fdJob  = fd_forms()['job'] ?? [];
+
+t_eq($fdCall['fields']['client_id']['label'] ?? '', 'Customer',
+     'OT2 — renaming "client" renames it on the Test request form too');
+t_ok(strpos($fdCall['fields']['billable_value']['label'] ?? '', 'customer') !== false,
+     'OT3 — and mid-sentence: "' . ($fdCall['fields']['billable_value']['label'] ?? '') . '"');
+t_ok(strpos($fdCall['fields']['ibo_office_id']['label'] ?? '', 'Branch') !== false,
+     'OT4 — renaming "office" follows too: "' . ($fdCall['fields']['ibo_office_id']['label'] ?? '') . '"');
+t_ok(strpos($fdJob['fields']['executing_office_id']['label'] ?? '', 'Branch') !== false,
+     'OT5 — on the Job form as well: "' . ($fdJob['fields']['executing_office_id']['label'] ?? '') . '"');
+
+// The sections must track it as well, or a placed field silently stops moving.
+$fdSecsRenamed = fd_sections('call');
+t_ok(count(array_filter(array_keys($fdSecsRenamed), fn($x) => strpos($x, 'Customer') !== false)) > 0,
+     'OT6 — the section names follow the wording: ' . implode(' · ', array_slice(array_keys($fdSecsRenamed), 0, 3)));
+t_ok(count(array_filter(array_keys($fdSecsRenamed), fn($x) => strpos($x, 'Branches') !== false)) > 0,
+     'OT7 — including the plural form');
+
+// Put it back, and prove the rename really was the cause rather than something
+// that happened to be true either way.
+term_overrides($fdTermsBefore);
+t_eq(fd_forms()['call']['fields']['client_id']['label'] ?? '', $fdCallBefore,
+     'OT8 — restoring the wording restores the label (so OT2 measured the rename)');
+
+// The Test request form asks for the quotation line in TWO places. Declared
+// once, the overlay must apply a hide to BOTH — hiding one copy and leaving the
+// other is the half-hidden field an admin would report as "it didn't work".
+$fdCallSrc = file_get_contents(__DIR__ . '/../views/ops/call_form.php');
+t_ok(substr_count($fdCallSrc, 'name="quote_line_id"') >= 2,
+     'OT9 ARMING — quote_line_id really does appear twice on that form');
+db()->exec("DELETE FROM form_field_layout WHERE form_key='call'");
+fd_save('call', [['field_key' => 'quote_line_id', 'label' => '', 'hidden' => 1, 'req' => '', 'sort_order' => 1]]);
+$fdOvCall = fd_overlay_html('call');
+t_ok(strpos($fdOvCall, 'fieldEls') !== false,
+     'OT10 — the overlay collects every control with that name, not just the first');
+t_ok(strpos($fdOvCall, '"quote_line_id"') !== false, 'OT11 — and carries the hide for it');
+db()->exec("DELETE FROM form_field_layout WHERE form_key='call'");
+fd_overrides('call', true);
+
 t_as_nobody();

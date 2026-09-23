@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '7085a92 · 2026-09-22 18:27 UTC · 666 files';
+$RELEASE = '9d5e6b5 · 2026-09-23 01:37 UTC · 666 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -130,7 +130,7 @@ $EXPECT  = [
     'lib/entity360.php' => ['s'=>4909,'h'=>'3d405b448a70e1e0'],
     'lib/equipment.php' => ['s'=>23618,'h'=>'78c1818b0b0ef3f5'],
     'lib/finevent.php' => ['s'=>8838,'h'=>'4ce2d3d330cd3231'],
-    'lib/formdesign.php' => ['s'=>39302,'h'=>'ca2ba6a16c1b16ac'],
+    'lib/formdesign.php' => ['s'=>50372,'h'=>'bbfd678491e4a5be'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
     'lib/helpers.php' => ['s'=>22586,'h'=>'20c14bf04d17d018'],
     'lib/hiringreq.php' => ['s'=>71416,'h'=>'eb57227e0fbf12a2'],
@@ -336,7 +336,7 @@ $EXPECT  = [
     'views/ops/billing_pay.php' => ['s'=>3412,'h'=>'3f6031e5af093770'],
     'views/ops/books_bridge.php' => ['s'=>6146,'h'=>'0fd4f65cf994e7de'],
     'views/ops/call_detail.php' => ['s'=>24634,'h'=>'18451665311bb57a'],
-    'views/ops/call_form.php' => ['s'=>67751,'h'=>'a8af3f71f77a2107'],
+    'views/ops/call_form.php' => ['s'=>67990,'h'=>'70591fb26844aa74'],
     'views/ops/call_profit.php' => ['s'=>10827,'h'=>'9ceb75929d00146d'],
     'views/ops/calls.php' => ['s'=>11306,'h'=>'d906595ec4d7ae6d'],
     'views/ops/candidate_detail.php' => ['s'=>49072,'h'=>'023275672790927c'],
@@ -486,7 +486,7 @@ $EXPECT  = [
     'views/ops/issues.php' => ['s'=>5325,'h'=>'445463195ce9f4c4'],
     'views/ops/job_close.php' => ['s'=>6109,'h'=>'490c017ab59cb999'],
     'views/ops/job_detail.php' => ['s'=>88886,'h'=>'e705b1125771117a'],
-    'views/ops/job_form.php' => ['s'=>58238,'h'=>'35edfd5b252af59a'],
+    'views/ops/job_form.php' => ['s'=>58476,'h'=>'233612eb23b52383'],
     'views/ops/jobs.php' => ['s'=>7058,'h'=>'54c963c415ee7600'],
     'views/ops/lead_convert.php' => ['s'=>3141,'h'=>'14311346040445c5'],
     'views/ops/lead_detail.php' => ['s'=>26694,'h'=>'07c08f46bb848617'],

@@ -783,3 +783,7 @@ window.TERM_SBU = <?= json_encode(Tl('sbu')) ?>;
   }
 })();
 </script>
+
+<?php // Form Designer — apply this company's label / order / hide / required overrides,
+      // and move any field they added into the section they chose.
+      if (function_exists("fd_overlay_html")) echo fd_overlay_html("job"); ?>
