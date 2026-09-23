@@ -152,7 +152,7 @@ rename screen → same · `.btn.small` 36px → B7/B10 · hiring-request
 
 ---
 
-## B5 — Area-home counts & attention · commit `__B5_COMMIT__`
+## B5 — Area-home counts & attention · commit `2765b4e`
 
 ### Source changes
 
