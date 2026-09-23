@@ -70,6 +70,32 @@ const TERM_DEFAULTS = [
     'offer'        => ['Offer', 'Offers', 'Recruitment', 'The job offer made to a selected candidate.'],
     'placement'    => ['Placement', 'Placements', 'Recruitment', 'A candidate successfully hired and placed.'],
     'recruiter'    => ['Recruiter', 'Recruiters', 'Recruitment', 'The person who runs the hiring for a requisition.'],
+    //  B4 — the six words the confusion audit found people hold apart every day
+    //  and which had NO written definition anywhere. Each is taken from a
+    //  decision already recorded, not invented here:
+    //
+    //   hiring request      the request layer built in M4, before execution
+    //   workforce/inspector Q32 Model D, §10 — one record, a role marker, and
+    //                       "Inspector" means team_role = FIELD
+    //   qa                  a stage of a report's life, not a separate object
+    //   billing readiness   a CHECK, not a document — the distinction that
+    //                       stops an invoice being raised early
+    //   professional        a Marketplace idea; not this company's staff
+    //
+    //  None of them changes a status, a rule or a model. They are the sentence
+    //  a person needed and could not find.
+    'hiring_request'    => ['Hiring Request', 'Hiring Requests', 'Recruitment',
+        'A request for headcount, raised before recruiting starts so it can be approved. Approving it is what allows a requisition to be raised against it.'],
+    'workforce'         => ['Workforce', 'Workforce', 'People',
+        'Everybody employed or engaged by this company. A workforce record is created when somebody is hired, whatever job they do.'],
+    'inspector'         => ['Inspector', 'Inspectors', 'Operations',
+        'A workforce member whose team role is Field — the ones who can be sent to site. Every inspector is workforce; not every workforce member is an inspector.'],
+    'qa'                => ['QA', 'QA', 'Reporting',
+        'The review a report goes through before it is issued. QA is a stage in a report\'s life, not a separate document.'],
+    'billing_readiness' => ['Billing readiness', 'Billing readiness', 'Money',
+        'A check that everything needed to bill is present and agreed. It is not an invoice and raises no money — it is what tells you an invoice can safely be raised.'],
+    'professional'      => ['Professional', 'Professionals', 'Recruitment',
+        'Somebody who lists themselves on the marketplace. A professional is not this company\'s staff until they are hired, which is what makes them workforce.'],
 ];
 
 // ---- Industry packs --------------------------------------------------------
@@ -310,6 +336,37 @@ function T_REG($key)          { return term_head(T($key)) . ' register'; }
 function T_DETAIL($key, $code){ return term_head(T($key)) . ($code !== '' && $code !== null ? ' ' . $code : ''); }
 function T_NEW($key)          { return 'New ' . Tl($key); }
 function T_EDIT($key)         { return 'Edit ' . Tl($key); }
+
+// ---------------------------------------------------------------------------
+//  B4 — a definition, where the word is actually used.
+//
+//  All 26 definitions existed. Exactly ONE screen printed them:
+//  views/ops/terminology.php, the admin rename page. That is the one place a
+//  person is not confused, because they went there on purpose.
+//
+//  These two put the sentence where the word is. There is no new component and
+//  no tooltip: a tooltip cannot be read on a phone, and inspectors are
+//  phone-first. It renders as the same muted one-liner that 295 of 401 views
+//  already carry under their title.
+//
+//  Deliberately NOT a glossary. The confusion audit's rule is that a
+//  RELATIONSHIP beats a definition -- "Raised from hiring request HR-00231"
+//  tells you more than any paragraph about requisitions -- so this is used only
+//  at the points the audit actually measured confusion, never sprayed across
+//  every screen.
+function T_HELP($key) {
+    $d = TERM_DEFAULTS[$key] ?? null;
+    return $d ? (string) ($d[3] ?? '') : '';
+}
+//  One muted line, ready to echo. Returns '' for an unknown key, so a caller
+//  can never print an empty box.
+function T_NOTE($key, $prefix = '') {
+    $h = T_HELP($key);
+    if ($h === '') return '';
+    return '<p class="sub t-note" style="margin:4px 0 0">'
+         . ($prefix !== '' ? '<b>' . htmlspecialchars($prefix, ENT_QUOTES) . '</b> ' : '')
+         . htmlspecialchars($h, ENT_QUOTES) . '</p>';
+}
 
 // Groups, for the Settings → Terminology screen.
 function term_groups() {

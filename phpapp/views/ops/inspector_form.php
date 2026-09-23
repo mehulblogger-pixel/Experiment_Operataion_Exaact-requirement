@@ -27,7 +27,28 @@
         //  Acknowledging is NOT merging (owner decision): the tick records that a
         //  human looked at the match and chose to proceed, and the second record
         //  is marked so the e-mail key lets it through deliberately. ?>
-  <?php if ($dupWarn !== ''): ?>
+  <?php //  B4 — the chain, read backwards. The candidate screen has always said
+      //  "this candidate is now Team Member #12"; from HERE there was nothing,
+      //  so you could not tell whether somebody arrived through recruitment or
+      //  was added by hand, nor which requirement they were hired against.
+      //  Nothing new is stored — candidates.inspector_id is simply read the
+      //  other way round. Silent when there is no recruitment behind them.
+      if ($isEdit && function_exists('workforce_origin')):
+        $wo = workforce_origin((int) $ins['id']);
+        if ($wo): $wc = $wo['candidate']; $wr = $wo['requisition']; ?>
+  <div class="panel" style="border-left:3px solid var(--focus);padding:10px 14px;margin-bottom:14px">
+    Hired through recruitment as candidate
+    <a href="/candidate?id=<?= (int) $wc['id'] ?>"><strong><?= e($wc['cand_code'] ?: ('#' . (int) $wc['id'])) ?></strong></a><?php
+      if ($wr): ?>, recruited for
+      <a href="/requisition?id=<?= (int) $wr['id'] ?>"><strong><?= e($wr['req_code']) ?></strong></a><?php
+      endif; ?>.
+    <span class="muted"><?= trim((string) ($wc['joined_at'] ?? '')) !== ''
+        ? 'Joined on ' . e(substr((string) $wc['joined_at'], 0, 10)) . '.'
+        : 'No joining date recorded yet — accepted is not the same as joined.' ?></span>
+  </div>
+<?php endif; endif; ?>
+
+<?php if ($dupWarn !== ''): ?>
     <div class="msg msg-warning" style="margin:0 0 14px">
       <div style="font-weight:700;margin-bottom:4px">This person may already be on your team</div>
       <div><?= e($dupWarn) ?></div>
@@ -72,7 +93,14 @@
         <?php foreach (['FIELD'=>'Field '.Tl('engineer').' — goes to site (top of the allocate list)','COORD'=>'Coordinator / office-based — deputable, listed below field '.Tlp('engineer'),'OFFICE'=>'Back office — deputable, listed last'] as $k=>$v): ?>
           <option value="<?= $k ?>" <?= ((string)($ins['team_role'] ?? 'FIELD')===$k)?'selected':'' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
-      </select></div>
+      </select>
+      <?php //  B4 — pair 4 of the confusion audit: "workforce vs inspector". The
+            //  rule is Q32 Model D §10 and it lived only in the code. This is
+            //  the field the rule is ABOUT, so it is where the sentence belongs. ?>
+      <small class="muted" style="display:block;margin-top:4px">Everyone here is
+        <?= e(function_exists('Tl') ? Tl('workforce') : 'workforce') ?>. Choosing
+        <b>Field</b> is what also makes somebody an
+        <?= e(function_exists('Tl') ? Tl('inspector') : 'inspector') ?> — the ones who can be sent to site.</small></div>
     <div class="ff"><label>Trade / discipline</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
         <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>" <?= (string)$curTrade===(string)$t['id']?'selected':'' ?>><?= e($t['label']) ?></option><?php endforeach; ?>

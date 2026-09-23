@@ -114,3 +114,38 @@ and then deleted once that was checked. The real gap was Recruitment.
 `.btn.small` is 36px on touch, blueprint asks 44px → **B7/B10** · hiring request
 has no `allowed_next()` helper → product/later · relationship line on the band →
 **B4** · consolidating the nine hand-written bands onto `na_state()` → **B10**.
+
+---
+
+## B4 — Terminology + relationship visibility · commit `__B4_COMMIT__`
+
+### Source changes
+
+| File | Component | Problem | Change | Reason | Risk | Test |
+|---|---|---|---|---|---|---|
+| `lib/terms.php` | `TERM_DEFAULTS` | Six words people hold apart daily had **no definition anywhere** | Six sentences added, each taken from a recorded decision (M4, Q32 Model D §10, confusion pairs 2/10/11) | A word nobody has written down is a word everybody guesses at | low — additive; no existing definition touched, asserted | B4 A, B |
+| `lib/terms.php` | `T_HELP()`, `T_NOTE()` | All 26 definitions printed on ONE screen: the admin rename page | Two accessors rendering the same muted one-liner 295 views already use | The rename screen is the one place nobody is confused | low — no new component, no tooltip | B4 C |
+| `lib/workforce.php` | `workforce_origin()` | The chain was visible one way only: candidate → workforce, never back | Reads `candidates.inspector_id` in reverse | A coordinator could not see how a person joined the company | low — read-only, returns null when there is nothing | B4 D |
+| `views/ops/hiring_request.php` | definition | — | The definition, under the title | pairs 1 and 7 | low | B4 C7 |
+| `views/ops/inspector_form.php` | Team field + origin | The workforce-vs-inspector rule lived only in code | Stated **at the field that decides it**; plus the origin block | pair 4 — the highest-value sentence in this phase | low | B4 C8, D7/D8 |
+| `views/ops/requisition_detail.php` | origin, direct path | A directly-raised requirement said **nothing** about its origin | *"Recorded directly — there is no hiring request behind this one. Both ways of starting are supported."* | A reader could not tell whether approval was skipped or never applied | low | B4 E |
+
+### Corrections to the audit
+
+"25 definitions" → **26**. "Five words undefined" → **six**. And *"no screen
+states the relationship between two confusable objects"* was **wrong** —
+`requisition_detail.php` has said *"Raised from hiring request HR-xxx"* since
+M4. B4 therefore did not build that line; it closed the two gaps either side.
+
+### ADR-001
+
+Untouched. The direct-path sentence describes and recommends nothing; the suite
+fails if the screen ever says "should have been raised", "preferred",
+"bypassed", "incorrectly", "ought to" or "skipped the approval".
+
+### Deferred
+
+QA / billing-readiness / professional definitions written but not yet surfaced
+on their screens → **B4 follow-on / B10** · the other 26 still only on the
+rename screen → same · `.btn.small` 36px → B7/B10 · hiring-request
+`allowed_next()` → product decision · nine hand-written `.nowband` blocks → B10.

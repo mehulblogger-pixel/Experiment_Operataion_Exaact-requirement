@@ -31,7 +31,10 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
 <div class="master-head">
   <div><h1><?= $r ? $e($r['req_no']) : 'New hiring request' ?>
     <?php if ($r): ?><span class="pill <?= $status === 'APPROVED' ? 'p-ok' : ($status === 'DRAFT' ? 'p-mut' : 'p-info') ?>" style="vertical-align:middle;font-size:12px"><?= $e((function_exists('hreq_statuses') ? hreq_statuses() : [])[$status] ?? $status) ?></span><?php endif; ?></h1>
-    <p class="sub" style="margin:2px 0 0"><?= $r ? $e($r['job_title']) . ' · ' . (int) $r['quantity'] . ' needed' : 'Tell us what you need. Once it is approved it becomes a ' . strtolower($L('requisition')) . ' and recruitment starts.' ?></p></div>
+    <p class="sub" style="margin:2px 0 0"><?= $r ? $e($r['job_title']) . ' · ' . (int) $r['quantity'] . ' needed' : 'Tell us what you need. Once it is approved it becomes a ' . strtolower($L('requisition')) . ' and recruitment starts.' ?></p>
+    <?php //  B4 — the definition, where the word is. It had one before this: the
+          //  admin rename screen, which is the one place nobody is confused. ?>
+    <?= function_exists('T_NOTE') ? T_NOTE('hiring_request') : '' ?></div>
 </div>
 
 <?php //  B3 — what happens next to THIS request. Read out of HREQ_STATUS and the

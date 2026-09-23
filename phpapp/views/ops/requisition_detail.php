@@ -34,6 +34,17 @@ if (!empty($req['hiring_request_id']) && function_exists('hreq_get')):
       endif; ?>.
     <span class="muted">Recruitment could not start before that approval.</span>
   </div>
+<?php elseif (function_exists('hreq_can_view') && hreq_can_view()): ?>
+  <?php //  B4 — a requirement with no hiring request behind it used to say
+        //  NOTHING about its origin, so a reader could not tell whether the
+        //  approval step had been skipped or had never applied. This states
+        //  what happened and recommends nothing: which path a workspace should
+        //  prefer is ADR-001, open, and the owner's to decide. ?>
+  <div class="panel" style="border-left:3px solid var(--line);padding:10px 14px">
+    <span class="muted">Recorded directly — there is no
+      <?= e(function_exists('Tl') ? Tl('hiring_request') : 'hiring request') ?> behind this one.
+      Both ways of starting are supported.</span>
+  </div>
 <?php endif; ?>
 
 <?php // M3 — where this requirement stands, in one line. Ten vacancies are ten

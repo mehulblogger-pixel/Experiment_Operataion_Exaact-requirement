@@ -706,3 +706,33 @@ function ops_report_approve($method) {
     redirect('/job?id=' . $job['id']);
     return true;
 }
+
+// ---------------------------------------------------------------------------
+//  B4 — WHERE THIS TEAM MEMBER CAME FROM.
+//
+//  The chain candidate → hired → workforce is visible in ONE direction: the
+//  candidate screen says "Hired — this candidate is now Team Member #12". From
+//  the team member's own screen there was nothing at all, so a coordinator
+//  looking at a person could not see which requirement they were recruited
+//  against, or that they came through recruitment rather than being added by
+//  hand.
+//
+//  Nothing new is stored. The link already exists as candidates.inspector_id;
+//  this reads it the other way round. Returns null when the person was not
+//  hired through recruitment, which is a real and common case (the Masters
+//  door adds people directly) and is said rather than guessed at.
+function workforce_origin($inspectorId) {
+    $inspectorId = (int) $inspectorId;
+    if ($inspectorId <= 0) return null;
+    try {
+        $c = ops_one("SELECT id, cand_code, first_name, last_name, stage, joined_at, requisition_id
+                        FROM candidates WHERE inspector_id=? ORDER BY id LIMIT 1", [$inspectorId]);
+    } catch (Throwable $e) { return null; }
+    if (!$c) return null;
+    $req = null;
+    if (!empty($c['requisition_id'])) {
+        try { $req = ops_one("SELECT id, req_code FROM requisitions WHERE id=?", [(int) $c['requisition_id']]); }
+        catch (Throwable $e) { $req = null; }
+    }
+    return ['candidate' => $c, 'requisition' => $req ?: null];
+}
