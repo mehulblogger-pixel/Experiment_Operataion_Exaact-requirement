@@ -92,10 +92,20 @@ import) sitting at the same visual weight as daily work (candidates, positions).
 | …that name what to do next | **3** |
 | …that are errors | 501 |
 | Views with a shared empty-state component | **0** |
-| Views with a bare "No records" style message | 18 |
+| Views with a bare "No records" style message | ~~18~~ **3** |
 
-**1,317 confirmations, 3 of which say what happens next.** This is the single
-largest finding of the census and speaks directly to Parts 17, 18 and 40.
+> **Corrected in UX-A5.** The 18 was inflated by explanatory prose beginning
+> "Nothing here…", which is not an empty state. Three views are genuinely bare,
+> two of them shared components. The rest are already tailored and specific.
+
+**1,317 confirmations, 3 of which link to what happens next.**
+
+> **Corrected in UX-A5.** This figure is arithmetically right and materially
+> misleading, and calling it "the single largest finding" was wrong. Reading the
+> messages, they are well written and several explain the *consequence* of the
+> action ("the original date is kept in the history", "it appears on the client
+> PDF"). The gap is a missing forward **link**, not bad copy — a much smaller
+> and cheaper problem. See F-A5-3.
 
 ### Raw technical text reaching a user — smaller than it looks
 
