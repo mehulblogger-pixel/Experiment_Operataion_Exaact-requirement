@@ -117,7 +117,7 @@ has no `allowed_next()` helper → product/later · relationship line on the ban
 
 ---
 
-## B4 — Terminology + relationship visibility · commit `__B4_COMMIT__`
+## B4 — Terminology + relationship visibility · commit `e750b6f`
 
 ### Source changes
 
