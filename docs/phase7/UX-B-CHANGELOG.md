@@ -84,7 +84,7 @@ line → B4 · area-home counts → B5 · heading count → B10.
 
 ---
 
-## B3 — Next Action · commit `__B3_COMMIT__`
+## B3 — Next Action · commit `b550f30`
 
 ### Source changes
 
