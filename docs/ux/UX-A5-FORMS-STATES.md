@@ -145,9 +145,12 @@ libraries but only **7** inside a `flash()`. Six of those are the admin-only
 demo loaders (`Could not load DEMO-S01…S06`); one is tenant provisioning and
 already ends with a recovery instruction.
 
-Part 16's rule — never show a stack trace — is **substantially already met**.
-The seven should still be tidied so the class of fault cannot spread, but this
-is housekeeping, not a defect hunt.
+> **CORRECTED in UX-A7 — this conclusion was wrong, and wrong in the comfortable
+> direction.** Part 16 is **violated on a routine screen**: Masters → Add a
+> person shows the user a raw `SQLSTATE[23000] … Duplicate entry`. My search
+> looked for `getMessage()` inside `flash()`; that error arrives through an
+> **uncaught exception**, which the search could never find. Counting the
+> handled paths and concluding the rule was met was the error. See F-A7-1.
 
 ---
 
@@ -188,11 +191,13 @@ consequence. C7 should **add forward links, not rewrite the words**.
 | F-A5-2 | Office pre-filled on 3 forms, current user on 2; assumptions rarely stated | cosmetic | MEDIUM |
 | F-A5-3 | No shared next-action component; 14 views mention one | structural | MEDIUM |
 | F-A5-4 | 3 bare empty states, 2 in shared components | cosmetic | LOW |
-| F-A5-5 | 7 raw exception messages, 6 admin-only | cosmetic | LOW |
+| F-A5-5 | 7 raw exception messages, 6 admin-only — **but see F-A7-1: an UNCAUGHT one reaches users on a routine screen** | cosmetic | ~~LOW~~ see A7 |
 
 **Retired as false alarms:** workflow continuity (already correct), message
-quality (already good), empty states at scale (3, not 18), errors at scale
-(7 reachable, not 90).
+quality (already good), empty states at scale (3, not 18).
+
+**Not retired after all:** errors. A7 found an uncaught exception putting a raw
+SQLSTATE in front of users on an ordinary task.
 
 **No product decision required.** F-A5-1 is the one substantial piece of work,
 and it has a proven in-repo precedent to copy rather than a design to invent.

@@ -600,6 +600,17 @@ so your history stays readable.
 **PASS:** refused, and the old record is untouched.
 
 ### DUP-003 — The same e-mail address
+
+> ⚠ **CORRECTION — do not run this test yet.** Verified in a browser during the
+> UX audit (UX-A7): adding a second person with a colleague's e-mail through
+> **Masters → Add a person** does **not** name who they may already be. The
+> duplicate is still refused — your data stays clean, only one record is created
+> — but the screen shows a raw database error rather than a sentence. The
+> friendly, named warning described below happens on the **hiring** path
+> (accepting a candidate), not on this one.
+>
+> Run this test after F-A7-1 is fixed. If you run it now it will look like a
+> failure of duplicate protection, which would be the wrong conclusion.
 **Where:** Admin → User register → add a person, or the people register.
 **Do:** add a second person with an e-mail a **current** colleague already uses.
 **Should happen:** you are stopped, **and told who they may already be, by name**.
