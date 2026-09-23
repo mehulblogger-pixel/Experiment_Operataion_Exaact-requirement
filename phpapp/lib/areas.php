@@ -80,10 +80,13 @@ function ops_area_def($area) {
             $title = 'Sales'; $icon = '🎯';
             $sub = 'Leads, opportunities, ' . strtolower(THP('inquiry')) . ', ' . strtolower(THP('quote')) . ' and the pipeline.';
             $routes = ['sales','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','preorder-checklist','templates'];
-            $t($fx('leads_can_view') && leads_can_view(), '🎯', 'Leads', '/leads', 'A company worth pursuing — before any specific job.');
+            $t($fx('leads_can_view') && leads_can_view(), '🎯', 'Leads', '/leads', 'A company worth pursuing — before any specific job.',
+                $num(fn() => $fx('leads_due_count') ? leads_due_count() : 0), 'amber');
             $t($fx('opp_can_view') && opp_can_view(), '💡', 'Opportunities', '/opportunities', 'A live deal you are working to win or lose.');
-            $t(can('mod.inquiries.view'), '📨', THP('inquiry'), '/inquiries', 'A specific request to quote — a ' . strtolower(Tl('quote')) . ' is raised from it.');
-            $t(can('mod.quotes.view'), '📝', THP('quote'), '/quotes', 'Quotations, revisions and approvals.');
+            $t(can('mod.inquiries.view'), '📨', THP('inquiry'), '/inquiries', 'A specific request to quote — a ' . strtolower(Tl('quote')) . ' is raised from it.',
+                $num(fn() => $fx('inquiries_due_count') ? inquiries_due_count() : 0), 'amber');
+            $t(can('mod.quotes.view'), '📝', THP('quote'), '/quotes', 'Quotations, revisions and approvals.',
+                $num(fn() => $fx('quotes_awaiting_contract_count') ? quotes_awaiting_contract_count() : 0), 'amber');
             // R11 — document / template library for marketing (crm.template.manage) moved
             // here from Admin, so a marketing manager reaches it in Sales — where their work
             // is — instead of via an Admin area that implied administrative power.
@@ -144,13 +147,15 @@ function ops_area_def($area) {
             $t($inspPack && can('mod.datacontrol.view'), '🗃', 'Data & information control', '/data-control', 'Information management controls.');
             $t($fx('risk_can_view') && risk_can_view(), '🎲', 'Risks & opportunities', '/risks', 'The risk register.',
                 $num(fn() => $fx('risk_counts') ? risk_counts()['high'] : 0), 'red');
-            $t($inspPack && can('mod.competence.view'), '🎓', 'Competence & authorisation', '/competence', 'Training, assessment and authorisation.');
+            $t($inspPack && can('mod.competence.view'), '🎓', 'Competence & authorisation', '/competence', 'Training, assessment and authorisation.',
+                $num(fn() => $fx('competence_due_counts') ? (competence_due_counts()['expired'] ?? 0) : 0), 'red');
             $t($inspPack && can('mod.impartiality.view'), '⚖️', 'Impartiality', '/impartiality', 'Threats to impartiality and controls.');
             $t($fx('disclosure_can_view') && disclosure_can_view(), '📢', 'Disclosure consent', '/disclosure', 'Consents to disclose.',
                 $num(fn() => $fx('disclosure_counts') ? disclosure_counts()['pending'] : 0), 'amber');
             $t($inspPack && can('mod.audits.view'), '🔍', 'Internal audits', '/internal-audits', 'The internal audit programme.');
             $t($inspPack && can('mod.audits.view'), '🏛', 'Management review', '/management-reviews', 'Management review records.');
-            $t(can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity']), '🔒', 'Confidentiality', '/confidentiality', 'Undertakings, NDAs and breaches.');
+            $t(can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity']), '🔒', 'Confidentiality', '/confidentiality', 'Undertakings, NDAs and breaches.',
+                $num(fn() => $fx('conf_open_breach_count') ? conf_open_breach_count() : 0), 'red');
             $t($fx('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients'])), '🛂', 'Site entry documents', '/site-docs', 'Papers needed for site access.');
             $t(can('mod.identity.view') && $fx('iddoc_can_view') && iddoc_can_view(), '🪪', 'Identity documents', '/identity', 'ID that gates site access.');
             // R11 — SLA / turnaround targets moved here from Admin. It is a
@@ -172,7 +177,8 @@ function ops_area_def($area) {
             $routes = ['reporting','documents','document','endorsements','endorsement','vendors','vendor-profile','expediting','expediting-projects','writing-assistant','phrase-library','learning','compliance'];
             if ((!function_exists('connect_cap_owner_shows') || connect_cap_owner_shows('reporting')) && can('mod.idems.view')) {
                 $sec('Reports');
-                $t(true, '📑', T_REG('report'), '/documents', 'The report register.');
+                $t(true, '📑', T_REG('report'), '/documents', 'The report register.',
+                    $num(fn() => $fx('idems_awaiting_my_approval_count') ? idems_awaiting_my_approval_count() : 0), 'amber');
                 $t(can('mod.idems.edit') || is_master_of('idems'), '➕', ucfirst(T_NEW('report')), '/document-new', 'Start a new report.');
                 $t(true, '✅', T_REG('endorsement'), '/endorsements', 'Manufacturer document endorsements.');
                 // Vendor register lives under Directory; the duplicate that was here is parked in Admin.
@@ -312,7 +318,8 @@ function ops_area_def($area) {
 
             $sec('Report configuration');
             $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global')), '👤', 'Approver mapping', '/approver-map', 'Who signs which report.');
-            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Approval rules', '/approval-rules', 'Routing rules for approval.');
+            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Approval rules', '/approval-rules', 'Routing rules for approval.',
+                $num(fn() => $fx('appr_cond_unarmed_count') ? appr_cond_unarmed_count() : 0), 'amber');
             // R11 — the crm.template.manage grant moved to Sales (Document templates), so
             // holding only that permission no longer forces a marketing manager into Admin.
             $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '📝', 'Report templates', '/templates?kind=report', 'The report template library.');   // M11 — explicit destination

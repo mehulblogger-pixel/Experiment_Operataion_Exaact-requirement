@@ -233,12 +233,26 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors i WHERE i.name LIKE 'RB3Same%
 //
 //  CORRECTION — this assertion used to demand RACE_LOST from all three on
 //  MariaDB, and went red roughly one full-suite run in three. That was the
-//  test over-specifying, not the product misbehaving. Traced to the source:
-//  a LATE straggler reads the application AFTER the winner has committed, so
-//  the idempotency guard (recruit.php, "already been converted") answers it
-//  BEFORE the transaction is even opened, and it never reaches the conditional
-//  UPDATE that produces RACE_LOST. Reproduced deliberately: convert an
-//  application, then convert it again — the second call returns ALREADY.
+//  test over-specifying, not the product misbehaving. A LATE straggler reads
+//  the application AFTER the winner has committed, so a pre-transaction guard
+//  answers it before it ever reaches the conditional UPDATE that produces
+//  RACE_LOST. There are TWO such guards, and a straggler may meet either:
+//
+//    ALREADY          the idempotency check — the application already records
+//                     the team member it produced
+//    WORKFORCE_MATCH  the duplicate check — the winner's inspector row now
+//                     exists and shares this candidate's e-mail/mobile, so
+//                     "is this person already on the team?" answers yes
+//
+//  Both were observed: ALREADY by deliberately converting an application
+//  twice; WORKFORCE_MATCH in a full MariaDB run, which printed
+//  [RACE_LOST RACE_LOST WORKFORCE_MATCH CONVERTED].
+//
+//  This set was widened ONCE before, on the ALREADY evidence alone. Widening
+//  again on new evidence is right; widening until it goes green would not be.
+//  The principle is unchanged, and the arming assertion below defends it:
+//  every loser got a SPECIFIC, NAMED reason, none silently succeeded, and a
+//  generic FAILED or a lock-timeout BUSY would still fail this test.
 //
 //  Both answers are specific, deterministic, and say the same thing to the
 //  person: somebody else has already hired this applicant. What must be true
@@ -252,17 +266,18 @@ if (t_driver() === 'sqlite') {
          'X2d (sqlite) · the other three were all refused, none of them silently succeeding');
 } else {
     $x2named = array_values(array_filter($x2res,
-        fn($r) => empty($r['ok']) && in_array((string)($r['code'] ?? ''), ['RACE_LOST', 'ALREADY'], true)));
+        fn($r) => empty($r['ok']) && in_array((string)($r['code'] ?? ''), ['RACE_LOST', 'ALREADY', 'WORKFORCE_MATCH'], true)));
     t_eq(count($x2named), 3,
-         'X2d · the other three were each given a NAMED reason — RACE_LOST (lost the write) or '
-         . 'ALREADY (the winner had already committed); never a generic failure [' . implode(' ', $x2codes) . ']');
+         'X2d · the other three were each given a NAMED reason — RACE_LOST (lost the write), '
+         . 'ALREADY (the winner had committed) or WORKFORCE_MATCH (the winner\'s team record '
+         . 'now matches); never a generic failure [' . implode(' ', $x2codes) . ']');
     //  ARMING — run the SAME filter over a synthetic set that contains the
     //  refusals this must never accept. If widening the set had made the
     //  assertion toothless, this would pass 3 and give the game away.
     $x2probe = [['ok' => false, 'code' => 'RACE_LOST'], ['ok' => false, 'code' => 'FAILED'],
                 ['ok' => false, 'code' => 'BUSY'],      ['ok' => true,  'code' => 'CONVERTED']];
     t_eq(count(array_values(array_filter($x2probe,
-             fn($r) => empty($r['ok']) && in_array((string)($r['code'] ?? ''), ['RACE_LOST', 'ALREADY'], true)))), 1,
+             fn($r) => empty($r['ok']) && in_array((string)($r['code'] ?? ''), ['RACE_LOST', 'ALREADY', 'WORKFORCE_MATCH'], true)))), 1,
          'X2d ARMING · the same filter accepts only 1 of a set holding FAILED, BUSY and a success — '
          . 'a generic failure still fails this assertion');
     t_ok($x2lost >= 0 && $x2lost <= 3,

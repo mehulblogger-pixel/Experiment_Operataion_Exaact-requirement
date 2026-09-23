@@ -5,8 +5,31 @@
 t_section('report config moved to Admin (simplify step 3)');
 
 $a = (string)file_get_contents(__DIR__ . '/../lib/areas.php');
-$reporting = substr($a, strpos($a, "case 'reporting':"), 1600);
-$admin = substr($a, strpos($a, "case 'admin':"), 7000);   // full admin case (it has grown with Terminology + Form Designer cards)
+//  SLICE TO THE NEXT `case`, NOT TO A MAGIC NUMBER.
+//
+//  This read a fixed 1600 bytes from `case 'reporting':`, and B5 broke it by
+//  adding a count to the report-register tile -- which pushed "Technical
+//  writing" past byte 1600 and made the test report a tile that was still
+//  there as missing. The window was already nearly full (the tile sat at byte
+//  ~1553), and substr() counts BYTES while this file is full of multi-byte
+//  emoji, so the real margin was smaller than it looked.
+//
+//  A fixed length cannot survive an area gaining a line, and every area
+//  eventually does. Slicing to the next `case '` is exact, needs no upkeep,
+//  and the assertions below are unchanged in substance: move a tile out of
+//  Reporting and they still fail.
+$areaSlice = function ($case) use ($a) {
+    $i = strpos($a, $case);
+    if ($i === false) return '';
+    $j = strpos($a, "case '", $i + strlen($case));
+    return $j === false ? substr($a, $i) : substr($a, $i, $j - $i);
+};
+$reporting = $areaSlice("case 'reporting':");
+$admin     = $areaSlice("case 'admin':");
+t_ok(strlen($reporting) > 900 && strlen($admin) > 3000,
+     'ARMING · both area slices were found (' . strlen($reporting) . ' / ' . strlen($admin) . ' bytes)');
+t_ok(strpos($reporting, "case 'money':") === false && strpos($admin, "case 'directory':") === false,
+     'ARMING · and neither slice ran on into the next area');
 
 // UPDATED IN MILESTONE 11 — the assertion is about WHERE the tile lives, not
 // what it is called. M11 renamed the Admin tile to 'Report templates' and gave

@@ -149,3 +149,47 @@ QA / billing-readiness / professional definitions written but not yet surfaced
 on their screens → **B4 follow-on / B10** · the other 26 still only on the
 rename screen → same · `.btn.small` 36px → B7/B10 · hiring-request
 `allowed_next()` → product decision · nine hand-written `.nowband` blocks → B10.
+
+---
+
+## B5 — Area-home counts & attention · commit `__B5_COMMIT__`
+
+### Source changes
+
+| File | Component | Problem | Change | Reason | Risk | Test |
+|---|---|---|---|---|---|---|
+| `lib/areas.php` | 7 tiles | 24 of 103 tiles carried a count; Sales 1/10, Reporting 0/8, Admin 1/24 | Leads, Inquiries, Quotes, Competence, Confidentiality, Report register and Approval rules wired to **existing** counters through the existing `$t()` signature | An area home answered "what can I do" and not "what needs attention" | low — additive, each inside the tile's own `$show` gate | B5 A–F, 36 assertions |
+| `tests/test_simplify_reportcfg.php` | area slice | Read a fixed **1600-byte** window; B5's added line pushed a still-present tile outside it | Slice to the next `case '`, plus two arming assertions | A fixed length cannot survive an area gaining a line | low — strictly stronger; 12 → 14 assertions, mutation-confirmed | itself |
+
+**24 → 31 wired. 14 → 17 rendering on the same seeded workspace.**
+
+### What was NOT built
+
+No count engine, KPI engine or dashboard calculation. No new business metric —
+four candidate counters were **rejected** because they are per-record
+(`imp_declaration_due`, `connect_client_bench_count`, `hwp_open_count`) or
+measure volume rather than attention (`consent_open_count`). No view changed;
+`area_home.php` already knew how to paint a badge.
+
+### Two test assumptions corrected
+
+`ops_area_def()` builds tiles whatever the licence says — the licence is
+enforced one level up by `ops_area_has()`, which the area-home route requires.
+And `quality` is deliberately gated on the **operations** licence
+("accreditation packs are Operations access-modules"), so entitling Operations
+is supposed to bring Quality with it.
+
+### Deferred
+
+~73 tiles still unwired — no workspace-wide counter exists and B5 may not write
+one · Insights and most of Admin are configuration destinations where a badge
+would be noise · per-record counters would need a product decision to aggregate.
+
+### B5 · a second, unrelated test correction
+
+`test_rb3_emp_code.php` X2d failed on the authoritative engine with
+`[RACE_LOST RACE_LOST WORKFORCE_MATCH CONVERTED]`. A straggler in the four-way
+conversion race was refused by the **duplicate guard** — the winner's team
+record now existed and matched the candidate's e-mail. Specific, deterministic,
+and correct. The accepted set (widened once before on `ALREADY` evidence) now
+includes it. Pre-existing behaviour; unrelated to B5.
