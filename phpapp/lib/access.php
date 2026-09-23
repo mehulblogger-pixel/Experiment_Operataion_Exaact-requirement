@@ -923,8 +923,74 @@ function theme_mix($a, $b, $t) {
     }
     return $o;
 }
+//  Deep Teal, per the UI/UX blueprint. Only a fallback — a workspace that has
+//  chosen a colour keeps it. 7.47:1 on white, so the ring derived from it is
+//  visible without adjustment on a default install.
+const THEME_BRAND = '#0f5f5c';
+
+//  ---- Accessibility (B1) --------------------------------------------------
+//  theme_lum() above is the OLD perceived-brightness formula (0.299/0.587/0.114).
+//  It is kept because two call sites use it only to choose black-or-white text
+//  on the top bar, where it is adequate. It is NOT the WCAG formula and must
+//  never be used to claim a contrast ratio. These three are.
+//
+//  WCAG 2.1 relative luminance. sRGB channel -> linear, then weighted.
+function theme_rel_lum($hex) {
+    $c = [];
+    foreach ([1, 3, 5] as $i) {
+        $v = hexdec(substr($hex, $i, 2)) / 255;
+        $c[] = $v <= 0.04045 ? $v / 12.92 : pow(($v + 0.055) / 1.055, 2.4);
+    }
+    return 0.2126 * $c[0] + 0.7152 * $c[1] + 0.0722 * $c[2];
+}
+//  Contrast ratio between two colours, 1..21.
+function theme_contrast($a, $b) {
+    $la = theme_rel_lum($a); $lb = theme_rel_lum($b);
+    return (max($la, $lb) + 0.05) / (min($la, $lb) + 0.05);
+}
+//  Return $c, adjusted only as far as necessary to reach $target contrast
+//  against EVERY background in $bgs.
+//
+//  Why this exists (F-A2-2): the derived tokens below were produced by mixing
+//  the surface toward the ink by a fixed fraction. A fixed fraction cannot
+//  promise a contrast ratio -- it produced 2.67:1 for secondary text on white,
+//  where WCAG AA asks 4.5:1, on EVERY workspace including the unbranded one.
+//
+//  The correction keeps the tenant's own colours and moves the derived value
+//  the minimum distance needed, so a workspace that already passes is left
+//  exactly as it is. It darkens on light surfaces and lightens on dark ones,
+//  and gives up at pure black/white rather than looping, because a mid-grey
+//  background genuinely cannot carry 4.5:1 in either direction.
+function theme_readable($c, $bgs, $target = 4.5) {
+    $bgs = array_values(array_filter((array) $bgs));
+    if (!$bgs) return $c;
+    $ok = function ($x) use ($bgs, $target) {
+        foreach ($bgs as $b) if (theme_contrast($x, $b) < $target) return false;
+        return true;
+    };
+    if ($ok($c)) return $c;                       // already compliant: do not touch it
+    $avg = 0.0; foreach ($bgs as $b) $avg += theme_rel_lum($b);
+    $avg /= count($bgs);
+    $towards = $avg > 0.18 ? '#000000' : '#ffffff';
+    for ($t = 0.02; $t < 1.0; $t += 0.02) {
+        $x = theme_mix($c, $towards, $t);
+        if ($ok($x)) return $x;
+    }
+    return $towards;
+}
+
 function theme_style_tag() {
-    $primary = theme_hex(setting_get('c_primary', '')) ?: (theme_hex(setting_get('brand_color', '')) ?: '#1e40af');
+    //  F-A2-1 — the blueprint mandates a Deep Teal primary; the stylesheet
+    //  shipped blue, so an unbranded workspace showed the wrong product. This
+    //  is only the FALLBACK: a workspace that has chosen its own colour is
+    //  untouched.
+    //
+    //  The blueprint also names Gold as the accent, and that is NOT applied
+    //  here. In this codebase --accent is wired to --info (app.css), so it is
+    //  not decoration -- it is the informational status colour, and changing it
+    //  would change the meaning of a status. Deferred to B10, recorded in the
+    //  B1 report.
+    $primary = theme_hex(setting_get('c_primary', '')) ?: (theme_hex(setting_get('brand_color', '')) ?: THEME_BRAND);
     $accent  = theme_hex(setting_get('c_accent', ''))  ?: '#0ea5e9';
     $bg      = theme_hex(setting_get('c_bg', ''))       ?: '#f4f6f9';
     $surface = theme_hex(setting_get('c_surface', ''))  ?: '#ffffff';
@@ -932,14 +998,41 @@ function theme_style_tag() {
     $fs = (int)(setting_get('font_size', '') ?: 14); if ($fs < 12 || $fs > 20) $fs = 14;
     $soft  = theme_mix($surface, $ink, 0.05);
     $line  = theme_mix($surface, $ink, 0.14);
-    $muted = theme_mix($surface, $ink, 0.45);
     $field = theme_mix($surface, $ink, 0.04);
+    //  Secondary text must be readable on every surface it actually lands on --
+    //  the card, the panel and the page -- not merely on the lightest of them.
+    //  Measured before this change: 2.67 / 2.43 / 2.46:1.
+    $muted = theme_readable(theme_mix($surface, $ink, 0.45), [$surface, $soft, $bg], 4.5);
+    //  A form control's boundary is a UI component under WCAG 1.4.11, which asks
+    //  3:1. The shared --line stays as it is, because it also draws table row
+    //  separators, where a 3:1 rule would make every list look like a spreadsheet.
+    //  --field-line already existed as a separate token and simply pointed at
+    //  --line; it now carries the requirement that belongs to it.
+    $fieldLine = theme_readable($line, [$surface, $field, $bg], 3.0);
+    //  The focus ring was painted in the raw brand colour, so its visibility was
+    //  whatever the tenant happened to choose: a pale gold brand measured 2.1:1,
+    //  which leaves a keyboard user unable to see where they are. Derived from
+    //  the brand, so the identity is kept, but never below 3:1.
+    $focus = theme_readable($primary, [$surface, $soft, $bg], 3.0);
+    //  Brand colour used as TEXT on a surface — a secondary button's label, a
+    //  brand-tinted link. Same derivation as the focus ring but at the text
+    //  threshold, because it is text.
+    $brandInk = theme_readable($primary, [$surface, $soft, $bg], 4.5);
+    //  A solid brand button. The label was hard-coded #fff, so a pale brand gave
+    //  2.1:1 and the button could not be read at all. Choose the label colour the
+    //  brand can actually carry, then -- only if even that is not enough -- move
+    //  the BUTTON'S OWN background far enough to carry it. The hue is kept, so a
+    //  gold workspace still has gold buttons; they simply become legible.
+    $onBrand = theme_contrast($primary, '#ffffff') >= theme_contrast($primary, '#000000') ? '#ffffff' : '#000000';
+    $btnBg   = theme_readable($primary, [$onBrand], 4.5);
+    //  The top bar sat on the same hard-coded guess, decided by the OLD
+    //  perceived-brightness formula rather than a contrast ratio.
+    $navtext = $onBrand;
+    $navlink = $onBrand === '#ffffff' ? 'rgba(255,255,255,.86)' : 'rgba(17,24,39,.78)';
     $isDark = theme_lum($surface) < 128;
     $shadow   = $isDark ? '0 1px 2px rgba(0,0,0,.4), 0 12px 34px rgba(0,0,0,.5)' : '0 1px 2px rgba(18,32,60,.05), 0 10px 30px rgba(18,32,60,.08)';
     $shadowSm = $isDark ? '0 1px 2px rgba(0,0,0,.45)' : '0 1px 2px rgba(18,32,60,.06)';
-    $navtext = theme_lum($primary) > 150 ? '#111827' : '#ffffff';
-    $navlink = theme_lum($primary) > 150 ? 'rgba(17,24,39,.72)' : 'rgba(255,255,255,.82)';
-    return "<style>:root{--brand:$primary;--accent:$accent;--bg:$bg;--card:$surface;--panel:$soft;--ink:$ink;--soft:$soft;--line:$line;--muted:$muted;--field:$field;--field-line:$line;--shadow:$shadow;--shadow-sm:$shadowSm;--fs:{$fs}px}"
+    return "<style>:root{--brand:$primary;--brand-ink:$brandInk;--btn-bg:$btnBg;--on-brand:$onBrand;--accent:$accent;--bg:$bg;--card:$surface;--panel:$soft;--ink:$ink;--soft:$soft;--line:$line;--muted:$muted;--field:$field;--field-line:$fieldLine;--focus:$focus;--shadow:$shadow;--shadow-sm:$shadowSm;--fs:{$fs}px}"
         . "body{font-size:var(--fs)}.stat-card,.master-card{background:var(--soft)}"
         . ".topbar .brand,.topbar .user{color:$navtext}.topbar nav a{color:$navlink}.topbar nav a:hover{color:$navtext}"
         . "</style>";
