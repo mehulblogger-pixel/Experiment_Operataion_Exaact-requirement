@@ -59,7 +59,7 @@ B10. 16px mobile type floor → B7. Dead `.topbar` CSS → B10.
 
 ---
 
-## B2 — Navigation + Recruitment Command Centre · commit `__B2_COMMIT__`
+## B2 — Navigation + Recruitment Command Centre · commit `2881e61`
 
 ### Source changes
 
