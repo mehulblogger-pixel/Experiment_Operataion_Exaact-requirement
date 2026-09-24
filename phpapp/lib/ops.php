@@ -7322,7 +7322,16 @@ function ops_jobs($route, $method) {
             'fOffice' => $fOffice, 'fUnalloc' => $fUnalloc]); return;
     }
     if ($route === 'job-new' || $route === 'job-edit') {
-        ops_require(is_coordinator_level(), 'Only coordinators and admins can allocate jobs.');
+        //  B10-CL-1 — the button is now gated where it is drawn, but a bookmark or
+        //  a stale page can still land here. Explain, the way B9-4 does, instead of
+        //  bouncing to the dashboard. The predicate is untouched.
+        if (!is_coordinator_level()) {
+            if (function_exists('ops_access_notice')) {
+                return ops_access_notice('Allocate a ' . Tl('job'),
+                    'Allocating a ' . Tl('job') . ' isn’t available to your role.');
+            }
+            ops_require(false, 'Only coordinators and admins can allocate jobs.');
+        }
         $job = null; $call = null;
         if ($route === 'job-edit') {
             $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
@@ -8119,7 +8128,22 @@ function inspector_date_schedule($insId, $from, $to) {
 function ops_my_jobs() {
     $u = current_user();
     $insId = $u['inspector_id'] ?? null;
-    if (!$insId && !is_coordinator_level()) { flash(inspector_link_msg(), 'error'); redirect('/'); }
+    if (!$insId && !is_coordinator_level()) {
+        //  B10-CL-2 — this is an IDENTITY-LINK state, not a permission refusal and
+        //  not "no jobs assigned": the login carries the field role but is not tied
+        //  to an engineer record, so there is no "mine" to list. The application
+        //  already has the precise wording (inspector_link_msg(), used by the My
+        //  Work notice); it is now shown on the screen the person asked for,
+        //  instead of flashing past on the way back to the dashboard.
+        //  The access decision below is unchanged — nothing new is permitted.
+        if (function_exists('ops_access_notice')) {
+            return ops_access_notice('My ' . Tlp('job'),
+                'This screen lists the ' . Tlp('job') . ' assigned to you, and your login is not linked to a '
+                    . Tl('engineer') . ' record yet — so there is nothing it can show.',
+                inspector_link_msg());
+        }
+        flash(inspector_link_msg(), 'error'); redirect('/');
+    }
     if ($insId) {
         $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp
             FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id

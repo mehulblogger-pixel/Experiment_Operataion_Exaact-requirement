@@ -25,9 +25,13 @@
 
 <div class="panel" style="margin-top:14px;max-width:640px">
   <p style="margin:0 0 4px;font-size:15px;font-weight:600"><?= e($noticeWhy) ?></p>
+  <?php //  B10 — a caller that already has a precise explanation (for example the
+        //  inspector-link message) supplies its own sub-line; everybody else gets
+        //  the original reassurance. Never both. ?>
   <p class="muted" style="margin:0 0 14px;font-size:13.5px">
-    Nothing is wrong with your account — this part of the system simply isn’t part of your work.
-    If you think you should have it, ask your administrator.
+    <?= isset($noticeSub) && $noticeSub !== '' ? e($noticeSub)
+        : 'Nothing is wrong with your account — this part of the system simply isn’t part of your work.
+           If you think you should have it, ask your administrator.' ?>
   </p>
   <div class="row-actions" style="display:flex;gap:8px;flex-wrap:wrap">
     <?php foreach ($noticeLinks as $lnk): ?>

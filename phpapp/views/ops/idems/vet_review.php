@@ -5,6 +5,9 @@ $vetPill = ['VETTED'=>'p-ok','RETURNED'=>'p-bad','DEBRIEFED'=>'p-info'];
 <div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Vet side by side</div>
 <div class="master-head">
   <div><h1>Vet: <?= e($doc['irn']) ?></h1>
+<?php //  B10-CL-3 — the definition where the word is. Same helper and same
+      //  registry B4 built; one line on the screen the term is the subject of. ?>
+    <?= function_exists('T_NOTE') ? T_NOTE('qa') : '' ?>
     <p class="sub" style="margin:2px 0 0"><?= e($doc['type_name'] ?: $doc['type_code']) ?> · <?= e($doc['client_disp'] ?: $doc['client_name'] ?: '—') ?>
       <?php if (!empty($doc['vet_status']) && isset(IDEMS_VET_STATUS[$doc['vet_status']])): ?>
         · <span class="pill <?= $vetPill[$doc['vet_status']] ?? 'p-mut' ?>"><?= e(IDEMS_VET_STATUS[$doc['vet_status']]) ?></span>

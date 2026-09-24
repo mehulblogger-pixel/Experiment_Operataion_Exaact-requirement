@@ -237,6 +237,13 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
   table.rtable,table.rtable{display:block;overflow:visible;white-space:normal;
     background:none;border:0;box-shadow:none;width:100%}
   table.rtable thead,table.rtable thead,.rt-head{display:none}
+  /*  B10-CL-4 — a bare `.rt-head` (0,1,0) loses to `table.rtable tr` (0,1,1)
+      below, which turns every row into a card. On a register whose header is
+      a plain <tr> rather than a <thead>, the header therefore became a card
+      too: a ~45px strip of run-together column names above the first record
+      (verified on /candidates). Qualifying the selector (0,2,1) lets the hide
+      win without touching the card layout itself.  */
+  table.rtable tr.rt-head{display:none}
   table.rtable tbody,table.rtable tr,table.rtable tbody,table.rtable tr{display:block;width:auto}
   table.rtable tr,table.rtable tr{background:var(--card);border:1px solid var(--line);
     border-radius:10px;box-shadow:var(--shadow-sm);margin:0 0 10px;overflow:hidden}
@@ -905,7 +912,15 @@ html.cmdk-open{overflow:hidden}
    stays dense. -------------------------------------------------------------- */
 @media (pointer:coarse){
   .btn,.tabs a,.dt th a,select.form-control,input.form-control{min-height:44px}
-  .btn.small{min-height:36px}
+  /*  B10-CL-6 — .btn.small was deliberately held at 36px when B7 wrote this
+      block. Measured at 360px it is 3,042 of the 3,046 interactive elements
+      still under the 44px floor this same block sets for every other
+      control, and it is the row action on every register (Allocate, Open,
+      Edit). Raised to the block's own standard; desktop is untouched
+      because the whole rule is inside @media (pointer:coarse).  */
+  .btn.small{min-height:44px}
+  /*  …and the Disruptions filter chips, the other 4.  */
+  .dz-chip{min-height:44px;display:inline-flex;align-items:center}
   /*  B6 — a panel tab is how a form is navigated on a phone, so it is a primary
       touch target and was 33px. Centring rather than padding keeps the bar the
       same height on a mouse, where the rule does not apply.  */

@@ -419,12 +419,12 @@ function ops_area_routes($area) {
 //    · the module is not enabled for this workspace  → licence
 //    · the module is on, but this role has nothing in it → role
 //  Neither reveals a permission name, a count, or whether any record exists.
-function ops_access_notice($title, $why) {
+function ops_access_notice($title, $why, $sub = '') {
     http_response_code(403);
     $links = [['href' => '/', 'label' => 'Back to home', 'primary' => 1]];
     // My Work is open to anyone signed in, so it is always a safe offer.
     $links[] = ['href' => '/my-work', 'label' => 'My Work'];
-    view('ops/access_notice', ['noticeTitle' => $title, 'noticeWhy' => $why, 'noticeLinks' => $links]);
+    view('ops/access_notice', ['noticeTitle' => $title, 'noticeWhy' => $why, 'noticeSub' => $sub, 'noticeLinks' => $links]);
     return true;
 }
 

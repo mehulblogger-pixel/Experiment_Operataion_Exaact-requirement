@@ -283,6 +283,9 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
     <?php if ($P['ready']): ?><span class="pill p-ok" style="font-size:11px;margin-left:6px">Ready to bill</span>
     <?php else: ?><span class="pill p-warn" style="font-size:11px;margin-left:6px">Not ready</span><?php endif; ?>
   </h3>
+  <?php //  B10-CL-3 — the definition where the word is. Same helper and same
+        //  registry B4 built; one line on the screen the term is the subject of. ?>
+  <?= function_exists('T_NOTE') ? T_NOTE('billing_readiness') : '' ?>
   <div style="display:flex;flex-wrap:wrap;gap:6px">
     <?php foreach ($P['checks'] as $ck): ?>
       <span class="pill <?= !empty($ck['ok']) ? 'p-ok' : 'p-warn' ?>" style="font-size:11px"><?= !empty($ck['ok']) ? '✓' : '○' ?> <?= e($ck['label']) ?><?= !empty($ck['hint']) && empty($ck['ok']) ? ' · ' . e($ck['hint']) : '' ?></span>

@@ -19,7 +19,10 @@ $wtLabel = fn($k) => $work_types[$k] ?? ucfirst(str_replace('_', ' ', $k));
 <div class="crumbs"><a href="/">Home</a> › <a href="/marketplace">Marketplace</a> › Talent search</div>
 <div class="master-head">
   <div><h1>Talent search</h1>
-    <p class="sub" style="margin:2px 0 0">Search the shared pool of self-listed professionals — <?= (int)$pool ?> registered. These are individuals who chose to be found; an organisation's own staff are never here.</p></div>
+    <p class="sub" style="margin:2px 0 0">Search the shared pool of self-listed professionals — <?= (int)$pool ?> registered. These are individuals who chose to be found; an organisation's own staff are never here.</p>
+<?php //  B10-CL-3 — the definition where the word is. Same helper and same
+      //  registry B4 built; one line on the screen the term is the subject of. ?>
+    <?= function_exists('T_NOTE') ? T_NOTE('professional') : '' ?></div>
 </div>
 
 <form class="panel tsearch" method="get" action="/connect-talent" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">

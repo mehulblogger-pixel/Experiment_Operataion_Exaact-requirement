@@ -1,5 +1,16 @@
 <?php $lock = job_lock_state($job); ?>
 <?= function_exists('chain_strip') ? chain_strip('JOB', (int)$job['id'], 'JOB', (int)$job['id']) : '' ?>
+<?php //  B10-CL-5 — the same .crumbs component the recruitment records use.
+      //  Hierarchy is the application's own: the rail groups these under
+      //  Operations, and /jobs is the register this record belongs to. Each
+      //  ancestor is a LINK only where the viewer may actually open it — the
+      //  Operations home and the register enforce the same rights this checks,
+      //  so a breadcrumb can never advertise a door that refuses. ?>
+<div class="crumbs"><a href="/">Home</a>
+  &rsaquo; <?= (can('mod.calls.view') || can('mod.jobs.view') || (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()))
+        ? '<a href="/operations">Operations</a>' : 'Operations' ?>
+  &rsaquo; <?= can('mod.jobs.view') ? '<a href="/jobs">' . e(TP('job')) . '</a>' : e(TP('job')) ?>
+  &rsaquo; <?= e((string)($job['job_code'] ?? '') !== '' ? (string)$job['job_code'] : '#' . (int)$job['id']) ?></div>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('job', $job['job_code'])) ?></h1>
     <p class="sub"><?= e($job['client_disp'] ?: $job['client_name'] ?: '—') ?> · <?= e($job['inspector_name'] ?: 'Unassigned') ?></p></div>

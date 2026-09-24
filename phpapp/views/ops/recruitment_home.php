@@ -54,6 +54,12 @@ $grp = function ($icon, $title, $n) use ($e) {
 <div class="master-head">
   <div>
     <h1>Recruitment &amp; Workforce</h1>
+<?php //  B10-CL-3 — the definition where the word is. B4 wrote these into the
+      //  terminology registry and put one at point of use (the hiring-request
+      //  screen); the rest were reachable only from /terminology. Same helper,
+      //  same registry, one line on the screen the term is the subject of —
+      //  not on every row and not where the word is already obvious. ?>
+    <?= function_exists('T_NOTE') ? T_NOTE('workforce') : '' ?>
     <p class="sub" style="margin:2px 0 0">One place for what needs action today, what's at risk, and who you can deploy before recruiting outside. Every figure is live and scoped to your branches.</p>
     <?php // Phase 6 — engagement mode: how this agency hires. A setting, not re-decided per candidate.
     $mode = function_exists('recruit_engagement_mode') ? recruit_engagement_mode() : 'BOTH';

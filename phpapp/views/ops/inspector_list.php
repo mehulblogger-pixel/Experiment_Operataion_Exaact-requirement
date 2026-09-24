@@ -1,6 +1,12 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › Inspectors</div>
 <div class="master-head">
-  <div><h1><?= e(T_REG('engineer')) ?></h1><p class="sub"><?= count($rows) ?> inspector(s)</p></div>
+  <div><h1><?= e(T_REG('engineer')) ?></h1><p class="sub"><?= count($rows) ?> inspector(s)</p>
+<?php //  B10-CL-3 — the definition where the word is. B4 wrote these into the
+      //  terminology registry and put one at point of use (the hiring-request
+      //  screen); the rest were reachable only from /terminology. Same helper,
+      //  same registry, one line on the screen the term is the subject of —
+      //  not on every row and not where the word is already obvious. ?>
+    <?= function_exists('T_NOTE') ? T_NOTE('inspector') : '' ?></div>
   <a class="btn" href="/m/inspectors/new">+ Add <?= e(Tl('engineer')) ?></a>
 </div>
 <form method="get" action="/m/inspectors" class="filter-bar">

@@ -121,7 +121,12 @@
             <td><span class="pill p-ok"><?= (int)$s['run'] ?> day<?= $s['run']==1?'':'s' ?></span><?= $s['until']?' <span class="muted" style="font-size:11px">to '.e($fmtD($s['until'])).'</span>':'' ?></td>
             <td class="muted" style="font-size:12px"><?= $s['next_busy'] ? 'busy '.e($fmtD($s['next_busy'])) : ($s['load']?'':'clear') ?></td>
             <?php if ($canAllocate): ?>
-              <td><a class="btn sm secondary" href="<?= $s_call ? '/job-new?call='.(int)$s_call : '/calls' ?>">Allocate</a></td>
+              <td><?php //  B10-CL-1 — only offer Allocate to somebody /job-new will
+                    //  actually admit. That route's own gate is is_coordinator_level(),
+                    //  so this uses exactly that: no new rule, and no button that
+                    //  bounces. Everyone else still gets through to the register.
+                    $mayAlloc = function_exists('is_coordinator_level') && is_coordinator_level(); ?>
+                <a class="btn sm secondary" href="<?= $mayAlloc && $s_call ? '/job-new?call='.(int)$s_call : '/calls' ?>"><?= $mayAlloc ? 'Allocate' : 'Open' ?></a></td>
             <?php endif; ?>
           </tr>
         <?php endforeach; ?>

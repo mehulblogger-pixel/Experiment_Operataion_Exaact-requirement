@@ -121,8 +121,17 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
         <span class="muted"><?= e($pc['client_name'] ?: '—') ?><?= $cross ? ' · <span class="badge AMBER">cross-office</span>' : '' ?></span>
         <span class="muted"><?= e(lk_options_or('inspection_type', INSPECTION_TYPES)[$pc['inspection_type']] ?? ($pc['inspection_type'] ?: '—')) ?><?= $pc['sbu'] ? ' · ' . e(lk_options_or('sbu', OPS_SBUS)[$pc['sbu']] ?? $pc['sbu']) : '' ?></span>
         <span class="muted">Needed by <?= e($req ?: '—') ?><?php if ($days !== null): ?> · <span class="badge <?= $days < 0 ? 'RED' : ($days <= 2 ? 'AMBER' : 'GREEN') ?>"><?= $days < 0 ? abs($days) . 'd overdue' : $days . 'd' ?></span><?php endif; ?></span>
-        <span style="margin-top:6px"><a class="btn small" href="/job-new?call=<?= (int)$pc['id'] ?>">Allocate</a>
-          <a class="btn small secondary" href="/call?id=<?= (int)$pc['id'] ?>">Open</a></span>
+        <span style="margin-top:6px"><?php
+          //  B10-CL-1 — Allocate is shown only to somebody who may actually do it.
+          //  This is not a new rule: call_can_allocate() is the SAME predicate the
+          //  /job-new route enforces, and the same one call_detail.php and the
+          //  cross-office panel already use. This card was one of the two places
+          //  that had not adopted it, so a finance user saw 31 Allocate buttons
+          //  that all bounced them back to the dashboard. "Open" is unchanged and
+          //  still available to everyone who can see the card.
+          $mayAlloc = function_exists('call_can_allocate') ? call_can_allocate($pc) : is_coordinator_level();
+          if ($mayAlloc): ?><a class="btn small" href="/job-new?call=<?= (int)$pc['id'] ?>">Allocate</a>
+          <?php endif; ?><a class="btn small secondary" href="/call?id=<?= (int)$pc['id'] ?>">Open</a></span>
       </div>
     <?php }; ?>
   <div class="card-grid">
