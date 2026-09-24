@@ -277,3 +277,62 @@ was.
 | `search_only_hit()` | Unchanged; the new sources simply participate. |
 | Result card layout | Unchanged. The audit found it already good. |
 | `cv_text` / `cv_keywords` in global search | Excluded on purpose; they remain in the candidate register. |
+
+
+---
+
+## Final gate — measured results
+
+| Gate | Result |
+|---|---|
+| Focused B8 (`test_b8_recruitment_search.php`) | **34 / 34** |
+| B7 regression (`test_b7_mobile_tables.php`) | **21 / 21** |
+| M4 boundary (`test_m4_correction.php`) | **107 / 107** |
+| Mutations | **10 / 10 caught** |
+| **SQLite full regression** | **13,968 passed, 0 failed** |
+| **MariaDB full regression** (authoritative) | **13,971 passed, 0 failed** |
+| Desktop browser UAT | **33 / 33** |
+| Mobile 360×800 | **PASS** — 0px overflow, 44px box, 3 rows, 0 clipped, 0 JS errors |
+| Mobile 390×844 | **PASS** — same |
+| Mobile 412×915 | **PASS** — same |
+| JS errors / failed requests across the desktop run | **0 / 0** |
+
+Desktop UAT verified, per source: the search returns matches, the results are
+grouped under the right label, the first result links to the right route, **and
+that record actually opens with HTTP 200**.
+
+| Source | Term | Matches | Group | Opens |
+|---|---|---:|---|---|
+| Candidates | `Ghosh` | 3 | 🧑‍💼 Candidates | `/candidate?id=1238` → 200 |
+| Requisitions | `REQ-2607` | 6 | 📋 Recruitment · Requisitions | `/requisition?id=292` → 200 |
+| Hiring requests | `HRQ-2026` | 6 | 📨 Hiring requests | `/hiring-request?id=203` → 200 |
+
+Role behaviour in the browser: COORDINATOR sees candidate results, SR_INSPECTOR
+does not.
+
+---
+
+## Did the `hreq_search()` refactor change any existing Hiring Request behaviour?
+
+**No.** The function is new, additive and read-only. Evidence:
+
+| Check | Result |
+|---|---|
+| `lib/hiringreq.php` diff stat, `214932c` → `2682177` | **30 added, 0 removed** |
+| Diff hunks | one — a single insertion after `hreq_list()` |
+| `hreq_list`, `hreq_get`, `hreq_save`, `hreq_submit`, `hreq_cancel`, `hreq_scope_gate`, `hreq_can_view` | **byte-identical** (per-function checksum, both commits) |
+| Callers of `hreq_search()` | exactly one — `lib/search.php` |
+| `test_m4_correction.php` | 107 / 107 |
+
+No route, dispatcher, approval path, migration or scope gate was touched. The
+hiring-request register behaves exactly as it did before B8; the only new
+capability is that global search can ask the layer a read-only question.
+
+---
+
+## Test data
+
+Three probe user accounts (`b8probe_*`) were created in the throwaway `rqv_ui`
+UI-test workspace to exercise office scoping and the role matrix, and **deleted**
+after the final run (verified: 0 rows). No business data was created, altered or
+removed. No schema change, no migration.
