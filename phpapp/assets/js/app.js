@@ -1595,13 +1595,46 @@
   // — so nothing scrolls sideways and every value keeps its name. Entry grids
   // (tables that contain a field) are left alone, and with JavaScript off the
   // table simply falls back to the old scroll-in-a-box.
+  //  How many DIFFERENT columns of this table hold an editable field?
+  //   0 — a plain data table
+  //   1 — a register with one action column (status picker, note box, tick box)
+  //   2+ — a grid people type across, which must keep its columns side by side
+  //  Stops counting at two: the caller only cares whether it is more than one,
+  //  and the availability board is 80 rows deep.
+  function fieldColumnCount(t) {
+    var SEL = 'input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea';
+    var seen = {}, n = 0;
+    for (var r = 0; r < t.rows.length; r++) {
+      var cells = t.rows[r].cells;
+      for (var i = 0; i < cells.length; i++) {
+        if (seen[i]) continue;
+        if (cells[i].querySelector(SEL)) { seen[i] = 1; if (++n > 1) return n; }
+      }
+    }
+    return n;
+  }
+
   function initResponsiveTables() {
     var tables = document.querySelectorAll('table.grid, table.dt, table.tbl');
     Array.prototype.forEach.call(tables, function (t) {
       if (t.dataset.rtReady) return;
       // An entry grid (has editable fields) is left alone; a data table with an
       // inline action form (only hidden inputs + a submit button) is fine to card.
-      if (t.querySelector('input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea')) return;
+      //
+      //  B7 — that sentence is the rule, but the old test did not implement it:
+      //  it skipped ANY table holding ANY field. That took four registers out of
+      //  the card layout and left them scrolling sideways inside their own box,
+      //  with no hint that more columns existed — the availability board showed
+      //  a bare list of names with the status and the Set-status control off
+      //  screen; the report-review screen could not show WHY a report came back;
+      //  contract openings hid the stage; and the to-bill list hid the value.
+      //  Each of those is a register carrying ONE control per row, which is
+      //  exactly the "inline action form" case the sentence says to card.
+      //
+      //  So ask the question the sentence actually asks: do people type ACROSS
+      //  the row, or is there a single column of controls? Fields spread over
+      //  two or more columns is a real entry grid and stays a table.
+      if (fieldColumnCount(t) > 1) return;
       var head = t.querySelector('thead tr');
       if (!head) { for (var i = 0; i < t.rows.length; i++) { if (t.rows[i].querySelector('th')) { head = t.rows[i]; break; } } }
       if (!head) return;
