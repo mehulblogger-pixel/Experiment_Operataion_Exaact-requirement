@@ -18,7 +18,7 @@
 <div class="master-head">
   <div>
     <h1>My Work</h1>
-    <p class="sub" style="margin:2px 0 0"><?= $name ? 'Everything waiting on ' . e($name) . ' right now.' : 'Everything waiting on you right now.' ?></p>
+    <p class="sub" style="margin:2px 0 0"><?= $userName ? 'Everything waiting on ' . e($userName) . ' right now.' : 'Everything waiting on you right now.' ?></p>
   </div>
 </div>
 

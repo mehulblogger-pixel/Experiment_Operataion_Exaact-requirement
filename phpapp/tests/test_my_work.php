@@ -63,21 +63,44 @@ try {
 }
 
 // ---- View: lanes render; empty state renders; a report label stays intact ----
-$renderMyWork = function ($vars) {
-    return (function () use ($vars) { extract($vars); ob_start(); include __DIR__ . '/../views/ops/my_work.php'; return ob_get_clean(); })();
+//
+// These used to render the template through a LOCAL copy of view()'s
+// extract-and-include. That imitation is why the /my-work rendering defect went
+// unnoticed for four weeks: it has no $name parameter of its own, so it could
+// never reproduce the collision that broke the real renderer. Everything below
+// now goes through the PRODUCTION view(), in a separate process so that another
+// test file's stub view() can never stand in for it.
+// See docs/phase7/MY-WORK-DEFECT-FIX.md and tests/_my_work_view_worker.php.
+$__root = dirname(__DIR__);
+$__env  = ($GLOBALS['__test_engine'] ?? 'sqlite') === 'sqlite'
+    ? 'DB_DRIVER=sqlite SQLITE_PATH=' . escapeshellarg((string) getenv('SQLITE_PATH'))
+    : 'DB_DRIVER=mysql DB_HOST=' . escapeshellarg((string) getenv('DB_HOST'))
+      . ' DB_NAME=' . escapeshellarg((string) getenv('DB_NAME'))
+      . ' DB_USER=' . escapeshellarg((string) getenv('DB_USER'))
+      . ' DB_PASS=' . escapeshellarg((string) getenv('DB_PASS'));
+$renderMyWork = function ($vars) use ($__root, $__env) {
+    $cmd = $__env . ' php ' . escapeshellarg($__root . '/tests/_my_work_view_worker.php')
+         . ' vars ' . escapeshellarg(json_encode($vars)) . ' 2>&1';
+    $raw = (string) shell_exec($cmd);
+    foreach (array_reverse(explode("\n", trim($raw))) as $line) {
+        $d = json_decode(trim($line), true);
+        if (is_array($d)) return (string) ($d['html'] ?? '');
+    }
+    return 'WORKER FAILED: ' . substr($raw, 0, 300);
 };
 $full = $renderMyWork([
     'lanes' => ['reports' => [['icon'=>'↩','n'=>2,'label'=>'returned for correction','sub'=>'reports a reviewer sent back','href'=>'/documents?mine=returned','tone'=>'bad','lane'=>'reports']],
                 'do' => [['icon'=>'✔','n'=>3,'label'=>'reports to approve','sub'=>'awaiting your approval','href'=>'/documents?mine=approve','tone'=>'info','lane'=>'do']]],
-    'total' => 2, 'isInspector' => true, 'inspectorUnlinked' => false, 'name' => 'Ravi',
+    'total' => 2, 'isInspector' => true, 'inspectorUnlinked' => false, 'userName' => 'Ravi', 'actions' => [],
 ]);
 t_ok(strpos($full, 'My reports') !== false && strpos($full, 'returned for correction') !== false, 'the My Work view groups tasks into lanes with their cards');
 t_ok(strpos($full, '/documents?mine=returned') !== false, 'a card links to the screen that handles it');
+t_ok(strpos($full, '<h1>My Work</h1>') !== false, 'the production renderer serves the My Work screen itself');
 
-$empty = $renderMyWork(['lanes' => [], 'total' => 0, 'isInspector' => true, 'inspectorUnlinked' => false, 'name' => 'Ravi']);
+$empty = $renderMyWork(['lanes' => [], 'total' => 0, 'isInspector' => true, 'inspectorUnlinked' => false, 'userName' => 'Ravi', 'actions' => []]);
 t_ok(strpos($empty, 'all caught up') !== false, 'the empty state shows a caught-up message, not a blank page');
 
-$unlinked = $renderMyWork(['lanes' => [], 'total' => 0, 'isInspector' => true, 'inspectorUnlinked' => true, 'name' => 'Ravi']);
+$unlinked = $renderMyWork(['lanes' => [], 'total' => 0, 'isInspector' => true, 'inspectorUnlinked' => true, 'userName' => 'Ravi', 'actions' => []]);
 t_ok(strpos($unlinked, 'not linked to an inspector record') !== false, 'an unlinked inspector gets a gentle notice, not a fatal');
 
 // No new permission was invented for this module.

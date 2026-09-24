@@ -8155,7 +8155,9 @@ function ops_my_work() {
         'actions'           => function_exists('action_centre') ? action_centre(10) : [],  // §19 — prioritised do-next list
         'isInspector'       => function_exists('is_field_inspector') && is_field_inspector(),
         'inspectorUnlinked' => function_exists('is_field_inspector') && is_field_inspector() && !my_inspector_id(),
-        'name'              => function_exists('user_name') ? user_name($u) : '',
+        // NB: never call this key 'name' — view() extract()s these vars over its own
+        // $name parameter, which is the view identifier. See docs/phase7/MY-WORK-DEFECT-FIX.md.
+        'userName'          => function_exists('user_name') ? user_name($u) : '',
     ]);
 }
 

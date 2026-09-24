@@ -745,6 +745,14 @@ $method = $_SERVER['REQUEST_METHOD'];
 $pdo = db();
 
 function view($name, $vars = []) {
+    // The view identifier is captured BEFORE extract(), because extract() writes the
+    // caller's variables into this scope and would otherwise overwrite $name itself.
+    // A caller passing ['name' => 'Zoya Kapoor'] used to make this function look for
+    // views/Zoya Kapoor.php — a 500 for most people, and (because views/admin.php
+    // exists) the wrong page for anyone called "admin". $name is still extracted and
+    // still reaches the template, so callers and templates are unaffected; only the
+    // file this function opens is now immune. See docs/phase7/MY-WORK-DEFECT-FIX.md.
+    $__view = (string)$name;
     extract($vars);
     // Buffered so every POST form on the page can be given its token on the way
     // out — one place, rather than 141 forms each relying on somebody remembering.
@@ -757,14 +765,14 @@ function view($name, $vars = []) {
     // "Failed opening required" — that almost always means a stale or partial
     // deployment (the code asked for a page whose file is not on the server).
     // Show a contained message with a way back instead of taking the app down.
-    $viewFile = __DIR__ . "/views/$name.php";
+    $viewFile = __DIR__ . "/views/$__view.php";
     if (is_file($viewFile)) {
         require $viewFile;
     } else {
         http_response_code(500);
         echo '<div class="panel" style="border-left:4px solid var(--bad)">'
            . '<h2 style="margin-top:0">This screen could not be loaded</h2>'
-           . '<p class="muted">The page <code>' . htmlspecialchars((string)$name, ENT_QUOTES) . '</code> is not available on the server. '
+           . '<p class="muted">The page <code>' . htmlspecialchars($__view, ENT_QUOTES) . '</code> is not available on the server. '
            . 'This usually means the app files are out of date — a full redeploy of the application usually fixes it.</p>'
            . '<p style="margin-bottom:0"><a class="btn" href="/">← Back to dashboard</a></p></div>';
     }

@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '214932c · 2026-09-24 08:42 UTC · 667 files';
+$RELEASE = 'c145a52 · 2026-09-24 11:57 UTC · 667 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
     'cron.php' => ['s'=>23812,'h'=>'9a49ea3b6161e98c'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>117563,'h'=>'170139f0a2cd0ce2'],
+    'index.php' => ['s'=>118188,'h'=>'2af05203c4e75ab6'],
     'lib/access.php' => ['s'=>78677,'h'=>'8857597c97b39418'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
     'lib/activity.php' => ['s'=>43860,'h'=>'f50c2abb6660e12e'],
@@ -171,7 +171,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66367,'h'=>'a72d0b3a6f354b7c'],
-    'lib/ops.php' => ['s'=>675179,'h'=>'a2de8dda0d191534'],
+    'lib/ops.php' => ['s'=>675364,'h'=>'9c0c29ecf462b8a4'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -514,7 +514,7 @@ $EXPECT  = [
     'views/ops/module_locked.php' => ['s'=>2419,'h'=>'82de67be8483b36c'],
     'views/ops/my_approvals.php' => ['s'=>7411,'h'=>'c7d93a57f230b23b'],
     'views/ops/my_jobs.php' => ['s'=>15228,'h'=>'bb2e2bb4879b97c4'],
-    'views/ops/my_work.php' => ['s'=>5894,'h'=>'bd095a0094c135e3'],
+    'views/ops/my_work.php' => ['s'=>5902,'h'=>'6bbb902c6782e932'],
     'views/ops/ncr_detail.php' => ['s'=>9032,'h'=>'827310b0993e1532'],
     'views/ops/ncr_form.php' => ['s'=>4424,'h'=>'4daffe02ea9a8430'],
     'views/ops/ncr_list.php' => ['s'=>2333,'h'=>'90f38b8b7a4abc50'],
