@@ -2482,8 +2482,12 @@ function tosrm_xo_html($xo, $csrf = '') {
 }
 
 function ops_operations_home($method) {
-    ops_require(can('mod.calls.view') || can('mod.jobs.view') || (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()),
-        'You do not have access to Operations.');
+    // B9-4 — a destination in the rail explains the outcome instead of bouncing
+    // the visitor back to the dashboard. The access decision below is unchanged.
+    if (!(can('mod.calls.view') || can('mod.jobs.view') || (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()))) {
+        if (function_exists('ops_access_notice')) return ops_access_notice('Operations', 'This area isn’t available to your role.');
+        ops_require(false, 'You do not have access to Operations.');
+    }
     tosrm_migrate_d();
     $offices = tosrm_office_scope();
     $metrics = tosrm_ops_metrics($offices);

@@ -65,6 +65,10 @@
     <a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">My Voucher</div><div class="ql">Enter km &amp; expenses</div></a>
   </div>
 
+  <?php // B9-2 — the RANKED next actions first, then the unranked counts below.
+        //  Same engine as /my-work (action_centre via dashboard_glance); this
+        //  page does not re-rank anything. ?>
+  <?php $glanceWantMgmt = false; include __DIR__ . '/ops/_glance_strip.php'; ?>
   <?php // What is waiting on ME right now — shown just below the KPI cards. ?>
   <?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
 
@@ -479,18 +483,42 @@
     }
 
     // ---------- role-based ordering ----------
+    // B9-3 — recruitment takes part in this sequence, but its block is built
+    // further down so that its queries (one of which WRITES) keep the exact
+    // execution order they have always had. So the ordered page is buffered with
+    // a one-off slot token where recruitment belongs FOR THIS ROLE, and the real
+    // section is dropped into that slot once it exists. The token is random per
+    // request, so no section's own content can ever collide with it.
+    $recruitSlot = '<!--b9-recruit-' . bin2hex(random_bytes(8)) . '-->';
+    ob_start();
     echo $secKpi;
+    // B9-2 — the RANKED next actions, then the unranked counts. The dashboard
+    // used to show only the counts, while the ranked strip sat on the area homes
+    // and the full ranked queue on /my-work. Same engine, better placement: this
+    // renders dashboard_glance() (action_centre) and re-ranks nothing.
+    $glanceWantMgmt = false;
+    include __DIR__ . '/ops/_glance_strip.php';
     // What is waiting on ME right now — shown just below the KPI cards, whatever
     // the role (quotes/contracts/vouchers to approve, reports to vet/approve, …).
     if (function_exists('ops_render_pending_tasks')) echo ops_render_pending_tasks();
     echo $secCompliance;
     echo $secAttention;
-    if ($isExec)          { echo $secExec; echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secSched; }
+    if ($isExec)          { echo $secExec; echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $recruitSlot; echo $secRepAppr; echo $secQuick; echo $secSched; }
     elseif (in_array($role, ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'], true))
-                          { echo $secCrm; echo $secQuick; echo $secMoney; echo $secCharts; }
-    elseif ($moneyFirst)  { echo $secMoney; echo $secCharts; echo $secSched; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secCrm; }
-    elseif ($schedFirst)  { echo $secQuick; echo $secSched; echo $secAvail; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; }
-    else                  { echo $secAvail; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; echo $secSched; }
+                          { echo $secCrm; echo $secQuick; echo $secMoney; echo $secCharts; echo $recruitSlot; }
+    elseif ($moneyFirst)  { echo $secMoney; echo $secCharts; echo $secSched; echo $secAvail; echo $recruitSlot; echo $secRepAppr; echo $secQuick; echo $secCrm; }
+    elseif ($schedFirst)  { echo $secQuick; echo $secSched; echo $secAvail; echo $recruitSlot; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; }
+    else                  { echo $secAvail; echo $recruitSlot; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; echo $secSched; }
+  ?>
+  <?php
+    // B9-3 — recruitment & workforce (placement fees, open manpower
+    // requisitions, agency renewals) used to be echoed AFTER the role-based
+    // ordering, so it came last for every role — including the people who
+    // run hiring. It is now captured like every other section and takes part
+    // in the SAME ordering sequence: no second sort, no numeric priorities,
+    // no universal "recruitment first" rule, and its queries still run in
+    // exactly the order they did before (this only defers the OUTPUT).
+    ob_start();
   ?>
   <?php
     // Recruitment belongs to people who actually run hiring — gate on the hiring
@@ -540,6 +568,11 @@
       <?php endforeach; ?>
     </div>
   <?php endif; ?>
+  <?php $secRecruit = ob_get_clean();
+    // The ordered page was buffered above with a placeholder where recruitment
+    // belongs for this role; drop the section in and emit the page.
+    echo str_replace($recruitSlot, $secRecruit, ob_get_clean());
+  ?>
 <?php endif; ?>
 
 <style>

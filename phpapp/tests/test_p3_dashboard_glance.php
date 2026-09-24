@@ -7,7 +7,14 @@
 t_section('Phase 3 §34 — role-aware dashboard "at a glance" strip');
 
 t_ok(function_exists('dashboard_glance'), 'the glance aggregator exists');
+// B9-2 moved this strip's markup into views/ops/_glance_strip.php so the
+// Dashboard and the Operations home could render the SAME thing (the engine
+// below is unchanged). These assertions are about what the area landing renders,
+// not about which file the markup sits in, so they follow the include.
 $view = file_get_contents(__DIR__ . '/../views/ops/area_home.php');
+t_ok(strpos($view, "include __DIR__ . '/_glance_strip.php'") !== false,
+    'the area landing pulls in the shared glance strip');
+foreach (glob(__DIR__ . '/../views/ops/_glance_strip.php') as $partial) $view .= file_get_contents($partial);
 t_ok(strpos($view, 'dashboard_glance()') !== false, 'the area landing renders the glance strip');
 t_ok(strpos($view, 'Your next actions') !== false, 'the strip shows the personal next-actions band');
 t_ok(strpos($view, '/command-centre') !== false, 'the management pulse links to the Command Centre');

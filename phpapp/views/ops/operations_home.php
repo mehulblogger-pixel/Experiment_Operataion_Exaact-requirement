@@ -82,6 +82,9 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
 
 <div class="op-live"><span class="dot"></span> Live — computed from source records now · <?= e(date('d M Y H:i')) ?><?= $scopeLabel ? ' · ' . e($scopeLabel) : '' ?></div>
 
+<?php // B9-2 — ranked next actions above the unranked counts, from the same
+      //  dashboard_glance()/action_centre engine the area homes already use. ?>
+<?php $glanceWantMgmt = false; include __DIR__ . '/_glance_strip.php'; ?>
 <?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
 
 <div class="op-kpis">
@@ -101,8 +104,14 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
       //  scheduling". Cross-office ones are tagged; their hand-off lives below.
       $pend = $pending ?? []; if ($pend): $today0 = strtotime(date('Y-m-d')); ?>
   <div class="op-sec">Pending scheduling — every <?= e(Tl('call')) ?> awaiting a person <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(<?= count($pend) ?>)</span></div>
-  <div class="card-grid">
-    <?php foreach ($pend as $pc):
+  <?php // B9-1 — this list is deliberately cumulative ("every call awaiting a
+        //  person"), and on a phone each card is ~170px, so 31 of them were
+        //  5,362px of a landing page. The most pressing are shown inline and the
+        //  remainder sit in the same <details class="fold"> B6 uses elsewhere:
+        //  every call is still on this page, still one tap away, still counted
+        //  in the heading above. Nothing is dropped and nothing is re-queried.
+        $pendCap = 8; $pendShown = array_slice($pend, 0, $pendCap); $pendRest = array_slice($pend, $pendCap);
+        $pendCard = function ($pc) use ($today0) {
         $req = (string)$pc['inspection_required_date'];
         $days = $req !== '' ? (int)round((strtotime($req) - $today0) / 86400) : null;
         $cross = !empty($pc['executing_office_id']) && !empty($pc['ibo_office_id'])
@@ -115,8 +124,15 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
         <span style="margin-top:6px"><a class="btn small" href="/job-new?call=<?= (int)$pc['id'] ?>">Allocate</a>
           <a class="btn small secondary" href="/call?id=<?= (int)$pc['id'] ?>">Open</a></span>
       </div>
-    <?php endforeach; ?>
+    <?php }; ?>
+  <div class="card-grid">
+    <?php foreach ($pendShown as $pc) $pendCard($pc); ?>
   </div>
+  <?php if ($pendRest): ?>
+    <details class="fold"><summary>Show the remaining <?= count($pendRest) ?> awaiting a person <span class="sub">of <?= count($pend) ?></span></summary>
+      <div class="card-grid"><?php foreach ($pendRest as $pc) $pendCard($pc); ?></div>
+    </details>
+  <?php endif; ?>
 <?php endif; ?>
 
 <?php // ---- Cross-office calls (contracting ↔ executing) ---------------------

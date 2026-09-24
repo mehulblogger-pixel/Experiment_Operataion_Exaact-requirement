@@ -9035,8 +9035,11 @@ function command_centre() {
 }
 function ops_command_centre($method) {
     // Management surface — the same audience as the operations/financial dashboards.
-    ops_require((function_exists('can') && (can('dash.operations') || can('dash.financial'))) || is_admin_level(),
-                'You cannot open the command centre.');
+    // B9-4 — explain rather than bounce (the decision itself is unchanged).
+    if (!(((function_exists('can') && (can('dash.operations') || can('dash.financial'))) || is_admin_level()))) {
+        if (function_exists('ops_access_notice')) return ops_access_notice('Command Centre', 'This board isn’t available to your role.');
+        ops_require(false, 'You cannot open the command centre.');
+    }
     view('ops/command_centre', command_centre());
     return true;
 }

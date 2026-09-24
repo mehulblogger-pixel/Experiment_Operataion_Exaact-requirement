@@ -401,10 +401,48 @@ function ops_area_routes($area) {
     return $d ? $d['routes'] : [$area];
 }
 
+
+// ---------------------------------------------------------------------------
+//  B9-4 — an access OUTCOME instead of a silent bounce to the dashboard.
+//
+//  ops_require() flashes and redirects to "/", which is right for a deep action
+//  route but wrong for a destination somebody deliberately navigated to: an
+//  inspector tapping "Money" in the rail just reappeared on the home screen.
+//  This renders a short explanation and offers somewhere they CAN go.
+//
+//  It changes no permission and opens no door. It is used only by the home
+//  destinations (the area homes, the Operations home, the Command Centre);
+//  every other ops_require() call site is untouched.
+//
+//  Two outcomes are distinguished, because they are genuinely different and the
+//  application already models the difference:
+//    · the module is not enabled for this workspace  → licence
+//    · the module is on, but this role has nothing in it → role
+//  Neither reveals a permission name, a count, or whether any record exists.
+function ops_access_notice($title, $why) {
+    http_response_code(403);
+    $links = [['href' => '/', 'label' => 'Back to home', 'primary' => 1]];
+    // My Work is open to anyone signed in, so it is always a safe offer.
+    $links[] = ['href' => '/my-work', 'label' => 'My Work'];
+    view('ops/access_notice', ['noticeTitle' => $title, 'noticeWhy' => $why, 'noticeLinks' => $links]);
+    return true;
+}
+
+// The outcome for an area home the viewer cannot open.
+function ops_area_denied($area) {
+    $def   = ops_area_def($area);
+    $title = $def['title'] ?? ucfirst(str_replace('-', ' ', (string)$area));
+    if (function_exists('ops_area_licence_ok') && !ops_area_licence_ok($area)) {
+        return ops_access_notice($title, 'This area is not switched on for your organisation.');
+    }
+    return ops_access_notice($title, 'This area isn’t available to your role.');
+}
+
 // Render an area Home.
 function ops_area_home($area, $method) {
     $def = ops_area_def($area);
-    ops_require($def && ops_area_has($area), 'You do not have access to this area.');
+    // B9-4 — explain rather than bounce. The decision itself is unchanged.
+    if (!$def || !ops_area_has($area)) return ops_area_denied($area);
     view('ops/area_home', ['def' => $def]);
     return true;
 }
