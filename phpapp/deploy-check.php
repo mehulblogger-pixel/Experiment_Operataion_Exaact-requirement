@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'd9604cf · 2026-09-24 05:02 UTC · 667 files';
+$RELEASE = '5b3610b · 2026-09-24 08:20 UTC · 667 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -216,7 +216,7 @@ $EXPECT  = [
     'lib/satisfaction.php' => ['s'=>15924,'h'=>'df9f9a6a9f86fa2c'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
     'lib/schedule.php' => ['s'=>35990,'h'=>'81b963c982b619c8'],
-    'lib/search.php' => ['s'=>26790,'h'=>'504ccabad437c5be'],
+    'lib/search.php' => ['s'=>34307,'h'=>'bd31026009e0390f'],
     'lib/security.php' => ['s'=>38300,'h'=>'59c69d7c557f1016'],
     'lib/seed_connect.php' => ['s'=>22943,'h'=>'06f835c70073b5b5'],
     'lib/seed_costing.php' => ['s'=>7626,'h'=>'d377be1adc35b4da'],
@@ -580,7 +580,7 @@ $EXPECT  = [
     'views/ops/satisfaction_list.php' => ['s'=>3892,'h'=>'55daf8bce1bc6fc9'],
     'views/ops/sbu_pl.php' => ['s'=>12044,'h'=>'99176596c74c73a5'],
     'views/ops/schedule_board.php' => ['s'=>10243,'h'=>'21eb482bb6e01f15'],
-    'views/ops/search.php' => ['s'=>4980,'h'=>'83f6410deba68358'],
+    'views/ops/search.php' => ['s'=>5790,'h'=>'85c5e4d33094db3f'],
     'views/ops/service_formats.php' => ['s'=>3036,'h'=>'ebbdc8d0a4949083'],
     'views/ops/service_scope.php' => ['s'=>8698,'h'=>'0199104c8ce5aefb'],
     'views/ops/settings.php' => ['s'=>69348,'h'=>'307c6d1ea9cf9056'],

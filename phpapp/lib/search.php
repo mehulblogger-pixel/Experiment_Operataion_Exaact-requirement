@@ -384,6 +384,117 @@ function search_sources() {
                 [$l, $l, $l, $l]));
         });
 
+    // ---- Recruitment ---------------------------------------------------------
+    //  B8. Until now the one box could find a customer, an invoice, a report and
+    //  a team member, but not the candidate you are hiring, the requisition you
+    //  are hiring against, or the hiring request that authorised it. Worse than
+    //  a gap: the empty state then said "Nothing matches Ravi Patel in any
+    //  register you can open", about a person the searcher could open from the
+    //  candidate register. It did not fail to find — it asserted absence.
+    //
+    //  These three follow the same shape as every source above: a permission the
+    //  register itself uses, that register's OWN scope clause, and title /
+    //  subtitle / meta / url. What differs is the scoping, and it differs three
+    //  ways — which is why each one is taken from the module rather than copied
+    //  from the source above it.
+
+    //  Candidates. The scope here is the one thing in B8 that cannot be written
+    //  by pattern-matching the other sources. A candidate has NO office of its
+    //  own: rasg_cand_scope() reaches the office THROUGH the requisition
+    //  (requisitions.office_id via c.requisition_id) and adds the recruitment
+    //  SBU clause. Handing the generic office/SBU helper a candidate alias
+    //  instead — the way every neighbouring source is written — would look
+    //  right, parse, run, and scope NOTHING: an office could read another
+    //  office's candidates. Use the module's helper.
+    //
+    //  Identity fields only — the names, the code, the e-mail, the mobile, the
+    //  same set the People source uses for a person. The candidate REGISTER also
+    //  searches cv_keywords and cv_text, and that is right there: reading CVs is
+    //  what that screen is for. It is deliberately NOT repeated here, because in
+    //  a box that searches everything, one word of a résumé would drag in every
+    //  candidate who ever mentioned it and bury the invoice you were after.
+    //
+    //  The full name is matched as well as its parts, because "Arjun Ghosh" is
+    //  what a recruiter types and neither column contains it. `||` is safe on
+    //  both engines here: db.php sets PIPES_AS_CONCAT on every MySQL connection
+    //  precisely so this dialect means the same thing on MariaDB as on SQLite.
+    //  Do not "fix" it to CONCAT() — that would then break SQLite.
+    $add('candidates', THP('candidate'), '🧑‍💼', function_exists('is_coordinator_level') && is_coordinator_level(),
+        function ($q, $n) use ($like) {
+            $l = $like($q);
+            [$sw, $sa] = function_exists('rasg_cand_scope') ? rasg_cand_scope('c') : ['1=1', []];
+            return array_map(fn($r) => [
+                'title'    => trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? '')) ?: ($r['cand_code'] ?: '—'),
+                'subtitle' => trim(($r['designation'] ? (DESIGNATIONS[$r['designation']] ?? $r['designation']) : '')
+                              . ($r['cand_code'] ? ' · ' . $r['cand_code'] : '')),
+                'meta'     => trim(($r['stage'] ?: '') . ($r['req_code'] ? ' · ' . $r['req_code'] : '')
+                              . ($r['proposed_site'] ? ' · ' . $r['proposed_site'] : ''), ' ·'),
+                'url'      => '/candidate?id=' . (int)$r['id'],
+            ], ops_all(
+                "SELECT c.id, c.cand_code, c.first_name, c.last_name, c.designation, c.stage, c.proposed_site,
+                        r.req_code
+                 FROM candidates c LEFT JOIN requisitions r ON r.id = c.requisition_id
+                 WHERE $sw AND (c.first_name LIKE ? OR c.last_name LIKE ? OR c.cand_code LIKE ?
+                                OR c.email LIKE ? OR c.mobile LIKE ?
+                                OR (c.first_name || ' ' || c.last_name) LIKE ?)
+                 ORDER BY c.id DESC LIMIT $n",
+                array_merge($sa, [$l, $l, $l, $l, $l, $l])));
+        });
+
+    //  Recruitment requisitions. Scoped by the module's own helper, which is
+    //  office AND SBU. The label carries its module because "Requirement" is a
+    //  word this product uses twice — a recruitment requisition here, a
+    //  marketplace requirement in Connect — and a tenant may rename either
+    //  through the terminology engine. The entity is NOT renamed; the group
+    //  simply says which kind it is, so the distinction survives whatever the
+    //  tenant calls them. The module word is read from the term's own group,
+    //  not hard-coded.
+    $add('requisitions', (TERM_DEFAULTS['requisition'][2] ?? 'Recruitment') . ' · ' . THP('requisition'), '📋',
+        function_exists('is_coordinator_level') && is_coordinator_level(),
+        function ($q, $n) use ($like) {
+            $l = $like($q);
+            [$sw, $sa] = function_exists('rcc_scope_req') ? rcc_scope_req('r') : ['1=1', []];
+            return array_map(fn($r) => [
+                'title'    => $r['req_code'],
+                'subtitle' => trim(($r['designation'] ? (DESIGNATIONS[$r['designation']] ?? $r['designation']) : '')
+                              . ((int)$r['quantity'] > 1 ? ' · ' . (int)$r['quantity'] . ' positions' : '')),
+                'meta'     => trim(($r['status'] ?: '') . ($r['project_site'] ? ' · ' . $r['project_site'] : ''), ' ·'),
+                'url'      => '/requisition?id=' . (int)$r['id'],
+                'dim'      => in_array((string)$r['status'], ['CLOSED', 'CANCELLED'], true),
+            ], ops_all(
+                "SELECT r.id, r.req_code, r.designation, r.status, r.project_site, r.quantity
+                 FROM requisitions r
+                 WHERE $sw AND (r.req_code LIKE ? OR r.designation LIKE ? OR r.project_site LIKE ?)
+                 ORDER BY r.id DESC LIMIT $n",
+                array_merge($sa, [$l, $l, $l])));
+        });
+
+    //  Hiring requests. A THIRD scoping rule, and the reason each source is
+    //  taken from its own module: hreq_list() scopes by OFFICE ONLY —
+    //  scope_office_clause('office_id'), with no SBU clause. Reusing the
+    //  requisition helper here would have added an SBU restriction the register
+    //  itself does not apply, and quietly hidden requests from people entitled
+    //  to see them. The permission is the register's own hreq_can_view().
+    $add('hiring_requests', THP('hiring_request'), '📨',
+        function_exists('hreq_can_view') && hreq_can_view(),
+        function ($q, $n) use ($like) {
+            $l = $like($q);
+            [$sw, $sa] = function_exists('scope_office_clause') ? scope_office_clause('office_id') : ['1=1', []];
+            return array_map(fn($r) => [
+                'title'    => $r['req_no'],
+                'subtitle' => trim((string)($r['job_title'] ?: ''))
+                              ?: ($r['designation'] ? (DESIGNATIONS[$r['designation']] ?? $r['designation']) : ''),
+                'meta'     => trim(($r['status'] ?: '') . ($r['requested_by_name'] ? ' · ' . $r['requested_by_name'] : ''), ' ·'),
+                'url'      => '/hiring-request?id=' . (int)$r['id'],
+                'dim'      => in_array((string)$r['status'], ['CANCELLED', 'REJECTED'], true),
+            ], ops_all(
+                "SELECT id, req_no, designation, job_title, status, requested_by_name
+                 FROM hiring_requests
+                 WHERE $sw AND (req_no LIKE ? OR designation LIKE ? OR job_title LIKE ?)
+                 ORDER BY id DESC LIMIT $n",
+                array_merge($sa, [$l, $l, $l])));
+        });
+
     $add('equipment', 'Equipment', '📐', can('mod.equipment.view') || is_master_of('equipment'),
         function ($q, $n) use ($like) {
             $l = $like($q);

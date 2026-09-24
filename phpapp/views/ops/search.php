@@ -41,7 +41,17 @@
 
 <?php elseif (!$groups): ?>
   <div class="panel" style="margin-top:16px">
-    <p style="margin:0">Nothing matches <b><?= e($q) ?></b> in any register you can open.</p>
+    <?php //  B8 — say what was SEARCHED, not what exists.
+          //  The old wording made a claim about every register the reader was
+          //  entitled to open, and therefore about the whole database. It was
+          //  wrong whenever a register is not among the search sources: it told
+          //  somebody that a candidate they could open from the candidate
+          //  register did not exist.
+          //  Counting $res['sources'] — the registers this person's
+          //  permissions actually put in front of the query — is both true and
+          //  safe: a source they may not see was never registered, so it is not
+          //  counted and not named, and the message reveals nothing about it. ?>
+    <p style="margin:0">No match for <b><?= e($q) ?></b> in the <?= count($res['sources'] ?? []) ?> register<?= count($res['sources'] ?? []) === 1 ? '' : 's' ?> searched.</p>
     <p class="muted" style="font-size:13px;margin:8px 0 0">Part of a word works — this matches anywhere inside a field, not just the start. If you expected a record from another branch, it is there but outside your scope.</p>
   </div>
 
