@@ -237,3 +237,52 @@ kept. Two faults in this stage's own tooling were found and corrected: a closed
 the next page's measurements.
 
 **ADR-001 remains OPEN.**
+
+## B7 — Mobile lists and tables
+
+**Correction first.** F-A4-3 said "249 of 251 table views scroll sideways on a
+phone" with "any card fallback: 2". Measured at 360/390/412 across a 320-page
+crawl: **0** pages scroll the body sideways, **100** tables were already
+rendered as labelled cards, and 11 pages had an inner scroll. The card engine
+`initResponsiveTables()` has existed since `b963490` (27 Aug), an **ancestor**
+of the commit that added the audit; the audit quoted the `overflow-x:auto`
+fallback and missed the card rules ten lines below it in the same media block.
+Same error class as B6's F-A5-1.
+
+**Changed** — one predicate in `assets/js/app.js`:
+
+```
+- if (t.querySelector('input…, select, textarea')) return;   // any field at all
++ if (fieldColumnCount(t) > 1) return;                        // only a real grid
+```
+
+The engine's own comment already said an entry grid is left alone but "a data
+table with an inline action form is fine to card". The test did not implement
+that sentence, which left four registers scrolling sideways with no hint more
+columns existed — `/availability` hid the status **and** the Set-status control,
+`/report-reviews` hid why a report came back, `/contract-openings` hid the
+stage, `/to-bill` hid the value. `fieldColumnCount()` counts distinct columns
+holding a field, not fields, and stops at two.
+
+**Result:** tables carded **100 → 134**; inner-scroll pages **11 → 6**, all six
+the same `/call` status-history table, which is headerless and correctly
+excluded by a different guard. Body overflow 0 and JS errors 0 at all three
+widths. Desktop verified unchanged by computed style, not by class name.
+
+**Not changed** — no new component (B7 did not need the one it was permitted),
+no engine, query, markup, route, permission or tenant scope. Every rule involved
+is inside `@media (max-width:640px)`.
+
+**Evidence** — 23 PHP assertions, 45 browser assertions, 5/5 mutations caught,
+SQLite **13,936/0**, MariaDB **13,936/0**.
+
+**Two weaknesses found in B7's own tests and fixed:** the `/companies` pricing
+grid was guarding nothing (it is `class="sc"`, which the engine never looks at),
+and the application contains **no** targeted multi-column entry grid at all — so
+the "must not card a real grid" rule had no live example. A unit section now
+runs the *shipped* `fieldColumnCount()` over purpose-built tables. Separately,
+the wrong guard was being mutated: a table with no `<th>` is stopped by
+`if (!head) return;`, now pinned as C1b.
+
+**Deferred:** `/availability` is now an 80-row card list; pagination is out of
+B7 scope (§15) and remains a product decision.
