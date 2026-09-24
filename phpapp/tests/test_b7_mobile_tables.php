@@ -65,7 +65,14 @@ t_ok(preg_match('/function fieldColumnCount[\s\S]{0,700}?if \(\+\+n > 1\) return
 //  (<tbody> only — timestamp, transition, actor), so there are no headings to
 //  label its cells with. Carding it would print values with no names.
 t_ok(strpos($b7js, "var head = t.querySelector('thead tr');") !== false,
-     'C1 · a table with no header row is still left alone');
+     'C1 · the engine still looks for a header row');
+//  THIS is the guard that keeps the /call status history a table — it has no
+//  <th> at all, so the search above finds nothing and the engine stops here.
+//  The application contains no targeted table with fields in two columns, so
+//  the threshold below has no live example either; both are pinned in source
+//  because a browser test cannot demonstrate what the product does not contain.
+t_ok(strpos($b7js, 'if (!head) return;') !== false,
+     'C1b · …and stops when there is none (what excludes the status history)');
 t_ok(strpos($b7js, '// headerless layout table — leave it') !== false,
      'C2 · …and so is one whose header cells are all empty');
 t_ok(strpos($b7js, "querySelectorAll('table.grid, table.dt, table.tbl')") !== false,
