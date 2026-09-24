@@ -475,11 +475,15 @@ function search_sources() {
     //  requisition helper here would have added an SBU restriction the register
     //  itself does not apply, and quietly hidden requests from people entitled
     //  to see them. The permission is the register's own hreq_can_view().
+    //  The query itself lives in lib/hiringreq.php, not here. That layer owns the
+    //  table — test_m4_correction.php asserts no other file reads or writes it —
+    //  and the boundary is deliberate: one door onto a record that carries an
+    //  approval decision. So search asks the layer, exactly as it asks
+    //  recruitment for the candidate and requisition scope helpers above.
     $add('hiring_requests', THP('hiring_request'), '📨',
         function_exists('hreq_can_view') && hreq_can_view(),
         function ($q, $n) use ($like) {
             $l = $like($q);
-            [$sw, $sa] = function_exists('scope_office_clause') ? scope_office_clause('office_id') : ['1=1', []];
             return array_map(fn($r) => [
                 'title'    => $r['req_no'],
                 'subtitle' => trim((string)($r['job_title'] ?: ''))
@@ -487,12 +491,7 @@ function search_sources() {
                 'meta'     => trim(($r['status'] ?: '') . ($r['requested_by_name'] ? ' · ' . $r['requested_by_name'] : ''), ' ·'),
                 'url'      => '/hiring-request?id=' . (int)$r['id'],
                 'dim'      => in_array((string)$r['status'], ['CANCELLED', 'REJECTED'], true),
-            ], ops_all(
-                "SELECT id, req_no, designation, job_title, status, requested_by_name
-                 FROM hiring_requests
-                 WHERE $sw AND (req_no LIKE ? OR designation LIKE ? OR job_title LIKE ?)
-                 ORDER BY id DESC LIMIT $n",
-                array_merge($sa, [$l, $l, $l])));
+            ], function_exists('hreq_search') ? hreq_search($l, $n) : []);
         });
 
     $add('equipment', 'Equipment', '📐', can('mod.equipment.view') || is_master_of('equipment'),

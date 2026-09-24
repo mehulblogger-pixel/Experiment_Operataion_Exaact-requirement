@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '5b3610b · 2026-09-24 08:20 UTC · 667 files';
+$RELEASE = '214932c · 2026-09-24 08:42 UTC · 667 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -133,7 +133,7 @@ $EXPECT  = [
     'lib/formdesign.php' => ['s'=>70278,'h'=>'82250b1cc55e3402'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
     'lib/helpers.php' => ['s'=>22586,'h'=>'20c14bf04d17d018'],
-    'lib/hiringreq.php' => ['s'=>71416,'h'=>'eb57227e0fbf12a2'],
+    'lib/hiringreq.php' => ['s'=>72971,'h'=>'bad25e23747d5ddf'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
     'lib/idems.php' => ['s'=>786409,'h'=>'3d46d6301e9ec8e5'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
@@ -216,7 +216,7 @@ $EXPECT  = [
     'lib/satisfaction.php' => ['s'=>15924,'h'=>'df9f9a6a9f86fa2c'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
     'lib/schedule.php' => ['s'=>35990,'h'=>'81b963c982b619c8'],
-    'lib/search.php' => ['s'=>34307,'h'=>'bd31026009e0390f'],
+    'lib/search.php' => ['s'=>34331,'h'=>'3358f1a7be1c8b45'],
     'lib/security.php' => ['s'=>38300,'h'=>'59c69d7c557f1016'],
     'lib/seed_connect.php' => ['s'=>22943,'h'=>'06f835c70073b5b5'],
     'lib/seed_costing.php' => ['s'=>7626,'h'=>'d377be1adc35b4da'],

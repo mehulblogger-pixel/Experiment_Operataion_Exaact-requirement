@@ -1152,6 +1152,36 @@ function hreq_list($status = '') {
     try { return ops_all($sql, $a); } catch (Throwable $e) { return []; }
 }
 
+//  B8 — the one query global search needs, kept HERE because this layer owns
+//  the table. test_m4_correction.php asserts that no file but this one reads or
+//  writes hiring_requests, and that boundary is deliberate: it is what stops a
+//  second door opening onto a record that carries an approval decision. Search
+//  therefore asks the layer instead of reaching past it — the same way it asks
+//  recruitment for rasg_cand_scope() and rcc_scope_req().
+//
+//  Scope and permission are the register's own. hreq_list() scopes by OFFICE
+//  ONLY — no SBU clause — and this must match it exactly; adding an SBU
+//  restriction here would hide requests from people the register shows them to.
+//  The caller checks hreq_can_view(); this refuses anyway, so the function is
+//  safe wherever it is called from.
+function hreq_search($like, $limit = 6) {
+    if (!hreq_can_view()) return [];
+    hreq_migrate();
+    $w = []; $a = [];
+    if (function_exists('scope_office_clause')) {
+        [$sw, $sa] = scope_office_clause('office_id');
+        if ($sw && $sw !== '1=1') { $w[] = $sw; $a = array_merge($a, $sa); }
+    }
+    $w[] = '(req_no LIKE ? OR designation LIKE ? OR job_title LIKE ?)';
+    array_push($a, $like, $like, $like);
+    $n = max(1, (int) $limit);
+    try {
+        return ops_all("SELECT id, req_no, designation, job_title, status, requested_by_name
+                        FROM hiring_requests WHERE " . implode(' AND ', $w) . "
+                        ORDER BY id DESC LIMIT $n", $a);
+    } catch (Throwable $e) { return []; }
+}
+
 // ---- Routes ---------------------------------------------------------------
 //  One dispatcher, one door. Scope first, then permission, exactly as every
 //  other register in the application does — no second access-control mechanism.

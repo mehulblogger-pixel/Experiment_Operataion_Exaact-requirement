@@ -79,17 +79,14 @@ t_ok(strpos($b7js, "querySelectorAll('table.grid, table.dt, table.tbl')") !== fa
      'C3 · the set of tables considered did not widen');
 
 // ---- D · nothing outside presentation moved -------------------------------
-//  B7 is a presentation change. If it ever touches a query, a route, a
-//  permission or a tenant scope, that is a different stage.
-$b7git = trim((string) @shell_exec('cd ' . escapeshellarg(__DIR__ . '/..') . ' && git diff --name-only HEAD~1 2>/dev/null'));
-if ($b7git !== '') {
-    foreach (explode("\n", $b7git) as $b7f) {
-        $b7f = trim($b7f);
-        if ($b7f === '' || strpos($b7f, 'docs/') === 0 || strpos($b7f, 'phpapp/tests/') === 0) continue;
-        $b7ok = in_array($b7f, ['phpapp/assets/js/app.js', 'phpapp/assets/css/app.css', 'phpapp/deploy-check.php'], true);
-        t_ok($b7ok, "D1 · only presentation files changed — saw \"$b7f\"");
-    }
-}
+//  B7 is a presentation change. The assertion that used to stand here diffed
+//  against HEAD~1 and demanded that only presentation files had changed. That
+//  was wrong the moment it was written: HEAD~1 is whatever the PREVIOUS commit
+//  happens to be, so the check does not describe B7 at all — it describes
+//  whoever commits next, and it duly failed on B8 for touching lib/search.php,
+//  which B8 was authorised to touch. A test that fails on unrelated future work
+//  teaches people to ignore it. What B7 actually needs guarding is B7's own
+//  behaviour, and sections A-C and G above do that without reference to git.
 //  Belt and braces: the engine must not have grown a data path.
 foreach (['fetch(', 'XMLHttpRequest', 'ops_all', 'SELECT '] as $b7q)
     t_ok(preg_match('/function initResponsiveTables[\s\S]{0,2600}?' . preg_quote($b7q, '/') . '/', $b7js) !== 1,

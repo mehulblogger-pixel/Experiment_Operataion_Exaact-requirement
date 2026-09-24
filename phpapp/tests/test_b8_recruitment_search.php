@@ -55,13 +55,26 @@ t_ok(strpos($b8src, "scope_clause('c.office_id'") === false,
      'C2 · candidates do NOT use a direct office/sbu clause — that would scope nothing');
 t_ok(strpos($b8src, "rcc_scope_req('r')") !== false,
      'C3 · requisitions use their own office AND sbu helper');
-t_ok(preg_match("/hiring_requests[\s\S]{0,900}?scope_office_clause\('office_id'\)/", $b8src) === 1,
-     'C4 · hiring requests scope by office ONLY, as their own register does');
-//  …and the hiring-request source must NOT have been given an sbu restriction
-//  its own register does not apply, which would hide requests from people
-//  entitled to see them.
-t_ok(preg_match("/\\\$add\('hiring_requests'[\s\S]{0,900}?rcc_scope_req/", $b8src) !== 1,
-     'C5 · …and were not given the requisition helper by mistake');
+//  Hiring requests are the one source whose QUERY does not live in search.php.
+//  lib/hiringreq.php owns that table — test_m4_correction.php asserts no other
+//  file reads or writes it, so that a record carrying an approval decision has
+//  exactly one door. Search therefore asks the layer. The first version of this
+//  stage put the SQL in search.php and broke that boundary; the regression
+//  caught it, and the fix was to respect the layer rather than widen the rule.
+$b8hr = (string) @file_get_contents(__DIR__ . '/../lib/hiringreq.php');
+t_ok(strpos($b8src, 'hreq_search($l, $n)') !== false,
+     'C4 · the hiring-request source asks the layer that owns the table');
+t_ok(preg_match('/(FROM|INTO|UPDATE|JOIN)\s+hiring_requests\b/i', $b8src) !== 1,
+     'C4b · …and search.php itself issues no SQL against that table');
+t_ok(preg_match("/function hreq_search[\s\S]{0,1200}?scope_office_clause\('office_id'\)/", $b8hr) === 1,
+     'C4c · the layer scopes it by office ONLY, exactly as hreq_list() does');
+//  …and it must NOT have been given an SBU restriction its own register does
+//  not apply, which would hide requests from people entitled to see them.
+t_ok(preg_match("/function hreq_search[\s\S]{0,1200}?(rcc_scope_req|scope_clause\()/", $b8hr) !== 1,
+     'C5 · …and was not given an SBU clause the register never applies');
+//  A caller that forgets the gate must still be refused by the layer.
+t_ok(preg_match('/function hreq_search[\s\S]{0,300}?hreq_can_view\(\)/', $b8hr) === 1,
+     'C5b · …and refuses on its own when the reader may not see hiring requests');
 
 // ---- D · permission gates come from each register -------------------------
 t_ok(preg_match("/\\\$add\('candidates'[^\n]*is_coordinator_level/", $b8src) === 1,

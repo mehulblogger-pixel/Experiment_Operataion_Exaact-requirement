@@ -40,6 +40,8 @@ narrowing, and the existing result layout.
 | File | Change |
 |---|---|
 | `lib/search.php` | three `$add(...)` entries in the existing registry |
+| `lib/hiringreq.php` | `hreq_search()` — the hiring-request query, in the layer that owns the table |
+| `tests/test_b7_mobile_tables.php` | a B7 assertion removed: it diffed against `HEAD~1` and so failed on unrelated later work |
 | `views/ops/search.php` | empty-state wording |
 | `tests/test_b8_recruitment_search.php` | new — 31 assertions |
 | `deploy-check.php` | regenerated |
@@ -86,19 +88,37 @@ application's SQLite dialect means the same thing on MariaDB.
 | Fields | `req_code`, `designation`, `project_site` — the register's own three |
 | Destination | `/requisition?id=` |
 
-### Hiring requests
+### Hiring requests — the query lives in the layer, not in search
 
 | | |
 |---|---|
-| Permission | `hreq_can_view()` — the register's own gate |
+| Permission | `hreq_can_view()`, checked by the source **and** again inside the layer |
 | **Scope** | **`scope_office_clause('office_id')` — office ONLY, no SBU** |
 | Fields | `req_no`, `designation`, `job_title` |
 | Destination | `/hiring-request?id=` |
+| Query | **`hreq_search()` in `lib/hiringreq.php`** — search asks the layer |
 
 The brief was right to require this be verified rather than assumed. `hreq_list()`
 scopes by office alone. Reusing the requisition helper would have added an SBU
 restriction the register itself does not apply, hiding requests from people
-entitled to see them. `C5` pins that it was not.
+entitled to see them. `C4c` and `C5` pin that it was not.
+
+**And the first version of this stage got the location wrong.** The SQL went
+into `lib/search.php`, which broke an M4 invariant the full regression caught on
+both engines:
+
+> `D · no file outside the layer reads or writes hiring_requests`
+
+`lib/hiringreq.php` owns that table so that a record carrying an approval
+decision has exactly one door. The fix was **not** to add `search.php` to an
+allowlist — it was to respect the boundary. `hreq_search()` now lives in the
+owning layer, applies that register's own scope, and refuses on its own via
+`hreq_can_view()` so it is safe wherever it is called from. Search asks the
+layer, exactly as the candidate and requisition sources ask recruitment for
+`rasg_cand_scope()` and `rcc_scope_req()`.
+
+Mutations **M10** (put the SQL back in `search.php`) and **M5** (strip the gate
+from both places) now guard it.
 
 **Three sources, three different scoping rules, none interchangeable.**
 
@@ -182,7 +202,7 @@ sixteen before them.
 
 ---
 
-## Mutation results — 8 of 8 caught
+## Mutation results — 10 of 10 caught
 
 | # | Defect | Caught by |
 |---|---|---|
@@ -194,6 +214,8 @@ sixteen before them.
 | M6 | Requisition gate removed | D2 |
 | M7 | Candidate scope removed entirely | browser S3, S4 |
 | M8 | Misleading universal empty state restored | G1, G2 |
+| M9 | Layer given an SBU clause its register never applies | C4c, C5 |
+| M10 | Hiring-request SQL moved back into `search.php` | C4, C4b, **and M4's own boundary test** |
 
 M4 and M7 fail in **opposite directions**, which is what makes the pair useful:
 
@@ -203,6 +225,29 @@ M4 and M7 fail in **opposite directions**, which is what makes the pair useful:
   they must not see.
 
 One helper, two ways to be wrong, both covered.
+
+---
+
+## What the regression caught, and one broken mutation
+
+**The full regression earned its place twice over.**
+
+1. **A real architectural violation by this stage** — the hiring-request SQL in
+   `search.php`, described above. Caught on both engines by a test written for
+   M4 months earlier.
+2. **A badly scoped assertion written during B7** — `test_b7_mobile_tables.php`
+   diffed against `HEAD~1` and demanded that only presentation files had
+   changed. That does not describe B7; it describes whoever commits next, and it
+   failed on B8 for touching a file B8 was authorised to touch. Removed, with
+   the reasoning left in the file. A test that fails on unrelated future work
+   teaches people to ignore it.
+
+**One mutation appeared to survive and did not.** M9 targets the office-only
+scope inside `hreq_search()`. The line it replaces appears **twice** in
+`hiringreq.php`, and a first-occurrence replace hit the copy in `hreq_list()` —
+`hreq_search()` was never mutated at all. Re-run so the mutation lands where it
+was aimed, it is caught by `C4c` and `C5`. The test was never weak; the mutation
+was.
 
 ---
 
