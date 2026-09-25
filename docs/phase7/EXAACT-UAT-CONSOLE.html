@@ -1,0 +1,734 @@
+<title>EXAACT UAT Console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  --paper:#f5f7f8; --card:#ffffff; --ink:#101922; --ink-2:#2b3946;
+  --steel:#63727f; --steel-2:#8b98a3; --rule:#dde3e7; --rule-2:#eaeef1;
+  --accent:#0d6f92; --accent-ink:#08536e; --accent-wash:#e8f2f6;
+  --pass:#1c7a4b; --pass-wash:#e6f2ec;
+  --fail:#b02a1f; --fail-wash:#fbeae8;
+  --block:#9a6a00; --block-wash:#fbf2e0;
+  --skip:#63727f; --skip-wash:#eef1f3;
+  --shadow:0 1px 2px rgba(16,25,34,.06),0 1px 10px rgba(16,25,34,.04);
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+  --disp:"Archivo","IBM Plex Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --paper:#0c131a; --card:#141e27; --ink:#e8eef2; --ink-2:#c2ced7;
+  --steel:#94a3ae; --steel-2:#6d7d89; --rule:#25323d; --rule-2:#1c2834;
+  --accent:#4bb4d8; --accent-ink:#8fd4ec; --accent-wash:#14303c;
+  --pass:#5cc48c; --pass-wash:#122b20;
+  --fail:#f08b80; --fail-wash:#331916;
+  --block:#dcae4e; --block-wash:#2e2415;
+  --skip:#94a3ae; --skip-wash:#1b2731;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 1px 12px rgba(0,0,0,.25);
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#0c131a; --card:#141e27; --ink:#e8eef2; --ink-2:#c2ced7;
+  --steel:#94a3ae; --steel-2:#6d7d89; --rule:#25323d; --rule-2:#1c2834;
+  --accent:#4bb4d8; --accent-ink:#8fd4ec; --accent-wash:#14303c;
+  --pass:#5cc48c; --pass-wash:#122b20;
+  --fail:#f08b80; --fail-wash:#331916;
+  --block:#dcae4e; --block-wash:#2e2415;
+  --skip:#94a3ae; --skip-wash:#1b2731;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 1px 12px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-text-size-adjust:100%}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:0 64px}
+h1,h2,h3,h4{font-family:var(--disp);text-wrap:balance;margin:0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---- masthead ---- */
+.mast{background:var(--card);border-bottom:1px solid var(--rule)}
+.mast-in{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:18px 16px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand h1{font-size:23px;font-weight:700;letter-spacing:-.01em}
+.brand .ver{font-family:var(--mono);font-size:11.5px;color:var(--steel);border:1px solid var(--rule);border-radius:3px;padding:1px 6px}
+.site{margin-top:5px;font-size:13px;color:var(--steel)}
+.site b{color:var(--ink-2);font-weight:500}
+
+/* ---- sticky status ---- */
+.status{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;background:var(--card);border-bottom:1px solid var(--rule);box-shadow:var(--shadow)}
+.status-in{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.tally{display:flex;align-items:baseline;gap:7px}
+.tally .big{font-family:var(--mono);font-weight:600;font-size:21px;letter-spacing:-.02em}
+.tally .of{font-size:12.5px;color:var(--steel)}
+.bar{flex:1 1 220px;min-width:160px;height:9px;border-radius:5px;background:var(--rule-2);display:flex;overflow:hidden;border:1px solid var(--rule)}
+.bar i{display:block;height:100%;transition:width .25s ease}
+.bar .p{background:var(--pass)} .bar .f{background:var(--fail)}
+.bar .b{background:var(--block)} .bar .s{background:var(--steel-2)}
+.verdict{font-family:var(--disp);font-weight:700;font-size:12px;letter-spacing:.07em;text-transform:uppercase;padding:6px 11px;border-radius:4px;border:1.5px solid;white-space:nowrap}
+.v-no{color:var(--fail);border-color:var(--fail);background:var(--fail-wash)}
+.v-wait{color:var(--block);border-color:var(--block);background:var(--block-wash)}
+.v-go{color:var(--pass);border-color:var(--pass);background:var(--pass-wash)}
+.savenote{font-size:11.5px;color:var(--steel);font-family:var(--mono)}
+
+/* ---- panels ---- */
+.panel{background:var(--card);border:1px solid var(--rule);border-radius:9px;box-shadow:var(--shadow);margin-top:20px;overflow:hidden}
+.panel>summary,.panel-h{padding:13px 16px;border-bottom:1px solid var(--rule-2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.panel>summary{cursor:pointer;list-style:none}
+.panel>summary::-webkit-details-marker{display:none}
+.panel>summary::after{content:"+";margin-left:auto;color:var(--steel);font-family:var(--mono);font-size:16px}
+.panel[open]>summary::after{content:"\2212"}
+.panel>summary:hover{background:var(--rule-2)}
+.panel h2,.panel h3{font-size:14.5px;font-weight:600;letter-spacing:.005em}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel)}
+.body{padding:14px 16px}
+.body p{margin:0 0 10px}
+.body p:last-child{margin-bottom:0}
+
+/* ---- safety rules ---- */
+.rules{display:grid;gap:10px}
+.rule{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:start;padding:11px 13px;border-radius:7px;background:var(--block-wash);border:1px solid color-mix(in srgb,var(--block) 28%,transparent)}
+.rule .n{font-family:var(--mono);font-weight:600;font-size:11px;color:var(--block);border:1.5px solid var(--block);border-radius:3px;padding:1px 5px;white-space:nowrap}
+.rule p{margin:0;font-size:13.5px;color:var(--ink-2)}
+.rule b{color:var(--ink)}
+.naming{width:100%;border-collapse:collapse;margin-top:4px;font-size:13px}
+.naming th,.naming td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--rule-2);vertical-align:top}
+.naming th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--steel);font-weight:600}
+.naming code{font-family:var(--mono);font-size:12px;background:var(--accent-wash);color:var(--accent-ink);padding:1px 5px;border-radius:3px}
+
+/* ---- gates ---- */
+.gates{display:grid;gap:1px;background:var(--rule-2)}
+.gate{display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:center;padding:10px 16px;background:var(--card)}
+.gate .gn{font-family:var(--mono);font-size:11px;color:var(--steel);min-width:20px}
+.gate .gt{font-size:13.5px;color:var(--ink-2);line-height:1.4}
+.gate .gt em{display:block;font-style:normal;font-family:var(--mono);font-size:11px;color:var(--steel-2);margin-top:2px}
+.stamp{font-family:var(--disp);font-weight:700;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;padding:3px 8px;border-radius:3px;border:1.5px solid;white-space:nowrap}
+.st-pass{color:var(--pass);border-color:var(--pass);background:var(--pass-wash)}
+.st-fail{color:var(--fail);border-color:var(--fail);background:var(--fail-wash)}
+.st-part{color:var(--block);border-color:var(--block);background:var(--block-wash)}
+.st-none{color:var(--steel);border-color:var(--rule);background:transparent}
+.attest{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2)}
+.attest input{width:17px;height:17px;accent-color:var(--accent)}
+
+/* ---- journey rail ---- */
+.rail{display:flex;gap:7px;overflow-x:auto;padding:14px 16px 4px;margin-inline:-16px;scrollbar-width:thin}
+.rail-wrap{position:sticky;top:calc(env(safe-area-inset-top,0px) + 46px);z-index:30;background:var(--paper);padding-inline:16px;margin-inline:-16px;border-bottom:1px solid var(--rule)}
+.jbtn{flex:0 0 auto;background:var(--card);border:1px solid var(--rule);border-radius:7px;padding:7px 11px;text-align:left;color:var(--ink-2);display:grid;gap:2px;min-width:112px}
+.jbtn:hover{border-color:var(--steel-2)}
+.jbtn[aria-selected="true"]{border-color:var(--accent);background:var(--accent-wash);color:var(--accent-ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.jbtn .jl{font-family:var(--disp);font-weight:600;font-size:12px}
+.jbtn .js{font-family:var(--mono);font-size:10.5px;color:var(--steel);letter-spacing:.02em}
+.jbtn[aria-selected="true"] .js{color:var(--accent-ink)}
+
+/* ---- steps ---- */
+.jhead{margin-top:22px}
+.jhead h2{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.jhead .jsub{color:var(--steel);font-size:13.5px;margin-top:3px}
+.grouphead{font-family:var(--disp);font-weight:600;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--steel);margin:22px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--rule)}
+.step{background:var(--card);border:1px solid var(--rule);border-radius:9px;margin-bottom:9px;box-shadow:var(--shadow);border-left:3px solid var(--rule)}
+.step[data-v="PASS"]{border-left-color:var(--pass)}
+.step[data-v="FAIL"]{border-left-color:var(--fail)}
+.step[data-v="BLOCKED"]{border-left-color:var(--block)}
+.step[data-v="SKIP"]{border-left-color:var(--steel-2)}
+.step-in{padding:12px 14px;display:grid;gap:9px}
+.sid{font-family:var(--mono);font-weight:600;font-size:11.5px;color:var(--accent-ink);background:var(--accent-wash);border-radius:3px;padding:2px 7px;justify-self:start}
+.do{display:grid;gap:5px}
+.doline{display:grid;grid-template-columns:78px 1fr;gap:10px;font-size:14px;align-items:baseline}
+.doline .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--steel);padding-top:2px}
+.doline .val{color:var(--ink)}
+.exp{background:var(--rule-2);border-radius:6px;padding:9px 11px;font-size:13.5px;color:var(--ink-2);border-left:2px solid var(--accent)}
+.exp .k{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--steel);margin-bottom:3px}
+.verdicts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.vb{border:1px solid var(--rule);background:transparent;border-radius:5px;padding:7px 12px;min-height:40px;font-family:var(--disp);font-weight:600;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--steel)}
+.vb:hover{border-color:var(--steel-2);color:var(--ink-2)}
+.vb[aria-pressed="true"].p{color:#fff;background:var(--pass);border-color:var(--pass)}
+.vb[aria-pressed="true"].f{color:#fff;background:var(--fail);border-color:var(--fail)}
+.vb[aria-pressed="true"].b{color:#fff;background:var(--block);border-color:var(--block)}
+.vb[aria-pressed="true"].s{color:#fff;background:var(--steel);border-color:var(--steel)}
+:root[data-theme="dark"] .vb[aria-pressed="true"]{color:#0c131a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .vb[aria-pressed="true"]{color:#0c131a}}
+.nbtn{margin-left:auto;border:0;background:transparent;color:var(--accent);font-size:12.5px;padding:7px 4px;min-height:40px;text-decoration:underline;text-underline-offset:2px}
+.notebox{display:grid;gap:7px}
+.notebox textarea{width:100%;font-family:var(--sans);font-size:13.5px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;min-height:62px;resize:vertical}
+.notebox textarea:focus{border-color:var(--accent);outline:none}
+.failhint{font-size:12.5px;color:var(--fail);display:flex;gap:7px;align-items:flex-start}
+.by{font-family:var(--mono);font-size:10.5px;color:var(--steel-2)}
+
+/* ---- run + export ---- */
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:11px}
+.field{display:grid;gap:4px}
+.field label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--steel)}
+.field input,.field select{font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;min-height:40px;width:100%}
+.field input:focus,.field select:focus{border-color:var(--accent);outline:none}
+.acts{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
+.btn{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px;padding:10px 15px;min-height:44px;font-family:var(--disp);font-weight:600;font-size:13px}
+.btn:hover{background:var(--accent-ink);border-color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--accent);}
+.btn.ghost:hover{background:var(--accent-wash);color:var(--accent-ink)}
+.msg{font-size:12.5px;color:var(--steel);min-height:18px}
+.msg.ok{color:var(--pass)} .msg.err{color:var(--fail)}
+
+/* ---- do-not-press ---- */
+.dnp{display:grid;gap:7px}
+.dnp li{display:grid;grid-template-columns:auto 1fr;gap:10px;font-size:13.5px;color:var(--ink-2);padding:8px 11px;background:var(--fail-wash);border:1px solid color-mix(in srgb,var(--fail) 25%,transparent);border-radius:6px;list-style:none;align-items:baseline}
+.dnp b{font-family:var(--mono);font-size:11.5px;color:var(--fail);white-space:nowrap}
+ul.dnp{padding:0;margin:0}
+
+.foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--steel)}
+.foot code{font-family:var(--mono);font-size:11.5px}
+@media (max-width:560px){
+  .doline{grid-template-columns:1fr;gap:1px}
+  .doline .k{padding-top:0}
+  .gate{grid-template-columns:auto 1fr;}
+  .gate .stamp,.gate .attest{grid-column:2}
+  .nbtn{margin-left:0}
+}
+</style>
+
+<header class="mast">
+  <div class="mast-in">
+    <div class="brand">
+      <h1>EXAACT UAT Console</h1>
+      <span class="ver">v1.0 &middot; built for commit cd96ace</span>
+    </div>
+    <div class="site">Testing <b>operations.mghaiapps.com</b> &mdash; 229 checks across 11 sections. Start with Step&nbsp;0.</div>
+  </div>
+</header>
+
+<div class="status">
+  <div class="status-in">
+    <div class="tally"><span class="big mono" id="tCount">0</span><span class="of">of <span class="mono">229</span> recorded</span></div>
+    <div class="bar" id="tBar" role="img" aria-label="Progress by result"><i class="p" style="width:0"></i><i class="f" style="width:0"></i><i class="b" style="width:0"></i><i class="s" style="width:0"></i></div>
+    <span class="verdict v-wait" id="tVerdict">Not yet tested</span>
+    <button class="btn ghost" id="bNext" style="padding:6px 11px;min-height:36px;font-size:12px">Next unrecorded</button>
+    <span class="savenote" id="tSave">connecting&hellip;</span>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <details class="panel" open>
+    <summary><span class="eyebrow">Read first</span><h2>The four safety rules</h2></summary>
+    <div class="body">
+      <div class="rules">
+        <div class="rule"><span class="n">Rule 1</span><p><b>Never edit or delete a record you did not create.</b> That includes every demo record already on the system.</p></div>
+        <div class="rule"><span class="n">Rule 2</span><p><b>Label everything you create as a test.</b> Put <code>UAT-2026-</code> in front of any reference, and <code>UAT TEST -</code> in front of any person's or company's name.</p></div>
+        <div class="rule"><span class="n">Rule 3</span><p><b>Do not issue real financial or legal documents.</b> Draft them, read them, then stop. See the do-not-press list below.</p></div>
+        <div class="rule"><span class="n">Rule 4</span><p><b>A technical error is always a defect.</b> If you see <code>SQLSTATE</code>, <code>PDOException</code>, <code>Fatal error</code>, or a wall of file names, stop, screenshot it, and mark the step FAIL. A plain-English message is the system working correctly &mdash; that is different.</p></div>
+      </div>
+      <table class="naming">
+        <thead><tr><th>What you create</th><th>Type this in front</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td>A client or vendor company</td><td><code>UAT TEST - </code></td><td>UAT TEST - Northfield Steels</td></tr>
+          <tr><td>A person</td><td><code>UAT TEST - </code></td><td>UAT TEST - Rajesh Kumar</td></tr>
+          <tr><td>A job title or designation</td><td><code>UAT-2026-</code></td><td>UAT-2026-Welding Inspector</td></tr>
+          <tr><td>A project or site reference</td><td><code>UAT-2026-</code></td><td>UAT-2026-PIPE-01</td></tr>
+          <tr><td>A purchase-order reference</td><td><code>UAT-2026-</code></td><td>UAT-2026-PO-0001</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:12px;font-size:13px;color:var(--steel)">You will never be asked to run a database command, edit code, change configuration, or open developer tools. If a step seems to need that, you have misread it &mdash; ask before proceeding.</p>
+    </div>
+  </details>
+
+  <section class="panel">
+    <div class="panel-h"><span class="eyebrow">Go / no-go</span><h2>The thirteen controls that must work</h2><span class="stamp st-none" id="gateSummary" style="margin-left:auto">0 of 13 proven</span></div>
+    <div class="gates" id="gates"></div>
+    <div class="body" style="border-top:1px solid var(--rule-2)">
+      <p style="font-size:13px;color:var(--steel);margin:0">These are filled in automatically from the steps that test them. Every one must read <b>PROVEN</b> before anyone signs off. A single FAIL here blocks go-live.</p>
+    </div>
+  </section>
+
+  <details class="panel">
+    <summary><span class="eyebrow">Rule 3</span><h2>Do not press these</h2></summary>
+    <div class="body">
+      <p style="font-size:13.5px;color:var(--ink-2)">Drafting and previewing is safe. These create real documents or assert that real money moved.</p>
+      <ul class="dnp">
+        <li><b>Invoices</b><span>Finalise, issue or send an invoice &mdash; a real financial document, possibly numbered in a legal sequence, possibly e-mailed to the client.</span></li>
+        <li><b>Vouchers</b><span>Mark <b>PAID</b> &mdash; asserts money has actually left the business.</span></li>
+        <li><b>Candidate</b><span>Standard offer letter, appointment letter, confirmation of employment, internship offer, relieving &amp; experience letter &mdash; real employment documents.</span></li>
+        <li><b>Report</b><span>Issue or finalise a report on a <b>real</b> client's work &mdash; a client may rely on it.</span></li>
+        <li><b>Careers page</b><span>Publishing a live job advert &mdash; real people may apply.</span></li>
+        <li><b>Anywhere</b><span>Anything that e-mails or messages an outside party.</span></li>
+      </ul>
+      <p style="margin-top:11px;font-size:13px;color:var(--steel)">The line is: does anyone outside this UAT team receive it, rely on it, or does it assert money moved? If in doubt, do not press it &mdash; ask.</p>
+    </div>
+  </details>
+
+  <div class="rail-wrap"><div class="rail" id="rail" role="tablist" aria-label="Test sections"></div></div>
+
+  <div class="jhead"><h2 id="jTitle">Step 0</h2><div class="jsub" id="jSub"></div></div>
+  <div id="stepList"></div>
+
+  <section class="panel">
+    <div class="panel-h"><span class="eyebrow">For the sign-off sheet</span><h2>Who ran this, and export</h2></div>
+    <div class="body">
+      <div class="fields">
+        <div class="field"><label for="fTester">Tester name</label><input id="fTester" type="text" placeholder="Your name"></div>
+        <div class="field"><label for="fRole">Signed in as (role)</label><input id="fRole" type="text" placeholder="e.g. Coordinator"></div>
+        <div class="field"><label for="fDevice">Device</label><select id="fDevice"><option value="">Choose&hellip;</option><option>Laptop</option><option>Tablet</option><option>Phone</option></select></div>
+        <div class="field"><label for="fBrowser">Browser</label><input id="fBrowser" type="text" placeholder="e.g. Chrome 130"></div>
+        <div class="field"><label for="fRoute">Recruitment routes to keep (item 24)</label><select id="fRoute"><option value="">Not decided yet</option><option>Both routes open</option><option>Approved route only</option></select></div>
+        <div class="field"><label for="fApprover">Report approver / issuer (item 27)</label><input id="fApprover" type="text" placeholder="Approver, then issuer"></div>
+      </div>
+      <div class="acts">
+        <button class="btn" id="bMd">Download the results</button>
+        <button class="btn ghost" id="bCsv">Download as a spreadsheet</button>
+      </div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    Built from <code>docs/phase7/EXAACT-BUSINESS-UAT-END-TO-END-PLAYBOOK.md</code>. Every screen name, button label and quoted message was read from the application running commit <code>cd96ace</code>.
+    <b>Step&nbsp;0 first:</b> if production is running an older version, some screens will differ and this console will report false failures.
+  </div>
+</div>
+
+<div class="wrap" style="padding-block:0"><div class="panel" id="copyPanel" hidden>
+  <div class="panel-h"><span class="eyebrow">Saving files is not available in this view</span><h3>Select and copy your results</h3></div>
+  <div class="body"><textarea id="copyArea" style="width:100%;min-height:220px;font-family:var(--mono);font-size:12px;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:10px" readonly></textarea>
+  <div class="acts"><button class="btn" id="bCopy">Copy to clipboard</button></div></div>
+</div></div>
+<script>window.__UAT__={"steps":[{"key":"step0","label":"Step 0","sub":"Confirm the playbook matches your live site","steps":[{"id":"0.1","group":"Step 0 — Confirm this playbook matches your live site (do this first)","do":[["What to do","Open https://operations.mghaiapps.com in Chrome"]],"expect":"The EXAACT sign-in page"},{"id":"0.2","group":"Step 0 — Confirm this playbook matches your live site (do this first)","do":[["What to do","Sign in with your administrator login"]],"expect":"A page whose heading is \"Good morning/afternoon/evening, \u003cyour name\u003e 👋\""},{"id":"0.3","group":"Step 0 — Confirm this playbook matches your live site (do this first)","do":[["What to do","Look at the left-hand menu strip"]],"expect":"You should see area links including Operations, Sales, Quality & Accreditation, Money, Reporting, Insights, Directory, Admin, Marketplace"},{"id":"0.4","group":"Step 0 — Confirm this playbook matches your live site (do this first)","do":[["What to do","Open Admin from the left strip"]],"expect":"A page headed \"Admin\""}]},{"key":"A","label":"Journey A","sub":"Recruitment, end to end","steps":[{"id":"A1.1","group":"A.1 — Route 1: raise a hiring request","do":[["Screen","Any"],["Click","Left strip → Operations"]],"expect":"Operations home opens"},{"id":"A1.2","group":"A.1 — Route 1: raise a hiring request","do":[["Screen","Operations"],["Click","Press Ctrl+K, type hiring requests, press Enter"]],"expect":"Page headed \"Hiring requests\""},{"id":"A1.3","group":"A.1 — Route 1: raise a hiring request","do":[["Screen","Hiring requests"],["Click","+ New request"]],"expect":"Page headed \"New hiring request\""},{"id":"A1.4","group":"A.1 — Route 1: raise a hiring request","do":[["Click","Create request"]],"expect":"Returns to the hiring request, showing a reference (e.g. TPIA2993-HR) and a status"},{"id":"A2.1","group":"A.2 — Test the control: you cannot approve your own request","do":[["What to do","Still signed in as the person who raised it, try to approve it"]],"expect":"You are refused. There is no approve control available to you, or using one is rejected"},{"id":"A3.1","group":"A.3 — Approve the request (second person)","do":[["Screen","Sign in as the approver (different person)"]],"expect":"Their dashboard"},{"id":"A3.2","group":"A.3 — Approve the request (second person)","do":[["Screen","Press Ctrl+K, type my approvals"],["Click","Enter"]],"expect":"Page headed \"My approvals\""},{"id":"A3.3","group":"A.3 — Approve the request (second person)","do":[["Screen","Find your UAT-2026-Welding Inspector request"],["Click","Open it"]],"expect":"The request detail"},{"id":"A3.4","group":"A.3 — Approve the request (second person)","do":[["Screen","Approve it"]],"expect":"Status becomes Approved"},{"id":"A4.1","group":"A.4 — Turn the approved request into a requisition","do":[["Screen","The approved hiring request"],["Click","The control that raises a requisition from it"]],"expect":"A new requisition is created, carrying the details across"},{"id":"A4.2","group":"A.4 — Turn the approved request into a requisition","do":[],"expect":"The requisition shows a reference like REQ-2607-09 and a status such as \"Open (approved, sourcing)\""},{"id":"A5.1","group":"A.5 — Route 2: raise a requisition directly","do":[["Screen","Press Ctrl+K, type new requisition"],["Click","Enter"]],"expect":"Page headed \"New requisition\""},{"id":"A5.2","group":"A.5 — Route 2: raise a requisition directly","do":[["Click","Save requisition"]],"expect":"Requisition created with its own reference and an open status"},{"id":"A6.1","group":"A.6 — Add candidates","do":[["Screen","The requisition"],["Click","Add candidates →"]],"expect":"Page headed \"Add candidate CV\""},{"id":"A6.2","group":"A.6 — Add candidates","do":[["Click","Add candidate (or Add & select)"]],"expect":"Candidate created, listed against your requisition"},{"id":"A6.3","group":"A.6 — Add candidates","do":[["Click","Repeat for a second candidate UAT TEST - Priya Sharma"]],"expect":"Two candidates against the requisition"},{"id":"A7.1","group":"A.7 — Move a candidate through selection","do":[["Do","Move the candidate to Submitted to client"]],"expect":"Stage changes; the change is recorded in the candidate's history"},{"id":"A7.2","group":"A.7 — Move a candidate through selection","do":[["Do","Move to Shortlisted"]],"expect":"Same"},{"id":"A7.3","group":"A.7 — Move a candidate through selection","do":[["Do","Use Schedule to book an interview (Round, When, Mode, Location / link, Competencies, Panel)"]],"expect":"Interview created"},{"id":"A7.4","group":"A.7 — Move a candidate through selection","do":[["Do","Record the interview outcome"]],"expect":"Recorded"},{"id":"A7.5","group":"A.7 — Move a candidate through selection","do":[["Do","Move to Offer released"]],"expect":"Stage changes"},{"id":"A8.1","group":"A.8 — The distinction that matters most: Accepted is not Joined","do":[["Screen","The candidate"],["Click","Move to Accepted (Hired)"]],"expect":"Heading shows the name and Accepted (Hired)"},{"id":"A8.2","group":"A.8 — The distinction that matters most: Accepted is not Joined","do":[["Screen","Same page"],["Click","Look for Mark as joined"]],"expect":"The control is present, under a question reading \"Have they actually joined? — hired is not the same as started\""},{"id":"A8.3","group":"A.8 — The distinction that matters most: Accepted is not Joined","do":[["Test","Try Mark as joined on a candidate who is *not* Accepted"]],"expect":"*\"Only an accepted (hired) person can be marked as joined.\"*"},{"id":"A8.4","group":"A.8 — The distinction that matters most: Accepted is not Joined","do":[["Test","Try it on an accepted person who has no team record"]],"expect":"*\"This person has no team record yet, so their joining cannot be recorded.\"*"},{"id":"A8.5","group":"A.8 — The distinction that matters most: Accepted is not Joined","do":[["Test","Enter a joining date in the future"]],"expect":"*\"A joining date in the future cannot be recorded — mark them joined on the day they start.\"*"},{"id":"A8.6","group":"A.8 — The distinction that matters most: Accepted is not Joined","do":[["Test","Enter a valid joining date (today or earlier)"]],"expect":"*\"Recorded as joined on YYYY-MM-DD.\"*"},{"id":"A8.7","group":"A.8 — The distinction that matters most: Accepted is not Joined","do":[["Test","Undo the joining"]],"expect":"*\"Joining removed. This person is still recorded as hired.\"*"},{"id":"A9.1","group":"A.9 — Workforce vs Inspector — and the silent-default trap","do":[["Test","On the requisition, check \"Which team\""]],"expect":"It offers the three real options: Field — goes to site, Coordinator / office-based, Back office"},{"id":"A9.2","group":"A.9 — Workforce vs Inspector — and the silent-default trap","do":[["Test","Create a requisition and leave \"Which team\" unset, then take a candidate through to Accepted"]],"expect":"EXAACT must ask you what kind of team member this is. It must not quietly decide \"Field\" for you"},{"id":"A9.3","group":"A.9 — Workforce vs Inspector — and the silent-default trap","do":[["Test","Choose Back office and complete the hire"]],"expect":"The person is workforce, but does not appear as an inspector available for site deployment"},{"id":"A9.4","group":"A.9 — Workforce vs Inspector — and the silent-default trap","do":[["Test","Open the Scheduling board and look for that person"]],"expect":"They must not be offered as someone you can send to site"},{"id":"A10.1","group":"A.10 — Multi-vacancy: one hire must not close a two-person requisition","do":[["Test","Your requisition asked for 2 people. Hire one"]],"expect":"The requisition stays open, showing 1 of 2 filled"},{"id":"A10.2","group":"A.10 — Multi-vacancy: one hire must not close a two-person requisition","do":[["Test","Hire the second"]],"expect":"Now it shows 2 of 2"},{"id":"A11.1","group":"A.11 — Sourcing from more than one place","do":[["Test","Add source, set *How many people* to 1"]],"expect":"A source is recorded against the requisition"},{"id":"A11.2","group":"A.11 — Sourcing from more than one place","do":[["Test","Try to promise more people than the requisition asked for"]],"expect":"Refused, or clearly flagged as over-committed"},{"id":"A12.1","group":"A.12 — Recruitment Command Centre","do":[["Screen","Press Ctrl+K, type recruitment"],["Click","Enter"]],"expect":"Page headed \"Recruitment Command Centre\""}]},{"key":"B","label":"Journey B","sub":"TPIA: work order to money in","steps":[{"id":"B1.1","group":"B.1 — Raise a work order","do":[["Screen","Left strip → Operations"]],"expect":"Operations home, showing Backlog, Schedule register, Assignment register"},{"id":"B1.2","group":"B.1 — Raise a work order","do":[["Screen","Operations"],["Click","＋ New work order"]],"expect":"Page headed \"New work order\""},{"id":"B1.3","group":"B.1 — Raise a work order","do":[["Click","Save work order"]],"expect":"Work order created with its own reference"},{"id":"B3.1","group":"B.3 — Allocate a person (create the job)","do":[["Screen","Operations home → Backlog"],["Click","Find your UAT work order, click Allocate"]],"expect":"The allocation screen"},{"id":"B3.2","group":"B.3 — Allocate a person (create the job)","do":[["Click","Choose a team member and the dates"]],"expect":"—"},{"id":"B3.3","group":"B.3 — Allocate a person (create the job)","do":[["Click","Save"]],"expect":"A Job is created with a reference like JOB-E0136"},{"id":"B3.4","group":"B.3 — Allocate a person (create the job)","do":[["Screen","Press Ctrl+K → scheduling board"]],"expect":"Page headed \"Scheduling board\" with Who is where, Who's free? and Needs a person"},{"id":"B3.5","group":"B.3 — Allocate a person (create the job)","do":[["Screen","Use ‹ Earlier / Today / Later › and the From / To dates"]],"expect":"The board moves through time"},{"id":"B3.6","group":"B.3 — Allocate a person (create the job)","do":[["Screen","Who's free?"]],"expect":"People with no work on those dates"},{"id":"B4.1","group":"B.4 — The inspector does the work","do":[["Screen","Inspector signs in"]],"expect":"Their own short dashboard"},{"id":"B4.2","group":"B.4 — The inspector does the work","do":[["Screen","My Jobs"]],"expect":"Page headed \"My Jobs\", listing the job you just allocated"},{"id":"B4.3","group":"B.4 — The inspector does the work","do":[["Screen","Open the job"]],"expect":"The job detail"},{"id":"B5.1","group":"B.5 — The report: drafted, approved, issued","do":[["Screen","Press Ctrl+K → new report"],["Click","Enter"]],"expect":"Page headed \"New report\""},{"id":"B5.2","group":"B.5 — The report: drafted, approved, issued","do":[["Screen","Start from a work order — everything known is filled in for you"],["Click","Pick your UAT work order, press Load"]],"expect":"The form fills itself in"},{"id":"B5.3","group":"B.5 — The report: drafted, approved, issued","do":[["Click","Generate report"]],"expect":"Report created in status DRAFT"},{"id":"B5.4","group":"B.5 — The report: drafted, approved, issued","do":[["Do","Submit the report"]],"expect":"Moves to VETTING (if vetting is switched on) or UNDER REVIEW"},{"id":"B5.5","group":"B.5 — The report: drafted, approved, issued","do":[["Do","As the reviewer, send it back with a remark"]],"expect":"Returns to DRAFT; a remark is required"},{"id":"B5.6","group":"B.5 — The report: drafted, approved, issued","do":[["Do","Try to send back without a remark"]],"expect":"Refused"},{"id":"B5.7","group":"B.5 — The report: drafted, approved, issued","do":[["Do","Fix and resubmit, then approve"]],"expect":"APPROVED"},{"id":"B5.8","group":"🔒 B5.8 — The segregation-of-duties test (do not skip)","do":[["Test","Signed in as the same person who approved it, try to issue it"]],"expect":"Refused"},{"id":"B5.9","group":"🔒 B5.8 — The segregation-of-duties test (do not skip)","do":[["Test","Sign in as a different authorised person and issue it"]],"expect":"Report becomes ISSUED and is locked"},{"id":"B5.10","group":"🔒 B5.8 — The segregation-of-duties test (do not skip)","do":[["Test","Try to edit an ISSUED report"]],"expect":"Refused — it is locked"},{"id":"B5.11","group":"🔒 B5.8 — The segregation-of-duties test (do not skip)","do":[["Test","Use the revise path instead"]],"expect":"A new draft is created; the issued one stays untouched"},{"id":"B6.1","group":"B.6 — Close the job","do":[["Screen","My Jobs (as the inspector) or the Job register"],["Click","Close job & record expenses"]],"expect":"The close screen"},{"id":"B6.2","group":"B.6 — Close the job","do":[["Screen","Enter Report upload date ⭐ and expenses: Travel (₹), Local conveyance (₹), Food (₹), Lodging (₹), Misc (₹), Expense notes"]],"expect":"—"},{"id":"B6.3","group":"B.6 — Close the job","do":[["Screen","The close screen"],["Click","Upload & Close"]],"expect":"Job closes, with a clear confirmation"},{"id":"B6.4","group":"B.6 — Close the job","do":[["Test","Try to close the same job again"]],"expect":"Refused"},{"id":"B7.1","group":"B.7 — Billing readiness — a check, not a document","do":[["Screen","Left strip → Money → Billing workspace"]],"expect":"Page headed \"Work waiting to be billed\""},{"id":"B7.2","group":"B.7 — Billing readiness — a check, not a document","do":[["Screen","Set Month (by closed date) to this month, press Apply"]],"expect":"Your closed UAT job is listed with an Include JOB-… tick box"},{"id":"B8.1","group":"B.8 — Invoice","do":[["Screen","Billing workspace"],["Click","Tick Include for your UAT job only"]],"expect":"Only your job is ticked"},{"id":"B8.2","group":"B.8 — Invoice","do":[["Click","Draft invoice for the ticked work"]],"expect":"A draft invoice is created"},{"id":"B8.3","group":"B.8 — Invoice","do":[["Screen","Open Money → Invoice tracker (or Invoices)"]],"expect":"Page headed \"Invoices\" with columns Invoice, Customer, Branch, PO / contract, Tax, Settled, Outstanding, Due, Status"},{"id":"B8.4","group":"B.8 — Invoice","do":[["Screen","Find your draft"]],"expect":"It is there, in draft status"},{"id":"B9.1","group":"B.9 — Voucher (the inspector's expenses)","do":[["Screen","Press Ctrl+K → vouchers"],["Click","Enter"]],"expect":"Page headed \"Inspector vouchers\""},{"id":"B9.2","group":"B.9 — Voucher (the inspector's expenses)","do":[["Screen","Open / create for your inspector and this month"]],"expect":"A voucher"},{"id":"B9.3","group":"B.9 — Voucher (the inspector's expenses)","do":[["Screen","Check the expenses you entered at B6.2 are on it"]],"expect":"They are"},{"id":"B9.4","group":"B.9 — Voucher (the inspector's expenses)","do":[["Test","Submit it as the inspector"]],"expect":"SUBMITTED"},{"id":"B9.5","group":"B.9 — Voucher (the inspector's expenses)","do":[["Test","Try to approve it as the same inspector"]],"expect":"Refused"},{"id":"B9.6","group":"B.9 — Voucher (the inspector's expenses)","do":[["Test","Approve as a manager"]],"expect":"APPROVED"},{"id":"B10.1","group":"B.10 — Profit","do":[["Screen","Money → Profit by work order"]],"expect":"Your UAT work order with revenue, cost and margin"},{"id":"B10.2","group":"B.10 — Profit","do":[["Screen","Money → Business Unit profit & loss"]],"expect":"Your test figures included"}]},{"key":"safe","label":"Section 9","sub":"Safe document handling","steps":[{"id":"9.1.1","group":"9.1 — A safe way to test documents anyway","do":[["Test","On your UAT TEST - candidate, press Draft offer"]],"expect":"A draft offer is prepared"},{"id":"9.1.2","group":"9.1 — A safe way to test documents anyway","do":[["Test","Preview the offer letter without sending it"]],"expect":"You can read it"},{"id":"9.1.3","group":"9.1 — A safe way to test documents anyway","do":[["Test","Check it shows the right name, role, salary and dates"]],"expect":"It does"},{"id":"9.1.4","group":"9.1 — A safe way to test documents anyway","do":[["Test","Do not send it"]],"expect":"—"}]},{"key":"C","label":"Journey C","sub":"Marketplace","steps":[{"id":"C1.1","group":"C.1 — The Marketplace area","do":[["Screen","Left strip → Marketplace"]],"expect":"Tiles: Requirements · Guided post · Talent search · Passports · Industry taxonomy · Qualification taxonomy · Verification desk · Rating-integrity desk · Messages · Channels · Agency bench · Market analytics · Organisations · Access requests"},{"id":"C2.1","group":"C.2 — Post a requirement","do":[["Screen","Marketplace"],["Click","Requirements"]],"expect":"The requirements register"},{"id":"C2.2","group":"C.2 — Post a requirement","do":[["Click","Create a new requirement, titled UAT-2026-Marketplace Welding Inspector"]],"expect":"Created in DRAFT"},{"id":"C2.3","group":"C.2 — Post a requirement","do":[["Click","Post it"]],"expect":"Moves to OPEN"},{"id":"C2.4","group":"C.2 — Post a requirement","do":[["Test","From OPEN, move to SHORTLISTING"]],"expect":"Allowed"},{"id":"C2.5","group":"C.2 — Post a requirement","do":[["Test","From SHORTLISTING, go back to OPEN (reopen)"]],"expect":"Allowed"},{"id":"C2.6","group":"C.2 — Post a requirement","do":[["Test","Try to jump straight from DRAFT to AWARDED"]],"expect":"Refused — an illegal move is rejected, not quietly applied"},{"id":"C2.7","group":"C.2 — Post a requirement","do":[["Test","CLOSE it, then try to reopen"]],"expect":"Refused — closed is final"},{"id":"C3.1","group":"C.3 — Applications","do":[["Test","Take an application from APPLIED to SHORTLISTED"]],"expect":"Allowed"},{"id":"C3.2","group":"C.3 — Applications","do":[["Test","Try to jump APPLIED → ACCEPTED directly"]],"expect":"Refused"},{"id":"C3.3","group":"C.3 — Applications","do":[["Test","Award the requirement to a shortlisted applicant"]],"expect":"The requirement becomes AWARDED *and* that application becomes ACCEPTED — both together"},{"id":"C3.4","group":"C.3 — Applications","do":[["Test","Check the other applicants"]],"expect":"Not left stranded in a misleading state"},{"id":"C4.1","group":"C.4 — Talent search and verification","do":[["Screen","Talent search"],["Test","Search for a skill"]],"expect":"Professionals listed with their qualifications"},{"id":"C4.2","group":"C.4 — Talent search and verification","do":[["Screen","Verification desk"],["Test","Open it"]],"expect":"Credentials waiting to be checked"},{"id":"C4.3","group":"C.4 — Talent search and verification","do":[["Test","Confirm an unverified credential is clearly marked as unverified"]],"expect":"It is"},{"id":"C5.1","group":"C.5 — Professional ≠ your workforce","do":[["Test","Take a marketplace professional. Open Operations → Scheduling board"]],"expect":"They are not offered as one of your own people to deploy"},{"id":"C5.2","group":"C.5 — Professional ≠ your workforce","do":[["Test","Open your workforce / team member list"]],"expect":"They are not in it"}]},{"key":"D","label":"Journey D","sub":"Money and billing","steps":[{"id":"D1.1","group":"D.1 — What Finance can and cannot do","do":[["Signed in as Finance, try","Open Money → Invoices"]],"expect":"✅ Opens"},{"id":"D1.2","group":"D.1 — What Finance can and cannot do","do":[["Signed in as Finance, try","Open Money → Billing workspace"]],"expect":"✅ Opens, headed \"Work waiting to be billed\""},{"id":"D1.3","group":"D.1 — What Finance can and cannot do","do":[["Signed in as Finance, try","Open Work orders"]],"expect":"✅ Opens — Finance may *look* at operations"},{"id":"D1.4","group":"D.1 — What Finance can and cannot do","do":[["Signed in as Finance, try","Try to allocate a person to a job"]],"expect":"❌ Refused — you see a page headed \"Allocate a job\" explaining you may not do this"},{"id":"D1.5","group":"D.1 — What Finance can and cannot do","do":[["Signed in as Finance, try","Open My Jobs"]],"expect":"❌ Refused — a page headed \"My jobs\" explaining why"},{"id":"D1.6","group":"D.1 — What Finance can and cannot do","do":[["Signed in as Finance, try","Open Admin"]],"expect":"❌ Refused — *\"This area isn't available to your role.\"*"},{"id":"D1.7","group":"D.1 — What Finance can and cannot do","do":[["Signed in as Finance, try","Open New requisition"]],"expect":"❌ Refused"},{"id":"D2.1","group":"D.2 — The money screens","do":[["Screen","Billable events"]],"expect":"Work that has become billable"},{"id":"D2.2","group":"D.2 — The money screens","do":[["Screen","Invoice tracker"]],"expect":"Invoices and what is outstanding"},{"id":"D2.3","group":"D.2 — The money screens","do":[["Screen","Billing workspace"]],"expect":"Closed work waiting to be billed"},{"id":"D2.4","group":"D.2 — The money screens","do":[["Screen","Revenue reconciliation"]],"expect":"Revenue recorded vs revenue expected"},{"id":"D2.5","group":"D.2 — The money screens","do":[["Screen","Contract number register"]],"expect":"Money tracked against client contract numbers"},{"id":"D2.6","group":"D.2 — The money screens","do":[["Screen","Office costs & overheads"]],"expect":"Costs by office"},{"id":"D2.7","group":"D.2 — The money screens","do":[["Screen","Month-end cost run"]],"expect":"The monthly cost process"},{"id":"D2.8","group":"D.2 — The money screens","do":[["Screen","Cost reconciliation"]],"expect":"Costs that do not agree"},{"id":"D2.9","group":"D.2 — The money screens","do":[["Screen","Reimbursable duplication"]],"expect":"Expenses claimed twice"},{"id":"D2.10","group":"D.2 — The money screens","do":[["Screen","Business Unit profit & loss"]],"expect":"Profit by line of business"},{"id":"D2.11","group":"D.2 — The money screens","do":[["Screen","Profit by work order"]],"expect":"Profit on one job"},{"id":"D3.1","group":"D.3 — Drafting an invoice","do":[["Screen","Billing workspace"],["Click","Set Month (by closed date), Apply"]],"expect":"Your closed UAT job listed"},{"id":"D3.2","group":"D.3 — Drafting an invoice","do":[["Click","Tick Include for your UAT job only"]],"expect":"Only yours ticked"},{"id":"D3.3","group":"D.3 — Drafting an invoice","do":[["Click","Draft invoice for the ticked work"]],"expect":"Draft invoice created"},{"id":"D3.4","group":"D.3 — Drafting an invoice","do":[["Test","Use Draft this project only with your UAT project"]],"expect":"Only your UAT work is on it"},{"id":"D3.5","group":"D.3 — Drafting an invoice","do":[["Test","Open the draft and check the amounts"]],"expect":"They match the job"},{"id":"D4.1","group":"D.4 — Duplicate billing","do":[["Test","Go back to the Billing workspace. Is your job still offered as unbilled?"]],"expect":"It should not be — it is now on a draft invoice"},{"id":"D4.2","group":"D.4 — Duplicate billing","do":[["Test","Try to draft a second invoice for the same job"]],"expect":"Refused, or the job is clearly flagged as already billed"},{"id":"D5.1","group":"D.5 — Reimbursable duplication","do":[["Screen","Reimbursable duplication"],["Test","Open it"]],"expect":"Expenses that look like they were claimed twice"},{"id":"D5.2","group":"D.5 — Reimbursable duplication","do":[["Test","Check whether your UAT voucher expenses appear"]],"expect":"They should not, since you claimed them once"}]},{"key":"E","label":"Journey E","sub":"Dashboards and next actions","steps":[{"id":"E1.1","group":"E.1 — Per-role dashboard test","do":[["Check","The greeting"]],"expect":"\"Good morning/afternoon/evening, \u003cname\u003e 👋\""},{"id":"E1.2","group":"E.1 — Per-role dashboard test","do":[["Check","Is what you see relevant to your job?"]],"expect":"An inspector sees their own work; a finance user sees money; a coordinator sees allocation"},{"id":"E1.3","group":"E.1 — Per-role dashboard test","do":[["Check","Is anything shown that you have no permission to act on?"]],"expect":"Nothing should be"},{"id":"E1.4","group":"E.1 — Per-role dashboard test","do":[["Check","Are the most urgent items at the top?"]],"expect":"Yes"},{"id":"E1.5","group":"E.1 — Per-role dashboard test","do":[["Check","Does every number link somewhere useful?"]],"expect":"Clicking a count opens the list behind it"},{"id":"E2.1","group":"E.2 — My Work","do":[["Screen","Press Ctrl+K → my work"],["Click","Enter"]],"expect":"Page headed \"My Work\""},{"id":"E2.2","group":"E.2 — My Work","do":[],"expect":"Everything waiting on you, across every module, in one place"},{"id":"E3.1","group":"E.3 — Command Centre","do":[["Screen","Press Ctrl+K → command centre"]],"expect":"Page headed \"Command Centre\" — attention, money and health for the whole business"},{"id":"E4.1","group":"E.4 — The counts must be true","do":[["Test","Count says *N*"]],"expect":"The list behind it has exactly *N* rows"}]},{"key":"F","label":"Journey F","sub":"Search","steps":[{"id":"F1.1","group":"F.1 — The three ways to find things","do":[["Method","Record search"],["How","The 🔍 box, \"Search every register\""]],"expect":"Page headed \"Search\" with Everything and category tabs"},{"id":"F1.2","group":"F.1 — The three ways to find things","do":[["Method","Command palette"],["How","🧭 in the top bar, or Ctrl+K / ⌘K"]],"expect":"Type a few letters of a screen name, jump straight to it"},{"id":"F1.3","group":"F.1 — The three ways to find things","do":[["Method","Within a register"],["How","The Search box on a register"]],"expect":"Filters that register"},{"id":"F2.1","group":"F.2 — Find your UAT records","do":[["Search for","UAT"]],"expect":"Every UAT record you created, across work orders, requisitions, candidates, clients, vendors"},{"id":"F2.2","group":"F.2 — Find your UAT records","do":[["Search for","UAT TEST - Rajesh"]],"expect":"Your UAT candidate"},{"id":"F2.3","group":"F.2 — Find your UAT records","do":[["Search for","UAT-2026-PIPE-01"]],"expect":"Your UAT work order and requisition"},{"id":"F2.4","group":"F.2 — Find your UAT records","do":[["Search for","Your UAT work order reference"]],"expect":"That work order"},{"id":"F3.1","group":"F.3 — Search respects permissions","do":[["Test","As an Inspector, search UAT"]],"expect":"Only things an inspector may see. Candidates and invoices must not appear"},{"id":"F3.2","group":"F.3 — Search respects permissions","do":[["Test","As Finance, search UAT"]],"expect":"Money records yes; recruitment candidates no"},{"id":"F4.1","group":"F.4 — Search behaves sensibly","do":[["Test","Search for gibberish (zzzqqq)"]],"expect":"A plain \"Nothing matches that.\" — not an error, not a blank page"},{"id":"F4.2","group":"F.4 — Search behaves sensibly","do":[["Test","Search for a single letter"]],"expect":"Either results or a sensible \"type a bit more\" message"},{"id":"F4.3","group":"F.4 — Search behaves sensibly","do":[["Test","Search with odd characters (', %, \")"]],"expect":"Handled calmly. No SQLSTATE or technical error"}]},{"key":"G","label":"Journey G","sub":"The inspector’s phone","steps":[{"id":"G2.1","group":"G.2 — Signing in on a phone","do":[["Test","Open the site on the phone browser"]],"expect":"Sign-in page fits the screen, no sideways scrolling"},{"id":"G2.2","group":"G.2 — Signing in on a phone","do":[["Test","Sign in"]],"expect":"Dashboard, greeting by name"},{"id":"G2.3","group":"G.2 — Signing in on a phone","do":[["Test","Can you read everything without zooming?"]],"expect":"Yes"},{"id":"G2.4","group":"G.2 — Signing in on a phone","do":[["Test","Rotate to landscape and back"]],"expect":"Layout adapts, nothing cut off"},{"id":"G3.1","group":"G.3 — The inspector's world is short","do":[["Test","Look at the whole menu"]],"expect":"About 29 destinations — not 162"},{"id":"G3.2","group":"G.3 — The inspector's world is short","do":[["Test","Which areas appear?"]],"expect":"Quality and Reporting only"},{"id":"G3.3","group":"G.3 — The inspector's world is short","do":[["Test","Is anything offered you cannot use?"]],"expect":"No"},{"id":"G4.1","group":"G.4 — My Jobs, the screen that matters","do":[["Screen","My Jobs"],["Test","Open it"]],"expect":"Page headed \"My Jobs\", listing your work"},{"id":"G4.2","group":"G.4 — My Jobs, the screen that matters","do":[["Test","Read a row without scrolling sideways"]],"expect":"You can"},{"id":"G4.3","group":"G.4 — My Jobs, the screen that matters","do":[["Test","Tap a job"]],"expect":"It opens"},{"id":"G5.1","group":"G.5 — Closing a job in the field","do":[["Test","Tap Close job & record expenses"]],"expect":"The close form"},{"id":"G5.2","group":"G.5 — Closing a job in the field","do":[["Test","Enter Report upload date ⭐"]],"expect":"Date picker works with a thumb"},{"id":"G5.3","group":"G.5 — Closing a job in the field","do":[["Test","Enter Travel, Local conveyance, Food, Lodging, Misc (₹) and notes"]],"expect":"Number keypad appears for money fields"},{"id":"G5.4","group":"G.5 — Closing a job in the field","do":[["Test","Tap Upload & Close"]],"expect":"Job closes; a clear confirmation"},{"id":"G5.5","group":"G.5 — Closing a job in the field","do":[["Test","Can you attach a photo or file from the phone?"]],"expect":"Yes"},{"id":"G6.1","group":"G.6 — Thumbs, not mice","do":[["Test","Tap each main button with your thumb, not a fingernail"]],"expect":"Each is easy to hit first time"},{"id":"G6.2","group":"G.6 — Thumbs, not mice","do":[["Test","Any button you keep missing?"]],"expect":"None"},{"id":"G7.1","group":"G.7 — Bad signal","do":[["Test","Turn mobile data off, then tap something"]],"expect":"A sensible message — not a technical error or a frozen screen"},{"id":"G7.2","group":"G.7 — Bad signal","do":[["Test","Turn data back on and retry"]],"expect":"It works"},{"id":"G7.3","group":"G.7 — Bad signal","do":[["Test","Submit a form as the signal drops"]],"expect":"Either it saves, or it tells you clearly that it did not. Never silently lose the data"}]},{"key":"H","label":"Journey H","sub":"Negative and security tests","steps":[{"id":"H1.1","group":"H.1 — Not signed in","do":[["Test","Sign out. Try to open the work order register directly"]],"expect":"Sent to the sign-in page"},{"id":"H1.2","group":"H.1 — Not signed in","do":[["Test","Try the candidate register directly"]],"expect":"Sent to the sign-in page"},{"id":"H1.3","group":"H.1 — Not signed in","do":[["Test","Try the invoices screen directly"]],"expect":"Sent to the sign-in page"},{"id":"H1.4","group":"H.1 — Not signed in","do":[["Test","Sign in"]],"expect":"You arrive at the application"},{"id":"H2.1","group":"H.2 — Signed in, but not allowed","do":[["As an Inspector, try to open","Work order register"]],"expect":"❌ Refused"},{"id":"H2.2","group":"H.2 — Signed in, but not allowed","do":[["As an Inspector, try to open","Candidate register"]],"expect":"❌ Refused — *\"You don't have permission to open People & hiring. Ask your workspace administrator if this should be available to you.\"*"},{"id":"H2.3","group":"H.2 — Signed in, but not allowed","do":[["As an Inspector, try to open","Invoices"]],"expect":"❌ Refused"},{"id":"H2.4","group":"H.2 — Signed in, but not allowed","do":[["As an Inspector, try to open","New requisition"]],"expect":"❌ Refused"},{"id":"H2.5","group":"H.2 — Signed in, but not allowed","do":[["As an Inspector, try to open","Allocate a job"]],"expect":"❌ Refused"},{"id":"H2.6","group":"H.2 — Signed in, but not allowed","do":[["As an Inspector, try to open","Admin"]],"expect":"❌ Refused — *\"This area isn't available to your role.\"*"},{"id":"H2.7","group":"H.2 — Signed in, but not allowed","do":[["As an Inspector, try to open","My Jobs"]],"expect":"✅ Allowed — this is their own work"},{"id":"H3.1","group":"H.3 — Guessing at other people's records","do":[["Test","Open one of your own records and note the number at the end of the web address"]],"expect":"e.g. ...?id=292"},{"id":"H3.2","group":"H.3 — Guessing at other people's records","do":[["Test","Change the number to another one and press Enter"]],"expect":"Either the record (if you are allowed it) or \"Nothing matches that.\""},{"id":"H3.3","group":"H.3 — Guessing at other people's records","do":[["Test","As an Inspector, try the number of a candidate record"]],"expect":"\"Nothing matches that.\" — never the candidate's details"},{"id":"H4.1","group":"H.4 — Approving your own work","do":[["Test","Raise a hiring request, then try to approve it yourself"]],"expect":"❌ Refused"},{"id":"H4.2","group":"H.4 — Approving your own work","do":[["Test","Approve a report, then try to issue that same report yourself"]],"expect":"❌ Refused"},{"id":"H4.3","group":"H.4 — Approving your own work","do":[["Test","Submit your own expense voucher, then try to approve it yourself"]],"expect":"❌ Refused"},{"id":"H5.1","group":"H.5 — Bad data in forms","do":[["Test","Save a form with required (⭐) fields empty"]],"expect":"Refused, with each missing field clearly named"},{"id":"H5.2","group":"H.5 — Bad data in forms","do":[["Test","Enter an end date before the start date"]],"expect":"Refused or clearly flagged"},{"id":"H5.3","group":"H.5 — Bad data in forms","do":[["Test","Enter a joining date in the future"]],"expect":"*\"A joining date in the future cannot be recorded — mark them joined on the day they start.\"*"},{"id":"H5.4","group":"H.5 — Bad data in forms","do":[["Test","Enter letters in a money field"]],"expect":"Refused, plainly"},{"id":"H5.5","group":"H.5 — Bad data in forms","do":[["Test","Enter a negative headcount (-5)"]],"expect":"Refused"},{"id":"H5.6","group":"H.5 — Bad data in forms","do":[["Test","Enter an enormous number (999999999)"]],"expect":"Refused or handled calmly — never a technical error"},{"id":"H5.7","group":"H.5 — Bad data in forms","do":[["Test","Paste 5,000 characters into a short text box"]],"expect":"Handled calmly"},{"id":"H5.8","group":"H.5 — Bad data in forms","do":[["Test","Type ' \" % \u003cscript\u003e into a text box and save"]],"expect":"Stored and shown as plain text. No SQLSTATE, no pop-up box appearing"},{"id":"H6.1","group":"H.6 — Form protection (verified)","do":[["Test","Open a form, leave it sitting for a long time, then submit"]],"expect":"Either it saves, or you are returned to the form. No record is created incorrectly"},{"id":"H6.2","group":"H.6 — Form protection (verified)","do":[["Test","Use the browser Back button after saving, then save again"]],"expect":"No duplicate record"},{"id":"H6.3","group":"H.6 — Form protection (verified)","do":[["Test","Double-click a save button"]],"expect":"One record, not two"},{"id":"H7.1","group":"H.7 — Sessions","do":[["Test","Sign in, then sign out, then press Back"]],"expect":"You do not get back in"},{"id":"H7.2","group":"H.7 — Sessions","do":[["Test","Sign in on two browsers at once"]],"expect":"Both work, or you are told why not"},{"id":"H7.3","group":"H.7 — Sessions","do":[["Test","Change your password, then use the old one"]],"expect":"Refused"},{"id":"H8.1","group":"H.8 — Deliberately breaking things","do":[["Test","Ask for a web address that does not exist"]],"expect":"A friendly \"Not found\" page with a way back — not a technical error"},{"id":"H8.2","group":"H.8 — Deliberately breaking things","do":[["Test","Try to close a job that is already closed"]],"expect":"Refused"},{"id":"H8.3","group":"H.8 — Deliberately breaking things","do":[["Test","Try to bill work that is already billed"]],"expect":"Refused"},{"id":"H8.4","group":"H.8 — Deliberately breaking things","do":[["Test","Try to edit a report that has been issued"]],"expect":"Refused — it is locked"},{"id":"H8.5","group":"H.8 — Deliberately breaking things","do":[["Test","Try to edit an approved hiring request"]],"expect":"Refused"},{"id":"H8.6","group":"H.8 — Deliberately breaking things","do":[["Test","Try to reopen a cancelled marketplace requirement"]],"expect":"Refused"},{"id":"A1.1","group":"16.1 — PASS / FAIL sheet","do":[],"expect":""},{"id":"A1.2","group":"16.1 — PASS / FAIL sheet","do":[],"expect":""},{"id":"A1.3","group":"16.1 — PASS / FAIL sheet","do":[],"expect":""}]},{"key":"S","label":"Smoke test","sub":"15-minute production smoke test","steps":[{"id":"S1","group":"","do":[["Do this","Open https://operations.mghaiapps.com"]],"expect":"Sign-in page appears within a few seconds"},{"id":"S2","group":"","do":[["Do this","Check the address bar shows a padlock (https)"]],"expect":"Padlock present"},{"id":"S3","group":"","do":[["Do this","Sign in as an administrator"]],"expect":"Dashboard, greeting by name"},{"id":"S4","group":"","do":[["Do this","Look at the left strip"]],"expect":"Your areas are listed"},{"id":"S5","group":"","do":[["Do this","Open Operations"]],"expect":"Backlog / Schedule / Assignment registers"},{"id":"S6","group":"","do":[["Do this","Open Work orders"]],"expect":"The register loads with data"},{"id":"S7","group":"","do":[["Do this","Open Candidates"]],"expect":"The register loads"},{"id":"S8","group":"","do":[["Do this","Open Money → Invoices"]],"expect":"The register loads"},{"id":"S9","group":"","do":[["Do this","Press Ctrl+K, type my work, press Enter"]],"expect":"\"My Work\" opens"},{"id":"S10","group":"","do":[["Do this","Search UAT"]],"expect":"Results (or a clean \"nothing matches\")"},{"id":"S11","group":"","do":[["Do this","Open any one record"]],"expect":"It opens, showing its details"},{"id":"S12","group":"","do":[["Do this","Sign out"]],"expect":"Returned to sign-in"},{"id":"S13","group":"","do":[["Do this","While signed out, try to open the candidate register directly"]],"expect":"Sent to sign-in"},{"id":"S14","group":"","do":[["Do this","Sign in as an Inspector"]],"expect":"Their short dashboard"},{"id":"S15","group":"","do":[["Do this","As the Inspector, open My Jobs"]],"expect":"It opens"},{"id":"S16","group":"","do":[["Do this","As the Inspector, try to open Invoices"]],"expect":"Refused"},{"id":"S17","group":"","do":[["Do this","On a phone, sign in and open My Jobs"]],"expect":"Readable, no sideways scrolling"},{"id":"S18","group":"","do":[["Do this","Anywhere in S1–S17, did you see SQLSTATE, PDOException or Fatal error?"]],"expect":"No"}]}],"gates":[{"n":11,"text":"A requestor cannot approve their own hiring request","steps":["A2.1","H4.1"]},{"n":12,"text":"A report approver cannot also issue that report","steps":["B5.8","H4.2"]},{"n":13,"text":"A person cannot approve their own expense voucher","steps":["B9.5","H4.3"]},{"n":14,"text":"Accepted (Hired) and Joined are genuinely different","steps":["A8.2","A8.3","A12.1"]},{"n":15,"text":"A Back-office hire is not a deployable field inspector","steps":["A9.3","A9.4"]},{"n":16,"text":"The system asked what kind of team member — never silently chose Field","steps":["A9.2"]},{"n":17,"text":"Hiring one person does not close a multi-vacancy requisition","steps":["A10.1"]},{"n":18,"text":"The same work cannot be invoiced twice","steps":["D4.2"]},{"n":19,"text":"An issued report cannot be edited","steps":["B5.10"]},{"n":20,"text":"Signed-out users reach no business screen","steps":["H1.1","H1.2","H1.3"]},{"n":21,"text":"An inspector cannot reach candidates, invoices or admin","steps":["H2.1","H2.2","H2.3","H2.6"]},{"n":22,"text":"Record numbers in the address bar expose nothing","steps":["H3.3"]},{"n":23,"text":"No screen showed SQLSTATE, PDOException or Fatal error","steps":[]}],"coverage":[{"n":1,"text":"Step 0 confirmed production matches the tested version"},{"n":2,"text":"Journey A (Recruitment) completed — both entry routes"},{"n":3,"text":"Journey B (TPIA, work order → invoice) completed"},{"n":4,"text":"Journey C (Marketplace) completed"},{"n":5,"text":"Journey D (Money & billing) completed"},{"n":6,"text":"Journey E (Dashboards) completed for every role you use"},{"n":7,"text":"Journey F (Search) completed"},{"n":8,"text":"Journey G (Phone) completed on a real phone"},{"n":9,"text":"Journey H (Negative & security) completed"},{"n":10,"text":"Smoke test passed on production"}]};</script>
+<script>
+(function(){
+"use strict";
+var DATA = window.__UAT__;
+var VERDICTS = ["PASS","FAIL","BLOCKED","SKIP"];
+var VLABEL = {PASS:"Pass",FAIL:"Fail",BLOCKED:"Blocked",SKIP:"Not run"};
+var VCLASS = {PASS:"p",FAIL:"f",BLOCKED:"b",SKIP:"s"};
+var ALL = [];
+DATA.steps.forEach(function(j){ j.steps.forEach(function(s){ s._j = j.key; ALL.push(s); }); });
+var TOTAL = ALL.length;
+var byId = {}; ALL.forEach(function(s){ byId[s.id] = s; });
+
+var state = {};          // stepId -> {status, note, by, at}
+var meta  = {};          // run details
+var current = DATA.steps[0].key;
+var db = null, downloads = null, me = "";
+var writeQueue = {};
+
+function docId(id){ return id.replace(/\./g,"_"); }
+function esc(t){ return String(t==null?"":t).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+function el(id){ return document.getElementById(id); }
+
+/* ---------- local fallback ---------- */
+var LS = "exaact-uat-v1";
+function localLoad(){
+  try{ var r = localStorage.getItem(LS); if(!r) return;
+    var o = JSON.parse(r); state = o.state || {}; meta = o.meta || {};
+  }catch(e){}
+}
+function localSave(){
+  try{ localStorage.setItem(LS, JSON.stringify({state:state, meta:meta})); }catch(e){}
+}
+
+/* ---------- counts ---------- */
+function counts(list){
+  var c = {PASS:0,FAIL:0,BLOCKED:0,SKIP:0,done:0};
+  list.forEach(function(s){ var v = state[s.id] && state[s.id].status;
+    if(v && c[v]!==undefined){ c[v]++; c.done++; } });
+  return c;
+}
+function gateState(g){
+  if(g.n===23) return meta.attest23 ? "PASS" : "NONE";
+  if(!g.steps.length) return "NONE";
+  var seen=0, bad=0;
+  g.steps.forEach(function(id){ var v = state[id] && state[id].status;
+    if(v==="PASS") seen++; else if(v==="FAIL") bad++; });
+  if(bad) return "FAIL";
+  if(seen===g.steps.length) return "PASS";
+  if(seen) return "PART";
+  return "NONE";
+}
+
+/* ---------- renders ---------- */
+function paintStatus(){
+  var c = counts(ALL);
+  el("tCount").textContent = c.done;
+  var bars = el("tBar").children, keys=["PASS","FAIL","BLOCKED","SKIP"];
+  for(var i=0;i<4;i++) bars[i].style.width = (c[keys[i]]/TOTAL*100)+"%";
+  var gs = DATA.gates.map(gateState);
+  var proven = gs.filter(function(x){return x==="PASS";}).length;
+  var failed = gs.filter(function(x){return x==="FAIL";}).length;
+  var v = el("tVerdict");
+  v.className = "verdict " + (failed ? "v-no" : (proven===DATA.gates.length ? "v-go" : "v-wait"));
+  v.textContent = failed ? ("Blocked — " + failed + " control" + (failed>1?"s":"") + " failed")
+                : (proven===DATA.gates.length ? "All controls proven" : "Not yet proven");
+  var gsum = el("gateSummary");
+  gsum.className = "stamp " + (failed ? "st-fail" : (proven===DATA.gates.length ? "st-pass" : "st-none"));
+  gsum.textContent = proven + " of " + DATA.gates.length + " proven" + (failed ? " · " + failed + " failed" : "");
+}
+
+function paintGates(){
+  var host = el("gates"); host.textContent = "";
+  DATA.gates.forEach(function(g){
+    var st = gateState(g);
+    var row = document.createElement("div"); row.className = "gate";
+    var refs = g.steps.length ? "from " + g.steps.join(", ") : "your attestation across the whole run";
+    row.innerHTML = '<span class="gn mono">'+g.n+'</span><div class="gt">'+esc(g.text)+'<em>'+esc(refs)+'</em></div>';
+    if(g.n===23){
+      var lab = document.createElement("label"); lab.className="attest";
+      var cb = document.createElement("input"); cb.type="checkbox"; cb.id="attest23"; cb.checked = !!meta.attest23;
+      cb.addEventListener("change", function(){ meta.attest23 = cb.checked; saveMeta(); paintGates(); paintStatus(); });
+      lab.appendChild(cb); lab.appendChild(document.createTextNode("I confirm none appeared"));
+      row.appendChild(lab);
+    } else {
+      var s = document.createElement("span");
+      s.className = "stamp " + (st==="PASS"?"st-pass":st==="FAIL"?"st-fail":st==="PART"?"st-part":"st-none");
+      s.textContent = st==="PASS"?"Proven":st==="FAIL"?"Failed":st==="PART"?"Part-tested":"Not tested";
+      row.appendChild(s);
+    }
+    host.appendChild(row);
+  });
+}
+
+function paintRail(){
+  var host = el("rail"); host.textContent = "";
+  DATA.steps.forEach(function(j){
+    var c = counts(j.steps);
+    var b = document.createElement("button");
+    b.className="jbtn"; b.setAttribute("role","tab");
+    b.setAttribute("aria-selected", j.key===current ? "true":"false");
+    b.innerHTML = '<span class="jl">'+esc(j.label)+'</span><span class="js mono">'+c.done+'/'+j.steps.length+(c.FAIL?' · '+c.FAIL+' fail':'')+'</span>';
+    b.addEventListener("click", function(){ current = j.key; uiSet("section", current); paintRail(); paintSteps(); window.scrollTo({top:0,behavior:"smooth"}); });
+    host.appendChild(b);
+  });
+}
+
+function paintSteps(){
+  var j = DATA.steps.filter(function(x){ return x.key===current; })[0];
+  el("jTitle").textContent = j.label;
+  el("jSub").textContent = j.sub;
+  var host = el("stepList"); host.textContent = "";
+  var lastGroup = null;
+  j.steps.forEach(function(s){
+    if(s.group && s.group!==lastGroup){
+      lastGroup = s.group;
+      var h = document.createElement("div"); h.className="grouphead"; h.textContent = s.group;
+      host.appendChild(h);
+    }
+    host.appendChild(stepCard(s));
+  });
+}
+
+function stepCard(s){
+  var rec = state[s.id] || {};
+  var card = document.createElement("div");
+  card.className = "step";
+  if(rec.status) card.setAttribute("data-v", rec.status);
+  var inner = document.createElement("div"); inner.className = "step-in";
+
+  var sid = document.createElement("span"); sid.className="sid"; sid.textContent = s.id;
+  inner.appendChild(sid);
+
+  if(s.do && s.do.length){
+    var d = document.createElement("div"); d.className="do";
+    s.do.forEach(function(pair){
+      var line = document.createElement("div"); line.className="doline";
+      line.innerHTML = '<span class="k">'+esc(pair[0]||"Do")+'</span><span class="val">'+esc(pair[1])+'</span>';
+      d.appendChild(line);
+    });
+    inner.appendChild(d);
+  }
+  if(s.expect){
+    var e = document.createElement("div"); e.className="exp";
+    e.innerHTML = '<span class="k">Should happen</span>'+esc(s.expect);
+    inner.appendChild(e);
+  }
+
+  var vrow = document.createElement("div"); vrow.className="verdicts";
+  VERDICTS.forEach(function(v){
+    var b = document.createElement("button");
+    b.className = "vb " + VCLASS[v];
+    b.type="button";
+    b.setAttribute("aria-pressed", rec.status===v ? "true":"false");
+    b.setAttribute("aria-label", VLABEL[v]+" step "+s.id);
+    b.textContent = VLABEL[v];
+    b.addEventListener("click", function(){ setVerdict(s.id, rec.status===v ? null : v); });
+    vrow.appendChild(b);
+  });
+  var nb = document.createElement("button");
+  nb.className="nbtn"; nb.type="button";
+  nb.textContent = (rec.note ? "Edit note" : "Add a note");
+  vrow.appendChild(nb);
+  inner.appendChild(vrow);
+
+  var nbox = document.createElement("div"); nbox.className="notebox";
+  nbox.hidden = !(rec.note || rec.status==="FAIL");
+  if(rec.status==="FAIL"){
+    var fh = document.createElement("div"); fh.className="failhint";
+    fh.innerHTML = '<b>&#9888;</b><span>Write down the <b>exact wording</b> shown on screen, and attach a screenshot to your defect report. If you saw <code>SQLSTATE</code>, <code>PDOException</code> or <code>Fatal error</code>, this is CRITICAL.</span>';
+    nbox.appendChild(fh);
+  }
+  var ta = document.createElement("textarea");
+  ta.value = rec.note || "";
+  ta.placeholder = "What actually happened? Exact on-screen wording, record reference, screenshot filename.";
+  ta.setAttribute("aria-label","Note for step "+s.id);
+  ta.id = "note-"+docId(s.id);
+  var t=null;
+  ta.addEventListener("input", function(){
+    clearTimeout(t);
+    t = setTimeout(function(){ setNote(s.id, ta.value); }, 600);
+  });
+  nbox.appendChild(ta);
+  if(rec.by || rec.at){
+    var by = document.createElement("div"); by.className="by";
+    by.textContent = (rec.by ? "recorded by "+rec.by : "recorded") + (rec.at ? " · "+rec.at : "");
+    nbox.appendChild(by);
+  }
+  inner.appendChild(nbox);
+  nb.addEventListener("click", function(){ nbox.hidden = !nbox.hidden; if(!nbox.hidden) ta.focus(); });
+
+  card.appendChild(inner);
+  return card;
+}
+
+/* ---------- writes ---------- */
+function stamp(){ var d=new Date(); return d.toISOString().slice(0,16).replace("T"," "); }
+
+function setVerdict(id, v){
+  if(v===null){ delete state[id]; }
+  else {
+    var rec = state[id] || {};
+    rec.status = v; rec.at = stamp(); if(me) rec.by = me;
+    state[id] = rec;
+  }
+  persistStep(id);
+  paintSteps(); paintRail(); paintGates(); paintStatus();
+}
+function setNote(id, note){
+  var rec = state[id] || {};
+  if(!note && !rec.status){ delete state[id]; }
+  else { rec.note = note; rec.at = stamp(); if(me) rec.by = me; state[id] = rec; }
+  persistStep(id);
+  paintRail();
+}
+function persistStep(id){
+  localSave();
+  if(!db) return;
+  var rec = state[id];
+  var ref = db.collection("verdicts").doc(docId(id));
+  var p = rec ? ref.set({stepId:id, status:rec.status||"", note:rec.note||"", by:rec.by||"", at:rec.at||""})
+              : ref.delete();
+  p.catch(function(e){ note("Could not save that to the shared record ("+(e&&e.code||"error")+"). It is saved on this device.", "err"); });
+}
+function saveMeta(){
+  localSave();
+  if(!db) return;
+  db.doc("meta/run").set(meta).catch(function(){});
+}
+function readFields(){
+  meta.tester = el("fTester").value; meta.role = el("fRole").value;
+  meta.device = el("fDevice").value; meta.browser = el("fBrowser").value;
+  meta.route = el("fRoute").value; meta.approver = el("fApprover").value;
+  saveMeta();
+}
+function fillFields(){
+  el("fTester").value = meta.tester||""; el("fRole").value = meta.role||"";
+  el("fDevice").value = meta.device||""; el("fBrowser").value = meta.browser||"";
+  el("fRoute").value = meta.route||""; el("fApprover").value = meta.approver||"";
+  var a = el("attest23"); if(a) a.checked = !!meta.attest23;
+}
+["fTester","fRole","fDevice","fBrowser","fRoute","fApprover"].forEach(function(id){
+  var n = el(id); var t=null;
+  n.addEventListener("input", function(){ clearTimeout(t); t=setTimeout(readFields,600); });
+  n.addEventListener("change", readFields);
+});
+
+function note(txt, kind){
+  var m = el("msg"); m.textContent = txt; m.className = "msg " + (kind||"");
+  if(kind==="ok") setTimeout(function(){ if(m.textContent===txt){ m.textContent=""; m.className="msg"; } }, 6000);
+}
+
+/* ---------- export ---------- */
+function buildMarkdown(){
+  var c = counts(ALL), L = [];
+  L.push("# EXAACT UAT — results");
+  L.push("");
+  L.push("Site: https://operations.mghaiapps.com");
+  L.push("Playbook: v1.0, built against commit cd96ace");
+  L.push("Exported: " + stamp());
+  L.push("");
+  L.push("Tester: " + (meta.tester||"—") + "   Role: " + (meta.role||"—"));
+  L.push("Device: " + (meta.device||"—") + "   Browser: " + (meta.browser||"—"));
+  L.push("");
+  L.push("## Totals");
+  L.push("");
+  L.push("| Result | Count |");
+  L.push("|---|---|");
+  L.push("| Pass | " + c.PASS + " |");
+  L.push("| Fail | " + c.FAIL + " |");
+  L.push("| Blocked | " + c.BLOCKED + " |");
+  L.push("| Not run | " + c.SKIP + " |");
+  L.push("| Not yet recorded | " + (TOTAL - c.done) + " |");
+  L.push("| **Total checks** | **" + TOTAL + "** |");
+  L.push("");
+  L.push("## Go / no-go controls");
+  L.push("");
+  L.push("| # | Control | State |");
+  L.push("|---|---|---|");
+  DATA.gates.forEach(function(g){
+    var st = gateState(g);
+    L.push("| " + g.n + " | " + g.text + " | " +
+      (st==="PASS"?"PROVEN":st==="FAIL"?"**FAILED**":st==="PART"?"part-tested":"not tested") + " |");
+  });
+  var gs = DATA.gates.map(gateState);
+  var failed = gs.filter(function(x){return x==="FAIL";}).length;
+  var proven = gs.filter(function(x){return x==="PASS";}).length;
+  L.push("");
+  L.push("**Readiness: " + (failed ? "BLOCKED — " + failed + " control(s) failed"
+        : proven===DATA.gates.length ? "all controls proven" : proven + " of " + DATA.gates.length + " proven") + "**");
+  L.push("");
+  L.push("Recruitment routes to keep (item 24): " + (meta.route||"not decided"));
+  L.push("Report approver / issuer (item 27): " + (meta.approver||"not recorded"));
+  L.push("");
+  L.push("## Failures and blocks");
+  L.push("");
+  var bad = ALL.filter(function(s){ var v=state[s.id]&&state[s.id].status; return v==="FAIL"||v==="BLOCKED"; });
+  if(!bad.length){ L.push("None recorded."); }
+  else bad.forEach(function(s){
+    var r = state[s.id];
+    L.push("### " + s.id + " — " + r.status);
+    L.push("");
+    L.push("- Section: " + s._j + (s.group ? " · " + s.group : ""));
+    s.do.forEach(function(p){ L.push("- " + (p[0]||"Do") + ": " + p[1]); });
+    L.push("- Should happen: " + s.expect);
+    L.push("- Note: " + (r.note || "(none written)"));
+    L.push("- Recorded: " + (r.by ? r.by + " · " : "") + (r.at||""));
+    L.push("");
+  });
+  L.push("## Every step");
+  L.push("");
+  DATA.steps.forEach(function(j){
+    L.push("### " + j.label + " — " + j.sub);
+    L.push("");
+    L.push("| Step | Result | Note |");
+    L.push("|---|---|---|");
+    j.steps.forEach(function(s){
+      var r = state[s.id] || {};
+      L.push("| " + s.id + " | " + (r.status ? VLABEL[r.status] : "—") + " | " +
+        (r.note||"").replace(/\|/g,"\\|").replace(/\n/g," ") + " |");
+    });
+    L.push("");
+  });
+  return L.join("\n");
+}
+function buildCsv(){
+  var rows = [["Section","Step","Group","Do","Should happen","Result","Note","Recorded by","Recorded at"]];
+  DATA.steps.forEach(function(j){
+    j.steps.forEach(function(s){
+      var r = state[s.id] || {};
+      rows.push([j.label, s.id, s.group||"",
+        s.do.map(function(p){ return (p[0]?p[0]+": ":"")+p[1]; }).join(" / "),
+        s.expect||"", r.status?VLABEL[r.status]:"", r.note||"", r.by||"", r.at||""]);
+    });
+  });
+  return rows.map(function(r){
+    return r.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(",");
+  }).join("\r\n");
+}
+function offer(filename, text){
+  if(downloads){
+    downloads.save({filename:filename, data:text}).then(function(){
+      note("Saved " + filename + ".", "ok");
+    }).catch(function(e){
+      var code = e && e.code;
+      if(code==="declined"){ note("Save cancelled.", ""); return; }
+      if(code==="rate_limited"){ note("A save prompt is already open — finish that one first.", "err"); return; }
+      showCopy(text, "That file could not be saved here (" + (code||"error") + ").");
+    });
+  } else {
+    showCopy(text, "Saving files is not available in this view.");
+  }
+}
+function showCopy(text, why){
+  el("copyArea").value = text;
+  el("copyPanel").hidden = false;
+  note(why + " Your results are in the box below — select and copy them.", "err");
+  el("copyPanel").scrollIntoView({behavior:"smooth", block:"start"});
+}
+el("bMd").addEventListener("click", function(){ readFields(); offer("exaact-uat-results.md", buildMarkdown()); });
+el("bCsv").addEventListener("click", function(){ readFields(); offer("exaact-uat-results.csv", buildCsv()); });
+el("bCopy").addEventListener("click", function(){
+  var ta = el("copyArea"); ta.select();
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(ta.value).then(function(){ note("Copied.", "ok"); })
+      .catch(function(){ note("Use your keyboard to copy the selected text.", ""); });
+  } else { note("Use your keyboard to copy the selected text.", ""); }
+});
+
+/* ---------- per-viewer conveniences (this device only) ---------- */
+var UI="exaact-uat-ui-v1";
+function uiLoad(){ try{ return JSON.parse(localStorage.getItem(UI)||"{}"); }catch(e){ return {}; } }
+function uiSave(o){ try{ localStorage.setItem(UI, JSON.stringify(o)); }catch(e){} }
+function uiSet(k,v){ var o=uiLoad(); o[k]=v; uiSave(o); }
+
+document.querySelectorAll("details.panel").forEach(function(d,i){
+  var key="panel"+i, o=uiLoad();
+  if(typeof o[key]==="boolean") d.open=o[key];
+  d.addEventListener("toggle", function(){ uiSet(key, d.open); });
+});
+
+/* jump to the first step with no result yet, wherever it is */
+el("bNext").addEventListener("click", function(){
+  var target=null;
+  for(var i=0;i<DATA.steps.length && !target;i++){
+    var j=DATA.steps[i];
+    for(var k=0;k<j.steps.length;k++){
+      if(!state[j.steps[k].id] || !state[j.steps[k].id].status){ target={j:j.key,id:j.steps[k].id}; break; }
+    }
+  }
+  if(!target){ note("Every one of the " + TOTAL + " checks has a result.", "ok"); return; }
+  if(current!==target.j){ current=target.j; uiSet("section",current); paintRail(); paintSteps(); }
+  var card=null;
+  document.querySelectorAll(".step .sid").forEach(function(n){ if(n.textContent===target.id) card=n.closest(".step"); });
+  if(card){
+    card.scrollIntoView({behavior:"smooth", block:"center"});
+    card.style.transition="box-shadow .3s"; card.style.boxShadow="0 0 0 3px var(--accent-wash), 0 0 0 4px var(--accent)";
+    setTimeout(function(){ card.style.boxShadow=""; }, 2200);
+  }
+});
+
+/* ---------- boot ---------- */
+localLoad();
+var savedSection = uiLoad().section;
+if(savedSection && DATA.steps.some(function(j){ return j.key===savedSection; })) current = savedSection;
+paintGates(); paintRail(); paintSteps(); paintStatus(); fillFields();
+el("tSave").textContent = "saved on this device";
+
+if(window.claude && window.claude.use){
+  window.claude.use("user").then(function(u){
+    if(!u) return;
+    return u.me().then(function(p){
+      if(p && p.name){ me = p.name; if(!meta.tester){ meta.tester = p.name; fillFields(); } }
+    }).catch(function(){});
+  }).catch(function(){});
+
+  window.claude.use("downloads").then(function(d){ downloads = d; }).catch(function(){});
+
+  window.claude.use("db").then(function(d){
+    if(!d){ el("tSave").textContent = "saved on this device only"; return; }
+    db = d;
+    el("tSave").textContent = "shared record · live";
+    db.collection("verdicts").onSnapshot(function(snap){
+      var next = {};
+      snap.docs.forEach(function(doc){
+        var v = doc.data() || {};
+        if(!v.stepId || !byId[v.stepId]) return;
+        next[v.stepId] = {status:v.status||"", note:v.note||"", by:v.by||"", at:v.at||""};
+        if(!next[v.stepId].status && !next[v.stepId].note) delete next[v.stepId];
+      });
+      state = next; localSave();
+      paintSteps(); paintRail(); paintGates(); paintStatus();
+    }, function(e){
+      el("tSave").textContent = "shared record unavailable — saving on this device";
+    });
+    db.doc("meta/run").onSnapshot(function(snap){
+      if(snap.exists){ meta = snap.data() || {}; fillFields(); paintGates(); paintStatus(); localSave(); }
+    }, function(){});
+  }).catch(function(){ el("tSave").textContent = "saved on this device only"; });
+} else {
+  el("tSave").textContent = "saved on this device only";
+}
+})();
+</script>
