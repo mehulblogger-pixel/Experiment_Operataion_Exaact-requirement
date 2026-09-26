@@ -125,9 +125,23 @@ if ($proMatches || $proLink):
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Also on the marketplace
     <span class="pill p-info" style="font-size:11px;margin-left:4px"><?= count($proMatches) ?></span>
-    <?php if ($proLink): ?><span class="pill p-ok" style="font-size:11px;margin-left:4px">✓ confirmed same person</span><?php endif; ?>
+    <?php
+      //  HOW the link was made, not just that it exists. A link the system made
+      //  on an exact mobile match and a link a person ticked are different facts,
+      //  and showing them identically is what made the tick feel arbitrary.
+      $pmMethod = (string) ($proLink['method'] ?? '');
+      $pmAuto   = strpos($pmMethod, 'auto-') === 0;
+      $pmWhy    = $pmAuto ? substr($pmMethod, 5) : '';
+      $pmWords  = function_exists('candpool_reason_words') ? candpool_reason_words($pmWhy) : $pmWhy;
+    ?>
+    <?php if ($proLink && $pmAuto): ?><span class="pill p-ok" style="font-size:11px;margin-left:4px">✓ linked automatically — <?= e($pmWords) ?></span>
+    <?php elseif ($proLink): ?><span class="pill p-ok" style="font-size:11px;margin-left:4px">✓ confirmed same person</span><?php endif; ?>
   </h3>
-  <p class="muted" style="font-size:12px;margin:0 0 8px">This candidate matches a known <strong>marketplace professional</strong> — the same person is already on the bench / passport. Matched by mobile / e-mail / name. <strong>Confirming</strong> records them as one person; nothing is merged and each pool keeps its own record, so it can be unlinked any time.</p>
+  <?php if ($proLink && $pmAuto): ?>
+    <p class="muted" style="font-size:12px;margin:0 0 8px">These two records were linked <strong>automatically</strong>, on <strong><?= e($pmWords) ?></strong> — evidence people do not share by accident. Nothing is merged: each pool keeps its own record, and you can unlink at any time if this is not the same person.</p>
+  <?php else: ?>
+    <p class="muted" style="font-size:12px;margin:0 0 8px">This candidate matches a known <strong>marketplace professional</strong> — the same person is already on the bench / passport. An exact match on a mobile number or e-mail address is linked for you; a match on the <strong>name alone</strong> is shown here for you to judge, because two people can share a name. <strong>Confirming</strong> records them as one person; nothing is merged and each pool keeps its own record, so it can be unlinked any time.</p>
+  <?php endif; ?>
   <?php // Gap-8 — once linked, show the ONE person resolved across every pool (read-view, no merge).
   $person = $person ?? null;
   if ($person && !empty($person['linked'])):
@@ -148,10 +162,12 @@ if ($proMatches || $proLink):
         <td><?= e($pm['name'] ?: ('#' . $pm['pro_id'])) ?></td>
         <td><span class="pill <?= in_array(strtolower((string)$pm['verification_tier']), ['verified','id_verified','engaged'], true) ? 'p-ok' : 'p-mut' ?>" style="font-size:11px"><?= e($pm['verification_tier'] ?: '—') ?></span></td>
         <td class="muted" style="font-size:12px"><?= e($pm['availability'] ?: '—') ?></td>
-        <td><span class="pill <?= $rTone[$pm['reason']] ?? 'p-mut' ?>" style="font-size:11px"><?= e($rLabel[$pm['reason']] ?? $pm['reason']) ?></span></td>
+        <?php $pmConf = function_exists('candpool_confidence') ? candpool_confidence($pm['reason']) : 0; ?>
+        <td><span class="pill <?= $rTone[$pm['reason']] ?? 'p-mut' ?>" style="font-size:11px"><?= e($rLabel[$pm['reason']] ?? $pm['reason']) ?></span>
+          <?php if ($pmConf > 0): ?><span class="muted" style="font-size:11px;margin-left:4px" title="How sure the match is. 94 and above is linked automatically."><?= (int) $pmConf ?>%</span><?php endif; ?></td>
         <td style="text-align:right">
           <?php if ($isLinked): ?>
-            <span class="pill p-ok" style="font-size:11px">✓ Confirmed</span>
+            <span class="pill p-ok" style="font-size:11px"><?= $pmAuto ? '✓ Linked automatically' : '✓ Confirmed' ?></span>
             <?php if ($canLink): ?>
             <form method="post" action="/candidate-unlink-pro?id=<?= (int)$cand['id'] ?>" style="display:inline" onsubmit="return confirm('Remove the confirmed link? Neither record is deleted.')">
               <input type="hidden" name="link_id" value="<?= (int)$proLink['id'] ?>">
@@ -161,10 +177,19 @@ if ($proMatches || $proLink):
           <?php elseif ($proLink): ?>
             <span class="muted" style="font-size:11px">another confirmed</span>
           <?php elseif ($canLink): ?>
+            <?php //  Still a question, and the screen says which kind. A name-only
+                  //  match is genuinely uncertain; a strong match left unlinked
+                  //  means another professional matched just as strongly, and
+                  //  THAT is exactly when a person should decide. ?>
             <form method="post" action="/candidate-link-pro?id=<?= (int)$cand['id'] ?>" style="display:inline" onsubmit="return confirm('Confirm this candidate and marketplace professional are the same person? Nothing is merged.')">
               <input type="hidden" name="pro_id" value="<?= (int)$pm['pro_id'] ?>">
               <button class="btn btn-ghost" type="submit" style="padding:2px 9px;font-size:12px">Confirm same person</button>
             </form>
+            <div class="muted" style="font-size:11px;margin-top:2px">
+              <?= $pmConf >= (defined('CANDPOOL_AUTOLINK_MIN') ? CANDPOOL_AUTOLINK_MIN : 94)
+                  ? 'More than one person matches this strongly — your call'
+                  : 'Name only — two people can share a name' ?>
+            </div>
           <?php endif; ?>
         </td>
       </tr>

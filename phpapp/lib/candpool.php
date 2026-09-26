@@ -74,6 +74,87 @@ function candpool_pro_matches($cand, $limit = 20) {
     return $out;
 }
 
+// ---------------------------------------------------------------------------
+//  CONFIDENCE, AND WHAT TO DO WITH IT.
+//
+//  The matcher above has always known HOW it matched — mobile, e-mail or name —
+//  and the screen threw that away: every match, from an exact mobile number down
+//  to a shared surname, was shown the same way with the same manual "Confirm
+//  same person" button. So the commonest case, where the system already knew the
+//  answer beyond reasonable doubt, was a chore; and the genuinely ambiguous case
+//  looked exactly like it, which is how a tick becomes a reflex.
+//
+//  The scores match the ones cand_dupes() already uses for candidate-to-candidate
+//  matching, so the product has one idea of confidence rather than two.
+// ---------------------------------------------------------------------------
+const CANDPOOL_CONFIDENCE = ['mobile' => 96, 'email' => 94, 'name' => 72];
+
+//  At or above this, the evidence is an exact match on something people do not
+//  share by accident, and the link is made automatically. Below it, a person is
+//  asked — which is what a confirmation button is actually for.
+const CANDPOOL_AUTOLINK_MIN = 94;
+
+function candpool_confidence($reason) {
+    return (int) (CANDPOOL_CONFIDENCE[(string) $reason] ?? 0);
+}
+
+function candpool_reason_words($reason) {
+    return ['mobile' => 'same mobile number', 'email' => 'same e-mail address',
+            'name'   => 'same name'][(string) $reason] ?? (string) $reason;
+}
+
+/**
+ * Link a candidate to their marketplace record when the evidence is conclusive.
+ *
+ * Returns [linked, reason, professional_id] — `linked` false means a person is
+ * still being asked, which is a normal outcome and not a failure.
+ *
+ * THREE REFUSALS, and the middle one is the important one:
+ *
+ *   1. Already linked. Nothing to do; never a second link.
+ *   2. MORE THAN ONE professional matches at that strength. Two people sharing a
+ *      mobile number is exactly the case a human must judge — a father and son,
+ *      a shared site phone. Auto-linking the first of them would be confidently
+ *      wrong, which is worse than asking. Ambiguity is never resolved silently.
+ *   3. The best evidence is only a name. Two people called Rajesh Sharma are two
+ *      people until somebody says otherwise.
+ *
+ * Nothing is merged, here or in the manual path: each pool keeps its own record
+ * and the link is reversible at any time. That is what makes linking on strong
+ * evidence a safe default rather than a gamble.
+ */
+function candpool_autolink($cand) {
+    $candId = (int) (is_array($cand) ? ($cand['id'] ?? 0) : $cand);
+    if ($candId <= 0) return [false, 'no-candidate', 0];
+    if (!function_exists('connect_identity_candidate_link_create')) return [false, 'no-ledger', 0];
+
+    if (function_exists('connect_identity_of_candidate') && connect_identity_of_candidate($candId))
+        return [false, 'already-linked', 0];
+
+    if (!is_array($cand) || !isset($cand['mobile'])) {
+        try { $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$candId]); } catch (Throwable $e) { return [false, 'no-candidate', 0]; }
+        if (!$cand) return [false, 'no-candidate', 0];
+    }
+
+    $matches = candpool_pro_matches($cand, 20);
+    if (!$matches) return [false, 'no-match', 0];
+
+    //  Only the strongest evidence counts, and only if it stands alone.
+    $best = 0;
+    foreach ($matches as $m) $best = max($best, candpool_confidence($m['reason'] ?? ''));
+    if ($best < CANDPOOL_AUTOLINK_MIN) return [false, 'too-weak', 0];
+
+    $atBest = array_values(array_filter($matches,
+        fn($m) => candpool_confidence($m['reason'] ?? '') === $best));
+    if (count($atBest) !== 1) return [false, 'ambiguous', 0];
+
+    $m = $atBest[0];
+    [$ok, , $linkId] = connect_identity_candidate_link_create(
+        $candId, (int) $m['pro_id'], 'auto-' . (string) $m['reason'], '',
+        'Linked automatically on ' . candpool_reason_words($m['reason']) . ' (confidence ' . $best . ').');
+    return $ok ? [true, (string) $m['reason'], (int) $m['pro_id']] : [false, 'refused', 0];
+}
+
 // The reverse: recruitment candidates that are the same person as a marketplace
 // professional. Read-only.
 function candpool_cand_matches($pro, $limit = 20) {

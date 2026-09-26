@@ -1100,8 +1100,19 @@ function theme_style_tag() {
         . "</style>";
 }
 function logo_html() {
-    $d = setting_get('logo_data', '');
-    return $d ? '<img src="' . e($d) . '" alt="logo" style="height:30px;vertical-align:middle;background:#fff;border-radius:4px;padding:2px 6px">' : '';
+    $d = trim((string) setting_get('logo_data', ''));
+    //  Only emit an <img> for something that can actually BE an image source.
+    //  This used to trust the setting blindly, so a corrupt or truncated value —
+    //  found in the wild as 5,000 letter A's — became src="AAAA…" on EVERY page:
+    //  a broken image in the header and a doomed request to /AAAA… on every load.
+    //  Falling back to the text logo is the correct failure: the header still
+    //  reads, and nobody chases a 404 that is really a bad setting.
+    $okSrc = $d !== '' && (stripos($d, 'data:image/') === 0
+                        || preg_match('~^https?://~i', $d) === 1
+                        || strpos($d, '/') === 0);
+    return $okSrc
+        ? '<img src="' . e($d) . '" alt="logo" style="height:30px;vertical-align:middle;background:#fff;border-radius:4px;padding:2px 6px">'
+        : '';
 }
 // The name shown in the header/title. An explicit app_name still wins, but when
 // it is blank we fall back to the company brand/legal name set in Company profile

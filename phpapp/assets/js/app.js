@@ -1717,7 +1717,8 @@
       // every field stays in the DOM, merely hidden — so a value typed on step
       // one is still there, and still submitted, when Save is pressed on step six.
       var isForm = wrap.classList.contains('form-tabs');
-      var curIdx = 0, backBtn = null, nextBtn = null, stepOut = null, actions = null;
+      var saveAlways = wrap.getAttribute('data-tabs-save') === 'always';
+      var curIdx = 0, backBtn = null, nextBtn = null, stepOut = null, actions = null, saveHint = null;
       if (isForm) {
         actions = wrap.parentNode.querySelector('.fs-actions');   // the Save / Cancel row
         var nav = document.createElement('div'); nav.className = 'fs-nav';
@@ -1729,7 +1730,13 @@
         var right = document.createElement('div'); right.className = 'fs-nav-right';
         right.appendChild(nextBtn);
         if (actions) right.appendChild(actions);                  // fold Save / Cancel into the nav
+        if (saveAlways) {
+          saveHint = document.createElement('div');
+          saveHint.className = 'muted fs-savehint';
+          saveHint.style.cssText = 'font-size:12px;flex-basis:100%;margin-top:6px';
+        }
         nav.appendChild(backBtn); nav.appendChild(stepOut); nav.appendChild(right);
+        if (saveHint) nav.appendChild(saveHint);
         wrap.appendChild(nav);
         var goto = function (i) {
           show(i, true);
@@ -1748,8 +1755,25 @@
           var last = i === groups.length - 1;
           backBtn.style.visibility = i > 0 ? 'visible' : 'hidden';
           nextBtn.style.display = last ? 'none' : '';
-          if (actions) actions.style.display = last ? '' : 'none';
+          //  SAVE-FROM-ANY-STEP (data-tabs-save="always").
+          //
+          //  A strict wizard hides Save until the last panel, which is right when
+          //  every step is needed to make a valid record. It is wrong where the
+          //  first step is already enough and the rest is enrichment — a recruiter
+          //  loading forty CVs must not walk four panels each time.
+          //
+          //  But the version of this that caused the complaint was worse than
+          //  either: no Back, no Next, no step count, and a live Save button under
+          //  panel one, so the form LOOKED like four steps and behaved like one.
+          //  People pressed Save on step one without ever learning the other three
+          //  existed. This mode keeps Save reachable AND shows the sequence, and
+          //  the label below says what pressing it early actually does.
+          if (actions) actions.style.display = (last || saveAlways) ? '' : 'none';
           stepOut.textContent = 'Step ' + (i + 1) + ' of ' + groups.length;
+          if (saveAlways && saveHint)
+            saveHint.textContent = last ? '' : ('You can save now — the remaining '
+              + (groups.length - 1 - i) + ' section' + ((groups.length - 1 - i) === 1 ? '' : 's')
+              + ' can be filled in later on this person\'s page.');
         }
         if (push) { try { history.replaceState(null, '', '#' + key + '=' + slug(groups[i].label)); } catch (e) {} }
       }

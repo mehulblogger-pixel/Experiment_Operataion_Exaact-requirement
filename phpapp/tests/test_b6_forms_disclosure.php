@@ -67,13 +67,28 @@ foreach (['agency_id', 'home_office_id', 'weekly_working_days', 'reports_to_id',
     t_ok(strpos($b6folded, 'name="' . $b6f . '"') !== false, "B5 · \"$b6f\" moved into a fold");
 
 // ---- C · the candidate form now uses the existing panel engine ------------
-t_eq(substr_count($b6cand, '<div data-tabs'), 1, 'C1 · the candidate form declares one panel container');
+//
+//  B6's own recommendation for this screen was "NAMED STEPS, save available from
+//  step one", and the first implementation delivered only the second half: four
+//  labelled panels, but no step count, no Back, no Next, and a live Save button
+//  adrift under the first one. So the form looked like four steps and behaved
+//  like one, and people created records having never seen panels two to four.
+//  The owner reported exactly that.
+//
+//  These assertions used to pin the IMPLEMENTATION (no .form-tabs) rather than
+//  the intent, which is why they now read the other way round. The intent is
+//  unchanged and is finally met in full: the sequence is visible AND Save is
+//  reachable from step one, through the engine's data-tabs-save="always" mode.
+t_ok(substr_count($b6cand, 'data-tabs data-tabs-key') === 1
+  || substr_count($b6cand, '<div class="form-tabs" data-tabs') === 1,
+     'C1 · the candidate form declares one panel container');
 t_eq(substr_count($b6cand, '<section class="fs-pane" data-tab='), 4, 'C2 · four panels');
-//  Save must NOT be folded into the wizard nav: the recommended treatment is
-//  "named steps, save available from step one", and this form is marked
-//  [data-tabs] WITHOUT .form-tabs precisely so Save stays put.
-t_ok(strpos($b6cand, 'class="form-tabs"') === false, 'C3 · not wizard mode, so Save is not hidden until the last panel');
-t_ok(strpos($b6cand, 'fs-actions') === false, 'C4 · and its action row is not folded into the panel nav');
+t_ok(strpos($b6cand, 'class="form-tabs"') !== false,
+     'C3 · it IS a stepped form now — Back, Next and "Step n of 4" are drawn');
+t_ok(strpos($b6cand, 'data-tabs-save="always"') !== false,
+     'C3 · …and Save is still available from step one, so bulk CV entry is not punished');
+t_ok(strpos($b6cand, 'fs-actions') !== false,
+     'C4 · its action row is folded into the panel nav, where the engine manages it');
 $b6save = strrpos($b6cand, '</div>');
 t_ok(strpos($b6cand, '</div>') < strpos($b6cand, 'type="submit"'), 'C5 · the Save button sits outside the panels');
 

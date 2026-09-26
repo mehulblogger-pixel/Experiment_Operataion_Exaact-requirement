@@ -61,7 +61,20 @@
       //  another, and Save sits OUTSIDE the panels so a candidate can still be
       //  saved from the first one. With scripting off all four panels render as
       //  one page, exactly as before. ?>
-<div data-tabs data-tabs-key="candform">
+<?php //  FOUR PANELS THAT LOOK LIKE FOUR STEPS NOW BEHAVE LIKE FOUR STEPS.
+      //
+      //  They were four panels with no Back, no Next and no step count, and a
+      //  live Save button sitting under the first one. So people filled panel one,
+      //  pressed the obvious green button, and created a record without ever
+      //  learning the other three existed — which is exactly what the owner hit.
+      //
+      //  form-tabs turns on the sequence the shared engine already knows how to
+      //  draw. data-tabs-save="always" keeps Save reachable from any step,
+      //  because a recruiter loading forty CVs must not walk four panels each
+      //  time — only the FIRST panel is needed to create a usable record, and the
+      //  rest is enrichment that is often not knowable yet. The engine then
+      //  prints, under the buttons, exactly what saving early leaves undone. ?>
+<div class="form-tabs" data-tabs data-tabs-key="candform" data-tabs-save="always">
 <section class="fs-pane" data-tab="Requirement &amp; person">
   <h3 class="tab-sub" style="margin-top:0">Requirement &amp; person</h3>
   <div class="form-grid">
@@ -179,13 +192,21 @@
     <div class="ff"><label>If lost — reason <span class="muted">why</span></label>
       <select class="form-control" name="drop_reason"><option value="">—</option><?php foreach (($rccDropReasons ?? []) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['drop_reason'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
   </div>
-</section>
-</div>
+  <?php //  The company's own extra fields live on the LAST panel rather than
+        //  floating below the whole form: outside the panels they rendered after
+        //  the wizard's Back / Next row, which reads as a fifth step nobody
+        //  labelled. ?>
   <?php if (function_exists('custom_fields_for') && custom_fields_for('candidate')): ?>
     <h3 class="tab-sub">More details</h3>
     <div class="form-grid"><?php render_custom_fields('candidate', $cfvals ?? []); ?></div>
   <?php endif; ?>
-  <div style="margin-top:16px;">
+</section>
+</div>
+  <?php //  fs-actions is what the tab engine looks for to fold Save / Cancel into
+        //  its Back / Next row. Without the class the buttons sit adrift below the
+        //  wizard, which is how this screen came to have a stray live Save button
+        //  under panel one in the first place. ?>
+  <div class="fs-actions" style="margin-top:16px;">
     <button class="btn" type="submit"><?= $isEdit ? 'Save candidate' : ($dupes ? 'Save anyway — this is a new person' : 'Add candidate') ?></button>
     <a class="btn secondary" href="/candidates">Cancel</a>
   </div>

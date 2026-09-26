@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '24d12b6 · 2026-09-26 10:18 UTC · 669 files';
+$RELEASE = '7409278 · 2026-09-26 11:07 UTC · 669 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -32,7 +32,7 @@ $EXPECT  = [
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>119577,'h'=>'67f72b8c97ca2243'],
-    'lib/access.php' => ['s'=>82263,'h'=>'eea2a295f659a420'],
+    'lib/access.php' => ['s'=>82956,'h'=>'06ab3b6423c2a827'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
     'lib/activity.php' => ['s'=>43860,'h'=>'f50c2abb6660e12e'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
@@ -56,7 +56,7 @@ $EXPECT  = [
     'lib/booksui.php' => ['s'=>24679,'h'=>'1a45924f453699a8'],
     'lib/bulk.php' => ['s'=>2157,'h'=>'ca3be826f9a4414c'],
     'lib/callprofit.php' => ['s'=>5760,'h'=>'7f81b6e7a9d7835f'],
-    'lib/candpool.php' => ['s'=>9050,'h'=>'0e367f7bb35f314c'],
+    'lib/candpool.php' => ['s'=>13127,'h'=>'ee1d58a962510a9a'],
     'lib/capa.php' => ['s'=>34318,'h'=>'cf9edf290b106bfd'],
     'lib/careers.php' => ['s'=>22969,'h'=>'70a9ec1b3acf87e3'],
     'lib/chain.php' => ['s'=>27590,'h'=>'38344fcbe18d90b5'],
@@ -171,7 +171,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66433,'h'=>'c2e1f6090c75b5b9'],
-    'lib/ops.php' => ['s'=>680854,'h'=>'48138635da265242'],
+    'lib/ops.php' => ['s'=>682070,'h'=>'d4ecb23e874f2890'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -342,8 +342,8 @@ $EXPECT  = [
     'views/ops/call_form.php' => ['s'=>67990,'h'=>'70591fb26844aa74'],
     'views/ops/call_profit.php' => ['s'=>10827,'h'=>'9ceb75929d00146d'],
     'views/ops/calls.php' => ['s'=>11306,'h'=>'d906595ec4d7ae6d'],
-    'views/ops/candidate_detail.php' => ['s'=>50522,'h'=>'7d9a1d37c25ada36'],
-    'views/ops/candidate_form.php' => ['s'=>21557,'h'=>'e555423f6d41a7fe'],
+    'views/ops/candidate_detail.php' => ['s'=>52755,'h'=>'fee0967b2d821022'],
+    'views/ops/candidate_form.php' => ['s'=>23079,'h'=>'b59eb2bc480e2ade'],
     'views/ops/candidate_list.php' => ['s'=>2784,'h'=>'1e2c041b86f7e74d'],
     'views/ops/candidate_pool.php' => ['s'=>4450,'h'=>'6434745c74e6751f'],
     'views/ops/capa_detail.php' => ['s'=>15272,'h'=>'46828d551ec0c77d'],

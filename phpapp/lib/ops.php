@@ -6608,7 +6608,24 @@ function ops_candidates($route, $method) {
                 if (function_exists('rkpi_stage_log'))
                     rkpi_stage_log($id, '', 'RECEIVED', ['to_code' => 'RECEIVED', 'track' => 'LEGACY',
                         'kind' => 'MOVE', 'remark' => 'CV received', 'actor' => user_name(current_user())]);
-                flash("$code added to the hiring pipeline." . $m5note . ($p4note ?? ''),
+                //  IF WE ALREADY KNOW THIS PERSON, SAY SO — do not ask.
+                //
+                //  The matcher has always scored the evidence; the screen simply
+                //  ignored the score and asked for the same manual tick whether it
+                //  had found an exact mobile number or a shared surname. An exact
+                //  match on a mobile or an e-mail is linked here, at the moment
+                //  the record is created, and the person is told why. Anything
+                //  weaker, or anything AMBIGUOUS, is still a question for a human
+                //  on the candidate screen. Nothing is merged and Unlink is always
+                //  there, which is what makes this safe rather than presumptuous.
+                $autoNote = '';
+                if (function_exists('candpool_autolink')) {
+                    [$alOk, $alWhy] = candpool_autolink((int) $id);
+                    if ($alOk) $autoNote = ' Also recognised on the marketplace — '
+                        . (function_exists('candpool_reason_words') ? candpool_reason_words($alWhy) : $alWhy)
+                        . ', so the two records are linked as one person.';
+                }
+                flash("$code added to the hiring pipeline." . $m5note . ($p4note ?? '') . $autoNote,
                       ($m5note !== '' || ($p4note ?? '') !== '') ? 'error' : 'success');
                 redirect('/candidate?id=' . $id);
             }
