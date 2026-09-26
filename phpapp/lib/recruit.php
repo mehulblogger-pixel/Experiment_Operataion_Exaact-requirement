@@ -1632,21 +1632,40 @@ function workforce_ack_note(array $matches) {
     return implode(', ', $bits);
 }
 
-/** Refusal codes — deterministic, testable, and safe to show. */
+/**
+ * Refusal codes — deterministic, testable, and safe to show.
+ *
+ * `{req}` is the name of the execution record, filled in by rcv_msg() from the
+ * terminology engine. A const cannot call a function, so the word cannot be
+ * resolved here; and hard-coding it was how these messages came to say
+ * "requirement" for the record every screen calls a Requisition (ADR-002).
+ * Read these through rcv_msg(), never directly.
+ */
 const RCV_CODES = [
     'CONVERTED'      => 'Added to the team.',
     'ALREADY'        => 'This application has already been converted.',
     'NO_CANDIDATE'   => 'No such application for this record.',
     'NOT_ALLOWED'    => 'You cannot convert this application.',
-    'NO_BRANCH'      => 'This conversion has no branch: the requirement carries none and neither does the recruiter. Set a branch on the requirement, or on the recruiter, and try again.',
-    'BLOCKED'        => 'The requirement does not allow this right now.',
+    'NO_BRANCH'      => 'This conversion has no branch: the {req} carries none and neither does the recruiter. Set a branch on the {req}, or on the recruiter, and try again.',
+    'BLOCKED'        => 'The {req} does not allow this right now.',
     'RACE_LOST'      => 'Somebody else converted this application a moment ago.',
     'FAILED'         => 'The conversion could not be completed. Nothing was changed.',
     'EMP_CODE'       => 'An employee number could not be issued, so nobody was added. Try again; if it keeps happening, ask an administrator to check the employee-number report.',
     'BUSY'           => 'Somebody else was saving at the same moment, so nothing was changed. Please try again.',
     'WORKFORCE_MATCH'=> 'This person may already be on your team. Open the application, check the possible match shown there, and tick to confirm before accepting.',
-    'TEAM_ROLE'      => 'Nobody has said which team this person joins. Choose Field, Coordinator or Back office on the requirement, or confirm it on the application, and try again.',
+    'TEAM_ROLE'      => 'Nobody has said which team this person joins. Choose Field, Coordinator or Back office on the {req}, or confirm it on the application, and try again.',
 ];
+
+/**
+ * One refusal message, with the object named the way this workspace names it.
+ *
+ * Every caller goes through here so a workspace that renames the record sees its
+ * own word in the refusal, not ours.
+ */
+function rcv_msg($code) {
+    $t = RCV_CODES[$code] ?? $code;
+    return str_replace('{req}', function_exists('Tl') ? Tl('requisition') : 'requisition', $t);
+}
 
 /**
  * WHICH BRANCH does a converted team member belong to? (owner decision BD1)
@@ -1924,7 +1943,7 @@ function wf_team_role_resolve(array $cand, $posted = '') {
     return ['role' => '', 'source' => 'none',
             'why' => $cap === 'UNCONFIGURED'
                 ? 'This workspace has not yet recorded what kind of business it does, so the system cannot tell whether this person is a field inspector or office staff. Choose which team they join, or set the workspace\'s business activities under Workspace setup.'
-                : 'Nobody has said which team this person joins. Choose Field, Coordinator or Back office on the requirement, or confirm it here, and try again.'];
+                : 'Nobody has said which team this person joins. Choose Field, Coordinator or Back office on the ' . (function_exists('Tl') ? Tl('requisition') : 'requisition') . ', or confirm it here, and try again.'];
 }
 
 /** Is this hire a deployable Inspector? Only ever true where site work exists. */
@@ -1934,22 +1953,22 @@ function wf_inspector_applies($role) {
 
 function rcv_refusal_before_transaction(array $cand, array $opt = []) {
     $candId = (int)($cand['id'] ?? 0);
-    if ($candId <= 0) return RCV_CODES['NO_CANDIDATE'];
-    if (function_exists('is_coordinator_level') && !is_coordinator_level()) return RCV_CODES['NOT_ALLOWED'];
+    if ($candId <= 0) return rcv_msg('NO_CANDIDATE');
+    if (function_exists('is_coordinator_level') && !is_coordinator_level()) return rcv_msg('NOT_ALLOWED');
     //  Scope: a record id is never proof of authorisation, and "not yours" is
     //  answered in the same words as "not there" so nothing can be enumerated.
     if (function_exists('connect_identity_scope_ok') && !connect_identity_scope_ok('candidate', $candId))
-        return RCV_CODES['NO_CANDIDATE'];
+        return rcv_msg('NO_CANDIDATE');
     if (empty($opt['want_hire'])) return '';
 
     //  IDEMPOTENCY (§13) — nothing new is built for it. The application already
     //  records which team member it produced, and that column is the guard.
-    if ((int)($cand['inspector_id'] ?? 0) > 0) return RCV_CODES['ALREADY'];
+    if ((int)($cand['inspector_id'] ?? 0) > 0) return rcv_msg('ALREADY');
 
     //  BRANCH (BD1) — no branch, no hire, and never a silent default.
     if (function_exists('rcv_branch_for')) {
         [$office, ] = rcv_branch_for($candId, (int)($opt['actor_id'] ?? 0));
-        if (!$office) return RCV_CODES['NO_BRANCH'];
+        if (!$office) return rcv_msg('NO_BRANCH');
     }
 
     //  WHICH TEAM (owner decision 2) — decided at the requirement, confirmed
@@ -1965,7 +1984,7 @@ function rcv_refusal_before_transaction(array $cand, array $opt = []) {
         $mm = workforce_matches($cand);
         if (workforce_strong_matches($mm)
             && !workforce_ack_ok((string)($opt['dup_ack'] ?? ''), $candId, $mm, $cand, (int)($opt['actor_id'] ?? 0)))
-            return RCV_CODES['WORKFORCE_MATCH'];
+            return rcv_msg('WORKFORCE_MATCH');
     }
     return '';
 }
@@ -1993,7 +2012,7 @@ function rcv_log($candId, $kind, $subject) {
 function rcv_convert($candId, array $opt = []) {
     $candId = (int)$candId;
     $fail = function ($code, $extra = '') use ($candId) {
-        return ['ok' => false, 'code' => $code, 'message' => (RCV_CODES[$code] ?? $code) . ($extra ? ' ' . $extra : ''),
+        return ['ok' => false, 'code' => $code, 'message' => rcv_msg($code) . ($extra ? ' ' . $extra : ''),
                 'inspector_id' => 0, 'identity' => 'NONE', 'branch' => null, 'branch_source' => 'none'];
     };
 
@@ -2200,6 +2219,6 @@ function rcv_convert($candId, array $opt = []) {
                                   : ' — identity relationship NOT recorded (marketplace capability unavailable)')
         . $wfAckNote);
 
-    return ['ok' => true, 'code' => 'CONVERTED', 'message' => RCV_CODES['CONVERTED'], 'inspector_id' => $insId,
+    return ['ok' => true, 'code' => 'CONVERTED', 'message' => rcv_msg('CONVERTED'), 'inspector_id' => $insId,
             'identity' => $identity, 'branch' => $office, 'branch_source' => $src];
 }

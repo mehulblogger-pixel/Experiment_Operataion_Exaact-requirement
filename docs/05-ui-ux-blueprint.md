@@ -243,6 +243,17 @@ Before **any** screen is approved, it must pass this checklist:
 3. Can it be used comfortably on a phone **in bright sunlight at a noisy industrial site**?
 4. Does the screen **avoid jargon** unless absolutely necessary?
 5. Can **80% of users** complete the workflow without reading a manual?
+6. Does the screen call every object by **the same name every other screen uses**,
+   taken from the terminology engine (`T()` / `Tl()` / `TH()` / `T_NEW()` …) rather
+   than typed as a literal? See **ADR-002 — one word per object**.
+
+Item 6 is not a style preference. The Recruitment Command Centre once printed
+"requirement" for the record every register called a "Requisition"; the owner read
+the two screens side by side and concluded the system held two different objects.
+A screen cannot be understood in five seconds if it disagrees with the screen one
+click away, and a hard-coded word also silently defeats Admin → Terminology, which
+makes a workspace's own rename look broken. `tests/test_recruit_terminology.php`
+enforces this for the recruitment screens.
 
 If any answer is **No**, the screen must be redesigned. This single principle keeps
 the application dramatically simpler than traditional industrial software and is one

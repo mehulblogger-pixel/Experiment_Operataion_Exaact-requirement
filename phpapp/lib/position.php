@@ -190,7 +190,8 @@ function positions_import_apply($rows) {
 function position_manpower_check($pos, $qty, $reqType = 'NEW') {
     $qty = max(1, (int)$qty);
     if (!$pos) return ['case' => 'C', 'tone' => 'warn', 'title' => 'New position',
-        'msg' => 'This requisition is not linked to a position in the master — a new-position approval is required before hiring.'];
+        'msg' => 'This ' . (function_exists('Tl') ? Tl('requisition') : 'requisition')
+                . ' is not linked to a position in the master — a new-position approval is required before hiring.'];
 
     $sanc = (int)($pos['sanctioned_headcount'] ?? 0);
     $occ  = (int)($pos['occupied_headcount'] ?? 0);

@@ -85,7 +85,7 @@ const TERM_DEFAULTS = [
     //  None of them changes a status, a rule or a model. They are the sentence
     //  a person needed and could not find.
     'hiring_request'    => ['Hiring Request', 'Hiring Requests', 'Recruitment',
-        'A request for headcount, raised before recruiting starts so it can be approved. Approving it is what allows a requisition to be raised against it.'],
+        'A request for headcount, raised before recruiting starts so it can be approved. Approving it is what allows a {requisition} to be raised against it.'],
     'workforce'         => ['Workforce', 'Workforce', 'People',
         'Everybody employed or engaged by this company. A workforce record is created when somebody is hired, whatever job they do.'],
     'inspector'         => ['Inspector', 'Inspectors', 'Operations',
@@ -180,6 +180,10 @@ const TERM_PACKS = [
             'call'     => ['Requirement', 'Requirements'],
             'job'      => ['Deployment', 'Deployments'],
             'engineer' => ['Worker', 'Workers'],
+            //  Same reasoning as the recruitment pack: the thing people are
+            //  recruited against is a job order, which keeps it distinct from
+            //  the client requirement above that asked for them.
+            'requisition' => ['Job Order', 'Job Orders'],
             'client'   => ['Principal Employer', 'Principal Employers'],
             'manday'   => ['Man-day', 'Man-days'],
         ],
@@ -191,7 +195,16 @@ const TERM_PACKS = [
             'call'        => ['Requirement', 'Requirements'],
             'job'         => ['Placement', 'Placements'],
             'engineer'    => ['Recruiter', 'Recruiters'],
-            'requisition' => ['Requirement', 'Requirements'],
+            //  "Job Order", not "Requirement". Two reasons, both measured:
+            //  (1) this pack previously gave 'call' AND 'requisition' the same
+            //  word, so two different objects wore one name on the same screens;
+            //  (2) "requirement" already means the CRITERIA on a requisition —
+            //  certificates required, minimum qualification — so the record and
+            //  its own fields collided. "Job order" is the term the staffing
+            //  industry actually uses for work a client places (it is what Zoho's
+            //  agency edition calls it), and it reads correctly here: a client
+            //  places a job order; you fill it with people.
+            'requisition' => ['Job Order', 'Job Orders'],
             'candidate'   => ['Candidate', 'Candidates'],
             'client'      => ['Client', 'Clients'],
         ],
@@ -356,7 +369,15 @@ function T_EDIT($key)         { return 'Edit ' . Tl($key); }
 //  every screen.
 function T_HELP($key) {
     $d = TERM_DEFAULTS[$key] ?? null;
-    return $d ? (string) ($d[3] ?? '') : '';
+    if (!$d) return '';
+    //  A help sentence may NAME another object — "…allows a {requisition} to be
+    //  raised against it". A const cannot call a function, so the other object's
+    //  name is a {key} token, resolved here from this workspace's own wording.
+    //  Typing the word instead is how the help text came to say "requisition" to
+    //  a workspace that had renamed it (ADR-002).
+    return (string) preg_replace_callback('~\{([a-z_]+)\}~', function ($m) {
+        return isset(TERM_DEFAULTS[$m[1]]) ? term_lower(term_raw($m[1], 0)) : $m[0];
+    }, (string) ($d[3] ?? ''));
 }
 //  One muted line, ready to echo. Returns '' for an unknown key, so a caller
 //  can never print an empty box.

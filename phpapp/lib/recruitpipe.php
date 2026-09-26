@@ -618,7 +618,7 @@ function recruitpipe_stage_tab($cand) {
     if (!is_array($cand) || empty($cand['id'])) return;
     [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
-    if (!$pipe || !$eff) { echo '<div class="panel"><p class="muted">No hiring workflow applies to this candidate yet. Once a requirement is linked, its workflow appears here.</p></div>'; return; }
+    if (!$pipe || !$eff) { echo '<div class="panel"><p class="muted">No hiring workflow applies to this candidate yet. Once a ' . (function_exists('Tl') ? Tl('requisition') : 'requisition') . ' is linked, its workflow appears here.</p></div>'; return; }
     $can = function_exists('is_coordinator_level') && is_coordinator_level();
     $closed = in_array((string)$cand['stage'], recruitpipe_legacy_terminal(), true);
     $kinds = defined('RPIPE_STAGE_KINDS') ? RPIPE_STAGE_KINDS : [];

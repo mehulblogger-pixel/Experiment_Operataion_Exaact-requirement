@@ -526,7 +526,7 @@ function hreq_qty_guard($hiringRequestId, $wantQty, $excludeRequisitionId = 0) {
     if ($others + $want <= $approved) return '';
     $left = max(0, $approved - $others);
     return 'The approved headcount for this hiring request is ' . $approved
-         . '. ' . ($others > 0 ? $others . ' already on other requisitions, so ' : '')
+         . '. ' . ($others > 0 ? $others . ' already on other ' . (function_exists('Tlp') ? Tlp('requisition') : 'requisitions') . ', so ' : '')
          . 'only ' . $left . ' can be recruited here.';
 }
 
@@ -1098,7 +1098,7 @@ function hreq_remaining_qty($id) {
 // Create the execution record. Returns [ok, message, requisitionId].
 function hreq_to_requisition($id, $qty = 0) {
     if (!hreq_can_create())
-        return [false, 'You do not have the right to raise a requisition from this request.', 0];
+        return [false, 'You do not have the right to raise a ' . (function_exists('Tl') ? Tl('requisition') : 'requisition') . ' from this request.', 0];
     hreq_migrate();
     if (function_exists('req_migrate')) req_migrate();
     $r = hreq_get($id); if (!$r) return [false, 'That hiring request no longer exists.', 0];
@@ -1163,7 +1163,8 @@ function hreq_to_requisition($id, $qty = 0) {
     if (function_exists('reqf_sync')) reqf_sync($rid);
     if (function_exists('act_log'))
         act_log('HIRING_REQUEST', (int) $id, 'SYSTEM', 'Recruitment requisition ' . $code . ' raised for ' . $qty, ['auto' => 1]);
-    return [true, 'Requisition ' . $code . ' raised for ' . $qty . ' of the approved headcount.', $rid];
+    return [true, (function_exists('TH') ? TH('requisition') : 'Requisition') . ' ' . $code
+        . ' raised for ' . $qty . ' of the approved headcount.', $rid];
 }
 
 // ---- Scope (§35) ----------------------------------------------------------

@@ -13,7 +13,13 @@ $savedPack  = (string) setting_get('terms_pack', '');
 term_apply_pack('recruitment');
 t_eq(T('engineer'), 'Recruiter', 'applying the pack renames the internal worker to Recruiter everywhere');
 t_eq(TP('engineer'), 'Recruiters', 'plural follows too');
-t_eq(T('requisition'), 'Requirement', 'the hiring demand reads as Requirement');
+//  The execution record reads as "Job Order" — the word a staffing agency
+//  actually uses. It used to read "Requirement", which collided with the
+//  marketplace requirement (cx_requirements) AND with the requisition's own
+//  criteria fields ("certificates required"), so the record and its contents
+//  shared a word. See test_recruit_terminology.php.
+t_eq(T('requisition'), 'Job Order', 'the hiring demand reads as Job Order');
+t_eq(TP('requisition'), 'Job Orders', 'plural follows');
 t_eq(T('job'), 'Placement', 'a filled position reads as Placement');
 t_eq(T('candidate'), 'Candidate', 'the candidate keeps its recruitment word');
 t_eq(term_pack_current(), 'recruitment', 'the screen shows the Recruitment pack as the one in force');

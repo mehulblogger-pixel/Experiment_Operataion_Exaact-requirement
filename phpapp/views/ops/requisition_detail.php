@@ -53,7 +53,7 @@ if (!empty($req['hiring_request_id']) && function_exists('hreq_get')):
       <?php if ($rdEnforced): ?>
         This workspace now starts recruitment from an approved
         <?= e(mb_strtolower(function_exists('hreq_label') ? hreq_label('request') : 'hiring request')) ?>,
-        so this requirement pre-dates that rule. It stays fully workable — nothing is
+        so this <?= e(Tl('requisition')) ?> pre-dates that rule. It stays fully workable — nothing is
         back-dated onto it and no approval is invented for it.
       <?php else: ?>
         Both ways of starting are supported in this workspace.
@@ -106,7 +106,7 @@ $h = $health ?? null; if ($h): [$hband, $htone] = $h['band']; ?>
   <div style="text-align:center;min-width:96px">
     <div style="font-size:34px;font-weight:800;line-height:1;color:var(--<?= $h['score']>=75?'ok':($h['score']>=45?'warn':'bad') ?>,#333)"><?= (int)$h['score'] ?></div>
     <div class="pill <?= e($htone) ?>" style="margin-top:5px"><?= e($hband) ?></div>
-    <div class="muted" style="font-size:11px;margin-top:4px">Requirement health</div>
+    <div class="muted" style="font-size:11px;margin-top:4px"><?= e(TH('requisition')) ?> health</div>
   </div>
   <div style="flex:1;min-width:220px">
     <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:6px">
@@ -265,14 +265,14 @@ if ($seeSal && !empty($rollup) && (int)($rollup['n'] ?? 0) > 0): $R = $rollup; ?
       return '<div class="kpi"><div class="k">'.$label.'</div><div class="v">'.fmoney_short($rev).'</div>'
         .'<div class="d"><b class="'.$mc.'">'.fmoney_short($prof).'</b> · '.($marg>=0?'':'−').number_format(abs($marg),1).'% · '.$sub.'</div></div>';
     };
-    echo $rtier('Planned <span class="muted" style="font-weight:400">(requirement)</span>', $R['plan_rev'], $R['plan_profit'], $R['plan_margin'], 'as budgeted');
+    echo $rtier('Planned <span class="muted" style="font-weight:400">(' . e(Tl('requisition')) . ')</span>', $R['plan_rev'], $R['plan_profit'], $R['plan_margin'], 'as budgeted');
     echo $rtier('Approved <span class="muted" style="font-weight:400">(locked hires)</span>', $R['appr_rev'], $R['appr_profit'], $R['appr_margin'], 'this many hires');
     if ((int)$R['n_act'] > 0) echo $rtier('Actual <span class="muted" style="font-weight:400">(billed &amp; paid)</span>', $R['act_rev'], $R['act_profit'], $R['act_margin'], (int)$R['n_act'].' recorded');
     else echo '<div class="kpi"><div class="k">Actual <span class="muted" style="font-weight:400">(billed &amp; paid)</span></div><div class="v" style="color:var(--muted)">—</div><div class="d">no actuals recorded yet</div></div>';
     ?>
   </div>
   <?php $dv = $R['appr_profit'] - $R['plan_profit']; if (abs($dv) >= 1): ?>
-  <p class="muted" style="font-size:12px;margin:8px 2px 0">Approved profit is running <span class="pill <?= $dv>=0?'p-ok':'p-bad' ?>" style="font-size:11px"><?= $dv>=0?'+':'−' ?><?= fmoney_short(abs($dv)) ?></span> against the requirement plan.</p>
+  <p class="muted" style="font-size:12px;margin:8px 2px 0">Approved profit is running <span class="pill <?= $dv>=0?'p-ok':'p-bad' ?>" style="font-size:11px"><?= $dv>=0?'+':'−' ?><?= fmoney_short(abs($dv)) ?></span> against the <?= e(Tl('requisition')) ?> plan.</p>
   <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -287,7 +287,7 @@ if ($seeSal && !empty($rollup) && (int)($rollup['n'] ?? 0) > 0): $R = $rollup; ?
 </div>
 <?php endif; ?>
 
-<div class="panel"><h3 class="tab-sub" style="margin-top:0">Candidates against this requisition <span class="muted">(<?= count($cands) ?>)</span></h3>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">Candidates against this <?= e(Tl('requisition')) ?> <span class="muted">(<?= count($cands) ?>)</span></h3>
   <?php if ($cands): ?>
   <table class="dt"><thead><tr><th>Candidate</th><th>Source</th><th>Stage</th><th>Fit</th><th></th></tr></thead><tbody>
     <?php foreach ($cands as $cd): ?><tr>
@@ -300,12 +300,12 @@ if ($seeSal && !empty($rollup) && (int)($rollup['n'] ?? 0) > 0): $R = $rollup; ?
       <td><a class="btn small secondary" href="/candidate?id=<?= (int)$cd['id'] ?>">Open</a></td>
     </tr><?php endforeach; ?>
   </tbody></table>
-  <?php else: ?><p class="muted">No candidates yet. Add a CV against this requisition from <a href="/candidate-new?req=<?= (int)$req['id'] ?>">Hiring</a>.</p><?php endif; ?>
+  <?php else: ?><p class="muted">No candidates yet. Add a CV against this <?= e(Tl('requisition')) ?> from <a href="/candidate-new?req=<?= (int)$req['id'] ?>">Hiring</a>.</p><?php endif; ?>
 </div>
 
 <?php // §16/§19 — before recruiting outside, who in the existing pool fits?
 if (!empty($pool)): ?>
-<div class="panel"><h3 class="tab-sub" style="margin-top:0">💡 Best matches from the pool <span class="muted">— existing people who fit, not yet on this requirement</span></h3>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">💡 Best matches from the pool <span class="muted">— existing people who fit, not yet on this <?= e(Tl('requisition')) ?></span></h3>
   <table class="dt"><thead><tr><th>Candidate</th><th>Designation</th><th>Fit</th><th>Why</th><th></th></tr></thead><tbody>
     <?php foreach ($pool as $pc): [$fl, $ftone] = recruit_fit_band($pc['fit']['score']);
       $why = implode(' · ', array_map(fn($x) => $x['label'], array_filter($pc['fit']['factors'], fn($x) => $x['state'] === 'ok'))); ?>
@@ -325,7 +325,7 @@ if (!empty($pool)): ?>
 <?php // P1b — the same ranked shortlist, but from the MARKETPLACE professional bench.
 $proPool = $proPool ?? [];
 if (!empty($proPool)): ?>
-<div class="panel"><h3 class="tab-sub" style="margin-top:0">🧑‍🔧 Best matches from the marketplace <span class="muted">— benched / verified professionals who fit this requirement</span></h3>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">🧑‍🔧 Best matches from the marketplace <span class="muted">— benched / verified professionals who fit this <?= e(Tl('requisition')) ?></span></h3>
   <table class="dt"><thead><tr><th>Professional</th><th>Verification</th><th>Availability</th><th>Fit</th><th>Why</th></tr></thead><tbody>
     <?php foreach ($proPool as $pp): [$fl, $ftone] = recruit_fit_band($pp['fit']['score']);
       $why = implode(' · ', array_map(fn($x) => $x['label'], array_filter($pp['fit']['factors'], fn($x) => $x['state'] === 'ok'))); ?>
@@ -338,6 +338,6 @@ if (!empty($proPool)): ?>
     </tr>
     <?php endforeach; ?>
   </tbody></table>
-  <p class="muted" style="font-size:12px;margin:6px 2px 0">The marketplace bench, scored against this requirement — the same people your clients can hire, surfaced here so recruiting can reach them first. Read-only.</p>
+  <p class="muted" style="font-size:12px;margin:6px 2px 0">The marketplace bench, scored against this <?= e(Tl('requisition')) ?> — the same people your clients can hire, surfaced here so recruiting can reach them first. Read-only.</p>
 </div>
 <?php endif; ?>

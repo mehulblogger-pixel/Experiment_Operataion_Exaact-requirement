@@ -27,8 +27,19 @@ $b2nav = file_get_contents(__DIR__ . '/../views/layout_top.php');
 t_ok(strlen($b2cc) > 20000, 'A1 ARMING · the Command Centre view was read (' . strlen($b2cc) . ' bytes)');
 //  Bands carry a style attribute in several places, so the pattern must allow
 //  any attributes before the heading -- an earlier version matched only 8 of them.
-preg_match_all('/<div class="band[^>]*><h2>([^<]+)<\/h2>/', $b2cc, $mB);
-$b2bands = array_map(fn($s) => html_entity_decode(trim($s)), $mB[1] ?? []);
+//  A heading may now resolve the object's name from the terminology engine —
+//  "Ownership, deployment & the [term] tracker" — so [^<]+ stopped matching it
+//  and the band read as missing. (The literal echo tag is not written in this
+//  comment: a close-tag inside a // comment ends PHP mode and turns the rest of
+//  the file into plain text, which is exactly what happened here.)
+//  Allow the echo tag and strip it before comparing: the
+//  literal words around it are what identifies the band, and the ORDER of the
+//  bands is what this block is actually testing.
+preg_match_all('/<div class="band[^>]*><h2>(.*?)<\/h2>/s', $b2cc, $mB);
+$b2bands = array_map(function ($s) {
+    $s = preg_replace('/<\?.*?\?>/s', '', $s);          // terminology lookups
+    return html_entity_decode(trim(preg_replace('/\s+/', ' ', $s)));
+}, $mB[1] ?? []);
 t_ok(count($b2bands) >= 10, 'A2 ARMING · ' . count($b2bands) . ' section bands found to order-check');
 
 // ---- B · action before analysis -----------------------------------------
@@ -76,7 +87,14 @@ $b2gone = array_values(array_diff($b2before, $b2now));
 t_ok(count($b2before) === 25, 'C ARMING · 25 destinations were pinned from the pre-B2 screen');
 t_eq($b2gone, [], 'C1 · every destination the screen offered before B2 is still offered');
 $b2added = array_values(array_diff($b2now, $b2before));
-t_eq($b2added, ['/hiring-requests'], 'C2 · exactly one destination was added, and it is the missing register');
+//  Two destinations have been added, both deliberately and both recorded here:
+//    /hiring-requests  — B2: the register had no door anywhere (see D1).
+//    /hiring-request   — ADR-001 (DECIDED): with approval mandatory the primary
+//                        button must lead to the NEW hiring request, because the
+//                        direct requisition door is shut. See docs/adr/ADR-001.
+$b2expectAdded = ['/hiring-request', '/hiring-requests'];
+$b2addedSorted = $b2added; sort($b2addedSorted); sort($b2expectAdded);
+t_eq($b2addedSorted, $b2expectAdded, 'C2 · exactly the two intended destinations were added, and nothing else');
 
 // ---- D · the hiring-request door, correctly gated ------------------------
 t_ok(strpos($b2cc, 'href="/hiring-requests"') !== false,
@@ -85,13 +103,24 @@ t_ok(preg_match('/hreq_can_view\(\)[^?]*\?>\s*\n?\s*<a class="btn secondary" hre
      || substr_count($b2cc, 'hreq_can_view()') >= 2,
      'D2 · it is behind hreq_can_view() — the same gate the handler itself uses');
 t_ok(function_exists('hreq_can_view'), 'D3 ARMING · that gate really exists');
-//  The neutral sentence must NOT declare a preferred path: ADR-001 is open and
-//  is the owner's decision, not this phase's.
+//  ADR-001 was OPEN when B2 shipped, so the sentence had to stay neutral and
+//  D5 asserted the page claimed no preferred path. The ADR is now DECIDED and
+//  configurable (setting `requisition_requires_request`, default on), so the
+//  requirement has changed shape: the page must say whichever is TRUE of the
+//  workspace it is being shown to, and must never offer a door the policy shut.
 t_ok(stripos($b2cc, 'Hiring starts either way') !== false,
-     'D4 · both ways in are stated');
-foreach (['preferred way', 'you should raise', 'always start', 'the correct way', 'must start'] as $b2claim)
-    t_ok(stripos($b2cc, $b2claim) === false,
-         "D5 · and the page does NOT declare a preferred path ('$b2claim' absent) — ADR-001 is the owner's call");
+     'D4 · when the direct route is open, both ways in are stated');
+t_ok(strpos($b2cc, 'hreq_direct_path_allowed') !== false,
+     'D5 · and the page asks the policy which of the two sentences is true');
+//  The either/way sentence and the primary direct-path button must BOTH sit
+//  inside the policy branch — a page that hard-codes either one would tell half
+//  of all workspaces something false.
+$b2neutral = strpos($b2cc, 'Hiring starts either way');
+$b2branch  = strpos($b2cc, '$ccDirect');
+t_ok($b2branch !== false && $b2neutral !== false && $b2branch < $b2neutral,
+     'D5 · the neutral sentence is inside the policy branch, not stated unconditionally');
+t_ok(preg_match('~\$ccDirect.*?/requisition-new~s', $b2cc) === 1,
+     'D5 · and the direct requisition button is offered only when the policy allows it');
 
 // ---- E · the rail ---------------------------------------------------------
 preg_match_all('/<span class="s-ic">([^<]+)<\/span>/u', $b2nav, $mI);

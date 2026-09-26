@@ -63,8 +63,14 @@ t_eq(HREQ_TERMS['requisition'][0], 'Recruitment Requisition', 'A3 · the canonic
 // the shipped word is: "Requisition" could never be read as a marketplace
 // requirement, so it is not padded out for the sake of it.
 t_eq(hreq_label('requisition'), 'Requisition', 'A3 · an unambiguous workspace word is left exactly as the workspace wrote it');
-term_apply_pack('recruitment');
-t_eq(T('requisition'), 'Requirement', 'A3 · a recruitment agency may still call it a Requirement — nothing is forced');
+//  A workspace that renames the record to the ambiguous word by hand is the
+//  case under test here. This used to borrow the word from the recruitment
+//  pack; the pack now ships "Job Order" (see test_recruit_terminology.php),
+//  so the fixture states the ambiguous word outright rather than depending on
+//  a pack's contents. The BEHAVIOUR asserted below is unchanged.
+$ambig = ['requisition' => ['Requirement', 'Requirements']];
+setting_set('terms', json_encode($ambig)); term_overrides($ambig);
+t_eq(T('requisition'), 'Requirement', 'A3 · a workspace may still call it a Requirement — nothing is forced');
 t_eq(hreq_label('requisition'), 'Recruitment Requirement',
      'A4 · but the screen qualifies it, so it can never be read as a marketplace requirement');
 t_eq(hreq_label('requisition', true), 'Recruitment Requirements', 'A4 · plural too');

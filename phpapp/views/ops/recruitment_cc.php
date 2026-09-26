@@ -118,17 +118,44 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
             //  workspace SHOULD prefer is ADR-001, open since Phase 2 and a
             //  business decision; this sentence deliberately does not take it.
             //  It only stops the user guessing which door exists. ?>
+      <?php
+        //  ONE WORD FOR ONE THING. This screen used to hard-code "requirement"
+        //  while every register said "requisition", so the same record wore two
+        //  names depending on which door you came through — and neither obeyed
+        //  Admin → Terminology. Both now come from the terminology engine.
+        $ccReq  = function_exists('Tl')  ? Tl('requisition')  : 'requisition';
+        $ccReqs = function_exists('Tlp') ? Tlp('requisition') : 'requisitions';
+        $ccReqH = function_exists('TH')  ? TH('requisition')  : 'Requisition';
+        $ccReqsH= function_exists('THP') ? THP('requisition') : 'Requisitions';
+        $ccHrq  = function_exists('Tl')  ? Tl('hiring_request')  : 'hiring request';
+        $ccHrqs = function_exists('Tlp') ? Tlp('hiring_request') : 'hiring requests';
+        //  ADR-001 — where the workspace requires an approved request, the direct
+        //  door is shut, so this page must stop pointing at it. Offering a button
+        //  that lands on a refusal is worse than not offering it.
+        $ccDirect = !function_exists('hreq_direct_path_allowed') || hreq_direct_path_allowed();
+      ?>
       <?php if (function_exists('hreq_can_view') && hreq_can_view()): ?>
-      <p class="sub" style="margin-top:6px">Hiring starts either way: raise a
-        <a href="/hiring-requests">hiring request</a> when the headcount has to be approved first,
-        or create a <a href="/requisition-new">requirement</a> directly when it does not.</p>
+      <p class="sub" style="margin-top:6px"><?php if ($ccDirect): ?>Hiring starts either way: raise a
+        <a href="/hiring-requests"><?= $e($ccHrq) ?></a> when the headcount has to be approved first,
+        or create a <a href="/requisition-new"><?= $e($ccReq) ?></a> directly when it does not.
+        <?php else: ?>Hiring starts with a <a href="/hiring-requests"><?= $e($ccHrq) ?></a>. Once it is
+        approved, “Start recruiting” turns it into a <?= $e($ccReq) ?> carrying the approved headcount.
+        <?php endif; ?></p>
       <?php endif; ?>
       <div class="refreshed"><?= $e($f['dept'] ? ($f['opts']['dept'][$f['dept']] ?? $f['dept']) : 'All departments') ?> · <?= $e($f['fy'] ?: '') ?> · Refreshed <?= date('d-M-Y') ?></div>
     </div>
     <div class="rfacts" style="display:flex;gap:8px;flex-wrap:wrap">
-      <a class="btn primary" href="/requisition-new">＋ New requirement</a>
-      <a class="btn secondary" href="/candidate-new">＋ Add candidate</a>
-      <a class="btn secondary" href="/requisitions">Requirements</a>
+      <?php //  The primary action follows the workspace's own policy: where
+            //  recruitment must start from an approved request, THAT is the
+            //  first thing to offer. Pointing at a door the policy has shut
+            //  would send people to a refusal and teach them to distrust the page. ?>
+      <?php if ($ccDirect): ?>
+        <a class="btn primary" href="/requisition-new">＋ <?= $e(function_exists('T_NEW') ? ucfirst(T_NEW('requisition')) : 'New requisition') ?></a>
+      <?php else: ?>
+        <a class="btn primary" href="/hiring-request">＋ <?= $e(function_exists('T_NEW') ? ucfirst(T_NEW('hiring_request')) : 'New hiring request') ?></a>
+      <?php endif; ?>
+      <a class="btn secondary" href="/candidate-new">＋ Add <?= $e(function_exists('Tl') ? Tl('candidate') : 'candidate') ?></a>
+      <a class="btn secondary" href="/requisitions"><?= $e($ccReqsH) ?></a>
       <?php //  B2 — the hiring-request REGISTER had no door anywhere: not in the
             //  rail, not an area tile, and not on this page. It was reachable only
             //  from an individual request's own detail screen, so you had to be
@@ -167,7 +194,7 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
         <a class="btn secondary" href="/recruit-export?dataset=candidates<?= $__qs ?>">⬇️ Export ▾</a>
         <span class="rcc-export-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--card,#fff);border:1px solid var(--line,#e5e9f0);border-radius:10px;box-shadow:0 6px 20px rgba(16,24,40,.12);z-index:20;min-width:210px;padding:6px">
           <a href="/recruit-export?dataset=candidates<?= $__qs ?>" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">Candidates</a>
-          <a href="/recruit-export?dataset=requisitions<?= $__qs ?>" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">Requirements</a>
+          <a href="/recruit-export?dataset=requisitions<?= $__qs ?>" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit"><?= $e($ccReqsH) ?></a>
           <a href="/recruit-export?dataset=offers<?= $__qs ?>" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">Offers</a>
           <a href="/recruit-export?dataset=funnel<?= $__qs ?>" style="display:block;padding:8px 12px;border-radius:7px;text-decoration:none;color:inherit">Funnel &amp; KPI summary</a>
         </span>
@@ -249,10 +276,10 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   <?php endif; ?>
 
   <!-- 7. TRACKER + PROJECTS (added) -->
-  <div class="band"><h2>Ownership, deployment &amp; the requirement tracker</h2><span class="add">added</span></div>
+  <div class="band"><h2>Ownership, deployment &amp; the <?= $e($ccReq) ?> tracker</h2><span class="add">added</span></div>
   <div class="g2 wide">
-    <div class="panel"><div class="ph"><h3>Requirement tracker</h3><span class="note">Resp 1 = Recruiter · Resp 2 = Reporting manager</span></div>
-      <div class="pb scroll"><?php if (!$d['tracker']): ?><div class="empty">No open requirements for these filters.</div><?php else: ?>
+    <div class="panel"><div class="ph"><h3><?= $e($ccReqH) ?> tracker</h3><span class="note">Resp 1 = Recruiter · Resp 2 = Reporting manager</span></div>
+      <div class="pb scroll"><?php if (!$d['tracker']): ?><div class="empty">No open <?= $e($ccReqs) ?> for these filters.</div><?php else: ?>
         <table><thead><tr><th>Req #</th><th>Posted</th><th>Resp 1</th><th>Resp 2</th><th>Working</th><th>Status</th><th class="num">Earned</th><th class="num">Lost</th><th></th></tr></thead>
         <tbody><?php foreach ($d['tracker'] as $t): $tone=$t['filled']>=$t['qty']?'var(--ok)':($t['filled']>0?'var(--warn)':'var(--bad)'); ?>
           <tr>
@@ -308,7 +335,7 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   <p class="msg msg-warn"><strong><?= (int)$K['over_committed'] ?></strong>
     more <?= (int)$K['over_committed'] === 1 ? 'person has' : 'people have' ?> been promised to sources
     than the approvals allow. Somebody is expecting to supply people there is no approved position for —
-    open the requirements below and reduce a promise.</p>
+    open the <?= $e($ccReqs) ?> below and reduce a promise.</p>
   <?php endif; ?>
   <!-- Manpower P&L (added) -->
   <div class="band" style="margin-top:12px"><h2>Manpower P&amp;L</h2><span class="bd">— money made when seats are filled, and lost while they stay open</span><span class="add">added</span></div>
@@ -384,7 +411,7 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
       <?php endif; ?></div>
     </div>
     <div class="panel"><div class="ph"><h3>Department load</h3><span class="note">candidates vs reached-offer</span></div>
-      <div class="pb"><?php if (!$d['dept']): ?><div class="empty">No department data — tag departments on requirements/candidates.</div><?php else: $dmax=max(1,max(array_map(fn($x)=>$x['cand'],$d['dept']))); ?>
+      <div class="pb"><?php if (!$d['dept']): ?><div class="empty">No department data — tag departments on <?= $e($ccReqs) ?>/<?= $e(function_exists("Tlp") ? Tlp("candidate") : "candidates") ?>.</div><?php else: $dmax=max(1,max(array_map(fn($x)=>$x['cand'],$d['dept']))); ?>
         <div class="dept"><?php foreach ($d['dept'] as $x): ?>
           <div class="drow"><span class="hl" style="text-align:right;overflow:hidden;text-overflow:ellipsis"><?= $e($x['label']) ?></span><div>
             <div class="dbar cand"><i style="width:<?= round($x['cand']/$dmax*100) ?>%"></i></div>
@@ -397,7 +424,7 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
 
   <!-- Recruiter performance (added) -->
   <div class="panel" style="margin-top:16px"><div class="ph"><h3>Recruiter performance <span class="add" style="margin-left:6px">added</span></h3><span class="note">Responsible 1 · posted vs working now, with profit lost while vacant</span></div>
-    <div class="pb"><?php $R=$d['recruiters']; if (!$R): ?><div class="empty">Assign a Recruiter (Responsible 1) on requirements to see this chart.</div><?php else:
+    <div class="pb"><?php $R=$d['recruiters']; if (!$R): ?><div class="empty">Assign a Recruiter (Responsible 1) on <?= $e($ccReqs) ?> to see this chart.</div><?php else:
       $rmax=max(1,max(array_map(fn($x)=>max($x['posted'],$x['working']),$R)));
       $lmax=max(1,max(array_map(fn($x)=>$x['lost'],$R)));
       $n=count($R);$W=520;$H=250;$pl=46;$pr=40;$pb=40;$pt=18;$plot=$H-$pb-$pt;$gw=($W-$pl-$pr)/max(1,$n);
@@ -432,7 +459,7 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
       </table></div>
       <p class="sub" style="margin-top:6px"><b>Carrying</b> and <b>Working</b> are what each person is
         responsible for today. <b>Recruited</b> and <b>Avg days</b> are what they delivered — credited from
-        the assignment history at the moment each person joined, so handing a requirement over does not
+        the assignment history at the moment each person joined, so handing a <?= $e($ccReq) ?> over does not
         move last month's results to somebody else.</p>
       <?php $UN = $d['unattributed'] ?? []; if ((int)($UN['total'] ?? 0) > 0): ?>
       <p class="sub"><strong><?= (int)$UN['total'] ?></strong>
@@ -478,5 +505,5 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   </div>
 
 
-  <p class="foot">Source of every number: the Candidates, Requirements and Placement records inside this app — nothing external is linked. Cards, bars and rows open the live detail screen. Money figures reuse the approved placement commercials.</p>
+  <p class="foot">Source of every number: the <?= $e(function_exists("THP") ? THP("candidate") : "Candidates") ?>, <?= $e($ccReqsH) ?> and <?= $e(function_exists("THP") ? THP("placement") : "Placement") ?> records inside this app — nothing external is linked. Cards, bars and rows open the live detail screen. Money figures reuse the approved placement commercials.</p>
 </div>
