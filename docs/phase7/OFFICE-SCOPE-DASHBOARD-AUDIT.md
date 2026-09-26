@@ -4,7 +4,11 @@
 Ahmedabad data.
 **Scope of this audit:** every tile and number on the Dashboard (`/`) and the
 Command Centre (`/command-centre`).
-**Audited against:** commit `cd96ace`. **AUDIT ONLY — no code was changed.**
+**Audited against:** commit `cd96ace`.
+
+> **STATUS: FIXED.** This document was the audit. The owner then decided all
+> three points, and D1, D2, D3 and I1 were fixed, plus the client/vendor
+> directory scoped by branch. See the closing section for what shipped.
 
 Each finding is marked with how it was established:
 
@@ -219,3 +223,37 @@ as a defect. Suggested wording:
 
 Also worth adding as a check: **every dashboard count must match the number of
 rows in the list it links to.** That single test catches D1, D2, D3 and I1.
+
+
+---
+
+## What shipped (owner decisions applied)
+
+The owner settled the three open points:
+
+1. *"Coordinator of respective office will see only client of that particular
+   office."* → the client and vendor directory and its dashboard tiles now scope
+   on `home_branch_id`. A party with **no** branch set stays visible to everyone,
+   because every existing party is unassigned and a strict filter would have
+   emptied the register on day one. It tightens as the field is filled in.
+2. *"For a contract or work order for their local office must be shown to that
+   office."* → confirms the two-office rule is correct, so **I1 was fixed by
+   bringing the count up to the register**, not by narrowing the register. The
+   rule now has one definition, `call_office_clause()`, which both callers use.
+3. *"Fix all the three."* → D1, D2 and D3 fixed with the same helper their own
+   registers use.
+
+**Evidence.** `tests/test_office_scope_counts.php` (34 assertions) seeds two
+offices, signs in as a coordinator scoped to one, and checks both directions —
+including that a master still sees everything. Each fix was mutation-tested:
+reverting the two-office rule, the directory scope, or the quotations scope each
+makes the suite fail. The directory was additionally verified over HTTP as a
+Mumbai-scoped coordinator, who sees the Mumbai and unassigned clients and not the
+Ahmedabad one. Full regression: **14,167 passed / 0 failed on MariaDB**, 14,163 on
+SQLite.
+
+**Still open, deliberately not done:** the client *pickers* on forms (the
+"Client + Add new" dropdowns on work orders, candidates and quotes) are
+**unchanged** — they still offer every party. Narrowing those would stop a
+coordinator raising work for a party assigned to another branch, which is a
+workflow decision, not a reporting one. Raise it separately if you want it.

@@ -31,7 +31,19 @@ t_ok(!call_alloc_allowed($AMD, [$AMD], false), 'a non-coordinator cannot allocat
 
 // Belt-and-braces: the register visibility SQL ORs both offices, so a refactor
 // cannot silently drop the contracting side (the office that must still see it).
-$src = file_get_contents(__DIR__ . '/../lib/ops.php');
-t_ok(strpos($src, 'c.executing_office_id') !== false
-  && strpos($src, 'OR c.ibo_office_id IN') !== false,
+//
+// That rule used to be written out inline here in ops.php. It was ALSO written
+// out, differently, in the dashboard's open-work-orders count — which scoped on
+// the executing office alone and so under-reported against this very register.
+// It now has one definition, call_office_clause(), and both callers ask it. This
+// guard follows it there: the OR must survive, wherever it lives.
+$srcOps = file_get_contents(__DIR__ . '/../lib/ops.php');
+$srcAcc = file_get_contents(__DIR__ . '/../lib/access.php');
+t_ok(function_exists('call_office_clause'),
+  'the two-office rule has a single named home');
+t_ok(strpos($srcAcc, 'OR $contractCol IN') !== false,
+  'that rule still ORs the contracting office — it was not silently dropped');
+t_ok(strpos($srcOps, "call_office_clause('c.executing_office_id', 'c.ibo_office_id')") !== false,
   'the calls register scopes on BOTH executing and contracting office');
+// The behavioural proof — a real scoped user, real rows, both directions — is in
+// tests/test_office_scope_counts.php; these three only stop a silent regression.

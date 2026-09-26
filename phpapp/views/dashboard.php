@@ -93,7 +93,21 @@
   <?php endif; } ?>
   <?php
     [$jw, $ja] = scope_clause('j.executing_office_id', 'j.sbu');
-    [$cw, $ca] = scope_clause('c.executing_office_id', 'c.sbu');
+    // A work order belongs to the office that CONTRACTED it as well as the one
+    // executing it, and the calls register has always shown both. This count used
+    // the executing office alone, so it reported fewer work orders than the list
+    // it links to. Same rule, one definition — see call_office_clause().
+    //
+    // The Business-Unit half of the scope is NOT part of that rule and still
+    // applies: office and Business Unit are separate questions, and dropping the
+    // second while fixing the first would leak another unit's work into the count.
+    [$cOffW, $ca] = call_office_clause('c.executing_office_id', 'c.ibo_office_id');
+    $cw = $cOffW;
+    $cSbu = function_exists('scope_sbus') ? scope_sbus() : 'ALL';
+    if ($cSbu !== 'ALL' && is_array($cSbu) && $cSbu) {
+        $cw .= ' AND c.sbu IN (' . implode(',', array_fill(0, count($cSbu), '?')) . ')';
+        foreach ($cSbu as $s0) $ca[] = $s0;
+    }
     $openCalls  = (int)ops_val("SELECT COUNT(*) FROM calls c WHERE c.status<>'CLOSED' AND $cw", $ca);
     $openJobs   = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND $jw", $ja);
     $closedJobs = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=1 AND $jw", $ja);
@@ -137,8 +151,17 @@
       <?php elseif ($salesUser || !$hasOps): ?>
       <?php // Sales: the pipeline is what they work. A money-only role (Finance)
             // skips these and gets the money tiles below instead. ?>
-      <div class="kpi"><span class="kic">🎯</span><div class="k">Open leads</div><div class="v"><a href="/leads"><?= (int)(function_exists('ops_val') ? (ops_val("SELECT COUNT(*) FROM leads WHERE status='OPEN'") ?: 0) : 0) ?></a></div><div class="d">Being chased</div></div>
-      <div class="kpi"><span class="kic">💡</span><div class="k">Open deals</div><div class="v"><a href="/opportunities"><?= (int)(function_exists('ops_val') ? (ops_val("SELECT COUNT(*) FROM opportunities WHERE status='OPEN'") ?: 0) : 0) ?></a></div><div class="d">In the pipeline</div></div>
+      <?php
+        // These two counts were written as bare COUNT(*) and so reported the
+        // WHOLE company, while the registers they link to have always scoped by
+        // branch — a branch user saw a number they could not reconcile with the
+        // list. Same helper the registers use, so the count and the list answer
+        // the same question.
+        [$lw, $la] = function_exists('scope_office_clause') ? scope_office_clause('office_id') : ['1=1', []];
+        [$ow, $oa] = function_exists('scope_office_clause') ? scope_office_clause('office_id') : ['1=1', []];
+      ?>
+      <div class="kpi"><span class="kic">🎯</span><div class="k">Open leads</div><div class="v"><a href="/leads"><?= (int)(function_exists('ops_val') ? (ops_val("SELECT COUNT(*) FROM leads WHERE status='OPEN' AND $lw", $la) ?: 0) : 0) ?></a></div><div class="d">Being chased</div></div>
+      <div class="kpi"><span class="kic">💡</span><div class="k">Open deals</div><div class="v"><a href="/opportunities"><?= (int)(function_exists('ops_val') ? (ops_val("SELECT COUNT(*) FROM opportunities WHERE status='OPEN' AND $ow", $oa) ?: 0) : 0) ?></a></div><div class="d">In the pipeline</div></div>
       <?php endif; ?>
       <?php if ($showMoney): ?>
         <div class="kpi"><span class="kic">💳</span><div class="k">Unbilled</div><div class="v"><a href="/invoicing?f=pending"><?= fmoney_short($mc['unbilled']) ?></a></div><div class="d"><?= (int)$mc['pending'] ?> job(s) to invoice</div></div>

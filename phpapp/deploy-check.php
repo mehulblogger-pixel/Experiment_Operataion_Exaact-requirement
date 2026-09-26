@@ -24,15 +24,15 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'f5ce8a1 · 2026-09-24 16:05 UTC · 669 files';
+$RELEASE = '6c1021c · 2026-09-26 02:24 UTC · 669 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
     'cron.php' => ['s'=>23812,'h'=>'9a49ea3b6161e98c'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>118188,'h'=>'2af05203c4e75ab6'],
-    'lib/access.php' => ['s'=>78677,'h'=>'8857597c97b39418'],
+    'index.php' => ['s'=>119577,'h'=>'67f72b8c97ca2243'],
+    'lib/access.php' => ['s'=>80627,'h'=>'ab304699f943eab5'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
     'lib/activity.php' => ['s'=>43860,'h'=>'f50c2abb6660e12e'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
@@ -112,7 +112,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>230566,'h'=>'ccc7801f1028c726'],
+    'lib/crm.php' => ['s'=>231023,'h'=>'6943b560b7c4355c'],
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>18815,'h'=>'62cf444263106e61'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -171,7 +171,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66367,'h'=>'a72d0b3a6f354b7c'],
-    'lib/ops.php' => ['s'=>677035,'h'=>'c2304c486d596db6'],
+    'lib/ops.php' => ['s'=>676976,'h'=>'ea19a3d7d385cd3f'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -293,7 +293,7 @@ $EXPECT  = [
     'tools/trace-audit.php' => ['s'=>2789,'h'=>'d95c97624d3d470e'],
     'tools/trace-thread.php' => ['s'=>4962,'h'=>'cb20d74d1a6eb46e'],
     'views/admin.php' => ['s'=>1090,'h'=>'aeb34e3396fd4ac5'],
-    'views/dashboard.php' => ['s'=>43885,'h'=>'c49a84e1f7c11c61'],
+    'views/dashboard.php' => ['s'=>45374,'h'=>'4e3ac8432be6dc34'],
     'views/detail.php' => ['s'=>34739,'h'=>'fc48123e14455cee'],
     'views/forgot_password.php' => ['s'=>2716,'h'=>'c041f8176182b36c'],
     'views/form.php' => ['s'=>24206,'h'=>'959912d692fa235f'],

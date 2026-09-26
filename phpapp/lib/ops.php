@@ -4977,14 +4977,13 @@ function ops_calls($route, $method) {
         $q = trim($_GET['q'] ?? '');
         $minCost = ($_GET['mincost'] ?? '') !== '' ? (float)$_GET['mincost'] : null;
         // Visible to BOTH the contracting and the executing office (peer offices).
-        $off = scope_offices(); $sbu = scope_sbus();
+        $sbu = scope_sbus();
         $conds = []; $args = [];
-        if ($off !== 'ALL' && is_array($off) && $off) {
-            $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
-            $ids = implode(',', array_map('intval', $off)); // inline ints (COALESCE drops bind affinity)
-            // Visible to BOTH the managing/contracting office and the executing office.
-            $conds[] = "(COALESCE(c.executing_office_id,$ahm) IN ($ids) OR c.ibo_office_id IN ($ids))";
-        }
+        // Visible to BOTH the managing/contracting office and the executing office.
+        // The rule itself lives in call_office_clause() so this register and the
+        // dashboard's open-work-orders count cannot drift apart again.
+        [$cOff, $cOffArgs] = call_office_clause('c.executing_office_id', 'c.ibo_office_id');
+        if ($cOff !== '1=1') { $conds[] = $cOff; foreach ($cOffArgs as $a0) $args[] = $a0; }
         if ($sbu !== 'ALL' && is_array($sbu) && $sbu) {
             $ph = implode(',', array_fill(0, count($sbu), '?'));
             $conds[] = "c.sbu IN ($ph)"; foreach ($sbu as $s) $args[] = $s;

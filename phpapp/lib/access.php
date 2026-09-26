@@ -810,6 +810,39 @@ function scope_clause($officeCol, $sbuCol) {
     return [$w ? implode(' AND ', $w) : '1=1', $args];
 }
 
+// ============================================================================
+//  THE TWO-OFFICE RULE FOR WORK ORDERS — one definition, every caller.
+//
+//  A work order belongs to TWO offices: the CONTRACTING office, which holds the
+//  client's order, and the EXECUTING office, which does the work. Both must see
+//  it — a branch that sold the work cannot chase it if the register hides it the
+//  moment another branch is asked to carry it out.
+//
+//  This was written out by hand in the calls register and, separately and
+//  DIFFERENTLY, in the dashboard's open-work-orders count: the count scoped on
+//  the executing office alone, so it under-reported against the very list it
+//  linked to. A rule stated twice is a rule that drifts, so it is stated once
+//  here and both callers ask this function.
+//
+//  A NULL executing office is treated as the managing (Ahmedabad) office, which
+//  is what scope_clause() above already does — the two must not disagree about
+//  an unassigned row.
+//
+//  This GRANTS NOTHING new: it is the calls register's existing rule, moved. The
+//  Business-Unit half is still scope_clause()'s job and is applied by the caller.
+//  $execCol / $contractCol are the executing and contracting office columns.
+// ============================================================================
+function call_office_clause($execCol, $contractCol) {
+    $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
+    if ($off === 'ALL' || !is_array($off) || !$off) return ['1=1', []];
+    static $ahm = null;
+    if ($ahm === null) $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
+    // Inline integer ids for the same reason scope_clause() does: a bound '20'
+    // does not match int 20 once COALESCE() has dropped integer affinity.
+    $ids = implode(',', array_map('intval', $off));
+    return ["(COALESCE($execCol, $ahm) IN ($ids) OR $contractCol IN ($ids))", []];
+}
+
 // Phase 2 §51 — the SCALAR twin of scope_clause(), for guarding a single record
 // fetched by id (detail / PDF / file-stream handlers). The list layer scopes with
 // scope_clause(); this closes the matching cross-office IDOR on the fetch-by-id

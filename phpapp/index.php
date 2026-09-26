@@ -1248,8 +1248,11 @@ if ($route === '') {
         && function_exists('ops_recruitment_home') && function_exists('recruit_home_can') && recruit_home_can()) {
         return ops_recruitment_home($method);
     }
-    $clients = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_client=1")->fetchColumn();
-    $vendors = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_vendor=1")->fetchColumn();
+    // Counted with the SAME branch rule as the register these tiles link to, so
+    // the number on the dashboard and the rows in the directory always agree.
+    [$bw, $ba] = function_exists('scope_office_clause') ? scope_office_clause('home_branch_id') : ['1=1', []];
+    $clients = (int)ops_val("SELECT COUNT(*) FROM business_partners WHERE is_client=1 AND $bw", $ba);
+    $vendors = (int)ops_val("SELECT COUNT(*) FROM business_partners WHERE is_vendor=1 AND $bw", $ba);
     return view('dashboard', ['clients' => $clients, 'vendors' => $vendors]);
 }
 
@@ -1262,6 +1265,22 @@ if ($route === 'clients' || $route === 'vendors') {
     $per = 40;
     $where = "$roleField = 1";
     $args = [];
+    // ------------------------------------------------------------------
+    //  Owner decision: a branch sees ITS OWN parties, not the whole company's.
+    //
+    //  business_partners.home_branch_id has existed (and been editable on the
+    //  360 screen) since the beginning, but nothing ever scoped on it, so every
+    //  branch read the entire directory.
+    //
+    //  A party with NO branch set stays visible to everyone. That is deliberate,
+    //  and it is the same rule leads, opportunities and complaints already use:
+    //  every existing party is unassigned today, so a strict filter would empty
+    //  this register for every branch user the moment it shipped. As each party
+    //  is given a branch it leaves the shared pool and belongs to that branch —
+    //  the directory tightens as the data is filled in, instead of going dark.
+    // ------------------------------------------------------------------
+    [$pw, $pa] = function_exists('scope_office_clause') ? scope_office_clause('home_branch_id') : ['1=1', []];
+    if ($pw !== '1=1') { $where .= " AND $pw"; foreach ($pa as $pa0) $args[] = $pa0; }
     if ($status) { $where .= " AND status = ?"; $args[] = $status; }
     if ($q) {
         $where .= " AND (legal_name LIKE ? OR display_name LIKE ? OR code LIKE ? OR gstin LIKE ? OR pan LIKE ?)";

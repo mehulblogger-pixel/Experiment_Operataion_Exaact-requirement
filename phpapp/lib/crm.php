@@ -1015,7 +1015,12 @@ function quote_validity($q) {
 // them. Scoped to is_current so superseded revisions are not double-counted.
 function quotes_expired_count() {
     try {
-        return (int)ops_val("SELECT COUNT(*) FROM quotations WHERE status='EXPIRED' AND COALESCE(is_current,1)=1");
+        // Branch-scoped, like every other quotation query: this feeds an attention
+        // tile on the Command Centre, and a branch manager acting on a number that
+        // counts other branches' lapsed quotations is chasing somebody else's work.
+        // quotations.office_id is the same column the quotation register scopes on.
+        [$w, $a] = function_exists('scope_office_clause') ? scope_office_clause('office_id') : ['1=1', []];
+        return (int)ops_val("SELECT COUNT(*) FROM quotations WHERE status='EXPIRED' AND COALESCE(is_current,1)=1 AND $w", $a);
     } catch (Throwable $e) { return 0; }
 }
 

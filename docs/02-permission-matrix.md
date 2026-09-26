@@ -109,6 +109,44 @@ marketplace professional to link to, so the capability was unusable in any case
 and permitting the write was entitlement leakage. The coordinator/manager/master
 band itself is unchanged.
 
+**Branch visibility of parties, and of the numbers that describe them
+(owner decision, this change).** Three things were settled together; none of them
+adds, removes or widens a **permission** — each narrows what an already-permitted
+user is *shown*, which is scope, not authority.
+
+1. **A branch sees its own parties.** The client and vendor directory
+   (`/clients`, `/vendors`) and the dashboard tiles that count them now scope on
+   `business_partners.home_branch_id` through the existing
+   `scope_office_clause()`. That column has always existed and has always been
+   editable on the 360 screen; nothing scoped on it, so every branch read the
+   whole company's directory. **A party with no branch set stays visible to
+   everyone** — the same "unassigned belongs to nobody, so it must not vanish"
+   rule leads, opportunities and complaints already use. Every existing party is
+   unassigned, so a strict filter would have emptied the register for every
+   branch user on the day it shipped; the directory tightens as the field is
+   filled in instead of going dark. Making it strict later is a one-line change
+   and a data question, not a permission question.
+
+2. **The two-office rule for work orders is now stated once.** A work order
+   belongs to the office that **contracted** it as well as the one **executing**
+   it, and both must see it. The calls register has always done this; the
+   dashboard's open-work-orders count scoped on the executing office alone and so
+   **under-reported against the very list it linked to**. The rule now lives in
+   `call_office_clause()` (`access.php`) and both callers ask it. The register's
+   behaviour is unchanged — this is the count catching up, not a widening.
+
+3. **Three counts that ignored scope now honour it.** The open-leads and
+   open-deals dashboard tiles and `quotes_expired_count()` (the Command Centre's
+   "Quotations lapsed") were hand-written `COUNT(*)`s that reported the whole
+   company while their registers scoped by branch. Each now uses
+   `scope_office_clause()` on the column its own register already scopes on.
+
+**The rule these four share:** a count and the list it links to must answer the
+same question. Where they disagreed, the list was right. Evidence and the full
+tile-by-tile trace are in `docs/phase7/OFFICE-SCOPE-DASHBOARD-AUDIT.md`;
+`tests/test_office_scope_counts.php` holds the behavioural proof, and each fix
+was mutation-tested by reverting it and confirming the suite fails.
+
 **Scope on identity relationships (R15 · invariant I16 — PARTIAL, deliberately).**
 No identity path evaluated branch scope at all. Each writer now applies
 **per-end visibility**: you may not build or break a relationship out of a record
