@@ -30,7 +30,22 @@ score is computed and then thrown away three lines later.
   `assignment_billing_packet()` independently checks `appr['rev'] > 0`. What was
   broken was the record and the green "Approved" assurance, not the invoice.
 
-## Recommended order
+## Status — all six are now fixed
+
+| # | Complaint | Shipped as |
+|---|---|---|
+| 1 | Saves from the first tab with no further input | `67356a6` — the form draws Back / Next / "Step 1 of 4"; Save stays reachable and says what it leaves for later |
+| 2 | Hardcoded tabs fight the configured workflow | `778e2b8` — the current stage decides which panel opens; ADR-003 |
+| 3 | CTC must build the salary structure | `75026fb` — `comp_solve_from_ctc()`, both policy numbers configurable |
+| 4 | Budget at requisition *and* approval | `7409278` — the approver sees the commitment above the Approve button |
+| 5 | Manual "same person" tick | `67356a6` — linked automatically on exact mobile/e-mail; ambiguity still asked |
+| 6 | Blank approved commercial accepted | `b309485` — refused, in a way that still accepts a fee-only agency deal |
+
+Incidental, found while verifying point 1 in a real browser: every page requested
+a URL of 5,000 letter A's and got a 404, because `logo_html()` trusted the logo
+setting blindly. Guarded; falls back to the text logo.
+
+## Original recommended order
 
 1. Cost on the hiring request and on the approval screen (point 4) — medium
    effort, low risk, largest business exposure.
