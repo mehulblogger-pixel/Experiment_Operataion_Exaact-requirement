@@ -123,6 +123,143 @@ function comp_compute($inputs) {
             'ctc' => $gross + $emp, 'net' => $gross - $ded];
 }
 
+// ---- The SOLVER: a CTC in, a whole structure out ---------------------------
+//
+//  comp_compute() above works bottom-up: you type every FIXED component and it
+//  derives the percentage ones. That is the wrong way round for the conversation
+//  that actually happens. Nobody negotiates a Basic. They agree a CTC — "twelve
+//  lakh" — and the structure has to follow from it.
+//
+//  Every Indian payroll platform does this top-down (Zoho Payroll, Keka,
+//  greytHR, Darwinbox), and they all do it the same way:
+//
+//      Basic              = a percentage of CTC          (policy)
+//      HRA, PF, gratuity… = derived from Basic            (already configured)
+//      one component      = the BALANCING figure          (policy)
+//
+//  The last line is what makes the arithmetic close exactly on the agreed
+//  number. Without a balancing component you get a structure that is nearly the
+//  CTC, and "nearly" is not something you can put in an offer letter.
+//
+//  BOTH policy numbers are settings, not constants, because they differ by
+//  company and by country — and this product is sold to TPIAs and project
+//  management companies who operate outside India.
+
+//  Basic as a percentage of CTC. 40% is the common Indian default; a company
+//  that uses 50% changes it once, here.
+function comp_basic_pct() {
+    $v = function_exists('setting_get') ? (float) setting_get('comp_basic_pct', 40) : 40.0;
+    return ($v > 0 && $v <= 100) ? $v : 40.0;
+}
+
+//  Which component absorbs the remainder so the total lands exactly on the CTC.
+//  It must be a FIXED earning — a percentage component cannot absorb anything,
+//  because changing it changes what it is a percentage of.
+function comp_balance_code() {
+    $c = function_exists('setting_get') ? strtoupper(trim((string) setting_get('comp_balance_code', 'SPECIAL'))) : 'SPECIAL';
+    return $c !== '' ? $c : 'SPECIAL';
+}
+
+//  The components a person can type a number into: FIXED ones only.
+function comp_fixed_codes() {
+    $out = [];
+    foreach (comp_defs(true) as $d) if ($d['calc'] === 'FIXED') $out[] = (string) $d['code'];
+    return $out;
+}
+
+/**
+ * Build a whole salary structure from one CTC figure.
+ *
+ * $targetCtc is in the SAME period as the component amounts — monthly, unless a
+ * workspace has configured otherwise. Callers holding an ANNUAL figure divide by
+ * twelve before calling; comp_solve_from_annual_ctc() does that for them.
+ *
+ * $pinned lets a person override any FIXED component ("make HRA 25,000") and
+ * re-solve around it: the balancing component simply absorbs a different
+ * remainder, so the total still lands on the CTC. That is the behaviour people
+ * expect when they edit one line of an offer.
+ *
+ * Returns comp_compute()'s result plus:
+ *    'inputs'  the FIXED amounts it solved for — what to store
+ *    'err'     set when the CTC cannot be made to fit, with a sentence saying why
+ *
+ * WHY IT ITERATES: the structure is linear in Basic, so one pass would do — but
+ * only while no component is a percentage of GROSS. A PCT_GROSS component makes
+ * the balancing figure feed back into the total it is trying to complete. Three
+ * or four passes settle that to the paisa; the loop stops as soon as it has.
+ */
+function comp_solve_from_ctc($targetCtc, array $pinned = []) {
+    comp_migrate();
+    $target = (float) $targetCtc;
+    if ($target <= 0)
+        return ['err' => 'Enter the CTC first — the structure is worked out from it.'];
+
+    $defs = comp_defs(true);
+    if (!$defs)
+        return ['err' => 'No salary components are configured yet. Set them up under Compensation setup first.'];
+
+    $balCode = comp_balance_code();
+    $balDef  = null;
+    foreach ($defs as $d) if ((string) $d['code'] === $balCode) $balDef = $d;
+    if (!$balDef || $balDef['calc'] !== 'FIXED' || $balDef['section'] !== 'EARNING')
+        return ['err' => 'The balancing component (' . e_plain($balCode) . ') must be a fixed EARNING, '
+                       . 'because it is what absorbs the remainder. Change it under Compensation setup.'];
+
+    //  Pinned values a person typed win over anything solved.
+    $pin = [];
+    foreach ($pinned as $k => $v) {
+        $k = strtoupper(trim((string) $k));
+        if ($v === '' || $v === null) continue;
+        $pin[$k] = max(0.0, (float) $v);
+    }
+
+    //  Basic follows policy unless it was pinned.
+    $inputs = $pin;
+    if (!isset($inputs['BASIC'])) $inputs['BASIC'] = round($target * comp_basic_pct() / 100, 2);
+    if (!isset($inputs[$balCode])) $inputs[$balCode] = 0.0;
+
+    $r = null;
+    for ($i = 0; $i < 12; $i++) {
+        $r = comp_compute($inputs);
+        $gap = $target - (float) $r['ctc'];
+        if (abs($gap) < 0.01) break;
+        //  A pinned balancing component cannot absorb anything — the person has
+        //  fixed it — so there is nothing left to adjust and the gap is real.
+        if (isset($pin[$balCode])) break;
+        $inputs[$balCode] = round(max(0.0, $inputs[$balCode] + $gap), 2);
+        if ($inputs[$balCode] <= 0 && $gap < 0) break;      // cannot go below zero
+    }
+    $r = comp_compute($inputs);
+    $r['inputs'] = $inputs;
+
+    //  THE HONEST FAILURE. A CTC too small for the structure — the statutory
+    //  floor plus the Basic percentage already exceed it — cannot be made to fit
+    //  by driving a component negative. Say so, with the figure it CAN do, rather
+    //  than silently returning something that does not add up.
+    if (abs($target - (float) $r['ctc']) >= 0.01) {
+        $r['err'] = 'This CTC cannot be split by the configured structure: the components already come to '
+                  . number_format((float) $r['ctc'], 2)
+                  . ($target < (float) $r['ctc']
+                     ? ', which is more than the CTC entered. Lower the Basic percentage, or raise the CTC.'
+                     : '. Check the pinned amounts.');
+    }
+    return $r;
+}
+
+/** The same, from an ANNUAL CTC — what a person actually negotiates. */
+function comp_solve_from_annual_ctc($annual, array $pinned = []) {
+    $a = (float) $annual;
+    if ($a <= 0) return ['err' => 'Enter the annual CTC first — the structure is worked out from it.'];
+    $r = comp_solve_from_ctc($a / 12, $pinned);
+    if (!isset($r['err'])) { $r['annual_ctc'] = round((float) $r['ctc'] * 12, 2); $r['monthly_ctc'] = (float) $r['ctc']; }
+    return $r;
+}
+
+//  A tiny escaper so this library never depends on a view helper being loaded.
+if (!function_exists('e_plain')) {
+    function e_plain($s) { return htmlspecialchars((string) $s, ENT_QUOTES); }
+}
+
 // ---- Admin screen ----------------------------------------------------------
 function ops_comp_setup($route, $method) {
     ops_require(hiring_admin_can(), 'Only an administrator can configure the compensation structure.');
@@ -131,6 +268,22 @@ function ops_comp_setup($route, $method) {
         $do = (string)($_POST['do'] ?? '');
         if ($do === 'save') { comp_save((int)($_POST['id'] ?? 0), $_POST); flash('Component saved.'); redirect('/comp-setup'); return true; }
         if ($do === 'toggle') { $c = comp_get((int)($_POST['id'] ?? 0)); if ($c) comp_set_active($c['id'], (int)$c['active'] === 0); flash('Component updated.'); redirect('/comp-setup'); return true; }
+        if ($do === 'save_policy') {
+            //  Validated here, not trusted from the form: a dropdown is not a
+            //  security boundary, and a bad value here silently breaks every
+            //  structure solved from a CTC afterwards.
+            $pct = (float) ($_POST['comp_basic_pct'] ?? 0);
+            if ($pct <= 0 || $pct > 100) { flash('Basic must be between 1 and 100 percent of CTC.', 'error'); redirect('/comp-setup'); return true; }
+            $code = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', (string) ($_POST['comp_balance_code'] ?? '')));
+            $ok = false;
+            foreach (comp_defs(true) as $d)
+                if ((string) $d['code'] === $code && $d['calc'] === 'FIXED' && $d['section'] === 'EARNING') $ok = true;
+            if (!$ok) { flash('The balancing heading must be an active fixed earning.', 'error'); redirect('/comp-setup'); return true; }
+            setting_set('comp_basic_pct', (string) $pct);
+            setting_set('comp_balance_code', $code);
+            flash('Saved. Structures built from a CTC will use these rules.');
+            redirect('/comp-setup'); return true;
+        }
     }
     view('ops/comp_setup', ['defs' => comp_defs(false)]);
     return true;

@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '7409278 · 2026-09-26 11:07 UTC · 669 files';
+$RELEASE = '67356a6 · 2026-09-26 11:41 UTC · 669 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -60,7 +60,7 @@ $EXPECT  = [
     'lib/capa.php' => ['s'=>34318,'h'=>'cf9edf290b106bfd'],
     'lib/careers.php' => ['s'=>22969,'h'=>'70a9ec1b3acf87e3'],
     'lib/chain.php' => ['s'=>27590,'h'=>'38344fcbe18d90b5'],
-    'lib/comp_config.php' => ['s'=>7659,'h'=>'27cd15fc2a212675'],
+    'lib/comp_config.php' => ['s'=>15360,'h'=>'5864ccfc2501116d'],
     'lib/company.php' => ['s'=>7536,'h'=>'cf72adf65cfa6d50'],
     'lib/competence.php' => ['s'=>54296,'h'=>'0761c88493b8c827'],
     'lib/complaints.php' => ['s'=>35427,'h'=>'3946b876dd98817e'],
@@ -201,7 +201,7 @@ $EXPECT  = [
     'lib/recruit_iv.php' => ['s'=>37985,'h'=>'d2e6b17e25cd12d9'],
     'lib/recruit_jd.php' => ['s'=>11577,'h'=>'fa60a38877273cec'],
     'lib/recruit_kpi.php' => ['s'=>43621,'h'=>'d9267e844dd99993'],
-    'lib/recruit_offer.php' => ['s'=>41997,'h'=>'7fd9534ac1e37f55'],
+    'lib/recruit_offer.php' => ['s'=>45886,'h'=>'96d89be986225584'],
     'lib/recruitpipe.php' => ['s'=>43744,'h'=>'168882c8e5c0c53c'],
     'lib/reportreview.php' => ['s'=>23222,'h'=>'ae43c4d37883823d'],
     'lib/reqfulfil.php' => ['s'=>12422,'h'=>'a87525ad1e75247a'],
@@ -365,7 +365,7 @@ $EXPECT  = [
     'views/ops/cockpit_modules.php' => ['s'=>5449,'h'=>'a1e3647e2802cc69'],
     'views/ops/cockpit_profile.php' => ['s'=>3071,'h'=>'84f78f02c0bef441'],
     'views/ops/command_centre.php' => ['s'=>5231,'h'=>'be8e5e385e08143a'],
-    'views/ops/comp_setup.php' => ['s'=>5249,'h'=>'9ee748c328fab799'],
+    'views/ops/comp_setup.php' => ['s'=>7455,'h'=>'2ca8003131120124'],
     'views/ops/company.php' => ['s'=>6302,'h'=>'af23bb3d61ea191e'],
     'views/ops/competence.php' => ['s'=>15684,'h'=>'0158f2c7aabbdebd'],
     'views/ops/complaint_detail.php' => ['s'=>16443,'h'=>'ccb78feeceb225b2'],

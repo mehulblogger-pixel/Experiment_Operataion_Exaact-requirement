@@ -162,6 +162,30 @@ function sal_save($candidateId, $post) {
     if (function_exists('comp_defs') && function_exists('comp_compute')) {
         $inputs = [];
         foreach (comp_defs(true) as $d) if ($d['calc'] === 'FIXED') $inputs[$d['code']] = (float)($post['c_' . $d['code']] ?? 0);
+
+        //  FROM THE CTC, when that is what was given.
+        //
+        //  This used to demand every fixed component by hand — Basic, then
+        //  Conveyance, then Special allowance — which is the wrong way round for
+        //  the conversation that happens. People agree a CTC and the structure
+        //  follows from it. When a CTC arrives, the solver works out the
+        //  components from the company's own configuration, and anything the
+        //  person typed is PINNED so their edits survive the solve.
+        $ctcIn = trim((string) ($post['solve_ctc'] ?? ''));
+        if ($ctcIn !== '' && (float) $ctcIn > 0 && function_exists('comp_solve_from_ctc')) {
+            $pin = [];
+            foreach ($inputs as $code => $amt)
+                if (trim((string) ($post['c_' . $code] ?? '')) !== '' && (float) $amt > 0) $pin[$code] = (float) $amt;
+            $annual = ((string) ($post['solve_period'] ?? 'MONTHLY')) === 'ANNUAL';
+            $solved = $annual
+                ? comp_solve_from_annual_ctc((float) $ctcIn, $pin)
+                : comp_solve_from_ctc((float) $ctcIn, $pin);
+            //  A solve that cannot close is not written. Returning the reason
+            //  matters more than writing a structure that does not add up.
+            if (!empty($solved['err'])) return ['err' => $solved['err']];
+            $inputs = $solved['inputs'];
+        }
+
         $r = comp_compute($inputs);
         db()->prepare("INSERT INTO salary_structures (candidate_id,currency,gross_ctc,net_pay,total_deductions,employer_cost,lines_json,candidate_expected,internal_benchmark,approved_budget,notes,created_by,created_by_id,created_at)
                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
@@ -424,7 +448,15 @@ function ops_candidate_offer($route, $method) {
     ops_require(is_coordinator_level(), 'Only coordinators / administrators can manage offers.');
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');
-        if ($do === 'sal_save') { sal_save($id, $_POST); flash('Salary structure saved.'); }
+        if ($do === 'sal_save') {
+            //  A solve that could not close returns a reason instead of writing.
+            //  Reporting "saved" over a refusal is the same class of mistake the
+            //  offer route below was corrected for: being told something exists
+            //  when it does not.
+            $salRes = sal_save($id, $_POST);
+            if (is_array($salRes) && !empty($salRes['err'])) flash($salRes['err'], 'error');
+            else flash('Salary structure saved.');
+        }
         elseif ($do === 'hrd_save') { hrd_save($id, $_POST); flash('HR discussion recorded.'); }
         elseif ($do === 'offer_create') {
             //  M6 (adversarial audit) — as with the interview route above: an offer
@@ -495,7 +527,33 @@ function recruit_offer_panel($cand) {
         <?php if ($can): ?>
         <details style="margin-top:10px"><summary style="cursor:pointer;font-size:12.5px;color:var(--brand,#1e40af)"><?= $sal ? 'Revise the salary structure' : 'Build the salary structure' ?></summary>
           <form method="post" action="<?= $act ?>" style="margin-top:8px"><input type="hidden" name="do" value="sal_save">
-            <p class="muted" style="margin:0 0 6px;font-size:11.5px">Enter the fixed amounts; % components compute automatically. Headings are set under <a href="/comp-setup">Compensation setup</a>.</p>
+            <?php //  THE CTC BOX. This is the number people actually agree, and it
+                  //  was the one number this form could not take: it demanded the
+                  //  components instead and left the person to work backwards.
+                  //  Type the CTC and the structure is built from the company's
+                  //  own configuration; type a component as well and that one is
+                  //  honoured, with the balance re-solved around it. ?>
+            <div style="background:var(--soft,#eef2ff);border:1px solid var(--line,#dbe2ea);border-radius:6px;padding:10px;margin-bottom:10px">
+              <label class="ff-l" style="font-weight:700">Build it from the CTC <span class="muted" style="font-weight:400">— the usual way round</span></label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:4px">
+                <div style="flex:1;min-width:150px">
+                  <input class="form-control" type="number" step="any" min="0" name="solve_ctc" placeholder="e.g. 1200000">
+                </div>
+                <div style="min-width:130px">
+                  <select class="form-control" name="solve_period">
+                    <option value="ANNUAL">per year</option>
+                    <option value="MONTHLY">per month</option>
+                  </select>
+                </div>
+              </div>
+              <p class="muted" style="margin:6px 0 0;font-size:11.5px">
+                Basic is <?= $e(function_exists('comp_basic_pct') ? rtrim(rtrim(number_format(comp_basic_pct(), 2, '.', ''), '0'), '.') : '40') ?>% of CTC and
+                <?= $e(function_exists('comp_balance_code') ? comp_balance_code() : 'SPECIAL') ?> absorbs the remainder, so the total lands exactly on the figure you type.
+                Both are set under <a href="/comp-setup">Compensation setup</a>.
+                Leave this blank to type every component by hand instead.
+              </p>
+            </div>
+            <p class="muted" style="margin:0 0 6px;font-size:11.5px">Or enter the fixed amounts; % components compute automatically. Anything you type here is kept, and the CTC above is re-balanced around it. Headings are set under <a href="/comp-setup">Compensation setup</a>.</p>
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
               <?php foreach ($defs as $d): ?>
                 <div><label class="ff-l"><?= $e($d['name']) ?><?= $d['calc']!=='FIXED'?' <span style="color:var(--muted,#94a3b8)">('.$e(rtrim(rtrim(number_format((float)$d['rate'],2,'.',''),'0'),'.')).'% '.($d['calc']==='PCT_BASIC'?'basic':'gross').')</span>':'' ?></label>

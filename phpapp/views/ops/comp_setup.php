@@ -14,6 +14,41 @@ foreach ($defs as $d) $byType[$d['section']][] = $d;
     <p class="sub" style="margin:2px 0 0">Define the salary headings your offers are built from — earnings, employee deductions and employer contributions — with their calculation rule and statutory flag. The salary structure computes CTC, net pay and employer cost from these.</p></div>
 </div>
 
+<?php //  THE TWO POLICY NUMBERS THE SOLVER NEEDS.
+      //
+      //  They belong here, beside the headings they act on, and they are
+      //  SETTINGS rather than constants because they differ by company and by
+      //  country — this product is sold to TPIAs and project management
+      //  companies who operate outside India, where "40% of CTC" means nothing.
+      $bpct = function_exists('comp_basic_pct') ? comp_basic_pct() : 40;
+      $bcode = function_exists('comp_balance_code') ? comp_balance_code() : 'SPECIAL';
+      $fixedEarnings = array_values(array_filter($defs, fn($d) => $d['calc'] === 'FIXED' && $d['section'] === 'EARNING' && (int) $d['active'] === 1));
+?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Building a structure from a CTC</h3>
+  <p class="muted" style="font-size:12.5px;margin:0 0 10px">When somebody types an agreed CTC on an offer, these two rules turn it into a full structure. Everything else is derived from the headings below.</p>
+  <form method="post" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+    <input type="hidden" name="do" value="save_policy">
+    <div>
+      <label class="ff-l">Basic is this % of CTC</label>
+      <input class="form-control" type="number" step="0.01" min="1" max="100" name="comp_basic_pct"
+             value="<?= $e(rtrim(rtrim(number_format((float) $bpct, 2, '.', ''), '0'), '.')) ?>" style="width:110px">
+    </div>
+    <div>
+      <label class="ff-l">This heading absorbs the remainder</label>
+      <select class="form-control" name="comp_balance_code" style="min-width:200px">
+        <?php foreach ($fixedEarnings as $fe): ?>
+          <option value="<?= $e($fe['code']) ?>" <?= $bcode === (string) $fe['code'] ? 'selected' : '' ?>><?= $e($fe['name']) ?> (<?= $e($fe['code']) ?>)</option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div><button class="btn">Save</button></div>
+  </form>
+  <p class="muted" style="font-size:11.5px;margin:8px 0 0">
+    Only a <strong>fixed earning</strong> can absorb the remainder — a percentage heading cannot, because changing it changes what it is a percentage of. That is why this list shows only fixed earnings.
+  </p>
+</div>
+
 <?php foreach ($sections as $sk => $slabel): ?>
 <div class="panel">
   <h3 class="tab-sub"><?= $e($slabel) ?></h3>
