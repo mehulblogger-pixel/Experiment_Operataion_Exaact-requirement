@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '0c36829 · 2026-09-26 03:17 UTC · 669 files';
+$RELEASE = 'f18c052 · 2026-09-26 04:43 UTC · 669 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -133,7 +133,7 @@ $EXPECT  = [
     'lib/formdesign.php' => ['s'=>70278,'h'=>'82250b1cc55e3402'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
     'lib/helpers.php' => ['s'=>22586,'h'=>'20c14bf04d17d018'],
-    'lib/hiringreq.php' => ['s'=>72971,'h'=>'bad25e23747d5ddf'],
+    'lib/hiringreq.php' => ['s'=>76068,'h'=>'30ee9138036ec7bd'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
     'lib/idems.php' => ['s'=>786654,'h'=>'ac696b399296a300'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
@@ -171,7 +171,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66433,'h'=>'c2e1f6090c75b5b9'],
-    'lib/ops.php' => ['s'=>677141,'h'=>'2ba9f2f68f9cca68'],
+    'lib/ops.php' => ['s'=>679687,'h'=>'7b0748bb78bf53a4'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -185,7 +185,7 @@ $EXPECT  = [
     'lib/position.php' => ['s'=>19369,'h'=>'66f6dff09b985620'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'fbf0949ead05b0b8'],
     'lib/pricing_admin.php' => ['s'=>10272,'h'=>'7f36c21dab0d782d'],
-    'lib/projcosting.php' => ['s'=>33732,'h'=>'48ba8a74f97ef790'],
+    'lib/projcosting.php' => ['s'=>34494,'h'=>'3f2482fab1b534e8'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
     'lib/qr.php' => ['s'=>17936,'h'=>'4d50b69b53bfa5e2'],
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],
@@ -561,7 +561,7 @@ $EXPECT  = [
     'views/ops/reimbursable_dedup.php' => ['s'=>5209,'h'=>'95ba7f96fb4ccc26'],
     'views/ops/report_reviews.php' => ['s'=>5202,'h'=>'278f5b6a228a0349'],
     'views/ops/reports.php' => ['s'=>15068,'h'=>'3be87a0f606b8d82'],
-    'views/ops/requisition_detail.php' => ['s'=>28408,'h'=>'c18476bfc6f83d3f'],
+    'views/ops/requisition_detail.php' => ['s'=>29284,'h'=>'158317c89233e944'],
     'views/ops/requisition_form.php' => ['s'=>62067,'h'=>'ecf86c68dc903fd3'],
     'views/ops/requisition_list.php' => ['s'=>2651,'h'=>'c15db7b60de5f2b7'],
     'views/ops/reset_data.php' => ['s'=>3978,'h'=>'227a141a70167b40'],
@@ -585,7 +585,7 @@ $EXPECT  = [
     'views/ops/search.php' => ['s'=>5790,'h'=>'85c5e4d33094db3f'],
     'views/ops/service_formats.php' => ['s'=>3036,'h'=>'ebbdc8d0a4949083'],
     'views/ops/service_scope.php' => ['s'=>8698,'h'=>'0199104c8ce5aefb'],
-    'views/ops/settings.php' => ['s'=>69348,'h'=>'307c6d1ea9cf9056'],
+    'views/ops/settings.php' => ['s'=>71263,'h'=>'c4940ac6ddab9894'],
     'views/ops/setup.php' => ['s'=>4814,'h'=>'2b39de10efe5b331'],
     'views/ops/site_docs.php' => ['s'=>5044,'h'=>'9e876a99f63d2805'],
     'views/ops/sla_targets.php' => ['s'=>2740,'h'=>'b96c71ffc40bd861'],

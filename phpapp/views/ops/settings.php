@@ -308,6 +308,32 @@
   </div>
   <?php endif; // reporting controls ?>
 
+  <?php // ADR-001 (decided) — how recruitment is allowed to start. Only offered
+        // where the hiring module is licensed; the hidden marker tells the save
+        // handler the checkbox was on this form, so an unchecked box means "off"
+        // rather than "the form never carried it".
+        if (!function_exists('licence_enabled') || licence_enabled('hiring') || licence_enabled('hr')): ?>
+  <div class="card">
+    <h2><?= e(function_exists('hreq_label') ? hreq_label('request', true) : 'Hiring requests') ?> &amp; approval</h2>
+    <input type="hidden" name="recruit_policy_form" value="1">
+    <div class="ff ff-check"><label><input type="checkbox" name="requisition_requires_request" value="1"
+      <?= setting_get('requisition_requires_request','1') === '1' ? 'checked' : '' ?>>
+      Recruitment may only start from an approved <?= e(mb_strtolower(function_exists('hreq_label') ? hreq_label('request') : 'hiring request')) ?></label>
+      <small class="muted">
+        <b>On</b> — every requirement begins as a <?= e(mb_strtolower(function_exists('hreq_label') ? hreq_label('request') : 'hiring request')) ?>,
+        is approved, and only then becomes a <?= e(mb_strtolower(function_exists('hreq_label') ? hreq_label('requisition') : 'requisition')) ?>.
+        The approval is the control, which is what an employer hiring into its own establishment needs.
+        <br>
+        <b>Off</b> — a <?= e(mb_strtolower(function_exists('hreq_label') ? hreq_label('requisition') : 'requisition')) ?>
+        may also be raised directly. Suits a manpower business whose authorisation is the
+        <?= e(Tl('client')) ?>'s own order rather than an internal approval.
+        <br>
+        Either way, requirements raised <b>before</b> you change this are unaffected — they stay editable,
+        recruitable and closeable.
+      </small></div>
+  </div>
+  <?php endif; // recruitment policy ?>
+
 </section>
 <section class="fs-pane" data-tab="Security">
   <h3 class="tab-sub" style="margin-top:0">Security</h3>

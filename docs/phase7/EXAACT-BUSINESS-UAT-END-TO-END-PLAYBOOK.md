@@ -391,12 +391,18 @@ does a requisition exist to recruit against.
 
 A requisition is raised directly, without a preceding hiring request.
 
-**Both routes exist in the live application — I confirmed both doors are
-present and working.** This is a known open business decision (recorded
-internally as ADR-001). **It is not a defect and must not be logged as one.**
-Your job during UAT is to decide, as the business owner, whether you want both
-doors open in real life or only Route 1. Record your decision on the sign-off
-sheet in Section 17.
+> ⚠️ **UPDATED — the owner has since decided this.** Recruitment now starts
+> **only** from an approved hiring request: **Route 1 is the route.** Route 2 is
+> switched off by the setting *"Recruitment may only start from an approved
+> hiring request"* on **Admin → System settings**, which ships **on**.
+>
+> **What this means for your testing:**
+> - **A.1 to A.4 (Route 1)** — test exactly as written.
+> - **A.5 (Route 2)** — the expected result is now **a polite refusal**, not a
+>   saved requisition. See A.5 below, which has been rewritten.
+> - Requirements raised **before** the policy are unaffected — they still open,
+>   edit and recruit normally. Test that too (A.5.3).
+> - Recorded internally as ADR-001, now **DECIDED**.
 
 ### A.1 — Route 1: raise a hiring request
 
@@ -476,9 +482,28 @@ from an unapproved ask.
 **✅ Check the details carried over** — job title, headcount (2), department,
 branch. If you have to retype them, log a defect.
 
-### A.5 — Route 2: raise a requisition directly
+### A.5 — Route 2: the direct route is now closed
 
-Now test the other door.
+Test that the door is shut, and that it shut politely.
+
+| # | Screen | Click | Should happen |
+|---|---|---|---|
+| A5.0 | Press **Ctrl+K**, type `new requisition` | Enter | **Refused.** A page explaining that this workspace starts recruitment from an approved hiring request, and telling you to raise one |
+| A5.0b | Read the message | — | It names **"Start recruiting"** — the button on an approved request that does the job — and says an administrator can change this in settings |
+| A5.0c | Open an existing requirement that was raised **before** this policy | — | **It opens normally**, and can still be edited and recruited against. Nothing is stranded |
+| A5.0d | Open **Project costing** and try to create a requirement from a role line | — | **Also refused**, with the same message — there is no side door |
+
+**🚩 If A5.0 lets you through and saves a requisition, the policy is not working
+— log it as High.**
+**🚩 If A5.0c refuses, that is worse — log it as Critical.** Existing
+requirements must never be blocked; that would be an outage, not a control.
+
+<details>
+<summary>If your workspace has the policy switched OFF (manpower businesses)</summary>
+
+An administrator can turn the policy off on **Admin → System settings** if your
+authorisation is the client's own order rather than an internal approval. With it
+off, the steps below apply instead and the direct route works as it always did.
 
 | # | Screen | Click | Should happen |
 |---|---|---|---|
@@ -517,8 +542,9 @@ conveyance.
 |---|---|---|
 | A5.2 | **Save requisition** | Requisition created with its own reference and an open status |
 
-**✅ Expected:** this works **without** a hiring request. That is Route 2 — the
-direct path — behaving as designed.
+**✅ Expected (policy OFF only):** this works **without** a hiring request.
+
+</details>
 
 ### A.6 — Add candidates
 
@@ -1638,7 +1664,7 @@ business is prepared to run on this system with real clients and real money.
 
 | # | Decision | Your answer |
 |---|---|---|
-| 24 | **Both recruitment routes** exist (Hiring Request → Requisition, and Requisition direct). Do you want both open in real life, or only the approved route? | ☐ Both ☐ Approved route only |
+| 24 | **Recruitment routes** — *decided: approved route only.* Confirm the policy is switched **on** for each workspace you run, and that your coordinators have been briefed that requirements now begin as a hiring request. | ☐ Confirmed ☐ Policy switched off for: __________ |
 | 25 | Does the shipped wording suit your business, or do you want it changed under *Admin → Terminology / wording*? | ☐ Keep ☐ Change: __________ |
 | 26 | Which roles will you actually use? (You do not have to use all sixteen.) | __________ |
 | 27 | Who signs off invoices, and who issues reports? They must be **different** people. | Approver: ______ Issuer: ______ |
@@ -1709,7 +1735,7 @@ Being precise about this so you know exactly how much weight each statement bear
 | # | Observation | Severity | Status |
 |---|---|---|---|
 | 1 | Four navigation items are below the 44px touch standard: sidebar close ✕ (20px), sidebar group toggle (33px), search 🔍 (34px), **🧭 Go to…** palette (32px). The main working buttons all meet it. | LOW | Known, recorded |
-| 2 | Two recruitment entry routes both exist (ADR-001). This is an **open business decision**, not a fault. | n/a | Awaiting your decision — item 24 |
+| 2 | Two recruitment entry routes both existed (ADR-001). **Now decided** — recruitment starts only from an approved hiring request, enforced by a setting that ships on. | n/a | Closed |
 
 ---
 

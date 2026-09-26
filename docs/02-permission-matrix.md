@@ -109,6 +109,29 @@ marketplace professional to link to, so the capability was unusable in any case
 and permitting the write was entitlement leakage. The coordinator/manager/master
 band itself is unchanged.
 
+**ADR-001 DECIDED — recruitment starts from an approved request (owner, this
+change).** A workspace policy, `requisition_requires_request`, **default ON**:
+a NEW requisition may only be created by converting an **approved** hiring
+request. Implemented as ADR-001 recommended — a policy, not a hard-coded block —
+because the right answer differs per customer; an administrator switches it off
+on Admin → System settings where the authorisation is the client's own order.
+
+**Adds no permission and narrows none.** The same people may create requisitions;
+they must now start from an approved request. The policy is asked at the WRITE in
+both doors that create one — the direct requisition form (beside its INSERT) and
+`pc_make_requisition()`, because the project-costing route is the direct path by
+its own description and would otherwise have been a side door. The governed route
+`hreq_to_requisition()` is **never** gated by it: once the policy is on it is the
+only way in.
+
+**Requisitions that already exist are untouched** (ADR-001 §1, M4 §39) — still
+readable, editable, recruitable and closeable. No approval is invented for them
+and none is demanded of them. Refusing them would be an outage, not a control.
+
+ADR-001's option (d) — aligning the direct route's role band `is_coordinator_level()`
+with the governed route's capability `mod.hiring.edit` — stays **open**: it
+narrows an existing gate and needs its own regression pass.
+
 **Branch visibility of parties, and of the numbers that describe them
 (owner decision, this change).** Three things were settled together; none of them
 adds, removes or widens a **permission** — each narrows what an already-permitted

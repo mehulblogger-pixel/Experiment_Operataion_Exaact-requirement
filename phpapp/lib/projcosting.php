@@ -339,6 +339,18 @@ function pc_make_quote($roll) {
 // economics (loaded cost, proposed rate, target margin); headcount/duration are
 // left for the recruiter to set. Returns ['id','code'].
 function pc_make_requisition($cid, $lineId) {
+    //  ADR-001 (decided) — a costing spawns a requisition on the DIRECT path, as
+    //  the route's own comment says, so the workspace policy applies here too.
+    //  Asked in the function rather than on the route, because this is the write.
+    //  Leaving it out would have left the policy with a hole: anyone refused on
+    //  the requisition form could raise the same requirement from a costing.
+    //  ADR-001 consequence §3 asked whether costing counts as separately
+    //  authorised; a costing is a COMMERCIAL estimate and carries no headcount
+    //  approval, so it does not.
+    if (function_exists('hreq_direct_path_block_reason')
+        && ($pcDirect = hreq_direct_path_block_reason()) !== '') {
+        return ['err' => $pcDirect];
+    }
     $h = pc_get($cid); if (!$h) return ['err' => 'Costing not found.'];
     $ln = ops_one("SELECT * FROM project_costing_lines WHERE id=? AND costing_id=?", [(int)$lineId, (int)$cid]);
     if (!$ln) return ['err' => 'Role not found.'];

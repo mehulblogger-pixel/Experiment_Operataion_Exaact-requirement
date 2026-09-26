@@ -38,12 +38,26 @@ if (!empty($req['hiring_request_id']) && function_exists('hreq_get')):
   <?php //  B4 — a requirement with no hiring request behind it used to say
         //  NOTHING about its origin, so a reader could not tell whether the
         //  approval step had been skipped or had never applied. This states
-        //  what happened and recommends nothing: which path a workspace should
-        //  prefer is ADR-001, open, and the owner's to decide. ?>
+        //  what happened.
+        //
+        //  ADR-001 is now DECIDED, so the line no longer says "both ways are
+        //  supported" — that was true only while the question was open. What it
+        //  says depends on the workspace's own policy, because the same record
+        //  means two different things under the two settings: where recruitment
+        //  must start from an approval, this one pre-dates that rule; where it
+        //  need not, this is simply the other legitimate route.
+        $rdEnforced = function_exists('hreq_direct_path_allowed') && !hreq_direct_path_allowed(); ?>
   <div class="panel" style="border-left:3px solid var(--line);padding:10px 14px">
     <span class="muted">Recorded directly — there is no
       <?= e(function_exists('Tl') ? Tl('hiring_request') : 'hiring request') ?> behind this one.
-      Both ways of starting are supported.</span>
+      <?php if ($rdEnforced): ?>
+        This workspace now starts recruitment from an approved
+        <?= e(mb_strtolower(function_exists('hreq_label') ? hreq_label('request') : 'hiring request')) ?>,
+        so this requirement pre-dates that rule. It stays fully workable — nothing is
+        back-dated onto it and no approval is invented for it.
+      <?php else: ?>
+        Both ways of starting are supported in this workspace.
+      <?php endif; ?></span>
   </div>
 <?php endif; ?>
 

@@ -1,10 +1,14 @@
 # ADR-001 — Should the direct requisition path remain available?
 
-- **Status:** OPEN — to be decided in **Phase 3**.
+- **Status:** **DECIDED — 26 Sep 2026.** Option **(c)**: a workspace policy,
+  `requisition_requires_request`, **default ON (enforced)**. Option (d) —
+  aligning the direct route's role band with the governed route's capability —
+  remains **open**; it narrows an existing gate and needs its own regression
+  pass, so it was deliberately not bundled in.
 - **Raised by:** Phase 2 · M4 correction.
 - **Decision owner:** the business owner (this is a product policy decision, not
   a technical one).
-- **Nothing in this ADR is implemented.** M4 changed no behaviour here.
+- **Implemented.** See the decision at the end of this file.
 
 ## Context
 
@@ -74,3 +78,58 @@ something.
    "direct" for the policy, or as separately authorised.
 4. Whether Phase 3's approval matrix should be the thing that decides, rather
    than a boolean.
+
+
+---
+
+## Decision (26 Sep 2026)
+
+**"Recruitment may only start from an approved hiring request."** The owner chose
+to close the direct path, implemented as option (c) — a workspace policy, not a
+hard-coded block — because the right answer genuinely differs per customer and
+one database per tenant means each can hold its own.
+
+**Default: ON (enforced).** This differs from the recommendation above, which
+suggested defaulting OFF to preserve existing behaviour on upgrade. The owner's
+instruction was explicit, and the refusal is not a dead end: it names the
+alternative and an administrator can switch the policy off on
+**Admin → System settings** in one click. A workspace whose authorisation is its
+client's order — the manpower-services case this ADR was written to protect —
+turns it off and is exactly as it was.
+
+### What was built
+
+| | |
+|---|---|
+| Policy | `hreq_direct_path_allowed()` / `hreq_direct_path_block_reason()` in `hiringreq.php` — one definition |
+| Setting | `requisition_requires_request`, default `'1'`, on Admin → System settings |
+| Gated | The direct requisition form (at the INSERT) **and** project costing → requirement |
+| Never gated | `hreq_to_requisition()` — the governed route is the only door left and must stay open |
+| Untouched | Every requisition that already exists |
+
+### The four consequences this ADR said to work through
+
+1. **Requisitions created before the policy** — they stay valid, editable,
+   recruitable and closeable. Nothing is retro-fitted with an invented approval
+   and nothing is stranded. Verified live: an existing direct requisition opens
+   and edits normally with the policy on.
+2. **What the refusal says** — it names the approval, names the *Start
+   recruiting* button that does the job, and says an administrator can change the
+   policy in settings. Shown before the wizard, not after five steps of it.
+3. **Does project costing count as "direct"?** **Yes.** The route's own comment
+   already called it the direct path, and a costing is a *commercial* estimate
+   carrying no headcount approval. Leaving it open would have left the policy
+   with a side door: anyone refused on the form could raise the same requirement
+   from a costing.
+4. **Should the approval matrix decide rather than a boolean?** Not yet. The
+   matrix decides *who approves a request*; this policy decides *whether
+   recruitment may begin without one*. They are different questions and the
+   boolean is the honest shape of this one.
+
+### Evidence
+
+`tests/test_adr001_direct_path.php` — 30 assertions covering enforcement, the
+reversible switch, every creation door, and (the one that matters most) that an
+existing requisition stays workable. Each guard was mutation-tested: flipping the
+default, unguarding the form, and opening the costing side door each make the
+suite fail. Full regression 14,207 passed / 0 failed on MariaDB, 14,205 on SQLite.

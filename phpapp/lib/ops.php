@@ -5742,6 +5742,22 @@ function ops_requisitions($route, $method) {
         ops_require(is_coordinator_level(), 'Only coordinators / managers can raise requisitions.');
         $req = null;
         if ($route === 'requisition-edit') { $req = ops_one("SELECT * FROM requisitions WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$req) { http_response_code(404); view('notfound'); return; } }
+        //  ADR-001 (decided) — say so BEFORE the form, not after five steps of it.
+        //  The write is still guarded on its own (below); this only spares the
+        //  person filling in a wizard that was never going to save. EDIT is never
+        //  refused: a requirement raised before the policy stays fully workable.
+        if ($route === 'requisition-new' && function_exists('hreq_direct_path_block_reason')
+            && ($m4New = hreq_direct_path_block_reason()) !== '' && function_exists('ops_access_notice')) {
+            return ops_access_notice(
+                'New ' . mb_strtolower(function_exists('hreq_label') ? hreq_label('requisition') : 'requisition'),
+                $m4New,
+                //  Plain text: the notice escapes this line, so markup would be
+                //  shown rather than rendered. Its own links go home and to My Work.
+                'Open ' . mb_strtolower(function_exists('hreq_label') ? hreq_label('request', true) : 'hiring requests')
+                . ' from the menu to raise one. An administrator can change this on '
+                . 'Admin → System settings if this workspace recruits on a '
+                . (function_exists('Tl') ? Tl('client') : 'client') . '’s order instead.');
+        }
         if ($method === 'POST') {
             $b = $_POST;
             // M3 — resolve what was picked to the canonical Department. The
@@ -5874,6 +5890,17 @@ function ops_requisitions($route, $method) {
                 if (function_exists('reqf_sync')) reqf_sync((int)$req['id']);   // M3 — the quantity may have changed
                 flash("Requisition {$req['req_code']} updated."); redirect('/requisition?id=' . $req['id']);
             } else {
+                //  ADR-001 (decided) — the DIRECT path. Asked here, at the write,
+                //  rather than on the route: a route is exactly where a control
+                //  gets forgotten (invariant I27), and this branch is the only
+                //  one that CREATES. The edit branch above is untouched, so a
+                //  requisition raised before the policy was switched on stays
+                //  fully workable.
+                if (function_exists('hreq_direct_path_block_reason')
+                    && ($m4Direct = hreq_direct_path_block_reason()) !== '') {
+                    flash($m4Direct, 'error');
+                    redirect('/hiring-requests');
+                }
                 $code = function_exists('recruit_req_code')
                     ? recruit_req_code(($b['office_id'] ?? '') !== '' ? (int)$b['office_id'] : 0,
                                        ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : 0, date('Y-m-d'))
@@ -9671,6 +9698,13 @@ function ops_settings($method) {
         // code only, never the report itself). On by default; a customer can switch
         // it off here.
         setting_set('notify_client_on_issue', !empty($_POST['notify_client_on_issue']) ? '1' : '0');
+        // ADR-001 (decided) — may recruitment start without an approved hiring
+        // request? On for an employer hiring into its own establishment, where
+        // the approval IS the control; off for a manpower business authorised by
+        // its client's order. Only shown while the hiring module is licensed, so
+        // the checkbox is only written when the form actually carried it.
+        if (($_POST['recruit_policy_form'] ?? '') === '1')
+            setting_set('requisition_requires_request', !empty($_POST['requisition_requires_request']) ? '1' : '0');
         // Configurable document numbering (prefix, separator, digits, FY, start).
         if (function_exists('numbering_types') && ($_POST['numbering_form'] ?? '') === '1')
             foreach (array_keys(numbering_types()) as $nk) numbering_save($nk, $_POST);

@@ -453,6 +453,58 @@ function hreq_req_block_reason($requisitionId) {
     return hreq_block_reason($hid);
 }
 
+// ============================================================================
+//  ADR-001 — DECIDED. "Recruitment may only start from an approved request."
+//
+//  EXAACT has always had two ways into recruitment: the governed one (Hiring
+//  Request → approval → Requisition) and the direct one (a Requisition raised
+//  straight away, hiring_request_id NULL). ADR-001 left the choice to the owner
+//  because it is a product policy, not a technical question: a manpower-services
+//  business is authorised by its CLIENT'S order and needs the direct route,
+//  while an employer hiring into its own establishment needs the approval to
+//  BE the control. The owner has now chosen the second.
+//
+//  Implemented as ADR-001 recommended — option (c), a workspace policy — rather
+//  than a hard-coded block, because the right answer differs per customer and
+//  one database per tenant means each can hold its own. A workspace that needs
+//  the direct route switches it off on Admin → System settings; nothing here is
+//  irreversible.
+//
+//  THREE THINGS THIS DELIBERATELY DOES NOT DO:
+//
+//  1. It does not touch requisitions that ALREADY EXIST (ADR-001 consequence
+//     §1, M4 §39). They stay valid, editable, recruitable and closeable. A
+//     requirement raised before the policy was switched on is not retro-fitted
+//     with an invented approval, and is not stranded either — inventing an
+//     approved headcount from nowhere would be a fiction, and blocking work on
+//     live requirements would be an outage.
+//  2. It does not narrow any PERMISSION. The same people may create
+//     requisitions; they must now start from an approved request. ADR-001's
+//     option (d) — aligning the direct route's role band with the capability the
+//     governed route uses — is a separate change needing its own regression
+//     pass, and stays open.
+//  3. It never blocks the GOVERNED route. hreq_to_requisition() is how an
+//     approved request becomes a requisition, and gating that would close the
+//     only door left.
+//
+//  Returns '' when creating is allowed, or the sentence to show the person.
+// ============================================================================
+function hreq_direct_path_allowed() {
+    if (!function_exists('setting_get')) return true;
+    // Default ENFORCED, per the owner's decision. A workspace that recruits on a
+    // client's order rather than its own approval turns this off.
+    return (string) setting_get('requisition_requires_request', '1') !== '1';
+}
+
+function hreq_direct_path_block_reason() {
+    if (hreq_direct_path_allowed()) return '';
+    $reqL = function_exists('hreq_label') ? mb_strtolower(hreq_label('requisition')) : 'requisition';
+    $hrqL = function_exists('hreq_label') ? mb_strtolower(hreq_label('request'))     : 'hiring request';
+    return 'This workspace starts recruitment from an approved ' . $hrqL . '. Raise a '
+         . $hrqL . ', get it approved, then use “Start recruiting” on it — that creates the '
+         . $reqL . ' for you, carrying the approved headcount across.';
+}
+
 //  M4 §14 — THE HEADCOUNT CEILING, for every write that can change executable
 //  quantity. Returns '' when the quantity is allowed, or the refusal.
 //
