@@ -179,6 +179,22 @@ function hreq_migrate() {
 
     // The execution record points back at the request it came from. Additive:
     // a requisition raised directly carries NULL, exactly as it always has (§19).
+    //  WHAT IT WILL COST. Added after the fact, and that is the point: the
+    //  request that goes through approval carried no money at all, so a manager
+    //  approved headcount and learned the price afterwards, on a record created
+    //  after their decision. These four are deliberately INDICATIVE — nobody
+    //  knows the exact salary when raising a request, and demanding one would
+    //  stall the flow. An estimate the approver can see beats an exact number
+    //  they cannot.
+    if (function_exists('ensure_column')) {
+        foreach ([
+            ['est_cost_per_person', 'DECIMAL(14,2) NULL'],   // per person, per period
+            ['est_cost_basis',      "VARCHAR(20) DEFAULT ''"],// which period — REQ_RATE_BASIS
+            ['est_duration_months', 'DECIMAL(8,2) NULL'],    // how long we carry it
+            ['est_onetime_cost',    'DECIMAL(14,2) NULL'],   // mobilisation, agency fee…
+        ] as [$c, $t]) { try { ensure_column('hiring_requests', $c, $t); } catch (Throwable $e) {} }
+    }
+
     if (function_exists('ensure_column')) {
         try { ensure_column('requisitions', 'hiring_request_id', 'INT NULL'); } catch (Throwable $e) {}
         //  M4 §4 — additive, idempotent, non-destructive, forward-only. Nothing is
@@ -385,6 +401,17 @@ function hreq_appr_ctx(array $r) {
         // reads for a hiring request: headcount, not money.
         'office_id'   => (int) ($r['office_id'] ?? 0),
         'amount'      => (int) ($r['quantity'] ?? 0),
+        //  MONEY IS A SEPARATE KEY, ON PURPOSE.
+        //
+        //  'amount' above has always meant HEADCOUNT for a hiring request, and
+        //  customers have written amount-band rules against it ("more than five
+        //  people needs the director"). Now that a request carries a cost, it is
+        //  tempting to make 'amount' the money — and that would silently change
+        //  the meaning of every band already configured, turning "5 people" into
+        //  "5 rupees". So the commitment arrives beside it under its own name,
+        //  and routing by value stays an explicit choice rather than something
+        //  that happens to a customer overnight.
+        'commitment'  => function_exists('hreq_commitment') ? hreq_commitment($r)['total'] : 0.0,
     ];
 }
 
@@ -589,7 +616,72 @@ function hreq_material_diff($r, array $incoming = null) {
     $qWas = (int) ($was['quantity'] ?? 0); $qNow = (int) ($now['quantity'] ?? $qWas);
     if ($qNow > $qWas)
         $out['quantity'] = ['was' => $qWas, 'now' => $qNow, 'why' => 'more headcount than was authorised'];
+
+    //  WHAT IT COSTS, on exactly the same asymmetry and for exactly the same
+    //  reason. An approver said yes to a commitment of a certain size; raising
+    //  it afterwards spends authority nobody granted, and is the single easiest
+    //  way to route around an approval. Lowering it stays inside what was
+    //  approved, so it is allowed — and still audited, like a quantity cut.
+    //
+    //  Compared as ONE number rather than field by field, because the fields
+    //  trade off against each other: halving the duration and doubling the rate
+    //  changes nothing anybody would call a change, and would otherwise fire two
+    //  material differences and a needless re-approval.
+    if (function_exists('hreq_commitment')) {
+        $cWas = hreq_commitment($was)['total'];
+        $cNow = hreq_commitment($now)['total'];
+        //  A rounding tail is not a business change.
+        if ($cNow - $cWas > 0.01)
+            $out['commitment'] = ['was' => $cWas, 'now' => $cNow,
+                                  'why' => 'a larger financial commitment than was approved'];
+    }
     return $out;
+}
+
+/**
+ * What this request commits the company to, as one number.
+ *
+ *     quantity x cost per person x duration  +  one-time cost
+ *
+ * Computed, never stored, so it cannot drift away from the figures it is made
+ * of. Returns `has` = false when nothing was estimated, which every screen uses
+ * to say "not estimated" rather than to print a confident zero.
+ *
+ * A per-period rate needs a duration to mean anything; a FIXED basis is the
+ * whole order and needs none. That mirrors the rule on placement commercials,
+ * deliberately: the same business shapes apply at both ends of the journey.
+ */
+function hreq_commitment($r) {
+    $n = function ($v) { return ($v === null || $v === '') ? 0.0 : (float) $v; };
+    $per     = $n($r['est_cost_per_person'] ?? null);
+    $months  = $n($r['est_duration_months'] ?? null);
+    $onetime = $n($r['est_onetime_cost'] ?? null);
+    $qty     = max(1, (int) ($r['quantity'] ?? 1));
+    $basis   = (string) ($r['est_cost_basis'] ?? '');
+    $perPeriod = in_array($basis, ['MONTHLY', 'MANMONTH', 'MANDAY', 'DAILY'], true);
+
+    //  A rate with no duration is not multiplied by a guess. It contributes what
+    //  it can be known to contribute — one period — and the screen says so.
+    $periods = $perPeriod ? $months : 1.0;
+    $partial = $perPeriod && $months <= 0;
+    if ($partial) $periods = 1.0;
+
+    $recurring = $per * $qty * ($periods > 0 ? $periods : 0);
+    $total     = $recurring + ($onetime * ($onetime > 0 ? 1 : 0));
+
+    return [
+        'has'        => ($per > 0 || $onetime > 0),
+        'per_person' => $per,
+        'basis'      => $basis,
+        'basis_label'=> defined('REQ_RATE_BASIS') ? (REQ_RATE_BASIS[$basis] ?? $basis) : $basis,
+        'months'     => $months,
+        'qty'        => $qty,
+        'onetime'    => $onetime,
+        'recurring'  => $recurring,
+        'total'      => $total,
+        'per_period' => $perPeriod,
+        'partial'    => $partial,   // a rate was given but no duration
+    ];
 }
 
 // ---- Save -----------------------------------------------------------------
@@ -699,6 +791,21 @@ function hreq_save($id, array $post) {
     $rtype = strtoupper(trim((string) ($post['request_type'] ?? '')));
     if ($rtype !== '' && !isset(hreq_request_types()[$rtype])) return [false, 'That is not a request type this workspace uses.', 0];
 
+    //  The money. Indicative, optional, and never negative — a negative cost
+    //  would read as income on every screen that sums these.
+    $money = function ($k) use ($post) {
+        $v = $post[$k] ?? null;
+        return ($v === null || $v === '') ? null : (float) $v;
+    };
+    $estPer = $money('est_cost_per_person'); $estMonths = $money('est_duration_months');
+    $estOne = $money('est_onetime_cost');
+    foreach ([[$estPer, 'cost per person'], [$estMonths, 'duration'], [$estOne, 'one-time cost']] as [$v, $lbl])
+        if ($v !== null && $v < 0) return [false, 'The ' . $lbl . ' cannot be a negative number.', 0];
+    $estBasis = trim((string) ($post['est_cost_basis'] ?? ''));
+    if ($estBasis !== '' && defined('REQ_RATE_BASIS') && !isset(REQ_RATE_BASIS[$estBasis]))
+        return [false, 'That is not a rate basis this workspace uses.', 0];
+    if ($estPer !== null && $estPer > 0 && $estBasis === '') $estBasis = 'MONTHLY';
+
     $cols = [
         'status'                   => $existing ? (string) $existing['status'] : 'DRAFT',
         'requested_by_id'          => $byId,
@@ -722,6 +829,10 @@ function hreq_save($id, array $post) {
         'priority'                 => $prio,
         'reason'                   => trim((string) ($post['reason'] ?? '')),
         'approval_required'        => isset($post['approval_required']) ? (int) !!$post['approval_required'] : 1,
+        'est_cost_per_person'      => $estPer,
+        'est_cost_basis'           => $estBasis,
+        'est_duration_months'      => $estMonths,
+        'est_onetime_cost'         => $estOne,
     ];
     $now = hreq_now(); $who = hreq_who();
     if ($existing) {
@@ -806,7 +917,8 @@ function hreq_require_reapproval($id, array $diff) {
             //  drift apart between a first approval and a re-approval.
             $r = hreq_get($id);
             [$started, $apprId] = appr_start('HIRING_REQUEST', $id, hreq_appr_ctx($r),
-                'Re-approval — hiring request ' . (string) ($r['req_no'] ?? '') . ' — ' . (string) ($r['job_title'] ?? ''), 0);
+                'Re-approval — hiring request ' . (string) ($r['req_no'] ?? '') . ' — ' . (string) ($r['job_title'] ?? ''),
+                function_exists('hreq_commitment') ? hreq_commitment($r)['total'] : 0);
             if ($started && $apprId > 0)
                 db()->prepare("UPDATE hiring_requests SET approval_ref=? WHERE id=?")->execute([(string) $apprId, $id]);
             $started = $started && $apprId > 0;
@@ -841,7 +953,8 @@ function hreq_snapshot(array $r) {
     foreach (['job_title','job_description','designation','grade','position_id','new_position_requested',
               'quantity','employment_type','work_location','required_by','priority','reason',
               'request_type','project_ref','office_id','client_id','hiring_department_id',
-              'requesting_department_id','requested_by_id','requested_by_name','approval_required'] as $f)
+              'requesting_department_id','requested_by_id','requested_by_name','approval_required',
+              'est_cost_per_person','est_cost_basis','est_duration_months','est_onetime_cost'] as $f)
         $fields[$f] = $r[$f] ?? null;
 
     return [
@@ -888,7 +1001,10 @@ function hreq_submit($id) {
     if ($next === 'SUBMITTED' && function_exists('appr_start')) {
         $fresh = hreq_get($id) ?: $r;
         [$started, $apprId] = appr_start('HIRING_REQUEST', (int) $id, hreq_appr_ctx($fresh),
-                                         'Hiring request ' . (string) $r['req_no'] . ' — ' . (string) $r['job_title'], 0);
+                                         'Hiring request ' . (string) $r['req_no'] . ' — ' . (string) $r['job_title'],
+                                         //  What the approver is being asked to commit. /my-approvals
+                                         //  already renders this as "Value"; it was simply never sent.
+                                         function_exists('hreq_commitment') ? hreq_commitment($fresh)['total'] : 0);
         if ($started && $apprId > 0) {
             db()->prepare("UPDATE hiring_requests SET status='UNDER_REVIEW', approval_ref=?, updated_at=? WHERE id=?")
                 ->execute([(string) $apprId, hreq_now(), (int) $id]);
@@ -1123,14 +1239,28 @@ function hreq_to_requisition($id, $qty = 0) {
         ? recruit_req_code((int) ($r['office_id'] ?? 0), (int) ($r['client_id'] ?? 0), date('Y-m-d'))
         : (function_exists('ops_next_code') ? ops_next_code('requisitions', 'req_code', 'REQ') : 'REQ-' . $id);
 
+    //  THE APPROVED FIGURE BECOMES THE BUDGET BASELINE.
+    //
+    //  Without this the requisition starts with no budget, and the placement
+    //  commercial approved later is measured against an estimate nobody
+    //  approved. Carrying it across means the variance on every hire is against
+    //  a number a named person actually said yes to.
+    //
+    //  Only what was approved is carried. A request with no estimate leaves the
+    //  requisition's budget untouched at zero, exactly as it is today.
+    $estCost  = ($r['est_cost_per_person'] ?? null) !== null ? (float) $r['est_cost_per_person'] : 0.0;
+    $estBasis = (string) ($r['est_cost_basis'] ?? '') ?: 'MONTHLY';
+
     db()->prepare("INSERT INTO requisitions
         (req_code, hiring_request_id, office_id, client_id, department, department_id, designation, grade,
          position_id, quantity, req_type, project_site, deploy_location, start_date, responsibilities,
+         budgeted_cost, rate_basis,
          status, approved_by, approval_date, created_by, created_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'OPEN', ?, ?, ?, ?)")
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'OPEN', ?, ?, ?, ?)")
         ->execute([$code, (int) $id, $r['office_id'], $r['client_id'], $deptCode, $deptId,
                    $r['designation'], $r['grade'], $r['position_id'], $qty, $r['request_type'],
                    $r['project_ref'], $r['work_location'], $r['required_by'], $r['job_description'],
+                   $estCost, $estBasis,
                    (string) $r['decided_by'], (string) substr((string) $r['decided_at'], 0, 10),
                    hreq_who(), hreq_now()]);
     $rid = (int) db()->lastInsertId();

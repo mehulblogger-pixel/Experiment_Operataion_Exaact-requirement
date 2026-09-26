@@ -16,7 +16,7 @@ $tone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-info','UNDER_REVIEW'=>'p-info','APPROV
 </div>
 <div class="panel">
   <table class="grid">
-    <tr><th>Request</th><th>What</th><th>Department</th><th>How many</th><th>Needed by</th><th>Priority</th><th>Status</th></tr>
+    <tr><th>Request</th><th>What</th><th>Department</th><th>How many</th><th class="num">Est. cost</th><th>Needed by</th><th>Priority</th><th>Status</th></tr>
     <?php foreach ($rows as $r): ?>
     <tr>
       <td><a href="/hiring-request?id=<?= (int) $r['id'] ?>"><strong><?= $e($r['req_no']) ?></strong></a>
@@ -24,11 +24,17 @@ $tone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-info','UNDER_REVIEW'=>'p-info','APPROV
       <td><?= $e($r['job_title']) ?></td>
       <td><?= $e(function_exists('vocab_value') && $r['hiring_department_id'] && ($v = vocab_value((int) $r['hiring_department_id'])) ? vocab_display($v) : '—') ?></td>
       <td><?= (int) $r['quantity'] ?></td>
+      <?php //  What each request commits the company to, so the register answers
+            //  "what is the pipeline worth?" — a question it could not answer at
+            //  all before, because no request carried a figure.
+            $lC = function_exists('hreq_commitment') ? hreq_commitment($r) : ['has' => false]; ?>
+      <td class="num"><?php if (empty($lC['has'])): ?><span class="muted">—</span>
+        <?php else: ?><?= $e(function_exists('fmoney_short') ? fmoney_short($lC['total']) : (function_exists('cur_sym') ? cur_sym() : '') . number_format($lC['total'], 0)) ?><?php endif; ?></td>
       <td><?= $e($r['required_by'] ?: '—') ?></td>
       <td><?= $e((function_exists('hreq_priorities') ? hreq_priorities() : [])[$r['priority']] ?? $r['priority']) ?></td>
       <td><span class="pill <?= $e($tone[$r['status']] ?? 'p-mut') ?>"><?= $e($st[$r['status']] ?? $r['status']) ?></span></td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$rows): ?><tr><td colspan="7" class="muted">No hiring requests yet<?= $mayRaise ? ' — <a href="/hiring-request">raise the first one</a>.' : '.' ?></td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr><td colspan="8" class="muted">No hiring requests yet<?= $mayRaise ? ' — <a href="/hiring-request">raise the first one</a>.' : '.' ?></td></tr><?php endif; ?>
   </table>
 </div>
