@@ -245,17 +245,30 @@ if (!empty($asgComm) && !empty($linkReq) && $seeSal):
     <?php if ($C['approved_by']): ?><span class="muted" style="margin-left:auto">Approved by <?= e($C['approved_by']) ?><?= $C['approved_at'] ? ' · '.e(substr($C['approved_at'],0,10)) : '' ?><?= $C['ref'] ? ' · ref '.e($C['ref']) : '' ?></span><?php endif; ?>
   </div>
 
+  <?php
+    //  A refused approval hands back what was typed (see ops.php), so nobody
+    //  re-keys a form they already filled. $asgWas is that stash, for THIS
+    //  candidate only, and it is consumed once.
+    $asgWas = [];
+    if (!empty($_SESSION['asg_form']) && (int)($_SESSION['asg_form']['id'] ?? 0) === (int)$cand['id']) {
+        $asgWas = (array)($_SESSION['asg_form']['post'] ?? []);
+        unset($_SESSION['asg_form']);
+    }
+    $asgV = function ($k, $fallback) use ($asgWas) {
+        return isset($asgWas[$k]) && $asgWas[$k] !== '' ? (string)$asgWas[$k] : $fallback;
+    };
+  ?>
   <?php if (is_coordinator_level()): ?>
-  <details style="margin-top:10px"<?= $C['status']==='' ? ' open' : '' ?>>
+  <details style="margin-top:10px"<?= ($C['status']==='' || $asgWas) ? ' open' : '' ?>>
     <summary style="cursor:pointer;font-weight:600;font-size:13px"><?= $C['approved'] ? 'Revise approved commercials' : 'Approve the commercials for this placement' ?></summary>
     <form method="post" action="/candidate-commercial?id=<?= (int)$cand['id'] ?>" style="margin-top:8px">
       <div class="form-grid">
-        <div class="ff"><label>Billing rate to client (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="bill_rate" value="<?= $C['bill_rate']>0 ? e(number_format($C['bill_rate'],2,'.','')) : '' ?>" placeholder="<?= e(number_format((float)($linkReq['billing_rate'] ?? 0),0)) ?>"></div>
-        <div class="ff"><label>Basis</label><select class="form-control" name="bill_basis"><?php foreach (REQ_RATE_BASIS as $k=>$v): ?><option value="<?= e($k) ?>"<?= $C['basis']===$k?' selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Our cost — monthly (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="cost_rate" value="<?= $C['cost_rate']>0 ? e(number_format($C['cost_rate'],2,'.','')) : '' ?>" placeholder="<?= e(number_format((float)($linkReq['budgeted_cost'] ?? 0),0)) ?>"></div>
-        <div class="ff"><label>Duration (months)</label><input class="form-control" type="number" step="0.01" name="months" value="<?= $C['months']>0 ? e(rtrim(rtrim(number_format($C['months'],2,'.',''),'0'),'.')) : '' ?>"></div>
-        <div class="ff"><label>One-time cost (<?= e($sym) ?>) <span class="muted">placement fee etc.</span></label><input class="form-control" type="number" step="0.01" name="onetime" value="<?= (float)$C['onetime']>0 ? e(number_format((float)$C['onetime'],2,'.','')) : '' ?>"></div>
-        <div class="ff"><label>Approval ref <span class="muted">optional</span></label><input class="form-control" name="ref" maxlength="60" value="<?= e($C['ref']) ?>"></div>
+        <div class="ff"><label>Billing rate to client (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="bill_rate" value="<?= e($asgV('bill_rate', $C['bill_rate']>0 ? number_format($C['bill_rate'],2,'.','') : '')) ?>" placeholder="<?= e(number_format((float)($linkReq['billing_rate'] ?? 0),0)) ?>"></div>
+        <div class="ff"><label>Basis</label><select class="form-control" name="bill_basis"><?php foreach (REQ_RATE_BASIS as $k=>$v): ?><option value="<?= e($k) ?>"<?= $asgV('bill_basis', $C['basis'])===$k?' selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+        <div class="ff"><label>Our cost — monthly (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="cost_rate" value="<?= e($asgV('cost_rate', $C['cost_rate']>0 ? number_format($C['cost_rate'],2,'.','') : '')) ?>" placeholder="<?= e(number_format((float)($linkReq['budgeted_cost'] ?? 0),0)) ?>"></div>
+        <div class="ff"><label>Duration (months)</label><input class="form-control" type="number" step="0.01" name="months" value="<?= e($asgV('months', $C['months']>0 ? rtrim(rtrim(number_format($C['months'],2,'.',''),'0'),'.') : '')) ?>"></div>
+        <div class="ff"><label>One-time cost (<?= e($sym) ?>) <span class="muted">placement fee etc.</span></label><input class="form-control" type="number" step="0.01" name="onetime" value="<?= e($asgV('onetime', (float)$C['onetime']>0 ? number_format((float)$C['onetime'],2,'.','') : '')) ?>"></div>
+        <div class="ff"><label>Approval ref <span class="muted">optional</span></label><input class="form-control" name="ref" maxlength="60" value="<?= e($asgV('ref', $C['ref'])) ?>"></div>
       </div>
       <p class="muted" style="font-size:12px;margin:4px 2px">Approving locks the rate we will bill and the cost we will carry for this person. The estimate stays on record for variance.</p>
       <div style="margin-top:6px"><button class="btn" type="submit">Approve commercials</button></div>

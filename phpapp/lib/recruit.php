@@ -1179,6 +1179,54 @@ function assignment_commercials($cand, $req) {
             'bill_rate' => $apBillRate, 'cost_rate' => $apCostRate];
 }
 
+/**
+ * Why this approval cannot be accepted — '' when it can.
+ *
+ * Approving LOCKS what we will bill a client and what we will carry as cost,
+ * stamps the approver's name and date on the record, and becomes the baseline
+ * every later variance is measured against. A blank form used to sail through
+ * all of that: the screen showed a green "Approved — locked for this hire" over
+ * three zeros, and every variance was then computed against nothing.
+ *
+ * The rule is deliberately the MINIMUM that makes the approval mean something,
+ * because the shapes of a legitimate deal differ by business:
+ *
+ *   * a MANPOWER SUPPLIER bills a rate for a duration     → rate + months
+ *   * a RECRUITMENT AGENCY bills a one-time placement fee → fee alone, no rate,
+ *     no duration, and no bench cost of its own
+ *   * a FIXED whole-order deal has a price but no months
+ *
+ * So: at least one real number, and a duration wherever the rate is per-period
+ * (without it the revenue this "locks" is arithmetically zero). Cost is not
+ * demanded — an agency that only places people genuinely carries none.
+ */
+function assignment_commercial_refusal($post) {
+    $n = function ($k) use ($post) {
+        $v = $post[$k] ?? '';
+        return ($v === '' || $v === null) ? 0.0 : (float) $v;
+    };
+    $bill = $n('bill_rate'); $cost = $n('cost_rate');
+    $months = $n('months');  $onetime = $n('onetime');
+    $basis = (string) ($post['bill_basis'] ?? 'MONTHLY');
+
+    foreach ([['bill_rate', $bill, 'billing rate'], ['cost_rate', $cost, 'cost'],
+              ['months', $months, 'duration'], ['onetime', $onetime, 'one-time cost']] as [$k, $v, $lbl])
+        if ($v < 0) return 'The ' . $lbl . ' cannot be a negative number.';
+
+    if ($bill <= 0 && $onetime <= 0)
+        return 'Approving locks what this placement will be billed at, so it needs a figure. '
+             . 'Enter the billing rate to the client, or a one-time cost such as a placement fee.';
+
+    //  A per-period rate with no duration locks a revenue of zero.
+    $perPeriod = in_array($basis, ['MONTHLY', 'MANMONTH', 'MANDAY', 'DAILY'], true);
+    if ($bill > 0 && $perPeriod && $months <= 0)
+        return 'A rate of ' . (function_exists('cur_sym') ? cur_sym() : '') . number_format($bill, 0)
+             . ' ' . strtolower((string) (REQ_RATE_BASIS[$basis] ?? $basis))
+             . ' needs a duration, or the value being approved is zero. Enter the number of months.';
+
+    return '';
+}
+
 // Is this assignment ready to hand to billing? A packet of explicit checks —
 // reuses the existing deputation bill gate (job_bills_missing) for chargeable
 // expenses so recruitment never re-implements what Operations already enforces.

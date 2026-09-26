@@ -6659,11 +6659,26 @@ function ops_candidates($route, $method) {
                                substr(trim($_POST['note'] ?? ''), 0, 400), $id]);
                 flash('Actual revenue and cost recorded for this placement.');
             } else {
+                //  An approval with no numbers in it used to be accepted: the
+                //  screen then showed a green "Approved — locked for this hire"
+                //  over three zeros, stamped with the approver's name, and every
+                //  later variance was measured against nothing. Refuse it, say
+                //  why in one sentence, and hand back what was typed so nobody
+                //  re-keys a form they already filled.
+                $why = function_exists('assignment_commercial_refusal')
+                     ? assignment_commercial_refusal($_POST) : '';
+                if ($why !== '') {
+                    $_SESSION['asg_form'] = ['id' => $id, 'post' => array_intersect_key($_POST,
+                        array_flip(['bill_rate','bill_basis','cost_rate','months','onetime','ref']))];
+                    flash($why, 'error');
+                    redirect('/candidate?id=' . $id);
+                }
                 $pdo->prepare("UPDATE candidates SET asg_bill_rate=?, asg_bill_basis=?, asg_cost_rate=?, asg_months=?, asg_onetime=?, asg_ref=?, asg_note=?, asg_status='APPROVED', asg_approved_by=?, asg_approved_at=? WHERE id=?")
                     ->execute([num($_POST['bill_rate'] ?? 0), substr((string)($_POST['bill_basis'] ?? 'MONTHLY'), 0, 20),
                                num($_POST['cost_rate'] ?? 0), num($_POST['months'] ?? 0), num($_POST['onetime'] ?? 0),
                                substr(trim($_POST['ref'] ?? ''), 0, 60), substr(trim($_POST['note'] ?? ''), 0, 400),
                                user_name(current_user()), date('c'), $id]);
+                unset($_SESSION['asg_form']);
                 flash('Placement commercials approved.');
             }
         }
