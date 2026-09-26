@@ -243,7 +243,7 @@ function c360_group($pid, $p) {
     // putting a child above its parent is the loop we must not allow.
     $subIds = array_map(fn($s) => (int)$s['id'], $subs);
     $opts = c360_rows("SELECT id, legal_name, display_name FROM business_partners
-                       WHERE is_client=1 AND status='ACTIVE' AND id<>?
+                       WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' AND id<>?
                        ORDER BY COALESCE(display_name, legal_name) LIMIT 800", [$pid]);
     $opts = array_values(array_filter($opts, fn($o) => !in_array((int)$o['id'], $subIds, true)));
     return ['parent' => $parent, 'subs' => $subs, 'opts' => $opts];

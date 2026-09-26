@@ -777,8 +777,8 @@ function ops_client_holds($method) {
         redirect('/client-holds');
     }
     $held = ops_all("SELECT id, COALESCE(NULLIF(display_name,''),legal_name) nm, hold_status, hold_reason
-        FROM business_partners WHERE is_client=1 AND hold_status IN ('HOLD','BLOCKED') ORDER BY nm");
-    $clients = ops_all("SELECT id, COALESCE(NULLIF(display_name,''),legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm");
+        FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " AND hold_status IN ('HOLD','BLOCKED') ORDER BY nm");
+    $clients = ops_all("SELECT id, COALESCE(NULLIF(display_name,''),legal_name) nm FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY nm");
     view('ops/client_holds', ['held' => $held, 'clients' => $clients]);
     return true;
 }
@@ -957,8 +957,8 @@ function credit_explainer($contractingOfficeId, $executingOfficeId) {
                 . '. Enter what ' . $e['name'] . ' is to receive; they can revert with the figure they need.'];
 }
 
-function clients_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_client=1 ORDER BY legal_name"); }
-function vendors_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_vendor=1 ORDER BY legal_name"); }
+function clients_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY legal_name"); }
+function vendors_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_vendor=1 AND " . partner_office_sql() . " ORDER BY legal_name"); }
 function offices_list() { return ops_all("SELECT * FROM offices ORDER BY is_ahmedabad DESC, name"); }
 function office($id) { return $id ? ops_one("SELECT * FROM offices WHERE id=?", [$id]) : null; }
 
@@ -9241,7 +9241,7 @@ function ops_reports() {
     arsort($fin['byProject']); $fin['byProjectTop'] = array_slice($fin['byProject'], 0, 10, true);
 
     // ---- filter option lists (scope-limited) ----
-    $clientOpts = ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) name FROM business_partners WHERE is_client=1 ORDER BY name");
+    $clientOpts = ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY name");
     $offOpts = scope_offices()==='ALL' ? offices_list() : array_filter(offices_list(), fn($o)=>in_array((int)$o['id'], scope_offices()));
     $sbuAll = lk_options_or('sbu', OPS_SBUS);
     $sbuOpts = scope_sbus()==='ALL' ? $sbuAll : array_intersect_key($sbuAll, array_flip(scope_sbus()));

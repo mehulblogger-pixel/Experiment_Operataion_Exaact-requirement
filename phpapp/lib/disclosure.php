@@ -107,7 +107,7 @@ function ops_disclosure($route, $method) {
         redirect('/disclosure');
     }
     $editId = (int)($_GET['edit'] ?? 0);
-    $clients = ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 AND status='ACTIVE' ORDER BY nm") ?: [];
+    $clients = ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' ORDER BY nm") ?: [];
     view('ops/disclosure', ['rows' => disclosure_all(['q' => trim((string)($_GET['q'] ?? ''))]),
         'canEdit' => $canEdit, 'edit' => $editId ? disclosure_get($editId) : null,
         'clients' => $clients, 'statuses' => DISCLOSURE_STATUSES, 'q' => trim((string)($_GET['q'] ?? ''))]);

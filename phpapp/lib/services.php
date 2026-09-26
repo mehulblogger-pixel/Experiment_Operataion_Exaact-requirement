@@ -422,7 +422,7 @@ function ops_services($route, $method) {
         if ($cr) $client = ['id' => (int)$cr['id'], 'name' => $nameOf($cr)];
     }
     $rawClients = function_exists('clients_list') ? (clients_list() ?: [])
-        : (ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 ORDER BY legal_name") ?: []);
+        : (ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY legal_name") ?: []);
     $clients = [];
     foreach ($rawClients as $r) $clients[] = ['id' => (int)$r['id'], 'name' => $nameOf($r)];
     view('ops/service_scope', [

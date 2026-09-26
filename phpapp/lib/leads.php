@@ -1112,7 +1112,7 @@ function ops_leads($route, $method) {
                     : 0)],
             ]) : ['mins' => 0, 'touches' => 0],
             'canEdit' => $canEdit, 'days' => lead_days_in_stage($l), 'stalled' => lead_stalled($l),
-            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
+            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
             // Who a lead can be allocated to. Active logins only — allocating
             // work to somebody who cannot sign in is the same as not allocating it.
             'users' => ops_all("SELECT id, first_name, last_name, username, role FROM users
@@ -1221,7 +1221,7 @@ function ops_leads($route, $method) {
         view('ops/lead_convert', [
             'l' => $l, 'stage_id' => (int)($_GET['stage_id'] ?? $l['stage_id']),
             'dup' => lead_possible_duplicate((string)$l['company_name']),
-            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
+            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
         ]);
         return true;
     }

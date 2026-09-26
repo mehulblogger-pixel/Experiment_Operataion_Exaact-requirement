@@ -841,7 +841,7 @@ function ops_sitedocs($route, $method) {
     view('ops/site_docs', [
         'rows' => $rows, 'canEdit' => $canEdit,
         'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners
-                              WHERE is_client=1 AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name)"),
+                              WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name)"),
         'kinds' => iddoc_kind_options(),
         'expiring' => sitedoc_expiring(45),
     ]);

@@ -811,6 +811,35 @@ function scope_clause($officeCol, $sbuCol) {
 }
 
 // ============================================================================
+//  WHICH PARTIES THIS BRANCH MAY SEE — one definition, every list and picker.
+//
+//  Owner decision: a branch sees its own clients and vendors, and the dropdown
+//  a person picks from must offer exactly what their register shows. A register
+//  that hides a party while the form beside it still offers that party is worse
+//  than no scoping at all — it tells two different stories about the same data.
+//
+//  So every party list asks this one function: the registers, the dashboard
+//  counts, and all ~40 pickers spread across operations, sales, reporting,
+//  quality and books.
+//
+//  A party with NO branch set stays visible to everyone. Same rule as leads,
+//  opportunities and complaints, and for the same reason: an unassigned party
+//  belongs to nobody, and hiding it from everybody would strand it. Every party
+//  is unassigned until somebody sets the field, so this is also what stops the
+//  change emptying every dropdown in the product on the day it ships.
+//
+//  Returns SQL only, never bound parameters: scope_office_clause() inlines its
+//  office ids as integers, so a caller can drop this into an existing query
+//  without disturbing that query's own arguments. That is deliberate — it is
+//  what let this be applied at every call site without re-plumbing each one.
+// ============================================================================
+function partner_office_sql($col = 'home_branch_id') {
+    if (!function_exists('scope_office_clause')) return '1=1';
+    [$w, $a] = scope_office_clause($col);
+    return $w;
+}
+
+// ============================================================================
 //  THE TWO-OFFICE RULE FOR WORK ORDERS — one definition, every caller.
 //
 //  A work order belongs to TWO offices: the CONTRACTING office, which holds the

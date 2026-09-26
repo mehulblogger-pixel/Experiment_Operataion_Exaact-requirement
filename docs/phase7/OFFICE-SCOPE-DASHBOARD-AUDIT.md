@@ -252,8 +252,34 @@ Mumbai-scoped coordinator, who sees the Mumbai and unassigned clients and not th
 Ahmedabad one. Full regression: **14,167 passed / 0 failed on MariaDB**, 14,163 on
 SQLite.
 
-**Still open, deliberately not done:** the client *pickers* on forms (the
-"Client + Add new" dropdowns on work orders, candidates and quotes) are
-**unchanged** — they still offer every party. Narrowing those would stop a
-coordinator raising work for a party assigned to another branch, which is a
-workflow decision, not a reporting one. Raise it separately if you want it.
+**Pickers — now done too (second owner decision).** The owner then asked for the
+client dropdown to be scoped as well: *"every scope of access shall be applied.
+Client drop down shall be scoped to that office only."* Every party list in the
+product now asks one rule, `partner_office_sql()` — the two shared helpers
+`clients_list()` / `vendors_list()` (which feed ~20 pickers) plus ~9 lists that
+built their own SQL inline, across operations, sales, reporting, quality, books
+and the portals. **29 call sites.** The register and the dropdown beside it now
+return the same parties, which is the point: a register that hides a party while
+the form still offers it tells two different stories about the same data.
+
+Verified live: a Mumbai-scoped coordinator opening **New work order** is offered
+the Mumbai and unassigned clients and **not** the Ahmedabad one, while a Master
+Admin on the same form is still offered all three.
+
+**Three party queries are deliberately NOT scoped**, and each would be a bug if
+it were:
+
+| Query | Why it must stay unscoped |
+|---|---|
+| The duplicate check before creating a party (`crm.php`) | It asks "does this name already exist?" A branch-blind answer is the whole point — scope it and two branches create two records for one client. |
+| An internal audit/trace helper | Not user-facing; picks any row to trace. |
+| `inspectors_list()` — the team-member picker | **Deliberate and important.** EXAACT is built for cross-office deputation: it carries an *inter-office credit* on every job for exactly the case where one office's person does another office's work. Scoping this picker would break that. It is a separate business decision, not an oversight — see below. |
+
+### The one question this raises
+
+**Should a branch be able to depute another branch's person?** Today: yes, and the
+product settles the money for it through inter-office credit. Scoping the
+team-member picker would end that. That is a real operational choice about how
+the business runs, not a reporting fix, so it was **not** made here. If the answer
+is "each branch uses only its own people", say so and it is a small change to the
+same helper — but it should be a decision, not a side effect.

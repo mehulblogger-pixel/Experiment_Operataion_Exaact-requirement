@@ -189,6 +189,71 @@ t_nothrow('the screens are wired to the helpers, not to bare COUNT(*)', function
         'quotes_expired_count() scopes before it counts');
 });
 
+// ============================================================================
+//  6 — THE PICKERS MUST OFFER EXACTLY WHAT THE REGISTER SHOWS
+//
+//  Owner decision: the client dropdown is scoped to the office too. A register
+//  that hides a party while the form beside it still offers that party tells two
+//  different stories about the same data, and the person filling the form is the
+//  one who pays for the difference.
+//
+//  clients_list() / vendors_list() feed ~20 pickers across operations, sales,
+//  reporting and quality; another ~20 queries build their own list inline. All
+//  ask partner_office_sql(), so this asserts the shared helpers AND that the
+//  helper actually filters.
+// ============================================================================
+t_nothrow('the client and vendor pickers are scoped to the branch', function () use ($osAs, &$osA, &$osB) {
+    $mkp = function ($name, $branch, $isClient) {
+        db()->prepare("INSERT INTO business_partners (legal_name,is_client,is_vendor,status,home_branch_id)
+                       VALUES (?,?,?,'ACTIVE',?)")->execute([$name, $isClient ? 1 : 0, $isClient ? 0 : 1, $branch]);
+    };
+    $mkp('OSPICK client A', $osA, true);
+    $mkp('OSPICK client B', $osB, true);
+    $mkp('OSPICK client none', null, true);
+    $mkp('OSPICK vendor A', $osA, false);
+    $mkp('OSPICK vendor B', $osB, false);
+
+    $osAs();
+    $cl = array_column(array_filter(clients_list(), fn($r) => strpos($r['legal_name'], 'OSPICK') === 0), 'legal_name');
+    t_ok(in_array('OSPICK client A', $cl, true),    'the client picker offers this branch\'s client');
+    t_ok(in_array('OSPICK client none', $cl, true), 'and the unassigned one, so nothing is stranded');
+    t_ok(!in_array('OSPICK client B', $cl, true),   'the client picker does NOT offer another branch\'s client');
+
+    $vn = array_column(array_filter(vendors_list(), fn($r) => strpos($r['legal_name'], 'OSPICK') === 0), 'legal_name');
+    t_ok(in_array('OSPICK vendor A', $vn, true),  'the vendor picker offers this branch\'s vendor');
+    t_ok(!in_array('OSPICK vendor B', $vn, true), 'the vendor picker does NOT offer another branch\'s vendor');
+
+    // The picker and the register must agree — that is the whole point.
+    [$w, $a] = scope_office_clause('home_branch_id');
+    $reg = array_column(ops_all("SELECT legal_name FROM business_partners
+                                 WHERE is_client=1 AND legal_name LIKE 'OSPICK client%' AND $w ORDER BY legal_name", $a), 'legal_name');
+    sort($cl); sort($reg);
+    t_eq($cl, $reg, 'the client picker and the client register return the same parties');
+
+    // And a master still sees every party in the picker.
+    t_as_admin();
+    $all = array_column(array_filter(clients_list(), fn($r) => strpos($r['legal_name'], 'OSPICK') === 0), 'legal_name');
+    t_eq(count($all), 3, 'a master\'s picker still offers every branch\'s client');
+    t_as_nobody();
+});
+
+t_nothrow('every party list in the product asks the shared branch rule', function () {
+    // A helper nothing calls would leave every dropdown exactly as it was, so
+    // this counts the call sites: if somebody adds a new party list without the
+    // rule, the count drops and this fails.
+    $root = dirname(__DIR__);
+    $n = 0;
+    foreach (glob($root . '/lib/*.php') as $f) {
+        $n += substr_count((string)@file_get_contents($f), 'partner_office_sql(');
+    }
+    t_ok($n >= 25, 'the branch rule is applied across the party lists (found ' . $n . ' call sites)');
+    $ops = (string)@file_get_contents($root . '/lib/ops.php');
+    t_ok(preg_match('/function clients_list\(\).*?partner_office_sql/s', $ops) === 1,
+        'clients_list() — which feeds most pickers — is scoped');
+    t_ok(preg_match('/function vendors_list\(\).*?partner_office_sql/s', $ops) === 1,
+        'vendors_list() is scoped');
+});
+
 // ---- tidy up: leave no fixture behind for the next test file ----------------
 t_nothrow('fixtures removed', function () use (&$osA, &$osB, &$osUid) {
     db()->exec("DELETE FROM calls WHERE call_code LIKE 'OSC%'");
@@ -196,6 +261,7 @@ t_nothrow('fixtures removed', function () use (&$osA, &$osB, &$osUid) {
     db()->exec("DELETE FROM opportunities WHERE ref LIKE 'OSO-%'");
     db()->exec("DELETE FROM quotations WHERE quote_no LIKE 'OSQ%'");
     db()->exec("DELETE FROM business_partners WHERE legal_name LIKE 'OSP %'");
+    db()->exec("DELETE FROM business_partners WHERE legal_name LIKE 'OSPICK %'");
     db()->prepare("DELETE FROM users WHERE id=?")->execute([$osUid]);
     db()->prepare("DELETE FROM offices WHERE id IN (?,?)")->execute([$osA, $osB]);
     t_as_nobody();

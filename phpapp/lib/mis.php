@@ -371,7 +371,7 @@ function ops_mis($method) {
         'activityOpts' => mis_activity_options(),
         'offices' => ops_all("SELECT id, name, code FROM offices WHERE COALESCE(is_active,1)=1 ORDER BY is_ahmedabad DESC, name"),
         'inspectors' => ops_all("SELECT id, name FROM inspectors ORDER BY name"),
-        'clients' => ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_client=1 ORDER BY legal_name"),
+        'clients' => ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY legal_name"),
     ]);
 }
 

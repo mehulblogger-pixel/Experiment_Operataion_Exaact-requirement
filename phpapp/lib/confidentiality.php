@@ -334,7 +334,7 @@ function ops_confidentiality($route, $method) {
             'f' => $_GET['f'] ?? 'open',
             'inspectors' => ops_all("SELECT id, name FROM inspectors ORDER BY name"),
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners
-                                  WHERE is_client=1 ORDER BY COALESCE(display_name, legal_name)"),
+                                  WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY COALESCE(display_name, legal_name)"),
         ]);
         return true;
     }

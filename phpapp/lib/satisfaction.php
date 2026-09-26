@@ -101,7 +101,7 @@ function sat_client_name($id) {
     return $r ? (trim((string)($r['display_name'] ?? '')) ?: (string)($r['legal_name'] ?? '')) : '';
 }
 function sat_clients() {
-    return ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1
+    return ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . "
         ORDER BY COALESCE(display_name, legal_name) LIMIT 500") ?: [];
 }
 

@@ -4,7 +4,8 @@ $sel = function ($opts, $cur) { foreach ($opts as $code => $label) {
     echo '<option value="' . e($code) . '"' . ($cur === $code ? ' selected' : '') . '>' . e($label) . '</option>'; } };
 // Optional client link — the party the item belongs to. Queried here so the form
 // stays self-contained; an empty choice keeps it optional.
-$clients = ops_all("SELECT id, COALESCE(display_name, legal_name) nm FROM business_partners WHERE is_client=1 AND status='ACTIVE' ORDER BY nm") ?: [];
+$clients = ops_all("SELECT id, COALESCE(display_name, legal_name) nm FROM business_partners
+                    WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' ORDER BY nm") ?: [];
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/samples">Items &amp; samples</a> › <?= $s ? e($s['item_code']) : 'Receive an item' ?></div>
 <div class="master-head"><div><h1><?= $s ? 'Edit ' . e($s['item_code']) : 'Receive an item' ?></h1>

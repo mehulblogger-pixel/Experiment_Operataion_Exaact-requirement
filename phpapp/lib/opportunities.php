@@ -957,7 +957,7 @@ function ops_opportunities($route, $method) {
             // without this there was no screen anywhere that could supply one.
             'clients' => opp_try(fn() => ops_all(
                 "SELECT id, display_name, legal_name FROM business_partners
-                 WHERE is_client=1 AND status='ACTIVE' ORDER BY display_name, legal_name"), []),
+                 WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' ORDER BY display_name, legal_name"), []),
             // Effort — this deal's logged time plus the lead it came from.
             'effort' => function_exists('act_effort')
                 ? act_effort([['OPPORTUNITY', (int)$o['id']], ['LEAD', (int)($o['lead_id'] ?? 0)]])
@@ -1003,7 +1003,7 @@ function ops_opportunities($route, $method) {
         view('ops/opportunity_form', [
             'pipelines' => pipelines_all('OPPORTUNITY'), 'prefill' => $prefill, 'form_err' => $formErr,
             'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
-            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
+            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
             'sources' => function_exists('lk_options_or') && defined('LEAD_SOURCES') ? lk_options_or('lead_source', LEAD_SOURCES) : [],
         ]);
         return true;

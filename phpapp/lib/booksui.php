@@ -269,7 +269,7 @@ function ops_books($route, $method) {
         $pid = (int)($_GET['partner'] ?? 0);
         view('ops/invoice_form', [
             'partner' => $pid ? ops_one("SELECT * FROM business_partners WHERE id=?", [$pid]) : null,
-            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
+            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
             'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
             'billable' => $pid ? books_billable_jobs($pid, 200) : [],
             'terms' => function_exists('lk_options') ? lk_options('payment_terms') : [],
@@ -358,7 +358,7 @@ function ops_books($route, $method) {
         $pid = (int)($_GET['partner'] ?? 0);
         view('ops/receipt_form', [
             'partner' => $pid ? ops_one("SELECT * FROM business_partners WHERE id=?", [$pid]) : null,
-            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
+            'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
             'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
             'open' => $pid ? books_open_invoices($pid) : [],
         ]);

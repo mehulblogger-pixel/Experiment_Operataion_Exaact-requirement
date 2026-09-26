@@ -748,7 +748,7 @@ function crm_signatories() {
 function crm_client_inspection_types() {
     $out = [];
     try {
-        foreach (ops_all("SELECT id, inspection_types FROM business_partners WHERE is_client=1 AND inspection_types <> ''") as $r)
+        foreach (ops_all("SELECT id, inspection_types FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " AND inspection_types <> ''") as $r)
             $out[(int)$r['id']] = array_values(array_filter(explode(',', $r['inspection_types'])));
     } catch (Throwable $e) {}
     return $out;
@@ -873,7 +873,7 @@ function quote_group_contract_candidates($quoteId) {
     if (!$ids) return [];
     $in = implode(',', array_fill(0, count($ids), '?'));
     return ops_all("SELECT id, legal_name, display_name FROM business_partners
-                    WHERE id IN ($in) AND is_client=1 ORDER BY display_name, legal_name", $ids) ?: [];
+                    WHERE id IN ($in) AND is_client=1 AND " . partner_office_sql() . " ORDER BY display_name, legal_name", $ids) ?: [];
 }
 // Register an ADDITIONAL contract under a quote for a related group company. The
 // primary contract must already be registered; the company must be in the client's

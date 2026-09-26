@@ -4430,7 +4430,7 @@ function ops_idems_vendors($route, $method) {
     // Register — every vendor partner, with its qualification profile (LEFT JOIN so
     // vendors never yet assessed still appear as prospects).
     $q = trim($_GET['q'] ?? ''); $fs = $_GET['status'] ?? ''; $fr = $_GET['risk'] ?? ''; $ftp = $_GET['vtype'] ?? '';
-    $where = "bp.is_vendor=1"; $args = [];
+    $where = "bp.is_vendor=1 AND " . partner_office_sql('bp.home_branch_id'); $args = [];
     if ($q)   { $where .= " AND (bp.display_name LIKE ? OR bp.legal_name LIKE ? OR bp.code LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%"); }
     if ($fs)  { $where .= " AND COALESCE(vp.approval_status,'PROSPECT')=?"; $args[] = $fs; }
     if ($fr)  { $where .= " AND vp.risk_class=?"; $args[] = $fr; }
@@ -4680,8 +4680,8 @@ function ops_idems_documents($route, $method) {
         // engineer selects a type that would open a blank screen.
         $typeReady = []; foreach (ops_all("SELECT report_type_id tid, COUNT(*) c FROM report_fields GROUP BY report_type_id") as $fc) $typeReady[(int)$fc['tid']] = (int)$fc['c'];
         view('ops/idems/doc_form', ['doc'=>$doc, 'pre'=>$pre, 'types'=>$types, 'allTypes'=>$allTypes, 'typeReady'=>$typeReady,
-            'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
-            'vendors'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_vendor=1 ORDER BY nm"),
+            'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY nm"),
+            'vendors'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_vendor=1 AND " . partner_office_sql() . " ORDER BY nm"),
             'inspectors'=>ops_all("SELECT id, name FROM inspectors WHERE status='ACTIVE' ORDER BY name"),
             'approvers'=>ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name, last_name"),
             'offices'=>ops_all("SELECT id, name FROM offices ORDER BY is_ahmedabad DESC, name"),
@@ -6806,7 +6806,7 @@ function ops_idems_approval_rules($route, $method) {
     $edit = ($route === 'idems-approval-rule-edit') ? ops_one("SELECT * FROM idems_approval_rules WHERE id=?", [(int)($_GET['id'] ?? 0)]) : null;
     view('ops/idems/approval_rules', ['rows'=>ops_all("SELECT r.*, o.name office_name, bp.display_name client_name FROM idems_approval_rules r LEFT JOIN offices o ON o.id=r.office_id LEFT JOIN business_partners bp ON bp.id=r.client_id ORDER BY r.level, r.sort_order, r.id"),
         'edit'=>$edit, 'types'=>idems_types(false), 'offices'=>ops_all("SELECT id, name FROM offices ORDER BY name"),
-        'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
+        'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY nm"),
         'users'=>ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name"), 'kinds'=>IDEMS_APPROVER_KINDS, 'sbuOpts'=>lk_options_or('sbu', OPS_SBUS)]);
     return true;
 }
@@ -8953,7 +8953,7 @@ function ops_idems_templates($route, $method) {
     view('ops/idems/templates', [
         'rows'=>ops_all("SELECT t.*, rt.name type_name, rt.code type_code, bp.display_name client_name, o.name office_name FROM report_templates t LEFT JOIN report_types rt ON rt.id=t.report_type_id LEFT JOIN business_partners bp ON bp.id=t.client_id LEFT JOIN offices o ON o.id=t.office_id ORDER BY t.id DESC"),
         'edit'=>$edit, 'validation'=>$edit ? idems_template_validate($edit) : null, 'statusMap'=>TEMPLATE_STATUS, 'types'=>idems_types(false),
-        'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
+        'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY nm"),
         'offices'=>ops_all("SELECT id, name FROM offices ORDER BY name"),
         'tokRefType'=>$tokRefType, 'tokens'=>$tokRefType ? idems_type_tokens($tokRefType) : null,
         'zipOk'=>class_exists('ZipArchive')]);
@@ -9082,8 +9082,8 @@ function ops_idems_endorsements($route, $method) {
             }
         }
         view('ops/idems/endorse_form', ['e'=>$e, 'docTypes'=>ENDORSE_DOC_TYPES,
-            'vendors'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_vendor=1 ORDER BY nm"),
-            'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
+            'vendors'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_vendor=1 AND " . partner_office_sql() . " ORDER BY nm"),
+            'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY nm"),
             'inspectors'=>ops_all("SELECT id, name FROM inspectors WHERE status='ACTIVE' ORDER BY name"),
             'approvers'=>ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name"),
             'offices'=>ops_all("SELECT id, name FROM offices ORDER BY is_ahmedabad DESC, name"), 'sbuOpts'=>lk_options_or('sbu', OPS_SBUS),

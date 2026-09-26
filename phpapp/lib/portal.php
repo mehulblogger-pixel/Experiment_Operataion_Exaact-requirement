@@ -117,7 +117,7 @@ function portal_contacts_by_partner() {
     foreach (portal_try(fn() => ops_all(
         "SELECT pc.id, pc.partner_id, pc.name, pc.email, pc.designation
          FROM partner_contacts pc JOIN business_partners p ON p.id = pc.partner_id
-         WHERE p.is_client=1 AND pc.email <> '' ORDER BY pc.is_primary DESC, pc.name"), []) as $c) {
+         WHERE p.is_client=1 AND " . partner_office_sql('p.home_branch_id') . " AND pc.email <> '' ORDER BY pc.is_primary DESC, pc.name"), []) as $c) {
         $out[(int)$c['partner_id']][] = [
             'id' => (int)$c['id'], 'name' => (string)$c['name'],
             'email' => (string)$c['email'], 'desig' => (string)($c['designation'] ?? ''),

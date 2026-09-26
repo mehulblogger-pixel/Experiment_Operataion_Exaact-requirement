@@ -114,8 +114,9 @@ band itself is unchanged.
 adds, removes or widens a **permission** — each narrows what an already-permitted
 user is *shown*, which is scope, not authority.
 
-1. **A branch sees its own parties.** The client and vendor directory
-   (`/clients`, `/vendors`) and the dashboard tiles that count them now scope on
+1. **A branch sees its own parties — in every list and every dropdown.** The
+   client and vendor directory (`/clients`, `/vendors`), the dashboard tiles that
+   count them, **and every picker that offers a party** now scope on
    `business_partners.home_branch_id` through the existing
    `scope_office_clause()`. That column has always existed and has always been
    editable on the 360 screen; nothing scoped on it, so every branch read the
@@ -126,6 +127,21 @@ user is *shown*, which is scope, not authority.
    branch user on the day it shipped; the directory tightens as the field is
    filled in instead of going dark. Making it strict later is a one-line change
    and a data question, not a permission question.
+
+   The rule has one home, `partner_office_sql()` (`access.php`), asked by the two
+   shared helpers `clients_list()` / `vendors_list()` and by every list that
+   builds its own SQL — **29 call sites**. A register that hides a party while
+   the form beside it still offers that party is worse than no scoping at all,
+   so the two are held to the same rule by construction.
+
+   **Three party queries stay unscoped, deliberately:** the duplicate check
+   before creating a party (a branch-blind "does this name exist?" is what stops
+   two branches creating two records for one client), an internal trace helper,
+   and **`inspectors_list()`**, the team-member picker. That last one is a
+   standing business rule, not an oversight: EXAACT carries an **inter-office
+   credit** on every job for the case where one office's person does another
+   office's work, so scoping the picker would end cross-office deputation.
+   Changing it is an owner decision about how the business runs.
 
 2. **The two-office rule for work orders is now stated once.** A work order
    belongs to the office that **contracted** it as well as the one **executing**
