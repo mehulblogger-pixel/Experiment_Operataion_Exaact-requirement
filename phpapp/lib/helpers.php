@@ -9,7 +9,38 @@ function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 // navigating the little iframe. Any existing add/edit screen works in the popup with no change of its own.
 function is_embed() { return (($_GET['embed'] ?? $_POST['_embed'] ?? '') === '1'); }
 
+/**
+ * The tab the person was on when they pressed the button, if any.
+ *
+ * Every form inside a tabbed screen carries `_tab` (the panel's slug) and
+ * `_tabkey` (that screen's hash key), stamped by the shared tab engine. Without
+ * this, a POST redirected to a bare path and the browser landed on panel one —
+ * so pressing ANY button on the Offer panel threw the person back to Overview,
+ * on every tabbed screen in the product.
+ *
+ * SANITISED HARD, because the result goes into a Location header: anything but
+ * [a-z0-9-] is dropped, so a newline can never be smuggled in to split the
+ * header. A value that does not survive that is simply ignored.
+ */
+function redirect_tab_fragment() {
+    $clean = function ($v) {
+        $v = strtolower(trim((string) $v));
+        $v = preg_replace('~[^a-z0-9-]~', '', $v);
+        return substr((string) $v, 0, 40);
+    };
+    $tab = $clean($_POST['_tab'] ?? '');
+    if ($tab === '') return '';
+    $key = $clean($_POST['_tabkey'] ?? '') ?: 'tab';
+    return '#' . $key . '=' . $tab;
+}
+
 function redirect($path) {
+    //  Put them back on the panel they were working on. Only ever ADDS a
+    //  fragment — a caller that already chose one keeps it — and only for a
+    //  same-page redirect, so this cannot follow somebody to another screen.
+    $path = (string) $path;
+    if (strpos($path, '#') === false && ($frag = redirect_tab_fragment()) !== '') $path .= $frag;
+
     if (function_exists('is_embed') && is_embed()) {
         // Inside the popup: tell the host to close + refresh (it knows where we ended up), and fall back to
         // navigating the iframe itself if the message can't be posted (opened outside a modal).

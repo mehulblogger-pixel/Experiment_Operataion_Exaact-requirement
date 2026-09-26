@@ -477,7 +477,12 @@ function ops_candidate_offer($route, $method) {
         elseif ($do === 'decline') { [$ok, $m] = offer_decline((int)($_POST['offer_id'] ?? 0), $_POST['reason'] ?? ''); flash($m, $ok ? 'success' : 'error'); }
         elseif ($do === 'withdraw') { [$ok, $m] = offer_withdraw((int)($_POST['offer_id'] ?? 0)); flash($m, $ok ? 'success' : 'error'); }
     }
-    redirect('/candidate?id=' . $id . '#tab=Offer');
+    //  The open panel is carried by the form and restored by redirect(); it is
+    //  no longer named here. This line used to write "#tab=Offer" — the generic
+    //  key instead of this screen's ("ct"), and the LABEL instead of the slug —
+    //  so it matched nothing and the person landed on panel one anyway, while
+    //  the address bar showed the right thing.
+    redirect('/candidate?id=' . $id);
     return true;
 }
 

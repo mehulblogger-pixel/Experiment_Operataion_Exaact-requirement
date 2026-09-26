@@ -353,7 +353,8 @@ function ops_candidate_interview($route, $method) {
         elseif ($do === 'score_save') { iv_score_save($_POST); flash('Panel member score saved.'); }
         elseif ($do === 'score_delete') { iv_score_delete((int)($_POST['score_id'] ?? 0)); flash('Score removed.'); }
     }
-    redirect('/candidate?id=' . $id . '#tab=Interviews');
+    //  See lib/recruit_offer.php: the open panel is carried by the form now.
+    redirect('/candidate?id=' . $id);
     return true;
 }
 
@@ -372,7 +373,8 @@ function ops_candidate_doc($route, $method) {
         elseif ($do === 'status') { doc_status_set((int)($_POST['doc_id'] ?? 0), (string)($_POST['status'] ?? '')); flash('Document status updated.'); }
         elseif ($do === 'delete') { doc_delete((int)($_POST['doc_id'] ?? 0)); flash('Document removed.'); }
     }
-    redirect('/candidate?id=' . $id . '#tab=Documents');
+    //  See lib/recruit_offer.php: the open panel is carried by the form now.
+    redirect('/candidate?id=' . $id);
     return true;
 }
 

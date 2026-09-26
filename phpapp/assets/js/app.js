@@ -1747,6 +1747,30 @@
         nextBtn.addEventListener('click', function () { goto(Math.min(groups.length - 1, curIdx + 1)); });
       }
 
+      //  CARRY THE OPEN PANEL THROUGH A SUBMIT.
+      //
+      //  Pressing any button used to redirect to a bare path, and the browser
+      //  landed on panel one — so a person working on Offer was thrown back to
+      //  Overview by every button on the screen. The server cannot know which
+      //  panel they were on unless the form tells it, so every form inside the
+      //  wrap carries the open panel's slug and this screen's hash key. PHP's
+      //  redirect() reads them back and re-opens that panel.
+      function stampForms(slugLabel) {
+        Array.prototype.forEach.call(wrap.querySelectorAll('form'), function (f) {
+          var set = function (name, val) {
+            var el = f.querySelector('input[name="' + name + '"]');
+            if (!el) {
+              el = document.createElement('input');
+              el.type = 'hidden'; el.name = name;
+              f.appendChild(el);
+            }
+            el.value = val;
+          };
+          set('_tab', slugLabel);
+          set('_tabkey', key);
+        });
+      }
+
       function show(i, push) {
         curIdx = i;
         groups.forEach(function (g, j) { g.panels.forEach(function (p) { p.hidden = j !== i; }); });
@@ -1775,11 +1799,28 @@
               + (groups.length - 1 - i) + ' section' + ((groups.length - 1 - i) === 1 ? '' : 's')
               + ' can be filled in later on this person\'s page.');
         }
+        stampForms(slug(groups[i].label));
         if (push) { try { history.replaceState(null, '', '#' + key + '=' + slug(groups[i].label)); } catch (e) {} }
       }
       var want = 0;
-      var m = (location.hash || '').match(new RegExp(key + '=([^&]+)'));
-      if (m) { groups.forEach(function (g, j) { if (slug(g.label) === m[1]) want = j; }); }
+      //  FORGIVING ON THE WAY IN, exact on the way out.
+      //
+      //  Three server redirects already tried to preserve the panel and wrote
+      //  "#tab=Offer" — the generic key instead of this screen's ("ct"), and the
+      //  LABEL instead of the slug. Both mismatched, so the hash was ignored and
+      //  the person landed on panel one anyway; the attempt looked like it worked
+      //  because the address bar showed the right thing.
+      //
+      //  So: accept this screen's key or the generic "tab", and match a panel by
+      //  its slug OR its label, ignoring case. Anything that names a real panel
+      //  opens it. What we WRITE stays exactly one canonical form.
+      var m = (location.hash || '').match(new RegExp('(?:^#|[#&])(?:' + key + '|tab)=([^&]+)', 'i'));
+      if (m) {
+        var wanted = decodeURIComponent(m[1]).toLowerCase();
+        groups.forEach(function (g, j) {
+          if (slug(g.label) === wanted || String(g.label).toLowerCase() === wanted) want = j;
+        });
+      }
       // Field-finding #20 — also honour a bare element-id hash (e.g. /job?id=5#holdpoints). The hold /
       // witness handler, and other in-page links, redirect to an element that lives ON a tab; without this
       // the page opened on the first tab (Overview) and the target panel stayed hidden — reading as "it
