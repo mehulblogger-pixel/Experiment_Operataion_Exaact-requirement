@@ -294,8 +294,89 @@ function req_skills_by_trade() { return function_exists('skills_by_trade') ? ski
 // Professional certificates — [code => "Name (issuing body)"]. Read straight
 // from the taxonomy master; empty (so the field simply stays free text) on an
 // install where the seed has not run.
-function req_cert_options() {
+// ============================================================================
+//  A CERTIFICATE THE LIST DOES NOT YET KNOW — learned once, offered for ever.
+//
+//  The certificate picker replaced a free-text box precisely because "CSWIP
+//  3.1", "cswip3.1" and "CSWIP Level 3.1" were three different requirements to
+//  the system. That fixed the spelling problem and created a new one: a real
+//  certificate the seeded list has never heard of could not be recorded at all,
+//  so people went back to writing it in a notes field where nothing can match on
+//  it.
+//
+//  This closes that without reopening the first problem. A new name is added to
+//  the SAME master the picker reads (`cx_prof_certifications`, maintained under
+//  Admin → Qualifications & certifications), so it is offered to everybody from
+//  then on — the list teaches itself.
+//
+//  THE DUPLICATE GUARD IS THE POINT. Adding blindly would rebuild the mess the
+//  master was created to end, so a name that already exists — ignoring case,
+//  punctuation and spacing — returns the EXISTING row rather than making a
+//  second one. "cswip 3.1" types its way onto the existing "CSWIP 3.1".
+//
+//  Rows added this way carry is_system = 0, so an administrator can tell what
+//  the company added from what shipped, and can rename, re-body or deactivate it
+//  on the taxonomy screen afterwards. Nothing here can touch a seeded row.
+//
+//  Returns ['code','label','created'] or ['err' => '<why>'].
+// ============================================================================
+function req_cert_add($name, $body = '') {
+    $name = trim(preg_replace('/\s+/', ' ', (string) $name));
+    $body = trim(preg_replace('/\s+/', ' ', (string) $body));
+    if ($name === '')            return ['err' => 'Type the name of the certificate.'];
+    if (mb_strlen($name) < 2)    return ['err' => 'That is too short to be a certificate name.'];
+    if (mb_strlen($name) > 240)  return ['err' => 'That name is too long — keep it under 240 characters.'];
+    if (mb_strlen($body) > 120)  $body = mb_substr($body, 0, 120);
+
+    //  The comparison key: letters and digits only, lower-cased. It is what makes
+    //  "CSWIP 3.1", "cswip3.1" and "C.S.W.I.P 3.1" the same certificate.
+    $key = fn($s) => strtolower(preg_replace('/[^a-z0-9]+/i', '', (string) $s));
+    $want = $key($name);
+    if ($want === '') return ['err' => 'That name has no letters or numbers in it.'];
+
+    try {
+        //  Match against what is already there — active or not. Re-adding a
+        //  DEACTIVATED certificate reactivates it rather than creating a twin,
+        //  which is what an operator means when they type it again.
+        foreach (db()->query("SELECT id, code, name, body, is_active FROM cx_prof_certifications")->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+            if ($key($r['name'] ?? '') !== $want) continue;
+            if ((int) ($r['is_active'] ?? 1) !== 1) {
+                db()->prepare("UPDATE cx_prof_certifications SET is_active=1 WHERE id=?")->execute([(int) $r['id']]);
+            }
+            $lbl = trim((string) $r['name']) . (trim((string) ($r['body'] ?? '')) !== '' ? ' — ' . trim((string) $r['body']) : '');
+            return ['code' => (string) $r['code'], 'label' => $lbl, 'created' => false];
+        }
+
+        //  A stable key from the name, made unique without ever colliding with a
+        //  code somebody else owns.
+        $base = function_exists('connect_qualtax_norm_code')
+            ? connect_qualtax_norm_code($name)
+            : trim(preg_replace('/[^A-Z0-9]+/', '_', strtoupper($name)), '_');
+        if ($base === '') $base = 'CERT';
+        $base = mb_substr($base, 0, 50);
+        $code = $base; $n = 1;
+        while ((int) ops_val("SELECT COUNT(*) FROM cx_prof_certifications WHERE code=?", [$code]) > 0) {
+            $code = mb_substr($base, 0, 50 - strlen((string) ++$n) - 1) . '_' . $n;
+            if ($n > 200) return ['err' => 'Could not allocate a code for that certificate.'];
+        }
+        $sort = (int) ops_val("SELECT COALESCE(MAX(sort_order),0) FROM cx_prof_certifications") + 10;
+        db()->prepare("INSERT INTO cx_prof_certifications (code,name,body,domain,sort_order,is_active,is_system)
+                       VALUES (?,?,?,'',?,1,0)")->execute([$code, $name, $body, $sort]);
+
+        if (function_exists('act_log')) {
+            try { act_log('MASTER', 0, 'CERT_ADDED', 'Certificate “' . $name . '” added from a ' . (function_exists('Tl') ? Tl('requisition') : 'requisition')); }
+            catch (Throwable $e) {}
+        }
+        req_cert_options(true);   // the picker must offer it immediately
+        return ['code' => $code, 'label' => $name . ($body !== '' ? ' — ' . $body : ''), 'created' => true];
+    } catch (Throwable $e) {
+        return ['err' => 'The certificate list is not available on this installation.'];
+    }
+}
+
+function req_cert_options($fresh = false) {
     static $cache = null, $at = -1;
+    if ($fresh) $cache = null;                       // a just-added certificate must show at once
     if ($cache !== null && $at === db_epoch()) return $cache;
     $at = db_epoch(); $out = [];
     try {

@@ -3148,7 +3148,7 @@ function ops_module_gate($route, $peek = false) {
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-joined'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring','candidate-link-pro'=>'hiring','candidate-unlink-pro'=>'hiring',
         'hiring-requests'=>'hiring','hiring-request'=>'hiring',
         'approval-delegations'=>'hiring',   // M2 — approval delegation config rides with recruitment
-        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','requisition-allocations'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring','recruit-export'=>'hiring','careers-admin'=>'hiring','jd-generate'=>'hiring','positions-import'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','requisition-allocations'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','candidate-pool'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring','recruit-export'=>'hiring','careers-admin'=>'hiring','jd-generate'=>'hiring','cert-add'=>'hiring','positions-import'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
@@ -3515,6 +3515,8 @@ function ops_dispatch($route, $method) {
             return ops_my_start($route, $method);
         case $route === 'jd-generate':                               // auto job-description / posting (AJAX)
             return ops_jd_generate($route, $method);
+        case $route === 'cert-add':                                  // learn a new certificate (AJAX)
+            return ops_cert_add($route, $method);
         case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
             return ops_projcosting($route, $method);
         case $route === 'recruit-config':

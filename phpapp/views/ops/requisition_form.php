@@ -380,11 +380,31 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
           <select class="form-control" id="rq_cert_pick">
             <option value="">+ add a certificate…</option>
             <?php foreach ($rqCerts as $ccode => $clabel): ?><option value="<?= e($clabel) ?>"><?= e($clabel) ?></option><?php endforeach; ?>
+            <?php //  A real certificate the seeded list has never heard of used to
+                  //  have nowhere to go, so it ended up in a notes field where
+                  //  nothing can match on it. Offered only to somebody who may
+                  //  maintain the master — see ops_cert_add().
+                  $rqCanAddCert = function_exists('connect_qualtax_manage_can') ? connect_qualtax_manage_can()
+                                : (function_exists('is_admin_level') && is_admin_level());
+                  if ($rqCanAddCert): ?>
+              <option value="__new__">➕ Not on the list — add one…</option>
+            <?php endif; ?>
           </select>
+          <?php if ($rqCanAddCert): ?>
+            <div id="rq_cert_new" hidden style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:6px;margin-top:6px">
+              <input class="form-control" id="rq_cert_new_name" placeholder="Certificate name — e.g. CSWIP 3.2" maxlength="240">
+              <input class="form-control" id="rq_cert_new_body" placeholder="Issuing body (optional) — e.g. TWI" maxlength="120">
+              <button class="btn small" type="button" id="rq_cert_new_go">Add</button>
+              <button class="btn small secondary" type="button" id="rq_cert_new_x">Cancel</button>
+            </div>
+            <div class="muted" id="rq_cert_msg" style="margin-top:4px;font-size:12.5px"></div>
+          <?php endif; ?>
           <div class="rq-chips" id="rq_cert_chips"></div>
           <input type="hidden" name="skills" id="rq_skills_val" value="<?= $v('skills') ?>">
-          <script>window.RQ_CERTS_HAVE = <?= json_encode($rqHave, JSON_UNESCAPED_UNICODE) ?>;</script>
-          <small class="muted">Pick as many as the role needs. Maintained under Admin → Qualifications &amp; certifications.</small>
+          <script>window.RQ_CERTS_HAVE = <?= json_encode($rqHave, JSON_UNESCAPED_UNICODE) ?>;
+                   window.RQ_CERT_CSRF = <?= json_encode(function_exists('csrf_token') ? csrf_token() : '') ?>;</script>
+          <small class="muted">Pick as many as the role needs.
+            <?= $rqCanAddCert ? 'Anything you add here joins the list for everyone.' : 'Maintained under Admin → Qualifications &amp; certifications.' ?></small>
         <?php else: ?>
           <input class="form-control" name="skills" value="<?= $v('skills') ?>" placeholder="e.g. CSWIP 3.1, NDT UT-II">
         <?php endif; ?>
@@ -711,10 +731,62 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
     }
     certPick.addEventListener('change', function(){
       var v = certPick.value;
+      if (v === '__new__') { showNew(true); certPick.selectedIndex = 0; return; }
       if (v && have.indexOf(v) < 0) { have.push(v); paint(); }
       certPick.selectedIndex = 0;
     });
     paint();
+
+    // ---- learn a certificate the list does not have yet --------------------
+    // The new name is saved to the same master the picker reads, so it is
+    // offered to everybody from now on — and added to THIS requisition without
+    // the person having to find it again in the list.
+    var newBox = document.getElementById('rq_cert_new'),
+        newName = document.getElementById('rq_cert_new_name'),
+        newBody = document.getElementById('rq_cert_new_body'),
+        newGo  = document.getElementById('rq_cert_new_go'),
+        newX   = document.getElementById('rq_cert_new_x'),
+        newMsg = document.getElementById('rq_cert_msg');
+    function showNew(on){
+      if (!newBox) return;
+      newBox.hidden = !on;
+      if (newMsg) newMsg.textContent = '';
+      if (on && newName) { newName.value = ''; if (newBody) newBody.value = ''; newName.focus(); }
+    }
+    function addOption(label){
+      // Keep the picker sorted-ish and never add the same label twice.
+      for (var i = 0; i < certPick.options.length; i++)
+        if (certPick.options[i].value === label) return;
+      var o = document.createElement('option');
+      o.value = label; o.textContent = label;
+      certPick.insertBefore(o, certPick.options[certPick.options.length - 1]);
+    }
+    function saveNew(){
+      if (!newName || !newGo) return;
+      var nm = (newName.value || '').trim();
+      if (!nm) { newMsg.textContent = 'Type the name of the certificate.'; return; }
+      newGo.disabled = true; newMsg.textContent = 'Adding…';
+      var body = new URLSearchParams();
+      body.set('_csrf', window.RQ_CERT_CSRF || '');
+      body.set('name', nm);
+      body.set('body', (newBody && newBody.value || '').trim());
+      fetch('/cert-add', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: body.toString(), credentials: 'same-origin' })
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          newGo.disabled = false;
+          if (!j || !j.ok) { newMsg.textContent = (j && j.error) || 'Could not add that certificate.'; return; }
+          addOption(j.label);
+          if (have.indexOf(j.label) < 0) { have.push(j.label); paint(); }
+          newMsg.textContent = j.note || 'Added.';
+          showNew(false);
+        })
+        .catch(function(){ newGo.disabled = false; newMsg.textContent = 'Could not reach the server — check your connection and try again.'; });
+    }
+    if (newGo) newGo.addEventListener('click', saveNew);
+    if (newX)  newX.addEventListener('click', function(){ showNew(false); });
+    // Enter inside the name box should add, not submit the whole requisition.
+    if (newName) newName.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); saveNew(); } });
+    if (newBody) newBody.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); saveNew(); } });
   }
 
   // Live commercial preview (mirrors req_commercials()/req_cost_buildup() server-side).

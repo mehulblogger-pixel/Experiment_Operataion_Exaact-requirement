@@ -147,6 +147,50 @@ function recruit_jd_generate($req, $opts = []) {
 }
 
 // ---- AJAX endpoint used by the careers admin & requisition screen ----------
+// ============================================================================
+//  ADD A CERTIFICATE THE LIST DOES NOT KNOW — from the requisition form (AJAX).
+//
+//  Same shape as ops_jd_generate() below: JSON, permission first, then CSRF,
+//  then the work. The gate is deliberately the one that already governs this
+//  master — connect_qualtax_manage_can(), i.e. admin level — and NOT the
+//  coordinator band that governs the requisition form around it.
+//
+//  That distinction is the whole reason this is a separate question: writing to
+//  the certificate master changes a list every requisition in the company picks
+//  from, so it is a master-data act, not a recruitment one. The permission
+//  matrix gives a Coordinator no master-data right, and widening one here —
+//  quietly, inside a feature request about a dropdown — is exactly the kind of
+//  change that must be asked for rather than assumed. If the owner wants
+//  coordinators to extend the list, that is a deliberate grant.
+//
+//  A person who may not add still sees the picker and every certificate in it;
+//  they simply are not offered the "add" control.
+// ============================================================================
+function ops_cert_add($route, $method) {
+    header('Content-Type: application/json');
+    $can = function_exists('connect_qualtax_manage_can') ? connect_qualtax_manage_can()
+         : (function_exists('is_admin_level') && is_admin_level());
+    if (!$can) { echo json_encode(['ok' => false, 'error' => 'Only an administrator can add to the certificate list. Ask one to add it under Admin → Qualifications & certifications.']); return true; }
+    if (function_exists('csrf_ok') && !csrf_ok($_POST['_csrf'] ?? '')) { echo json_encode(['ok' => false, 'error' => 'Session expired — reload the page.']); return true; }
+    if ($method !== 'POST') { echo json_encode(['ok' => false, 'error' => 'Not allowed.']); return true; }
+    if (!function_exists('req_cert_add')) { echo json_encode(['ok' => false, 'error' => 'The certificate list is not available on this installation.']); return true; }
+
+    $res = req_cert_add($_POST['name'] ?? '', $_POST['body'] ?? '');
+    if (!empty($res['err'])) { echo json_encode(['ok' => false, 'error' => $res['err']]); return true; }
+    echo json_encode([
+        'ok'      => true,
+        'code'    => $res['code'],
+        'label'   => $res['label'],
+        'created' => !empty($res['created']),
+        // The person needs to know which of the two things happened: a new
+        // certificate, or a match onto one the list already had.
+        'note'    => !empty($res['created'])
+            ? 'Added — it is now on the list for everyone.'
+            : 'That certificate is already on the list, so it has been selected rather than added twice.',
+    ]);
+    return true;
+}
+
 function ops_jd_generate($route, $method) {
     header('Content-Type: application/json');
     if (!(function_exists('is_coordinator_level') && is_coordinator_level())) { echo json_encode(['ok' => false, 'error' => 'Not allowed.']); return true; }
