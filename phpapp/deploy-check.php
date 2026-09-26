@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '67356a6 · 2026-09-26 11:41 UTC · 669 files';
+$RELEASE = '75026fb · 2026-09-26 12:05 UTC · 669 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -202,7 +202,7 @@ $EXPECT  = [
     'lib/recruit_jd.php' => ['s'=>11577,'h'=>'fa60a38877273cec'],
     'lib/recruit_kpi.php' => ['s'=>43621,'h'=>'d9267e844dd99993'],
     'lib/recruit_offer.php' => ['s'=>45886,'h'=>'96d89be986225584'],
-    'lib/recruitpipe.php' => ['s'=>43744,'h'=>'168882c8e5c0c53c'],
+    'lib/recruitpipe.php' => ['s'=>49666,'h'=>'0fac4cddc4142462'],
     'lib/reportreview.php' => ['s'=>23222,'h'=>'ae43c4d37883823d'],
     'lib/reqfulfil.php' => ['s'=>12422,'h'=>'a87525ad1e75247a'],
     'lib/reset.php' => ['s'=>11477,'h'=>'8d961eb9724047b9'],
@@ -342,7 +342,7 @@ $EXPECT  = [
     'views/ops/call_form.php' => ['s'=>67990,'h'=>'70591fb26844aa74'],
     'views/ops/call_profit.php' => ['s'=>10827,'h'=>'9ceb75929d00146d'],
     'views/ops/calls.php' => ['s'=>11306,'h'=>'d906595ec4d7ae6d'],
-    'views/ops/candidate_detail.php' => ['s'=>52755,'h'=>'fee0967b2d821022'],
+    'views/ops/candidate_detail.php' => ['s'=>54052,'h'=>'b65ca452c42a06de'],
     'views/ops/candidate_form.php' => ['s'=>23079,'h'=>'b59eb2bc480e2ade'],
     'views/ops/candidate_list.php' => ['s'=>2784,'h'=>'1e2c041b86f7e74d'],
     'views/ops/candidate_pool.php' => ['s'=>4450,'h'=>'6434745c74e6751f'],

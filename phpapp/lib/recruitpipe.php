@@ -518,6 +518,115 @@ function ops_recruit_candidate_flow($route, $method) {
     return true;
 }
 
+// ---------------------------------------------------------------------------
+//  THE CONFIGURED PROCESS DECIDES THE SCREEN.
+//
+//  The candidate screen carried TWO navigations for one journey: the configured
+//  workflow strip across the top ("Stage 4 of 8 · Management Interview") and,
+//  directly beneath it, a fixed row of tabs — Overview, Pipeline, Interviews,
+//  Documents, Offer, Recruitment, CV, Timeline. Both describe the same hiring,
+//  neither knew about the other, and they did not even agree on words: the
+//  stage said "Management Interview" while the tab said "Interviews", and the
+//  "Compensation" stage had no tab at all.
+//
+//  Underneath that was the real fault. The WORKFLOW is configurable — a company
+//  can run six stages or eighteen — and the SCREEN was not. A company that
+//  configured a short process still saw all eight tabs, in an order its process
+//  does not follow, including ones it never uses. The configuration was honest
+//  and the screen ignored it, which is the same shape of bug as a terminology
+//  setting that half the screens do not read.
+//
+//  A stage already knows what KIND it is — step, gate, interview, offer,
+//  terminal — so the mapping from "where this candidate is" to "what this
+//  screen should open" was there all along and simply was not asked for.
+//
+//  DELIBERATELY CONSERVATIVE, in two ways:
+//
+//    * A workspace with NO pipeline configured is untouched. Every tab, in the
+//      original order. There is no configuration to honour, so honouring it
+//      cannot mean taking things away.
+//    * Only the two tabs that map ONE-TO-ONE onto a stage kind can be hidden.
+//      Overview, CV, Timeline, Documents and the rest are the record itself —
+//      its history and its files — not steps in a process, and a process that
+//      does not mention them is not a process that forbids them.
+// ---------------------------------------------------------------------------
+function recruitpipe_screen_plan($cand) {
+    $plan = ['has_pipeline' => false, 'needs' => [], 'focus' => '', 'stage_name' => ''];
+    if (!function_exists('recruitpipe_cand_state')) return $plan;
+    if (!is_array($cand) || (int) ($cand['id'] ?? 0) <= 0) return $plan;
+    [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
+    if (!$pipe || !$eff) return $plan;                 // no process configured: change nothing
+
+    //  THE TWO POWERS HERE CARRY VERY DIFFERENT RISK, so they are granted on
+    //  different evidence.
+    //
+    //  ORDERING is harmless: every tab is still on the screen, one click away,
+    //  and a person who picks another keeps it. It applies to any candidate.
+    //
+    //  HIDING takes a capability off the screen, and recruitpipe_cand_state()
+    //  resolves a DEFAULT pipeline for candidates that were never put on one —
+    //  so treating "a pipeline resolved" as "this company configured this
+    //  process" would quietly strip tabs from every legacy record on the
+    //  strength of a fallback nobody chose. Hiding therefore requires the
+    //  process to have actually been LOCKED IN for this hire (pipeline_id),
+    //  which happens on the first real move through it.
+    $locked = (int) ($cand['pipeline_id'] ?? 0) > 0;
+
+    $plan['has_pipeline'] = $locked;
+    //  Which panels the configured stages actually call for.
+    $kinds = [];
+    foreach ($eff as $st) $kinds[(string) ($st['kind'] ?? 'step')] = true;
+    $plan['needs'] = $locked ? [
+        'Interviews' => !empty($kinds['interview']),
+        'Offer'      => !empty($kinds['offer']),
+    ] : [];
+
+    //  What THIS candidate's current stage needs open. A closed candidate has no
+    //  current stage, so nothing is forced and the screen opens as it always did.
+    $closed = function_exists('recruitpipe_legacy_terminal')
+        && in_array((string) ($cand['stage'] ?? ''), recruitpipe_legacy_terminal(), true);
+    $cur = $closed ? null : ($eff[$idx] ?? null);
+    if ($cur) {
+        $plan['stage_name'] = (string) ($cur['name'] ?? '');
+        $plan['focus'] = [
+            'interview' => 'Interviews',
+            'offer'     => 'Offer',
+        ][(string) ($cur['kind'] ?? 'step')] ?? 'Pipeline';
+        //  DEFENCE IN DEPTH, and unreachable today — deliberately kept.
+        //
+        //  A focus is derived from the CURRENT stage's kind, and a stage of kind
+        //  'interview' necessarily makes needs['Interviews'] true, so the focus
+        //  cannot currently name a tab that will not be drawn. Removing this line
+        //  breaks no test, which is exactly why the reasoning is written down
+        //  rather than left implied: add a kind whose tab is conditional on
+        //  something else, and this becomes load-bearing overnight. Opening a tab
+        //  that is not on the screen leaves a person on a blank page.
+        if ($plan['focus'] !== 'Pipeline' && !recruitpipe_wants_tab($plan, $plan['focus']))
+            $plan['focus'] = 'Pipeline';
+    }
+    return $plan;
+}
+
+/** Is a given tab wanted for this candidate? Unknown tabs are always kept. */
+function recruitpipe_wants_tab($plan, $tab) {
+    if (empty($plan['has_pipeline'])) return true;              // nothing configured: keep everything
+    if (!array_key_exists($tab, $plan['needs'] ?? [])) return true;   // not a stage-shaped tab
+    return (bool) $plan['needs'][$tab];
+}
+
+/**
+ * The tab order for this candidate, current stage first.
+ *
+ * The shared tab engine already honours data-tabs-order, so putting the focus
+ * panel first makes it the one that opens — no new mechanism, and a person who
+ * clicks another tab still lands there, and still keeps it on a refresh.
+ */
+function recruitpipe_tab_order($plan, array $all) {
+    $focus = (string) ($plan['focus'] ?? '');
+    if ($focus === '' || !in_array($focus, $all, true)) return $all;
+    return array_merge([$focus], array_values(array_filter($all, fn($t) => $t !== $focus)));
+}
+
 // The panel injected at the top of the candidate screen — the primary tracker.
 function recruitpipe_candidate_panel($cand) {
     if (!is_array($cand) || empty($cand['id'])) return;

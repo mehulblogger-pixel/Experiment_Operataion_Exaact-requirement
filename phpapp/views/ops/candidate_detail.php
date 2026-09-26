@@ -32,7 +32,27 @@ if ($dupes): ?>
 </div>
 <?php endif; ?>
 
-<div data-tabs data-tabs-key="ct" data-tabs-order="Overview,Pipeline,Interviews,Documents,Offer,Recruitment,CV,Timeline">
+<?php
+  //  ONE NAVIGATION, NOT TWO. The configured workflow now decides this screen:
+  //  which panels it offers, and which one opens.
+  //
+  //  With no workflow configured, recruitpipe_screen_plan() returns has_pipeline
+  //  = false and everything below behaves exactly as it always has — same tabs,
+  //  same order. Honouring a configuration cannot mean taking things away from
+  //  somebody who has not made one.
+  $ctPlan  = function_exists('recruitpipe_screen_plan') ? recruitpipe_screen_plan($cand) : ['has_pipeline' => false];
+  $ctAll   = ['Overview', 'Pipeline', 'Interviews', 'Documents', 'Offer', 'Recruitment', 'CV', 'Timeline'];
+  $ctWants = fn($t) => !function_exists('recruitpipe_wants_tab') || recruitpipe_wants_tab($ctPlan, $t);
+  $ctAll   = array_values(array_filter($ctAll, $ctWants));
+  $ctOrder = function_exists('recruitpipe_tab_order') ? recruitpipe_tab_order($ctPlan, $ctAll) : $ctAll;
+?>
+<?php if (!empty($ctPlan['focus']) && !empty($ctPlan['stage_name'])): ?>
+  <p class="muted" style="font-size:12px;margin:0 0 6px">
+    Open on <b><?= e($ctPlan['focus']) ?></b> because this hire is at
+    <b><?= e($ctPlan['stage_name']) ?></b>. Every other section is still one click away.
+  </p>
+<?php endif; ?>
+<div data-tabs data-tabs-key="ct" data-tabs-order="<?= e(implode(',', $ctOrder)) ?>">
 <section data-tab="Overview">
 <div class="panel">
   <h3 class="tab-sub">Candidate details</h3>
@@ -628,9 +648,9 @@ usort($tl, fn($a, $b) => strcmp(substr($b['at'], 0, 10) . $b['at'], substr($a['a
 <?php // Per-stage capture — the whole pipeline as a tab, with notes + uploads per stage. ?>
 <section data-tab="Pipeline"><?php if (function_exists('recruitpipe_stage_tab')) recruitpipe_stage_tab($cand); ?></section>
 <?php // Phase 4 — interviews (multi-round + scorecards) and the document set. ?>
-<section data-tab="Interviews"><?php if (function_exists('recruit_iv_panel')) recruit_iv_panel($cand); ?></section>
+<?php if ($ctWants('Interviews')): ?><section data-tab="Interviews"><?php if (function_exists('recruit_iv_panel')) recruit_iv_panel($cand); ?></section><?php endif; ?>
 <section data-tab="Documents"><?php if (function_exists('recruit_docs_panel')) recruit_docs_panel($cand); ?></section>
-<section data-tab="Offer"><?php if (function_exists('recruit_offer_panel')) recruit_offer_panel($cand); ?></section>
+<?php if ($ctWants('Offer')): ?><section data-tab="Offer"><?php if (function_exists('recruit_offer_panel')) recruit_offer_panel($cand); ?></section><?php endif; ?>
 </div><!-- /data-tabs -->
 
 <?php
