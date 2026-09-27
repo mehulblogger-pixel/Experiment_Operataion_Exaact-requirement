@@ -42,6 +42,24 @@ Charts. Both work-starters live on this first screen.
 - **Coordinator → Inspector:** the moment a job is allocated with an `inspector_id`, it appears in that inspector's **My Jobs** (`/my-jobs`, `ops.php:5917`) and their dashboard KPIs.
 - **Upstream (Finance/Branch Manager → Coordinator):** the coordinator can only raise a call after Accounts registered the contract and the Branch Manager opened it; "won quotes without a contract number" shows on the exec/coordinator dashboard (`dashboard.php:290-315`).
 
+**What the work-order form already knows (ADR-004):** a work order raised from a
+contract opens with the contract's **purchase order**, the line still open on it,
+and the **rate the client actually agreed** — so the commercials are read off the
+order rather than typed from memory. Only what is unambiguous is filled: one order
+on the contract, one line with balance left. Two of either and nothing is assumed,
+because a guess there becomes a wrong rate on a real invoice; a fully consumed line
+is never offered. The form says which order it read from.
+
+The reverse holds too: a work order with **no** contract or purchase order on it
+shows a "link this to what it was sold under" panel offering that client's open
+contracts and active orders in a click — and linking the order also joins it to the
+contract, so the *next* work order fills itself in. Only **open** contracts with
+time and quantity left are offered (the scheduling gate would refuse the rest).
+Both directions close once anything on the work order has been **invoiced**: the
+invoice carries its own copy of the number, and the remedy for a wrong one is a
+credit note, not a re-link. `ops.call.create` throughout — the same right that
+raises a work order — enforced at the write, not only hidden from the screen.
+
 **Click-count — most common task:**
 - **Raise a call from a contract:** `/raise-call` (1) → select client (1) → "Raise call ▶" (1) → Save prefilled form (1) = **~4 clicks**.
 - **Allocate a job:** landing "Allocate" (1) → pick inspector (1) → "Allocate" submit (1) = **~3 clicks**.

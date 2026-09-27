@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '2386b1a · 2026-09-27 02:54 UTC · 669 files';
+$RELEASE = 'b6257d1 · 2026-09-27 05:57 UTC · 669 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -107,12 +107,12 @@ $EXPECT  = [
     'lib/connect_taxonomy.php' => ['s'=>9836,'h'=>'3757c0d0d7daeb05'],
     'lib/connect_trust.php' => ['s'=>7228,'h'=>'27ac2d7be0dd9e28'],
     'lib/connect_verify.php' => ['s'=>18988,'h'=>'55e8aee1eccae351'],
-    'lib/contracts.php' => ['s'=>67221,'h'=>'e6d0e7c682bff5d1'],
+    'lib/contracts.php' => ['s'=>99023,'h'=>'c71027c2ca373528'],
     'lib/controldocs.php' => ['s'=>15272,'h'=>'e99fcf054f6e6b1e'],
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>233817,'h'=>'d619151b0d486dd5'],
+    'lib/crm.php' => ['s'=>237768,'h'=>'bbfaba6630e78614'],
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>23757,'h'=>'08dc56a9418f97d5'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -170,8 +170,8 @@ $EXPECT  = [
     'lib/nextaction.php' => ['s'=>14006,'h'=>'4999aacd4e3c81bd'],
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
-    'lib/opportunities.php' => ['s'=>66433,'h'=>'c2e1f6090c75b5b9'],
-    'lib/ops.php' => ['s'=>683284,'h'=>'5952ac2b8a25a9bc'],
+    'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
+    'lib/ops.php' => ['s'=>687201,'h'=>'81e83136e899b337'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -338,8 +338,8 @@ $EXPECT  = [
     'views/ops/billing.php' => ['s'=>8817,'h'=>'cce993ae611d2c60'],
     'views/ops/billing_pay.php' => ['s'=>3412,'h'=>'3f6031e5af093770'],
     'views/ops/books_bridge.php' => ['s'=>6146,'h'=>'0fd4f65cf994e7de'],
-    'views/ops/call_detail.php' => ['s'=>25559,'h'=>'54cfcea49711024a'],
-    'views/ops/call_form.php' => ['s'=>67990,'h'=>'70591fb26844aa74'],
+    'views/ops/call_detail.php' => ['s'=>28699,'h'=>'595ed8e33fd8bff0'],
+    'views/ops/call_form.php' => ['s'=>68367,'h'=>'654f51c59635133c'],
     'views/ops/call_profit.php' => ['s'=>10827,'h'=>'9ceb75929d00146d'],
     'views/ops/calls.php' => ['s'=>11689,'h'=>'d7865a3523e372f3'],
     'views/ops/candidate_detail.php' => ['s'=>54052,'h'=>'b65ca452c42a06de'],
@@ -398,7 +398,7 @@ $EXPECT  = [
     'views/ops/connect_taxonomy_admin.php' => ['s'=>11160,'h'=>'1b219237df7dd86f'],
     'views/ops/connect_verify.php' => ['s'=>5029,'h'=>'f5e86444d6b668f3'],
     'views/ops/consents.php' => ['s'=>3636,'h'=>'135aebfdc257c26d'],
-    'views/ops/contract_detail.php' => ['s'=>17580,'h'=>'ee86f8e379649b19'],
+    'views/ops/contract_detail.php' => ['s'=>20373,'h'=>'ff877ea0f6cfa319'],
     'views/ops/contract_openings.php' => ['s'=>5171,'h'=>'5f2b2ca5bcae96d9'],
     'views/ops/contract_overrides.php' => ['s'=>8957,'h'=>'6d9de0085c1e6c37'],
     'views/ops/cost_reconciliation.php' => ['s'=>5649,'h'=>'5b7fa0d55a494a4b'],
@@ -407,7 +407,7 @@ $EXPECT  = [
     'views/ops/crm/approval_rule_list.php' => ['s'=>2506,'h'=>'6086b04020ffcea7'],
     'views/ops/crm/inquiry_form.php' => ['s'=>4637,'h'=>'5af6e49c375c49a0'],
     'views/ops/crm/inquiry_list.php' => ['s'=>4641,'h'=>'5917461194b40e2e'],
-    'views/ops/crm/quote_detail.php' => ['s'=>61448,'h'=>'ff10b8023dc3decc'],
+    'views/ops/crm/quote_detail.php' => ['s'=>69358,'h'=>'3f94e5b61c57d24d'],
     'views/ops/crm/quote_external.php' => ['s'=>8932,'h'=>'b2bc432b39deb979'],
     'views/ops/crm/quote_form.php' => ['s'=>41886,'h'=>'e1fbb4b7d507a0fe'],
     'views/ops/crm/quote_list.php' => ['s'=>8038,'h'=>'36be301c9d7ffe37'],

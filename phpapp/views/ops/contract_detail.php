@@ -99,8 +99,9 @@
   <summary class="btn small secondary" style="display:inline-block">✎ Edit contract</summary>
   <form method="post" action="/contract-edit" class="inline-add" style="margin-top:12px">
     <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
-    <div class="ff"><label>Contract number <span class="muted">— fixed, it identifies the contract</span></label>
-      <input class="form-control" value="<?= e($c['contract_number'] ?: '—') ?>" disabled></div>
+    <div class="ff"><label>Contract number <span class="muted">— corrected below, not here</span></label>
+      <input class="form-control" value="<?= e($c['contract_number'] ?: '—') ?>" disabled>
+      <small class="muted">The number is the reference every <?= e(Tl('call')) ?>, job and invoice is filed under, so it is changed on its own — see &ldquo;Correct the contract number&rdquo; below.</small></div>
     <div class="ff"><label>Title</label><input class="form-control" name="title" value="<?= e($c['title'] ?? '') ?>"></div>
     <div class="ff"><label><?= e(T('sbu')) ?></label><select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (string)($c['sbu'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Value</label><input class="form-control" type="number" step="0.01" name="value" value="<?= e((string)($c['value'] ?? '')) ?>"></div>
@@ -123,7 +124,45 @@
     </div>
     <button class="btn small" type="submit">Save changes</button>
   </form>
-  <form method="post" action="/contract-delete" style="margin-top:12px" onsubmit="return confirm('Delete contract <?= e($c['contract_number'] ?: '') ?>? This cannot be undone. (Only possible while no calls/jobs or POs are under it.)')">
+  <?php // ---- Point 1 — correct a contract number that was typed wrongly ------
+        //  This used to be impossible, and the reason given was that the number is
+        //  the reference everything else is filed under. That is true, and it is
+        //  exactly why it has to be correctable: a wrong number, left wrong, is
+        //  carried by every invoice for the life of the contract. So the correction
+        //  moves the contract AND everything filed under it, together, in one go.
+        //  What it will not do is merge two contracts — that is a different
+        //  decision and it is refused rather than guessed at. ?>
+  <div class="panel" style="margin-top:12px;background:var(--soft)">
+    <b>Correct the contract number</b>
+    <p class="muted" style="margin:4px 0 8px">
+      <?php $impact = $renumberImpact ?? []; ?>
+      <?php if ($impact): ?>
+        Everything filed under <b><?= e($c['contract_number']) ?></b> moves with it:
+        <?= e(implode(', ', array_map(fn($k, $n) => $n . ' ' . $k, array_keys($impact), $impact))) ?>.
+        Nothing is left behind and nothing is lost.
+      <?php else: ?>
+        Nothing is filed under this number yet, so correcting it affects only the contract itself.
+      <?php endif; ?>
+    </p>
+    <form method="post" action="/contract-renumber" class="inline-add"
+          <?php // The number goes into the JS string through json_encode, not by
+                //  interpolation: a client-typed number containing an apostrophe
+                //  would otherwise close the string and the confirm would never fire,
+                //  so the form would submit unconfirmed. ?>
+          onsubmit="return confirm(<?= e(json_encode('Change ' . ($c['contract_number'] ?: 'this contract') . ' to the number you typed, and move everything filed under it? The old number will no longer exist.')) ?>)">
+      <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+      <div class="ff"><label>Corrected number</label>
+        <input class="form-control" name="contract_number" required
+               maxlength="<?= defined('CONTRACT_NO_MAX') ? (int)CONTRACT_NO_MAX : 40 ?>"
+               placeholder="<?= e($c['contract_number'] ?: 'the right number') ?>"></div>
+      <div class="ff"><label>Why <span class="muted">— kept on the record</span></label>
+        <input class="form-control" name="reason" placeholder="e.g. typed 0142, the client's PO says 0124"></div>
+      <button class="btn small secondary" type="submit">Correct the number</button>
+    </form>
+  </div>
+
+  <form method="post" action="/contract-delete" style="margin-top:12px"
+        onsubmit="return confirm(<?= e(json_encode('Delete contract ' . ($c['contract_number'] ?: '') . '? This cannot be undone. (Only possible while no ' . Tlp('call') . '/jobs or POs are under it.)')) ?>)">
     <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
     <button class="btn small danger" type="submit">Delete contract</button>
     <span class="muted" style="font-size:12px;margin-left:6px">Blocked once work or a PO is recorded under it — close it instead.</span>

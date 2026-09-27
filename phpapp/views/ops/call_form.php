@@ -400,6 +400,11 @@ document.addEventListener('DOMContentLoaded', function () {
 </section>
 <section class="fs-pane" data-tab="Purchase order">
   <h3 class="tab-sub" style="margin-top:0">5. Against the <?= e(Tl('client')) ?>'s purchase order <span class="muted">(optional)</span></h3>
+  <?php // Point 3 — when the order and its rate were read forward from the
+        //  contract, say so. A rate that appears by itself is a rate nobody checks. ?>
+  <?php if (!empty($call['_prefill_note'])): ?>
+    <p class="muted" style="margin:0 2px 8px">✓ <?= e($call['_prefill_note']) ?> Change anything that is different for this piece of work.</p>
+  <?php endif; ?>
   <div class="form-grid">
     <?php // When the client has not sent a formal PO, the work is still against a
           // line of OUR accepted quotation — offer those lines here so the call is

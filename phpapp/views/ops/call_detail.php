@@ -10,6 +10,50 @@
     — or type the contract number there if this was a direct order under a running contract.
   </div>
 <?php endif; ?>
+<?php // ---- Point 3, the other direction ------------------------------------
+      //  The client, the contract and the purchase order were all entered before
+      //  this work came in. When this record is missing one of them, the answer is
+      //  almost always already on file — so the right candidates are offered here
+      //  to be attached in a click, rather than left to be hunted for on the edit
+      //  form. The same two rules the raise-a-work-order path enforces apply: the
+      //  contract must belong to this client and must be open. ?>
+<?php $lc = $linkCands ?? []; if (!empty($canLinkCommercial) && (!empty($lc['contracts']) || !empty($lc['pos']))): ?>
+  <div class="panel" style="margin-bottom:12px;border:1px solid var(--warn)">
+    <b>⚓ Link this <?= e(Tl('call')) ?> to what it was sold under</b>
+    <p class="muted" style="margin:4px 0 10px">
+      <?= !empty($lc['need_contract']) && !empty($lc['need_po']) ? 'It has neither a contract nor a purchase order on it.'
+          : (!empty($lc['need_contract']) ? 'It has no contract number on it.' : 'It has no purchase order on it.') ?>
+      Everything below is already recorded for this <?= e(Tl('client')) ?> — pick it here and the rate, the dates and the
+      billing branch are read off it instead of being typed again.
+    </p>
+    <form method="post" action="/call-link-commercial" class="inline-add">
+      <input type="hidden" name="id" value="<?= (int)$call['id'] ?>">
+      <?php if (!empty($lc['contracts'])): ?>
+        <div class="ff"><label>Its contract</label>
+          <select class="form-control searchable" name="contract_id"><option value="">— leave as it is —</option>
+            <?php foreach ($lc['contracts'] as $lcc): ?>
+              <option value="<?= (int)$lcc['id'] ?>"><?= e($lcc['contract_number']
+                . (trim((string)($lcc['title'] ?? '')) !== '' ? ' — ' . mb_substr((string)$lcc['title'], 0, 60) : '')
+                . (($lcc['end_date'] ?? '') !== '' ? ' · to ' . fdate($lcc['end_date']) : '')) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <small class="muted">Only this <?= e(Tl('client')) ?>&rsquo;s open contracts, and only ones with time and quantity left.</small></div>
+      <?php endif; ?>
+      <?php if (!empty($lc['pos'])): ?>
+        <div class="ff"><label>Its purchase order</label>
+          <select class="form-control searchable" name="po_id"><option value="">— leave as it is —</option>
+            <?php foreach ($lc['pos'] as $lcp): ?>
+              <option value="<?= (int)$lcp['id'] ?>"><?= e(($lcp['po_number'] ?: 'unnumbered')
+                . ' — ' . fmoney((float)($lcp['value'] ?? 0))
+                . ' · ' . ((int)($lcp['line_count'] ?? 0) ? (int)$lcp['line_count'] . ' line(s)' : 'no line items')) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <small class="muted">Linking it also joins the order to the contract, so the next <?= e(Tl('call')) ?> fills itself in.</small></div>
+      <?php endif; ?>
+      <button class="btn small" type="submit">Link it</button>
+    </form>
+  </div>
+<?php endif; ?>
 <?php //  B10-CL-5 — the same .crumbs component the recruitment records use.
       //  Hierarchy is the application's own: the rail groups these under
       //  Operations, and /calls is the register this record belongs to. Each

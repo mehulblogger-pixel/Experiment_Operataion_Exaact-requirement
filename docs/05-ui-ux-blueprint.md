@@ -246,6 +246,9 @@ Before **any** screen is approved, it must pass this checklist:
 6. Does the screen call every object by **the same name every other screen uses**,
    taken from the terminology engine (`T()` / `Tl()` / `TH()` / `T_NEW()` …) rather
    than typed as a literal? See **ADR-002 — one word per object**.
+7. Does every value the system filled in **say where it came from**, and does the
+   screen refuse to guess when the source is ambiguous? See **ADR-004 — a contract
+   number is a key, not a field**.
 
 Item 6 is not a style preference. The Recruitment Command Centre once printed
 "requirement" for the record every register called a "Requisition"; the owner read
@@ -254,6 +257,15 @@ A screen cannot be understood in five seconds if it disagrees with the screen on
 click away, and a hard-coded word also silently defeats Admin → Terminology, which
 makes a workspace's own rename look broken. `tests/test_recruit_terminology.php`
 enforces this for the recruitment screens.
+
+Item 7 is the other half of not making people re-type. A field the system filled in
+is only trustworthy if the screen names the document it was read from — "value
+₹450,000 — from PO 4500123" is a figure somebody can check in two seconds, while the
+same figure appearing on its own is a figure nobody checks and everybody re-enters.
+And when the source is genuinely ambiguous — two purchase orders, two open lines —
+the screen must **offer the choice rather than pick one**, because a silent guess
+here ends up on a real invoice. Prefilling is a convenience; prefilling without
+provenance is a liability.
 
 If any answer is **No**, the screen must be redesigned. This single principle keeps
 the application dramatically simpler than traditional industrial software and is one

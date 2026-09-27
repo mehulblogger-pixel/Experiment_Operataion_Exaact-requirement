@@ -3887,6 +3887,18 @@ function ops_dispatch($route, $method) {
             return ops_contract_edit($method);
         case $route === 'contract-delete' && $method === 'POST':
             return ops_contract_delete($method);
+        // Point 1 — a contract number typed wrongly can be corrected, and the
+        // correction carries every call, job, invoice and engagement with it.
+        case $route === 'contract-renumber' && $method === 'POST':
+            return ops_contract_renumber($method);
+        // Point 1 — "is this a duplicate?", answered while the number is being
+        // typed rather than after the form has been submitted.
+        case $route === 'contract-no-check':
+            return ops_contract_no_check();
+        // Point 3, the other direction — attach a work order that has no contract
+        // or purchase order on it to the right one, in a click.
+        case $route === 'call-link-commercial' && $method === 'POST':
+            return ops_call_link_commercial($method);
         case $route === 'address-geo' && $method === 'POST':
             return geofence_save_address($route, $method);
         case $route === 'site-geo-capture' && $method === 'POST':
@@ -5158,6 +5170,40 @@ function ops_calls($route, $method) {
                 ];
             }
         }
+        // Point 3 — the commercial detail comes forward too. The purchase order
+        // sitting on this contract, the line still open on it, and the rate and
+        // unit the client agreed to are all already recorded; asking for them
+        // again here is how the work order and the order end up disagreeing.
+        // Only fills what is unambiguous, and never overwrites anything already set.
+        if ($route === 'call-new' && function_exists('call_commercial_prefill')) {
+            $ctId = (int)($_GET['contract_id'] ?? 0);
+            if (!$ctId && !empty($call['contract_number']))
+                $ctId = (int)ops_val("SELECT id FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1",
+                                     [(string)$call['contract_number']]);
+            $cp = call_commercial_prefill($ctId, (int)($_GET['po_id'] ?? 0));
+            if (!empty($cp['po_id'])) {
+                if (!is_array($call)) $call = [];
+                foreach (['po_id', 'po_line_item_id', 'billable_rate', 'billable_basis'] as $k) {
+                    $v = $cp[$k] ?? null;
+                    if ($v === null || $v === '' || $v === 0) continue;
+                    if (($call[$k] ?? '') === '' || ($call[$k] ?? null) === null) $call[$k] = $v;
+                }
+                // Said out loud on the form, because a rate that appeared by itself
+                // is a rate nobody checks.
+                $call['_prefill_note'] = 'Read off ' . ($cp['from']['po_id'] ?? 'the purchase order')
+                    . (!empty($cp['billable_rate']) ? ' — including the agreed rate' : '') . '.';
+            }
+            // A work order raised straight from an order: seed the client from it too.
+            if (!empty($_GET['po_id']) && empty($call['client_id'])) {
+                $poRow = ops_one("SELECT partner_id, contract_id FROM partner_purchase_orders WHERE id=?", [(int)$_GET['po_id']]);
+                if ($poRow) {
+                    if (!is_array($call)) $call = [];
+                    $call['client_id'] = (int)$poRow['partner_id'];
+                    if (empty($call['contract_number']) && (int)($poRow['contract_id'] ?? 0))
+                        $call['contract_number'] = (string)ops_val("SELECT contract_number FROM partner_contracts WHERE id=?", [(int)$poRow['contract_id']]);
+                }
+            }
+        }
         // A direct call with no contract (the "none of these" fallback from the
         // raise-call picker, or an ARC draw-down): just seed the client.
         if ($route === 'call-new' && empty($call['client_id']) && !empty($_GET['client_id'])) {
@@ -5184,6 +5230,11 @@ function ops_calls($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
+            // The "read off PO X" note describes what the form OPENED with. Once
+            // something has been submitted, the person may have chosen a different
+            // order — so the claim is dropped rather than left standing over an
+            // answer it no longer describes.
+            if (is_array($call)) unset($call['_prefill_note']);
             // A call under a registered contract can only be raised once that
             // contract is OPEN — i.e. a manager has endorsed it and the branch
             // manager has approved it. A contract still PENDING is not ready for
@@ -5453,7 +5504,11 @@ function ops_calls($route, $method) {
             'alloc_date'    => $allocDate,
         ];
         view('ops/call_detail', ['call' => $call, 'jobs' => $jobs, 'lead' => $lead,
-            'sameOffice' => call_same_office($call), 'costIncurred' => call_cost_incurred($call['id'])]);
+            'sameOffice' => call_same_office($call), 'costIncurred' => call_cost_incurred($call['id']),
+            // Point 3, the other direction — when this work order has no contract or
+            // purchase order on it, the right ones to attach it to, ready to click.
+            'linkCands' => function_exists('call_link_candidates') ? call_link_candidates($call) : ['need_contract' => false, 'need_po' => false],
+            'canLinkCommercial' => can('ops.call.create') || is_master()]);
         return;
     }
 }

@@ -754,10 +754,13 @@ function opp_register_contract($oppId, array $b = []) {
         $contractNo = function_exists('gen_contract_number') ? gen_contract_number($branchId) : $contractNo;
     }
     if ($contractNo === '') return ['err' => 'Enter the contract number, or tick auto-generate.'];
-    if (function_exists('contract_no_clash')) {
-        $clash = contract_no_clash($contractNo, $cid);
-        if ($clash) return ['err' => 'Contract number ' . $contractNo . ' is already registered against '
-            . ($clash['owner_name'] ?: 'another party') . '. A contract number must identify one contract.'];
+    // Point 1 — the same duplicate check the quotation path uses, so the
+    // won-without-a-quotation route cannot register a duplicate either.
+    $dupWarn = [];
+    if (function_exists('contract_duplicate_check')) {
+        $dup = contract_duplicate_check($cid, $contractNo, null, $b);
+        if ($dup['block'] !== '') return ['err' => $dup['block']];
+        $dupWarn = $dup['warn'];
     }
     $ex = ops_one("SELECT id, open_status FROM partner_contracts WHERE partner_id=? AND contract_number=?", [$cid, $contractNo]);
     if ($ex) {
@@ -772,7 +775,8 @@ function opp_register_contract($oppId, array $b = []) {
     $pdo->prepare("UPDATE opportunities SET contract_id=?, updated_at=? WHERE id=?")->execute([$contractId, date('c'), (int)$o['id']]);
     if (function_exists('act_log')) act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM',
         'Contract ' . $contractNo . ' registered from this deal (no quotation)', ['auto' => 1, 'partner_id' => $cid]);
-    return ['ok' => true, 'contract_id' => $contractId, 'contract_no' => $contractNo, 'open_status' => $openStatus, 'partner_id' => $cid];
+    return ['ok' => true, 'contract_id' => $contractId, 'contract_no' => $contractNo, 'open_status' => $openStatus,
+            'partner_id' => $cid, 'warn' => $dupWarn];
 }
 
 // Deals WON without a quotation, handed to Accounts, still needing a contract —
@@ -1080,6 +1084,7 @@ function ops_opportunities($route, $method) {
         ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register the contract.');
         $r = opp_register_contract($id, $_POST);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
+        foreach (($r['warn'] ?? []) as $w) flash($w, 'warning');
         if (($r['open_status'] ?? '') === 'PENDING') {
             flash('Contract ' . $r['contract_no'] . ' registered and awaiting approval — a manager endorses it and the branch manager approves it before it opens and the ' . Tlp('call') . ' can be raised from it.', 'warning');
         } else {

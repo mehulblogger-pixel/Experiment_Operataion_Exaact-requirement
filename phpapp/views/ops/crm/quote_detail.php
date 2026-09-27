@@ -587,29 +587,142 @@
     <?php endif; ?>
 
   <?php elseif ($canContract): ?>
-    <p class="sub">Register the contract number to open it. A new number is registered as <b>pending</b> — a manager endorses and the branch manager approves before the order floats to operations.</p>
+    <?php
+      // Point 1 / Point 2 — registering a contract is ONE button. Everything the
+      // contract needs is already on the purchase order and the quotation, so it is
+      // read from there and shown as a summary; the fields are still here, folded
+      // away, for the occasion when something genuinely has to be different.
+      // The two signatures are untouched: this makes the DATA one click, not the
+      // approval. A duplicate about to be created is named before the button is
+      // pressed, not discovered afterwards.
+      $pf       = $contractPrefill ?? [];
+      $pfNote   = function_exists('contract_prefill_note') ? contract_prefill_note($pf) : '';
+      $pfBranch = (int)($pf['branch_id'] ?? 0) ?: (int)($q['office_id'] ?? 0);
+      $pfBranchName = $pfBranch ? (string)ops_val("SELECT name FROM offices WHERE id=?", [$pfBranch]) : '';
+      $pfValue  = ($pf['value'] ?? null) !== null ? (float)$pf['value'] : (float)($q['total_amount'] ?? 0);
+      $existing = $clientContracts ?? [];
+    ?>
+    <p class="sub">One click registers it. The number is generated, and the value, dates and branch come across from
+      <?= !empty($pf['po_number']) ? 'the ' . e(Tl('client')) . '&rsquo;s purchase order' : 'this ' . e(Tl('quote')) ?> —
+      nothing is re-typed. It is registered as <b>pending</b>: a manager endorses and the branch manager approves before the order floats to operations.</p>
+
+    <?php if ($existing): ?>
+      <?php // The duplicate warning, up front. Most double-registrations happen
+            // because nobody could see what this client already had. ?>
+      <div class="panel" style="margin:0 0 10px;background:var(--soft)">
+        <b>This <?= e(Tl('client')) ?> already has <?= count($existing) ?> contract<?= count($existing) === 1 ? '' : 's' ?>.</b>
+        <span class="muted">Check this is not one of them under a second number.</span>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          <?php foreach ($existing as $ex0): $eos0 = $ex0['open_status'] ?: 'OPEN'; ?>
+            <a class="btn small secondary" href="/contract?id=<?= (int)$ex0['id'] ?>" target="_blank"><?= e($ex0['contract_number']) ?>
+              <span class="muted">· <?= e(strtolower(defined('CONTRACT_OPEN_STATES') ? (CONTRACT_OPEN_STATES[$eos0] ?? $eos0) : $eos0)) ?></span></a>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    <?php endif; ?>
+
+    <?php // The one-click path. It posts nothing but auto_contract and the PO it
+          // read from; the server fills the rest from the same two documents. ?>
+    <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>" style="margin-bottom:10px">
+      <input type="hidden" name="auto_contract" value="1">
+      <?php if (!empty($pf['po_id'])): ?><input type="hidden" name="po_id" value="<?= (int)$pf['po_id'] ?>"><?php endif; ?>
+      <div class="panel" style="margin:0;border:1px solid var(--ok)">
+        <table class="grid" style="margin:0">
+          <tr><th style="width:38%">Contract number</th><td><b>generated</b> <span class="muted">— BRANCH/C/FY/00001</span></td></tr>
+          <tr><th>Billing branch</th><td><b><?= e($pfBranchName ?: '—') ?></b> <span class="muted">— owns this contract &amp; its invoices</span></td></tr>
+          <tr><th>Value</th><td><b><?= e(fmoney($pfValue)) ?></b><?= !empty($pf['from']['value']) ? ' <span class="muted">— from ' . e($pf['from']['value']) . '</span>' : '' ?></td></tr>
+          <tr><th>Runs from</th><td><b><?= e(($pf['start_date'] ?? '') !== '' ? fdate($pf['start_date']) : '—') ?></b>
+            <?= ($pf['end_date'] ?? '') !== '' ? ' to <b>' . e(fdate($pf['end_date'])) . '</b>' : ' <span class="muted">— no end date on the order, so none is invented</span>' ?></td></tr>
+          <?php if (!empty($pf['po_number'])): ?>
+            <tr><th>Against purchase order</th><td><b><?= e($pf['po_number']) ?></b> <span class="muted">— linked to the contract automatically</span></td></tr>
+          <?php endif; ?>
+        </table>
+        <?php if ($pfNote !== ''): ?><p class="muted" style="margin:8px 2px 0"><?= e($pfNote) ?></p><?php endif; ?>
+        <?php if (empty($q['client_id']) && $q['client_name']): ?><p class="muted" style="margin:6px 2px 0">&ldquo;<?= e($q['client_name']) ?>&rdquo; will be registered as a <?= e(Tl('client')) ?> automatically.</p><?php endif; ?>
+        <div style="margin-top:10px"><button class="btn" type="submit">✓ Register the contract &amp; request opening</button></div>
+      </div>
+    </form>
+
+    <?php if (!empty($pf['choices'])): ?>
+      <p class="muted" style="margin:0 2px 10px">This <?= e(Tl('client')) ?> has <?= count($pf['choices']) ?> purchase orders not yet on a contract, so none was assumed.
+        Pick the right one below if the contract is against one of them.</p>
+    <?php endif; ?>
+
+    <details class="fold">
+      <summary>Enter it differently &mdash; type the <?= e(Tl('client')) ?>&rsquo;s own number, or change the dates</summary>
+      <div class="fold-body">
     <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>">
       <div class="form-grid">
         <div class="ff"><label>Contract number</label>
-          <input class="form-control" name="contract_number" id="contract_number" placeholder="e.g. CON/2026/0142">
-          <label class="chk" style="margin-top:6px"><input type="checkbox" name="auto_contract" value="1" id="auto_contract"> Generate automatically <span class="muted">(BRANCH/C/FY/00001)</span></label></div>
+          <input class="form-control" name="contract_number" id="contract_number" placeholder="e.g. CON/2026/0142"
+                 maxlength="<?= defined('CONTRACT_NO_MAX') ? (int)CONTRACT_NO_MAX : 40 ?>"
+                 data-client="<?= (int)($q['client_id'] ?? 0) ?>">
+          <label class="chk" style="margin-top:6px"><input type="checkbox" name="auto_contract" value="1" id="auto_contract"> Generate automatically <span class="muted">(BRANCH/C/FY/00001)</span></label>
+          <?php // Point 1 — the duplicate is named while it is being typed. ?>
+          <small id="cno_warn" style="display:none;margin-top:6px"></small></div>
         <?php // The branch is set ONCE here and carries to every call, job and the
-              //  invoice (its numbering series). Defaults to the quotation's office;
-              //  change it only if another branch owns and bills this contract. ?>
+              //  invoice (its numbering series). Defaults to what the order / quote /
+              //  client record already says; change it only if another branch owns and
+              //  bills this contract. ?>
         <div class="ff"><label>Billing branch <span class="muted">— owns this contract &amp; its invoices</span></label>
           <select class="form-control searchable" name="branch_id">
-            <?php $qOff = (int)($q['office_id'] ?? 0); foreach (offices_list() as $o): ?>
-              <option value="<?= (int)$o['id'] ?>" <?= $qOff === (int)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option>
+            <?php foreach (offices_list() as $o): ?>
+              <option value="<?= (int)$o['id'] ?>" <?= $pfBranch === (int)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option>
             <?php endforeach; ?>
           </select>
           <small class="muted">Set once; the calls, jobs and invoice all inherit it.</small></div>
-        <div class="ff"><label>Contract start</label><input class="form-control" type="date" name="start_date"></div>
-        <div class="ff"><label>Contract end</label><input class="form-control" type="date" name="end_date"></div>
+        <div class="ff"><label>Value (<?= e(cur_sym()) ?>)</label>
+          <input class="form-control" type="number" step="0.01" name="value" value="<?= e(number_format($pfValue, 2, '.', '')) ?>">
+          <small class="muted"><?= !empty($pf['from']['value']) ? 'From ' . e($pf['from']['value']) . '.' : 'From this ' . e(Tl('quote')) . '.' ?></small></div>
+        <?php if (!empty($pf['choices'])): ?>
+        <div class="ff"><label>Against which purchase order?</label>
+          <select class="form-control searchable" name="po_id"><option value="">— none / decide later —</option>
+            <?php foreach ($pf['choices'] as $poc): ?>
+              <option value="<?= (int)$poc['id'] ?>"><?= e(($poc['po_number'] ?: 'unnumbered') . ' — ' . fmoney((float)($poc['value'] ?? 0))) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <small class="muted">Its value and dates are used for anything left blank here.</small></div>
+        <?php endif; ?>
+        <div class="ff"><label>Contract start</label><input class="form-control" type="date" name="start_date" id="c_start" value="<?= e($pf['start_date'] ?? '') ?>"></div>
+        <div class="ff"><label>Contract end</label><input class="form-control" type="date" name="end_date" id="c_end" value="<?= e($pf['end_date'] ?? '') ?>"></div>
       </div>
-      <?php if (empty($q['client_id']) && $q['client_name']): ?><p class="muted" style="margin:6px 2px">"<?= e($q['client_name']) ?>" will be registered as a client automatically.</p><?php endif; ?>
-      <div style="margin-top:10px"><button class="btn" type="submit">Register &amp; request opening</button></div>
+      <div style="margin-top:10px"><button class="btn secondary" type="submit">Register &amp; request opening</button></div>
     </form>
-    <script>(function(){var a=document.getElementById('auto_contract'),n=document.getElementById('contract_number');if(a&&n)a.addEventListener('change',function(){n.disabled=a.checked;n.style.background=a.checked?'var(--soft)':'';if(a.checked)n.value='';});})();</script>
+      </div>
+    </details>
+    <script>(function(){
+      var a=document.getElementById('auto_contract'),n=document.getElementById('contract_number');
+      if(a&&n)a.addEventListener('change',function(){n.disabled=a.checked;n.style.background=a.checked?'var(--soft)':'';if(a.checked)n.value='';});
+      // Point 1 — ask the server whether this number is a duplicate while it is
+      // still being typed. A warning here costs nothing; the same warning after a
+      // submit costs a contract nobody can delete.
+      var box=document.getElementById('cno_warn'),t=null;
+      if(!n||!box)return;
+      // The warning text names the party that already holds the number, and that
+      // name comes from the client master — so it is escaped before it reaches
+      // innerHTML. A company called <img onerror=...> must read as a company name,
+      // not run as script.
+      function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+      function show(parts,bad){
+        if(!parts||!parts.length){box.style.display='none';box.textContent='';return;}
+        box.style.display='block';
+        box.innerHTML=parts.map(function(p){return '\u26a0 '+esc(p);}).join('<br>');
+        box.style.color=bad?'var(--bad)':'var(--warn)';
+      }
+      n.addEventListener('input',function(){
+        clearTimeout(t);var v=n.value.trim();if(v.length<3){show(null);return;}
+        t=setTimeout(function(){
+          var s=(document.getElementById('c_start')||{}).value||'',en=(document.getElementById('c_end')||{}).value||'';
+          fetch('/contract-no-check?client_id='+encodeURIComponent(n.dataset.client||'0')+'&no='+encodeURIComponent(v)+'&start='+encodeURIComponent(s)+'&end='+encodeURIComponent(en))
+            .then(function(r){return r.json();}).then(function(d){
+              if(!d||!d.ok){show(null);return;}
+              if(d.block){show([d.block],true);return;}
+              show(d.warn||null,false);
+            }).catch(function(){show(null);});
+        },350);
+      });
+    })();</script>
   <?php else: ?>
     <p class="sub">Awaiting Accounts to register the client &amp; contract number.</p>
   <?php endif; ?>

@@ -937,8 +937,12 @@ function crm_add_group_contract($quoteId, $partnerId, array $b = []) {
     $no = trim((string)($b['contract_number'] ?? ''));
     if (!empty($b['auto_contract']) || $no === '') $no = function_exists('gen_contract_number') ? gen_contract_number($branchId) : $no;
     if ($no === '') return ['err' => 'Enter the contract number, or tick auto-generate.'];
-    $clash = function_exists('contract_no_clash') ? contract_no_clash($no, $partnerId) : null;
-    if ($clash) return ['err' => 'Contract number ' . $no . ' is already registered against ' . ($clash['owner_name'] ?: 'another party') . '.'];
+    // Point 1 — the same duplicate check the main registration uses, so a group
+    // contract cannot slip a duplicate number in through the side door.
+    $dup = function_exists('contract_duplicate_check')
+        ? contract_duplicate_check($partnerId, $no, null, $b)
+        : ['block' => '', 'warn' => []];
+    if ($dup['block'] !== '') return ['err' => $dup['block']];
     $ex = ops_one("SELECT id FROM partner_contracts WHERE partner_id=? AND contract_number=?", [$partnerId, $no]);
     if ($ex) { $cid = (int)$ex['id']; }
     else {
@@ -949,7 +953,7 @@ function crm_add_group_contract($quoteId, $partnerId, array $b = []) {
         $cid = (int)db()->lastInsertId();
     }
     if (function_exists('crm_log_change')) crm_log_change((int)$quoteId, 'Group contract ' . $no . ' registered for a related company under this quotation.');
-    return ['ok' => true, 'contract_id' => $cid, 'contract_no' => $no];
+    return ['ok' => true, 'contract_id' => $cid, 'contract_no' => $no, 'warn' => $dup['warn']];
 }
 
 // The group history shaped for JSON — what the quote form draws. The company
@@ -1749,6 +1753,21 @@ function ops_crm_quotes($route, $method) {
             'clientReg' => !empty($q['client_id']) ? ops_one("SELECT code, legal_name FROM business_partners WHERE id=?", [$q['client_id']]) : null,
             // §6 — the contract row and who may act on its opening approval.
             'contractRow'  => !empty($q['contract_id']) ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$q['contract_id']]) : null,
+            // Point 1/2 — everything the contract needs, already read off the
+            // client's purchase order and this quotation, so registering it is a
+            // confirmation and not a re-typing exercise. Nothing is written here;
+            // this only decides what the form opens with.
+            // Only for the people who may actually register it: it is several
+            // queries against the purchase orders, and everyone else's quote page
+            // should not pay for a panel it will never show.
+            'contractPrefill' => (function_exists('contract_prefill') && (can('crm.contract.register') || is_master()))
+                ? contract_prefill((int)$q['id']) : [],
+            // Contracts this client already has, so a duplicate about to be created
+            // is visible BEFORE the button is pressed rather than discovered later.
+            'clientContracts' => !empty($q['client_id'])
+                ? (ops_all("SELECT id, contract_number, open_status, start_date, end_date, value
+                            FROM partner_contracts WHERE partner_id=? ORDER BY id DESC LIMIT 6", [(int)$q['client_id']]) ?: [])
+                : [],
             // One rate quotation → contracts for group companies: all contracts under
             // this quote, and the related companies still eligible for one.
             'quoteContracts' => function_exists('contracts_for_quote') ? contracts_for_quote((int)$q['id']) : [],
@@ -2161,15 +2180,34 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register the contract.');
         $cid = crm_register_client_for_quote($q);
+        // Point 1/2 — nothing here is re-typed. The purchase order and the
+        // quotation already carry the value, the dates, the subject and the
+        // branch, so they are read once and used for anything left blank on the
+        // form. That is what makes the one-click registration possible: the
+        // button posts nothing but its own name and this fills in the rest.
+        $pf = function_exists('contract_prefill')
+            ? contract_prefill((int)$q['id'], (int)($_POST['po_id'] ?? 0)) : [];
         // The office is chosen once here and carries to every call, job and invoice.
-        // Accounts may change it at registration; it defaults to the quote's office.
-        $branchId = (int)($_POST['branch_id'] ?? 0) ?: ((int)($q['office_id'] ?? 0) ?: null);
+        // Accounts may change it at registration; it defaults to what the quote /
+        // order / client record already says.
+        $branchId = (int)($_POST['branch_id'] ?? 0) ?: ((int)($pf['branch_id'] ?? 0) ?: ((int)($q['office_id'] ?? 0) ?: null));
         // §6b — a structured number can be generated instead of typed: BRANCH/C/FY/NNNNN.
         $contractNo = trim($_POST['contract_number'] ?? '');
         if (!empty($_POST['auto_contract']) || $contractNo === '') {
             $contractNo = gen_contract_number($branchId);
         }
-        $start = $_POST['start_date'] ?? ''; $end = $_POST['end_date'] ?? '';
+        // The inherited value is used when the field was NOT SENT — which is what
+        // the one-click form does, since it has no date or value inputs at all. It
+        // is NOT used when the field was sent empty: the manual form shows these
+        // pre-filled, so clearing one is a deliberate "there is no end date", and
+        // quietly putting the inherited date back would make the field impossible
+        // to clear. isset() tells the two apart exactly.
+        $start = isset($_POST['start_date']) ? trim((string)$_POST['start_date']) : (string)($pf['start_date'] ?? '');
+        $end   = isset($_POST['end_date'])   ? trim((string)$_POST['end_date'])   : (string)($pf['end_date'] ?? '');
+        // The contract's value is the money actually committed — the client's PO
+        // when there is one, the quotation when there is not.
+        $cValue = (isset($_POST['value']) && trim((string)$_POST['value']) !== '') ? (float)$_POST['value']
+                : (($pf['value'] ?? null) !== null ? (float)$pf['value'] : (float)$q['total_amount']);
         $contractId = $q['contract_id'] ?: null;
         // A won deal gets ONE contract. If this quotation already carries a LIVE
         // contract (open or awaiting approval) and a DIFFERENT number is being
@@ -2188,19 +2226,21 @@ function ops_crm_quotes($route, $method) {
                 redirect('/quote?id=' . $q['id']);
             }
         }
-        // §3 — the same contract number on the same client is a rate contract
-        // being drawn down again, which is normal. The same number on a DIFFERENT
-        // client is a duplicate, and every expiry and quantity figure downstream
-        // would then be reading the wrong contract.
+        // §3 / Point 1 — one place decides whether this number is a duplicate.
+        // The same number on a DIFFERENT party is refused outright: every expiry,
+        // quantity and invoice figure downstream would read the wrong contract.
+        // A near-miss (the same number written with different punctuation, or a
+        // live contract already covering the same period) is shown as a warning
+        // and the registration still goes through — it is occasionally deliberate,
+        // and refusing it would leave the person with nowhere to go.
         if ($contractNo !== '' && $cid) {
-            $clash = contract_no_clash($contractNo, $cid);
-            if ($clash) {
-                flash('Contract number ' . $contractNo . ' is already registered against '
-                    . ($clash['owner_name'] ?: 'another ' . Tl('client'))
-                    . '. A contract number must identify one contract — use a different number, '
-                    . 'or correct the ' . Tl('client') . ' on this ' . Tl('quote') . '.', 'error');
+            $dup = contract_duplicate_check($cid, $contractNo, null, ['start_date' => $start, 'end_date' => $end]);
+            if ($dup['block'] !== '') {
+                flash($dup['block'] . ' Use a different number, or correct the ' . Tl('client')
+                    . ' on this ' . Tl('quote') . '.', 'error');
                 redirect('/quote?id=' . $q['id']);
             }
+            foreach ($dup['warn'] as $w) flash($w, 'warning');
         }
         // §6d — opening a NEW contract number needs two signatures (a manager
         // endorses, the branch manager approves). It is registered as PENDING and
@@ -2213,10 +2253,22 @@ function ops_crm_quotes($route, $method) {
             else {
                 $me = user_name(current_user()); $meId = (int)(current_user()['id'] ?? 0);
                 $pdo->prepare("INSERT INTO partner_contracts (partner_id,contract_number,title,value,start_date,end_date,notes,branch_id,open_status,requested_by,requested_by_id,requested_at,is_active) VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?,?,?, 0)")
-                    ->execute([$cid, $contractNo, $q['subject'], (float)$q['total_amount'], $start, $end, 'From quotation ' . $q['quote_no'], $branchId, $me, $meId, date('c')]);
+                    ->execute([$cid, $contractNo, ((string)($pf['title'] ?? '') ?: (string)$q['subject']), $cValue, $start, $end,
+                               'From quotation ' . $q['quote_no'] . (!empty($pf['po_number']) ? ', PO ' . $pf['po_number'] : ''),
+                               $branchId, $me, $meId, date('c')]);
                 $contractId = (int)$pdo->lastInsertId();
                 $isNew = true; $openStatus = 'PENDING';
             }
+        }
+        // Point 3 — the order the contract was read from is attached to it, so the
+        // link works in both directions from the moment it exists: the contract
+        // knows its PO, and a work order raised later can prefill from it instead
+        // of asking for the same PO number a third time.
+        if ($contractId && !empty($pf['po_id'])) {
+            try {
+                $pdo->prepare("UPDATE partner_purchase_orders SET contract_id=? WHERE id=? AND COALESCE(contract_id,0)=0")
+                    ->execute([$contractId, (int)$pf['po_id']]);
+            } catch (Throwable $e) {}
         }
         $pdo->prepare("UPDATE quotations SET client_id=?, contract_number=?, contract_id=? WHERE id=?")->execute([$cid, $contractNo, $contractId, $q['id']]);
         if ($contractId && function_exists('contract_link_quotation')) contract_link_quotation($contractId, (int)$q['id']);
@@ -2242,6 +2294,7 @@ function ops_crm_quotes($route, $method) {
         $qid = (int)($_GET['id'] ?? 0);
         $r = crm_add_group_contract($qid, (int)($_POST['partner_id'] ?? 0), $_POST);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/quote?id=' . $qid . '#contract'); }
+        foreach (($r['warn'] ?? []) as $w) flash($w, 'warning');
         flash('Group contract ' . $r['contract_no'] . ' registered and awaiting approval — it opens after a manager endorses and the branch manager approves, and then its ' . Tlp('call') . ' are raised from it.', 'warning');
         redirect('/quote?id=' . $qid . '#contract');
     }

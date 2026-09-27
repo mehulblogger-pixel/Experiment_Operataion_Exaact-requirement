@@ -1037,6 +1037,10 @@ function ops_contract_360() {
         // Field #3 — the contract's quantity line items, and whether this user may edit/delete it.
         'lines' => contract_lines($id),
         'canEditContract' => can('crm.contract.register') || is_master(),
+        // Point 1 — what a correction to the number would carry with it, counted
+        // BEFORE the button exists, so nobody discovers afterwards that they just
+        // moved forty invoices.
+        'renumberImpact' => contract_renumber_impact($c),
         // Module 18 — the live expiry/quantity verdict the scheduling gate already uses,
         // now shown where the contract is actually read.
         'state' => contract_state_row($c),
@@ -1101,4 +1105,560 @@ function ops_contract_delete($method) {
     if (function_exists('act_log')) act_log('PARTNER', $pid, 'SYSTEM', 'Contract ' . $cno . ' deleted');
     flash('Contract ' . $cno . ' deleted.');
     redirect('/partner?id=' . $pid . '&tab=contracts');
+}
+
+// ===========================================================================
+//  Point 1 / Point 2 — the contract number is entered ONCE, never typed twice,
+//  and can be corrected after the fact
+//
+//  Three separate problems were solved together here because they are the same
+//  problem seen from three sides:
+//
+//    * the same contract was being registered twice, because nothing warned the
+//      person that a number they were about to create already existed in all
+//      but its punctuation;
+//    * every field on the registration form was being re-typed although the
+//      purchase order and the quotation already carried it;
+//    * a number typed wrongly could never be corrected, because the number IS
+//      the join key for the whole sales -> operations -> finance spine.
+// ===========================================================================
+
+// The narrowest column that stores a contract number anywhere in the system
+// (invoice_lines is VARCHAR(40)). A longer number would be stored whole on one
+// table and truncated on another, and since every join across the spine is on
+// that string, the two halves of one contract would stop recognising each other.
+// So this is the hard ceiling for anything generated or accepted.
+const CONTRACT_NO_MAX = 40;
+
+// Every place a contract number is stored AS TEXT, and the column that holds
+// it. Correcting a number means correcting all of these together or not at all,
+// so the list lives in one place: a table added to the system and missed here
+// is the one way a rename can still orphan history, and the test battery reads
+// this list back against the real schema.
+function contract_no_tables() {
+    return [
+        'quotations'       => 'contract_number',
+        'calls'            => 'contract_number',
+        'jobs'             => 'contract_number',
+        'invoices'         => 'contract_number',
+        'invoice_lines'    => 'contract_number',
+        'billable_events'  => 'contract_number',
+        'cost_allocations' => 'contract_number',
+        // Phase 2 §25 — the engagement is keyed on the number itself, and the
+        // built-in reconciliation flags any row whose engagement key and contract
+        // number disagree. Miss this one and every job under the contract is
+        // reported broken the next day.
+        'engagements'      => 'engagement_key',
+    ];
+}
+
+// A contract number with its punctuation and case taken out, so that
+// AHM/C/25-26/42 and ahm-c-2526-42 are recognised as one human intention.
+// Used only to WARN — nothing stored is ever changed by this.
+function contract_no_key($no) {
+    return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)$no));
+}
+
+// Is this number about to create a duplicate? Returns
+//   ['block' => reason or '', 'warn' => [reasons], 'reuse' => the same client's
+//    existing row under this exact number (a rate-contract draw-down, which is
+//    normal and not an error)]
+// 'block' means refuse the save. 'warn' means show it and let the person decide —
+// a near-miss is usually a typo but is occasionally deliberate, and refusing a
+// deliberate one would leave them with no way forward.
+function contract_duplicate_check($clientId, $no, $exceptId = null, array $b = []) {
+    $out = ['block' => '', 'warn' => [], 'reuse' => null];
+    $no  = trim((string)$no);
+    $clientId = (int)$clientId;
+    if ($no === '') return $out;
+
+    if (mb_strlen($no) > CONTRACT_NO_MAX) {
+        $out['block'] = 'A contract number can be at most ' . CONTRACT_NO_MAX . ' characters — this one is '
+            . mb_strlen($no) . '. Anything longer is stored in full on some screens and cut short on others, '
+            . 'and the two halves stop matching.';
+        return $out;
+    }
+
+    // (1) The same number against a DIFFERENT party is always wrong: every
+    // expiry, quantity and invoice figure downstream would read the other
+    // contract. This one is refused, never merely warned about.
+    $clash = contract_no_clash($no, $clientId, $exceptId);
+    if ($clash) {
+        $out['block'] = 'Contract number ' . $no . ' is already registered against '
+            . ($clash['owner_name'] ?: 'another party')
+            . '. A contract number must identify one contract.';
+        return $out;
+    }
+
+    if (!$clientId) return $out;
+
+    // (2) The same number against the SAME party is a rate contract being drawn
+    // down again — normal, and the existing row is reused rather than a second
+    // one created. Said out loud so nobody thinks they created something new.
+    $exact = ops_one("SELECT * FROM partner_contracts WHERE partner_id=? AND contract_number=?"
+        . ($exceptId ? " AND id<>" . (int)$exceptId : "") . " ORDER BY id DESC LIMIT 1", [$clientId, $no]);
+    if ($exact) {
+        $out['reuse'] = $exact;
+        $out['warn'][] = 'This number already exists for this ' . Tl('client') . ' ('
+            . strtolower(CONTRACT_OPEN_STATES[$exact['open_status'] ?: 'OPEN'] ?? 'open')
+            . '). Nothing new will be created — the work is recorded against that same contract.';
+    }
+
+    // (3) A number that differs from an existing one ONLY in punctuation or case
+    // is almost always the same contract typed a second time. This is the case
+    // the system used to accept silently, leaving one client with two contracts
+    // and half the work under each.
+    if (!$exact) {
+        $key = contract_no_key($no);
+        if ($key !== '') {
+            $rows = ops_all("SELECT id, contract_number, open_status, start_date, end_date, value
+                             FROM partner_contracts WHERE partner_id=?"
+                . ($exceptId ? " AND id<>" . (int)$exceptId : "") . " ORDER BY id DESC LIMIT 200", [$clientId]) ?: [];
+            foreach ($rows as $r) {
+                if (contract_no_key($r['contract_number']) !== $key) continue;
+                $out['warn'][] = 'This ' . Tl('client') . ' already has contract ' . $r['contract_number']
+                    . ' — the same number written differently. If it is the same contract, use that one; '
+                    . 'registering it again would split the work and the billing across two files.';
+                break;
+            }
+        }
+    }
+
+    // (4) A live contract for the same party covering the same period is worth a
+    // second look even when the number is genuinely different — it is how the
+    // same order gets registered twice under two numbers.
+    $start = trim((string)($b['start_date'] ?? ''));
+    $end   = trim((string)($b['end_date'] ?? ''));
+    if (!$exact && $start !== '' && $end !== '') {
+        $ov = ops_one("SELECT contract_number, start_date, end_date FROM partner_contracts
+                       WHERE partner_id=? AND COALESCE(open_status,'OPEN') IN ('OPEN','PENDING')
+                         AND COALESCE(start_date,'')<>'' AND COALESCE(end_date,'')<>''
+                         AND start_date <= ? AND end_date >= ?"
+            . ($exceptId ? " AND id<>" . (int)$exceptId : "") . " ORDER BY id DESC LIMIT 1",
+            [$clientId, $end, $start]);
+        if ($ov) $out['warn'][] = 'Contract ' . $ov['contract_number'] . ' already covers '
+            . fdate($ov['start_date']) . ' to ' . fdate($ov['end_date']) . ' for this ' . Tl('client')
+            . '. Two contracts running over the same period is possible, but check this is not the same one twice.';
+    }
+
+    return $out;
+}
+
+// ---------------------------------------------------------------------------
+//  Everything a contract needs, read off what has already been entered
+//
+//  The purchase order is the document that actually commits the money and the
+//  dates, so it is read first; the quotation is the fallback; the client record
+//  supplies the branch. Each value comes back with WHERE it came from, so the
+//  screen can say "start date — from PO 4500123" instead of presenting a
+//  mystery date the person then feels obliged to check by hand.
+//
+//  Returns ['value','start_date','end_date','title','branch_id','po_id',
+//           'from' => [field => source], 'choices' => [POs to pick from]].
+// ---------------------------------------------------------------------------
+function contract_prefill($quoteId = 0, $poId = 0) {
+    po_migrate();
+    $quoteId = (int)$quoteId; $poId = (int)$poId;
+    $out = ['value' => null, 'start_date' => '', 'end_date' => '', 'title' => '',
+            'branch_id' => 0, 'po_id' => 0, 'po_number' => '', 'from' => [], 'choices' => []];
+
+    $q = $quoteId ? ops_one("SELECT * FROM quotations WHERE id=?", [$quoteId]) : null;
+    $clientId = (int)($q['client_id'] ?? 0);
+
+    // Which purchase order to read. One that names this quotation is certain.
+    // Otherwise, an order for the same client that is not yet attached to any
+    // contract is a candidate — but only if there is exactly one, because
+    // guessing between two would put the wrong money on the contract.
+    $po = $poId ? ops_one("SELECT * FROM partner_purchase_orders WHERE id=?", [$poId]) : null;
+    if (!$po && $quoteId) $po = ops_one("SELECT * FROM partner_purchase_orders WHERE quotation_id=? ORDER BY id DESC LIMIT 1", [$quoteId]);
+    // The quotation often records the client's PO number even when nobody has
+    // linked the two records — that written number is a certain match, so use it
+    // rather than making somebody find the same order again by hand.
+    if (!$po && $clientId && trim((string)($q['po_number'] ?? '')) !== '')
+        $po = ops_one("SELECT * FROM partner_purchase_orders WHERE partner_id=? AND po_number=? ORDER BY id DESC LIMIT 1",
+                      [$clientId, trim((string)$q['po_number'])]);
+    if (!$po && $clientId) {
+        $cands = ops_all("SELECT * FROM partner_purchase_orders
+                          WHERE partner_id=? AND COALESCE(is_active,1)=1 AND COALESCE(contract_id,0)=0
+                          ORDER BY id DESC LIMIT 10", [$clientId]) ?: [];
+        if (count($cands) === 1) $po = $cands[0];
+        elseif (count($cands) > 1) $out['choices'] = $cands;
+    }
+
+    if ($po) {
+        $label = 'PO ' . (trim((string)$po['po_number']) !== '' ? $po['po_number'] : '(unnumbered)');
+        $out['po_id'] = (int)$po['id'];
+        $out['po_number'] = (string)$po['po_number'];
+        if ($po['value'] !== null && (float)$po['value'] > 0) { $out['value'] = (float)$po['value']; $out['from']['value'] = $label; }
+        if (trim((string)$po['start_date']) !== '') { $out['start_date'] = (string)$po['start_date']; $out['from']['start_date'] = $label; }
+        if (trim((string)$po['end_date'])   !== '') { $out['end_date']   = (string)$po['end_date'];   $out['from']['end_date'] = $label; }
+        if (trim((string)$po['title'])      !== '') { $out['title']      = (string)$po['title'];      $out['from']['title'] = $label; }
+    }
+
+    if ($q) {
+        $label = Tl('quote') . ' ' . quote_label($q);
+        if ($out['value'] === null && (float)($q['total_amount'] ?? 0) > 0) { $out['value'] = (float)$q['total_amount']; $out['from']['value'] = $label; }
+        if ($out['title'] === '' && trim((string)($q['subject'] ?? '')) !== '') { $out['title'] = (string)$q['subject']; $out['from']['title'] = $label; }
+        // A contract runs from the day the client accepted, so that date is the
+        // honest start. No end date is invented: a quotation's own validity period
+        // is how long the PRICE stood, not how long the work runs, and guessing it
+        // would put a wrong expiry on a live contract.
+        if ($out['start_date'] === '' && trim((string)($q['accepted_date'] ?? '')) !== '') {
+            $out['start_date'] = substr((string)$q['accepted_date'], 0, 10);
+            $out['from']['start_date'] = $label;
+        }
+        if (!$out['branch_id'] && (int)($q['office_id'] ?? 0)) { $out['branch_id'] = (int)$q['office_id']; $out['from']['branch_id'] = $label; }
+    }
+
+    // The branch that owns the client is the fallback, and on a client created
+    // for one office it is also the right answer.
+    if (!$out['branch_id'] && $clientId) {
+        $hb = (int)ops_val("SELECT home_branch_id FROM business_partners WHERE id=?", [$clientId]);
+        if ($hb) { $out['branch_id'] = $hb; $out['from']['branch_id'] = Tl('client') . ' record'; }
+    }
+    if (!$out['branch_id']) $out['branch_id'] = (int)(current_user()['home_office_id'] ?? 0);
+
+    // Start date: with nothing else to go on, a contract starts the day it is
+    // registered rather than with an empty box somebody has to fill in.
+    if ($out['start_date'] === '') { $out['start_date'] = date('Y-m-d'); $out['from']['start_date'] = 'today'; }
+
+    return $out;
+}
+
+// A one-line, plain-English account of what was filled in for you and from
+// where — so the person confirming a one-click registration can see it is not
+// a black box. Returns '' when nothing was inherited.
+function contract_prefill_note(array $pf) {
+    if (empty($pf['from'])) return '';
+    $names = ['value' => 'value', 'start_date' => 'start date', 'end_date' => 'end date',
+              'title' => 'subject', 'branch_id' => 'billing branch'];
+    $by = [];
+    foreach ($pf['from'] as $field => $src) $by[$src][] = $names[$field] ?? $field;
+    $bits = [];
+    foreach ($by as $src => $fields) {
+        $last = array_pop($fields);
+        $bits[] = ($fields ? implode(', ', $fields) . ' and ' . $last : $last) . ' from ' . $src;
+    }
+    return 'Taken across for you: ' . implode('; ', $bits) . '.';
+}
+
+// ---------------------------------------------------------------------------
+//  Correct a contract number that was typed wrongly
+//
+//  The number is the join key for the whole spine, which is exactly why this
+//  used to be impossible: changing it on the contract alone would have left
+//  every call, job, invoice and engagement pointing at a number that no longer
+//  existed. So the correction moves ALL of them together, inside one
+//  transaction, or none of them. What it will NOT do is merge two contracts:
+//  if the new number is already in use the correction is refused, because
+//  "correct a typo" and "merge two files" are different decisions and only the
+//  first one is safe to do silently.
+//
+//  Returns ['ok'=>true,'moved'=>[table=>rows],'old'=>no,'new'=>no] or ['err'=>…].
+// ---------------------------------------------------------------------------
+function contract_renumber($id, $newNo, $reason = '') {
+    $id = (int)$id;
+    $c  = $id ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [$id]) : null;
+    if (!$c) return ['err' => 'That contract no longer exists.'];
+    $old = (string)($c['contract_number'] ?? '');
+    $new = trim((string)$newNo);
+    if ($new === '') return ['err' => 'Enter the corrected contract number.'];
+    if ($new === $old) return ['err' => 'That is the number it already has.'];
+    if (mb_strlen($new) > CONTRACT_NO_MAX)
+        return ['err' => 'A contract number can be at most ' . CONTRACT_NO_MAX . ' characters.'];
+
+    $dup = contract_duplicate_check((int)$c['partner_id'], $new, $id);
+    if ($dup['block'] !== '') return ['err' => $dup['block']];
+    if (!empty($dup['reuse']))
+        return ['err' => 'This ' . Tl('client') . ' already has a contract numbered ' . $new
+            . '. Correcting a number cannot merge two contracts — close or delete the other one first, '
+            . 'or choose a different number.'];
+
+    // An engagement is keyed on the number and that key is unique. One already
+    // standing under the new number would make the move fail half-way, so it is
+    // caught before anything is written.
+    if (!empty(table_columns('engagements')['engagement_key'])) {
+        $ex = ops_val("SELECT id FROM engagements WHERE engagement_key=?", [$new]);
+        if ($ex) return ['err' => 'Number ' . $new . ' already has an engagement record against it. '
+            . 'Pick another number, or ask support to merge the two.'];
+    }
+
+    $pdo = db();
+    $moved = [];
+    $inTx = false;
+    try {
+        if (!$pdo->inTransaction()) { $pdo->beginTransaction(); $inTx = true; }
+        $pdo->prepare("UPDATE partner_contracts SET contract_number=? WHERE id=?")->execute([$new, $id]);
+        if ($old !== '') {
+            foreach (contract_no_tables() as $table => $col) {
+                $cols = table_columns($table);
+                if (empty($cols[$col])) continue;                     // not on this install
+                $st = $pdo->prepare("UPDATE $table SET $col=? WHERE $col=?");
+                $st->execute([$new, $old]);
+                $n = (int)$st->rowCount();
+                if ($n) $moved[$table] = $n;
+            }
+        }
+        if ($inTx) $pdo->commit();
+    } catch (Throwable $e) {
+        if ($inTx && $pdo->inTransaction()) { $pdo->rollBack(); }
+        else {
+            // We did not open this transaction, so we cannot undo only our part of
+            // it — rolling back here would silently discard the caller's work too.
+            // The caller owns the transaction and must own the decision, so the
+            // failure is handed back up rather than swallowed into a return value
+            // that would let them commit a half-renamed contract.
+            throw $e;
+        }
+        return ['err' => 'The correction could not be applied, so nothing was changed. (' . $e->getMessage() . ')'];
+    }
+
+    $note = 'Contract number corrected from ' . ($old !== '' ? $old : '(blank)') . ' to ' . $new
+        . ($reason !== '' ? ' — ' . $reason : '')
+        . ($moved ? '. Moved with it: ' . implode(', ', array_map(fn($t, $n) => $n . ' ' . $t, array_keys($moved), $moved)) . '.' : '.');
+    if (function_exists('act_log')) act_log('PARTNER', (int)$c['partner_id'], 'SYSTEM', $note);
+    $qid = contract_quote_id($c);
+    if ($qid && function_exists('crm_log_change')) crm_log_change($qid, $note);
+
+    return ['ok' => true, 'old' => $old, 'new' => $new, 'moved' => $moved, 'note' => $note];
+}
+
+// What a correction would carry with it — shown BEFORE the button is pressed,
+// so nobody discovers afterwards that they moved forty invoices.
+function contract_renumber_impact($c) {
+    $no = trim((string)($c['contract_number'] ?? ''));
+    $out = [];
+    if ($no === '') return $out;
+    // One for the singular and one for the plural. "1 quotes" on a screen the
+    // owner reads is a small thing that makes the whole sentence look machine-made.
+    $labels = [
+        'quotations'       => [Tl('quote'), Tlp('quote')],
+        'calls'            => [Tl('call'), Tlp('call')],
+        'jobs'             => ['job', 'jobs'],
+        'invoices'         => ['invoice', 'invoices'],
+        'invoice_lines'    => ['invoice line', 'invoice lines'],
+        'billable_events'  => ['billable event', 'billable events'],
+        'cost_allocations' => ['cost allocation', 'cost allocations'],
+        'engagements'      => ['engagement record', 'engagement records'],
+    ];
+    foreach (contract_no_tables() as $table => $col) {
+        $cols = table_columns($table);
+        if (empty($cols[$col])) continue;
+        try { $n = (int)ops_val("SELECT COUNT(*) FROM $table WHERE $col=?", [$no]); } catch (Throwable $e) { continue; }
+        if (!$n) continue;
+        $pair = $labels[$table] ?? [$table, $table];
+        $out[$n === 1 ? $pair[0] : $pair[1]] = $n;
+    }
+    return $out;
+}
+
+// Handler — correct the number. Accounts / back-office only, same right that
+// registered it.
+function ops_contract_renumber($method) {
+    ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can correct a contract number.');
+    if ($method !== 'POST') redirect('/');
+    $id = (int)($_POST['id'] ?? 0);
+    $r  = contract_renumber($id, $_POST['contract_number'] ?? '', trim((string)($_POST['reason'] ?? '')));
+    if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/contract?id=' . $id); }
+    flash('Contract number corrected to ' . $r['new']
+        . ($r['moved'] ? ' — ' . array_sum($r['moved']) . ' linked record(s) moved with it.' : '.'));
+    redirect('/contract?id=' . $id);
+}
+
+// JSON — "is this number a duplicate?", answered while it is being typed rather
+// than after the form has been submitted. Read-only.
+function ops_contract_no_check() {
+    header('Content-Type: application/json');
+    if (!(can('crm.contract.register') || is_master())) { echo json_encode(['ok' => false]); return true; }
+    $r = contract_duplicate_check((int)($_GET['client_id'] ?? 0), (string)($_GET['no'] ?? ''),
+                                 (int)($_GET['except'] ?? 0) ?: null,
+                                 ['start_date' => (string)($_GET['start'] ?? ''), 'end_date' => (string)($_GET['end'] ?? '')]);
+    echo json_encode(['ok' => true, 'block' => $r['block'], 'warn' => $r['warn'],
+                      'reuse' => !empty($r['reuse'])]);
+    return true;
+}
+
+// ===========================================================================
+//  Point 3 — the work order already knows what the contract and the order say
+//
+//  The client, the purchase order and the contract were all entered before the
+//  work came in. Asking for them a third time when an inspection is raised is
+//  how the three records end up disagreeing: somebody picks the wrong order, or
+//  types a rate that is not the rate the client agreed to. So the commercial
+//  detail is read forward from the contract, and — the other direction — a work
+//  order that somehow has no contract or order against it can be linked to the
+//  right one in a click instead of being edited field by field.
+// ===========================================================================
+
+// What a work order raised under this contract should open with. Only ever
+// fills what is UNAMBIGUOUS: one purchase order on the contract, one line with
+// balance left on that order. Two of either and nothing is assumed, because a
+// guess here becomes a wrong rate on a real invoice.
+//
+// Returns ['po_id','po_line_item_id','billable_rate','billable_basis',
+//          'from' => [field => source]].
+function call_commercial_prefill($contractId = 0, $poId = 0) {
+    po_migrate();
+    $out = ['po_id' => 0, 'po_line_item_id' => 0, 'billable_rate' => null, 'billable_basis' => '', 'from' => []];
+    $contractId = (int)$contractId; $poId = (int)$poId;
+
+    $po = $poId ? ops_one("SELECT * FROM partner_purchase_orders WHERE id=?", [$poId]) : null;
+    if (!$po && $contractId) {
+        $pos = ops_all("SELECT * FROM partner_purchase_orders
+                        WHERE contract_id=? AND COALESCE(is_active,1)=1 ORDER BY id DESC", [$contractId]) ?: [];
+        if (count($pos) === 1) $po = $pos[0];
+    }
+    if (!$po) return $out;
+
+    $out['po_id'] = (int)$po['id'];
+    $poLabel = 'PO ' . (trim((string)$po['po_number']) !== '' ? $po['po_number'] : '(unnumbered)');
+    $out['from']['po_id'] = $poLabel;
+
+    // The line to draw down. Only one line still has quantity left → it is the
+    // one; more than one and the coordinator picks, because the balances are the
+    // whole point of tracking them.
+    $lines = ops_all("SELECT * FROM po_line_items WHERE purchase_order_id=?", [(int)$po['id']]) ?: [];
+    $open = array_values(array_filter($lines, fn($l) => ((float)$l['quantity'] - (float)$l['consumed']) > 0));
+    if (count($open) === 1) {
+        $l = $open[0];
+        $out['po_line_item_id'] = (int)$l['id'];
+        $out['from']['po_line_item_id'] = $poLabel;
+        if ($l['rate'] !== null && $l['rate'] !== '') {
+            $out['billable_rate'] = (float)$l['rate'];
+            $out['from']['billable_rate'] = $poLabel . ' line';
+        }
+        if (trim((string)$l['item_type']) !== '') {
+            // PO_ITEM_TYPES is a subset of CHARGE_UNITS, so the unit carries across
+            // as-is rather than being re-chosen from a similar-looking list.
+            $out['billable_basis'] = (string)$l['item_type'];
+            $out['from']['billable_basis'] = $poLabel . ' line';
+        }
+    }
+    return $out;
+}
+
+// ---------------------------------------------------------------------------
+//  The other direction — a work order with no contract or order on it
+//
+//  Offers the contracts and orders this client actually has, so the link is a
+//  click rather than a hunt. Deliberately narrow: only OPEN contracts for this
+//  client, and only active orders, because the point is to attach the record to
+//  the right commercial document, not to give somebody a list to browse.
+// ---------------------------------------------------------------------------
+function call_link_candidates($call) {
+    po_migrate();
+    $clientId = (int)($call['client_id'] ?? 0);
+    $out = ['contracts' => [], 'pos' => [], 'need_contract' => false, 'need_po' => false];
+    if (!$clientId) return $out;
+
+    $cno = trim((string)($call['contract_number'] ?? ''));
+    $out['need_contract'] = $cno === '';
+    $out['need_po'] = (int)($call['po_id'] ?? 0) === 0;
+
+    // Once anything on this work order has been invoiced, the commercial record is
+    // closed: the invoice carries its OWN copy of the contract number, and putting
+    // a different one on the work order now would make the two disagree — which is
+    // the very class of mistake this whole change exists to prevent. So a link is
+    // offered only while there is still nothing billed against it. A wrongly
+    // numbered invoice is a credit note, not a dropdown.
+    try {
+        $billed = (int) ops_val("SELECT COUNT(*) FROM jobs WHERE call_id=? AND COALESCE(invoice_raised,0)=1",
+                                [(int)($call['id'] ?? 0)]);
+    } catch (Throwable $e) { $billed = 0; }
+    if ($billed) { $out['need_contract'] = false; $out['need_po'] = false; $out['billed'] = $billed; return $out; }
+
+    if ($out['need_contract']) {
+        // The whole row, not a handful of columns: contract_state_row() reads the
+        // quantity and the originating quotation to reach its verdict, and a
+        // partial SELECT would leave it silently unable to see an exhausted
+        // contract — it would only ever catch an expired one.
+        $rows = ops_all("SELECT * FROM partner_contracts
+                         WHERE partner_id=? AND COALESCE(open_status,'OPEN')='OPEN' AND COALESCE(is_active,1)=1
+                         ORDER BY id DESC LIMIT 12", [$clientId]) ?: [];
+        // A contract that has run out of time or quantity cannot take new work —
+        // the scheduling gate would refuse it anyway, so it is not offered here.
+        foreach ($rows as $r) {
+            $st = contract_state_row($r);
+            if (!empty($st['state']) && contract_state_blocks($st['state'])) continue;
+            $out['contracts'][] = $r;
+        }
+    }
+    if ($out['need_po']) {
+        // The orders under the contract this work order is already on come first:
+        // that is almost always the right answer.
+        $sql = "SELECT po.*, (SELECT COUNT(*) FROM po_line_items l WHERE l.purchase_order_id=po.id) line_count
+                FROM partner_purchase_orders po
+                WHERE po.partner_id=? AND COALESCE(po.is_active,1)=1 ORDER BY po.id DESC LIMIT 12";
+        $rows = ops_all($sql, [$clientId]) ?: [];
+        if ($cno !== '') {
+            $cid = (int)ops_val("SELECT id FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1", [$cno]);
+            if ($cid) usort($rows, fn($a, $b) => ((int)($b['contract_id'] ?? 0) === $cid ? 1 : 0) - ((int)($a['contract_id'] ?? 0) === $cid ? 1 : 0));
+        }
+        $out['pos'] = $rows;
+    }
+    return $out;
+}
+
+// Attach a work order to its contract and / or its purchase order. Refuses a
+// contract belonging to another party, and a contract that is not open — the
+// same two rules the raise-a-work-order path enforces, so the link cannot be
+// used as a way around them.
+function call_link_commercial($callId, $contractId = 0, $poId = 0) {
+    $callId = (int)$callId;
+    $call = $callId ? ops_one("SELECT * FROM calls WHERE id=?", [$callId]) : null;
+    if (!$call) return ['err' => 'That ' . Tl('call') . ' no longer exists.'];
+    $clientId = (int)($call['client_id'] ?? 0);
+    $set = []; $args = []; $said = [];
+
+    // The same rule the candidate list applies, enforced HERE — a list is a
+    // convenience, the write is the control. Once an invoice has gone out under
+    // this work order, its number is on that invoice; changing it now would leave
+    // the two disagreeing, and the correct remedy is a credit note.
+    try { $billed = (int) ops_val("SELECT COUNT(*) FROM jobs WHERE call_id=? AND COALESCE(invoice_raised,0)=1", [$callId]); }
+    catch (Throwable $e) { $billed = 0; }
+    if ($billed && !is_master())
+        return ['err' => 'This ' . Tl('call') . ' has already been invoiced, so its commercial reference cannot be changed — '
+            . 'the invoice carries its own copy of the number and the two would stop agreeing. '
+            . 'Correct it on the contract instead, or raise a credit note.'];
+
+    if ($contractId) {
+        $ct = ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$contractId]);
+        if (!$ct) return ['err' => 'That contract no longer exists.'];
+        if ($clientId && (int)$ct['partner_id'] !== $clientId)
+            return ['err' => 'That contract belongs to a different ' . Tl('client') . '.'];
+        if (strtoupper((string)($ct['open_status'] ?? 'OPEN')) !== 'OPEN' && !is_master())
+            return ['err' => 'Contract ' . $ct['contract_number'] . ' is not open yet — it needs a manager to endorse it and the branch manager to approve it first.'];
+        $set[] = 'contract_number=?'; $args[] = (string)$ct['contract_number'];
+        $said[] = 'contract ' . $ct['contract_number'];
+    }
+    if ($poId) {
+        $po = ops_one("SELECT * FROM partner_purchase_orders WHERE id=?", [(int)$poId]);
+        if (!$po) return ['err' => 'That purchase order no longer exists.'];
+        if ($clientId && (int)$po['partner_id'] !== $clientId)
+            return ['err' => 'That purchase order belongs to a different ' . Tl('client') . '.'];
+        $set[] = 'po_id=?'; $args[] = (int)$po['id'];
+        $said[] = 'PO ' . ($po['po_number'] ?: '(unnumbered)');
+        // And the order back to the contract, so the pair is joined from both ends
+        // and the next work order prefills without being asked again.
+        if ($contractId && (int)($po['contract_id'] ?? 0) === 0) {
+            try { db()->prepare("UPDATE partner_purchase_orders SET contract_id=? WHERE id=?")->execute([(int)$contractId, (int)$po['id']]); } catch (Throwable $e) {}
+        }
+    }
+    if (!$set) return ['err' => 'Nothing was chosen to link.'];
+
+    $args[] = $callId;
+    db()->prepare("UPDATE calls SET " . implode(', ', $set) . " WHERE id=?")->execute($args);
+    $note = Tl('call') . ' ' . ($call['call_code'] ?? $callId) . ' linked to ' . implode(' and ', $said) . '.';
+    if (function_exists('act_log')) act_log('CALL', $callId, 'SYSTEM', $note);
+    return ['ok' => true, 'said' => implode(' and ', $said)];
+}
+
+function ops_call_link_commercial($method) {
+    ops_require(can('ops.call.create') || is_master(), 'Only operations / coordinators can link a ' . Tl('call') . '.');
+    if ($method !== 'POST') redirect('/');
+    $id = (int)($_POST['id'] ?? 0);
+    $r = call_link_commercial($id, (int)($_POST['contract_id'] ?? 0), (int)($_POST['po_id'] ?? 0));
+    if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/call?id=' . $id); }
+    flash('Linked to ' . $r['said'] . '. The commercials now read off it instead of being typed again.');
+    redirect('/call?id=' . $id);
 }
