@@ -840,6 +840,59 @@ function partner_office_sql($col = 'home_branch_id') {
 }
 
 // ============================================================================
+//  HOW MUCH OF A CLIENT ANOTHER OFFICE MAY SEE — and that it may change NOTHING
+//
+//  The registers were scoped long ago, but the client RECORD was not: a Mumbai
+//  coordinator who reached an Ahmedabad client — through search, or a bookmarked
+//  link — could open every form on it and save. Tested on the live data, a
+//  Mumbai-only coordinator renamed an Ahmedabad client and set its credit terms
+//  to 999 days. Ahmedabad would never have known.
+//
+//  Hiding the record outright was the wrong answer: the same company is often
+//  worked on by more than one branch, and a coordinator arranging a visit needs
+//  to know WHO the client is. So the owner's rule is:
+//
+//      basic identity  — visible to any office (who this company is)
+//      contact details — the owning office's only
+//      commercial      — the owning office's only
+//      any change      — the owning office's only, always
+//
+//  Returns 'FULL' or 'BASIC'. A party with no branch set belongs to nobody and
+//  stays FULL, the same rule partner_office_sql() applies — otherwise the day
+//  this shipped every existing client would have locked itself.
+// ============================================================================
+function partner_view_level($partner) {
+    if (function_exists('is_master') && is_master()) return 'FULL';
+    $branch = (int) (is_array($partner) ? ($partner['home_branch_id'] ?? 0) : $partner);
+    if (!$branch) return 'FULL';                       // unassigned — belongs to nobody
+    if (!function_exists('scope_offices')) return 'FULL';
+    $off = scope_offices();
+    if ($off === 'ALL' || !is_array($off) || !$off) return 'FULL';
+    return in_array($branch, array_map('intval', $off), true) ? 'FULL' : 'BASIC';
+}
+
+// May this person change this client / vendor at all? Only the office that owns
+// it. This is the WRITE half of the rule above and is deliberately a separate
+// function, because "may see some of it" and "may change it" are different
+// questions and answering both with one flag is how the leak happened.
+function partner_can_write($partner) { return partner_view_level($partner) === 'FULL'; }
+
+// The one refusal message, so every door says the same thing and names the
+// office to ask. A refusal that does not say who owns the record just sends
+// somebody hunting.
+function partner_write_denied_msg($partner) {
+    $branch = (int) (is_array($partner) ? ($partner['home_branch_id'] ?? 0) : $partner);
+    $name = '';
+    if ($branch && function_exists('ops_val')) {
+        try { $name = (string) ops_val("SELECT name FROM offices WHERE id=?", [$branch]); } catch (Throwable $e) {}
+    }
+    return 'This ' . (function_exists('Tl') ? Tl('client') : 'client') . ' belongs to '
+        . ($name !== '' ? 'the ' . $name . ' office' : 'another office')
+        . '. You can see who they are, but their contact details, commercial terms and any change to them '
+        . 'are that office\'s to make — ask them.';
+}
+
+// ============================================================================
 //  THE TWO-OFFICE RULE FOR WORK ORDERS — one definition, every caller.
 //
 //  A work order belongs to TWO offices: the CONTRACTING office, which holds the

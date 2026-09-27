@@ -85,6 +85,11 @@ function job_lock_state($job, $today = null) {
 // Who may hand a locked job back. Deliberately not the engineer and not the
 // coordinator: if the person who missed the deadline can undo it, there is no
 // deadline.
+// The branch manager already reaches this through workforce.report.approve, which
+// the role carries — checked against the live role map rather than assumed, after
+// a change naming BRANCH_MANAGER here turned out to grant nothing it did not
+// already have while quietly adding BRANCH_APP_MANAGER, which nobody asked for.
+// The list stays as it was.
 function can_unlock_job() {
     return is_master() || can('users.manage.global') || can('settings.manage')
         || can('workforce.report.approve');

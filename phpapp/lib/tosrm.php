@@ -1030,9 +1030,21 @@ function tosrm_render_job_panel($job) {
         <div class="ta-grid" style="margin-top:12px">
         <form method="post" action="/assign-reassign" class="ta-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label>Reassign <span class="ta-hint">(original kept in history)</span></label>
+          <label>Reassign <span class="ta-hint"><?= $curInsp ? 'currently ' . $esc((string)(ops_val("SELECT name FROM inspectors WHERE id=?", [$curInsp]) ?: 'someone')) . ' — the original is kept in history' : 'nobody is assigned yet' ?></span></label>
           <div class="ta-row">
-            <select class="form-control" name="inspector_id"><option value="">Choose resource…</option><?php foreach ($insps as $ip): ?><option value="<?=(int)$ip['id']?>" <?=(int)$ip['id']===$curInsp?'selected':''?>><?=$esc($ip['name'])?></option><?php endforeach; ?></select>
+            <?php // The box opens on NOBODY, not on the person already assigned.
+                  //  Pre-selecting the current holder meant pressing Reassign without
+                  //  touching the dropdown answered "Choose a different resource to
+                  //  reassign to." — which reads as "this cannot be reassigned again",
+                  //  and was reported as exactly that. The person already on it is
+                  //  named beside the box instead, and is not offered as a choice:
+                  //  reassigning to whoever already has it is not a thing to do. ?>
+            <select class="form-control" name="inspector_id">
+              <option value="">Choose who takes it over…</option>
+              <?php foreach ($insps as $ip): if ((int)$ip['id'] === $curInsp) continue; ?>
+                <option value="<?=(int)$ip['id']?>"><?=$esc($ip['name'])?></option>
+              <?php endforeach; ?>
+            </select>
             <input class="form-control" type="text" name="reason" placeholder="Reason">
             <input class="form-control" type="text" name="approver" placeholder="Approved by">
             <button class="btn" type="submit">Reassign</button>

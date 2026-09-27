@@ -42,3 +42,23 @@ is where its approval queues appear.
 **Click-count — approve something:**
 - **Contract opening:** pending-task card → `/contract-openings` (1) → **Approve** (1) = **2 clicks**.
 - **Report:** pending-task card → `/documents?mine=approve` (1) → open report (1) → Approve (1) = **~3 clicks**.
+
+
+## Cross-office money, and the jobs that lock themselves (ADR-005)
+
+**What you see of a job another branch sold.** When your branch carries out work
+for an order another branch holds, your revenue on it is the **inter-office
+credit** — not the figure the client is billed. That is true on the work order,
+on the job, in the registers and, since ADR-005, in **Reports**: the revenue
+totals, the top-10 customers chart, the revenue-by-contract chart and the
+business-unit split all read your branch's books, not the company's. Invoicing
+and payment totals belong to the branch that raises the invoice.
+
+Seniority does not change this. A branch manager sees their own branch's share,
+the same as a coordinator. Only a master, or somebody whose scope is company-wide,
+reads the company figure.
+
+**Reopening a locked job.** A job locks itself two days after its inspection end
+date. You can reopen it — you hold `workforce.report.approve`, which is what the
+lock asks for — giving a reason and a number of days. A coordinator cannot: if the
+person who missed the deadline can undo it, there is no deadline.

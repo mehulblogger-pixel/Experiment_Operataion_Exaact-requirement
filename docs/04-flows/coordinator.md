@@ -60,6 +60,26 @@ invoice carries its own copy of the number, and the remedy for a wrong one is a
 credit note, not a re-link. `ops.call.create` throughout — the same right that
 raises a work order — enforced at the write, not only hidden from the screen.
 
+**Another office's client (ADR-005):** a coordinator can see WHO another branch's
+client is — that is how you know who you are dealing with when the work is shared
+— but not their contact people, their site addresses, their commercial terms,
+their contracts or their purchase orders, and nothing on the record can be
+changed. The screen says whose client it is and which office to ask. The work
+orders listed on it are only the ones this office is part of, by the same
+two-office rule the register uses. A client with no branch set belongs to nobody
+and stays fully open, which is how every existing record kept working.
+
+**If a job will not let you edit it:** it has locked itself, two days after its
+inspection end date — dates, man-days, expenses and credit are fixed from then
+on. Reports and photographs can still be uploaded. A coordinator cannot reopen it
+(the deadline is on you); the branch manager can. That is deliberate, not a
+fault.
+
+**If Reassign says "choose a different resource":** it is asking you to pick
+somebody. The box opens on nobody and no longer offers whoever currently holds
+the job — who that is, is written beside it. There is no limit on how many times
+a job can be reassigned.
+
 **Click-count — most common task:**
 - **Raise a call from a contract:** `/raise-call` (1) → select client (1) → "Raise call ▶" (1) → Save prefilled form (1) = **~4 clicks**.
 - **Allocate a job:** landing "Allocate" (1) → pick inspector (1) → "Allocate" submit (1) = **~3 clicks**.

@@ -957,6 +957,32 @@ function credit_explainer($contractingOfficeId, $executingOfficeId) {
                 . '. Enter what ' . $e['name'] . ' is to receive; they can revert with the figure they need.'];
 }
 
+// May this person see a party's contact / commercial detail? One line, asked by
+// every JSON endpoint that serves it, so the two doors cannot drift apart.
+// A party that no longer exists answers "no" rather than throwing.
+// Whose revenue may the person reading a report see on THIS job? A master, or
+// anyone whose scope is company-wide, reads the company's figure. Everybody else
+// reads their own office's share — and on a cross-office job that is the credit,
+// not the client's invoice. Returns an office id, or null for the whole company.
+function reports_revenue_office($job) {
+    if (function_exists('is_master') && is_master()) return null;
+    $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
+    if ($off === 'ALL' || !is_array($off) || !$off) return null;
+    $ids = array_map('intval', $off);
+    // The office in scope that actually has a part in this job. Contracting first:
+    // where one office both sells and executes, either answer is the same figure.
+    foreach (['contracting_office_id', 'executing_office_id'] as $col) {
+        $v = (int) ($job[$col] ?? 0);
+        if ($v && in_array($v, $ids, true)) return $v;
+    }
+    return $ids[0];
+}
+function partner_readable($partnerId) {
+    if (!function_exists('partner_view_level')) return true;
+    $row = ops_one("SELECT id, home_branch_id FROM business_partners WHERE id=?", [(int)$partnerId]);
+    if (!$row) return false;
+    return partner_view_level($row) === 'FULL';
+}
 function clients_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY legal_name"); }
 function vendors_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_vendor=1 AND " . partner_office_sql() . " ORDER BY legal_name"); }
 function offices_list() { return ops_all("SELECT * FROM offices ORDER BY is_ahmedabad DESC, name"); }
@@ -4288,6 +4314,10 @@ function ops_dispatch($route, $method) {
             return true;
         case $route === 'partner-sites':
             header('Content-Type: application/json');
+            // A site address is contact detail, so the office boundary applies.
+            // The client picker feeding this is already office-scoped, so the
+            // normal path is untouched — this closes the hand-typed URL behind it.
+            if (!partner_readable((int)($_GET['id'] ?? 0))) { echo json_encode([]); return true; }
             $out = [];
             foreach (ops_all("SELECT id, address_type, label, town_village, district, city, state FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id", [(int)($_GET['id'] ?? 0)]) as $a) {
                 $lbl = trim(($a['label'] ?: (lk_options_or('address_type', ADDRESS_TYPES)[$a['address_type']] ?? $a['address_type'])) . ' — ' . implode(', ', array_filter([$a['town_village'], $a['district'], $a['city'], $a['state']])), ' —');
@@ -4296,6 +4326,8 @@ function ops_dispatch($route, $method) {
             echo json_encode($out); return true;
         case $route === 'partner-pos':
             header('Content-Type: application/json');
+            // A purchase order is commercial detail — the same boundary.
+            if (!partner_readable((int)($_GET['id'] ?? 0))) { echo json_encode([]); return true; }
             $out = [];
             foreach (ops_all("SELECT id, po_number, po_type, value FROM partner_purchase_orders WHERE partner_id=? ORDER BY id DESC", [(int)($_GET['id'] ?? 0)]) as $o) {
                 $hasLines = (int)ops_val("SELECT COUNT(*) FROM po_line_items WHERE purchase_order_id=?", [$o['id']]);
@@ -9309,18 +9341,38 @@ function ops_reports() {
         'invoiced'=>0,'paid'=>0,'outstanding'=>0,'overdue'=>0,'creditRecvCnt'=>0,'creditPendCnt'=>0];
     $byInspector=[]; $todayD=date('Y-m-d');
     foreach ($jobs as $j) {
-        $p = job_profit($j);
+        // The office whose books this reader is entitled to. job_profit() has always
+        // accepted one and done the right thing with it — this report simply never
+        // passed it, so every total here was the COMPANY's view handed to whoever
+        // opened the page. One argument moves credit, revenue, the business-unit
+        // split and the per-office split onto the right side of the boundary at once.
+        $revOff = function_exists('reports_revenue_office') ? reports_revenue_office($j) : null;
+        $p = job_profit($j, $revOff);
         $fin['credit']+=$p['credit']; $fin['labour']+=$p['labour']; $fin['exp']+=$p['expenses']; $fin['subcon']+=$p['subcon']; $fin['profit']+=$p['profit'];
         if (($j['credit_direction']??'')==='GIVEN') $fin['given']+=$p['credit']; else $fin['recv']+=$p['credit'];
         // invoicing / payment / inter-office credit
-        if (!empty($j['invoice_raised'])) { $fin['invoiced']+=(float)$j['invoice_amount']; if (empty($j['payment_received']) && ($j['invoice_due_date']??'') && $j['invoice_due_date']<$todayD) $fin['overdue']++; }
-        if (!empty($j['payment_received'])) $fin['paid']+=(float)$j['payment_amount'];
+        // Invoicing and payment are the CONTRACTING office's business: it raises the
+        // invoice to the client and receives the money. An office that only carried
+        // the work out is owed a credit, not an invoice, so these figures are not
+        // its own and are not added to its totals.
+        $holdsInvoice = ($revOff === null) || (int)($j['contracting_office_id'] ?? 0) === (int)$revOff
+                        || (int)($j['contracting_office_id'] ?? 0) === 0;
+        if ($holdsInvoice && !empty($j['invoice_raised'])) { $fin['invoiced']+=(float)$j['invoice_amount']; if (empty($j['payment_received']) && ($j['invoice_due_date']??'') && $j['invoice_due_date']<$todayD) $fin['overdue']++; }
+        if ($holdsInvoice && !empty($j['payment_received'])) $fin['paid']+=(float)$j['payment_amount'];
         if (($j['credit_direction']??'')!=='GIVEN' && (($j['executing_office_id']??null))) { if (!empty($j['credit_received'])) $fin['creditRecvCnt']++; else $fin['creditPendCnt']++; }
         $sk=$j['sbu']?:'—'; $fin['bySbu'][$sk]=($fin['bySbu'][$sk]??0)+$p['credit'];
         $ok=$j['office_name']?:'Ahmedabad'; $fin['byOffice'][$ok]=($fin['byOffice'][$ok]??0)+$p['credit'];
         // Revenue = invoiced value where raised, else expected credit. Grouped by
         // customer (top-10 chart) and by project/contract number (revenue-by-project chart).
-        $rev=(float)($j['invoice_amount']??0); if ($rev<=0) $rev=$p['credit'];
+        //
+        // On a CROSS-OFFICE job the invoiced value belongs to the office that holds
+        // the client's order, not to the office that carried the work out. The
+        // detail screens have honoured that for a long time; this total did not, so
+        // a branch manager could read another branch's client-billable figure off
+        // the Top-10-customers chart with the customer named beside it. It asks the
+        // same reader the job screen asks, for the office doing the reading.
+        $rev = (float) ($p['revenue'] ?? 0);
+        if ($rev<=0) $rev=$p['credit'];
         if ($rev!=0){ $ck=$j['client_disp']?:($j['client_name']?:'(no client)'); $fin['byClient'][$ck]=($fin['byClient'][$ck]??0)+$rev;
             $pk=$j['boss_number']?:('(no ' . Tl('boss') . ')'); $fin['byProject'][$pk]=($fin['byProject'][$pk]??0)+$rev; }
         foreach (ops_all("SELECT * FROM expenses WHERE job_id=?", [$j['id']]) as $x) {

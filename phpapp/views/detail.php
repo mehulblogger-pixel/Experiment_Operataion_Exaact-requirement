@@ -7,9 +7,18 @@ $badge = $p['status']==='ACTIVE'?'GREEN':($p['status']==='BLACKLISTED'?'RED':'AM
 $id = (int)$p['id'];
 // Contract / PO / deputations apply to clients (companies we receive orders from);
 // purchase order comes first, contract is selected after the PO is received.
-$tabs = ['overview'=>'Overview','general'=>'General','registration'=>'Registration','addresses'=>'Addresses','contacts'=>'Contacts'];
-if (!empty($p['is_client'])) { $tabs['purchase_orders']='Purchase Orders'; $tabs['contracts']='Contract Numbers'; $tabs['projects']=TP('job'); }
-$tabs += ['relationships'=>'Relationships','notes'=>'Notes','timeline'=>'Timeline'];
+// Another office may see WHO this company is, not their contact details, their
+// commercial terms, or anything filed under them. The handler has already
+// withheld the rows; the tabs that would now be blank are dropped too, because
+// an empty tab reads as "there is nothing here", which is a different and
+// misleading statement.
+$pBasic = ($viewLevel ?? 'FULL') !== 'FULL';
+$tabs = ['overview'=>'Overview','general'=>'General'];
+if (!$pBasic) $tabs += ['registration'=>'Registration','addresses'=>'Addresses','contacts'=>'Contacts'];
+if (!empty($p['is_client']) && !$pBasic) { $tabs['purchase_orders']='Purchase Orders'; $tabs['contracts']='Contract Numbers'; }
+if (!empty($p['is_client'])) $tabs['projects']=TP('job');
+$tabs += ['relationships'=>'Relationships'];
+if (!$pBasic) $tabs += ['notes'=>'Notes','timeline'=>'Timeline'];
 if (!isset($tabs[$tab])) $tab = 'overview';
 // Cross-tab data flow: primary contact/address and links between them.
 $primaryContact = null; foreach ($contacts as $c) { if ($c['is_primary']) { $primaryContact = $c; break; } } if (!$primaryContact && $contacts) $primaryContact = $contacts[0];
@@ -19,6 +28,14 @@ $contactsByAddr = []; foreach ($contacts as $c) { $contactsByAddr[$c['address_id
 function addr_line($a) { return implode(', ', array_filter([$a['line1'] ?? '',$a['line2'] ?? '',$a['town_village'] ?? '',$a['district'] ?? '',$a['city'] ?? '',$a['state'] ?? '',$a['pincode'] ?? ''])); }
 function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a['address_type']] ?? $a['address_type']) . ($a['label'] ? ' — '.$a['label'] : ''); }
 ?>
+<?php // Say plainly why this record is showing less than usual, and who to ask.
+      // A screen that silently shows less looks broken; one that explains is a
+      // boundary people can work with. ?>
+<?php if ($pBasic): ?>
+  <div class="msg msg-warning" style="margin-bottom:12px">
+    <b>🔒 Another office&rsquo;s <?= e(Tl('client')) ?>.</b> <?= e($viewNote ?? '') ?>
+  </div>
+<?php endif; ?>
 <div class="master-head">
   <div><h1><?= e(partner_name($p)) ?></h1>
     <p class="sub"><?= e($p['code']) ?> · <?= e(roles_label($p)) ?> <span class="badge <?= $badge ?>"><?= e(lk_options_or('partner_status', STATUSES)[$p['status']] ?? $p['status']) ?></span></p></div>
@@ -28,7 +45,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <?php if (!empty($p['is_client'])): ?>
       <a class="btn" href="/customer?id=<?= $id ?>">Customer 360</a>
     <?php endif; ?>
-    <a class="btn secondary" href="/partner-edit?id=<?= $id ?>">Edit</a>
+    <?php if (!$pBasic): ?><a class="btn secondary" href="/partner-edit?id=<?= $id ?>">Edit</a><?php endif; ?>
   </div>
 </div>
 
@@ -70,7 +87,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <dt>GSTIN / PAN / CIN</dt><dd><?= e($p['gstin'] ?: '—') ?> · <?= e($p['pan'] ?: '—') ?> · <?= e($p['cin'] ?: '—') ?></dd>
     <dt>TAN / MSME</dt><dd><?= e($p['tan'] ?: '—') ?> · <?= e($p['msme_udyam'] ?: '—') ?></dd>
   </dl>
-  <a class="btn secondary" href="/partner-edit?id=<?= $id ?>">Edit details</a>
+  <?php if (!$pBasic): ?><a class="btn secondary" href="/partner-edit?id=<?= $id ?>">Edit details</a><?php endif; ?>
 
 <?php elseif ($tab === 'registration'): ?>
   <table class="grid"><tr><th>Document</th><th>Number</th><th>Valid till</th><th>File</th></tr>
@@ -390,12 +407,13 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <?php foreach ($rels as $r): ?><tr><td><?= e(lk_options_or('relationship_type', REL_TYPES)[$r['relation_type']] ?? $r['relation_type']) ?></td><td><?php if ($r['rid']): ?><a href="/partner?id=<?= (int)$r['rid'] ?>"><?= e($r['rd'] ?: $r['rn']) ?></a><?php else: ?>—<?php endif; ?></td><td><?= e($r['notes'] ?: '—') ?></td></tr><?php endforeach; ?>
     <?php if (!$rels): ?><tr><td colspan="3">No relationships recorded.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add a relationship</h3>
+  <?php if (!$pBasic): ?>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=relationship" class="inline-add">
     <div class="ff"><label>Relation</label><select class="form-control" name="relation_type"><?php foreach (lk_options_or('relationship_type', REL_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Related company</label><select class="form-control searchable" name="related_id"><option value="">— select company —</option><?php foreach ($all_partners as $ap): ?><option value="<?= (int)$ap['id'] ?>"><?= e($ap['display_name'] ?: $ap['legal_name']) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Notes</label><input class="form-control" name="notes"></div>
     <button class="btn small" type="submit">Add</button>
-  </form>
+  </form><?php endif; ?>
 
 <?php elseif ($tab === 'notes'): ?>
   <?php foreach ($notes as $n): ?><div class="note-item"><div class="muted"><?= fdate($n['created_at']) ?> · <?= e($n['author_name'] ?: '—') ?></div><?= e($n['note']) ?></div><?php endforeach; ?>

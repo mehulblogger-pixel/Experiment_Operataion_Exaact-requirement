@@ -1404,6 +1404,14 @@ if ($route === 'partner-edit') {
         'You do not have permission to edit ' . Tl('client') . ' / ' . Tl('vendor') . ' records.');
     $p = find_partner((int)($_GET['id'] ?? 0));
     if (!$p) { http_response_code(404); return view('notfound'); }
+    // The office boundary. Having the right to edit clients is not the same as
+    // having the right to edit THIS client: a Mumbai coordinator reaching an
+    // Ahmedabad record through search could rename it and rewrite its credit
+    // terms. Refused at the form AND at the save — a form that opens and then
+    // refuses wastes the typing, and a save guarded only by a hidden form is
+    // not guarded at all.
+    ops_require(!function_exists('partner_can_write') || partner_can_write($p),
+        function_exists('partner_write_denied_msg') ? partner_write_denied_msg($p) : 'That record belongs to another office.');
     if ($method === 'POST') {
         $b = $_POST;
         if (!empty($b['is_subcontractor'])) $b['is_vendor'] = 1; // sub-contractor ⇒ vendor
@@ -1447,6 +1455,11 @@ if ($route === 'partner-add' && $method === 'POST') {
     ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
         || (function_exists('is_coordinator_level') && is_coordinator_level()),
         'You do not have permission to change ' . Tl('client') . ' / ' . Tl('vendor') . ' records.');
+    // …and the same office boundary as the edit form. Every sub-form here —
+    // contact, address, registration, contract, relationship, note — writes to
+    // another office's client record just as surely as renaming it does.
+    ops_require(!function_exists('partner_can_write') || partner_can_write($p),
+        function_exists('partner_write_denied_msg') ? partner_write_denied_msg($p) : 'That record belongs to another office.');
     // Registering a contract is Accounts/back-office work — the same gate the CRM
     // "register contract" path uses (crm.php:1830). This partner-screen door used
     // to create a partner_contracts row with no permission check at all, so a
@@ -1664,25 +1677,55 @@ if ($route === 'partner') {
         'You do not have permission to view this ' . Tl('client') . ' / ' . Tl('vendor') . ' record.');
     $p = find_partner((int)($_GET['id'] ?? 0));
     if (!$p) { http_response_code(404); return view('notfound'); }
+    // ---- The office boundary on the RECORD ---------------------------------
+    //  Another office may see WHO this company is — that is how a coordinator
+    //  arranging a visit knows who they are dealing with. It may not see their
+    //  contact details or anything commercial, and it may change nothing.
+    //
+    //  The restricted collections are emptied HERE rather than hidden in the
+    //  template. A template that forgets one line leaks; a handler that never
+    //  loads the rows cannot.
+    $viewLevel = function_exists('partner_view_level') ? partner_view_level($p) : 'FULL';
+    $pFull = $viewLevel === 'FULL';
+    if (!$pFull) {
+        // Commercial terms live on the record itself, so they are cleared off the
+        // row before it ever reaches the screen.
+        foreach (['payment_terms', 'credit_days', 'manmonth_basis', 'manmonth_min_days'] as $cf)
+            if (array_key_exists($cf, $p)) $p[$cf] = '';
+    }
     $subs = $pdo->prepare("SELECT * FROM business_partners WHERE parent_id = ?"); $subs->execute([$p['id']]);
     $parent = $p['parent_id'] ? find_partner($p['parent_id']) : null;
     return view('detail', [
+        'viewLevel' => $viewLevel,
+        'viewNote'  => $pFull ? '' : (function_exists('partner_write_denied_msg') ? partner_write_denied_msg($p) : ''),
         'p' => $p, 'tab' => $_GET['tab'] ?? 'overview', 'parent' => $parent,
         'subsidiaries' => $subs->fetchAll(),
-        'addresses' => children('partner_addresses', $p['id']),
-        'contacts' => children('partner_contacts', $p['id']),
+        'addresses' => $pFull ? children('partner_addresses', $p['id']) : [],
+        'contacts' => $pFull ? children('partner_contacts', $p['id']) : [],
         // Field #1 — metadata only (never the base64 blob) in the list; the file is
         // streamed on demand by /partner-reg-file so a page of registrations stays light.
-        'registrations' => ops_all("SELECT id, partner_id, doc_type, number, valid_to, notes, file_name, mime, uploaded_by, uploaded_at
-                                    FROM partner_registrations WHERE partner_id=? ORDER BY id", [$p['id']]),
-        'notes' => children('partner_notes', $p['id'], 'id DESC'),
-        'contracts' => children('partner_contracts', $p['id']),
-        'pos' => children('partner_purchase_orders', $p['id']),
+        'registrations' => $pFull ? ops_all("SELECT id, partner_id, doc_type, number, valid_to, notes, file_name, mime, uploaded_by, uploaded_at
+                                    FROM partner_registrations WHERE partner_id=? ORDER BY id", [$p['id']]) : [],
+        'notes' => $pFull ? children('partner_notes', $p['id'], 'id DESC') : [],
+        'contracts' => $pFull ? children('partner_contracts', $p['id']) : [],
+        'pos' => $pFull ? children('partner_purchase_orders', $p['id']) : [],
         'rels' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT r.*, b.legal_name rn, b.display_name rd, b.id rid FROM partner_relationships r LEFT JOIN business_partners b ON b.id=r.related_id WHERE r.partner_id=?"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
         'all_partners' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT id, legal_name, display_name FROM business_partners WHERE id <> ? ORDER BY legal_name"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
         'cityList' => array_values(array_filter(array_column($pdo->query("SELECT DISTINCT city FROM partner_addresses WHERE city <> '' ORDER BY city")->fetchAll(), 'city'))),
+        // The work orders on this record follow the SAME two-office rule the
+        // register does: the office that sold the work and the office that carries
+        // it out both see it, nobody else. Listing every work order here was the
+        // way a branch could read another branch's whole workload off a client it
+        // merely happened to reach.
         'linkedCalls' => (function() use ($pdo, $p) {
-            try { $s = $pdo->prepare("SELECT id, call_code, inspection_type, status, call_received_date, inspection_required_date FROM calls WHERE client_id=? OR vendor_id=? ORDER BY id DESC"); $s->execute([$p['id'], $p['id']]); return $s->fetchAll(); }
+            try {
+                $w = function_exists('call_office_clause')
+                   ? call_office_clause('executing_office_id', 'ibo_office_id')[0] : '1=1';
+                $s = $pdo->prepare("SELECT id, call_code, inspection_type, status, call_received_date, inspection_required_date
+                                    FROM calls WHERE (client_id=? OR vendor_id=?) AND $w ORDER BY id DESC");
+                $s->execute([$p['id'], $p['id']]);
+                return $s->fetchAll();
+            }
             catch (Throwable $e) { return []; }
         })(),
     ]);

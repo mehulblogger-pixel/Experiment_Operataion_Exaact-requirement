@@ -257,8 +257,15 @@ function ops_customer360($route, $method) {
     if ($route === 'customer-parent' && $method === 'POST') {
         ops_require(can('mod.clients.edit') || is_master_of('clients'), 'You cannot change customer records.');
         $pid = (int)($_POST['id'] ?? 0);
-        if (!c360_one("SELECT id FROM business_partners WHERE id=?", [$pid])) {
+        $pRow = c360_one("SELECT id, home_branch_id FROM business_partners WHERE id=?", [$pid]);
+        if (!$pRow) {
             flash('That customer no longer exists.', 'error'); redirect('/clients');
+        }
+        // The office boundary. Putting a client under a parent decides whose
+        // group — and therefore whose quotation history — it belongs to, so it is
+        // as much a change to the record as renaming it.
+        if (function_exists('partner_can_write') && !partner_can_write($pRow)) {
+            flash(partner_write_denied_msg($pRow), 'error'); redirect('/customer?id=' . $pid);
         }
         $parent = (int)($_POST['parent_id'] ?? 0);
         if ($parent === $pid) { flash('A company cannot be its own parent.', 'error'); redirect('/customer?id=' . $pid); }
