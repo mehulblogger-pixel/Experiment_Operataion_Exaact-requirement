@@ -5003,7 +5003,27 @@ function ops_calls($route, $method) {
         // §a.ix — the register has to answer "where is this call stuck?" without
         // opening it: which office is executing, what activity, what credit is
         // owed, whose desk it is on, who is doing it, when, and how late.
-        $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
+        //  THE CONTRACT NUMBER, RESOLVED — not the copy taken at the time.
+        //
+        //  calls.contract_number is filled when the work order is raised. A
+        //  contract number registered AFTERWARDS never reached that copy, so the
+        //  register went on showing 'contract no. pending' for a work order that
+        //  plainly had one — reported from the floor, on a job already allocated
+        //  to its engineer.
+        //
+        //  contract_number_for() has always resolved this properly (the job, then
+        //  the call, then the quotation behind it) and the register simply never
+        //  asked. This is that same order of preference expressed in SQL, so it
+        //  stays one query for the page rather than one per row.
+        $resolvedContract =
+            "COALESCE(NULLIF(c.contract_number,''),"
+          . " NULLIF((SELECT j4.contract_number FROM jobs j4"
+          . "          WHERE j4.call_id=c.id AND COALESCE(j4.contract_number,'')<>''"
+          . "          ORDER BY j4.id LIMIT 1),''),"
+          . " NULLIF((SELECT q4.contract_number FROM quotations q4 WHERE q4.id=c.quotation_id),''),"
+          . " '') resolved_contract_number";
+
+        $rows = ops_all("SELECT c.*, $resolvedContract, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
             eo.name exec_office_name, eo.coordinator_name exec_coordinator,
             io2.name ibo_office_name,
             cu.first_name coord_fname, cu.last_name coord_lname, cu.username coord_uname,

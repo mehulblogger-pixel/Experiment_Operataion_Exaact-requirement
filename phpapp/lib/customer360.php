@@ -284,6 +284,75 @@ function ops_customer360($route, $method) {
         redirect('/customer?id=' . $pid);
     }
 
+    // ------------------------------------------------------------------------
+    //  ADD A BRANCH / GSTIN OF THIS CLIENT, OWNED BY MY OFFICE.
+    //
+    //  The case: Jindal is an Ahmedabad client. Jindal also has a Mumbai office,
+    //  and for a particular job Mumbai pays. Mumbai needs its OWN record — its
+    //  own GSTIN, its own quotations, its own contracts — without Ahmedabad
+    //  being able to read or edit it, and without inventing a second, unrelated
+    //  "Jindal" that nobody can tell apart from the first.
+    //
+    //  So: a child record under the same parent (one group, one customer in
+    //  reality) with its own billing branch. partner_group_ids_visible() then
+    //  keeps the two apart — each office sees its own, and neither sees the
+    //  other's quotations through the family tree.
+    // ------------------------------------------------------------------------
+    if ($route === 'customer' && $method === 'POST' && ($_POST['action'] ?? '') === 'add_branch_company') {
+        ops_require(can('mod.clients.edit') || is_master_of('clients'), 'You cannot change customer records.');
+        $pid = (int) ($_POST['id'] ?? 0);
+        $parent = c360_one("SELECT * FROM business_partners WHERE id=?", [$pid]);
+        if (!$parent) { flash('That customer no longer exists.', 'error'); redirect('/clients'); }
+
+        //  You cannot hang a branch off a client you are not allowed to open.
+        //  The page gate above is not enough on its own: this is a POST, and a
+        //  crafted one reaches here exactly as the form does.
+        if (function_exists('scope_allows') && !scope_allows((int) ($parent['home_branch_id'] ?? 0))) {
+            flash('That ' . (function_exists('Tl') ? Tl('client') : 'client') . ' belongs to another office.', 'error');
+            redirect('/clients');
+        }
+
+        $name = trim((string) ($_POST['legal_name'] ?? ''));
+        if ($name === '') { flash('Give the branch company its registered name.', 'error'); redirect('/customer?id=' . $pid); }
+        $gstin = strtoupper(trim((string) ($_POST['gstin'] ?? '')));
+        if ($gstin !== '' && !preg_match('~^[0-9A-Z]{15}$~', $gstin)) {
+            flash('A GSTIN is 15 characters — check it, or leave it blank and add it later.', 'error');
+            redirect('/customer?id=' . $pid);
+        }
+        //  The same GSTIN twice is the same legal entity twice. That is the
+        //  duplicate this feature could most easily create, so it is refused by
+        //  name rather than left for somebody to discover at invoice time.
+        if ($gstin !== '') {
+            $dup = c360_one("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) nm FROM business_partners WHERE UPPER(COALESCE(gstin,''))=? LIMIT 1", [$gstin]);
+            if ($dup) { flash('GSTIN ' . $gstin . ' is already on ' . $dup['nm'] . '.', 'error'); redirect('/customer?id=' . $pid); }
+        }
+
+        $br = (int) ($_POST['home_branch_id'] ?? 0);
+        if (!$br) { flash('Pick the office this branch company belongs to.', 'error'); redirect('/customer?id=' . $pid); }
+        if (!c360_one("SELECT id FROM offices WHERE id=? AND is_active=1", [$br])) { flash('Pick an active branch.', 'error'); redirect('/customer?id=' . $pid); }
+        //  …and only an office you yourself work in, unless you see them all.
+        if (function_exists('scope_allows') && !scope_allows($br)) {
+            flash('You can only create a branch company for an office you work in.', 'error');
+            redirect('/customer?id=' . $pid);
+        }
+
+        //  The GROUP ROOT is the parent, not the record you happened to open, so
+        //  a branch of a branch still lands in one family rather than a chain.
+        $root = (int) ($parent['parent_id'] ?? 0) ?: (int) $parent['id'];
+        $code = function_exists('ops_next_code') ? ops_next_code('business_partners', 'code', 'C') : ('C' . time());
+        db()->prepare("INSERT INTO business_partners (code, legal_name, display_name, parent_id, home_branch_id, gstin, is_client, is_vendor, status, created_at)
+                       VALUES (?,?,?,?,?,?,1,0,'ACTIVE',?)")
+            ->execute([$code, $name, trim((string) ($_POST['display_name'] ?? '')) ?: $name, $root, $br, $gstin, date('c')]);
+        $newId = (int) db()->lastInsertId();
+        if (function_exists('act_log')) {
+            act_log('PARTNER', $newId, 'SYSTEM', 'Created as a branch company of ' . ($parent['display_name'] ?: $parent['legal_name']) . '.', ['auto' => 1]);
+            act_log('PARTNER', $pid, 'SYSTEM', 'Branch company ' . $name . ' added under this client.', ['auto' => 1]);
+        }
+        $offName = (string) (c360_one("SELECT name FROM offices WHERE id=?", [$br])['name'] ?? '');
+        flash($name . ' created under this client and owned by ' . $offName . '. Only ' . $offName . ' can see or edit it.');
+        redirect('/customer?id=' . $newId);
+    }
+
     // Set this client's billing branch — the office every new invoice for them is
     // raised from, so nobody hits "No branch is set". Additive; clearing is allowed.
     if ($route === 'customer' && $method === 'POST' && ($_POST['action'] ?? '') === 'set_branch') {

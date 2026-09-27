@@ -73,6 +73,17 @@ function ops_nav_index($fresh = false) {
     if (!$isInsp && ($can('mod.calls.view') || $can('mod.jobs.view') || $can('mod.vouchers.view') || $can('mod.hiring.view') || $can('mod.reconcile.view'))) {
         $A = 'Operations';
         $add('Operations', '/operations', $A, '🛠️', 'The operations landing.');
+        //  WHO THE WORK IS FOR, beside the work itself.
+        //
+        //  The client and vendor registers live in the Directory area, and that
+        //  is where they are MAINTAINED. But a coordinator raising a work order
+        //  needs to look a client up constantly, and reported not being able to
+        //  reach them from Operations at all — they were behind a tile called
+        //  "Directory", which does not say what is inside it. The register is one
+        //  screen; which areas point AT it is a navigation question, and the
+        //  answer is "every area whose users need it".
+        if ($can('mod.clients.view')) $add($thp('client'), '/clients', $A, '🏢', 'Who the work is for.');
+        if ($can('mod.vendors.view')) $add($thp('vendor'), '/vendors', $A, '🚚', 'Who the work is subcontracted to.');
         if ($can('mod.calls.view')) $add($thp('call'), '/calls', $A, '📋', 'Work orders from the client.');
         if ($can('mod.calls.edit') || $can('mod.calls.view')) $add($tnew('call'), '/call-new', $A, '➕', 'Raise a new work order.', 'action');
         if ($can('mod.jobs.view'))  $add($thp('job'), '/jobs', $A, '🗂️', 'Allocation, execution & closure.');

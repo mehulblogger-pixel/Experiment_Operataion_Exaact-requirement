@@ -828,18 +828,59 @@ function partner_group_ids($pid) {
     } catch (Throwable $e) { return [$pid]; }
 }
 
+/**
+ * The group, filtered to the companies THIS office is allowed to see.
+ *
+ * partner_group_ids() walks the whole family — parent, children, grandchildren —
+ * because that is what a group IS. But a group is not a permission: a client can
+ * hold a branch record owned by another office, and one office must not read
+ * another's commercials through the family tree.
+ *
+ * The worked example this exists for: Jindal is an Ahmedabad client, and Jindal
+ * Mumbai is a branch of it owned by the Mumbai office, because Mumbai pays for
+ * that work. Ahmedabad may see its own Jindal. It may NOT see Mumbai's — not the
+ * record, not its quotations, not its contracts — even though the two are one
+ * group. Before this, the group walk showed Mumbai's quotations to Ahmedabad.
+ *
+ * A record with no office set stays visible to everyone: unassigned is not
+ * secret, and silently hiding legacy clients would be its own bug.
+ */
+function partner_group_ids_visible($pid) {
+    $ids = partner_group_ids($pid);
+    if (!$ids) return [];
+    if (!function_exists('scope_offices')) return $ids;
+    $off = scope_offices();
+    if ($off === 'ALL' || !is_array($off) || !$off) return $ids;   // sees everything anyway
+    try {
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $w  = function_exists('partner_office_sql') ? partner_office_sql('home_branch_id') : '1=1';
+        $rows = ops_all("SELECT id FROM business_partners WHERE id IN ($in) AND $w", $ids);
+        $vis = array_map(fn($r) => (int) $r['id'], $rows ?: []);
+    } catch (Throwable $e) { return $ids; }
+    //  The record actually being looked at stays in the list even if its office
+    //  says otherwise — whoever opened it already passed the check on that page,
+    //  and dropping it here would blank the screen rather than protect anything.
+    $pid = (int) $pid;
+    if ($pid && !in_array($pid, $vis, true)) $vis[] = $pid;
+    return $vis;
+}
+
 // Every current quotation across that group. is_current only, so it is one row
 // per quotation and not one per revision. Newest first.
 function quotes_for_group($pid, $excludeQuoteId = 0) {
-    $ids = partner_group_ids($pid);
+    //  Two filters, and both are needed. The GROUP filter stops another office's
+    //  company appearing in the family at all; the QUOTATION filter stops a quote
+    //  raised by another office appearing under a company we can both see.
+    $ids = function_exists('partner_group_ids_visible') ? partner_group_ids_visible($pid) : partner_group_ids($pid);
     if (!$ids) return [];
     try {
         $in = implode(',', array_fill(0, count($ids), '?'));
         $args = $ids;
+        $qw = function_exists('scope_office_clause') ? scope_office_clause('q.office_id')[0] : '1=1';
         $sql = "SELECT q.id, q.quote_no, q.rev, q.status, q.total_amount, q.created_at, q.subject, q.client_id,
                        bp.display_name, bp.legal_name
                 FROM quotations q LEFT JOIN business_partners bp ON bp.id = q.client_id
-                WHERE q.client_id IN ($in) AND q.is_current=1";
+                WHERE q.client_id IN ($in) AND q.is_current=1 AND $qw";
         if ($excludeQuoteId) { $sql .= " AND q.id<>?"; $args[] = (int)$excludeQuoteId; }
         $sql .= " ORDER BY q.id DESC LIMIT 50";
         return ops_all($sql, $args);
@@ -885,8 +926,13 @@ function crm_add_group_contract($quoteId, $partnerId, array $b = []) {
     if (empty($q['contract_id'])) return ['err' => 'Register the main contract first, then add group-company contracts under it.'];
     $partnerId = (int)$partnerId;
     if (!$partnerId) return ['err' => 'Pick the group company the contract is for.'];
-    $group = array_map('intval', partner_group_ids((int)($q['client_id'] ?? 0)));
-    if (!in_array($partnerId, $group, true)) return ['err' => 'That company is not in this client’s group. Link it as a subsidiary / related company on the client record first.'];
+    //  Visible group only: a contract cannot be registered against a group company
+    //  belonging to another office, which would put that office's commercials on
+    //  a record they cannot even open.
+    $group = array_map('intval', function_exists('partner_group_ids_visible')
+        ? partner_group_ids_visible((int)($q['client_id'] ?? 0))
+        : partner_group_ids((int)($q['client_id'] ?? 0)));
+    if (!in_array($partnerId, $group, true)) return ['err' => 'That company is not in this client’s group, or it belongs to another office. Link it as a subsidiary / related company on the client record first.'];
     $branchId = (int)($b['branch_id'] ?? 0) ?: (($q['office_id'] ?? null) ?: null);
     $no = trim((string)($b['contract_number'] ?? ''));
     if (!empty($b['auto_contract']) || $no === '') $no = function_exists('gen_contract_number') ? gen_contract_number($branchId) : $no;

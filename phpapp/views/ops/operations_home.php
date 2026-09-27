@@ -77,6 +77,13 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   <div class="row-actions">
     <?php if (can('mod.calls.edit') || can('mod.calls.view')): ?><a class="btn primary" href="/call-new">＋ <?= e(ucfirst(T_NEW('call'))) ?></a><?php endif; ?>
     <?php if (function_exists('sched_board_can') && sched_board_can()): ?><a class="btn secondary" href="/schedule">Scheduling board</a><?php endif; ?>
+    <?php //  WHO THE WORK IS FOR. Reported as missing from Operations entirely —
+          //  and it effectively was: the registers sat behind a tile called
+          //  "Directory", which does not say what is inside it. They are still
+          //  maintained in the Directory area; these are doors, not a second
+          //  copy, and they respect the same office scope as everything else. ?>
+    <?php if (can('mod.clients.view')): ?><a class="btn secondary" href="/clients">🏢 <?= e(function_exists('THP') ? THP('client') : 'Clients') ?></a><?php endif; ?>
+    <?php if (can('mod.vendors.view')): ?><a class="btn secondary" href="/vendors">🚚 <?= e(function_exists('THP') ? THP('vendor') : 'Vendors') ?></a><?php endif; ?>
   </div>
 </div>
 

@@ -148,6 +148,47 @@
       </select></div>
     <button class="btn small">Save branch</button>
   </form>
+
+  <?php // ---------------------------------------------------------------------
+        //  A BRANCH OF THIS CLIENT, OWNED BY ANOTHER OFFICE.
+        //
+        //  Jindal is an Ahmedabad client with a Mumbai office that pays for its
+        //  own work. Mumbai needs its own record and its own GSTIN — inside the
+        //  same client group, so reporting still sees one customer — but visible
+        //  and editable only to Mumbai. Creating a second, unrelated "Jindal"
+        //  would lose the relationship and nobody could tell the two apart.
+        $bcOffices = ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name") ?: [];
+        if (function_exists('scope_offices')) {
+            $bcScope = scope_offices();
+            if ($bcScope !== 'ALL' && is_array($bcScope) && $bcScope)
+                $bcOffices = array_values(array_filter($bcOffices, fn($o) => in_array((int) $o['id'], array_map('intval', $bcScope), true)));
+        }
+        if ($bcOffices): ?>
+  <details style="margin-top:14px">
+    <summary style="cursor:pointer;font-weight:600;font-size:13px">➕ Add a branch / GSTIN of this client for another office</summary>
+    <p class="muted" style="font-size:12px;margin:6px 0 8px">
+      Use this when the same customer has an office that orders and pays separately —
+      a different GSTIN, its own quotations and its own contracts. It stays inside this
+      client's group for reporting, but <strong>only the office you choose can see or edit it</strong>.
+    </p>
+    <form method="post" action="/customer?id=<?= (int)$p['id'] ?>" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <input type="hidden" name="action" value="add_branch_company">
+      <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+      <div class="ff" style="min-width:230px;margin:0"><label>Registered name *</label>
+        <input class="form-control" name="legal_name" required placeholder="e.g. Jindal Steel &amp; Power Ltd — Mumbai"></div>
+      <div class="ff" style="min-width:160px;margin:0"><label>Short name</label>
+        <input class="form-control" name="display_name" placeholder="Jindal Mumbai"></div>
+      <div class="ff" style="min-width:170px;margin:0"><label>GSTIN</label>
+        <input class="form-control" name="gstin" maxlength="15" style="text-transform:uppercase" placeholder="27AAAAA0000A1Z5"></div>
+      <div class="ff" style="min-width:180px;margin:0"><label>Owned by office *</label>
+        <select class="form-control" name="home_branch_id" required>
+          <option value="">— pick an office —</option>
+          <?php foreach ($bcOffices as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['name']) ?></option><?php endforeach; ?>
+        </select></div>
+      <button class="btn">Create branch company</button>
+    </form>
+  </details>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 

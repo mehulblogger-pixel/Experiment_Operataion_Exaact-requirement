@@ -75,8 +75,13 @@
         <td><a href="/call?id=<?= (int)$c['id'] ?>"><b><?= e($c['call_code']) ?></b></a>
             <?php if (!empty($c['folder_link'])): ?><a href="<?= e($c['folder_link']) ?>" target="_blank" rel="noopener" title="Shared folder">🔗</a><?php endif; ?></td>
         <td><?= e($c['client_disp'] ?: $c['client_name'] ?: '—') ?>
-            <?php if (!empty($c['contract_number'])): ?>
-              <div class="muted" style="font-size:11px"><?= e($c['contract_number']) ?></div>
+            <?php //  Read the RESOLVED number, falling back to the row's own copy
+                  //  for any caller that has not been updated to select it. A work
+                  //  order whose contract number was registered after it was raised
+                  //  used to read 'pending' for ever.
+                  $cNum = trim((string) ($c['resolved_contract_number'] ?? $c['contract_number'] ?? '')); ?>
+            <?php if ($cNum !== ''): ?>
+              <div class="muted" style="font-size:11px"><?= e($cNum) ?></div>
             <?php else: ?>
               <?php // Visible in the register too, so a coordinator scanning the
                     // list can see which orders still have paperwork outstanding. ?>
