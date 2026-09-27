@@ -14,6 +14,12 @@ claim about a permission carries a `file:line` reference so you can verify it.
 > interaction law, but grants no permissions: the matrix and lifecycles above still
 > bind.
 
+> **Working on recruitment?** `recruitment/RECRUITMENT-MODULE.md` is the single
+> living reference for that module — who can use it, the journey, what is
+> configurable, the real state of approvals, known gaps and the decisions still
+> open. It is edited in place (each section has a permanent ID) and changes in
+> the same commit as the module.
+
 All file references are relative to the `phpapp/` folder unless stated otherwise.
 
 ## What the app is (in one paragraph)
