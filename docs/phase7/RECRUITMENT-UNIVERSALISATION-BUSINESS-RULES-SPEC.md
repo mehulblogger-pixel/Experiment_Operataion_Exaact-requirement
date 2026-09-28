@@ -3712,7 +3712,7 @@ section is present and complete.
 
 **Consequence:** because options B and C were not taken, **no offer-to-requirement-version link is required** for this control.
 
-**Closes:** B5, C37. **Integrated into:** Section 7 ("Hired" is configurable) and Section 19 (rule 13; *DECIDED (A2)*).
+**Closes:** B5. **C37 remains OPEN** — A2 decides which requirement **version** a candidate stays attached to; it does **not** decide the **visibility** question, which stands unanswered at §15(C). **Integrated into:** Section 7 ("Hired" is configurable) and Section 19 (rule 13; *DECIDED (A2)*).
 
 ## A3 — Offer approval and Candidate Hiring approval
 
