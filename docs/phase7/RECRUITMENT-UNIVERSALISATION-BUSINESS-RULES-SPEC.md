@@ -2896,6 +2896,16 @@ verified in source during this exercise.
 | **REVIEW REQUIRED on a candidate (D7-CAND, Q14, Q16)** | **Nothing comparable exists.** Pipeline movement is a single controlled path to gate on (D1); interviews and scorecards are already separate records, so Q15 holds | **EXTEND.** A new review state on an existing controlled path — not a new engine. |
 | **Candidate Hiring approval event (D5, Q1)** | Rule table's `entity` is free text; `APPR_ENTITIES` is the constant that gates accepted values | **EXTEND.** A fifth value on an existing engine. |
 | **Findability of previously rejected candidates (F2)** | Candidate register already filters by stage (audit S2); candidates already attach to requisitions | **REUSE.** No new data; no rejection-reason field required. |
+| **Pending-change execution levels (A5)** | `REXEC_ACTIONS` — `ADVANCE` · `INTERVIEW` · `OFFER` · `JOIN`, enforced at 23 call sites with refusal messages; `hreq_to_requisition()` gates raising a requisition | **REUSE.** The gate consults a configured level instead of a fixed block list. No new gate, no new enforcement point. |
+| **Candidate review evidence (A1)** | The weighted match engine in `lib/recruit.php` — seven factors, per-factor verdicts, whose own header states *"Nothing here writes data or makes a decision on its own"* | **REUSE.** Used as decision support only; it may never clear, reject or gate. No new matching engine. |
+| **Recruitment scope for a candidate (A7)** | `scope_clause()` / `scope_office_clause()`; `candidates.requisition_id`; requisition `office_id` + `sbu` | **REUSE.** Scope derived by join. **No column on `candidates`, no migration.** |
+| **Availability after rejection (C36)** | `lib/candpool.php` person convergence with confidence thresholds | **REUSE.** Availability computed per person across rows. |
+| **Weakening control (A8)** | `hreq_approved_qty()` already compares against the **approved snapshot**, not the current value | **REUSE the pattern**, extended from quantity to the eligibility minimums. |
+| **Budget materiality (C45 / C9)** | `hreq_commitment()` already computes per-person × quantity × periods + one-time, and already reaches the approval engine under its own context key | **REUSE.** Only the threshold and its materiality are new; routing by value stays a separate, explicit choice. |
+| **Role profiles + override (A4 / B4)** | `custom_roles` base-role mechanism, the access editor, `data.salary`, Configurable Role Workspaces | **REUSE + EXTEND narrowly.** Two permission capabilities added; **no per-user layer, no permission-model rewrite.** See §16. |
+| **Proposal lifecycle (G2)** | The version chain (see the row above); `reapproval_state` is single-valued, which is what one-pending-per-record already implies | **EXTEND.** Refused and withdrawn proposals retained; no nested revision history. |
+| **Closed / not-proceeding stage kind (C43)** | `RPIPE_STAGE_KINDS` = `step · gate · interview · offer · terminal`, where **`terminal` means hired** — there is **no closed kind**, so every loss lives in the legacy field | **EXTEND the existing vocabulary.** One further kind on an engine that already exists — **but a prerequisite for D1, not an optional extra** (see §2, D1 status). |
+| **One Recruitment home (C21)** | `/recruitment` is already an entry point — *"index.php can hand a recruitment-only company straight to the command centre BEFORE ops_dispatch()"*; `/recruitment-cc` holds funnel and KPIs | **CONNECT / MAP.** Funnel and KPI summaries surfaced on the home; the board **retained**, renamed through the terminology engine. Nothing deleted. |
 
 ## The highest-coupling component
 
@@ -2942,12 +2952,22 @@ is a new engine.
 
 | Verdict | Count | Meaning |
 |---|---|---|
-| REUSE, unchanged | 22 | Exists and serves the requirement as-is — now including the material-change approval route (F1) and rejected-candidate findability (F2) |
-| REUSE + adjust or reconcile | 2 | The mechanism exists; a list or a predicate needs settling — the material-change field list (D7), and `is_coordinator_level()` vs `mod.hiring.*` (D3/D4) |
-| EXTEND | 6 | Exists; needs widening — hiring-request fields (D2), inheritance (Section 6), offer audit (D6), the version chain (D7), REVIEW REQUIRED (Section 19), the Candidate Hiring event (Q1) |
-| CONNECT / MAP | 1 | Two landings to be related (D8) |
+| REUSE, unchanged | 28 | Exists and serves the requirement as-is — now including the execution-gate levels (A5), the match engine as evidence (A1), derived scope (A7), availability (C36), the weakening comparison (A8) and the commitment calculation (C45/C9) |
+| REUSE + adjust or reconcile | 3 | The mechanism exists; a list or a predicate needs settling — the material-change field list (D7/A6), `is_coordinator_level()` vs `mod.hiring.*` (D3/D4/C19), and role profiles plus the two narrow capabilities (A4/B4) |
+| EXTEND | 8 | Exists; needs widening — hiring-request fields (D2), inheritance (§6), offer audit (D6), the version chain on **both** records (D7/A6), REVIEW REQUIRED (§19), the Candidate Hiring event (Q1/A3), the proposal lifecycle (G2), and the **closed stage kind** (C43) |
+| CONNECT / MAP | 2 | Two landings related, and the funnel/KPI surfacing (D8 / C21) |
 | **BUILD NEW** | **0** | **Nothing in this specification requires a new engine.** |
-| **Total** | **31** | |
+| **Total** | **41** | |
+
+**The zero still holds, and it was tested hardest by C43.** A closed stage kind is the
+only thing in this specification that does not already exist in some form — and it is
+**one further value in an existing kind vocabulary on an existing pipeline engine**, not
+a new engine. It is nonetheless a **prerequisite** for D1's authority rather than an
+enhancement, and the deferred legacy migration (C15–C18) inherits that dependency.
+
+**REUSE → EXTEND → CONNECT → MAP → MIGRATE → DEPRECATE → BUILD** remains the ordered
+preference, and this map is read in that order: reuse what exists, extend before
+connecting, and **build only when nothing else serves.** Nothing has reached BUILD.
 
 **The zero has survived every addition.** Three issues, thirty-five decisions and
 two rules locked in consistency review later, the material-change versioning model,
@@ -2965,100 +2985,176 @@ business decisions, and not one of them requires a new engine.
 Everything still requiring a business or technical decision. **Nothing in this
 list may be decided in code.**
 
-## A. Resolved by the D1–D9 / Q1–Q25 decisions — no longer open
+## A. Resolved — open question → decision → governing rule and section
 
-These were recorded as open in the first issue of this specification. The
-decisions have closed them, and they are listed here so nobody reopens them.
+Every item here was once open. Nothing is deleted: each row records the question as
+it was asked, the decision that closed it, and where the governing rule now lives.
 
-| Was | Now closed by | Resolution |
-|---|---|---|
-| **C1** — what "Candidate Hiring" means as an approval event | **Q1** | Configurable per organisation: none, its own approval, Offer approval serving as it, both, or different sequences |
-| **C2** — does the material list add to or replace the existing twelve? | **D7, Q4** | **Additions, not replacements.** Existing controls are retained |
-| **C5** — where does "active recruitment process" begin? | **D3, Q2** | Configurable by organisation / pipeline; no separate hard-coded active-status engine |
-| **C6** — is Requisition approval off or unstated? | **D5, Q24** | Approval-capable and configurable per organisation. The earlier inferred "No" was wrong |
-| **C10** — should materiality become configurable per organisation? | **Q4** | Yes |
-| **C4** (partly) — EXAACT's own approval chains | **Q22** | No longer blocking: absence of a rule means no approval. Chains remain configuration, supplied per organisation |
-| **C3** (partly) — the role × action matrix | **Q23** | Delivered as a predefined role profile plus administrator override, not as a fixed matrix |
-| **C8** (partly) — is budget a material control? | **D7** | Yes, budget must be available as a material-change control. The threshold question remains open as **C45** |
-| **F1** — does Q22 disable the material-change control when no rule is configured? | **Owner decision, Task 3 review** | No. Material-change approval **inherits** the underlying requirement's rule; a separate chain takes precedence; matched on the **proposed changed values**; no approval only where neither requires it. Section 10 |
-| **F2** — are previously rejected candidates reconsidered when a requirement is relaxed? | **Owner decision, Task 3 review** | No automatic reconsideration. The rejection stands; the candidate remains **findable** for deliberate human reconsideration. Section 19 |
-| **F3** — D1's single-source rule vs Q21's configurable "Hired" | **Owner confirmation** | The pipeline remains the source of lifecycle *position*; offer and workforce records remain the source of those *events*; terminal stage kinds map to the configured Hired point. Section 2 (D1) |
+### A.1 — Closed by the D1–D9 / Q1–Q25 decisions
 
-## B. Blocking — an implementation plan cannot be written without these
-
-| # | Item | Decision | Why it blocks |
+| Was open | Closed by | Resolution | Governing section |
 |---|---|---|---|
-| **B1** | **Who judges that a candidate "no longer appears to satisfy" the latest approved version** — an automatic comparison of eligibility fields, or human judgement? | Section 19, Q14 | It is the trigger for the entire review flow. An automatic check additionally cannot exist until D2 adds the three missing fields |
-| **B2** | **What a brand-new organisation starts with** under Q22 — approval on or off by default | D5, Q22, **F1** | Implemented literally, EXAACT today (0 rules) would move every hiring request to self-approving. **Since F1 makes material-change approval inherit from the requirement, this one decision now also governs whether material changes need approval** — one decision, two effects. See Section 8 |
-| **B3** | **Does versioning apply to the Hiring Request only, or to the Requisition as well?** | D7, Q24 | Determines the scope of the whole versioning model |
-| **B4** | The **contents of each predefined role profile** — what a Recruiter, Hiring Manager and Department Head may do by default | D4, Q23 | Defaults ship with the product; they cannot be guessed |
-| **B5** | **Do candidates already at offer, accepted or hired stage move to a new approved version?** | Q13, Q16 | Q16 requires review before progressing, but a hired person has nowhere to progress |
+| **C1** — what "Candidate Hiring" means as an approval event | **Q1** | Configurable per organisation: none, its own approval, Offer approval serving as it, both, or different sequences | §8 |
+| **C2** — does the material list add to or replace the existing twelve? | **D7, Q4** | **Additions, not replacements.** Existing controls retained | §10 |
+| **C5** — where does "active recruitment process" begin? | **D3, Q2** | Configurable per organisation / pipeline; derived from stage kinds, no separate engine | §7 |
+| **C6** — is Requisition approval off or unstated? | **D5, Q24** | Approval-capable and configurable. The earlier inferred "No" was wrong | §8 |
+| **C10** — should materiality be configurable per organisation? | **Q4** | Yes | §10 |
+| **C3** (part) — the role × action matrix | **Q23** | Delivered as a role profile plus administrator override, not a fixed matrix | §7 |
+| **C4** (part) — EXAACT's own approval chains | **Q22** | No longer blocking: absence of a rule means no approval; chains are per-organisation configuration | §8 |
+| **C8** (part) — is budget a material control? | **D7** | Yes. The threshold question became **C45**, now closed at A.2 | §10 |
 
-## C. Required before the relevant decision is built
+### A.2 — Closed by the sixteen rules locked in review (F1–F3, A1–A8, B2, B4, C45/C9, C36/C43, G2, C21)
+
+| Was open | Closed by | Resolution | Governing section |
+|---|---|---|---|
+| **B1** — who judges that a candidate no longer satisfies the latest version? | **A1** | **All** active candidates enter Review Required. The existing match engine is decision-support evidence only and may never clear, reject or gate. A1 does **not** wait on D2 | §2 (D7-CAND), §19 |
+| **B2** — what a brand-new organisation starts with, and requests already SUBMITTED | **B2** *(locked)* | Approval **required** by default; "no rule configured" ≠ "approval off"; a configuration change applies to requests raised **after** it | §2 (D5), §8 |
+| **B3** — does versioning apply to the Requisition as well? | **A6** | **Both** records are versioned, one mechanism, **separate** material-field lists | §2 (D7), §10 |
+| **B4** — the contents of each role profile | **B4** *(locked)* | Three shipped profiles tabled in full; two permission capabilities required as a **narrow** supersession | §2 (D4), §7, §16 |
+| **B5** — do offered / accepted / joined candidates move to a new version? | **A2** | A new version reaches candidates only until an offer is **issued**; the boundary is fixed and **not** derived from Q21 | §2 (D7-CAND), §19 |
+| **C7** — enforcement posture when a requisition would weaken the approved requirement | **A8** | Routed through the material-change process; judged against the **approved minimum**, never the previous value | §2 (D2), §10 |
+| **C9** — are budget decreases material? | **C9** *(locked)* | **No.** An increase spends authority nobody granted; a decrease stays inside the approval | §10 |
+| **C11** — does the same material matrix apply to requisition changes? | **A6** | Same **mechanism**, different **contents** per entity | §10 |
+| **C20** — do candidates acquire an office dimension? | **A7** | **No.** Scope is derived from the requirement. No new column, no backfill of 935 rows | §2 (D3), §7 |
+| **C21** — which landing becomes the one home? | **C21** *(locked)* | `/recruitment`. `/recruitment-cc` and the analytics engine **retained**; naming via the terminology engine | §11 |
+| **C23** — confirmation of the D8 reading | **C21** *(locked)* | **Confirmed**: general Home remains the landing page; one recruitment home, one click away | §2 (D8), §11 |
+| **C36** — on Reject, does the candidate return to the pool or stay closed? | **C36** *(locked)* | The row stays closed; **no "return to pool" transition**; availability evaluated **per person** across rows | §2 (D3), §7, §19 |
+| **C38** — can Offer and Candidate Hiring approval both fire, and in what order? | **A3** | Both, **in a fixed order** set by the lifecycle. A refused hiring approval blocks conversion without rejecting the candidate | §2 (D5), §8 |
+| **C39** — does administrator override apply per user, per role, or both? | **A4** | **Per role only.** A shipped profile is a **default, not a floor** | §2 (D4), §7 |
+| **C43** — does a Reject write a terminal stage, and which? | **C43** *(locked)* | The configured **closed / not-proceeding** stage, by **kind** never name; fails safe as a configuration problem; never the legacy field | §2 (D1, D7-CAND), §19 |
+| **C45** — does a threshold apply to budget changes? | **C45** *(locked)* | Total **commitment**, greater of a configured percentage or absolute amount; defaults 10% / ₹1,00,000 | §10 |
+| **G2-gap** — may a refused material change be amended and resubmitted? | **G2** *(locked)* | **No.** Closed permanently; a further attempt is a **new** proposal. One pending per record; withdrawal permitted with a reason | §10 |
+| **G1-gap** — Q6 said "configurable" with no option list | **A5** | Four graduated levels over the existing execution gate; **default level 2** | §2 (D7), §10 |
+| **G3-gap** — may an override *remove* a default right? | **A4** | **Yes** — a default, not a floor. Sensitive permissions always set deliberately | §7 |
+| **F3** — D1's single-source rule vs Q21's configurable "Hired" | **F3** *(confirmed)* | Pipeline is the source of lifecycle **position**; offer and workforce records the source of those **events**; terminal kinds map to the configured Hired point | §2 (D1) |
+
+### A.3 — Dependency chains created by these closures
+
+```
+C43 ──▶ D1 ──▶ C15–C18
+  the closed stage kind is a PREREQUISITE for D1's authority, so the deferred
+  legacy migration inherits the dependency: 933 candidates cannot be fully
+  represented while loss outcomes have nowhere to go.
+
+B4 ──▶ A4
+  two permission capabilities supersede "no new permission codes" TO THAT EXTENT
+  AND NO FURTHER. No per-user layer, no permission-model rewrite. See §16.
+
+F1 ──▶ material-change approval ──▶ B2
+  a material change inherits the requirement's rule, matched on the PROPOSED
+  values, so B2's starting state governs material-change approval too.
+
+G2 ──▶ A5
+  one pending proposal per record is what lets a single execution level resolve.
+
+A6 ──▶ A1 ──▶ A2
+  both records versioned; a new EFFECTIVE version triggers review; the review
+  reaches candidates only up to an issued offer.
+
+C21 ──▶ D8 ──▶ C22 (open)
+  the one home is decided; whether Role Workspaces are its per-role mechanism
+  is not.
+```
+
+## B. Blocking — **none remain**
+
+All five items that once blocked an implementation plan are closed. They are listed
+at A.2 with their resolutions; this subsection is retained rather than deleted so
+the record shows that the blocking set emptied rather than vanished.
+
+| Former blocker | Now closed by |
+|---|---|
+| B1 — the eligibility judge | **A1** |
+| B2 — the new-organisation default | **B2** *(locked)* |
+| B3 — versioning scope | **A6** |
+| B4 — role profile contents | **B4** *(locked)* |
+| B5 — version reach at offer / accepted / joined | **A2** |
+
+**No item in this specification is simultaneously open and decided.** Items that
+remain genuinely open are listed at C and D, and none of them has a locked rule.
+
+## C. Still open — required before the relevant area is built
+
+These have **no** locked rule. Nothing here may be decided in code.
 
 | # | Item | Decision |
 |---|---|---|
-| C7 | Enforcement posture when a requisition would weaken the approved requirement: block, warn, or route to material change | D2, D7 |
-| C45 | Whether a **threshold** applies to budget changes, and whether any increase is material or only one beyond a band (the unresolved remainder of C8) | D7 |
-| C9 | Whether budget **decreases** are material (the quantity precedent suggests not — an inference, not a decision) | D7 |
-| C11 | Whether the same material matrix applies to requisition changes as to hiring-request changes | D7, B3 |
 | C12 | Mapping the ten offer **business events** onto existing offer states | D6 |
 | C13 | Which audit mechanism carries offer events — `act_log`, the stage ledger, or both | D6 |
 | C14 | Whether downstream consumers read **current stage** or **stage history** | D1 |
-| C15 | The default **pipeline** the 933 legacy candidates map onto | D1 |
-| C16 | The legacy-stage → pipeline-stage **mapping table** | D1 |
-| C17 | Whether migration is **one-off** or **lazy on next touch** | D1 |
-| C18 | Whether **terminal** legacy candidates are migrated at all | D1 |
-| C19 | Reconciling **`is_coordinator_level()`** on candidate screens against `mod.hiring.*` | D4 |
-| C20 | Whether candidates acquire an **office dimension**, which "recruitment scope" may require | D3, D4 |
-| C21 | Which of the two **landings** becomes the one home, and what happens to the other | D8 |
-| C22 | Whether **role workspaces** are the mechanism for per-role landing within the one home | D8 |
-| C23 | Confirmation of the **D8 reading** adopted in Section 11 | D8 |
-| C24 | Whether "Hiring Managers" / "Department Heads" are the same roles as the Pack's "Recruitment manager" / "Department manager" | D4 |
-| C25 | The **candidate state machine** and its transition triggers, now that the active boundary is configurable | D3, Q2 |
-| C26 | Which business rules permit a candidate to **return to the available pool** | D3 |
-| **C36** | On **REJECT** from a Review Required, does the candidate return to the available company-wide pool or stay closed? | Section 19, Q19, Q20, D3 |
-| **C37** | Where "Hired" = **Offer Accepted**, what is the candidate's visibility between accepting and joining? | Q21, D3 |
-| **C38** | Can **Offer approval and Candidate Hiring approval both fire** for one candidate, and in what order? | Q1 |
-| **C39** | Does "**administrator override**" apply per user, per role, or both? | Q23 |
-| **C40** | Whether a **pending** material change is visible to recruiters, and how it is presented | D7, Q6 |
-| **C41** | Whether **rejected** proposed versions are visible to the proposer only, or to all authorised users | Q7 |
-| **C42** | Whether **supporting documents** on a material change reuse the existing document DMS | Q11 |
-| **C43** | Whether a **REJECT** from review writes a terminal pipeline stage, and which one | Section 19, D1 |
-| **C44** | Where the **mobile / desktop line** falls for borderline cases (conditional approvals, document-heavy reviews) | D9, Q25 |
+| **C15** | The default **pipeline** the 933 legacy candidates map onto | D1 — *and now dependent on C43* |
+| **C16** | The legacy-stage → pipeline-stage **mapping table** | D1 — *dependent on C43* |
+| **C17** | Whether migration is **one-off** or **lazy on next touch** | D1 — *dependent on C43* |
+| **C18** | Whether **terminal** legacy candidates are migrated at all | D1 — *dependent on C43* |
+| C19 | Reconciling **`is_coordinator_level()`** on candidate screens against `mod.hiring.*` | D4 — a prerequisite of A4, not a tidy-up |
+| C22 | Whether **Role Workspaces** are the mechanism for per-role landing within the one home | D8, C21 |
+| C24 | Whether "Hiring Manager" / "Department Head" are the Pack's "Recruitment manager" / "Department manager" | D4 |
+| C25 | The candidate **state machine** and its transition triggers, the active boundary now being configurable | D3, Q2 |
+| C26 | Which business rules permit a candidate to **return to the available pool** | D3, C36 |
+| C37 | Where "Hired" = **Offer Accepted**, the candidate's **visibility** between accepting and joining — A2 protects them from version changes but does not decide visibility | Q21, D3 |
+| C40 | How a **pending** material change is made visible to people still working — **A5 makes answering this necessary, not optional** | D7, A5 |
+| C41 | Whether **refused or withdrawn** proposals are visible to the proposer only, or to all authorised users | Q7, G2 |
+| C42 | Whether **supporting documents** on a proposal reuse the existing document DMS | Q11 |
+| C44 | Where the **mobile / desktop line** falls for borderline cases — notably whether an approval requiring attached documents must be completable on a phone | D9, Q25 |
+| **C46** | The **exact permission codes** for the two capabilities B4 requires, following the project's naming convention | B4, A4 |
+| **C47** | Whether the pipeline's **closed** stage kind is a single kind or a small family (rejected · withdrawn · declined), and the stage-kind vocabulary's final shape | C43, D1 |
 
 ## D. Not put to the owner as decisions at all
+
+Recorded so they are not lost. None has a locked rule, and none is an implementation
+clarification for this document.
 
 | # | Item | Note |
 |---|---|---|
 | C27 | **Which industries come first** | The Decision Pack asked. Unanswered. Nothing may be prioritised in code. |
-| C28 | `WF_TEAM_ROLES` configurability (FIELD / COORD / OFFICE) | The **second** of the two gaps recurring across industries. Never put to the owner. |
+| C28 | `WF_TEAM_ROLES` configurability (FIELD / COORD / OFFICE) | The **second** of the two gaps recurring across 11 of 13 industries. Never put to the owner. |
 | C29 | Healthcare **licence / registration validity** | A legal gate that does not exist as a concept. |
 | C30 | IT services **notice period** handling | Does not exist. |
 | C31 | Recruitment agency **client-submission states** | Does not exist as a pipeline concept. |
-| C32 | Whether `APPR_ENTITIES` becomes configurable | **Now effectively required** by D5 and Q1 — the constant is the gate on a fifth event. Still never put to the owner as a decision. |
-| C33 | **Recruitment model** as a configuration dimension (internal / client-facing / both) | Proposed in Section 5; no existing mechanism identified. |
-| C34 | Rate-limiting and abuse controls on the public `/careers` intake | Audit S5 — explicitly not examined in that pass. |
+| **C32** | Whether `APPR_ENTITIES` becomes configurable or is simply extended | **Now required, not optional.** A3 and Q1 add a fifth approvable event (Candidate Hiring), and the constant is the gate on accepted entity values. The *form* of the change is an implementation choice; that a change is needed is settled. |
+| C33 | **Recruitment model** as a configuration dimension (internal / client-facing / both) | Proposed in §5; no existing mechanism identified. |
+| C34 | Rate-limiting and abuse controls on the public `/careers` intake | Audit S5 — never examined. **This is a security item that exists today regardless of anything in this specification**, and does not belong in a recruitment backlog. |
 | C35 | Whether the absence of offer auditing was originally intentional | D6 answers the requirement; the history is unestablished. |
 
 ## E. Recorded disagreements between sources
 
-| # | Disagreement | Resolution |
-|---|---|---|
-| G1 | Decision numbering: owner's D1–D9 vs Decision Pack 1–9 differ in five places | Owner's numbering is authoritative. Mapping table at the top. |
-| G2 | D7 broadened Pack Decision 6 from *budget* to a *multi-field material matrix*, and now further to a versioning model | Business decision wins; broadening recorded. |
-| G3 | D3 is Model A **plus a condition**, the condition now configurable | Business decision wins; refinement recorded. |
-| G4 | D8's letter and the owner's prose admit two readings | Section 11 states the reading adopted; C23 asks for confirmation. |
-| G5 | Audit row counts: estimates gave pipelines 3 / stages 32; exact counts are **4** and **33** | Corrected. The load-bearing figures (935, 2, 0 rules) stand. |
-| G6 | Audit §8 open question — was the missing offer audit intentional? | **D6 supersedes it.** It is a gap and must be closed. |
-| **G7** | The first issue of this specification recorded **Requisition approval as not required** | **Reversed by D5 and Q24.** It was an inference from an omission, and it was wrong. |
-| **G8** | The first issue recorded **D9 as not a business decision** | **Reversed by D9 and Q25.** It is now both a decision and a verification requirement. |
-| **G9** | Live code **pauses recruitment outright** on a pending re-approval | **Q5 and Q6 supersede it.** Today's behaviour becomes one configurable option among several. Documented in Section 10, not changed. |
-| **G10** | Live code keeps **one** approved snapshot, not a version chain | **Q7 and Q12 supersede it.** A version history is required. Documented in Section 10, not changed. |
-| **G11** | Live code requires a **manual approval** when no rule matches and `approval_required` is 1 | **Q22 supersedes it.** Documented in Section 8 with its business consequence, not changed. |
+### An identifier collision, resolved
 
----
----
+The disagreement series was numbered **G1–G11**. The owner has since locked a decision
+named **G2** (the material-change proposal lifecycle), so `G2` meant two different
+things in one document — a disagreement about D7's broadening, and a binding rule.
+
+**Resolved by renaming this series to `DG1–DG11`** ("documented disagreement"). The
+locked decision identifiers — F1, F2, F3, A1–A8, B2, B4, C45, C9, C36, C43, **G2**,
+C21 — are unchanged and unambiguous. Former identifiers are shown so any earlier
+reference still resolves.
+
+| # | Was | Disagreement | Resolution |
+|---|---|---|---|
+| **DG1** | G1 | Decision numbering: owner's D1–D9 vs Decision Pack 1–9 differ in five places | Owner's numbering is authoritative. Mapping table at the top of this document. |
+| **DG2** | G2 | D7 broadened Pack Decision 6 from *budget* to a *multi-field material matrix*, and further to a versioning model | Business decision wins; broadening recorded. Now fully specified in §10. |
+| **DG3** | G3 | D3 is Model A **plus a condition**, the condition now configurable | Business decision wins; refinement recorded. Closed by Q2 and A7. |
+| **DG4** | G4 | D8's letter and the owner's prose admit two readings | **Closed.** C21 decides the destination and C23 is confirmed — §11. |
+| **DG5** | G5 | Audit row counts: estimates gave pipelines 3 / stages 32; exact counts are **4** and **33** | Corrected. The load-bearing figures (935, 2, 0 rules) came from exact counts and stand. |
+| **DG6** | G6 | Audit §8 open question — was the missing offer audit intentional? | **D6 supersedes it.** It is a gap and must be closed. |
+| **DG7** | G7 | Issue 1 recorded **Requisition approval as not required** | **Reversed by D5 and Q24.** An inference from an omission, and it was wrong. |
+| **DG8** | G8 | Issue 1 recorded **D9 as not a business decision** | **Reversed by D9 and Q25.** It is both a decision and a verification requirement. |
+| **DG9** | G9 | Live code **pauses recruitment outright** on a pending re-approval | **Superseded by Q5, Q6 and A5.** Today's behaviour becomes **level 1** of four configurable levels — §10. |
+| **DG10** | G10 | Live code keeps **one** approved snapshot, not a version chain | **Superseded by Q7, Q12, A6 and G2.** A version chain is required, for **both** records — §10. |
+| **DG11** | G11 | Live code requires a **manual approval** when no rule matches and `approval_required` is 1 | **Superseded by Q22 and B2.** "No rule configured" and "approval off" are distinct states; the condition surfaces as a configuration problem — §8. |
+| **DG12** | *(new)* | `G2` denoted both a disagreement and a locked decision | **Resolved by this renaming.** Disagreements are `DG*`; locked decisions keep their own identifiers. |
+
+### Two disagreements with the running system that remain live
+
+These are **not** contradictions in the specification — they are places where the
+locked rules require behaviour the code does not yet have. They are recorded here
+rather than as open questions, because the decision is settled and only the
+implementation is outstanding.
+
+| # | The specification requires | The code today |
+|---|---|---|
+| **DG9** | A configurable pending-change effect, four levels | One hard pause |
+| **DG10** | A version chain on **both** records, with refused and withdrawn proposals retained | One approved snapshot on the Hiring Request, and **no change control at all** on the Requisition |
 
 # Section 16 — Explicit Non-Goals
 
@@ -3091,6 +3187,27 @@ not authorise:
 - Database · schema · migrations · seed data
 - Routes · permissions · workflows · pipeline stages · terminology
 - Configuration · existing records
+
+**The one narrow exception, and its exact boundary**
+
+Section 16's prohibition on permission changes is superseded **only** to this extent:
+
+> **B4 permits two new permission capabilities** — one to *propose a material change*
+> (Q8) and one to *clear a Review Required* (Q17) — because both are locked as
+> role-model rights that a role must be able to hold **without** general recruitment
+> write, and the three permissions recruitment declares today cannot express that.
+
+**Everything else about permissions remains prohibited:**
+
+- **No per-user permission layer** — not now, and not under A4 at all.
+- **No blanket rewrite or redesign of the permission model.**
+- **No new salary permission** — the existing `data.salary` remains the control.
+- **No change to the existing access engine or `custom_roles`** beyond using them.
+- **No implementation of these codes is authorised by this document.** The exact
+  codes and their wiring are an implementation-planning matter (C46).
+
+**This is a two-capability exception inside an otherwise unchanged permission model.
+It is not a mandate to revisit permissions generally.**
 
 **Architectural changes explicitly prohibited**
 - **No separate recruitment engines** — not for TPIA, agency, corporate, IT, or
@@ -3137,7 +3254,7 @@ repository or the audit. Where no mechanism exists, the cell says so.
 
 | Decision | Business Requirement | Existing Mechanism | Future Change Needed | Status |
 |---|---|---|---|---|
-| **D1** | The configurable pipeline is the authoritative candidate lifecycle | `lib/recruitpipe.php` (L04) — built, tested, admin-configurable; stage ledger `candidate_events` via `rkpi_stage_log()`; 4 pipelines / 33 stages; **2 of 935 candidates adopted** | Reconciliation and migration later; consumers moved off legacy `stage`; partial sync retired | **DECIDED** |
+| **D1** | The configurable pipeline is the authoritative candidate lifecycle | `lib/recruitpipe.php` (L04) — built, tested, admin-configurable; stage ledger `candidate_events` via `rkpi_stage_log()`; 4 pipelines / 33 stages; **2 of 935 candidates adopted** | Reconciliation and migration later; consumers moved off legacy `stage`; partial sync retired. **Requires the `closed` stage kind (C43) before it is implementable, and C15–C18 inherit that dependency** | **DECIDED / DEPENDENCY** |
 | **D2** | Core requirement approved at Hiring Request; execution detail at Requisition; inherit, never weaken | `lib/hiringreq.php` holds 32 of the core fields incl. 4 budget estimate fields; `requisitions` holds the person-spec fields (`lib/recruit.php:57-58`); inheritance carries 17 fields (`lib/hiringreq.php:1242-1265`) | Add **three** concepts (qualification, experience, essential skills); widen inheritance to the latest approved version; define weaken-enforcement posture | **DECIDED** |
 | **D3** | Available pool company-wide; active candidates gated; **active definition configurable per organisation / pipeline** | Candidate register unscoped `$where='1=1'` (`lib/ops.php:6503`); **no office column on `candidates`**; office scope engine works for requisitions (`lib/ops.php:5840`); **no active-status concept exists** | Derive active state from pipeline stage kinds (Q2 — no separate engine); decide whether candidates gain an office dimension | **DECIDED / DETAIL PENDING** |
 | **D4** | Role defaults + configurable permissions + recruitment scope | `mod.hiring.view`, `mod.hiring.edit`, `hiring.admin` (`lib/access.php:156,198`); candidate screens gated by `is_coordinator_level()` (`lib/ops.php:6867`); Configurable Role Workspaces exist | Define role profiles with administrator override (Q23); reconcile the coordinator predicate; define recruitment scope | **DECIDED / DETAIL PENDING** |
@@ -3165,7 +3282,7 @@ repository or the audit. Where no mechanism exists, the cell says so.
 | **Q11** | D7 | Supporting documents optional | Document DMS exists (`lib/recruit_iv.php`) | Attach optionally to a proposed version | **DECIDED** |
 | **Q12** | D7 | Approved change creates a new approved version; previous preserved | **Nothing** for hiring requests; quotation revisions are the pattern | A version chain | **DECIDED** |
 | **Q13** | D7-CAND | Existing candidates move to the latest approved version | Candidates link to a requisition, **not to a version** | A version reference on the link | **DECIDED** |
-| **Q14** | D7-CAND | Candidate whose eligibility is in doubt is flagged, not rejected | **Nothing** | A review flag. **Needs B1 answered first** | **DECIDED / BLOCKED** |
+| **Q14** | D7-CAND | Candidate whose eligibility is in doubt is flagged, not rejected | **Nothing** | A review flag. **B1 is closed by A1**: all active candidates are flagged, and the existing match engine supplies evidence only | **DECIDED** |
 | **Q15** | D7-CAND | Previous assessments and interviews remain valid | Interviews and scorecards are separate records already | Confirm nothing invalidates them | **DECIDED** |
 | **Q16** | D7-CAND | Review must be resolved before the candidate progresses | Pipeline movement is a single controlled path | A gate on stage movement | **DECIDED** |
 | **Q17** | D7-CAND, D4 | Review permission follows role defaults + permission + scope | As D4 | A review right in the role profile | **DECIDED** |
@@ -3183,17 +3300,30 @@ repository or the audit. Where no mechanism exists, the cell says so.
 
 | Status | Meaning |
 |---|---|
-| **DECIDED** | The business decision is complete enough to write an implementation plan against, subject to Section 15(B). |
-| **DECIDED / DETAIL PENDING** | The direction is decided; specific rules, values, defaults or matrices are still required. |
-| **DECIDED / BLOCKED** | The rule is decided but cannot be built until a blocking question in Section 15(B) is answered. |
+| **DECIDED** | The business decision is complete enough to write an implementation plan against. **Section 15(B) is now empty, so nothing qualifies this status.** |
+| **DECIDED / DETAIL PENDING** | The direction is decided; specific values or mappings remain open at Section 15(C) — never a business decision, only a detail. |
+| **DECIDED / DEPENDENCY** | Decided, and implementable only after a named prerequisite exists. Used by **D1**, which depends on the **closed** stage kind (C43). Replaces *DECIDED / BLOCKED*, which described a blocking **question**; no blocking question remains. |
 | **DECIDED / VERIFICATION** | Decided, and additionally requires verification before any claim is made. |
+
+**Retired status.** *DECIDED / BLOCKED* is retired, not renamed in place: it meant
+"waiting on an unanswered business question", and since all five blocking questions are
+closed, no item can hold it. Where an item is decided but needs a **prerequisite built**
+rather than a question answered, it now reads **DECIDED / DEPENDENCY**. The convention
+itself is unchanged — a status still says how ready a decision is to build.
 
 ## What the statuses add up to
 
-Of the ten primary decisions, **two are clear to plan against** (D1, D2), **seven**
-carry pending detail, and **one** (D9) additionally requires verification. Of the
-twenty-five supporting decisions, **twenty-one are clear**, **two** carry pending
-detail, **one** (Q14) is blocked on B1, and **one** (Q25) requires verification.
+**As reconciled in Section 15, no item is both open and decided, and the blocking set
+is empty.** Of the ten primary decisions, **D2 is clear to plan against**, **D1 is
+decided with a named dependency** (the closed stage kind), **seven** carry pending
+detail at Section 15(C), and **D9** additionally requires verification. Of the
+twenty-five supporting decisions, **twenty-two are clear** — Q14 having been closed by
+A1 — **two** carry pending detail, and **one** (Q25) requires verification.
+
+**What "pending detail" now means.** Every remaining item at Section 15(C) is a value,
+a mapping or a reconciliation — **none is a business decision awaiting the owner**, and
+none of them has a locked rule contradicting it. The sixteen rules locked in review
+closed all five former blockers.
 
 **This is not drift.** The owner decided *direction* deliberately and left *values*
 — role profile contents, approval chains, thresholds, defaults — to be set once the
@@ -3202,8 +3332,8 @@ close before implementation planning begins.
 
 ## A note on what did NOT change
 
-Across three issues, thirty-five decisions and two rules locked in consistency
-review (F1, F2), the architectural answer has not moved:
+Across five issues, thirty-five decisions and **sixteen** rules locked in review and
+Part-B resolution, the architectural answer has not moved:
 **no new engine is required.** One approval engine, one pipeline engine, one KPI/SLA
 engine, one configuration model. The five configuration dimensions added by this
 issue all attach to mechanisms that already exist, and the versioning model D7 needs
