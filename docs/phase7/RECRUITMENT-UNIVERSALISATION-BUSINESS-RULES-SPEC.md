@@ -1560,11 +1560,92 @@ matrix as a long list of business decisions to be taken one cell at a time. Unde
 Q23 it becomes **a shipped default that an administrator can change** — so what is
 needed is a sensible starting profile per role, not a locked matrix.
 
-**UNDECIDED — DO NOT IMPLEMENT (B4): the contents of each profile.** Defaults ship
-with the product and cannot be guessed.
+### DECIDED (A4) — the override model
 
-**UNDECIDED (C39):** whether "administrator override" applies per user, per role,
-or both.
+**Per role, never per user.** An organisation needing different rights for an
+individual creates a **custom role with the appropriate base**, so every exception is
+named and reviewable in one place. A shipped profile is a **default, not a floor**: an
+administrator may both grant additional rights and **remove** rights the default
+includes. **Sensitive permissions — candidate salary visibility and equivalents — are
+never granted or removed as a side effect of a blanket action**; they are always set
+deliberately.
+
+**No per-user grant layer is introduced.** The existing `custom_roles` base-role
+mechanism and the existing access editor are reused.
+
+**Role profiles track their shipped base**; a shipped change that *adds* a sensitive
+permission does not propagate without deliberate administrator action.
+
+**Why per role and not per user.** Individual grants accumulate invisibly: nobody
+remembers why one person holds something, and *"who can see candidate salaries?"*
+stops having a findable answer because it is no longer in one place. A custom role
+names the exception instead of hiding it.
+
+### DECIDED (B4) — the shipped default profiles
+
+| Action | Recruiter | Hiring Manager | Department Head |
+|---|---|---|---|
+| View candidates in scope | ✔ | ✔ | ✔ |
+| Raise a Hiring Request | — | ✔ | ✔ |
+| Raise a Requisition from an approved request | ✔ | — | — |
+| Create / edit candidate | ✔ | — | — |
+| Move candidate stage | ✔ | — | — |
+| Shortlist | ✔ | ✔ | — |
+| Reject | ✔ | ✔ | — |
+| Schedule an interview | ✔ | — | — |
+| Record interview outcome / scorecard | ✔ | ✔ | — |
+| Offer create / revise / send | ✔ | — | — |
+| Convert candidate to workforce | ✔ | — | — |
+| **Propose a material change** (Q8) | ✔ | ✔ | ✔ |
+| **Clear a Review Required** (Q17) | — | ✔ | ✔ |
+| View candidate salary | — | — | — |
+| Export · Delete | — | — | — |
+
+**A Recruiter cannot clear a Review Required.** The review exists *because the
+requirement moved*; letting the person under pressure to fill the role clear their own
+candidates would hollow out the control. This follows the segregation the code already
+asserts — `requested_by_id` is material as *"the identity segregation of duties was
+judged against"*, and `hreq_can_create()` records that *"approval authority is held
+APART from creation authority on purpose."*
+
+**A Recruiter can complete the hire**, because Candidate Hiring approval is the
+control on the conversion where an organisation configures one (A3) — not an
+assumption that the Recruiter is an approval authority. Without it the three shipped
+roles could not complete a hire at all.
+
+**Everyone may propose a material change**, because proposing is *asking*, not
+spending: F1's approval is the control, and under A8 the recruiter is usually the
+person who discovers the need.
+
+**Salary visibility is off in all three** and granted deliberately through the
+existing `data.salary` permission, which already resists blanket grants.
+
+### Two permission capabilities are required — a narrow supersession
+
+These profiles cannot be expressed with the three permissions recruitment declares
+today (`mod.hiring.view`, `mod.hiring.edit`, `hiring.admin` — where
+`hreq_can_create()` is literally `can('mod.hiring.edit')`). Two locked rules need a
+role to hold a specific write right **without** general recruitment write:
+
+| Capability | Why it cannot fold into `mod.hiring.edit` |
+|---|---|
+| **Propose a material change** (Q8) | A Department Head must propose without gaining candidate create/edit or offer rights |
+| **Clear a Review Required** (Q17) | The reviewer right must be grantable to a role that does not run the pipeline |
+
+Both follow the project's established permission naming convention; the exact codes
+are settled in implementation planning, not here.
+
+**Scope of the supersession — deliberately narrow:**
+
+- **No per-user permission layer**, then or ever under A4.
+- **No blanket rewrite of the permission model.**
+- The **existing access engine and `custom_roles`** are reused.
+- **No new salary permission** — `data.salary` remains the control.
+- Every other constraint in this specification stands unchanged.
+
+**Roles still undecided:** HR · Operations manager · Coordinator · Administrator ·
+Finance · Inspector / field staff · External client · Agency. Nothing may be assumed
+for them.
 
 ## The primary recruitment roles
 
@@ -1632,9 +1713,40 @@ gate is an operations role. So D3 as decided is *narrower* than today's behaviou
 implementing it faithfully means deciding who authorised recruitment users are,
 which is D4. **This is why the two cannot be split.**
 
-**Recruitment scope may require a schema change.** `candidates` carries no office
-dimension, so whatever "recruitment scope" is defined to mean, delivering it for
-candidates may need a new column and a migration (C20). Not decided here.
+### DECIDED (A7) — recruitment scope is derived, not stored
+
+A candidate does **not** acquire an office dimension. Scope for an **active**
+candidate is **derived from the requirement they are attached to** — that
+requirement's office and business unit — reusing the existing scope helpers. A
+candidate attached to no requirement has no scope, because the available pool is
+company-wide (D3). `candidates.sbu` remains **descriptive** and is **not** used for
+access decisions; the requirement is the single source.
+
+**No new column on `candidates`. No migration of existing candidate records.**
+
+| Candidate | Has a requirement? | Scope |
+|---|---|---|
+| In the available pool | No | none needed — company-wide by D3 |
+| Active on a requirement | Yes | that requirement's office and business unit |
+
+**Locked consequence:** if a requisition moves office or business unit, the active
+candidates attached to it **inherit that changed scope**.
+
+**Why not a column.** It would create a second source of truth for one fact — the
+candidate's office and their requirement's office — which can disagree, in a
+security-relevant place; and it would require inventing an office for 935 existing
+rows. A directly raised requisition (ADR-001) still carries `office_id`, so candidates
+on it scope correctly with no gap.
+
+### DECIDED (C36) — availability is evaluated per person
+
+There is **no "return to pool" transition.** Availability follows D3's definition: a
+person not hired and under no active recruitment process is in the available pool.
+
+**Availability is evaluated per person across all their candidate rows**, using the
+existing pool convergence — **never per row**. Someone rejected on one requirement
+while active on another is **not** available. F2's findability then covers deliberate
+reconsideration.
 
 ---
 # Section 8 — Approval Rules (D5 · Q1, Q22, Q24)
@@ -1764,10 +1876,68 @@ exactly right for a small single-office business and exactly wrong for a corpora
 customer. The mechanism already exists to express either — `approval_required` is
 a per-record control, and its default is the lever.
 
-**UNDECIDED — DO NOT IMPLEMENT (B2): what a brand-new organisation starts with.**
-Approval on by default until rules are written, or off by default per Q22. This is
-the only decision in this document where a literal reading would *reduce* an
-existing control, so it is called out rather than assumed.
+### DECIDED (B2) — the starting state, and what a configuration change reaches
+
+**A new organisation starts with approval required.** Until an administrator
+configures otherwise, Hiring Requests require approval.
+
+**"No approval rule configured" and "Approval Required = OFF" are distinct states and
+must never be conflated.** Where an organisation requires approval but no matching
+rule exists:
+
+- the request does **not** self-approve;
+- **no approver is invented**;
+- the request **waits**;
+- the condition is surfaced as a **configuration problem**, naming what must be fixed.
+
+Q22 is honoured — nothing is invented — while silence is not mistaken for consent.
+
+**A change to the approval configuration applies to Hiring Requests raised after the
+change.** Requests already submitted continue under the configuration — and,
+mid-chain, the approval chain — in force when they were raised. A requester may
+**withdraw and resubmit** to bring a request under the new configuration: a deliberate
+human act, never automatic.
+
+**Through F1, this default also governs whether material changes require approval** —
+one decision with two effects.
+
+**Why not re-evaluate in flight.** Turning approval off under a re-evaluation rule
+would make requests already at SUBMITTED **approved en masse, with no named
+approver**. And judging a thing against what was in force when it was created is the
+pattern already locked three times: F1's approved snapshot, A2's issued offer, A8's
+approved minimum.
+
+### DECIDED (A3) — two gates, in a fixed order
+
+Offer approval and Candidate Hiring approval govern **different events and neither
+substitutes for the other**:
+
+> Offer approval → offer **issued** → candidate **accepts** → Candidate Hiring approval → workforce conversion
+
+- **Offer approval** gates **issuing** the offer.
+- **Candidate Hiring approval** gates **converting an accepted candidate into
+  workforce**.
+- Where both are configured, **both must pass, in that order** — the order is fixed by
+  the recruitment lifecycle and is **not configurable**, because joining follows
+  acceptance which follows issue.
+- Where only one is configured, only that gate applies.
+- Where neither is configured, no approval is required (Q22, B2).
+
+**A refused Candidate Hiring approval blocks the conversion; it does not reject the
+candidate** — rejection remains a human act with a mandatory reason.
+
+**The distinction preserved:** the *offer* decision is whether the organisation is
+willing to make the offer; the *hiring* decision is whether the accepted person is
+actually converted into workforce.
+
+**EVIDENCE.** `offer_issue()` refuses an unapproved offer — *"§32 — an UNAPPROVED
+offer can never be issued."* The conversion point is `rcv_convert()`, a discrete named
+step carrying **no approval today**, and therefore a clean gate.
+
+**One consequence to hold in view:** a hiring approval placed *after* acceptance can
+fail once a person has accepted and possibly resigned elsewhere. That is a legitimate
+choice — some organisations need a final establishment or site-clearance check — but an
+organisation switching it on creates that exposure deliberately.
 
 ## What is NOT decided
 
@@ -1900,8 +2070,38 @@ When a material change is proposed:
 | 8 | An **approved change creates a NEW APPROVED VERSION** | Q12 |
 | 9 | The **previous approved version remains historically preserved** | Q12 |
 
-**DECIDED (Q6): the effect of a pending material change on ongoing recruitment
-activity is configurable by organisation.**
+**DECIDED (Q6 · A5): the effect of a pending material change on ongoing recruitment
+activity is configurable by organisation — as a single graduated level over the
+existing execution gate, not as independent switches.**
+
+| Level | Continues | Pauses |
+|---|---|---|
+| **1 — Pause everything** | nothing | raise requisition · advance · interview · offer · joining — **today's behaviour** |
+| **2 — Continue screening, commit to nobody** *(shipped default)* | raise requisition · advance · interview | **offer · joining** |
+| **3 — Continue everything except joining** | raise · advance · interview · offer | **joining** |
+| **4 — Continue as normal** | everything | nothing |
+
+**Level 2 is the product default, not a mandate** — an organisation may configure any
+level, and **level 1 preserves today's exact behaviour** for anyone who wants it.
+
+**Why level 2 by default.** It blocks exactly what a pending change threatens —
+commitments made on authority that is in question — while permitting work that costs
+nothing and commits no one. The execution gate's own record states the harm it exists
+to prevent: *"an OFFER could be created, approved, ISSUED and accepted against a
+requisition whose approval had been invalidated — a commitment made to a person for
+headcount nobody had approved."*
+
+**Where a level permits work to continue, the pending change must be visible to the
+people doing that work** (C40 — this decision makes answering it necessary rather than
+optional).
+
+**This reuses the existing gate.** `REXEC_ACTIONS` already defines the four levers —
+`ADVANCE` "move this candidate forward", `INTERVIEW` "schedule an interview", `OFFER`
+"make an offer", `JOIN` "record a joining" — already enforced at 23 call sites, already
+returning a refusal in words a coordinator can act on; raising a requisition is
+separately gated in `hreq_to_requisition()`. **No new gate, no new enforcement point,
+no new vocabulary** — the gate consults a configured level instead of a fixed block
+list.
 
 **DECIDED (Q8): who may propose a material change follows D4** — role defaults +
 configurable permission + recruitment scope.
@@ -2043,6 +2243,39 @@ quotations — a revision table carrying the parent record, a revision number, w
 changed it, when, a summary, and the full snapshot. **This is an existing pattern
 to extend, not a mechanism to invent.**
 
+### DECIDED (A6) — versioning applies to both records
+
+**One versioning mechanism covers both the Hiring Request and the Requisition**, each
+with its **own configurable material-field list**:
+
+| Record | Its material list covers |
+|---|---|
+| **Hiring Request** | the **authority** it carries — headcount, budget, role, office, engagement type, minimum eligibility |
+| **Requisition** | the fields that change **who qualifies or what it costs** — **not** execution wording such as the job description |
+
+Where a requisition has no approving authority behind it (ADR-001, a directly raised
+requisition), **its own version chain still applies.**
+
+**Candidate review under A1 is triggered by a new *effective* version of either
+record** — whether or not an approval chain was required for it. **Approval** asks
+whether an authority decision is required; an **effective version** records that the
+requirement governing recruitment has actually changed. **These must not be
+conflated.**
+
+**Why both records, not just the request.** The eligibility criteria that decide
+"stricter" live on the **requisition** — `qualification`, `experience_min`,
+`relevant_experience`, `skills`, `discipline`, `category`, `trade_id`, `skill_id` — and
+D2-B **permits the requisition to strengthen** them. Requisitions have **no change
+control of any kind** today: `act_log('REQUISITION', …)` appears only for
+approval-chain notes and fulfilment allocations, never a field edit. So versioning the
+Hiring Request alone would leave a documented path around A1 — raise the requisition's
+minimum experience from 5 to 8, and no version, no approval and no candidate review
+would occur.
+
+And `hreq_remaining_qty()` confirms **one request can spawn several requisitions**, so
+request-level versioning alone cannot express one office tightening while another does
+not.
+
 ### Gap 3 — materiality is a constant, not configuration
 
 **Today:** `HREQ_MATERIAL_FIELDS` is a PHP constant. The comment above it reads
@@ -2073,12 +2306,104 @@ constant, not many places deciding materiality.
 **This is the hard dependency in Section 3: three of the four additions do not yet
 exist as fields.**
 
-## UNDECIDED — DO NOT IMPLEMENT
+## DECIDED (C45 · C9) — budget materiality is judged on the total commitment
 
-- Whether a **threshold** applies to budget changes, and whether any increase is
-  material or only one beyond a band (C8).
-- Whether budget **decreases** are material — the quantity precedent suggests not,
-  but that is an inference (C9).
+**The authoritative measure is the total commitment**, as computed by the existing
+calculation:
+
+> **per-person cost × quantity × periods + one-time cost**
+
+**Not any individual cost field.** Watching only the per-person figure would miss the
+obvious evasion — halve the per-person cost and triple the duration, and the total
+rises while the field falls. The approver authorised a *total*.
+
+| Rule | Value |
+|---|---|
+| An **increase** is material when it exceeds | a configured **percentage** of the approved commitment **or** a configured **absolute amount**, **whichever is greater** |
+| Shipped defaults | **10%** and **₹1,00,000**, both configurable per organisation |
+| Where **no commitment was approved** | the absolute amount alone applies |
+| An **incomplete estimate later completed** | judged the same way — against the commitment **as shown to the approver**. No special exception |
+| A **decrease** | **not material** |
+
+**Why a threshold is required, not merely convenient.** The cost fields are
+*deliberately indicative*: *"nobody knows the exact salary when raising a request, and
+demanding one would stall the flow. An estimate the approver can see beats an exact
+number they cannot."* If any change to an estimate forced re-approval, refining
+₹8,00,000 to ₹8,10,000 would send the request back — and people would enter round,
+useless numbers instead.
+
+**Why *greater of*.** On ₹3,00,000 the floor governs and small drift is not material;
+on ₹1,00,00,000 the percentage governs and the threshold scales. *Smaller of* would
+make ₹1 lakh of drift material on a crore-scale estimate.
+
+**Why decreases are not material.** Consistent with the quantity rule: an increase
+spends authority nobody granted, a decrease stays inside the approval. A fundamental
+change of role that accompanies a reduction is caught by `designation`, `grade` and
+`position_id`, **already material** — so money need not be made symmetric to
+compensate.
+
+**This does not make the commitment determine the approval chain.** The commitment
+already reaches the approval engine under its own context key, deliberately apart from
+the headcount band — *"routing by value stays an explicit choice rather than something
+that happens to a customer overnight."* **Materiality and routing remain separate
+controls**, as F1 requires.
+
+## DECIDED (G2) — the proposal lifecycle
+
+> Approved version → Proposal → Pending → **Approved / Refused / Withdrawn**
+
+A **refused** proposal is **closed permanently and remains in history** (Q7). **It
+cannot be amended in place.** A further attempt is a **new proposal**, which:
+
+- may be **pre-filled** from the refused one and **carries a reference** to it;
+- has its **own** mandatory reason (Q10);
+- is evaluated and **routed on its own proposed values** (F1);
+- receives its **own** decision and audit history.
+
+**Why not amend in place.** Q7 requires the refused content to survive, so editing the
+same proposal would either overwrite it or force a revision history **nested inside**
+the requirement's version chain — two levels of versioning for one concept. A new
+proposal keeps one chain, one level, and a complete record. It also keeps a refusal
+truthful: a named person refused **specific values**, and those values must not change
+under the decision afterwards.
+
+**At most one proposal may be pending against a record at any time.** A second cannot
+be raised until the pending one is approved, refused or withdrawn — consistent with the
+single-valued re-approval state the record already carries, and required for **A5** to
+resolve one execution level.
+
+**A proposer may withdraw their own pending proposal.** Withdrawal **closes** the
+proposal, **requires a reason**, **remains permanently in history**, **does not alter
+the approved version**, and **restores normal execution** under A5.
+
+**No historical proposal is ever overwritten.**
+
+## DECIDED (A8) — a Requisition that would weaken the approved requirement
+
+A requisition value **below the approved minimum** on its Hiring Request is a
+**weakening**, and is **routed through this material-change process** as a proposed
+Requisition version, with a mandatory reason and the approval route F1 selects. It is
+**neither silently permitted nor blocked outright**.
+
+- Weakening is judged **against the approved minimum, never against the Requisition's
+  previous value** — so correcting an over-specified requisition back toward the
+  approved floor is **not** a weakening and proceeds freely.
+- The exception is recorded **on the Requisition**, not by re-versioning the Hiring
+  Request, so it **does not relax the standard** for other requisitions raised from the
+  same request.
+- Where no approval is required (F1, Q22, B2), the weakening **still requires a reason
+  and still creates a version** — the control **degrades to auditability, not to
+  nothing**.
+- A **relaxation** triggers neither candidate review (A1) nor reconsideration of
+  previously rejected candidates (F2).
+
+**EVIDENCE.** Only **quantity** is enforced between the two records today:
+`hreq_approved_qty()` reads the **approved snapshot's** quantity and
+`hreq_remaining_qty()` stops requisitions exceeding approved headcount. No eligibility
+field is checked at all. A8 extends that existing compare-against-what-was-approved
+pattern from one field to the eligibility minimums.
+
+## UNDECIDED — DO NOT IMPLEMENT
 - Whether versioning applies to the **Hiring Request only or the Requisition too**
   (B3). Q24 making requisitions approvable suggests both; D7 does not say.
 - Whether the same material matrix applies to requisition changes (C11).
@@ -2330,12 +2655,48 @@ D8's home shows the funnel and KPIs, both of which read lifecycle state.
 **D8 should follow D1**, or the one home will be built over the legacy lifecycle
 and rebuilt afterwards.
 
+## DECIDED (C21) — `/recruitment` is the one primary Recruitment home
+
+**`/recruitment` is the one primary Recruitment home.** It already serves as a direct
+entry point for recruitment-only organisations, and it already holds recruitment
+execution, actions, functions and worklists. **Funnel and KPI summaries from the
+existing Command Centre are surfaced within it**, while the **full analytics board
+remains available** as a named destination from the home.
+
+**Nothing is deleted or rebuilt.** The change follows **REUSE → EXTEND → CONNECT**: the
+existing home is reused, extended with a funnel and KPI summary, and connected through
+to the board for depth. `/recruitment-cc` and the existing analytics engine are
+**retained**, not replaced.
+
+**Naming forms part of this decision.** Only one destination is presented as the
+Recruitment home; the analytics board is **renamed for its actual purpose through the
+existing terminology engine**, so the two no longer read as competing homes.
+
+**Role Workspaces remain compatible** as per-role landing and curation **within** the
+unified Recruitment experience — they configure what a role sees on arriving, while
+this decision fixes that there is one recruitment destination.
+
+### Why `/recruitment` and not the board
+
+| | `/recruitment` | `/recruitment-cc` |
+|---|---|---|
+| Already an entry point? | **Yes** — `recruit_home_can()` records that *"index.php can hand a recruitment-only company straight to the command centre BEFORE ops_dispatch()"* | No |
+| What it is | **Where people work** — worklists, actions, the workforce conversion | **A board you look at** — funnel, sources, ageing, drop reasons, SLA, KPIs |
+
+Three reasons: making the board the home would mean changing working routing to satisfy
+a presentation decision; a KPI board is not where work happens; and **Q25 puts
+operational work on a phone and administration on a desk** — a funnel board is
+desk-shaped analysis, so leading with it would put the wrong screen first for the
+phone-first users D9 serves.
+
+**CLARIFICATION (C23) — confirmed.** The reading adopted is: the application's general
+Home remains the landing page, and within recruitment there is exactly one recruitment
+home, one click away.
+
 ## UNDECIDED — DO NOT IMPLEMENT
 
-Which of the two landings becomes the one home; whether the other is redirected,
-merged, or retained for a different audience; what the navigation entry is called;
-whether role workspaces (which already exist) are the mechanism by which different
-roles land in different places within the one home.
+How the analytics board is reached and named in navigation; how much funnel and KPI
+detail is summarised on the home versus left to the board.
 
 ---
 
@@ -2361,7 +2722,7 @@ Mobile must support the important **operational** recruitment activities:
 | Candidate updates | Adding what was learnt from a conversation |
 | Pipeline movement | Moving a candidate to the next stage |
 | Hiring decisions | The decision itself, where the user holds the right |
-| Review Required clearance (Section 19) — **INFERENCE, not in the owner's list** | A review that blocks a candidate must be clearable wherever the reviewer is. Proposed on the strength of Section 19; **the owner has not adopted it as an eighth item** |
+| Review Required clearance (Section 19) — **INFERENCE, not in the owner's list** | A review that blocks a candidate must be clearable wherever the reviewer is. Proposed on the strength of Section 19; **the owner has not adopted it as an eighth item.** B4 has since made the reviewer right real — held by Hiring Manager and Department Head, not Recruiter — which strengthens the case without adopting it |
 
 ## What may remain desktop
 
