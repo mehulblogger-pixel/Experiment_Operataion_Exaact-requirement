@@ -2443,6 +2443,13 @@ thrown out by a machine.**
 | 8 | The outcome may be **CONTINUE** or **REJECT** — both require a reason | Q19 |
 | 9 | If REJECT is chosen, the candidate is **immediately rejected**; no additional approval is required | Q20 |
 | 10 | A **relaxed** requirement does **not** automatically reconsider a previously rejected candidate | F2 |
+| 11 | **ALL** active candidates on the requirement enter Review Required — not only those that appear to fail | **A1** |
+| 12 | The existing match engine supplies **evidence only**; it may never clear, reject or gate a candidate | **A1** |
+| 13 | A new version reaches candidates only **until an offer has been ISSUED** | **A2** |
+| 14 | A new **effective** version of **either** the Hiring Request or the Requisition can trigger these rules | **A6** |
+| 15 | REJECT moves the candidate to the configured **closed / not-proceeding** stage, chosen by **kind** | **C43** |
+| 16 | Availability afterwards is evaluated **per person**, across all their candidate rows | **C36** |
+| 17 | Where a material change drives the version, the approval chain is matched on the **proposed values** | **F1** |
 
 ## When a requirement is RELAXED (F2)
 
@@ -2531,13 +2538,16 @@ was done honestly against what was asked at the time.
 
 | Property | Rule |
 |---|---|
-| What raises it | A new approved version whose eligibility the candidate may not meet (Q14) |
+| What raises it | A new **effective** version of the requirement — of the Hiring Request **or** the Requisition (Q14, A1, A6) |
+| Who is raised | **Every** active candidate on the requirement, not a filtered subset (A1) |
+| Who is **not** raised | Candidates whose offer is already ISSUED, ACCEPTED or JOINED (A2) |
 | What it does | Blocks progression only (Q16) — it does not reject, hide, or unassign |
 | What it does not touch | Prior assessments, interview records and scorecards (Q15) |
 | Who may clear it | Role defaults + configurable permission + recruitment scope (Q17) |
 | What clearing requires | A mandatory reason, always (Q18) |
 | Outcomes | CONTINUE or REJECT, each with a reason (Q19) |
-| On REJECT | Immediate rejection, no further approval (Q20) |
+| On REJECT | Immediate rejection, no further approval (Q20). The row moves to the configured **closed / not-proceeding** stage and **stays closed** (C36, C43) |
+| Scope of the reviewer's right | Derived from the requirement's office and business unit — **not** from a field on the candidate (A7) |
 
 ## EVIDENCE — what exists and what does not
 
@@ -2565,36 +2575,232 @@ are new behaviour built on existing structures.
 - **Q17 depends on D4.** The reviewer right lives in the role profile.
 - **Section 19 feeds D9.** A review that blocks a candidate must be clearable on a
   phone, because the reviewer is often not at a desk.
+- **REJECT depends on D1's CLOSED stage kind.** A rejection cannot be recorded on
+  the authoritative pipeline until a stage of kind **CLOSED / NOT PROCEEDING**
+  exists to hold it (C43, below).
+- **A1 does NOT depend on D2.** Every active candidate is reviewed regardless, so
+  the flow is buildable before the eligibility fields exist. D2 only makes the
+  reviewer's evidence richer.
 
-## BLOCKING — DO NOT IMPLEMENT UNTIL ANSWERED
+## DECIDED (A1) — who is reviewed, and what the system may never decide
 
-**B1 — who judges that a candidate "no longer appears to satisfy" the latest
-version?** Two readings, with very different consequences:
+**B1 is closed.** The question was whether the system decides who "no longer
+appears to satisfy" the new version, or whether a person does.
 
-- **Automatic** — the system compares the candidate's qualification, experience
-  and skills against the new version and flags mismatches. Consistent, but
-  requires D2's three fields first, and will flag people a recruiter would not
-  have.
-- **Human** — the system flags *every* candidate on the requirement when a new
-  version is approved, and a person decides. Simpler and safer, but creates review
-  work on every change.
+> **All active candidates** attached to the requirement enter **Review Required**.
+> An authorised reviewer decides, per candidate, whether they continue or are
+> rejected. The existing candidate-versus-requirement match engine is reused as
+> **decision-support evidence only**.
 
-**This specification does not choose.** It is the trigger for the entire flow, and
-it is the owner's decision.
+The engine's score, factor results and text matching **MUST NOT**:
 
-**B5 — do candidates already at offer, accepted or hired stage move to a new
-version?** Q13 says existing candidates move; Q16 says review must clear before
-progressing — but a candidate who has already joined has nowhere left to progress.
+- automatically **clear** a Review Required;
+- automatically **reject** a candidate;
+- automatically **gate** progression.
+
+**The decision belongs to an authorised human reviewer.** No new matching engine is
+built; the existing one is reused unchanged.
+
+### Why every active candidate, and not only the apparent failures
+
+Deciding **who escapes scrutiny is itself a decision**, and the evidence available
+is not strong enough to make it:
+
+| Criterion | How the engine compares it | Safe to filter on? |
+|---|---|---|
+| Minimum experience | true numeric comparison | reliable as evidence |
+| Essential skills | **token text matching** | no |
+| Minimum qualification | **no comparison factor exists at all** | no |
+
+A filter would therefore exempt people from review on a string match, and exempt
+every qualification change completely. The engine's own module header states the
+principle the product relies on: *"all deterministic & explainable… **Nothing here
+writes data or makes a decision on its own.**"*
+
+**Consequence for sequencing: A1 does not wait on D2.** Every active candidate is
+reviewed either way; the qualification, experience and essential-skills fields make
+the reviewer's evidence richer as they arrive.
+
+### What the reviewer is shown
+
+The existing engine's seven weighted factors — Designation 20, Discipline 20,
+Skills 15, Experience 15, Business unit 10, Location 10, Cost 10 — with a
+percentage and a per-factor verdict carrying plain evidence such as *"6 vs 8 yrs"*.
+It is presented as **evidence for a human**, never as a verdict.
+
+## DECIDED (A2) — the boundary is an ISSUED offer
+
+**B5 is closed.** Q13 moves existing candidates to the latest approved version;
+Q16 gates progression. A candidate who has already been made a commitment has
+nothing left to gate.
+
+> A newly approved requirement version reaches candidates **only until an offer has
+> been ISSUED**.
+
+| Candidate's offer state | Enters Review Required? | Re-linked to the new version? |
+|---|---|---|
+| none — active, pre-offer | **Yes** | **Yes** |
+| **DRAFT** — not yet a commitment | **Yes** | **Yes** |
+| **ISSUED** | **No** | **No** |
+| **ACCEPTED** | **No** | **No** |
+| **JOINED** | **No** | **No** |
+
+Candidates whose offer is issued, accepted or joined **remain attached to the
+version that applied when the offer was issued.** That version is what the
+commitment was made against, and history must continue to show it.
+
+**This boundary is fixed in the product and is deliberately independent of the
+organisation's configurable definition of "Hired" (Q21).** A reporting preference
+must never decide whose offer may be reopened.
+
+## DECIDED (A6) — both records are versioned, and the trigger is an *effective* version
+
+> Material versioning applies to **both** the Hiring Request and the Requisition,
+> through **one common mechanism**, each with its **own configurable material-field
+> list**.
+
+| Record | What its material list protects |
+|---|---|
+| **Hiring Request** | the **authority** carried by the approved request |
+| **Requisition** | what **affects who qualifies**, or what the requirement **costs** |
+
+**Ordinary job-description wording is not material merely because it changed.**
+
+**A new *effective* version of either record can trigger the candidate-review rules
+in this section** — whether or not an approval chain was required for it:
+
+- **Approval** asks whether an **authority decision** is needed.
+- An **effective version** records that the requirement governing recruitment has
+  **actually changed**.
+
+A change can be genuinely material to eligibility while sitting below every
+approval threshold. Tying candidate review to approval alone would leave those
+candidates screened against a requirement nobody is applying any more.
+
+**Directly raised requisitions are versioned too** — they have no Hiring Request
+above them, so their own version chain is the only record of what changed.
+
+**Versioning must not be used to merge the two records into one entity.** They
+remain distinct, with distinct purposes (D2).
+
+## DECIDED (A7) — the scope the reviewer's right is evaluated in
+
+Scope for an **active** candidate is **derived from the requirement attached through
+the requisition** — that requirement's **office** and **business unit / SBU** —
+using the **existing scope helpers**. `candidates.sbu` remains **descriptive** and
+is never an access-authority field.
+
+**No candidate office column and no migration are added.** Section 7 holds the full
+rule and the reasoning; this section only states the consequence: **a reviewer's
+right to clear a Review Required is evaluated against the requirement's scope, not
+against anything stored on the candidate.**
+
+## DECIDED (C36 · C43) — what a REJECT writes, and what follows
+
+### What a REJECT writes
+
+When an authorised reviewer chooses **REJECT**:
+
+- the candidate row moves to the pipeline's configured stage of kind **CLOSED /
+  NOT PROCEEDING**;
+- the row **stays closed** — the rejection stands (F2);
+- **no additional approval is required** (Q20);
+- a **mandatory reason** is recorded;
+- the **reviewer's identity** is recorded.
+
+**The existing stage / event ledger carries all of it.** `candidate_events`
+already stores `from_stage`, `to_stage`, a **remark** for the reason and an
+**actor** for the reviewer. **Nothing new is required to record a rejection.**
+
+**A Review Required rejection and an ordinary rejection use the SAME closed stage.**
+The recorded reason distinguishes the circumstances; there is no separate
+review-rejection stage for an organisation to configure.
+
+### The closed stage kind — and why it is distinct from terminal
+
+The configurable pipeline's stage-kind vocabulary gains a kind meaning **CLOSED /
+NOT PROCEEDING**, which is **DISTINCT** from:
+
+> **TERMINAL** = the **successful** hired / onboarding end.
+
+**Always reason by KIND, never by a fixed stage name.** An organisation may label
+its closed stage *Rejected*, *Not proceeding*, *Screened out* or anything else,
+while reporting and KPI logic reasons about the kind. This is the same
+label-versus-kind separation that makes the pipeline industry-portable (D1).
+
+**Where a pipeline has no configured CLOSED stage:**
+
+- the rejection **cannot be recorded**;
+- the condition is surfaced as a **configuration problem** to be fixed;
+- **the system MUST NOT fall back to the legacy stage field.**
+
+A silent fallback would put the true outcome in one place and the pipeline's
+version of it in another — two half-mechanisms doing one job, which is exactly the
+defect D1 exists to remove.
+
+### This is a prerequisite for D1, not an enhancement
+
+The CLOSED stage kind is a **foundational prerequisite** for D1's
+configurable-pipeline authority. **D1 therefore stands as DECIDED WITH
+IMPLEMENTATION DEPENDENCY.**
+
+**The dependency also reaches the deferred legacy items C15–C18.** The legacy
+candidate population cannot be fully represented on the authoritative pipeline
+while rejection, withdrawal and declined offers have nowhere to go.
+
+**EVIDENCE.** `RPIPE_STAGE_KINDS` today is `step · gate · interview · offer ·
+terminal`, where `terminal` is labelled *"Final (hired / onboarding)"*. **There is
+no closed kind.** Every loss outcome is therefore expressible only through the
+legacy field, whose terminal set is `ACCEPTED · REJECTED · WITHDRAWN ·
+OFFER_DECLINED`. So a configurable pipeline cannot presently record a loss at all.
+
+### Availability afterwards — per person, with no "Return to Pool"
+
+There is **no "Return to Pool" transition.** Availability is **derived** per D3: a
+person is available to the company-wide pool when they are **not hired** **AND**
+**under no active recruitment process**.
+
+**Availability is evaluated ACROSS ALL candidate rows for that person — never per
+row:**
+
+| Situation | Available? |
+|---|---|
+| Rejected on Requirement A **+** active on Requirement B | **NO** |
+| Closed on every relevant process **+** not hired | **Yes** — findable for deliberate future consideration (F2) |
+
+**Reuse the existing candidate-pool convergence. Do not create a second
+availability engine.**
+
+## Material-change interaction (F1 · G2)
+
+Where a material change drives the version that triggers these rules:
+
+- the applicable approval chain is determined using the **PROPOSED values**, never
+  the previously approved ones;
+- a **separate material-change approval chain takes precedence** where one is
+  configured;
+- where neither the material-change configuration nor the underlying requirement
+  requires approval, **no approval is required** — the change still records a
+  mandatory reason and still creates a version, so the candidate-review rules in
+  this section still apply.
+
+**Proposal history (G2).** A **refused** proposal is **closed**, stays
+**permanently in history**, and **cannot be amended in place**. A further attempt
+is a **NEW proposal**: it may be pre-filled from and reference the refused one, but
+it carries its **own** mandatory reason and is routed on **its own** proposed
+values. **At most ONE proposal may be pending against a record at a time.** A
+proposer may **withdraw** their own pending proposal — withdrawal closes it,
+requires a reason, remains in history, **does not change the approved version**,
+and restores normal execution per **A5**.
 
 ## UNDECIDED — DO NOT IMPLEMENT
 
-- On REJECT, whether the candidate returns to the available company-wide pool or
-  stays closed (C36).
-- Whether a REJECT writes a terminal pipeline stage, and which one (C43).
-- Whether REVIEW REQUIRED is visible to everyone who can see the candidate, or
-  only to those who can clear it.
+- Whether REVIEW REQUIRED is visible to everyone who can see the candidate, or only
+  to those who can clear it.
 - Whether a single review clears a candidate for one requirement or for all
   requirements they are attached to.
+- Which stage a deliberately reconsidered candidate re-enters at, and where
+  findability is surfaced (carried from F2, above).
 
 ---
 
@@ -3406,16 +3612,22 @@ section is present and complete.
 
 # Section 20 — Appendix: Locked Clarifications A1–A8
 
-> **Status: PRESERVATION RECORD ONLY.** This appendix records eight rules the
-> owner locked after the Task 3 consistency review and the Task 5 clarification
-> inventory. It is deliberately **not yet integrated** into Sections 2, 10 or 19 —
-> that happens once in a single pass, after the remaining Part B values are
-> settled, so those sections are not rewritten after every individual decision.
+> **Status: HISTORICAL RECORD — INTEGRATION COMPLETE.** This appendix records
+> eight rules the owner locked after the Task 3 consistency review and the Task 5
+> clarification inventory, in the wording in which each was locked, together with
+> the codebase evidence gathered before each decision.
 >
-> **Where this appendix and an earlier section disagree, this appendix governs.**
-> Section 15's register still lists items these rules have closed; that
-> reconciliation is part of the final pass, and each entry below names what it
-> closes.
+> **These eight rules have now been integrated into the numbered sections** — see
+> the *Integrated into* line under each rule. Section 15's register has been
+> reconciled accordingly.
+>
+> **PRECEDENCE: this appendix is SUBORDINATE to the integrated specification
+> wherever the same rule appears in both.** Sections 1–19 govern. This appendix is
+> kept because it preserves the **locked wording**, the **evidence** behind each
+> decision and the **reason** each was decided that way — material the numbered
+> sections state as rules rather than as reasoning. **If this appendix and a
+> numbered section ever disagree, the numbered section is the rule and the
+> disagreement is a defect to be fixed.**
 >
 > Numbered 20 because section numbers in this document are never reused.
 
@@ -3434,7 +3646,7 @@ section is present and complete.
 
 **Evidence.** A weighted match engine already exists in `lib/recruit.php`: seven factors (Designation 20, Discipline 20, Skills 15, Experience 15, Business unit 10, Location 10, Cost 10) returning a percentage and a per-factor verdict with evidence such as *"6 vs 8 yrs"*. Its module header states: *"all deterministic & explainable… **Nothing here writes data or makes a decision on its own.**"* Experience is a true numeric comparison; Skills and Discipline are token text matching; **qualification has no factor at all**, because ranked qualification comparison needs an ordered vocabulary that does not exist.
 
-**Closes:** B1. **Integrates into:** Section 19.
+**Closes:** B1. **Integrated into:** Section 19 (rules 11–12; *DECIDED (A1)*).
 
 ## A2 — Which lifecycle points a new version reaches
 
@@ -3460,7 +3672,7 @@ section is present and complete.
 
 **Consequence:** because options B and C were not taken, **no offer-to-requirement-version link is required** for this control.
 
-**Closes:** B5, C37. **Integrates into:** Sections 7, 19.
+**Closes:** B5, C37. **Integrated into:** Section 7 ("Hired" is configurable) and Section 19 (rule 13; *DECIDED (A2)*).
 
 ## A3 — Offer approval and Candidate Hiring approval
 
@@ -3480,7 +3692,7 @@ section is present and complete.
 
 **Evidence.** `offer_issue()` refuses an unapproved offer — *"§32 — an UNAPPROVED offer can never be issued."* The conversion point is `rcv_convert()`, which writes the workforce record; **no approval exists there today**, but it is a discrete named step and therefore a clean gate.
 
-**Closes:** C38. **Integrates into:** Sections 4, 8.
+**Closes:** C38. **Integrated into:** Section 4 (lifecycle gates) and Section 8 (approval rules).
 
 ## A4 — Administrator permission override model
 
@@ -3498,7 +3710,7 @@ section is present and complete.
 
 **Evidence.** `can($perm)` resolves a user's effective permissions from their role; **no per-user grant layer exists**. `custom_roles` already implements profile-plus-customisation: *"A custom role is **NEVER free-floating**: it copies an existing built-in role's permissions (its 'base'), so it always means something definite and **can never accidentally grant everything**."* The access editor already grants **and** denies. Identity documents already resist blanket grants — they *"back out here and ha[ve] to be granted deliberately."* And a recorded lesson on omission: a module absent from `module_groups()` *"cannot be granted or denied by an administrator at all"*, which had already silently happened to five modules.
 
-**Closes:** C39 and the unregistered direction question (G3). **Integrates into:** Section 7.
+**Closes:** C39 and the unregistered direction question (G3). **Integrated into:** Section 7 (*DECIDED (A4) — the override model*, and *DECIDED (B4) — the shipped default profiles*).
 
 ## A5 — Effect of a pending material change
 
@@ -3518,7 +3730,7 @@ section is present and complete.
 
 **Evidence.** `REXEC_ACTIONS` already defines the four levers — `ADVANCE` "move this candidate forward", `INTERVIEW` "schedule an interview", `OFFER` "make an offer", `JOIN` "record a joining" — and the gate is asked at 23 call sites. Its header explains the graduation: *"The gate asks a different (larger) set of questions for a joining than for a screening call, **because they cost different things**."* It also records why it exists: *"an OFFER could be created, approved, ISSUED and accepted against a requisition whose approval had been invalidated — **a commitment made to a person for headcount nobody had approved**."* Raising a requisition is separately gated in `hreq_to_requisition()`.
 
-**Closes:** G1 (unregistered — Q6 said "configurable" with no option list anywhere). **Requires:** C40 (pending-change visibility) becomes necessary rather than optional. **Integrates into:** Sections 2, 10.
+**Closes:** G1 (unregistered — Q6 said "configurable" with no option list anywhere). **Requires:** C40 (pending-change visibility) becomes necessary rather than optional. **Integrated into:** Section 2 (locked decisions) and Section 10 (graduated execution control).
 
 ## A6 — Versioning applies to both records
 
@@ -3545,7 +3757,7 @@ section is present and complete.
 
 **Evidence also.** `hreq_remaining_qty()` = approved − converted confirms **one Hiring Request can spawn several Requisitions**, so request-level versioning alone cannot express one office tightening while another does not.
 
-**Closes:** B3, C11. **Integrates into:** Sections 10, 19.
+**Closes:** B3, C11. **Integrated into:** Section 10 (the common versioning mechanism) and Section 19 (rule 14; *DECIDED (A6)*).
 
 ## A7 — Recruitment scope for a candidate
 
@@ -3565,7 +3777,7 @@ section is present and complete.
 
 **Why no column.** It would create a second source of truth for one fact — the candidate's office and their requirement's office — which can disagree, in a security-relevant place; and it would require inventing an office for 935 existing rows.
 
-**Closes:** C20. **Integrates into:** Section 7.
+**Closes:** C20. **Integrated into:** Section 7 (*DECIDED (A7)*), with the reviewer-scope consequence stated in Section 19.
 
 ## A8 — When a Requisition would weaken the approved requirement
 
@@ -3586,7 +3798,7 @@ section is present and complete.
 
 **Evidence.** The only request-to-requisition enforcement today is **quantity**: `hreq_approved_qty()` reads the **approved snapshot's** quantity and `hreq_remaining_qty()` stops requisitions exceeding approved headcount. **No eligibility field is checked at all.** That existing comparison — against what was approved, not against the current value — is the precedent A8 extends from one field to the eligibility minimums.
 
-**Closes:** C7. **Integrates into:** Sections 2 (D2-B), 10.
+**Closes:** C7. **Integrated into:** Section 2 (D2-B) and Sections 6 and 10 (strengthen freely; weaken only by proposal).
 
 ## Dependencies between these rules
 
@@ -3617,11 +3829,22 @@ A7 (scope from the requirement) ──▶ D3 pool stays company-wide
 
 **Still protected and untouched:** Operations · Quality · Reporting · Money/Billing · Workforce · Marketplace · the existing approval, KPI/SLA and pipeline engines · the existing identity and organisation architecture. No Person Hub. Requisition and Marketplace Requirement remain separate.
 
-## Still open after these eight
+## The six configuration values that followed — ALL NOW LOCKED
 
-Six configuration values, in the agreed order: **B2** (new-organisation approval default, and treatment of requests already at SUBMITTED) · **B4** (the three role profiles) · **C45/C9** (budget materiality) · **C36/C43** (Review Required rejection outcome) · **G2** (resubmit versus a new material-change proposal) · **C21** (primary Recruitment landing).
+When these eight rules were recorded, six configuration values remained open. **All
+six have since been decided, one at a time, and integrated:**
 
-**No implementation is authorised by this appendix.** Section 16's non-goals apply to every rule recorded here.
+| # | Value | The decision, in short | Integrated into |
+|---|---|---|---|
+| **B2** | New-organisation approval default | Approval Required is **ON** for a new organisation. **"No approval rule configured" and "Approval Required = OFF" are DIFFERENT STATES** and must never be collapsed into one. Hiring Requests already at SUBMITTED keep the rule that was in force when they were submitted. | Sections 2, 5, 8 |
+| **B4** | The three shipped role profiles | Recorded per role as **a default, not a floor** (per A4): administrators may grant and remove rights, subject to the sensitive-permission guard. Adds `hiring.material_change.propose` and `hiring.review.clear`. | Section 7 |
+| **C45 / C9** | Budget materiality | Judged against the **commitment** value, which reaches the approval engine under its **own** context key, kept separate from headcount. | Sections 8, 10 |
+| **C36 / C43** | Review Required rejection outcome | REJECT writes the configured **CLOSED / NOT PROCEEDING** stage, chosen by **kind** and never by name; availability is then evaluated **per person**. This exposed a **prerequisite for D1**. | Sections 7, 19 |
+| **G2** | Resubmit versus a new proposal | A refused proposal is **closed and permanent**; a further attempt is a **NEW** proposal on its own values; **one pending proposal at a time**; a proposer may withdraw their own. | Sections 10, 19 |
+| **C21** | The primary Recruitment landing | Locked, reusing the existing recruitment-home capability rather than building a new destination. | Sections 11, 12 |
+
+**No implementation is authorised by this appendix, nor by the integration of these
+rules.** Section 16's non-goals apply to every rule recorded here.
 
 ---
 
