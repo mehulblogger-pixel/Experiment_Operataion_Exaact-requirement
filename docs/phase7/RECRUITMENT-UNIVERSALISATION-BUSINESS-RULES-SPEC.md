@@ -64,10 +64,15 @@ The numbering differs; the intent does not.
 - **Issue 1** converted decisions **D1–D9** as they stood.
 - **Issue 2** incorporated the twenty-five supporting decisions **Q1–Q25** and the
   revisions to D1–D9.
-- **Issue 3** (this one) applies the two rules the owner locked after the Task 3
+- **Issue 3** applies the two rules the owner locked after the Task 3
   consistency review — **F1**, the material-change approval rule, and **F2**, what
   happens when a requirement is relaxed — together with nine editorial corrections
   that review found.
+- **Issue 4** (this one) records eight further locked rules, **A1–A8**, in
+  **Section 20** as a preservation record. They are **not yet integrated** into
+  Sections 2, 10 and 19; that happens in one pass once the remaining configuration
+  values are settled. **Where Section 20 and an earlier section disagree, Section 20
+  governs.**
 
 **The two rules locked in consistency review:**
 
@@ -2538,10 +2543,240 @@ inspection only — the approval matcher, the amount-band scoring, the hiring-re
 approval context, and the candidate stage constant — to evidence F1 and F2. Nothing
 executed, nothing changed.**
 
+**Fourth issue.** Records the eight locked rules A1–A8 in Section 20 as a
+preservation record, adds the header pointer to it, and changes nothing else.
+Sections 2, 10 and 19 were deliberately **not** edited. Read-only source inspection
+supported the evidence cited (the candidate match engine, the offer lifecycle and
+issue guard, the workforce conversion point, the permission and custom-role model,
+the execution gate's action set, requisition eligibility fields and change control,
+candidate table columns, and the approved-quantity comparison). **Nothing executed,
+nothing changed.**
+
 **One error was made and corrected during Issue 2.** An editing range overran and
 removed Section 16 (Explicit Non-Goals). It was detected by a section-inventory check
 before commit and restored from the committed Issue 1 text, then extended. The
 section is present and complete.
+
+---
+
+# Section 20 — Appendix: Locked Clarifications A1–A8
+
+> **Status: PRESERVATION RECORD ONLY.** This appendix records eight rules the
+> owner locked after the Task 3 consistency review and the Task 5 clarification
+> inventory. It is deliberately **not yet integrated** into Sections 2, 10 or 19 —
+> that happens once in a single pass, after the remaining Part B values are
+> settled, so those sections are not rewritten after every individual decision.
+>
+> **Where this appendix and an earlier section disagree, this appendix governs.**
+> Section 15's register still lists items these rules have closed; that
+> reconciliation is part of the final pass, and each entry below names what it
+> closes.
+>
+> Numbered 20 because section numbers in this document are never reused.
+
+## A1 — Candidate eligibility when a requirement becomes stricter
+
+> When a stricter approved requirement version is applied, **all active candidates
+> attached to that requirement enter Review Required.** An authorised reviewer must
+> decide whether each candidate can continue or should be rejected. The existing
+> candidate-versus-requirement comparison engine is reused as **decision-support
+> evidence only**. Its score, factor results and text matching **must not
+> automatically clear, reject or gate** a candidate.
+
+**Flow:** stricter version → active candidates → Review Required → reviewer sees comparison evidence → Continue or Reject → mandatory reason.
+
+**Also locked:** no automatic rejection · no automatic clearance · no new matching engine · the existing engine is reused · **A1 does not depend on D2 being complete** — richer evidence becomes available as those fields arrive.
+
+**Evidence.** A weighted match engine already exists in `lib/recruit.php`: seven factors (Designation 20, Discipline 20, Skills 15, Experience 15, Business unit 10, Location 10, Cost 10) returning a percentage and a per-factor verdict with evidence such as *"6 vs 8 yrs"*. Its module header states: *"all deterministic & explainable… **Nothing here writes data or makes a decision on its own.**"* Experience is a true numeric comparison; Skills and Discipline are token text matching; **qualification has no factor at all**, because ranked qualification comparison needs an ordered vocabulary that does not exist.
+
+**Closes:** B1. **Integrates into:** Section 19.
+
+## A2 — Which lifecycle points a new version reaches
+
+> A new approved requirement version reaches candidates **up to the point an offer
+> has been issued**. Candidates with an issued, accepted or joined offer are
+> neither placed into Review Required nor re-linked to the new version; they remain
+> attached to the version in force when their offer was issued. A **draft** offer is
+> not yet a commitment, so those candidates remain in scope. **This boundary is
+> fixed in the product and is not derived from the organisation's "Hired" setting
+> (Q21).**
+
+| Candidate state | Reached by a new version? |
+|---|---|
+| Active, pre-offer | **Yes** → Review Required (A1) |
+| Draft offer | **Yes** — not yet a commitment |
+| Issued offer | **No** — protected |
+| Accepted | **No** — protected |
+| Joined | **No** — protected |
+
+**Why not derived from Q21.** Q21 is a measurement and closure setting. If the boundary followed it, changing a reporting preference would silently change who can have an offer withdrawn — one setting carrying two unrelated meanings.
+
+**Evidence.** The offer lifecycle is `DRAFT → PENDING_APPROVAL → APPROVED → ISSUED → VIEWED → ACCEPTED / DECLINED / EXPIRED / WITHDRAWN`; `issued_at` distinguishes a draft from a commitment; `letter_html`, `offer_terms` and `ctc` preserve what was promised, so a later requirement change cannot rewrite it.
+
+**Consequence:** because options B and C were not taken, **no offer-to-requirement-version link is required** for this control.
+
+**Closes:** B5, C37. **Integrates into:** Sections 7, 19.
+
+## A3 — Offer approval and Candidate Hiring approval
+
+> Offer approval and Candidate Hiring approval govern **different events and
+> neither substitutes for the other**. Offer approval gates **issuing** the offer;
+> Candidate Hiring approval gates **converting an accepted candidate into
+> workforce**. Where both are configured, both must pass, in that order — the order
+> is fixed by the recruitment lifecycle and is **not configurable**. Where only one
+> is configured, only that gate applies. Where neither is configured, no approval
+> is required (Q22). A refused Candidate Hiring approval **blocks the conversion; it
+> does not reject the candidate** — rejection remains a human act with a mandatory
+> reason.
+
+**Flow:** Offer approval → issue offer → candidate accepts → Candidate Hiring approval → workforce conversion.
+
+**The distinction preserved:** the *offer* decision is whether the organisation is willing to make the offer; the *hiring* decision is whether the accepted person is actually converted into workforce.
+
+**Evidence.** `offer_issue()` refuses an unapproved offer — *"§32 — an UNAPPROVED offer can never be issued."* The conversion point is `rcv_convert()`, which writes the workforce record; **no approval exists there today**, but it is a discrete named step and therefore a clean gate.
+
+**Closes:** C38. **Integrates into:** Sections 4, 8.
+
+## A4 — Administrator permission override model
+
+> Recruitment permissions are configured **per role, never per user**. An
+> organisation that needs different rights for an individual creates a custom role
+> with the appropriate base, so every exception is named and reviewable in one
+> place. **A shipped role profile is a default, not a floor:** an administrator may
+> both grant additional rights and remove rights the default includes. Sensitive
+> permissions — candidate salary visibility and equivalents — are **never granted or
+> removed as a side effect of a blanket action**; they are always set deliberately.
+> This reuses the existing `custom_roles` base-role mechanism and the existing
+> access editor; **no per-user grant layer is introduced.**
+
+**Also locked:** *Role profiles track their shipped base; however, a shipped change that adds a sensitive permission does not propagate that permission without deliberate administrator action.*
+
+**Evidence.** `can($perm)` resolves a user's effective permissions from their role; **no per-user grant layer exists**. `custom_roles` already implements profile-plus-customisation: *"A custom role is **NEVER free-floating**: it copies an existing built-in role's permissions (its 'base'), so it always means something definite and **can never accidentally grant everything**."* The access editor already grants **and** denies. Identity documents already resist blanket grants — they *"back out here and ha[ve] to be granted deliberately."* And a recorded lesson on omission: a module absent from `module_groups()` *"cannot be granted or denied by an administrator at all"*, which had already silently happened to five modules.
+
+**Closes:** C39 and the unregistered direction question (G3). **Integrates into:** Section 7.
+
+## A5 — Effect of a pending material change
+
+> The effect of a pending material change is configured per organisation as **a
+> single graduated level over the existing execution gate**, not as independent
+> switches:
+> **1 — Pause everything:** no recruitment execution activity.
+> **2 — Continue screening and interviewing, but make no offer and record no joining.**
+> **3 — Continue everything except recording a joining.**
+> **4 — Continue as normal.**
+> The shipped default is **Level 2**. This reuses the existing `REXEC_ACTIONS`
+> execution gate and its refusal messages. **No new gate or independent enforcement
+> mechanism is introduced.** Where a level permits work to continue, the pending
+> change must be **visible** to the people performing that work.
+
+**Also locked:** Level 2 is the **product default, not a mandate** — an organisation may configure any level. **Level 1 is today's behaviour**, so an organisation wanting no change selects it.
+
+**Evidence.** `REXEC_ACTIONS` already defines the four levers — `ADVANCE` "move this candidate forward", `INTERVIEW` "schedule an interview", `OFFER` "make an offer", `JOIN` "record a joining" — and the gate is asked at 23 call sites. Its header explains the graduation: *"The gate asks a different (larger) set of questions for a joining than for a screening call, **because they cost different things**."* It also records why it exists: *"an OFFER could be created, approved, ISSUED and accepted against a requisition whose approval had been invalidated — **a commitment made to a person for headcount nobody had approved**."* Raising a requisition is separately gated in `hreq_to_requisition()`.
+
+**Closes:** G1 (unregistered — Q6 said "configurable" with no option list anywhere). **Requires:** C40 (pending-change visibility) becomes necessary rather than optional. **Integrates into:** Sections 2, 10.
+
+## A6 — Versioning applies to both records
+
+> Requirement versioning applies to **both** the Hiring Request and the Requisition,
+> using **one** versioning mechanism. Each entity has its **own configurable
+> material-field list**: the Hiring Request's covers the authority it carries; the
+> Requisition's covers the fields that change **who qualifies or what it costs**, and
+> not execution wording such as the job description. Candidate review under A1 is
+> triggered by a **new effective version** of either record — whether or not an
+> approval chain was required for it. Where a requisition has no approving authority
+> behind it (ADR-001, a directly raised requisition), its own version chain still
+> applies.
+
+**The distinction locked with it:**
+
+| | Meaning |
+|---|---|
+| **Approval** | whether an authority decision is required |
+| **Effective version** | whether the requirement governing recruitment has actually changed |
+
+**These must not be conflated.** The trigger for candidate review is the second, not the first — which preserves A1 when an organisation requires no approval for that entity, when a direct requisition exists, and when a change becomes effective without an approval workflow.
+
+**Why this rule exists.** The eligibility criteria that decide "stricter" live on the **requisition** — `requisitions` carries `qualification`, `experience_min`, `relevant_experience`, `skills`, `discipline`, `category`, `trade_id`, `skill_id` — and D2-B **permits the requisition to strengthen** them. Requisitions have **no change control of any kind** today: `act_log('REQUISITION', …)` appears only for approval-chain notes and fulfilment allocations, never a field edit. Versioning the Hiring Request alone would therefore leave a documented path around A1: raise the requisition's minimum experience from 5 to 8, and no version, no approval and no candidate review would occur.
+
+**Evidence also.** `hreq_remaining_qty()` = approved − converted confirms **one Hiring Request can spawn several Requisitions**, so request-level versioning alone cannot express one office tightening while another does not.
+
+**Closes:** B3, C11. **Integrates into:** Sections 10, 19.
+
+## A7 — Recruitment scope for a candidate
+
+> A candidate does **not** acquire an office dimension. Recruitment scope for an
+> **active** candidate is **derived from the requirement they are attached to** —
+> that requirement's office and business unit — reusing the existing scope helpers.
+> A candidate not attached to any requirement has no scope, because the available
+> pool is company-wide by D3. `candidates.sbu` remains **descriptive** and is not
+> used for access decisions; the requirement is the single source. This requires
+> **no new column on `candidates` and no migration of existing candidate records.**
+
+**Also locked as an expected consequence:** *If a requisition moves office or business-unit scope, the active candidates attached to it inherit that changed recruitment scope.*
+
+**The distinction preserved:** available candidate pool = company-wide; active candidate = scoped through its requirement.
+
+**Evidence.** `candidates` has **no office column** — verified against both the `CREATE TABLE` and every `ensure_column('candidates', …)` call. It does carry `requisition_id` (one requirement per candidate row), `allocation_id` and `sbu`. The requisition register already scopes via `scope_clause('r.office_id','r.sbu')`. An ADR-001 direct requisition still carries `office_id`, so candidates on it scope correctly.
+
+**Why no column.** It would create a second source of truth for one fact — the candidate's office and their requirement's office — which can disagree, in a security-relevant place; and it would require inventing an office for 935 existing rows.
+
+**Closes:** C20. **Integrates into:** Section 7.
+
+## A8 — When a Requisition would weaken the approved requirement
+
+> A requisition value that falls **below the approved minimum** on its Hiring
+> Request is a **weakening** and is routed through the material-change process as a
+> proposed Requisition version, with a mandatory reason and the approval route
+> selected under F1. It is **neither silently permitted nor blocked outright**.
+> Weakening is judged **against the approved minimum, never against the
+> Requisition's previous value**, so reducing an over-specified Requisition back
+> toward the approved floor is not a weakening and proceeds freely. The exception is
+> recorded **on the Requisition**, not by re-versioning the Hiring Request, so it
+> does not relax the standard for other Requisitions raised from the same Hiring
+> Request. Where no approval is required under F1/Q22, the weakening **still
+> requires a reason and still creates a version** — the control degrades to
+> auditability, not to nothing. A relaxation does **not** trigger candidate review
+> under A1 and does **not** automatically reconsider previously rejected candidates
+> under F2.
+
+**Evidence.** The only request-to-requisition enforcement today is **quantity**: `hreq_approved_qty()` reads the **approved snapshot's** quantity and `hreq_remaining_qty()` stops requisitions exceeding approved headcount. **No eligibility field is checked at all.** That existing comparison — against what was approved, not against the current value — is the precedent A8 extends from one field to the eligibility minimums.
+
+**Closes:** C7. **Integrates into:** Sections 2 (D2-B), 10.
+
+## Dependencies between these rules
+
+```
+A6 (version both records) ──▶ A1 (review trigger = new effective version)
+        │                          ▲
+        │                          │ A1 no longer waits on D2
+        ▼                          │
+A8 (weakening routes as a      A2 (…but only up to an issued offer)
+    Requisition version)
+        │
+        └──▶ F1 (which chain reviews it, matched on NEW values)
+                    │
+                    └──▶ B2 (what an unconfigured organisation starts with —
+                             now governs material change too)
+
+A4 (role defaults + override) ──▶ Q8  propose a change
+                              └──▶ Q17 clear a Review Required
+                              └──▶ B4  the profile contents (open)
+
+A5 (pending-change levels) ──▶ C40 pending change must be visible (open)
+A7 (scope from the requirement) ──▶ D3 pool stays company-wide
+```
+
+## What these rules did NOT change
+
+**No new engine.** All eight reuse mechanisms that already exist: the approval matcher and its current-value rule matching, the `REXEC_ACTIONS` execution gate, `custom_roles` and the access editor, the candidate match engine, the office and business-unit scope helpers, the approved-snapshot comparison, and the quotation revision pattern.
+
+**Still protected and untouched:** Operations · Quality · Reporting · Money/Billing · Workforce · Marketplace · the existing approval, KPI/SLA and pipeline engines · the existing identity and organisation architecture. No Person Hub. Requisition and Marketplace Requirement remain separate.
+
+## Still open after these eight
+
+Six configuration values, in the agreed order: **B2** (new-organisation approval default, and treatment of requests already at SUBMITTED) · **B4** (the three role profiles) · **C45/C9** (budget materiality) · **C36/C43** (Review Required rejection outcome) · **G2** (resubmit versus a new material-change proposal) · **C21** (primary Recruitment landing).
+
+**No implementation is authorised by this appendix.** Section 16's non-goals apply to every rule recorded here.
 
 ---
 
@@ -2567,5 +2802,6 @@ ready.** It is not. It is specified.
 | Date | Change |
 |---|---|
 | 2026-09-27 | **Issue 1.** Created. Converts owner decisions D1–D9 into product rules and configuration specification. Sources: the audit and the Business Decision Pack (`a010113`). |
+| 2026-09-28 | **Issue 4.** Records the eight locked clarifications **A1–A8** in a new **Section 20** appendix, with each rule's locked wording, its supporting evidence, the register items it closes, the sections it will integrate into, and the dependency map between them. **Preservation only — Sections 2, 10 and 19 are unchanged**, pending the single integration pass after the remaining six configuration values are settled. |
 | 2026-09-28 | **Issue 3.** Applies the two rules the owner locked after the Task 3 consistency review — **F1** (material-change approval inherits the underlying requirement's rule; separate chain takes precedence; chain matched on the proposed changed values; no approval only where neither requires it) and **F2** (a relaxed requirement does not automatically reconsider a previously rejected candidate; the rejection stands and the candidate remains findable for deliberate human reconsideration) — carries the **F3** reading into D1, and applies nine editorial corrections (F4–F11). Section 14's reuse map extended to 31 rows; **BUILD NEW remains 0**. |
 | 2026-09-27 | **Issue 2.** Incorporates the locked supporting decisions **Q1–Q25** and the revised D1–D9, including the material-change versioning model (D7, Q4–Q12) and candidate version behaviour (D7-CANDIDATE, Q13–Q20, new Section 19). Rewrites Sections 2, 3, 4, 5, 7, 8, 10, 12, 15, 17; extends Sections 1, 6, 14, 16, 18. Withdraws five statements from Issue 1 — see Section 15(E). Five new configuration dimensions recorded, every one attaching to a mechanism that already exists. **No new engine required.** |
