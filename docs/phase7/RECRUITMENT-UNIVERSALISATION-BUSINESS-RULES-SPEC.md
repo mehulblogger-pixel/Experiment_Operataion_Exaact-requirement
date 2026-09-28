@@ -68,11 +68,22 @@ The numbering differs; the intent does not.
   consistency review — **F1**, the material-change approval rule, and **F2**, what
   happens when a requirement is relaxed — together with nine editorial corrections
   that review found.
-- **Issue 4** (this one) records eight further locked rules, **A1–A8**, in
-  **Section 20** as a preservation record. They are **not yet integrated** into
-  Sections 2, 10 and 19; that happens in one pass once the remaining configuration
-  values are settled. **Where Section 20 and an earlier section disagree, Section 20
-  governs.**
+- **Issue 4** records eight further locked rules, **A1–A8**, in **Section 20**.
+  They were recorded there first as a preservation record and have **since been
+  integrated** into the numbered sections, together with the six Part-B
+  configuration values (**B2 · B4 · C45/C9 · C36/C43 · G2 · C21**), in a four-batch
+  integration pass.
+
+**PRECEDENCE — one rule, and it runs one way.**
+
+> **Sections 1–19 govern.** Section 20 is the **historical record** of how eight of
+> those rules were locked and what evidence was gathered for each, and it is
+> **SUBORDINATE** wherever the same rule appears in both. **If Section 20 and a
+> numbered section ever disagree, the numbered section is the rule and the
+> disagreement is a defect to be fixed** — never a licence for the appendix to win.
+
+Section 20's own status header states the same thing. **No appendix, register or
+traceability table in this document overrides an operative rule.**
 
 **The two rules locked in consistency review:**
 
@@ -1678,12 +1689,21 @@ Q17) are decision rights, not data rights.
 
 ## Constraints on any future work
 
-- **No new permission codes at this stage** — the role profile and override model
-  is expressed through the existing permission architecture wherever it can be.
-  Where Q23 genuinely cannot be expressed within the existing three recruitment
-  permissions, that is recorded as a clarification, not resolved here.
-- **Do not replace the existing permission architecture.**
+- **The role profile and override model is expressed through the existing
+  permission architecture wherever it can be.** The former constraint *"no new
+  permission codes at this stage"* is **SUPERSEDED — narrowly and only to the extent
+  B4 requires**: exactly **two** capabilities are added, to *propose a material
+  change* (Q8) and to *clear a Review Required* (Q17), because the three permissions
+  recruitment declares today cannot express a role holding either right **without**
+  general recruitment write. See *Two permission capabilities are required* above,
+  and §16 for the exact boundary of the exception.
+- **No other new permission code is authorised.** In particular **no new salary
+  permission** — `data.salary` remains the control.
+- **No per-user permission layer**, not now and not under A4.
+- **Do not replace or redesign the existing permission architecture.**
 - Access is never granted by role name alone.
+- **The exact codes are not settled here.** They follow the project's naming
+  convention and belong to implementation planning (**C46**).
 
 ## EVIDENCE — the position today
 
@@ -1941,12 +1961,21 @@ organisation switching it on creates that exposure deliberately.
 
 ## What is NOT decided
 
+### Closed since this list was first written — recorded, not deleted
+
+| Was listed here as undecided | Now decided by | Where the rule lives |
+|---|---|---|
+| The new-organisation default under Q22 | **B2** *(locked)* | **This section**, *DECIDED (B2)* above — approval **required** by default; "no rule configured" ≠ "approval OFF" |
+| Whether Offer approval and Candidate Hiring approval may both fire for one candidate, and in what order (C38) | **A3** *(locked)* | **This section**, *DECIDED (A3)* above — both may fire, in a **fixed** order the lifecycle sets |
+
+**Neither is open. Nothing in this subsection reopens them.**
+
+### Genuinely still open
+
 **UNDECIDED — DO NOT IMPLEMENT:**
 
-- The new-organisation default under Q22 (**B2**).
-- Whether Offer approval and Candidate Hiring approval may both fire for one
-  candidate, and in what order (C38).
-- Whether `APPR_ENTITIES` becomes configurable or is simply extended (C32).
+- Whether `APPR_ENTITIES` becomes configurable or is simply extended (**C32**) —
+  note that A3 and Q1 make *some* change to it necessary; only the form is open.
 - Any organisation's actual chains. Chains are configuration, supplied per
   organisation — **no rule may be seeded in any environment.**
 
@@ -2403,11 +2432,20 @@ Requisition version, with a mandatory reason and the approval route F1 selects. 
 field is checked at all. A8 extends that existing compare-against-what-was-approved
 pattern from one field to the eligibility minimums.
 
+## Closed since this list was first written — recorded, not deleted
+
+| Was listed here as undecided | Now decided by | Where the rule lives |
+|---|---|---|
+| Whether versioning applies to the **Hiring Request only or the Requisition too** (B3) | **A6** *(locked)* | **This section**, *DECIDED (A6)* above — **both** records, **one** mechanism |
+| Whether the same material matrix applies to requisition changes (C11) | **A6** *(locked)* | **This section**, *DECIDED (A6)* above — the **same mechanism**, with its **own configurable field list** per record |
+
+**Neither is open.** A6 exists precisely to close the path around A1 that
+request-only versioning would leave open, so this list must never be read as
+reopening it.
+
 ## UNDECIDED — DO NOT IMPLEMENT
-- Whether versioning applies to the **Hiring Request only or the Requisition too**
-  (B3). Q24 making requisitions approvable suggests both; D7 does not say.
-- Whether the same material matrix applies to requisition changes (C11).
-- Whether a pending change is **visible** to recruiters, and how (C40).
+- Whether a pending change is **visible** to recruiters, and how (C40) — **A5 makes
+  answering this necessary rather than optional.**
 - Whether **rejected** proposed versions are visible to all authorised users or
   only the proposer (C41).
 - Whether supporting documents reuse the **existing document DMS** (C42).
@@ -3533,8 +3571,10 @@ closed all five former blockers.
 
 **This is not drift.** The owner decided *direction* deliberately and left *values*
 — role profile contents, approval chains, thresholds, defaults — to be set once the
-consequences were visible. The five blocking items in Section 15(B) are what must
-close before implementation planning begins.
+consequences were visible. **All five of those values have since been decided**, which
+is why Section 15(B) is empty: the blocking set closed, item by item, rather than being
+set aside. **Nothing in Section 15(B) remains to be answered before implementation
+planning begins.**
 
 ## A note on what did NOT change
 
