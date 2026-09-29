@@ -912,8 +912,10 @@ additions, not replacements. No control is lost.**
 **DECIDED: when a new approved version is created, existing candidates attached to
 that requirement move to the latest approved version (Q13).**
 
-**DECIDED: if a candidate no longer appears to satisfy the latest requirement, DO
-NOT automatically reject. Flag REVIEW REQUIRED (Q14).**
+**DECIDED: a candidate whose eligibility the latest requirement may affect is NEVER
+automatically rejected. Flag REVIEW REQUIRED (Q14)** — and, per **A1** below,
+**every active candidate** on the requirement is flagged, **unconditionally**, not
+only those a comparison suggests may fail.
 
 **DECIDED: the candidate must be reviewed before progressing (Q16).**
 
@@ -1325,7 +1327,7 @@ and it is a prerequisite for D1 rather than an optional extra (see D1's status n
 | Field config | ✔ | ✔ | ✔ | — | — | ✔ | ✔ |
 | Dropdowns | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | Permissions | ✔ who may raise | ✔ | ✔ who may see | ✔ who may move | ✔ who approves | ✔ | ✔ |
-| Material-change list | ✔ | ✔ (if B3 = both) | ✔ triggers review | — | ✔ | — | — |
+| Material-change list | ✔ | ✔ (**A6** — its **own** configurable list) | ✔ triggers review | — | ✔ | — | — |
 | Pending-change effect | ✔ | ✔ | ✔ may pause work | — | — | — | — |
 | Active definition | — | — | ✔ visibility | ✔ source of truth | — | — | — |
 | "Hired" definition | — | ✔ closure | ✔ pool membership | ✔ terminal point | — | ✔ | ✔ |
@@ -2472,8 +2474,8 @@ thrown out by a machine.**
 | # | Rule | Q |
 |---|---|---|
 | 1 | When a new approved version is created, **existing candidates attached to that requirement move to the latest approved version** | Q13 |
-| 2 | If a candidate no longer appears to satisfy the latest requirement, **DO NOT automatically reject** | Q14 |
-| 3 | Instead the candidate is flagged **REVIEW REQUIRED** | Q14 |
+| 2 | A candidate whose eligibility the new version may affect is **NEVER automatically rejected** | Q14 |
+| 3 | The candidate is flagged **REVIEW REQUIRED** — **unconditionally**, never on the strength of a comparison (see rules 11–12) | Q14 · **A1** |
 | 4 | **Previous assessments and interviews remain valid** and are not automatically invalidated | Q15 |
 | 5 | The candidate **must be reviewed before progressing** | Q16 |
 | 6 | Reviewer permission follows **role defaults + configurable permission + recruitment scope** | Q17 |
@@ -3263,6 +3265,7 @@ it was asked, the decision that closed it, and where the governing rule now live
 | **C21** — which landing becomes the one home? | **C21** *(locked)* | `/recruitment`. `/recruitment-cc` and the analytics engine **retained**; naming via the terminology engine | §11 |
 | **C23** — confirmation of the D8 reading | **C21** *(locked)* | **Confirmed**: general Home remains the landing page; one recruitment home, one click away | §2 (D8), §11 |
 | **C36** — on Reject, does the candidate return to the pool or stay closed? | **C36** *(locked)* | The row stays closed; **no "return to pool" transition**; availability evaluated **per person** across rows | §2 (D3), §7, §19 |
+| **C26** — which business rules permit a candidate to **return to the available pool**? | **C36** *(locked)* | **There are none, because there is no such transition.** Availability is **derived**: a person not hired **AND** under no active recruitment process is in the available pool, evaluated **per person** across all their candidate rows through the **existing** pool convergence. One rejected candidate row does **not** start a return-to-pool workflow | §2 (D3), §7, §19 |
 | **C38** — can Offer and Candidate Hiring approval both fire, and in what order? | **A3** | Both, **in a fixed order** set by the lifecycle. A refused hiring approval blocks conversion without rejecting the candidate | §2 (D5), §8 |
 | **C39** — does administrator override apply per user, per role, or both? | **A4** | **Per role only.** A shipped profile is a **default, not a floor** | §2 (D4), §7 |
 | **C43** — does a Reject write a terminal stage, and which? | **C43** *(locked)* | The configured **closed / not-proceeding** stage, by **kind** never name; fails safe as a configuration problem; never the legacy field | §2 (D1, D7-CAND), §19 |
@@ -3334,7 +3337,6 @@ These have **no** locked rule. Nothing here may be decided in code.
 | C22 | Whether **Role Workspaces** are the mechanism for per-role landing within the one home | D8, C21 |
 | C24 | Whether "Hiring Manager" / "Department Head" are the Pack's "Recruitment manager" / "Department manager" | D4 |
 | C25 | The candidate **state machine** and its transition triggers, the active boundary now being configurable | D3, Q2 |
-| C26 | Which business rules permit a candidate to **return to the available pool** | D3, C36 |
 | C37 | Where "Hired" = **Offer Accepted**, the candidate's **visibility** between accepting and joining — A2 protects them from version changes but does not decide visibility | Q21, D3 |
 | C40 | How a **pending** material change is made visible to people still working — **A5 makes answering this necessary, not optional** | D7, A5 |
 | C41 | Whether **refused or withdrawn** proposals are visible to the proposer only, or to all authorised users | Q7, G2 |
@@ -3500,7 +3502,7 @@ repository or the audit. Where no mechanism exists, the cell says so.
 |---|---|---|---|---|
 | **D1** | The configurable pipeline is the authoritative candidate lifecycle | `lib/recruitpipe.php` (L04) — built, tested, admin-configurable; stage ledger `candidate_events` via `rkpi_stage_log()`; 4 pipelines / 33 stages; **2 of 935 candidates adopted** | Reconciliation and migration later; consumers moved off legacy `stage`; partial sync retired. **Requires the `closed` stage kind (C43) before it is implementable, and C15–C18 inherit that dependency** | **DECIDED / DEPENDENCY** |
 | **D2** | Core requirement approved at Hiring Request; execution detail at Requisition; inherit, never weaken | `lib/hiringreq.php` holds 32 of the core fields incl. 4 budget estimate fields; `requisitions` holds the person-spec fields (`lib/recruit.php:57-58`); inheritance carries 17 fields (`lib/hiringreq.php:1242-1265`) | Add **three** concepts (qualification, experience, essential skills); widen inheritance to the latest approved version; define weaken-enforcement posture | **DECIDED** |
-| **D3** | Available pool company-wide; active candidates gated; **active definition configurable per organisation / pipeline** | Candidate register unscoped `$where='1=1'` (`lib/ops.php:6503`); **no office column on `candidates`**; office scope engine works for requisitions (`lib/ops.php:5840`); **no active-status concept exists** | Derive active state from pipeline stage kinds (Q2 — no separate engine); decide whether candidates gain an office dimension | **DECIDED / DETAIL PENDING** |
+| **D3** | Available pool company-wide; active candidates gated; **active definition configurable per organisation / pipeline** | Candidate register unscoped `$where='1=1'` (`lib/ops.php:6503`); **no office column on `candidates`**; office scope engine works for requisitions (`lib/ops.php:5840`); **no active-status concept exists** | Derive active state from pipeline stage kinds (Q2 — no separate engine). **A7 has settled the scope question: candidates gain NO office dimension.** An active candidate's scope is **derived** from the requirement reached through its requisition — that requirement's office and business unit — using the **existing** scope helpers; `candidates.sbu` stays **descriptive** and never replaces it; a candidate on no requirement belongs to the company-wide pool under the configured access model; and moving a requisition's office or SBU moves the scope of the active candidates attached to it. **No candidate office column, and no migration for one** | **DECIDED / DETAIL PENDING** |
 | **D4** | Role defaults + configurable permissions + recruitment scope | `mod.hiring.view`, `mod.hiring.edit`, `hiring.admin` (`lib/access.php:156,198`); candidate screens gated by `is_coordinator_level()` (`lib/ops.php:6867`); Configurable Role Workspaces exist | Define role profiles with administrator override (Q23); reconcile the coordinator predicate; define recruitment scope | **DECIDED / DETAIL PENDING** |
 | **D5** | Configurable approval for **five** events; no rule means no approval | `lib/recruit_approval.php` (L05) carries approvers, sequence, conditions, thresholds, SLA, reminders, escalation, delegation. `HIRING_REQUEST` and `OFFER` fire; **`REQUISITION` and `SALARY` never fire**; `APPR_ENTITIES` is a constant; **0 rules configured** | Add a Candidate Hiring event; **wire Requisition and Salary**; decide the new-organisation default under Q22 | **DECIDED / DETAIL PENDING** |
 | **D6** | Significant offer lifecycle events permanently auditable; never rewritten | Two audit mechanisms exist: `act_log()` and `candidate_events`/`rkpi_stage_log()`. **`act_log` count in `lib/recruit_offer.php` = 0** — offers appear in neither | Map the 10 business events; carry them on one existing mechanism. **No third mechanism** | **DECIDED / DETAIL PENDING** |
@@ -3534,8 +3536,8 @@ repository or the audit. Where no mechanism exists, the cell says so.
 | **Q19** | D7-CAND | Outcome is Continue or Reject; both need a reason | Candidate rejection exists | Two outcomes, both reasoned | **DECIDED** |
 | **Q20** | D7-CAND | Reject is immediate, no further approval | Rejection needs no approval today | None beyond the review flow | **DECIDED** |
 | **Q21** | D1, D3 | "Hired" configurable — Offer Accepted **or** Actual Joined; both remain distinct events | Acceptance and joining are already distinct steps (`lib/recruit_offer.php`, workforce hand-off) | A per-organisation setting; consumers read it | **DECIDED** |
-| **Q22** | D5 | No configured rule means the event needs no approval | `appr_start()` already starts nothing when no rule matches — **but `approval_required` defaults to 1, so the record waits for a manual decision** | Decide the new-organisation default (**B2**) | **DECIDED / DETAIL PENDING** |
-| **Q23** | D4 | Predefined role profile + administrator override | Role model and Role Workspaces exist | Define the profiles (**B4**) and the override scope | **DECIDED / DETAIL PENDING** |
+| **Q22** | D5 | No configured rule means the event needs no approval | `appr_start()` already starts nothing when no rule matches — **but `approval_required` defaults to 1, so the record waits for a manual decision** | **Closed by B2:** a new organisation starts with approval **required**. Where approval is required and no rule matches, the request **waits** and the condition surfaces as a **configuration problem** naming what to fix — it never self-approves and **no approver is invented**. A configuration change applies to requests raised **after** it; requests already submitted keep the configuration, and mid-chain the chain, in force when they were raised, with deliberate **withdraw and resubmit** available | **DECIDED** |
+| **Q23** | D4 | Predefined role profile + administrator override | Role model and Role Workspaces exist | **Closed by B4** (with the override model at **A4**): the three shipped profiles are tabled in full at §7. A profile is a **default, not a floor** — an administrator may grant **and** remove rights through the **existing** role and access model; **no per-user layer**; salary visibility stays on the existing **`data.salary`**; sensitive permissions are always set **deliberately** and a shipped change that adds one does **not** propagate without administrator action. Only the two capability codes remain an implementation detail (**C46**) | **DECIDED** |
 | **Q24** | D5 | Requisition approval configurable per organisation | Configurable today but **never fires** | Wire it | **DECIDED** |
 | **Q25** | D9 | Mobile operational; complex administration desktop | Responsive UI exists; unverified | Verification | **DECIDED / VERIFICATION** |
 ---
@@ -3561,8 +3563,8 @@ itself is unchanged — a status still says how ready a decision is to build.
 is empty.** Of the ten primary decisions, **D2 is clear to plan against**, **D1 is
 decided with a named dependency** (the closed stage kind), **seven** carry pending
 detail at Section 15(C), and **D9** additionally requires verification. Of the
-twenty-five supporting decisions, **twenty-two are clear** — Q14 having been closed by
-A1 — **two** carry pending detail, and **one** (Q25) requires verification.
+twenty-five supporting decisions, **twenty-four are clear** — Q14 closed by A1, and
+Q22 and Q23 closed by **B2** and **B4** — and **one** (Q25) requires verification.
 
 **What "pending detail" now means.** Every remaining item at Section 15(C) is a value,
 a mapping or a reconciliation — **none is a business decision awaiting the owner**, and
