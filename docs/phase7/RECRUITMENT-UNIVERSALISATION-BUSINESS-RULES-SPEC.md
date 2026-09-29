@@ -63,7 +63,7 @@ The numbering differs; the intent does not.
 **From this document onward, the owner's D1–D9 numbering is authoritative.**
 
 ---
-## This is the third issue of this specification
+## The four issues of this specification, and the correction programme that followed
 
 - **Issue 1** converted decisions **D1–D9** as they stood.
 - **Issue 2** incorporated the twenty-five supporting decisions **Q1–Q25** and the
@@ -77,6 +77,11 @@ The numbering differs; the intent does not.
   integrated** into the numbered sections, together with the six Part-B
   configuration values (**B2 · B4 · C45/C9 · C36/C43 · G2 · C21**), in a four-batch
   integration pass.
+- **A documentation-correction programme** then followed: the **Task 6A** read-only
+  validation audit, and five documentation-only correction batches (**6B-1** to
+  **6B-3c**) that closed every documentation finding it raised. Section 18 records
+  the sequence. **It changed no decision** — only statements that had fallen out of
+  step with the decisions.
 
 **PRECEDENCE — one rule, and it runs one way.**
 
@@ -357,8 +362,12 @@ yet authoritative. **That distinction must be stated in any status report.**
 
 - A **pipeline** is an ordered set of **stages** belonging to one recruitment
   model (an industry, a business type, or a specific hiring style).
-- A **stage** carries a *kind* (its business meaning — screening, interview,
-  offer, terminal) and a *label* (what the user sees).
+- A **stage** carries a *kind* (its business meaning) and a *label* (what the user
+  sees). The kinds are **step · gate · interview · offer · terminal · closed /
+  not proceeding**, where **terminal** is the **successful** end — hired and
+  onboarding — and **closed / not proceeding** means the candidate is **no longer
+  proceeding**. The two are **distinct**, and the closed kind is a prerequisite for
+  D1 (C43, and D1's status note above).
 - The **kind** is what downstream engines reason about. The **label** is what
   configuration changes freely.
 - A candidate occupies exactly one stage of exactly one pipeline at a time.
@@ -1491,7 +1500,7 @@ D3 decides *when* a gate applies. D4 decides *who* passes it.
 | **Active Candidate** | Attached to an active recruitment process | Candidate state **+** recruitment relationship **+** permission |
 | **Hiring Transition** | Reached hiring / offer / acceptance stages | Controlled transition state |
 | **Joined / Workforce** | Entered the workforce | No longer treated as a general recruitment-pool candidate |
-| **Released / Available Again** | No longer actively engaged; where business rules allow, returns to the available pool | Back to company-wide |
+| **Released / Available Again** | **Derived, not transitioned (C36):** the person is not hired and is under no active recruitment process, so they are in the available pool again. There is **no "Return to Pool" action** — availability is evaluated **per person across all their candidate rows** through the existing pool convergence, and closing one candidate row starts no workflow | Back to company-wide |
 
 ## "Active recruitment process" is configurable (D3 · Q2)
 
@@ -2883,6 +2892,14 @@ serves**. Deprecation comes second-to-last, and only after a mapping exists.
 | The audit's verdict: **"Possible duplicate.** Home is a launchpad; CC is the funnel/KPI board. OPEN QUESTION whether two landings are warranted." | audit §16 |
 | Components: `lib/recruit.php` (Command Centre / launchpad) and `lib/recruit_cc.php` (Phase 7 Command Centre) | audit L01, L09 |
 
+**Note on the wording above — historical, not current.** That row uses "Command
+Centre" for **both** components, because that is how the audit found them, and **it
+is preserved deliberately as evidence of the naming collision C21 resolves.** It is
+not current terminology. **Currently: `/recruitment` is the one primary Recruitment
+home, and `/recruitment-cc` is the analytics board**, renamed for its actual purpose
+through the existing terminology engine (C21, below). **No route or file is
+renamed by this specification.**
+
 **EVIDENCE — what is *not* a duplicate.** The audit checked and found these to be
 intentionally distinct, and D8 must not be used to collapse them:
 
@@ -3219,11 +3236,12 @@ enhancement, and the deferred legacy migration (C15–C18) inherits that depende
 preference, and this map is read in that order: reuse what exists, extend before
 connecting, and **build only when nothing else serves.** Nothing has reached BUILD.
 
-**The zero has survived every addition.** Three issues, thirty-five decisions and
-two rules locked in consistency review later, the material-change versioning model,
-the candidate review flow, a fifth approval event and rejected-candidate
-findability all map onto mechanisms that already exist. **Five of the thirty-one
-need widening; none needs inventing.**
+**The zero has survived every addition.** Four issues, thirty-five decisions and
+sixteen rules locked in review later, the material-change versioning model, the
+candidate review flow, a fifth approval event and rejected-candidate findability all
+map onto mechanisms that already exist. Of the **forty-one** rows mapped above —
+**28 REUSE · 3 REUSE + adjust · 8 EXTEND · 2 CONNECT/MAP · 0 BUILD NEW** —
+**eight need widening; none needs inventing.**
 
 **That last row is the specification's central architectural claim.** Nine
 business decisions, and not one of them requires a new engine.
@@ -3586,8 +3604,9 @@ planning begins.**
 
 ## A note on what did NOT change
 
-Across five issues, thirty-five decisions and **sixteen** rules locked in review and
-Part-B resolution, the architectural answer has not moved:
+Across four issues, thirty-five decisions and **sixteen** rules locked in review and
+Part-B resolution — and the documentation corrections that followed — the
+architectural answer has not moved:
 **no new engine is required.** One approval engine, one pipeline engine, one KPI/SLA
 engine, one configuration model. The five configuration dimensions added by this
 issue all attach to mechanisms that already exist, and the versioning model D7 needs
@@ -3651,10 +3670,45 @@ the execution gate's action set, requisition eligibility fields and change contr
 candidate table columns, and the approved-quantity comparison). **Nothing executed,
 nothing changed.**
 
+**The integration pass.** The eight rules A1–A8 and the six Part-B configuration
+values were integrated into the numbered sections in **four reviewed batches**, each
+followed by a preservation and integrity report: Sections 2, 4, 5, 6 · Sections 7, 8,
+10, 11, 12 · Sections 14, 15, 16, 17 · Sections 19 and 20. **Documentation only.**
+
+**The documentation-correction programme.** A read-only validation audit (**Task
+6A**) compared every locked decision against every statement about it and raised
+**26** documentation findings — no wrong rule among them, but stale open-item lists,
+status cells, prompts and counts that contradicted decisions already taken. Five
+**documentation-only** batches closed all 26:
+
+| Batch | Scope | Findings closed | Commit |
+|---|---|---|---|
+| **Task 6A** | Read-only validation audit — **no edits** | — (26 raised) | audit baseline |
+| **6B-1** | P0 — the precedence reversal, the stale permission prohibition, four stale open-item entries, one self-contradiction | K2 · V6 · V1 · V2 · V3 · V4 · V7 | `6df5fa7` |
+| **6B-2** | P1 — the A2 closure label over-claiming C37 | V5 | `6d57bc2` |
+| **6B-3a** | P2 — the conditional Review Required trigger, two traceability statuses, the candidate-office prompt, the material-matrix conditional, C26 | V15 · V8 · V9 · V10 · V14 · V16 | `53dbacd` |
+| **6B-3b** | P3 — a retired status named as live, and four stale "still to be decided" gates | K1 · K3 · V13 · V11 · V12 | `86e910d` |
+| **6B-3c** | P3/P4 — this batch: return-to-pool wording, a false `(open)` marker, the issue and architecture counts, this record, the stage-kind list, the Command Centre evidence | V17 · V18 · V19 · V20 · V21 · V22 · V23 | *this commit* |
+
+**What the programme did and did not do.** Every batch was **documentation only** —
+no PHP, JavaScript, CSS, HTML, schema, database, route, permission, workflow, test,
+configuration or deployment change, and **no application testing was performed or
+claimed**. Verification was by section hashing, table validation and
+finding-by-finding assertion against the document itself. **No business decision was
+changed, added or reinterpreted**, and no genuinely open question was closed:
+**C37** — the visibility of a candidate between Offer Accepted and Joined — was
+explicitly confirmed **OPEN** and left untouched throughout.
+
+**Zero Task 6A documentation findings now remain.** That is a statement about this
+document's internal consistency, **not** about the business: the items at Section
+15(C) and 15(D), C37 among them, remain open and may not be decided in code.
+
 **One error was made and corrected during Issue 2.** An editing range overran and
 removed Section 16 (Explicit Non-Goals). It was detected by a section-inventory check
 before commit and restored from the committed Issue 1 text, then extended. The
-section is present and complete.
+section is present and complete. **The discipline that followed from it** — targeted
+string anchors with uniqueness assertions, never line ranges, and a section inventory
+before and after every edit — was applied to every batch above.
 
 ---
 
@@ -3865,7 +3919,7 @@ A8 (weakening routes as a      A2 (…but only up to an issued offer)
 
 A4 (role defaults + override) ──▶ Q8  propose a change
                               └──▶ Q17 clear a Review Required
-                              └──▶ B4  the profile contents (open)
+                              └──▶ B4  the profile contents (LOCKED)
 
 A5 (pending-change levels) ──▶ C40 pending change must be visible (open)
 A7 (scope from the requirement) ──▶ D3 pool stays company-wide
