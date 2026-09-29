@@ -24,8 +24,12 @@ Where the audit and a decision disagree, **the decision wins and the
 disagreement is written down** — it is never resolved quietly in code.
 
 The traceability table in Section 17 uses three further compound statuses —
-*DECIDED / DETAIL PENDING*, *DECIDED / BLOCKED* and *DECIDED / VERIFICATION* —
-defined in that section's own status legend.
+*DECIDED / DETAIL PENDING*, *DECIDED / DEPENDENCY* and *DECIDED / VERIFICATION* —
+defined in that section's own status legend. **A fourth, *DECIDED / BLOCKED*, is
+retired**: it meant "waiting on an unanswered business question", and no item can
+hold it now that all five blocking questions are closed. Where an item is decided
+but needs a **prerequisite built** rather than a question answered, it reads
+*DECIDED / DEPENDENCY*.
 
 This document authorises **no change to any running system**. Section 16 states
 that explicitly.
@@ -3486,8 +3490,10 @@ organisation architecture
 ## What must happen next
 
 A **separate implementation plan**, written only after this specification is
-reviewed and approved, and after the blocking clarifications in Section 15(B) are
-answered.
+reviewed and approved. **Section 15(B)'s former blocking clarifications are
+resolved, so planning is no longer gated on them.** The items still recorded as
+open at Section 15(C) and Section 15(D) are handled according to their recorded
+status — and, per this section, none of them may be decided in code.
 
 ---
 
@@ -3501,10 +3507,10 @@ repository or the audit. Where no mechanism exists, the cell says so.
 | Decision | Business Requirement | Existing Mechanism | Future Change Needed | Status |
 |---|---|---|---|---|
 | **D1** | The configurable pipeline is the authoritative candidate lifecycle | `lib/recruitpipe.php` (L04) — built, tested, admin-configurable; stage ledger `candidate_events` via `rkpi_stage_log()`; 4 pipelines / 33 stages; **2 of 935 candidates adopted** | Reconciliation and migration later; consumers moved off legacy `stage`; partial sync retired. **Requires the `closed` stage kind (C43) before it is implementable, and C15–C18 inherit that dependency** | **DECIDED / DEPENDENCY** |
-| **D2** | Core requirement approved at Hiring Request; execution detail at Requisition; inherit, never weaken | `lib/hiringreq.php` holds 32 of the core fields incl. 4 budget estimate fields; `requisitions` holds the person-spec fields (`lib/recruit.php:57-58`); inheritance carries 17 fields (`lib/hiringreq.php:1242-1265`) | Add **three** concepts (qualification, experience, essential skills); widen inheritance to the latest approved version; define weaken-enforcement posture | **DECIDED** |
+| **D2** | Core requirement approved at Hiring Request; execution detail at Requisition; inherit, never weaken | `lib/hiringreq.php` holds 32 of the core fields incl. 4 budget estimate fields; `requisitions` holds the person-spec fields (`lib/recruit.php:57-58`); inheritance carries 17 fields (`lib/hiringreq.php:1242-1265`) | Add **three** concepts (qualification, experience, essential skills); widen inheritance to the latest approved version; **A8 has settled the enforcement posture:** a Requisition value below the approved Hiring Request minimum is a **weakening**, judged against the **approved minimum** and never against the Requisition's previous value, and is routed through the **material-change / versioning process** with a mandatory reason — neither silently permitted nor blocked outright. Where no approval is required, it still needs a reason and still creates a version | **DECIDED** |
 | **D3** | Available pool company-wide; active candidates gated; **active definition configurable per organisation / pipeline** | Candidate register unscoped `$where='1=1'` (`lib/ops.php:6503`); **no office column on `candidates`**; office scope engine works for requisitions (`lib/ops.php:5840`); **no active-status concept exists** | Derive active state from pipeline stage kinds (Q2 — no separate engine). **A7 has settled the scope question: candidates gain NO office dimension.** An active candidate's scope is **derived** from the requirement reached through its requisition — that requirement's office and business unit — using the **existing** scope helpers; `candidates.sbu` stays **descriptive** and never replaces it; a candidate on no requirement belongs to the company-wide pool under the configured access model; and moving a requisition's office or SBU moves the scope of the active candidates attached to it. **No candidate office column, and no migration for one** | **DECIDED / DETAIL PENDING** |
 | **D4** | Role defaults + configurable permissions + recruitment scope | `mod.hiring.view`, `mod.hiring.edit`, `hiring.admin` (`lib/access.php:156,198`); candidate screens gated by `is_coordinator_level()` (`lib/ops.php:6867`); Configurable Role Workspaces exist | Define role profiles with administrator override (Q23); reconcile the coordinator predicate; define recruitment scope | **DECIDED / DETAIL PENDING** |
-| **D5** | Configurable approval for **five** events; no rule means no approval | `lib/recruit_approval.php` (L05) carries approvers, sequence, conditions, thresholds, SLA, reminders, escalation, delegation. `HIRING_REQUEST` and `OFFER` fire; **`REQUISITION` and `SALARY` never fire**; `APPR_ENTITIES` is a constant; **0 rules configured** | Add a Candidate Hiring event; **wire Requisition and Salary**; decide the new-organisation default under Q22 | **DECIDED / DETAIL PENDING** |
+| **D5** | Configurable approval for **five** events; no rule means no approval | `lib/recruit_approval.php` (L05) carries approvers, sequence, conditions, thresholds, SLA, reminders, escalation, delegation. `HIRING_REQUEST` and `OFFER` fire; **`REQUISITION` and `SALARY` never fire**; `APPR_ENTITIES` is a constant; **0 rules configured** | Add a Candidate Hiring event; **wire Requisition and Salary**. **B2 has settled the default:** approval is **required** for a new organisation, and where approval is required but no rule matches, the request **waits** and the condition surfaces as a **configuration problem** — never self-approval, never an invented approver. Requests already submitted keep the configuration, and mid-chain the chain, in force when they were raised, with deliberate **withdraw and resubmit** available | **DECIDED / DETAIL PENDING** |
 | **D6** | Significant offer lifecycle events permanently auditable; never rewritten | Two audit mechanisms exist: `act_log()` and `candidate_events`/`rkpi_stage_log()`. **`act_log` count in `lib/recruit_offer.php` = 0** — offers appear in neither | Map the 10 business events; carry them on one existing mechanism. **No third mechanism** | **DECIDED / DETAIL PENDING** |
 | **D7** | Material change creates a pending proposed version; approved version stays effective; configurable field list and approval route; full history | `HREQ_MATERIAL_FIELDS` (12 fields), `hreq_material_diff()` against `approved_snapshot_json`, `reapproval_state`, `HREQ_REAPPROVAL_BLOCKS`; documented at `docs/phase3/M4-MATERIAL-CHANGE-MATRIX.md`; **quotation revision table is an existing version-chain pattern** | Make the field list configurable; add budget; add a version chain; make the effect on recruitment configurable; add the separate material-change chain option | **DECIDED / DETAIL PENDING** |
 | **D7-CAND** | Candidates move to the latest approved version; eligibility risk is flagged for review, never auto-rejected. **F2:** a relaxed requirement does not auto-reconsider a rejected candidate — the rejection stands and the candidate stays findable | Stage ledger exists; **no review-flag concept, no version link on a candidate**; candidate rejection carries **no reason** (`CAND_STAGES`, `lib/ops.php:78`), which is why automatic reconsideration is neither safe nor possible; register already filters by stage (audit S2) | New review state and its clearance flow (Section 19); findability by REUSE | **DECIDED / DETAIL PENDING** |
@@ -3897,7 +3903,10 @@ rules.** Section 16's non-goals apply to every rule recorded here.
 The next step is **not** code. It is:
 
 1. The owner reviews this specification.
-2. The owner answers the **five blocking clarifications** in Section 15(B).
+2. **Section 15(B)'s five former blocking clarifications are resolved** — nothing
+   there remains to be answered. The items still recorded as open at Section 15(C)
+   and Section 15(D) are handled according to their recorded status, and none of
+   them may be decided in code.
 3. A separate **implementation plan** is written and approved.
 4. Only then does implementation begin — and **D1, D2 and Q21** come first, because
    everything else is built on them.
