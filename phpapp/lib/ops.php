@@ -3499,7 +3499,18 @@ function ops_dispatch($route, $method) {
             return ops_recruit_pipelines($route, $method);
         case $route === 'candidate-flow':      // Phase 2b — move a candidate along its configured pipeline
             return ops_recruit_candidate_flow($route, $method);
-        case $route === 'candidate-stage':     // Per-stage capture — notes + documents for one pipeline stage
+        //  GATE 0 · F7 — this case was written as 'candidate-stage', which the
+        //  candidate family's case above already claims for ops_candidates(). PHP
+        //  matches switch(true) in order, so this branch was unreachable and the
+        //  Pipeline tab's three forms (stage notes, upload, delete document) posted
+        //  into the legacy stage-move handler, which found no `to_stage` and
+        //  answered "Unknown stage." — three broken functions behind a misleading
+        //  message. The legacy route name is NOT moved: it is the single execution
+        //  choke point (rexec_block_reason, the joining transaction, drop reason)
+        //  and is depended on by candidate_detail.php, four test workers and the
+        //  browser UAT. Per-stage capture takes a distinct name instead, chosen so
+        //  it does not share the '/candidate-stage' prefix the UAT selector matches.
+        case $route === 'candidate-pipestage': // Per-stage capture — notes + documents for one pipeline stage
             return ops_recruit_candidate_stage($route, $method);
         case $route === 'positions' || $route === 'positions-org' || $route === 'positions-import':   // Phase 3 — position master, org chart & import
             return ops_positions($route, $method);

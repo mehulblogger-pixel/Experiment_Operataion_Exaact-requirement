@@ -761,6 +761,194 @@ Money, Marketplace, dashboards and APIs are untouched by either.
 **Gate 0 and Gate 1 are unblocked by all three** — neither touches workforce timing,
 approval segregation or role profiles.
 
+## 20b. Gate 0 — reachability, baseline and pre-pipeline safety (executed)
+
+**Documentation-plus-minimal-correction gate. Executed at `6238875`.** Everything
+below is measured, not inferred.
+
+### F2 — closed and recorded
+
+The owner selected **option C**. Recorded in the Closure Pack §5.12 and its register:
+**requester ≠ approver always; the master / superuser exception is configurable per
+organisation and OFF by default**; every use is audit-recorded as requester = approver
+under the master exception; **no per-user exception**. Migration of existing workspaces
+is explicitly left to **Gate 4** as an implementation matter — *"existing workspaces
+enabled, new workspaces disabled"* is a discussion hypothesis and is **not** a locked
+rule.
+
+### F7 — VERIFIED as a live functional defect, and corrected
+
+**Evidence table (source at `6238875`):**
+
+| Location | Handler | Purpose | Reachable? | Callers / tests |
+|---|---|---|---|---|
+| `ops.php:3476` (candidate family case) | `ops_candidates()` → `ops.php:6249` | Legacy stage move — **the single execution choke point** (`rexec_block_reason()`, the joining transaction, drop reason/point) | **YES** — matched first | `views/ops/candidate_detail.php:463`; workers `_p6b2_worker`, `_rb3s3_worker`, `_p4_worker`; `test_p3m4_security.php:230`; `test_p3m6_security.php:211`; `tools/p7-browser-uat.js:183` |
+| `ops.php:3502` (before fix) | `ops_recruit_candidate_stage()` → `recruitpipe.php:701` | Pipeline per-stage capture — notes, document upload, document delete | **NO — shadowed** | `recruitpipe.php:767, 791, 802` — **three live forms**; no test referenced it by route |
+
+**The defect was worse than 7B reported.** The shadowed handler is **not** dead code —
+three live Pipeline-tab forms post to it. Those forms send `do=notes|upload|deletedoc`
+and **no `to_stage`**, so they reached the legacy handler, which read `''`, failed
+`isset(lk_options_or('candidate_stage', CAND_STAGES)[''])` and answered
+**"Unknown stage."** So **stage notes could not be saved, stage documents could not be
+uploaded, and stage documents could not be deleted** — three user-facing functions
+broken behind a message that described none of them.
+
+**Correction — and why it runs the other way.** The naive fix (removing
+`candidate-stage` from the family case) would have handed the route to the pipeline
+handler and **silently disabled the execution choke point**. The legacy name was
+therefore **not moved**. Per-stage capture took a distinct name,
+**`candidate-pipestage`**, chosen so it does not even share the `/candidate-stage`
+prefix that the browser UAT's `form[action^=…]` selector matches and `.first()`-picks.
+
+**Changed: four lines.** One dispatcher case name (`lib/ops.php`) and three form actions
+(`lib/recruitpipe.php`). **No business logic, no permissions, no lifecycle, no schema.**
+Module gating needs no map entry — `ops_module_family('candidate-pipestage')` resolves to
+`hiring` through the `candidate` family, asserted in the test, which is why
+`candidate-flow` needs no entry either.
+
+### Baseline — candidate pipeline adoption (measured)
+
+**Production is NOT reachable from this container.** The repository holds no database,
+and the MariaDB instance available here carries ~300 **regression and mutation
+fixtures**, not the live tenant. **The figures below are the seeded regression fixture
+measured on `gate0_base`, the database this run's own suite built — not current
+production facts.**
+
+| Metric | Measured |
+|---|---|
+| Total candidates | **935** |
+| With a legacy stage (non-empty) | **935 (100%)** |
+| With `pipeline_id` | **2** |
+| With `pipeline_stage_id` | **2** |
+| With both legacy and pipeline stage | **2** |
+| With neither | **0** |
+| Configured pipelines | **4** |
+| Configured stages | **33** |
+| **Approval rules configured** | **0** |
+
+**The audit's historical 935 / 2 / 4 / 33 / 0 figures are reproduced exactly on the
+fixture.** They remain historical with respect to production, which must be re-measured
+before any migration.
+
+### TWO NEW FINDINGS — data integrity, discovered by measurement
+
+**G0-1 · Ten candidate rows carry a legacy stage that is not a valid stage.**
+
+| Value | Rows | Valid `CAND_STAGES` key? | In any `REQF_*` set? |
+|---|---|---|---|
+| `OFFER` | **9** | **NO** (the valid key is `OFFERED`) | **NO** |
+| `' RECEIVED'` *(leading space)* | **1** | **NO** | **NO** |
+
+Verified against `CAND_STAGES` and the lookup-resolved set (10 keys either way), and
+against all three classification constants. These ten rows are therefore **neither
+filled, nor active, nor lost** — they are **invisible to the funnel arithmetic** — and
+**unmapped** for any legacy→pipeline migration. The same ten appear in `scope_regress`
+and `ops_reg`, so this is **systematic seed data, not a one-off.**
+
+**Consequence for Gate 1:** C16's mapping table must handle unknown and
+whitespace-corrupted legacy values **explicitly and visibly**, not silently drop them.
+This is exactly D1's principle 4 — *"a conflict is reported, not guessed."*
+
+**G0-2 · One row is closed on the legacy field while sitting on a live pipeline stage.**
+`stage IN (ACCEPTED, REJECTED, WITHDRAWN, OFFER_DECLINED)` **and**
+`pipeline_stage_id > 0` — **1 row**. The first real instance of the legacy/pipeline
+disagreement class. It must be **surfaced for a human**, per D1.
+
+**Neither is fixed here.** Both are Gate 1 prerequisites, recorded not repaired.
+
+### PART E — the `REQF_*` choke point, measured (and a 7B claim refined)
+
+| Consumer | Uses `REQF_*`? | Reads `candidates.stage` independently? |
+|---|---|---|
+| `lib/reqfulfil.php` (owner of the constants) | ✔ all three | — |
+| `lib/recruit_kpi.php` | ✔ all three | ✔ (`c.stage IN (…)` in demand, settled rows, metrics) |
+| `lib/recruit_exec.php` | ✔ filled | ✔ |
+| `lib/recruit_fulfil.php` | ✔ filled | — |
+| `lib/recruit_cc.php` | ✔ filled | ✔ |
+
+**Refinement of a 7B statement.** 7B called the three constants *"the single
+classification choke point."* That is true **for classification** — filled / active /
+lost — and **five** files delegate to them. But **twelve** library files read
+`candidates.stage` **without** going through them: `candpool.php`, `crmdash.php`,
+`nextaction.php`, `opportunities.php`, `ops.php`, `recruit.php`, `recruit_assign.php`,
+`recruit_export.php`, `recruit_offer.php`, `recruitpipe.php`, `search.php`, `tosrm.php`.
+**Changing the constants moves classification, not every reader.** Gate 1 must treat
+those twelve as a separate, enumerated surface.
+
+### PART F/G — legacy and pipeline baselines
+
+**Writers of `candidates.stage`:** the column default `DEFAULT 'RECEIVED'`
+(`ops.php:202` — every row gets one at insert, which is why adoption is 935/2); route
+`candidate-stage` (`ops.php:6249`); and **`recruitpipe_cand_goto()`'s coarse legacy
+sync** (`recruitpipe.php:451–459`), which writes `INTERVIEW` / `OFFERED` and never over
+a legacy terminal. **That is two half-mechanisms inside one function** and is what D1/C14
+must end.
+
+**The configured pipeline does fall back to legacy today, in three named places:**
+`recruitpipe_cand_state()` resolves by rule when no pipeline is locked;
+`recruitpipe_legacy_terminal()` gates the flow closed (`recruitpipe.php:454`, `471`);
+and `na_candidate()` lets a terminal legacy stage **win over** the pipeline
+(`nextaction.php:169–186`). **No authority was changed in Gate 0.**
+
+### PART H/I — test baseline, both engines
+
+| Engine | Result |
+|---|---|
+| **SQLite** | **15,158 passed · 0 failed** |
+| **MariaDB 10.11** (authoritative) | **15,158 passed · 0 failed** |
+
+MariaDB was genuinely run, not assumed: the local server was started, and because
+`root` authenticates by unix socket a TCP user was created for the harness
+(`DB_DRIVER=mysql`). Targeted suites all green beforehand: recruitment 471 · p4 924 ·
+p3m6 259 · p5 kpi 145 · p3m1 approval 114 · p3m4 security 77 · rb3 atomic 83 · teamrole
+RB1/RB2 61 · module02 access 21 · quality gate 24 · invoicing 19 · calls 18 · job360 14.
+
+**One consequential detail:** the first full run came back **15,157 / 1**, the single
+failure being the **deploy checksum manifest**, stale because two shipped files changed.
+It names its own remedy, so `php tools/make_deploy_check.php` was run and
+`phpapp/deploy-check.php` regenerated — **669 files, mechanically derived**. The suite is
+green on both engines only with that regeneration included.
+
+### PART J/K — the focused test, and its mutation
+
+**`phpapp/tests/test_gate0_stage_route.php` — 24 assertions, all passing.** It reads the
+**source**, because the defect was a dispatch-ordering fact: it asserts no second case
+claims the bare name, that the family case still owns `candidate-stage`, that
+`ops_candidates()` still handles it, that `candidate-pipestage` exists after the family
+case and is no longer shadowed, that all three forms post to the new name and none to
+the old, that the new name does not share the UAT's prefix, that module family
+resolution still returns `hiring`, and that all thirteen routes in the family case are
+still listed.
+
+**Mutation:** reverting the case name to `candidate-stage` re-creates the shadowing.
+**3 assertions fail**, including the reachability condition itself. The test genuinely
+guards the invariant rather than merely passing beside it.
+
+### Gate 0 acceptance — all thirteen criteria met
+
+F2 documented as closed · F7 independently verified and its correction tested ·
+fixture data measured and production inaccessibility explicitly recorded · the 935/2
+figures **not** presented as current production facts · `REQF_*` consumers mapped (and
+the choke-point claim refined) · legacy-stage consumers mapped · pipeline consumers and
+their three legacy fallbacks mapped · SQLite baseline captured · **MariaDB baseline
+genuinely captured** · protected-module baselines captured · **no Gate 1 implementation
+occurred** · the working tree holds only the intended documentation, the four-line
+correction, the regenerated checksum manifest and one new test.
+
+### Gate 1 prerequisites produced by Gate 0
+
+1. **G0-1** — C16's mapping must handle `OFFER`, `' RECEIVED'` and any other
+   non-member legacy value **explicitly and visibly**.
+2. **G0-2** — the legacy/pipeline conflict class exists in real data (1 row) and must be
+   **surfaced, never guessed**.
+3. **Twelve** library files read `candidates.stage` outside the `REQF_*` choke point and
+   must be enumerated as their own migration surface.
+4. **Re-measure against production** before migrating; this container cannot see it.
+5. The `REQF_*` change must be accompanied by **figure-for-figure re-baselining**, since
+   five subsystems move together.
+6. `recruitpipe_cand_goto()`'s coarse legacy sync and the three pipeline→legacy fallbacks
+   are the **first things D1/C14 must retire**, and each has a named line.
+
 ## 21. Recommended next prompt
 
 **Updated by Task 7C.** The reconciliation prompt this section originally recommended

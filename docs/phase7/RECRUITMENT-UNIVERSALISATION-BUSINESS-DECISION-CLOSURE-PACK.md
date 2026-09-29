@@ -77,7 +77,7 @@ The three documents fit together like this:
 | **C41** | Rejected material changes | **Permanently retained** with reason and audit; **do not alter the approved version**; **never deleted** | **CLOSED** |
 | **C42** | Supporting documents | **OPTIONAL** | **CLOSED** |
 | **C44 · D9** | The mobile line | **Operational workflows must work on real mobile browsers**; complex administration may stay desktop. **Not a native app requirement** | **CLOSED** |
-| **SELF-APPROVAL** | May a requester approve their own record? | **No. The requester must not approve their own submission. No self-approval loophole** | **CLOSED** |
+| **SELF-APPROVAL** | May a requester approve their own record? | **No. The requester must not approve their own submission. No self-approval loophole.** **The master/superuser exception is CONFIGURABLE per organisation and OFF by default** (see §5.12) | **CLOSED** |
 
 ## 5. Final business rules
 
@@ -234,6 +234,35 @@ DISTINCT gates.**
 > **The requester must not approve their own submission. Do not create a
 > self-approval loophole.**
 
+**The master / superuser exception — locked as configurable, OFF by default.**
+
+The approval engine already carries one documented exception to segregation of
+duties, tied to the **`is_superuser` master flag** (not to the Administrator role).
+When the rule above expands from Hiring Request to Requisition, Offer, Salary and
+Candidate Hiring approval, that exception is **not** carried across unchanged:
+
+| Actor | Default behaviour |
+|---|---|
+| Any ordinary user | **Requester ≠ Approver.** Always |
+| A master / superuser who is also the requester | **May NOT self-approve** — unless the organisation has deliberately enabled the exception |
+
+- **The default for every organisation is NO self-approval**, master included.
+- **An organisation administrator may explicitly enable the master exception** where
+  its operating model requires it — for example a genuinely single-administrator
+  workspace, which would otherwise be unable to approve anything it raises.
+- **Every approval taken under the enabled exception is audit-recorded** as
+  requester and approver being the same person, **and** as the master exception
+  having been used. It is never silent.
+- **There is no per-user exception.** The setting is organisational; it is not a
+  grant attached to an individual.
+
+**Migration of existing workspaces is an implementation matter for Gate 4, not a
+business decision, and is deliberately left open here.** Gate 4 must inspect actual
+tenant and configuration state before choosing how existing installations move to
+the new default. **No migration behaviour is decided by this Pack** — in particular,
+"existing workspaces enabled, new workspaces disabled" is a hypothesis raised in
+discussion, **not** a locked rule.
+
 ### 5.13 Mobile (D9 · C44)
 
 **Operational workflows must work on real mobile browsers.** Complex administration
@@ -329,4 +358,5 @@ on this Pack and on the reconciled Business Rules Specification.
 
 | Date | Change |
 |---|---|
+| 2026-09-29 | **F2 refinement recorded.** The self-approval rule's **master / superuser exception** is locked as **configurable per organisation and OFF by default**, with every use audit-recorded as requester = approver under the master exception, and no per-user exception. Migration of existing workspaces is explicitly left to Gate 4 as an implementation matter. See §5.12. |
 | 2026-09-29 | **Created.** Closes the recruitment universalisation business-decision stage: C37 · OPEN-1 · OPEN-2 · OPEN-3 · OPEN-4 · C47 · C24 · C27 · C12/C13 · C14 · C19 · C32/Q1 · C40 · C41 · C42 · C44/D9 · SELF-APPROVAL. Issued together with the correction of the two documentation defects found by the Task 6C review. **Documentation only — no implementation.** |

@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '2ed7a37 · 2026-09-27 07:20 UTC · 669 files';
+$RELEASE = '6238875 · 2026-09-29 18:56 UTC · 669 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -171,7 +171,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>690756,'h'=>'dba21866fd986fce'],
+    'lib/ops.php' => ['s'=>691671,'h'=>'9dcae8f9153af880'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -202,7 +202,7 @@ $EXPECT  = [
     'lib/recruit_jd.php' => ['s'=>11577,'h'=>'fa60a38877273cec'],
     'lib/recruit_kpi.php' => ['s'=>43621,'h'=>'d9267e844dd99993'],
     'lib/recruit_offer.php' => ['s'=>46244,'h'=>'d84b9e2a64f3b92a'],
-    'lib/recruitpipe.php' => ['s'=>49666,'h'=>'0fac4cddc4142462'],
+    'lib/recruitpipe.php' => ['s'=>49678,'h'=>'0f7e2834677e5247'],
     'lib/reportreview.php' => ['s'=>23222,'h'=>'ae43c4d37883823d'],
     'lib/reqfulfil.php' => ['s'=>12422,'h'=>'a87525ad1e75247a'],
     'lib/reset.php' => ['s'=>11477,'h'=>'8d961eb9724047b9'],

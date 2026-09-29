@@ -764,7 +764,7 @@ function recruitpipe_stage_tab($cand) {
 
             <?php // Notes for this stage ?>
             <?php if ($can && !$closed): ?>
-            <form method="post" action="/candidate-stage?id=<?= $cid ?>" style="margin-bottom:10px">
+            <form method="post" action="/candidate-pipestage?id=<?= $cid ?>" style="margin-bottom:10px">
               <input type="hidden" name="do" value="notes"><input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
               <label class="ff-l" style="display:block;font-size:11.5px;font-weight:600;color:var(--muted,#656e7a);margin-bottom:3px">Notes / details captured at this stage</label>
               <textarea class="form-control" name="notes" rows="2" placeholder="What happened at this stage — screening notes, decision, next step…"><?= $e($note['notes'] ?? '') ?></textarea>
@@ -788,7 +788,7 @@ function recruitpipe_stage_tab($cand) {
                     <?php if ($d['file_name']): ?><?php if (function_exists('doc_can_download') && doc_can_download($d) && $d['file_data']): ?>· <a href="<?= $e($d['file_data']) ?>" download="<?= $e($d['file_name']) ?>"><?= $e($d['file_name']) ?></a><?php else: ?>· <span class="muted"><?= $e($d['file_name']) ?></span><?php endif; ?><?php endif; ?></span>
                   <span class="pill <?= $pill[$st] ?? 'p-mut' ?>" style="font-size:10px"><?= $e(DOC_STATUSES[$st] ?? $st) ?></span>
                   <?php if ($can && !$closed): ?>
-                  <form method="post" action="/candidate-stage?id=<?= $cid ?>" style="margin:0 0 0 auto" onsubmit="return confirm('Remove this document?')">
+                  <form method="post" action="/candidate-pipestage?id=<?= $cid ?>" style="margin:0 0 0 auto" onsubmit="return confirm('Remove this document?')">
                     <input type="hidden" name="do" value="deletedoc"><input type="hidden" name="doc_id" value="<?= (int)$d['id'] ?>">
                     <button class="btn secondary" style="padding:2px 8px;font-size:11px">✕</button>
                   </form>
@@ -799,7 +799,7 @@ function recruitpipe_stage_tab($cand) {
             <?php endif; ?>
 
             <?php if ($can && !$closed): ?>
-            <form method="post" action="/candidate-stage?id=<?= $cid ?>" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+            <form method="post" action="/candidate-pipestage?id=<?= $cid ?>" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
               <input type="hidden" name="do" value="upload"><input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
               <div><label class="ff-l" style="display:block;font-size:11.5px;font-weight:600;color:var(--muted,#656e7a);margin-bottom:3px">Document type</label>
                 <select class="form-control" name="doc_type" style="min-width:150px"><?php foreach (doc_types() as $t): ?><option><?= $e($t) ?></option><?php endforeach; ?></select></div>
