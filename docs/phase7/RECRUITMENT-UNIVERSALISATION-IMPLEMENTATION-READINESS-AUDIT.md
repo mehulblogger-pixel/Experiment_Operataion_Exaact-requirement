@@ -20,6 +20,11 @@ summary suggests — the approval engine alone is ~2,400 lines with delegation, 
 escalation, notification gating and requester resolution. **Nothing requires a new
 engine.**
 
+**Updated by Task 7C (§20a):** of the three blockers below, **F3 is withdrawn** — there
+was no conflict — and **F1 and F2 are resolved as decisions and deferred to Gates 5 and 4
+as work**. **Gates 0 and 1 are unblocked.** The three paragraphs that follow are the
+original 7B statement, kept for the record; read §20a for the verified position.
+
 Three things make this "with conditions" rather than "ready":
 
 1. **Two locked rules meet existing, deliberate, documented behaviour that contradicts
@@ -81,7 +86,7 @@ decision** and resolves no business question.
 | **C18** | Whether terminal legacy candidates are migrated at all | **B — implementation choice** | `recruitpipe_legacy_terminal()` (line 404) already names the four closed legacy values, so the population is precisely identifiable either way |
 | **C22** | Whether Role Workspaces are the per-role landing mechanism within the one home | **C — existing architecture reconciliation** | Role Workspaces exist; `ops_recruitment_home()` (route `recruitment`, `lib/ops.php:3492`) is the host. A reconciliation, not a decision |
 | **C25** | The candidate state machine and its transition triggers | **A — already determined by locked rules** | D1 makes the pipeline authoritative, Q2 derives "active" from stage kinds, C47 supplies the closed kind and C14 splits current-state from history. **The state machine is a design artefact to be written down, not a decision to be taken** |
-| **C46** | The exact codes for the two B4 capabilities | **B — implementation choice** | The convention is visible and mechanical: `ACCESS_MODULES` generates `mod.<module>.view|edit`, and module-scoped rights read `hiring.admin`. `hiring.material_change.propose` / `hiring.review.clear` fit it |
+| **C46** | The exact codes for the two B4 capabilities | **B — implementation choice** | The convention is visible and mechanical: `ACCESS_MODULES` generates `mod.<module>.view` / `.edit`, and module-scoped rights read `hiring.admin`. `hiring.material_change.propose` / `hiring.review.clear` fit it |
 
 **None of the seven is class D.** No further owner decision is required for any of them.
 
@@ -503,6 +508,12 @@ gate's tests re-run together.
 **Three, and all three are conflicts between a locked rule and existing deliberate
 behaviour. None may be resolved by adapting the business rule.**
 
+> **SUPERSEDED IN PART BY §20a (Task 7C).** All three were verified against source.
+> **F3 is WITHDRAWN — no conflict exists.** F1 and F2 are **resolved as decisions** and
+> deferred as work to **Gate 5** and **Gate 4**. The statements below are the original
+> 7B findings, retained as the record of what was found; **§20a carries the verified
+> position and the resolutions.**
+
 ### F1 — When does the workforce record get created?
 **Locked rule (C37):** *"Joining changes the joining state to Joined and permits
 workforce handoff."*
@@ -517,6 +528,11 @@ stands with C37's Joined state layered on top (the reading the code and RB-2 alr
 support), or whether hand-off moves to Joined. **This is a prior-decision
 reconciliation, not a new question** — but it must be stated before Gate 5.
 
+> **RESOLVED by §20a.** The conflict is sharper than stated here: the row is created
+> **`status='ACTIVE'`**, and nothing operational gates on `joined_at`. **RB-1's creation
+> at Accepted stands; the operational boundary moves to `inspectors.status`.** Work
+> deferred to **Gate 5**.
+
 ### F2 — Does the master exception to segregation survive?
 **Locked rule:** *"The requester must not approve their own submission. Do not create a
 self-approval loophole."*
@@ -529,6 +545,11 @@ the reason single-admin workspaces function) or withdrawn. **Do not widen the gu
 all entities in Gate 4 without an answer**, because widening it inherits the exception
 into four more entities.
 
+> **RESOLVED by §20a**, with one owner confirmation outstanding. The exception is the
+> **`is_superuser` master flag, not the ADMIN role**; the gap is **entity scope only**;
+> the extension point is `appr_guard()` using the engine's own `appr_requester_id()`.
+> Work deferred to **Gate 4**.
+
 ### F3 — `role_defaults_base('ADMIN')` returns every permission
 **Locked rule (OPEN-4):** *"Do NOT make Administrator automatically equivalent to
 unrestricted business authority."*
@@ -540,20 +561,222 @@ change to an Operations-wide role**, not a recruitment-local change.
 only what Administrator receives *for recruitment*. Gate 6 cannot be planned without
 this.
 
+> **WITHDRAWN by §20a.** This finding was wrong in its conclusion, though right on the
+> fact. `role_defaults_base()` is the **shipped default**, consulted only when the
+> tenant has stored no `role_access` override — so it is *a default, not a floor*, exactly
+> as A4 requires. And `can()`'s only blanket bypass is the **`is_superuser` master flag,
+> not the ADMIN role**. The locked model is already implemented. What remains is defining
+> the shipped Administrator profile, which is ordinary **Gate 6** work under OPEN-4's own
+> gate. **Gate 6 can be planned.**
+
 **Everything else is implementable as documented.** F7 (route collision) is a defect to
 fix, not a blocker on a decision.
 
+## 20a. Reconciliation of F1 · F2 · F3 (Task 7C)
+
+**Verified independently against source at `fa2c177`.** One finding is withdrawn as an
+overstatement of my own; the other two are confirmed with their resolutions determined.
+**No application code was changed by this reconciliation** — see the classification.
+
+### F1 — Accepted vs Joined: what "workforce record" actually means
+
+**Evidence table — the six things the prompt asked to be distinguished:**
+
+| Concept | Where it lives today | When it happens |
+|---|---|---|
+| **A · Preliminary person record** | `INSERT INTO inspectors (…)` in `rcv_convert()` (`lib/recruit.php:2210–2219`) | **At stage = ACCEPTED** |
+| **B · Workforce activation / deployability** | **the same INSERT — `status` is hardcoded `'ACTIVE'`** (line 2212) | **At stage = ACCEPTED** |
+| **C · Inspector creation** | as A | At ACCEPTED |
+| **D · Workforce status** | `inspectors.status` — read as `status='ACTIVE'` by assets (`assets.php:254`), headcount (`audits.php:338`), availability and allocation | `ACTIVE` from creation |
+| **E · Joining date** | `candidates.joined_at` (`ops.php:469`), set by route `candidate-joined` (6242) with `act_log('CANDIDATE', id, 'JOINED')`, cleared at 6214 | **Later, separately** |
+| **F · Operational eligibility** | follows `inspectors.status='ACTIVE'` + `home_office_id` | **At ACCEPTED** |
+
+**Verified finding — confirmed, and sharper than 7B stated it.** The issue is not *that*
+a record is created at Accepted; it is that the record is created **`ACTIVE`**. A
+search of the Workforce and Operations spine found **no consumer that gates anything on
+`joined_at`** — `workforce_origin()` (`workforce.php:728`) reads it for display only.
+So today a **hired-but-not-joined person is already an operationally deployable team
+member**, which is precisely what C37 says must not happen.
+
+**Locked rule (C37):** Offer Accepted → **Hired** → **Joining Pending** → **Joined** →
+workforce operational handoff; *"Joining-pending people… are not treated as ordinary
+active recruitment candidates"*; *"Joining… permits workforce handoff."*
+
+**Resolution — minimum-change architecture:**
+
+> **RB-1 stands: the record is still created at Accepted.** Employee-number claiming,
+> duplicate detection, branch resolution, team-role choice, race safety and the identity
+> link are all correct and must not move. **What changes is one value: the status the row
+> is created with.** Create it in a *not-yet-joined* status at Accepted; **promote it to
+> `ACTIVE` when the joining is recorded**, audited on both sides.
+
+This keeps **one** workforce spine, **one** identity, and **one** field that every
+consumer already reads — `inspectors.status`. **No second workforce engine, no duplicate
+Candidate → Employee identity, and no new gate on every allocation path** (the rejected
+alternative — adding a `joined_at` check to each deployment route — would create a
+second source of truth for one fact).
+
+**Classification: D — larger implementation, belongs to Gate 5.** The decision is now
+determined; the work is not a reconciliation edit. **Why it cannot be done here:** every
+`status='ACTIVE'` consumer changes behaviour for hired-not-joined people — asset issue
+lists, active headcount, availability and allocation. That is a deliberate,
+customer-visible change across **Operations and Workforce**, the two most protected
+modules, and it needs their regression suites around it.
+
+**Code / data impact when built:** one changed literal in the `rcv_convert()` INSERT; one
+status promotion on the joining path; a status value added to the `inspectors.status`
+vocabulary. **No schema change, no migration of existing rows** (existing ACTIVE rows
+are people who already joined or were added through Masters).
+
+### F2 — Segregation of duties and the master exception
+
+**Verified finding — confirmed exactly as reported.**
+
+- The rule exists and is correct in form: `hreq_segregation_blocks()`
+  (`hiringreq.php:363`) → `hreq_is_own_request()` compares
+  **`hiring_requests.requested_by_id` to `current_user()['id']`** — *"not a name, not a
+  role."*
+- **Two readers, one rule:** the direct decision path `hreq_may_decide()` (367) and the
+  chain via `appr_guard()` (`recruit_approval.php:1577`).
+- **The gap is entity scope only.** `appr_guard()` returns `''` immediately unless
+  `entity === 'HIRING_REQUEST'` (1563), and the source states why: *"Applying
+  segregation of duties to every entity is a customer-visible policy change and is
+  recorded as a Phase-3 question, not slipped in here."* **The Closure Pack answers that
+  recorded question.** So `OFFER`, `SALARY`, `REQUISITION` — and a future
+  Candidate Hiring entity — have **no segregation check today**.
+- **The exception is `is_master()` — the `is_superuser` flag, not the ADMIN role.**
+  `is_master()` = `ua()['master']`, and `ua()` sets master from `$u['is_superuser']`
+  (`access.php:729`). It is **code**, one line, stated once, and mirrored by the same
+  standing exception in `idems.php` for report finalisation. Its rationale is recorded:
+  *"A single-administrator workspace has nobody else to approve."*
+
+**Resolution:**
+
+> **Extend the existing rule through the existing engine — do not build a second
+> security layer.** `appr_guard()` gains the generic requester comparison for **every**
+> approval-capable entity, using the approval engine's own `appr_requester_id()` /
+> `appr_resolve_requester()` (`recruit_approval.php:2292`, `2311`) rather than a
+> per-entity helper. Delegation is unaffected: `appr_can_act()` already requires a
+> delegator to genuinely hold the delegated role (1541–1549), and segregation is asked
+> separately, so a delegate cannot be used to approve the requester's own record.
+
+**On the master exception — flagged, not decided by me.** Preserving it is the safe
+default and is what I recommend, because **removing it would leave a
+single-administrator workspace unable to approve anything it raises** — recruitment
+would be unusable in exactly the smallest installations. But the Closure Pack's
+guardrail says *"Do not allow self-approval"* without naming an exception, so **the
+owner should confirm explicitly** whether the existing master exception survives being
+carried into four more entities. **Until confirmed, do not widen the guard** — widening
+it inherits the exception wherever it goes.
+
+**Classification: D — larger implementation, belongs to Gate 4**, with one owner
+confirmation attached (above). **No code change here:** widening segregation changes
+behaviour on three live entities that have behaved one way since Phase 6, and needs the
+approval regression suite around it.
+
+**Audit retention when built** — all already present in `recruit_approval_requests` /
+`_steps` and `act_log`: requester, approver, entity, action, delegation, timestamp,
+result. Nothing new to store.
+
+### F3 — Administrator permissions: **finding withdrawn**
+
+**My 7B wording was wrong and I am correcting it.** 7B said *"The conflict is direct and
+in one line."* **There is no conflict.** The fact was right; the conclusion was not.
+
+**What the code actually does:**
+
+1. `can($perm)` (`access.php:767`) = licence check → **`$a['master'] || in_array($perm, $a['perms'])`**. The **only** blanket bypass is `master`.
+2. `master` is the **`is_superuser` flag**, not the ADMIN role — `ua()` (729):
+   `$role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper($u['role'])`.
+   **So a user whose role is ADMIN does not bypass `can()`.**
+3. `role_perms($role)` (557–565) reads the tenant's stored **`role_access`** override
+   **first**, and only falls back to `role_defaults_base()` when none is stored.
+   **`role_defaults_base('ADMIN') => $all` is therefore a SHIPPED DEFAULT, not a
+   floor** — an administrator can store a narrower set through the existing access
+   editor and it wins.
+
+**So the locked model is already implemented:** **Role → Permission Profile (stored
+override, else shipped default) → Recruitment Scope (`offices`/`sbus`, `scope_clause()`)
+→ actual access (`can()`)** — and A4's *"a default, not a floor"* holds literally.
+
+**What genuinely remains** is narrower and is not a blocker: the **shipped default value
+for Administrator** is "every permission", so a brand-new organisation's Administrator
+starts unrestricted until someone narrows it. **OPEN-4 already governs this** —
+Administrator is one of the eight roles whose profile *"must be explicitly defined
+before its corresponding workflow capabilities are enabled."* Defining the shipped
+Administrator profile is therefore **ordinary Gate 6 work under OPEN-4's own gate**, not
+a conflict to reconcile.
+
+**One related item for Gate 6, recorded not resolved:** `is_admin_level()`
+(`ops.php:603`) grants decision-shaped rights to a **role band** — `MGMT_ROLES`, seven
+roles including ADMIN — outside `can()`. `hreq_can_decide()` and `is_coordinator_level()`
+both rest on it. That is the **same defect class as C19** and belongs with it.
+
+**Classification: B — documentation / interpretation mismatch only. No code change
+required, now or later, to satisfy the locked rule.**
+
+### Cross-check of the three together
+
+| Scenario | Today | Verdict |
+|---|---|---|
+| Administrator raises a Hiring Request, then tries to approve it | ADMIN is **not** master, so `hreq_segregation_blocks()` returns true → **refused** | **Already correct** |
+| Administrator proposes a material change, then tries to approve it | Runs on the `HIRING_REQUEST` entity, so `appr_guard()` applies → **refused**. *If a future material-change entity is added, it needs the F2 widening first* | Correct today; **F2 dependency noted** |
+| Administrator acts as a delegated approver | `appr_can_act()` requires the delegator genuinely to hold the configured role; segregation is asked separately | **Already correct** |
+| Candidate accepts the offer | Hired ✔ and Joining Pending ✔ (RB-2) — **but the workforce row is created `ACTIVE`** | **F1 — premature** |
+| Candidate joins | `joined_at` set; **no status change** | **F1 — handoff not marked** |
+| A retained preliminary record must not imply Joined | It currently implies **ACTIVE** | **F1** |
+
+**F1 is the only live behavioural gap.** F2 is an entity-scope gap. F3 is not a gap.
+
+### Test scenarios identified (none written — no code changed)
+
+**F1 (Gate 5):** offer accepted → Hired with Joining Pending · workforce row exists but
+is **not** ACTIVE · not offered for allocation or asset issue while joining-pending ·
+joining recorded → status promotes to ACTIVE, audited · un-joining reverses it ·
+existing RB-1 consumers and workforce reports unaffected for already-joined people.
+**F2 (Gate 4):** requester refused on **each** approval entity · an unrelated approver
+succeeds · a delegate of a legitimate approver succeeds · a delegate cannot approve the
+requester's own record · the master exception behaves exactly as the owner confirms.
+**F3 (Gate 6):** Administrator can administer configuration · a stored `role_access`
+override for ADMIN wins over the shipped default · Administrator cannot bypass approval
+or segregation · no per-user recruitment permission layer appears.
+All of the above on **SQLite and MariaDB**, which the existing test architecture supports.
+
+### Protected-module impact of this reconciliation
+
+**None.** No application file was changed. When the two deferred items are built:
+**F1 → Workforce and Operations** (every `status='ACTIVE'` reader), plus Reporting for
+headcount; **F2 → the approval surfaces of Offer, Salary and Requisition**. Quality,
+Money, Marketplace, dashboards and APIs are untouched by either.
+
+### Net effect on the blocker list
+
+| Blocker | Status after 7C |
+|---|---|
+| **F1** | **Resolved as a decision; deferred to Gate 5 as work.** Architecture determined: keep RB-1's creation, move the *operational* boundary to `inspectors.status` |
+| **F2** | **Resolved as a decision; deferred to Gate 4 as work**, with **one owner confirmation outstanding** — does the documented master exception survive being widened to all entities? |
+| **F3** | **WITHDRAWN.** No conflict exists. The shipped Administrator profile is ordinary Gate 6 work under OPEN-4 |
+| **F7** | Unchanged — a defect to confirm and fix in Gate 0 |
+
+**Gate 0 and Gate 1 are unblocked by all three** — neither touches workforce timing,
+approval segregation or role profiles.
+
 ## 21. Recommended next prompt
 
-**Do not proceed to code.** The next controlled step is a short **decision-reconciliation
-prompt** covering exactly F1, F2 and F3 — three narrow questions, each about how a
-newly locked rule meets an existing deliberate one, with the existing behaviour quoted
-so the answer is informed. None of the three reopens a closed decision.
+**Updated by Task 7C.** The reconciliation prompt this section originally recommended
+has been carried out — see §20a. F3 is withdrawn, and F1 and F2 are decided with their
+work placed in Gates 5 and 4.
 
-After those three are answered, the natural next prompt is **Gate 0 + Gate 1 only**
-(reachability, baseline, closed kind, kind-derived classification), with the same
-batch-verify-report-stop discipline this programme has used throughout — because Gate 1
-moves five subsystems through one choke point and deserves its own review.
+**The next controlled step is now Gate 0 + Gate 1 only** — confirm and fix the
+`candidate-stage` route collision (F7), re-measure the live legacy-versus-pipeline
+candidate state, add the `closed` stage kind with its configurable outcomes, and move the
+three `REQF_*` constants to kind-derived sets. Same batch-verify-report-stop discipline:
+Gate 1 moves five subsystems through one choke point and deserves its own review.
+
+**One question to put to the owner alongside it, not blocking it:** does the documented
+**master exception** to segregation of duties survive being carried into Offer, Salary,
+Requisition and Candidate Hiring approval? Gate 4 needs the answer; Gates 0 and 1 do
+not.
 
 ---
 
@@ -563,11 +786,14 @@ moves five subsystems through one choke point and deserves its own review.
 
 **Conditions, precisely:**
 
-1. **Answer F1** — workforce hand-off at Accepted (RB-1) or at Joined (C37).
-2. **Answer F2** — whether the documented master exception to segregation of duties
-   survives being widened to all approval entities.
-3. **Answer F3** — whether OPEN-4 narrows the Administrator role generally, or only its
-   recruitment rights.
+1. ~~**Answer F1**~~ — **done (§20a).** RB-1's creation at Accepted stands; the
+   operational boundary moves to `inspectors.status`. **Work deferred to Gate 5.**
+2. **Answer F2's remaining question** — whether the documented **master exception** to
+   segregation of duties survives being widened to all approval entities. The rest of F2
+   is decided (§20a); **work deferred to Gate 4**. *This is the only outstanding owner
+   question.*
+3. ~~**Answer F3**~~ — **withdrawn (§20a).** No conflict existed; defining the shipped
+   Administrator profile is ordinary Gate 6 work under OPEN-4.
 4. **Confirm and fix F7** — the duplicate `candidate-stage` dispatcher case, which makes
    pipeline per-stage capture unreachable.
 5. **Re-measure the live candidate data state** before any migration; the repository
