@@ -682,9 +682,15 @@ implementation planning.
 Finance · Inspector / field staff · External client · Agency. **Nothing may be
 assumed for them.**
 
-**UNDECIDED:** the remaining eight roles (HR · Operations manager · Coordinator ·
-Administrator · Finance · Inspector / field staff · External client · Agency).
-Nothing may be assumed for them.
+**DECIDED (OPEN-4) — the role framework covers all eleven.** The supported role
+categories are **Recruiter · Hiring Manager · Department Head · HR · Operations
+Manager · Coordinator · Administrator · Finance · Inspector / Field Staff · External
+Client · Agency**. **Role existence does not imply permission:** access is **Role →
+Permission Profile → Recruitment Scope**, configurable **per role, never per user**.
+The three profiles above **remain authoritative**, and **every other role profile must
+be explicitly defined before its workflow capabilities are enabled** — so nothing may
+still be assumed for the eight. **Administrator is NOT automatically unrestricted
+business authority**, and sensitive permissions remain deliberate. See §15(A.4).
 
 ---
 
@@ -1669,9 +1675,11 @@ are settled in implementation planning, not here.
 - **No new salary permission** — `data.salary` remains the control.
 - Every other constraint in this specification stands unchanged.
 
-**Roles still undecided:** HR · Operations manager · Coordinator · Administrator ·
-Finance · Inspector / field staff · External client · Agency. Nothing may be assumed
-for them.
+**The other eight roles — HR · Operations manager · Coordinator · Administrator ·
+Finance · Inspector / field staff · External client · Agency — are recognised role
+categories under OPEN-4, but their profiles are NOT yet defined.** Each must be
+explicitly defined before its workflow capabilities are enabled, so nothing may be
+assumed for them. **Administrator is not unrestricted by default.** See §15(A.4).
 
 ## The primary recruitment roles
 
@@ -1965,6 +1973,18 @@ candidate** — rejection remains a human act with a mandatory reason.
 willing to make the offer; the *hiring* decision is whether the accepted person is
 actually converted into workforce.
 
+### DECIDED (SELF-APPROVAL) — the requester is never the approver
+
+> **The requester must not approve their own submission. No self-approval loophole
+> may be created.**
+
+This applies to every approval-capable event in this section, and to a material-change
+proposal under F1. It is **not** satisfied merely by configuring a chain that happens
+to name someone else: where the configured approver **is** the requester, the record
+does not self-approve. It sits alongside B2's rule that a missing rule is a
+**configuration problem**, never consent — the two together close both routes by which
+a record could authorise itself. Closed by the Business Decision Closure Pack; see §15(A.4).
+
 **EVIDENCE.** `offer_issue()` refuses an unapproved offer — *"§32 — an UNAPPROVED
 offer can never be issued."* The conversion point is `rcv_convert()`, a discrete named
 step carrying **no approval today**, and therefore a clean gate.
@@ -2033,11 +2053,13 @@ This specification therefore separates the two:
 - **The current technical implementation** is `job_offers`, and its state model
   has not been mapped against this list in this exercise.
 
-**CLARIFICATION REQUIRED — the state mapping.** Which of the ten business events
-correspond to existing offer states, which are new, and which are combinations,
-must be established before implementation. It was not established here because
-doing so reliably requires reading offer state transitions in detail, which this
-exercise deliberately scoped out.
+**The state mapping (C12) — to be established against the existing ledger.** Which
+of the ten business events correspond to existing offer states, which are new and
+which are combinations must be established before implementation. It was not
+established here because doing so reliably requires reading offer state transitions in
+detail, which this exercise deliberately scoped out. **The mechanism question is
+settled (C13, below): the mapping is made onto the existing ledger, not onto a new
+one.**
 
 ## EVIDENCE — the gap is real and larger than expected
 
@@ -2056,10 +2078,11 @@ audited nowhere. The audit recorded this as an open question (was the omission
 intentional, the stage ledger being the record?). **D6 answers it: it is a gap,
 and it must be closed.**
 
-**CLARIFICATION REQUIRED — which mechanism.** Whether offer auditing should use
-`act_log` (the entity audit), the stage ledger, or both, is an implementation
-decision. The specification requires only that it be **permanent, attributable and
-never rewritten**. Two mechanisms already exist; **a third must not be created.**
+**DECIDED (C13) — which mechanism.** **Reuse the existing audit / event ledger.
+Do NOT build a second offer-specific audit engine.** Offer lifecycle events must be
+permanently auditable through the **existing authoritative mechanism**, and must be
+**permanent, attributable and never rewritten**. Two mechanisms already exist; **a
+third must not be created.** See §15(A.4).
 
 ## Constraints
 
@@ -2458,12 +2481,13 @@ pattern from one field to the eligibility minimums.
 request-only versioning would leave open, so this list must never be read as
 reopening it.
 
-## UNDECIDED — DO NOT IMPLEMENT
-- Whether a pending change is **visible** to recruiters, and how (C40) — **A5 makes
-  answering this necessary rather than optional.**
-- Whether **rejected** proposed versions are visible to all authorised users or
-  only the proposer (C41).
-- Whether supporting documents reuse the **existing document DMS** (C42).
+## CLOSED by the Business Decision Closure Pack — ruled at §15(A.4)
+
+| Was undecided here | Decision |
+|---|---|
+| Whether a pending change is **visible** to recruiters, and how (**C40**) | **Pending material changes must be visible to authorised users**, showing the **currently approved version**, the **proposed version / change** and the **pending status**. The approved version **remains effective until approval**. This is what makes A5 levels 2–4 safe |
+| Whether **rejected** proposed versions are visible to all authorised users or only the proposer (**C41**) | Rejected material changes **remain permanently in history**, **retain reason and audit information**, and **do not alter the approved version**. **Rejected proposals are not deleted** |
+| Whether supporting documents reuse the existing document DMS (**C42**) | Supporting documents for material changes are **OPTIONAL** |
 
 ---
 
@@ -2567,10 +2591,15 @@ The candidate register already filters by stage (audit S2) and candidates alread
 attach to requisitions. *"Show me the people we turned down for this requirement"*
 is close to existing capability.
 
+**DECIDED (OPEN-3) — where a reconsidered candidate re-enters.** The candidate
+returns to the **stage immediately preceding the rejection**, never to the start. A
+**reconsideration reason is mandatory**, the **original rejection stays permanently in
+history**, and the actor, date/time, previous closed outcome, previous stage and
+resulting stage are all recorded. The candidate becomes active again **for that
+specific requirement / process only** (OPEN-1). See §15(A.4).
+
 **UNDECIDED — DO NOT IMPLEMENT:** whether findability is surfaced as a filter on
-the existing register, a panel on the requirement, or both; and whether a
-deliberate reconsideration re-enters the pipeline at its original stage or at the
-start.
+the existing register, a panel on the requirement, or both.
 
 ## What this means in business language
 
@@ -2769,6 +2798,15 @@ already stores `from_stage`, `to_stage`, a **remark** for the reason and an
 The recorded reason distinguishes the circumstances; there is no separate
 review-rejection stage for an organisation to configure.
 
+**DECIDED (C47) — one kind, configurable outcomes.** There is **one** semantic stage
+kind, **`closed` / not proceeding**, carrying a **configurable closed OUTCOME
+(subtype)**. Initial examples: **Rejected · Withdrawn · Offer Declined · Offer
+Withdrawn · Position Closed · Requirement Cancelled · Duplicate · Not Available ·
+Not Suitable · Other**. **These are outcomes, not stage kinds** — the kinds remain
+`step · gate · interview · offer · terminal · closed`. Outcome **plus reason plus
+audit history** is what reporting reads. **No second rejection lifecycle, and no
+duplicate lifecycle engine.** See §15(A.4).
+
 ### The closed stage kind — and why it is distinct from terminal
 
 The configurable pipeline's stage-kind vocabulary gains a kind meaning **CLOSED /
@@ -2846,14 +2884,18 @@ proposer may **withdraw** their own pending proposal — withdrawal closes it,
 requires a reason, remains in history, **does not change the approved version**,
 and restores normal execution per **A5**.
 
+## CLOSED by the Business Decision Closure Pack — recorded here, ruled at §15(A.4)
+
+| Was undecided here | Decision |
+|---|---|
+| Whether REVIEW REQUIRED is visible to everyone who can see the candidate, or only to those who can clear it (**OPEN-2**) | **Anyone with legitimate permission to view the candidate or the process can see it. Visibility does NOT grant authority to clear** — only the configured *Clear Review Required* permission does |
+| Whether a single review clears a candidate for one requirement or for all (**OPEN-1**) | **Requirement-specific.** A stricter version of Requirement A raises it for **Requirement A only**, and clearing it clears **only that requirement / process relationship** — never the candidate globally |
+| Which stage a deliberately reconsidered candidate re-enters at (**OPEN-3**) | The **stage immediately preceding the rejection**, with a **mandatory reconsideration reason**; the original rejection is **retained permanently** — actor, date/time, previous closed outcome, previous stage and resulting stage all recorded; the candidate becomes active again **for that requirement only** |
+
 ## UNDECIDED — DO NOT IMPLEMENT
 
-- Whether REVIEW REQUIRED is visible to everyone who can see the candidate, or only
-  to those who can clear it.
-- Whether a single review clears a candidate for one requirement or for all
-  requirements they are attached to.
-- Which stage a deliberately reconsidered candidate re-enters at, and where
-  findability is surfaced (carried from F2, above).
+- Where findability of previously rejected candidates is **surfaced** — a filter on
+  the existing register, a panel on the requirement, or both (carried from F2).
 
 ---
 
@@ -3051,11 +3093,13 @@ Mobile approvals and mobile candidate review both rely on the access model, so
 **D9 depends on D3, D4 and Section 19** being settled. A phone screen cannot show
 an approval the permission model has not yet defined.
 
-## UNDECIDED — DO NOT IMPLEMENT
+## CLOSED (C44 · D9) by the Business Decision Closure Pack — ruled at §15(A.4)
 
-Where exactly the line falls between a mobile "hiring decision" and desktop
-"complex administration" for borderline cases — for example an approval that
-carries conditions, or a review that requires reading attached documents.
+**Operational workflows must work on real mobile browsers**; complex administration
+and configuration may remain desktop-oriented. **This is not a requirement to build
+native Android or iOS applications.** Verification is therefore browser-based on real
+devices — and, as this section states, **no mobile-readiness claim may be made until
+it is performed.**
 
 ---
 
@@ -3325,6 +3369,44 @@ C21 ──▶ D8 ──▶ C22 (open)
   is not.
 ```
 
+### A.4 — Closed by the Business Decision Closure Pack
+
+Task 6C's read-only review found that **genuine unresolved business questions
+remained**, and that four of them (**OPEN-1 … OPEN-4**) were discussed only in
+section-level *UNDECIDED* blocks and were **missing from this register**. The owner
+has since closed them.
+
+**Source of record:** `docs/phase7/RECRUITMENT-UNIVERSALISATION-BUSINESS-DECISION-CLOSURE-PACK.md`
+— the Closure Pack carries each decision's full locked wording. **For these
+decisions the Closure Pack governs**, because it is the later business decision; any
+difference between it and this specification is a defect to be fixed. Everything
+else in this specification stands unchanged.
+
+**Implementation has NOT occurred.** These are decisions, not built behaviour.
+
+| # | The question as it was asked | Final decision | Implementation implication | Status |
+|---|---|---|---|---|
+| **C37** | Where "Hired" = Offer Accepted, what is the candidate's visibility between accepting and joining? | **Offer Accepted establishes Hired where configured. Hired and Joined remain distinct facts**, and hired-but-not-joined is represented as **Joining Pending → Joined**. Joining-pending people **remain visible to authorised users for legitimate follow-up** but are **not** treated as ordinary active recruitment candidates. Joining permits workforce hand-off; a non-joining outcome retains the historical Offer Accepted decision | A joining state distinct from the recruitment outcome. **A2 is unchanged** — an issued offer still shields the candidate from Review Required. **No second recruitment lifecycle engine** | **CLOSED** |
+| **OPEN-1** | Does a Review Required clearance cover one requirement or all the candidate is attached to? | **Review Required is requirement-specific.** A stricter version of Requirement A raises it for **Requirement A only**, and clearing it clears **only that requirement / process relationship** — never the candidate globally | The flag and its clearance attach to the candidate-requirement relationship, not to the person | **CLOSED** |
+| **OPEN-2** | Is Review Required visible to everyone who can see the candidate, or only to those who can clear it? | **Anyone with legitimate permission to view the candidate or the process can see the Review Required state. Visibility does not grant authority to clear it** — only holders of the configured *Clear Review Required* permission may clear | Visibility follows existing view permission; clearance follows the Q17 capability. Two separate rights | **CLOSED** |
+| **OPEN-3** | At which stage does a deliberately reconsidered, previously rejected candidate re-enter? | **No automatic reconsideration** (F2 unchanged). On deliberate reconsideration by an authorised user, the candidate returns to the **stage immediately preceding the rejection**, with a **mandatory reconsideration reason**, and the **original rejection is retained permanently in history** — actor, date/time, previous closed outcome, previous stage and resulting stage all recorded. The candidate becomes active again **for that specific requirement / process** | An audited reconsideration action on the existing stage ledger. **Rejection history is never erased or overwritten** | **CLOSED** |
+| **OPEN-4** | What are the permissions of the eight roles beyond the three shipped profiles? | **Eleven role categories are supported** — Recruiter · Hiring Manager · Department Head · HR · Operations Manager · Coordinator · Administrator · Finance · Inspector / Field Staff · External Client · Agency. **Role existence does not imply permission:** access is Role → Permission Profile → Recruitment Scope. Permissions stay **configurable per role, never per user**. The three detailed profiles (Recruiter · Hiring Manager · Department Head) **remain authoritative**; **every other role profile must be explicitly defined before its workflow capabilities are enabled**. **Administrator is NOT automatically unrestricted business authority**, and sensitive permissions stay deliberate | The framework covers all eleven; enabling any of the eight is gated on defining its profile first | **CLOSED** |
+| **C47** | Is the closed stage kind a single kind or a family (rejected · withdrawn · declined)? | **One semantic stage kind — `closed` / not proceeding — with configurable closed OUTCOMES (subtypes).** Initial examples: Rejected · Withdrawn · Offer Declined · Offer Withdrawn · Position Closed · Requirement Cancelled · Duplicate · Not Available · Not Suitable · Other. **These are outcomes, not stage kinds.** The kinds remain **step · gate · interview · offer · terminal · closed**, and **terminal and closed stay distinct.** Outcome plus reason plus audit history carry reporting | One kind, one vocabulary, configurable outcomes. **No second rejection lifecycle and no duplicate lifecycle engine** | **CLOSED** |
+| **C24** | Are "Hiring Manager" / "Department Head" the Decision Pack's "Recruitment manager" / "Department manager"? | **Do not create duplicate roles because terminology differs.** Map terminology through the **existing configurable terminology / role architecture**: Recruitment Manager → the existing configurable recruitment-execution role; Department Manager → the existing configurable department-authority role; Hiring Manager → the Hiring Manager concept | Terminology mapping only. **No rename or duplication of the permission architecture to match wording** | **CLOSED** |
+| **C27** | Which industries come first? | **First universal validation / configuration packs: TPIA · Recruitment / Staffing · Manufacturing / Trading.** The engine **remains universal and industry-neutral** | Configuration packs, not architecture. **The architecture must not be hard-coded around TPIA** | **CLOSED** |
+| **C12 · C13** | Which offer events map to which states, and which audit mechanism carries them? | **Reuse the existing audit / event ledger. Do NOT build a second offer-specific audit engine.** Offer lifecycle events must be permanently auditable through the existing authoritative mechanism | Extend what exists. The "no third mechanism" constraint becomes "reuse the existing one" | **CLOSED** |
+| **C14** | Do downstream consumers read current stage or stage history? | **The configurable pipeline is authoritative for current state; the stage / event ledger carries history. Legacy `candidate.stage` is NOT an independent authoritative lifecycle**, and two competing lifecycle authorities must not be maintained | Current state from the pipeline, history from the ledger — the split is decided | **CLOSED** |
+| **C19** | How is `is_coordinator_level()` reconciled against `mod.hiring.*`? | **Reconcile it into the configurable role / permission architecture. It must not remain a universal recruitment authority.** Do not blindly delete compatibility logic that existing screens depend on — **reuse or extend safely** | A reconciliation with a compatibility constraint, not a deletion | **CLOSED** |
+| **C32 · Q1** | Does `APPR_ENTITIES` become configurable or is it simply extended? | **Candidate Hiring approval is configurable per organisation, and Offer Approval and Candidate Hiring Approval are DISTINCT gates** — both configured: offer approval → offer issued → candidate accepts → Candidate Hiring approval → workforce conversion; one configured: only that gate; neither: neither. **A refused Candidate Hiring approval blocks workforce conversion and does not automatically reject the candidate** | The business rule is settled (and matches A3). The *form* of the entity-list change remains an implementation choice | **CLOSED at the business level** |
+| **C40** | How is a pending material change made visible to people still working? | **Pending material changes must be visible to authorised users**, showing the **currently approved version**, the **proposed version / change**, and the **pending status**. **The approved version remains effective until approval** | Makes A5 levels 2–4 safe to use, as A5 requires | **CLOSED** |
+| **C41** | Are refused or withdrawn proposals visible to the proposer only, or to all authorised users? | **Rejected material changes remain permanently in history, retain their reason and audit information, and do not alter the approved version. Rejected proposals are not deleted** | Retention and audit are settled | **CLOSED** |
+| **C42** | Do supporting documents on a proposal reuse the existing document DMS? | **Supporting documents for material changes are OPTIONAL** | Confirms Q11; no mandatory attachment | **CLOSED** |
+| **C44 · D9** | Where does the mobile / desktop line fall for borderline cases? | **Operational workflows must work on real mobile browsers**; complex administration and configuration may remain desktop-oriented. **This is not a requirement to build native Android or iOS applications** | Browser-based verification on real devices, not a native app | **CLOSED** |
+| **SELF-APPROVAL** *(new locked rule)* | *(Raised by the Task 6C review: nothing forbade a requester from being a configured approver of their own record.)* | **The requester must not approve their own submission. No self-approval loophole may be created** | A constraint the approval configuration and its enforcement must honour | **CLOSED** |
+
+**Nothing above is a new business question.** Each row records a decision the owner
+has taken, in the owner's own terms.
+
 ## B. Blocking — **none remain**
 
 All five items that once blocked an implementation plan are closed. They are listed
@@ -3346,26 +3428,25 @@ remain genuinely open are listed at C and D, and none of them has a locked rule.
 
 These have **no** locked rule. Nothing here may be decided in code.
 
+**Eleven items formerly listed here are now CLOSED** by the Business Decision
+Closure Pack and have moved to **A.4** above, with their questions and decisions
+recorded there: **C12 · C13 · C14 · C19 · C24 · C37 · C40 · C41 · C42 · C44 ·
+C47**. What remains below is genuinely open.
+
 | # | Item | Decision |
 |---|---|---|
-| C12 | Mapping the ten offer **business events** onto existing offer states | D6 |
-| C13 | Which audit mechanism carries offer events — `act_log`, the stage ledger, or both | D6 |
-| C14 | Whether downstream consumers read **current stage** or **stage history** | D1 |
 | **C15** | The default **pipeline** the 933 legacy candidates map onto | D1 — *and now dependent on C43* |
 | **C16** | The legacy-stage → pipeline-stage **mapping table** | D1 — *dependent on C43* |
 | **C17** | Whether migration is **one-off** or **lazy on next touch** | D1 — *dependent on C43* |
 | **C18** | Whether **terminal** legacy candidates are migrated at all | D1 — *dependent on C43* |
-| C19 | Reconciling **`is_coordinator_level()`** on candidate screens against `mod.hiring.*` | D4 — a prerequisite of A4, not a tidy-up |
 | C22 | Whether **Role Workspaces** are the mechanism for per-role landing within the one home | D8, C21 |
-| C24 | Whether "Hiring Manager" / "Department Head" are the Pack's "Recruitment manager" / "Department manager" | D4 |
 | C25 | The candidate **state machine** and its transition triggers, the active boundary now being configurable | D3, Q2 |
-| C37 | Where "Hired" = **Offer Accepted**, the candidate's **visibility** between accepting and joining — A2 protects them from version changes but does not decide visibility | Q21, D3 |
-| C40 | How a **pending** material change is made visible to people still working — **A5 makes answering this necessary, not optional** | D7, A5 |
-| C41 | Whether **refused or withdrawn** proposals are visible to the proposer only, or to all authorised users | Q7, G2 |
-| C42 | Whether **supporting documents** on a proposal reuse the existing document DMS | Q11 |
-| C44 | Where the **mobile / desktop line** falls for borderline cases — notably whether an approval requiring attached documents must be completable on a phone | D9, Q25 |
 | **C46** | The **exact permission codes** for the two capabilities B4 requires, following the project's naming convention | B4, A4 |
-| **C47** | Whether the pipeline's **closed** stage kind is a single kind or a small family (rejected · withdrawn · declined), and the stage-kind vocabulary's final shape | C43, D1 |
+
+**These seven are implementation values, mappings and reconciliations — not business
+decisions awaiting the owner.** C15–C18 are migration mechanics gated on C43; C22 is
+a UX mechanism choice; C25 is a design artefact; C46 is a naming choice. Nothing here
+may be decided in code without the relevant plan being approved.
 
 ## D. Not put to the owner as decisions at all
 
@@ -3374,12 +3455,12 @@ clarification for this document.
 
 | # | Item | Note |
 |---|---|---|
-| C27 | **Which industries come first** | The Decision Pack asked. Unanswered. Nothing may be prioritised in code. |
+| ~~C27~~ | **Which industries come first** | **CLOSED by the Business Decision Closure Pack** — first configuration packs: **TPIA · Recruitment / Staffing · Manufacturing / Trading**, with the engine remaining industry-neutral. See **A.4**. |
 | C28 | `WF_TEAM_ROLES` configurability (FIELD / COORD / OFFICE) | The **second** of the two gaps recurring across 11 of 13 industries. Never put to the owner. |
 | C29 | Healthcare **licence / registration validity** | A legal gate that does not exist as a concept. |
 | C30 | IT services **notice period** handling | Does not exist. |
 | C31 | Recruitment agency **client-submission states** | Does not exist as a pipeline concept. |
-| **C32** | Whether `APPR_ENTITIES` becomes configurable or is simply extended | **Now required, not optional.** A3 and Q1 add a fifth approvable event (Candidate Hiring), and the constant is the gate on accepted entity values. The *form* of the change is an implementation choice; that a change is needed is settled. |
+| ~~C32~~ | Whether `APPR_ENTITIES` becomes configurable or is simply extended | **CLOSED at the business level by the Business Decision Closure Pack** — Candidate Hiring approval is configurable per organisation and is a **distinct gate** from Offer approval. The *form* of the entity-list change remains an implementation choice; that a change is needed was already settled. See **A.4**. |
 | C33 | **Recruitment model** as a configuration dimension (internal / client-facing / both) | Proposed in §5; no existing mechanism identified. |
 | C34 | Rate-limiting and abuse controls on the public `/careers` intake | Audit S5 — never examined. **This is a security item that exists today regardless of anything in this specification**, and does not belong in a recruitment backlog. |
 | C35 | Whether the absence of offer auditing was originally intentional | D6 answers the requirement; the history is unestablished. |
@@ -3590,10 +3671,26 @@ detail at Section 15(C), and **D9** additionally requires verification. Of the
 twenty-five supporting decisions, **twenty-four are clear** — Q14 closed by A1, and
 Q22 and Q23 closed by **B2** and **B4** — and **one** (Q25) requires verification.
 
-**What "pending detail" now means.** Every remaining item at Section 15(C) is a value,
-a mapping or a reconciliation — **none is a business decision awaiting the owner**, and
-none of them has a locked rule contradicting it. The sixteen rules locked in review
-closed all five former blockers.
+**What "pending detail" now means — and the correction the Task 6C review forced.**
+This paragraph previously asserted that every remaining item at Section 15(C) was a
+value, a mapping or a reconciliation, and that **none was a business decision awaiting
+the owner**. **That was not true.** The **Task 6C** read-only review established that
+several genuine business questions were still unresolved — **C37**, the closed-kind
+vocabulary (**C47**), the role-terminology mapping (**C24**), industry priority
+(**C27**) — and that four more (**OPEN-1 … OPEN-4**) existed only in section-level
+*UNDECIDED* blocks, missing from the register entirely.
+
+**Those questions have since been closed by the business owner** through the
+**Business Decision Closure Pack**
+(`docs/phase7/RECRUITMENT-UNIVERSALISATION-BUSINESS-DECISION-CLOSURE-PACK.md`), and
+each is recorded with its decision at **Section 15(A.4)**. **That closure is now
+authoritative.** **Implementation has NOT occurred** — these are decisions, not built
+behaviour.
+
+**What remains at Section 15(C) is now genuinely only values, mappings and
+reconciliations** — seven of them, none a business decision awaiting the owner, and
+none contradicted by a locked rule. The sixteen rules locked in review closed all five
+former blockers; the Closure Pack closed what the 6C review found still open.
 
 **This is not drift.** The owner decided *direction* deliberately and left *values*
 — role profile contents, approval chains, thresholds, defaults — to be set once the
