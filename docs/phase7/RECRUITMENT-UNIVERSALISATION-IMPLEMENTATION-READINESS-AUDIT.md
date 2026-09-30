@@ -998,6 +998,247 @@ audit, and no open business question is answered in it.**
 
 ---
 
+## §20c — GATE 1A RECORD: RECONCILING THE RECRUITMENT PIPELINE CONSUMERS
+
+Gate 1A was authorised to re-inventory every consumer of the legacy
+`candidates.stage` column, classify each one, give every current-state consumer a
+named replacement source, and surface the two data findings from Gate 0 — all
+**without moving authority**, which is Gate 1B's job.
+
+### C1 — Two Gate 0 figures were wrong. Both are corrected here.
+
+| Gate 0 said | Gate 1A measured | Why Gate 0 was wrong |
+|---|---|---|
+| 12 independent readers | **9** | `lib/crmdash.php`, `lib/opportunities.php` and `lib/tosrm.php` mention `candidates` **zero** times. Their `stage` references are *opportunity* stages, `opportunities.stage_id`, `jobs.stage` and `sla_targets.stage`. They were counted by a grep for `stage`, not for candidate stage. |
+| 3 legacy writers | **6 production write sites** | Two live writers were missed entirely, and the column default was not counted. |
+
+The corrected write inventory (production paths only; seed/demo and test files
+excluded):
+
+| # | Site | What it writes | Guarded? |
+|---|---|---|---|
+| 1 | `lib/ops.php:202` | `stage VARCHAR(20) DEFAULT 'RECEIVED'` — the column default | n/a |
+| 2 | `lib/ops.php:6680` | the candidate INSERT | n/a |
+| 3 | `lib/ops.php:6380, 6383` | the joining transaction | yes — `rexec_block_reason()` |
+| 4 | `lib/ops.php:6458–6459` | an ordinary stage move | yes |
+| 5 | `lib/recruitpipe.php:456, 458` | the coarse pipeline→legacy sync | yes — skips legacy terminals |
+| 6 | **`lib/recruit_offer.php:351`** — *missed by Gate 0* | `stage='OFFERED'` when an offer is issued, ledger-logged with `track='LEGACY'` | yes — skips all four legacy terminals |
+| 7 | **`lib/recruit_exec.php:305, 308`** — *missed by Gate 0* | restores the prior stage when a joining is reverted for want of a seat, preserving `decided_at` only for genuine terminals | yes — falls back to `'OFFERED'` |
+| 8 | `lib/careers.php:144` | the public intake INSERT | n/a |
+
+Sites 6 and 7 matter disproportionately: both are *correct, deliberate* code
+with sound reasons (6 makes "shortlist → offer" durations measurable; 7 is a
+compensating revert). Neither is a bug. But both write a column that D1 says is
+no longer the authority, so **both must be re-pointed in Gate 1B**, and a
+migration plan that did not know they existed would have left the legacy column
+being written by two paths nobody had accounted for.
+
+### C2 — The eight-way classification, and a replacement source for every current-state consumer
+
+| Consumer | Class | Replacement source |
+|---|---|---|
+| `lib/reqfulfil.php:108–125` | **A CURRENT STATE** + D KPI | `rpipe_current_state()` → stage `kind`, via the `REQF_*` sets recomputed on kinds (Gate 1B) |
+| `lib/nextaction.php:165–186` | **A CURRENT STATE** | `rpipe_current_state()` → `closed` / `kind`; `joined_at` unchanged |
+| `lib/recruit_assign.php:642` | **A CURRENT STATE** + D KPI | `rpipe_current_state()` → `closed` (replaces `NOT IN (terminals)`) |
+| `lib/recruit_fulfil.php:265, 320, 641, 789` | **A CURRENT STATE** | stage `kind` = `terminal`/`closed` |
+| `lib/ops.php` register + counts + handler | **A CURRENT STATE** + **H WRITE** | pipeline position; the handler stays the execution choke point |
+| `lib/recruit.php:754–755, 989–1019, 1003` | **D KPI/REPORTING** | `kind`-based sets — **see C5, these do not agree with `REQF_*` today** |
+| `lib/recruit_cc.php:187, 233, 319–366` | **D KPI/REPORTING** | `kind`-based sets |
+| `lib/recruit_kpi.php:288–290, 339–345` | **B HISTORICAL** + D KPI | already reads the `candidate_events` ledger for history; sets move to kinds |
+| `lib/candpool.php:166, 187, 209` | **C DISPLAY ONLY** | stage `name` for the label; no logic depends on it |
+| `lib/search.php:430, 434` | **C DISPLAY ONLY** | stage `name` |
+| `lib/recruit_export.php:68` | **C DISPLAY ONLY** | stage `name` |
+| `lib/recruitpipe.php:451–459` | **E COMPATIBILITY** + **H WRITE/SYNC** | retired in Gate 1B — the sync exists only because legacy is authoritative |
+| `lib/recruit_offer.php:350–354` | **H WRITE/SYNC** | write the pipeline position; keep the ledger entry |
+| `lib/recruit_exec.php:290–315` | **H WRITE/SYNC** | revert the pipeline position |
+| `lib/careers.php:144`, `lib/ops.php:202/6680` | **F MIGRATION** | the pipeline's first stage |
+| `tests/*`, `lib/seed_demo_*.php` | **G TEST ONLY** | unchanged |
+
+Nine independent reader files, three of them display-only. **Every
+current-state consumer now has a named target**, which was the gate's
+precondition for any later implementation.
+
+### C3 — G0-1: the ten malformed values have a deterministic origin, and it is benign
+
+Gate 0 measured ten rows whose legacy stage is not a defined stage: `OFFER`
+(9 rows — the defined key is `OFFERED`) and `' RECEIVED'` (1 row, leading space).
+Gate 1A was required to find deterministic evidence or else preserve and mark
+them. **Deterministic evidence exists.** Each value has exactly one origin in the
+entire codebase, and both are test fixtures:
+
+- **`OFFER` ← `tests/test_rb3_step3_atomic.php:100`**, the `$mkCand` helper's
+  default `$stage = 'OFFER'`. The test only ever compares the value with itself
+  (`t_eq($stageOf($x), 'OFFER', …)`), so the typo never failed anything.
+- **`' RECEIVED'` ← `tests/test_recruit_iv.php:8`**, a single INSERT with a
+  literal leading space.
+
+**No production code path can write either value.** This reframes the finding:
+the ten rows are test-fixture residue in the local regression databases, which is
+also why the identical ten appeared in `scope_regress` and `ops_reg` — all three
+are databases the suite itself populates.
+
+Two honest limits on that conclusion:
+
+1. **Production was never reachable** in Gate 0 or Gate 1A (no database in the
+   repository). This says the *local* occurrences are explained; it does **not**
+   certify that production is clean. The diagnostic built in this gate is the
+   instrument that will answer that against real tenant data.
+2. The two fixtures are **left exactly as they are.** Correcting `'OFFER'` to
+   `'OFFERED'` is a one-word change, but the standing constraints bar modifying
+   tests, and these rows are currently the only live specimens of the malformed
+   class — the new diagnostic test asserts against genuine residue rather than a
+   value invented to be broken. Recommended as a separate, explicitly authorised
+   cleanup.
+
+No row was mapped, corrected, trimmed or moved.
+
+### C4 — G0-2 and the new diagnostic
+
+Gate 0 found one row closed on the legacy field while sitting on a live pipeline
+stage. Gate 1A adds the mechanism that makes such rows visible for deliberate
+reconciliation, in `lib/recruitpipe.php`:
+
+| Function | What it does |
+|---|---|
+| `rpipe_legacy_stage_valid($v)` | Is this an exactly-defined stage? Lookup-resolved, so a renamed stage is judged against the workspace's own vocabulary. Exact, not case-folded or trimmed. |
+| `rpipe_legacy_stage_class($v)` | Which `REQF_*` set the value falls in, or `''` — `''` is what makes a malformed row invisible to funnel arithmetic. |
+| `rpipe_current_state($cand)` | **The single replacement source.** Answers `PIPELINE` / `LEGACY_ONLY` / `NONE`, never substituting legacy for a pipeline answer, and returns `closed = null` when the authority cannot say. |
+| `rpipe_recon_class($cand)` | Classifies one candidate into `B_PIPELINE_OK` / `C_LEGACY_MAPPABLE` / `D_LEGACY_NO_EVIDENCE` / `E_CONFLICT` / `F_INVALID_LEGACY`. |
+| `rpipe_recon_scan($limit)` | Counts every candidate and names the ones needing a person. |
+
+Three design decisions worth recording:
+
+- **`closed` is asked of the stage `kind`, never of a stage name** (C47). Until
+  the `closed` kind exists in Gate 1B, no pipeline stage can report closed, and
+  the helper correctly returns `false` rather than borrowing the legacy answer.
+- **A pipeline answer requires the stage id to match.** `recruitpipe_cand_state()`
+  falls back to `recruitpipe_for($req)` when the locked pipeline is inactive; the
+  candidate's stage id then belongs to a different pipeline, is not found, and
+  `$idx` stays `0` — which would read as *"on stage one of a pipeline they were
+  never on"*. `rpipe_current_state()` reports `LEGACY_ONLY` in that case.
+- **Nothing in this gate writes.** Proved, not asserted — see C6.
+
+### C5 — G1A-1 and G1A-2: two findings Gate 1A discovered on its own
+
+**G1A-1 — the readers do not agree on what the value *is*.**
+`lib/nextaction.php:165` reads the column as `strtoupper(trim($v))`; `reqfulfil`
+and `recruitpipe_legacy_terminal()` compare strictly. So `' RECEIVED'` is a live
+Received candidate to one reader and an unclassifiable row to the other. This is
+the same "two half-mechanisms doing one job" pattern as the stage column itself,
+one level down. `rpipe_current_state()` carries **both** readings and raises
+`legacy_reader_split` rather than silently picking one.
+
+**G1A-2 — "filled" is computed two different ways in production today.**
+This one is business-visible and independent of the pipeline question:
+
+| Site | Counts "filled" as | Agrees with `REQF_FILLED_STAGES`? |
+|---|---|---|
+| `lib/reqfulfil.php:35` | `['ACCEPTED']` — the canonical definition | — defines it |
+| `lib/recruit_cc.php:230` | derives from the constant | yes |
+| `lib/recruit_kpi.php:288` | derives via `rkpi_filled_stages()` | yes |
+| `lib/recruit_fulfil.php:259` | derives, with an `['ACCEPTED']` fallback | yes |
+| **`lib/recruit.php:754`** | hardcoded `IN ('OFFERED','ACCEPTED')` | **no** |
+| **`lib/recruit.php:1003`** | hardcoded `IN ('OFFERED','ACCEPTED')`, aliased `filled` | **no** |
+
+In business terms: `recruit_req_health()` computes
+`$vacancies = max(0, $qty - $filled)` and, when that reaches zero, tells the
+manager **"All positions filled"** (`recruit.php:770`). Because it counts an
+*issued* offer as filled, **a 5-seat requisition with 5 offers issued and none
+accepted reports "All positions filled"**, while the canonical fulfilment engine
+correctly reports 0 filled and 5 still in progress. If any of those five
+candidates declines, the health panel has already told the manager the job was
+done.
+
+`recruit_cc.php:319/329` also hardcode `('OFFERED','ACCEPTED')`, but there the
+series is deliberately labelled *offered* against a separate `$ccFill` *joined*
+series — a two-line trend, not a divergent definition of filled. Not a defect.
+
+**G1A-2 was NOT fixed in this gate.** It changes a number a manager reads on
+screen, and Gate 1B already owns the `REQF_*` before/after figures, which is
+where the two definitions must converge. Deferred deliberately, not overlooked.
+
+### C6 — What changed, and the evidence
+
+Changed files: `lib/recruitpipe.php` (additive helpers only — no existing
+function altered), `tests/test_gate1a_stage_reconcile.php` (new),
+`phpapp/deploy-check.php` (regenerated, 669 files).
+
+No schema change. No migration. No route change. No permission change. No
+lifecycle status or transition added. No protected module touched. No production
+deployment.
+
+| Check | Result |
+|---|---|
+| Gate 1A tests, SQLite | **82 / 0** |
+| Gate 1A tests, MariaDB 10.11 | **82 / 0** |
+| Full suite, SQLite | **15,240 / 0** (Gate 0 baseline 15,158 + 82) |
+| Full suite, MariaDB 10.11 (authoritative) | **15,241 / 0** |
+| Mutation targets killed | **7 / 7** |
+
+**The +1 on MariaDB is explained, not waved away.** The two engines run
+deliberately engine-conditional tests: SQLite-only lock-timeout tests
+(`BUSY1`–`BUSY2`) against MariaDB-only row-locking concurrency tests, plus three
+assertions whose *message text* embeds the engine name or an auto-increment id
+(`A4`, `A6`, `C4`). A full assertion-level diff of both runs confirms
+**zero** Gate 1A assertions among the differences, and the battery reports
+**82 / 0 on each engine** — so nothing in this gate behaves differently on
+MariaDB than on SQLite.
+
+Two mutations initially **survived**, and both exposed a genuine weakness in the
+test battery rather than in the code:
+
+- A scan that "repaired" malformed values passed all 67 original assertions,
+  because `strtoupper(trim('OFFER'))` is `'OFFER'` — a fixed point — and the
+  read-only fingerprint had captured its "before" value *after* earlier scans
+  had already done the damage.
+- A scan that wrote `pipeline_stage_id` escaped for the same reason: only the
+  stage-length component was compared against a pristine baseline.
+
+Both were fixed at the root: the fingerprint is now taken **before any
+diagnostic runs**, covers **every column a diagnostic could write**, and each of
+the test's own rows is re-checked individually so compensating writes cannot net
+out. The battery grew from 67 to 82 assertions, and all seven mutations now die.
+
+A third issue surfaced in the full suite: the test's inactive-pipeline fixture
+leaked a row into `recruit_pipelines`, failing an unrelated global count in
+`tests/test_recruit_pipeline.php:12`. The fixture now removes itself the moment
+it has served its purpose — and the candidate keeps its now-dangling
+`pipeline_id`, which is a *better* specimen of an unresolvable position than the
+original fixture was.
+
+### C7 — Baseline
+
+Gate 0's measured baseline could not be re-read: the container was rebuilt and
+its `gate0_base` database no longer exists (no database ships in the repository).
+The baseline was regenerated by the suite itself, as in Gate 0. **Production
+remains unreachable, so no production figures are claimed here.**
+
+### C8 — What Gate 1A deliberately did NOT do
+
+- Did not move authority to the pipeline — that is Gate 1B.
+- Did not add the `closed` stage kind — Gate 1B.
+- Did not retire the coarse legacy sync — Gate 1B.
+- Did not migrate, map, trim or correct a single candidate row.
+- Did not repoint any of the nine readers or six writers. They still read and
+  write the legacy column exactly as before; the replacement source now exists
+  beside them, with a target named for each.
+- Did not fix G1A-2, or the two test fixtures behind G0-1.
+
+---
+
 # STOP
 
-**Audit only. Nothing was implemented, committed or pushed.**
+**Scope of this document.** §1–§21 and §20a are audit only — they were written
+under Prompts 7B and 7C and implemented nothing. §20b (Gate 0) and §20c
+(Gate 1A) are *records of authorised gates that did change code*, each within the
+narrow scope its gate named:
+
+| Section | Gate | Code changed? |
+|---|---|---|
+| §1–§21, §20a | 7B audit, 7C reconciliation | no |
+| §20b | Gate 0 | yes — one route name, three form actions, one new test |
+| §20c | Gate 1A | yes — additive helpers, one new test, regenerated manifest |
+
+**Gate 1A stops here and waits for an explicit pass before Gate 1B.** Authority
+has NOT moved to the pipeline; every reader and writer still behaves exactly as
+it did before this gate.

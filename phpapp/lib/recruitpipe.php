@@ -460,6 +460,186 @@ function recruitpipe_cand_goto($cand, $targetStageId, $remark, $actor) {
     return true;
 }
 
+// ============================================================================
+//  GATE 1A — RECONCILIATION: ONE PLACE THAT SAYS WHERE A CANDIDATE IS
+//
+//  D1 makes the configurable pipeline authoritative for a candidate's CURRENT
+//  recruitment position; C14 puts history in the stage/event ledger and leaves
+//  the legacy `candidates.stage` column as historical / compatibility data.
+//
+//  Today nine library files read that column and six production sites write it,
+//  so "where is this candidate" has more than one answer. This section adds the
+//  ONE derived answer those readers will be switched onto in Gate 1B, plus the
+//  diagnostic that makes the disagreements visible first.
+//
+//  DELIBERATELY READ-ONLY. Nothing here writes, migrates or mutates anything:
+//  Gate 1A reconciles and reports; Gate 1B moves authority. A reconciliation
+//  that quietly repaired its own findings would destroy the evidence it exists
+//  to produce — and the locked rules say a conflict is surfaced, never guessed.
+// ============================================================================
+
+// Is this legacy stage value one the product actually defines? Compared against
+// the lookup-resolved set, so a workspace that renamed a stage is still judged
+// against its OWN vocabulary — and EXACTLY, because Gate 0 measured a row whose
+// value differs from a valid one only by a leading space.
+function rpipe_legacy_stage_valid($v) {
+    if (!defined('CAND_STAGES')) return false;
+    $set = function_exists('lk_options_or') ? lk_options_or('candidate_stage', CAND_STAGES) : CAND_STAGES;
+    return is_string($v) && $v !== '' && array_key_exists($v, $set);
+}
+
+// Which of the three shared classification sets a legacy value belongs to, or
+// '' when it belongs to none. A value in none of them is invisible to the funnel
+// arithmetic, which is how Gate 0 found ten such rows.
+function rpipe_legacy_stage_class($v) {
+    //  index.php loads reqfulfil before this file, so in the running product the
+    //  sets are always present. Loaded anyway rather than trusted, because a
+    //  MISSING set would make every candidate look unclassifiable and quietly
+    //  turn the diagnostic below into a liar.
+    if (!defined('REQF_ACTIVE_STAGES') && is_file(__DIR__ . '/reqfulfil.php'))
+        require_once __DIR__ . '/reqfulfil.php';
+    $v = (string) $v;
+    if (defined('REQF_FILLED_STAGES') && in_array($v, REQF_FILLED_STAGES, true)) return 'FILLED';
+    if (defined('REQF_ACTIVE_STAGES') && in_array($v, REQF_ACTIVE_STAGES, true)) return 'ACTIVE';
+    if (defined('REQF_LOST_STAGES')   && in_array($v, REQF_LOST_STAGES,   true)) return 'LOST';
+    return '';
+}
+
+// THE DERIVED CURRENT STATE — the single replacement source for every
+// current-state reader. It answers from the pipeline when the pipeline can
+// answer, says so plainly when it cannot, and NEVER silently substitutes the
+// legacy value for a pipeline answer. The legacy value travels alongside as
+// data, never as the answer.
+//
+//   source  PIPELINE     the candidate sits on a resolved pipeline stage
+//           LEGACY_ONLY  no pipeline position — legacy is all there is (yet)
+//           NONE         neither; nothing can be said, and it says nothing
+//
+// `conflict` is true when the two disagree about being closed. It is reported,
+// not resolved: D1's reconciliation principle 4.
+function rpipe_current_state($cand) {
+    recruitpipe_migrate();
+    if (!is_array($cand) && (int) $cand > 0)
+        $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int) $cand]) ?: [];
+    if (!is_array($cand) || empty($cand['id'])) return null;
+
+    $legacy = (string) ($cand['stage'] ?? '');
+    $out = [
+        'candidate_id'   => (int) $cand['id'],
+        'source'         => 'NONE',
+        'pipeline_id'    => 0,
+        'stage_id'       => 0,
+        'stage_key'      => '',
+        'stage_name'     => '',
+        'kind'           => '',
+        'closed'         => null,          // null = not determinable from the authority
+        'legacy_stage'   => $legacy,
+        'legacy_valid'   => rpipe_legacy_stage_valid($legacy),
+        'legacy_class'   => rpipe_legacy_stage_class($legacy),
+        'legacy_closed'  => in_array($legacy, recruitpipe_legacy_terminal(), true),
+        'conflict'       => false,
+        //  GATE 1A FINDING (G1A-1) — THE READERS DO NOT AGREE ON THE VALUE ITSELF.
+        //  nextaction.php:165 reads this column as strtoupper(trim($v)); reqfulfil
+        //  and recruitpipe_legacy_terminal() compare it strictly. So ' RECEIVED'
+        //  is a live Received candidate to one reader and an unclassifiable row to
+        //  the other — the same defect pattern as the stage column itself, one
+        //  level down. Both readings are carried so the disagreement is visible
+        //  instead of depending on which file asked.
+        'legacy_lenient'        => strtoupper(trim($legacy)),
+        'legacy_lenient_closed' => in_array(strtoupper(trim($legacy)), recruitpipe_legacy_terminal(), true),
+        'legacy_reader_split'   => false,
+    ];
+
+    [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
+    if ($pipe && $eff && (int) ($cand['pipeline_stage_id'] ?? 0) > 0) {
+        $here = $eff[$idx] ?? null;
+        if ($here && (int) $here['id'] === (int) $cand['pipeline_stage_id']) {
+            $out['source']      = 'PIPELINE';
+            $out['pipeline_id'] = (int) $pipe['id'];
+            $out['stage_id']    = (int) $here['id'];
+            $out['stage_key']   = (string) ($here['stage_key'] ?? '');
+            $out['stage_name']  = (string) ($here['name'] ?? '');
+            $out['kind']        = (string) ($here['kind'] ?? '');
+            //  'closed' is asked of the KIND, never of a stage name — C47. Until
+            //  the closed kind exists (Gate 1B) no pipeline stage can report
+            //  closed, and this correctly says false rather than borrowing the
+            //  legacy answer.
+            $out['closed']      = ($out['kind'] === 'closed');
+        }
+    }
+    if ($out['source'] === 'NONE' && $legacy !== '') $out['source'] = 'LEGACY_ONLY';
+
+    //  THE CONFLICT CLASS (G0-2). Only askable when the pipeline has an answer:
+    //  legacy says the process is over, the pipeline says the candidate is live.
+    if ($out['source'] === 'PIPELINE' && $out['legacy_closed'] && $out['closed'] === false)
+        $out['conflict'] = true;
+
+    //  G1A-1: the strict and lenient readings disagree. Flagged, never smoothed
+    //  over — picking one silently is how the product ends up with two answers.
+    if ($out['legacy_closed'] !== $out['legacy_lenient_closed']
+        || (!$out['legacy_valid'] && $out['legacy_lenient'] !== $legacy
+            && rpipe_legacy_stage_valid($out['legacy_lenient'])))
+        $out['legacy_reader_split'] = true;
+
+    return $out;
+}
+
+// Reconciliation classes, in the taxonomy the gate was specified against. Kept
+// as a constant so the diagnostic, its tests and any later migration all read
+// the same list rather than three drifting copies.
+const RPIPE_RECON_CLASSES = [
+    'B_PIPELINE_OK'      => 'Already on a valid pipeline stage',
+    'E_CONFLICT'         => 'Pipeline live, legacy closed — must be reconciled by a person',
+    'F_INVALID_LEGACY'   => 'Legacy value is not a defined stage — unmapped, never guessed',
+    'C_LEGACY_MAPPABLE'  => 'Legacy only, value is defined and classified — a mapping can be proposed',
+    'D_LEGACY_NO_EVIDENCE' => 'Legacy only, nothing to map from — left unresolved',
+];
+
+// Classify ONE candidate. Order matters: a conflict outranks "looks fine", and an
+// invalid legacy value outranks "mappable", because a value the product does not
+// define is not evidence of anything.
+function rpipe_recon_class($cand) {
+    $st = rpipe_current_state($cand);
+    if (!$st) return null;
+    if ($st['conflict'])                        $cls = 'E_CONFLICT';
+    elseif ($st['source'] === 'PIPELINE')       $cls = 'B_PIPELINE_OK';
+    elseif (!$st['legacy_valid'])               $cls = 'F_INVALID_LEGACY';
+    elseif ($st['legacy_reader_split'])         $cls = 'F_INVALID_LEGACY';
+    elseif ($st['legacy_class'] !== '')         $cls = 'C_LEGACY_MAPPABLE';
+    else                                        $cls = 'D_LEGACY_NO_EVIDENCE';
+    $st['recon_class'] = $cls;
+    return $st;
+}
+
+// The diagnostic. Read-only, bounded, and it returns the rows as well as the
+// counts so a person can act on named candidates rather than a number.
+//
+//  NOTHING IS MUTATED. No stage is written, no mapping is applied, no history is
+//  rewritten. A candidate in E or F leaves this function exactly as it arrived.
+function rpipe_recon_scan($limit = 500) {
+    recruitpipe_migrate();
+    $counts = array_fill_keys(array_keys(RPIPE_RECON_CLASSES), 0);
+    $rows   = [];
+    $limit  = max(1, (int) $limit);
+    try {
+        $cands = ops_all("SELECT * FROM candidates ORDER BY id") ?: [];
+    } catch (Throwable $e) { return ['counts' => $counts, 'rows' => [], 'total' => 0, 'truncated' => false]; }
+    $total = 0;
+    foreach ($cands as $c) {
+        $st = rpipe_recon_class($c);
+        if (!$st) continue;
+        $total++;
+        $counts[$st['recon_class']]++;
+        //  Only the classes that need a human are carried back in full; the
+        //  healthy majority is a count, so the report stays readable.
+        if (in_array($st['recon_class'], ['E_CONFLICT', 'F_INVALID_LEGACY', 'D_LEGACY_NO_EVIDENCE'], true)
+            && count($rows) < $limit)
+            $rows[] = $st + ['detected_at' => date('c')];
+    }
+    return ['counts' => $counts, 'rows' => $rows, 'total' => $total,
+            'truncated' => count($rows) >= $limit];
+}
+
 // The candidate-flow route: advance / back / jump within the pipeline.
 function ops_recruit_candidate_flow($route, $method) {
     ops_require(is_coordinator_level(), 'Only coordinators and admins can move a candidate.');
