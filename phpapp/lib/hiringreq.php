@@ -192,6 +192,17 @@ function hreq_migrate() {
             ['est_cost_basis',      "VARCHAR(20) DEFAULT ''"],// which period — REQ_RATE_BASIS
             ['est_duration_months', 'DECIMAL(8,2) NULL'],    // how long we carry it
             ['est_onetime_cost',    'DECIMAL(14,2) NULL'],   // mobilisation, agency fee…
+            //  GATE 2 · D2 — THE CORE PERSON SPECIFICATION, entered once here and
+            //  inherited by every requisition raised from this request. These three
+            //  are the FLOOR a requisition may make stricter and may not drop below
+            //  without change control (A8).
+            //
+            //  Nullable and defaultless on purpose: "no minimum stated" is a real
+            //  answer and must never be read as a minimum of zero, which would turn
+            //  every requirement into one with a floor nobody set.
+            ['min_experience_years', 'DECIMAL(5,2) NULL'],
+            ['min_qualification',    "VARCHAR(40) DEFAULT ''"],
+            ['essential_skills',     "VARCHAR(600) DEFAULT ''"],
         ] as [$c, $t]) { try { ensure_column('hiring_requests', $c, $t); } catch (Throwable $e) {} }
     }
 
@@ -833,8 +844,64 @@ function hreq_save($id, array $post) {
         'est_cost_basis'           => $estBasis,
         'est_duration_months'      => $estMonths,
         'est_onetime_cost'         => $estOne,
+        //  GATE 2 · D2 — THE CORE PERSON SPECIFICATION. Entered once, here, on the
+        //  request the approver signs, and inherited by every requisition raised
+        //  from it. These three are the FLOOR a requisition may make stricter and
+        //  may not drop below without change control (A8).
+        //
+        //  Nullable on purpose: a request that states no minimum has no floor, and
+        //  an absent value must never be read as a floor of zero.
+        'min_experience_years'     => (array_key_exists('min_experience_years', $post)
+                                       && trim((string) $post['min_experience_years']) !== '')
+                                      ? max(0, (float) $post['min_experience_years']) : null,
+        'min_qualification'        => strtoupper(trim((string) ($post['min_qualification'] ?? ''))),
+        'essential_skills'         => substr(trim((string) ($post['essential_skills'] ?? '')), 0, 600),
     ];
     $now = hreq_now(); $who = hreq_who();
+    //  GATE 2 — AN APPROVED REQUIREMENT IS NOT EDITED IN PLACE.
+    //
+    //  M4 wrote the incoming values into the row and only THEN noticed the change
+    //  was material. The approved snapshot survived in its column, so nothing was
+    //  lost, but every screen, count and export then read the PROPOSED values as
+    //  though an approver had agreed to them: a pending change was silently
+    //  effective. That is the defect Gate 2 exists to remove.
+    //
+    //  So the classification happens BEFORE the write. A material change to an
+    //  approved request becomes a PROPOSAL and this row is left exactly as the
+    //  approver left it. A non-material change still takes the ordinary edit path
+    //  below, which is what D7 allows.
+    //
+    //  The WHOLE submit becomes the proposal, not just its material parts.
+    //  Splitting it would let somebody slip a material change into an otherwise
+    //  harmless edit and have the remainder applied at once, leaving the record in
+    //  a state no approver saw and no version records.
+    if ($existing && $wasApproved && function_exists('rver_propose')) {
+        $approvedFields = rver_approved_fields('HIRING_REQUEST', $id);
+        if ($approvedFields === null) {
+            //  Approved before Gate 2 and never versioned: adopt the snapshot it
+            //  already has as version 1, so it has a floor to be judged against.
+            rver_ensure_initial('HIRING_REQUEST', $id, $existing,
+                                ['note' => 'Adopted from the approval snapshot taken before versioning']);
+            $approvedFields = rver_approved_fields('HIRING_REQUEST', $id);
+        }
+        if (is_array($approvedFields)) {
+            $proposedRow = rver_field_set('HIRING_REQUEST', $cols + (array) $existing);
+            $g2diff = rver_diff('HIRING_REQUEST', $approvedFields, $proposedRow);
+            if ($g2diff['is_material']) {
+                //  Q10 — the reason is mandatory, and it is the caller's to supply.
+                $why = trim((string) ($post['change_reason'] ?? ''));
+                if ($why === '')
+                    return [false, 'This change alters what was approved ('
+                        . implode(', ', array_keys($g2diff['material']))
+                        . '). Give a reason for the change so it can go to change control.', $id];
+                [$pok, $pmsg] = rver_propose('HIRING_REQUEST', $id, $cols, $why,
+                    is_array($post['change_docs'] ?? null) ? $post['change_docs'] : []);
+                //  The row is deliberately NOT written on either outcome: a refused
+                //  proposal must not leave the change half-applied.
+                return [$pok, $pmsg, $id];
+            }
+        }
+    }
     if ($existing) {
         $set = implode(',', array_map(fn($c) => "$c=?", array_keys($cols)));
         db()->prepare("UPDATE hiring_requests SET $set, updated_by=?, updated_at=? WHERE id=?")
@@ -869,6 +936,76 @@ function hreq_save($id, array $post) {
         return [true, $msg, $id];
     }
     return [true, $existing ? 'Hiring request saved.' : 'Hiring request created.', $id];
+}
+
+//  GATE 2 — THE TWO WRITES THE VERSIONING ENGINE NEEDS, KEPT INSIDE THIS LAYER.
+//
+//  lib/reqversion.php owns requirement versioning for BOTH entities, but this file
+//  owns the hiring_requests table — a boundary the M4 suite enforces by reading
+//  every other library for SQL against it. Rather than widen that guard, the
+//  engine asks here. One table, one owner, and the versioning engine stays
+//  entity-agnostic.
+
+//  Apply an approved version's field set to the record. Only real columns, never
+//  the identity or the bookkeeping, and only ever called from rver_apply() inside
+//  its transaction.
+function hreq_apply_approved_version($id, array $fields, $version = 0) {
+    $id = (int) $id;
+    if (!hreq_write_version_fields($id, $fields)) return false;
+    hreq_write_approved_snapshot($id, $fields, $version);
+    //  ONE audit line for ONE act: the approved requirement moved to a new version.
+    //  The versioning engine records the proposal's own history; this records that
+    //  the RECORD changed, which is what this layer is accountable for.
+    if (function_exists('act_log'))
+        act_log('HIRING_REQUEST', $id, 'SYSTEM',
+                'Approved version ' . (int) $version . ' applied to the record',
+                ['auto' => 1, 'outcome' => 'VERSIONED', 'body' => json_encode(array_keys($fields))]);
+    return true;
+}
+
+function hreq_write_version_fields($id, array $fields) {
+    $id = (int) $id; if ($id <= 0 || !$fields) return false;
+    $cols = [];
+    foreach ($fields as $c => $v) {
+        if (!preg_match('~^[a-z_][a-z0-9_]*$~', (string) $c)) continue;
+        if (in_array($c, ['id', 'req_no', 'created_at', 'created_by'], true)) continue;
+        $cols[$c] = $v;
+    }
+    if (!$cols) return false;
+    $set = implode(',', array_map(fn($c) => "$c=?", array_keys($cols)));
+    try {
+        db()->prepare("UPDATE hiring_requests SET $set, updated_at=? WHERE id=?")
+            ->execute([...array_values($cols), hreq_now(), $id]);
+        return true;
+    } catch (Throwable $e) { return false; }
+}
+
+//  Record the newly approved snapshot beside the version chain, so every existing
+//  reader of approved_snapshot_json sees the approved values without being
+//  rewritten. One authority, two readers.
+function hreq_write_approved_snapshot($id, array $fields, $version = 0) {
+    try {
+        db()->prepare("UPDATE hiring_requests SET approved_snapshot_json=?, approved_snapshot_at=? WHERE id=?")
+            ->execute([json_encode(['fields' => $fields, 'at' => hreq_now(), 'version' => (int) $version]),
+                       hreq_now(), (int) $id]);
+        return true;
+    } catch (Throwable $e) { return false; }
+}
+
+//  Move the re-approval marker. The states are this layer's own vocabulary
+//  (HREQ_REAPPROVAL), so an unknown one is refused rather than stored.
+function hreq_set_reapproval($id, $state) {
+    $state = strtoupper(trim((string) $state));
+    if (!array_key_exists($state, HREQ_REAPPROVAL)) return false;
+    try {
+        db()->prepare("UPDATE hiring_requests SET reapproval_state=?, updated_at=? WHERE id=?")
+            ->execute([$state, hreq_now(), (int) $id]);
+    } catch (Throwable $e) { return false; }
+    if (function_exists('act_log'))
+        act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                'Re-approval state is now ' . (HREQ_REAPPROVAL[$state] ?? $state),
+                ['auto' => 1, 'outcome' => $state]);
+    return true;
 }
 
 //  M4 §10 — a material change invalidates the standing approval and asks the
@@ -954,7 +1091,10 @@ function hreq_snapshot(array $r) {
               'quantity','employment_type','work_location','required_by','priority','reason',
               'request_type','project_ref','office_id','client_id','hiring_department_id',
               'requesting_department_id','requested_by_id','requested_by_name','approval_required',
-              'est_cost_per_person','est_cost_basis','est_duration_months','est_onetime_cost'] as $f)
+              'est_cost_per_person','est_cost_basis','est_duration_months','est_onetime_cost',
+              //  GATE 2 — the core person specification is part of what was approved,
+              //  so it is part of the snapshot a requisition's floor is judged against.
+              'min_experience_years','min_qualification','essential_skills'] as $f)
         $fields[$f] = $r[$f] ?? null;
 
     return [
@@ -1065,13 +1205,58 @@ function hreq_apply_decision($id, $result, $by, $note = '', $source = 'DIRECT') 
         $cas = " AND UPPER(COALESCE(status,''))='APPROVED'"
              . " AND UPPER(COALESCE(reapproval_state,'')) IN ('REQUIRED','IN_PROGRESS')";
         if ($to === 'APPROVED') {
-            //  The NEW approved snapshot is captured at the decision — never when
-            //  the change was merely submitted for re-approval.
+            //  GATE 2 — THE DECISION IS WHERE THE CHANGE TAKES EFFECT.
+            //
+            //  The proposed values live on a proposal, not on this row, so
+            //  re-snapshotting the row would capture the values the approver was
+            //  replacing. The versioning engine applies the proposal: it writes the
+            //  record, appends the new approved version and refreshes the snapshot,
+            //  all in one transaction. If it cannot, nothing here claims it did.
+            if (function_exists('rver_pending') && ($g2p = rver_pending('HIRING_REQUEST', (int) $id))) {
+                [$g2ok, $g2msg] = rver_apply((int) $g2p['id'],
+                    ['decided_by' => $who, 'note' => substr(trim((string) $note), 0, 400)]);
+                if (!$g2ok) return [false, $g2msg];
+                //  rver_apply() has set the state, the snapshot and the version; only
+                //  the decision's own fields are left to record.
+                db()->prepare("UPDATE hiring_requests SET decided_by=?, decided_at=?, decision_note=?,
+                               updated_by=?, updated_at=? WHERE id=?")
+                    ->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
+                if (function_exists('act_log'))
+                    act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                            'Re-approval ' . $to . ' via ' . $source . ($who !== '' ? ' by ' . $who : ''),
+                            ['auto' => 1, 'outcome' => $to, 'body' => trim((string) $note)]);
+                return [true, 'Re-approval recorded — the change is now the approved '
+                            . mb_strtolower(hreq_label('requisition')) . '.'];
+            }
+            //  No proposal: a re-approval opened before Gate 2, decided the old way.
+            //  The snapshot is captured at the decision, never at submission.
             $stw = db()->prepare("UPDATE hiring_requests SET reapproval_state='REAPPROVED', decided_by=?, decided_at=?,
                            decision_note=?, approved_snapshot_json=?, approved_snapshot_at=?, updated_by=?, updated_at=? WHERE id=?" . $cas);
             $stw->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400),
                            json_encode(hreq_snapshot($r)), hreq_now(), $who, hreq_now(), (int) $id]);
         } else {
+            //  GATE 2 — a refused re-approval closes the proposal, keeps it on record
+            //  for ever, and leaves the approved requirement untouched.
+            //
+            //  Symmetrical with the APPROVED branch above, and it has to be: the
+            //  rejection is decided by rver_reject()'s own compare-and-swap on the
+            //  proposal, which then moves the marker to REJECTED. Falling through to
+            //  the $cas write below would find the marker already moved, match no
+            //  rows, and report failure for a rejection that had in fact succeeded —
+            //  which is how a race ends with BOTH processes saying they lost.
+            if (function_exists('rver_pending') && ($g2p = rver_pending('HIRING_REQUEST', (int) $id))) {
+                [$g2ok, $g2msg] = rver_reject((int) $g2p['id'], substr(trim((string) $note), 0, 400));
+                if (!$g2ok) return [false, $g2msg];
+                db()->prepare("UPDATE hiring_requests SET decided_by=?, decided_at=?, decision_note=?,
+                               updated_by=?, updated_at=? WHERE id=?")
+                    ->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
+                if (function_exists('act_log'))
+                    act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                            'Re-approval ' . $to . ' via ' . $source . ($who !== '' ? ' by ' . $who : ''),
+                            ['auto' => 1, 'outcome' => $to, 'body' => trim((string) $note)]);
+                return [true, 'Re-approval rejected — the approved ' . mb_strtolower(hreq_label('requisition'))
+                            . ' is unchanged.'];
+            }
             $stw = db()->prepare("UPDATE hiring_requests SET reapproval_state='REJECTED', decided_by=?, decided_at=?,
                            decision_note=?, updated_by=?, updated_at=? WHERE id=?" . $cas);
             $stw->execute([$who, hreq_now(), substr(trim((string) $note), 0, 400), $who, hreq_now(), (int) $id]);
@@ -1117,6 +1302,13 @@ function hreq_apply_decision($id, $result, $by, $note = '', $source = 'DIRECT') 
     }
     if ((int) $stw1->rowCount() < 1)
         return [false, 'Somebody else decided this request a moment ago. Open it again to see the decision.'];
+    //  GATE 2 — the first approved VERSION, recorded at the decision that created
+    //  it. Version 1 is what every later change is judged against, and it is never
+    //  overwritten: an approved change appends version 2.
+    if ($to === 'APPROVED' && function_exists('rver_ensure_initial'))
+        rver_ensure_initial('HIRING_REQUEST', (int) $id, hreq_get((int) $id),
+            ['decided_by' => $who, 'approval_ref' => (string) ($r['approval_ref'] ?? ''),
+             'note' => 'First approved version']);
     if (function_exists('act_log'))
         act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
                 $to . ' via ' . $source . ($who !== '' ? ' by ' . $who : ''),

@@ -154,6 +154,18 @@ const PERMISSIONS = [
     // appoint a Recruitment Manager who configures their hiring product without
     // any system-wide administrator powers.
     'hiring.admin'    => 'Configure the recruitment module',
+    //  GATE 2 · C46 — propose a change to an ALREADY-APPROVED requirement.
+    //
+    //  Held apart from hiring.admin and from ordinary editing on purpose: raising
+    //  a requirement, editing an unapproved one and asking to change what an
+    //  approver already signed are three different responsibilities. Granted per
+    //  ROLE like every other permission (A4) — never per user — and the
+    //  recruitment scope still applies on top of it, so it is not a licence to
+    //  reach another branch's work.
+    //
+    //  Deliberately in NO role default. Somebody has to decide who may reopen an
+    //  approved requirement, and that decision belongs to the customer.
+    'hiring.material_change.propose' => 'Propose a change to an approved requirement (goes to change control)',
     // ---- CRM / Marketing & Sales (fine-grained actions) ----
     'crm.quote.create'    => 'Create / edit quotations',
     'crm.quote.approve'   => 'Approve quotations (approval chain)',
@@ -195,7 +207,7 @@ function permission_groups() {
         'Inspection documentation (IDEMS)' => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.audit.view'],
         'Money'                          => ['finance.reconcile'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
-        'Recruitment'                    => ['hiring.admin'],
+        'Recruitment'                    => ['hiring.admin','hiring.material_change.propose'],
         'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
         'Complaints & appeals'           => ['complaints.decide','capa.close','ncr.close'],
         'Administration'                 => ['master.manage','users.manage.branch','users.manage.global','org.hierarchy.view','settings.manage'],

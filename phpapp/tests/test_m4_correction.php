@@ -339,12 +339,28 @@ if (preg_match_all('/(INSERT INTO|UPDATE |DELETE FROM)/', $src, $wm, PREG_OFFSET
 //  the one place that invalidates a standing approval after a material change. It
 //  belongs on this list for the same reason as the other five — it writes, and it
 //  audits what it writes (material change, execution blocked, chain started).
+//  GATE 2 added three more, and they belong on this list for the same reason as
+//  the rest — each writes, and each audits what it writes:
+//
+//    hreq_apply_approved_version   applies an approved version's values to the
+//                                  record and its snapshot as ONE act, audited once
+//                                  because it IS one act
+//    hreq_write_version_fields     the column write that act performs
+//    hreq_write_approved_snapshot  the snapshot write that act performs
+//    hreq_set_reapproval           moves the re-approval marker, audited
+//
+//  They exist because lib/reqversion.php owns requirement versioning for BOTH
+//  entities while THIS file owns the hiring_requests table. Rather than weaken the
+//  boundary asserted a few lines below, the versioning engine asks here — so the
+//  table still has exactly one owner.
 $AUDITED = ['hreq_migrate', 'hreq_save', 'hreq_submit', 'hreq_apply_decision', 'hreq_cancel',
-            'hreq_to_requisition', 'hreq_require_reapproval', 'hreq_qty_enforce_after_write'];
+            'hreq_to_requisition', 'hreq_require_reapproval', 'hreq_qty_enforce_after_write',
+            'hreq_apply_approved_version', 'hreq_write_version_fields',
+            'hreq_write_approved_snapshot', 'hreq_set_reapproval'];
 $unaudited = array_values(array_diff(array_keys($writes), $AUDITED));
 t_ok(!$unaudited, 'D0 · every database write in the layer lives in an audited function'
      . ($unaudited ? ' — audit these: ' . implode(', ', $unaudited) : ''));
-t_eq(count($writes), 7, 'D0 · and there are exactly seven of them — M4 added the re-approval writer '
+t_eq(count($writes), 10, 'D0 · and there are exactly ten of them — M4 added the re-approval writer '
      . 'and the headcount-ceiling compensator, both of which audit what they do');
 
 // For each mutation path: the chain, in order, BEFORE the first write.

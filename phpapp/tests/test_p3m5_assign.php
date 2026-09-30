@@ -153,7 +153,9 @@ $hbase = fn(array $x = []) => array_merge([
     'requesting_department_id' => $qua['id'], 'hiring_department_id' => $eng['id'],
     'job_title' => 'M5 Engineer', 'designation' => 'ENGINEER', 'job_description' => 'm5',
     'quantity' => 4, 'office_id' => 9551, 'required_by' => '2026-12-01',
-    'employment_type' => 'CONTRACT', 'request_type' => 'PROJECT', 'priority' => 'NORMAL', 'reason' => 'x'], $x);
+    'employment_type' => 'CONTRACT', 'request_type' => 'PROJECT', 'priority' => 'NORMAL', 'reason' => 'x',
+    //  GATE 2 · Q10 — a material change to an APPROVED requirement needs a reason.
+    'change_reason' => 'Gate 2 test — material change'], $x);
 [$okH,, $hId] = hreq_save(0, $hbase());
 hreq_submit($hId); hreq_apply_decision($hId, 'APPROVED', 'M5 Approver', 'ok');
 [$okR,, $rM4] = hreq_to_requisition($hId, 4);

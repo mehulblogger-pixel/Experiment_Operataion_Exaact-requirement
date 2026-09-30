@@ -795,6 +795,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits
     if (function_exists('req_groups_migrate')) req_groups_migrate();  // 1c — requisition deployment groups (headcount + reporting contact + site)
     if (function_exists('recruitpipe_migrate')) recruitpipe_migrate(); // Phase 2 — configurable recruitment pipelines + stages
+    if (function_exists('rver_migrate')) rver_migrate();          // Gate 2 — requirement versions + change proposals (hiring request + requisition)
     if (function_exists('position_migrate')) position_migrate();       // Phase 3 — position master + requisition.position_id
     if (function_exists('recruit_iv_migrate')) recruit_iv_migrate();   // Phase 4 — interviews + candidate_docs
     if (function_exists('comp_migrate')) comp_migrate();               // Phase 5.1A — salary_component_defs (configurable compensation)

@@ -25,6 +25,11 @@ $act  = function ($u) { $_SESSION['uid']=$u; current_user(true); ua(true); };
 $act($uMgr);
 $eng = dept_of('Engineering'); $qua = dept_of('Quality');
 $base = fn(array $x=[]) => array_merge([
+    //  GATE 2 · Q10 — a material change to an APPROVED requirement needs a stated
+    //  reason before it can go to change control. Carried on every payload here
+    //  because that is how the product now works; it is only ever consumed when
+    //  the change actually turns out to be material.
+    'change_reason' => 'Gate 2 test — material change',
     'requested_by_id'=>$uMgr,'requested_by_name'=>'M4S Manager',
     'requesting_department_id'=>$qua['id'],'hiring_department_id'=>$eng['id'],
     'job_title'=>'M4S Engineer','designation'=>'ENGINEER','job_description'=>'security probes',
@@ -90,7 +95,12 @@ t_eq((int)$after['approval_required'], 1,                         'B · and the 
 //  quantity IS accepted — but it is a material increase, so it costs the approval
 [$oq,$mq] = hreq_save($hB, $base(['job_title'=>'M4S Post','quantity'=>500]));
 $aq = hreq_get($hB);
-t_eq((int)$aq['quantity'], 500, 'B · a quantity increase is accepted as a REQUEST…');
+//  GATE 2 — the ask is accepted, but as a PROPOSAL rather than as an edit. The
+//  record keeps the approved figure until somebody decides, which is the whole
+//  point: a pending change must not be effective.
+t_eq((int) rver_proposed_fields(rver_pending('HIRING_REQUEST', $hB))['quantity'], 500,
+     'B · a quantity increase is accepted as a REQUEST…');
+t_eq((int)$aq['quantity'], 10, 'B · …and the RECORD still carries the approved 10 until it is decided');
 t_eq((int) hreq_approved_qty($aq), 10, 'B · *** …but the APPROVED figure is still 10 ***');
 t_ok(!hreq_is_executable($aq), 'B · *** and recruitment is blocked until it is re-approved ***');
 

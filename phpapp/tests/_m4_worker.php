@@ -31,7 +31,9 @@ try {
                                     'job_title'=>$r['job_title'], 'designation'=>$r['designation'],
                                     'quantity'=>(int)$r['quantity'], 'office_id'=>$r['office_id'],
                                     'employment_type'=>$r['employment_type'], 'request_type'=>$r['request_type'],
-                                    'priority'=>$r['priority'], 'grade'=>$arg]);
+                                    'priority'=>$r['priority'], 'grade'=>$arg,
+                                    //  GATE 2 · Q10 — a material change carries its reason.
+                                    'change_reason'=>'concurrent material change']);
                                  $out['ok']=(bool)$ok; $out['msg']=$msg; }
     elseif ($op === 'decide')  { [$ok,$msg] = hreq_apply_decision($id, $arg, 'worker', 'concurrent'); $out['ok']=(bool)$ok; $out['msg']=$msg; }
     elseif ($op === 'exec')    { $out['msg'] = hreq_req_block_reason($id); $out['ok'] = ($out['msg'] === ''); }

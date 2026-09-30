@@ -18,6 +18,11 @@ $uMgr = (int)$pdo->lastInsertId(); $mine['u'][]=$uMgr;
 $_SESSION['uid']=$uMgr; current_user(true); ua(true);
 $eng = dept_of('Engineering'); $qua = dept_of('Quality');
 $base = fn(array $x=[]) => array_merge([
+    //  GATE 2 · Q10 — a material change to an APPROVED requirement needs a stated
+    //  reason before it can go to change control. Carried on every payload here
+    //  because that is how the product now works; it is only ever consumed when
+    //  the change actually turns out to be material.
+    'change_reason' => 'Gate 2 test — material change',
     'requested_by_id'=>$uMgr,'requested_by_name'=>'M4C','requesting_department_id'=>$qua['id'],
     'hiring_department_id'=>$eng['id'],'job_title'=>'M4C Engineer','designation'=>'ENGINEER',
     'quantity'=>10,'office_id'=>9461,'employment_type'=>'CONTRACT','request_type'=>'PROJECT','priority'=>'NORMAL',

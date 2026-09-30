@@ -5981,6 +5981,25 @@ function ops_requisitions($route, $method) {
                 //  §14 — the headcount ceiling, on the EDIT path and not only on
                 //  creation. This was the defect the M4 audit found.
                 $m4prevQty = (int) ($req['quantity'] ?? 0);
+                //  GATE 2 — CHANGE CONTROL ON AN APPROVED REQUIREMENT.
+                //
+                //  The same rule the hiring request now follows: a material change
+                //  to an approved requirement does not edit it. It becomes a
+                //  proposal, the approved version stays in force, and this save
+                //  writes nothing. A non-material change takes the ordinary path
+                //  below, which is what D7 allows.
+                //
+                //  A8 also applies here: a person specification dropping BELOW the
+                //  approved hiring request's minimum is a weakening, and goes
+                //  through change control even when it is not otherwise material.
+                if (function_exists('rver_propose')) {
+                    $g2in = [];
+                    foreach (array_merge($fields, $extraCols) as $g2f)
+                        if (array_key_exists($g2f, $b)) $g2in[$g2f] = $norm($g2f, $b[$g2f] ?? '');
+                    $g2res = rver_gate_requisition_edit((int) $req['id'], $g2in, $b);
+                    if (is_array($g2res)) { flash((string) $g2res[1], $g2res[0] ? 'success' : 'error');
+                                            redirect('/requisition?id=' . (int) $req['id']); }
+                }
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields)) . ',' . implode(',', array_map(fn($f)=>"$f=?", $extraCols));
                 $vals = array_merge(array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), $extraVals, [$req['id']]);
                 $pdo->prepare("UPDATE requisitions SET $set WHERE id=?")->execute($vals);

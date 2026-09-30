@@ -23,6 +23,14 @@ const APPR_ENTITIES = [
     'REQUISITION'    => 'Requisition (SRF)',
     'OFFER'          => 'Offer',
     'SALARY'         => 'Salary structure',
+    //  GATE 2 — an organisation MAY configure a chain specifically for changes to
+    //  an already-approved requirement, which then wins over the underlying
+    //  requirement's own chain (F1). They are entities of THIS engine, not a
+    //  second one: the matrix, authority, delegation, scope, segregation, inbox,
+    //  SLA and notifications are all the ones already built. Configure no rule for
+    //  them and a change simply inherits the requirement's own chain.
+    'HREQ_CHANGE'    => 'Change to an approved Hiring Request',
+    'REQ_CHANGE'     => 'Change to an approved Requisition',
 ];
 
 function appr_migrate() {
@@ -1649,6 +1657,27 @@ function appr_undo_step($stepId, $req, $why) {
 //  this correction was told not to touch.
 function appr_callback($entity, $entityId, $result, $req = null) {
     try {
+        //  GATE 2 — A DECISION ON A CHANGE TO AN APPROVED REQUIREMENT.
+        //
+        //  The change lives on a proposal, not on the record, so the decision is
+        //  applied by the versioning engine: on approval it writes the record and
+        //  appends a new approved version in one transaction; on rejection it
+        //  leaves the approved requirement exactly as it is and keeps the refused
+        //  proposal on record. This callback decides nothing itself — it is the
+        //  same hand-off the HIRING_REQUEST branch below performs.
+        if ($entity === 'HREQ_CHANGE' || $entity === 'REQ_CHANGE') {
+            if (!function_exists('rver_pending')) return true;
+            $target = $entity === 'HREQ_CHANGE' ? 'HIRING_REQUEST' : 'REQUISITION';
+            $p = rver_pending($target, (int) $entityId);
+            //  No open proposal is not a failure: it was withdrawn, or already
+            //  decided, and the chain has nothing left to apply.
+            if (!$p) return true;
+            [$ok, $msg] = ($result === 'APPROVED')
+                ? rver_apply((int) $p['id'], ['decided_by' => _appr_actor(),
+                                              'note' => (string) ($req['rule_name'] ?? '')])
+                : rver_reject((int) $p['id'], (string) ($req['rule_name'] ?? ''));
+            return $ok ? true : (string) $msg;
+        }
         if ($entity === 'HIRING_REQUEST') {
             // The hiring-request layer owns its own state machine and refuses a
             // decision on a request that is no longer open for one. That refusal
@@ -1680,6 +1709,11 @@ function appr_callback($entity, $entityId, $result, $req = null) {
             //  left to the only thing entitled to derive it, M3's reqf_sync().
             if ($result === 'APPROVED') {
                 db()->prepare("UPDATE requisitions SET approved_by=? WHERE id=?")->execute(['Approval chain', (int) $entityId]);
+                //  GATE 2 — the first approved VERSION, recorded at the decision that
+                //  created it. Idempotent: a requirement that already has one keeps it.
+                if (function_exists('rver_ensure_initial'))
+                    rver_ensure_initial('REQUISITION', (int) $entityId, null,
+                        ['decided_by' => _appr_actor(), 'note' => 'First approved version']);
                 if (function_exists('reqf_sync')) { try { reqf_sync((int) $entityId); } catch (Throwable $e) {} }
                 if (function_exists('act_log'))
                     act_log('REQUISITION', (int) $entityId, 'NOTE', 'Approved through the approval chain',

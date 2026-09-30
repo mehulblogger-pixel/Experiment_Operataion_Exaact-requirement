@@ -156,17 +156,38 @@ $GLOBALS['__db_epoch'] = (int) ($GLOBALS['__db_epoch'] ?? 0) + 1;
 $snapWas   = hreq_approved_snapshot(hreq_get($h1));
 $titleWas  = (string) ($snapWas['fields']['job_title'] ?? '');
 $convWas   = hreq_converted_qty($h1);
-[$eOk, $eMsg] = hreq_save($h1, $base(['quantity' => 99, 'job_title' => 'Something Else']));
-t_ok($eOk, 'an approved request CAN now be changed: ' . $eMsg);
-t_ok(stripos($eMsg, 're-approval') !== false, '…but never silently — the answer says re-approval');
+//  GATE 2 re-pointed these again, at a stronger contract still. A material change
+//  to an approved request no longer WRITES the record and then blocks recruitment:
+//  it becomes a proposal, and the approved requirement stays in force untouched
+//  until somebody decides. The protection is the same one, now enforced before the
+//  write rather than compensated for after it.
+[$noWhy, $noMsg] = hreq_save($h1, $base(['quantity' => 99, 'job_title' => 'Something Else']));
+t_ok(!$noWhy, 'a material change with no stated reason is refused: ' . $noMsg);
+t_ok(stripos($noMsg, 'reason') !== false, '…and says a reason is what is missing (Q10)');
+t_eq((int) hreq_get($h1)['quantity'], 10, '…and NOTHING was written — still the approved 10');
+
+[$eOk, $eMsg] = hreq_save($h1, $base(['quantity' => 99, 'job_title' => 'Something Else',
+                                      'change_reason' => 'the project grew']));
+t_ok($eOk, 'an approved request CAN be changed, with a reason: ' . $eMsg);
+t_ok(stripos($eMsg, 'approv') !== false, '…and the answer says it needs a decision');
 $h1row = hreq_get($h1);
-t_eq(hreq_reapproval_state($h1row), 'REQUIRED', '…the standing approval is invalidated');
-t_ok(!hreq_is_executable($h1row), '…recruitment is blocked while it is unapproved');
+$prop = rver_pending('HIRING_REQUEST', $h1);
+t_ok(is_array($prop), '…a PROPOSAL was created');
+t_eq((int) rver_proposed_fields($prop)['quantity'], 99, '…carrying the proposed 99');
+t_eq((int) $h1row['quantity'], 10,
+     '*** …while the RECORD still carries the approved 10 — a pending change is not effective ***');
+t_eq((string) $h1row['job_title'], $titleWas, '…and the approved title is untouched');
+t_ok(rver_block_reason('HIRING_REQUEST', $h1, 'OFFER') !== '',
+     '…and no offer may be made while the change waits (the shipped level-2 effect)');
+t_eq(rver_block_reason('HIRING_REQUEST', $h1, 'ADVANCE'), '',
+     '…but screening continues, which is what level 2 means');
 t_eq((int) hreq_approved_qty($h1row), 10, '…and the APPROVED figure is intact at 10, not 99');
 t_eq((int) hreq_remaining_qty($h1), max(0, 10 - $convWas),
      '…so the headcount ceiling is still measured from the approved 10, not the typed 99');
 $snap99 = hreq_approved_snapshot($h1row);
 t_eq((int) ($snap99['fields']['quantity'] ?? 0), 10, '…the approved snapshot was not overwritten');
+t_eq((int) rver_current('HIRING_REQUEST', $h1)['version'], 1,
+     '…and the approved VERSION is still 1 — a proposal creates no version until it is approved');
 t_eq((string) ($snap99['fields']['job_title'] ?? ''), $titleWas, '…nor was the approved title');
 t_ok($titleWas !== 'Something Else', '…and the approved title is not the one just typed in');
 

@@ -124,6 +124,27 @@ function rexec_block_reason($requisitionId, $action = 'ADVANCE', $candidateId = 
         if ($why !== '') return $why;
     }
 
+    //  2b · GATE 2 — A CHANGE AWAITING A DECISION, and what the organisation has
+    //  said that should stop. Asked PER ACTION, because the four configured
+    //  effects differ only by which actions they allow: pause everything, keep
+    //  screening but commit to nobody (the shipped default), everything but
+    //  joining, or carry on. Answered by the versioning engine so this gate does
+    //  not hold a second opinion about it, and expressed as an ordinary refusal
+    //  here so it reads like every other one.
+    if (function_exists('rver_block_reason')) {
+        $why = (string) rver_block_reason('REQUISITION', $rq, $action);
+        if ($why !== '') return $why;
+        //  A change to the hiring request the requirement was raised from stops
+        //  execution on that requirement too — the authority being changed is the
+        //  one this requirement spends.
+        try { $hid = (int) ops_val("SELECT COALESCE(hiring_request_id,0) FROM requisitions WHERE id=?", [$rq]); }
+        catch (Throwable $e) { $hid = 0; }
+        if ($hid > 0) {
+            $why = (string) rver_block_reason('HIRING_REQUEST', $hid, $action);
+            if ($why !== '') return $why;
+        }
+    }
+
     //  3 · THE SEAT. Only a joining consumes one. An offer does not: the business
     //  deliberately runs more offers than seats, because offers are declined —
     //  and refusing the fifth offer for four seats would stop normal recruitment.

@@ -28,7 +28,9 @@ $base = fn(array $x = []) => array_merge([
     'requested_by_id' => $uBoss, 'requested_by_name' => 'M6S', 'requesting_department_id' => $qua['id'],
     'hiring_department_id' => $eng['id'], 'job_title' => 'M6S Engineer', 'designation' => 'ENGINEER',
     'job_description' => 'm6s', 'quantity' => 3, 'office_id' => 9621, 'required_by' => '2026-12-01',
-    'employment_type' => 'CONTRACT', 'request_type' => 'PROJECT', 'priority' => 'NORMAL', 'reason' => 'x'], $x);
+    'employment_type' => 'CONTRACT', 'request_type' => 'PROJECT', 'priority' => 'NORMAL', 'reason' => 'x',
+    //  GATE 2 · Q10 — a material change to an APPROVED requirement needs a reason.
+    'change_reason' => 'Gate 2 test — material change'], $x);
 $approve = function (array $x = []) use ($base) {
     [$ok,, $id] = hreq_save(0, $base($x)); if (!$ok) return 0;
     hreq_submit($id); hreq_apply_decision($id, 'APPROVED', 'M6S Approver', 'ok'); return (int) $id; };

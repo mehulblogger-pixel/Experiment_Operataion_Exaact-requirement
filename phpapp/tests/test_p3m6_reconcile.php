@@ -23,6 +23,9 @@ $uRec = (int) $pdo->lastInsertId();
 $_SESSION['uid'] = $uBoss; current_user(true); ua(true);
 $eng = dept_of('Engineering'); $qua = dept_of('Quality');
 $base = fn(array $x = []) => array_merge([
+    //  GATE 2 · Q10 — a material change to an APPROVED requirement needs a stated
+    //  reason before it can go to change control.
+    'change_reason' => 'Gate 2 test — material change',
     'requested_by_id' => $uBoss, 'requested_by_name' => 'M6R', 'requesting_department_id' => $qua['id'],
     'hiring_department_id' => $eng['id'], 'job_title' => 'M6R Engineer', 'designation' => 'ENGINEER',
     'job_description' => 'm6r', 'quantity' => 10, 'office_id' => 9631, 'required_by' => '2026-12-01',

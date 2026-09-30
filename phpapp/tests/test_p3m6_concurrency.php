@@ -20,6 +20,11 @@ $uBoss = $mkU('m6c_boss'); $uX = $mkU('m6c_x'); $uY = $mkU('m6c_y');
 $_SESSION['uid'] = $uBoss; current_user(true); ua(true);
 $eng = dept_of('Engineering'); $qua = dept_of('Quality');
 $base = fn(array $x = []) => array_merge([
+    //  GATE 2 · Q10 — a material change to an APPROVED requirement needs a stated
+    //  reason before it can go to change control. Carried on every payload here
+    //  because that is how the product now works; it is only ever consumed when
+    //  the change actually turns out to be material.
+    'change_reason' => 'Gate 2 test — material change',
     'requested_by_id' => $uBoss, 'requested_by_name' => 'M6C', 'requesting_department_id' => $qua['id'],
     'hiring_department_id' => $eng['id'], 'job_title' => 'M6C Engineer', 'designation' => 'ENGINEER',
     'job_description' => 'm6c', 'quantity' => 2, 'office_id' => 9641, 'required_by' => '2026-12-01',

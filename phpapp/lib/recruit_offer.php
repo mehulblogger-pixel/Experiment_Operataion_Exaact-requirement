@@ -111,6 +111,10 @@ function recruit_offer_migrate() {
         // swallowed by the boot-safety catch.
         // Historical rows stay NULL and fail closed, by design.
         ensure_column('job_offers', 'created_by_id', 'INT NULL');
+        //  GATE 2 · A2 — the requirement version this offer was issued against,
+        //  stamped at issue so the boundary never depends on clock resolution.
+        //  0 means "not recorded", which every offer issued before Gate 2 carries.
+        ensure_column('job_offers', 'req_version_at_issue', 'INT DEFAULT 0');
         ensure_column('salary_structures', 'created_by_id', 'INT NULL');
         if (function_exists('act_index')) {
             act_index('salary_structures', 'idx_sal_cand', '(candidate_id)');
@@ -356,6 +360,20 @@ function offer_issue($id) {
     //  Neither write can undo the offer: the offer is already issued. A failure to
     //  record where they now stand is not a failure to transact.
     if ($cand) offer_move_to_offer_stage((int) $o['candidate_id'], $cand);
+    //  GATE 2 · A2 — WHICH REQUIREMENT VERSION THIS OFFER WAS MADE AGAINST.
+    //
+    //  Recorded here, at issue, rather than derived later from timestamps. A
+    //  derivation is ambiguous whenever an approval and an issue land in the same
+    //  second, and "which requirement was this person promised?" is not a question
+    //  that may depend on clock resolution. A later approved version does not move
+    //  a candidate who already holds an issued offer.
+    if ($cand && function_exists('rver_current') && !empty($cand['requisition_id'])) {
+        try {
+            $rv = rver_current('REQUISITION', (int) $cand['requisition_id']);
+            if ($rv) db()->prepare("UPDATE job_offers SET req_version_at_issue=? WHERE id=?")
+                ->execute([(int) $rv['version'], (int) $id]);
+        } catch (Throwable $e) { /* the column is additive; an older schema simply derives it */ }
+    }
     return [true, 'Offer issued. Share the letter with the candidate.'];
 }
 //  Put a candidate on the offer stage of their own pipeline, and record it.

@@ -26,6 +26,9 @@ $uRecB = $mk('m6l_b', 'COORDINATOR', 0, 9612, '9612');
 $act($uBoss);
 $eng = dept_of('Engineering'); $qua = dept_of('Quality');
 $base = fn(array $x = []) => array_merge([
+    //  GATE 2 · Q10 — a material change to an APPROVED requirement needs a stated
+    //  reason before it can go to change control.
+    'change_reason' => 'Gate 2 test — material change',
     'requested_by_id' => $uBoss, 'requested_by_name' => 'M6L Boss',
     'requesting_department_id' => $qua['id'], 'hiring_department_id' => $eng['id'],
     'job_title' => 'M6L Engineer', 'designation' => 'ENGINEER', 'job_description' => 'm6',

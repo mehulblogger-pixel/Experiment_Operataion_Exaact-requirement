@@ -1491,6 +1491,254 @@ data — production remains unreachable from this environment.**
 
 ---
 
+## §20e — GATE 2 RECORD: REQUIREMENT VERSIONING & CHANGE CONTROL
+
+Gate 2 implements the locked versioning architecture for **both** the Hiring
+Request and the Recruitment Requisition, through **one** mechanism.
+
+### E1 — The defect this gate removes
+
+M4 already detected material change correctly and already asked the existing
+approval engine for a new decision. What it did **not** do was keep the approved
+requirement effective while the change waited: `hreq_save()` wrote the incoming
+values straight into the live row and only *then* noticed the change was material.
+The approved snapshot survived in its column, so nothing was lost — but every
+screen, count and export then read the **proposed** values as though an approver
+had agreed to them. **A pending change was silently effective.**
+
+That is now impossible. A material change to an approved requirement does not
+touch the record; it becomes a proposal.
+
+### E2 — Schema (additive, idempotent, nothing destructive)
+
+| Object | Purpose |
+|---|---|
+| `requirement_versions` | one row per approved version; **append-only**, never updated, never deleted |
+| `requirement_change_proposals` | proposals with their full lifecycle and decision history |
+| `requirement_change_proposals.pending_key` | `"ENTITY:id"` while PENDING, `NULL` otherwise, under a unique index |
+| `hiring_requests.min_experience_years / min_qualification / essential_skills` | D2's CORE person specification, nullable |
+| `requisitions.` same three | the requisition's own copy, which it may make stricter |
+| `requisitions.preferred_skills / screening_questions / sourcing_requirements / client_requirements / recruitment_notes / evaluation_criteria` | D2's execution detail |
+| `requisitions.approved_snapshot_json / approved_snapshot_at / change_state` | mirrors what the hiring request already had |
+| `job_offers.req_version_at_issue` | A2's boundary, stamped at issue |
+
+**The pending-uniqueness trick is worth recording.** A partial unique index would
+be the natural way to say "one pending proposal per requirement", and MariaDB does
+not have them. So `pending_key` carries the identity only while the row is PENDING
+and `NULL` otherwise: a unique index treats NULLs as distinct on **both** engines,
+so any number of decided proposals coexist while a second PENDING one cannot be
+inserted. The database enforces the rule, not a check the next caller might forget
+— and a test proves it by attempting the insert directly.
+
+### E3 — One mechanism, two entities
+
+`lib/reqversion.php` holds the whole engine. The only per-entity knowledge is in
+`rver_entities()`; everything else is shared. **No second approval engine, no
+second audit engine, no second lifecycle engine, and no "master requirement" table
+replacing the two it versions.** Each entity keeps its own material-field list
+(A6) and its own version chain (§20): a Requisition version never mutates the
+Hiring Request's, which a test asserts directly.
+
+### E4 — Materiality, and what "configurable" means here
+
+`rver_material_fields($entity)` returns the shipped list **plus** whatever the
+organisation adds. Configuration may only **ADD**: the shipped list is a floor, not
+a default an administrator can empty. Removing a protection is exactly the change
+an organisation should not be able to make by accident, and the audit matrix an
+approver relies on is what would quietly stop being true. A configured field the
+table does not have is ignored, so a typo cannot make every save look material.
+
+### E5 — Budget: total commitment, not a single field
+
+    per-person cost x quantity x applicable periods + one-time cost
+
+Judged as **one number**, because the fields trade off against each other: halving
+a duration while doubling a rate is not a change anybody would call a change, and
+comparing field by field would fire a needless re-approval on it.
+
+| Threshold | Shipped | Configurable as |
+|---|---|---|
+| Percentage | 10% | `rver_budget_pct` |
+| Absolute | ₹1,00,000 | `rver_budget_abs` |
+| Rule | greater of the two | `rver_budget_rule` — `GREATER` / `LESSER` / `PCT` / `ABS` |
+
+A **decrease is never material**. Where nothing was approved before, the absolute
+floor decides — a percentage of nothing would make any first estimate material. A
+change landing **exactly on** the threshold is inside it, which is the reading an
+approver signing a limit expects; a rupee past it is material. Completing a partial
+estimate (a rate with no duration, which contributes one period) to a full one is
+judged like any other increase.
+
+### E6 — A8: stricter is fine, weaker is change-controlled
+
+Judged against the **approved Hiring Request minimum**, never against the previous
+Requisition version. Three floor kinds, each with its direction stated in code:
+experience (higher is stricter), qualification (later in the configured order is
+stricter), essential skills (a larger set is stricter).
+
+| Case | Outcome |
+|---|---|
+| Requisition asks 5 years, floor is 3 | stricter — allowed, ordinary edit |
+| Diploma + certification against a Diploma floor | stricter — allowed |
+| Requisition 5 → 2 years, floor is 3 | **weakening below the floor** — change control |
+| Requisition 5 → 4 years, floor is 3 | above the floor — ordinary edit |
+| Requisition 2 → 3 years, floor is 3 | **towards** the floor — never a weakening |
+| An essential skill the approved request named is dropped | weakening — change control |
+| No hiring request at all (the direct path) | no floor exists, so nothing to breach |
+
+A weakening always requires a reason, a new Requisition version and audit history;
+whether it *also* requires approval is the organisation's configuration to decide.
+
+### E7 — Approval routing (F1), and B2
+
+A chain configured specifically for material changes **wins**; otherwise the change
+inherits the requirement's own chain. Either way it is the **existing** approval
+engine that is asked, with the **proposed** values as context — a change is judged
+by what it is becoming, not by what it was. Two entities were added to
+`APPR_ENTITIES` (`HREQ_CHANGE`, `REQ_CHANGE`) so an organisation can configure such
+a chain; configure no rule for them and the change simply inherits.
+
+**B2 is honoured exactly.** Approval Required is ON by default (the hiring request
+carries it per record; a requisition inherits it from its request, else from a
+workspace setting that also defaults ON). "No matching rule" is **not** "approval
+off": the proposal waits, nothing self-approves, no approver is invented, and the
+configuration gap is stated on the screen and in the audit trail so an
+administrator can fix it. Where approval genuinely is not required, the change
+still gets a reason, a new version and a full audit trail.
+
+### E8 — What a pending change stops (A5/Q6)
+
+Four organisation-configured levels, expressed in the **existing** `REXEC_ACTIONS`
+vocabulary and answered inside the **existing** execution gate, per action:
+
+| Level | Effect |
+|---|---|
+| 1 | pause everything |
+| **2 — shipped default** | **continue screening and interviewing; no offer, no joining** |
+| 3 | everything except joining |
+| 4 | carry on |
+
+`lib/recruit_exec.php` asks `rver_block_reason()` per action, so a refusal reads
+like every other execution refusal in the product. A change to the hiring request a
+requirement was raised from stops execution on that requirement too — the authority
+being changed is the one it spends.
+
+### E9 — The lifecycle, and G2
+
+`PROPOSE → PENDING → decision → APPROVED / REJECTED / WITHDRAWN`.
+
+A refused proposal is **kept for ever**, is **never amended in place** (a new
+attempt is a new row), does not change the approved version, and its refused values
+remain available to prefill a later attempt. A withdrawn proposal records its
+withdrawal reason, closes, leaves the approved version untouched and restores
+normal operation. Q10's reason is **mandatory** for both proposing and withdrawing;
+Q11's supporting documents are optional.
+
+### E10 — Approval applies the change; nothing else does
+
+`rver_apply()` is the only place an approved requirement's values move, and it does
+the record write, the new version and the proposal's closure **in one transaction**
+— so there is never a version whose values the record does not carry. It closes the
+proposal **first**, conditionally on it still being PENDING, so two approvers
+deciding in the same instant cannot both win and the loser changes nothing.
+
+### E11 — The architectural boundary was respected, not widened
+
+`lib/hiringreq.php` owns the `hiring_requests` table, and the M4 suite enforces
+that by reading every other library for SQL against it. Rather than widen that
+guard, the versioning engine **asks** that layer:
+`hreq_apply_approved_version()`, `hreq_write_version_fields()`,
+`hreq_write_approved_snapshot()`, `hreq_set_reapproval()` — each audited, each
+inside the layer. The table still has exactly one owner, and the engine stays
+entity-agnostic.
+
+The existing `reapproval_state` marker is **driven** by the proposal rather than
+replaced by a second one, so every existing reader — `hreq_is_executable()`, the
+registers, the screens, the guards — keeps working unchanged.
+
+### E12 — Candidates, and the issued-offer boundary (Q13 / A2)
+
+Candidates keep their requirement across a version change: none is lost, none is
+reassigned, and `rver_applicable_version()` answers, for one candidate, which
+version they have to meet. That is the relationship **Gate 3** needs, and it is all
+Gate 2 provides — **Review Required is not implemented here.**
+
+A candidate holding an **issued, viewed or accepted** offer, or already in the
+workforce, stays on the version in force when that commitment was made. A **draft**
+offer remains in scope.
+
+**A defect was found and fixed while proving this.** The boundary was first derived
+from the offer's issue timestamp against the version chain, which is ambiguous
+whenever an approval and an issue land in the same second — and "which requirement
+was this person promised?" must not depend on clock resolution. The version is now
+**stamped on the offer at issue** (`job_offers.req_version_at_issue`), with the
+timestamp derivation kept only as the fallback for offers issued before this gate.
+
+### E13 — Who may propose (Q8 / C46 / A4)
+
+Permission `hiring.material_change.propose`, registered in the catalogue and
+configurable in the Recruitment group, per **role** and never per user.
+
+Q8's model is role defaults **plus** a specific permission **plus** scope — three
+things that add up. So a role that may already change this requirement keeps that
+ability, the permission **extends** it to roles whose defaults do not include
+changing requirements, and the recruitment scope applies on top of both. Requiring
+the new permission *instead* would have silently removed, on upgrade, something
+every existing recruiter can do today — and an upgrade that removes a capability
+nobody asked to remove is not a safe upgrade. A user with neither is refused, and a
+manager scoped to another branch is refused on this one.
+
+### E14 — Verification
+
+| Check | Result |
+|---|---|
+| Gate 2 battery, SQLite | **169 / 0** |
+| Gate 2 battery, MariaDB 10.11 | **169 / 0** |
+| Full suite, SQLite | **15,608 / 0** |
+| Full suite, MariaDB 10.11 (authoritative) | **15,631 / 0** |
+| Mutation targets killed | **24 / 24** |
+| Browser (Chromium), desktop + phone | **22 / 0** |
+| Whole-app crawl, every role | **all screens render cleanly** |
+
+The suite totals differ between engines for the reasons recorded in §20d: a
+handful of pre-existing tests embed run-dependent values or count their own scratch
+files, and MariaDB runs row-locking races where SQLite runs lock-timeout tests. The
+focused Gate 2 battery is **169 on both engines**, so nothing in this gate behaves
+differently on MariaDB.
+
+Two problems were found by the work itself and fixed at the root:
+
+- **The rejection path reported failure for a rejection that had succeeded.**
+  `rver_reject()` moves the state marker, and the old code then ran its own
+  state-guarded write, matched no rows, and returned false — so a race could end
+  with *both* processes saying they lost. The two decision branches are now
+  symmetric.
+- **My own tenant-isolation test found leftovers of its own making**: tenant B's
+  database outlives the process, so it is now cleared before it is entered. An
+  isolation test that passes on its own residue proves nothing.
+
+### E15 — Findings, classified
+
+| Finding | Class |
+|---|---|
+| Self-approval configuration (configurable, OFF by default, master exception) | **deferred — Gate 4**, as locked. Gate 2 reuses the existing framework and proves a change is judged by the same segregation the first approval was |
+| Review Required, and what a stricter version does to attached candidates | **deferred — Gate 3**, as instructed. Gate 2 provides `rver_applicable_version()` and the audience split, and implements nothing else |
+| The requisition edit path is gated inside `lib/ops.php`'s handler | **documentation only** — the gate is one call; the requisition's own save remains where it was |
+| `hreq_require_reapproval()` remains for re-approvals opened before Gate 2 | **documentation only** — existing records continue under the configuration they were raised under (§8) |
+
+### E16 — What Gate 2 deliberately did NOT do
+
+No Review Required, no automatic candidate re-evaluation, no candidate
+reconsideration, no offer audit engine, no Candidate Hiring approval, no workforce
+Accepted-vs-Joined change, no inspector status change, no role catalogue or
+permission redesign, no mobile redesign, no Person Hub, no organisation
+convergence, no Marketplace change, and no new KPI, approval, audit or lifecycle
+engine. **Gate 1B's pipeline authority is untouched.** No candidate deleted, no
+historical version deleted, no event or KPI fact rewritten. **No production
+deployment, and no claim about production data.**
+
+---
+
 # STOP
 
 **Scope of this document.** §1–§21 and §20a are audit only — they were written
@@ -1504,9 +1752,12 @@ narrow scope its gate named:
 | §20b | Gate 0 | yes — one route name, three form actions, one new test |
 | §20c | Gate 1A | yes — additive helpers, one new test, regenerated manifest |
 | §20d | Gate 1B | yes — pipeline authority activated across the recruitment chain |
+| §20e | Gate 2 | yes — requirement versioning and change control for both entities |
 
-**Gate 1B stops here and waits for an explicit pass before Gate 2.**
+**Gate 2 stops here and waits for an explicit pass before Gate 3.**
 
-Pipeline is authoritative for current recruitment state. Legacy
-`candidates.stage` is no longer an independent current-state authority. No
-production deployment was performed.
+Pipeline is authoritative for current recruitment state, unchanged by Gate 2.
+Legacy `candidates.stage` is no longer an independent current-state authority.
+An approved requirement is immutable and a pending change is not effective.
+Gate 3's Review Required has NOT been implemented. No production deployment was
+performed.

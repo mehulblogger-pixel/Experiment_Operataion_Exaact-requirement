@@ -42,6 +42,10 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
       //  offers no action this user is not already allowed. $remaining is the
       //  screen's own number, handed over rather than recomputed. ?>
 <?php if ($r && function_exists('na_html')) echo na_html('hiring_request', $r + ['__remaining' => (int) $remaining]); ?>
+<?php //  GATE 2 — the approved version, any proposed change, and the history.
+      //  Rendered from ONE helper so this screen and the requirement screen cannot
+      //  disagree about whether a pending change is in force.
+      if ($r && function_exists('rver_panel')) rver_panel('HIRING_REQUEST', (int) $r['id']); ?>
 
 <?php if ($r && $status === 'APPROVED'): ?>
   <div class="panel" id="na-recruit" style="border-left:3px solid #1a7f37">

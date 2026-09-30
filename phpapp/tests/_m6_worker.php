@@ -45,7 +45,9 @@ try {
             'hiring_department_id' => $r['hiring_department_id'], 'job_title' => $r['job_title'],
             'designation' => $r['designation'], 'quantity' => (int) $r['quantity'], 'office_id' => $r['office_id'],
             'employment_type' => $r['employment_type'], 'request_type' => $r['request_type'],
-            'priority' => $r['priority'], 'grade' => $arg]);
+            'priority' => $r['priority'], 'grade' => $arg,
+            //  GATE 2 · Q10 — a material change carries its reason.
+            'change_reason' => 'concurrent material change']);
         $out['ok'] = (bool) $ok; $out['msg'] = (string) $msg; $out['code'] = $ok ? 'CHANGED' : 'REFUSED';
     } elseif ($op === 'advance') {
         $why = rexec_cand_block_reason($id, 'ADVANCE');
