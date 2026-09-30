@@ -6296,6 +6296,26 @@ function ops_candidates($route, $method) {
             $dropPoint  = $lost ? substr(trim((string)($_POST['drop_point'] ?? '')), 0, 30) : '';
             $dropReason = $lost ? substr(trim((string)($_POST['drop_reason'] ?? '')), 0, 60) : '';
 
+            //  GATE 1B — WHERE THIS MOVE IS ACTUALLY RECORDED.
+            //
+            //  This route stays the execution choke point: the approval boundary,
+            //  the seat question, the joining transaction, the workforce record and
+            //  the drop reason all live behind it, and Gate 0 showed what happens
+            //  when that is disturbed. What changes is WHERE the move lands. The
+            //  requested legacy target is translated into the candidate's own
+            //  pipeline stage, and the pipeline position is what gets written —
+            //  because the pipeline is now the current state.
+            //
+            //  $pipeTarget is null when no deterministic translation exists: the
+            //  candidate is not in a pipeline at all (a pool candidate — D3, they
+            //  must NOT be given one), or the requested value is an early step that
+            //  names no single configured stage. The legacy column is then written
+            //  exactly as before, because for those candidates it is the only
+            //  record there is. It is never written as well as the pipeline.
+            $pipeTarget = function_exists('rpipe_stage_for_legacy_target')
+                ? rpipe_stage_for_legacy_target($cand, $to) : null;
+            $priorPipeStage = (int) ($cand['pipeline_stage_id'] ?? 0);
+
             // ================================================================
             //  RB-3 · STEP 3 — A JOINING IS ONE TRANSACTION, OR IT IS NOTHING
             //
@@ -6375,15 +6395,33 @@ function ops_candidates($route, $method) {
                         if ($seatWhy !== '') throw new RuntimeException('SEAT|' . $seatWhy);
                     }
 
-                    //  2 · THE STAGE.
+                    //  2 · THE STAGE — written as a PIPELINE POSITION when the
+                    //      candidate has one, still inside this transaction, so a
+                    //      joining remains one atomic act.
                     try {
-                        $stw = $pdo->prepare("UPDATE candidates SET stage=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?");
-                        $stw->execute([$to, $decided, $dropPoint, $dropReason, $id]);
+                        if ($pipeTarget) {
+                            $stw = $pdo->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?");
+                            $stw->execute([(int) $pipeTarget['pipeline_id'], (int) $pipeTarget['id'], $decided, $dropPoint, $dropReason, $id]);
+                        } else {
+                            $stw = $pdo->prepare("UPDATE candidates SET stage=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?");
+                            $stw->execute([$to, $decided, $dropPoint, $dropReason, $id]);
+                        }
                     } catch (Throwable $e) {
-                        $stw = $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?");
-                        $stw->execute([$to, $decided, $id]);
+                        if ($pipeTarget) {
+                            $stw = $pdo->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=?, decided_at=? WHERE id=?");
+                            $stw->execute([(int) $pipeTarget['pipeline_id'], (int) $pipeTarget['id'], $decided, $id]);
+                        } else {
+                            $stw = $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?");
+                            $stw->execute([$to, $decided, $id]);
+                        }
                     }
-                    if ($stw->rowCount() < 1 && (string)$cand['stage'] !== (string)$to)
+                    //  "Nothing was written AND it was not already there" still means
+                    //  the row went away underneath us. Asked of whichever column
+                    //  this move actually targeted.
+                    $already = $pipeTarget
+                        ? ($priorPipeStage === (int) $pipeTarget['id'])
+                        : ((string) $cand['stage'] === (string) $to);
+                    if ($stw->rowCount() < 1 && !$already)
                         throw new RuntimeException('GONE|That application is no longer there.');
 
                     //  3 · THE KPI STAGE LEDGER, inside — the owner named it
@@ -6455,8 +6493,18 @@ function ops_candidates($route, $method) {
                 redirect('/candidate?id=' . $id);
             }
 
-            try { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?")->execute([$to, $decided, $dropPoint, $dropReason, $id]); }
-            catch (Throwable $e) { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]); }
+            //  GATE 1B — the pipeline position when there is one, the legacy column
+            //  only for candidates who have none. Never both.
+            try {
+                if ($pipeTarget) $pdo->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?")
+                    ->execute([(int) $pipeTarget['pipeline_id'], (int) $pipeTarget['id'], $decided, $dropPoint, $dropReason, $id]);
+                else $pdo->prepare("UPDATE candidates SET stage=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?")
+                    ->execute([$to, $decided, $dropPoint, $dropReason, $id]);
+            } catch (Throwable $e) {
+                if ($pipeTarget) $pdo->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=?, decided_at=? WHERE id=?")
+                    ->execute([(int) $pipeTarget['pipeline_id'], (int) $pipeTarget['id'], $decided, $id]);
+                else $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]);
+            }
             //  PHASE 5 — the ledger records the move HERE, at the moment it
             //  happened, and not after the compensating checks below.
             //
@@ -6480,7 +6528,11 @@ function ops_candidates($route, $method) {
             //  compensating revert stays exactly as it was for every other path
             //  that can still reach it.
             if ($m6Joining && function_exists('rexec_join_enforce_after_write')) {
-                $m6rev = rexec_join_enforce_after_write($id, (string) $cand['stage'], (string) ($cand['decided_at'] ?? ''));
+                //  The prior position is handed over whole — legacy value AND pipeline
+                //  stage, 0 meaning "they were not on a pipeline" — so a refused
+                //  joining puts the row back exactly as it was found.
+                $m6rev = rexec_join_enforce_after_write($id, (string) $cand['stage'],
+                                                        (string) ($cand['decided_at'] ?? ''), $priorPipeStage);
                 if ($m6rev !== '') { flash($m6rev, 'error'); redirect('/candidate?id=' . $id); }
             }
             //  PHASE 4 — the stage move is what CREDITS a source, so the source's

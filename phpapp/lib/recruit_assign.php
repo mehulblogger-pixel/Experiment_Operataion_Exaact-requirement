@@ -210,8 +210,16 @@ function rasg_state_ok($subject, $row, &$code) {
         if (!in_array($st, RASG_ASSIGNABLE_REQ, true)) { $code = 'BAD_STATE'; return false; }
         return true;
     }
-    $stage = strtoupper(trim((string) ($row['stage'] ?? '')));
-    if (in_array($stage, RASG_CAND_TERMINAL, true)) { $code = 'BAD_STATE'; return false; }
+    //  GATE 1B — asked of the CURRENT STATE, not of the legacy column.
+    //
+    //  This used to read strtoupper(trim($row['stage'])) against a literal list.
+    //  That was the G1A-1 defect in miniature: this guard normalised the value
+    //  while reqfulfil compared it strictly, so ' REJECTED' was closed here and
+    //  unclassifiable there. It now asks the classification, which is taken from
+    //  the configured stage kind and therefore cannot disagree with any other
+    //  consumer. A candidate whose state cannot be established is NOT treated as
+    //  closed: ownership may still move, exactly as before.
+    if (function_exists('reqf_classify') && reqf_classify($row) === 'LOST') { $code = 'BAD_STATE'; return false; }
     return true;
 }
 
@@ -629,19 +637,27 @@ function rasg_workload($uid, array $opt = []) {
     //  centre reads — not the requisition rule, which would lose every candidate
     //  that belongs to no requirement.
     [$cc, $ca] = empty($opt['no_scope']) ? rasg_cand_scope('c') : ['1=1', []];
-    $cand = "FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id WHERE $cc AND c.recruiter_id=$uid";
+    //  GATE 1B — the classification joins travel WITH the fragment, so every
+    //  counter below can ask reqf_class_expr() without rebuilding them.
+    $cand = "FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id"
+          . reqf_class_join('c') . " WHERE $cc AND c.recruiter_id=$uid";
 
     $out = [];
     $out['assigned_requisitions'] = $n("SELECT COUNT(*) $req", $sa);
     $out['active_requisitions']   = $n("SELECT COUNT(*) $req AND r.status IN ($live)", $sa);
     $out['vacancies']             = $n("SELECT COALESCE(SUM(CASE WHEN r.quantity>0 THEN r.quantity ELSE 1 END),0) $req AND r.status IN ($live)", $sa);
-    $out['filled']                = $n("SELECT COUNT(*) FROM candidates c2 JOIN requisitions r ON r.id=c2.requisition_id
-                                        WHERE $sc AND r.recruiter_id=$uid AND r.status IN ($live) AND c2.stage='ACCEPTED'", $sa);
+    $out['filled']                = $n("SELECT COUNT(*) FROM candidates c2 JOIN requisitions r ON r.id=c2.requisition_id"
+                                        . reqf_class_join('c2') . "
+                                        WHERE $sc AND r.recruiter_id=$uid AND r.status IN ($live) AND " . reqf_class_expr('c2') . "='FILLED'", $sa);
     $out['open_seats']            = max(0, $out['vacancies'] - $out['filled']);
     $out['candidates']            = $n("SELECT COUNT(*) $cand", $ca);
-    $out['active_candidates']     = $n("SELECT COUNT(*) $cand AND c.stage NOT IN ($term)", $ca);
-    $out['offers']                = $n("SELECT COUNT(*) $cand AND c.stage='OFFERED'", $ca);
-    $out['joins']                 = $n("SELECT COUNT(*) $cand AND c.stage='ACCEPTED'", $ca);
+    //  "Active work" means NOT CLOSED — it deliberately still includes somebody
+    //  already hired, and it still counts a candidate whose state cannot be
+    //  established. An exclusion must stay an exclusion: rewriting it as ='ACTIVE'
+    //  would silently drop every unclassifiable candidate out of the total.
+    $out['active_candidates']     = $n("SELECT COUNT(*) $cand AND " . reqf_class_expr('c') . "<>'LOST'", $ca);
+    $out['offers']                = $n("SELECT COUNT(*) $cand AND " . reqf_kind_expr('c') . "='offer'", $ca);
+    $out['joins']                 = $n("SELECT COUNT(*) $cand AND " . reqf_class_expr('c') . "='FILLED'", $ca);
     //  Interviews arranged for the people this person is chasing. Counted from
     //  the interviews table itself, never from a stage label — a candidate can sit
     //  several rounds, and "has reached the interview stage" is a different number
@@ -654,7 +670,8 @@ function rasg_workload($uid, array $opt = []) {
     //  Work that has been sitting still. "Overdue" is not a new status — it is the
     //  ageing rule the command centre already shows, asked per recruiter.
     $cut = date('Y-m-d', strtotime('-' . (int) ($opt['overdue_days'] ?? 30) . ' days'));
-    $out['overdue']               = $n("SELECT COUNT(*) $cand AND c.stage NOT IN ($term) AND c.stage<>'ACCEPTED'
+    //  Still in play — neither closed nor already filled — and sitting still.
+    $out['overdue']               = $n("SELECT COUNT(*) $cand AND " . reqf_class_expr('c') . " NOT IN ('FILLED','LOST')
                                         AND substr(COALESCE(NULLIF(c.cv_received_date,''),c.created_at),1,10) < " . db()->quote($cut), $ca);
     return $out;
 }
@@ -672,8 +689,9 @@ function rasg_unassigned(array $opt = []) {
     return [
         'requisitions' => $n("SELECT COUNT(*) FROM requisitions r
                               WHERE $rw AND r.status IN ($live) AND COALESCE(r.recruiter_id,0)=0", $ra),
-        'candidates'   => $n("SELECT COUNT(*) FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id
-                              WHERE $cw AND c.stage NOT IN ($term) AND COALESCE(c.recruiter_id,0)=0", $ca),
+        'candidates'   => $n("SELECT COUNT(*) FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id"
+                              . reqf_class_join('c') . "
+                              WHERE $cw AND " . reqf_class_expr('c') . "<>'LOST' AND COALESCE(c.recruiter_id,0)=0", $ca),
     ];
 }
 

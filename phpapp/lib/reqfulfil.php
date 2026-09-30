@@ -30,13 +30,93 @@
 //    Requisition status   what the WHOLE REQUIREMENT is   (partially filled)
 // ============================================================================
 
-// Stages that mean a seat is taken. Matches what the Recruitment Command Centre
-// has always counted as `filled`, so no existing number changes meaning.
+//  GATE 1B — WHAT THESE THREE LISTS NOW ARE.
+//
+//  They used to BE the classification: every consumer compared a candidate's
+//  legacy stage value against them. D1/C14 made the configurable pipeline the
+//  authority for current state, so classification is now taken from the
+//  configured stage KIND (RPIPE_KIND_CLASS in lib/recruitpipe.php).
+//
+//  These lists survive as the ONE-WAY LEGACY COMPATIBILITY MAP: the translation
+//  for candidates who have never been moved on a pipeline and therefore have no
+//  kind to ask. They cannot override a pipeline answer, they produce values in
+//  the same vocabulary the kinds produce, and migration drains them.
+//
+//  Do not add a consumer that compares a stage value against these directly.
+//  Ask reqf_classify() for one candidate, or reqf_class_expr() for a set.
 const REQF_FILLED_STAGES = ['ACCEPTED'];
-// Stages where somebody is still in play — not filled, but not lost either.
 const REQF_ACTIVE_STAGES = ['RECEIVED', 'SUBMITTED', 'SHORTLISTED', 'INTERVIEW', 'OFFERED', 'HOLD'];
-// Stages that came to nothing.
 const REQF_LOST_STAGES   = ['REJECTED', 'WITHDRAWN', 'OFFER_DECLINED'];
+
+// ---------------------------------------------------------------------------
+//  THE SINGLE CLASSIFICATION CHOKE POINT
+//
+//  Every fulfilment, health, KPI and dashboard figure resolves through here.
+//  There are exactly two renderings, and BOTH are generated from the one
+//  mapping in lib/recruitpipe.php:
+//
+//    reqf_classify()   one candidate, in PHP — for detail screens and logic
+//    reqf_class_expr() a set, in SQL — for aggregate reporting queries
+//
+//  Two renderings rather than one because a per-row PHP call across a KPI query
+//  spanning every requisition in the workspace is an N+1 nobody would accept.
+//  They are not two definitions: a test asserts they agree for every kind and
+//  every legacy value, so drift between them fails the suite.
+// ---------------------------------------------------------------------------
+
+// The classification of ONE candidate: 'FILLED' | 'ACTIVE' | 'LOST' | ''.
+// '' means no classification could be established — genuinely unknown, and a
+// caller must never quietly treat it as zero.
+function reqf_classify($cand) {
+    if (!function_exists('rpipe_current_state')) return '';
+    $st = rpipe_current_state($cand);
+    return $st ? (string) $st['class'] : '';
+}
+
+// The JOINs that reqf_class_expr() needs. `$c` is the candidates alias.
+//
+// The two ON clauses ARE the Gate 1A guard, expressed in SQL: the candidate's
+// locked pipeline must still be active, and the stage must belong to THAT
+// pipeline. Without them a stage id left behind by a retired pipeline would be
+// read as a live position.
+function reqf_class_join($c = 'c') {
+    return " LEFT JOIN recruit_pipelines rp_k ON rp_k.id = $c.pipeline_id AND rp_k.active = 1"
+         . " LEFT JOIN recruit_stages rs_k ON rs_k.id = $c.pipeline_stage_id"
+         . " AND rs_k.pipeline_id = rp_k.id AND rs_k.active = 1";
+}
+
+// The SQL expression yielding a candidate's classification. Requires the joins
+// above. Built from RPIPE_KIND_CLASS and the legacy map, never hand-written, so
+// adding a stage kind cannot leave a reporting query behind.
+function reqf_class_expr($c = 'c') {
+    $q = fn($v) => "'" . str_replace("'", "''", (string) $v) . "'";
+    // Pipeline first — it is the authority.
+    $kind = '';
+    foreach (RPIPE_KIND_CLASS as $k => $cls) $kind .= " WHEN rs_k.kind = {$q($k)} THEN {$q($cls)}";
+    // Then, only for candidates with no resolvable pipeline position, the
+    // one-way legacy compatibility map.
+    $legacy = '';
+    foreach (['FILLED' => REQF_FILLED_STAGES, 'ACTIVE' => REQF_ACTIVE_STAGES, 'LOST' => REQF_LOST_STAGES] as $cls => $vals)
+        foreach ($vals as $v) $legacy .= " WHEN $c.stage = {$q($v)} THEN {$q($cls)}";
+    return "CASE WHEN rs_k.id IS NOT NULL THEN (CASE$kind ELSE '' END)"
+         . " ELSE (CASE$legacy ELSE '' END) END";
+}
+
+// The SQL expression yielding a candidate's EFFECTIVE STAGE KIND. Requires the
+// same joins. This is what a stage-specific question must ask — "how many offers
+// are out" is a question about the offer KIND, not about the string 'OFFERED'.
+function reqf_kind_expr($c = 'c') {
+    $q = fn($v) => "'" . str_replace("'", "''", (string) $v) . "'";
+    $legacy = '';
+    foreach (RPIPE_LEGACY_KIND as $v => $k) $legacy .= " WHEN $c.stage = {$q($v)} THEN {$q($k)}";
+    return "CASE WHEN rs_k.id IS NOT NULL THEN rs_k.kind ELSE (CASE$legacy ELSE '' END) END";
+}
+
+// COUNT of candidates in one classification, for use in a subquery or a HAVING.
+function reqf_class_count_sql($class, $where, $c = 'c') {
+    return "(SELECT COUNT(*) FROM candidates $c" . reqf_class_join($c)
+         . " WHERE ($where) AND " . reqf_class_expr($c) . " = '" . str_replace("'", "''", (string) $class) . "')";
+}
 
 // Statuses a person has deliberately set, which counting must never overrule.
 const REQF_MANUAL_STATUSES = ['CLOSED', 'CANCELLED', 'DRAFT'];
@@ -101,12 +181,13 @@ function reqf_counts($req) {
     // anybody can act on.
     $out['cancelled'] = min($out['requested'], max(0, (int) ($r['cancelled_qty'] ?? 0)));
 
-    $ph = implode(',', array_fill(0, count(REQF_FILLED_STAGES), '?'));
-    $pa = implode(',', array_fill(0, count(REQF_ACTIVE_STAGES), '?'));
-    $pl = implode(',', array_fill(0, count(REQF_LOST_STAGES), '?'));
+    //  GATE 1B — counted by CLASSIFICATION, not by legacy stage value.
+    //  One expression, generated from the stage-kind mapping, used for all four
+    //  numbers so they cannot disagree with each other or with any other screen.
+    $J = reqf_class_join('c');
+    $E = reqf_class_expr('c');
     try {
-        $out['filled']      = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage IN ($ph)",
-                                            array_merge([$id], REQF_FILLED_STAGES));
+        $out['filled']      = (int) ops_val("SELECT COUNT(*) FROM candidates c $J WHERE c.requisition_id=? AND $E='FILLED'", [$id]);
         //  RB-2 — JOINED MEANS JOINED.
         //
         //  This used to count accepted people who had a team record, and call
@@ -118,12 +199,9 @@ function reqf_counts($req) {
         //  It now counts the people somebody has explicitly marked as having
         //  joined. On existing data that is zero, which is the honest answer:
         //  the system genuinely does not know when anybody arrived.
-        $out['joined']      = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage IN ($ph) AND COALESCE(joined_at,'') <> ''",
-                                            array_merge([$id], REQF_FILLED_STAGES));
-        $out['in_progress'] = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage IN ($pa)",
-                                            array_merge([$id], REQF_ACTIVE_STAGES));
-        $out['lost']        = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage IN ($pl)",
-                                            array_merge([$id], REQF_LOST_STAGES));
+        $out['joined']      = (int) ops_val("SELECT COUNT(*) FROM candidates c $J WHERE c.requisition_id=? AND $E='FILLED' AND COALESCE(c.joined_at,'') <> ''", [$id]);
+        $out['in_progress'] = (int) ops_val("SELECT COUNT(*) FROM candidates c $J WHERE c.requisition_id=? AND $E='ACTIVE'", [$id]);
+        $out['lost']        = (int) ops_val("SELECT COUNT(*) FROM candidates c $J WHERE c.requisition_id=? AND $E='LOST'", [$id]);
     } catch (Throwable $e) { /* a database without candidates yet */ }
 
     // Requested − filled − cancelled. Someone still in the pipeline has NOT

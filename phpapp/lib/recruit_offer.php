@@ -337,25 +337,59 @@ function offer_issue($id) {
     if ($letter === '') $letter = offer_letter_html($o, $cand, sal_current((int)$o['candidate_id']));
     db()->prepare("UPDATE job_offers SET status='ISSUED', issued_by=?, issued_at=?, letter_html=? WHERE id=?")
         ->execute([_off_actor(), _off_now(), $letter, (int)$id]);
-    // Coarse-sync the candidate's legacy stage to OFFERED (unless already closed).
+    //  MOVE THE CANDIDATE TO THE OFFER STAGE OF THEIR PIPELINE.
     //
-    //  PHASE 5 — and RECORD it. This path moved a candidate to OFFERED and wrote
-    //  nothing to candidate_events, so the stage ledger had no trace of the most
-    //  ordinary offer there is: "days from shortlist to offer" measured from the
-    //  ledger silently missed every offer issued the normal way. Measured, not
-    //  assumed — see docs/phase5/P5-PREIMPLEMENTATION-AUDIT.md, section 5a.
+    //  PHASE 5 established WHY this has to happen at all: issuing an offer used to
+    //  move the candidate and write nothing to the ledger, so "days from shortlist
+    //  to offer" measured from the ledger silently missed every offer issued the
+    //  ordinary way. Measured, not assumed — docs/phase5/P5-PREIMPLEMENTATION-AUDIT.md
+    //  section 5a.
     //
-    //  The ledger write can never undo the offer: the offer is already issued and
-    //  the stage already moved. A failure to observe is not a failure to transact.
-    if ($cand && !in_array($cand['stage'], ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true)) {
-        db()->prepare("UPDATE candidates SET stage='OFFERED' WHERE id=?")->execute([(int)$o['candidate_id']]);
-        if (function_exists('rkpi_stage_log'))
-            rkpi_stage_log((int)$o['candidate_id'], (string)$cand['stage'], 'OFFERED', [
-                'from_code' => (string)$cand['stage'], 'to_code' => 'OFFERED', 'track' => 'LEGACY',
-                'kind' => 'MOVE', 'actor' => _off_actor(), 'remark' => 'Offer issued']);
-    }
+    //  GATE 1B changes WHERE it is recorded, not whether. This used to write
+    //  candidates.stage='OFFERED', which was a current-state write to a column that
+    //  is no longer the authority — one of the two writers Gate 0 missed entirely.
+    //  It now moves the PIPELINE POSITION to the offer-kind stage, which is what
+    //  every consumer reads. The classification follows automatically, and an
+    //  issued offer classifies as ACTIVE: the seat is not filled until it is
+    //  accepted (G1A-2).
+    //
+    //  Neither write can undo the offer: the offer is already issued. A failure to
+    //  record where they now stand is not a failure to transact.
+    if ($cand) offer_move_to_offer_stage((int) $o['candidate_id'], $cand);
     return [true, 'Offer issued. Share the letter with the candidate.'];
 }
+//  Put a candidate on the offer stage of their own pipeline, and record it.
+//
+//  Deliberately does nothing when the candidate has no pipeline to move within, or
+//  when their process is already closed: issuing an offer must never silently
+//  reopen somebody who was rejected, and it must never invent a pipeline position
+//  for a candidate who is not in a recruitment process at all (D3).
+function offer_move_to_offer_stage($candId, $cand) {
+    if (!function_exists('rpipe_current_state')) return;
+    $st = rpipe_current_state($cand);
+    if (!$st || $st['class'] === 'LOST' || $st['class'] === 'FILLED') return;
+    //  D3 — no requirement means no recruitment process to be positioned within.
+    if ((int) ($cand['requisition_id'] ?? 0) <= 0) return;
+    [$pipe, $eff, ] = recruitpipe_cand_state($cand);
+    if (!$pipe || !$eff) return;
+    $target = null;
+    foreach ($eff as $s) if (($s['kind'] ?? '') === 'offer') { $target = $s; break; }
+    if (!$target) return;                                  // no offer stage configured
+    if ((int) ($cand['pipeline_stage_id'] ?? 0) === (int) $target['id']) return;   // already there
+    $fromName = (string) ($st['stage_name'] !== '' ? $st['stage_name'] : $st['legacy_stage']);
+    try {
+        db()->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=? WHERE id=?")
+            ->execute([(int) $pipe['id'], (int) $target['id'], (int) $candId]);
+    } catch (Throwable $e) { return; }
+    if (function_exists('rkpi_stage_log'))
+        try {
+            rkpi_stage_log((int) $candId, $fromName, (string) $target['name'], [
+                'from_code' => (string) ($st['stage_key'] !== '' ? $st['stage_key'] : $st['legacy_stage']),
+                'to_code' => (string) ($target['stage_key'] ?? ''), 'track' => 'PIPELINE',
+                'kind' => 'MOVE', 'actor' => _off_actor(), 'remark' => 'Offer issued']);
+        } catch (Throwable $e) { /* observing must not undo the offer */ }
+}
+
 function offer_accept($id) {
     $why = offer_guard_by_offer($id, 'JOIN');
     if ($why !== '') return [false, $why];

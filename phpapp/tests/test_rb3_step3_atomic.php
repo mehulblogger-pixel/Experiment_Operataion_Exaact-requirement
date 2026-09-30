@@ -103,6 +103,12 @@ $mkCand = function ($first, $rq = null, $stage = 'OFFER', $mobile = '') {
     return (int)db()->lastInsertId();
 };
 $stageOf = fn($id) => (string)ops_val("SELECT stage FROM candidates WHERE id=?", [$id]);
+//  GATE 1B — an acceptance is now recorded as a move to the candidate's pipeline
+//  TERMINAL STAGE, not as a string in candidates.stage. Every assertion about the
+//  OUTCOME therefore asks the classification; $stageOf stays for the assertions
+//  that are specifically about the legacy column being left alone.
+$filledN = fn($rq) => (int)ops_val("SELECT COUNT(*) FROM candidates c" . reqf_class_join('c')
+    . " WHERE c.requisition_id=? AND " . reqf_class_expr('c') . "='FILLED'", [$rq]);
 $inspOf  = fn($id) => (int)ops_val("SELECT COALESCE(inspector_id,0) FROM candidates WHERE id=?", [$id]);
 $staffN  = fn() => (int)ops_val("SELECT COUNT(*) FROM inspectors");
 $evN     = fn($id) => (int)ops_val("SELECT COUNT(*) FROM candidate_events WHERE candidate_id=?", [$id]);
@@ -123,16 +129,18 @@ t_eq($stageOf($cA) . '/' . $stageOf($cB), 'OFFER/OFFER', 'T1b · neither has tak
 $before = $staffN();
 $s3race([['accept', $cA, '', $s3me], ['accept', $cB, '', $s3me]]);
 
-$acc = (int)ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rq1]);
-t_eq($acc, 1, 'T1c · exactly ONE of the two was accepted');
+t_eq($filledN($rq1), 1, 'T1c · exactly ONE of the two was accepted');
 t_eq($staffN() - $before, 1, 'T1 · exactly ONE team member was created — the loser left NOBODY behind');
 
 //  The decisive assertion: nobody is sitting at a non-accepted stage while
 //  holding a workforce record. That is the state the old ordering produced.
-$orphan = (int)ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage<>'ACCEPTED' AND COALESCE(inspector_id,0)>0", [$rq1]);
+$orphan = (int)ops_val("SELECT COUNT(*) FROM candidates c" . reqf_class_join('c')
+    . " WHERE c.requisition_id=? AND " . reqf_class_expr('c') . "<>'FILLED' AND COALESCE(c.inspector_id,0)>0", [$rq1]);
 t_eq($orphan, 0, 'T1d · NOBODY holds a team member for a hire that did not happen');
-$loser = ($stageOf($cA) === 'ACCEPTED') ? $cB : $cA;
+$loser = (t_class($cA) === 'FILLED') ? $cB : $cA;
 t_eq($stageOf($loser), 'OFFER', 'T1e · the loser is exactly where they started, not reverted from somewhere');
+t_eq((int)ops_val("SELECT COALESCE(pipeline_stage_id,0) FROM candidates WHERE id=?", [$loser]), 0,
+     'T1e2 · …including their pipeline position: the refused move left no trace of itself');
 t_eq($inspOf($loser), 0, 'T1f · …with no workforce record');
 t_eq($evN($loser), 0, 'T1g · …and no stage-history entry: the move never happened, rather than happening and being undone');
 
@@ -166,7 +174,12 @@ $s3race([['move', $cMv, 'SHORTLISTED', $s3me]]);
 t_eq($stageOf($cMv), 'SHORTLISTED', 'T3 · an ordinary stage move still works exactly as before');
 t_ok($evN($cMv) >= 1, 'T3b · …and still writes its stage history');
 $s3race([['move', $cMv, 'REJECTED', $s3me]]);
-t_eq($stageOf($cMv), 'REJECTED', 'T3c · so does a rejection');
+//  A rejection now lands on the closed off-ramp whose configured OUTCOME is
+//  "rejected" — one closed KIND, many outcomes (C47).
+$mvSt = rpipe_current_state($cMv);
+t_eq($mvSt['kind'], 'closed', 'T3c · so does a rejection — recorded as a closed stage');
+t_eq($mvSt['closed_outcome'], 'REJECTED', 'T3c2 · …carrying the rejected outcome, not a generic closure');
+t_eq($mvSt['class'], 'LOST', 'T3c3 · …and classifying as lost');
 
 // ---------------------------------------------------------------------------
 t_section('RB3S3 · T4 — an acceptance that succeeds writes EVERYTHING');
@@ -175,7 +188,7 @@ $rq4 = $mkReq(2);
 $cOk = $mkCand('Clean', $rq4);
 $b4 = $staffN();
 $s3race([['accept', $cOk, '', $s3me]]);
-t_eq($stageOf($cOk), 'ACCEPTED', 'T4 · the candidate is Accepted');
+t_eq(t_class($cOk), 'FILLED', 'T4 · the candidate is Accepted');
 t_ok($inspOf($cOk) > 0, 'T4b · a workforce record exists');
 t_eq($staffN(), $b4 + 1, 'T4c · exactly one was created');
 t_ok((string)ops_val("SELECT emp_code FROM inspectors WHERE id=?", [$inspOf($cOk)]) !== '',
@@ -251,12 +264,12 @@ if (t_driver() === 'sqlite') {
     usleep(1200000);
     db()->beginTransaction();
     db()->prepare("SELECT id FROM requisitions WHERE id=? FOR UPDATE")->execute([$rqD]);
-    db()->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $cWin]);
+    t_move_stage($cWin, 'ACCEPTED');
     usleep(2000000);                                       // child pre-checks, passes, then BLOCKS on our lock
     db()->commit();                                        // now the seat is really gone
     $s3reap($h);
 
-    t_eq($stageOf($cWin), 'ACCEPTED', 'T7a · the seat really was taken while the loser was in flight — the trap is armed');
+    t_eq(t_class($cWin), 'FILLED', 'T7a · the seat really was taken while the loser was in flight — the trap is armed');
     t_eq($stageOf($cLos), 'OFFER', 'T7 · the loser was refused — the seat was decided INSIDE the transaction');
     t_eq($inspOf($cLos), 0, 'T7b · …and no workforce record was created for them');
     t_ok((int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='CANDIDATE' AND entity_id=? AND kind='IDENTITY_REFUSED'", [$cLos]) >= 1,
@@ -300,16 +313,16 @@ if (t_driver() === 'sqlite') {
     usleep(1200000);
     db()->beginTransaction();
     db()->prepare("SELECT id FROM requisitions WHERE id=? FOR UPDATE")->execute([$rqN]);
-    db()->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $nWin]);
+    t_move_stage($nWin, 'ACCEPTED');
     usleep(2000000);
     db()->commit();
     $s3reap($hN);
 
-    t_eq($stageOf($nWin), 'ACCEPTED', 'T10a · the one seat was taken while the other was in flight — the trap is armed');
+    t_eq(t_class($nWin), 'FILLED', 'T10a · the one seat was taken while the other was in flight — the trap is armed');
     t_eq($inspOf($nLos), 0, 'T10b · the loser has no workforce record — the refusal left nothing behind');
     t_eq($stageOf($nLos), 'OFFER',
          'T10 · they were still refused — the seat check INSIDE the transaction is the only thing that could have done it');
-    t_eq((int)ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rqN]), 1,
+    t_eq($filledN($rqN), 1,
          'T10c · one approved seat, exactly one person in it');
 
     //  T10d — RB-1 ITSELF: the path T10 used to guard no longer exists.
@@ -319,7 +332,7 @@ if (t_driver() === 'sqlite') {
     $cRb1 = $mkCand('Rb1NoTick', $rqR);
     $hR   = $s3spawn('move', $cRb1, 'ACCEPTED', $s3me, 900);
     $s3reap($hR);
-    t_eq($stageOf($cRb1), 'ACCEPTED', 'T10d1 · the acceptance went through with NO request for a workforce record — armed');
+    t_eq(t_class($cRb1), 'FILLED', 'T10d1 · the acceptance went through with NO request for a workforce record — armed');
     t_ok($inspOf($cRb1) > 0,
          'T10d · …and they have one anyway — RB-1: every accepted person is a member of the team, never an unticked box');
     t_ok((string)ops_val("SELECT COALESCE(emp_code,'') FROM inspectors WHERE id=?", [$inspOf($cRb1)]) !== '',
@@ -390,7 +403,7 @@ $tk = $tokFor($cAck);
 t_ok($tk !== '', 'X2a · a strong duplicate exists and a genuine tick was issued — the trap is armed');
 $bX2 = $staffN();
 $s3race([['accept', $cAck, $tk, $s3me]]);
-t_eq($stageOf($cAck), 'ACCEPTED', 'X2 · an acknowledged duplicate is accepted');
+t_eq(t_class($cAck), 'FILLED', 'X2 · an acknowledged duplicate is accepted');
 t_ok($inspOf($cAck) > 0, 'X2b · …and the workforce record was created');
 t_eq($staffN(), $bX2 + 1, 'X2c · exactly one');
 
@@ -448,7 +461,7 @@ t_ok((int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='CANDIDATE'
 //  X12 — RETRY. The same candidate, once the problem is gone, accepts cleanly.
 $bR = $staffN();
 $s3race([['accept', $cFail, '', $s3me]]);
-t_eq($stageOf($cFail), 'ACCEPTED', 'X12 · the recruiter retried and it worked');
+t_eq(t_class($cFail), 'FILLED', 'X12 · the recruiter retried and it worked');
 t_ok($inspOf($cFail) > 0, 'X12b · …with a workforce record');
 t_eq($staffN(), $bR + 1, 'X12c · …exactly one, with nothing left over from the failed attempt');
 
@@ -491,7 +504,7 @@ t_section('RB3S3 · X13 / X16 — double submit, and an id from another tenant')
 $cDbl = $mkCand('DoubleSubmit', $mkReq(3));
 $bD = $staffN();
 $s3race([['accept', $cDbl, '', $s3me], ['accept', $cDbl, '', $s3me], ['accept', $cDbl, '', $s3me]]);
-t_eq($stageOf($cDbl), 'ACCEPTED', 'X13a · the candidate was accepted');
+t_eq(t_class($cDbl), 'FILLED', 'X13a · the candidate was accepted');
 t_eq($staffN(), $bD + 1, 'X13 · three simultaneous submissions of the SAME acceptance produce ONE workforce record');
 t_eq((int)ops_val("SELECT COUNT(*) FROM inspectors WHERE id=?", [$inspOf($cDbl)]), 1, 'X13b · …and one employee number');
 

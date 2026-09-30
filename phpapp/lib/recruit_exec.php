@@ -39,8 +39,20 @@ const REXEC_ACTIONS = [
 //  Taken from the lifecycle M3 established; no status is added or renamed.
 const REXEC_LIVE_STATES = ['OPEN', 'PROPOSED', 'OFFERED', 'PARTIALLY_FILLED', 'HIRED'];
 
-//  Stages that mean the person is in a seat. One definition — reqfulfil's, the
-//  M3 authority for counting a multi-vacancy requirement.
+//  IS THIS PERSON IN A SEAT?
+//
+//  GATE 1B — asked of the current state, which is the configured pipeline stage's
+//  kind, and no longer of a literal legacy stage value. One definition, shared
+//  with reqfulfil and everything else that counts a multi-vacancy requirement.
+function rexec_holds_seat($cand) {
+    if (!function_exists('reqf_classify')) return false;
+    return reqf_classify($cand) === 'FILLED';
+}
+
+//  The legacy value list, kept ONLY for the ops.php stage route, which still has
+//  to decide whether a requested LEGACY TARGET means "this person is joining"
+//  before any move has happened. That is a question about a requested value, not
+//  about a candidate's current state, so it cannot be asked of the pipeline.
 function rexec_filled_stages() {
     return defined('REQF_FILLED_STAGES') ? REQF_FILLED_STAGES : ['ACCEPTED'];
 }
@@ -156,9 +168,8 @@ function rexec_seats($requisitionId, $exceptCandidateId = 0) {
     } else {
         try {
             $out['requested'] = max(0, (int) ops_val("SELECT quantity FROM requisitions WHERE id=?", [$rq]));
-            $ph = implode(',', array_fill(0, count(rexec_filled_stages()), '?'));
-            $out['filled'] = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage IN ($ph)",
-                                           array_merge([$rq], rexec_filled_stages()));
+            $out['filled'] = (int) ops_val("SELECT COUNT(*) FROM candidates c" . reqf_class_join('c')
+                . " WHERE c.requisition_id=? AND " . reqf_class_expr('c') . "='FILLED'", [$rq]);
         } catch (Throwable $e) {}
     }
 
@@ -174,9 +185,8 @@ function rexec_seats($requisitionId, $exceptCandidateId = 0) {
     $except = $exOk ? (int) $except : 0;
     if ($except > 0) {
         try {
-            $ph = implode(',', array_fill(0, count(rexec_filled_stages()), '?'));
-            $already = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE id=? AND requisition_id=? AND stage IN ($ph)",
-                                     array_merge([$except, $rq], rexec_filled_stages()));
+            $already = (int) ops_val("SELECT COUNT(*) FROM candidates c" . reqf_class_join('c')
+                . " WHERE c.id=? AND c.requisition_id=? AND " . reqf_class_expr('c') . "='FILLED'", [$except, $rq]);
             if ($already > 0) $out['filled'] = max(0, $out['filled'] - 1);
         } catch (Throwable $e) {}
     }
@@ -201,8 +211,7 @@ function rexec_move_action($cand, $destinationRequisitionId) {
     $here = (int) ($cand['requisition_id'] ?? 0);
     $dest = (int) $destinationRequisitionId;
     if ($dest <= 0 || $dest === $here) return 'ADVANCE';                 // not a move
-    return in_array(strtoupper((string) ($cand['stage'] ?? '')), rexec_filled_stages(), true)
-        ? 'JOIN' : 'ADVANCE';
+    return rexec_holds_seat($cand) ? 'JOIN' : 'ADVANCE';
 }
 
 //  THE COMPENSATOR FOR A MOVE. The gate above is a check, and check-then-write is
@@ -213,13 +222,13 @@ function rexec_move_action($cand, $destinationRequisitionId) {
 function rexec_move_enforce_after_write($candidateId, $priorRequisitionId) {
     $id = rexec_id($candidateId, $ok); if (!$ok) return '';
     $id = (int) $id; if ($id <= 0) return '';
-    try { $c = ops_one("SELECT id, requisition_id, stage FROM candidates WHERE id=?", [$id]); }
+    try { $c = ops_one("SELECT * FROM candidates WHERE id=?", [$id]); }
     catch (Throwable $e) { return ''; }
     if (!$c) return '';
     $now = (int) ($c['requisition_id'] ?? 0);
     $was = (int) $priorRequisitionId;
     if ($now <= 0 || $now === $was) return '';                            // no move happened
-    if (!in_array(strtoupper((string) $c['stage']), rexec_filled_stages(), true)) return '';   // no seat taken
+    if (!rexec_holds_seat($c)) return '';                                 // no seat taken
     //  DELIBERATELY *NOT* THE RANK RULE THE JOINING COMPENSATOR USES, and the
     //  difference matters: a joining is several people arriving at the SAME
     //  requirement at the same moment, where ranking them is the fair way to
@@ -261,15 +270,27 @@ function rexec_cand_block_reason($candidateId, $action = 'ADVANCE') {
 //  not there, the write is put back, the attempt is audited, and the caller is
 //  told. A compensating revert is the only thing that holds under real
 //  concurrency without wrapping every caller in a transaction they do not own.
-function rexec_join_enforce_after_write($candidateId, $priorStage, $priorDecidedAt = '') {
+//  GATE 1B — $priorPipelineStageId is how the candidate is put back.
+//
+//  The revert used to restore a LEGACY STAGE VALUE, because that column was the
+//  current state. It is not any more, so restoring it alone would leave the
+//  candidate sitting on whatever pipeline stage the refused joining put them on,
+//  still counted as filling a seat they were denied — the revert would not revert
+//  anything a consumer reads.
+//
+//  So BOTH are put back, to exactly what they were. `false` means the caller did
+//  not tell us the prior pipeline position and only the legacy value is restored;
+//  an integer (0 included) is the position to restore, and 0 restores "no pipeline
+//  position at all" rather than leaving the new one standing.
+function rexec_join_enforce_after_write($candidateId, $priorStage, $priorDecidedAt = '', $priorPipelineStageId = false) {
     $id = rexec_id($candidateId, $cOk);
     if (!$cOk) return '';                          // nothing identifiable was written
     $id = (int) $id; if ($id <= 0) return '';
-    try { $c = ops_one("SELECT id, requisition_id, stage FROM candidates WHERE id=?", [$id]); }
+    try { $c = ops_one("SELECT * FROM candidates WHERE id=?", [$id]); }
     catch (Throwable $e) { return ''; }
     if (!$c) return '';
     $rq = (int) ($c['requisition_id'] ?? 0); if ($rq <= 0) return '';
-    if (!in_array(strtoupper((string) $c['stage']), rexec_filled_stages(), true)) return '';   // no seat taken
+    if (!rexec_holds_seat($c)) return '';                                 // no seat taken
 
     //  WAS THERE A SEAT FOR THEM, NOT COUNTING THEMSELVES?
     //
@@ -300,12 +321,32 @@ function rexec_join_enforce_after_write($candidateId, $priorStage, $priorDecided
     //  Restored to what it was, or cleared when the stage returned to is not one
     //  that carries a decision.
     $priorDecided = (string) $priorDecidedAt;
-    $keepStamp = in_array(strtoupper($back), ['REJECTED', 'WITHDRAWN', 'OFFER_DECLINED'], true);
+    $keepStamp = rpipe_kind_class(rpipe_legacy_kind(strtoupper($back))) === 'LOST';
+    //  THE PIPELINE POSITION IS WHAT GOES BACK.
+    //
+    //  Restoring the legacy value alone would leave this candidate on the
+    //  pipeline's terminal stage, still classified as filling a seat they were
+    //  just refused — the revert would not actually revert anything a consumer
+    //  reads. When the candidate was on a pipeline, that position is restored;
+    //  when they were not, the legacy value is restored, because for them it is
+    //  the only record of where they stood.
+    $knowsPipe = $priorPipelineStageId !== false && $priorPipelineStageId !== null;
+    $backPipe  = $knowsPipe ? ((int) $priorPipelineStageId > 0 ? (int) $priorPipelineStageId : null) : null;
+    $stamp     = $keepStamp ? $priorDecided : '';
     try {
-        db()->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")
-            ->execute([$back, $keepStamp ? $priorDecided : '', $id]);
+        if ($knowsPipe)
+            db()->prepare("UPDATE candidates SET stage=?, pipeline_stage_id=?, decided_at=? WHERE id=?")
+                ->execute([$back, $backPipe, $stamp, $id]);
+        else
+            db()->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")
+                ->execute([$back, $stamp, $id]);
     } catch (Throwable $e) {
-        try { db()->prepare("UPDATE candidates SET stage=? WHERE id=?")->execute([$back, $id]); }
+        try {
+            if ($knowsPipe)
+                db()->prepare("UPDATE candidates SET stage=?, pipeline_stage_id=? WHERE id=?")
+                    ->execute([$back, $backPipe, $id]);
+            else db()->prepare("UPDATE candidates SET stage=? WHERE id=?")->execute([$back, $id]);
+        }
         catch (Throwable $e2) { return ''; }
     }
     if (function_exists('reqf_sync')) { try { reqf_sync($rq); } catch (Throwable $e) {} }

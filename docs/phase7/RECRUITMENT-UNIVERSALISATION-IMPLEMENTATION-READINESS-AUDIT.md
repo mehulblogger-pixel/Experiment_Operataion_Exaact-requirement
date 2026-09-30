@@ -1226,6 +1226,271 @@ remains unreachable, so no production figures are claimed here.**
 
 ---
 
+## §20d — GATE 1B RECORD: THE CONFIGURABLE PIPELINE IS NOW THE AUTHORITY
+
+Gate 1B is the controlled implementation of D1/C14. The chain
+
+> pipeline → stage → **stage kind** → current state → REQF classification →
+> fulfilment / health / KPI / dashboards
+
+is now the single authoritative answer to "where is this candidate?", and
+`candidates.stage` is compatibility, history and migration data with no authority
+of its own.
+
+### D1 — The closed stage kind (C47)
+
+| What | Where |
+|---|---|
+| `closed` added to the kind vocabulary | `RPIPE_STAGE_KINDS`, `lib/recruitpipe.php` |
+| `terminal` kept and kept distinct | `rpipe_kind_is_terminal()` / `rpipe_kind_is_closed()` |
+| Ten configurable closed OUTCOMES | `RPIPE_CLOSED_OUTCOMES` + lookup `candidate_closed_outcome` |
+| Which outcome a closed stage represents | new column `recruit_stages.closed_outcome` |
+| Every pipeline gets off-ramps | `recruitpipe_ensure_closed_stages()` — idempotent, additive, seq 9000+ |
+
+`terminal` is a **successful** finish and classifies as FILLED; `closed` means
+**not proceeding** and classifies as LOST. They are never interchangeable, and
+closed is asked of the KIND — never of a stage's name, and never of the legacy
+column. The ten outcomes are subtypes beneath **one** kind: "rejected" and
+"accepted" did not become kinds, and a test asserts they cannot be configured as
+kinds.
+
+Closed stages are deliberately **not part of the progression**.
+`recruitpipe_effective_stages()` excludes them, so nobody can be *advanced* into
+Rejected and no progress bar ends in three dead ends; a new
+`recruitpipe_resolvable_stages()` (progression + off-ramps) is what RESOLVES a
+position, because a closed candidate genuinely is on a stage.
+
+### D2 — One classification choke point, two renderings
+
+| Function | Purpose |
+|---|---|
+| `RPIPE_KIND_CLASS` | **the one mapping**: kind → FILLED / ACTIVE / LOST |
+| `RPIPE_LEGACY_KIND` | the one-way compatibility map: legacy value → kind |
+| `reqf_classify($cand)` | one candidate, in PHP |
+| `reqf_class_expr()` / `reqf_class_join()` | a set, in SQL |
+| `reqf_kind_expr()` | the effective KIND, for stage-specific questions |
+
+Two renderings exist because a per-row PHP call across a KPI query spanning every
+requirement in the workspace is an N+1 nobody would accept. They are **not two
+definitions**: both are generated from `RPIPE_KIND_CLASS`, and tests assert they
+agree for every stage kind and every legacy value, including the malformed ones —
+so drift between them fails the suite.
+
+The `REQF_*` constants survive with a changed job, stated in the code: they are
+now the **one-way legacy compatibility map** for candidates who have never been
+moved on a pipeline and therefore have no kind to ask. That map cannot override a
+pipeline answer, produces values in the same vocabulary, and migration drains it.
+
+### D3 — G1A-2 corrected: the business defect is gone
+
+Measured on the same fixture before and after, with legacy-only candidates (which
+is what an existing un-migrated workspace looks like):
+
+| Case | Figure | Before Gate 1B | After Gate 1B |
+|---|---|---|---|
+| 5 seats, 5 offers issued, **0 accepted** | fulfilment filled | 0 | 0 |
+| | fulfilment in progress | 5 | 5 |
+| | **requirement health filled** | **5** | **0** |
+| | **requirement health vacancies** | **0** | **5** |
+| | **"All positions filled"** | **YES** | **no** |
+| 5 seats, the same five accept | fulfilment filled | 5 | 5 |
+| | requirement health filled | 5 | 5 |
+| | "All positions filled" | YES | YES |
+
+The row in bold is the defect: a requirement for five people with five offers out
+and nobody accepted told the manager the job was done, while the fulfilment engine
+correctly said five were still to hire. `recruit.php:754` and `:1003` no longer
+compute "filled" from a hardcoded `IN ('OFFERED','ACCEPTED')`; they ask the choke
+point, where `offer` classifies as ACTIVE. Case B is unchanged, which is the point
+— the fix corrects the wrong answer without moving the right one.
+
+`recruit_cc.php`'s offered-vs-joined trend remains two deliberately distinct
+series (`$CK IN ('offer','terminal')` against `$CE='FILLED'`), as required.
+
+### D4 — Current-state consumers moved
+
+| File | Sites moved | Kept as-is |
+|---|---|---|
+| `lib/reqfulfil.php` | all four counts (filled / joined / in progress / lost) | — |
+| `lib/recruit.php` | health, dashboard pipeline / offers / joinings / dormant / overdue interviews, commercial rollup | — |
+| `lib/recruit_cc.php` | funnel + donut grouping, requirement filled, trends, department load, drop reasons, waiting, ageing, time-to-hire | the offered-vs-joined series' distinct meaning |
+| `lib/recruit_kpi.php` | the demand spine's fl/inprog/lostn/dir, ageing, analytics registry | ledger history, which is already event-based |
+| `lib/recruit_fulfil.php` | all four "fulfilled" counts; `rful_filled_stages()` retired | — |
+| `lib/recruit_assign.php` | the assignability guard, workload filled/active/offers/joins/overdue, unassigned | — |
+| `lib/nextaction.php` | the whole candidate resolver | RB-2's `joined_at` rule, untouched |
+| `lib/recruit_exec.php` | seat counts, the "except" release, JOIN-vs-ADVANCE, both compensators | the seat-ceiling reasoning, untouched |
+| `lib/recruitpipe.php` | the flow-route guard, the workflow panel, the stage tab | — |
+| `lib/ops.php` | the stage route's two writes; the revert now told the prior position | the choke point itself, the transaction shape, permissions |
+
+**Display-only uses of a stage NAME were deliberately left alone** (`candpool.php`,
+`search.php`, `recruit_export.php`), as were the event-ledger reads that are
+already history rather than current state.
+
+One semantic change is worth flagging: `recruit.php`'s "dormant candidates"
+opportunity card used to read `IN ('HOLD','REJECTED','WITHDRAWN')`, which was
+inconsistent twice over — it omitted OFFER_DECLINED, who are just as
+re-approachable, and included HOLD, who have not been closed at all. It now asks
+for closed candidates. Recorded because it changes what that card lists.
+
+### D5 — Legacy writers retired or re-pointed
+
+| # | Writer | Now |
+|---|---|---|
+| 1 | column default `DEFAULT 'RECEIVED'` | unchanged — it is the intake record |
+| 2 | `ops.php` candidate INSERT | unchanged — intake, before any process |
+| 3 | `ops.php` joining transaction | **writes the pipeline position**, inside the same transaction |
+| 4 | `ops.php` ordinary move | **writes the pipeline position** |
+| 5 | `recruitpipe.php` coarse sync | **deleted**; nothing replaces it |
+| 6 | `recruit_offer.php` offer-issued | **moves the pipeline to the offer stage**, ledger entry kept |
+| 7 | `recruit_exec.php` joining revert | **restores the prior pipeline position** |
+| 8 | `careers.php` public intake | unchanged — intake |
+
+There is deliberately **no reverse synchroniser**, and therefore no
+pipeline → legacy → pipeline authority loop.
+
+The stage route keeps the legacy vocabulary in its dropdown and translates the
+requested target into the candidate's own pipeline stage
+(`rpipe_stage_for_legacy_target()`): accept → the terminal stage, offer → the
+offer stage, each closure → the off-ramp carrying that outcome. It returns null
+for the early legacy values (a pipeline may configure six `step` stages, so
+"shortlisted" names none of them) and for a candidate with no process at all, and
+the legacy column is then written as before — for those rows it is the only record
+there is. **It is never written as well as the pipeline.**
+
+A closure through the real route keeps its drop point, drop reason, decision stamp
+and ledger remark: asserted, not assumed, by driving the actual route in a
+subprocess.
+
+### D6 — Migration: deterministic, idempotent, additive, explicit
+
+| Function | Purpose |
+|---|---|
+| `rpipe_migration_plan($cand)` | what WOULD happen and why — MIGRATE / SKIP / REVIEW. Never writes |
+| `rpipe_migration_apply($plan)` | one move, guarded by `COALESCE(pipeline_stage_id,0)=0` |
+| `rpipe_reconcile_run($limit, $apply)` | a bounded, resumable pass; `$apply=false` is a dry run |
+
+A candidate is migrated **only where the evidence is certain**: their legacy value
+translates to a kind, and their pipeline configures **exactly one** stage of that
+kind. Everything else is surfaced for a person.
+
+Determinism is a property of the configuration, not of the value, and both
+branches are proved: on a requirement with no grade, CORP18's L2 interview is
+conditional and does not apply, so `INTERVIEW` maps to the single L1 and IS
+certain; on a SENIOR requirement two interview stages apply and **the same value
+is refused**. `SHORTLISTED` never maps.
+
+Resumable by construction rather than by bookkeeping: every pass re-derives its
+plans and only moves candidates who still have no position, so a second pass
+migrates nobody and a bounded pass reports that more remain. The legacy value is
+**never cleared** — it is the historical record and the only evidence a later
+reconciliation would have. Each move is written to the existing ledger on a new
+`MIGRATION` track with kind `MIGRATE`, and `rkpi_stage_durations()` skips it, so
+no stage duration is ever measured across a reconciliation. Nothing runs because a
+page was opened.
+
+### D7 — G0-1, G0-2, G1A-1 under pipeline authority
+
+**G0-1 (malformed legacy values)** — unchanged and still never repaired. `OFFER`
+and `' RECEIVED'` translate to **no kind**, so they classify as `''` — genuinely
+unknown, not quietly ACTIVE and not quietly LOST. A scan and a dry-run migration
+leave them byte-identical, and migration refuses to place them, saying why. The
+two test fixtures behind them were **not modified**, as instructed, and no claim
+is made about production, which remains unreachable.
+
+**G0-2 (pipeline live, legacy closed)** — the pipeline decides the classification,
+because it is the authority; the disagreement is still detected, still classified
+`E_CONFLICT`, and migration explicitly **skips** such a candidate naming the
+conflict. The legacy evidence is preserved, never deleted, and nobody is
+automatically rejected, reopened or moved because the old value disagrees.
+
+**G1A-1 (readers disagreed about normalisation)** — fixed at the root rather than
+by picking a winner. `nextaction.php`'s `strtoupper(trim())` and
+`recruit_assign.php`'s identical normalisation are **gone**: both now ask the
+classification, so there is no normalisation rule of their own left to disagree
+with anybody. The strict/lenient split is still reported on the state for the
+diagnostic's benefit.
+
+### D8 — Candidate pool safety (D3)
+
+`recruitpipe_cand_state()` resolves the DEFAULT pipeline for a candidate with no
+requirement — right for showing what a process would look like, wrong for writing
+a position. Without a guard, editing a company-wide pool candidate would have
+enrolled them in active recruitment merely because a default pipeline exists.
+Guards added in `rpipe_stage_for_legacy_target()` and
+`offer_move_to_offer_stage()`; migration SKIPs such candidates naming D3; and an
+applied migration pass provably leaves them in the pool.
+
+### D9 — Verification
+
+| Check | Result |
+|---|---|
+| Gate 1B battery, SQLite | **191 / 0** |
+| Gate 1B battery, MariaDB 10.11 | **191 / 0** |
+| Full suite, SQLite | **15,451–15,452 / 0** |
+| Full suite, MariaDB 10.11 (authoritative) | **15,451–15,453 / 0** |
+| Mutation targets killed | **12 / 12** |
+| Browser (Chromium), desktop + phone | **22 / 0** |
+| Whole-app crawl, every role | **208 screens, all render cleanly** |
+
+**The suite total is not a deterministic invariant, on either engine**, and it is
+worth stating exactly why rather than quoting one number as if it were.
+
+Repeated runs gave 15,451 and 15,452 on SQLite and 15,451 through 15,453 on
+MariaDB, **always with zero failures**. Diffing two runs' assertion lists shows
+the assertion SET is symmetric — 11 lines differ each way, and every one of them
+is the SAME assertion carrying a run-dependent value in its message text:
+
+- `tests/test_php_close_tag_in_comment.php` writes its own scratch PHP files under
+  the system temp directory and reports how many it scanned (1230 vs 1231), so the
+  figure moves with what else is in `/tmp`;
+- the concurrency tests legitimately resolve races differently from run to run
+  (`CONVERTED` vs `BUSY`, one winner vs a dead heat, `owner=216` vs `owner=0`) —
+  each outcome is asserted as acceptable, which is the point of those tests;
+- MariaDB additionally runs real row-locking races where SQLite runs lock-timeout
+  tests, which is the pre-existing engine difference Gate 1A already recorded.
+
+None of this involves Gate 1B: the focused battery is exactly **191 on both
+engines**, so nothing in this gate behaves differently on MariaDB than on SQLite.
+
+Three mutations initially survived and each exposed a real gap:
+
+- the offer-issued legacy write and the joining-revert legacy write both survived,
+  because the battery had not driven those production paths end to end. It now
+  does — `offer_create → submit → approve → issue`, and a two-candidates-one-seat
+  race through the real compensator.
+- removing the closed kind from the vocabulary killed only one assertion, so the
+  battery now also asserts that a stage can be **configured** as closed through
+  the ordinary save path and that an invented kind such as "rejected" is refused.
+
+A real defect was found this way too: the revert, given `null` for "they had no
+prior pipeline position", left the candidate on the terminal stage they had just
+been refused. It now restores **both** columns to exactly what they were, with `0`
+meaning "no position at all".
+
+### D10 — Findings, classified
+
+| Finding | Class | Note |
+|---|---|---|
+| The Command Centre funnel is coarser for migrated candidates | **deferred — reporting gate** | The kind vocabulary has one `step` kind, so CV Screening and HOD Shortlisting both bucket as RECEIVED. The funnel stays truthful (it is cumulative) but a per-pipeline-stage funnel is a screen redesign and out of scope here. Recorded in `RCC_KIND_BUCKET`. |
+| `tools/p7-browser-uat.js` cannot create a requirement | **deferred — pre-existing** | It gets 403 on `/requisition-new` because ADR-001 closed the direct path. The script predates that decision; it is stale relative to ADR-001, not to this gate. `tools/g1b-browser-check.js` covers what Gate 1B changed. |
+| The two G0-1 test fixtures still write undefined stage values | **test-only** | Left untouched as instructed. A one-word fix each, needing explicit authorisation. |
+| `rexec_filled_stages()` still returns legacy values | **documentation only** | Retained solely so the stage route can ask "does this requested TARGET mean a joining?" before any move exists — a question about a requested value, not about a candidate's state. Commented as such. |
+| Workforce `Accepted`-vs-`Joined`, `is_coordinator_level()`, self-approval | **deferred — later gates** | F1 → Gate 5, F2 → Gate 4, F3/OPEN-4 → Gate 6, unchanged. |
+
+### D11 — What Gate 1B deliberately did NOT do
+
+No new lifecycle engine, no second state machine, no second classification engine,
+no new current-state column, no duplicated event ledger. No requisition or hiring
+request versioning, Review Required, approval changes, offer audit engine,
+self-approval configuration, role permission redesign, Hired-vs-Joined workforce
+change, inspector status change, mobile or Role Workspace redesign, Person Hub,
+organisation convergence, or Marketplace change. No candidate deleted, no legacy
+stage data deleted, no historical event or KPI fact rewritten, no tenant touched
+but the one under test. **No production deployment, and no claim about production
+data — production remains unreachable from this environment.**
+
+---
+
 # STOP
 
 **Scope of this document.** §1–§21 and §20a are audit only — they were written
@@ -1238,7 +1503,10 @@ narrow scope its gate named:
 | §1–§21, §20a | 7B audit, 7C reconciliation | no |
 | §20b | Gate 0 | yes — one route name, three form actions, one new test |
 | §20c | Gate 1A | yes — additive helpers, one new test, regenerated manifest |
+| §20d | Gate 1B | yes — pipeline authority activated across the recruitment chain |
 
-**Gate 1A stops here and waits for an explicit pass before Gate 1B.** Authority
-has NOT moved to the pipeline; every reader and writer still behaves exactly as
-it did before this gate.
+**Gate 1B stops here and waits for an explicit pass before Gate 2.**
+
+Pipeline is authoritative for current recruitment state. Legacy
+`candidates.stage` is no longer an independent current-state authority. No
+production deployment was performed.

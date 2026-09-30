@@ -14,7 +14,19 @@ $def = recruitpipe_default();
 t_eq($def['code'], 'CORP18', 'the Corporate Recruitment Workflow is the default');
 
 $stages = recruitpipe_stages($def['id'], true);
-t_eq(count($stages), 18, 'the corporate workflow has all 18 stages');
+//  GATE 1B — 18 steps to walk through, plus the three closed off-ramps every
+//  pipeline needs so that "not proceeding" has somewhere to live. The off-ramps are
+//  NOT part of the progression: recruitpipe_effective_stages() excludes them, so
+//  nobody can be advanced into Rejected and no progress bar ends in three dead
+//  ends. Asserted separately, because the two numbers mean different things.
+t_eq(count($stages), 21, 'the corporate workflow stores 18 progression stages plus 3 closed off-ramps');
+$prog = array_values(array_filter($stages, fn($s) => $s['kind'] !== 'closed'));
+$offr = array_values(array_filter($stages, fn($s) => $s['kind'] === 'closed'));
+t_eq(count($prog), 18, 'the corporate workflow has all 18 stages to walk through');
+t_eq(count($offr), 3, 'and three ways to close a candidate who is not proceeding');
+t_eq(count(array_unique(array_column($offr, 'closed_outcome'))), 3,
+    'each off-ramp carries a distinct configurable outcome, and they are subtypes of ONE closed kind');
+foreach ($offr as $o) t_eq($o['kind'], 'closed', 'every off-ramp is the same single closed KIND: ' . $o['stage_key']);
 $seqs = array_map(fn($s) => (int)$s['seq'], $stages);
 $sorted = $seqs; sort($sorted);
 t_ok($seqs === $sorted, 'stages come back ordered by sequence');
@@ -76,30 +88,45 @@ t_eq($idx, 0, 'a fresh candidate starts at the first stage');
 // SENIOR + medical required → all 18 stages apply.
 t_eq(count($eff), 18, 'the full 18-stage path applies for a senior, medical-required requisition');
 
-// Advance to the L1 interview stage → legacy stage coarse-syncs to INTERVIEW.
+//  GATE 1B — a pipeline move writes the PIPELINE POSITION, and nothing else.
+//  These assertions used to require the opposite: that moving a candidate also
+//  stamped an approximation of their position into candidates.stage, because that
+//  column was what reporting read. It is not the authority any more, so writing it
+//  would recreate the dual authority Gate 1B exists to remove.
 $l1 = null; foreach ($eff as $s) if ($s['stage_key'] === 'L1') $l1 = $s;
+$legacyBefore = (string) ops_val("SELECT stage FROM candidates WHERE id=?", [$cid]);
 recruitpipe_cand_goto($cand, (int)$l1['id'], 'cleared screening', 'tester');
 $c2 = ops_one("SELECT * FROM candidates WHERE id=?", [$cid]);
 t_eq((int)$c2['pipeline_stage_id'], (int)$l1['id'], 'the candidate now sits at L1 in the configured pipeline');
-t_eq($c2['stage'], 'INTERVIEW', 'reaching an interview stage coarse-syncs the legacy stage to INTERVIEW');
+t_eq($c2['stage'], $legacyBefore, 'the legacy stage is NOT touched by a pipeline move — no coarse sync, no second authority');
 t_ok((int)$c2['pipeline_id'] > 0, 'the pipeline is locked onto the candidate on first move');
+t_eq(rpipe_current_state($c2)['kind'], 'interview', 'and the CURRENT STATE comes from the stage kind');
+t_eq(rpipe_current_state($c2)['class'], 'ACTIVE', 'an interview classifies as active work');
 
-// Advance to the offer stage → legacy stage coarse-syncs to OFFERED.
+// Advance to the offer stage.
 $offer = null; foreach ($eff as $s) if ($s['kind'] === 'offer') $offer = $s;
 recruitpipe_cand_goto($c2, (int)$offer['id'], '', 'tester');
 $c3 = ops_one("SELECT * FROM candidates WHERE id=?", [$cid]);
-t_eq($c3['stage'], 'OFFERED', 'reaching the offer stage coarse-syncs the legacy stage to OFFERED');
+t_eq($c3['stage'], $legacyBefore, 'still no legacy write when the candidate reaches the offer stage');
+t_eq(rpipe_current_state($c3)['kind'], 'offer', 'the current state is the offer stage');
+t_eq(rpipe_current_state($c3)['class'], 'ACTIVE',
+    'AN ISSUED OFFER IS NOT A FILLED SEAT — it classifies as ACTIVE (G1A-2)');
 
 // The move is audited in candidate_events.
 $evN = (int)ops_one("SELECT COUNT(*) c FROM candidate_events WHERE candidate_id=?", [$cid])['c'];
 t_ok($evN >= 2, 'every configured move is written to the candidate timeline');
 
-// Terminal legacy stage is never overwritten by a coarse sync.
+//  A legacy value is never overwritten by a pipeline move, terminal or not — and
+//  the pipeline, not the legacy value, decides where the candidate now is.
 db()->prepare("UPDATE candidates SET stage='ACCEPTED' WHERE id=?")->execute([$cid]);
 $c4 = ops_one("SELECT * FROM candidates WHERE id=?", [$cid]);
 recruitpipe_cand_goto($c4, (int)$l1['id'], '', 'tester');
 $c5 = ops_one("SELECT * FROM candidates WHERE id=?", [$cid]);
-t_eq($c5['stage'], 'ACCEPTED', 'a closed (ACCEPTED) candidate is never coarse-synced back to an earlier stage');
+t_eq($c5['stage'], 'ACCEPTED', 'the legacy value is left as the historical record, untouched');
+t_eq(rpipe_current_state($c5)['kind'], 'interview',
+    'the PIPELINE says interview, and the pipeline is the authority — a stale ACCEPTED does not override it');
+t_ok(rpipe_current_state($c5)['conflict'],
+    '…and the disagreement between the two is SURFACED rather than resolved behind our back (G0-2)');
 
 // A junior/no-medical candidate gets the shorter effective path (conditional skip).
 db()->prepare("INSERT INTO requisitions (req_code,designation,grade,cmp_medical,status,created_at) VALUES ('SRF-J','Clerk','JUNIOR',0,'OPEN',?)")->execute([date('c')]);

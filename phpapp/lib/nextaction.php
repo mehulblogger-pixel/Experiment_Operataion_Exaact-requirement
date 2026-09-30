@@ -162,14 +162,24 @@ function na_requisition($row) {
 function na_candidate($row) {
     if (!function_exists('recruitpipe_cand_state')) return null;
     [$pipe, $eff, $idx] = recruitpipe_cand_state($row);
-    $stage = strtoupper(trim((string) ($row['stage'] ?? '')));
     $can = function_exists('is_coordinator_level') && is_coordinator_level();
     $id  = (int) ($row['id'] ?? 0);
 
-    //  A terminal legacy stage wins over the pipeline — recruitpipe itself
-    //  treats these as terminal (recruitpipe_legacy_terminal()).
-    $terminal = function_exists('recruitpipe_legacy_terminal') ? recruitpipe_legacy_terminal() : [];
-    if ($stage === 'ACCEPTED') {
+    //  GATE 1B — ASKED OF THE AUTHORITY, NOT OF THE LEGACY COLUMN.
+    //
+    //  This block used to read strtoupper(trim($row['stage'])) and let a terminal
+    //  legacy value win over the pipeline. That was one half of G1A-1: this file
+    //  tidied the value before reading it while reqfulfil compared it strictly, so
+    //  ' REJECTED' was closed here and unclassifiable there. It now asks
+    //  rpipe_current_state(), so there is no normalisation rule of its own left to
+    //  disagree with anybody — and no path by which the legacy column can override
+    //  a configured pipeline position.
+    $st = function_exists('rpipe_current_state') ? rpipe_current_state($row) : null;
+    $cls = $st ? (string) $st['class'] : '';
+
+    //  FILLED — successful completion. RB-2 stands: hired is not joined, and the
+    //  joining date is what tells them apart.
+    if ($cls === 'FILLED') {
         $joined = trim((string) ($row['joined_at'] ?? '')) !== '';
         if ($joined)
             return na_answer(['state' => 'Joined', 'tone' => 'p-ok',
@@ -178,12 +188,24 @@ function na_candidate($row) {
             'next' => 'Mark as joined once they actually arrive', 'cta' => 'Mark as joined',
             'route' => '/candidate?id=' . $id . '#na-joined', 'can' => $can,
             'note' => $can ? '' : 'A recruiter records the joining date.',
-            'src' => 'candidates.stage=ACCEPTED with no joined_at (RB-2)']);
+            'src' => 'current state classifies as FILLED with no joined_at (RB-2)']);
     }
-    if (in_array($stage, $terminal, true))
-        return na_answer(['state' => ucfirst(strtolower(str_replace('_', ' ', $stage))), 'tone' => 'p-mut',
+    //  LOST — not proceeding. The label prefers the CONFIGURED outcome of the
+    //  closed stage, so a workspace that calls it "Did not attend" sees its own
+    //  word rather than a built-in one.
+    if ($cls === 'LOST') {
+        $label = '';
+        if ($st && $st['source'] === 'PIPELINE') {
+            $outc = (string) $st['closed_outcome'];
+            $label = $outc !== '' ? (string) (rpipe_closed_outcomes()[$outc] ?? $outc)
+                                  : (string) $st['stage_name'];
+        }
+        if ($label === '') $label = ucfirst(strtolower(str_replace('_', ' ', (string) ($st['legacy_stage'] ?? ''))));
+        return na_answer(['state' => $label !== '' ? $label : 'Closed', 'tone' => 'p-mut',
             'note' => 'Closed. Nothing further is required.',
-            'src' => 'recruitpipe_legacy_terminal()']);
+            'src' => $st && $st['source'] === 'PIPELINE'
+                ? 'pipeline stage kind=closed' : 'legacy compatibility map — not yet migrated']);
+    }
 
     if (!$pipe || !$eff) return null;                       // no pipeline resolved — say nothing
     $here = $eff[$idx] ?? null;

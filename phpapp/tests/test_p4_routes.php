@@ -150,15 +150,17 @@ $j1 = $t4cand($rqC, 'OFFERED'); rful_attach($j1, $aC);
 $j2 = $t4cand($rqC, 'OFFERED'); rful_attach($j2, $aC);
 $drive('route_cand_stage', $j1, 'ACCEPTED', ['team_role' => 'FIELD']);
 $drive('route_cand_stage', $j2, 'ACCEPTED', ['team_role' => 'FIELD']);
-t_eq($stageOf($j1), 'ACCEPTED', 'RT3.1 · the first joined through the route');
-t_eq($stageOf($j2), 'ACCEPTED', 'RT3.2 · the second too');
+//  GATE 1B — a joining is recorded as a move to the pipeline's terminal stage, so
+//  the outcome is asked of the classification rather than of the legacy column.
+t_eq(t_class($j1), 'FILLED', 'RT3.1 · the first joined through the route');
+t_eq(t_class($j2), 'FILLED', 'RT3.2 · the second too');
 t_eq(rful_fulfilled($aC), 2, 'RT3.3 · the sub-contractor is credited with both of its two');
 
 $j3 = $t4cand($rqC, 'OFFERED');
 $pdo->prepare("UPDATE candidates SET allocation_id=? WHERE id=?")->execute([$aC, $j3]);   // past the door
 t_eq($linkOf($j3), (int) $aC, 'RT3.4 · a third carries a smuggled credit to the same two-seat source');
 $drive('route_cand_stage', $j3, 'ACCEPTED', ['team_role' => 'FIELD']);
-t_eq($stageOf($j3), 'ACCEPTED', 'RT3.5 · they DO join — there is an approved seat, and Phase 4 never blocks that');
+t_eq(t_class($j3), 'FILLED', 'RT3.5 · they DO join — there is an approved seat, and Phase 4 never blocks that');
 t_eq(rful_fulfilled($aC), 2, 'RT3.6 · but the source is STILL credited with exactly two (mutant T27)');
 t_eq($linkOf($j3), 0, 'RT3.7 · the smuggled credit was dropped to the direct path');
 t_eq($linkOf($j1), (int) $aC, 'RT3.8 · the first ESTABLISHED credit is untouched');

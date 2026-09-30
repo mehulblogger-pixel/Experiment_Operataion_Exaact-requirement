@@ -27,7 +27,106 @@ const RPIPE_STAGE_KINDS = [
     'interview' => 'Interview',
     'offer'     => 'Offer',
     'terminal'  => 'Final (hired / onboarding)',
+    //  C47 — NOT PROCEEDING. Distinct from 'terminal', which is a SUCCESSFUL
+    //  finish. A closed stage is an off-ramp: the process stopped. Never
+    //  interchangeable with terminal, and never inferred from a stage's NAME.
+    'closed'    => 'Closed (not proceeding)',
 ];
+
+//  THE ONE MAPPING FROM STAGE KIND TO RECRUITMENT CLASSIFICATION.
+//
+//  Every fulfilment, health, KPI and dashboard figure in the product resolves
+//  through this table and nothing else. It replaces the literal stage-value
+//  lists that used to be spelled out, differently, in six files.
+//
+//  The load-bearing line is 'offer' => 'ACTIVE'. An ISSUED OFFER IS NOT A
+//  FILLED SEAT (G1A-2): until the candidate accepts, the seat is still open and
+//  the vacancy still has to be recruited for. recruit.php used to count an
+//  issued offer as filled, which is how a requirement for five people with five
+//  offers out and nobody accepted reported "All positions filled".
+const RPIPE_KIND_CLASS = [
+    'step'      => 'ACTIVE',
+    'gate'      => 'ACTIVE',
+    'interview' => 'ACTIVE',
+    'offer'     => 'ACTIVE',
+    'terminal'  => 'FILLED',
+    'closed'    => 'LOST',
+];
+
+// The classification of one configured stage kind, or '' for an unknown kind.
+function rpipe_kind_class($kind) {
+    return RPIPE_KIND_CLASS[(string) $kind] ?? '';
+}
+
+//  THE ONE-WAY LEGACY COMPATIBILITY MAP.
+//
+//  A candidate who has never been moved on a pipeline has no configured stage,
+//  so there is no kind to ask. Rather than give such a candidate a SECOND
+//  classification path, their legacy value is translated once into the
+//  authoritative vocabulary — a stage kind — and then classified by exactly the
+//  same rule as everybody else.
+//
+//  This is compatibility/migration data, not an authority: it is one-directional,
+//  it never runs when the pipeline can answer, and migration drains it.
+//  OFFERED maps to 'offer', which classifies as ACTIVE — the G1A-2 correction
+//  applies to un-migrated candidates too, not just migrated ones.
+const RPIPE_LEGACY_KIND = [
+    'RECEIVED'       => 'step',
+    'SUBMITTED'      => 'step',
+    'SHORTLISTED'    => 'step',
+    'HOLD'           => 'step',
+    'INTERVIEW'      => 'interview',
+    'OFFERED'        => 'offer',
+    'ACCEPTED'       => 'terminal',
+    'REJECTED'       => 'closed',
+    'WITHDRAWN'      => 'closed',
+    'OFFER_DECLINED' => 'closed',
+];
+
+// The kind a legacy value translates to, or '' when it translates to nothing.
+// EXACT match: a value that is not a defined stage translates to nothing at all,
+// which is how a malformed value stays visible instead of being guessed at.
+function rpipe_legacy_kind($v) { return RPIPE_LEGACY_KIND[(string) $v] ?? ''; }
+
+// Is this kind a closed (not-proceeding) kind? Asked of the KIND, never a name.
+function rpipe_kind_is_closed($kind) { return (string) $kind === 'closed'; }
+// Is this kind a successful completion?
+function rpipe_kind_is_terminal($kind) { return (string) $kind === 'terminal'; }
+
+//  C47 — THE CONFIGURABLE CLOSED OUTCOMES.
+//
+//  One semantic closed KIND, many configurable outcomes beneath it. These are
+//  subtypes, not kinds: a workspace may rename them, add its own, or retire the
+//  ones it does not use, and the classification is unaffected because it is
+//  taken from the kind.
+const RPIPE_CLOSED_OUTCOMES = [
+    'REJECTED'         => 'Rejected',
+    'WITHDRAWN'        => 'Withdrawn',
+    'OFFER_DECLINED'   => 'Offer declined',
+    'OFFER_WITHDRAWN'  => 'Offer withdrawn',
+    'POSITION_CLOSED'  => 'Position closed',
+    //  {req} is the codebase's one placeholder for the execution record's name,
+    //  filled from the workspace's own vocabulary at render time. Typing the word
+    //  here would hard-code a name every workspace is allowed to choose, which is
+    //  exactly what tests/test_recruit_terminology.php exists to prevent.
+    'REQ_CANCELLED'    => '{req} cancelled',
+    'DUPLICATE'        => 'Duplicate',
+    'NOT_AVAILABLE'    => 'Not available',
+    'NOT_SUITABLE'     => 'Not suitable',
+    'OTHER'            => 'Other',
+];
+
+// The workspace's own closed-outcome list, falling back to the shipped one, with
+// the {req} placeholder resolved to whatever this workspace calls a requirement.
+function rpipe_closed_outcomes() {
+    $out = function_exists('lk_options_or')
+        ? lk_options_or('candidate_closed_outcome', RPIPE_CLOSED_OUTCOMES)
+        : RPIPE_CLOSED_OUTCOMES;
+    $word = function_exists('Tl') ? (string) Tl('requisition') : 'requisition';
+    foreach ($out as $k => $v)
+        if (is_string($v) && strpos($v, '{req}') !== false) $out[$k] = ucfirst(str_replace('{req}', $word, $v));
+    return $out;
+}
 
 // Condition operators for a conditional stage (§10 of the brief).
 const RPIPE_COND_OPS = [
@@ -101,8 +200,59 @@ function recruitpipe_migrate() {
             updated_at VARCHAR(30) DEFAULT ''
         )");
         if (function_exists('act_index')) act_index('candidate_stage_data', 'idx_csd_cand', '(candidate_id)');
+        //  GATE 1B · C47 — which closed outcome a closed stage represents.
+        //  Meaningful only when kind='closed'; empty everywhere else. Additive.
+        ensure_column('recruit_stages', 'closed_outcome', "VARCHAR(40) DEFAULT ''");
     } catch (Throwable $e) { /* never break boot */ }
     recruitpipe_seed();
+    recruitpipe_ensure_closed_stages();
+    recruitpipe_ensure_closed_outcome_list();
+}
+
+//  The closed-outcome vocabulary, registered with the existing lookup engine so
+//  a workspace can rename or extend it exactly like any other configured list.
+function recruitpipe_ensure_closed_outcome_list() {
+    if (!function_exists('lk_ensure_value') || !function_exists('lk_type')) return;
+    try {
+        if (!lk_type('candidate_closed_outcome')) return;
+        foreach (RPIPE_CLOSED_OUTCOMES as $code => $label) lk_ensure_value('candidate_closed_outcome', $code, $label);
+    } catch (Throwable $e) { /* a workspace without the lookup engine yet */ }
+}
+
+//  EVERY PIPELINE NEEDS SOMEWHERE TO CLOSE A CANDIDATE.
+//
+//  Without a closed-kind stage, "not proceeding" would have nowhere to live and
+//  the only way to express it would be the legacy column this gate is retiring.
+//  So each pipeline gets the three off-ramps that the four legacy terminal
+//  values collapse into, mapped by outcome.
+//
+//  Idempotent and additive: a pipeline that already has a closed stage is left
+//  alone, so a workspace that renamed or removed one never has it resurrected.
+//  Off-ramps sit at seq 9000+ so they can never be mistaken for the next step.
+function recruitpipe_ensure_closed_stages() {
+    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
+    try {
+        $pipes = ops_all("SELECT id FROM recruit_pipelines") ?: [];
+        if (!$pipes) return;
+        $have = [];
+        foreach (ops_all("SELECT DISTINCT pipeline_id FROM recruit_stages WHERE kind='closed'") ?: [] as $r)
+            $have[(int) $r['pipeline_id']] = true;
+        $ins = db()->prepare("INSERT INTO recruit_stages
+            (pipeline_id,seq,stage_key,name,kind,responsible_role,mandatory,
+             condition_field,condition_op,condition_value,closed_outcome,active)
+            VALUES (?,?,?,?,'closed','',0,'','','',?,1)");
+        foreach ($pipes as $p) {
+            $pid = (int) $p['id'];
+            if (!empty($have[$pid])) continue;
+            $seq = 9000;
+            foreach ([['CLOSED_REJECTED', 'Not proceeding — rejected', 'REJECTED'],
+                      ['CLOSED_WITHDRAWN', 'Not proceeding — withdrew', 'WITHDRAWN'],
+                      ['CLOSED_OFFER_DECLINED', 'Not proceeding — offer declined', 'OFFER_DECLINED']] as $c) {
+                $ins->execute([$pid, $seq, $c[0], $c[1], $c[2]]);
+                $seq += 10;
+            }
+        }
+    } catch (Throwable $e) { /* never break boot */ }
 }
 
 // ---- Per-stage capture (notes) --------------------------------------------
@@ -287,13 +437,41 @@ function recruitpipe_stage_applies($stage, array $ctx) {
         default:    return true;                           // no/unknown op = include
     }
 }
-// The stages that actually apply to a given requisition, in order.
+//  THE PROGRESSION — the stages a candidate walks through, in order.
+//
+//  Closed-kind stages are deliberately EXCLUDED. They are off-ramps, not steps:
+//  including them would let "advance" walk a candidate into Rejected, and would
+//  put three dead ends on the end of every progress bar. They are reached by an
+//  explicit closure, never by moving one step forward.
 function recruitpipe_effective_stages($pipelineId, $req) {
     $ctx = recruitpipe_context($req);
     $out = [];
-    foreach (recruitpipe_stages($pipelineId, true) as $s)
+    foreach (recruitpipe_stages($pipelineId, true) as $s) {
+        if (rpipe_kind_is_closed($s['kind'] ?? '')) continue;
         if (recruitpipe_stage_applies($s, $ctx)) $out[] = $s;
+    }
     return $out;
+}
+
+// The closed off-ramps configured for a pipeline. Conditions apply here too, so
+// a workspace can make an outcome available only to certain requirements.
+function recruitpipe_closed_stages($pipelineId, $req = []) {
+    $ctx = recruitpipe_context($req);
+    $out = [];
+    foreach (recruitpipe_stages($pipelineId, true) as $s) {
+        if (!rpipe_kind_is_closed($s['kind'] ?? '')) continue;
+        if (recruitpipe_stage_applies($s, $ctx)) $out[] = $s;
+    }
+    return $out;
+}
+
+//  EVERY stage a candidate could legitimately BE on — progression plus
+//  off-ramps. Used to RESOLVE a position; never to decide what comes next.
+//  Without this, a candidate parked on a closed stage would resolve to nothing
+//  and read as though they had no pipeline position at all.
+function recruitpipe_resolvable_stages($pipelineId, $req = []) {
+    return array_merge(recruitpipe_effective_stages($pipelineId, $req),
+                       recruitpipe_closed_stages($pipelineId, $req));
 }
 
 // ---- Writes (config screen) ------------------------------------------------
@@ -401,6 +579,10 @@ function ops_recruit_pipelines($route, $method) {
 // ============================================================================
 
 // Legacy stages that mean "closed" — the configured flow is locked at these.
+//  GATE 1B — the four legacy values that mean "this process is over", kept for the
+//  compatibility map and the G0-2 conflict detector ONLY. No screen and no counter
+//  asks this any more: they ask the classification, which comes from the configured
+//  stage kind. Do not reintroduce it as a gate.
 function recruitpipe_legacy_terminal() { return ['ACCEPTED', 'REJECTED', 'WITHDRAWN', 'OFFER_DECLINED']; }
 
 // Resolve a candidate's live position: [pipeline, effectiveStages, idx].
@@ -448,15 +630,20 @@ function recruitpipe_cand_goto($cand, $targetStageId, $remark, $actor) {
             'track' => 'PIPELINE', 'kind' => 'MOVE', 'remark' => (string)$remark, 'actor' => (string)$actor]);
     else db()->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
         ->execute([(int)$cand['id'], $fromName, $target['name'], (string)$remark, (string)$actor, date('c')]);
-    // Coarse legacy sync — only at the interview/offer milestones, and never
-    // over a terminal legacy stage (so hire/loss handling is never disturbed).
-    $cur = (string)($cand['stage'] ?? '');
-    if (!in_array($cur, recruitpipe_legacy_terminal(), true)) {
-        if ($target['kind'] === 'interview' && in_array($cur, ['RECEIVED','SUBMITTED','SHORTLISTED',''], true))
-            db()->prepare("UPDATE candidates SET stage='INTERVIEW' WHERE id=?")->execute([(int)$cand['id']]);
-        elseif ($target['kind'] === 'offer' && $cur !== 'ACCEPTED')
-            db()->prepare("UPDATE candidates SET stage='OFFERED' WHERE id=?")->execute([(int)$cand['id']]);
-    }
+    //  GATE 1B — THE COARSE LEGACY SYNC IS GONE.
+    //
+    //  Until now this function also wrote candidates.stage at the interview and
+    //  offer milestones, so that reporting — which read that column — would follow
+    //  a pipeline move. It existed for exactly one reason: the legacy column was
+    //  the authority. It no longer is. Every consumer now classifies from the
+    //  configured stage kind, so writing a coarse approximation of the position
+    //  into a second column would create the dual authority this gate removes,
+    //  and a pipeline -> legacy -> pipeline loop with it.
+    //
+    //  Nothing replaces it. There is deliberately NO reverse synchroniser: the
+    //  pipeline position above IS the current state, and the ledger entry above IS
+    //  the history. The legacy value is left exactly as it was found, as the
+    //  historical record of where this candidate stood before migration.
     return true;
 }
 
@@ -491,18 +678,12 @@ function rpipe_legacy_stage_valid($v) {
 // Which of the three shared classification sets a legacy value belongs to, or
 // '' when it belongs to none. A value in none of them is invisible to the funnel
 // arithmetic, which is how Gate 0 found ten such rows.
+//  GATE 1B — now derived, not listed. A legacy value is translated to a kind and
+//  then classified by the same rule as a configured stage, so there is one
+//  classification in the product rather than one for pipeline candidates and
+//  another for legacy ones.
 function rpipe_legacy_stage_class($v) {
-    //  index.php loads reqfulfil before this file, so in the running product the
-    //  sets are always present. Loaded anyway rather than trusted, because a
-    //  MISSING set would make every candidate look unclassifiable and quietly
-    //  turn the diagnostic below into a liar.
-    if (!defined('REQF_ACTIVE_STAGES') && is_file(__DIR__ . '/reqfulfil.php'))
-        require_once __DIR__ . '/reqfulfil.php';
-    $v = (string) $v;
-    if (defined('REQF_FILLED_STAGES') && in_array($v, REQF_FILLED_STAGES, true)) return 'FILLED';
-    if (defined('REQF_ACTIVE_STAGES') && in_array($v, REQF_ACTIVE_STAGES, true)) return 'ACTIVE';
-    if (defined('REQF_LOST_STAGES')   && in_array($v, REQF_LOST_STAGES,   true)) return 'LOST';
-    return '';
+    return rpipe_kind_class(rpipe_legacy_kind($v));
 }
 
 // THE DERIVED CURRENT STATE — the single replacement source for every
@@ -532,6 +713,16 @@ function rpipe_current_state($cand) {
         'stage_key'      => '',
         'stage_name'     => '',
         'kind'           => '',
+        'closed_outcome' => '',
+        'terminal'       => null,
+        //  The kind the candidate is EFFECTIVELY at: the configured kind when the
+        //  pipeline answers, the compatibility translation when it cannot. This is
+        //  what stage-specific questions ("how many offers are out?") must ask,
+        //  so they stop naming literal legacy values.
+        'eff_kind'       => '',
+        //  '' = no classification could be established. Callers must treat this
+        //  as "unknown", never as a zero that quietly drops out of a total.
+        'class'          => '',
         'closed'         => null,          // null = not determinable from the authority
         'legacy_stage'   => $legacy,
         'legacy_valid'   => rpipe_legacy_stage_valid($legacy),
@@ -550,24 +741,53 @@ function rpipe_current_state($cand) {
         'legacy_reader_split'   => false,
     ];
 
-    [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
-    if ($pipe && $eff && (int) ($cand['pipeline_stage_id'] ?? 0) > 0) {
-        $here = $eff[$idx] ?? null;
-        if ($here && (int) $here['id'] === (int) $cand['pipeline_stage_id']) {
-            $out['source']      = 'PIPELINE';
-            $out['pipeline_id'] = (int) $pipe['id'];
-            $out['stage_id']    = (int) $here['id'];
-            $out['stage_key']   = (string) ($here['stage_key'] ?? '');
-            $out['stage_name']  = (string) ($here['name'] ?? '');
-            $out['kind']        = (string) ($here['kind'] ?? '');
-            //  'closed' is asked of the KIND, never of a stage name — C47. Until
-            //  the closed kind exists (Gate 1B) no pipeline stage can report
-            //  closed, and this correctly says false rather than borrowing the
-            //  legacy answer.
-            $out['closed']      = ($out['kind'] === 'closed');
+    //  Resolved against PROGRESSION PLUS OFF-RAMPS, because a closed candidate
+    //  genuinely IS on a stage — just not one you advance to. Resolving against
+    //  the progression alone would report a closed candidate as having no
+    //  pipeline position, and the classification would silently fall back to the
+    //  legacy column for exactly the candidates whose outcome matters most.
+    [$pipe, , ] = recruitpipe_cand_state($cand);
+    $wantId = (int) ($cand['pipeline_stage_id'] ?? 0);
+    if ($pipe && $wantId > 0) {
+        $req = !empty($cand['requisition_id'])
+            ? (ops_one("SELECT * FROM requisitions WHERE id=?", [(int) $cand['requisition_id']]) ?: []) : [];
+        $here = null;
+        foreach (recruitpipe_resolvable_stages((int) $pipe['id'], is_array($req) ? $req : []) as $s)
+            if ((int) $s['id'] === $wantId) { $here = $s; break; }
+        //  THE GATE 1A GUARD, unchanged: the stage must belong to the pipeline
+        //  this candidate actually resolves to. recruitpipe_cand_state() falls
+        //  back to another pipeline when the locked one is inactive, and a
+        //  borrowed stage id must never be reported as a position.
+        if ($here) {
+            $out['source']         = 'PIPELINE';
+            $out['pipeline_id']    = (int) $pipe['id'];
+            $out['stage_id']       = (int) $here['id'];
+            $out['stage_key']      = (string) ($here['stage_key'] ?? '');
+            $out['stage_name']     = (string) ($here['name'] ?? '');
+            $out['kind']           = (string) ($here['kind'] ?? '');
+            $out['closed_outcome'] = (string) ($here['closed_outcome'] ?? '');
+            //  Closed is asked of the KIND, never of a stage name — C47.
+            $out['closed']         = rpipe_kind_is_closed($out['kind']);
+            $out['terminal']       = rpipe_kind_is_terminal($out['kind']);
+            //  THE CLASSIFICATION, from the kind and from nothing else.
+            $out['eff_kind']       = $out['kind'];
+            $out['class']          = rpipe_kind_class($out['kind']);
         }
     }
     if ($out['source'] === 'NONE' && $legacy !== '') $out['source'] = 'LEGACY_ONLY';
+
+    //  LEGACY-ONLY CANDIDATES — the one-way compatibility map.
+    //
+    //  A candidate who has never been moved on a pipeline has no kind to ask, so
+    //  their classification is read from the legacy value through the documented
+    //  compatibility map. This is NOT a second authority: it is one-directional,
+    //  it cannot override a pipeline answer, it produces a value in the SAME
+    //  vocabulary, and migration drains it. When the pipeline can answer, this
+    //  never runs.
+    if ($out['source'] === 'LEGACY_ONLY') {
+        $out['eff_kind'] = rpipe_legacy_kind($legacy);
+        $out['class']    = rpipe_kind_class($out['eff_kind']);
+    }
 
     //  THE CONFLICT CLASS (G0-2). Only askable when the pipeline has an answer:
     //  legacy says the process is over, the pipeline says the candidate is live.
@@ -640,6 +860,209 @@ function rpipe_recon_scan($limit = 500) {
             'truncated' => count($rows) >= $limit];
 }
 
+//  WHICH PIPELINE STAGE DOES A REQUESTED LEGACY TARGET MEAN?
+//
+//  The ordinary candidate-stage route offers the legacy vocabulary, and it is the
+//  execution choke point — the seat transaction, the workforce record and the drop
+//  reason all live behind it, and Gate 0 proved how easily that gets broken. So the
+//  route is kept and its TARGET is translated: a request to mark somebody accepted
+//  becomes a move to their pipeline's terminal stage, a rejection becomes a move to
+//  the matching closed off-ramp, and the pipeline stays the authority.
+//
+//  Returns null when no DETERMINISTIC translation exists, and the caller then
+//  leaves the pipeline alone. That is the honest answer for the early legacy
+//  values: a pipeline may have six 'step' stages, so "shortlisted" names no single
+//  one of them, and guessing would move a candidate somewhere nobody asked for.
+//  Those values carry sub-step detail the kind vocabulary cannot express, and they
+//  do not change the classification either way — both read as ACTIVE.
+function rpipe_stage_for_legacy_target($cand, $toLegacy) {
+    $to   = strtoupper(trim((string) $toLegacy));
+    $kind = rpipe_legacy_kind($to);
+    if ($kind === '' || $kind === 'step') return null;       // nothing, or nothing single
+    //  D3 — A CANDIDATE WITH NO RECRUITMENT PROCESS IS NOT IN A PIPELINE.
+    //
+    //  recruitpipe_cand_state() resolves the DEFAULT pipeline when a candidate has
+    //  no requirement, which is right for showing somebody what a process would
+    //  look like and wrong for writing a position. Without this guard, editing a
+    //  company-wide pool candidate would silently enrol them in active recruitment
+    //  merely because a default pipeline exists. Pool membership is not recruitment
+    //  activity.
+    if ((int) ($cand['requisition_id'] ?? 0) <= 0) return null;
+    [$pipe, $eff, ] = recruitpipe_cand_state($cand);
+    if (!$pipe) return null;
+    $req = !empty($cand['requisition_id'])
+        ? (ops_one("SELECT * FROM requisitions WHERE id=?", [(int) $cand['requisition_id']]) ?: []) : [];
+    $req = is_array($req) ? $req : [];
+
+    if ($kind === 'closed') {
+        //  The OUTCOME decides which off-ramp, so a rejection and a withdrawal do
+        //  not collapse into one another. A workspace that removed the matching
+        //  off-ramp falls back to whichever closed stage it does configure.
+        $closed = recruitpipe_closed_stages((int) $pipe['id'], $req);
+        foreach ($closed as $s) if (strtoupper((string) ($s['closed_outcome'] ?? '')) === $to) return $s;
+        return $closed[0] ?? null;
+    }
+    foreach ($eff as $s) if ((string) ($s['kind'] ?? '') === $kind) return $s;
+    return null;                                              // this pipeline has no such stage
+}
+
+// ============================================================================
+//  GATE 1B — CONTROLLED RECONCILIATION OF LEGACY CANDIDATES
+//
+//  Existing candidates carry a legacy stage value and no pipeline position. They
+//  still classify correctly, through the one-way compatibility map, so nothing is
+//  broken while they wait. This is how they are moved onto the authority properly.
+//
+//  THE RULES, and they are not negotiable:
+//    · ONLY where the evidence is deterministic. A legacy value translates to a
+//      kind; if the candidate's pipeline has EXACTLY ONE stage of that kind, the
+//      target is certain. Two interview stages means "interview" names neither of
+//      them, and the candidate is surfaced for a person to decide instead.
+//    · NOTHING is guessed, trimmed, corrected or repaired. A malformed value
+//      translates to nothing and stays exactly as it is.
+//    · ADDITIVE. The legacy value is never cleared — it is the historical record
+//      of where this candidate stood before migration, and the only evidence a
+//      later reconciliation would have.
+//    · IDEMPOTENT. A candidate already on a pipeline stage is left alone, even
+//      when their legacy value disagrees: that disagreement is a G0-2 conflict for
+//      a person to resolve, not something to overwrite.
+//    · EXPLICIT. Nothing here runs because a page was opened. It is invoked
+//      deliberately, in bounded batches, and it reports what it did.
+// ============================================================================
+
+//  What WOULD happen to one candidate, and why. Never writes.
+//
+//  `action` is 'MIGRATE' (a certain target), 'SKIP' (already on the pipeline, or
+//  not in a process at all) or 'REVIEW' (a person must decide, and `reason` says
+//  what is undecidable).
+function rpipe_migration_plan($cand) {
+    $st = rpipe_recon_class($cand);
+    if (!$st) return null;
+    $out = ['candidate_id' => $st['candidate_id'], 'recon_class' => $st['recon_class'],
+            'action' => 'REVIEW', 'reason' => '', 'pipeline_id' => 0, 'stage_id' => 0,
+            'stage_name' => '', 'stage_key' => '', 'legacy_stage' => $st['legacy_stage']];
+
+    if ($st['source'] === 'PIPELINE') {
+        $out['action'] = 'SKIP';
+        $out['reason'] = $st['conflict']
+            ? 'already on a pipeline stage; the legacy value disagrees and that conflict is for a person (G0-2)'
+            : 'already on a pipeline stage — the authority already answers';
+        return $out;
+    }
+    if (!is_array($cand)) $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int) $st['candidate_id']]) ?: [];
+    //  D3 — a candidate in the company-wide pool is not in a recruitment process,
+    //  so there is no pipeline they belong in. Not a problem to be fixed.
+    if ((int) ($cand['requisition_id'] ?? 0) <= 0) {
+        $out['action'] = 'SKIP';
+        $out['reason'] = 'no recruitment process — a company-wide pool candidate stays in the pool (D3)';
+        return $out;
+    }
+    $kind = rpipe_legacy_kind($st['legacy_stage']);
+    if ($kind === '') {
+        $out['reason'] = $st['legacy_valid']
+            ? 'the legacy value translates to no stage kind'
+            : 'the legacy value is not a defined stage — preserved, unmapped, never guessed (G0-1)';
+        return $out;
+    }
+    [$pipe, , ] = recruitpipe_cand_state($cand);
+    if (!$pipe) {
+        $out['reason'] = 'no pipeline applies to this '
+                       . (function_exists('Tl') ? (string) Tl('requisition') : 'requisition');
+        return $out;
+    }
+    $req = ops_one("SELECT * FROM requisitions WHERE id=?", [(int) $cand['requisition_id']]) ?: [];
+
+    //  Candidates of the target kind. For a closure the OUTCOME narrows it to one,
+    //  which is what makes a rejection deterministic while an interview is not.
+    $cands = [];
+    if ($kind === 'closed') {
+        foreach (recruitpipe_closed_stages((int) $pipe['id'], $req) as $s)
+            if (strtoupper((string) ($s['closed_outcome'] ?? '')) === strtoupper($st['legacy_stage'])) $cands[] = $s;
+    } else {
+        foreach (recruitpipe_effective_stages((int) $pipe['id'], $req) as $s)
+            if ((string) ($s['kind'] ?? '') === $kind) $cands[] = $s;
+    }
+    if (count($cands) === 0) {
+        $out['reason'] = 'this pipeline configures no ' . $kind . ' stage for that outcome';
+        return $out;
+    }
+    if (count($cands) > 1) {
+        //  THE HONEST ANSWER. CORP18 has an L1 and an L2 interview, so a legacy
+        //  "INTERVIEW" names neither of them. Picking the first would invent a
+        //  position nobody recorded.
+        $out['reason'] = 'ambiguous — ' . count($cands) . ' ' . $kind . ' stages apply, so the legacy value names none of them';
+        return $out;
+    }
+    $out['action']      = 'MIGRATE';
+    $out['pipeline_id'] = (int) $pipe['id'];
+    $out['stage_id']    = (int) $cands[0]['id'];
+    $out['stage_name']  = (string) $cands[0]['name'];
+    $out['stage_key']   = (string) ($cands[0]['stage_key'] ?? '');
+    $out['reason']      = 'exactly one ' . $kind . ' stage applies, so the position is certain';
+    return $out;
+}
+
+//  Apply one plan. Returns true only when a row was actually moved.
+//  The legacy value is left untouched, and the move is written to the existing
+//  stage ledger as a MIGRATE so it can never be mistaken for a recruiter's action
+//  or counted as a stage duration.
+function rpipe_migration_apply(array $plan, $actor = 'migration') {
+    if (($plan['action'] ?? '') !== 'MIGRATE') return false;
+    $cid = (int) $plan['candidate_id'];
+    if ($cid <= 0 || (int) $plan['stage_id'] <= 0) return false;
+    try {
+        //  The WHERE clause is the idempotency guard: a candidate who has been given
+        //  a position since the plan was made is not moved by a stale plan.
+        $st = db()->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=?
+                             WHERE id=? AND COALESCE(pipeline_stage_id,0)=0");
+        $st->execute([(int) $plan['pipeline_id'], (int) $plan['stage_id'], $cid]);
+        if ($st->rowCount() < 1) return false;
+    } catch (Throwable $e) { return false; }
+    if (function_exists('rkpi_stage_log'))
+        try {
+            rkpi_stage_log($cid, (string) $plan['legacy_stage'], (string) $plan['stage_name'], [
+                //  The stable KEY, not the display name — renaming a stage must not
+                //  rewrite what a migration recorded.
+                'from_code' => (string) $plan['legacy_stage'], 'to_code' => (string) ($plan['stage_key'] ?? ''),
+                'track' => 'MIGRATION', 'kind' => 'MIGRATE', 'actor' => (string) $actor,
+                'remark' => 'Reconciled onto the configured pipeline: ' . (string) $plan['reason']]);
+        } catch (Throwable $e) { /* recording must not undo the reconciliation */ }
+    return true;
+}
+
+//  A bounded, resumable pass. $apply=false is a dry run and writes nothing.
+//
+//  Resumable by construction rather than by bookkeeping: every pass re-derives the
+//  plans from current data and only moves candidates who still have no position, so
+//  running it again continues where the last one stopped and running it twice over
+//  the same rows changes nothing the second time.
+function rpipe_reconcile_run($limit = 200, $apply = false, $actor = 'migration') {
+    recruitpipe_migrate();
+    $limit = max(1, (int) $limit);
+    $out = ['examined' => 0, 'migrated' => 0, 'skipped' => 0, 'review' => 0,
+            'applied' => (bool) $apply, 'plans' => [], 'more' => false];
+    try {
+        //  Only candidates who could possibly need it, so a workspace that has
+        //  finished migrating pays almost nothing to ask again.
+        $rows = ops_all("SELECT * FROM candidates WHERE COALESCE(pipeline_stage_id,0)=0
+                         ORDER BY id LIMIT " . ($limit + 1)) ?: [];
+    } catch (Throwable $e) { return $out; }
+    if (count($rows) > $limit) { $out['more'] = true; $rows = array_slice($rows, 0, $limit); }
+    foreach ($rows as $c) {
+        $plan = rpipe_migration_plan($c);
+        if (!$plan) continue;
+        $out['examined']++;
+        if ($plan['action'] === 'MIGRATE') {
+            if (!$apply) { $out['migrated']++; }
+            elseif (rpipe_migration_apply($plan, $actor)) { $out['migrated']++; }
+            else { $plan['action'] = 'REVIEW'; $plan['reason'] = 'the move could not be written'; $out['review']++; }
+        } elseif ($plan['action'] === 'SKIP') $out['skipped']++;
+        else $out['review']++;
+        $out['plans'][] = $plan;
+    }
+    return $out;
+}
+
 // The candidate-flow route: advance / back / jump within the pipeline.
 function ops_recruit_candidate_flow($route, $method) {
     ops_require(is_coordinator_level(), 'Only coordinators and admins can move a candidate.');
@@ -648,8 +1071,17 @@ function ops_recruit_candidate_flow($route, $method) {
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
     if ($method !== 'POST') { redirect('/candidate?id=' . $id); return true; }
 
-    if (in_array((string)$cand['stage'], recruitpipe_legacy_terminal(), true)) {
-        flash('This candidate is closed (' . (lk_options_or('candidate_stage', CAND_STAGES)[$cand['stage']] ?? $cand['stage']) . ') — reopen it from the stage control to continue the workflow.', 'warning');
+    //  GATE 1B — asked of the current state. A closed candidate is one whose
+    //  CONFIGURED STAGE KIND is closed, or — while they are still un-migrated —
+    //  one whose legacy value translates to a closed kind. Either way the question
+    //  goes through the classification, so this screen cannot disagree with the
+    //  fulfilment figures about whether somebody is still being recruited.
+    $flowSt = rpipe_current_state($cand);
+    if ($flowSt && $flowSt['class'] === 'LOST') {
+        $flowLbl = $flowSt['source'] === 'PIPELINE' && (string) $flowSt['closed_outcome'] !== ''
+            ? (string) (rpipe_closed_outcomes()[$flowSt['closed_outcome']] ?? $flowSt['stage_name'])
+            : (string) (lk_options_or('candidate_stage', CAND_STAGES)[$cand['stage']] ?? $cand['stage']);
+        flash('This candidate is closed (' . $flowLbl . ') — reopen it from the stage control to continue the workflow.', 'warning');
         redirect('/candidate?id=' . $id); return true;
     }
 
@@ -763,8 +1195,8 @@ function recruitpipe_screen_plan($cand) {
 
     //  What THIS candidate's current stage needs open. A closed candidate has no
     //  current stage, so nothing is forced and the screen opens as it always did.
-    $closed = function_exists('recruitpipe_legacy_terminal')
-        && in_array((string) ($cand['stage'] ?? ''), recruitpipe_legacy_terminal(), true);
+    $closed = function_exists('rpipe_current_state')
+        && ($s = rpipe_current_state($cand)) && $s['class'] === 'LOST';
     $cur = $closed ? null : ($eff[$idx] ?? null);
     if ($cur) {
         $plan['stage_name'] = (string) ($cur['name'] ?? '');
@@ -813,7 +1245,8 @@ function recruitpipe_candidate_panel($cand) {
     [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
     if (!$pipe || !$eff) return;
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
-    $closed = in_array((string)$cand['stage'], recruitpipe_legacy_terminal(), true);
+    $tabSt = rpipe_current_state($cand);
+    $closed = $tabSt && $tabSt['class'] === 'LOST';
     $can = function_exists('is_coordinator_level') && is_coordinator_level();
     $cur = $eff[$idx] ?? null;
     //  Visibility only — the workflow screen and the switch action each ask the
@@ -909,7 +1342,8 @@ function recruitpipe_stage_tab($cand) {
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     if (!$pipe || !$eff) { echo '<div class="panel"><p class="muted">No hiring workflow applies to this candidate yet. Once a ' . (function_exists('Tl') ? Tl('requisition') : 'requisition') . ' is linked, its workflow appears here.</p></div>'; return; }
     $can = function_exists('is_coordinator_level') && is_coordinator_level();
-    $closed = in_array((string)$cand['stage'], recruitpipe_legacy_terminal(), true);
+    $wfSt = rpipe_current_state($cand);
+    $closed = $wfSt && $wfSt['class'] === 'LOST';
     $kinds = defined('RPIPE_STAGE_KINDS') ? RPIPE_STAGE_KINDS : [];
     $cid = (int)$cand['id'];
     $pill = ['VERIFIED'=>'p-ok','REJECTED'=>'p-bad','EXPIRED'=>'p-bad','RESUBMIT'=>'p-warn','UNDER_REVIEW'=>'p-info','UPLOADED'=>'p-info','REQUESTED'=>'p-warn','REQUIRED'=>'p-mut'];

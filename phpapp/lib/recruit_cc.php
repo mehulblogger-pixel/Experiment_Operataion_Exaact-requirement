@@ -66,6 +66,39 @@ const RCC_DROP_REASONS = [
 const RCC_FUNNEL_ORDER = ['RECEIVED','SUBMITTED','SHORTLISTED','INTERVIEW','OFFERED','ACCEPTED'];
 const RCC_TERMINAL     = ['REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD'];
 
+//  GATE 1B — WHICH FUNNEL BUCKET A CONFIGURED STAGE KIND BELONGS TO.
+//
+//  The funnel keeps its six buckets; what changed is where a candidate's bucket
+//  comes from. A candidate on a configured pipeline is bucketed by their stage's
+//  KIND, because that is now their current state. A candidate who has never been
+//  moved on a pipeline is still bucketed by their legacy value, because for them
+//  that value IS the only record — and bucketing them that way keeps every
+//  existing figure on existing data identical.
+//
+//  KNOWN LIMITATION, deliberately not fixed here: the kind vocabulary has one
+//  'step' kind, so a pipeline candidate at CV Screening and one at HOD
+//  Shortlisting both bucket as RECEIVED. The funnel stays truthful — it is
+//  cumulative, so neither is credited with reaching a stage they have not — but
+//  it is coarser for migrated candidates than a per-stage funnel would be.
+//  Recorded as a deferred finding for the reporting gate; a per-pipeline-stage
+//  funnel is a screen redesign and is out of scope here.
+const RCC_KIND_BUCKET = [
+    'step'      => 'RECEIVED',
+    'gate'      => 'RECEIVED',
+    'interview' => 'INTERVIEW',
+    'offer'     => 'OFFERED',
+    'terminal'  => 'ACCEPTED',
+    'closed'    => 'REJECTED',   // lands in RCC_TERMINAL — reached CV-received only
+];
+
+//  The SQL expression giving a candidate's funnel bucket, from the authority.
+function rcc_bucket_expr($c = 'c') {
+    $q = fn($v) => "'" . str_replace("'", "''", (string) $v) . "'";
+    $k = '';
+    foreach (RCC_KIND_BUCKET as $kind => $bucket) $k .= " WHEN rs_k.kind = {$q($kind)} THEN {$q($bucket)}";
+    return "CASE WHEN rs_k.id IS NOT NULL THEN (CASE$k ELSE $c.stage END) ELSE $c.stage END";
+}
+
 // Active users for the Recruiter / Hiring-manager pickers (configurable = the
 // user register itself).
 function rcc_users() {
@@ -183,8 +216,13 @@ function rcc_data($f) {
     $d = ['f' => $f, 'stages' => $stages];
 
     // ---- Stage counts (current) ----
+    //  GATE 1B — grouped by the AUTHORITY, not by the legacy column. $CJ/$CE
+    //  classify, $CK gives the effective stage kind, $CB the funnel bucket.
+    $CJ = reqf_class_join('c'); $CE = reqf_class_expr('c'); $CK = reqf_kind_expr('c');
+    $CB = rcc_bucket_expr('c');
     $stageCount = [];
-    foreach ($rows("SELECT stage, COUNT(*) n FROM candidates c WHERE $cw GROUP BY stage", $ca) as $r) $stageCount[$r['stage']] = (int)$r['n'];
+    foreach ($rows("SELECT $CB bkt, COUNT(*) n FROM candidates c $CJ WHERE $cw GROUP BY bkt", $ca) as $r)
+        $stageCount[$r['bkt']] = ($stageCount[$r['bkt']] ?? 0) + (int)$r['n'];
     $sc = function ($k) use ($stageCount) { return (int)($stageCount[$k] ?? 0); };
     $total = array_sum($stageCount);
 
@@ -223,14 +261,11 @@ function rcc_data($f) {
     //  this milestone exists to remove.
     $m5live = defined('RASG_LIVE_REQ') ? RASG_LIVE_REQ : ['OPEN','PROPOSED','OFFERED','PARTIALLY_FILLED','HIRED'];
     $m5in   = "'" . implode("','", $m5live) . "'";
-    //  "Filled" is M3's definition, read from M3, not spelled out again here. It
-    //  happens to be the single stage ACCEPTED today, so this is not a change of
-    //  behaviour — it is a change of OWNERSHIP, so that the day the definition
-    //  moves, this screen moves with it instead of quietly disagreeing.
-    $ccFill = defined('REQF_FILLED_STAGES')
-        ? "'" . implode("','", array_map(fn($x) => str_replace("'", "''", (string) $x), REQF_FILLED_STAGES)) . "'"
-        : "'ACCEPTED'";
-    $reqRows = $rows("SELECT r.*, (SELECT COUNT(*) FROM candidates cc WHERE cc.requisition_id=r.id AND cc.stage IN ($ccFill)) filled
+    //  GATE 1B — "filled" is no longer a list of stage values this screen holds.
+    //  It is a CLASSIFICATION, asked of reqf_class_expr() like everywhere else, so
+    //  the Command Centre, the requisition, requirement health and the KPI engine
+    //  cannot give four different answers to one question.
+    $reqRows = $rows("SELECT r.*, (SELECT COUNT(*) FROM candidates cc" . reqf_class_join('cc') . " WHERE cc.requisition_id=r.id AND " . reqf_class_expr('cc') . "='FILLED') filled
                       FROM requisitions r WHERE $rw AND r.status IN ($m5in) ", $ra);
     //  PHASE 5 — THE DEMAND FIGURES ARE ASKED FOR, NOT WORKED OUT HERE.
     //
@@ -301,8 +336,8 @@ function rcc_data($f) {
     //  record was opened) to the day the joining was decided, in CALENDAR days.
     //  Measured through the canonical ageing helper so this screen, the analytics
     //  registry and the recruiter table cannot drift into three answers.
-    $hires = $rows("SELECT created_at, cv_received_date, decided_at FROM candidates c
-                    WHERE $cw AND stage IN ($ccFill) AND COALESCE(decided_at,'')<>'' AND COALESCE(created_at,'')<>''", $ca);
+    $hires = $rows("SELECT c.created_at, c.cv_received_date, c.decided_at FROM candidates c $CJ
+                    WHERE $cw AND $CE='FILLED' AND COALESCE(c.decided_at,'')<>'' AND COALESCE(c.created_at,'')<>''", $ca);
     $days = [];
     foreach ($hires as $h) {
         $from = trim((string)($h['cv_received_date'] ?? '')) ?: trim((string)($h['created_at'] ?? ''));
@@ -316,9 +351,9 @@ function rcc_data($f) {
     foreach ($rows("SELECT substr(COALESCE(NULLIF(cv_received_date,''),created_at),1,7) m, COUNT(*) n
                     FROM candidates c WHERE $cw AND COALESCE(NULLIF(cv_received_date,''),created_at)<>'' GROUP BY m ORDER BY m", $ca) as $r) $trend[$r['m']]['cv'] = (int)$r['n'];
     foreach ($rows("SELECT substr(COALESCE(NULLIF(decided_at,''),created_at),1,7) m, COUNT(*) n
-                    FROM candidates c WHERE $cw AND stage IN ('OFFERED','ACCEPTED') GROUP BY m ORDER BY m", $ca) as $r) $trend[$r['m']]['off'] = (int)$r['n'];
+                    FROM candidates c $CJ WHERE $cw AND $CK IN ('offer','terminal') GROUP BY m ORDER BY m", $ca) as $r) $trend[$r['m']]['off'] = (int)$r['n'];
     foreach ($rows("SELECT substr(COALESCE(NULLIF(decided_at,''),created_at),1,7) m, COUNT(*) n
-                    FROM candidates c WHERE $cw AND stage IN ($ccFill) GROUP BY m ORDER BY m", $ca) as $r) $trend[$r['m']]['join'] = (int)$r['n'];
+                    FROM candidates c $CJ WHERE $cw AND $CE='FILLED' GROUP BY m ORDER BY m", $ca) as $r) $trend[$r['m']]['join'] = (int)$r['n'];
     ksort($trend);
     $d['trend'] = array_slice(array_map(fn($k) => ['m' => $k, 'label' => rcc_month_label($k),
         'cv' => (int)($trend[$k]['cv'] ?? 0), 'off' => (int)($trend[$k]['off'] ?? 0), 'join' => (int)($trend[$k]['join'] ?? 0)], array_keys($trend)), -8);
@@ -326,7 +361,7 @@ function rcc_data($f) {
     // ---- Department load (candidates vs reached-offer) ----
     $dept = [];
     foreach ($rows("SELECT COALESCE(NULLIF(department,''),'—') d, COUNT(*) n FROM candidates c WHERE $cw GROUP BY d", $ca) as $r) $dept[$r['d']]['cand'] = (int)$r['n'];
-    foreach ($rows("SELECT COALESCE(NULLIF(department,''),'—') d, COUNT(*) n FROM candidates c WHERE $cw AND stage IN ('OFFERED','ACCEPTED') GROUP BY d", $ca) as $r) $dept[$r['d']]['off'] = (int)$r['n'];
+    foreach ($rows("SELECT COALESCE(NULLIF(c.department,''),'—') d, COUNT(*) n FROM candidates c $CJ WHERE $cw AND $CK IN ('offer','terminal') GROUP BY d", $ca) as $r) $dept[$r['d']]['off'] = (int)$r['n'];
     $deptOpt = rcc_departments();
     $d['dept'] = [];
     foreach ($dept as $k => $v) $d['dept'][] = ['label' => $deptOpt[$k] ?? $k, 'cand' => (int)($v['cand'] ?? 0), 'off' => (int)($v['off'] ?? 0)];
@@ -334,7 +369,11 @@ function rcc_data($f) {
 
     // ---- Drop / hold reasons ----
     $dropOpt = rcc_drop_reasons(); $drops = [];
-    foreach ($rows("SELECT COALESCE(NULLIF(drop_reason,''),'OTHER') dr, COUNT(*) n FROM candidates c WHERE $cw AND stage IN ('REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD') GROUP BY dr", $ca) as $r) $drops[] = ['label' => $dropOpt[$r['dr']] ?? $r['dr'], 'n' => (int)$r['n']];
+    //  Everybody whose process is closed, plus anybody parked with a recorded
+    //  drop/hold reason. Asked of the classification; the reason column itself is
+    //  what this card is actually about.
+    foreach ($rows("SELECT COALESCE(NULLIF(c.drop_reason,''),'OTHER') dr, COUNT(*) n FROM candidates c $CJ
+                    WHERE $cw AND ($CE='LOST' OR COALESCE(c.drop_reason,'')<>'') GROUP BY dr", $ca) as $r) $drops[] = ['label' => $dropOpt[$r['dr']] ?? $r['dr'], 'n' => (int)$r['n']];
     usort($drops, fn($a, $b) => $b['n'] <=> $a['n']); $d['drops'] = array_slice($drops, 0, 10);
 
     // ---- Where they drop off (drop point) — Initially / In between / Salary / Accepted-no-join ----
@@ -352,8 +391,8 @@ function rcc_data($f) {
 
     // ---- How long active (ageing buckets) ----
     $buckets = ['0–15 days' => 0, '16–30 days' => 0, '31–45 days' => 0, 'Over 45 days' => 0];
-    foreach ($rows("SELECT substr(COALESCE(NULLIF(cv_received_date,''),created_at),1,10) dt FROM candidates c
-                    WHERE $cw AND stage NOT IN ('ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED')", $ca) as $r) {
+    foreach ($rows("SELECT substr(COALESCE(NULLIF(c.cv_received_date,''),c.created_at),1,10) dt FROM candidates c $CJ
+                    WHERE $cw AND $CE NOT IN ('FILLED','LOST')", $ca) as $r) {
         $age = (strtotime(date('Y-m-d')) - strtotime($r['dt'] ?: date('Y-m-d'))) / 86400;
         if ($age <= 15) $buckets['0–15 days']++; elseif ($age <= 30) $buckets['16–30 days']++; elseif ($age <= 45) $buckets['31–45 days']++; else $buckets['Over 45 days']++;
     }
@@ -363,7 +402,7 @@ function rcc_data($f) {
     $d['waiting'] = [];
     foreach ($rows("SELECT c.id, (c.first_name||' '||c.last_name) nm, c.cand_code, c.department, c.recruiter_id,
                         substr(COALESCE(NULLIF(c.cv_received_date,''),c.created_at),1,10) dt
-                    FROM candidates c WHERE $cw AND c.stage NOT IN ('ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED')
+                    FROM candidates c $CJ WHERE $cw AND $CE NOT IN ('FILLED','LOST')
                     ORDER BY dt ASC LIMIT 8", $ca) as $r) {
         $age = (int)floor((strtotime(date('Y-m-d')) - strtotime($r['dt'] ?: date('Y-m-d'))) / 86400);
         $d['waiting'][] = ['id' => (int)$r['id'], 'nm' => trim($r['nm']) ?: $r['cand_code'], 'dept' => (function_exists('dept_row_label') ? (dept_row_label($r) ?: '—') : ($deptOpt[$r['department']] ?? $r['department'] ?: '—')),

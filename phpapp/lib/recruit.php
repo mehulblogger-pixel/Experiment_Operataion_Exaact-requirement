@@ -751,8 +751,22 @@ function recruit_req_health($req) {
     $id = (int)($req['id'] ?? 0);
     $qty = max(1, (int)($req['quantity'] ?? 1));
     $one = function ($sql, $a = []) { try { return (int)(ops_one($sql, $a)['n'] ?? 0); } catch (Throwable $e) { return 0; } };
-    $filled     = $one("SELECT COUNT(*) n FROM candidates WHERE requisition_id=? AND stage IN ('OFFERED','ACCEPTED')", [$id]);
-    $inPipe     = $one("SELECT COUNT(*) n FROM candidates WHERE requisition_id=? AND stage IN ('RECEIVED','SUBMITTED','SHORTLISTED','INTERVIEW','HOLD')", [$id]);
+    //  GATE 1B — G1A-2 CORRECTED.
+    //
+    //  These two counts used to be spelled out here as literal stage lists, and
+    //  the "filled" list wrongly included OFFERED. Because vacancies is
+    //  quantity - filled, a requirement for five people with five offers issued
+    //  and NOBODY accepted reported "All positions filled" a few lines below,
+    //  while the fulfilment engine correctly reported five still to hire. If one
+    //  of those five then declined, this panel had already told the manager the
+    //  job was done.
+    //
+    //  Both now go through the one classification choke point, so an issued offer
+    //  counts as ACTIVE — the seat is still open — and this panel can no longer
+    //  disagree with the requisition, the Command Centre or the KPI engine.
+    $J = reqf_class_join('c'); $E = reqf_class_expr('c');
+    $filled     = $one("SELECT COUNT(*) n FROM candidates c $J WHERE c.requisition_id=? AND $E='FILLED'", [$id]);
+    $inPipe     = $one("SELECT COUNT(*) n FROM candidates c $J WHERE c.requisition_id=? AND $E='ACTIVE'", [$id]);
     $vacancies  = max(0, $qty - $filled);
     $start = substr((string)($req['start_date'] ?? ''), 0, 10);
     $days  = $start !== '' && function_exists('days_between') ? days_between(date('Y-m-d'), $start) : null;
@@ -940,11 +954,11 @@ function recruit_overdue_interviews($limit = 50) {
         return ops_all(
             "SELECT c.id, c.cand_code, (c.first_name||' '||c.last_name) nm, c.designation, c.stage,
                     c.interview_date, r.req_code
-             FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id
+             FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id" . reqf_class_join('c') . "
              WHERE COALESCE(c.interview_required,0)=1
                AND COALESCE(c.interview_date,'')<>'' AND c.interview_date < ?
                AND COALESCE(c.interview_done_date,'')='' AND COALESCE(c.interview_outcome,'')=''
-               AND c.stage IN ('RECEIVED','SUBMITTED','SHORTLISTED','INTERVIEW','OFFERED','HOLD')
+               AND " . reqf_class_expr('c') . "='ACTIVE'
                AND $cw
              ORDER BY c.interview_date LIMIT $lim", array_merge([$today], $ca)) ?: [];
     } catch (Throwable $e) { return []; }
@@ -955,11 +969,11 @@ function recruit_overdue_interviews_count() {
     [$cw, $ca] = recruit_sbu_clause('c.sbu');
     try {
         return (int)(ops_one(
-            "SELECT COUNT(*) n FROM candidates c
+            "SELECT COUNT(*) n FROM candidates c" . reqf_class_join('c') . "
              WHERE COALESCE(c.interview_required,0)=1
                AND COALESCE(c.interview_date,'')<>'' AND c.interview_date < ?
                AND COALESCE(c.interview_done_date,'')='' AND COALESCE(c.interview_outcome,'')=''
-               AND c.stage IN ('RECEIVED','SUBMITTED','SHORTLISTED','INTERVIEW','OFFERED','HOLD')
+               AND " . reqf_class_expr('c') . "='ACTIVE'
                AND $cw", array_merge([$today], $ca))['n'] ?? 0);
     } catch (Throwable $e) { return 0; }
 }
@@ -980,17 +994,21 @@ function recruit_data() {
     [$rw, $ra]   = function_exists('scope_clause') ? scope_clause('r.office_id', 'r.sbu') : ['1=1', []];
     [$jw, $ja]   = function_exists('scope_clause') ? scope_clause('j.executing_office_id', "''") : ['1=1', []];
     [$cw, $ca]   = recruit_sbu_clause('c.sbu');
-    $activeStages = "('RECEIVED','SUBMITTED','SHORTLISTED','INTERVIEW','OFFERED','HOLD')";
+    //  GATE 1B — the dashboard asks the classification choke point, not a list of
+    //  literal stage values. $KJ/$KE classify; $KK answers stage-specific
+    //  questions by KIND ("how many offers are out"), so a workspace that renames
+    //  or reorders its stages does not silently empty a dashboard card.
+    $KJ = reqf_class_join('c'); $KE = reqf_class_expr('c'); $KK = reqf_kind_expr('c');
 
     $d = [];
 
     // ---------- Headline counts (KPI row) ----------
     $d['open_reqs']   = $one("SELECT COUNT(*) n FROM requisitions r WHERE r.status='OPEN' AND $rw", $ra);
-    $d['pipeline']    = $one("SELECT COUNT(*) n FROM candidates c WHERE c.stage IN $activeStages AND $cw", $ca);
+    $d['pipeline']    = $one("SELECT COUNT(*) n FROM candidates c $KJ WHERE $KE='ACTIVE' AND $cw", $ca);
     $d['interviews']  = $one("SELECT COUNT(*) n FROM candidates c WHERE COALESCE(c.interview_required,0)=1
                               AND COALESCE(c.interview_date,'')<>'' AND COALESCE(c.interview_done_date,'')=''
                               AND c.interview_date>=? AND c.interview_date<=? AND $cw", array_merge([$today,$in7], $ca));
-    $d['offers']      = $one("SELECT COUNT(*) n FROM candidates c WHERE c.stage='OFFERED' AND $cw", $ca);
+    $d['offers']      = $one("SELECT COUNT(*) n FROM candidates c $KJ WHERE $KK='offer' AND $cw", $ca);
     $d['expiring']    = $one("SELECT COUNT(*) n FROM jobs j WHERE COALESCE(j.closed_flag,0)=0 AND j.inspector_id IS NOT NULL
                               AND COALESCE(NULLIF(j.schedule_end_date,''),j.inspection_end_date,j.scheduled_date) BETWEEN ? AND ? AND $jw", array_merge([$today,$in30], $ja));
     $d['available']   = $one("SELECT COUNT(*) n FROM inspector_day_status s WHERE s.day=? AND s.status='AVAILABLE'", [$today]);
@@ -1000,12 +1018,12 @@ function recruit_data() {
     //  the APPROVED number rather than the original ask.
     $d['t_reqs'] = $rows("SELECT r.id, r.req_code, r.designation, r.project_site, o.name office, r.status, COALESCE(r.quantity,1) quantity,
                                  COALESCE(r.cancelled_qty,0) cancelled_qty,
-                                 (SELECT COUNT(*) FROM candidates c WHERE c.requisition_id=r.id AND c.stage IN ('OFFERED','ACCEPTED')) filled
+                                 (SELECT COUNT(*) FROM candidates c" . reqf_class_join('c') . " WHERE c.requisition_id=r.id AND " . reqf_class_expr('c') . "='FILLED') filled
                           FROM requisitions r LEFT JOIN offices o ON o.id=r.office_id
                           WHERE r.status IN ('OPEN','PROPOSED') AND $rw ORDER BY r.id DESC LIMIT 6", $ra);
     $d['t_followups'] = $rows("SELECT c.id, c.cand_code, (c.first_name||' '||c.last_name) nm, c.designation, c.stage,
                                       COALESCE(NULLIF(c.decided_at,''),c.cv_received_date) since
-                               FROM candidates c WHERE c.stage IN $activeStages
+                               FROM candidates c $KJ WHERE $KE='ACTIVE'
                                  AND COALESCE(NULLIF(c.decided_at,''),c.cv_received_date,'') <> ''
                                  AND COALESCE(NULLIF(c.decided_at,''),c.cv_received_date) < ? AND $cw
                                ORDER BY since LIMIT 6", array_merge([$ago7], $ca));
@@ -1014,9 +1032,9 @@ function recruit_data() {
                                   AND COALESCE(c.interview_date,'')<>'' AND COALESCE(c.interview_done_date,'')=''
                                   AND c.interview_date>=? AND $cw ORDER BY c.interview_date LIMIT 6", array_merge([$today], $ca));
     $d['t_offers'] = $rows("SELECT c.id, c.cand_code, (c.first_name||' '||c.last_name) nm, c.designation, c.expected_rate, c.rate_type
-                            FROM candidates c WHERE c.stage='OFFERED' AND $cw ORDER BY c.decided_at DESC LIMIT 6", $ca);
+                            FROM candidates c $KJ WHERE $KK='offer' AND $cw ORDER BY c.decided_at DESC LIMIT 6", $ca);
     $d['t_joinings'] = $rows("SELECT c.id, c.cand_code, (c.first_name||' '||c.last_name) nm, c.designation, c.proposed_site
-                              FROM candidates c WHERE c.stage='ACCEPTED' AND c.inspector_id IS NULL AND $cw
+                              FROM candidates c $KJ WHERE $KE='FILLED' AND c.inspector_id IS NULL AND $cw
                               ORDER BY c.decided_at DESC LIMIT 6", $ca);
     $d['t_expiring'] = $rows("SELECT j.id, j.job_code, i.name inspector, bp.display_name client,
                                      COALESCE(NULLIF(j.schedule_end_date,''),j.inspection_end_date,j.scheduled_date) endd
@@ -1033,11 +1051,11 @@ function recruit_data() {
                                  (SELECT COUNT(*) FROM candidates c WHERE c.requisition_id=r.id) cands
                           FROM requisitions r LEFT JOIN offices o ON o.id=r.office_id
                           WHERE r.status='OPEN' AND COALESCE(r.created_at,'') < ? AND $rw
-                            AND NOT EXISTS (SELECT 1 FROM candidates c WHERE c.requisition_id=r.id AND c.stage IN ('OFFERED','ACCEPTED'))
+                            AND NOT EXISTS (SELECT 1 FROM candidates c $KJ WHERE c.requisition_id=r.id AND $KK IN ('offer','terminal'))
                           ORDER BY r.created_at LIMIT 6", array_merge([$ago14], $ra));
     $d['r_dormant'] = $rows("SELECT c.id, c.cand_code, (c.first_name||' '||c.last_name) nm, c.stage,
                                     COALESCE(NULLIF(c.decided_at,''),c.cv_received_date) since
-                             FROM candidates c WHERE c.stage IN $activeStages
+                             FROM candidates c $KJ WHERE $KE='ACTIVE'
                                AND COALESCE(NULLIF(c.decided_at,''),c.cv_received_date,'')<>''
                                AND COALESCE(NULLIF(c.decided_at,''),c.cv_received_date) < ? AND $cw
                              ORDER BY since LIMIT 6", array_merge([$ago14], $ca));
@@ -1062,10 +1080,18 @@ function recruit_data() {
                              WHERE COALESCE(j.closed_flag,0)=0
                                AND COALESCE(NULLIF(j.schedule_end_date,''),j.inspection_end_date,j.scheduled_date) BETWEEN ? AND ? AND $jw
                              ORDER BY endd LIMIT 6", array_merge([$today,$in14], $ja));
-    // Dormant candidates whose designation matches a live open requirement.
+    //  Candidates we did NOT proceed with, whose designation matches a live open
+    //  requirement — a genuine re-approach opportunity.
+    //
+    //  GATE 1B changed this set, deliberately. It used to read
+    //  IN ('HOLD','REJECTED','WITHDRAWN'), which was inconsistent twice over: it
+    //  omitted OFFER_DECLINED, who are just as re-approachable, and it included
+    //  HOLD, who have not been closed at all — a candidate on hold is still in
+    //  play and belongs in the pipeline card, not in a re-approach list. Now it
+    //  asks the classification: everybody whose process is closed.
     $d['o_match'] = $rows("SELECT c.id, c.cand_code, (c.first_name||' '||c.last_name) nm, c.designation
-                           FROM candidates c
-                           WHERE c.stage IN ('HOLD','REJECTED','WITHDRAWN') AND COALESCE(c.designation,'')<>''
+                           FROM candidates c $KJ
+                           WHERE $KE='LOST' AND COALESCE(c.designation,'')<>''
                              AND EXISTS (SELECT 1 FROM requisitions r WHERE r.status='OPEN' AND r.designation=c.designation)
                              AND $cw ORDER BY c.id DESC LIMIT 6", $ca);
     $d['o_extensions'] = $d['t_expiring'];   // same set, framed as an extension opportunity
@@ -1261,7 +1287,10 @@ function recruit_req_commercial_rollup($req) {
     asg_migrate();
     $rows = [];
     try {
-        $rows = ops_all("SELECT * FROM candidates WHERE requisition_id=? AND (stage='ACCEPTED' OR inspector_id IS NOT NULL)", [(int)($req['id'] ?? 0)]);
+        //  Somebody who FILLED a seat, or who already has a workforce record.
+        $rows = ops_all("SELECT c.* FROM candidates c" . reqf_class_join('c')
+            . " WHERE c.requisition_id=? AND (" . reqf_class_expr('c') . "='FILLED' OR c.inspector_id IS NOT NULL)",
+            [(int)($req['id'] ?? 0)]);
     } catch (Throwable $e) { $rows = []; }
     $s = ['n' => 0, 'approved' => 0, 'n_act' => 0,
           'plan_rev' => (float)($req['expected_revenue'] ?? 0), 'plan_profit' => (float)($req['expected_profit'] ?? 0),

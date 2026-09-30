@@ -96,8 +96,12 @@ function rkpi_stage_log($candidateId, $fromLabel, $toLabel, array $o = []) {
                        rkpi_now(),
                        substr((string) ($o['from_code'] ?? ''), 0, 60),
                        substr((string) ($o['to_code'] ?? ''), 0, 60),
-                       in_array(($o['track'] ?? ''), ['LEGACY', 'PIPELINE'], true) ? $o['track'] : '',
-                       in_array(($o['kind'] ?? 'MOVE'), ['MOVE', 'REVERT', 'SWITCH'], true) ? ($o['kind'] ?? 'MOVE') : 'MOVE']);
+                       //  GATE 1B adds the MIGRATION track and the MIGRATE kind, so a
+                       //  candidate being reconciled onto the configured pipeline is
+                       //  distinguishable from a recruiter moving them. The whitelists
+                       //  stay whitelists: an unrecognised value is still discarded.
+                       in_array(($o['track'] ?? ''), ['LEGACY', 'PIPELINE', 'MIGRATION'], true) ? $o['track'] : '',
+                       in_array(($o['kind'] ?? 'MOVE'), ['MOVE', 'REVERT', 'SWITCH', 'MIGRATE'], true) ? ($o['kind'] ?? 'MOVE') : 'MOVE']);
         return true;
     } catch (Throwable $e) {
         //  A ledger write must never lose a business action that already
@@ -336,13 +340,14 @@ function rkpi_demand(array $opt = []) {
                   CASE WHEN COALESCE(r.cancelled_qty,0) > (CASE WHEN COALESCE(r.quantity,0) > 0 THEN r.quantity ELSE 1 END)
                        THEN (CASE WHEN COALESCE(r.quantity,0) > 0 THEN r.quantity ELSE 1 END)
                        WHEN COALESCE(r.cancelled_qty,0) > 0 THEN r.cancelled_qty ELSE 0 END canc,
-                  (SELECT COUNT(*) FROM candidates c1 WHERE c1.requisition_id=r.id AND c1.stage IN ($fill)) fl,
-                  (SELECT COUNT(*) FROM candidates c2 WHERE c2.requisition_id=r.id AND c2.stage IN ($act))  inprog,
-                  (SELECT COUNT(*) FROM candidates c3 WHERE c3.requisition_id=r.id AND c3.stage IN ($lost)) lostn,
+                  (SELECT COUNT(*) FROM candidates c1 " . reqf_class_join('c1') . " WHERE c1.requisition_id=r.id AND " . reqf_class_expr('c1') . "='FILLED') fl,
+                  (SELECT COUNT(*) FROM candidates c2 " . reqf_class_join('c2') . " WHERE c2.requisition_id=r.id AND " . reqf_class_expr('c2') . "='ACTIVE')  inprog,
+                  (SELECT COUNT(*) FROM candidates c3 " . reqf_class_join('c3') . " WHERE c3.requisition_id=r.id AND " . reqf_class_expr('c3') . "='LOST') lostn,
                   COALESCE((SELECT SUM(CASE WHEN a.allocated_qty > 0 THEN a.allocated_qty ELSE 0 END)
                             FROM requisition_allocations a
                             WHERE a.requisition_id=r.id),0) alloc,
-                  (SELECT COUNT(*) FROM candidates c4 WHERE c4.requisition_id=r.id AND c4.stage IN ($fill)
+                  (SELECT COUNT(*) FROM candidates c4" . reqf_class_join('c4') . " WHERE c4.requisition_id=r.id
+                                                        AND " . reqf_class_expr('c4') . "='FILLED'
                                                         AND COALESCE(c4.allocation_id,0)=0) dir
                 FROM requisitions r WHERE $where
               ) row1
@@ -539,7 +544,8 @@ function rkpi_settled_rows(array $opt = []) {
     try {
         $rows = ops_all("SELECT c.id, c.stage, c.created_at, c.decided_at, c.cv_received_date
                          FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id
-                         WHERE $where AND (c.stage IN ($fill) OR c.stage IN ($lost))", $args) ?: [];
+                         " . reqf_class_join('c') . "
+                         WHERE $where AND " . reqf_class_expr('c') . " IN ('FILLED','LOST')", $args) ?: [];
     } catch (Throwable $e) { $rows = []; }
     return $rows;
 }
@@ -587,6 +593,10 @@ function rkpi_stage_durations($candidateId, $track = 'PIPELINE', $basis = 'calen
         $kind = strtoupper((string) ($h['event_kind'] ?? ''));
         if ($kind === 'REVERT') { $out['reverted']++; $prev = null; continue; }
         if ($kind === 'SWITCH') { $prev = null; continue; }
+        //  GATE 1B — a reconciliation is not a step anybody took, so no duration is
+        //  ever measured across one. The track filter below would already skip it;
+        //  this makes the intent explicit and survives the track being renamed.
+        if ($kind === 'MIGRATE') { $prev = null; continue; }
         if (strtoupper((string) ($h['track'] ?? '')) !== strtoupper((string) $track)) {
             if ((string) ($h['to_code'] ?? '') === '') $out['uncoded']++;
             continue;
@@ -686,7 +696,8 @@ function rkpi_metrics() {
                 try {
                     return (int) ops_val("SELECT COUNT(*) FROM candidates c
                                           LEFT JOIN requisitions r ON r.id=c.requisition_id
-                                          WHERE c.stage IN ($fill) AND $sw AND $pw", array_merge($sa, $pa));
+                                          " . reqf_class_join('c') . "
+                                          WHERE " . reqf_class_expr('c') . "='FILLED' AND $sw AND $pw", array_merge($sa, $pa));
                 } catch (Throwable $e) { return null; }
             }],
         'hiring.tth_avg_days' => ['label'=>'Average time to hire','unit'=>'days','agg'=>'avg','source'=>'recruit/candidates',
@@ -698,7 +709,8 @@ function rkpi_metrics() {
                 try {
                     $rows = ops_all("SELECT c.cv_received_date, c.created_at, c.decided_at FROM candidates c
                                      LEFT JOIN requisitions r ON r.id=c.requisition_id
-                                     WHERE c.stage IN ($fill) AND COALESCE(c.decided_at,'')<>'' AND $sw AND $pw",
+                                     " . reqf_class_join('c') . "
+                                     WHERE " . reqf_class_expr('c') . "='FILLED' AND COALESCE(c.decided_at,'')<>'' AND $sw AND $pw",
                                      array_merge($sa, $pa));
                 } catch (Throwable $e) { return null; }
                 if (!$rows) return null;                      // NO DATA — not zero

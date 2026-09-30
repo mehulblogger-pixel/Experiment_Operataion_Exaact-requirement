@@ -187,12 +187,20 @@ t_ok($offId > 0, 'E0 · an offer is created through the production path');
 offer_submit($offId); offer_approve($offId);
 [$okE, $msgE] = offer_issue($offId);
 t_ok($okE, 'E1 · the offer is issued — ' . (string) $msgE);
-t_eq((string) ops_one("SELECT stage FROM candidates WHERE id=?", [$cE])['stage'], 'OFFERED', 'E2 · the candidate moved to OFFERED');
+//  GATE 1B — issuing an offer moves the candidate to the OFFER STAGE of their
+//  pipeline. It used to stamp candidates.stage='OFFERED', a current-state write to
+//  a column that is no longer the authority. What E1–E5 actually guard is that the
+//  move is RECORDED — which was the Phase 5 defect — and that still holds, now on
+//  the pipeline track.
+t_eq(rpipe_current_state($cE)['kind'], 'offer', 'E2 · the candidate moved to the offer stage');
+t_eq(reqf_classify(ops_one("SELECT * FROM candidates WHERE id=?", [$cE])), 'ACTIVE',
+     'E2b · …and an issued offer is ACTIVE work, not a filled seat (G1A-2)');
 $afterE = $evs($cE);
 t_ok(count($afterE) > $before, 'E3 · …and the ledger RECORDED it (it used to record nothing)');
 $lastE = end($afterE);
-t_eq((string) $lastE['to_code'], 'OFFERED', 'E4 · with the stage code, not just a display name');
-t_eq('LEGACY',  (string) $lastE['track'],   'E5 · and the ladder it belongs to');
+t_eq((string) $lastE['to_code'], (string) rpipe_current_state($cE)['stage_key'],
+     'E4 · with the stage KEY, not just a display name');
+t_eq('PIPELINE', (string) $lastE['track'], 'E5 · and the ladder it belongs to — the configured pipeline');
 t_eq(   (string) $lastE['event_kind'], 'MOVE', 'E6 · recorded as a move');
 
 //  E7–E11 · a reverted joining used to leave the ledger claiming a hire.
@@ -321,7 +329,7 @@ $evJ0 = (int) ops_val("SELECT COUNT(*) FROM candidate_events WHERE candidate_id=
 
 $p5drive('route_cand_stage', $cJ, 'ACCEPTED', ['team_role' => 'FIELD']);
 
-t_eq((string) ops_val("SELECT stage FROM candidates WHERE id=?", [$cJ]), 'ACCEPTED', 'J1 · the route really moved the candidate');
+t_eq(t_class($cJ), 'FILLED', 'J1 · the route really moved the candidate');
 //  The claim the M3 probe stands for: the standing was recomputed, not left.
 t_eq('PARTIALLY_FILLED', (string) ops_val("SELECT status FROM requisitions WHERE id=?", [$rqJ]),
      'J2 · one of two seats filled — the requirement is recomputed to PARTIALLY_FILLED, not left OPEN and not forced to HIRED');

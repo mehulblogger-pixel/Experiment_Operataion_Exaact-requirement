@@ -60,11 +60,16 @@ t_eq($offN($c1), 1, 'L1.9 · an offer was drafted');
 offer_submit($o1); offer_approve($o1);
 [$iOk, $iMsg] = offer_issue($o1);
 t_ok($iOk, 'L1.10 · the offer was issued: ' . $iMsg);
-t_eq($stage($c1), 'OFFERED', 'L1.11 · the candidate is OFFERED');
+//  GATE 1B — the offer moved the candidate to the OFFER STAGE of their pipeline,
+//  which is where a consumer now reads their position from. The legacy column is
+//  no longer written, so the question has to be asked of the authority.
+t_eq(rpipe_current_state($c1)['kind'], 'offer', 'L1.11 · the candidate is at the offer stage');
+t_eq(t_class($c1), 'ACTIVE', 'L1.11b · …and an issued offer is ACTIVE, not a filled seat (G1A-2)');
 [$aOk, $aMsg] = offer_accept($o1);
 t_ok($aOk, 'L1.12 · the offer was accepted: ' . $aMsg);
 //  the joining itself goes through the stage write the route performs
-$pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $c1]);
+t_move_stage($c1, 'ACCEPTED');
+t_eq(t_class($c1), 'FILLED', 'L1.12b · the joining put them on a terminal stage, so the seat is taken');
 reqf_sync($rq);
 t_eq(rexec_seats($rq)['remaining'], 1, 'L1.13 · one of the two seats is now taken');
 t_eq(strtoupper((string) ops_val("SELECT status FROM requisitions WHERE id=?", [$rq])), 'PARTIALLY_FILLED',
@@ -74,7 +79,7 @@ t_eq(strtoupper((string) ops_val("SELECT status FROM requisitions WHERE id=?", [
 t_section('L2 · the last seat, and the one after it');
 $c2 = $mkCand($rq);
 t_eq(rexec_block_reason($rq, 'JOIN', $c2), '', 'L2.1 · the second joining is permitted');
-$pdo->prepare("UPDATE candidates SET stage='ACCEPTED', decided_at=? WHERE id=?")->execute([date('c'), $c2]);
+t_move_stage($c2, 'ACCEPTED');
 reqf_sync($rq);
 t_eq(rexec_seats($rq)['remaining'], 0, 'L2.2 · both seats are now taken');
 $c3 = $mkCand($rq);
@@ -83,14 +88,24 @@ t_ok($why3 !== '', 'L2.3 · *** a third joining on a two-seat requirement is ref
 t_eq(rexec_block_reason($rq, 'ADVANCE', $c3), '', 'L2.4 · …but the third candidate may still be worked — only the seat is gone');
 t_eq(rexec_block_reason($rq, 'OFFER', $c3), '',
      'L2.5 · …and may still be offered, because offers are declined and the business runs more than it has seats');
-//  the compensating revert: the write happens anyway, and is put back
-$pdo->prepare("UPDATE candidates SET stage='ACCEPTED' WHERE id=?")->execute([$c3]);
-$rev = rexec_join_enforce_after_write($c3, 'OFFERED');
+//  the compensating revert: the write happens anyway, and is put back.
+//  GATE 1B — what goes back is the PIPELINE POSITION, so the caller hands over
+//  where they stood. Restoring only the legacy value would have left this person on
+//  the terminal stage, still counted as filling a seat they were just refused.
+$c3row  = ops_one("SELECT * FROM candidates WHERE id=?", [$c3]);
+$c3prior = (int) ($c3row['pipeline_stage_id'] ?? 0);
+$c3priorKind = (string) rpipe_current_state($c3row)['kind'];
+t_move_stage($c3, 'ACCEPTED');
+t_eq(t_class($c3), 'FILLED', 'L2.5b · the joining really was written past the gate');
+$rev = rexec_join_enforce_after_write($c3, 'OFFERED', '', $c3prior);
 t_ok($rev !== '', 'L2.6 · *** a joining written past the gate is reverted: ' . $rev . ' ***');
-t_eq($stage($c3), 'OFFERED', 'L2.7 · …and the candidate is back where they were');
+t_ok(t_class($c3) !== 'FILLED', 'L2.7 · …and the candidate no longer holds a seat');
+t_eq((int) ops_val("SELECT COALESCE(pipeline_stage_id,0) FROM candidates WHERE id=?", [$c3]), $c3prior,
+     'L2.7b · put back on the exact pipeline position they were on — 0 meaning none at all');
 t_ok((int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='CANDIDATE' AND entity_id=? AND subject LIKE 'Joining reverted%'", [$c3]) >= 1,
      'L2.8 · the reverted joining is on the audit spine');
-t_eq((int) ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND stage='ACCEPTED'", [$rq]), 2,
+t_eq((int) ops_val("SELECT COUNT(*) FROM candidates c" . reqf_class_join('c')
+     . " WHERE c.requisition_id=? AND " . reqf_class_expr('c') . "='FILLED'", [$rq]), 2,
      'L2.9 · *** never more joined than approved ***');
 //  a candidate already holding a seat is not refused their own seat
 t_eq(rexec_block_reason($rq, 'JOIN', $c1), '', 'L2.10 · somebody already in a seat does not compete with themselves');

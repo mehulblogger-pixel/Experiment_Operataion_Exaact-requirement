@@ -143,3 +143,39 @@ function t_query_uses_index($sql, $prefix) {
     }
     return false;
 }
+
+//  GATE 1B — PERFORM A STAGE MOVE THE WAY THE ROUTE NOW DOES.
+//
+//  Many tests simulate "the candidate was accepted" with a direct
+//  UPDATE candidates SET stage='ACCEPTED'. That worked while the legacy column WAS
+//  the current state. It is not any more: the configurable pipeline is, so a raw
+//  poke at the legacy column no longer moves the candidate anywhere a consumer
+//  reads — which is exactly the property Gate 1B exists to establish.
+//
+//  This helper mirrors lib/ops.php's stage route: it translates the requested
+//  legacy target into the candidate's own pipeline stage and writes the pipeline
+//  position, falling back to the legacy column only for a candidate who has no
+//  pipeline — the same rule, in one place, so the simulation cannot drift from the
+//  thing it simulates.
+function t_move_stage($candId, $to, $decidedAt = null) {
+    $candId = (int) $candId;
+    $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$candId]);
+    if (!$cand) return false;
+    $decided = $decidedAt !== null ? $decidedAt
+        : (in_array($to, ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true)
+            ? date('c') : (string) ($cand['decided_at'] ?? ''));
+    $target = function_exists('rpipe_stage_for_legacy_target')
+        ? rpipe_stage_for_legacy_target($cand, $to) : null;
+    if ($target)
+        db()->prepare("UPDATE candidates SET pipeline_id=?, pipeline_stage_id=?, decided_at=? WHERE id=?")
+            ->execute([(int) $target['pipeline_id'], (int) $target['id'], $decided, $candId]);
+    else
+        db()->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")
+            ->execute([(string) $to, $decided, $candId]);
+    return true;
+}
+
+// What a candidate's CURRENT STATE classifies as: 'FILLED' | 'ACTIVE' | 'LOST' | ''.
+function t_class($candId) {
+    return (string) reqf_classify(ops_one("SELECT * FROM candidates WHERE id=?", [(int) $candId]));
+}

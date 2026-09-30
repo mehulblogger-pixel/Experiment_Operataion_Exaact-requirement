@@ -253,17 +253,17 @@ function rful_list($requisitionId, $includeClosed = true) {
     catch (Throwable $e) { return []; }
 }
 
-//  FULFILLED, counted through M3's own definition of "filled" — candidates in
-//  REQF_FILLED_STAGES. There is no second counter and no stored total to drift.
-function rful_filled_stages() {
-    return defined('REQF_FILLED_STAGES') ? REQF_FILLED_STAGES : ['ACCEPTED'];
-}
+//  FULFILLED, counted through the ONE classification choke point — a candidate
+//  whose current state classifies as FILLED. GATE 1B moved this from a list of
+//  legacy stage values to the classification, so a seat is counted as taken when
+//  the configured pipeline says the process completed successfully, not when a
+//  particular string happens to sit in a column. There is no second counter and
+//  no stored total to drift.
 function rful_fulfilled($allocationId) {
     $a = rful_id($allocationId, $ok); if (!$ok || $a === null) return 0;
-    $ph = implode(',', array_fill(0, count(rful_filled_stages()), '?'));
     try {
-        return (int) ops_val("SELECT COUNT(*) FROM candidates WHERE allocation_id=? AND stage IN ($ph)",
-                             array_merge([$a], rful_filled_stages()));
+        return (int) ops_val("SELECT COUNT(*) FROM candidates c" . reqf_class_join('c')
+            . " WHERE c.allocation_id=? AND " . reqf_class_expr('c') . "='FILLED'", [$a]);
     } catch (Throwable $e) { return 0; }
 }
 
@@ -314,11 +314,11 @@ function rful_summary($requisitionId) {
     }
     //  People who arrived without an allocation — the direct path, which stays
     //  legitimate (ADR-001 and the pre-Phase-4 world both produce them).
-    $ph = implode(',', array_fill(0, count(rful_filled_stages()), '?'));
     try {
         $out['direct_fulfilled'] = (int) ops_val(
-            "SELECT COUNT(*) FROM candidates WHERE requisition_id=? AND COALESCE(allocation_id,0)=0 AND stage IN ($ph)",
-            array_merge([$rq], rful_filled_stages()));
+            "SELECT COUNT(*) FROM candidates c" . reqf_class_join('c')
+            . " WHERE c.requisition_id=? AND COALESCE(c.allocation_id,0)=0 AND " . reqf_class_expr('c') . "='FILLED'",
+            [$rq]);
     } catch (Throwable $e) {}
     //  COMMITTED is what the requirement has already spent: every seat promised to
     //  a source, PLUS everybody who arrived without one. A person found directly
@@ -636,10 +636,10 @@ function rful_seat_block($allocationId, $exceptCandidateId = 0) {
     if ($sOk && $self !== null) {
         //  Somebody already counted against this allocation does not consume a
         //  second seat by being saved again.
-        $ph = implode(',', array_fill(0, count(rful_filled_stages()), '?'));
         try {
-            $mine = (int) ops_val("SELECT COUNT(*) FROM candidates WHERE id=? AND allocation_id=? AND stage IN ($ph)",
-                                  array_merge([$self, (int) $a['id']], rful_filled_stages()));
+            $mine = (int) ops_val("SELECT COUNT(*) FROM candidates c" . reqf_class_join('c')
+                . " WHERE c.id=? AND c.allocation_id=? AND " . reqf_class_expr('c') . "='FILLED'",
+                [$self, (int) $a['id']]);
         } catch (Throwable $e) { $mine = 0; }
         $done = max(0, $done - $mine);
     }
@@ -784,10 +784,9 @@ function rful_enforce_candidate($candidateId, $priorAllocationId = 0) {
     //  Over-allocated: the ESTABLISHED credits stay, the arriving one goes. Never
     //  displace somebody already counted — the ratified Phase 3 capacity rule.
     if ($bad === 'OVER_ALLOCATED') {
-        $ph = implode(',', array_fill(0, count(rful_filled_stages()), '?'));
         try {
-            $ids = ops_all("SELECT id FROM candidates WHERE allocation_id=? AND stage IN ($ph) ORDER BY id",
-                           array_merge([$link], rful_filled_stages()));
+            $ids = ops_all("SELECT c.id FROM candidates c" . reqf_class_join('c')
+                . " WHERE c.allocation_id=? AND " . reqf_class_expr('c') . "='FILLED' ORDER BY c.id", [$link]);
         } catch (Throwable $e) { $ids = []; }
         $keep = array_slice(array_map(fn($r) => (int) $r['id'], $ids), 0, (int) $a['allocated_qty']);
         if (in_array($cid, $keep, true)) return '';              // established — untouched
