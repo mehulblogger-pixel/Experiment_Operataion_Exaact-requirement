@@ -49,7 +49,30 @@ const ACT_KINDS = [
     'IDENTITY_LINKED'   => 'Identity linked',
     'IDENTITY_UNLINKED' => 'Identity unlinked',
     'IDENTITY_REFUSED'  => 'Identity change refused',
+    // Gate 5 — joining. Exactly the same defect as the identity kinds above, one
+    // workflow along: the joining route has always called
+    // act_log('CANDIDATE', $id, 'JOINED', ...), and act_log() normalises an
+    // unregistered kind to NOTE, so every joining this product has ever recorded
+    // was stored as an untyped note. "When did this person actually start?" was
+    // therefore unanswerable from the ledger, which is the one question the
+    // joining record exists to answer. Registering them makes the trail real.
+    'JOINED'            => 'Joined',
+    'JOINING_CLEARED'   => 'Joining removed',
 ];
+
+// Which kinds a PERSON may record by hand. The rest are events the system
+// writes about itself, and offering them in the composer invites somebody to
+// hand-type "Joined" as though that were how joining is recorded — two doors
+// onto one business fact, which is the defect this programme keeps removing.
+// `SYSTEM` was already being skipped at the one composer that remembered to;
+// this makes the rule the list's own, so every composer gets it right.
+const ACT_KINDS_SYSTEM = ['SYSTEM', 'IDENTITY_LINKED', 'IDENTITY_UNLINKED', 'IDENTITY_REFUSED',
+                          'JOINED', 'JOINING_CLEARED'];
+function act_kinds_manual() {
+    $out = [];
+    foreach (ACT_KINDS as $k => $v) if (!in_array($k, ACT_KINDS_SYSTEM, true)) $out[$k] = $v;
+    return $out;
+}
 
 // What an activity can be about. Kept as a short code plus the route that opens
 // it, so the timeline can link back without every caller passing a URL.

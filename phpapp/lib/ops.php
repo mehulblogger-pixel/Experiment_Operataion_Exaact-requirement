@@ -2927,7 +2927,14 @@ function ops_masters() {
                 ['salary_ctc','Annual CTC (₹)','money',['salary'=>1]],
                 ['leave_balance','Leave balance (days)','number',[]],
                 ['compoff_balance','Comp-off balance (days)','number',[]],
-                ['status','Status','select',['opts'=>['ACTIVE'=>'Active','INACTIVE'=>'Inactive']]],
+                //  GATE 5 — the option list is the workforce vocabulary itself, not
+                //  a second copy of it. This is not cosmetic: a <select> whose
+                //  options do not contain the row's CURRENT value renders with the
+                //  first option pre-selected, so opening a joining-pending person
+                //  to correct their phone number and pressing Save would have
+                //  silently put them on the roster weeks early — an activation
+                //  nobody chose and nobody would see.
+                ['status','Status','select',['opts'=>wf_statuses()]],
             ],
             'list' => ['name'=>'Name','emp_code'=>'Emp code','sbu'=>'Business Unit','skills'=>'Skills','status'=>'Status'],
             'list_labels' => ['sbu'=>OPS_SBUS],
@@ -6243,10 +6250,39 @@ function ops_candidates($route, $method) {
 
         $undo = !empty($_POST['undo']);
         if ($undo) {
-            db()->prepare("UPDATE candidates SET joined_at=NULL WHERE id=?")->execute([$id]);
-            if (function_exists('act_log')) { try { act_log('CANDIDATE', $id, 'JOINING_CLEARED', 'Joining record removed'); } catch (Throwable $e) {} }
-            if (function_exists('reqf_sync') && !empty($cand['requisition_id'])) { try { reqf_sync((int)$cand['requisition_id']); } catch (Throwable $e) {} }
-            flash('Joining removed. This person is still recorded as hired.');
+            //  GATE 5 — clearing a joining must also take the person back OFF the
+            //  roster. Before this it cleared the date and left them ACTIVE, so
+            //  the record said "has not joined" while the scheduler said
+            //  "available for work" — the exact contradiction this gate removes.
+            //
+            //  The date and the operational status are ONE fact, so they move in
+            //  ONE transaction: a cleared date with the person still schedulable
+            //  is worse than changing nothing at all.
+            $stoodDown = false; $cleared = false;
+            try {
+                db()->beginTransaction();
+                //  Conditional, so pressing Undo twice is one event, not two.
+                $st = db()->prepare("UPDATE candidates SET joined_at=NULL WHERE id=? AND joined_at IS NOT NULL AND joined_at<>''");
+                $st->execute([$id]);
+                $cleared = $st->rowCount() >= 1;
+                if ($cleared) {
+                    if ((int)($cand['inspector_id'] ?? 0) > 0 && function_exists('wf_join_stand_down'))
+                        $stoodDown = wf_join_stand_down((int)$cand['inspector_id'], 'joining record removed');
+                    if (function_exists('act_log')) {
+                        try { act_log('CANDIDATE', $id, 'JOINING_CLEARED', 'Joining record removed'); } catch (Throwable $e) {}
+                    }
+                }
+                db()->commit();
+            } catch (Throwable $e) {
+                try { db()->rollBack(); } catch (Throwable $e2) {}
+                flash('That joining could not be removed. Nothing was changed — please try again.', 'error');
+                redirect('/candidate?id=' . $id);
+            }
+            if ($cleared && function_exists('reqf_sync') && !empty($cand['requisition_id'])) { try { reqf_sync((int)$cand['requisition_id']); } catch (Throwable $e) {} }
+            flash(!$cleared
+                ? 'No joining was recorded for this person, so there was nothing to remove.'
+                : ('Joining removed. This person is still recorded as hired'
+                   . ($stoodDown ? ', and is no longer available for scheduling until a joining is recorded again.' : '.')));
             redirect('/candidate?id=' . $id);
         }
 
@@ -6271,10 +6307,54 @@ function ops_candidates($route, $method) {
             flash('A joining date in the future cannot be recorded — mark them joined on the day they start.', 'error');
             redirect('/candidate?id=' . $id);
         }
-        db()->prepare("UPDATE candidates SET joined_at=? WHERE id=?")->execute([$when, $id]);
-        if (function_exists('act_log')) { try { act_log('CANDIDATE', $id, 'JOINED', 'Recorded as joined on ' . $when); } catch (Throwable $e) {} }
+        //  GATE 5 — JOINING IS THE ACTIVATION BOUNDARY.
+        //
+        //  This is the single place in the product where a hired person becomes
+        //  an operationally active member of the workforce. The joining date and
+        //  the operational status are one business fact and are written together:
+        //  a date without the activation leaves operations unable to schedule
+        //  somebody who has actually started, and an activation without the date
+        //  puts somebody to work with no record of when they began.
+        $activated = false; $isNew = false;
+        try {
+            db()->beginTransaction();
+            //  Conditional first, so a genuine joining is distinguishable from a
+            //  correction to a joining already recorded — and so two clicks a
+            //  microsecond apart produce ONE joining rather than two.
+            $st = db()->prepare("UPDATE candidates SET joined_at=? WHERE id=? AND (joined_at IS NULL OR joined_at='')");
+            $st->execute([$when, $id]);
+            $isNew = $st->rowCount() >= 1;
+            if (!$isNew) db()->prepare("UPDATE candidates SET joined_at=? WHERE id=?")->execute([$when, $id]);
+            //  Activation carries its own precondition (wf_join_activate), so
+            //  correcting a date never re-activates somebody who has since left.
+            if (function_exists('wf_join_activate'))
+                $activated = wf_join_activate((int)$cand['inspector_id'], 'joined on ' . $when);
+            if (function_exists('act_log')) {
+                try {
+                    act_log('CANDIDATE', $id, $isNew ? 'JOINED' : 'NOTE',
+                        $isNew ? 'Recorded as joined on ' . $when : 'Joining date corrected to ' . $when);
+                } catch (Throwable $e) {}
+            }
+            db()->commit();
+        } catch (Throwable $e) {
+            try { db()->rollBack(); } catch (Throwable $e2) {}
+            flash('That joining could not be recorded. Nothing was changed — please try again.', 'error');
+            redirect('/candidate?id=' . $id);
+        }
         if (function_exists('reqf_sync') && !empty($cand['requisition_id'])) { try { reqf_sync((int)$cand['requisition_id']); } catch (Throwable $e) {} }
-        flash('Recorded as joined on ' . $when . '.');
+        //  Say what actually happened. If the activation did NOT take effect the
+        //  person will not appear for scheduling, and the one thing we must not do
+        //  is report plain success and let somebody discover that next week.
+        $nowSt = (string)ops_val("SELECT status FROM inspectors WHERE id=?", [(int)$cand['inspector_id']]);
+        if ($activated) {
+            flash('Recorded as joined on ' . $when . '. They are now on the team and available for scheduling.');
+        } elseif (!function_exists('wf_is_active') || wf_is_active($nowSt)) {
+            flash($isNew ? 'Recorded as joined on ' . $when . '.' : 'Joining date updated to ' . $when . '.');
+        } else {
+            flash('Joining recorded on ' . $when . ', but this person\'s team record is marked “'
+                . (function_exists('wf_status_label') ? wf_status_label($nowSt) : $nowSt)
+                . '”, so they will not appear for scheduling until that is changed.', 'warning');
+        }
         redirect('/candidate?id=' . $id);
     }
 

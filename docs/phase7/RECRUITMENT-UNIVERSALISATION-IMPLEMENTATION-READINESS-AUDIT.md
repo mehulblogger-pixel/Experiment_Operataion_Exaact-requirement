@@ -2200,8 +2200,9 @@ narrow scope its gate named:
 | §20e | Gate 2 | yes — requirement versioning and change control for both entities |
 | §20f | Gate 3 | yes — Review Required when a stricter approved version becomes effective |
 | §20g | Gate 4 | yes — self-approval governance across every approval entity |
+| §20h | Gate 5 | yes — joining is the single workforce activation boundary |
 
-**Gate 4 stops here and waits for an explicit pass before Gate 5.**
+**Gate 5 stops here and waits for an explicit pass before Gate 6.**
 
 Pipeline is authoritative for current recruitment state, unchanged by Gate 2.
 Legacy `candidates.stage` is no longer an independent current-state authority.
@@ -2210,3 +2211,232 @@ stricter approved version now reaches every active candidate as a relationship-
 specific Review Required, which only a person holding `hiring.review.clear` may
 decide, and which no score can create, clear or excuse. No production deployment
 was performed.
+
+---
+
+## §20h — GATE 5 RECORD: WORKFORCE ACTIVATION, JOINING & OPERATIONAL STATUS
+
+Starting base `b1e793c` (Gate 4), verified clean and present on the remote before
+any change was made.
+
+### §20h.1 — The business problem, in one sentence
+
+Saying yes to a job offer is not the same as turning up for work, but the system
+treated them as the same moment. A person who accepted an offer was written
+straight into the team as **Active**, which meant they appeared on the
+availability board, in the allocation picker, and in the capacity figures — so a
+coordinator could schedule them for an inspection weeks before their first day,
+and the utilisation reports counted them as though they were already producing.
+
+### §20h.2 — Reproduced before it was changed
+
+The behaviour was reproduced as an executable test at `b1e793c` rather than
+inferred from the earlier audit. The reproduction printed:
+
+```
+  ok    REPRO 1 · acceptance converts the candidate to a team member
+  ok    REPRO 2 · an inspectors row exists
+    >>> inspectors.status   = 'ACTIVE'
+    >>> candidates.joined_at = ''
+  ok    REPRO 3 · the person has NOT joined (joined_at is empty)
+  FAIL  REPRO 4 · the Inspector must NOT be operationally ACTIVE before joining
+  FAIL  REPRO 5 · …and must not appear on the schedulable roster
+```
+
+The second failure is the one that matters commercially: it is not a wrong field
+value, it is a person who could be given paid work before they existed as an
+employee. The cause was a single hardcoded literal in `rcv_convert()`
+(`lib/recruit.php`), which wrote `status` as `'ACTIVE'` in the INSERT.
+
+### §20h.3 — The status vocabulary, which did not exist
+
+`inspectors.status` is, and remains, the one authoritative answer to "may this
+person be given work today". Gate 5 adds no second status column and no parallel
+workforce lifecycle.
+
+What it did not have was a vocabulary written down anywhere. Two values were
+implied by a single dropdown, and spelled as bare string literals in seventeen
+separate database reads. The vocabulary is now named once, in `lib/workforce.php`:
+
+| Value | Means |
+|---|---|
+| `ACTIVE` | on the team and available for work |
+| `PENDING_JOINING` | hired, but their first day has not happened yet |
+| `INACTIVE` | no longer working with us |
+
+A blank or missing status still reads as `ACTIVE`, exactly as before
+(field-finding #26), because every screen that deactivates somebody writes a real
+non-empty value. Tightening that would have quietly dropped existing people off
+the roster — a different change from the one this gate is for.
+
+**Why a third value rather than reusing `INACTIVE`.** A joiner and a leaver are
+not the same business fact. The joiner is somebody HR must chase to a start date;
+the leaver is somebody who is finished. If both read `INACTIVE` the joining
+follow-up list cannot be built at all, and a brand-new hire appears on screen as
+though they had been deactivated. Two different facts sharing one label is the
+defect the earlier gates were spent removing.
+
+**Why this is not schema expansion.** No column and no table was added. The
+column was already `VARCHAR(20)`; `PENDING_JOINING` is fifteen characters. This
+is the code/transition correction the gate instruction asked to be preferred.
+
+### §20h.4 — Why one new value needed almost no reader changes
+
+Every operational read in the product asks **positively** for `ACTIVE` — as
+`status='ACTIVE'`, or `COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE'`, or
+`COALESCE(status,'ACTIVE')='ACTIVE'`. A new value is therefore excluded from
+scheduling, allocation, availability and capacity the moment it exists, by the
+rule the code already states rather than by seventeen new conditions that would
+each have to be kept in step forever.
+
+Verified by measurement, not assumption:
+
+| Reader | File | Effect on a joiner |
+|---|---|---|
+| availability board, scheduling, allocation | `lib/workforce.php:inspector_availability()` | excluded |
+| allocation / deputation picker | `lib/ops.php:inspectors_list(true)` | excluded |
+| capacity and utilisation | `lib/mis.php:mis_available_days()` | not counted |
+| audit team-size figure | `lib/audits.php` | not counted |
+| approver-map gap report | `lib/idems.php` | not counted |
+| marketplace, matching, passport | `lib/connect_*.php` | excluded |
+| full team list (admin) | `lib/ops.php:inspectors_list(false)` | **still visible** |
+
+The last row is the §11 requirement: an accepted-but-not-joined person must stay
+findable so their joining can be chased, while not being assignable or counted.
+The existing Next Action engine (`lib/nextaction.php`) already produces
+"Mark as joined once they actually arrive" for exactly this state, so the
+follow-up was reused rather than rebuilt.
+
+### §20h.5 — A CORRECTION to this document's own earlier audit
+
+The Gate 5 audit note stated that **no** reader treats "not `ACTIVE`" as "has
+left". That was true of the SQL gating reads, and it was **wrong** as a general
+statement. A family of asset-recovery readers did exactly that:
+
+| Site | What it said |
+|---|---|
+| `lib/assets.php:asset_counts()` | counted kit held by anyone "not active" as held by a leaver |
+| `lib/assets.php` (the "left" filter) | same, in the asset register filter |
+| `views/ops/inspector_form.php` | "🚪 this person is inactive — collect their kit" |
+| `views/ops/asset_register.php` | "🚪 left — not returned" |
+
+With only two values those tests were correct, because "not active" and "has
+left" genuinely were the same thing. With a joiner in the vocabulary they are
+not. Kit is routinely issued before day one — a laptop, an ID card, safety gear —
+so a brand-new hire would have been reported as a leaver holding unreturned
+company property, and chased for it.
+
+Leaving is now `INACTIVE` and nothing else, expressed once as `wf_has_left()` /
+`wf_left_sql()`. These are deliberately **not** the negation of `wf_is_active()`,
+and the test battery asserts that they are not (`C10`, `H2`).
+
+### §20h.6 — One activation boundary, and only one
+
+There is exactly one joining mechanism in the product: the `candidate-joined`
+route (`lib/ops.php`). No second one was introduced. Its workforce half lives in
+`lib/workforce.php` as a function, so the transition is testable without HTTP and
+so a second caller inherits the same rule instead of growing its own.
+
+| Function | Moves | Refuses when |
+|---|---|---|
+| `wf_join_activate()` | `PENDING_JOINING` → `ACTIVE` | the row is not joining-pending |
+| `wf_join_stand_down()` | `ACTIVE` → `PENDING_JOINING` | the row is not active |
+| `wf_status_move()` | the one conditional write both share | the precondition fails |
+
+Both directions carry their precondition **in the UPDATE**, not in a PHP check
+beforehand: a PHP check answers from a value read a moment ago, the database
+answers from the row as it is now. That is what makes them idempotent and what
+makes the concurrency test meaningful.
+
+Consequences that follow from the preconditions rather than from extra code:
+
+- Recording a joining for somebody an administrator has since marked `INACTIVE`
+  — they resigned before their start date — does **not** resurrect them. The
+  screen says so plainly instead of reporting plain success (`G3`).
+- Clearing a joining takes the person back **off** the roster. Previously undo
+  cleared the date and left them `ACTIVE`: "has not joined" and "available for
+  work" at the same time.
+- Pressing the button twice is one joining, not two. The date write is
+  conditional too, which is what distinguishes a genuine joining from a
+  correction to a date already recorded.
+
+The date and the operational status are one business fact and are written in one
+transaction. A date without the activation leaves operations unable to schedule
+somebody who has started; an activation without the date puts somebody to work
+with no record of when they began.
+
+### §20h.7 — The joining audit trail was not being recorded
+
+`act_log()` normalises an unregistered activity kind to `NOTE`. The joining route
+has always called `act_log('CANDIDATE', $id, 'JOINED', …)`, and `JOINED` was
+never registered — so **every joining this product has ever recorded was stored
+as an untyped note**. "When did this person actually start?" was unanswerable
+from the ledger, which is the one question the joining record exists to answer.
+This is the same defect the identity events had, one workflow along.
+
+`JOINED` and `JOINING_CLEARED` are now registered. Because the activity composer
+offered every registered kind, a new `act_kinds_manual()` keeps system events out
+of the "record something that happened" dropdown — otherwise somebody could
+hand-type "Joined" as a CRM note, which would be a second door onto a business
+fact that must have exactly one.
+
+### §20h.8 — Existing data: classified, never guessed
+
+No production or development database is reachable from the build environment, so
+the five figures the gate asks for cannot be quoted here. What was built instead
+is the means to answer them safely on any database, and the rule that nothing is
+changed without a human reading the answer first.
+
+`php tools/g5-data-audit.php` is **read-only** and reports:
+
+| Group | Treatment |
+|---|---|
+| team members created from a recruitment hire | counted |
+| …of those, currently `ACTIVE` | counted |
+| **safe to correct** — `ACTIVE`, from recruitment, no joining date, **and no record of ever having worked** | corrected by `--apply` |
+| **ambiguous** — no joining date but they **have** worked | **never touched**, listed for a human |
+| active people added directly (no candidate record) | **never touched** |
+| already `PENDING_JOINING` | nothing to do |
+
+The ambiguous group is the important one. Somebody with a job or an attendance
+record plainly started work; what is missing is the *date*. Demoting them would
+take a working colleague off the roster — a worse error than the one being
+corrected — so they are reported for a person to backfill, never reclassified.
+
+The migration is additive, forward-only, idempotent, non-destructive and audited;
+it can only ever move `ACTIVE` → `PENDING_JOINING`, one row at a time under that
+row's own precondition. It is **deliberately not wired into `boot()`**: nobody's
+records are reclassified as a side effect of opening a page. The run is recorded
+in the organisation's configuration ledger as `wf_joining_migrated_at`.
+
+**No production database was read or modified, and nothing was deployed.**
+
+### §20h.9 — What was changed
+
+| File | Change |
+|---|---|
+| `lib/workforce.php` | the status vocabulary, `wf_is_active`/`wf_active_sql`, `wf_has_left`/`wf_left_sql`, the activation boundary, the survey and the migration |
+| `lib/recruit.php` | `rcv_convert()` creates the team member `PENDING_JOINING`, not `ACTIVE` |
+| `lib/ops.php` | `candidate-joined` activates and stands down atomically; Inspectors master form uses the vocabulary |
+| `lib/activity.php` | `JOINED` / `JOINING_CLEARED` registered; `act_kinds_manual()` |
+| `lib/assets.php` | "has left" means `INACTIVE`, not "not active" |
+| `views/ops/inspector_form.php` | vocabulary-driven status select; leaver-only kit warning |
+| `views/ops/asset_register.php` | leaver-only "not returned" badge |
+| `views/ops/inspector_list.php`, `inspector_profile.php` | the new status reads in plain English |
+| `views/ops/activities.php`, `lib/tosrm.php` | composers offer human activity kinds only |
+| `tests/test_gate5_workforce_activation.php`, `tests/_g5_worker.php` | the battery (sections A–N, Z) |
+| `tools/g5-data-audit.php`, `tools/g5-mutations.py` | the data audit and the mutation battery |
+
+### §20h.10 — What was deliberately NOT done
+
+- No new permission, and no change to any permission: joining is already gated at
+  coordinator level and by scope, and that gate was left exactly as it was.
+- No new status column, table, or parallel workforce lifecycle.
+- No change to Gate 1B pipeline authority, Gate 2 versioning, Gate 3 reviews or
+  Gate 4 approval governance. Gate 3's rule that an open review blocks `JOIN` is
+  re-proved in this gate's own battery (`N3`).
+- No reader was widened. `inspector_availability()` keeps its strict
+  `status='ACTIVE'`; the tolerant idiom was not pushed into it, because that
+  would newly admit blank-status people to the availability board — a different
+  change, and not this gate's.
+- No production deployment, and no production data read or written.

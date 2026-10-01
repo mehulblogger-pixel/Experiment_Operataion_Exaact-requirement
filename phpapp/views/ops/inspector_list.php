@@ -25,7 +25,7 @@
     <td><?= e(trade_label($r['trade_id'] ?? null)) ?></td>
     <td><?= e(sbu_labels($r['sbus'] ?? '')) ?></td>
     <td class="muted" style="font-size:13px;"><?= e(skill_labels($r['skill_ids'] ?? '')) ?></td>
-    <td><span class="badge <?= ($r['status']??'')==='ACTIVE'?'GREEN':'AMBER' ?>"><?= e($r['status'] ?: '—') ?></span></td>
+    <td><span class="badge <?= wf_is_active($r['status'] ?? '')?'GREEN':'AMBER' ?>"><?= e(wf_status_label($r['status'] ?? '')) ?></span></td>
     <td class="row-actions">
       <a class="btn small secondary" href="/inspector-profile?id=<?= (int)$r['id'] ?>">Profile</a>
       <a class="btn small" href="/m/inspectors/edit?id=<?= (int)$r['id'] ?>">Edit</a>

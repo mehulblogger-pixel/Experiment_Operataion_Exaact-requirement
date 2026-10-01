@@ -2237,8 +2237,21 @@ function rcv_convert($candId, array $opt = []) {
         //  operator can see that a person decided this rather than a race.
         $dupAck = $wfAckNote !== '' ? 1 : 0;
         $writeInspector = function ($code) use ($name, $cand, $kind, $office, $ag, $opt, $roll, $placement, $gd, $teamRole, $dupAck) {
+            //  GATE 5 — the team member is created JOINING PENDING, not ACTIVE.
+            //
+            //  Accepting an offer creates the person's team record, and must: the
+            //  employee number, the branch and the identity link all exist from
+            //  this moment, and the joining screen needs somebody to mark as
+            //  joined. What acceptance does NOT do is put them to work. Writing
+            //  'ACTIVE' here meant a person who had merely said yes to an offer
+            //  appeared on the availability board, in the allocation picker and in
+            //  the capacity figures — schedulable for an inspection weeks before
+            //  their first day, and counted as though they were already producing.
+            //
+            //  They become ACTIVE when their joining is recorded, and nowhere else
+            //  (wf_join_activate(), lib/workforce.php).
             db()->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,emp_code,home_office_id,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,team_role,dup_ack,status,created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'" . WF_ST_JOINING . "',?)")
                 ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
                            $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $kind,
                            $code, $office,
@@ -2291,7 +2304,7 @@ function rcv_convert($candId, array $opt = []) {
     //  9 AUDIT — outside the transaction. A failed observation is never a failed
     //     transaction (invariant I41): the hire stands whatever the audit does.
     rcv_log($candId, 'IDENTITY_LINKED',
-        'Converted to team member #' . $insId . ' (branch from ' . $src . ')'
+        'Converted to team member #' . $insId . ' (branch from ' . $src . ', joining pending — not yet available for work)'
         . ($identity === 'LINKED' ? ' — identity relationship recorded'
                                   : ' — identity relationship NOT recorded (marketplace capability unavailable)')
         . $wfAckNote);

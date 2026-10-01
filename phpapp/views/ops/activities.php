@@ -43,7 +43,7 @@
   <h3 style="margin-top:0">Record something that happened</h3>
   <div class="form-grid" style="gap:12px 16px">
     <div><label>What kind</label><select class="form-control" name="kind">
-      <?php foreach (ACT_KINDS as $k=>$v): if ($k==='SYSTEM') continue; ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+      <?php foreach (act_kinds_manual() as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
     </select></div>
     <div><label>Which way</label><select class="form-control" name="direction">
       <option value="">—</option><option value="OUT">We contacted them</option><option value="IN">They contacted us</option>

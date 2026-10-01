@@ -100,10 +100,12 @@ function asset_counts() {
             'out'    => (int)ops_val("SELECT COUNT(*) FROM asset_issues WHERE status='ISSUED'"),
             'noack'  => (int)ops_val("SELECT COUNT(*) FROM asset_issues WHERE status='ISSUED' AND (ack_on='' OR ack_on IS NULL)"),
             'people' => (int)ops_val("SELECT COUNT(DISTINCT person_id) FROM asset_issues WHERE status='ISSUED'"),
-            // Still out with somebody who is no longer active — the kit most likely
-            // to be lost track of.
+            // Still out with somebody who has LEFT — the kit most likely to be
+            // lost track of. Gate 5: "has left" is INACTIVE specifically, not
+            // merely "not active". A new joiner issued a laptop and an ID card
+            // before their first day is not a leaver and must not be chased as one.
             'left'   => (int)ops_val("SELECT COUNT(*) FROM asset_issues a JOIN inspectors i ON i.id=a.person_id
-                                      WHERE a.status='ISSUED' AND COALESCE(i.status,'ACTIVE')<>'ACTIVE'"),
+                                      WHERE a.status='ISSUED' AND " . wf_left_sql('i')),
         ];
     } catch (Throwable $e) { if (asset_missing_table($e)) return ['out'=>0,'noack'=>0,'people'=>0,'left'=>0]; throw $e; }
 }
@@ -240,7 +242,8 @@ function ops_assets($route, $method) {
     if ($fPerson) { $w[] = 'a.person_id=?'; $args[] = $fPerson; }
     if ($fType !== '' && isset(asset_types()[$fType])) { $w[] = 'a.asset_type=?'; $args[] = $fType; }
     if ($fStatus !== '' && isset(ASSET_STATUS[$fStatus])) { $w[] = 'a.status=?'; $args[] = $fStatus; }
-    if ($fLeft) { $w[] = "a.status='ISSUED' AND COALESCE(i.status,'ACTIVE')<>'ACTIVE'"; }
+    //  Gate 5 — a leaver is INACTIVE, not simply "not active" (see wf_left_sql).
+    if ($fLeft) { $w[] = "a.status='ISSUED' AND " . wf_left_sql('i'); }
     if ($q !== '') { $w[] = '(a.asset_name LIKE ? OR a.identifier LIKE ? OR i.name LIKE ?)'; array_push($args, "%$q%", "%$q%", "%$q%"); }
     $rows = [];
     try {

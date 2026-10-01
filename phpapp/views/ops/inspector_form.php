@@ -44,7 +44,7 @@
       endif; ?>.
     <span class="muted"><?= trim((string) ($wc['joined_at'] ?? '')) !== ''
         ? 'Joined on ' . e(substr((string) $wc['joined_at'], 0, 10)) . '.'
-        : 'No joining date recorded yet — accepted is not the same as joined.' ?></span>
+        : 'No joining date recorded yet — accepted is not the same as joined, so they are not yet available for scheduling or allocation.' ?></span>
   </div>
 <?php endif; endif; ?>
 
@@ -102,7 +102,13 @@
         <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>" <?= (string)$curTrade===(string)$t['id']?'selected':'' ?>><?= e($t['label']) ?></option><?php endforeach; ?>
       </select><small class="muted">Manage under <a href="/lookup?key=trade">Trade</a> / <a href="/lookup?key=skill">Skill</a>.</small></div>
     <div class="ff"><label>Status</label>
-      <select class="form-control" name="status"><?php foreach (['ACTIVE'=>'Active','INACTIVE'=>'Inactive'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['status'] ?? 'ACTIVE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <?php // Gate 5 — the option list IS the workforce vocabulary (wf_statuses()).
+            // A <select> whose options omit the row's current value renders with
+            // the first option pre-selected, so editing a joining-pending person's
+            // phone number and pressing Save would silently have put them on the
+            // roster weeks before their start date. ?>
+      <select class="form-control" name="status"><?php foreach (wf_statuses() as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['status'] ?? 'ACTIVE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+      <?php if (($ins['status'] ?? '') === WF_ST_JOINING): ?><small class="muted">They become <b>Active</b> automatically when their joining is recorded on their candidate record.</small><?php endif; ?></div>
 
     <?php // Document checklist (gap 3) — presence-only, so it shows here without
           //   the identity-document permission. What is missing is one click from
@@ -125,9 +131,12 @@
         <span class="muted">— <?= (int)$pa['out'] ?> currently held<?= $pa['noack'] ? ', '.(int)$pa['noack'].' not acknowledged' : '' ?></span></label>
       <div>
         <?php if ((int)$pa['out'] === 0): ?><span class="muted">Nothing issued yet.</span>
-        <?php else: $inactive = ($ins['status'] ?? 'ACTIVE') !== 'ACTIVE'; ?>
-          <span class="pill <?= $inactive ? 'p-bad' : 'p-ok' ?>"><?= (int)$pa['out'] ?> in hand<?= $inactive ? ' — not returned' : '' ?></span>
-          <?php if ($inactive): ?> <span class="pill p-bad">🚪 this person is inactive — collect their kit</span><?php endif; ?>
+        <?php else: // Gate 5 — only a LEAVER owes their kit back. A joiner who has
+                    // been given a laptop before their first day holds it quite
+                    // legitimately and must not be chased for it.
+                    $left = wf_has_left($ins['status'] ?? ''); ?>
+          <span class="pill <?= $left ? 'p-bad' : 'p-ok' ?>"><?= (int)$pa['out'] ?> in hand<?= $left ? ' — not returned' : '' ?></span>
+          <?php if ($left): ?> <span class="pill p-bad">🚪 this person has left — collect their kit</span><?php endif; ?>
           <?php if ($pa['noack']): ?> <span class="pill p-warn"><?= (int)$pa['noack'] ?> awaiting sign-off</span><?php endif; ?>
         <?php endif; ?>
       </div>

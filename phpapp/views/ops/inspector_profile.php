@@ -5,7 +5,7 @@
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/m/inspectors"><?= e(THP('engineer')) ?></a> › <?= e($ins['name']) ?></div>
 <div class="master-head"><div>
-  <h1><?= e($ins['name']) ?> <?php if ($ins['status']!=='ACTIVE'): ?><span class="pill p-mut"><?= e($ins['status']) ?></span><?php endif; ?></h1>
+  <h1><?= e($ins['name']) ?> <?php if (!wf_is_active($ins['status'] ?? '')): ?><span class="pill p-<?= e(wf_status_tone($ins['status'])) ?>"><?= e(wf_status_label($ins['status'])) ?></span><?php endif; ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($ins['emp_code'] ?: '—') ?><?= $ins['sbu'] ? ' · '.e(sbu_label($ins['sbu']) ?: $ins['sbu']) : '' ?>
     <?= $ins['mobile'] ? ' · 📞 '.e($ins['mobile']) : '' ?><?= $ins['email'] ? ' · '.e($ins['email']) : '' ?></p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">

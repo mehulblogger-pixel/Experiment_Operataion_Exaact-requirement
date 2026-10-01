@@ -2009,7 +2009,10 @@ function tosrm_render_comms($entityKind, $entityId, $backAnchor = 'comms') {
     $rows = act_for_entity($entityKind, (int)$entityId, 50) ?: [];
     $canEdit = tosrm_can_edit();
     $csrf = function_exists('csrf_token') ? csrf_token() : '';
-    $kinds = defined('ACT_KINDS') ? ACT_KINDS : ['NOTE'=>'Note','CALL'=>'Call','EMAIL'=>'Email','WHATSAPP'=>'WhatsApp','MEETING'=>'Meeting'];
+    //  Only the kinds a person may record by hand — the system's own events
+    //  (joining, identity) are written by the workflow that causes them.
+    $kinds = function_exists('act_kinds_manual') ? act_kinds_manual()
+           : (defined('ACT_KINDS') ? ACT_KINDS : ['NOTE'=>'Note','CALL'=>'Call','EMAIL'=>'Email','WHATSAPP'=>'WhatsApp','MEETING'=>'Meeting']);
     ob_start(); ?>
     <div class="card tosrm-comms" style="margin-top:16px">
       <h3 style="margin:0 0 4px">Communication log</h3>

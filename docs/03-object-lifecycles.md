@@ -851,6 +851,58 @@ OPEN ─▶ CONTINUED     (a person with authority confirms they still meet it �
 
 ---
 
+## Workforce operational status (`inspectors.status`) — Gate 5
+
+**One column, one question: may this person be given work today.** There is no
+second status column and no parallel workforce lifecycle. Adding one would be a
+change, not a correction, and is explicitly out of scope.
+
+| Status | Means | May be scheduled / allocated / counted |
+|---|---|---|
+| `ACTIVE` | on the team and available for work | **yes** |
+| `PENDING_JOINING` | hired, but their first day has not happened yet | **no** |
+| `INACTIVE` | no longer working with us | **no** |
+
+A blank or missing status reads as `ACTIVE` (field-finding #26): every screen that
+deactivates somebody writes a real non-empty value, so a person with no explicit
+status is a working person.
+
+**Transitions**
+
+```
+(offer accepted)  ──▶  PENDING_JOINING        rcv_convert()  — creates the team member
+PENDING_JOINING   ──▶  ACTIVE                 wf_join_activate()   — joining recorded
+ACTIVE            ──▶  PENDING_JOINING        wf_join_stand_down() — joining cleared
+ACTIVE            ──▶  INACTIVE               a person, on the Inspector form
+PENDING_JOINING   ──▶  INACTIVE               a person, on the Inspector form
+INACTIVE          ──▶  ACTIVE                 a person, on the Inspector form
+```
+
+**Rules**
+
+- Accepting an offer creates the team record — employee number, branch, identity
+  link — and sets `PENDING_JOINING`. Acceptance never makes anybody operationally
+  active. "Hired" and "joined" are different facts, and `candidates.joined_at` is
+  what tells them apart.
+- **Joining is the single activation boundary.** The only mechanism is the
+  `candidate-joined` route; its workforce half is `wf_join_activate()`. The
+  joining date and the status are written in one transaction.
+- Both automatic transitions are **conditional on the status they expect to
+  find**, so they are idempotent and cannot overrule a person's decision.
+  Recording a joining for somebody since marked `INACTIVE` does not resurrect
+  them, and the screen says so rather than reporting success.
+- Clearing a joining returns the person to `PENDING_JOINING`. They remain hired.
+- `PENDING_JOINING` is **not** "has left". Only `INACTIVE` is. The asset-recovery
+  features ask `wf_has_left()`, never "not active", so a new starter issued a
+  laptop before day one is not chased as a leaver.
+- An accepted-but-not-joined person stays **visible** in the full team list and
+  in the Next Action follow-up ("Mark as joined once they actually arrive"), while
+  being excluded from scheduling, allocation and capacity.
+- No permission changed. Recording or clearing a joining is coordinator-level
+  plus recruitment scope, exactly as before Gate 5.
+
+---
+
 ## `tenant_requests.status` — public workspace signup (operations tenants)
 
 A NEW inspection company applies for its **own operations workspace** from the

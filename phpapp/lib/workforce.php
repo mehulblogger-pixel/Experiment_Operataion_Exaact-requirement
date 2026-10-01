@@ -5,6 +5,259 @@
 //  Reuses the existing inspectors / jobs / voucher_entries tables.
 // ============================================================================
 
+// ============================================================================
+//  OPERATIONAL STATUS — the one workforce vocabulary                  (Gate 5)
+// ============================================================================
+//  `inspectors.status` is the single authoritative answer to one business
+//  question: MAY THIS PERSON BE GIVEN WORK TODAY. There is no second status
+//  column, no parallel workforce lifecycle, and Gate 5 does not add one.
+//
+//  Until now that vocabulary was written down nowhere. Two values were implied
+//  by a single dropdown on the Inspectors form, and spelled as bare string
+//  literals in seventeen separate reads. This names them in one place so the
+//  next person does not have to grep for them.
+//
+//    ACTIVE           on the team and available for work
+//    PENDING_JOINING  hired, but their first day has not happened yet
+//    INACTIVE         no longer working with us
+//
+//  WHY A THIRD VALUE RATHER THAN REUSING `INACTIVE`
+//  A joiner and a leaver are not the same business fact. The joiner is somebody
+//  HR must chase to a start date; the leaver is somebody who is finished. If
+//  both read INACTIVE then the joining follow-up list cannot be built at all,
+//  and a brand-new hire appears on screen as though they had been deactivated —
+//  which is what an operations manager would quite reasonably escalate. Two
+//  different facts sharing one label is precisely the defect the earlier gates
+//  were spent removing, so it is not reintroduced here.
+//
+//  WHY THIS NEEDS NO CHANGE TO ANY READER
+//  Every operational read in the product asks POSITIVELY for ACTIVE — either
+//  `status='ACTIVE'`, or the blank-tolerant
+//  `COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE'`, or `COALESCE(status,'ACTIVE')`.
+//  Not one of them asks `status<>'ACTIVE'` and not one treats "not active" as
+//  "has left". A new value is therefore excluded from scheduling, allocation,
+//  availability and capacity the moment it exists — excluded by the rule the
+//  code already states, rather than by seventeen new conditions that would each
+//  have to be kept in step forever. That is what makes this the smallest safe
+//  correction rather than a rewrite.
+const WF_ST_ACTIVE   = 'ACTIVE';
+const WF_ST_JOINING  = 'PENDING_JOINING';
+const WF_ST_INACTIVE = 'INACTIVE';
+
+function wf_statuses() {
+    return [
+        WF_ST_ACTIVE   => 'Active',
+        WF_ST_JOINING  => 'Joining pending',
+        WF_ST_INACTIVE => 'Inactive',
+    ];
+}
+function wf_status_label($code) {
+    $c = strtoupper(trim((string)$code));
+    if ($c === '') $c = WF_ST_ACTIVE;            // a blank status has always meant active
+    return wf_statuses()[$c] ?? $c;
+}
+//  Pill tone. Joining pending is deliberately 'warn', not 'bad': it is a
+//  perfectly healthy state that simply needs a follow-up, and colouring it like
+//  a failure would teach people to ignore the colour.
+function wf_status_tone($code) {
+    $c = strtoupper(trim((string)$code));
+    if ($c === '') $c = WF_ST_ACTIVE;
+    if ($c === WF_ST_ACTIVE)   return 'ok';
+    if ($c === WF_ST_JOINING)  return 'warn';
+    if ($c === WF_ST_INACTIVE) return 'mut';
+    return 'mut';
+}
+
+//  The canonical "is this person operationally active" test, in PHP and in SQL.
+//
+//  Both deliberately REPRODUCE the behaviour already in the code rather than
+//  changing it: a blank or missing status still reads as ACTIVE (field-finding
+//  #26 — a person with no explicit status is a working person, because every
+//  screen that deactivates somebody writes a real non-empty value). Tightening
+//  that here would quietly drop existing people off the roster, which is a
+//  different change from the one Gate 5 is for.
+function wf_is_active($status) {
+    $c = strtoupper(trim((string)$status));
+    return ($c === '' ? WF_ST_ACTIVE : $c) === WF_ST_ACTIVE;
+}
+function wf_active_sql($alias = '') {
+    $p = $alias === '' ? '' : rtrim($alias, '.') . '.';
+    return "COALESCE(NULLIF(" . $p . "status,''),'" . WF_ST_ACTIVE . "')='" . WF_ST_ACTIVE . "'";
+}
+
+//  HAS THIS PERSON LEFT? — deliberately NOT the opposite of wf_is_active().
+//
+//  This is the correction that made the third status value safe. "Not available
+//  for work" and "has left the company" were the same test everywhere the kit
+//  recovery features asked the question — `COALESCE(status,'ACTIVE')<>'ACTIVE'`
+//  — because with only two values they WERE the same thing. With a joiner in the
+//  vocabulary they are not: somebody issued a laptop and an ID card a week before
+//  their first day would have been reported as a leaver with unreturned company
+//  property, and chased for it. Leaving is INACTIVE and nothing else.
+function wf_has_left($status) {
+    return strtoupper(trim((string)$status)) === WF_ST_INACTIVE;
+}
+function wf_left_sql($alias = '') {
+    $p = $alias === '' ? '' : rtrim($alias, '.') . '.';
+    return "UPPER(TRIM(COALESCE(" . $p . "status,'')))='" . WF_ST_INACTIVE . "'";
+}
+
+// ----------------------------------------------------------------------------
+//  JOINING — the one activation boundary
+// ----------------------------------------------------------------------------
+//  A person becomes operationally ACTIVE when they JOIN, and at no other
+//  moment. Accepting an offer creates the team member — the record, the
+//  employee number, the branch and the reporting line all exist from
+//  acceptance, because that is what makes identity continuous and what the
+//  joining screen needs in order to have somebody to mark as joined — but it
+//  does not put them to work.
+//
+//  There is exactly ONE joining mechanism in this product (the `candidate-joined`
+//  route) and this is its workforce half. It lives here, as a function, for two
+//  reasons: the transition is then testable without going through HTTP, and a
+//  second caller inherits the SAME rule instead of growing a second one.
+//
+//  Both directions are CONDITIONAL on the status they expect to find, which is
+//  what makes them idempotent and what stops them overruling a human decision:
+//
+//   • activating promotes ONLY a PENDING_JOINING row. Somebody an administrator
+//     has since marked INACTIVE — they resigned before their start date, say —
+//     stays INACTIVE. Recording their joining must not quietly bring a leaver
+//     back onto the roster.
+//   • standing down demotes ONLY an ACTIVE row, so clearing the joining of
+//     somebody already INACTIVE changes nothing.
+//
+//  Each returns TRUE only when it actually moved the row, so the caller can
+//  tell a real transition from a repeat and say something truthful on screen.
+function wf_join_activate($inspectorId, $note = '') {
+    return wf_status_move((int)$inspectorId, WF_ST_JOINING, WF_ST_ACTIVE,
+        'Started work' . ($note !== '' ? ' — ' . $note : '') . '. Now available for scheduling and allocation.');
+}
+function wf_join_stand_down($inspectorId, $note = '') {
+    return wf_status_move((int)$inspectorId, WF_ST_ACTIVE, WF_ST_JOINING,
+        'Joining record removed' . ($note !== '' ? ' — ' . $note : '')
+        . '. Still hired, but not available for scheduling or allocation until their joining is recorded.');
+}
+
+//  The single conditional write both directions share.
+//
+//  The UPDATE carries its own precondition, so two processes recording the same
+//  joining at the same instant do not both "succeed": the second matches no row
+//  and reports no transition. The check is not done in PHP first, because a PHP
+//  check answers from a value read a moment ago and the database answers from
+//  the row as it is now.
+//
+//  TRIM/UPPER are applied in SQL as well as in PHP so a value typed by hand into
+//  a database tool ('pending_joining ') still matches. Both engines support them.
+function wf_status_move($inspectorId, $from, $to, $subject) {
+    $inspectorId = (int)$inspectorId;
+    if ($inspectorId <= 0) return false;
+    $st = db()->prepare("UPDATE inspectors SET status=? WHERE id=? AND UPPER(TRIM(COALESCE(status,'')))=?");
+    $st->execute([$to, $inspectorId, $from]);
+    if ($st->rowCount() < 1) return false;
+    //  Audit INSIDE the caller's transaction so the record and its evidence
+    //  stand or fall together — but never allowed to break the transition
+    //  (invariant I41: a failed observation is not a failed business change).
+    if (function_exists('act_log')) {
+        try { act_log('INSPECTOR', $inspectorId, 'SYSTEM', $subject); } catch (Throwable $e) {}
+    }
+    return true;
+}
+
+// ----------------------------------------------------------------------------
+//  EXISTING DATA — classify before changing anything
+// ----------------------------------------------------------------------------
+//  Installs that already ran the old code hold people who were made ACTIVE the
+//  moment they accepted an offer. Some of those have since genuinely started
+//  work; some never arrived. Guessing between them is not acceptable, so this
+//  CLASSIFIES first and reports what it found, and it changes nothing at all
+//  unless it is explicitly told to.
+//
+//  wf_joining_survey() is READ-ONLY. It is the thing to run first, and on a live
+//  database it is the thing to run INSTEAD, until somebody has read the figures
+//  and decided.
+//
+//  The six groups it returns:
+//    recruited             people whose team record came from a recruitment hire
+//    recruited_active      …of those, currently ACTIVE
+//    reclassify            ACTIVE, from recruitment, NO joining date, and no
+//                          evidence of ever having worked — safe to correct
+//    ambiguous             ACTIVE, no joining date, but they HAVE worked (a job
+//                          or an attendance record). The joining date is simply
+//                          missing; the person plainly started. NEVER touched —
+//                          demoting them would take a working colleague off the
+//                          roster, which is a worse error than the one being
+//                          fixed. Reported for a human to backfill the date.
+//    direct_active         ACTIVE with no recruitment record at all — added
+//                          through the Masters door. Legitimate, and out of
+//                          scope by construction: this migration can only ever
+//                          touch somebody who has a candidate record.
+//    already_pending       already correct (a repeat run, or new data)
+function wf_joining_survey() {
+    $one = function ($sql) { try { return (int)ops_val($sql); } catch (Throwable $e) { return -1; } };
+    $A = wf_active_sql('i');
+    $noJoin = "(c.joined_at IS NULL OR c.joined_at='')";
+    //  "Has this person ever actually worked?" — the evidence that settles an
+    //  otherwise unclassifiable row. Tables are probed, not assumed: a workspace
+    //  that never enabled attendance simply has no attendance evidence.
+    $worked = [];
+    foreach ([['jobs', 'inspector_id'], ['attendance', 'inspector_id']] as [$t, $col]) {
+        try { ops_val("SELECT COUNT(*) FROM $t WHERE $col IS NOT NULL"); $worked[] = "EXISTS (SELECT 1 FROM $t w WHERE w.$col=i.id)"; }
+        catch (Throwable $e) { /* table absent in this workspace — no evidence from it */ }
+    }
+    $W = $worked ? '(' . implode(' OR ', $worked) . ')' : '1=0';
+    $J = "FROM inspectors i JOIN candidates c ON c.inspector_id=i.id";
+    return [
+        'recruited'        => $one("SELECT COUNT(DISTINCT i.id) $J"),
+        'recruited_active' => $one("SELECT COUNT(DISTINCT i.id) $J WHERE $A"),
+        'reclassify'       => $one("SELECT COUNT(DISTINCT i.id) $J WHERE $A AND $noJoin AND NOT $W"),
+        'ambiguous'        => $one("SELECT COUNT(DISTINCT i.id) $J WHERE $A AND $noJoin AND $W"),
+        'already_pending'  => $one("SELECT COUNT(DISTINCT i.id) $J WHERE UPPER(TRIM(COALESCE(i.status,'')))='" . WF_ST_JOINING . "'"),
+        'direct_active'    => $one("SELECT COUNT(*) FROM inspectors i WHERE " . wf_active_sql('i')
+                                   . " AND NOT EXISTS (SELECT 1 FROM candidates c WHERE c.inspector_id=i.id)"),
+        'ids_reclassify'   => wf_joining_ids($A, $noJoin, $W, false),
+        'ids_ambiguous'    => wf_joining_ids($A, $noJoin, $W, true),
+    ];
+}
+function wf_joining_ids($A, $noJoin, $W, $worked) {
+    try {
+        $rows = ops_all("SELECT DISTINCT i.id, i.name, i.emp_code, c.id cand_id, c.cand_code, c.stage
+                           FROM inspectors i JOIN candidates c ON c.inspector_id=i.id
+                          WHERE $A AND $noJoin AND " . ($worked ? $W : "NOT $W") . " ORDER BY i.id");
+        return $rows ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
+//  THE MIGRATION. Additive, forward-only, idempotent, non-destructive, audited —
+//  and a DRY RUN unless $apply is passed true, because this touches real people's
+//  records and the instruction for this gate is explicit that existing data is
+//  not to be changed blindly. It is deliberately NOT wired into boot(): nothing
+//  reclassifies anybody as a side effect of somebody opening a page.
+//
+//  It can only ever move ACTIVE → PENDING_JOINING, only for a person with a
+//  recruitment record, no joining date and no history of having worked, and only
+//  one row at a time under that row's own precondition. It never deletes, never
+//  touches a leaver, and never touches somebody added through the Masters door.
+function wf_joining_migrate($apply = false) {
+    $s = wf_joining_survey();
+    $out = ['applied' => 0, 'skipped_ambiguous' => count($s['ids_ambiguous']),
+            'dry_run' => !$apply, 'survey' => $s];
+    if (!$apply || !$s['ids_reclassify']) return $out;
+    foreach ($s['ids_reclassify'] as $r) {
+        $moved = wf_status_move((int)$r['id'], WF_ST_ACTIVE, WF_ST_JOINING,
+            'Corrected to “Joining pending” — hired through recruitment (' . ($r['cand_code'] ?: ('candidate #' . (int)$r['cand_id']))
+            . ') with no joining date recorded and no work history, so they were never operationally active.');
+        if ($moved) $out['applied']++;
+    }
+    //  The run itself is recorded in the organisation's configuration ledger, so
+    //  "who changed these people and when" is answerable later.
+    if (function_exists('setting_set')) {
+        try { setting_set('wf_joining_migrated_at', date('c') . ' (' . $out['applied'] . ' corrected, '
+              . $out['skipped_ambiguous'] . ' left for review)'); } catch (Throwable $e) {}
+    }
+    return $out;
+}
+
 function avail_status_options() { return lk_options_or('avail_status', AVAIL_STATUS); }
 function avail_label($code) { $o = avail_status_options(); return $o[$code] ?? ($code ?: '—'); }
 // Tone for the pill / card colour.

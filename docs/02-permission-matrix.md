@@ -682,3 +682,35 @@ Approval authority   ≠   Recruitment edit
 
 Being a named approver grants none of the others, and none of the others grants
 approval authority.
+
+---
+
+## Workforce activation (Gate 5) — no permission changed
+
+Gate 5 moved **when** a hired person becomes operationally active (on joining,
+not on acceptance). It did **not** move **who** may do anything, and it adds no
+permission. Recorded here so a later reader does not go looking for one.
+
+| Action | Who, before and after Gate 5 |
+|---|---|
+| Record a joining / clear a joining | coordinator level (`is_coordinator_level()`) **plus** recruitment scope on the application |
+| Convert an accepted candidate to a team member | unchanged — coordinator level, scope, branch, team, and the execution boundary |
+| Change a team member's status by hand | the existing Inspectors master form (admin) |
+
+Two consequences worth being explicit about:
+
+- **The joining screen is the only activation mechanism.** An administrator can
+  still set a status by hand on the Inspector form — that door existed before and
+  is unchanged — but nothing else in the product activates anybody. Deliberately
+  one door, not two.
+- **Visibility is still not authority.** A joining-pending colleague is visible in
+  the full team list and in the Next Action follow-up to everyone who could
+  already see team members. Seeing that somebody has not joined confers no right
+  to record their joining.
+
+```
+Workforce activation   =   the joining screen only
+                       ≠   acceptance of an offer
+                       ≠   approval authority (Gate 4)
+                       ≠   hiring.review.clear (Gate 3)
+```

@@ -120,7 +120,7 @@
         <td><strong><?= e($r['asset_name']) ?></strong><?php if ($r['identifier']): ?><div class="muted" style="font-size:12px"><?= e($r['identifier']) ?><?= (int)$r['quantity']>1 ? ' · ×'.(int)$r['quantity'] : '' ?></div><?php endif; ?></td>
         <td class="muted"><?= e($types[$r['asset_type']] ?? $r['asset_type']) ?></td>
         <td><?= e($r['person_name'] ?: '—') ?><?php if ($r['emp_code']): ?> <span class="muted">(<?= e($r['emp_code']) ?>)</span><?php endif; ?>
-          <?php if ($issued && ($r['person_status'] ?? 'ACTIVE') !== 'ACTIVE'): ?><span class="pill p-bad" title="This person is inactive but still holds this asset">🚪 left — not returned</span><?php endif; ?></td>
+          <?php if ($issued && wf_has_left($r['person_status'] ?? '')): ?><span class="pill p-bad" title="This person has left but still holds this asset">🚪 left — not returned</span><?php endif; ?></td>
         <td class="muted"><?= e($r['issued_on'] ?: '—') ?></td>
         <td><?php if (trim((string)$r['ack_on'])!==''): ?>
               <span class="pill p-ok">✓</span> <span class="muted" style="font-size:12px"><?= e($r['ack_by'] ?: '') ?> · <?= e($r['ack_on']) ?></span>
