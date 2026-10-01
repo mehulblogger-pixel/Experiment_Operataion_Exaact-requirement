@@ -53,8 +53,25 @@ $g5onRoster = function ($ins) use ($g5off) {
 t_section('G5 A · ACCEPTANCE CREATES THE TEAM MEMBER BUT DOES NOT ACTIVATE THEM');
 // ---------------------------------------------------------------------------
 [$cA, $iA, $rA] = $g5hire('A');
-t_ok(!empty($rA['ok']), 'A1 · acceptance converts the candidate to a team member');
+//  The refusal REASON is part of the assertion. Without it a failure here says
+//  only "something went wrong" and the next person has to re-run the whole suite
+//  to find out what — which is exactly what happened the first time this battery
+//  was run inside the full MariaDB suite.
+t_ok(!empty($rA['ok']), 'A1 · acceptance converts the candidate to a team member'
+     . (empty($rA['ok']) ? ' — REFUSED: ' . ($rA['code'] ?? '?') . ' / ' . ($rA['message'] ?? '') : ''));
 t_ok($iA > 0, 'A2 · the inspectors row exists from acceptance (identity is continuous)');
+//  STOP HERE if the hire did not happen. Everything below asserts things about a
+//  person, and with no person the "absent from the roster" checks would all pass
+//  for the wrong reason — a green tick for a hire that never occurred is worse
+//  than a red one.
+if ($iA <= 0) {
+    //  Print what the engine itself recorded, so the reason is in the test output
+    //  rather than in a database nobody will open.
+    foreach (ops_all("SELECT kind, subject FROM activities WHERE entity_kind='CANDIDATE' AND entity_id=? ORDER BY id DESC", [$cA]) ?: [] as $a)
+        echo "    >>> " . $a['kind'] . ': ' . $a['subject'] . "\n";
+    t_ok(false, 'A2x · no team member was created — the rest of this suite cannot be trusted, stopping');
+    return;
+}
 t_eq($g5status($iA), WF_ST_JOINING, 'A3 · …and its status is Joining pending, NOT Active');
 t_ok(!wf_is_active($g5status($iA)), 'A4 · wf_is_active() agrees they are not operationally active');
 t_eq($g5joined($cA), '', 'A5 · no joining date has been recorded');
@@ -325,6 +342,63 @@ t_eq($g5status($iM), WF_ST_ACTIVE, 'M2 · the person ends up active exactly once
 t_eq((int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='CANDIDATE' AND entity_id=? AND kind='JOINED'", [$cM]), 1,
      'M3 · *** and only ONE joining was recorded, not two ***');
 t_eq($g5joined($cM), $today, 'M4 · with the right date');
+
+// ---------------------------------------------------------------------------
+t_section('G5 O · A HIRE IS NEVER REPORTED AS FAILED HAVING ACTUALLY HAPPENED');
+// ---------------------------------------------------------------------------
+//  Found by this gate's own battery, in the full MariaDB suite, and PRE-EXISTING
+//  (identical at b1e793c).
+//
+//  The identity ledger migrates itself lazily on first use, and its first use is
+//  inside the transaction that creates a team member. MariaDB commits implicitly
+//  on ANY DDL — a no-op CREATE TABLE IF NOT EXISTS included — so the first
+//  conversion in a process committed the half-made team member, then failed at
+//  its own commit() with "There is no active transaction", rolled back nothing,
+//  and told the recruiter the hire had failed for a person who now existed.
+//
+//  In production that is the first hire after a deploy, or the first hire in a
+//  new workspace: the recruiter sees a failure, tries again, and the second
+//  attempt is refused because the person is already on the team.
+//  WHAT MAKES THIS REACHABLE IN PRODUCTION, and why the first attempt at this
+//  test proved nothing: the migration short-circuits on a static keyed to
+//  db_epoch(). boot() already runs it once, so a naive probe returns early and
+//  never reaches the DDL at all. The epoch CHANGES whenever the connection does —
+//  and this product gives every tenant its own database, so serving another
+//  workspace invalidates that static and the next call does real schema work.
+//  The first such call was the one inside the hire transaction.
+//
+//  The epoch is bumped here to put the migration back in the state a tenant
+//  switch leaves it in, which is the only way this assertion tests anything.
+t_ok(function_exists('connect_identity_migrate'), 'O1 · the identity ledger has a migration');
+if (function_exists('connect_identity_migrate')) {
+    $epochWas = $GLOBALS['__db_epoch'] ?? 0;
+    $GLOBALS['__db_epoch'] = (int) $epochWas + 991;     //  as a tenant switch would
+    $txOk = false; $still = false;
+    try {
+        $txOk = (bool) $pdo->beginTransaction();
+        connect_identity_migrate();          //  must NOT commit what it did not open
+        $still = $pdo->inTransaction();
+        if ($still) $pdo->rollBack();
+    } catch (Throwable $e) {
+        try { if ($pdo->inTransaction()) $pdo->rollBack(); } catch (Throwable $e2) {}
+    }
+    $GLOBALS['__db_epoch'] = $epochWas;                 //  put it back
+    if (function_exists('connect_identity_migrate')) { try { connect_identity_migrate(); } catch (Throwable $e) {} }
+    t_ok($txOk, 'O2 · a transaction was open, with the migration due to run');
+    t_ok($still, 'O3 · *** the migration did not silently commit the caller transaction ***');
+}
+//  And the business guarantee the above protects: a conversion either happens and
+//  says so, or does not happen and says so. Never the third thing.
+[$cO, $iO, $rO] = $g5hire('O');
+$insExists = $iO > 0 ? (int) ops_val("SELECT COUNT(*) FROM inspectors WHERE id=?", [$iO]) : 0;
+$linked    = (int) ops_val("SELECT COALESCE(inspector_id,0) FROM candidates WHERE id=?", [$cO]);
+if (!empty($rO['ok'])) {
+    t_eq($insExists, 1, 'O4 · a reported SUCCESS means the team member really exists');
+    t_eq($linked, $iO, 'O5 · …and the application really points at them');
+} else {
+    //  A reported failure must have left NOTHING behind.
+    t_eq($linked, 0, 'O4 · *** a reported FAILURE left no team member attached ***');
+}
 
 // ---------------------------------------------------------------------------
 t_section('G5 N · THE EARLIER GATES STILL HOLD');

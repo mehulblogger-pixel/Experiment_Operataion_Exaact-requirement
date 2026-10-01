@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'b1e793c · 2026-10-01 11:01 UTC · 675 files';
+$RELEASE = '0215b85 · 2026-10-01 11:25 UTC · 675 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -89,7 +89,7 @@ $EXPECT  = [
     'lib/connect_geo.php' => ['s'=>15539,'h'=>'5a1f51ac70ec64d2'],
     'lib/connect_govern.php' => ['s'=>7181,'h'=>'22ce5ad54e44ce2a'],
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
-    'lib/connect_identity.php' => ['s'=>56947,'h'=>'7b47484ccb30c52b'],
+    'lib/connect_identity.php' => ['s'=>58186,'h'=>'6500583342a99ab1'],
     'lib/connect_kpi.php' => ['s'=>25816,'h'=>'6822491cfb7498be'],
     'lib/connect_market.php' => ['s'=>39876,'h'=>'0fd3332b96bb74f5'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
@@ -192,7 +192,7 @@ $EXPECT  = [
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
-    'lib/recruit.php' => ['s'=>137814,'h'=>'056915760385d9f6'],
+    'lib/recruit.php' => ['s'=>138522,'h'=>'0d2186f83e7fa8ee'],
     'lib/recruit_approval.php' => ['s'=>169897,'h'=>'aeb8b5972a6e6fec'],
     'lib/recruit_assign.php' => ['s'=>40788,'h'=>'bcdcf294d7fa64a5'],
     'lib/recruit_cc.php' => ['s'=>33057,'h'=>'bba9d9edaf43ee16'],

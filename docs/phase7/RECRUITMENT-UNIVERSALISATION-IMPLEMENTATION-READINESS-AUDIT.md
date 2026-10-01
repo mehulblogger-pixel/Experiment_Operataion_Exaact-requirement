@@ -2411,6 +2411,59 @@ in the organisation's configuration ledger as `wf_joining_migrated_at`.
 
 **No production database was read or modified, and nothing was deployed.**
 
+### §20h.8a — A PRE-EXISTING MariaDB DEFECT THIS GATE'S TESTS FOUND
+
+Not part of Gate 5's brief, found by Gate 5's own battery, and **present
+unchanged at `b1e793c`**. It is recorded here because it is the most serious
+thing this gate turned up.
+
+**A hire could be reported as failed having actually happened.**
+
+`connect_identity_migrate()` creates the identity-ledger table lazily on first
+use, and its first use is `connect_identity_conversion_link_create()` — which
+`rcv_convert()` calls **inside** the transaction that creates a team member.
+MariaDB commits implicitly on any DDL, a no-op `CREATE TABLE IF NOT EXISTS`
+included. So the sequence was:
+
+1. the transaction opens and the team member is inserted;
+2. the identity ledger migrates itself — and that DDL **commits the
+   half-finished transaction**, persisting the new team member;
+3. `commit()` then fails with "There is no active transaction";
+4. the rollback has nothing left to undo;
+5. the recruiter is told **"The conversion could not be completed. Nothing was
+   changed."** — about a person who now exists on the team.
+
+The recruiter's natural next step is to try again, and the second attempt is
+refused because the person is already there. The code's own comments state that
+"a reported failure that commits a row is the exact defect this batch exists to
+remove", so this was a live instance of the defect class the programme is for.
+
+**Why it had never been seen.** The migration short-circuits on a `static` keyed
+to `db_epoch()`, and `boot()` already runs it once, so in a single-tenant process
+the DDL never happens again. But `db_epoch()` changes whenever the connection
+does — and this product gives **every tenant its own database**, so serving
+another workspace invalidates that static and the next call does real schema
+work. In production the exposure is the first conversion after any tenant switch,
+not merely the first after a deploy.
+
+**The fix** is the pattern the codebase had already established twice:
+
+* `connect_identity_migrate()` now refuses to run DDL inside a transaction it did
+  not open, and deliberately does **not** set its done-marker when it skips, so
+  the schema work simply happens later, outside. This is the same rule, for the
+  same reason, as `act_migrate()` in `lib/activity.php`.
+* `rcv_convert()` readies that schema **before** opening its transaction, exactly
+  as Gate 3 calls `crev_migrate()` before `rver_apply()`'s transaction.
+
+**The first version of the regression test was worthless and was replaced.** It
+opened a transaction, called the migration and asserted the transaction survived
+— but the `static` made the call return early without reaching any DDL, so it
+passed with the guard removed. Mutation M14 surviving is what exposed it. The
+test now bumps `db_epoch()` first, putting the migration in the state a tenant
+switch leaves it in, and M14 is killed on MariaDB. M14 is skipped on SQLite and
+said so out loud, because SQLite has transactional DDL and the mutation survives
+there for a correct reason.
+
 ### §20h.9 — What was changed
 
 | File | Change |
@@ -2419,6 +2472,7 @@ in the organisation's configuration ledger as `wf_joining_migrated_at`.
 | `lib/recruit.php` | `rcv_convert()` creates the team member `PENDING_JOINING`, not `ACTIVE` |
 | `lib/ops.php` | `candidate-joined` activates and stands down atomically; Inspectors master form uses the vocabulary |
 | `lib/activity.php` | `JOINED` / `JOINING_CLEARED` registered; `act_kinds_manual()` |
+| `lib/connect_identity.php` | §20h.8a — the migration refuses to run DDL inside somebody else's transaction |
 | `lib/assets.php` | "has left" means `INACTIVE`, not "not active" |
 | `views/ops/inspector_form.php` | vocabulary-driven status select; leaver-only kit warning |
 | `views/ops/asset_register.php` | leaver-only "not returned" badge |

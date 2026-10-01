@@ -21,7 +21,27 @@
 // ============================================================================
 
 function connect_identity_migrate() {
-    static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
+    static $doneAt = -1; if ($doneAt === db_epoch()) return;
+    //  NEVER run DDL inside a transaction this function did not open. MariaDB
+    //  commits implicitly on any DDL, including a no-op CREATE TABLE IF NOT
+    //  EXISTS, so doing schema work here silently committed the CALLER's
+    //  transaction half way through their work.
+    //
+    //  That was not theoretical. rcv_convert() calls
+    //  connect_identity_conversion_link_create() — which calls this — from inside
+    //  the transaction that creates a team member. On MariaDB the first
+    //  conversion in a process (the first hire after a deploy, or in a new
+    //  workspace) committed the half-made team member here, then failed at its
+    //  own commit() with "There is no active transaction", rolled back nothing,
+    //  and reported FAILURE to the recruiter for a person who had in fact been
+    //  created. A reported failure that commits a row is exactly the defect this
+    //  programme exists to remove.
+    //
+    //  The marker is deliberately NOT set when we skip: the schema step simply
+    //  happens later, outside, the way it always would have. (Same rule, and the
+    //  same reason, as act_migrate() in lib/activity.php.)
+    try { if (db()->inTransaction()) return; } catch (Throwable $e) {}
+    $doneAt = db_epoch();
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     db()->exec("CREATE TABLE IF NOT EXISTS cx_identity_link (
         id $pk,

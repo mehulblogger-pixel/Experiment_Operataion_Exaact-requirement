@@ -2136,6 +2136,17 @@ function rcv_convert($candId, array $opt = []) {
     //  7 IDENTITY CAPABILITY — decided BEFORE the write so the outcome is known,
     //     and never a blocker on recruitment (BD2).
     $mayLink = function_exists('connect_identity_conversion_allowed') && connect_identity_conversion_allowed();
+    //  …and its schema is made ready HERE, before the transaction opens.
+    //
+    //  The identity ledger migrates itself lazily on first use, and its first use
+    //  is inside the transaction below. On MariaDB that DDL implicitly committed
+    //  the half-made team member and the commit then failed, so a hire that HAD
+    //  happened was reported as a failure. The migration now refuses to run
+    //  inside somebody else's transaction, which makes this call the thing that
+    //  gets the table ready — the same order Gate 3 uses for crev_migrate().
+    if ($mayLink && function_exists('connect_identity_migrate')) {
+        try { connect_identity_migrate(); } catch (Throwable $e) {}
+    }
 
     //  7a IS THIS PERSON ALREADY ON THE TEAM? — owner decision 2, RB-3 Step 2.
     //
