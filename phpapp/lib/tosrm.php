@@ -972,7 +972,26 @@ function tosrm_render_job_panel($job) {
     $hold = tosrm_assign_state($job); $accept = tosrm_accept_state($job);
     $hist = tosrm_assign_history($jid);
     $csrf = function_exists('csrf_token') ? csrf_token() : '';
-    $insps = ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'')<>'INACTIVE' ORDER BY name") ?: [];
+    //  A-F1 (Gate 6) — WHO MAY BE GIVEN THIS JOB.
+    //
+    //  This asked NEGATIVELY: "anybody who is not INACTIVE". With two status
+    //  values that was the same as asking for the active, so it read as correct
+    //  for years. Once Gate 5 added PENDING_JOINING it stopped being correct, and
+    //  silently: a person who had accepted an offer and not yet started appeared
+    //  in this dropdown and could be put on a job weeks before their first day.
+    //  That is the one thing the Gate 5 activation boundary exists to prevent,
+    //  and this screen was the single place still able to do it.
+    //
+    //  Gate 5's census missed it because it looked for `<>'ACTIVE'` and
+    //  `='INACTIVE'` and not for `<>'INACTIVE'`, which is the form used here.
+    //
+    //  It now asks the ONE canonical question (wf_active_sql(), lib/workforce.php)
+    //  rather than carrying a second definition of "active" that has to be kept
+    //  in step by hand. A blank status still counts as active, exactly as before
+    //  and exactly as everywhere else (field-finding #26); the difference is that
+    //  a joiner — and any unrecognised value — is now excluded instead of
+    //  admitted by default.
+    $insps = ops_all("SELECT id, name FROM inspectors WHERE " . wf_active_sql() . " ORDER BY name") ?: [];
     $curInsp = (int)($job['inspector_id'] ?? 0);
     $curDate = (string)($job['scheduled_date'] ?? '');
     // §resource-decision — accept/decline only matters for a non-employee

@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '0215b85 · 2026-10-01 11:25 UTC · 675 files';
+$RELEASE = '135f6d1 · 2026-10-01 13:38 UTC · 675 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -250,7 +250,7 @@ $EXPECT  = [
     'lib/terms.php' => ['s'=>28589,'h'=>'6aa8716a9d4cae12'],
     'lib/timesheet.php' => ['s'=>9615,'h'=>'0850f4b87638e4a5'],
     'lib/tmplpreview.php' => ['s'=>3520,'h'=>'770170cf566d21da'],
-    'lib/tosrm.php' => ['s'=>174751,'h'=>'699dacbfa2e48e0d'],
+    'lib/tosrm.php' => ['s'=>175958,'h'=>'97546ac06cc88324'],
     'lib/trace_audit.php' => ['s'=>17883,'h'=>'b7fce5750cd3b3df'],
     'lib/trace_seed.php' => ['s'=>26992,'h'=>'77cf9de62dacbf11'],
     'lib/trust.php' => ['s'=>55443,'h'=>'612b7b84607188ff'],
