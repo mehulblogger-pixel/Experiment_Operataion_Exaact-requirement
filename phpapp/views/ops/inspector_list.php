@@ -1,6 +1,17 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › Inspectors</div>
 <div class="master-head">
-  <div><h1><?= e(T_REG('engineer')) ?></h1><p class="sub"><?= count($rows) ?> inspector(s)</p>
+<?php //  D4 (Gate 6) — the headline must not count people who have not arrived as
+      //  though they were working here. The rows were already labelled correctly;
+      //  the total was not. Counted over the rows ACTUALLY DISPLAYED, so the
+      //  figure stays true when the D3 filter narrows the list. A blank status
+      //  counts as on the team, consistent with every other reader. ?>
+<?php $nTeam = 0; $nJoin = 0;
+      foreach ($rows as $__r) {
+          if (strtoupper(trim((string) ($__r['status'] ?? ''))) === WF_ST_JOINING) $nJoin++;
+          elseif (wf_is_active($__r['status'] ?? '')) $nTeam++;
+      } ?>
+  <div><h1><?= e(T_REG('engineer')) ?></h1><p class="sub"><?= (int) $nTeam ?> on the team<?php
+        if ($nJoin > 0): ?> · <strong><?= (int) $nJoin ?> joining pending</strong><?php endif; ?></p>
 <?php //  B10-CL-3 — the definition where the word is. B4 wrote these into the
       //  terminology registry and put one at point of use (the hiring-request
       //  screen); the rest were reachable only from /terminology. Same helper,
@@ -11,8 +22,17 @@
 </div>
 <form method="get" action="/m/inspectors" class="filter-bar">
   <input class="form-control" type="text" name="q" value="<?= e($q) ?>" placeholder="Search name / code / skill…">
+  <?php //  D3 — the one vocabulary, so this list can answer "who have we hired
+        //  that has not started yet?". Everyone by default: this is the team
+        //  register, not an allocation list. ?>
+  <select class="form-control" name="status" style="max-width:210px">
+    <option value="">Everyone</option>
+    <?php foreach (wf_statuses() as $k => $v): ?>
+      <option value="<?= e($k) ?>" <?= (($fStatus ?? '') === $k) ? 'selected' : '' ?>><?= e($v) ?></option>
+    <?php endforeach; ?>
+  </select>
   <button class="btn secondary" type="submit">Search</button>
-  <?php if ($q): ?><a class="btn secondary" href="/m/inspectors">Clear</a><?php endif; ?>
+  <?php if ($q !== '' || ($fStatus ?? '') !== ''): ?><a class="btn secondary" href="/m/inspectors">Clear</a><?php endif; ?>
 </form>
 <table class="grid">
   <tr><th>Name</th><th>Emp code</th><th>Team</th><th>Trade</th><th><?= e(TP('sbu')) ?></th><th>Skills</th><th>Status</th><th>Actions</th></tr>

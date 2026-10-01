@@ -164,6 +164,31 @@ function wf_status_move($inspectorId, $from, $to, $subject) {
     return true;
 }
 
+//  WHO IS HIRED BUT HAS NOT STARTED, in the offices a board is showing.
+//
+//  D2 (Gate 6). The availability board excludes a joining-pending person, which
+//  is correct — and says nothing, which is not. A coordinator who knows an
+//  engineer was hired opens the board, cannot find them, and has no way to tell
+//  apart "nobody was hired", "hired and not joined yet", "joined and on leave"
+//  and "my filters are hiding them". A silent absence is the most likely reason
+//  somebody concludes the product has lost their data.
+//
+//  This counts them so the board can SAY so. It deliberately mirrors
+//  inspector_availability()'s own scope rules — same office set, same
+//  non-subcontractor rule — because a count drawn from a different population
+//  than the board would be worse than no count at all. It changes no
+//  qualification: the board's roster query is untouched.
+function wf_joining_pending_in_offices($offices) {
+    $where = "UPPER(TRIM(COALESCE(status,'')))='" . WF_ST_JOINING . "' AND COALESCE(staff_kind,'ASSET')<>'SUBCON'";
+    if (is_array($offices)) {
+        if (!$offices) return 0;
+        $in = implode(',', array_map('intval', $offices));
+        $where .= " AND (home_office_id IN ($in))";
+    }
+    try { return (int) ops_val("SELECT COUNT(*) FROM inspectors WHERE $where"); }
+    catch (Throwable $e) { return 0; }
+}
+
 // ----------------------------------------------------------------------------
 //  EXISTING DATA — classify before changing anything
 // ----------------------------------------------------------------------------
@@ -659,8 +684,13 @@ function ops_inspector_availability($method) {
         $grid = ['month' => $month, 'days' => $dG, 'people' => $peopleG, 'matrix' => $mG];
     }
 
+    //  D2 — how many people in this scope are hired but have not started. The
+    //  board explains their absence instead of leaving it silent.
+    $joiningPending = function_exists('wf_joining_pending_in_offices') ? wf_joining_pending_in_offices($offices) : 0;
+
     view('ops/availability', [
         'rows' => $filtered, 'allRows' => $rows, 'day' => $day, 'offices' => $offices,
+        'joiningPending' => $joiningPending,
         'freeBoth' => $freeBoth, 'tomorrow' => $tomorrow,
         'check' => $check, 'grid' => $grid, 'month' => $month,
         'officeList' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),

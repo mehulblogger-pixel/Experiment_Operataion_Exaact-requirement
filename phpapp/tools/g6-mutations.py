@@ -26,7 +26,46 @@ MUTATIONS = [
  ("G6-M2 the assignment dropdown stops filtering at all", "lib/tosrm.php",
   """    $insps = ops_all("SELECT id, name FROM inspectors WHERE " . wf_active_sql() . " ORDER BY name") ?: [];""",
   """    $insps = ops_all("SELECT id, name FROM inspectors ORDER BY name") ?: [];"""),
+ # ---- D2: the availability path's own qualification ----------------------
+ ("G6-M3 the availability path stops requiring ACTIVE", "lib/workforce.php",
+  """    $where = "status='ACTIVE' AND COALESCE(staff_kind,'ASSET')<>'SUBCON'";""",
+  """    $where = "COALESCE(status,'')<>'INACTIVE' AND COALESCE(staff_kind,'ASSET')<>'SUBCON'";"""),
 ]
+
+#  MUTATIONS WHOSE EFFECT IS ONLY VISIBLE ON SCREEN.
+#
+#  D2's message, D3's filter and D4's counts live in views and in a route
+#  handler, and view() is defined in index.php — unreachable from the test
+#  harness. The only honest way to prove these is to drive the real routes in a
+#  browser, so these are checked against tools/g6-browser-run.sh, not the suite.
+BROWSER_MUTATIONS = [
+ ("G6-B1 the board stops counting who has not joined", "lib/workforce.php",
+  """    try { return (int) ops_val("SELECT COUNT(*) FROM inspectors WHERE $where"); }""",
+  """    try { return 0; }"""),
+
+ ("G6-B2 the team filter matches negatively", "lib/ops.php",
+  """        $w[] = "UPPER(TRIM(COALESCE(status,'')))=?"; $args[] = $fStatus;""",
+  """        $w[] = "UPPER(TRIM(COALESCE(status,'')))<>?"; $args[] = $fStatus;"""),
+
+ ("G6-B3 the headline counts joiners as workforce", "views/ops/inspector_list.php",
+  """          if (strtoupper(trim((string) ($__r['status'] ?? ''))) === WF_ST_JOINING) $nJoin++;
+          elseif (wf_is_active($__r['status'] ?? '')) $nTeam++;""",
+  """          $nTeam++;"""),
+
+ ("G6-B4 the close control goes back to a small target", "assets/css/app.css",
+  """  min-width:44px;min-height:44px;align-items:center;justify-content:center;padding:0}""",
+  """  padding:0}"""),
+]
+
+
+def run_browser(env):
+    p = subprocess.run(['bash', 'tools/g6-browser-run.sh'], cwd=ROOT,
+                       capture_output=True, text=True, env=env)
+    out = p.stdout + p.stderr
+    for line in out.splitlines():
+        if line.startswith('BROWSER RESULT:'):
+            return int(line.split(',')[1].strip().split()[0]), out
+    return -1, out
 
 
 #  CRASH SAFETY. A mutation battery deliberately holds a BROKEN copy of a source
@@ -107,8 +146,33 @@ def main():
             print('  killed    %-56s could not run' % name); killed += 1
         else:
             print('  killed    %-56s %d assertion(s) failed' % (name, fails)); killed += 1
+    bkilled = 0
+    for name, rel, find, repl in BROWSER_MUTATIONS:
+        path = os.path.join(ROOT, rel)
+        original = io.open(path, encoding='utf-8').read()
+        io.open(path + SIDECAR, 'w', encoding='utf-8').write(original)
+        if original.count(find) != 1:
+            os.remove(path + SIDECAR)
+            print('  ?? %-56s ANCHOR MATCHED %d TIMES' % (name, original.count(find)))
+            survived.append(name + ' (anchor)')
+            continue
+        io.open(path, 'w', encoding='utf-8').write(original.replace(find, repl, 1))
+        try:
+            fails, out = run_browser(env)
+        finally:
+            io.open(path, 'w', encoding='utf-8').write(original)
+            if os.path.exists(path + SIDECAR):
+                os.remove(path + SIDECAR)
+        if fails == 0:
+            print('  SURVIVED  %-56s 0 browser failures' % name); survived.append(name)
+        elif fails < 0:
+            print('  killed    %-56s browser run could not complete' % name); bkilled += 1
+        else:
+            print('  killed    %-56s %d browser assertion(s) failed' % (name, fails)); bkilled += 1
+
     print('\n%d killed / %d run (%d skipped as engine-specific)'
           % (killed, len(MUTATIONS) - len(skipped), len(skipped)))
+    print('%d browser mutation(s) killed / %d run' % (bkilled, len(BROWSER_MUTATIONS)))
     if skipped: print('SKIPPED (not applicable to this engine): ' + ', '.join(skipped))
     if survived:
         print('SURVIVORS:'); [print('  - ' + x) for x in survived]; sys.exit(1)

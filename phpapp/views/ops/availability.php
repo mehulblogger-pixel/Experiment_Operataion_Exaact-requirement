@@ -74,6 +74,21 @@
   <?php endif; ?>
 </form>
 
+<?php //  D2 (Gate 6) — EXPLAIN AN ABSENCE.
+      //  Somebody hired who has not started is deliberately not on this board.
+      //  Saying nothing about them is how a coordinator concludes the record was
+      //  lost, or worse, goes looking for a way to schedule them anyway. This
+      //  states the fact and points at the list where their joining is recorded.
+      //  It reports; it decides nothing. The roster above is unchanged. ?>
+<?php $jp = (int) ($joiningPending ?? 0); if ($jp > 0): ?>
+  <div class="msg msg-info" style="margin:0 0 14px">
+    <strong><?= $jp ?></strong> <?= $jp === 1 ? 'person has' : 'people have' ?> been hired but
+    <strong>not yet joined</strong>, so <?= $jp === 1 ? 'they are' : 'they are' ?> not available for
+    scheduling until their joining is recorded.
+    <a href="/m/inspectors?status=<?= e(WF_ST_JOINING) ?>">See who &rarr;</a>
+  </div>
+<?php endif; ?>
+
 <div class="panel-split" style="align-items:start">
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Free to allocate <span class="muted">— free today <em>and</em> tomorrow (<?= e(fdate($tomorrow)) ?>)</span></h3>

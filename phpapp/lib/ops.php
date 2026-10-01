@@ -4934,10 +4934,36 @@ function ops_inspectors($action, $method) {
     }
     // list
     $q = trim($_GET['q'] ?? '');
-    $where = "1=1"; $args = [];
-    if ($q) { $where = "(name LIKE ? OR emp_code LIKE ? OR skills LIKE ?)"; $args = ["%$q%", "%$q%", "%$q%"]; }
-    $rows = ops_all("SELECT * FROM inspectors WHERE $where ORDER BY name", $args);
-    view('ops/inspector_list', ['rows' => $rows, 'q' => $q]);
+    //  D3 (Gate 6) — AN OPTIONAL STATUS FILTER.
+    //
+    //  This is the HR/team-management view, not an operational allocation
+    //  surface, so the default is unchanged: everyone, including people who have
+    //  not started and people who have left. §11 of Gate 5 depends on that.
+    //
+    //  What was missing is a way to ASK. "Who have we hired that has not started
+    //  yet?" was unanswerable without reading every row of the whole team, which
+    //  is why the availability board now links straight here with the filter set.
+    //
+    //  Matching is POSITIVE in every branch — the chosen value is named, never
+    //  negated. A negative filter here is how a joiner would quietly become
+    //  assignable again, which is the defect A-F1 was. Filtering this list grants
+    //  nobody anything: it changes which rows are listed and no qualification
+    //  anywhere else.
+    //
+    //  ACTIVE deliberately uses wf_active_sql() rather than an equality test, so
+    //  a blank status is listed as active here exactly as it is treated as active
+    //  everywhere else (field-finding #26).
+    $fStatus = strtoupper(trim((string) ($_GET['status'] ?? '')));
+    if ($fStatus !== '' && !isset(wf_statuses()[$fStatus])) $fStatus = '';   // ignore anything unrecognised
+    $w = ['1=1']; $args = [];
+    if ($q) { $w[] = "(name LIKE ? OR emp_code LIKE ? OR skills LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%"); }
+    if ($fStatus === WF_ST_ACTIVE) {
+        $w[] = wf_active_sql();
+    } elseif ($fStatus !== '') {
+        $w[] = "UPPER(TRIM(COALESCE(status,'')))=?"; $args[] = $fStatus;
+    }
+    $rows = ops_all("SELECT * FROM inspectors WHERE " . implode(' AND ', $w) . " ORDER BY name", $args);
+    view('ops/inspector_list', ['rows' => $rows, 'q' => $q, 'fStatus' => $fStatus]);
 }
 // ---- Inspector entitlements (P2) — Super-Admin only ------------------------
 // Effective map of what an inspector may claim: ['HEAD'=>[code=>['allowed','rate']], 'MODE'=>[...]]
