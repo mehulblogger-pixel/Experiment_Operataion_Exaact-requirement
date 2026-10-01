@@ -3512,6 +3512,8 @@ function ops_dispatch($route, $method) {
         //  it does not share the '/candidate-stage' prefix the UAT selector matches.
         case $route === 'candidate-pipestage': // Per-stage capture — notes + documents for one pipeline stage
             return ops_recruit_candidate_stage($route, $method);
+        case $route === 'candidate-review':   // Gate 3 — decide a requirement review: continue, reject, or reconsider
+            return ops_candidate_review($route, $method);
         case $route === 'positions' || $route === 'positions-org' || $route === 'positions-import':   // Phase 3 — position master, org chart & import
             return ops_positions($route, $method);
         case $route === 'departments':                               // Department hub — designations, positions, headcount & people by department
@@ -6645,7 +6647,12 @@ function ops_candidates($route, $method) {
                 //  On a MOVE the candidate holds no seat on the destination, so
                 //  they must not be excused from its count.
                 $m6self = ($m6act === 'JOIN') ? 0 : ($cand ? (int) $cand['id'] : 0);
-                $m6why = rexec_block_reason((int) $b['requisition_id'], $m6act, $m6self);
+                //  GATE 3 — the acting candidate is named EXPLICITLY, because $m6self
+                //  is 0 on a move and a review belongs to a person, not to a seat.
+                //  Without this, reallocating a candidate was a way past an
+                //  unresolved requirement review.
+                $m6why = rexec_block_reason((int) $b['requisition_id'], $m6act, $m6self,
+                                            $cand ? (int) $cand['id'] : 0);
                 if ($m6why !== '') {
                     flash($m6why, 'error');
                     redirect($cand ? '/candidate?id=' . (int)$cand['id'] : '/candidates');

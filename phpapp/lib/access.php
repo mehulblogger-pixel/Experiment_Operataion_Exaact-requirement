@@ -166,6 +166,12 @@ const PERMISSIONS = [
     //  Deliberately in NO role default. Somebody has to decide who may reopen an
     //  approved requirement, and that decision belongs to the customer.
     'hiring.material_change.propose' => 'Propose a change to an approved requirement (goes to change control)',
+    //  GATE 3 (§12) — DECIDING a requirement review, which is not the same thing as
+    //  being able to edit recruitment. Somebody who may move candidates all day is
+    //  not thereby entitled to rule that a person still meets a requirement the
+    //  business has just raised; that judgement is what this permission places.
+    //  Deliberately in NO role default: an organisation says who holds it.
+    'hiring.review.clear' => 'Decide a requirement review on a candidate (continue or reject)',
     // ---- CRM / Marketing & Sales (fine-grained actions) ----
     'crm.quote.create'    => 'Create / edit quotations',
     'crm.quote.approve'   => 'Approve quotations (approval chain)',
@@ -207,7 +213,7 @@ function permission_groups() {
         'Inspection documentation (IDEMS)' => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.audit.view'],
         'Money'                          => ['finance.reconcile'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
-        'Recruitment'                    => ['hiring.admin','hiring.material_change.propose'],
+        'Recruitment'                    => ['hiring.admin','hiring.material_change.propose','hiring.review.clear'],
         'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
         'Complaints & appeals'           => ['complaints.decide','capa.close','ncr.close'],
         'Administration'                 => ['master.manage','users.manage.branch','users.manage.global','org.hierarchy.view','settings.manage'],

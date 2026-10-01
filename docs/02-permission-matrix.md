@@ -541,3 +541,53 @@ dropdown is not a control.
 built. A workspace may add its own sources without a line of code; the shipped
 values always stay valid so that narrowing the list never makes yesterday's
 allocations unreadable.
+
+---
+
+## Requirement change control & requirement reviews (Gates 2 and 3)
+
+Two permissions were added to the Recruitment group. Both are **per role**, both are
+configurable on the Roles & permissions screen (`/access`), both ship in **no role's
+defaults**, and neither carries any system-wide power.
+
+| Permission | What it allows | Shipped default |
+|---|---|---|
+| `hiring.material_change.propose` | Propose a change to an **approved** requirement, which goes to change control instead of editing the record (Gate 2) | in no role's defaults |
+| `hiring.review.clear` | **Decide** a requirement review on a candidate — continue or reject — after a stricter approved version became effective (Gate 3) | in no role's defaults |
+
+**`hiring.material_change.propose` EXTENDS, it does not replace.** Gate 2's model is
+role defaults **plus** this permission **plus** recruitment scope — three things that
+add up. A role that may already change this requirement keeps that ability; the
+permission extends the same ability to roles whose defaults do not include changing
+requirements; scope applies on top of both. Requiring the permission *instead* would
+have silently removed, on upgrade, something every existing recruiter can do today.
+
+**`hiring.review.clear` is deliberately NOT the general recruitment edit right, and
+is deliberately NOT additive to it.** Somebody who may move candidates all day is not
+thereby entitled to rule that a person still meets a requirement the business has
+just raised — that is the judgement this permission places with a named population.
+So deciding a review needs this permission **and** recruitment scope, and nothing
+else grants it.
+
+**Visibility is not authority.** Anyone who can legitimately open the candidate can
+see that a review is open, what changed, and which versions are involved. Deciding it
+is a separate question, asked inside `crev_continue()` / `crev_reject()` /
+`crev_reconsider()` rather than on the screen — so a direct POST, a crafted URL, a
+stage move, an offer, a joining, a workforce conversion or a future caller all meet
+the same refusal. A user without the permission, and a user with the permission but
+scoped to another branch, are both refused at the service.
+
+**Scope derives through the requirement**, as it always has: candidate → requirement
+→ office / business unit. Gate 3 adds **no candidate office column**.
+
+**What a review stops:** while one is open, an **offer** and a **joining** can never
+proceed — those are commitments to a person. An organisation may optionally let
+screening and interviewing continue (`crev_allow_screening`), which is off by
+default. This is answered inside the existing execution gate
+(`rexec_block_reason()`), per action, in the existing `REXEC_ACTIONS` vocabulary —
+there is no second action-policy engine.
+
+Neither gate adds a route that bypasses the module gates: the one new route
+(`candidate-review`) is reached only by somebody who can already open the candidate,
+and it performs no authority check of its own precisely so that the check cannot be
+skipped by reaching the functions another way.

@@ -341,6 +341,20 @@ t_eq((int) rver_current('REQUISITION', $rq2)['version'], 2,
 t_section('G2 · K — an issued offer pins the version boundary (A2)');
 // ---------------------------------------------------------------------------
 $verAtIssue = (int) rver_current('REQUISITION', $rq2)['version'];
+//  GATE 3 — THE VERSION CHANGE IN SECTION J PUT THESE CANDIDATES IN REVIEW.
+//
+//  Section J moved this requirement from Engineer to Foreman, so the people
+//  attached to it were sourced against a role it no longer asks for, and no offer
+//  can be made to any of them until somebody has confirmed they still fit. That is
+//  Gate 3's rule and it is correct here — so the reviews are resolved first, the
+//  way a recruiter would resolve them, and only then is the offer made. Nothing
+//  about Gate 2's boundary changes; it is simply reached through the review now.
+if (function_exists('crev_open_all')) {
+    foreach ([$cJ1, $cJ2] as $cx)
+        foreach (crev_open_all($cx) as $rx)
+            crev_continue((int) $rx['id'], 'Checked against the changed role — still suitable.');
+    t_eq(count(crev_open_all($cJ1)), 0, 'K-0 · the requirement review on this candidate is resolved first');
+}
 $oK = (int) offer_create($cJ1, ['ctc' => 400000, 'joining_date' => date('Y-m-d', strtotime('+30 days'))]);
 t_ok($oK > 0, 'K0 · an offer is created');
 offer_submit($oK); offer_approve($oK);

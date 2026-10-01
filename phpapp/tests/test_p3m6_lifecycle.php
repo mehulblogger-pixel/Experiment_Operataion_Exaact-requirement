@@ -130,10 +130,25 @@ t_eq($offN($cB), 0, 'L3.6 · …and none exists');
 t_ok(!recruitpipe_cand_goto(ops_one("SELECT * FROM candidates WHERE id=?", [$cB]), 1, 'attack', 'attacker'),
      'L3.7 · *** the configured pipeline will not advance it either ***');
 t_eq($stage($cB), 'RECEIVED', 'L3.8 · the candidate has not moved');
-//  …and it all works again once re-approved
+//  …and it all works again once re-approved AND the candidate has been looked at.
+//
+//  GATE 3 ADDED THE SECOND HALF OF THAT SENTENCE. The change re-approved here moved
+//  the role from Engineer to Supervisor, so the person sitting in this process was
+//  sourced against a requirement that no longer exists. Re-approval lifts M4's
+//  block — the authority is sound again — and a REQUIREMENT REVIEW takes its place
+//  until somebody confirms, for this candidate, that they still fit. That is not
+//  the same block arriving twice: the first was about the requirement, the second
+//  is about the person.
 hreq_apply_decision($hB, 'APPROVED', 'M6L Approver', 're-approved');
-t_eq(rexec_block_reason($rqB, 'OFFER', $cB), '', 'L3.9 · re-approval restores execution');
-t_ok(offer_create($cB, ['ctc' => 500000]) > 0, 'L3.10 · …and the offer can now be made');
+t_ok(hreq_is_executable(hreq_get($hB)), 'L3.9 · re-approval makes the request executable again');
+$l3rev = function_exists('crev_open_all') ? crev_open_all($cB) : [];
+t_eq(count($l3rev), 1, 'L3.10 · *** …and a requirement review now stands in M4\'s place ***');
+t_ok(rexec_block_reason($rqB, 'OFFER', $cB) !== '',
+     'L3.11 · *** so no offer can be made until a person has looked at this candidate ***');
+[$l3ok] = crev_continue((int) $l3rev[0]['id'], 'Checked against the Supervisor requirement — still suitable.');
+t_ok($l3ok, 'L3.12 · the review is cleared, with a reason');
+t_eq(rexec_block_reason($rqB, 'OFFER', $cB), '', 'L3.13 · NOW execution is restored');
+t_ok(offer_create($cB, ['ctc' => 500000]) > 0, 'L3.14 · …and the offer can be made');
 
 // ---- L4 · AN OFFER ALREADY IN FLIGHT WHEN THE BLOCK LANDS ------------------
 t_section('L4 · the block catches an offer mid-flight');

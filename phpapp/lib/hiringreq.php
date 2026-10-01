@@ -91,6 +91,22 @@ const HREQ_MATERIAL_FIELDS = [
     'client_id'              => 'the client contract it is billed against',
     'request_type'           => 'the basis on which it was authorised',
     'requested_by_id'        => 'the identity segregation of duties was judged against',
+    //  GATE 3 FINDING (G3-1) — THE FLOOR ITSELF WAS NOT PROTECTED.
+    //
+    //  Gate 2 put these three on the REQUISITION's material list, with the reason
+    //  "the floor candidates are judged against", and made the approved hiring
+    //  request's values the A8 floor a requisition may not weaken. They were not on
+    //  the REQUEST's own list, so the floor could be edited on an already-approved
+    //  request with no proposal, no approval and no new version: the ceiling was
+    //  guarded and the thing it was measured against was not.
+    //
+    //  That is also why a stricter hiring request could not reach a candidate at
+    //  all — no version was ever created to be stricter THAN. This is an extension
+    //  of a decision Gate 2 already took, in the only direction Gate 2 allows its
+    //  material lists to move (add, never remove).
+    'min_experience_years'   => 'the experience floor candidates are judged against',
+    'min_qualification'      => 'the qualification floor candidates are judged against',
+    'essential_skills'       => 'the skills a candidate must have to be eligible',
 ];
 
 // Starter vocabularies. Each is created through the EXISTING lookup engine, so a

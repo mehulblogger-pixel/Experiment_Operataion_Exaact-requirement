@@ -759,6 +759,81 @@ never be issued** (§32) — the chain is the thing that approves it.
 
 ---
 
+## Requirement change proposal (`requirement_change_proposals.status`) — recruitment (Gate 2)
+
+An **approved** requirement — a Hiring Request or a Requisition — is immutable. A
+change to something the approver authorised does not touch the record: it becomes a
+**proposal**, and the approved version stays in force until somebody decides.
+
+```
+PENDING ─▶ APPROVED      (the change takes effect; a new approved version is recorded)
+   │
+   ├─────▶ REJECTED      (nothing changes; the proposal and its refused values are kept for ever)
+   │
+   └─────▶ WITHDRAWN     (the proposer stands it down; nothing changes)
+```
+
+- **One PENDING proposal per requirement**, enforced by the database (a
+  `pending_key` that carries the requirement's identity only while the row is
+  pending, under a unique index — portable across SQLite and MariaDB).
+- A **reason is mandatory** to propose and to withdraw.
+- A refused proposal is **never amended in place**: a further attempt is a new row,
+  and the refused values remain available to prefill it.
+- Approval is the **only** thing that moves an approved requirement's values, and it
+  writes the record, the new version and the proposal's closure in one transaction.
+- Routing uses the **existing** approval engine (`HREQ_CHANGE` / `REQ_CHANGE`), with
+  the **proposed** values as context. "No matching rule" is **not** "approval off" —
+  the proposal waits and the configuration gap is reported.
+- While a proposal is pending, what recruitment may still do is configurable in four
+  levels, expressed in the existing `REXEC_ACTIONS` vocabulary; the shipped default
+  continues screening and interviewing and allows **no offer and no joining**.
+
+---
+
+## Requirement review (`candidate_reviews.status`) — recruitment (Gate 3)
+
+When a **stricter** approved requirement version becomes effective, every candidate
+still actively in that process is put in front of a human. This is the record of
+that question and its answer. It belongs to **one candidate's one application**
+(the candidate row *is* the candidate↔requirement relationship), never to a person:
+the same human on two requirements has two rows and can be in review on one while
+interviewing on the other. There is deliberately **no `candidates.review_required`
+column**.
+
+```
+OPEN ─▶ CONTINUED     (a person with authority confirms they still meet it — reason required)
+  │
+  └───▶ REJECTED      (a person with authority rejects them — reason required, no further approval)
+```
+
+- **One OPEN review per relationship**, enforced by the database the same way the
+  change proposal above is. A second stricter version while a review is open does
+  not raise a second review; it moves the open one onto the newer version, because
+  there is one decision to make and it must be made against the current bar.
+- **Who it reaches (A1):** *all* active candidates on the affected process — no
+  score, suitability or attribute of any kind exempts anybody, creates a review, or
+  prevents one. The suitability figures shown on the screen are **evidence for the
+  reviewer**, never a verdict.
+- **Who it does not reach (A2):** anybody whose commitment was already made — an
+  **issued** (or viewed, accepted) offer, or a joining. They stay on the version in
+  force when that commitment was made, read from the version stamped on the offer at
+  issue. A **draft** offer is still in scope.
+- **A relaxed requirement raises nothing and reopens nobody.** A rejected candidate
+  stays rejected until somebody deliberately reconsiders them.
+- **Reject** lands on the organisation's own configured `closed` / not-proceeding
+  off-ramp (preferring a *Not suitable* outcome where one is configured). There is
+  no `REVIEW_REJECTED` state: a rejection is a rejection.
+- **Deliberate reconsideration** returns the candidate to the stage recorded in the
+  event ledger as the one they were on immediately **before** they were closed — not
+  to the first stage — with a mandatory reason. The original rejection is appended
+  to, never rewritten.
+- Deciding a review requires **`hiring.review.clear`** plus recruitment scope.
+  Being able to *see* a review confers no authority to decide it.
+- While a review is open, an **offer** and a **joining** can never proceed; an
+  organisation may optionally let screening and interviewing continue.
+
+---
+
 ## `tenant_requests.status` — public workspace signup (operations tenants)
 
 A NEW inspection company applies for its **own operations workspace** from the

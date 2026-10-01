@@ -886,12 +886,22 @@ function rver_apply($pid, array $meta = []) {
     $row = rver_row($entity, $id); if (!$row) return [false, 'That requirement no longer exists.'];
     $fields = rver_proposed_fields($p);
     if (!$fields) return [false, 'That proposal carries no values.'];
+    $g3 = [];
 
     //  Only real columns, and never the identity or the bookkeeping.
     $cols = [];
     foreach (rver_table_fields($d['table']) as $c)
         if (array_key_exists($c, $fields)) $cols[$c] = $fields[$c];
     if (!$cols) return [false, 'That proposal changes nothing.'];
+
+    //  GATE 3 — ITS SCHEMA, BEFORE THE TRANSACTION OPENS.
+    //
+    //  Applying a change now also raises requirement reviews, and that table has to
+    //  exist first. MariaDB COMMITS IMPLICITLY ON ANY DDL, so a CREATE TABLE firing
+    //  inside the transaction below would silently commit a half-applied change —
+    //  the same trap RB-3 documented on the joining path. Migrated here, where a
+    //  commit costs nothing.
+    if (function_exists('crev_migrate')) { try { crev_migrate(); } catch (Throwable $e) {} }
 
     $pdo = db();
     $own = false;
@@ -943,6 +953,22 @@ function rver_apply($pid, array $meta = []) {
             } catch (Throwable $e) { /* an entity without the column */ }
         }
         rver_set_change_state($entity, $id, $entity === 'HIRING_REQUEST' ? 'REAPPROVED' : 'NONE');
+
+        //  GATE 3 — A1. THE MOMENT A STRICTER VERSION BECOMES EFFECTIVE, EVERY
+        //  ACTIVE CANDIDATE IN THAT PROCESS GOES TO A HUMAN.
+        //
+        //  Raised INSIDE this transaction, deliberately. A new version in force with
+        //  nobody reviewed is precisely the silent wrongness Gate 2 was built to end:
+        //  the requirement would have moved while five people carried on being
+        //  advanced against the old one. So it fails CLOSED — if the reviews cannot
+        //  be raised, the change does not take effect and the approver is told,
+        //  rather than the change landing and the control quietly not running.
+        //
+        //  Gate 3 decides direction and audience; this gate only tells it that a new
+        //  version is now in force, and from which one.
+        if ($ver > 1 && function_exists('crev_raise_for_version'))
+            $g3 = crev_raise_for_version($entity, $id, $ver - 1, $ver);
+
         if ($own) $pdo->commit();
     } catch (Throwable $e) {
         if ($own) { try { $pdo->rollBack(); } catch (Throwable $e2) {} }
@@ -952,7 +978,14 @@ function rver_apply($pid, array $meta = []) {
     }
     rver_audit($entity, $id, 'Change approved — new version ' . $ver . ' is now in force',
                ['outcome' => 'APPROVED', 'body' => json_encode(['proposal' => (int) $pid, 'version' => $ver])]);
-    return [true, 'Change approved. Version ' . $ver . ' is now the approved requirement.'];
+    $msg = 'Change approved. Version ' . $ver . ' is now the approved requirement.';
+    //  SAY SO. A reviewer being asked to re-check people is work somebody has to do,
+    //  and an approver who has just created that work should be told they created it
+    //  rather than discovering it on a register later.
+    $n = (int) (($g3['raised'] ?? 0) + ($g3['refreshed'] ?? 0));
+    if ($n > 0) $msg .= ' ' . $n . ' candidate' . ($n === 1 ? '' : 's')
+                      . ' now need' . ($n === 1 ? 's' : '') . ' a review against it.';
+    return [true, $msg];
 }
 
 //  REJECT (G2) — the proposal is kept for ever, the approved version does not
@@ -1387,4 +1420,142 @@ function rver_version_audience($entity, $id) {
         else $out['in_scope'][] = $cid;
     }
     return $out;
+}
+
+// ===========================================================================
+//  GATE 3 — WHICH WAY DID THE REQUIREMENT MOVE?
+//
+//  Gate 2 answers "what changed, and is it material". Gate 3 needs one more
+//  thing: DIRECTION. A requirement that asks for more than it used to is not the
+//  same event as one that asks for less, and the locked rules treat them
+//  oppositely — stricter sends every active candidate to a human (A1), relaxed
+//  deliberately does nothing (§18).
+//
+//  This is an EXTENSION of the Gate 2 comparison, not a second one. It consumes
+//  rver_diff()'s own output, so there is exactly one algorithm that decides
+//  whether two field sets differ, and it reuses RVER_SPEC_FLOOR's directions and
+//  rver_qual_rank()'s configured order — the same semantics A8 already judges a
+//  requisition's floor with. Nothing here re-reads a row or re-compares a value.
+//
+//  THREE DIRECTIONS, because two are not enough:
+//
+//    stricter  — the bar a candidate must clear went UP. More experience, a
+//                higher qualification, an extra essential skill.
+//    relaxed   — the bar came DOWN. Never triggers anything (§18).
+//    redefined — what is wanted CHANGED, neither up nor down: the role, the
+//                grade, the department, the branch. Candidates were sourced for
+//                something else. Not "stricter" in the arithmetic sense, which
+//                is exactly why it needs naming rather than silently landing in
+//                "neither" and reaching nobody.
+//
+//  Everything else — headcount, budget, the client, the authorisation basis — is
+//  'neither'. A budget increase is material (Gate 2 stops execution while it is
+//  pending) but it does not change what a candidate has to be, so forcing a human
+//  to re-read every CV because a rate moved would teach people to click through
+//  reviews without looking. That is the failure mode this engine exists to avoid.
+// ===========================================================================
+
+//  Fields whose change REDEFINES what is being recruited. Each is already in
+//  Gate 2's material list with the same business reason; this says which of them
+//  a candidate is judged by, rather than which ones an approver authorises.
+const RVER_REDEFINES = [
+    'designation'    => 'the role being recruited',
+    'grade'          => 'the pay band',
+    'department'     => 'the department the person joins',
+    'department_id'  => 'the department the person joins',
+    'team_role'      => 'the kind of team member being recruited',
+    'office_id'      => 'the branch the person would work from',
+    'trade_id'       => 'the trade being recruited',
+    'skill_id'       => 'the skill being recruited',
+];
+
+//  Did one field get stricter, more relaxed, or redefined?
+//
+//  Returns 'stricter' | 'relaxed' | 'redefined' | 'neither'. A field that is both
+//  (a skill added AND another removed) is 'redefined': it is not a clean raise,
+//  and calling it stricter would overstate what happened while calling it relaxed
+//  would hide that a new skill is now compulsory.
+function rver_field_direction($field, $was, $now) {
+    $f = (string) $field;
+    if (isset(RVER_SPEC_FLOOR[$f])) {
+        $dir = RVER_SPEC_FLOOR[$f]['dir'];
+        if ($dir === 'min') {
+            $a = (float) $was; $b = (float) $now;
+            if ($b > $a) return 'stricter';
+            if ($b < $a) return 'relaxed';
+            return 'neither';
+        }
+        if ($dir === 'rank') {
+            //  The CONFIGURED order decides, so a workspace that defines its own
+            //  qualification ladder is judged against its own ladder. -1 means the
+            //  value is not in the ladder at all: naming an unknown qualification
+            //  is a redefinition, not a raise, because nobody can say how high it is.
+            $a = rver_qual_rank($was); $b = rver_qual_rank($now);
+            if ($a < 0 && $b < 0) return 'neither';
+            if ($b < 0 || $a < 0) return 'redefined';
+            if ($b > $a) return 'stricter';
+            if ($b < $a) return 'relaxed';
+            return 'neither';
+        }
+        if ($dir === 'set') {
+            $split = fn($v) => array_values(array_filter(array_map(
+                fn($x) => strtolower(trim((string) $x)),
+                preg_split('~[,;\n]~', (string) $v) ?: []), fn($x) => $x !== ''));
+            $a = $split($was); $b = $split($now);
+            $added   = array_diff($b, $a);
+            $removed = array_diff($a, $b);
+            if ($added && $removed) return 'redefined';
+            if ($added)   return 'stricter';
+            if ($removed) return 'relaxed';
+            return 'neither';
+        }
+    }
+    if (isset(RVER_REDEFINES[$f])) return 'redefined';
+    return 'neither';
+}
+
+//  THE DIRECTION OF A WHOLE CHANGE, built on rver_diff() and on nothing else.
+//
+//  $was / $now are field sets — an approved version's fields and the newly
+//  approved ones. The verdict is deliberately coarse: a change is stricter if ANY
+//  candidate-facing field got stricter, because a candidate has to clear every
+//  part of the bar, not the average of it.
+function rver_strictness($entity, array $was, array $now) {
+    $d = rver_diff($entity, $was, $now);
+    $out = ['stricter' => [], 'relaxed' => [], 'redefined' => [], 'neither' => [],
+            'is_stricter' => false, 'is_relaxed' => false, 'is_redefined' => false,
+            'changed' => $d['changed'], 'summary' => ''];
+    foreach ($d['changed'] as $f => $rec) {
+        //  'commitment' is Gate 2's derived verdict, not a column a candidate is
+        //  judged by. It must never be read as a direction.
+        if ($f === 'commitment') { $out['neither'][$f] = $rec; continue; }
+        $dir = rver_field_direction($f, $rec['was'], $rec['now']);
+        $rec['direction'] = $dir;
+        $rec['label'] = RVER_SPEC_FLOOR[$f]['label'] ?? (RVER_REDEFINES[$f] ?? $f);
+        $out[$dir][$f] = $rec;
+    }
+    $out['is_stricter']  = !empty($out['stricter']);
+    $out['is_relaxed']   = !empty($out['relaxed']);
+    $out['is_redefined'] = !empty($out['redefined']);
+
+    $bits = [];
+    foreach (['stricter' => 'stricter', 'redefined' => 'changed', 'relaxed' => 'relaxed'] as $k => $word)
+        foreach ($out[$k] as $rec) $bits[] = (string) $rec['label'] . ' ' . $word;
+    $out['summary'] = $bits ? ucfirst(implode('; ', $bits)) : 'Nothing a candidate is judged by changed.';
+    return $out;
+}
+
+//  The same question asked of two VERSIONS of one requirement, by number. This is
+//  how Gate 3 asks "did version 3 raise the bar above version 2" without ever
+//  touching the version store itself.
+function rver_strictness_between($entity, $id, $fromVersion, $toVersion) {
+    $a = rver_version($entity, $id, (int) $fromVersion);
+    $b = rver_version($entity, $id, (int) $toVersion);
+    if (!$a || !$b) return null;
+    //  Decoded by the version store's OWN reader, so a snapshot's shape is known
+    //  in one place. Decoding it here would be a second reader of the same column.
+    $fa = rver_snapshot_fields($a);
+    $fb = rver_snapshot_fields($b);
+    if (!is_array($fa) || !is_array($fb)) return null;
+    return rver_strictness($entity, $fa, $fb);
 }

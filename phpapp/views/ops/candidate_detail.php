@@ -19,6 +19,12 @@
       //  joining date is shown as exactly that: accepted is not joined (RB-2). ?>
 <?php if (function_exists('na_html')) echo na_html('candidate', $cand); ?>
 
+<?php // GATE 3 — a requirement review, ABOVE the workflow tracker.
+//  Deliberately first: if the requirement this person was sourced against has
+//  changed, that is the most important thing on the screen, and showing it below
+//  the tracker would let somebody read the tracker and act without ever seeing it.
+if (function_exists('crev_panel')) crev_panel($cand); ?>
+
 <?php // Phase 2b — the configured hiring-workflow tracker (primary journey view).
 if (function_exists('recruitpipe_candidate_panel')) recruitpipe_candidate_panel($cand); ?>
 

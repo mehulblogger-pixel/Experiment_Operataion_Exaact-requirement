@@ -98,7 +98,21 @@ function rexec_id($v, &$ok) {
 //  $action         one of REXEC_ACTIONS.
 //  $candidateId    the person, when one is involved — so that a candidate who
 //                  ALREADY holds a seat is not refused the seat they hold.
-function rexec_block_reason($requisitionId, $action = 'ADVANCE', $candidateId = 0) {
+//  GATE 3 — $actingCandidateId, AND WHY IT IS NOT $candidateId.
+//
+//  $candidateId has one job and it is a narrow one: a candidate who already holds a
+//  seat must not be counted against themselves when the seat is counted. On a MOVE
+//  to a different requirement the caller deliberately passes 0 there, because the
+//  candidate holds no seat on the destination and excusing them would hand out a
+//  seat that does not exist.
+//
+//  "Which candidate is this action about" is a DIFFERENT question, and Gate 3 needs
+//  it: a requirement review belongs to a person. Reading the answer off the seat
+//  parameter would have meant that reallocating a candidate — the one path that
+//  passes 0 — skipped the review check entirely, which is exactly the alternate
+//  route §27 says to test. So it is its own parameter, defaulting to $candidateId
+//  so every existing caller keeps the behaviour it already had.
+function rexec_block_reason($requisitionId, $action = 'ADVANCE', $candidateId = 0, $actingCandidateId = null) {
     //  Validated BEFORE it is used to look anything up — a malformed id must not
     //  become a different requirement's answer.
     $rq = rexec_id($requisitionId, $idOk);
@@ -143,6 +157,26 @@ function rexec_block_reason($requisitionId, $action = 'ADVANCE', $candidateId = 
             $why = (string) rver_block_reason('HIRING_REQUEST', $hid, $action);
             if ($why !== '') return $why;
         }
+    }
+
+    //  2c · GATE 3 — A REQUIREMENT REVIEW THIS CANDIDATE HAS NOT PASSED.
+    //
+    //  Asked PER CANDIDATE, because a review belongs to one person's one
+    //  application, not to the requirement: four candidates on a requirement may
+    //  have four different answers, and refusing all of them because one is under
+    //  review would stop recruitment the business never asked to stop. With no
+    //  candidate named there is nothing to ask — a requirement does not hold a
+    //  review, people do.
+    //
+    //  This is the LAST word before the seat, and it is asked here rather than on a
+    //  screen so that a stage move, an offer, a joining and a workforce conversion
+    //  all meet the same refusal. Gate 3's own tests drive each of those paths
+    //  directly, below the UI, for exactly that reason.
+    $actor = $actingCandidateId === null ? $candidateId : $actingCandidateId;
+    $actor = rexec_id($actor, $aOk);
+    if ($aOk && (int) $actor > 0 && function_exists('crev_block_reason')) {
+        $why = (string) crev_block_reason((int) $actor, $action);
+        if ($why !== '') return $why;
     }
 
     //  3 · THE SEAT. Only a joining consumes one. An offer does not: the business

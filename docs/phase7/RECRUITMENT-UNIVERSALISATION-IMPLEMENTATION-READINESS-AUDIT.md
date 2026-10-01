@@ -1739,6 +1739,263 @@ deployment, and no claim about production data.**
 
 ---
 
+## §20f — GATE 3 RECORD: REVIEW REQUIRED & REQUIREMENT-CHANGE IMPACT
+
+Gate 2 made an approved requirement immutable. Gate 3 answers the question Gate 2
+deliberately left open: **what happens to the people already in the process when the
+requirement they were sourced against legitimately changes.**
+
+### F1 — The gap this gate closes
+
+A manager raised a requirement, it was approved, recruiters went out and found five
+people against a three-year minimum. The requirement was then properly changed
+through Gate 2's change control, and the approved minimum became eight years.
+
+Those five people stayed exactly where they were, and nothing told anybody. They
+continued to be shortlisted, interviewed and offered against a bar **nobody had ever
+checked them against** — and the business would have found out at the worst possible
+moment, with an offer already in somebody's hands.
+
+Gate 3 makes that impossible: when a stricter approved version becomes effective,
+**every** active candidate in that process is put in front of a human who must say,
+per person, Continue or Reject, with a reason.
+
+### F2 — Schema (additive, idempotent, non-destructive)
+
+| Object | Purpose |
+|---|---|
+| `candidate_reviews` | one row per review episode: what changed, which two versions, who raised it, who decided it, when, and why |
+| `candidate_reviews.open_key` | `"candidate:ENTITY:id"` while OPEN, `NULL` once decided, under a unique index |
+
+Nothing else. **No `candidates.review_required` column** — that is the global
+candidate state the locked rules forbid, and it would make one person's review on one
+vacancy stop their interview on another. No new version store, no second pipeline, no
+second approval or audit engine, and no candidate office column.
+
+The one-open-review rule is enforced by the **database**, using the same mechanism
+Gate 2 proved portable for its one-pending proposal: `open_key` carries the
+relationship's identity only while the review is open, and NULLs are distinct in a
+unique index on both engines. Two open reviews for one relationship would be two
+questions where there is one decision to make, and a reviewer who answered one would
+leave the candidate blocked by the other. A test proves it by attempting the duplicate
+insert directly, below every line of application code.
+
+### F3 — Why a review belongs to a relationship, and why that needed no new table
+
+In this product a candidate **row is one application**: one human against one
+requirement, with `person_ref` threading a person's several rows together. So a
+review that belongs to a row belongs, by construction, to exactly one requirement.
+A person on three requirements has three rows, and changing the first cannot reach the
+other two.
+
+That is asserted behaviourally (clear R1 → R2 still in review; reject R2 → R1 still
+live) **and** structurally (the `candidates` table has no `review_required` column),
+because a global flag is invisible in behaviour right up until two applications of one
+person disagree.
+
+A review also records the requirement it was raised against. If a candidate is later
+reallocated to a different requirement, that review stops speaking for a process it
+was never about — it stays OPEN on the record, because nobody answered it, but it does
+not block work on an unrelated requirement. Move them back and it blocks again.
+
+### F4 — Direction, as a narrow extension of Gate 2's own comparison
+
+Gate 2 answers "what changed, and is it material". Gate 3 needed one more thing:
+**direction**. `rver_strictness()` consumes `rver_diff()`'s own output — so there is
+exactly one algorithm that decides whether two field sets differ — and reuses
+`RVER_SPEC_FLOOR`'s directions and `rver_qual_rank()`'s configured order, the same
+semantics A8 already judges a requisition's floor with.
+
+| Direction | Meaning | Raises a review? |
+|---|---|---|
+| **stricter** | the bar a candidate must clear went UP | **always — A1, not configurable** |
+| **redefined** | what is wanted changed, neither up nor down (the role, grade, department, branch) | yes by default, can be switched off |
+| **relaxed** | the bar came down | **never** (§18) |
+| **neither** | headcount, budget, the client, the authorisation basis | no |
+
+A budget increase is material — Gate 2 stops execution while it is pending — but it
+does not change what a candidate has to *be*, so forcing a human to re-read every CV
+because a rate moved would teach people to click through reviews without looking. That
+is the failure mode this engine exists to avoid.
+
+**`redefined` is a decision this gate had to take, and it is flagged for
+confirmation.** The locked rules name "stricter"; they do not say what should happen
+when a vacancy stops being for a Welder and becomes one for an Electrician. Leaving it
+out would mean five welders quietly remain attached to an electrician vacancy — the
+same class of silent wrongness as unapproved headcount. So it ships **on**, is
+configurable off per workspace, and is recorded here as a default to confirm rather
+than a rule assumed.
+
+**Which pair of versions is compared** is the immediately preceding one, never version
+1. That distinction is invisible on a rising history and decisive on a falling one: a
+bar that goes 10 → 4 → 6 is a **rise** against the previous version (review) and a
+**fall** against the first (no review). The second reading is wrong, and only a
+non-monotonic history says so, which is why one is in the battery.
+
+### F5 — A1: all of them, with no exemption anywhere
+
+The population is: attached to the affected process, **still active** by Gate 1B's
+authority (pipeline → stage → kind → class), and not past the A2 boundary. Nothing
+else. There is deliberately no suitability input of any kind in the trigger path.
+
+Proved across the full spectrum against a new 10-year bar — 25 years, 11 years, 9
+years, 1 year, and nothing recorded at all — all five reviewed, at different pipeline
+stages. And the ones it must **not** reach: rejected, withdrawn and offer-declined
+candidates are not reviewed, because they already left.
+
+A class that cannot be established is treated as **not active** and reported by the
+sweep rather than silently dropped: an unknown position is not evidence of activity,
+and asserting a review against a candidate nobody can place would be guessing.
+
+### F6 — A2: the issued-offer boundary
+
+Answered by Gate 2's single answer to "which version applies to this person", which
+reads the version **stamped on the offer at issue**. A candidate whose applicable
+version is older than the one that just became effective is holding a commitment made
+against the requirement as it then stood, and a later version does not reach them.
+
+| Candidate | Reached by a later stricter version? |
+|---|---|
+| no offer, at any active stage | **yes** |
+| **draft** offer | **yes** — a draft is a document, not a promise |
+| **issued** offer | no |
+| offer **accepted** | no — the boundary is Offer Issued, not Hired |
+| already **joined** | no |
+
+### F7 — What a review stops, and what it never permits
+
+Answered inside the **existing** execution gate, per action, in the existing
+`REXEC_ACTIONS` vocabulary — there is no parallel action-policy engine. The shipped
+answer is that nothing about the candidate advances. An organisation may let screening
+and interviewing continue; an **offer** and a **joining** can never be unblocked,
+because those are commitments to a human being.
+
+Enforced at the owning service, not on a screen, and driven directly in the tests
+through: the stage route, the configured-pipeline route, offer creation, interview
+scheduling, the joining, workforce conversion, and reallocation to another
+requirement.
+
+**Reallocation needed a real fix.** `rexec_block_reason()`'s third parameter means
+"do not count this candidate against their own seat", and the reallocation path
+deliberately passes `0` there because the candidate holds no seat on the destination.
+Reading "which candidate is this action about" off that parameter meant the one path
+that passes 0 skipped the review check entirely — exactly the alternate route the
+locked rules say to test. It is now its own parameter, defaulting to the old one, so
+no existing caller changed behaviour.
+
+### F8 — Outcomes, reasons and history
+
+**Continue** records that somebody with authority looked at this person against the
+new requirement and said yes, and why. Historical interviews, assessments, scorecards
+and stage history are untouched and remain valid evidence; continuing moves nobody and
+re-scores nothing.
+
+**Reject** closes the candidate immediately, needs **no further approval** (asserted by
+counting approval requests before and after), and lands on the organisation's own
+configured `closed` off-ramp through Gate 1B's own closed-stage reader — preferring an
+off-ramp whose outcome is *Not suitable*, falling back to the ordinary rejection
+off-ramp. There is no `REVIEW_REJECTED` state.
+
+A reason is **mandatory** for Continue, Reject and reconsideration. Blank, whitespace
+and punctuation standing in for a reason are all refused — an audit trail of empty
+strings is not an audit trail. Every event goes into the **existing** candidate ledger
+through the one stage-ledger writer, so a review sits in the same history, in the same
+order, as everything else that happened to that candidate.
+
+### F9 — §18 and §19: nothing automatic, and back to the right stage
+
+A relaxed requirement raises no review, moves nobody, builds no queue and revisits no
+rejection. A rejected candidate stays rejected.
+
+A **deliberate** reconsideration returns them to the stage the event ledger records
+them on immediately **before** they were closed — rejected out of an interview, back
+to the interview; closed at screening, back to screening — never to the first stage,
+because being reconsidered is not being re-applied. The original rejection is appended
+to, never rewritten. Where the ledger does not record the origin, the engine says so
+and asks for a deliberate move rather than guessing a stage.
+
+### F10 — Evidence, and the line it must never cross
+
+The reviewer is shown how the candidate stands against the requirement as it now is,
+so they are not holding two records side by side in their head. It is labelled on
+screen as **evidence to weigh, not a decision**, and it is read by nothing: not by the
+trigger, not by the audience, not by the block, not by continue or reject. A candidate
+who plainly fails every line still needs a human to reject them; one who exceeds every
+line still needs a human to clear them. Much of the mutation battery exists to prove
+that this cannot acquire a vote.
+
+### F11 — Findings, classified
+
+| Finding | Class | What was done |
+|---|---|---|
+| **G3-1 — the A8 floor itself was not change-controlled.** Gate 2 put `min_experience_years`, `min_qualification` and `essential_skills` on the *requisition's* material list and made the approved *hiring request's* values the floor a requisition may not weaken — but left them off the request's own list. The floor could be edited on an already-approved request with no proposal, no approval and no new version: the ceiling was guarded and the thing it was measured against was not. It is also why a stricter hiring request could not reach a candidate at all, since no version was ever created to be stricter *than*. | **narrow extension required** | Added to `HREQ_MATERIAL_FIELDS`, the only direction Gate 2 allows a material list to move (add, never remove). No engine was changed |
+| **Review Required replaces M4's block after a re-approval.** A re-approval that redefines the role lifts M4's requirement-level block and a candidate-level review takes its place. An existing lifecycle test asserted "re-approval restores execution" | **intended behaviour change** | The test now asserts both halves — the review stands in M4's place, and execution is restored once a person has cleared it. Strengthened, not relaxed |
+| **Gate 2's own suite issued an offer straight after a version change.** Correctly blocked now | **intended behaviour change** | The reviews are resolved first, the way a recruiter would, before the offer. Gate 2's boundary assertions are unchanged |
+| **`crev_migrate` was not wired into `boot()`** — caught by the repository's own guard, which exists because a table created only by a lucky code path crashes a fresh MariaDB install | **real defect, fixed** | Wired into the boot migrate chain |
+| **Gate 2's permission and proposal lifecycle were never recorded in `docs/02-permission-matrix.md` or `docs/03-object-lifecycles.md`** | **documentation gap, fixed** | Both gates' permissions and both lifecycles are now recorded, as the repository's own hard rule requires |
+| The matching engine scores marketplace professionals, not recruitment candidates — there is no candidate↔requisition score engine in the product | **documentation only** | None built (out of scope). The suitability spectrum is proved with candidate attributes instead, which is what a reviewer actually sees |
+
+### F12 — Verification
+
+| Check | Result |
+|---|---|
+| Gate 3 battery, SQLite | **225 / 0** |
+| Gate 3 battery, MariaDB 10.11 | **225 / 0** |
+| Full suite, SQLite | **15,859 / 0** |
+| Full suite, MariaDB 10.11 *(authoritative)* | **15,860 / 0** on the committed code (15,862 / 0 on an earlier run) |
+| Mutation targets killed | **24 / 24** |
+| Browser (Chromium), desktop + 360 / 390 / 412 px | **65 / 0**, repeatable — seven runs, the last two on the final code |
+
+The MariaDB total differs by two between runs for the reason recorded in §20d and
+again in §20e: a handful of pre-existing tests count their own scratch files or run
+row-locking races that resolve differently. It is the **failure** count that is
+asserted, and it is zero on both engines, every run. The focused Gate 3 battery is
+**225 on both**, so nothing in this gate behaves differently on MariaDB.
+
+Three problems in the verification itself were found and fixed at the root:
+
+- **Two mutations survived the first pass**, and both were gaps in the tests rather
+  than in the code. One ("the wrong pair of versions is compared") survived because
+  every version in the battery was stricter than the last, so comparing against
+  version 1 gave the same answer — fixed by adding the non-monotonic history in F4.
+  The other ("two concurrent resolutions both succeed") survived because the PHP
+  pre-check answers first whenever two processes do not actually overlap, so a
+  behavioural test passes whether the real protection is there or not — fixed by a
+  two-process race **and** a direct assertion that every resolving write is
+  conditional on the review still being open and reports a no-match as a loss.
+- **The browser check was non-deterministic**, giving 53/12 and 65/0 on alternate
+  runs. `php -S` fails quietly when the port is already held, so the browser was
+  reading a previous run's database while the seeder reported the new one — evidence
+  that cannot be trusted, which is worse than a failure. The runner now refuses to
+  start against a port it did not open, asserts its own seeded scenario before
+  driving anything, and tears its server down afterwards.
+- **This gate's own test file leaked shared state into later suites.** It raised far
+  more than eight live requirements, pushing an existing reconciliation test's own
+  requirement off a dashboard that shows the eight biggest; and it granted a
+  permission to a *role*, which is a workspace-wide override of that role's whole
+  permission set. Both are now put back at the end of the file, with the reviews,
+  versions and candidates all left intact as evidence.
+
+### F13 — What Gate 3 deliberately did NOT do
+
+No candidate re-scoring, no automatic clearance, no automatic rejection, no
+reconsideration queue, no Candidate Hiring approval, no offer-audit redesign, no
+workforce-conversion or inspector-boundary change, no permission-architecture
+redesign, no KPI, SLA, Marketplace, agency or careers-page change, no organisation
+convergence, no Person Hub, no candidate office column, no new identity master, and
+no new approval, audit, pipeline or version engine.
+
+**Gate 1B's pipeline authority and Gate 2's versioning are unchanged**, and Gate 2's
+guarantees are re-proved in this gate's own battery: approved-version immutability,
+the proposal lifecycle, one pending proposal, refused proposals retained with their
+values, the mandatory reason, budget materiality, the A8 floor, proposed-value
+routing, the offer version stamp and the pre-Gate-2 fallback behind it.
+
+No candidate deleted, no rejection rewritten, no historical version removed, no event
+or KPI fact altered. **No production deployment, and no claim about production data.**
+
+---
+
 # STOP
 
 **Scope of this document.** §1–§21 and §20a are audit only — they were written
@@ -1753,11 +2010,14 @@ narrow scope its gate named:
 | §20c | Gate 1A | yes — additive helpers, one new test, regenerated manifest |
 | §20d | Gate 1B | yes — pipeline authority activated across the recruitment chain |
 | §20e | Gate 2 | yes — requirement versioning and change control for both entities |
+| §20f | Gate 3 | yes — Review Required when a stricter approved version becomes effective |
 
-**Gate 2 stops here and waits for an explicit pass before Gate 3.**
+**Gate 3 stops here and waits for an explicit pass before Gate 4.**
 
 Pipeline is authoritative for current recruitment state, unchanged by Gate 2.
 Legacy `candidates.stage` is no longer an independent current-state authority.
-An approved requirement is immutable and a pending change is not effective.
-Gate 3's Review Required has NOT been implemented. No production deployment was
-performed.
+An approved requirement is immutable and a pending change is not effective. A
+stricter approved version now reaches every active candidate as a relationship-
+specific Review Required, which only a person holding `hiring.review.clear` may
+decide, and which no score can create, clear or excuse. No production deployment
+was performed.
