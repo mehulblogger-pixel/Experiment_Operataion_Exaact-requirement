@@ -2494,3 +2494,160 @@ there for a correct reason.
   would newly admit blank-status people to the availability board — a different
   change, and not this gate's.
 - No production deployment, and no production data read or written.
+
+---
+
+## §20i — GATE 6B RECORD: THE TWO LOCKED DECISIONS (R1-UI, R2)
+
+Gate 6A asked three open questions and the owner locked three answers. R1 ("keep
+today's Review Required behaviour") needed no code — only regression protection,
+which §20f already carries and this gate re-proves. The other two needed building.
+
+### R1-UI — the Review Required trigger is now visible and changeable
+
+**The problem, in business terms.** When an approved requirement changes, the
+people already in the process may no longer be the right people, so each of them
+is flagged *Review Required* and somebody must decide before they can be offered a
+job. Since Gate 3 an organisation *could* choose whether a **redefined**
+requirement (the role became Electrician where it said Welder) raises that flag —
+but only by writing a row into the database. In practice that meant nobody could
+change it, and because a hand-written row bypasses `setting_set()`, any change was
+also completely unaudited.
+
+**What was built.** The decision is now on the screen that already holds this
+organisation's other recruitment governance choices — Recruitment → approval
+rules — behind the gate that already guarded it. Nothing new was invented:
+
+| Need | Reused |
+|---|---|
+| Where | the existing `/recruit-approvals` screen and its view |
+| Who may | the existing `ops_require(hiring_admin_can(), …)` on that route |
+| Storage | the existing `crev_trigger_redefined` setting, read by the existing `crev_triggers()` |
+| Save | the existing `setting_set()`, the same path Gate 4's self-approval policy uses |
+| Audit | nothing built — `setting_set()` already writes to the sealed `idems_audit` chain |
+
+Four small additions in `lib/candreview.php` keep the screen and the engine from
+ever disagreeing: `crev_trigger_key()` (so the setting name is built in exactly
+one place), `crev_trigger_on()`, and `crev_trigger_state()`, which is what the view
+renders. The view asks the engine, never the settings table.
+
+**What deliberately cannot be configured.** `CREV_TRIGGER_ALWAYS = ['stricter']`
+is a constant. A requirement that became *stricter* always raises a review,
+because the candidates in the process were judged against the old, lower bar. The
+screen **says** so and offers no control for it — hiding the rule would leave an
+administrator guessing why reviews keep appearing, and offering a switch the
+engine ignores would be worse than either. Writing `crev_trigger_stricter=0`
+straight into the database has no effect, and that is asserted (A14).
+
+**Default ON.** An organisation with no stored row behaves exactly as it did
+before this screen existed (A3, A8). No workspace's behaviour moved.
+
+### R2 — the utilisation breakdown leaves out people who have not started
+
+**The problem, in business terms.** The per-person utilisation table answers "how
+much of the capacity we have did we actually use". The capacity denominator,
+`mis_available_days()`, counts only `status='ACTIVE'` people — so somebody hired
+but not yet joined was never in the capacity figure, yet the breakdown listed them
+with zero days used. A branch manager reads that row as either "this person is
+sitting idle, chase them" (they cannot work yet — they have not started) or "this
+report is wrong". Either way the rows that *do* mean idle capacity are harder to
+find.
+
+**Where the rule lives, and why there.** `mis_person_utilisation()` in
+`lib/mis.php`, immediately beside the denominator it has to agree with. The report
+in `ops_reports()` now calls it instead of carrying the loop inline. Two reasons:
+the two halves of one figure cannot drift apart when they sit together, and the
+rule becomes testable without rendering a view — `view()` is defined in
+`index.php`, so a loop inline in the route handler could only ever be proved in a
+browser.
+
+**The scope, held deliberately narrow.** `inspectors_list(false)` is shared by the
+requisition form, the voucher list, the timesheet and the person-linking picker on
+the user form, where somebody who starts next week **should** appear — that is how
+their login and paperwork exist before day one. So the exclusion is applied at the
+one report whose question does not apply to them, and the shared reader's meaning
+is untouched (E4–E8). A small keyed read, `wf_joining_pending_ids()`, answers
+"who has not started yet" for the whole page in one query, because the shared
+readers deliberately do not return the status column.
+
+**What is NOT excluded.** A leaver. They may well have worked during the period
+being reported, and dropping their days would understate what the business
+delivered (D8, D9). "Not yet available for work" and "has left" remain different
+questions, as Gate 5 established.
+
+**Excluded from a sum is not hidden.** The same person stays on the team register,
+stays selectable in that very screen's own person filter (`inspOpts`, which still
+uses the unfiltered list), and is named on the availability board as hired but not
+yet joined. Proved in the browser at R2-UI-8 and R2-UI-11.
+
+### A pre-existing defect found while testing, and fixed
+
+The mandated phone-width checks found `/recruit-approvals` scrolling sideways by
+31px at 360px. The cause was the rules grid's inline `grid-template-columns:280px
+1fr` — a 280px fixed rail plus an 18px gap cannot fit a 360px phone. Measured at
+31px **both with and without** the new panel in the DOM, so it predates Gate 6B.
+An inline style cannot carry a media query, so the layout moved to a class that
+stacks on narrow screens, using the same rule, breakpoint and 280px rail as
+`views/ops/recruit_pipelines.php`, which had already solved it. Fixed rather than
+merely noted because it is on the screen R1-UI ships and was failing a check this
+gate was required to pass; 390px improved from 1px to 0px as a side effect.
+
+### Evidence
+
+| Check | Result |
+|---|---|
+| `tests/test_gate6b_triggers_and_utilisation.php` — SQLite | 73 passed, 0 failed |
+| the same battery — **authoritative MariaDB** | 73 passed, 0 failed |
+| `tools/g6b-browser-check.js` — desktop + 360/390/412px | 60 passed, 0 failed |
+| server mutations (`tools/g6b-mutations.py`) | 16 of 16 killed by a behavioural assertion |
+| browser mutations | 6 of 6 killed by a browser assertion |
+| full suite — SQLite | 16195 passed; the only failures were the stale deploy manifest (regenerated) |
+| full suite — **authoritative MariaDB** | 16192 passed; same, plus five `tenant_signup` failures traced to a gitignored artifact (below), not to code |
+| Gate 3 / Gate 4 / Gate 5 / Gate 6 regression, MariaDB | 225 / 142 / 101 / 102, 0 failed |
+
+**One mutation survived at first, and what it taught.** `G6B-B5` removed the media
+query that stacks the rules layout on a phone, and no assertion failed. The reason
+was worth knowing: the 31px overflow had actually been cured by changing the
+content column from `1fr` to `minmax(0,1fr)` (which lets it shrink), not by the
+media query — so "no sideways scrolling" could not see the media query's absence.
+But a 280px rail beside a column squeezed to a sliver *also* fits a 360px
+viewport, and is useless. A new assertion now checks what the media query is
+actually for: the layout resolves to **one** column on a phone and the content
+area is usably wide (measured at 328 / 358 / 380px). B5 is killed by that. The
+first version of the fix was right; the first version of its test was not.
+
+**Two false signals were rejected rather than recorded as passes.** An early
+browser-mutation pass reported `G6B-B1` "killed" with 31 failures beginning at
+*"signed in"* — the isolated worktree lacked the gitignored `licence-agreement.json`,
+so login hit the licence gate and everything cascaded. That is not a kill, and it
+was discarded: the licence artifact was supplied, an **unmutated** baseline was
+re-established at 51/51, and only then were the mutations re-run. The same pass
+had also been interrupted mid-`B3`, leaving that mutation's sabotage on disk in the
+worktree — caught by the sidecar heal and by diffing the worktree against the
+working tree, which is precisely why mutations are never run in the working tree.
+
+**Five `tenant_signup` failures in the full suite were not this change.** They
+report that workspace approval was no longer blocked for want of cloud mode. The
+cause is `phpapp/tenants.php` — a **gitignored** registry file that one of this
+gate's own browser runs created, which records a base domain and therefore makes
+cloud mode read as already on. Proved by running that suite with **this gate's
+code** in a tree without the file: 20 passed, 0 failed. It is local scratch state,
+not source, and nothing in Gate 6B reads or writes it.
+
+Mutations were run only in an isolated `git worktree`, never in the working tree,
+and every kill is a failing behavioural assertion — no mutation is counted as
+killed because the suite crashed or a source grep stopped matching.
+
+### Boundaries honoured
+
+- No permission added, removed or moved. §20 of `docs/02-permission-matrix.md`
+  records this explicitly.
+- No status and no transition added. `docs/03-object-lifecycles.md` gains only a
+  statement of what `PENDING_JOINING` means **in reporting**.
+- No schema migration, and no change to `joined_at` semantics.
+- `inspectors_list()`, `mis_available_days()`, the capacity denominator, the
+  availability board, workforce activation, the Inspector status rules, the MIS
+  person filter, the person-linking pickers, the recruitment lifecycle, the Review
+  Required engine's own rules and candidate visibility were all left as they were.
+- No production access, no production deployment, no production data read or
+  written.

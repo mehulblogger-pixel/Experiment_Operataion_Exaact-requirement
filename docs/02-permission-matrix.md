@@ -685,6 +685,38 @@ approval authority.
 
 ---
 
+## Review Required triggers & the utilisation breakdown (Gate 6B) — no permission changed
+
+Gate 6B put two existing decisions where a person can see them. Neither adds,
+removes or moves a permission, and neither is a new door.
+
+| What changed | Who may do it |
+|---|---|
+| Switch the "redefined" Review Required trigger on or off | the **existing** gate on the Recruitment approval-rules screen — `hiring_admin_can()` (administrator, or `hiring.admin`). No new permission. |
+| Switch the "stricter" trigger off | **nobody.** It is a constant in the engine (`CREV_TRIGGER_ALWAYS`), not a setting. There is no control for it and writing the setting by hand has no effect. |
+| See the per-person utilisation breakdown | unchanged — whoever could already open Reports, with the same office scope |
+
+Three things worth being explicit about:
+
+- **The trigger was always configurable; it was never *visible*.** Since Gate 3
+  the `crev_trigger_redefined` setting has governed this, but only a database
+  write could change it — unusable for an administrator, and because it bypassed
+  `setting_set()`, completely unaudited. Gate 6B moves it onto the screen that
+  already carries the organisation's other recruitment governance decisions, so
+  the change now goes through the sealed configuration audit trail like any other
+  setting. The default is ON, so no existing organisation's behaviour moved.
+- **A locked rule is shown, not hidden.** The screen states that a stricter
+  requirement always raises a review and that this is not configurable, and
+  offers no control for it. Hiding it would leave an administrator guessing why
+  reviews still appear; offering a switch that the engine ignores would be worse.
+- **Being left out of a sum is not being hidden.** The utilisation breakdown now
+  omits people who have been hired but have not started. The same people remain
+  on the team register, remain selectable in that very screen's person filter,
+  and are named on the availability board as hired but not yet joined. No
+  visibility rule changed.
+
+---
+
 ## Workforce activation (Gate 5) — no permission changed
 
 Gate 5 moved **when** a hired person becomes operationally active (on joining,

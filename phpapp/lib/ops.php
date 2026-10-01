@@ -9611,8 +9611,10 @@ function ops_reports() {
     $util=[]; $mdBySbu=[]; $depMd=0;$inspMd=0;$subMd=0;
     foreach ($jobs as $j) { $md=job_mandays($j); $sk=$j['sbu']?:'—'; $mdBySbu[$sk]=($mdBySbu[$sk]??0)+$md;
         if (($j['job_type']??'')==='DEPUTATION') $depMd+=$md; else $inspMd+=$md; if ($j['subcon_id']) $subMd+=$md; }
-    foreach (inspectors_list(false) as $ins) { $md=0; foreach ($jobs as $j) if ($j['ins_id']==$ins['id']) $md+=job_mandays($j);
-        if ($md>0 || $F['insp']==='' ) $util[]=['name'=>$ins['name'],'mandays'=>$md,'working'=>$wd,'pct'=>$wd?round($md/$wd*100):0]; }
+    //  R2 (Gate 6B) — the per-person breakdown leaves out people who have not
+    //  started yet. The rule lives in lib/mis.php beside the capacity denominator
+    //  it has to agree with; see mis_person_utilisation() for why.
+    $util = mis_person_utilisation($jobs, $wd, $F['insp']);
 
     // ---- PEOPLE & COMPLIANCE ----
     $certExp = ops_all("SELECT c.*, i.name inspector_name FROM inspector_certs c JOIN inspectors i ON i.id=c.inspector_id WHERE c.valid_to<>'' ORDER BY c.valid_to");

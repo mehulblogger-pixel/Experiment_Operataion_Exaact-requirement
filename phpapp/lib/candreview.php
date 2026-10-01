@@ -90,13 +90,39 @@ const CREV_PERM_CLEAR = 'hiring.review.clear';
 const CREV_TRIGGER_ALWAYS = ['stricter'];
 const CREV_TRIGGER_OPTIONAL = ['redefined'];
 
+//  R1-UI (Gate 6B) — ONE PLACE THAT BUILDS THE SETTING KEY.
+//
+//  The key was previously assembled inline here and nowhere else, which was fine
+//  while nothing else needed it. Now that the Approval Rules screen reads and
+//  writes it, a second hand-typed 'crev_trigger_redefined' would be a second
+//  definition of the same thing — the defect class this programme keeps removing.
+//  The screen and the handler both go through this function.
+function crev_trigger_key($t) { return 'crev_trigger_' . strtolower(trim((string) $t)); }
+
 function crev_triggers() {
     $on = CREV_TRIGGER_ALWAYS;
     foreach (CREV_TRIGGER_OPTIONAL as $t) {
-        $v = function_exists('setting_get') ? setting_get('crev_trigger_' . $t, '1') : '1';
+        $v = function_exists('setting_get') ? setting_get(crev_trigger_key($t), '1') : '1';
         if ((string) $v !== '0') $on[] = $t;
     }
     return $on;
+}
+
+//  Is this trigger currently on? Mandatory triggers always answer true, so a
+//  caller cannot accidentally render 'stricter' as something switchable.
+function crev_trigger_on($t) {
+    $t = strtolower(trim((string) $t));
+    if (in_array($t, CREV_TRIGGER_ALWAYS, true)) return true;
+    return in_array($t, crev_triggers(), true);
+}
+
+//  What the configuration screen needs, so the view asks the engine rather than
+//  the settings table. 'mandatory' is returned as well, so the screen can SHOW
+//  that 'stricter' exists and is not negotiable instead of silently omitting it.
+function crev_trigger_state() {
+    $opt = [];
+    foreach (CREV_TRIGGER_OPTIONAL as $t) $opt[$t] = crev_trigger_on($t);
+    return ['mandatory' => CREV_TRIGGER_ALWAYS, 'optional' => $opt];
 }
 
 function crev_now() { return function_exists('now_iso') ? now_iso() : date('c'); }

@@ -88,7 +88,70 @@ $sp = $selfPolicy ?? ['self_approval' => false, 'master_exception' => false, 'mi
   <?php endif; ?>
 </div>
 
-<div style="display:grid;grid-template-columns:280px 1fr;gap:18px;align-items:start">
+<?php //  R1-UI (Gate 6B) — WHICH REQUIREMENT CHANGES RAISE A REVIEW.
+      //
+      //  The trigger has been on since Gate 3; what was missing was any way for an
+      //  administrator to see it or change it. Shown on the screen that already
+      //  carries the organisation's other recruitment governance decisions, read
+      //  from the engine (crev_trigger_state()) rather than the settings table, and
+      //  saved through the same setting_set() path, so the change is audited.
+      //
+      //  'stricter' is shown as a fixed fact, not a switch: it is a constant in the
+      //  engine and there is deliberately no control that could turn it off. ?>
+<?php $rt = $reviewTriggers ?? ['mandatory' => ['stricter'], 'optional' => []]; ?>
+<div class="panel" style="margin-bottom:16px">
+  <h3 style="margin:0 0 4px">When does a requirement change need its candidates re-checked?
+    <?php if (!empty($rt['optional']['redefined'])): ?>
+      <span class="pill p-ok" style="font-size:11px">Redefined: ON</span>
+    <?php else: ?>
+      <span class="pill p-mut" style="font-size:11px">Redefined: OFF</span>
+    <?php endif; ?>
+  </h3>
+  <p class="muted" style="margin:0 0 10px">
+    When an approved requirement changes, the people already in the process may no longer
+    be the right people. Where that is so, each of them gets a <strong>Review Required</strong>
+    flag that somebody has to decide before they can be offered a job or marked as joined.
+  </p>
+  <p class="muted" style="margin:0 0 10px;font-size:12.5px">
+    <strong>A requirement that became stricter always raises a review</strong> — a higher
+    experience floor, a higher qualification, or an extra essential skill. That is not
+    configurable, because the candidates were judged against the old, lower bar.
+    A requirement that was <em>relaxed</em> never raises one: lowering the bar reopens nobody.
+  </p>
+  <form method="post" style="margin:0">
+    <input type="hidden" name="do" value="review_triggers">
+    <label style="display:block;margin-bottom:10px">
+      <input type="checkbox" name="trigger_redefined" value="1"<?= !empty($rt['optional']['redefined']) ? ' checked' : '' ?>>
+      <strong>Also raise a review when the requirement is redefined</strong>
+      <span class="muted" style="font-size:12px">— on by default. A change that is not a
+      higher bar but makes the people in the process the <em>wrong</em> people: the role became
+      Electrician where it said Welder, the branch moved from Mumbai to Dubai, or the
+      department, grade, team, trade or skill changed. Switch it off only if this
+      organisation re-labels roles without changing what it actually wants.</span>
+    </label>
+    <button class="btn">Save triggers</button>
+  </form>
+  <p class="muted" style="margin:10px 0 0;font-size:11.5px">
+    Covers <?= (int) count(RVER_REDEFINES) ?> requirement fields. Changing this is recorded in
+    the configuration audit trail like any other setting.
+  </p>
+</div>
+
+<?php //  PRE-EXISTING RESPONSIVE DEFECT, found by the Gate 6B browser battery at 360px.
+      //
+      //  This was an inline `grid-template-columns:280px 1fr`. A 280px fixed rail
+      //  plus the 18px gap cannot fit a 360px phone, so the right-hand panel ran
+      //  31px past the viewport and the whole page scrolled sideways — measured
+      //  identically with and without the R1-UI panel above, so it predates it.
+      //
+      //  An inline style cannot carry a media query, so the layout moves to a class
+      //  and stacks on narrow screens. Same rule, same breakpoint and same 280px
+      //  rail as views/ops/recruit_pipelines.php, which already solved this. ?>
+<style>
+  .ar-split{display:grid;grid-template-columns:280px minmax(0,1fr);gap:18px;align-items:start}
+  @media(max-width:1080px){.ar-split{grid-template-columns:1fr}}
+</style>
+<div class="ar-split">
   <div class="panel" style="padding:0">
     <div style="padding:12px 15px;border-bottom:1px solid var(--line,#e5e7eb);font-weight:700;font-size:14px">Rules (<?= count($rules) ?>)</div>
     <?php foreach ($rules as $r): $on = $sel && (int)$r['id']===(int)$sel['id']; ?>

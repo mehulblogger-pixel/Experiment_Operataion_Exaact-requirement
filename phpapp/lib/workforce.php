@@ -178,6 +178,30 @@ function wf_status_move($inspectorId, $from, $to, $subject) {
 //  non-subcontractor rule — because a count drawn from a different population
 //  than the board would be worse than no count at all. It changes no
 //  qualification: the board's roster query is untouched.
+//  WHO HAS BEEN HIRED BUT HAS NOT STARTED YET?
+//
+//  Returns their team-member ids, keyed by id so a caller can test membership in
+//  one step rather than scanning a list per person.
+//
+//  This exists because the shared team-member readers deliberately do NOT return
+//  the status column, and a report that must leave out people who cannot yet work
+//  needs to know who they are WITHOUT changing what those shared readers mean to
+//  the dozen screens that use them. One small keyed read answers the question for
+//  the whole page.
+//
+//  SUBCON is excluded for the same reason it is excluded everywhere else in this
+//  file: a subcontractor is not a person on our joining pipeline.
+function wf_joining_pending_ids() {
+    $out = [];
+    try {
+        $rows = ops_all("SELECT id FROM inspectors
+                          WHERE UPPER(TRIM(COALESCE(status,'')))='" . WF_ST_JOINING . "'
+                            AND COALESCE(staff_kind,'ASSET')<>'SUBCON'") ?: [];
+    } catch (Throwable $e) { return $out; }
+    foreach ($rows as $r) $out[(int) $r['id']] = true;
+    return $out;
+}
+
 function wf_joining_pending_in_offices($offices) {
     $where = "UPPER(TRIM(COALESCE(status,'')))='" . WF_ST_JOINING . "' AND COALESCE(staff_kind,'ASSET')<>'SUBCON'";
     if (is_array($offices)) {

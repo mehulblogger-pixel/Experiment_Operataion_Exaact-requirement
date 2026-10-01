@@ -268,6 +268,56 @@ function mis_utilisation($from, $to, $officeId = 0, $inspectorId = 0) {
     ];
 }
 
+// ----------------------------------------------------------------------------
+//  PER-PERSON UTILISATION — WHO APPEARS IN THE BREAKDOWN, AND WHY
+// ----------------------------------------------------------------------------
+//  This is the "how much of each person's month did we actually use" table on the
+//  reports screen. It sits here, next to mis_available_days(), because the two
+//  must agree about who counts: one is the numerator's row list, the other the
+//  capacity denominator, and when they disagreed the screen contradicted itself.
+//
+//  R2 (Gate 6B) — SOMEBODY HIRED BUT NOT YET JOINED IS NOT IN THIS TABLE.
+//
+//  mis_available_days() counts only status='ACTIVE' people, so a joining-pending
+//  person was never in the capacity figure — yet the breakdown listed them with
+//  zero days used. A branch manager reads that row as either "this person is
+//  sitting idle, chase them" (they cannot work yet — they have not started) or
+//  "this report is wrong", and either way the rows that DO mean idle capacity are
+//  harder to pick out of the list.
+//
+//  The exclusion is deliberately applied HERE and nowhere else. inspectors_list()
+//  is shared by the requisition form, the voucher list, the person-linking picker
+//  on the user form and the timesheet, where a person who starts next week SHOULD
+//  appear — that is how their login and paperwork exist before day one. So this
+//  one report, whose question does not apply to them, filters its own rows, and
+//  the shared reader keeps the meaning every other screen depends on.
+//
+//  "Not yet available for work" is not "hidden from the business": the same
+//  person stays on the team register, stays selectable in this screen's own
+//  person filter, and is named on the availability board as hired but not yet
+//  joined. A leaver is NOT excluded — they may well have worked during the period
+//  being reported, and dropping their days would understate what was delivered.
+//
+//  @param array  $jobs        the period's execution records, already scoped
+//  @param int    $workingDays working days in the period (the denominator)
+//  @param string $filterInsp  the person filter; when set, only people with
+//                             recorded days are listed
+function mis_person_utilisation(array $jobs, $workingDays, $filterInsp = '') {
+    $workingDays = (int) $workingDays;
+    $notStartedYet = function_exists('wf_joining_pending_ids') ? wf_joining_pending_ids() : [];
+    $out = [];
+    foreach (inspectors_list(false) as $ins) {
+        if (isset($notStartedYet[(int) $ins['id']])) continue;
+        $md = 0;
+        foreach ($jobs as $j) if ($j['ins_id'] == $ins['id']) $md += job_mandays($j);
+        if ($md > 0 || (string) $filterInsp === '') {
+            $out[] = ['name' => $ins['name'], 'mandays' => $md, 'working' => $workingDays,
+                      'pct' => $workingDays ? round($md / $workingDays * 100) : 0];
+        }
+    }
+    return $out;
+}
+
 function mis_available_days(array $F) {
     // The engineers who appear in the period, or every active one when the
     // filter does not name a person.

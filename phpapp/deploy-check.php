@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '378b678 · 2026-10-01 14:36 UTC · 676 files';
+$RELEASE = '7cce780 · 2026-10-01 18:26 UTC · 677 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -57,7 +57,7 @@ $EXPECT  = [
     'lib/bulk.php' => ['s'=>2157,'h'=>'ca3be826f9a4414c'],
     'lib/callprofit.php' => ['s'=>5760,'h'=>'7f81b6e7a9d7835f'],
     'lib/candpool.php' => ['s'=>13127,'h'=>'ee1d58a962510a9a'],
-    'lib/candreview.php' => ['s'=>58491,'h'=>'b3f665ab62da0af5'],
+    'lib/candreview.php' => ['s'=>59806,'h'=>'2db34cbe1e26423f'],
     'lib/capa.php' => ['s'=>34318,'h'=>'cf9edf290b106bfd'],
     'lib/careers.php' => ['s'=>22969,'h'=>'70a9ec1b3acf87e3'],
     'lib/chain.php' => ['s'=>27590,'h'=>'38344fcbe18d90b5'],
@@ -154,7 +154,7 @@ $EXPECT  = [
     'lib/lookups.php' => ['s'=>76156,'h'=>'5719504dcd9ba279'],
     'lib/methods.php' => ['s'=>13959,'h'=>'14969626618c15f8'],
     'lib/mghsso.php' => ['s'=>10002,'h'=>'80f043e73ff44d13'],
-    'lib/mis.php' => ['s'=>23708,'h'=>'4e0a8a4c11e56489'],
+    'lib/mis.php' => ['s'=>26675,'h'=>'793805e19f98b98f'],
     'lib/mkt_billing.php' => ['s'=>8396,'h'=>'34d5dafe732275bb'],
     'lib/mkt_credits.php' => ['s'=>9152,'h'=>'a415feb6c7997cff'],
     'lib/mkt_escrow.php' => ['s'=>12953,'h'=>'38961c0e1478671e'],
@@ -172,7 +172,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>703902,'h'=>'6bc32c020fc69996'],
+    'lib/ops.php' => ['s'=>703931,'h'=>'528c2b552d33edbb'],
     'lib/orgadmin.php' => ['s'=>76662,'h'=>'de9dbfea41642ec8'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -193,7 +193,7 @@ $EXPECT  = [
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
     'lib/recruit.php' => ['s'=>138522,'h'=>'0d2186f83e7fa8ee'],
-    'lib/recruit_approval.php' => ['s'=>169897,'h'=>'aeb8b5972a6e6fec'],
+    'lib/recruit_approval.php' => ['s'=>171690,'h'=>'0fa9966f711c8227'],
     'lib/recruit_assign.php' => ['s'=>40788,'h'=>'bcdcf294d7fa64a5'],
     'lib/recruit_cc.php' => ['s'=>33057,'h'=>'bba9d9edaf43ee16'],
     'lib/recruit_exec.php' => ['s'=>24603,'h'=>'0546b6c003d3493c'],
@@ -263,7 +263,7 @@ $EXPECT  = [
     'lib/visibility.php' => ['s'=>4843,'h'=>'281d50af3a4d26fa'],
     'lib/vocab.php' => ['s'=>19053,'h'=>'a9a1c5c84a2f8d0b'],
     'lib/webhookq.php' => ['s'=>7844,'h'=>'10e0dde19b283fdf'],
-    'lib/workforce.php' => ['s'=>56993,'h'=>'a6b55caed4055e50'],
+    'lib/workforce.php' => ['s'=>58084,'h'=>'4ab7d01681a0d870'],
     'lib/workspace.php' => ['s'=>15210,'h'=>'7cf36505c40be5c2'],
     'manifest.php' => ['s'=>1665,'h'=>'cd62f3f83b1a7969'],
     'phase1-inventory.php' => ['s'=>23590,'h'=>'37dcca72c7f637f2'],
@@ -284,6 +284,7 @@ $EXPECT  = [
     'tools/g5-data-audit.php' => ['s'=>4416,'h'=>'57925e6eebb6aaab'],
     'tools/g5-seed.php' => ['s'=>3454,'h'=>'028b959ca0476d86'],
     'tools/g6-seed.php' => ['s'=>2826,'h'=>'510d2e87fd1a411a'],
+    'tools/g6b-seed.php' => ['s'=>4137,'h'=>'c8030e3d63576a47'],
     'tools/licence-issue.php' => ['s'=>6116,'h'=>'563a0af4621b9578'],
     'tools/phase1_inventory_engine.php' => ['s'=>53763,'h'=>'587c1ddbd38ed330'],
     'tools/reset-admin.php' => ['s'=>2377,'h'=>'5eba3ddcf695da09'],
@@ -330,7 +331,7 @@ $EXPECT  = [
     'views/ops/ai_settings.php' => ['s'=>3976,'h'=>'85c7c7702303d4f6'],
     'views/ops/ai_topup_pay.php' => ['s'=>2522,'h'=>'d49277496bd6ae07'],
     'views/ops/approval_delegations.php' => ['s'=>6265,'h'=>'d6eedb718e5d4758'],
-    'views/ops/approval_rules.php' => ['s'=>19918,'h'=>'20548717ef2b342b'],
+    'views/ops/approval_rules.php' => ['s'=>23702,'h'=>'b1b2f838cfbf47ae'],
     'views/ops/approvals.php' => ['s'=>6693,'h'=>'f828df72d1a093af'],
     'views/ops/area_home.php' => ['s'=>4684,'h'=>'ff2892fd60f40036'],
     'views/ops/asset_register.php' => ['s'=>12667,'h'=>'5e7b08c6df453d0c'],

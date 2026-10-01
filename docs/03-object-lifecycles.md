@@ -900,6 +900,17 @@ INACTIVE          ──▶  ACTIVE                 a person, on the Inspector f
   being excluded from scheduling, allocation and capacity.
 - No permission changed. Recording or clearing a joining is coordinator-level
   plus recruitment scope, exactly as before Gate 5.
+- **In reporting (Gate 6B).** The per-person utilisation breakdown on Reports
+  leaves `PENDING_JOINING` people out, because the capacity denominator
+  (`mis_available_days()`, `status='ACTIVE'`) never counted them: listing them gave
+  a row of zero days against a capacity that excluded them, which reads as either
+  "this person is idle" or "this report is broken". The rule lives in
+  `mis_person_utilisation()` beside that denominator so the two cannot drift
+  apart. It is applied at that one report and **not** in `inspectors_list()`,
+  which the requisition form, voucher list, timesheet and person-linking picker
+  share and where somebody starting next week should appear. `INACTIVE` people are
+  **not** excluded from the breakdown: a leaver may have worked during the period
+  reported, and dropping their days would understate what was delivered.
 
 ---
 

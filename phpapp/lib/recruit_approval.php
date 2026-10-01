@@ -2608,8 +2608,35 @@ function ops_recruit_approvals($route, $method) {
             flash('Self-approval policy saved.');
             redirect('/recruit-approvals'); return true;
         }
+        //  R1-UI (Gate 6B) — WHICH REQUIREMENT CHANGES RAISE A REVIEW.
+        //
+        //  The 'redefined' trigger has existed and been ON since Gate 3, but it was
+        //  readable only as a settings row: an administrator who found the reviews
+        //  noisy had to have somebody write to the database, which is both unusable
+        //  and — because it bypasses setting_set() — completely unaudited. That is
+        //  the same defect Gate 4 fixed for the superuser exception, so it is fixed
+        //  the same way, on the same screen, behind the same permission.
+        //
+        //  Written through setting_set(), which already records organisation, key,
+        //  old value, new value, actor and timestamp on the sealed audit chain, so
+        //  the audit requirement needed nothing built for it.
+        //
+        //  Only the OPTIONAL triggers are writable. 'stricter' is mandatory and is
+        //  never read from the form: a post that tried to switch it off would be
+        //  ignored, because CREV_TRIGGER_ALWAYS is a constant, not a setting.
+        if ($do === 'review_triggers') {
+            foreach (CREV_TRIGGER_OPTIONAL as $t) {
+                setting_set(crev_trigger_key($t), (($_POST['trigger_' . $t] ?? '') === '1') ? '1' : '0');
+            }
+            flash('Review Required triggers saved.');
+            redirect('/recruit-approvals'); return true;
+        }
     }
     $selfPolicy = appr_self_state();          // GATE 4 — what this organisation has decided
+    //  R1-UI — asked of the Review Required engine, not of the settings table, so
+    //  the screen and the engine can never disagree about what is on.
+    $reviewTriggers = function_exists('crev_trigger_state') ? crev_trigger_state()
+                    : ['mandatory' => ['stricter'], 'optional' => []];
     $selId = (int)($_GET['id'] ?? 0);
     $sel = $selId ? appr_rule($selId) : null;
     // M2 — what the administrator needs to see to trust the configuration: which
@@ -2629,6 +2656,7 @@ function ops_recruit_approvals($route, $method) {
     }
     view('ops/approval_rules', [
         'selfPolicy' => $selfPolicy,          // GATE 4
+        'reviewTriggers' => $reviewTriggers,  // R1-UI (Gate 6B)
         'rules'  => appr_rules(null, false),
         'sel'    => $sel,
         'levels' => $sel ? appr_levels($sel['id']) : [],
