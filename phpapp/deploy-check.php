@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'ce79b41 · 2026-10-01 03:05 UTC · 672 files';
+$RELEASE = '054950a · 2026-10-01 10:03 UTC · 673 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -32,7 +32,7 @@ $EXPECT  = [
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>122748,'h'=>'8417ca15f39b35c2'],
-    'lib/access.php' => ['s'=>87369,'h'=>'b525737a949f50c7'],
+    'lib/access.php' => ['s'=>87803,'h'=>'729ff3f1ae456f88'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
     'lib/activity.php' => ['s'=>43860,'h'=>'f50c2abb6660e12e'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
@@ -134,7 +134,7 @@ $EXPECT  = [
     'lib/formdesign.php' => ['s'=>70278,'h'=>'82250b1cc55e3402'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
     'lib/helpers.php' => ['s'=>23982,'h'=>'2e245f9258448e49'],
-    'lib/hiringreq.php' => ['s'=>96795,'h'=>'0fd3abda655bb93a'],
+    'lib/hiringreq.php' => ['s'=>98841,'h'=>'fe8ce14c9ccc8658'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
     'lib/idems.php' => ['s'=>786654,'h'=>'ac696b399296a300'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
@@ -193,7 +193,7 @@ $EXPECT  = [
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
     'lib/recruit.php' => ['s'=>136841,'h'=>'05e50a91859a831e'],
-    'lib/recruit_approval.php' => ['s'=>150228,'h'=>'c9cdc7c3906e7657'],
+    'lib/recruit_approval.php' => ['s'=>169897,'h'=>'aeb8b5972a6e6fec'],
     'lib/recruit_assign.php' => ['s'=>40788,'h'=>'bcdcf294d7fa64a5'],
     'lib/recruit_cc.php' => ['s'=>33057,'h'=>'bba9d9edaf43ee16'],
     'lib/recruit_exec.php' => ['s'=>24603,'h'=>'0546b6c003d3493c'],
@@ -202,7 +202,7 @@ $EXPECT  = [
     'lib/recruit_iv.php' => ['s'=>38102,'h'=>'f42fdb14f4c786dc'],
     'lib/recruit_jd.php' => ['s'=>11577,'h'=>'fa60a38877273cec'],
     'lib/recruit_kpi.php' => ['s'=>44791,'h'=>'01e1256f752079c1'],
-    'lib/recruit_offer.php' => ['s'=>49411,'h'=>'d004a58efa7b927b'],
+    'lib/recruit_offer.php' => ['s'=>50420,'h'=>'ca79a631b18f0fe2'],
     'lib/recruitpipe.php' => ['s'=>82698,'h'=>'508ab85becc96cf4'],
     'lib/reportreview.php' => ['s'=>23222,'h'=>'ae43c4d37883823d'],
     'lib/reqfulfil.php' => ['s'=>16474,'h'=>'aeda367b914bbe2e'],
@@ -280,6 +280,7 @@ $EXPECT  = [
     'tools/cost-reconciliation.php' => ['s'=>2884,'h'=>'43103a0ad282892b'],
     'tools/engagement-parity.php' => ['s'=>2433,'h'=>'caecc781a3ede147'],
     'tools/g3-seed.php' => ['s'=>6955,'h'=>'aa86eedab4155b1f'],
+    'tools/g4-seed.php' => ['s'=>3269,'h'=>'ee13f091f6933cb5'],
     'tools/licence-issue.php' => ['s'=>6116,'h'=>'563a0af4621b9578'],
     'tools/phase1_inventory_engine.php' => ['s'=>53763,'h'=>'587c1ddbd38ed330'],
     'tools/reset-admin.php' => ['s'=>2377,'h'=>'5eba3ddcf695da09'],
@@ -326,7 +327,7 @@ $EXPECT  = [
     'views/ops/ai_settings.php' => ['s'=>3976,'h'=>'85c7c7702303d4f6'],
     'views/ops/ai_topup_pay.php' => ['s'=>2522,'h'=>'d49277496bd6ae07'],
     'views/ops/approval_delegations.php' => ['s'=>6265,'h'=>'d6eedb718e5d4758'],
-    'views/ops/approval_rules.php' => ['s'=>16619,'h'=>'c289a71a8dd1c8a8'],
+    'views/ops/approval_rules.php' => ['s'=>19918,'h'=>'20548717ef2b342b'],
     'views/ops/approvals.php' => ['s'=>6693,'h'=>'f828df72d1a093af'],
     'views/ops/area_home.php' => ['s'=>4684,'h'=>'ff2892fd60f40036'],
     'views/ops/asset_register.php' => ['s'=>12678,'h'=>'4e1059588b45df6f'],
@@ -439,7 +440,7 @@ $EXPECT  = [
     'views/ops/flow_gaps.php' => ['s'=>3363,'h'=>'48ceadbccf10fe16'],
     'views/ops/form_designer.php' => ['s'=>19389,'h'=>'9d054bc806345582'],
     'views/ops/hierarchy.php' => ['s'=>55996,'h'=>'0ed12718ecd77b34'],
-    'views/ops/hiring_request.php' => ['s'=>27679,'h'=>'dd8b407f9f394b65'],
+    'views/ops/hiring_request.php' => ['s'=>28619,'h'=>'d67c24dd2a50f535'],
     'views/ops/hiring_request_list.php' => ['s'=>3004,'h'=>'0b5cff62fb90b6e5'],
     'views/ops/hwpoints.php' => ['s'=>3338,'h'=>'679fdb6488397c4a'],
     'views/ops/idems/approval_rules.php' => ['s'=>6707,'h'=>'c2df5a10e140394e'],

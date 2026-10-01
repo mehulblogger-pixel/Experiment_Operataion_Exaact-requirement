@@ -76,4 +76,28 @@ foreach ($m[1] as $rel) { require_once $root . $rel; }
 // Build the whole schema + seed on the throwaway database.
 boot();
 
+// ============================================================================
+//  GATE 4 — WHICH KIND OF ORGANISATION THIS SUITE IS SIMULATING.
+//
+//  Gate 4 makes self-approval organisation-configurable and switches it off for a
+//  NEW organisation, with the master/superuser exception off too until somebody
+//  turns it on. The throwaway database built above is, by construction, brand new,
+//  so without this line the whole suite would run as a day-one organisation.
+//
+//  That is not what these suites are simulating. Almost every one of them models an
+//  ESTABLISHED workspace with a single administrator who raises a record and then
+//  decides it — which in real life is an organisation that has deliberately enabled
+//  the master exception, and which is exactly what Gate 4's migration preserves for
+//  a workspace already in use. So the suite says so, once, out loud, instead of each
+//  of those fixtures silently depending on a default.
+//
+//  THE CONTROL ITSELF IS NOT WEAKENED BY THIS. tests/test_gate4_self_approval.php
+//  sets BOTH settings explicitly for every assertion it makes — off, on, and the
+//  master exception both ways — so the blocked paths are proved there rather than
+//  assumed here, and the Gate 4 mutation battery is run against that file.
+if (function_exists('setting_set')) {
+    setting_set('appr_self_approval', '0');            // self-approval itself stays OFF
+    setting_set('appr_self_master_exception', '1');    // …with the master exception enabled
+}
+
 fwrite(STDOUT, "bootstrap: app booted on a throwaway " . strtoupper($GLOBALS['__test_engine']) . " db (" . count($m[1]) . " libs)\n");

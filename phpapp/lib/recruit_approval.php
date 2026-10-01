@@ -117,6 +117,101 @@ function appr_migrate() {
     //  and a second run finds nothing to move. No activity row is ever deleted.
     try { if (function_exists('appr_cond_migrate_ledger')) appr_cond_migrate_ledger(); }
     catch (Throwable $e) { /* never break boot */ }
+    //  GATE 4 · §10 — THE POLICY IN FORCE WHEN THE REQUEST WAS RAISED.
+    //
+    //  Frozen onto the request, exactly as this engine already freezes each level's
+    //  SLA policy onto its step. Without it, switching the organisation's policy
+    //  would reach into every chain already waiting for a decision — a request
+    //  raised under one rule being judged under another, which is the silent change
+    //  §10 forbids.
+    try { ensure_column('recruit_approval_requests', 'self_policy', "VARCHAR(24) DEFAULT ''"); }
+    catch (Throwable $e) {}
+    try { appr_self_migrate(); } catch (Throwable $e) { /* never break boot */ }
+}
+
+//  GATE 4 · §6 — SETTLING SELF-APPROVAL FOR AN ORGANISATION THAT ALREADY EXISTS.
+//
+//  The locked rule gives a NEW organisation self-approval off and no master
+//  exception. It also forbids assuming anything about an organisation that already
+//  exists. So this does not assume: it MEASURES, once, and records what it decided.
+//
+//  WHAT THE EVIDENCE IN THE CODE SAYS AN EXISTING ORGANISATION DOES TODAY — and it
+//  is not one answer, which is exactly why guessing would have been wrong:
+//
+//    · a HIRING REQUEST  — self-approval already blocked, with a master allowed
+//                          unconditionally (the old hardcoded is_master() line).
+//    · EVERY OTHER ENTITY — no requester/approver comparison existed at all,
+//                          because appr_guard() returned early for them.
+//
+//  SO THE TWO SETTINGS ARE DECIDED SEPARATELY, each on its own evidence:
+//
+//  SELF-APPROVAL → OFF, for every organisation.
+//      For hiring requests this changes NOTHING: they were already blocked. For the
+//      other entities there was no setting to preserve — there was no rule. That
+//      absence was a defect, recorded by Gate 2 as "widen appr_guard()'s entity
+//      scope" and deferred to this gate; persisting it as though a customer had
+//      chosen it would turn a bug into a policy. Closing it is this gate's purpose,
+//      and it is reported rather than slipped in.
+//
+//  MASTER EXCEPTION → ON for an organisation that is already in use, OFF for a new
+//      one. A master in an existing workspace CAN approve their own hiring request
+//      today; switching that off underneath them would remove a capability they are
+//      relying on, which §6 forbids. So their actual behaviour is preserved, written
+//      down explicitly rather than left implicit, and they can now switch it off —
+//      which they could not do before. A new organisation gets the locked default.
+//
+//  THE EVIDENCE TEST is "has this organisation ever used recruitment approvals or
+//  raised a hiring request". That is measured from its own data, not from a version
+//  marker, because a marker says when the code arrived and the data says whether
+//  anybody was working under the old rules.
+//
+//  Additive, forward-only, idempotent (the marker short-circuits it), non-destructive
+//  (nothing is rewritten, no approval row is touched, no decision is re-made) and
+//  auditable (setting_set() already records who/what/old/new on the sealed chain,
+//  and the marker records which branch was taken and why).
+function appr_self_migrate() {
+    if (!function_exists('setting_get') || !function_exists('setting_set')) return '';
+    $already = (string) setting_get('appr_self_migrated', '');
+    if ($already !== '') return $already;                 // decided once, never re-decided
+
+    //  TWO SIGNALS, because one is not enough. A chain row proves the approval engine
+    //  has been used; a hiring request proves people were raising and deciding things
+    //  even where no chain was configured — and those direct decisions are exactly
+    //  the ones a master was self-approving under the old hardcoded exception.
+    //
+    //  The hiring request question is asked of the layer that OWNS that table, not
+    //  queried here: a second reader outside that layer is what the M4 suite checks
+    //  for, and widening its guard to admit this one would be the wrong fix.
+    $inUse = false;
+    try { if ((int) ops_val('SELECT COUNT(*) FROM recruit_approval_requests') > 0) $inUse = true; }
+    catch (Throwable $e) { /* a table that is not there yet is not evidence of use */ }
+    if (!$inUse && function_exists('hreq_any_exists')) {
+        try { $inUse = (bool) hreq_any_exists(); } catch (Throwable $e) {}
+    }
+
+    //  An explicit value is NEVER overwritten. An organisation that has already been
+    //  configured by a person keeps exactly what that person chose.
+    if ((string) setting_get(APPR_SELF_KEY, '') === '') setting_set(APPR_SELF_KEY, '0');
+    if ((string) setting_get(APPR_SELF_MASTER_KEY, '') === '')
+        setting_set(APPR_SELF_MASTER_KEY, $inUse ? '1' : '0');
+
+    $verdict = ($inUse ? 'EXISTING' : 'NEW') . '@'
+             . (function_exists('now_iso') ? now_iso() : date('c'));
+    setting_set('appr_self_migrated', $verdict);
+    if (function_exists('act_log')) {
+        try {
+            act_log('', 0, 'SYSTEM',
+                $inUse ? 'Self-approval governance applied to an organisation already in use — '
+                       . 'self-approval off, master exception preserved as it was'
+                       : 'Self-approval governance applied to a new organisation — '
+                       . 'self-approval off, master exception off',
+                ['auto' => 1, 'outcome' => 'SELF_APPROVAL_MIGRATION',
+                 'body' => json_encode(['in_use' => $inUse, 'self_approval' => '0',
+                                        'master_exception' => $inUse ? '1' : '0',
+                                        'verdict' => $verdict])]);
+        } catch (Throwable $e) {}
+    }
+    return $verdict;
 }
 
 function _appr_now() { return function_exists('now_iso') ? now_iso() : date('c'); }
@@ -1318,8 +1413,11 @@ function appr_start($entity, $entityId, $ctx, $subject = '', $amount = 0) {
     // D1 — the display name is still written, for screens; the IDENTITY is written
     // beside it, from the session, and it is the identity that decides anything.
     $reqUid = function_exists('current_user') ? (int) ((current_user()['id'] ?? 0)) : 0;
-    db()->prepare("INSERT INTO recruit_approval_requests (entity,entity_id,rule_id,rule_name,subject,amount,status,current_seq,requester,requester_id,created_at) VALUES (?,?,?,?,?,?, 'PENDING', ?,?,?,?)")
-        ->execute([$entity,(int)$entityId,(int)$rule['id'],(string)$rule['name'],(string)$subject,(float)$amount, (int)$levels[0]['seq'], _appr_actor(), $reqUid ?: null, _appr_now()]);
+    //  GATE 4 · §10 — the self-approval policy is stamped here, with the rest of the
+    //  request's frozen context, so this chain is judged under the rule it was
+    //  raised under however the organisation reconfigures itself later.
+    db()->prepare("INSERT INTO recruit_approval_requests (entity,entity_id,rule_id,rule_name,subject,amount,status,current_seq,requester,requester_id,self_policy,created_at) VALUES (?,?,?,?,?,?, 'PENDING', ?,?,?,?,?)")
+        ->execute([$entity,(int)$entityId,(int)$rule['id'],(string)$rule['name'],(string)$subject,(float)$amount, (int)$levels[0]['seq'], _appr_actor(), $reqUid ?: null, appr_self_policy_token(), _appr_now()]);
     $reqId = (int)db()->lastInsertId();
     // An org-chart approver token ("reporting manager", "HOD", …) is resolved to a
     // real person here, from the requisition's position walked up the reporting
@@ -1568,22 +1666,39 @@ function appr_can_act($step, $user = null) {
 //  policy change and is recorded as a Phase-3 question, not slipped in here.
 function appr_guard($req) {
     $entity = strtoupper((string) ($req['entity'] ?? ''));
-    if ($entity !== 'HIRING_REQUEST' || !function_exists('hreq_get')) return '';
-    // 1. ENTITLEMENT first — the workspace must have bought recruitment. This is
-    //    asked before anything about the person, and a master does not escape it.
-    if (function_exists('licence_blocks') && licence_blocks('mod.hiring.view'))
+
+    //  GATE 4 — THE ENTITLEMENT QUESTION, FOR EVERY ENTITY.
+    //
+    //  This used to be asked only for a hiring request, because the whole function
+    //  returned early for everything else. The module each entity belongs to is
+    //  already written down in APPR_ENTITY_MODULE precisely so it can be asked once,
+    //  for all of them, and a master does not escape it.
+    $mod = APPR_ENTITY_MODULE[$entity] ?? '';
+    if ($mod !== '' && function_exists('licence_blocks') && licence_blocks($mod))
         return 'The recruitment module is not switched on for this installation.';
-    $r = hreq_get((int) ($req['entity_id'] ?? 0));
-    if (!$r) return 'That hiring request no longer exists.';
-    // 2. BRANCH SCOPE — asked here, at the decision, not only on a route.
-    if (function_exists('hreq_in_scope') && !hreq_in_scope($r))
-        return 'This hiring request is outside your office / branch scope.';
-    // 3. SEGREGATION OF DUTIES — the requestor may not approve their own request.
-    //    One rule, two readers: the same helper the direct decision path uses,
-    //    including its single stated master exception, neither broadened nor
-    //    narrowed here.
-    if (function_exists('hreq_segregation_blocks') && hreq_segregation_blocks($r))
-        return 'You raised this request, so somebody else has to decide it.';
+
+    if ($entity === 'HIRING_REQUEST' && function_exists('hreq_get')) {
+        $r = hreq_get((int) ($req['entity_id'] ?? 0));
+        if (!$r) return 'That hiring request no longer exists.';
+        // BRANCH SCOPE — asked here, at the decision, not only on a route.
+        if (function_exists('hreq_in_scope') && !hreq_in_scope($r))
+            return 'This hiring request is outside your office / branch scope.';
+    }
+
+    //  GATE 4 — SEGREGATION OF DUTIES, FOR EVERY ENTITY, AT THIS ONE CHOKE POINT.
+    //
+    //  THE DEFECT THIS REPLACES. The old first line of this function was
+    //      if ($entity !== 'HIRING_REQUEST') return '';
+    //  so a requisition, an offer, a salary structure and — after Gate 2 — a
+    //  material change to an already-approved requirement were every one of them
+    //  decided with NO requester/approver comparison. The person who proposed a
+    //  change could approve their own change. The rule was not weak; it was absent.
+    //
+    //  It is asked HERE, in the one function every chain decision passes through,
+    //  rather than added to each screen: a rule copied onto four screens is a rule
+    //  that will be missing from the fifth.
+    $why = appr_self_block_reason($req, ['path' => 'CHAIN']);
+    if ($why !== '') return $why;
     return '';
 }
 
@@ -2116,6 +2231,23 @@ const APPR_ENTITY_SOURCE = [
     'OFFER'          => 'job_offers',
     'SALARY'         => 'salary_structures',
     'REQUISITION'    => 'requisitions',
+    //  GATE 4 FINDING (G4-2) — GATE 2'S ENTITIES WERE NEVER REGISTERED HERE.
+    //
+    //  Gate 2 added HREQ_CHANGE and REQ_CHANGE to APPR_ENTITIES but not to this map
+    //  or to APPR_ENTITY_MODULE, so appr_entity_record() returned null for them and
+    //  appr_requester_id() answered ENTITY_UNRESOLVED. The measurable effect was not
+    //  cosmetic: the proposer of a material change was NEVER TOLD their change had
+    //  been approved or rejected, because appr_email_requester() could not resolve
+    //  who to write to — and the reason was filed as "the record could not be
+    //  resolved". A change control nobody is notified about is a change control
+    //  people route around.
+    //
+    //  A change's entity_id is the TARGET REQUIREMENT's id (that is what Gate 2
+    //  passes to appr_start and what its callback resolves), so the record is the
+    //  requirement itself. WHO RAISED THE CHANGE is a different question, answered
+    //  in appr_requester_id() from the proposal.
+    'HREQ_CHANGE'    => 'hiring_requests',
+    'REQ_CHANGE'     => 'requisitions',
 ];
 function appr_entity_record($entity, $id) {
     $entity = strtoupper(trim((string) $entity));
@@ -2145,6 +2277,10 @@ const APPR_ENTITY_MODULE = [
     'REQUISITION'    => 'mod.hiring.view',
     'OFFER'          => 'mod.hiring.view',
     'SALARY'         => 'mod.hiring.view',
+    //  GATE 4 (G4-2) — a change to a recruitment requirement is a recruitment
+    //  record, so it is entitled exactly as the requirement it changes is.
+    'HREQ_CHANGE'    => 'mod.hiring.view',
+    'REQ_CHANGE'     => 'mod.hiring.view',
 ];
 
 //  M3 CORRECTION #4 · E1 + E2 — THE COMMON GATE.
@@ -2334,6 +2470,22 @@ function appr_requester_id($req) {
     $fromEntity = 0;
     if ($entity === 'HIRING_REQUEST')             $fromEntity = (int) ($rec['requested_by_id'] ?? 0);
     elseif ($entity === 'OFFER' || $entity === 'SALARY') $fromEntity = (int) ($rec['created_by_id'] ?? 0);
+    elseif ($entity === 'HREQ_CHANGE' || $entity === 'REQ_CHANGE') {
+        //  GATE 4 — WHO RAISED A CHANGE IS THE PERSON WHO PROPOSED IT.
+        //
+        //  Not the person who raised the requirement years ago. If A raises a
+        //  requirement and B proposes a material change to it, the approval request
+        //  in hand is B's, and B is who must not decide it. Taking the requirement's
+        //  own raiser here would block the wrong person and let the right one
+        //  through — the rule inverted while looking like it was working.
+        $target = $entity === 'HREQ_CHANGE' ? 'HIRING_REQUEST' : 'REQUISITION';
+        try {
+            $pr = ops_one("SELECT proposed_by_id FROM requirement_change_proposals
+                           WHERE entity=? AND entity_id=? AND status='PENDING'
+                           ORDER BY id DESC LIMIT 1", [$target, $eid]);
+            if ($pr) $fromEntity = (int) ($pr['proposed_by_id'] ?? 0);
+        } catch (Throwable $e) { /* the table is Gate 2's; absent means nothing to read */ }
+    }
     if ($fromEntity > 0) return [$fromEntity, ''];
     $fromChain = (int) ($req['requester_id'] ?? 0);
     if ($fromChain > 0) return [$fromChain, ''];
@@ -2444,7 +2596,20 @@ function ops_recruit_approvals($route, $method) {
         if ($do === 'rule_toggle') { $r = appr_rule((int)($_POST['id'] ?? 0)); if ($r) appr_rule_set_active($r['id'], (int)$r['active'] === 0); flash('Rule updated.'); redirect('/recruit-approvals'); return true; }
         if ($do === 'level_save') { appr_level_save($_POST); flash('Level saved.'); redirect('/recruit-approvals?id=' . (int)($_POST['rule_id'] ?? 0)); return true; }
         if ($do === 'level_delete') { appr_level_delete((int)($_POST['level_id'] ?? 0)); flash('Level removed.'); redirect('/recruit-approvals?id=' . (int)($_POST['rule_id'] ?? 0)); return true; }
+        //  GATE 4 — the organisation's own self-approval policy. Written through
+        //  setting_set(), which already records who changed which key and from what
+        //  to what on the sealed audit chain, so §13's configuration audit needed
+        //  nothing built for it. Two independent switches, because "may anyone
+        //  decide their own request" and "may a superuser" are different questions
+        //  and an organisation answers them separately.
+        if ($do === 'self_policy') {
+            setting_set(APPR_SELF_KEY, ($_POST['self_approval'] ?? '') === '1' ? '1' : '0');
+            setting_set(APPR_SELF_MASTER_KEY, ($_POST['master_exception'] ?? '') === '1' ? '1' : '0');
+            flash('Self-approval policy saved.');
+            redirect('/recruit-approvals'); return true;
+        }
     }
+    $selfPolicy = appr_self_state();          // GATE 4 — what this organisation has decided
     $selId = (int)($_GET['id'] ?? 0);
     $sel = $selId ? appr_rule($selId) : null;
     // M2 — what the administrator needs to see to trust the configuration: which
@@ -2463,6 +2628,7 @@ function ops_recruit_approvals($route, $method) {
         }
     }
     view('ops/approval_rules', [
+        'selfPolicy' => $selfPolicy,          // GATE 4
         'rules'  => appr_rules(null, false),
         'sel'    => $sel,
         'levels' => $sel ? appr_levels($sel['id']) : [],
@@ -2534,4 +2700,177 @@ function ops_my_approvals($route, $method) {
     }
     view('ops/my_approvals', ['inbox' => appr_inbox(), 'waiting' => appr_waiting_on_others()]);
     return true;
+}
+
+// ============================================================================
+//  GATE 4 — SELF-APPROVAL GOVERNANCE
+//
+//  WHAT THIS IS, in business terms.
+//
+//  Somebody raises a hiring request, a requisition, an offer, a salary structure,
+//  or a change to an already-approved requirement. Somebody else is supposed to
+//  decide it. That separation is the whole point of having an approval step: a
+//  control the same person can satisfy on their own is not a control, it is
+//  paperwork.
+//
+//  WHAT THE AUDIT OF THE EXISTING CODE FOUND, BEFORE ANYTHING WAS CHANGED
+//
+//  1. The rule existed for exactly ONE entity. appr_guard() opened with
+//        if ($entity !== 'HIRING_REQUEST') return '';
+//     so a requisition, an offer, a salary structure and — since Gate 2 — a
+//     material change to an approved requirement were ALL decided with no
+//     requester/approver comparison at all. The person who proposed a change
+//     could approve their own change, and nothing anywhere said no.
+//
+//  2. The master exception was HARDCODED and UNCONDITIONAL. hreq_segregation_
+//     blocks() began `if (is_master()) return false;` — so a superuser could
+//     always approve their own request, in every organisation, with no way to
+//     turn it off and nothing recorded when they did.
+//
+//  3. Self-approval was NOT configurable anywhere. There was no setting.
+//
+//  4. There was NO per-user exception, and this gate does not create one. The
+//     only individual attribute involved is users.is_superuser, which is the
+//     platform's existing master model, not a self-approval override.
+//
+//  WHAT THIS SECTION ADDS — and what it deliberately reuses
+//
+//    · TWO organisation settings, in the settings table that already IS this
+//      product's organisation configuration (one database per tenant, so a
+//      setting is per-organisation by construction). setting_set() already
+//      records who changed which key, from what to what, on the sealed audit
+//      chain — so §13's configuration audit needed nothing built.
+//    · the EXISTING requester resolver, appr_requester_id(), which already
+//      answers "who raised this" for every entity, from the business object's own
+//      id column, never from a name, and which fails closed rather than guessing.
+//    · the EXISTING audit spine, act_log(), for the exception record.
+//    · the EXISTING master model, is_master().
+//
+//  No new approval engine. No new audit engine. No second permission mechanism.
+//  No per-user flag. No username comparison. No route-level rule.
+// ============================================================================
+
+//  THE TWO KEYS. Organisation-level, in the organisation's own configuration.
+const APPR_SELF_KEY   = 'appr_self_approval';          // may a requester decide their own request?
+const APPR_SELF_MASTER_KEY = 'appr_self_master_exception';  // may a MASTER do so, when the above is off?
+
+//  SHIPPED DEFAULTS, both OFF. The default is the interpretation of absence, so
+//  these two lines are the locked rule: a new organisation starts with
+//  self-approval off and no master exception, and has to decide to turn either on.
+function appr_self_allowed() {
+    return function_exists('setting_get') ? ((string) setting_get(APPR_SELF_KEY, '0') === '1') : false;
+}
+function appr_self_master_exception() {
+    return function_exists('setting_get') ? ((string) setting_get(APPR_SELF_MASTER_KEY, '0') === '1') : false;
+}
+
+//  THE POLICY, AS A STAMP. Two flags in one short string, so one additive column
+//  carries the whole answer and a future third flag does not need another column.
+function appr_self_policy_token() {
+    return 'S' . (appr_self_allowed() ? '1' : '0') . 'M' . (appr_self_master_exception() ? '1' : '0');
+}
+
+//  WHICH POLICY GOVERNS THIS DECISION (§10).
+//
+//  The one stamped on the request when it was raised, where there is one. A request
+//  raised before this gate carries no stamp, and a DIRECT decision has no request
+//  row at all — both fall back to what the organisation has configured now, which
+//  for them is the only answer there is.
+function appr_self_policy_for($req) {
+    $tok = is_array($req) ? trim((string) ($req['self_policy'] ?? '')) : '';
+    if (preg_match('~^S([01])M([01])$~', $tok, $m))
+        return ['self' => $m[1] === '1', 'master' => $m[2] === '1', 'frozen' => true];
+    return ['self' => appr_self_allowed(), 'master' => appr_self_master_exception(), 'frozen' => false];
+}
+
+//  THE ONE RULE, for every entity, asked in one place.
+//
+//  Returns '' when the decision may proceed, or the reason it may not. The
+//  comparison is between IDENTITIES — an integer user id on both sides — never
+//  between names, and never between a name and an id.
+//
+//  Order matters and is deliberate:
+//    1. Who raised this? Asked of the existing resolver. If that cannot be
+//       answered, nothing can be asserted about self-approval, so the decision is
+//       allowed to proceed — see the note below, which explains why the opposite
+//       would be worse.
+//    2. Is the person deciding the same person? If not, there is nothing here.
+//    3. Has the organisation allowed self-approval outright? Then proceed.
+//    4. Is this a master, and has the organisation deliberately enabled the master
+//       exception? Then proceed AND RECORD IT — that is the whole reason the
+//       exception is allowed to exist.
+//    5. Otherwise, refuse.
+//
+//  ON AN UNRESOLVABLE REQUESTER. A row from before the engine recorded identities
+//  carries no raiser id at all. Refusing those would make every historical
+//  approval in every existing workspace undecidable — a control that stops the
+//  business rather than protecting it, and a silent behaviour change of exactly
+//  the kind this gate is forbidden to make. So the question goes unanswered rather
+//  than answered wrongly, and the reason is available to the caller.
+function appr_self_block_reason($req, array $opt = []) {
+    if (!is_array($req)) return '';
+    [$requesterId, $why] = function_exists('appr_requester_id')
+        ? appr_requester_id($req) : [0, 'NO_RESOLVER'];
+    if ((int) $requesterId <= 0) return '';                 // cannot be asserted — see above
+    $me = function_exists('current_user') && ($u = current_user()) ? (int) ($u['id'] ?? 0) : 0;
+    if ($me <= 0 || (int) $requesterId !== $me) return '';   // a different person: nothing to say
+
+    //  §10 — the policy this request was RAISED under, not necessarily the one in
+    //  force now. A chain already waiting on somebody is not re-judged because an
+    //  administrator changed a switch this morning.
+    $pol = appr_self_policy_for($req);
+    if ($pol['self']) return '';                             // the organisation permits it outright
+
+    $isMaster = function_exists('is_master') && is_master();
+    if ($isMaster && $pol['master']) {
+        appr_audit_self_exception($req, (int) $requesterId, $me, $opt);
+        return '';
+    }
+    //  Phrased so the reader knows WHICH rule stopped them and that it is a
+    //  configuration, not a bug — and, for a master, that the exception exists and
+    //  is switched off rather than absent.
+    return $isMaster
+        ? 'You raised this, and this organisation has not enabled the master self-approval exception, '
+          . 'so somebody else has to decide it.'
+        : 'You raised this, so somebody else has to decide it.';
+}
+
+//  THE EXCEPTION RECORD (§13).
+//
+//  A master approving their own request is the one case the locked rule allows and
+//  the one case that must never pass unnoticed. Every field §13 asks for is here,
+//  on the EXISTING audit spine — the organisation is implicit and absolute,
+//  because one database per tenant means this row cannot be in another
+//  organisation's trail.
+function appr_audit_self_exception($req, $requesterId, $approverId, array $opt = []) {
+    if (!function_exists('act_log')) return;
+    $entity = strtoupper((string) ($req['entity'] ?? ''));
+    $body = [
+        'requester_id'            => (int) $requesterId,
+        'approver_id'             => (int) $approverId,
+        'requester_equals_approver' => true,
+        'self_approval_exception' => 'MASTER',
+        'organisation'            => function_exists('setting_get') ? (string) setting_get('company_name', '') : '',
+        'approval_entity'         => $entity,
+        'approval_request_id'     => (int) ($req['id'] ?? 0),
+        'entity_id'               => (int) ($req['entity_id'] ?? 0),
+        'path'                    => (string) ($opt['path'] ?? 'CHAIN'),
+        'at'                      => function_exists('now_iso') ? now_iso() : date('c'),
+    ];
+    try {
+        act_log($entity !== '' && defined('ACT_ENTITIES') && isset(ACT_ENTITIES[$entity]) ? $entity : '',
+            (int) ($req['entity_id'] ?? 0), 'SYSTEM',
+            'Self-approval allowed under the master exception — the person who raised this decided it',
+            ['auto' => 1, 'outcome' => 'SELF_APPROVAL_EXCEPTION', 'body' => json_encode($body)]);
+    } catch (Throwable $e) { /* never block the decision on its own audit row */ }
+}
+
+//  WHAT THE ORGANISATION HAS CONFIGURED, for a screen and for a test. Read-only.
+function appr_self_state() {
+    return [
+        'self_approval'     => appr_self_allowed(),
+        'master_exception'  => appr_self_master_exception(),
+        'migrated'          => function_exists('setting_get')
+                                 ? (string) setting_get('appr_self_migrated', '') : '',
+    ];
 }

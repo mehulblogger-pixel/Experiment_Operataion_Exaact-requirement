@@ -222,6 +222,13 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
 /* keep wide tables from pushing the page sideways on small screens: each
    scrolls inside its own box instead of stretching (or freezing) the page */
 @media (max-width:640px){
+  /* GATE 4 — A DECISION BUTTON HAS TO BE HITTABLE WITH A THUMB.
+     `.btn.small` is 4-5px of vertical padding, which is right beside a table row on
+     a laptop and about 24px tall on a phone. Approve and Reject on a hiring request
+     are an operational workflow a manager does in the field, and a 24px target next
+     to its opposite is how the wrong one gets pressed. Raised to a real touch target
+     on small screens only; the desktop density is untouched. */
+  .btn.small{min-height:34px;padding-top:7px;padding-bottom:7px}
   /* Fallback for any table JS did not convert: scroll inside its own box
      rather than stretching the page. Data tables get the card layout below. */
   table.grid,table.dt,table.tbl{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;max-width:100%}

@@ -388,9 +388,45 @@ function hreq_is_own_request($r) {
 //  master exception is M4's, stated once, here, and neither broadened nor
 //  narrowed by M1.
 function hreq_segregation_blocks($r) {
-    if (function_exists('is_master') && is_master()) return false;
-    return hreq_is_own_request(is_array($r) ? $r : hreq_get($r));
+    $row = is_array($r) ? $r : hreq_get($r);
+    if (!hreq_is_own_request($row)) return false;          // not your own request: nothing to decide here
+
+    //  GATE 4 — THE MASTER EXCEPTION IS NOW THE ORGANISATION'S DECISION.
+    //
+    //  This line used to read `if (is_master()) return false;` — unconditional, in
+    //  every organisation, with nothing recorded when it was used. A superuser could
+    //  always approve their own request and no customer could switch that off.
+    //
+    //  It is now asked of the organisation's configuration, in the one place Gate 4
+    //  holds that question, and a master who uses the exception is AUDITED. The
+    //  shape of this function is unchanged — one rule, two readers — and so is its
+    //  answer whenever the organisation has the exception enabled, which is what
+    //  every existing workspace is migrated to.
+    if (function_exists('appr_self_allowed') && appr_self_allowed()) return false;
+    if (function_exists('is_master') && is_master()
+        && function_exists('appr_self_master_exception') && appr_self_master_exception()) {
+        if (function_exists('appr_audit_self_exception'))
+            appr_audit_self_exception(['entity' => 'HIRING_REQUEST', 'entity_id' => (int) ($row['id'] ?? 0), 'id' => 0],
+                (int) ($row['requested_by_id'] ?? 0),
+                (int) ((current_user()['id'] ?? 0)), ['path' => 'DIRECT']);
+        return false;
+    }
+    return true;
 }
+//  GATE 4 — HAS THIS ORGANISATION EVER RAISED A HIRING REQUEST?
+//
+//  Asked by Gate 4's one-time migration, which needs to know whether people have
+//  already been working under the old self-approval behaviour before it decides
+//  what to preserve. It lives HERE because this file owns the table: the migration
+//  asking the question directly would have put a second reader of hiring_requests
+//  outside this layer, which the M4 suite checks for and which Gate 2 established
+//  the pattern for — ask the owner, never widen the guard.
+function hreq_any_exists() {
+    hreq_migrate();
+    try { return (int) ops_val("SELECT COUNT(*) FROM hiring_requests") > 0; }
+    catch (Throwable $e) { return false; }
+}
+
 function hreq_may_decide($r) {
     if (!hreq_can_decide()) return false;
     return !hreq_segregation_blocks($r);

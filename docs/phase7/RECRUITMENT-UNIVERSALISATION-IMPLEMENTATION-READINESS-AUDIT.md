@@ -1996,6 +1996,194 @@ or KPI fact altered. **No production deployment, and no claim about production d
 
 ---
 
+## §20g — GATE 4 RECORD: APPROVAL GOVERNANCE & SELF-APPROVAL
+
+Gate 4 was asked to make self-approval configurable, off by default, with an
+explicitly enabled master exception. The audit it began with found something larger:
+**for five of the six approval entities the rule did not exist at all.**
+
+### G1 — The audit, before any code was changed
+
+| Question | What the code actually said |
+|---|---|
+| Where is approval configuration stored? | the per-tenant `settings` table (`setting_get`/`setting_set`). One database per tenant, so a setting **is** organisation configuration. `setting_set()` already audits who changed which key, old → new, on the sealed chain |
+| Was self-approval configurable? | **No.** There was no setting anywhere |
+| What happened when requester = approver? | **hiring request:** blocked. **requisition, offer, salary, and Gate 2's two change entities:** *not checked at all* — `appr_guard()` opened with `if ($entity !== 'HIRING_REQUEST') return '';`. `offer_approve()` had no check either |
+| Was there a master exception? | Yes — **hardcoded and unconditional**: `hreq_segregation_blocks()` began `if (is_master()) return false;`. No way to switch it off, nothing recorded when used |
+| Any per-user exception? | **None.** The only individual attribute is `users.is_superuser`, the platform's master model |
+| How do existing organisations behave? | No setting has ever existed, so every one of them is in the implicit case — and the implicit case is **not one answer** (see G4) |
+| How is absence interpreted? | `setting_get($k, $def)` returns the caller's default, so the default *is* the interpretation |
+| Which entities use the common engine? | `HIRING_REQUEST`, `REQUISITION`, `OFFER`, `SALARY`, `HREQ_CHANGE`, `REQ_CHANGE`. **Candidate Hiring does not exist as an approval entity** — Gate 3 deferred it |
+| How are requester and approver compared? | `hiring_requests.requested_by_id` vs the session, for hiring requests only. The engine also records `recruit_approval_requests.requester_id` from the session for **every** entity, which no guard read |
+| How is configuration resolved per organisation? | from that tenant's own `settings` row, cached per request, with no cross-tenant path |
+
+### G2 — What was built, and what was reused instead of built
+
+Two organisation settings, both **OFF** by default — and the default is the locked
+rule, because `setting_get`'s default is what absence means:
+
+| Setting | Question |
+|---|---|
+| `appr_self_approval` | may **anyone** decide a request they raised? |
+| `appr_self_master_exception` | may a **superuser**, when the above is off? |
+
+Reused rather than rebuilt:
+
+- **`appr_requester_id()`** — the existing resolver, built for the notification
+  predicates, which answers "who raised this" for every entity from the business
+  object's own id column, **never from a name**, and returns a reason rather than
+  guessing. Gate 4 did not write a requester resolver; it asked the one that was
+  already trusted.
+- **`setting_set()`'s audit** — §13's configuration audit needed nothing built. The
+  trail already records the setting, its old value, its new value, who changed it and
+  when, hash-chained. Asserted rather than assumed.
+- **`act_log()`** for the exception record, **`is_master()`** for the master model,
+  and the existing approval engine untouched.
+
+No new approval engine, no new audit engine, no second permission mechanism, no
+per-user flag, no username comparison, no route-level rule.
+
+### G3 — The rule, in one place, for every entity
+
+`appr_guard()` now asks entitlement for every entity (from the `APPR_ENTITY_MODULE`
+map that already existed for exactly that purpose), branch scope where the entity has
+one, and then **`appr_self_block_reason()`** — the one segregation question — for all
+six. The direct `offer_approve()` fallback asks the same function, because a control
+present on the chain and absent on the fallback is absent.
+
+Order inside the rule, and why each step is where it is:
+
+1. **who raised this** — from the existing resolver. If it cannot be answered, nothing
+   is asserted either way: a row from before the engine recorded identities would
+   otherwise make every historical approval in every existing workspace undecidable,
+   which is a control that stops the business rather than protecting it.
+2. **is the decider the same person** — integers on both sides.
+3. **has the organisation allowed it outright** — then proceed.
+4. **is this a superuser, with the exception deliberately enabled** — then proceed
+   **and record it**.
+5. otherwise refuse, and say which rule refused: a superuser is told the exception
+   exists and is switched off, so the refusal reads as a setting rather than a fault.
+
+### G4 — The migration, decided on measured evidence (§6)
+
+The brief forbids assuming anything about an existing organisation. The evidence is
+that an existing organisation does **not** have one behaviour, which is exactly why a
+single guess would have been wrong:
+
+| Entity | What an existing organisation does today |
+|---|---|
+| hiring request | self-approval blocked, **master allowed unconditionally** |
+| every other entity | **no requester/approver comparison existed** |
+
+So the two settings are migrated separately, each on its own evidence:
+
+- **`appr_self_approval` → OFF, for every organisation.** For hiring requests this
+  changes nothing — they were already blocked. For the other entities there was no
+  setting to preserve; there was no rule. That absence was a defect, recorded by Gate
+  2 as "widen `appr_guard()`'s entity scope" and deferred to this gate. Persisting it
+  as though a customer had chosen it would turn a bug into a policy. **This is a
+  deliberate tightening, reported here rather than slipped in.**
+- **`appr_self_master_exception` → ON for an organisation already in use, OFF for a
+  new one.** A superuser in an existing workspace *can* approve their own hiring
+  request today; switching that off underneath them would remove a capability they
+  rely on. Their actual behaviour is preserved, written down explicitly instead of
+  left implicit — and they can now switch it off, which they could not do before.
+
+The evidence test is "has this organisation ever used recruitment approvals or raised
+a hiring request", measured from its own data rather than from a version marker,
+because a marker says when the code arrived and the data says whether anybody was
+working under the old rules. The hiring-request half of that question is asked of the
+layer that **owns** that table (`hreq_any_exists()`), because querying it from the
+approval engine would have put a second reader of `hiring_requests` outside its
+owning layer — which the M4 suite checks for, and which Gate 2 established the pattern
+for: ask the owner, never widen the guard.
+
+The migration is additive, forward-only, idempotent (a marker short-circuits it),
+non-destructive (no approval row is touched, no decision re-made, no history
+rewritten) and auditable (both `setting_set()` writes and a `SELF_APPROVAL_MIGRATION`
+entry recording which branch was taken).
+
+### G5 — A configuration change never reaches a decision in flight (§10)
+
+The policy in force when a chain opens is **stamped onto the request**
+(`recruit_approval_requests.self_policy`), exactly as this engine already freezes each
+level's SLA policy onto its step. A request raised under one policy stays judged under
+it; a request raised afterwards gets the new one; a pre-Gate-4 row carries no stamp
+and is judged under the current configuration, which is the only policy it has.
+
+### G6 — §11 re-proved, in the right units
+
+Approved commitment **₹10,00,000**, proposed **₹13,00,000**, threshold
+**₹12,00,000** — and the proposed figure chooses the rule. Asserted on a
+**requisition** change, deliberately: for a hiring request this product reads the
+approval band as **headcount** and keeps money as a separate key (documented in
+`hreq_appr_ctx()`), so a money threshold asserted there would be asserting nothing.
+Same rule, different unit; the unit has to match the example or the test is theatre.
+And the proposer of the change cannot decide it — the hole this gate closed.
+
+### G7 — Findings, classified
+
+| Finding | Class | What was done |
+|---|---|---|
+| **G4-1 — segregation existed for one entity out of six.** `appr_guard()` returned no-block for requisition, offer, salary and both of Gate 2's change entities. A proposer could approve their own material change | **real defect, fixed** | the rule moved to the common choke point for every entity, using the identity the engine already recorded |
+| **G4-2 — Gate 2's change entities were never registered with the engine.** `HREQ_CHANGE`/`REQ_CHANGE` were in `APPR_ENTITIES` but not in `APPR_ENTITY_SOURCE` or `APPR_ENTITY_MODULE`, so `appr_entity_record()` returned null and `appr_requester_id()` answered `ENTITY_UNRESOLVED`. The measurable effect: **the proposer of a material change was never told it had been approved or rejected**, because `appr_email_requester()` could not resolve who to write to | **real defect, fixed** | registered in both maps; a change's requester resolves from the proposal's `proposed_by_id` (the proposer), not from the requirement's original raiser |
+| **G4-3 — the master exception was hardcoded and silent** | **real defect, fixed** | organisation-configurable, and audited every time it is used |
+| **G4-4 — a decision button was offered that the service would always refuse.** Now that the exception can be off, a superuser meets this often | **usability, fixed** | the screen already asked the full question; it now also names the exception and links an administrator to the setting, so a refusal reads as configuration rather than breakage |
+| **G4-5 — `.btn.small` is ~24px tall on a phone.** Approve and Reject sit next to each other on a workflow a manager does in the field | **real defect, fixed** | raised to a 34px touch target at ≤640px only; desktop density untouched |
+| **The claim "deliberately in NO role default"** (written in Gate 3's code comment and Gate 3's permission-matrix section) | **documentation error, corrected** | ADMIN and MASTER_ADMIN hold `array_keys(PERMISSIONS)` by design, so an administrator does hold it. Corrected in both places to "no *operational* role's defaults", and Gate 4 asserts the distinction that actually matters |
+| **Candidate Hiring approval** does not exist as an approval entity | **out of scope, reported** | nothing built — Gate 3 deferred it, and inventing it here would be scope creep |
+
+### G8 — Verification
+
+| Check | Result |
+|---|---|
+| Gate 4 battery, SQLite | **142 / 0** |
+| Gate 4 battery, MariaDB 10.11 | **142 / 0** |
+| Full suite, SQLite | **16,004 / 0** |
+| Full suite, MariaDB 10.11 *(authoritative)* | **16,003 / 0** |
+| Mutation targets killed | **8 / 8** |
+| Browser (Chromium), desktop + 360 / 390 / 412 px | **42 / 0**, three consecutive runs |
+| Whole-app crawl, every role | **all screens render cleanly** |
+| Gate 2 suite | **170 / 0** |
+| Gate 3 suite | **225 / 0** |
+| Approval suites (P3-M1, P3-M4, M4, M4-correction) | **116 / 176 / 93 / 107, all 0 failed** |
+
+Four problems in the verification itself were found and fixed at the root:
+
+- **The historical fixtures depended on the unconditional master bypass.** Forty-five
+  assertions failed the moment it became configurable, because almost every suite
+  models an established workspace whose single administrator raises a record and then
+  decides it. That is a real organisation with the exception deliberately enabled, so
+  `tests/bootstrap.php` now says so once, out loud, instead of each fixture silently
+  depending on a default — and the Gate 4 battery sets both switches explicitly for
+  every assertion it makes, so the blocked paths are proved rather than assumed.
+- **The concurrency worker called the internal writer, not the guarded entry point**,
+  and so appeared to show a self-approval winning a race. `hreq_decide()` is where
+  scope, capability and segregation are asked; `hreq_apply_decision()` is the writer
+  both the direct path and the approval callback share, deliberately unguarded because
+  the chain's own guard has already run. The worker was testing nothing.
+- **One mutation survived because it was ineffective**, not because the code was
+  unguarded: it was inserted after the branch it was meant to flip. It was moved so it
+  actually bites, rather than the test being weakened.
+- **This gate's own test file left a reference bound to the settings cache.** Every
+  test file is required into the same global scope, so a later file's variable of the
+  same name assigned a string straight into the cache and crashed the suite three
+  files later, in a test with nothing to do with settings. The reference is now
+  released immediately.
+
+### G9 — What Gate 4 deliberately did NOT do
+
+No inspector operational status (Gate 5), no Administrator-profile reconciliation
+(Gate 6), no decision on Gate 3's deferred "redefined" trigger, no Person Hub, no
+organisation-master convergence, no new KPI or audit engine, no Candidate Hiring
+approval entity, no native mobile work, and **no production deployment**.
+
+Gate 1B's pipeline authority, Gate 2's versioning and Gate 3's Review Required are
+all unchanged and re-proved in their own suites. No approval history was rewritten, no
+decision re-made, no approval record deleted.
+
+---
+
 # STOP
 
 **Scope of this document.** §1–§21 and §20a are audit only — they were written
@@ -2011,8 +2199,9 @@ narrow scope its gate named:
 | §20d | Gate 1B | yes — pipeline authority activated across the recruitment chain |
 | §20e | Gate 2 | yes — requirement versioning and change control for both entities |
 | §20f | Gate 3 | yes — Review Required when a stricter approved version becomes effective |
+| §20g | Gate 4 | yes — self-approval governance across every approval entity |
 
-**Gate 3 stops here and waits for an explicit pass before Gate 4.**
+**Gate 4 stops here and waits for an explicit pass before Gate 5.**
 
 Pipeline is authoritative for current recruitment state, unchanged by Gate 2.
 Legacy `candidates.stage` is no longer an independent current-state authority.

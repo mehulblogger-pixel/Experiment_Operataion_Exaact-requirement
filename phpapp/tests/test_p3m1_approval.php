@@ -281,11 +281,25 @@ t_ok(strpos(substr($guard, 0, $firstWrite), 'appr_guard($req)') !== false,
      'M1.10 · appr_act asks the guard before its first write');
 t_ok(strpos(substr($guard, 0, $firstWrite), 'appr_can_act($step)') !== false,
      'M1.10 · …and the approver question too');
-$g = substr($srcAppr, strpos($srcAppr, 'function appr_guard('), 1400);
-foreach ([['licence_blocks(', 'entitlement'], ['hreq_in_scope(', 'branch scope'], ['hreq_segregation_blocks(', 'segregation']] as $need)
+$g = substr($srcAppr, strpos($srcAppr, 'function appr_guard('), 2600);
+//  GATE 4 — the segregation question is no longer the hiring request's own helper.
+//
+//  It used to be `hreq_segregation_blocks(`, which could only ever answer for a
+//  hiring request — and the guard returned early for every other entity, so there
+//  was no segregation on a requisition, an offer, a salary structure or a material
+//  change at all. It now asks appr_self_block_reason(), which answers for EVERY
+//  entity from the identity the engine already records.
+foreach ([['licence_blocks(', 'entitlement'], ['hreq_in_scope(', 'branch scope'],
+          ['appr_self_block_reason(', 'segregation']] as $need)
     t_ok(strpos($g, $need[0]) !== false, 'M1.10 · the guard asks ' . $need[1]);
 t_ok(strpos($g, 'licence_blocks(') < strpos($g, 'hreq_in_scope('),
      'M1.10 · and asks entitlement FIRST — the order is the security property');
+//  AND IT IS NO LONGER LIMITED TO ONE ENTITY. This is the line that would catch the
+//  early return coming back, which is the whole defect Gate 4 removed.
+t_ok(strpos($g, "if (\$entity !== 'HIRING_REQUEST'") === false,
+     'M1.10 · *** the guard does NOT return early for non-hiring entities ***');
+t_ok(strpos($g, 'appr_self_block_reason(') > strpos($g, 'hreq_in_scope('),
+     'M1.10 · …and asks segregation after entitlement and scope, not before');
 
 // ---------------------------------------------------------------------------
 //  11 · M1 CORRECTION — cancelling a request closes its approval chain

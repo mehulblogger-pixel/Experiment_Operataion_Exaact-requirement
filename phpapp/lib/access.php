@@ -170,7 +170,12 @@ const PERMISSIONS = [
     //  being able to edit recruitment. Somebody who may move candidates all day is
     //  not thereby entitled to rule that a person still meets a requirement the
     //  business has just raised; that judgement is what this permission places.
-    //  Deliberately in NO role default: an organisation says who holds it.
+    //  In no OPERATIONAL role's default: a Coordinator, Branch Manager, Inspector and
+    //  so on do not hold it, and an organisation grants it deliberately. An
+    //  administrator does hold it, because role_defaults_base() gives MASTER_ADMIN and
+    //  ADMIN array_keys(PERMISSIONS) by this product's long-standing design — stated
+    //  precisely here because "in no role default" was written first, is what somebody
+    //  would rely on when deciding who can do what, and is not true of an admin.
     'hiring.review.clear' => 'Decide a requirement review on a candidate (continue or reject)',
     // ---- CRM / Marketing & Sales (fine-grained actions) ----
     'crm.quote.create'    => 'Create / edit quotations',

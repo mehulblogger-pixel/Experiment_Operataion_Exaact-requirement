@@ -738,7 +738,24 @@ PENDING ─▶ APPROVED        (every level approved → callback: entity approv
 
 Per-step status: `PENDING ─▶ APPROVED` / `REJECTED`. The request's
 `current_seq` names the level awaiting action; only that level's approver (role
-match, named-user match, or a master) may act. Approving advances to the next
+match, named-user match, or a master) may act.
+
+**Who may NOT act, whatever the chain says (Gate 4).** The person who raised the
+request cannot decide it. This is asked at the single common choke point,
+`appr_guard()`, for **every** entity — hiring request, requisition, offer, salary
+structure, and Gate 2's two change entities — from the requester identity the engine
+already records (the business object's own raiser id where it has one, the chain's
+`requester_id` otherwise, and never a name). Before Gate 4 this guard returned
+no-block for everything except a hiring request, so a person could approve their own
+material change.
+
+Two organisation settings govern it, both OFF for a new organisation:
+`appr_self_approval` (may anyone decide their own?) and
+`appr_self_master_exception` (may a superuser, when the first is off?). The second is
+audited every time it is used. An **ADMIN role is not a superuser** and does not get
+the exception. The policy in force when the chain opened is **stamped onto the
+request** (`self_policy`), so reconfiguring the organisation never re-judges a
+decision already in flight. Approving advances to the next
 level; the final approval — or any rejection — fires a **callback** that updates
 the underlying entity: `job_offers` → `APPROVED` (else back to `DRAFT`),
 `requisitions` → `approved` (else `on_hold`). **An unapproved offer still can

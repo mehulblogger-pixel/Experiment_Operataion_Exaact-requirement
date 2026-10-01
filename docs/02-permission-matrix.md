@@ -552,8 +552,20 @@ defaults**, and neither carries any system-wide power.
 
 | Permission | What it allows | Shipped default |
 |---|---|---|
-| `hiring.material_change.propose` | Propose a change to an **approved** requirement, which goes to change control instead of editing the record (Gate 2) | in no role's defaults |
-| `hiring.review.clear` | **Decide** a requirement review on a candidate — continue or reject — after a stricter approved version became effective (Gate 3) | in no role's defaults |
+| `hiring.material_change.propose` | Propose a change to an **approved** requirement, which goes to change control instead of editing the record (Gate 2) | in no *operational* role's defaults |
+| `hiring.review.clear` | **Decide** a requirement review on a candidate — continue or reject — after a stricter approved version became effective (Gate 3) | in no *operational* role's defaults |
+
+> **CORRECTION, made in Gate 4.** The two rows above previously read "in no role's
+> defaults". That was inaccurate, and the inaccuracy mattered because it is the kind
+> of claim somebody would rely on when deciding who can do what.
+>
+> `role_defaults_base()` gives **MASTER_ADMIN and ADMIN `array_keys(PERMISSIONS)`** —
+> every permission in the catalogue — by this product's own long-standing design.
+> So both permissions above ARE held by an administrator out of the box. What is true
+> is that they are in no *operational* role's defaults: a Coordinator, Asst. Manager,
+> Branch Manager, Inspector and so on do not get them, and an organisation grants
+> them deliberately. Gate 4's own battery asserts that distinction directly rather
+> than restating the old claim.
 
 **`hiring.material_change.propose` EXTENDS, it does not replace.** Gate 2's model is
 role defaults **plus** this permission **plus** recruitment scope — three things that
@@ -591,3 +603,82 @@ Neither gate adds a route that bypasses the module gates: the one new route
 (`candidate-review`) is reached only by somebody who can already open the candidate,
 and it performs no authority check of its own precisely so that the check cannot be
 skipped by reaching the functions another way.
+
+---
+
+## Self-approval governance (Gate 4)
+
+Approval authority was never a permission in this product and still is not: it is
+`appr_can_act()` — being the step's named user or its configured role — followed by
+`appr_guard()`. Gate 4 changes **who may approve their own request**, and makes that
+the organisation's decision instead of a line of code.
+
+### The two switches
+
+| Setting | Question | Shipped default |
+|---|---|---|
+| `appr_self_approval` | May **anyone** decide a request they raised? | **OFF** |
+| `appr_self_master_exception` | May a **superuser** decide a request they raised, when the above is off? | **OFF** for a new organisation |
+
+Both are **organisation-level**, in the `settings` table that already *is* this
+product's organisation configuration (one database per tenant, so a setting is
+per-organisation by construction). They are configured on **Recruitment approvals**
+(`/recruit-approvals`, gated `hiring_admin_can()`), and changing either is recorded
+on the sealed audit chain by `setting_set()` — the setting, its old value, its new
+value, who changed it and when.
+
+There is **no per-user mechanism** and Gate 4 does not create one: no
+`users.allow_self_approval`, no per-request exemption, no username comparison, no
+route-level rule. The only individual attribute involved is `users.is_superuser`,
+which is this platform's existing master model.
+
+### What the rule now covers — and what it covered before
+
+`appr_guard()` used to open with `if ($entity !== 'HIRING_REQUEST') return '';`. So
+the requester/approver comparison existed for a hiring request and for **nothing
+else**: a requisition, an offer, a salary structure and — after Gate 2 — a material
+change to an approved requirement were every one of them decided with no segregation
+check at all. The person who proposed a change could approve their own change.
+
+It is now asked at that **one choke point**, for every entity on the common engine
+(`HIRING_REQUEST`, `REQUISITION`, `OFFER`, `SALARY`, `HREQ_CHANGE`, `REQ_CHANGE`),
+using the requester identity the engine already records — the business object's own
+raiser id where it has one, the chain's `requester_id` otherwise, and **never a
+name**. The direct offer-approval fallback (used when no rule matches) asks the same
+function, so the control is not present on one path and absent on the other.
+
+*Candidate Hiring* is listed in Gate 4's brief but **does not exist as an approval
+entity in this product** — Gate 3 explicitly deferred it. There is nothing to
+enforce the rule on, and Gate 4 does not create it.
+
+### The master exception, and what an ADMIN does not get
+
+`is_master()` is `users.is_superuser` → the `MASTER_ADMIN` role. An **ADMIN role is
+not a superuser**, so an administrator does **not** get the self-approval exception
+however many permissions they hold — asserted directly, because "admin" and
+"superuser" are easy to conflate and the whole control rests on the difference.
+
+Every use of the exception is written to the audit spine with
+`outcome='SELF_APPROVAL_EXCEPTION'` and carries the requester id, the approver id,
+`requester_equals_approver`, which exception was used, the organisation, the approval
+entity, the request reference, the path (chain or direct) and the time.
+
+### A configuration change never reaches a decision already in flight
+
+The policy in force when a chain is opened is **stamped onto the request**
+(`recruit_approval_requests.self_policy`), exactly as the engine already freezes each
+level's SLA policy onto its step. A request raised under one policy is judged under
+that policy however the organisation reconfigures itself afterwards; a request raised
+after the change gets the new one. A row from before Gate 4 carries no stamp and is
+judged under the current configuration, which is the only policy it has.
+
+### Capabilities that remain separate
+
+```
+Approval authority   ≠   Recruitment edit
+                     ≠   hiring.review.clear   (Gate 3)
+                     ≠   data.salary
+```
+
+Being a named approver grants none of the others, and none of the others grants
+approval authority.

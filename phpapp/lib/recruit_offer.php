@@ -321,6 +321,24 @@ function offer_approve($id) {
     $why = offer_guard_by_offer($id, 'OFFER');
     if ($why !== '') return [false, $why];
     $o = offer_get($id); if (!$o || !in_array($o['status'], ['PENDING_APPROVAL','DRAFT'], true)) return [false, 'This offer is not awaiting approval.'];
+
+    //  GATE 4 — THE DIRECT APPROVAL PATH ASKS THE SAME SEGREGATION QUESTION.
+    //
+    //  This function is the documented fallback for when no approval rule matches:
+    //  the chain approves an offer where one is configured, and an administrator
+    //  approves it here where none is. The chain's decisions pass appr_guard(); this
+    //  one did not pass anything, so an organisation with no offer rule had no
+    //  segregation on offers at all — the control present on one path and absent on
+    //  the other, which is the same as absent.
+    //
+    //  Asked through the SAME function the chain uses, shaped as the request row it
+    //  expects, so there is one rule and not a second opinion about offers.
+    if (function_exists('appr_self_block_reason')) {
+        $sWhy = (string) appr_self_block_reason(
+            ['entity' => 'OFFER', 'entity_id' => (int) $id, 'id' => 0, 'requester_id' => 0],
+            ['path' => 'DIRECT']);
+        if ($sWhy !== '') return [false, $sWhy];
+    }
     db()->prepare("UPDATE job_offers SET status='APPROVED', approved_by=?, approved_at=? WHERE id=?")->execute([_off_actor(), _off_now(), (int)$id]);
     return [true, 'Offer approved — it can now be issued.'];
 }

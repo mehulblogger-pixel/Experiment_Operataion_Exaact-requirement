@@ -80,7 +80,20 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
     <?php else: ?>
     Waiting for a decision. Recruitment cannot start until this is approved.
     <?php if (!$mayDecide && function_exists('hreq_is_own_request') && hreq_is_own_request($r)): ?>
-      <span class="muted" style="margin-left:10px">You raised this request, so somebody else has to decide it.</span>
+      <span class="muted" style="margin-left:10px">You raised this request, so somebody else has to decide it.<?php
+        //  GATE 4 — SAY THAT THIS IS A SETTING, not a dead end.
+        //
+        //  Before Gate 4 a superuser was never shown this at all, because the master
+        //  bypass was unconditional. Now that it is the organisation's decision, a
+        //  superuser who meets this message needs to know the exception exists and is
+        //  switched off — otherwise the only honest-looking conclusion is that the
+        //  product is broken, and somebody goes looking for a workaround.
+        if (function_exists('is_master') && is_master()
+            && function_exists('appr_self_master_exception') && !appr_self_master_exception()): ?>
+        This organisation has not enabled the superuser self-approval exception<?php
+          if (function_exists('hiring_admin_can') && hiring_admin_can()): ?> —
+          <a href="/recruit-approvals">change that in the approval settings</a><?php endif; ?>.
+      <?php endif; ?></span>
     <?php endif; ?>
     <?php
       //  THE NUMBER, AT THE MOMENT OF DECIDING.

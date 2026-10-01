@@ -29,6 +29,65 @@ $applySummary = function ($r) use ($e) {
   <div class="row-actions"><form method="post" style="display:inline"><input type="hidden" name="do" value="rule_save"><input type="hidden" name="name" value="New rule"><button class="btn">＋ New rule</button></form></div>
 </div>
 
+<?php
+// ---------------------------------------------------------------------------
+//  GATE 4 — SELF-APPROVAL POLICY, for this organisation.
+//
+//  Placed ABOVE the rules, deliberately: a chain that routes an approval to the
+//  person who raised it is not an approval, so whether that is permitted at all is
+//  a more fundamental question than who is on which level. Two switches, because
+//  "may anybody decide their own request" and "may a superuser" are different
+//  questions an organisation answers separately.
+//
+//  Built from the existing panel/pill classes. No new UI framework.
+$sp = $selfPolicy ?? ['self_approval' => false, 'master_exception' => false, 'migrated' => ''];
+?>
+<div class="panel" style="margin-bottom:18px<?= $sp['self_approval'] ? ';border-left:4px solid var(--amber,#d97706);background:#fffdf5' : '' ?>">
+  <h3 class="tab-sub" style="margin-top:0">Who may approve their own request
+    <?php if ($sp['self_approval']): ?>
+      <span class="pill p-bad" style="font-size:11px">Self-approval is ON</span>
+    <?php else: ?>
+      <span class="pill p-ok" style="font-size:11px">Self-approval is OFF</span>
+    <?php endif; ?>
+    <?php if ($sp['master_exception']): ?>
+      <span class="pill p-warn" style="font-size:11px">Superuser exception enabled</span>
+    <?php endif; ?>
+  </h3>
+  <p class="muted" style="margin:0 0 10px">
+    Normally the person who raises a hiring request, a requirement, an offer, a salary
+    structure or a change to an approved requirement cannot be the person who approves
+    it — that separation is the whole point of having an approval step. These two
+    switches are this organisation's own decision, and they apply to every one of
+    those records.
+  </p>
+  <form method="post" style="margin:0">
+    <input type="hidden" name="do" value="self_policy">
+    <label style="display:block;margin-bottom:8px">
+      <input type="checkbox" name="self_approval" value="1"<?= $sp['self_approval'] ? ' checked' : '' ?>>
+      <strong>Allow anyone to approve their own request</strong>
+      <span class="muted" style="font-size:12px">— off by default. Switching this on removes the
+      separation for everybody, not just administrators.</span>
+    </label>
+    <label style="display:block;margin-bottom:10px">
+      <input type="checkbox" name="master_exception" value="1"<?= $sp['master_exception'] ? ' checked' : '' ?>>
+      <strong>Allow a superuser to approve their own request</strong>
+      <span class="muted" style="font-size:12px">— for a workspace where one person legitimately
+      does both. Every time it is used it is recorded in the audit trail as a self-approval
+      exception. An ordinary administrator does <em>not</em> get this; only a superuser.</span>
+    </label>
+    <button class="btn">Save policy</button>
+  </form>
+  <?php if ($sp['migrated'] !== ''): ?>
+    <p class="muted" style="margin:10px 0 0;font-size:11.5px">
+      Policy first applied to this organisation: <?= $e($sp['migrated']) ?>.
+      <?php if (strpos((string) $sp['migrated'], 'EXISTING') === 0): ?>
+        This workspace was already in use, so the superuser exception was kept as it
+        behaved before — you can switch it off here, which was not possible previously.
+      <?php endif; ?>
+    </p>
+  <?php endif; ?>
+</div>
+
 <div style="display:grid;grid-template-columns:280px 1fr;gap:18px;align-items:start">
   <div class="panel" style="padding:0">
     <div style="padding:12px 15px;border-bottom:1px solid var(--line,#e5e7eb);font-weight:700;font-size:14px">Rules (<?= count($rules) ?>)</div>
