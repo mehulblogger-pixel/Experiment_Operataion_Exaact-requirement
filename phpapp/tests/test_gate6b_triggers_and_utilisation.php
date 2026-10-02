@@ -28,10 +28,30 @@ recruitpipe_migrate(); rkpi_migrate(); person_migrate();
 //  real setting, which is workspace-wide and not a fixture. Leaving it changed
 //  would hand every later suite a different review policy.
 $trigBefore = setting_get(crev_trigger_key('redefined'), null);
-//  FORCE THE SETTINGS CACHE TO RELOAD. settings_cache() is keyed on db_epoch(), so
-//  bumping the epoch is how a test makes a direct DELETE visible to setting_get().
-//  setting_set() keeps the cache fresh by itself; this is only for the raw writes.
-$reload = function () { $GLOBALS['__db_epoch'] = (int) ($GLOBALS['__db_epoch'] ?? 0) + 1; };
+//  PUT A SETTING BACK TO "NO ROW AT ALL" — the state of a workspace that has never
+//  opened this screen — and keep the in-memory settings cache honest about it.
+//
+//  WHY THIS IS NOT AN EPOCH BUMP (Gate 6C · F-1). This helper used to do
+//  `$GLOBALS['__db_epoch']++`. That global is how the APPLICATION detects that the
+//  live database has been switched — choosing a company at login, "Log in as",
+//  provisioning — so incrementing it from a test faked a tenant switch for the
+//  rest of the PHP process. Every suite that ran after this file inherited the
+//  corrupted context: seven assertions failed on SQLite, six on MariaDB, and a
+//  tenant registry file was written. Nothing here ever needed a database switch;
+//  it needed ONE cached value forgotten.
+//
+//  settings_cache() hands back the cache BY REFERENCE and is the one mechanism the
+//  application already uses for exactly this (setting_set() writes through it), so
+//  unsetting a key through it is a real reload of that value — no second cache
+//  mechanism invented, and nothing process-global touched.
+//
+//  The delete and the forget are deliberately one call, so a raw row deletion can
+//  never again be paired with the wrong kind of invalidation.
+$forgetSetting = function ($key) use ($pdo) {
+    $pdo->prepare("DELETE FROM settings WHERE skey=?")->execute([$key]);
+    $cache = &settings_cache();
+    unset($cache[$key]);
+};
 $made = ['ins' => [], 'off' => []];
 
 // ---------------------------------------------------------------------------
@@ -44,8 +64,7 @@ t_eq(crev_trigger_key('  REDEFINED '), 'crev_trigger_redefined',
 
 //  A NEW ORGANISATION. No row for the setting at all — which is exactly the state
 //  of every workspace that existed before this screen did.
-$pdo->prepare("DELETE FROM settings WHERE skey=?")->execute([crev_trigger_key('redefined')]);
-$reload();
+$forgetSetting(crev_trigger_key('redefined'));
 t_ok(crev_trigger_on('redefined'),
      'A3 · *** with no setting stored at all, a redefinition raises a review: the default is ON ***');
 t_ok(in_array('redefined', crev_triggers(), true),
@@ -61,19 +80,18 @@ t_ok(array_key_exists('redefined', $st['optional']),
 t_eq($st['optional']['redefined'], true, 'A8 · and it reads ON for a new organisation');
 
 //  PERSISTENCE, both ways, through the same helpers the screen uses.
-setting_set(crev_trigger_key('redefined'), '0'); $reload();
+setting_set(crev_trigger_key('redefined'), '0');
 t_ok(!crev_trigger_on('redefined'), 'A9 · switching it OFF persists');
 t_eq(crev_trigger_state()['optional']['redefined'], false, 'A10 · …and the screen would show OFF');
-setting_set(crev_trigger_key('redefined'), '1'); $reload();
+setting_set(crev_trigger_key('redefined'), '1');
 t_ok(crev_trigger_on('redefined'), 'A11 · switching it back ON persists');
 t_eq(crev_trigger_state()['optional']['redefined'], true, 'A12 · …and the screen would show ON');
 
 t_ok(crev_trigger_on('stricter'), 'A13 · stricter reads ON');
-setting_set(crev_trigger_key('stricter'), '0'); $reload();
+setting_set(crev_trigger_key('stricter'), '0');
 t_ok(crev_trigger_on('stricter'),
      'A14 · *** and stays ON even when the setting is written straight to the database ***');
-$pdo->prepare("DELETE FROM settings WHERE skey=?")->execute([crev_trigger_key('stricter')]);
-$reload();
+$forgetSetting(crev_trigger_key('stricter'));
 
 // ---------------------------------------------------------------------------
 t_section('G6B · B — R1-UI · IS THE CHANGE AUDITED, AND WHO MAY MAKE IT?');
@@ -87,7 +105,7 @@ t_ok(setting_change_class(crev_trigger_key('redefined'))['secret'] === false,
 
 $auditBefore = (int) ops_val("SELECT COUNT(*) FROM idems_audit WHERE entity='setting' AND field=?",
                              [crev_trigger_key('redefined')]);
-setting_set(crev_trigger_key('redefined'), '0'); $reload();
+setting_set(crev_trigger_key('redefined'), '0');
 $auditAfter = (int) ops_val("SELECT COUNT(*) FROM idems_audit WHERE entity='setting' AND field=?",
                             [crev_trigger_key('redefined')]);
 t_ok($auditAfter > $auditBefore,
@@ -101,11 +119,11 @@ t_eq((string) ($last['new_value'] ?? $last['new'] ?? ''), '0',
 //  without touching anything must not add a line that says nothing happened.
 $n1 = (int) ops_val("SELECT COUNT(*) FROM idems_audit WHERE entity='setting' AND field=?",
                     [crev_trigger_key('redefined')]);
-setting_set(crev_trigger_key('redefined'), '0'); $reload();
+setting_set(crev_trigger_key('redefined'), '0');
 t_eq((int) ops_val("SELECT COUNT(*) FROM idems_audit WHERE entity='setting' AND field=?",
                    [crev_trigger_key('redefined')]), $n1,
      'B5 · saving the same value again adds nothing to the trail');
-setting_set(crev_trigger_key('redefined'), '1'); $reload();
+setting_set(crev_trigger_key('redefined'), '1');
 
 //  WHO. The screen is one route, already gated; this is that gate, not a new one.
 t_ok(function_exists('hiring_admin_can'),
@@ -254,7 +272,7 @@ t_eq($c4['kind'] ?? '', 'stricter', 'C11 · still raised as a tightening');
 t_ok(($c4['blocked'] ?? '') !== '',
      'C12 · *** and the candidate is genuinely stopped: the locked rule survives the configuration ***');
 
-setting_set(crev_trigger_key('redefined'), '1'); $reload();
+setting_set(crev_trigger_key('redefined'), '1');
 
 // ---------------------------------------------------------------------------
 t_section('G6B · D — R2 · WHO APPEARS IN THE PER-PERSON UTILISATION BREAKDOWN');
@@ -383,10 +401,9 @@ try {
     foreach ($made['off'] as $o) $pdo->prepare("DELETE FROM offices WHERE id=?")->execute([$o]);
     $pdo->prepare("DELETE FROM users WHERE username=?")->execute([$G . '_boss']);
 } catch (Throwable $e) {}
-if ($trigBefore === null) $pdo->prepare("DELETE FROM settings WHERE skey=?")->execute([crev_trigger_key('redefined')]);
+if ($trigBefore === null) $forgetSetting(crev_trigger_key('redefined'));
 else setting_set(crev_trigger_key('redefined'), $trigBefore);
-$pdo->prepare("DELETE FROM settings WHERE skey=?")->execute([crev_trigger_key('stricter')]);
-$reload();
+$forgetSetting(crev_trigger_key('stricter'));
 t_eq((int) ops_val("SELECT COUNT(*) FROM inspectors WHERE emp_code LIKE ?", [$G . '%']), 0,
      'Z1 · the people this suite created are gone');
 t_ok(crev_trigger_on('stricter'), 'Z2 · and the mandatory trigger is on, as it must always be');
