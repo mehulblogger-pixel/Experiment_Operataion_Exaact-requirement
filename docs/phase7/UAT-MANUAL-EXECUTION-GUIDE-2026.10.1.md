@@ -5,6 +5,9 @@
 **Companion:** `EXAACT-BUSINESS-UAT-END-TO-END-PLAYBOOK.md` (the original journey detail)
 **This guide adds what that one assumed:** the setup, user and permission groundwork that
 comes *before* the eight journeys.
+**Interactive version:** the same 152 steps as a tick-as-you-go page, which keeps the result
+sheet and produces the final record — <https://claude.ai/artifact/4QuSHMXjZL8TTWDRGw7iph>
+(private to the owner's account). This document remains the authoritative text.
 
 ---
 
