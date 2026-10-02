@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '7cce780 · 2026-10-01 18:26 UTC · 677 files';
+$RELEASE = 'eacf282 · 2026-10-02 10:35 UTC · 677 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -184,7 +184,7 @@ $EXPECT  = [
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
     'lib/portal.php' => ['s'=>114128,'h'=>'afcf984120ca04b3'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
-    'lib/preflight.php' => ['s'=>5451,'h'=>'fbf0949ead05b0b8'],
+    'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>10272,'h'=>'7f36c21dab0d782d'],
     'lib/projcosting.php' => ['s'=>34494,'h'=>'3f2482fab1b534e8'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
