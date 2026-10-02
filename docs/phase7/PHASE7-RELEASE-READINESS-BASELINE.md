@@ -95,11 +95,12 @@ development, and no step may be used to introduce new features.**
 
 The distinction matters more than any individual item, so it is stated plainly.
 
-**Release blockers (5)** — must be closed before production release:
+**Release blockers — 1 closed, 4 open.** All must be closed before production
+release:
 
 | ID | Blocker | Status |
 |---|---|---|
-| **B-1** | Stale release version identity | Open — next controlled action |
+| ~~**B-1**~~ | ~~Stale release version identity~~ | **CLOSED** — resolved at `0f2123d`, 2026-10-02 |
 | **B-2** | Production backup + restore not verified | Not started |
 | **B-3** | Production environment not verified | Not started |
 | **B-4** | Deployment, checksum verification, smoke test not performed | Not started |
@@ -117,7 +118,12 @@ the deferred list is a blocker, and nothing in the blocker list is backlog.
 
 ---
 
-## 5. B-1 — the one code-level release blocker
+## 5. B-1 — CLOSED at `0f2123d` (was the one code-level release blocker)
+
+> **Status, 2026-10-02: RESOLVED.** The release identity is now `2026.10.1` /
+> `2026-10-02` and the checksum manifest has been regenerated (677 files). The
+> package identity resolves to `exaact-2026.10.1`. The table below is retained as
+> the historical record of what the blocker was and why it mattered.
 
 | | |
 |---|---|
@@ -126,10 +132,17 @@ the deferred list is a blocker, and nothing in the blocker list is backlog.
 | **Where** | `phpapp/lib/preflight.php:25-26` |
 | **Why it matters** | `tools/release.sh` names the package from `APP_VERSION`, and the administrator deployment tool reports it. The stamp was last changed in `b963490`, **697 commits** ago — before every gate from 1A through 6C-F1. A package built today would be named `exaact-2026.07.1`, indistinguishable from a build predating all of this work. |
 
-**Not changed in this documentation task, deliberately.** It is the next controlled
-release-preparation action, and it must be done together with regenerating the deploy
-checksum manifest (`php tools/make_deploy_check.php`), because changing a tracked
-file invalidates the manifest.
+*(Historical note, true when written: "Not changed in this documentation task,
+deliberately. It is the next controlled release-preparation action, and it must be
+done together with regenerating the deploy checksum manifest, because changing a
+tracked file invalidates the manifest.")*
+
+**That is what was done.** Commit `0f2123d` changed the two constants and
+regenerated the manifest in the same commit — two files, four lines. No behaviour
+changed and no test needed updating, because `APP_VERSION` is never compared or
+branched on: the only `version_compare()` in the application tests PHP's own
+version. Validation at that commit: deploy_check 14/0, parse_all 1/0, boot 25/0,
+schema_guard 6/0, release_note_button 8/0, `git diff --check` clean.
 
 ---
 
@@ -228,7 +241,7 @@ trail; and one phone-width pass of the inspector's screens.
 
 **Go** only when every one of these holds:
 
-1. **B-1** resolved — version bumped, checksum manifest regenerated, committed.
+1. ~~**B-1** resolved — version bumped, checksum manifest regenerated, committed.~~ **DONE at `0f2123d`.**
 2. **B-5** — Business UAT signed off by the owner, including UAT-G6B-01 and
    UAT-G6B-02.
 3. **B-3** — production environment verification clean.
@@ -248,3 +261,59 @@ It does not deploy, package, bump the version, access production, run UAT, or ru
 backup. It does not start an implementation gate. It records the position so that the
 next action — controlled release-version preparation — begins from an agreed and
 evidenced starting point.
+
+---
+
+## 13. Verification status — 2026-10-02, release candidate `0f2123d`
+
+An audit was run to close Business UAT and begin production verification. It could
+close neither, and this section records what was actually checked so the next
+attempt does not repeat it.
+
+### B-5 · Business UAT — OPEN. Not executed.
+
+The repository was searched for evidence of an executed UAT against this release
+candidate. There is none:
+
+| Evidence sought | Found |
+|---|---|
+| A commit after `0f2123d` | **none** — the tree is clean and `0f2123d..HEAD` is empty |
+| A UAT results or sign-off document for 2026.10.1 | **none** |
+| Recorded outcomes in `EXAACT-UAT-CONSOLE.data.json` | **none.** Its JSON keys are `coverage, do, expect, gates, group, id, key, label, n, steps, sub, text` — 229 steps *to perform*, with no result, status, verdict, date or signed-by field anywhere. It is a checklist, not a record. |
+| `P7-FINAL-RELEASE-UAT.md` | **Not evidence for this candidate.** Dated 2026-09-22, baseline `295e5d8`, 13,251 assertions — a different and earlier release attempt, written before Gates 0–6C existed. Its own §2, §3 and §4 record production environment verification, backup verification and the smoke test as **BLOCKED**. |
+
+**No journey A–H result exists, and neither UAT-G6B-01 nor UAT-G6B-02 has been
+run.** B-5 therefore stays OPEN. Nothing about the product is implied by this: it
+means the acceptance activity has not happened yet.
+
+### B-3 · Production environment verification — OPEN. Not attempted.
+
+Gated on UAT passing, so not begun. Separately, it is **not performable from the
+development environment**, which was re-checked on 2026-10-02:
+
+| Prerequisite | State |
+|---|---|
+| `phpapp/config.local.php` (would hold production credentials) | **absent** |
+| Production hostname in any config file | **none** |
+| `DB_HOST` / `DB_NAME` / `DB_USER` / `DB_PASS` environment variables | **none set** |
+
+This matches what `P7-FINAL-RELEASE-UAT.md` found in September. B-3 needs either
+production credentials supplied to a verification environment, or an administrator
+performing the read-only checks in §8 from a browser on the live site.
+
+### B-2 · Backup and restore verification — OPEN. Not attempted.
+
+Gated on UAT, and likewise not performable here: `exaact_backups/` contains only
+`__control/` — development and demo snapshots, the same source Gate 6A §17 used.
+**No production backup is present in this environment**, so none of the eight steps
+in §9 can be evidenced from it.
+
+### B-4 · Deployment, checksum verification, smoke test — OPEN.
+
+Unchanged. Depends on B-1 (done), B-2, B-3 and B-5.
+
+### Production safety during this audit
+
+No production system was contacted. No production data was read, written or
+migrated; no configuration was changed; nothing was deployed, packaged or uploaded.
+The only changes were to the two documents recording blocker status.

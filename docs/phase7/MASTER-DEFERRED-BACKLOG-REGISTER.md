@@ -40,14 +40,16 @@ records were Gate 6, Gate 6A, Gate 6C and Gate 6C-F1, and those are now written.
 
 | Classification | Count | Meaning |
 |---|---:|---|
-| **Release blockers** | **5** | Must be closed before production release. One is a code artifact; four are verification steps not yet performed. |
+| **Release blockers** | **4 open, 1 closed** | Must be closed before production release. The code artifact (**B-1**) is **CLOSED** at `0f2123d`; the four remaining are verification steps not yet performed. |
 | **Genuinely deferred** | **6** | Knowingly not done. None blocks release. |
 | **Open — owner decision / external verification** | **3** | Cannot be settled from repository evidence. |
 | **Resolved** | **11** | Recorded so they are never again mistaken for current blockers. |
 
 **Nothing in the deferred list blocks the release.** Nothing in the resolved list
-is a current blocker. The five release blockers are the whole of the remaining
-critical path, and four of them are verification activities rather than defects.
+is a current blocker. The release blockers are the whole of the remaining critical
+path. **B-1 is now closed** (release identity `2026.10.1`, commit `0f2123d`); the
+four that remain — B-2, B-3, B-4, B-5 — are all verification activities rather than
+defects, and none can be performed from the development environment.
 
 ---
 
@@ -62,15 +64,15 @@ These are production-blocking. They are deliberately **not** in the deferred lis
 | **ID** | B-1 |
 | **Origin** | Gate 6 Closure & Release-Readiness audit, 2026-10-02 |
 | **Description** | `APP_VERSION = '2026.07.1'` and `APP_VERSION_DATE = '2026-07-27'` in `phpapp/lib/preflight.php`. The stamp was last changed in commit `b963490`; **697 commits** have landed since, including every gate from 1A through 6C-F1. `tools/release.sh` names the package from `APP_VERSION`, and the administrator deployment tool reports it. |
-| **Current status** | **RELEASE BLOCKER — open** |
-| **Why not already done** | Deliberately excluded from the documentation-closure task, which is forbidden from changing the version. It belongs to the controlled release-version preparation step. |
+| **Current status** | **RESOLVED — CLOSED at `0f2123d`, 2026-10-02** |
+| **Why not already done** | *(Historical: it was deliberately excluded from the documentation-closure task, which was forbidden from changing the version, and belonged to the controlled release-version preparation step.)* **Done in that step.** |
 | **Impact** | Business and operational. A package built today would be named `exaact-2026.07.1` — indistinguishable from a build predating all of Phase 7's gate work. Neither you nor a customer could tell the two apart, and a rollback decision would have nothing to anchor on. |
 | **Dependency** | None. It is a two-constant change plus `php tools/make_deploy_check.php`. |
 | **Priority** | **Critical** |
 | **Production blocking?** | **Yes** |
-| **Intended phase/gate** | Release Version Preparation (the next controlled step) |
+| **Intended phase/gate** | Release Version Preparation — **completed** |
 | **Evidence** | `phpapp/lib/preflight.php:25-26`; `tools/release.sh` (`VER=$(php -r 'require "lib/preflight.php"; echo APP_VERSION;')`); `git rev-list --count b963490..cdb9eee` = 697 |
-| **Notes** | Proposed identity `APP_VERSION = '2026.10.1'`, `APP_VERSION_DATE = '2026-10-02'`. **Not applied in this task.** Changing it invalidates the deploy checksum manifest, so the manifest must be regenerated in the same commit. |
+| **Notes** | **Resolved at `0f2123d`.** `APP_VERSION = '2026.10.1'`, `APP_VERSION_DATE = '2026-10-02'`, with the checksum manifest regenerated in the same commit (677 files). Package identity now resolves to `exaact-2026.10.1`. Two files, four lines; no behaviour changed and no test required updating, because `APP_VERSION` is never compared or branched on anywhere in the application. The `2026.07.1` values above are retained as the historical record of what the blocker was. |
 
 ### B-2 · Production backup and restore not verified
 
