@@ -1792,3 +1792,84 @@ severity high rather than low when you are unsure, and let the fix happen before
 real client money depends on it.
 
 **Do not sign Section 19 until every CRITICAL is closed.**
+
+---
+
+## 23. Gate 6B checks — added 2026-10-02
+
+Two checks covering the Gate 6B work, which landed after this playbook was written.
+Everything in §1 (the safety rules) and §9 (the "do not press" list) applies to both:
+**no documents issued, no money moved, no real business records altered.**
+
+Both are read-and-configure only. The one setting they change is a governance
+preference you are free to leave in either position, and the check puts it back.
+
+### UAT-G6B-01 · The Review Required trigger is yours to control
+
+**Why this matters in business terms.** When an approved requirement changes, the
+people already in the process may no longer be the right people. Where that is so,
+each of them gets a **Review Required** flag that somebody must decide before they can
+be offered a job or marked as joined. Until now one part of that rule — whether a
+*redefined* requirement (the role became Electrician where it said Welder) raises the
+flag — could only be changed by editing the database. In practice that meant nobody
+could change it, and any change left no audit trail.
+
+**Who to sign in as:** an administrator, or a user holding the recruitment-admin
+permission.
+
+**Where:** Recruitment → **Approval Rules**.
+
+| # | Step | What you should see |
+|---:|---|---|
+| 1 | Open the screen | The existing self-approval panel and rules list are still there, plus a new panel: "When does a requirement change need its candidates re-checked?" |
+| 2 | Read the panel | It explains the flag in plain words, and states that **a requirement that became stricter always raises a review** and that this is **not configurable** |
+| 3 | Look for a control for "stricter" | **There is none, deliberately.** The rule is shown as a fact, not offered as a switch |
+| 4 | Check the starting state | The "Redefined" tick is **ON**, and the pill reads **Redefined: ON** |
+| 5 | Untick it, press **Save triggers** | A confirmation that the triggers were saved |
+| 6 | Reload the page (or navigate away and back) | The tick is still **OFF** and the pill reads **Redefined: OFF** — the change stuck |
+| 7 | Confirm the locked rule survived | The screen still states that a stricter requirement always raises a review |
+| 8 | Tick it again, press **Save triggers**, reload | Back to **ON**. The switch works both ways |
+| 9 | Sign in as an ordinary coordinator and open the same screen | **Refused.** You should see a "only an administrator can configure approval rules" style message, and **no trigger control at all** |
+
+**Pass means:** an authorised administrator can see it, understand it, switch it both
+ways and have it persist; the mandatory rule is visible but not switchable; and an
+unauthorised user can neither see nor change it.
+
+**Leave it ON** when you finish, unless you have decided otherwise for business
+reasons — ON is the behaviour every workspace had before this screen existed.
+
+### UAT-G6B-02 · The utilisation report does not count people who have not started
+
+**Why this matters in business terms.** The per-person utilisation table answers "how
+much of the capacity we have did we actually use". Somebody hired but not yet joined
+was never in the capacity figure, yet they appeared in the table with zero days used —
+which reads either as "this person is idle, chase them" (they cannot work yet; they
+have not started) or as "this report is wrong". Either way the rows that genuinely
+mean spare capacity were harder to find.
+
+**Who to sign in as:** anyone who can already open Reports.
+
+**Preparation:** you need, in the same office, one person who is **active**, one who is
+**hired but not yet joined**, and ideally one **leaver**. Use real people already in
+those states — do not create or change anybody for this test.
+
+**Where:** Reports → the **Utilization** panel.
+
+| # | Step | What you should see |
+|---:|---|---|
+| 1 | Open Reports and find the Utilization table | A row per person, with man-days and a percentage |
+| 2 | Look for your **active** person | **Present.** The report still does its job |
+| 3 | Look for your **hired-but-not-joined** person | **Absent.** They are not counted, because they cannot yet work |
+| 4 | Look for your **leaver** | **Present.** They may well have worked during the period, and those days still count |
+| 5 | Open the **person filter** on the same screen | The hired-but-not-joined person is **still selectable.** Left out of a total is not hidden from the business |
+| 6 | Open the **availability board** | The hired-but-not-joined person is named as hired but not yet joined, and is **not** offered as a bookable resource |
+| 7 | Open the **team register** (default view) | The hired-but-not-joined person **is listed**, as they were before |
+| 8 | Filter the team register to "Joining pending" | They appear there, and the active person and leaver do not |
+
+**Pass means:** the breakdown excludes only people who have not started; active people
+and leavers are unchanged; and that person remains findable in the filter, on the
+availability board and on the team register.
+
+**If step 3 shows them, or step 5 does not,** stop and report it — those two are the
+whole point of the change and they are protected by automated tests, so a failure here
+would mean the live site differs from the tested code.

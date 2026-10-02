@@ -2651,3 +2651,384 @@ killed because the suite crashed or a source grep stopped matching.
   Required engine's own rules and candidate visibility were all left as they were.
 - No production access, no production deployment, no production data read or
   written.
+
+---
+
+## §20j — GATE REGISTER CHRONOLOGY (added at documentation closure, 2026-10-02)
+
+The records in this document were written as each gate completed, so their letters
+follow the order they were *written*, not the order the gates *ran*. Four records
+were missing and are added below. This table is the authoritative order.
+
+| # | Gate | Record | Commits | Disposition |
+|---:|---|---|---|---|
+| 1 | Gate 0 — reachability, baseline, pre-pipeline safety | **§20b** | `42c6550` | CLOSED |
+| 2 | Gate 1A — reconciling the pipeline consumers | **§20c** | `045e0fd` | CLOSED |
+| 3 | Gate 1B — the configurable pipeline is the authority | **§20d** | `8e80be0` | CLOSED |
+| 4 | Gate 2 — requirement versioning & change control | **§20e** | `ce79b41` | CLOSED |
+| 5 | Gate 3 — Review Required & requirement-change impact | **§20f** | `054950a` | CLOSED |
+| 6 | Gate 4 — approval governance & self-approval | **§20g** | `b1e793c` | CLOSED |
+| 7 | Gate 5 — workforce activation, joining, operational status | **§20h** | `0215b85`, `135f6d1` | CLOSED |
+| 8 | **Gate 6 — assignment boundary and lifecycle legibility** | **§20k** (new) | `378b678`, `7cce780` | CLOSED |
+| 9 | **Gate 6A — decision & outstanding-requirement closure audit** | **§20l** (new) | read-only, no commit | CLOSED |
+| 10 | Gate 6B — the two locked decisions (R1-UI, R2) | **§20i** | `f60f78f` | CLOSED |
+| 11 | **Gate 6C — post-implementation audit & closure readiness** | **§20m** (new) | read-only, no commit | PASS / CLOSED |
+| 12 | **Gate 6C-F1 — test-isolation correction** | **§20n** (new) | `cdb9eee` | CLOSED |
+
+**A correction to an earlier statement.** A summary during the closure review said
+this document had no Gate 0 record. It does — **§20b**, "Gate 0 — reachability,
+baseline and pre-pipeline safety (executed)", including its thirteen acceptance
+criteria, findings G0-1 and G0-2, the corrected `candidate-pipestage` route and the
+both-engine baselines. The earlier search pattern required a `§` character that the
+§20b heading does not use. **No Gate 0 record is added here**, because adding one
+would duplicate §20b. For completeness, Gate 0's identity is recorded in the table
+above and summarised in the Gate 0 paragraph below.
+
+### Gate 0, as already recorded in §20b — summary only, not a second record
+
+Gate 0 (`42c6550`) restored recruitment stage-route reachability and established the
+pre-pipeline baseline. Its findings, all recorded in §20b:
+
+- **G0-1** — ten candidate rows carrying a legacy stage value that is not a valid
+  stage (e.g. `OFFER`, `' RECEIVED'` with a leading space). §20b and the follow-up
+  analysis (§C3) established a deterministic and benign origin. **This was measured
+  in development and demo fixture data. It is NOT a claim about production data**,
+  and nothing in this programme has read production data.
+- **G0-2** — one row closed on the legacy field while sitting on a live pipeline
+  stage: the legacy/pipeline conflict class.
+- **The duplicate candidate-stage dispatcher** — two route handlers could answer the
+  same path, so the intended one was unreachable.
+- **The corrected route** — renamed `candidate-pipestage`, deliberately not sharing
+  a prefix with `/candidate-stage`, with module gating resolving through
+  `ops_module_family()`.
+- **Baseline and regression evidence** — pipeline-adoption measurement, the
+  `REQF_*` choke point, legacy and pipeline baselines, and the test baseline on both
+  engines, plus one focused test (`test_gate0_stage_route.php`) and its mutation.
+
+---
+
+## §20k — GATE 6 RECORD: THE ASSIGNMENT BOUNDARY, AND A LIFECYCLE YOU CAN SEE
+
+**Gate name:** Gate 6 — authorisation & UX implementation (A-F1, then D2–D5)
+**Starting commit:** `135f6d1` (end of Gate 5)
+**Ending commit:** `7cce780`
+**Intermediate commit:** `378b678` (A-F1)
+
+### Purpose
+
+Gate 5 made joining the one moment a hired person becomes operationally active. Gate
+6 asked the next question: does the product actually *behave* and *read* that way on
+screen? A read-only UX audit was run first, and it found that one place did not.
+
+### What was implemented
+
+**Phase 1 — A-F1, a P0 defect (`378b678`).** The job-assignment dropdown carried its
+own copy of the active-person rule, written negatively as
+`COALESCE(status,'')<>'INACTIVE'`. With a third status in the vocabulary, "not
+inactive" no longer means "active": somebody hired but not yet joined was still
+offered for assignment. Gate 5's own battery could never have caught it, because the
+screen called neither `wf_is_active()` nor `wf_active_sql()`. The call site now asks
+`wf_active_sql()` — one rule, one place.
+
+**Phase 2 — D2 to D5 (`7cce780`).** Four changes making the lifecycle legible:
+
+- **D2** — the availability board now says *why* somebody is absent: "N people have
+  been hired but not yet joined… not available for scheduling until their joining is
+  recorded", with a link to the filtered register (`wf_joining_pending_in_offices()`).
+- **D3** — a status filter on the team register, built from `wf_statuses()`, with
+  "Everyone" as the default so the unfiltered view is unchanged.
+- **D4** — the register headline splits the two populations: "N on the team · M
+  joining pending".
+- **D5** — the mobile menu close control raised to a 44px touch target.
+
+### Key findings
+
+- The defect class is the one this programme keeps meeting: **two half-mechanisms
+  doing one job.** A shared helper existed and the screen did not use it.
+- A positive test can pass for the wrong reason. Assertion D4-UI-7 initially matched
+  the words "Joining pending" in D3's own dropdown; it was scoped to
+  `.master-head .sub`.
+- A measurement can lie if taken at the wrong moment. D5 appeared "clipped" at 360px
+  and 412px but not 390px — the drawer was being measured mid-slide. Waiting for the
+  computed transform to reach identity gave consistent results at all widths.
+
+### Test evidence
+
+`test_gate6_assignment_boundary.php` (12 assertions) and
+`test_gate6_d2_availability.php` (17) — **102 assertions green** in the Gate 6 group
+on both SQLite and authoritative MariaDB, re-confirmed at Gate 6C.
+
+### Mutation evidence
+
+`tools/g6-mutations.py` — 3 server mutations and 4 browser mutations, all killed by
+behavioural assertions. Two were instructive: **AF1-8** initially passed under
+mutation because a comment contained the helper's name, so it was tightened to
+require the real call site; and **G6-B1** was first recorded as "killed" by an
+aborted run, which is not a kill — the seed was changed to compute its own expected
+count so a mutation can no longer abort it.
+
+### Browser evidence
+
+`tools/g6-browser-check.js` — the real routes driven over HTTP at desktop width plus
+360 / 390 / 412px, including the close control actually closing the drawer and
+clearing the backdrop.
+
+### Production access / deployment status
+
+None. No production access, no deployment, no production data read or written.
+
+### Deferred items
+
+**A-F4** (aggregated Next Action) scoped out by instruction; **A-F7** (reports and
+pickers that list everyone) deliberately left untouched. Both carried forward to the
+Master Deferred Backlog Register as **D-02** and **D-01**.
+
+### Final disposition
+
+**CLOSED.** A-F1 fixed and protected; the lifecycle legible on screen; no permission
+changed, no status or transition added.
+
+---
+
+## §20l — GATE 6A RECORD: DECISION & OUTSTANDING-REQUIREMENT CLOSURE AUDIT
+
+**Gate name:** Gate 6A — decision & outstanding-requirement closure audit
+**Starting commit:** `7cce780`
+**Ending commit:** `7cce780` — **read-only; zero file changes**
+
+### Purpose
+
+Before building anything further, establish which business decisions were genuinely
+settled and which were still open, and classify the remaining Gate 6 findings —
+without recommending an answer to any open decision.
+
+### What was audited
+
+- **§17 — existing data.** The audit was required either to report real figures or to
+  say the source was unavailable, and was forbidden from manufacturing a substitute
+  dataset. Real development and demo figures were produced from
+  `exaact_backups/__control/*.json.gz`, including 30 defect rows and 3 ambiguous
+  rows which together demonstrated that a blanket status migration would be unsafe.
+  **These are development/demo figures. They are not production figures**, and no
+  production data was read.
+- **Gate 3's "Redefined" trigger** — traced end to end and confirmed as an existing,
+  working, configurable trigger (`CREV_TRIGGER_OPTIONAL = ['redefined']`, default on)
+  whose only deficiency was that no screen exposed it.
+- **A-F7 classification** — the "reports that list everyone" finding separated into
+  its distinct questions: the utilisation breakdown, the recruitment-form pickers and
+  the MIS person filter. Only the first was a report whose question did not apply to
+  a person awaiting a start date.
+- **Three open decisions put to the owner** — recorded as **R1** (what to do about
+  the Redefined trigger's behaviour), **R1-UI** (whether to expose it on a screen)
+  and **R2** (whether the utilisation breakdown should exclude people who have not
+  started). The audit deliberately described options without calling any of them
+  safer, better or best.
+
+### Key findings
+
+1. The Redefined trigger needed **no behavioural change** — only visibility. It had
+   been configurable since Gate 3 but only through a database write, which also
+   meant any change bypassed `setting_set()` and was therefore unaudited.
+2. The utilisation breakdown disagreed with its own capacity denominator.
+3. A-F7's three parts are three different business questions and must not be
+   answered with one change.
+
+### Test / mutation / browser evidence
+
+None, and none required: read-only audit, zero file changes.
+
+### Production access / deployment status
+
+None.
+
+### Deferred items
+
+A-F7's sibling questions (pickers, MIS filter) left for an owner decision — now
+**D-01**.
+
+### Final disposition
+
+**CLOSED.** Three decisions put to the owner and subsequently locked as **R1: A**,
+**R1-UI: A**, **R2: B**, which became Gate 6B's scope.
+
+---
+
+## §20m — GATE 6C RECORD: POST-IMPLEMENTATION AUDIT & CLOSURE READINESS
+
+**Gate name:** Gate 6C — post-implementation audit & closure readiness
+**Starting commit:** `f60f78f` · **first pass:** NOT READY · **final pass:** `cdb9eee` — PASS / CLOSED
+**Both passes read-only; zero file changes**
+
+### Purpose
+
+Independently verify Gate 6B against the locked decisions R1, R1-UI and R2, without
+relying on Gate 6B's own report.
+
+### What was audited, and how
+
+- **R1** — the production path traced in source. `crev_raise_for_version()` has
+  exactly one caller, `rver_apply()` at `reqversion.php:969`, raised inside the
+  transaction and failing closed. One trigger mechanism, read only inside
+  `candreview.php`. Match scoring proven incapable of deciding anything:
+  `crev_evidence()` has a single display call site and **zero** references inside
+  `crev_raise_for_version`, `crev_audience`, `crev_block_reason`, `crev_continue` and
+  `crev_reject`.
+- **R1-UI** — the ten-step walkthrough driven on the real screen with real posts:
+  visible, explained, mandatory trigger shown with no control, default ON, save,
+  full reload still OFF, back ON. Save proven to go through `setting_set()` only.
+  Audit entry confirmed. Permission enforced: an ordinary coordinator signs in, is
+  refused, and never sees the control.
+- **R2** — verified on the **actually rendered** table, not a helper:
+  joining-pending absent, active present, leaver present; the same page's person
+  filter still lists the joining-pending person.
+- **Mobile** — the 31px overflow at 360px proven to pre-date the panel by measuring
+  commit `7cce780`, where the panel is provably absent.
+- **Scope** — sixteen protected function bodies compared byte-for-byte against
+  `7cce780`: all identical.
+
+### The four required R1 cases, through `rver_apply()` only
+
+| Config | Change | Result |
+|---|---|---|
+| ON | Redefined | Review Required |
+| OFF | Redefined | No Review Required |
+| ON | Stricter | Review Required |
+| OFF | Stricter | **Review Required** — the locked rule survives the configuration |
+
+Plus: default ON with no stored row; `crev_trigger_stricter=0` written straight to
+the database still reads ON.
+
+### Key findings
+
+**First pass — NOT READY, on one finding, F-1.** The Gate 6B test battery corrupted
+process-wide tenant state. Bisected in four clean worktrees: `7cce780` 0 failures;
+`f60f78f` as committed 7 failures (SQLite) and a registry file written; the battery
+stubbed out, 0 failures; **only the epoch bump neutralised, 0 failures with all 73
+battery assertions still passing.** Classified as a test-suite defect, with
+application behaviour proven clean. Not fixed in the audit, per its no-fix rule.
+
+**Two false signals were rejected rather than recorded as evidence.** An early
+browser-mutation pass reported a "kill" with 31 failures beginning at *"signed in"* —
+the isolated worktree lacked the git-ignored `licence-agreement.json`, so login hit
+the licence gate and everything cascaded. And in the final pass, a first full-suite
+attempt reported 9 and 11 failures because both engines were run **concurrently in
+one worktree**, sharing a registry-file path; the MariaDB log even carried a SQLite
+error. Both runs were discarded and repeated correctly.
+
+### Test evidence (final pass, at `cdb9eee`)
+
+```
+Gate 6B battery   SQLite  73 passed / 0 failed   MariaDB  73 passed / 0 failed
+Full regression   SQLite 16206 passed / 0 failed  MariaDB 16205 passed / 0 failed
+```
+
+Protected suites on authoritative MariaDB: gate3 225, gate4 142, gate5 101, gate6
+102, gate6b 73, recruitment 483, workforce 101, KPI 232, security 289, SaaS
+isolation 30, module05 14, module34 12 — **none failing**.
+
+### Mutation evidence
+
+16 of 16 server mutations and 6 of 6 browser mutations killed, each by its specific
+intended assertion, reproduced independently on verified 73/73 and 60/60 baselines.
+
+### Browser evidence
+
+60 assertions at desktop plus 360 / 390 / 412px: 0px overflow, one grid column on
+phones with the content column 328 / 358 / 380px wide, desktop unchanged at two
+columns.
+
+### Production access / deployment status
+
+None. Only throwaway SQLite files and local `g6c*` MariaDB databases.
+
+### Deferred items
+
+None raised. A-F7 and A-F4 confirmed still deferred.
+
+### Final disposition
+
+**GATE 6C — PASS / CLOSED** at `cdb9eee`, after F-1 was corrected (see §20n).
+
+---
+
+## §20n — GATE 6C-F1 RECORD: TEST-ISOLATION CORRECTION
+
+**Gate name:** Gate 6C-F1 — test battery correction
+**Starting commit:** `f60f78f` · **Ending commit:** `cdb9eee`
+
+### Purpose
+
+Close Gate 6C finding F-1. **This was not a product defect.** No application
+behaviour was wrong at any point; the fault was in how the Gate 6B test battery
+reset its own state between scenarios.
+
+### Root cause
+
+`phpapp/tests/test_gate6b_triggers_and_utilisation.php` reset state by incrementing
+`$GLOBALS['__db_epoch']`. That global is how the **application** detects that the
+live database has been *switched* — choosing a company at login, "Log in as",
+provisioning. Incrementing it from a test therefore faked a tenant switch for the
+remainder of the PHP process, and every suite running later in the same process
+inherited the corrupted tenant context. A tenant registry file (`phpapp/tenants.php`)
+was written as a downstream side effect. Run on its own the battery passed, which is
+why only a full-suite audit exposed it.
+
+### The correction
+
+Investigation showed the battery never needed a database switch at all. Of the ten
+call sites, **three** followed a raw `DELETE` of a settings row and needed only that
+one cached value forgotten; the other **seven** followed `setting_set()`, which
+already refreshes the cache, and were contributing nothing but the damage. Those
+seven were removed, and the three use one helper:
+
+```php
+$forgetSetting = function ($key) use ($pdo) {
+    $pdo->prepare("DELETE FROM settings WHERE skey=?")->execute([$key]);
+    $cache = &settings_cache();          // the application's own mechanism
+    unset($cache[$key]);
+};
+```
+
+`settings_cache()` returns the cache by reference and is exactly what
+`setting_set()` writes through, so **no second cache or tenant mechanism was
+introduced and nothing process-global is touched.** The delete and the forget are one
+call, so a raw row deletion can never again be paired with the wrong invalidation.
+
+### What did NOT change
+
+**Application code: unchanged.** The diff is one test file, 35 insertions and 18
+deletions. No `lib/`, `views/`, `index.php`, schema, migration, runner, bootstrap,
+deploy manifest, configuration or tooling file was touched. **All 73 assertion labels
+are byte-identical** — nothing weakened, removed, skipped or reworded.
+
+### Test evidence
+
+Gate 6B battery 73 passed / 0 failed on SQLite and on authoritative MariaDB. Full
+regression in **separate clean worktrees** (the valid control, after an invalid
+concurrent run was discarded): SQLite 16206 passed / 0 failed, MariaDB 16205 passed
+/ 0 failed. Both engines were red before this commit.
+
+### Mutation evidence
+
+16 of 16 server and 6 of 6 browser mutations still killed, each by the same intended
+assertion. Mutations **M2** and **M4** still bite on assertion **A3** — the "no row
+stored at all" default-ON case — which is precisely the assertion the new helper must
+make work, so the replacement mechanism is load-bearing rather than decorative.
+
+### Browser evidence
+
+60 assertions, 0 failures, desktop plus 360 / 390 / 412px.
+
+### Production access / deployment status
+
+None. No production access, deployment, migration or settings change.
+
+### Deferred items
+
+One housekeeping item: the stale git-ignored `phpapp/tenants.php` in the original
+working copy, which the environment's safety control prevented deleting. Proven not
+to recur — recorded as **O-03** in the Master Deferred Backlog Register.
+
+### Final disposition
+
+**CLOSED.** Gate 6C re-audited `cdb9eee` and returned PASS / CLOSED.
