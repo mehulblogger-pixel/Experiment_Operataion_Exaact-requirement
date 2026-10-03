@@ -123,7 +123,11 @@
     <div class="ff"><label>Financial year starts in</label>
       <select class="form-control" name="fy_start_month">
         <?php $months=['1'=>'January','2'=>'February','3'=>'March','4'=>'April','5'=>'May','6'=>'June','7'=>'July','8'=>'August','9'=>'September','10'=>'October','11'=>'November','12'=>'December'];
-        $cur=(string)fy_start_month(); foreach ($months as $k=>$v): ?><option value="<?= $k ?>" <?= $cur===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+        //  PHP turns the numeric string keys above into integers, so comparing them
+        //  against a (string) cast never matched and NO option was ever marked selected.
+        //  The browser then showed the first one — January — whatever the setting said,
+        //  and saving the tab wrote that back. Compare as integers, both sides.
+        $cur=(int)fy_start_month(); foreach ($months as $k=>$v): ?><option value="<?= $k ?>" <?= (int)$k===$cur?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select><small class="muted">India = April. This year (from today) = <strong><?= e(current_fy()) ?></strong>.</small></div>
     <div class="ff"><label>Current financial year <span class="muted">— what every register opens on</span></label>
       <select class="form-control" name="fy_current">

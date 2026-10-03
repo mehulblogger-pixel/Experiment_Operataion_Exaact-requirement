@@ -2,7 +2,9 @@
   $u = current_user();
   $months = ['1'=>'January','2'=>'February','3'=>'March','4'=>'April','5'=>'May','6'=>'June',
              '7'=>'July','8'=>'August','9'=>'September','10'=>'October','11'=>'November','12'=>'December'];
-  $curFy = (string)(function_exists('fy_start_month') ? fy_start_month() : 4);
+  //  Integer, not string: $months has integer keys, so a string never matched and
+  //  the wizard always displayed January regardless of the stored month.
+  $curFy = (int)(function_exists('fy_start_month') ? fy_start_month() : 4);
   $curInd = function_exists('industry_current') ? (string)industry_current() : '';
   $industries = defined('INDUSTRY_TEMPLATES') ? INDUSTRY_TEMPLATES : [];
 ?>
@@ -43,7 +45,7 @@
   <div class="form-grid">
     <div class="ff"><label>Financial year starts in</label>
       <select class="form-control" name="fy_start_month">
-        <?php foreach ($months as $k=>$v): ?><option value="<?= $k ?>" <?= $curFy===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+        <?php foreach ($months as $k=>$v): ?><option value="<?= $k ?>" <?= (int)$k===$curFy?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select><small class="muted">India = April.</small></div>
     <div class="ff"><label>Currency symbol</label>
       <input class="form-control" name="currency_symbol" value="<?= e(setting_get('currency_symbol','')) ?>" placeholder="<?= e(function_exists('cur_sym') ? cur_sym() : '₹') ?>" maxlength="4"></div>
