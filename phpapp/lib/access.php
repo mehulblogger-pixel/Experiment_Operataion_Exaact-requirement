@@ -235,7 +235,13 @@ function module_groups() {
     $g = [
         'Marketing & Sales (CRM)' => ['leads','inquiries','quotes','crm_orders','crm_reports'],
         'Inspection documentation' => ['idems'],
-        'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
+        'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','reconcile'],
+        //  Recruitment stands on its own. It was filed under Operations and
+        //  labelled "Hiring / candidates" while its permission group said
+        //  "Recruitment", so an administrator looking for recruitment access
+        //  could not find it (UAT 1.5.3, R-14). Grouping and labels only —
+        //  this grants nothing and takes nothing away.
+        'Recruitment'             => ['hiring'],
         'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','ncr','capa','audits','datacontrol','identity','confidentiality'],
         'Directory & masters'     => ['clients','vendors','masters','overheads','portal'],
         'Insights & admin'        => ['reports','users','settings'],
@@ -336,7 +342,7 @@ const ACCESS_MODULES = [
     'vouchers'      => 'Vouchers',
     'invoicing'     => 'Invoicing',
     'profitability' => 'Profitability',
-    'hiring'        => 'Hiring / candidates',
+    'hiring'        => 'Recruitment',
     'reconcile'     => 'Attendance reconcile',
     'clients'       => 'Clients',
     'vendors'       => 'Vendors',
