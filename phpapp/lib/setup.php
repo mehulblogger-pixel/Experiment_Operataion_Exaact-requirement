@@ -193,6 +193,106 @@ function setup_render_db_form(array $vals = [], $msg = '', $isError = false) {
 
 // True once the Master Admin has been through the wizard. Kept in settings, so
 // it survives everything except a deliberate reset.
+// ---------------------------------------------------------------------------
+//  FIRST-RUN JOURNEY — what a new workspace still has to decide
+//
+//  The install wizard asks only what nobody else can decide: the database and
+//  the administrator. Everything after that — who you are, what your offices
+//  are called, who may sign in — was left to the owner to discover, and in
+//  business UAT they did not: masters that existed were reported missing and
+//  the order to do things in was never stated. `org_start_here()` already
+//  solves exactly this for the organisation tab; this is the same idea widened
+//  to the whole workspace (backlog R-17).
+//
+//  TWO RULES THIS FOLLOWS.
+//   1. Every step has an HONEST done-signal, read from real data. A checklist
+//      that cannot tell whether it is finished is worse than no checklist — it
+//      teaches people to ignore it. A step nobody can compute is left out.
+//   2. It never offers a screen the viewer cannot open: the caller gates the
+//      whole panel on administrator level, the same test the screens behind
+//      these links already apply. This grants nothing.
+//
+//  Returns the ordered steps. 'done' is boolean, 'state' is the short truth
+//  underneath it ("3 on the list"), 'why' says what breaks if it is skipped.
+function setup_journey() {
+    $v      = fn($k) => trim((string) setting_get($k, ''));
+    $count  = function ($sql) { try { return (int) ops_val($sql); } catch (Throwable $e) { return 0; } };
+
+    $offices = $count("SELECT COUNT(*) FROM offices WHERE is_active=1");
+    $desig   = count(lk_options_or('designation', DESIGNATIONS));
+    $depts   = count(lk_options_or('department', DEPARTMENTS));
+    $people  = $count("SELECT COUNT(*) FROM users WHERE is_active=1");
+    $homed   = $count("SELECT COUNT(*) FROM users WHERE is_active=1 AND COALESCE(home_office_id,0)>0");
+
+    $steps = [
+        ['title' => 'Say who you are',
+         'why'   => 'Your company name goes on every document, e-mail and report. Nothing else can be printed convincingly until it is right.',
+         'done'  => $v('company_name') !== '', 'state' => $v('company_name') ?: 'not set yet',
+         'href'  => '/settings', 'cta' => 'Open Settings'],
+
+        ['title' => 'Set your currency and financial year',
+         'why'   => 'These decide how every figure is printed and which year it falls in. Changing them later moves figures between years.',
+         'done'  => $v('currency_symbol') !== '',
+         'state' => ($v('currency_symbol') ?: 'currency not set')
+                    . ' · year starts ' . date('F', mktime(0, 0, 0, (int) (function_exists('fy_start_month') ? fy_start_month() : 4), 1)),
+         'href'  => '/settings', 'cta' => 'Open Settings'],
+
+        ['title' => 'Set up your ' . Tlp('office'),
+         'why'   => 'Everything is scoped by ' . Tl('office') . '. A person cannot be given one that does not exist yet.',
+         'done'  => $offices > 0, 'state' => $offices . ' active',
+         'href'  => '/hierarchy?tab=offices', 'cta' => 'Open ' . Tlp('office')],
+
+        ['title' => 'Check the designation list',
+         'why'   => 'Job titles come from this list, so every card and every report reads the same way.',
+         'done'  => $desig > 0, 'state' => $desig . ' on the list',
+         'href'  => '/lookup?key=designation', 'cta' => 'Open the list'],
+
+        ['title' => 'Check the department list',
+         'why'   => 'Hiring requests and requisitions choose a department. An empty list stops both.',
+         'done'  => $depts > 0, 'state' => $depts . ' on the list',
+         'href'  => '/lookup?key=department', 'cta' => 'Open the list'],
+
+        ['title' => 'Add the people who sign in',
+         'why'   => 'One login per person. What they can see follows from their role and their home ' . Tl('office') . '.',
+         'done'  => $people > 1, 'state' => $people . ' active',
+         'href'  => '/user-new', 'cta' => 'Add a person'],
+
+        ['title' => 'Give everyone a home ' . Tl('office'),
+         'why'   => 'This is what decides which records each person sees. Without it they see nothing, or too much.',
+         'done'  => $people > 0 && $homed >= $people, 'state' => $homed . ' of ' . $people . ' done',
+         'href'  => '/hierarchy?tab=people', 'cta' => 'Open People'],
+
+        ['title' => 'Check who can do what',
+         'why'   => 'Read the roles once, now, while it is cheap. A permission nobody checked is the one that surprises you later.',
+         'done'  => $people > 1, 'state' => $people > 1 ? 'worth a look' : 'add people first',
+         'href'  => '/access', 'cta' => 'Open Roles'],
+
+        ['title' => 'Turn on e-mail',
+         'why'   => 'Offers, approvals and reminders are sent by e-mail. Until this is set they are written but never leave.',
+         'done'  => $v('smtp_host') !== '', 'state' => $v('smtp_host') ?: 'not configured',
+         'href'  => '/settings', 'cta' => 'Open Settings'],
+    ];
+
+    //  Approval rules only matter where the module that uses them is on, so the
+    //  list does not grow a step a recruitment-free workspace can never finish.
+    if (!function_exists('licence_enabled') || licence_enabled('hr')) {
+        $rules = $count("SELECT COUNT(*) FROM recruit_approval_rules");
+        $steps[] = ['title' => 'Decide who approves a hire',
+            'why'   => 'Until a rule matches, a hiring request waits for an administrator rather than the right manager.',
+            'done'  => $rules > 0, 'state' => $rules . ' rule(s)',
+            'href'  => '/recruit-approvals', 'cta' => 'Open approval rules'];
+    }
+
+    foreach ($steps as $i => $_) $steps[$i]['n'] = $i + 1;
+    return $steps;
+}
+
+// How far through the first-run journey this workspace is: [done, total].
+function setup_journey_progress() {
+    $s = setup_journey();
+    return [count(array_filter($s, fn($x) => $x['done'])), count($s)];
+}
+
 function setup_done() {
     return function_exists('setting_get') && setting_get('setup_done', '') === '1';
 }

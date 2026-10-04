@@ -15,6 +15,80 @@
   <span class="scope-tag"><?= $scopeAll ? 'All offices' : ($office ? e($office) : 'Your scope') ?></span>
 </div>
 
+<?php
+  //  FIRST-RUN JOURNEY (R-17). What a new workspace still has to decide, in the
+  //  order that works, with each step saying what breaks if it is skipped.
+  //  Administrators only — every link goes to a screen that already requires
+  //  that level, so this advertises nothing a viewer could not already open,
+  //  and it grants nothing. Once every step is done it stops taking up room and
+  //  becomes a single line that can be opened again.
+  $sjShow = function_exists('setup_journey')
+            && (function_exists('is_admin_level') ? is_admin_level() : false);
+  if ($sjShow):
+      $sjSteps = setup_journey();
+      $sjLeft  = array_values(array_filter($sjSteps, fn($x) => !$x['done']));
+      $sjDone  = count($sjSteps) - count($sjLeft);
+?>
+<style>
+  /*  Phone first. The desktop shape — title, status and button on one line —
+      squeezes the title to a column of single words at 390px, which is how the
+      first cut of this panel looked. Below 620px the step stacks instead.  */
+  .sj-row{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;
+          border:1px solid var(--line);background:var(--card)}
+  .sj-row.is-next{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 7%,transparent)}
+  .sj-row.is-done{opacity:.55}
+  .sj-num{font-weight:800;min-width:22px;flex:none;color:var(--brand)}
+  .sj-row.is-done .sj-num{color:var(--ok)}
+  .sj-body{flex:1 1 auto;min-width:0}
+  .sj-why{font-size:13px;margin-top:2px}
+  .sj-state{font-size:12.5px;flex:none}
+  .sj-cta{flex:none}
+  @media (max-width:620px){
+    .sj-row{flex-wrap:wrap}
+    .sj-body{flex:1 1 100%}
+    .sj-state{order:3;margin-left:32px}
+    .sj-cta{order:4;margin-left:auto}
+  }
+</style>
+  <?php if ($sjLeft): ?>
+  <div class="panel" style="border:1px solid var(--brand);background:color-mix(in srgb,var(--brand) 6%,transparent)">
+    <div class="ctitle" style="margin-top:0"><h3>Finish setting up <?= e(function_exists('app_name') ? app_name() : 'your workspace') ?></h3>
+      <span class="pill p-info"><?= (int)$sjDone ?> of <?= count($sjSteps) ?> done</span></div>
+    <p class="muted" style="margin:0 0 10px;font-size:13.5px">The order matters — each one is needed by the next.
+      You can stop at any point and come back; this panel remembers where you are.</p>
+    <div style="display:grid;gap:8px">
+      <?php foreach ($sjSteps as $st): $isNext = !$st['done'] && $st['n'] === $sjLeft[0]['n']; ?>
+        <div class="sj-row<?= $isNext ? ' is-next' : '' ?><?= $st['done'] ? ' is-done' : '' ?>">
+          <span class="sj-num"><?= $st['done'] ? '&#10004;' : (int)$st['n'] ?></span>
+          <div class="sj-body">
+            <b><?= e($st['title']) ?></b>
+            <?php if ($isNext): ?><span class="pill p-info" style="margin-left:6px">do this next</span><?php endif; ?>
+            <div class="muted sj-why"><?= e($st['why']) ?></div>
+          </div>
+          <span class="muted sj-state"><?= e($st['state']) ?></span>
+          <a class="btn small sj-cta<?= $isNext ? '' : ' secondary' ?>" href="<?= e($st['href']) ?>"><?= e($st['cta']) ?></a>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <?php else: ?>
+  <details class="panel" style="margin-bottom:14px">
+    <summary style="cursor:pointer;color:var(--muted);font-size:13.5px">
+      Setup complete &mdash; all <?= count($sjSteps) ?> steps done. Open to review them.</summary>
+    <div style="margin-top:10px;display:grid;gap:6px">
+      <?php foreach ($sjSteps as $st): ?>
+        <div class="sj-row is-done">
+          <span class="sj-num">&#10004;</span>
+          <div class="sj-body"><b><?= e($st['title']) ?></b></div>
+          <span class="muted sj-state"><?= e($st['state']) ?></span>
+          <a class="btn small secondary sj-cta" href="<?= e($st['href']) ?>">Open</a>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  </details>
+  <?php endif; ?>
+<?php endif; ?>
+
 <?php // Configurable role workspace — a curated quick-access launchpad for this
       // user's role (permission-safe; shows nothing unless an admin configured it).
       if (function_exists('workspace_launchpad_html')) echo workspace_launchpad_html($u); ?>

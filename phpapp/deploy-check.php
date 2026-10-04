@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'dfbf7ce · 2026-10-04 06:08 UTC · 677 files';
+$RELEASE = '36ac68e · 2026-10-04 06:24 UTC · 677 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -234,7 +234,7 @@ $EXPECT  = [
     'lib/services.php' => ['s'=>28431,'h'=>'6fc99ee80df3ff34'],
     'lib/settingmeta.php' => ['s'=>12701,'h'=>'092392a858cc10d8'],
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
-    'lib/setup.php' => ['s'=>16806,'h'=>'6371d1ead78681ea'],
+    'lib/setup.php' => ['s'=>22705,'h'=>'43cbca244da74864'],
     'lib/setup_cockpit.php' => ['s'=>31439,'h'=>'3bf43713e1b2b0e3'],
     'lib/stagegate.php' => ['s'=>21633,'h'=>'9ca3dd19c9846c44'],
     'lib/superadmin.php' => ['s'=>10675,'h'=>'995da0045cd4e7ee'],
@@ -301,7 +301,7 @@ $EXPECT  = [
     'tools/trace-audit.php' => ['s'=>2789,'h'=>'d95c97624d3d470e'],
     'tools/trace-thread.php' => ['s'=>4962,'h'=>'cb20d74d1a6eb46e'],
     'views/admin.php' => ['s'=>1090,'h'=>'aeb34e3396fd4ac5'],
-    'views/dashboard.php' => ['s'=>45374,'h'=>'4e3ac8432be6dc34'],
+    'views/dashboard.php' => ['s'=>49286,'h'=>'29ae0ed9d6928512'],
     'views/detail.php' => ['s'=>35729,'h'=>'0619372afa855405'],
     'views/forgot_password.php' => ['s'=>2716,'h'=>'c041f8176182b36c'],
     'views/form.php' => ['s'=>24206,'h'=>'959912d692fa235f'],
