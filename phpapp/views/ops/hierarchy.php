@@ -59,7 +59,10 @@
   function org_office_html($o, $canEdit, $counts, $offOpts, $heads, $desc, $depth = 0) {
     $id = (int)$o['id'];
     $n  = $counts[$id] ?? 0;
-    echo '<li class="ot-li">';
+    //  An address for this row. Every inline action on it posts and reloads, and
+    //  without somewhere to come back to the browser lands at the top of the page
+    //  — so setting up ten offices meant scrolling back down ten times.
+    echo '<li class="ot-li" id="office-' . $id . '">';
     echo '<div class="ot-row' . (!(int)($o['is_active'] ?? 1) ? ' ot-off' : '') . '">';
     echo   '<div class="ot-main">';
     echo     '<b>' . e($o['name']) . '</b>';
@@ -381,7 +384,7 @@
   </div>
   <?php endif; ?>
 
-  <div class="panel">
+  <div class="panel" id="office-list">
     <div class="master-head" style="margin-bottom:8px">
       <div><h3 class="tab-sub" style="margin:0"><?= e(THP('office')) ?> structure</h3>
         <p class="sub" style="margin:2px 0 0">Drag-free: change the “sits under” box on any row and it moves at once. Every person's home <?= e(Tl('office')) ?> comes from this list.</p></div>
@@ -704,6 +707,12 @@
   .ot-ul{list-style:none;margin:0;padding:0}
   .ot-ul .ot-ul{margin-left:16px;padding-left:16px;border-left:2px solid var(--line)}
   .ot-li{position:relative;margin:4px 0}
+  /*  The row you just changed, so a reload answers "what happened" as well as
+      "where was I". Fades on its own; no layout shift.  */
+  .ot-li.ot-justdone > *{background:color-mix(in srgb,var(--brand) 14%,transparent);
+    border-radius:8px;transition:background 1.4s ease 1.1s}
+  .ot-li.ot-faded > *{background:transparent}
+  @media (prefers-reduced-motion:reduce){ .ot-li.ot-justdone > *{transition:none} }
   .ot-ul .ot-ul > .ot-li::before{content:'';position:absolute;left:-16px;top:19px;width:12px;border-top:2px solid var(--line)}
   .ot-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;
     border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--card)}
@@ -901,5 +910,31 @@
   // ---- go ---------------------------------------------------------------
   fit();
   window.addEventListener('resize', autoFit);
+})();
+</script>
+
+<script>
+(function () {
+  //  BRING THEM BACK TO THE ROW.
+  //  The office actions now redirect with "#office-<id>", but the shared
+  //  tab-and-hash handler in app.js only resolves a bare element id INSIDE a
+  //  tabbed panel, and this list is not one — so the fragment was in the address
+  //  bar and the page still opened at the top. This closes that gap for the
+  //  office tree, and marks the row so the reload also says what changed.
+  function land() {
+    var h = location.hash || '';
+    if (!/^#office-(list|\d+)$/.test(h)) return;
+    var el; try { el = document.querySelector(h); } catch (e) { return; }
+    if (!el) return;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block: 'center'});
+    if (el.classList.contains('ot-li')) {
+      el.classList.add('ot-justdone');
+      setTimeout(function () { el.classList.add('ot-faded'); }, 60);
+      setTimeout(function () { el.classList.remove('ot-justdone', 'ot-faded'); }, 3200);
+    }
+  }
+  if (document.readyState !== 'loading') setTimeout(land, 120);
+  else document.addEventListener('DOMContentLoaded', function () { setTimeout(land, 120); });
 })();
 </script>

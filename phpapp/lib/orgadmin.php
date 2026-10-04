@@ -1101,6 +1101,24 @@ function ops_hierarchy_screen($method) {
         $do = $_POST['do'] ?? '';
         $back = '/hierarchy' . (($_POST['tab'] ?? '') !== '' ? '?tab=' . urlencode($_POST['tab']) : '');
 
+        //  COME BACK TO THE ROW, NOT THE TOP OF THE PAGE.
+        //  Every inline action on an office — move it under another, deactivate
+        //  it, rename it — posts and reloads. Without an anchor the browser lands
+        //  at the top, so setting up ten offices meant scrolling back down ten
+        //  times, and correcting a mistake meant finding the row again. Reported
+        //  in business UAT 1.3.1.
+        //
+        //  Delete and merge are the exception: the row the person was on no
+        //  longer exists, so they are returned to the list itself. A new office
+        //  has no id until it is saved, and the list header is where the "+ New"
+        //  button is, which is where somebody adding several of them is going
+        //  next anyway.
+        if (($_POST['tab'] ?? '') === 'offices') {
+            $focus = (int)($_POST['office_id'] ?? 0);
+            $gone  = in_array($do, ['office-delete', 'office-merge'], true);
+            $back .= (!$gone && $focus) ? '#office-' . $focus : '#office-list';
+        }
+
         if ($do === 'auto') {
             $n = count(org_auto_arrange(true, true));
             flash($n ? ($n . ' person(s) placed under a reporting manager. Correct any of them on the People tab.')
