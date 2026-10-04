@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '36ac68e · 2026-10-04 06:24 UTC · 677 files';
+$RELEASE = 'a3d9dfc · 2026-10-04 07:23 UTC · 677 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -371,10 +371,10 @@ $EXPECT  = [
     'views/ops/cockpit_forms.php' => ['s'=>2066,'h'=>'6e3e25f0c6afa805'],
     'views/ops/cockpit_home.php' => ['s'=>6864,'h'=>'978d1eba5c974119'],
     'views/ops/cockpit_modules.php' => ['s'=>5449,'h'=>'a1e3647e2802cc69'],
-    'views/ops/cockpit_profile.php' => ['s'=>3071,'h'=>'84f78f02c0bef441'],
+    'views/ops/cockpit_profile.php' => ['s'=>3657,'h'=>'e9d8ff5c3309ccfa'],
     'views/ops/command_centre.php' => ['s'=>5231,'h'=>'be8e5e385e08143a'],
     'views/ops/comp_setup.php' => ['s'=>7455,'h'=>'2ca8003131120124'],
-    'views/ops/company.php' => ['s'=>6302,'h'=>'af23bb3d61ea191e'],
+    'views/ops/company.php' => ['s'=>7391,'h'=>'ee60ec9ceb4f6b8f'],
     'views/ops/competence.php' => ['s'=>15684,'h'=>'0158f2c7aabbdebd'],
     'views/ops/complaint_detail.php' => ['s'=>16443,'h'=>'ccb78feeceb225b2'],
     'views/ops/complaint_form.php' => ['s'=>5404,'h'=>'a954e686b2b65ce7'],
@@ -507,7 +507,7 @@ $EXPECT  = [
     'views/ops/licence.php' => ['s'=>9595,'h'=>'fd45ac3765e46551'],
     'views/ops/licence_issue.php' => ['s'=>12495,'h'=>'5d30b99e548474d9'],
     'views/ops/licence_issued.php' => ['s'=>2319,'h'=>'197c336d23a9a3b4'],
-    'views/ops/lookup_values.php' => ['s'=>9679,'h'=>'a62d72cd79569f27'],
+    'views/ops/lookup_values.php' => ['s'=>10228,'h'=>'0292d7a9b727d21d'],
     'views/ops/lookups.php' => ['s'=>7956,'h'=>'b4bc57423fe118f5'],
     'views/ops/master_form.php' => ['s'=>2642,'h'=>'35e45d9d09cd662b'],
     'views/ops/master_list.php' => ['s'=>2136,'h'=>'1d1942663bce97ab'],
@@ -593,7 +593,7 @@ $EXPECT  = [
     'views/ops/search.php' => ['s'=>5790,'h'=>'85c5e4d33094db3f'],
     'views/ops/service_formats.php' => ['s'=>3036,'h'=>'ebbdc8d0a4949083'],
     'views/ops/service_scope.php' => ['s'=>8698,'h'=>'0199104c8ce5aefb'],
-    'views/ops/settings.php' => ['s'=>71614,'h'=>'95b21e4f650efc0f'],
+    'views/ops/settings.php' => ['s'=>72425,'h'=>'c76ce8cc0ebbb0f6'],
     'views/ops/setup.php' => ['s'=>4973,'h'=>'815026b2664655ed'],
     'views/ops/site_docs.php' => ['s'=>5044,'h'=>'9e876a99f63d2805'],
     'views/ops/sla_targets.php' => ['s'=>2740,'h'=>'b96c71ffc40bd861'],
@@ -620,7 +620,7 @@ $EXPECT  = [
     'views/ops/trace.php' => ['s'=>2789,'h'=>'97077c528b9d3ea3'],
     'views/ops/trace_thread.php' => ['s'=>4700,'h'=>'bbcce6ab3f5dedda'],
     'views/ops/two_factor.php' => ['s'=>7555,'h'=>'93b61f4ae4310265'],
-    'views/ops/user_form.php' => ['s'=>38204,'h'=>'a4df588593dda251'],
+    'views/ops/user_form.php' => ['s'=>42156,'h'=>'b5991096ac60ab44'],
     'views/ops/users.php' => ['s'=>8775,'h'=>'204b1b963fcf37a5'],
     'views/ops/vendor.php' => ['s'=>5170,'h'=>'64920720e59c0caa'],
     'views/ops/vendor_users.php' => ['s'=>8944,'h'=>'772219bec83410a7'],

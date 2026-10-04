@@ -576,3 +576,59 @@
   }
 })();
 </script>
+
+<?php
+//  ACCOUNT STATUS — the lifecycle actions, on the person's own screen (R-13).
+//  Deactivate, reactivate, remove the sign-in and reset two-step all existed,
+//  but only as buttons on a row of the /users list. Open somebody's record to
+//  look at them — which is what you do when deciding — and there was no way to
+//  act on what you just read; you had to go back and find their row again. The
+//  business UAT reported exactly that: "there is not option on the screen where
+//  we reactivate the user".
+//
+//  Same endpoints, same wording, same confirmations as the list. This adds no
+//  permission and no new rule: /user-retire already refuses deactivating your
+//  own account and removing the last Master Admin, and the route guards itself.
+if (!empty($user['id'])): $uid = (int)$user['id']; $left = function_exists('user_delete_wait') ? user_delete_wait($user) : null; ?>
+<div class="panel" style="margin-top:16px">
+  <div class="ctitle" style="margin-top:0"><h3 style="margin:0">Account status</h3>
+    <span class="pill <?= !empty($user['is_active']) ? 'p-ok' : 'p-warn' ?>">
+      <?= !empty($user['is_active']) ? 'Can sign in' : 'Cannot sign in' ?></span></div>
+  <p class="muted" style="margin:6px 0 10px;font-size:13.5px">
+    Switching somebody off takes away the sign-in and nothing else. Every report, voucher and
+    audit entry in their name stays exactly as it is, and you can switch them back on at any time.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <?php if (!empty($user['is_active'])): ?>
+      <form method="post" action="/user-retire" style="display:inline"
+            onsubmit="return confirm('Deactivate <?= e($user['username'] ?? '') ?>?\n\nThey can no longer sign in. Every report, voucher and audit entry in their name stays exactly as it is, and you can switch them back on at any time.')">
+        <input type="hidden" name="_do" value="deactivate"><input type="hidden" name="id" value="<?= $uid ?>">
+        <button class="btn secondary" type="submit">Deactivate</button>
+      </form>
+    <?php else: ?>
+      <form method="post" action="/user-retire" style="display:inline">
+        <input type="hidden" name="_do" value="reactivate"><input type="hidden" name="id" value="<?= $uid ?>">
+        <button class="btn" type="submit">Reactivate</button>
+      </form>
+      <?php if ($left !== null && (int)$left === 0): ?>
+        <form method="post" action="/user-retire" style="display:inline"
+              onsubmit="return confirm('Remove the sign-in for <?= e($user['username'] ?? '') ?>?\n\nOnly the login goes. Their reports, vouchers and audit trail stay — those are records this company has to keep. This cannot be undone.')">
+          <input type="hidden" name="_do" value="delete"><input type="hidden" name="id" value="<?= $uid ?>">
+          <button class="btn secondary" type="submit">Remove sign-in</button>
+        </form>
+      <?php elseif ($left !== null): ?>
+        <span class="muted" style="font-size:12.5px">Removable in <?= (int)$left ?> day(s) — an account is kept for
+          <?= (int)(function_exists('user_retire_days') ? user_retire_days() : 0) ?> days after it is switched off,
+          so anything raised about their work can still be traced to them.</span>
+      <?php endif; ?>
+    <?php endif; ?>
+    <?php if (!empty($user['totp_enabled']) && (is_master() || can('users.manage.global'))): ?>
+      <form method="post" action="/user-2fa-reset" style="display:inline"
+            onsubmit="return confirm('Clear two-step sign-in for <?= e($user['username'] ?? '') ?>? Do this only when you are sure who you are speaking to — it removes a lock on their account.')">
+        <input type="hidden" name="id" value="<?= $uid ?>">
+        <button class="btn secondary" type="submit">Reset two-step</button>
+      </form>
+    <?php endif; ?>
+    <a class="btn secondary" href="/users">All people</a>
+  </div>
+</div>
+<?php endif; ?>

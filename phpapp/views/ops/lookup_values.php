@@ -29,39 +29,6 @@
 
 <?php // Where this list appears. Tick a form to add it as a dropdown there; untick
       // to take it off (values people already chose stay saved, just stop showing). ?>
-<details class="panel" <?= empty($shownOn) ? '' : 'open' ?> style="margin-bottom:14px">
-  <summary style="cursor:pointer;font-weight:600">🖥️ Appears on these forms<?= $shownOn ? ' — ' . e(implode(', ', $shownOn)) : ' — not on any form yet' ?></summary>
-  <form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" style="margin-top:12px">
-    <input type="hidden" name="set_forms" value="1">
-    <?php lk_render_form_ticks($shownOn); ?>
-    <small class="muted">The list shows as a dropdown on each ticked form. To make a field required, use <a href="/custom-fields">Custom fields</a>.</small>
-    <div style="margin-top:12px"><button class="btn small" type="submit">Save where it appears</button></div>
-  </form>
-</details>
-
-<?php // Which module this list belongs to — move it to another group here. ?>
-<details class="panel" style="margin-bottom:14px">
-  <summary style="cursor:pointer;font-weight:600">🗂️ Module — <?= e(function_exists('lk_module_group_label') ? lk_module_group_label($t['module'] ?? '') : ($t['module'] ?: 'General')) ?></summary>
-  <form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" style="margin-top:12px">
-    <input type="hidden" name="set_module" value="1">
-    <div class="ff" style="max-width:340px"><label>This list belongs to</label>
-      <select class="form-control" name="module">
-        <?php
-          $cur = (string)($t['module'] ?? '');
-          $modOpts = ['' => 'General'];
-          foreach (['People', 'Directory', 'Sales', 'Operations', 'Reporting', 'Money'] as $mtag) {
-              // Always include the list's current module even if that module is off,
-              // so moving is never blocked; otherwise only offer enabled modules.
-              if ($mtag !== $cur && function_exists('lk_group_enabled') && !lk_group_enabled($mtag)) continue;
-              $modOpts[$mtag] = function_exists('lk_module_group_label') ? lk_module_group_label($mtag) : $mtag;
-          }
-          foreach ($modOpts as $mv => $ml) echo '<option value="' . e($mv) . '"' . ($mv === $cur ? ' selected' : '') . '>' . e($ml) . '</option>';
-        ?>
-      </select>
-      <small class="muted">Changes which heading it sits under on the Masters screen.</small></div>
-    <div style="margin-top:12px"><button class="btn small" type="submit">Save module</button></div>
-  </form>
-</details>
 
 <?php // Typing beats scanning on a list of any length, and these lists grow. ?>
 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
@@ -108,6 +75,47 @@
     <?php if ($editRow): ?><a class="btn secondary" href="/lookup?key=<?= e($t['type_key']) ?>">Cancel</a><?php endif; ?>
   </div>
 </form>
+
+
+<?php //  CONFIGURATION BELOW THE CONTENT (R-15). These two panels — where the
+      //  list appears, and which module owns it — used to sit above the values,
+      //  so opening a 40-value list showed two settings boxes first and the
+      //  values after them. They are set once and rarely changed; the values are
+      //  why people open this screen. Same panels, same forms, further down. ?>
+<h3 class="tab-sub" style="margin-top:22px">List settings <span class="muted" style="font-weight:400">— set once, rarely changed</span></h3>
+<details class="panel" <?= empty($shownOn) ? '' : 'open' ?> style="margin-bottom:14px">
+  <summary style="cursor:pointer;font-weight:600">🖥️ Appears on these forms<?= $shownOn ? ' — ' . e(implode(', ', $shownOn)) : ' — not on any form yet' ?></summary>
+  <form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" style="margin-top:12px">
+    <input type="hidden" name="set_forms" value="1">
+    <?php lk_render_form_ticks($shownOn); ?>
+    <small class="muted">The list shows as a dropdown on each ticked form. To make a field required, use <a href="/custom-fields">Custom fields</a>.</small>
+    <div style="margin-top:12px"><button class="btn small" type="submit">Save where it appears</button></div>
+  </form>
+</details>
+
+<?php // Which module this list belongs to — move it to another group here. ?>
+<details class="panel" style="margin-bottom:14px">
+  <summary style="cursor:pointer;font-weight:600">🗂️ Module — <?= e(function_exists('lk_module_group_label') ? lk_module_group_label($t['module'] ?? '') : ($t['module'] ?: 'General')) ?></summary>
+  <form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" style="margin-top:12px">
+    <input type="hidden" name="set_module" value="1">
+    <div class="ff" style="max-width:340px"><label>This list belongs to</label>
+      <select class="form-control" name="module">
+        <?php
+          $cur = (string)($t['module'] ?? '');
+          $modOpts = ['' => 'General'];
+          foreach (['People', 'Directory', 'Sales', 'Operations', 'Reporting', 'Money'] as $mtag) {
+              // Always include the list's current module even if that module is off,
+              // so moving is never blocked; otherwise only offer enabled modules.
+              if ($mtag !== $cur && function_exists('lk_group_enabled') && !lk_group_enabled($mtag)) continue;
+              $modOpts[$mtag] = function_exists('lk_module_group_label') ? lk_module_group_label($mtag) : $mtag;
+          }
+          foreach ($modOpts as $mv => $ml) echo '<option value="' . e($mv) . '"' . ($mv === $cur ? ' selected' : '') . '>' . e($ml) . '</option>';
+        ?>
+      </select>
+      <small class="muted">Changes which heading it sits under on the Masters screen.</small></div>
+    <div style="margin-top:12px"><button class="btn small" type="submit">Save module</button></div>
+  </form>
+</details>
 
 <script>
 (function () {

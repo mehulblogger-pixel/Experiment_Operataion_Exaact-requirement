@@ -27,8 +27,14 @@ $chosen = array_flip($chosen ?? []);
     <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
 
     <div class="ff" style="max-width:420px;margin-bottom:20px">
-      <label for="ck_company" style="font-weight:600;display:block;margin-bottom:4px">Company name</label>
+      <label for="ck_company" style="font-weight:600;display:block;margin-bottom:4px">Company name
+        <span class="muted" style="font-weight:400">— the name on your documents</span></label>
       <input id="ck_company" class="form-control" name="company_name" value="<?= $e($company ?? '') ?>" placeholder="e.g. Sachee HR Recruitment Services">
+      <?php //  R-16: the counterpart note. Branding sets what the SOFTWARE is called
+            //  on screen; this sets what the BUSINESS is called on anything printed. ?>
+      <small class="muted" style="display:block;margin-top:4px">Your trading name, as it should appear on invoices,
+        offers and letters. The name in the application header is separate and is set under
+        <a href="/settings">Settings &rsaquo; Branding</a> — leave that one blank and it follows this.</small>
     </div>
 
     <h2 style="font-size:17px;margin:0 0 4px">What does your company do?</h2>

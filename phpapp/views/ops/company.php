@@ -10,8 +10,23 @@
     <div class="form-grid">
       <div class="ff ff-wide"><label>Legal name <span class="muted">— as registered</span></label>
         <input class="form-control" name="legal_name" value="<?= e($p['legal_name'] ?? '') ?>" placeholder="e.g. Mystical Home Decor Products"></div>
-      <div class="ff ff-wide"><label>Brand / trading name <span class="muted">— shown in the app</span></label>
-        <input class="form-control" name="brand" value="<?= e($p['brand'] ?? '') ?>" placeholder="e.g. MGH AI Apps"></div>
+      <?php //  R-16 — THIS LABEL USED TO SAY "shown in the app", AND THAT WAS NOT
+            //  always true. The header shows Settings > Branding > Application name
+            //  when one is set, and falls back to this only when it is blank. A
+            //  tester read the two screens as duplicates because both claimed the
+            //  same job. Say which one is actually in force, and where the other is.
+            $sjAppName = trim((string) setting_get('app_name', '')); ?>
+      <div class="ff ff-wide"><label>Brand / trading name <span class="muted">— the name on invoices and documents</span></label>
+        <input class="form-control" name="brand" value="<?= e($p['brand'] ?? '') ?>" placeholder="e.g. MGH AI Apps">
+        <small class="muted">Used on invoices, the GST export and your privacy notice.
+          <?php if ($sjAppName !== ''): ?>
+            The header currently shows <strong><?= e($sjAppName) ?></strong>, set as Application name under
+            <a href="/settings">Settings &rsaquo; Branding</a>; clear that field and the header falls back to this one.
+          <?php else: ?>
+            The header falls back to this name, because no Application name is set under
+            <a href="/settings">Settings &rsaquo; Branding</a>.
+          <?php endif; ?>
+        </small></div>
       <div class="ff ff-wide"><label>Address</label>
         <textarea class="form-control" name="address" rows="3" placeholder="Street, city, state, PIN"><?= e($p['address'] ?? '') ?></textarea></div>
       <div class="ff"><label>GSTIN <span class="muted">— fills PAN &amp; State automatically</span></label><input class="form-control" id="cp_gstin" name="gstin" value="<?= e($p['gstin'] ?? '') ?>" placeholder="15-character GSTIN" maxlength="15" style="text-transform:uppercase"></div>

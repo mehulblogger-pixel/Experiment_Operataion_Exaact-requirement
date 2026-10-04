@@ -61,7 +61,17 @@
 <section class="fs-pane" data-tab="Branding &amp; theme">
   <h3 class="tab-sub" style="margin-top:0;">Branding</h3>
   <div class="form-grid">
-    <div class="ff"><label>Application name</label><input class="form-control" name="app_name" value="<?= e(setting_get('app_name','')) ?>" placeholder="e.g. Exaact Inspection Ops"></div>
+    <?php //  TWO NAMES, AND THEY ARE NOT THE SAME THING (R-16). This one is what
+          //  the software calls itself in the header; the company's own name, the
+          //  one that goes on documents, lives on Your company. A tester read the
+          //  two as a duplicate because neither field said which was which.
+          $ckName = trim((string) setting_get('company_name', '')); ?>
+    <div class="ff"><label>Application name <span class="muted">— shown in the header</span></label>
+      <input class="form-control" name="app_name" value="<?= e(setting_get('app_name','')) ?>" placeholder="e.g. Exaact Inspection Ops">
+      <small class="muted">What the software calls itself on screen. <strong>Leave it blank</strong> and the header uses your
+        company name<?= $ckName !== '' ? ' — currently <strong>' . e($ckName) . '</strong>' : '' ?>.
+        This is not the name on your invoices and letters: that is
+        <a href="/company-profile">Your company</a>.</small></div>
     <div class="ff"><label>Logo (PNG/JPG/SVG, ≤600 KB)</label><input class="form-control" type="file" name="logo" accept="image/*"></div>
     <div class="ff">
       <?php if (setting_get('logo_data','')): ?>
