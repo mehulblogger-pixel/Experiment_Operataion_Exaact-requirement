@@ -217,7 +217,7 @@
             <?= in_array((string)$code, $sbuSel, true) ? 'checked' : '' ?>> <?= e($lbl) ?></label>
         <?php endforeach; ?>
       </div>
-      <small class="muted">Missing one? Add it to the <a href="/m/sbu"><?= e(Tl('sbu')) ?> master</a> and it appears here.</small></div>
+      <small class="muted">Missing one? Add it to the <a href="/lookup?key=sbu"><?= e(Tl('sbu')) ?> master</a> and it appears here.</small></div>
     <?php else: ?>
       <input type="hidden" name="scope_sbus_all" value="1">
     <?php endif; ?>
@@ -261,7 +261,7 @@
       </select>
       <input class="form-control" name="position_title_new" id="u_desig_new" style="display:none;margin-top:6px"
              placeholder="Type the new designation — it is added to the master">
-      <small class="muted"><a href="/m/designation">Manage the designation master</a></small></div>
+      <small class="muted"><a href="/lookup?key=designation">Manage the designation master</a></small></div>
 
     <?php // 5.5 days is five full days plus one half day. It was mislabelled
           // "alternate Sat off", which is a different arrangement altogether and

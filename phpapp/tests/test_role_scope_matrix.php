@@ -41,17 +41,13 @@ foreach (['mod.calls.edit','mod.jobs.edit','mod.idems.edit','mod.vouchers.edit',
           'dash.operations','users.manage.branch','master.manage'] as $p)
     t_ok(!in_array($p, $fin, true), "*** FINANCE must not hold $p");
 
-t_section('RECORDED DEVIATION — Finance sees operational registers (open decision D-07)');
-//  The matrix gives FINANCE "—" on Vouchers, yet the engine grants
-//  mod.vouchers.view (access.php role_defaults_base, FINANCE $view list). It
-//  also grants jobs/idems view; the matrix marks Jobs "⚠ implicit".
-//  This is what a Finance user reported seeing as "an inspector's workspace".
-//  Asserted as the CURRENT state, not as the intent, so the deviation is
-//  visible in the suite instead of hiding. When D-07 is decided, this section
-//  and the matrix move together — never one without the other.
-t_ok(in_array('mod.vouchers.view', $fin, true),
-     'DEVIATION: FINANCE holds mod.vouchers.view while the matrix says "—"');
-t_ok(in_array('mod.jobs.view', $fin, true),
-     'DEVIATION: FINANCE holds mod.jobs.view (matrix marks this implicit)');
-t_ok(in_array('mod.idems.view', $fin, true),
-     'DEVIATION: FINANCE holds mod.idems.view (inspection reports)');
+t_section('D-07 — what Finance reads, now that code and matrix agree');
+//  Decided 2026-10-04 (docs/02-permission-matrix.md, note above the module table).
+//  Finance bills from jobs and calls and pays vouchers, so all three are money and
+//  the matrix now states View. Inspection reports carry no figure and were removed:
+//  carrying them made a finance login open on an operations menu (UAT 1.5.4).
+t_ok(in_array('mod.vouchers.view', $fin, true), '*** FINANCE reads vouchers — it pays them (matrix: View)');
+t_ok(in_array('mod.jobs.view',     $fin, true), '*** FINANCE reads jobs — it bills from them (matrix: View)');
+t_ok(in_array('mod.calls.view',    $fin, true), '*** FINANCE reads calls — it bills from them (matrix: View)');
+t_ok(!in_array('mod.idems.view',   $fin, true), '*** FINANCE does NOT read inspection reports (D-07 removed them)');
+t_ok(!in_array('mod.idems.edit',   $fin, true), '*** FINANCE cannot write inspection reports');

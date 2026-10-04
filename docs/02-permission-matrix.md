@@ -20,13 +20,23 @@ sales roles BDM/KAM/MM/ME are in the CRM mini-matrix below.)
 Master (MA) bypasses every gate (`access.php:530`). "Edit" implies View. Per-user
 overrides and the Settings→Roles editor can change any of this at runtime.
 
+> **D-07 (decided, 2026-10-04) — what Finance reads.** Business UAT 1.5.4 reported a
+> Finance login opening on what looked like an operations menu. Measured: the engine
+> granted FINANCE view on jobs, calls, vouchers **and inspection reports**, while this
+> matrix gave it "—" on Vouchers and marked Jobs "implicit". Decision: Finance **bills**
+> from jobs and calls and **pays** vouchers, so all three are money and are now stated
+> here as **View**; inspection reports are the technical finding, carry no figure, and
+> were removed from `role_defaults_base()`. Finance holds no operational write right —
+> asserted in `tests/test_role_scope_matrix.php`. Office scope stays **ALL**: finance
+> reconciles across offices, which is a decision, not an oversight.
+
 ## Operational & admin modules
 
 | Module / Object | MA | AD | BD | SBU | BM | BAM | OM | CO | AM | FIN | INS |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | **Calls** ¹ | E·D | E·D | View | View | Edit | View·D | Edit | Edit | Edit | View | — ᵃ |
-| **Jobs** ² | E·C | E·C | Allocate | Allocate | E·C | View | E·C | E·C | Allocate | View ⚠ᵇ | View/Close **own** ᵇ |
-| **Vouchers** ³ | Full | Full | View | View | Approve | — | Approve | Approve | Approve | — | **own** V/E/Submit |
+| **Jobs** ² | E·C | E·C | Allocate | Allocate | E·C | View | E·C | E·C | Allocate | View | View/Close **own** ᵇ |
+| **Vouchers** ³ | Full | Full | View | View | Approve | — | Approve | Approve | Approve | View | **own** V/E/Submit |
 | **Profitability** ⁴ | View | View | View | View | View | — | View | — | — | View | — |
 | **Business Partners** ⁵ | E | E | E | E | E | E | E | E | E | View | — |
 | **Contracts (open)** ⁶ | Endorse+Approve | Endorse+Approve | Endorse | Endorse | Approve | Approve | Endorse | — | — | Register/Reopen | — |

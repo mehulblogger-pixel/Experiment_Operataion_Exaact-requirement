@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'a5d3056 · 2026-10-04 02:46 UTC · 677 files';
+$RELEASE = '95df458 · 2026-10-04 03:37 UTC · 677 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -32,7 +32,7 @@ $EXPECT  = [
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>122748,'h'=>'8417ca15f39b35c2'],
-    'lib/access.php' => ['s'=>87803,'h'=>'729ff3f1ae456f88'],
+    'lib/access.php' => ['s'=>88186,'h'=>'0c3665caa1fb3adb'],
     'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
@@ -620,7 +620,7 @@ $EXPECT  = [
     'views/ops/trace.php' => ['s'=>2789,'h'=>'97077c528b9d3ea3'],
     'views/ops/trace_thread.php' => ['s'=>4700,'h'=>'bbcce6ab3f5dedda'],
     'views/ops/two_factor.php' => ['s'=>7555,'h'=>'93b61f4ae4310265'],
-    'views/ops/user_form.php' => ['s'=>38186,'h'=>'fe9f6ece4f0f6c88'],
+    'views/ops/user_form.php' => ['s'=>38204,'h'=>'a4df588593dda251'],
     'views/ops/users.php' => ['s'=>8775,'h'=>'204b1b963fcf37a5'],
     'views/ops/vendor.php' => ['s'=>5170,'h'=>'64920720e59c0caa'],
     'views/ops/vendor_users.php' => ['s'=>8944,'h'=>'772219bec83410a7'],

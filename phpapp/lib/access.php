@@ -517,8 +517,13 @@ function module_defaults($role) {
             $edit = ['inquiries','quotes'];
             $view = ['crm_orders','crm_reports','clients']; break;
         case 'FINANCE':
+            //  Jobs, calls and vouchers are money: finance bills from the first
+            //  two and pays the third, so it reads all three (matrix, D-07).
+            //  Inspection reports are not — they are the technical finding, with
+            //  no figure on them. Carrying them made a finance login open on an
+            //  operations menu, which is what UAT 1.5.4 reported.
             $edit = ['invoicing','crm_orders'];
-            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers','idems']; break;
+            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers']; break;
         case 'INSPECTOR': case 'SR_INSPECTOR': $edit = ['idems']; break; // inspectors write reports; else My Jobs / My Voucher
     }
     // Identity documents are never handed out by a blanket "everything" grant.
