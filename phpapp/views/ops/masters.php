@@ -4,9 +4,30 @@
     <p class="sub" style="margin:2px 0 0">The ready-made answers your forms offer. Set them up once, and everyone picks from the same list instead of re-typing.</p></div>
 </div>
 
+<?php //  ONE BOX THAT FINDS ANY LIST.
+      //  This screen carries three layers, a dozen groups and a collapsed section
+      //  of lists belonging to modules this plan does not include. The owner went
+      //  looking for office expense heads, public holidays and back-office staff,
+      //  all of which are here, and reported that none of them existed (UAT 1.3,
+      //  R-12). Scanning is not finding. Typing is.
+      //
+      //  It filters every card on the page as you type, across all three layers,
+      //  and opens the collapsed section when the match is inside it. Client-side,
+      //  so it answers on the keystroke — no round trip, works on a phone. ?>
+<div class="panel" style="margin-bottom:14px;padding:12px 14px">
+  <label for="mSearch" style="display:block;font-weight:600;margin-bottom:6px">Looking for a particular list?</label>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <input id="mSearch" class="form-control" type="search" autocomplete="off"
+           style="flex:1 1 260px;min-width:0"
+           placeholder="Type what you call it — holidays, designation, expense, agency…">
+    <button type="button" id="mSearchClear" class="btn secondary" style="display:none">Clear</button>
+  </div>
+  <div id="mSearchCount" class="muted" style="font-size:13px;margin-top:7px"></div>
+</div>
+
 <?php // A plain-English map of the whole screen, so the three kinds of "master"
       // stop looking like the same thing. Each card below sits under one of these. ?>
-<div class="panel" style="margin-bottom:18px">
+<div class="panel" id="mLayers" style="margin-bottom:18px">
   <strong>How this fits together — three layers</strong>
   <div class="card-grid" style="margin-top:10px">
     <div class="master-card" style="cursor:default">
@@ -125,3 +146,80 @@
   </div>
 <?php endforeach; ?>
 <?php endif; ?>
+
+<script>
+(function () {
+  var box = document.getElementById('mSearch');
+  if (!box) return;
+  var clear = document.getElementById('mSearchClear'),
+      count = document.getElementById('mSearchCount');
+
+  //  Only the cards that go somewhere are searchable. The three explainer cards
+  //  at the top of the page have no href and are not lists.
+  var cards = [].slice.call(document.querySelectorAll('a.master-card'));
+  var grids = [].slice.call(document.querySelectorAll('.card-grid'));
+
+  //  A heading belongs to the grid that follows it, so it hides with it.
+  function headingsFor(grid) {
+    var out = [], el = grid.previousElementSibling;
+    while (el && /^(H3|H4|P)$/.test(el.tagName)) { out.push(el); el = el.previousElementSibling; }
+    return out;
+  }
+  var owned = grids.map(function (g) { return { grid: g, heads: headingsFor(g) }; });
+
+  function show(el, on) { el.style.display = on ? '' : 'none'; }
+
+  function apply() {
+    var q = box.value.trim().toLowerCase();
+    clear.style.display = q ? '' : 'none';
+    var hits = 0;
+
+    cards.forEach(function (c) {
+      var on = !q || c.textContent.toLowerCase().indexOf(q) !== -1;
+      show(c, on);
+      if (on) hits++;
+    });
+
+    //  Hide a group whose cards have all gone, and its heading with it, so the
+    //  page does not leave a trail of empty section titles.
+    owned.forEach(function (o) {
+      var any = [].slice.call(o.grid.querySelectorAll('a.master-card'))
+                  .some(function (c) { return c.style.display !== 'none'; });
+      var hasCards = o.grid.querySelector('a.master-card');
+      var on = !q || !hasCards || any;
+      show(o.grid, on);
+      o.heads.forEach(function (h) { show(h, on); });
+    });
+
+    //  A match inside the collapsed "modules not in this plan" section is no use
+    //  to anybody while it stays shut.
+    [].slice.call(document.querySelectorAll('details')).forEach(function (d) {
+      if (!q) return;
+      var any = [].slice.call(d.querySelectorAll('a.master-card'))
+                  .some(function (c) { return c.style.display !== 'none'; });
+      if (any) d.open = true;
+    });
+
+    //  A group heading carries its full size ("Operations · 25 list(s)"). During
+    //  a search that contradicts the one card under it, so the tally steps aside
+    //  and the heading keeps only its name.
+    [].slice.call(document.querySelectorAll('h4 > span.muted')).forEach(function (t) {
+      show(t, !q);
+    });
+
+    //  While you are searching, the primer is in the way: you asked a question
+    //  and the answer should be the next thing on screen.
+    var primer = document.getElementById('mLayers');
+    if (primer) show(primer, !q);
+
+    count.textContent = q
+      ? (hits ? hits + (hits === 1 ? ' list matches' : ' lists match') + ' \u201C' + box.value.trim() + '\u201D'
+              : 'Nothing here is called \u201C' + box.value.trim() + '\u201D. Try a shorter word \u2014 \u201Cexpense\u201D rather than \u201Coffice expense heads\u201D.')
+      : '';
+  }
+
+  box.addEventListener('input', apply);
+  box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { box.value = ''; apply(); } });
+  clear.addEventListener('click', function () { box.value = ''; apply(); box.focus(); });
+})();
+</script>

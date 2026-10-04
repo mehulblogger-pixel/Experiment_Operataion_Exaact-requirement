@@ -2,7 +2,13 @@
 <div class="master-head">
   <div><h1><?= e($t['label']) ?></h1>
     <p class="sub">Values in this master list<?= $parentType ? ' · each belongs under a <strong>' . e($parentType['label']) . '</strong>' : '' ?></p></div>
-  <a class="btn secondary" href="/lookups">← All master lists</a>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn secondary" href="/lookups">← All master lists</a>
+    <?php // The form that adds a value sits below the table, so on a list of forty
+          //  designations "add one" meant scrolling past all forty. The button
+          //  belongs where the eye already is. ?>
+    <a class="btn" href="#lkAdd" id="lkAddJump">+ Add a value</a>
+  </div>
 </div>
 
 <?php // A recruitment workspace can reset this list to the recruitment-agency
@@ -57,7 +63,14 @@
   </form>
 </details>
 
-<table class="grid">
+<?php // Typing beats scanning on a list of any length, and these lists grow. ?>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+  <input id="lkFind" class="form-control" type="search" autocomplete="off"
+         style="flex:1 1 240px;min-width:0" placeholder="Find a value in this list…">
+  <span id="lkFindCount" class="muted" style="font-size:13px"></span>
+</div>
+
+<table class="grid" id="lkTable">
   <?php // Module 01 — is this value safe to remove? Show how many records use it. ?>
   <?php $tracked = function_exists('lk_value_usage') && isset(lk_usage_map()[$t['type_key']]); ?>
   <tr><th>Value</th><?php if ($parentType): ?><th>Under (<?= e($parentType['label']) ?>)</th><?php endif; ?><th>Code</th><th>Active</th><?php if ($tracked): ?><th>Used by</th><?php endif; ?><th>Actions</th></tr>
@@ -77,8 +90,8 @@
   <?php if (!$values): ?><tr><td colspan="<?= ($parentType ? 5 : 4) + ($tracked ? 1 : 0) ?>">No values yet — add one below.</td></tr><?php endif; ?>
 </table>
 
-<h3 class="tab-sub"><?= $editRow ? 'Edit value' : 'Add a value' ?></h3>
-<form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" class="panel">
+<h3 class="tab-sub" id="lkAdd"><?= $editRow ? 'Edit value' : 'Add a value' ?></h3>
+<form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" class="panel" id="lkAddForm">
   <?php if ($editRow): ?><input type="hidden" name="edit_id" value="<?= (int)$editRow['id'] ?>"><?php endif; ?>
   <div class="form-grid">
     <div class="ff"><label>Value *</label><input class="form-control" name="label" required value="<?= e($editRow['label'] ?? '') ?>" placeholder="e.g. Premium"></div>
@@ -95,3 +108,32 @@
     <?php if ($editRow): ?><a class="btn secondary" href="/lookup?key=<?= e($t['type_key']) ?>">Cancel</a><?php endif; ?>
   </div>
 </form>
+
+<script>
+(function () {
+  //  Jump to the add form and put the cursor in it, so "+ Add a value" is one
+  //  tap rather than a tap and a scroll.
+  var jump = document.getElementById('lkAddJump'), form = document.getElementById('lkAddForm');
+  if (jump && form) jump.addEventListener('click', function () {
+    setTimeout(function () { var f = form.querySelector('input[name="label"]'); if (f) f.focus(); }, 180);
+  });
+
+  //  Filter the values as you type. Rows only — never the header row.
+  var box = document.getElementById('lkFind'), table = document.getElementById('lkTable'),
+      count = document.getElementById('lkFindCount');
+  if (!box || !table) return;
+  var rows = [].slice.call(table.rows).slice(1);
+
+  function apply() {
+    var q = box.value.trim().toLowerCase(), hits = 0;
+    rows.forEach(function (r) {
+      var on = !q || r.textContent.toLowerCase().indexOf(q) !== -1;
+      r.style.display = on ? '' : 'none';
+      if (on) hits++;
+    });
+    count.textContent = q ? hits + ' of ' + rows.length + ' shown' : '';
+  }
+  box.addEventListener('input', apply);
+  box.addEventListener('keydown', function (e) { if (e.key === 'Escape') { box.value = ''; apply(); } });
+})();
+</script>

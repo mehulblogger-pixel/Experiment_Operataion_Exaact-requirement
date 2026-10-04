@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '46171d4 · 2026-10-04 03:49 UTC · 677 files';
+$RELEASE = 'f7d051b · 2026-10-04 05:32 UTC · 677 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -507,11 +507,11 @@ $EXPECT  = [
     'views/ops/licence.php' => ['s'=>9595,'h'=>'fd45ac3765e46551'],
     'views/ops/licence_issue.php' => ['s'=>12495,'h'=>'5d30b99e548474d9'],
     'views/ops/licence_issued.php' => ['s'=>2319,'h'=>'197c336d23a9a3b4'],
-    'views/ops/lookup_values.php' => ['s'=>7681,'h'=>'0daecb1919a3c9ed'],
+    'views/ops/lookup_values.php' => ['s'=>9679,'h'=>'a62d72cd79569f27'],
     'views/ops/lookups.php' => ['s'=>7956,'h'=>'b4bc57423fe118f5'],
     'views/ops/master_form.php' => ['s'=>2642,'h'=>'35e45d9d09cd662b'],
     'views/ops/master_list.php' => ['s'=>2136,'h'=>'1d1942663bce97ab'],
-    'views/ops/masters.php' => ['s'=>7447,'h'=>'4f78bc8efa5f00e9'],
+    'views/ops/masters.php' => ['s'=>12060,'h'=>'8db1f232975036f7'],
     'views/ops/method_detail.php' => ['s'=>4270,'h'=>'1c92ae6509bbc815'],
     'views/ops/method_form.php' => ['s'=>3356,'h'=>'74e2d531c1dd528c'],
     'views/ops/methods_list.php' => ['s'=>2146,'h'=>'a038dbaacfbefdbc'],
