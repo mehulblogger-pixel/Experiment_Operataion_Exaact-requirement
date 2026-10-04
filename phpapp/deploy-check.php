@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'eacf282 · 2026-10-02 10:35 UTC · 677 files';
+$RELEASE = 'a5d3056 · 2026-10-04 02:46 UTC · 677 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -593,8 +593,8 @@ $EXPECT  = [
     'views/ops/search.php' => ['s'=>5790,'h'=>'85c5e4d33094db3f'],
     'views/ops/service_formats.php' => ['s'=>3036,'h'=>'ebbdc8d0a4949083'],
     'views/ops/service_scope.php' => ['s'=>8698,'h'=>'0199104c8ce5aefb'],
-    'views/ops/settings.php' => ['s'=>71263,'h'=>'c4940ac6ddab9894'],
-    'views/ops/setup.php' => ['s'=>4814,'h'=>'2b39de10efe5b331'],
+    'views/ops/settings.php' => ['s'=>71614,'h'=>'95b21e4f650efc0f'],
+    'views/ops/setup.php' => ['s'=>4973,'h'=>'815026b2664655ed'],
     'views/ops/site_docs.php' => ['s'=>5044,'h'=>'9e876a99f63d2805'],
     'views/ops/sla_targets.php' => ['s'=>2740,'h'=>'b96c71ffc40bd861'],
     'views/ops/sso.php' => ['s'=>5477,'h'=>'1ff5f650e95dd9a0'],
