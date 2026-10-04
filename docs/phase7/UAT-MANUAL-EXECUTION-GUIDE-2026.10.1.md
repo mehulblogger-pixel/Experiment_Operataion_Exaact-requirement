@@ -118,36 +118,45 @@ Open **Admin → Settings** (`/settings`).
 |---|---|---|
 | 1.2.1 | Company / organisation name | Your real trading name, spelled as you want it on documents |
 | 1.2.2 | Logo | Present and not stretched |
-| 1.2.3 | Financial year start month | Your actual FY start (April for most Indian businesses) |
+| 1.2.3 | Financial year start month | Your actual FY start — April for most Indian businesses. **Fixed 2026-10-04:** this dropdown never showed the stored month and always displayed January, and saving the tab wrote January back. Re-check after re-uploading `views/ops/settings.php`. If it still shows January, the value really was overwritten — set it to April and tell me |
 | 1.2.4 | Currency and number format | Correct for your invoices |
 | 1.2.5 | Address, GST/tax identifiers | Exactly as they must appear on a legal document |
 | 1.2.6 | E-mail sending configuration | Configured, and the outbox shows recent successful sends |
-| 1.2.7 | Cloud mode / base domain | Set if you run multiple workspaces; blank if single-company |
+| 1.2.7 | Cloud mode / base domain | **Only applies if you sell EXAACT to other companies**, each on its own sub-domain (`acme.yourdomain.com`). You run one company, so this should be **blank**. If it is blank, that is a PASS |
 
 **Mode B:** set each of these and confirm it saves and survives a page reload.
 **Mode A:** confirm only. If one is wrong, that is a real finding — note it, don't fix it mid-test.
 
-## 1.3 Masters — the lists everything else chooses from
+## 1.3 The lists everything else chooses from
 
-Open **Masters** (`/masters`). Verify each list exists and holds sensible values.
+> **Correction (2026-10-04).** The first version of this guide told you to find all
+> eleven lists under `/masters`. That was wrong, and it is why several of these came
+> back as "nothing such found". They live on **four** different screens. The addresses
+> below are taken from the application's own registries and verified.
 
-| # | Master | Why it matters | Minimum to check |
+| # | List | Where it really is | Why it matters |
 |---|---|---|---|
-| 1.3.1 | **Offices / branches** (`/m/...`) | Everything is scoped by office; this is the backbone | At least your real branches, each with the right type and parent |
-| 1.3.2 | **Business Units (SBU)** | Revenue and cost split by unit | Your real units |
-| 1.3.3 | **Departments** | Hiring requests and requisitions choose one | Your real departments |
-| 1.3.4 | **Designations** | Job titles on requisitions and offers | Your real titles |
-| 1.3.5 | **Trades / disciplines** | Which inspector can do which job | Your real disciplines |
-| 1.3.6 | **Activities / services** | What you sell and execute | Your real service list |
-| 1.3.7 | **Expense heads** | Voucher columns | Your real expense categories |
-| 1.3.8 | **Office expense heads** | Branch overheads | Correct per branch |
-| 1.3.9 | **Public holidays** | Working-day and capacity maths | This year's actual holidays |
-| 1.3.10 | **Agencies / subcontractors** | Outsourced manpower | Your real agencies, with rates |
-| 1.3.11 | **Back-office staff** | People who are not field inspectors | Correct |
+| 1.3.1 | **Offices / branches** | `/hierarchy?tab=offices` — the `/masters` card forwards you here on purpose, because this screen also owns the tree and each office's head | Everything is scoped by office |
+| 1.3.2 | **Business Units (SBU)** | `/lookup?key=sbu` | Revenue and cost split by unit |
+| 1.3.3 | **Departments** | `/lookup?key=department` | Hiring requests and requisitions choose one |
+| 1.3.4 | **Designations** | `/lookup?key=designation` | Job titles on requisitions and offers |
+| 1.3.5 | **Trades / disciplines** | `/lookup?key=trade` | Which inspector can do which job |
+| 1.3.6 | **Activities / services** | **Not a master.** Settings → `/service-scope` and `/service-formats` | What you sell and execute |
+| 1.3.7 | **Expense heads (voucher columns)** | `/masters` → "Expense heads (voucher columns)" | What an engineer claims on a job |
+| 1.3.8 | **Office expense heads** | `/masters` → "Office expense heads" | A branch's own running costs, and how each spreads across business units. **A different list from 1.3.7, deliberately** |
+| 1.3.9 | **Public holidays** | `/masters` → "Public holidays" | Working-day and capacity maths |
+| 1.3.10 | **Agencies / subcontractors** | `/masters` → "Recruitment / manpower agencies" | Outsourced manpower |
+| 1.3.11 | **Back-office staff** | `/masters` card forwards to `/hierarchy?tab=people` | People live in one register, so the card sends you there rather than keeping a second copy |
 
-For each: **does it open, does it list, can you add one, does the new one appear in the place
-that uses it?** That last part is the real test — add a test designation, then check it appears
-in the requisition form's designation dropdown.
+For each: **does it open, does it list, can you add one, and does the new one appear in
+the place that uses it?** That last part is the real test — add a test designation at
+`/lookup?key=designation`, then check it appears in the requisition form's designation
+dropdown and on the Add-a-login form.
+
+**A finding worth recording separately:** you are the Master Admin and you could not
+find three lists that exist. Even with my bad instructions, a list a business owner
+cannot locate is a real usability defect against the "Zero Training UI" standard. It is
+logged as **R-12** and is not closed by this correction.
 
 ## 1.4 Users, roles and registration
 
@@ -157,11 +166,11 @@ Open **Admin → Users** (`/users`).
 |---|---|---|
 | 1.4.1 | Review the user list | Every real person who should have access, nobody who should not. **Look for leavers who still have logins** — that is a genuine finding |
 | 1.4.2 | Create a new user (`/user-new`) | The form asks for name, login, e-mail, **role**, **home office**, and the **person** they are |
-| 1.4.3 | Note the person-linking field | It offers existing team members **and** lets you add a new one inline. A person who starts next week should be offerable here — that is deliberate |
+| 1.4.3 | On `/user-new`, open the **Position / designation** dropdown | It lists the designations from the master **and** ends with "**+ Add a designation not on this list…**". Choose that, type a new title, save — the new designation is added to the master and appears for the next person. Below the field, "Manage the designation master" must open the list (**fixed 2026-10-04** — it used to say "Not found") |
 | 1.4.4 | Save, then sign in as that user in a private window | They land on a home page appropriate to their role, not an error |
-| 1.4.5 | Edit a user (`/user-edit`) | Changes save and survive reload |
+| 1.4.5 | Edit `uat.coord`: change the **home office** to another branch, save, reload | The new office sticks. Then change it back. Nothing else about the user changes |
 | 1.4.6 | Retire a user (`/user-retire`) — **use your test user only** | They can no longer sign in; their historical records remain |
-| 1.4.7 | Unlock / 2FA reset (`/user-unlock`, `/user-2fa-reset`) | Available to an administrator |
+| 1.4.7 | Find the reactivate / unlock control for a retired user | Available to an administrator. **Your finding stands:** the screen calls it *reactivate*, there is no *unlock*, and there is no control on the screen where you retire someone. Logged as **R-13** |
 
 **Create these four test users now — Parts 2 and especially Journey H need them:**
 
@@ -183,9 +192,9 @@ Open **Admin → Access** (`/access`).
 |---|---|---|
 | 1.5.1 | The role list | The real roles: Master Admin, Business Director, Business Unit Head, Branch Manager, Operation Manager, Coordinator, Finance, Senior Inspector, Inspector, and the sales/marketing roles |
 | 1.5.2 | What each role can do | Matches how your business actually works. **If a Coordinator can do something only a Manager should, that is a finding** |
-| 1.5.3 | The recruitment-administrator permission | Only the people who should configure recruitment hold it |
+| 1.5.3 | On `/access`, find the **Recruitment** permission group → "**Configure the recruitment module**" | It exists — my earlier wording ("recruitment-administrator") was not what the screen says, which is why you could not find it. Only people who should configure recruitment hold it. **Separate real finding:** the module toggle for recruitment is named "Hiring / candidates" and filed under the **Operations** heading, not Recruitment. Logged as **R-14** |
 | 1.5.4 | Office scope | A branch user sees their branch, not every branch |
-| 1.5.5 | Access requests (`/access-requests`) | If somebody has requested access, it is visible and decidable |
+| 1.5.5 | Open `/access-requests` | **My earlier description was wrong.** This is not internal staff asking for permissions — it is the **Marketplace partner queue**: outside organisations asking to connect to you. If you do not use Marketplace it is correctly empty, and empty is a PASS. Internal access is granted directly on `/access` and `/user-edit` |
 
 ## 1.6 Licence and modules
 
