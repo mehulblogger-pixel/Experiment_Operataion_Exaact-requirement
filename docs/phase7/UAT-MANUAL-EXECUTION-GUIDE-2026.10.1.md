@@ -262,7 +262,7 @@ Joining → Workforce.
 | A18 | **Offer** — on a test candidate only | `/candidate-offer` | Generates for review. **Do not send it to a real person** |
 | A19 | Mark joined — test candidate only | `/candidate-joined` | They become an active team member **at this moment and not before** |
 | A20 | Check the team register | `/m/inspectors` | Before A19 they are listed as **joining pending**; after A19, active |
-| A21 | **The critical one:** before marking joined, try to allocate them to a job | `/availability`, job allocation | **They must not be offered.** A person who has not started cannot be given work |
+| A21 | **The critical one:** before marking joined, try to allocate them to a job | `/job` → Assignment lifecycle | **They must not be offered.** A person who has not started cannot be given work. **Do not test this from the one-line version — use Part 2★, step by step.** The wrong dropdown passes by accident |
 
 **A21 is the single most important check in Journey A.** It is the defect this release's Gate 6
 fixed. If a hired-but-not-joined person can be assigned a job, stop and tell me.
@@ -367,14 +367,167 @@ Sign in as the *wrong* person and try things. Nothing here is destructive.
 | H6 | Perform a recruitment action | `uat.finance` | **Refused** |
 | H7 | Open an admin screen | `uat.inspector` | **Refused** |
 | H8 | View somebody's salary / CTC | `uat.coord` | **Hidden or refused** |
-| H9 | **Type a forbidden address straight into the browser bar** — e.g. `/users`, `/approval-rules`, `/licence` | each test user | **Still refused.** Hiding a menu item is not security; the address must be refused too |
+| H9 | **Type a forbidden address straight into the browser bar** | each test user | **Still refused.** Hiding a menu item is not security. **Use Part 2★** — a refusal here bounces you to the home page with a red message rather than showing an error page, and a tester who does not know that can record a breach as a pass |
 | H10 | Open another branch's client commercial terms | a branch-scoped user | **Refused or hidden** |
-| H11 | **Multi-workspace only:** try to reach a record ID belonging to another company | any user | **Refused.** If other-company data appears, **STOP THE ENTIRE UAT** |
+| H11 | **Multi-company only:** try to reach a record ID belonging to another company | any user | **Refused.** If other-company data appears, **STOP THE ENTIRE UAT**. **Use Part 2★** — it tells you first how to check whether this applies to you at all, and what to test instead if it does not |
 | H12 | Sign in with a retired user | retired test user | **Refused** |
 | H13 | Sign in with a wrong password three times | any | Sensibly handled; no crash, no information leak |
 
 **H9 and H11 are the two that matter most.** H9 catches the commonest real security mistake —
 hiding a button but leaving the door open. H11 is the one that would end a release.
+
+---
+
+# PART 2★ — THE THREE CHECKS THAT CAN STOP THE RELEASE
+
+Everything else in this guide is worth knowing. **These three decide whether the release
+ships.** They are written out click by click because a vague instruction here is worse than
+no instruction: all three can be "passed" by accident if you look at the wrong screen.
+
+---
+
+## ★ A21 — a person who has not started cannot be given work
+
+### What is actually being tested
+
+When somebody accepts your offer they exist in the system, but they do not start until the
+day they join. Between those two dates they must appear in your team register — you hired
+them, you want to see them — and must **not** be offerable for work.
+
+This is not hypothetical. The job screen's engineer dropdown used to ask *"who is not
+inactive?"* instead of *"who is active?"*. With only two statuses those were the same
+question, so it read as correct for years. The moment a "joining pending" status existed it
+silently stopped being correct, and **a person who had accepted an offer could be put on an
+inspection weeks before their first day.** That is the defect this release fixed, and A21 is
+how you confirm the fix is really on your server.
+
+### Before you start — you need one specific person
+
+Somebody with the status **joining pending**: offer accepted, not yet marked joined.
+
+1. Open `/m/inspectors` (Team register).
+2. Filter or look for **Joining pending**. Note the person's name exactly.
+3. **If nobody is in that state**, make one: run Journey A steps A7 → A18 on a *test*
+   candidate and **stop before A19** (do not mark them joined). That leaves them in exactly
+   the state A21 needs.
+
+Also note the name of one person who **is** active, in the same office. You need both.
+
+### The test
+
+| # | Do this | What a PASS looks like |
+|---|---|---|
+| A21.1 | On `/m/inspectors`, confirm your joining-pending person **is listed** | Present, marked as joining pending. Being kept off jobs is not the same as being hidden — if they have vanished from the register, that is a different defect: record it |
+| A21.2 | Open `/jobs` and open any job, or go straight to `/job?id=…` | The job screen opens on its Overview tab |
+| A21.3 | Find the collapsible section headed **"Assignment lifecycle"** (subtitle: *hold, reschedule, reassign, no-show — with history*) and expand it | The panel opens |
+| A21.4 | Open the **engineer / inspector dropdown** inside that panel | A list of people you could assign |
+| A21.5 | **Read every name in that dropdown.** Your joining-pending person must **not** be there | Their name is absent |
+| A21.6 | Check your **active** person **is** in the same dropdown | Present — this proves you are reading the right control and it is not simply empty |
+| A21.7 | Open `/availability` | The joining-pending person is **named as awaited**, not offered as bookable |
+
+### How to read the result
+
+- **PASS** — absent from the dropdown in A21.5, present in the register in A21.1, and the
+  active person present in A21.6. All three must hold.
+- **FAIL** — their name appears in the engineer dropdown. **Stop Journey A and tell me.**
+  This one blocks the release on its own.
+- A21.6 failing on its own means the dropdown is empty for some other reason (no active
+  people in that office, or a permission problem). That is a different finding — record it
+  as such rather than calling A21 a pass.
+
+---
+
+## ★ H9 — a forbidden address typed straight into the browser
+
+### What is actually being tested
+
+Hiding a menu item is not security. The commonest real mistake in business software is to
+remove the button and leave the door open, so anyone who knows or guesses the address walks
+straight in. H9 types the address by hand and checks the door is actually locked.
+
+### Know what a refusal looks like before you start
+
+**This application does not show an error page when it refuses you.** It sends you back to
+the **home page** with a **red message bar** saying why. So:
+
+- **PASS** = you land on the home page with a red message, for example
+  *"Only an administrator can configure approval rules."*
+- **FAIL** = **the screen loads.** Any part of it — a heading, a table, a form — means you
+  got in.
+
+Read that twice. A tester expecting a "403 Forbidden" page can see the correct refusal and
+record it as a failure, or see a real breach and think nothing happened.
+
+### The test
+
+Sign in as **`uat.coord`** in a **private / incognito window** (so your administrator
+session is not reused). Then type each address into the browser bar by hand — do not click
+a menu, do not paste a link from elsewhere.
+
+| # | Type this address | What a PASS looks like |
+|---|---|---|
+| H9.1 | `/users` | Bounced home, red message |
+| H9.2 | `/user-new` | Bounced home, red message |
+| H9.3 | `/approval-rules` | Bounced home — message reads **"Only an administrator can configure approval rules."** |
+| H9.4 | `/licence` | Bounced home, red message |
+| H9.5 | `/settings` | Bounced home, red message |
+| H9.6 | `/audit-log` | Bounced home, red message |
+| H9.7 | Repeat all six as **`uat.finance`** | Same six refusals |
+| H9.8 | Repeat all six as **`uat.inspector`** | Same six refusals |
+
+Then one more, which is the other half of the same question:
+
+| # | Do this | What a PASS looks like |
+|---|---|---|
+| H9.9 | As each of the three, look at the menu | None of those six screens is offered. Both must be true: not in the menu **and** refused by address |
+
+### How to read the result
+
+- **PASS** — all eighteen attempts bounce home with a message.
+- **FAIL** — any one of them loads. **Stop and tell me which address, which user, and what
+  you could see.** A single one is enough to hold the release.
+- A screen that loads but is empty is still a FAIL. Record what it showed.
+
+---
+
+## ★ H11 — nothing from another company
+
+### First, decide whether this applies to you
+
+H11 only means something if **this installation serves more than one company**.
+
+1. Open `/settings` and find **cloud mode / base domain**.
+2. **Blank** → you run one company. **H11 is Not applicable — record it as such, not as a
+   pass.** Then do the office-boundary test below instead, which is the equivalent risk that
+   *does* apply to you.
+3. **Set** → you serve several companies. Do the full test below.
+
+Recording "pass" on a test that could not have failed is how an untested boundary gets
+signed off. If it does not apply, say so.
+
+### If you run more than one company
+
+| # | Do this | What a PASS looks like |
+|---|---|---|
+| H11.1 | Sign into **company A**. Open any job, candidate or invoice. Note the number at the end of the address — e.g. `/job?id=412` | You have a real record id belonging to company A |
+| H11.2 | Sign out completely. Sign into **company B** as any user | You are in the other company |
+| H11.3 | Type that exact address from H11.1 into the browser bar | **Refused, or "not found".** Nothing of company A appears |
+| H11.4 | Repeat with a candidate id and an invoice id | Same — refused or not found |
+
+**If any company A data appears in company B — even a name, even a number — STOP THE ENTIRE
+UAT and tell me immediately.** Do not continue testing. That is the only finding in this
+whole guide that ends a release outright.
+
+### If you run one company — do this instead (H10)
+
+The equivalent boundary for you is between **offices**, not companies.
+
+| # | Do this | What a PASS looks like |
+|---|---|---|
+| H10.1 | Sign in as a user whose home office is branch A | You are scoped to that branch |
+| H10.2 | Open `/clients` and find a customer belonging to branch B | You may see the customer exists — that is deliberate |
+| H10.3 | Try to open that customer's **commercial terms** and contacts | **Refused or hidden.** Basic identity visible, commercial detail not |
+| H10.4 | Open `/reports` and look for branch B's revenue | Branch B's revenue figures are not shown |
 
 ---
 
