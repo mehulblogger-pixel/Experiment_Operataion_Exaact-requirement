@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '439beee · 2026-10-08 10:16 UTC · 677 files';
+$RELEASE = 'c78947d · 2026-10-08 11:02 UTC · 678 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -286,6 +286,7 @@ $EXPECT  = [
     'tools/g6-seed.php' => ['s'=>2826,'h'=>'510d2e87fd1a411a'],
     'tools/g6b-seed.php' => ['s'=>4137,'h'=>'c8030e3d63576a47'],
     'tools/licence-issue.php' => ['s'=>6116,'h'=>'563a0af4621b9578'],
+    'tools/permission-audit.php' => ['s'=>12272,'h'=>'754ed8413717268e'],
     'tools/phase1_inventory_engine.php' => ['s'=>53763,'h'=>'587c1ddbd38ed330'],
     'tools/reset-admin.php' => ['s'=>2377,'h'=>'5eba3ddcf695da09'],
     'tools/sbom.php' => ['s'=>5314,'h'=>'7da7803dd8b6a816'],
