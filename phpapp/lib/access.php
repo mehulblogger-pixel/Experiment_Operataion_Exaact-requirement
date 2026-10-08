@@ -295,6 +295,12 @@ function permission_nav_groups() {
     $fine = [
         'Sales'                   => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
         'Operations'              => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
+        //  R-14, second half. module_groups() gave recruitment its own heading on
+        //  the ROLE screen, but this map feeds the PER-USER screen and was not
+        //  touched — so these three landed in "Other" and the module stayed under
+        //  Operations. A business UAT screenshot of Edit user > Permissions showed
+        //  exactly that. One name, one place, on both screens.
+        'Recruitment'             => ['hiring.admin','hiring.material_change.propose','hiring.review.clear'],
         'Reporting'               => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.template.approve'],
         'Money'                   => ['data.credit','data.revenue','data.salary','data.profitability','finance.reconcile'],
         'Quality & Accreditation' => ['idems.audit.view','person.iddoc.view','person.iddoc.manage','complaints.decide','capa.close','ncr.close'],
@@ -305,7 +311,8 @@ function permission_nav_groups() {
     // module view/edit access, by nav area — each key expands to .view + .edit
     $mods = [
         'Sales'                   => ['leads','inquiries','quotes','crm_orders','crm_reports'],
-        'Operations'              => ['calls','jobs','vouchers','hiring','reconcile'],
+        'Operations'              => ['calls','jobs','vouchers','reconcile'],
+        'Recruitment'             => ['hiring'],
         'Reporting'               => ['idems'],
         'Money'                   => ['invoicing','profitability','overheads'],
         'Quality & Accreditation' => ['equipment','competence','impartiality','identity','complaints','ncr','confidentiality','capa','audits','datacontrol'],
