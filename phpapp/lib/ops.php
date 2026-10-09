@@ -3129,6 +3129,34 @@ function job_owned_by_me($jobId) {
 // working screen, so only families whose ownership is unambiguous are listed.
 // Routes outside these families keep their existing behaviour — see
 // docs/phase1/M5-KNOWN-LIMITATIONS.md.
+//  R-20 — which VERB a route performs. Absent means 'view', which is what the
+//  module gate has always asked, so a route not listed here behaves exactly as
+//  before. Each entry is transcribed from the guard that authorises the action
+//  today; the equivalence is asserted per role in
+//  tests/test_permission_verb_enforcement.php, which fails if anybody who can
+//  act today would be locked out.
+//
+//  Deliberately NOT listed, and why: opportunity-delete and bill-delete share a
+//  module and a verb with a route whose authority differs (lead-delete needs the
+//  edit tick, expense-delete admits Finance), and one right cannot mean two
+//  things. Those stay with their handlers. ncr-reopen is left out too: its guard
+//  reaches across modules (mod.capa.edit also grants it), which no per-module
+//  verb can express.
+function perm_route_verb($route) {
+    static $v = [
+        'inquiry-delete'     => 'delete',
+        'lead-delete'        => 'delete',
+        'call-delete'        => 'delete',
+        'document-delete'    => 'delete',
+        'endorsement-delete' => 'delete',
+        'expense-delete'     => 'delete',
+        'audit-close'        => 'archive',
+        'capa-close'         => 'archive',
+        'job-close'          => 'archive',
+    ];
+    return $v[$route] ?? 'view';
+}
+
 function ops_module_family($route) {
     static $fam = [
         // Recruitment (hr)
@@ -3363,6 +3391,36 @@ function ops_module_gate($route, $peek = false) {
             ? 'The ' . PRODUCT_MODULES[$owner][0] . ' module is not switched on for this installation.'
             : 'You don’t have access to the ' . access_module_label($mod) . ' module. Ask your administrator.');
     }
+    // ---- R-20: the route's VERB, on top of module access ------------------
+    //
+    //  Until now this gate asked one question — "may you open this module?" —
+    //  and every destructive act was left to its handler, where authority was a
+    //  job title rather than a right. That is why the owner could not say "may
+    //  edit a job but never delete one".
+    //
+    //  The verb is asked here, AFTER module access, for two reasons. The module
+    //  refusal keeps its own carefully worded screen and is said first, which is
+    //  the right order: "you don't have this module" before "you don't have
+    //  Delete". And because the handler's own guard still runs afterwards, this
+    //  can only ever TIGHTEN — it never admits anybody the old code refused.
+    //
+    //  Only routes whose present authority the verb can express exactly are
+    //  listed. Where two routes in one module have different authority today
+    //  (deleting a lead needs the edit tick, deleting an opportunity needs a
+    //  management role) one right cannot represent both, so the narrower route
+    //  is left to its handler rather than guessed at. Proved role by role in
+    //  tests/test_permission_verb_enforcement.php.
+    if ($mod) {
+        $verb = perm_route_verb($base);
+        if ($verb !== 'view' && !can(perm_verb_key($mod, $verb))) {
+            $what = strtolower(perm_verb_label($verb));
+            ops_require(false, 'You can open ' . access_module_label($mod)
+                . ', but you do not have permission to ' . $what
+                . ' here. Ask your administrator for the "' . perm_verb_label($verb)
+                . '" tick on ' . access_module_label($mod) . '.');
+        }
+    }
+
     // Registers only an accredited body needs. With every accreditation pack
     // (inspection, laboratory) switched off they are hidden from the menu; refuse
     // them here too, so a bookmarked or typed URL cannot reach a screen the

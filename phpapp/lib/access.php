@@ -633,6 +633,68 @@ function perm_legacy_edit_also_granted() {
     ];
 }
 
+//  WHERE TODAY'S AUTHORITY IS A JOB TITLE, NOT A TICK.
+//
+//  Most destructive actions are guarded by is_admin_level() or
+//  is_coordinator_level() rather than by any permission. is_admin_level() is
+//  SEVEN roles wide, not two (MGMT_ROLES), so handing the new Delete verb only
+//  to administrators would strip it from five roles that can delete today.
+//
+//    inquiries  delete  is_admin_level()        (lib/crm.php inquiry-delete)
+//    leads      delete  is_admin_level()        (lib/opportunities.php opportunity-delete)
+//    jobs       delete  is_coordinator_level()  (lib/ops.php expense-delete, lib/bills.php bill-delete)
+//
+//  Granting these keeps day one identical. The owner can then UNTICK them on
+//  the grid — which is the whole point of the change: narrowing becomes a
+//  decision somebody makes and can see, instead of a side effect of a job title.
+function perm_legacy_role_grants() {
+    return [
+        'inquiries' => ['delete' => 'MGMT'],
+        'leads'     => ['delete' => 'MGMT'],
+        'jobs'      => ['delete' => 'COORD'],
+    ];
+}
+
+//  WHERE TODAY'S AUTHORITY IS A NAMED RIGHT THAT IS NOT THE EDIT TICK.
+//
+//  Read from each guard (docs/phase7/PERMISSION-MODEL-AUDIT.md). Without these,
+//  a Branch Application Manager would lose the ability to delete a call, a
+//  Senior Inspector would lose document deletion, Finance would lose expense
+//  deletion, and a Coordinator would lose closing a job — each because the right
+//  that authorises them today is not the module's edit tick.
+function perm_legacy_right_grants() {
+    return [
+        'ops.call.delete'   => ['calls' => ['delete']],             // call-delete
+        'ops.job.close'     => ['jobs'  => ['archive', 'delete']],  // job-close, bill-delete
+        'finance.reconcile' => ['jobs'  => ['delete']],             // expense-delete
+        'idems.finalize'    => ['idems' => ['delete']],             // document/endorsement-delete
+        'capa.close'        => ['capa'  => ['archive']],            // capa-close
+    ];
+}
+
+//  Upgrade a SAVED permission set to the six-verb vocabulary.
+//
+//  Deliberately a read-time interpretation, not a database rewrite: it never
+//  touches stored data, so it is idempotent, needs no downtime, and cannot
+//  half-apply. A set saved before the verb split is simply read correctly.
+function perm_upgrade_verbs(array $perms) {
+    $add = [];
+    // The old tick was labelled "add / edit" and genuinely allowed both.
+    $legacyEdit = perm_legacy_edit_also_granted();
+    foreach ($perms as $p) {
+        if (!preg_match('/^mod\.(\w+)\.edit$/', $p, $m)) continue;
+        $add[] = perm_verb_key($m[1], 'add');
+        foreach ($legacyEdit[$m[1]] ?? [] as $v) $add[] = perm_verb_key($m[1], $v);
+    }
+    // A named right that authorised a destructive act carries its verb across.
+    foreach (perm_legacy_right_grants() as $right => $byMod) {
+        if (!in_array($right, $perms, true)) continue;
+        foreach ($byMod as $mod => $verbs)
+            foreach ($verbs as $v) $add[] = perm_verb_key($mod, $v);
+    }
+    return array_values(array_unique(array_merge($perms, $add)));
+}
+
 function perm_verb_label($verb) {
     return [
         'view'    => 'View',    'add'     => 'Add',    'edit'   => 'Edit',
@@ -750,6 +812,20 @@ function module_defaults($role) {
         $out[] = perm_verb_key($k, 'edit');
         foreach ($legacy[$k] ?? [] as $v) $out[] = perm_verb_key($k, $v);
     }
+    //  Verbs a job title grants today. Scoped to modules the role can already
+    //  see, so this widens nobody's reach into a module they have no business in
+    //  — it only names a power they already hold.
+    $isMgmt  = in_array($role, MGMT_ROLES, true);
+    $isCoord = $isMgmt || in_array($role, ['ASST_MANAGER', 'COORDINATOR'], true);
+    $seen    = array_merge($view, $edit);
+    foreach (perm_legacy_role_grants() as $k => $byVerb) {
+        if (!in_array($k, $seen, true)) continue;
+        foreach ($byVerb as $v => $who) {
+            if ($who === 'MGMT'  && !$isMgmt)  continue;
+            if ($who === 'COORD' && !$isCoord) continue;
+            $out[] = perm_verb_key($k, $v);
+        }
+    }
     return array_values(array_unique($out));
 }
 
@@ -802,7 +878,11 @@ function role_perms($role) {
     $raw = setting_get('role_access', '');
     if ($raw !== '') {
         $ov = json_decode($raw, true);
-        if (is_array($ov) && isset($ov[$role]) && is_array($ov[$role])) return merge_new_module_defaults(array_values($ov[$role]), $role);
+        //  A stored override was saved under the two-verb vocabulary, so it is
+        //  upgraded as it is read. Read-time, never rewritten: idempotent, no
+        //  downtime, and it cannot half-apply.
+        if (is_array($ov) && isset($ov[$role]) && is_array($ov[$role]))
+            return perm_upgrade_verbs(merge_new_module_defaults(array_values($ov[$role]), $role));
     }
     return role_defaults($role)['perms'];
 }
@@ -827,6 +907,13 @@ function role_grant_perm($role, $perm) {
 function role_defaults($role) {
     $d = role_defaults_base($role);
     $d['perms'] = array_values(array_unique(array_merge($d['perms'], module_defaults($role))));
+    //  R-20 — the single place where the role's fine-grained rights and its
+    //  module verbs are both in hand, so it is the only place the right-level
+    //  carry-over can be worked out: a Branch Application Manager holds
+    //  ops.call.delete from its own definition, and that is what entitles it to
+    //  Delete on Calls. module_defaults() cannot see fine rights, so doing it
+    //  there would have missed exactly these people.
+    $d['perms'] = perm_upgrade_verbs($d['perms']);
     return $d;
 }
 
@@ -844,7 +931,11 @@ function user_effective_perms($u) {
         $hasMod = false; foreach ($perms as $p) if (strncmp($p, 'mod.', 4) === 0) { $hasMod = true; break; }
         if (!$hasMod) $perms = array_merge($perms, module_defaults($role));   // pre-module logins keep module access
         else $perms = merge_new_module_defaults($perms, $role);               // grant brand-new modules
-        return array_values(array_unique($perms));
+        //  R-20 — a per-user set stored before the verb split says "mod.X.edit",
+        //  which meant add AND edit, and on four modules carried a destructive
+        //  act as well. Upgrading it here is what keeps that person able to do
+        //  on Monday exactly what they did on Friday.
+        return perm_upgrade_verbs(array_values(array_unique($perms)));
     }
     return role_perms($role);
 }

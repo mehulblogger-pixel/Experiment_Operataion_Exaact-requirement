@@ -58,6 +58,23 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 >    Delete are always generic. Binding Add was tried and reverted: it auto-granted
 >    `crm.contract.register` to sales roles the matrix withholds it from.
 >
+> **What is enforced, and what is not yet.** The module gate
+> (`ops_module_gate()`, `lib/ops.php`) now asks the route's verb on top of module
+> access, for nine routes whose present authority a per-module verb can express
+> exactly: `inquiry-delete`, `lead-delete`, `call-delete`, `document-delete`,
+> `endorsement-delete`, `expense-delete` (Delete) and `audit-close`,
+> `capa-close`, `job-close` (Archive). The verb is an **additional** lock — each
+> handler's own guard still runs behind it — so enforcement can only tighten and
+> never admits anybody the old code refused.
+>
+> Three destructive routes are deliberately **left to their handlers**:
+> `opportunity-delete` and `bill-delete` each share a module and a verb with a
+> route whose authority differs today (deleting a lead needs the edit tick;
+> deleting an expense admits Finance), and one right cannot mean two things;
+> `ncr-reopen`'s guard reaches across modules (`mod.capa.edit` also grants it),
+> which no per-module verb can express. Guessing at these is how a permission
+> change silently locks somebody out, so they are named rather than assumed.
+>
 > **No cell in the tables below changes.** Every role can do precisely what it
 > could do before: the old "add / edit" tick becomes Add **and** Edit, and on the
 > four modules where that tick already carried a destructive act — deleting a lead,
@@ -66,7 +83,17 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 > something they can do today. Administrators receive every verb, because deleting
 > was previously theirs by role. Asserted in both directions by
 > `tests/test_permission_verb_migration.php`; the destructive-action guards are
-> asserted by `tests/test_permission_write_guards.php`.
+> asserted by `tests/test_permission_write_guards.php`; the per-role before/after
+> equivalence of every enforced route by
+> `tests/test_permission_verb_enforcement.php`.
+>
+> A permission set saved under the old two-verb model is upgraded **as it is
+> read** (`perm_upgrade_verbs()`), not rewritten in the database — so the change
+> needs no downtime, is idempotent, and cannot half-apply. Three carry-over
+> mechanisms feed it, each mirroring a guard in the code: the edit tick's own
+> reach, a job title's reach (`is_admin_level()` is seven roles wide, not two),
+> and a named right's reach (`ops.job.close`, `idems.finalize`,
+> `finance.reconcile`, `ops.call.delete`, `capa.close`).
 
 ## Operational & admin modules
 

@@ -70,27 +70,51 @@ foreach (['MASTER_ADMIN','ADMIN'] as $r) {
 t_eq($adminGaps, [], '*** administrators hold every verb on every module'
      . ($adminGaps ? ' — MISSING: ' . implode(', ', array_slice($adminGaps, 0, 8)) : ''));
 
-t_section('Nothing was handed out: no ordinary role gained Delete or Archive');
+t_section('Nothing was handed out: every destructive verb traces to a power held today');
 
-// The other half of the promise. A role that could not even edit a module must
-// not come out of this able to destroy records in it.
-$gained = [];
-$legacy = perm_legacy_edit_also_granted();
+// The other half of the promise, and the strict version of it. A destructive
+// verb may appear on a role ONLY if one of the three documented carry-over
+// mechanisms justifies it. Anything else is a silent grant of new power.
+//
+//   1. the module's edit tick already carried the act   perm_legacy_edit_also_granted()
+//   2. a job title already carried it                   perm_legacy_role_grants()
+//   3. a named right the role holds already carried it  perm_legacy_right_grants()
+//
+// Each mechanism is traced to the guard it mirrors in lib/access.php, so a new
+// grant that no guard justifies fails here rather than being discovered later.
+$unjustified = [];
+$legacyEdit  = perm_legacy_edit_also_granted();
+$roleGrants  = perm_legacy_role_grants();
+$rightGrants = perm_legacy_right_grants();
 foreach ($ROLES as $r) {
-    if (in_array($r, ['MASTER_ADMIN','ADMIN'], true)) continue;   // covered above
-    $perms = module_defaults($r);
+    if (in_array($r, ['MASTER_ADMIN','ADMIN'], true)) continue;   // hold everything, checked above
+    $perms   = role_defaults($r)['perms'];
+    $isMgmt  = in_array($r, MGMT_ROLES, true);
+    $isCoord = $isMgmt || in_array($r, ['ASST_MANAGER','COORDINATOR'], true);
     foreach ($MODULES as $m) {
-        $couldEdit = in_array("mod.$m.edit", $perms, true);
         foreach (['archive','delete'] as $v) {
             if (!in_array(perm_verb_key($m, $v), $perms, true)) continue;
-            // allowed only where the audit proved the edit tick already carried it
-            if ($couldEdit && in_array($v, $legacy[$m] ?? [], true)) continue;
-            $gained[] = "$r/$m/$v";
+            // (1) the edit tick already carried it
+            if (in_array("mod.$m.edit", $perms, true)
+                && in_array($v, $legacyEdit[$m] ?? [], true)) continue;
+            // (2) the role's job title already carried it
+            $who = $roleGrants[$m][$v] ?? null;
+            if ($who === 'MGMT'  && $isMgmt)  continue;
+            if ($who === 'COORD' && $isCoord) continue;
+            // (3) a named right the role holds already carried it
+            $byRight = false;
+            foreach ($rightGrants as $right => $byMod) {
+                if (!in_array($right, $perms, true)) continue;
+                if (in_array($v, $byMod[$m] ?? [], true)) { $byRight = true; break; }
+            }
+            if ($byRight) continue;
+            $unjustified[] = "$r/$m/$v";
         }
     }
 }
-t_eq($gained, [], '*** no ordinary role silently gained a destructive verb'
-     . ($gained ? ' — GAINED: ' . implode(', ', array_slice($gained, 0, 8)) : ''));
+t_eq($unjustified, [],
+     '*** every destructive verb traces to a power the role already held'
+     . ($unjustified ? ' — UNJUSTIFIED: ' . implode(', ', array_slice($unjustified, 0, 8)) : ''));
 
 t_section('Nothing was handed out: the module grid never grants a fine-grained right');
 
