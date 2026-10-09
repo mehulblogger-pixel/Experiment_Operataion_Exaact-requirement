@@ -207,3 +207,47 @@ t_eq(PERM_VERB_IMPLIES['archive'], ['view','edit'], '*** Archive implies Edit an
 t_eq(PERM_VERB_IMPLIES['add'],     ['view'],        '*** Add implies View');
 t_eq(PERM_VERB_IMPLIES['approve'], ['view'],        '*** Approve implies View');
 t_eq(PERM_VERB_IMPLIES['view'],    [],              '*** View implies nothing — it is the floor');
+
+t_section('The migration runs ONCE, not on every read');
+
+//  THIS TEST EXISTS BECAUSE THE FEATURE WAS BROKEN WITHOUT IT, AND ONLY A REAL
+//  BROWSER ROUND-TRIP FOUND IT.
+//
+//  perm_upgrade_verbs() is a one-time migration that happens to run at read
+//  time. With no way to tell "saved before the verbs existed" from "the owner
+//  deliberately withheld this", it re-applied the carry-over on every read: the
+//  owner unticked Delete on Jobs, saved, reloaded — and Delete was ticked again.
+//  Every function behaved exactly as written, which is why no unit test caught
+//  it; the bug lived in the gap between them.
+//
+//  The whole point of R-20 is the sentence "may edit a job but never delete
+//  one". If a withheld verb comes back, nothing else in this change matters.
+
+// An OLD set — saved before the verb split, so it has no stamp and must be upgraded.
+$old = ['mod.jobs.view', 'mod.jobs.edit'];
+$up  = perm_upgrade_verbs($old);
+t_ok(in_array('mod.jobs.add', $up, true),
+     '*** a set saved before the split still gains Add from its edit tick');
+t_ok(in_array('mod.jobs.delete', $up, true),
+     '*** and still gains the destructive verb that edit tick carried');
+
+// A NEW set — the owner ticked Edit and deliberately left Delete clear.
+$deliberate = perm_close_implications(['mod.jobs.edit', 'mod.jobs.add']);
+t_ok(in_array(PERM_VOCAB_TAG, $deliberate, true),
+     '*** every saved set is stamped with the vocabulary it was written in');
+$read = perm_upgrade_verbs($deliberate);
+t_ok(!in_array('mod.jobs.delete', $read, true),
+     '*** "may edit a job but never delete one" SURVIVES being read back');
+t_eq($read, $deliberate,
+     '*** a set saved in the new vocabulary is returned exactly as it was stored');
+
+// Reading twice must not drift either — this runs on every page load.
+t_eq(perm_upgrade_verbs($read), $read, '*** reading a stamped set twice changes nothing');
+
+t_section('Closing implications still does its job, stamp aside');
+
+$closed = perm_close_implications(['mod.jobs.delete']);
+foreach (['mod.jobs.view', 'mod.jobs.edit', 'mod.jobs.delete'] as $k)
+    t_ok(in_array($k, $closed, true), "*** ticking Delete stores $k too");
+t_ok(!in_array('mod.jobs.add', $closed, true),
+     '*** but Delete does not quietly grant Add — it implies only what it must');

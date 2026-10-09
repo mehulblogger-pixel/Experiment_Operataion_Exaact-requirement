@@ -462,15 +462,52 @@
         </div>
         <?php
     };
+    //  R-20 — module access is now six verbs, not two, so rendering it as a flat
+    //  list of tickboxes would have turned this screen into a wall of ~190 of
+    //  them. It is drawn as the same grid the role editor uses (one shared
+    //  partial, because R-14 was two permission screens drifting apart), and only
+    //  the fine-grained business rights stay as a list.
+    //
+    //  A key used by the grid must NOT also appear in the list below it: the
+    //  seven sign-off rights ARE the Approve column, and showing each twice
+    //  would let one copy look ticked while the other looked clear.
+    $pvHas   = fn($k) => in_array($k, $curPerms, true);
+    $pvAllow = fn($k) => isset($allowPerms[$k]);
+    $pvField = fn($k) => 'name="permissions[]" value="' . e($k) . '"';
     foreach ($navGroups as $gname => $keys):
-        $inThis = array_values(array_filter($keys, fn($k) => isset($allowPerms[$k])));
-        if (!$inThis) continue;
-        $pairs = [];
-        foreach ($inThis as $k) { $pairs[$k] = $allowPerms[$k]; $shown[$k] = true; }
-        $renderGroup($gname, $pairs);
+        // the modules this heading owns, and every key the grid will draw for them
+        $pvModules = [];
+        foreach (array_keys(ACCESS_MODULES) as $m)
+            if (in_array("mod.$m.view", $keys, true)) $pvModules[] = $m;
+        $gridKeys = [];
+        foreach ($pvModules as $m)
+            foreach (access_module_verbs($m) as $v) $gridKeys[perm_verb_key($m, $v)] = true;
+
+        $inThis = array_values(array_filter($keys,
+            fn($k) => isset($allowPerms[$k]) && !isset($gridKeys[$k])));
+        if (!$pvModules && !$inThis) continue;
+
+        if ($pvModules) {
+            // Only draw the grid if this manager may grant at least one cell in
+            // it — a grid of nothing but padlocks tells somebody they are
+            // blocked from something they were never offered.
+            $anyGrantable = false;
+            foreach (array_keys($gridKeys) as $k) if (isset($allowPerms[$k])) { $anyGrantable = true; break; }
+            if ($anyGrantable) {
+                $pvGroup = $gname;
+                include __DIR__ . '/_perm_verb_grid.php';
+                foreach (array_keys($gridKeys) as $k) $shown[$k] = true;
+            }
+        }
+        if ($inThis) {
+            $pairs = [];
+            foreach ($inThis as $k) { $pairs[$k] = $allowPerms[$k]; $shown[$k] = true; }
+            $renderGroup($pvModules ? $gname . ' — what they can do' : $gname, $pairs);
+        }
     endforeach;
     $orphans = array_diff_key($allowPerms, $shown);
     if ($orphans) $renderGroup('Other', $orphans);
+    include __DIR__ . '/_perm_verb_grid_assets.php';
   ?>
   <script>(function(){
     // The ⓘ explains each permission. A title tooltip only shows on hover, so on a

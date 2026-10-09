@@ -371,7 +371,11 @@ const ACCESS_MODULES = [
     'impartiality'  => 'Impartiality & conflicts',
     'identity'      => 'Identity documents (site access)',
     'complaints'    => 'Complaints & appeals',
-    'leads'         => 'Leads &amp; pipeline',
+    //  A plain ampersand. It was stored pre-escaped, and every view escapes
+    //  again on the way out, so the Roles & access grid printed
+    //  "Leads &amp; pipeline" at the owner. Escaping belongs at render time,
+    //  never in the data — the other thirty labels already get this right.
+    'leads'         => 'Leads & pipeline',
     'ncr'           => 'Nonconformities',
     'confidentiality' => 'Confidentiality (§4.2)',
     'capa'          => 'Corrective actions',
@@ -672,12 +676,32 @@ function perm_legacy_right_grants() {
     ];
 }
 
+//  THE STAMP THAT STOPS THE MIGRATION RUNNING FOREVER.
+//
+//  perm_upgrade_verbs() is a ONE-TIME migration that happens to run at read
+//  time. Without a way to tell "saved before the verbs existed" from "the owner
+//  deliberately withheld this", it re-applied the carry-over on every single
+//  read — so unticking Delete on Jobs appeared to save, and came back ticked.
+//  That is not a cosmetic bug: it made the entire point of R-20 impossible.
+//  A browser round-trip caught it; no unit test would have, because each
+//  function was behaving exactly as written.
+//
+//  Every set written by the new editor carries this marker (added by
+//  perm_close_implications, which every save path runs through). A set without
+//  it predates the verb split and is upgraded as it is read. It is a value in
+//  the list rather than a column because both stores are untyped lists — a JSON
+//  array of strings, and a comma-separated string — and neither has anywhere
+//  else to put it. can() never asks for it, and the editors never render it.
+const PERM_VOCAB_TAG = '@verbs2';
+
 //  Upgrade a SAVED permission set to the six-verb vocabulary.
 //
 //  Deliberately a read-time interpretation, not a database rewrite: it never
-//  touches stored data, so it is idempotent, needs no downtime, and cannot
-//  half-apply. A set saved before the verb split is simply read correctly.
+//  touches stored data, so it needs no downtime and cannot half-apply. A set
+//  saved before the verb split is simply read correctly; one saved after it is
+//  returned untouched, because every tick in it was somebody's decision.
 function perm_upgrade_verbs(array $perms) {
+    if (in_array(PERM_VOCAB_TAG, $perms, true)) return $perms;   // already in the new vocabulary
     $add = [];
     // The old tick was labelled "add / edit" and genuinely allowed both.
     $legacyEdit = perm_legacy_edit_also_granted();
@@ -693,6 +717,25 @@ function perm_upgrade_verbs(array $perms) {
             foreach ($verbs as $v) $add[] = perm_verb_key($mod, $v);
     }
     return array_values(array_unique(array_merge($perms, $add)));
+}
+
+//  Close a ticked set under PERM_VERB_IMPLIES, so what gets SAVED is already
+//  consistent. Ticking Delete on Jobs saves Edit and View as well — "may delete
+//  but may not see" is not a state any screen should have to render, and a
+//  person who finds that in their access would reasonably think the software is
+//  broken. The grid also does this live in the browser, so the ticks the
+//  administrator sees match the ticks that are stored.
+function perm_close_implications(array $perms) {
+    $out = $perms;
+    foreach ($perms as $p) {
+        if (!preg_match('/^mod\.(\w+)\.(\w+)$/', $p, $m)) continue;
+        foreach (PERM_VERB_IMPLIES[$m[2]] ?? [] as $weaker) $out[] = perm_verb_key($m[1], $weaker);
+    }
+    //  Stamp it. Every save path runs through here, so this is the one place
+    //  that can promise a stored set is in the new vocabulary — and therefore
+    //  that its gaps are deliberate and must never be filled in again.
+    $out[] = PERM_VOCAB_TAG;
+    return array_values(array_unique($out));
 }
 
 function perm_verb_label($verb) {

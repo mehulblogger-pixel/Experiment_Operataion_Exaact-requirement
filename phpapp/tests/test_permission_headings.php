@@ -49,3 +49,30 @@ $orphans = array_values(array_filter(array_keys(PERMISSIONS), fn($k) => !isset($
 sort($orphans);
 echo '  ungrouped today (' . count($orphans) . '): ' . (implode(', ', $orphans) ?: 'none') . "\n";
 t_ok(count($orphans) <= 12, 'the ungrouped set has not grown unnoticed (' . count($orphans) . ')');
+
+t_section('Both permission screens draw the grid from ONE partial');
+
+// R-14 happened because two permission screens drifted apart until recruitment
+// had one name on one and another on the other, and the owner read them side by
+// side and concluded the system held two different objects. The six-verb grid is
+// a single partial for exactly that reason. If a future change inlines a copy
+// into either screen, the drift can start again — so this asserts both screens
+// include the shared file and neither carries its own table.
+$role = file_get_contents(__DIR__ . '/../views/ops/access.php');
+$user = file_get_contents(__DIR__ . '/../views/ops/user_form.php');
+
+t_ok(strpos($role, "_perm_verb_grid.php") !== false,
+     '*** the role editor includes the shared verb grid');
+t_ok(strpos($user, "_perm_verb_grid.php") !== false,
+     '*** the per-user editor includes the shared verb grid');
+foreach (['access.php' => $role, 'user_form.php' => $user] as $name => $src)
+    t_ok(strpos($src, '<table class="dt vgrid">') === false,
+         "*** $name has no inlined copy of the grid table");
+
+// The partial must cover every verb the vocabulary defines, or a right would
+// exist that no screen can grant — invisible, and impossible to diagnose.
+$partial = file_get_contents(__DIR__ . '/../views/ops/_perm_verb_grid.php');
+t_ok(strpos($partial, 'foreach (PERM_VERBS as $v)') !== false,
+     '*** the grid draws a column for every verb in the vocabulary, not a fixed list');
+t_ok(strpos($partial, 'perm_verb_key($k, $v)') !== false,
+     '*** each cell posts the right perm_verb_key() resolves, never a hand-built string');

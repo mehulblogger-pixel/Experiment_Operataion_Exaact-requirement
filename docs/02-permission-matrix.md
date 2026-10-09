@@ -75,6 +75,33 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 > which no per-module verb can express. Guessing at these is how a permission
 > change silently locks somebody out, so they are named rather than assumed.
 >
+> **The migration runs once, not on every read — and why that matters.** Every
+> saved permission set carries a vocabulary stamp (`PERM_VOCAB_TAG`, added by
+> `perm_close_implications()`, which every save path runs through). A set without
+> the stamp predates the verb split and is upgraded as it is read; a set with it
+> is returned exactly as stored.
+>
+> Without the stamp the upgrade re-applied its carry-over on *every* read, so a
+> withheld verb came straight back: the owner unticked Delete on Jobs, saved,
+> reloaded, and Delete was ticked again. Every function behaved exactly as
+> written — the fault lived in the gap between them, and only a real
+> save-and-reload in a browser exposed it. Since "may edit a job but never delete
+> one" is the whole point of R-20, nothing else in this change matters if that
+> regresses. It is pinned in `tests/test_permission_verb_migration.php` under
+> "The migration runs ONCE, not on every read".
+>
+> **Where the owner sets this.** Settings → Roles & access (per role) and
+> Users → Edit → Permissions (per person). Both screens draw the grid from ONE
+> partial, `views/ops/_perm_verb_grid.php` — R-14 was caused by two permission
+> screens drifting apart, so a single implementation is the fix that holds.
+> Column headings grant one verb everywhere, row headings grant full control of
+> a module, and ticking a stronger verb fills in the weaker ones it must include
+> (a saved set is closed under `PERM_VERB_IMPLIES` by `perm_close_implications()`,
+> so it can never say "may delete but may not see"). On a phone the grid becomes
+> large labelled switches per module rather than a squeezed table: this is a
+> desk-first screen, and CLAUDE.md forbids averaging desk and phone into one
+> middle.
+>
 > **No cell in the tables below changes.** Every role can do precisely what it
 > could do before: the old "add / edit" tick becomes Add **and** Edit, and on the
 > four modules where that tick already carried a destructive act — deleting a lead,

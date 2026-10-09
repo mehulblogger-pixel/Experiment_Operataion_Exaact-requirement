@@ -3466,6 +3466,12 @@ function ops_access($method) {
         $before = role_perms($sel);   // Module 02 — the role's resolved default, to diff for the audit
         // Records a role-default change on the sealed audit chain (Module 02).
         $logRoleAccess = function ($after) use ($sel, $before) {
+            //  The vocabulary stamp is bookkeeping, not a permission. Leaving it
+            //  in would record "granted @verbs2" on the sealed audit chain the
+            //  first time any role is saved — a line nobody could interpret.
+            $strip   = fn($a) => array_values(array_diff($a, [PERM_VOCAB_TAG]));
+            $after   = $strip($after);
+            $before  = $strip($before);
             $granted = array_values(array_diff($after, $before));
             $revoked = array_values(array_diff($before, $after));
             if (($granted || $revoked) && function_exists('idems_log'))
@@ -3491,9 +3497,10 @@ function ops_access($method) {
         }
         $valid = array_keys(all_permissions());
         $checked = array_values(array_intersect(array_keys($_POST['perms'] ?? []), $valid));
-        // edit implies view for every module
-        foreach ($checked as $p) if (preg_match('/^mod\.(\w+)\.edit$/', $p, $mm)) $checked[] = "mod.{$mm[1]}.view";
-        $checked = array_values(array_unique($checked));
+        //  R-20 — close the set under the verb implications, not just edit→view.
+        //  Ticking Delete also stores Edit and View, so a saved set can never say
+        //  "may delete but may not see", which no screen should have to render.
+        $checked = perm_close_implications($checked);
         $store[$sel] = $checked;
         setting_set('role_access', json_encode($store));
         $logRoleAccess($checked);
@@ -9870,7 +9877,13 @@ function ops_users($route, $method) {
                 $preserved = array_diff($existing, $assignable);
                 $chosen    = array_merge($chosen, $preserved);
             }
-            $perms = implode(',', array_values(array_unique($chosen)));
+            //  R-20 — close the ticked set under the verb implications before it is
+            //  stored, exactly as the role editor does. Ticking Delete stores Edit
+            //  and View too: "may delete but may not see" is not a state any
+            //  screen should have to render, and a person who found that in their
+            //  own access would reasonably think the software was broken.
+            $chosen = perm_close_implications(array_values(array_unique($chosen)));
+            $perms = implode(',', $chosen);
             // "Reset access to the role default" — clears the per-user override so the
             // login tracks its ROLE's full default access (and any modules added
             // later) instead of a frozen ticked set. This is the recovery when an

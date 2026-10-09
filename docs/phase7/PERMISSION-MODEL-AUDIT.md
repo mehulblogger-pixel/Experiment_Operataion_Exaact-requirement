@@ -385,6 +385,24 @@ decision on three points:
 
 ---
 
+## 4a. What was built, and the one bug worth remembering
+
+Steps 2–4 shipped on `claude/testing-branch-setup-0gqe8n`: the six-verb
+vocabulary, enforcement at the single module gate for nine routes, and one
+shared grid partial driving both permission screens.
+
+One defect is worth recording because of how it hid. The read-time migration
+that keeps everybody's access intact had no way to tell *"saved before the verbs
+existed"* from *"the owner deliberately withheld this"*, so it re-applied its
+carry-over on every read. Unticking Delete on Jobs saved correctly — and came
+back ticked on reload. Every function behaved exactly as written; the fault was
+in the gap between them, and no unit test would have found it. A real
+save-and-reload in a browser did. The fix is a vocabulary stamp on every saved
+set, and the behaviour is now pinned by a test.
+
+It is a good argument for the rule that a feature is not finished until it has
+been used the way the owner will use it, rather than only tested in pieces.
+
 ## 5. How to reproduce every number here
 
 ```
