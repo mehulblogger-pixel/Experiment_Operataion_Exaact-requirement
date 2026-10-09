@@ -142,9 +142,16 @@ t_section('The two-verb vocabulary is still what the audit measured');
 // yields exactly two rights and the edit tick is labelled "add / edit". When the
 // six-verb model lands, THIS is the assertion that must be updated deliberately,
 // in the same commit — which is the point of pinning it.
+// UPDATED when the six-verb model landed, which is what pinning it was for.
+// The merged "add / edit" tick is gone: a module now yields its own verbs, and
+// Add and Edit are separate rights.
 $acc = file_get_contents(__DIR__ . '/../lib/access.php');
-t_ok(strpos($acc, '"$l — add / edit"') !== false,
-     '*** the edit right still openly covers add as well (R-20, awaiting owner decision)');
+t_ok(strpos($acc, '"$l — add / edit"') === false,
+     '*** the merged "add / edit" tick is gone');
+t_eq(PERM_VERBS, ['view','add','edit','archive','delete','approve'],
+     '*** a module now yields six verbs, not two');
+t_ok(perm_verb_key('leads', 'delete') === 'mod.leads.delete',
+     '*** Delete is a right of its own that can be withheld from an editor');
 
 t_section('Where the Edit tick also grants a destructive action (migration-critical)');
 

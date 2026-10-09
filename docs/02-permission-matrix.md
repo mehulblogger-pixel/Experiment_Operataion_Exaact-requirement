@@ -1,8 +1,10 @@
 # 02 — Permission Matrix
 
 Who can do what to each object, traced to real `can()` checks and route guards.
-Verbs: **View**, **Create**, **Edit**, **Delete**, **Approve**, **Close**, **Issue**,
-**Reopen**, **Export**, **—** (none). **⚠ implicit** = allowed only because no check
+Grantable verbs (`PERM_VERBS`, `lib/access.php`): **View**, **Add**, **Edit**,
+**Archive**, **Delete**, **Approve** — see the R-20 note below. The cells in the
+tables also use the older shorthand for acts that have their own named right:
+**Create**, **Close**, **Issue**, **Reopen**, **Export**, **—** (none). **⚠ implicit** = allowed only because no check
 blocks it (see `99-gaps-and-risks.md`). Paths relative to `phpapp/`.
 
 > **Company Business Capabilities are NOT permissions.** `lib/connect_capability.php`
@@ -29,6 +31,42 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 > were removed from `role_defaults_base()`. Finance holds no operational write right —
 > asserted in `tests/test_role_scope_matrix.php`. Office scope stays **ALL**: finance
 > reconciles across offices, which is a decision, not an oversight.
+
+> **R-20 (decided by the owner, 2026-10-09) — the six-verb model.** Until now a
+> module produced exactly two rights: `mod.<key>.view`, and one tick the code
+> itself labelled *"add / edit"*. The owner could not say *"may edit a job but
+> never delete one"*, because deleting was a consequence of being an
+> administrator rather than a right that could be handed out. Measured in
+> `docs/phase7/PERMISSION-MODEL-AUDIT.md`: of the six verbs asked for, only view
+> (31/31) and edit (31/31) were separately grantable — add 3/31, delete 1/31,
+> deactivate 3/31, activate 0/31.
+>
+> **The vocabulary is now six verbs:** View, Add, Edit, Archive, Delete, Approve
+> (`PERM_VERBS` in `lib/access.php`). Three decisions shape it:
+>
+> 1. **Archive is one right, not Deactivate plus Activate.** Whoever may take a
+>    record out of use may put it back. Splitting them lets somebody break
+>    something and then need an administrator to undo their own slip.
+> 2. **Remove and Delete are one act,** except for users — where the app already
+>    distinguishes Deactivate, Remove sign-in and (deliberately) no Delete, because
+>    an inspection body must keep the record of who did the inspection.
+> 3. **Only Approve binds to an existing right.** The seven genuine sign-off
+>    rights (`crm.quote.approve`, `idems.finalize`, `complaints.decide`,
+>    `hiring.review.clear`, `workforce.report.approve`, `capa.close`, `ncr.close`)
+>    *are* the Approve column — no duplicate is created, and the ISO 17020
+>    separation of preparing from approving is preserved. Add, Edit, Archive and
+>    Delete are always generic. Binding Add was tried and reverted: it auto-granted
+>    `crm.contract.register` to sales roles the matrix withholds it from.
+>
+> **No cell in the tables below changes.** Every role can do precisely what it
+> could do before: the old "add / edit" tick becomes Add **and** Edit, and on the
+> four modules where that tick already carried a destructive act — deleting a lead,
+> re-opening a closed nonconformity, closing an internal audit, deleting a bill on
+> a job — the stronger verb is granted too, or those people would have lost
+> something they can do today. Administrators receive every verb, because deleting
+> was previously theirs by role. Asserted in both directions by
+> `tests/test_permission_verb_migration.php`; the destructive-action guards are
+> asserted by `tests/test_permission_write_guards.php`.
 
 ## Operational & admin modules
 

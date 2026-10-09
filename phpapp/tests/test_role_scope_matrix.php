@@ -27,7 +27,18 @@ t_section('Inspector holds no dashboard or money right');
 $insp = role_defaults('INSPECTOR')['perms'];
 foreach (['dash.operations','dash.financial','data.salary','data.revenue','finance.reconcile'] as $p)
     t_ok(!in_array($p, $insp, true), "*** INSPECTOR must not hold $p");
-t_eq($insp, ['mod.idems.view','mod.idems.edit'], '*** INSPECTOR holds reports and nothing else');
+// R-20 — the old single "add / edit" tick became two verbs. An inspector who
+// could add and change a report before must be able to add and change one now,
+// so Add appears here. The set is still reports and nothing else, and the
+// inspector gains NO Archive, Delete or Approve: those are new rights that have
+// to be granted deliberately.
+t_eq($insp, ['mod.idems.view','mod.idems.add','mod.idems.edit'],
+     '*** INSPECTOR holds reports and nothing else');
+foreach (['archive','delete'] as $v)
+    t_ok(!in_array("mod.idems.$v", $insp, true),
+         "*** INSPECTOR gained no mod.idems.$v from the verb split");
+t_ok(!in_array('idems.finalize', $insp, true),
+     '*** INSPECTOR still cannot sign off their own report (ISO 17020 separation)');
 
 t_section('Finance holds the money rights the matrix grants');
 $fin = role_defaults('FINANCE')['perms'];

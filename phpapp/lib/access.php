@@ -322,8 +322,21 @@ function permission_nav_groups() {
     ];
     $groups = [];
     foreach ($fine as $g => $keys) $groups[$g] = $keys;
+    //  R-20 — expand EVERY verb the module has, not just view and edit. The
+    //  verb split created mod.<key>.add / .archive / .delete, and a permission
+    //  that no heading claims is rendered under "Other". That is precisely the
+    //  R-14 bug the owner caught in a screenshot, and it would have come
+    //  straight back for 90-odd new permissions. perm_verb_key() is used rather
+    //  than building the string, so a verb bound to an existing right (Approve,
+    //  and a few Add / Delete rights) lands under its own heading instead of
+    //  appearing twice under two different ones.
     foreach ($mods as $g => $keys) {
-        foreach ($keys as $k) { $groups[$g][] = "mod.$k.view"; $groups[$g][] = "mod.$k.edit"; }
+        foreach ($keys as $k) {
+            foreach (access_module_verbs($k) as $v) {
+                $key = perm_verb_key($k, $v);
+                if (!in_array($key, $groups[$g], true)) $groups[$g][] = $key;
+            }
+        }
     }
     return $groups;
 }
@@ -461,7 +474,8 @@ function perm_help($key) {
     }
     if (isset($h[$key])) return $h[$key];
     // Per-module view / edit permissions: generic, with a note for the sensitive ones.
-    if (strncmp($key, 'mod.', 4) === 0 && preg_match('/^mod\.(.+)\.(view|edit)$/', $key, $mm)) {
+    if (strncmp($key, 'mod.', 4) === 0
+        && preg_match('/^mod\.(.+)\.(view|add|edit|archive|delete|approve)$/', $key, $mm)) {
         $lbl = access_module_label($mm[1]);
         $extra = [
             'users'         => ' Controls login accounts and their access — administrators only.',
@@ -471,21 +485,187 @@ function perm_help($key) {
             'identity'      => ' Personal identity documents — grant deliberately.',
             'overheads'     => ' Office finance figures — finance / managers.',
         ][$mm[1]] ?? '';
-        return $mm[2] === 'edit'
-            ? 'Add and change records in "' . $lbl . '" (also lets them view it).' . $extra
-            : 'See the "' . $lbl . '" screens, read-only.' . $extra;
+        // One sentence per verb, written for somebody who has never seen a
+        // permission matrix. Each says what the person can DO, not what the
+        // right is called, and names what it also carries with it.
+        $say = [
+            'view'    => 'See the "' . $lbl . '" screens, read-only.',
+            'add'     => 'Create new records in "' . $lbl . '" (also lets them view it).',
+            'edit'    => 'Change existing records in "' . $lbl . '" (also lets them view it).',
+            'archive' => 'Take a record in "' . $lbl . '" out of use, and put it back '
+                       . '(also lets them view and change it).',
+            'delete'  => 'Permanently destroy a record in "' . $lbl . '". Grant sparingly — '
+                       . 'prefer Archive, which is reversible.',
+            'approve' => 'Sign off work in "' . $lbl . '". Kept separate from editing so the '
+                       . 'person who prepares something is not the person who approves it.',
+        ][$mm[2]] ?? ('Act on "' . $lbl . '".');
+        return $say . $extra;
     }
     return PERMISSIONS[$key] ?? $key;
 }
 
-// Full permission map = fine-grained perms + per-module view/edit perms.
+// ============================================================================
+//  THE VERB VOCABULARY                                                  (R-20)
+// ============================================================================
+//  Before this, a module produced exactly two rights: view, and one tick
+//  labelled "add / edit". The owner could not say "may edit a job but never
+//  delete one", because deleting was a consequence of being an administrator
+//  rather than a right that could be handed out. The audit measured it:
+//  docs/phase7/PERMISSION-MODEL-AUDIT.md.
+//
+//  Six verbs now, as decided by the owner. Two rules stop this from doubling
+//  the permission count for nothing:
+//
+//   1. ARCHIVE IS ONE RIGHT, not Deactivate plus Activate. Whoever may take a
+//      record out of use may put it back. Splitting them lets a person break
+//      something and then need an administrator to undo their own slip — every
+//      mistake becomes somebody else's job.
+//
+//   2. WHERE A WELL-NAMED RIGHT ALREADY GOVERNS THE ACT, THE VERB BINDS TO IT
+//      instead of creating a duplicate. This application already had seven
+//      proper sign-off rights and a handful of proper create / delete rights —
+//      the one part of the old model that was right. A second permission
+//      guarding the same button is a bug, not a feature: one of the two
+//      inevitably gets forgotten at a call site, and then the same button is
+//      protected on some screens and open on others.
+// ----------------------------------------------------------------------------
+const PERM_VERBS = ['view', 'add', 'edit', 'archive', 'delete', 'approve'];
+
+//  Holding a verb necessarily grants the weaker ones. Enforced in two places on
+//  purpose: the grid ticks the implied cells when you tick a strong one (so what
+//  is SAVED is already closed under this), and can() falls back to it (so a set
+//  saved by an older build, or by hand, still behaves). Belt and braces, because
+//  "may delete but may not see" is not a state any screen should have to handle.
+const PERM_VERB_IMPLIES = [
+    'view'    => [],
+    'add'     => ['view'],
+    'edit'    => ['view'],
+    'archive' => ['view', 'edit'],
+    'delete'  => ['view', 'edit'],
+    'approve' => ['view'],
+];
+
+//  module => verb => the right that ALREADY governs it. Anything not listed
+//  here uses the generic mod.<module>.<verb>. A verb absent from both means the
+//  module has no such act — Approve, mostly: an office or a holiday list is not
+//  signed off by anybody, and showing an Approve tick for one would be a lie.
+function perm_verb_bindings() {
+    static $b = null;
+    if ($b !== null) return $b;
+    return $b = [
+        //  ONLY APPROVE IS BOUND. Add, Edit, Archive and Delete are always the
+        //  generic mod.<module>.<verb>, and the reason is a regression this very
+        //  map caused once: binding Add on orders to crm.contract.register meant
+        //  every role holding the edit tick on orders was auto-granted the right
+        //  to register a contract — a right the permission matrix deliberately
+        //  withholds from a sales manager, who owns the deal only until the quote
+        //  is won. The suite caught it (test_sales_handoff).
+        //
+        //  The lesson generalises: crm.quote.create, ops.call.create,
+        //  crm.contract.register and ops.call.delete are not "the Add verb" or
+        //  "the Delete verb" wearing a different name — they are narrower
+        //  business rights that happen to sit on a creating or deleting screen.
+        //  They stay exactly as they are, asked by their handlers, on top of the
+        //  coarse verb the gate asks. Coarse gate plus fine check is how this
+        //  application already works.
+        //
+        //  Approve is different and is bound: a sign-off right is the whole of
+        //  what the Approve column means, there is exactly one per module, and
+        //  no role default hands it out — so binding it creates no duplicate and
+        //  grants nobody anything. It also keeps the ISO 17020 separation of
+        //  preparing from approving in the one place it is already correct.
+        'quotes'      => ['approve' => 'crm.quote.approve'],
+        'idems'       => ['approve' => 'idems.finalize'],
+        'complaints'  => ['approve' => 'complaints.decide'],
+        'hiring'      => ['approve' => 'hiring.review.clear'],
+        'reconcile'   => ['approve' => 'workforce.report.approve'],
+        // Closing a corrective action or a nonconformity asserts it actually
+        // worked, so close is this module's Approve and stays the dedicated
+        // right it already was. Note it is NOT also this module's Archive:
+        // today RE-OPENING a closed nonconformity needs only the edit tick, so
+        // treating Archive as ncr.close would make re-opening harder than it is
+        // now and take it away from people who can do it. Archive is generic,
+        // and perm_legacy_edit_also_granted() hands it to everyone whose edit
+        // tick already carried it.
+        'capa'        => ['approve' => 'capa.close'],
+        'ncr'         => ['approve' => 'ncr.close'],
+    ];
+}
+
+//  The permission key that grants <verb> on <module> — the bound right if there
+//  is one, otherwise the generic one. Every caller must go through this; writing
+//  "mod.$k.delete" by hand is how the duplicate-right bug gets reintroduced.
+function perm_verb_key($module, $verb) {
+    $bound = perm_verb_bindings()[$module][$verb] ?? null;
+    return $bound ?: "mod.$module.$verb";
+}
+
+//  Which verbs this module actually has. Approve exists only where a real
+//  sign-off right is bound; the other five exist everywhere.
+function access_module_verbs($module) {
+    $v = ['view', 'add', 'edit', 'archive', 'delete'];
+    if (isset(perm_verb_bindings()[$module]['approve'])) $v[] = 'approve';
+    return $v;
+}
+
+//  WHERE TODAY'S EDIT TICK ALREADY GRANTS A DESTRUCTIVE ACT.
+//
+//  The audit's most dangerous finding: in these four places the generic
+//  "add / edit" tick IS the delete-or-archive right. Read from the code, not
+//  from the labels (docs/phase7/PERMISSION-MODEL-AUDIT.md §1):
+//
+//    leads   edit -> deletes a lead           (lib/leads.php  leads_can_edit)
+//    ncr     edit -> re-opens a closed NCR    (lib/ncr.php    ncr_can_raise)
+//    audits  edit -> closes an internal audit (lib/audits.php aud_can_edit)
+//    jobs    edit -> deletes a bill on a job  (lib/bills.php  job_bill_can_upload)
+//
+//  So the obvious migration rule — "everyone keeps View + Add + Edit, nobody
+//  gets Delete until it is ticked" — would QUIETLY TAKE AWAY what these people
+//  can do today. Whoever holds the edit tick on these modules must receive the
+//  stronger verb too. This map is the whole reason the migration is safe, and
+//  it is asserted by tests/test_permission_verb_migration.php.
+function perm_legacy_edit_also_granted() {
+    return [
+        'leads'  => ['delete'],
+        'ncr'    => ['archive'],
+        'audits' => ['archive'],
+        'jobs'   => ['delete'],
+    ];
+}
+
+function perm_verb_label($verb) {
+    return [
+        'view'    => 'View',    'add'     => 'Add',    'edit'   => 'Edit',
+        'archive' => 'Archive', 'delete'  => 'Delete', 'approve'=> 'Approve',
+    ][$verb] ?? $verb;
+}
+
+//  What each verb means, in the words the grid shows on hover. Written for
+//  somebody who has never read a permission matrix.
+function perm_verb_help($verb) {
+    return [
+        'view'    => 'Can open and read it.',
+        'add'     => 'Can create a new one.',
+        'edit'    => 'Can change one that already exists.',
+        'archive' => 'Can take it out of use — and put it back.',
+        'delete'  => 'Can destroy it permanently. Grant sparingly.',
+        'approve' => 'Can sign it off. Deliberately separate from editing, so the '
+                   . 'person who prepares something is not the person who approves it.',
+    ][$verb] ?? '';
+}
+
+// Full permission map = fine-grained perms + every verb each module supports.
 function all_permissions() {
     $p = [];
     foreach (PERMISSIONS as $k => $lbl) $p[$k] = perm_label($k, $lbl);
     foreach (ACCESS_MODULES as $k => $lbl) {
         $l = access_module_label($k);
-        $p["mod.$k.view"] = "$l — view";
-        $p["mod.$k.edit"] = "$l — add / edit";
+        foreach (access_module_verbs($k) as $v) {
+            $key = perm_verb_key($k, $v);
+            // A bound right keeps the label it already had — it is the same
+            // permission, shown in a new column, not a new permission.
+            if (!isset($p[$key])) $p[$key] = "$l — " . strtolower(perm_verb_label($v));
+        }
     }
     return $p;
 }
@@ -549,7 +729,27 @@ function module_defaults($role) {
     }
     $out = [];
     foreach ($view as $k) $out[] = "mod.$k.view";
-    foreach ($edit as $k) { $out[] = "mod.$k.view"; $out[] = "mod.$k.edit"; }
+    //  R-20 — the old edit tick meant "add / edit", so a role that had it must
+    //  now receive BOTH Add and Edit, or every role quietly loses the ability to
+    //  create records. And on the four modules where the edit tick also carried
+    //  a destructive act, it must receive that verb too. Nobody's reach changes.
+    $legacy = perm_legacy_edit_also_granted();
+    //  Administrators hold EVERY verb. This is not generosity: before R-20,
+    //  deleting was guarded by is_admin_level() rather than by a tick, so an
+    //  administrator could already delete. If the new Delete right were withheld
+    //  from them, the migration would TAKE AWAY an ability they have today —
+    //  the exact failure the no-loss rule exists to prevent.
+    $isAdmin = in_array($role, ['MASTER_ADMIN', 'ADMIN'], true);
+    foreach ($edit as $k) {
+        $out[] = "mod.$k.view";
+        if ($isAdmin) {
+            foreach (access_module_verbs($k) as $v) $out[] = perm_verb_key($k, $v);
+            continue;
+        }
+        $out[] = perm_verb_key($k, 'add');
+        $out[] = perm_verb_key($k, 'edit');
+        foreach ($legacy[$k] ?? [] as $v) $out[] = perm_verb_key($k, $v);
+    }
     return array_values(array_unique($out));
 }
 
@@ -586,7 +786,9 @@ function modules_at_last_save() {
 function merge_new_module_defaults($perms, $role) {
     $known = modules_at_last_save();
     foreach (module_defaults($role) as $dp) {
-        if (!preg_match('/^mod\.(\w+)\.(view|edit)$/', $dp, $m)) continue;
+        // R-20 — must accept every verb, or a module added later would grant
+        // only view/edit and silently withhold Add, Archive and Delete.
+        if (!preg_match('/^mod\.(\w+)\.(view|add|edit|archive|delete|approve)$/', $dp, $m)) continue;
         $isNew = $known === null ? in_array($m[1], NEW_MODULES, true) : !in_array($m[1], $known, true);
         if ($isNew && !in_array($dp, $perms, true)) $perms[] = $dp;
     }
@@ -806,6 +1008,27 @@ function ua($fresh = false) {
 // Master Admin who could still open it would be looking at a screen the
 // customer has not paid for and cannot be supported on.
 function can($perm) {
+    if (function_exists('licence_blocks') && licence_blocks($perm)) return false;
+    $a = ua();
+    if ($a['master'] || in_array($perm, $a['perms'], true)) return true;
+    // R-20 — verb implication, checked ONLY on a miss so the common path is
+    // untouched. Holding Delete on Jobs means holding Edit and View on Jobs; a
+    // set that says otherwise is malformed, and "may delete but may not see" is
+    // not a state any screen should have to render. The grid saves sets already
+    // closed under this, so in practice this catches sets written by an older
+    // build or edited by hand.
+    if (strncmp($perm, 'mod.', 4) !== 0) return false;
+    if (!preg_match('/^mod\.(.+)\.(view|edit)$/', $perm, $mm)) return false;
+    foreach (PERM_VERB_IMPLIES as $verb => $implies) {
+        if (!in_array($mm[2], $implies, true)) continue;
+        if (can_direct(perm_verb_key($mm[1], $verb))) return true;
+    }
+    return false;
+}
+
+// can() without the implication fallback — the plain "is this exact right
+// ticked?" question. Separate so the fallback above cannot recurse.
+function can_direct($perm) {
     if (function_exists('licence_blocks') && licence_blocks($perm)) return false;
     $a = ua();
     return $a['master'] || in_array($perm, $a['perms'], true);
