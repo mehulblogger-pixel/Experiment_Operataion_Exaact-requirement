@@ -365,7 +365,13 @@ function ops_stage_gates($route, $method) {
 }
 
 function ops_approvals($route, $method) {
-    ops_require(gate_can_view(), 'You cannot open the approvals queue.');
+    //  R-27 — this is now the ONE front door for "what needs me?", so the guard
+    //  can no longer be gate_can_view() alone: that refused every recruitment
+    //  approver who holds no stage-gate rights, which is most of them. Either
+    //  queue is enough to open the screen; each section still decides its own
+    //  visibility, so nobody sees a queue they could not see before.
+    ops_require(function_exists('approvals_hub_can_view') ? approvals_hub_can_view() : gate_can_view(),
+        'You cannot open the approvals queue.');
     gate_migrate();
 
     if ($route === 'approval-act' && $method === 'POST') {
@@ -378,8 +384,14 @@ function ops_approvals($route, $method) {
 
     $status = (string)($_GET['f'] ?? 'PENDING');
     if (!isset(GATE_STATUS[$status])) $status = 'PENDING';
-    $q = gate_queue($status);
+    //  A viewer with no stage-gate rights still opens this screen for the
+    //  recruitment section, so the gate queue must come back empty rather than
+    //  refusing — gate_queue() itself is only asked when they may see it.
+    $q = gate_can_view() ? gate_queue($status) : ['act' => [], 'watch' => []];
     view('ops/approvals', ['q' => $q, 'status' => $status, 'labels' => GATE_STATUS,
-                           'can_manage' => gate_can_manage()]);
+                           'can_manage' => gate_can_view() && gate_can_manage(),
+                           'gatesOn'    => gate_can_view(),
+                           'sections'   => function_exists('approvals_hub_sections')
+                                           ? approvals_hub_sections() : []]);
     return true;
 }

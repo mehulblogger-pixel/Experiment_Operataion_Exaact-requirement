@@ -3230,7 +3230,19 @@ function ops_route_module_map() {
         'industry'=>'settings','industry-apply'=>'settings',
         'crm-dashboard'=>'crm_reports',
         // The approval queue and its rules ride with the pipeline they guard.
-        'approvals'=>'leads','approval-act'=>'leads',
+        'approval-act'=>'leads',
+        //  R-27 — 'approvals' is deliberately NOT mapped to a module any more.
+        //  It was 'leads', which was right while the screen showed stage gates
+        //  alone (they are deals). It is now the ONE inbox for everything
+        //  waiting on a person, and its audience spans modules: a recruitment
+        //  approver may hold no leads access at all, and a single module gate
+        //  cannot express "either of two queues".
+        //
+        //  It is therefore guarded by its HANDLER instead — ops_approvals()
+        //  requires approvals_hub_can_view(), and each section decides its own
+        //  visibility, so nobody sees a queue they could not see before. The
+        //  POST that decides a deal keeps its own guard (gate_act() asks
+        //  gate_can_act()), and stays mapped above.
         // The Ads Pro link rides with leads: it exists to produce them.
         // 'licence' and 'sso' are deliberately ungated by module. The licence
         // screen in particular is what somebody reaches when the licence has

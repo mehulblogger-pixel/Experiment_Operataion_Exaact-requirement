@@ -6,19 +6,71 @@ $act = $q['act']; $watch = $q['watch'];
 $total = count($act) + count($watch);
 $sumOf = function ($rows) { $t = 0.0; foreach ($rows as $r) $t += (float)$r['amount']; return $t; };
 ?>
+<?php
+// R-27 — this screen is now the ONE answer to "what needs me?". It used to show
+// stage gates only, while recruitment approvals lived at /my-approvals, so a
+// manager had to know which KIND of thing they were approving before they knew
+// where to look. The two systems are still separate underneath — they have
+// different records, rules and audiences — but they now share a front door.
+$sections = $sections ?? [];
+$gatesOn  = $gatesOn  ?? true;
+$waiting  = 0; foreach ($sections as $sec) $waiting += count($sec['items']);
+?>
 <div class="master-head">
   <div><h1>Approvals</h1>
-  <p class="sub" style="margin:2px 0 0">Deals held at a stage until somebody with the authority agrees. A quotation of this size already needed an approver; the deal it belongs to did not, and the forecast is built from the deal.</p></div>
+  <p class="sub" style="margin:2px 0 0">
+    <?php if ($waiting): ?>
+      <b><?= (int)$waiting ?></b> <?= $waiting === 1 ? 'thing is' : 'things are' ?> waiting on you.
+    <?php else: ?>
+      Everything waiting on your decision, in one place.
+    <?php endif; ?>
+  </p></div>
   <?php if ($can_manage): ?><a class="btn secondary" href="/stage-gates">Approval rules</a><?php endif; ?>
 </div>
 
+<?php // ---- everything that is NOT a stage gate, newest concern first --------
+foreach ($sections as $sec):
+  if ($sec['key'] === 'gates') continue;          // rendered in full below
+?>
+  <div class="panel" style="margin-top:16px;padding:0;overflow:hidden">
+    <div style="padding:12px 16px;background:var(--soft);border-bottom:1px solid var(--line);display:flex;gap:12px;flex-wrap:wrap;align-items:baseline">
+      <b style="font-size:13.5px"><?= e($sec['title']) ?></b>
+      <span class="muted" style="font-size:12.5px">— <?= count($sec['items']) ?></span>
+      <a class="btn small secondary" style="margin-left:auto" href="<?= e($sec['act']) ?>">Open <?= e(strtolower($sec['title'])) ?> →</a>
+      <div class="muted" style="font-size:12.5px;flex-basis:100%"><?= e($sec['sub']) ?></div>
+    </div>
+    <div class="dt-scroll">
+      <table class="dt">
+        <caption class="sr-only"><?= e($sec['title']) ?> waiting on you</caption>
+        <thead><tr>
+          <th scope="col">What</th><th scope="col">Kind</th>
+          <th scope="col">Raised by</th><th scope="col">Due</th><th scope="col"></th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($sec['items'] as $it): $row = approvals_hub_row($sec['key'], $it); ?>
+          <tr>
+            <td><b><?= e($row['what']) ?></b><?= $row['rule'] !== '' ? ' <span class="muted" style="font-size:12px">· ' . e($row['rule']) . '</span>' : '' ?></td>
+            <td><?= e($row['kind']) ?></td>
+            <td><?= e($row['who']) ?></td>
+            <td><?= e($row['when']) ?></td>
+            <td style="text-align:right"><a class="btn small" href="<?= e($row['url']) ?>">Decide</a></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<?php endforeach; ?>
+
+<?php if ($gatesOn): ?>
 <div class="filter-bar" style="margin-top:12px">
   <?php foreach ($labels as $k => $l): ?>
     <a class="btn small <?= $status === $k ? '' : 'secondary' ?>" href="/approvals?f=<?= e($k) ?>"><?= e($l) ?></a>
   <?php endforeach; ?>
 </div>
+<?php endif; ?>
 
-<?php if (!$total): ?>
+<?php if (!$total && $gatesOn && !$waiting): ?>
   <div class="panel" style="margin-top:16px;text-align:center;padding:32px 16px">
     <div style="font-size:28px;line-height:1">✓</div>
     <p style="margin:8px 0 0"><b>Nothing <?= e(strtolower($labels[$status] ?? $status)) ?>.</b></p>

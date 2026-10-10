@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'c53d968 · 2026-10-10 05:36 UTC · 681 files';
+$RELEASE = '27c11cc · 2026-10-10 06:11 UTC · 682 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
     'cron.php' => ['s'=>23812,'h'=>'9a49ea3b6161e98c'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>122852,'h'=>'353a3ea62fb800f0'],
+    'index.php' => ['s'=>122945,'h'=>'d8ac925f165e412f'],
     'lib/access.php' => ['s'=>108906,'h'=>'66fd957255c52864'],
     'lib/access_state.php' => ['s'=>9063,'h'=>'aeed1346f40b86bc'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
@@ -42,6 +42,7 @@ $EXPECT  = [
     'lib/agreement.php' => ['s'=>30404,'h'=>'850a0f08f100b313'],
     'lib/ai.php' => ['s'=>26123,'h'=>'9a1b149e7eb200b0'],
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
+    'lib/approvals_hub.php' => ['s'=>4789,'h'=>'e8b2f6a01ef230b0'],
     'lib/areas.php' => ['s'=>39126,'h'=>'2ecdcce0151ff4b9'],
     'lib/assets.php' => ['s'=>14415,'h'=>'019c1f61103da27d'],
     'lib/attend.php' => ['s'=>13919,'h'=>'695a4eae1fd9e2a9'],
@@ -173,7 +174,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>710289,'h'=>'381c1b3f80d0faf2'],
+    'lib/ops.php' => ['s'=>711089,'h'=>'8810965925a72e3b'],
     'lib/orgadmin.php' => ['s'=>77714,'h'=>'c66e5bb654e8e16d'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -237,7 +238,7 @@ $EXPECT  = [
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
     'lib/setup.php' => ['s'=>22705,'h'=>'43cbca244da74864'],
     'lib/setup_cockpit.php' => ['s'=>31439,'h'=>'3bf43713e1b2b0e3'],
-    'lib/stagegate.php' => ['s'=>21633,'h'=>'9ca3dd19c9846c44'],
+    'lib/stagegate.php' => ['s'=>22623,'h'=>'699772501f2dbdbb'],
     'lib/superadmin.php' => ['s'=>10675,'h'=>'995da0045cd4e7ee'],
     'lib/tally.php' => ['s'=>43582,'h'=>'b555bf1d1298c5bb'],
     'lib/tapi.php' => ['s'=>68071,'h'=>'558f4e8113367330'],
@@ -336,7 +337,7 @@ $EXPECT  = [
     'views/ops/ai_topup_pay.php' => ['s'=>2408,'h'=>'a6c85b5a75f2bc3e'],
     'views/ops/approval_delegations.php' => ['s'=>6151,'h'=>'dbb7ef0112381a62'],
     'views/ops/approval_rules.php' => ['s'=>23629,'h'=>'25c7ff05b5caa481'],
-    'views/ops/approvals.php' => ['s'=>6632,'h'=>'d59d47671d48350b'],
+    'views/ops/approvals.php' => ['s'=>9059,'h'=>'10797e07fd17f681'],
     'views/ops/area_home.php' => ['s'=>4611,'h'=>'718227061d3895e3'],
     'views/ops/asset_register.php' => ['s'=>12566,'h'=>'5973afebeb7207d5'],
     'views/ops/attendance_recon.php' => ['s'=>3064,'h'=>'d7aa936250745627'],
