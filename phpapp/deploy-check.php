@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'cd99751 · 2026-10-10 05:18 UTC · 681 files';
+$RELEASE = 'c53d968 · 2026-10-10 05:36 UTC · 681 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -33,7 +33,7 @@ $EXPECT  = [
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>122852,'h'=>'353a3ea62fb800f0'],
     'lib/access.php' => ['s'=>108906,'h'=>'66fd957255c52864'],
-    'lib/access_state.php' => ['s'=>8645,'h'=>'d8376157de232340'],
+    'lib/access_state.php' => ['s'=>9063,'h'=>'aeed1346f40b86bc'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
@@ -173,7 +173,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>708851,'h'=>'6190b732c0798846'],
+    'lib/ops.php' => ['s'=>710289,'h'=>'381c1b3f80d0faf2'],
     'lib/orgadmin.php' => ['s'=>77714,'h'=>'c66e5bb654e8e16d'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],

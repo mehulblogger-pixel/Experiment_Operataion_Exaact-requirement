@@ -46,7 +46,13 @@ function access_can_subscribe() {
 // Does this request want JSON rather than a page? A blocked fetch() must not be
 // answered with a redirect to the dashboard (§10).
 function access_wants_json() {
-    if (strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest') return true;
+    //  'fetch' is this application's own convention (lead_form, opportunity_form,
+    //  requisition_form and app.js all send it); 'xmlhttprequest' is the older
+    //  one. Recognising only the latter meant a refused picker received an HTML
+    //  page, JSON.parse threw, and the .catch() swallowed it — the dropdown
+    //  simply stayed empty with nothing said to anybody.
+    $xrw = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
+    if ($xrw === 'xmlhttprequest' || $xrw === 'fetch') return true;
     $accept = (string) ($_SERVER['HTTP_ACCEPT'] ?? '');
     if ($accept !== '' && stripos($accept, 'application/json') !== false
         && stripos($accept, 'text/html') === false) return true;

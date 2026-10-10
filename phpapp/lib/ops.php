@@ -3345,6 +3345,27 @@ function ops_route_module_map() {
         'report-equip-add'=>'equipment','report-equip-del'=>'equipment',
         'reset-data'=>'settings',
         'partner-import'=>'clients','partner-template'=>'clients','duplicates'=>'clients',
+        //  SECURITY (Journey H9, found 2026-10-10 by sweeping every route as a
+        //  field inspector). These eight JSON endpoints feed the client pickers.
+        //  They were in NEITHER this map nor ops_module_family(), so $mod came
+        //  back null and ops_module_gate() never ran at all — they were the only
+        //  routes in the application with no gate whatsoever.
+        //
+        //  An inspector, who has no clients access of any kind, could type
+        //  /partner-contact?id=1 and read a client contact's NAME, EMAIL and
+        //  MOBILE, and /partner-address?id=1 for their site address. Nothing in
+        //  the UI offered it; hiding a menu item is not security, which is
+        //  exactly what H9 exists to prove.
+        //
+        //  Gated on 'clients' because that is what they return. Every screen
+        //  that uses these pickers — call, quote, lead and opportunity forms —
+        //  belongs to a role that already holds mod.clients.view, so no
+        //  legitimate flow loses anything. access_deny() answers a fetch() with
+        //  JSON, so a refused picker fails quietly instead of pasting a login
+        //  page into a dropdown.
+        'partner-contact'=>'clients','partner-address'=>'clients','partner-sites'=>'clients',
+        'partner-meta'=>'clients','partner-pos'=>'clients','partner-gaps'=>'clients',
+        'po-lines'=>'clients','contract-no-check'=>'clients',
     ];
     return $map;
 }

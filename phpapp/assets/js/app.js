@@ -327,7 +327,7 @@
     function loadPoLines(keep) {
       if (!poLine) return;
       if (!po || !po.value) { fillSelect(poLine, [], ''); poLineNote(null); return; }
-      fetch('/po-lines?id=' + encodeURIComponent(po.value))
+      fetch('/po-lines?id=' + encodeURIComponent(po.value), {headers:{'X-Requested-With':'fetch'}})
         .then(function (r) { return r.json(); })
         .then(function (data) {
           // The endpoint answers with {lines, hint}; older callers were handed a
@@ -355,8 +355,8 @@
     function loadClientLinks() {
       var id = client ? client.value : '';
       if (!id) { fillSelect(site, [], ''); fillSelect(po, [], ''); fillSelect(poLine, [], ''); return; }
-      if (site) fetch('/partner-sites?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (rows) { fillSelect(site, rows, site.value); autoPick(site, rows); }).catch(function () {});
-      if (po) fetch('/partner-pos?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); })
+      if (site) fetch('/partner-sites?id=' + encodeURIComponent(id), {headers:{'X-Requested-With':'fetch'}}).then(function (r) { return r.json(); }).then(function (rows) { fillSelect(site, rows, site.value); autoPick(site, rows); }).catch(function () {});
+      if (po) fetch('/partner-pos?id=' + encodeURIComponent(id), {headers:{'X-Requested-With':'fetch'}}).then(function (r) { return r.json(); })
         .then(function (rows) {
           fillSelect(po, rows, po.value);
           // One live order for this client is the normal case for an ARC, and
@@ -677,7 +677,7 @@
     function load() {
       var id = client.value;
       if (!id) { rebuild(null); return; }
-      fetch('/partner-meta?id=' + encodeURIComponent(id))
+      fetch('/partner-meta?id=' + encodeURIComponent(id), {headers:{'X-Requested-With':'fetch'}})
         .then(function (r) { return r.json(); })
         .then(function (res) { rebuild(res.inspection_types || []); })
         .catch(function () { rebuild(null); });
