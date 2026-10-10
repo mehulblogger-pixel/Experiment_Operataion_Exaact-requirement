@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/data-requests">Requests about personal data</a> › <span>Erase</span></div>
 
 <div class="master-head">
   <div><h1>Erase <?= e($prev['name']) ?></h1>

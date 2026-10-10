@@ -3,7 +3,6 @@
   $pct = fn($v) => $t['total'] > 0 ? round($v * 100 / $t['total']) : 0;
   $link = fn($over = []) => '/receivables?' . http_build_query(array_merge(['basis' => $basis], $over));
 ?>
-<div class="crumbs"><a href="/">Home</a> › Billing › Receivables ageing</div>
 <?php billing_tabs('receivables'); ?>
 <div class="master-head">
   <div><h1>Receivables ageing</h1>

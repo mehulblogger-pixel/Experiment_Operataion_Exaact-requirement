@@ -17,11 +17,10 @@
   $terms    = $isEdit ? (string)($q['terms_conditions'] ?? '') : '';
   if (trim($terms) === '') $terms = $defaultTerms;
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <?= $isEdit ? e(quote_label($q)) : 'New' ?></div>
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit — ' . e(quote_label($q)) : ucfirst(T_NEW('quote')) ?></h1>
     <p class="sub" style="margin:2px 0 0"><?= $preInq ? 'From ' . e(Tl('inquiry')) . ' ' . e($preInq['inquiry_no']) . '. ' : '' ?><?= $preLead ? 'From lead ' . e($preLead['ref']) . ' — company, contact and requirement carried across. ' : '' ?>Fill the header, add the sites, then the line items. The <?= e(Tl('quote')) ?> number is generated on save.</p></div>
-  <a class="btn secondary" href="/quotes">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <form method="post" action="/<?= $isEdit ? 'quote-edit?id=' . (int)$q['id'] : 'quote-new' ?>" class="panel" id="qform">

@@ -8,11 +8,10 @@
   $curTrade = $cand['trade_id'] ?? '';
   $curSkills = ($curTrade && isset($skillsByTrade[$curTrade])) ? $skillsByTrade[$curTrade] : [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/candidates"><?= e(TP('candidate')) ?></a> › <?= $isEdit ? 'Edit' : 'Add CV' ?></div>
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit — ' . e(candidate_name($cand)) : 'Add candidate CV' ?></h1>
     <p class="sub">Submit a candidate for project work. You can move them through Submitted → Shortlisted → Interview → Accept / Hold / Reject afterwards.</p></div>
-  <a class="btn secondary" href="/candidates">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <?php if (!$isEdit): ?>

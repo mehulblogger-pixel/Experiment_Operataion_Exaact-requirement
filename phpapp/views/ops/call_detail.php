@@ -60,11 +60,6 @@
       //  ancestor is a LINK only where the viewer may actually open it — the
       //  Operations home and the register enforce the same rights this checks,
       //  so a breadcrumb can never advertise a door that refuses. ?>
-<div class="crumbs"><a href="/">Home</a>
-  &rsaquo; <?= (can('mod.calls.view') || can('mod.jobs.view') || (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()))
-        ? '<a href="/operations">Operations</a>' : 'Operations' ?>
-  &rsaquo; <?= can('mod.calls.view') ? '<a href="/calls">' . e(TP('call')) . '</a>' : e(TP('call')) ?>
-  &rsaquo; <?= e((string)($call['call_code'] ?? '') !== '' ? (string)$call['call_code'] : '#' . (int)$call['id']) ?></div>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('call', $call['call_code'])) ?></h1>
     <p class="sub"><?= e($call['client_disp'] ?: $call['client_name'] ?: 'No client') ?> · <?= e(OPS_REGIONS[$call['region']] ?? '') ?></p></div>

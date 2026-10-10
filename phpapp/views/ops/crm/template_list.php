@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/templates">Document templates</a> › <?= e(T('quote')) ?> &amp; e-mail</div>
 <div class="master-head">
   <div><h1>Document templates</h1>
     <p class="sub" style="margin:2px 0 0">Upload your Word <?= e(Tl('quote')) ?> format (for editing) and the signature that appears on the <strong><?= e(Tl('client')) ?> PDF</strong>. The generated <?= e(Tl('quote')) ?> stamps the document / format number from the format.</p></div>

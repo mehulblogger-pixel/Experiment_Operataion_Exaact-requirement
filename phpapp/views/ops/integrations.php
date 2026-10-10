@@ -5,7 +5,6 @@
   $word = ['ok'=>'Healthy', 'warn'=>'Attention', 'bad'=>'Failing'];
   $attention = 0; foreach ($rows as $r) if ($r['severity'] !== 'ok') $attention++;
 ?>
-<div class="crumbs"><a href="/">Home</a> › Integration health</div>
 <div class="master-head">
   <div><h1>Integration health</h1>
     <p class="sub" style="margin:2px 0 0">Every external connection — Ads Pro, Books, licence renewal, email and more — with its last sync and whether it is working. Read-only, from each integration's own status.</p></div>

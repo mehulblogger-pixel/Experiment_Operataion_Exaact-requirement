@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Internal audits</div>
 <div class="master-head">
   <div><h1>Internal audits</h1>
     <p class="sub" style="margin:2px 0 0"><?= e(accreditation_ref('audit')) ?>. The question an assessor asks is not “did you audit”

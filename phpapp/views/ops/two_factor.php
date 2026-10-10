@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <span>Two-step sign-in</span></div>
 
 <div class="master-head">
   <div><h1>Two-step sign-in</h1>

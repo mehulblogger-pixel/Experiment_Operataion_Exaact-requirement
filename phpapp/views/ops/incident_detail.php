@@ -1,5 +1,4 @@
 <?php $h = incident_hours_left($inc); ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/incidents">Incident register</a> › <span><?= e($inc['ref']) ?></span></div>
 
 <div class="master-head">
   <div><h1><?= e($inc['ref']) ?></h1>

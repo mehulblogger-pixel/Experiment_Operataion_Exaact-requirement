@@ -7,7 +7,6 @@
   $recent = $recent ?? []; $cats = $cats ?? []; $streamLabels = $streamLabels ?? []; $cur = $currency ?? '₹';
   $money = fn($n) => e($cur) . number_format((float)$n, 0);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/super-admin">Super Admin</a> › Financial control</div>
 <div class="master-head">
   <div><h1>Financial control</h1>
     <p class="sub">GMV, Connect revenue and payment-provider cost are three different things — this board keeps them apart. <b>Connect revenue is only our own fees; the professional’s service value is GMV, not our income.</b></p></div>

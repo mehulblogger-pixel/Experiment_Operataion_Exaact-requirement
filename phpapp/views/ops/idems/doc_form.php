@@ -8,7 +8,6 @@
       return $pre[$preKey] ?? '';
   };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <?= $doc ? e($doc['irn']) : 'New report' ?></div>
 <div class="master-head"><div><h1><?= e($doc ? ucfirst(T_EDIT('report')) : ucfirst(T_NEW('report'))) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= $doc ? 'IRN '.e($doc['irn']).' — the IRN never changes.' : 'The IRN (Inspection Reference Number) is generated automatically when you save.' ?></p></div></div>
 

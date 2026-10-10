@@ -14,12 +14,11 @@
   $vHoursFmt = rtrim(rtrim(number_format($vHours, 1, '.', ''), '0'), '.') ?: '0';
   $vDays = count($byDate);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/vouchers"><?= e(TP('voucher')) ?></a> › <?= e($v['month']) ?></div>
 <div class="master-head">
   <div><h1>Statement of travelling expenses
       <span class="pill <?= $vpill[0] ?>" style="vertical-align:middle;font-size:12px"><?= e($vpill[1]) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><strong><?= e($v['inspector_name']) ?></strong><?= $v['emp_code']?' · '.e($v['emp_code']):'' ?> · Month <?= e($v['month']) ?> · <?= e(T("sbu")) ?> <?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></p></div>
-  <a class="btn secondary" href="/vouchers">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <div class="kpi-row" style="margin:16px 0">

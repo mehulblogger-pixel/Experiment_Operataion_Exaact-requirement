@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/analytics">Analytics</a> › <span>KPI library</span></div>
 <div class="master-head"><div>
   <h1>KPI library</h1>
   <p class="sub" style="margin:2px 0 0">Every KPI is a configurable definition — name, formula, unit, target, direction. Edit one and the change flows to every dashboard.</p>

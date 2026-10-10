@@ -1,7 +1,6 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <a href="/crm-templates">Templates</a> › <?= $t ? 'Edit' : 'Add' ?></div>
 <div class="master-head">
   <div><h1><?= $t ? 'Edit template — ' . e($t['name']) : 'Add quote / e-mail template' ?></h1></div>
-  <a class="btn secondary" href="/crm-templates">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <form method="post" action="/<?= $t ? 'crm-template-edit?id=' . (int)$t['id'] : 'crm-template-new' ?>" class="panel" enctype="multipart/form-data">

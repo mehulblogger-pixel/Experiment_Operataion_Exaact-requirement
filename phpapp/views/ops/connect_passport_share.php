@@ -5,7 +5,6 @@ $inspector = $inspector ?? null; $token = $token ?? ''; $url = $url ?? '';
 $data = $data ?? null; $inspectors = $inspectors ?? [];
 $qr = ($url !== '' && function_exists('qr_svg')) ? qr_svg($url, 160, 'M', 3) : '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › Passport link</div>
 <div class="master-head">
   <div><h1>Professional passport</h1>
     <p class="sub" style="margin:2px 0 0">The public, shareable page for a professional — verified credentials, live status and reputation.

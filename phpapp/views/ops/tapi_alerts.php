@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/analytics">Analytics</a> › <span>Alerts</span></div>
 <div class="master-head"><div>
   <h1>Alerts</h1>
   <p class="sub" style="margin:2px 0 0">Rule-based watches on any KPI. Breaches are e-mailed by the nightly job, once per rule per day.</p>

@@ -1,11 +1,10 @@
 <?php $done = $r['status'] === 'COMPLETE'; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/management-reviews">Management reviews</a> › <?= e($r['ref']) ?></div>
 <div class="master-head">
   <div><h1><?= e($r['ref']) ?> — management review</h1>
     <p class="sub" style="margin:2px 0 0">Held <?= e($r['held_on'] ? fdate($r['held_on']) : '—') ?>
       · period <?= e(fdate($r['period_from'])) ?> to <?= e(fdate($r['period_to'])) ?>
       · chaired by <?= e($r['chair'] ?: '—') ?></p></div>
-  <a class="btn secondary" href="/management-reviews">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <?php if ($done): ?>

@@ -31,7 +31,6 @@ $opt = function ($sel = 0) use ($picker) {
   .achip form{display:inline;margin:0} .achip button{border:0;background:transparent;color:#9a2a2a;cursor:pointer;font-size:13px}
 </style>
 
-<div class="crumbs"><a href="/">Home</a> › <a href="/connect-taxonomy">Taxonomy</a> › Manage graph</div>
 <div class="master-head"><div><h1>Taxonomy graph — admin</h1>
   <p class="sub" style="margin:2px 0 0">Add, rename, retire, relate and alias technical concepts. New professions are added here — no code change. The marketplace search, profile and matching read this live.</p></div></div>
 

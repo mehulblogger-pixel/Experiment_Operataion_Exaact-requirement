@@ -294,6 +294,41 @@ futile, and you were right to refuse it. The answer is not "rebuild" or "patch" 
 third thing: **give the application the shared structure it is missing, once, and let
 385 screens inherit it.** That is what fixed the permission model, and it worked.
 
+### 9.1a Step 1 is DONE (2026-10-10) — R-24
+
+The navigation model shipped. `lib/nav.php` answers *"where does this screen
+sit?"* by chaining the three maps of §6, none of which had to be invented:
+
+- The gate's route→module map was lifted out of `ops_module_gate()` into
+  `ops_route_module_map()`, so permission and navigation read **one** source
+  rather than two copies that drift. 459 entries, plus the prefix fallback.
+- The breadcrumb is drawn **once**, in `views/layout_top.php`. All 405 screens
+  inherit it; the 277 hand-typed crumbs are gone; a new screen gets a trail
+  without anybody remembering to type one.
+- `nav_back_info()` returns where you actually came from, labelled with that
+  screen's own name, falling back to the true parent. Never a fixed guess.
+- Every step is permission-checked, so a breadcrumb cannot offer a refusal.
+
+**Three bugs it surfaced, none of which a unit test would have found unprompted:**
+
+1. `parse_url()` returns the referrer host **without** its port while `HTTP_HOST`
+   keeps it. Compared raw they never matched on any host carrying one, so the
+   referrer was silently discarded and Back fell back to the parent every time —
+   the exact behaviour the function exists to remove, hiding behind code that
+   read correctly.
+2. The Back url and its label were computed separately and drifted immediately:
+   the link went to Masters while the words still said "Equipment & calibration".
+   Worse than a wrong link, because people read the words.
+3. `ops_area_has()` answers **false** for Operations and Recruitment — both are
+   served by their own handlers, not the generic area engine. Gating the trail on
+   it dropped the area step from the two busiest areas in the product, and every
+   screen beneath them lost a level with nothing failing. Caught only because a
+   recruitment test noticed.
+
+All three are pinned in `tests/test_nav_model.php`. Full suite: 16,505 passing.
+
+R-21 and R-22 are closed by this, as §9.2 predicted — not patched individually.
+
 ### 9.2 What I would do, in order
 
 | # | Work | Why it is first | Rough size |

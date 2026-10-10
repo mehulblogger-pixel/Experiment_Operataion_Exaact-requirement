@@ -1,12 +1,11 @@
 <?php $sel = (int)($_GET['i'] ?? 0); ?>
-<div class="crumbs"><a href="/">Home</a> › Identity documents</div>
 <div class="master-head">
   <div><h1>Identity documents</h1>
     <p class="sub" style="margin:2px 0 0">Held for one stated reason, for a limited time, and every look is recorded.</p></div>
   <div style="display:flex;gap:8px">
     <?php if (!empty($canManage)): ?><a class="btn secondary" href="/iddoc-access">🔎 Access review (DPO)</a><?php endif; ?>
     <a class="btn secondary" href="/agency-staff">Agency-staff roster →</a>
-    <a class="btn secondary" href="/">← Back</a>
+    <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
   </div>
 </div>
 

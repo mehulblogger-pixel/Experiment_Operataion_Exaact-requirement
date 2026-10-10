@@ -1,7 +1,6 @@
 <?php
 $badge = ['DRAFT' => 'AMBER', 'CURRENT' => 'GREEN', 'SUPERSEDED' => 'GREY', 'WITHDRAWN' => 'RED'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Quality &amp; accreditation › Method library</div>
 <div class="master-head">
   <div><h1>Inspection methods &amp; standards</h1>
     <p class="sub"><?= (int)($counts['current'] ?? 0) ?> current<?php if (!empty($counts['unvalidated'])): ?> · <span style="color:#b5751a"><?= (int)$counts['unvalidated'] ?> not yet validated</span><?php endif; ?> · controlled revisions (ISO §7.1)</p></div>

@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <span>Privacy notice</span></div>
 
 <div class="master-head">
   <div><h1>Privacy notice</h1>

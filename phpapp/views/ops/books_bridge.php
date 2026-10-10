@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <span>MGH Books connection</span></div>
 
 <div class="master-head">
   <div><h1>📗 MGH Books connection</h1>

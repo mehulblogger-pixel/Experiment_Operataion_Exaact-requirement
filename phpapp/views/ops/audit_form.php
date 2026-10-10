@@ -1,9 +1,8 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/internal-audits">Internal audits</a> › Plan one</div>
 <div class="master-head">
   <div><h1>Plan an internal audit</h1>
     <p class="sub" style="margin:2px 0 0">Name the auditor and whoever runs the area. If they are the same person
       this will refuse — §8.8.2, auditors shall not audit their own work.</p></div>
-  <a class="btn secondary" href="/internal-audits">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <form method="post" action="/internal-audit-new">

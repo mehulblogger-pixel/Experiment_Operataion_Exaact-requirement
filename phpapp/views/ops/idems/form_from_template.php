@@ -4,7 +4,6 @@
   $have = array_values(array_filter($plan, fn($p)=>$p['exists']));
   $auto = $auto ?? false;
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/report-templates">Document templates</a> › Build form</div>
 <div class="master-head">
   <div><h1><?= $auto ? 'Fields found in your file' : 'Form from format' ?></h1>
     <p class="sub" style="margin:2px 0 0">Reading <strong><?= e($tpl['file_name'] ?: $tpl['name']) ?></strong> for <strong><?= e($type['code']) ?> — <?= e($type['name']) ?></strong>.

@@ -1,11 +1,10 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/profitability"><?= e(TP('boss')) ?></a> › <?= e($boss['boss_number']) ?></div>
 <div class="master-head">
   <div><h1><?= e(T('boss')) ?> <?= e($boss['boss_number']) ?>
       <?php if (!empty($boss['superseded_by'])): ?><span class="pill p-warn" style="vertical-align:middle;font-size:12px">Renewed</span><?php endif; ?></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($boss['client_disp'] ?: $boss['client_name'] ?: '—') ?> · <?= (int)$p['jobs'] ?> job(s)
       <?php if (!empty($boss['prev_no'])): ?> · <span class="muted">continues from <a href="/profitability?boss=<?= (int)$boss['prev_id'] ?>"><?= e($boss['prev_no']) ?></a></span><?php endif; ?>
       <?php if (!empty($boss['next_no'])): ?> · <span class="muted">renewed as <a href="/profitability?boss=<?= (int)$boss['next_id'] ?>"><?= e($boss['next_no']) ?></a></span><?php endif; ?></p></div>
-  <a class="btn secondary" href="/profitability">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <div class="kpi-row">

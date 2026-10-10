@@ -1,5 +1,4 @@
 <?php // Smart remarks & conclusions — proposals the inspector reviews before applying ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Suggested remarks</div>
 <div class="master-head">
   <div><h1>Suggested remarks</h1>
     <p class="sub" style="margin:2px 0 0">Drafted from this report's own findings using the standard phrase library. <strong>You decide</strong> — edit anything before applying.</p></div>

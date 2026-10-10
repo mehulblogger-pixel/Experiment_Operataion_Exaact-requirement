@@ -1,5 +1,4 @@
 <?php $h = $head; $windows = [30=>'30 days', 90=>'90 days', 180=>'6 months', 365=>'12 months', 730=>'2 years']; ?>
-<div class="crumbs"><a href="/">Home</a> › Sales dashboard</div>
 <div class="master-head">
   <div><h1>Sales dashboard</h1>
   <p class="sub" style="margin:2px 0 0">How selling is going — the funnel, where deals stop moving, and why they are lost.

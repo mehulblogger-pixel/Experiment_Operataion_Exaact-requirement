@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Equipment</div>
 <div class="master-head">
   <div><h1>Equipment register</h1>
     <p class="sub" style="margin:2px 0 0">Every measuring and test instrument, and the certificate proving it was

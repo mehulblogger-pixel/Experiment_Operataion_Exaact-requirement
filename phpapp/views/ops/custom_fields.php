@@ -3,7 +3,6 @@
   foreach (ops_masters() as $mk=>$mc) $entLabels[$mk] = $mc['label'];
   $curLabel = $entLabels[$entity] ?? $entity;
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › Custom fields</div>
 <div class="master-head">
   <div><h1>Custom fields — <?= e($curLabel) ?></h1>
     <p class="sub">Add your own fields to this form. They appear automatically. A dropdown field can use any master list — pick a dependent list to get cascading selects.</p></div>

@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/analytics">Analytics</a> › <span>Management review</span></div>
 <div class="master-head"><div>
   <h1>Management review</h1>
   <p class="sub" style="margin:2px 0 0"><?= e($review['period']['from'] ?: 'all time') ?> — <?= e($review['period']['to'] ?: 'now') ?> · generated <?= e(date('d M Y H:i', strtotime($review['generated']))) ?></p>

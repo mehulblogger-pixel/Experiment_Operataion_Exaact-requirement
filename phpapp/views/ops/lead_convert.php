@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/leads">Leads</a> › <a href="/lead?id=<?= (int)$l['id'] ?>"><?= e($l['ref']) ?></a> › Convert</div>
 <div class="master-head"><div><h1>Convert <?= e($l['ref']) ?></h1>
   <p class="sub" style="margin:2px 0 0">Winning a lead is not a tick in a column. It becomes a customer on the master and an inquiry in the funnel — everything below comes from the lead, so nothing is retyped.</p></div></div>
 

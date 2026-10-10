@@ -9,7 +9,6 @@
   };
   $stars = fn($n) => str_repeat('★', max(0, min(5, (int)$n))) . str_repeat('☆', 5 - max(0, min(5, (int)$n)));
 ?>
-<div class="crumbs"><a href="/">Home</a> › Rating-integrity desk</div>
 <div class="master-head">
   <div><h1>Rating-integrity desk</h1>
     <p class="sub">Someone believes a rating about them is wrong. Investigate, then decide: the rating <b>stands</b>, gets a <b>public note</b>, or is <b>removed from scores</b>. Removed ratings are hidden, never deleted — the record stays.</p></div>

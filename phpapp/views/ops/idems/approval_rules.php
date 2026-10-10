@@ -1,5 +1,4 @@
 <?php // IDEMS approval rules (configurable multi-level chain) ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <?= e(T('report')) ?> approvals</div>
 <div class="master-head"><div><h1>Approval rules</h1>
   <p class="sub" style="margin:2px 0 0">Design the approval chain by <?= e(Tl('report')) ?> type, <?= e(T('office')) ?>, <?= e(Tl('client')) ?> or <?= e(T('sbu')) ?>. Leave a match blank for "any". Multiple levels run in order. No rule ⇒ the <?= e(Tl('engineer')) ?>'s mapped approver is used (single level).</p></div>
   <a class="btn secondary" href="/approver-map">Approver mapping →</a>

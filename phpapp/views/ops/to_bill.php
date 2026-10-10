@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Billing › Waiting to be billed</div>
 <?php billing_tabs('to-bill'); ?>
 <div class="master-head">
   <div><h1>Work waiting to be billed</h1>

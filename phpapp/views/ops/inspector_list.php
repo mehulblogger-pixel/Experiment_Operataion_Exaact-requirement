@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › Inspectors</div>
 <div class="master-head">
 <?php //  D4 (Gate 6) — the headline must not count people who have not arrived as
       //  though they were working here. The rows were already labelled correctly;

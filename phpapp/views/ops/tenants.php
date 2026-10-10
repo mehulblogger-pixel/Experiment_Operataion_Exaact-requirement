@@ -4,7 +4,6 @@
   $tenants = (array)($reg['tenants'] ?? []);
   $on = $base !== '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Cloud workspaces</div>
 <div class="master-head">
   <div><h1>Cloud workspaces</h1>
     <p class="sub" style="margin:2px 0 0">Run one copy of the app as many separate businesses — each on its own

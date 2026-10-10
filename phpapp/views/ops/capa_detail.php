@@ -1,5 +1,4 @@
 <?php $open = capa_is_open($c); $al = capa_action_overdue($c); $vl = capa_verify_overdue($c); ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/capa">Corrective actions</a> › <?= e($c['ref']) ?></div>
 <div class="master-head">
   <div><h1><?= e($c['ref']) ?> — <?= e($c['title']) ?></h1>
     <p class="sub" style="margin:2px 0 0">
@@ -9,7 +8,7 @@
       <?php if ($complaint): ?> · <a href="/complaint?id=<?= (int)$complaint['id'] ?>"><?= e($complaint['ref']) ?></a><?php endif; ?>
       <?php if ($follows): ?> · follows <a href="/capa-item?id=<?= (int)$follows['id'] ?>"><?= e($follows['ref']) ?></a><?php endif; ?>
     </p></div>
-  <a class="btn secondary" href="/capa">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <?php if (!$open): ?>

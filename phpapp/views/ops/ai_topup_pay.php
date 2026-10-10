@@ -2,7 +2,6 @@
   $order = $order ?? []; $cfg = $cfg ?? []; $size = (int) ($size ?? 0); $price = (int) ($price ?? 0);
   $cur = $currency ?? 'INR'; $sym = $cur === 'INR' ? '₹' : ($cur . ' ');
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/ai-forms">Build forms with AI</a> › Buy AI actions</div>
 <div class="master-head"><div><h1>Buy more AI actions</h1>
   <p class="sub" style="margin:2px 0 0"><strong><?= $size ?></strong> extra AI actions for this month — <strong><?= e($sym . number_format($price)) ?></strong>.</p></div></div>
 

@@ -1,5 +1,4 @@
 <?php $groups = $res['groups']; ?>
-<div class="crumbs"><a href="/">Home</a> › Search</div>
 <div class="master-head">
   <div><h1>Search</h1>
   <p class="sub" style="margin:2px 0 0">One box across every register you are allowed to see. References, company names, contacts, invoice numbers, report numbers — whatever you have to hand.</p></div>

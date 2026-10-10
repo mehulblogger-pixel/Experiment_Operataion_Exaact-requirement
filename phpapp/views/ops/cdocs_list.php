@@ -1,5 +1,4 @@
 <?php $badge = ['DRAFT' => 'AMBER', 'CURRENT' => 'GREEN', 'SUPERSEDED' => 'GREY', 'WITHDRAWN' => 'RED']; ?>
-<div class="crumbs"><a href="/">Home</a> › Quality &amp; accreditation › Controlled documents</div>
 <div class="master-head">
   <div><h1>Controlled documents</h1>
     <p class="sub"><?= (int)($counts['current'] ?? 0) ?> current<?php if (!empty($counts['review_due'])): ?> · <span style="color:#b5751a"><?= (int)$counts['review_due'] ?> overdue for review</span><?php endif; ?> · policies, procedures &amp; forms under version control (ISO §8.3)</p></div>

@@ -68,7 +68,6 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   @media (max-width:820px){ .op-kpis{grid-template-columns:repeat(2,1fr)} .op-grid{grid-template-columns:1fr} }
 </style>
 
-<div class="crumbs"><a href="/">Home</a> › Operations</div>
 <div class="master-head">
   <div>
     <h1>Operations</h1>

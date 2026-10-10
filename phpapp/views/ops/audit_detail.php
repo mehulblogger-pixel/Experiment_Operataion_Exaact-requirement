@@ -1,12 +1,11 @@
 <?php $closed = $a['status'] === 'CLOSED'; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/internal-audits">Internal audits</a> › <?= e($a['ref']) ?></div>
 <div class="master-head">
   <div><h1><?= e($a['ref']) ?><?= $a['scope'] ? ' — ' . e($a['scope']) : '' ?></h1>
     <p class="sub" style="margin:2px 0 0">Planned <?= e($a['planned_on'] ? fdate($a['planned_on']) : '—') ?>
       · auditor <?= e($a['auditor'] ?: '—') ?>
       <?= $a['area_owner'] ? ' · area run by ' . e($a['area_owner']) : '' ?>
       · clauses <?= e(implode(', ', audit_clauses_of($a))) ?></p></div>
-  <a class="btn secondary" href="/internal-audits">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <?php if ($closed): ?>

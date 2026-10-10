@@ -31,11 +31,9 @@
   $scOff = $asCsv($user['scope_offices'] ?? '');
   $scSbu = $asCsv($user['scope_sbus'] ?? '');
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/hierarchy">Organisation &amp; people</a> ›
-  <a href="/users">Login accounts</a> › <?= $user ? 'Edit' : 'Add' ?></div>
 <div class="master-head">
   <div style="display:flex;align-items:flex-start;gap:12px">
-    <a class="btn secondary" href="/users" title="Back" style="margin-top:2px">← Back</a>
+    <a class="btn secondary" href="<?= e(nav_back($cur)) ?>" title="Back" style="margin-top:2px">← <?= e(nav_back_label($cur)) ?></a>
     <div><h1><?= $user ? 'Edit ' . e(trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')) ?: $user['username']) : 'Add a person' ?></h1>
       <p class="sub" style="margin:2px 0 0">One person: who they are, what they can see, where they sit and who they report to.</p></div>
   </div>

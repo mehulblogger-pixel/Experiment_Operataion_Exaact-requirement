@@ -1,11 +1,10 @@
 <?php $form = $form ?? []; $rec = $rec ?? []; $values = $values ?? []; $canEdit = $canEdit ?? false; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/cform?f=<?= e($form['slug']) ?>"><?= e($form['name']) ?></a> › <?= e($rec['title'] ?: ('#' . $rec['id'])) ?></div>
 <div class="master-head"><div>
   <h1><?= e($rec['title'] ?: ($form['name'] . ' #' . $rec['id'])) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($form['name']) ?> · added <?= e(fdate(substr((string)$rec['created_at'],0,10))) ?><?= $rec['created_by'] ? ' by ' . e($rec['created_by']) : '' ?></p></div>
   <div style="display:flex;gap:8px">
     <?php if ($canEdit): ?><a class="btn" href="/cform-edit?id=<?= (int)$rec['id'] ?>">Edit</a><?php endif; ?>
-    <a class="btn secondary" href="/cform?f=<?= e($form['slug']) ?>">← Back</a>
+    <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
   </div>
 </div>
 

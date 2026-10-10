@@ -1,9 +1,8 @@
 <?php $isEdit = !empty($inq['id']); ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/inquiries"><?= e(TP('inquiry')) ?></a> › <?= $isEdit ? 'Edit' : 'New' ?></div>
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit inquiry — ' . e($inq['inquiry_no']) : 'New ' . Tl('client') . ' ' . Tl('inquiry') ?></h1>
     <p class="sub" style="margin:2px 0 0">Capture what the <?= e(Tl('client')) ?> asked for. You can raise a <?= e(Tl('quote')) ?> against it afterwards.</p></div>
-  <a class="btn secondary" href="/inquiries">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <?php if (!empty($error)): ?><div class="msg msg-error" style="margin-bottom:12px"><?= e($error) ?></div><?php endif; ?>

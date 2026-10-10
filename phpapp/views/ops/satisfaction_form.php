@@ -1,5 +1,4 @@
 <?php $val = fn($k, $dv = '') => e($s[$k] ?? $dv); ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/satisfaction">Customer satisfaction</a> › Request feedback</div>
 <div class="master-head"><div><h1>Request feedback</h1>
   <p class="sub">Record that you have asked a <?= e(T('client')) ?> for feedback. When their answer comes in, open the survey and record the response.</p></div></div>
 

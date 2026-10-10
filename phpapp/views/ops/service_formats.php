@@ -7,7 +7,6 @@
 //  client-specific) is still resolved by the template picker at finalize.
 // ============================================================================
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/service-scope">Service scope</a> › Report formats</div>
 <div class="master-head">
   <div>
     <h1>Report formats by service line</h1>

@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Operations desk</div>
 <div class="master-head">
   <div><h1>Operations desk</h1>
     <p class="sub" style="margin:2px 0 0">The control centre — what is waiting, what is scheduled, what is at risk.

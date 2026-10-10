@@ -1,5 +1,4 @@
 <?php // Create / edit an endorsement (upload the manufacturer original + supporting evidence) ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/endorsements"><?= e(TP('endorsement')) ?></a> › <?= $e ? e($e['endorsement_no']) : 'New' ?></div>
 <div class="master-head"><div><h1><?= e($e ? ucfirst(T_EDIT('endorsement')) : ucfirst(T_NEW('endorsement'))) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= $e ? e($e['endorsement_no']) : 'Upload a manufacturer / vendor quality record for TPIA review &amp; endorsement. The original is never altered.' ?></p></div></div>
 

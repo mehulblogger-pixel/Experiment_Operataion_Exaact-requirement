@@ -55,7 +55,6 @@ $table = function ($rows, $head, $exportKey) use ($money, $pill, $avg, $sal, $qs
     <?php
 };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Management dashboard</div>
 <div class="master-head">
   <div><h1>Management dashboard</h1>
     <p class="sub">Every figure below is counted off one set of <?= e(Tlp('job')) ?>: the ones whose inspection fell inside <strong><?= e($period) ?></strong>. Narrow it any way you like — the numbers stay consistent with each other.</p></div>

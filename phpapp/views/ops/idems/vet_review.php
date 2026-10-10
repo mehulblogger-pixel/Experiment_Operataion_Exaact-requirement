@@ -2,7 +2,6 @@
 // Side-by-side vetting: the actual report (left) and the vetting checklist (right).
 $vetPill = ['VETTED'=>'p-ok','RETURNED'=>'p-bad','DEBRIEFED'=>'p-info'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Vet side by side</div>
 <div class="master-head">
   <div><h1>Vet: <?= e($doc['irn']) ?></h1>
 <?php //  B10-CL-3 — the definition where the word is. Same helper and same

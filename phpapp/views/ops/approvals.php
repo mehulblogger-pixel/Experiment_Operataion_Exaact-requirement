@@ -6,7 +6,6 @@ $act = $q['act']; $watch = $q['watch'];
 $total = count($act) + count($watch);
 $sumOf = function ($rows) { $t = 0.0; foreach ($rows as $r) $t += (float)$r['amount']; return $t; };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Approvals</div>
 <div class="master-head">
   <div><h1>Approvals</h1>
   <p class="sub" style="margin:2px 0 0">Deals held at a stage until somebody with the authority agrees. A quotation of this size already needed an approver; the deal it belongs to did not, and the forecast is built from the deal.</p></div>

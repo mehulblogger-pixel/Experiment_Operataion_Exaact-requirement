@@ -3,7 +3,6 @@
   $qs = function (array $over = []) { return '/notifications?' . http_build_query(array_merge($_GET, $over)); };
   $short = function ($s, $n = 60) { $s = (string)$s; return mb_strlen($s) > $n ? mb_substr($s, 0, $n - 1) . '…' : $s; };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Notification log</div>
 <div class="master-head">
   <div><h1>Notification log</h1>
     <p class="sub" style="margin:2px 0 0">Every email the system sent or tried to send — recipient, subject, category and whether it actually went out. Read-only, from the send log.</p></div>

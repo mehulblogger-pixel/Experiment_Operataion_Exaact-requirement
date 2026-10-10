@@ -11,7 +11,6 @@ $deptColor = function ($d) {
 };
 $groups = function_exists('dept_org_groups') ? dept_org_groups() : [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/positions">Positions</a> › Org chart</div>
 <div class="master-head">
   <div><h1>Organisation chart</h1>
     <p class="sub" style="margin:2px 0 0">The reporting hierarchy built from the position master (who reports to whom), coloured by department.</p></div>

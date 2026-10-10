@@ -27,7 +27,6 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
     return $h . '</select>';
 };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/hiring-requests">Hiring requests</a> › <?= $r ? $e($r['req_no']) : 'New' ?></div>
 <div class="master-head">
   <div><h1><?= $r ? $e($r['req_no']) : 'New hiring request' ?>
     <?php if ($r): ?><span class="pill <?= $status === 'APPROVED' ? 'p-ok' : ($status === 'DRAFT' ? 'p-mut' : 'p-info') ?>" style="vertical-align:middle;font-size:12px"><?= $e((function_exists('hreq_statuses') ? hreq_statuses() : [])[$status] ?? $status) ?></span><?php endif; ?></h1>
@@ -298,7 +297,7 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
 
     <div style="margin-top:14px;display:flex;gap:8px">
       <button class="btn" type="submit"><?= $r ? 'Save draft' : 'Create request' ?></button>
-      <?php if ($r): ?><a class="btn secondary" href="/hiring-requests">Back</a><?php endif; ?>
+      <?php if ($r): ?><a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a><?php endif; ?>
     </div>
   </form>
   <script>

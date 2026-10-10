@@ -4,7 +4,6 @@
   $byArea = [];
   foreach ($rows as $r) $byArea[$r['area']][] = $r;
 ?>
-<div class="crumbs"><a href="/">Home</a> › <span>Where we stand</span></div>
 
 <div class="master-head">
   <div><h1>Where we stand</h1>

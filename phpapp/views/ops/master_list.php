@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <?= e($cfg['label']) ?></div>
 <div class="master-head">
   <div><h1><?= e($cfg['label']) ?></h1><p class="sub"><?= count($rows) ?> record(s)</p></div>
   <div style="display:flex;gap:6px">

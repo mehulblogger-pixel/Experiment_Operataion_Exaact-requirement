@@ -10,7 +10,6 @@
   $curTrade = $ins['trade_id'] ?? '';
   $trades = lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/m/inspectors"><?= e(TP('engineer')) ?></a> › <?= $isEdit ? 'Edit' : 'Add' ?></div>
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit — ' . e($ins['name']) : 'Add ' . Tl('engineer') ?></h1></div>
   <div style="display:flex;gap:8px">

@@ -202,13 +202,12 @@
     echo '</div>';
   };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Fill</div>
 <div class="master-head"><div><h1>Fill <?= e(Tl('report')) ?> <?= e($doc['irn']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($doc['title'] ?: $doc['type_code']) ?></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>" title="Client, vendor, PO, applicable standards, result &amp; release status">✎ Edit details</a>
     <a class="btn secondary" href="/my-signature" target="_blank" title="Draw or upload your signature — it is added to reports you sign automatically">✍️ My signature</a>
-    <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">← Back</a>
+    <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
   </div>
 </div>
 <div class="panel" style="margin-bottom:12px;border-left:3px solid var(--brand);background:var(--soft);font-size:12.5px;padding:8px 12px">

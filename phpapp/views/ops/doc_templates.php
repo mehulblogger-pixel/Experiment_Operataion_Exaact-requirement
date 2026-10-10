@@ -8,7 +8,6 @@ $lh = function_exists('setting_get') ? setting_get('doc_letterhead', '') : '';
 $ft = function_exists('setting_get') ? setting_get('doc_footer', '') : '';
 $ca = function_exists('setting_get') ? setting_get('company_address', '') : '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › Document templates</div>
 <div class="master-head">
   <div><h1>Document Studio</h1>
     <p class="sub" style="margin:2px 0 0">Configure the letters issued to candidates — offer, appointment and any other document. Type text and drop in <b>{tokens}</b>; every variable is auto-filled from the candidate's data when the letter is generated.</p></div>

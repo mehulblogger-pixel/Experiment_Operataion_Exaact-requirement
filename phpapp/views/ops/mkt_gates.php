@@ -6,7 +6,6 @@
       return '<span style="display:inline-block;font-size:11px;font-weight:700;color:#fff;background:' . $c . ';border-radius:999px;padding:2px 9px">' . e($s) . '</span>';
   };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/super-admin">Super Admin</a> › Feature gates</div>
 <div class="master-head">
   <div><h1>Feature gates</h1>
     <p class="sub">Roll out each money feature in three steps — <b>Off</b> (invisible), <b>Test</b> (staff only, no charging), <b>Live</b> (everyone). Everything defaults to Off; turning a feature on is always deliberate.</p></div>

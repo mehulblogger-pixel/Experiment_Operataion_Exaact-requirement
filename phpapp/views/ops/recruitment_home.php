@@ -50,7 +50,6 @@ $grp = function ($icon, $title, $n) use ($e) {
   @media (max-width:560px){ .rc-kpis{grid-template-columns:repeat(2,1fr)} }
 </style>
 
-<div class="crumbs"><a href="/">Home</a> › <a href="/operations">Operations</a> › Recruitment</div>
 <div class="master-head">
   <div>
     <h1>Recruitment &amp; Workforce</h1>

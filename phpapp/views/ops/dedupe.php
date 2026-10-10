@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/clients"><?= e(T_REG('client')) ?></a> › Possible duplicates</div>
 <div class="master-head">
   <div><h1>Possible duplicates</h1>
     <p class="sub">The same company entered twice, months apart, spelt differently. Nothing is merged automatically — read the pair, then decide.</p></div>

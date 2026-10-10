@@ -8,7 +8,6 @@
   // Every non-core bundle key, so we can show what a package keeps vs hides.
   $nonCore = array_keys(array_filter($modules, fn($m) => empty($m['core'])));
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/super-admin">Control panel</a> › Product package</div>
 <div class="master-head">
   <div><h1>Product package</h1>
     <p class="sub" style="margin:2px 0 0">Pick which EXAACT this installation is. This sets the industry pack and which product

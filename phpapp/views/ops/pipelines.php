@@ -1,5 +1,4 @@
 <?php $byKind = []; foreach ($rows as $r) $byKind[$r['entity_kind']][] = $r; ?>
-<div class="crumbs"><a href="/">Home</a> › Pipelines &amp; funnels</div>
 <div class="master-head">
   <div><h1>Pipelines &amp; funnels</h1>
   <p class="sub" style="margin:2px 0 0">Have as many as your business needs — new business, renewals, repeat orders, each with its own stages. Adjust any of them to match how you actually work, or build one from scratch.</p></div>

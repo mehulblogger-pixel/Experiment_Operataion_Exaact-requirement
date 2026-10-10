@@ -6,7 +6,6 @@
   $custName = $o['client_name'] ?: ($o['partner_name'] ?: '');
 ?>
 <?= function_exists('chain_strip') ? chain_strip('OPPORTUNITY', (int)$o['id'], 'OPPORTUNITY', (int)$o['id']) : '' ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/opportunities">Deals</a> › <?= e($o['ref']) ?></div>
 <div class="master-head"><div>
   <h1><?= e($o['name']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($o['ref']) ?>

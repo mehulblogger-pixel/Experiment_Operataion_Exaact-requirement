@@ -3,7 +3,6 @@ $badge = ['DRAFT' => 'AMBER', 'CURRENT' => 'GREEN', 'SUPERSEDED' => 'GREY', 'WIT
 $ee = fn($x) => e((string)$x);
 $row = fn($lbl, $val) => $val !== '' && $val !== null ? '<tr><th style="text-align:left;width:190px;color:#697787;font-weight:600">' . e($lbl) . '</th><td>' . $val . '</td></tr>' : '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/cdocs">Controlled documents</a> › <?= e($d['doc_code']) ?></div>
 <div class="master-head">
   <div><h1><?= e($d['doc_code']) ?> <span class="badge <?= $badge ?>"><?= e($d['status']) ?></span></h1>
     <p class="sub"><?= e($d['title']) ?><?php if ($d['revision']): ?> · <?= e($d['revision']) ?><?php endif; ?></p></div>

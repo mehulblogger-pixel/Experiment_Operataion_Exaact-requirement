@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Contract openings</div>
 <div class="master-head">
   <div><h1>Contract openings</h1>
     <p class="sub" style="margin:2px 0 0">Won orders waiting for their contract number to be opened. A manager <b>endorses</b>, then the branch manager <b>approves</b> — then the order floats to operations.</p></div>

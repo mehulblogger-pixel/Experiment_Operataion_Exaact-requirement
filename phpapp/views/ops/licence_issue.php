@@ -1,5 +1,4 @@
 <?php $can = $can_sign ?? false; $modules = $modules ?? []; $history = $history ?? []; $beats = $beats ?? []; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/licence">Licence</a> › Issue a licence</div>
 <div class="master-head"><div>
   <h1>Licence console</h1>
   <p class="sub" style="margin:2px 0 0">Generate a signed licence key for a customer. Only this server can sign one —

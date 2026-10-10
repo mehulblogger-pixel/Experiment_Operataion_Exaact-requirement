@@ -22,7 +22,6 @@ $applySummary = function ($r) use ($e) {
     return $b ? implode(' · ', $b) : 'Any';
 };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Recruitment approvals</div>
 <div class="master-head">
   <div><h1>Approval rules &amp; matrix</h1>
     <p class="sub" style="margin:2px 0 0">Configure who approves what, in how many steps — by entity, department, grade or value band — each level with its own SLA, reminder cadence and escalation. The narrowest matching rule applies.</p></div>

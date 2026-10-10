@@ -7,7 +7,6 @@
   $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n, 2);
   $clean = empty($rows);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/money">Money</a> › Reimbursable duplication</div>
 <div class="master-head">
   <div><h1>Reimbursable duplication</h1>
     <p class="sub" style="margin:2px 0 0">Reimbursables (travel · lodging · food) can be recorded on <strong>two doors</strong> — the <?= e(Tl('job')) ?>&rsquo;s

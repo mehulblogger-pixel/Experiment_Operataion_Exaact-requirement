@@ -3,7 +3,6 @@ $badge = ['DRAFT' => 'AMBER', 'CURRENT' => 'GREEN', 'SUPERSEDED' => 'GREY', 'WIT
 $row = fn($lbl, $val) => $val !== '' && $val !== null ? '<tr><th style="text-align:left;width:190px;color:#697787;font-weight:600">' . e($lbl) . '</th><td>' . $val . '</td></tr>' : '';
 $ee = fn($x) => e((string)$x);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/methods">Method library</a> › <?= e($m['method_code']) ?></div>
 <div class="master-head">
   <div><h1><?= e($m['method_code']) ?> <span class="badge <?= $badge ?>"><?= e($m['status']) ?></span>
     <?php if ((int)$m['is_validated'] === 1): ?><span class="badge GREEN">Validated</span><?php else: ?><span class="badge AMBER">Not validated</span><?php endif; ?></h1>

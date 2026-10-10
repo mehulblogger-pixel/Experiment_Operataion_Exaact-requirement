@@ -3,12 +3,18 @@
 t_section('recruitment: navigation & cross-linking (1a)');
 
 // Breadcrumbs on the two list screens that lacked them.
-$reqList = file_get_contents(__DIR__ . '/../views/ops/requisition_list.php');
-$candList = file_get_contents(__DIR__ . '/../views/ops/candidate_list.php');
-t_ok(strpos($reqList, 'class="crumbs"') !== false && strpos($reqList, '/recruitment') !== false,
-    'the requisition list has breadcrumbs back to Recruitment');
-t_ok(strpos($candList, 'class="crumbs"') !== false && strpos($candList, '/recruitment') !== false,
-    'the candidate list has breadcrumbs back to Recruitment');
+//
+// R-24 — these are no longer typed into the views. The trail is derived once,
+// centrally, from where a screen actually sits, so the question is no longer
+// "does this file contain a crumb?" but "does the model put this screen under
+// Recruitment?" — which is the thing the original test was really asking.
+t_as_admin();
+foreach (['requisitions' => 'the requisition list', 'candidates' => 'the candidate list'] as $route => $what) {
+    $labels = array_map(fn($s) => $s['label'], nav_trail($route));
+    t_ok(in_array('Recruitment', $labels, true),
+         "*** $what has a trail back to Recruitment");
+}
+t_as_nobody();
 
 // Candidate detail links back to its requisition.
 $candDetail = file_get_contents(__DIR__ . '/../views/ops/candidate_detail.php');

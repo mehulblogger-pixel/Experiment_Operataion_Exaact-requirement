@@ -1,5 +1,4 @@
 <?php $ackLate = cmp_ack_overdue($c); $decLate = cmp_decide_overdue($c); $closed = $c['status'] === 'CLOSED'; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/complaints">Complaints &amp; appeals</a> › <?= e($c['ref']) ?></div>
 <div class="master-head">
   <div><h1><?= e($c['ref']) ?> — <?= e($c['subject']) ?></h1>
     <p class="sub" style="margin:2px 0 0">
@@ -11,7 +10,7 @@
   <div style="display:flex;gap:8px">
     <?php if ($canRecord && !$closed && $c['kind'] !== 'APPEAL' && $c['outcome'] !== 'PENDING'): ?>
       <a class="btn secondary" href="/complaint-new?appeal_of=<?= (int)$c['id'] ?>">They are appealing</a><?php endif; ?>
-    <a class="btn secondary" href="/complaints">← Back</a>
+    <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
   </div>
 </div>
 

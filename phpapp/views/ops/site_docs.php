@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/identity">Identity documents</a> › What sites require</div>
 <div class="master-head"><div>
   <h1>What each site requires before the gate opens</h1>
   <p class="sub" style="margin:2px 0 0">A refinery that wants a medical and a police verification says so here, once. Deputing somebody who does not hold them is then refused at the allocation screen rather than at the barrier.</p></div></div>

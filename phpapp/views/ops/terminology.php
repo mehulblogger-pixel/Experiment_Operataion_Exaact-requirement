@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Terminology</div>
 <div class="master-head"><div>
   <h1>Terminology</h1>
   <p class="sub" style="margin:2px 0 0">Every screen in the app reads its wording from here. Change a word once and it changes everywhere — headings, menus, buttons, labels and e-mails. Nothing about your data changes; only what things are called.</p>

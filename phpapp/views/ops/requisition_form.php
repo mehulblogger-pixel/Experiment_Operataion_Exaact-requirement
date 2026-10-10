@@ -128,7 +128,6 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   #rq_cost_auto{cursor:pointer;text-decoration:underline;color:var(--brand,#1e40af)}
 </style>
 
-<div class="crumbs"><a href="/">Home</a> › <a href="/requisitions"><?= e(TP('requisition')) ?></a> › <?= $isEdit ? 'Edit' : 'New' ?></div>
 <?php // M4 correction §1 — name the object. This screen creates an approved
       // RECRUITMENT REQUISITION directly (the direct path); it is not the hiring
       // request, and it is not a marketplace requirement.

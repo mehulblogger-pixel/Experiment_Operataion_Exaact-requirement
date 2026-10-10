@@ -1,9 +1,8 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Server check</div>
 <div class="master-head">
   <div><h1>Server check</h1>
     <p class="sub" style="margin:2px 0 0">What this build is, and whether this server can run all of it.
       Quote the version below on any support message.</p></div>
-  <a class="btn secondary" href="/settings">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <div class="panel" style="max-width:760px">

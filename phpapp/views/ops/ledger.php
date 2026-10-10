@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/clients">Customers</a> › <a href="/partner?id=<?= (int)$p['id'] ?>"><?= e($p['display_name'] ?: $p['legal_name']) ?></a> › Ledger</div>
 <div class="master-head">
   <div><h1>Ledger — <?= e($p['display_name'] ?: $p['legal_name']) ?></h1>
   <p class="sub" style="margin:2px 0 0">Every invoice, receipt, TDS deduction and credit note against this customer, in date order, with a running balance. This is the answer to "what do they actually owe us".</p></div>

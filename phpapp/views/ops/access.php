@@ -19,7 +19,6 @@
     'INSPECTOR' => 'Field engineer — only their own My Jobs / My Voucher; no admin screens.',
   ];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Roles &amp; access</div>
 <div class="master-head">
   <div><h1>Roles &amp; permissions</h1>
     <p class="sub" style="margin:2px 0 0">Pick a role, apply the recommended set in one click, then fine-tune. Applies to everyone in that role without a personal override. <strong>Master Admin</strong> always has everything.</p></div>

@@ -3,14 +3,13 @@
                 'HOLD'=>'AMBER','REJECTED'=>'RED','ACCEPTED'=>'GREEN','WITHDRAWN'=>'RED'];
   $cur = $cand['stage'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/candidates"><?= e(TP('candidate')) ?></a> › <?= e($cand['cand_code'] ?: candidate_name($cand)) ?></div>
 <div class="master-head">
   <div><h1><?= e(candidate_name($cand)) ?>
       <span class="badge <?= $stageBadge[$cur] ?? 'AMBER' ?>" style="vertical-align:middle"><?= e(lk_options_or('candidate_stage', CAND_STAGES)[$cur] ?? $cur) ?></span></h1>
     <p class="sub"><?= e($cand['cand_code']) ?><?= $cand['trade_label']?' · '.e($cand['trade_label']):'' ?><?= $cand['skill_label']?' / '.e($cand['skill_label']):'' ?> · <?= e(lk_options_or('candidate_source', CAND_SOURCES)[$cand['source']] ?? $cand['source']) ?></p></div>
   <div class="row-actions">
     <a class="btn secondary" href="/candidate-edit?id=<?= (int)$cand['id'] ?>">Edit</a>
-    <a class="btn secondary" href="/candidates">← Back</a>
+    <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
   </div>
 </div>
 

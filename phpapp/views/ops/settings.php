@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Settings</div>
 <h1>System settings</h1>
 <p class="sub">Company-wide options — financial year, branding and dashboards.
   <a href="/preflight">Server check &amp; version <?= e(APP_VERSION) ?> →</a></p>

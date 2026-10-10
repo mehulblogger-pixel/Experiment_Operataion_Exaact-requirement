@@ -19,7 +19,6 @@ $chosen = array_flip($chosen ?? []);
 </style>
 
 <div class="ck">
-  <div class="crumbs"><a href="/">Home</a> › <a href="/workspace/setup">Workspace setup</a> › Business profile</div>
   <h1 style="margin:.2em 0">Business profile</h1>
   <p class="muted" style="margin-top:0">Tell us your company name and what you do. Pick <strong>every</strong> activity that applies — many companies do more than one. This tailors your workspace and, later, what we suggest.</p>
 

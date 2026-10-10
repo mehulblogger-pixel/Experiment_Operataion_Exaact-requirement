@@ -12,7 +12,6 @@
   $locMax = 1; foreach ($locs as $l) { $locMax = max($locMax, (int)$l['value']); }
   $vMax = 0; foreach ($verif as $v) { $vMax += (int)$v['value']; } $vMax = max(1, $vMax);
 ?>
-<div class="crumbs"><a href="/">Home</a> › Market analytics</div>
 <div class="master-head">
   <div><h1>Labour-market analytics</h1>
     <p class="sub" style="margin:2px 0 0">Where demand meets supply across the marketplace — the intelligence a talent network runs on.

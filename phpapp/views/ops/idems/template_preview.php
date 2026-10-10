@@ -3,7 +3,6 @@
 // recipient sees versus what stays internal, and flags conditional / scored fields.
 $type = $pv['type']; $c = $pv['counts'];
 ?>
-<div class="crumbs"><a href="/report-types">Report types</a> › <a href="/report-builder?type=<?= (int)$type['id'] ?>">Builder</a> › Persona preview</div>
 <div class="master-head">
   <div>
     <h1>Persona preview — <?= e($type['name'] ?: $type['code']) ?></h1>

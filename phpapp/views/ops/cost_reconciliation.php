@@ -8,7 +8,6 @@
   $green = !empty($summary['green']);
   $mode = $mode ?? 'reconciled'; $modes = $modes ?? [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/money">Money</a> › Cost reconciliation</div>
 <div class="master-head">
   <div><h1>Cost reconciliation</h1>
     <p class="sub" style="margin:2px 0 0">Where a <?= e(Tl('job')) ?>'s legacy sub-contractor cost disagrees with what a committed

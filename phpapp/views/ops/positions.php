@@ -6,7 +6,6 @@ $positions = $positions ?? []; $offices = $offices ?? []; $sel = $sel ?? null;
 $posName = [];
 foreach ($positions as $p) $posName[(int)$p['id']] = $p['name'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Positions</div>
 <div class="master-head">
   <div><h1>Position master</h1>
     <p class="sub" style="margin:2px 0 0">The roles your organisation sanctions — each with its department, grade, reporting line and headcount. Staff requisitions are validated against these.</p></div>

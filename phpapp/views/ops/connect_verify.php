@@ -11,7 +11,6 @@
       return '<span class="vp vp-' . $cls . '">' . e(ucfirst(strtolower($s))) . '</span>';
   };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Verification desk</div>
 <div class="master-head">
   <div><h1>Verification desk</h1>
     <p class="sub" style="margin:2px 0 0">Confirm or reject the identity and credential checks people submit.

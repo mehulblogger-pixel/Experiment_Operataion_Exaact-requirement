@@ -58,11 +58,10 @@
     echo '</div>';
   }
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/calls"><?= e(T_REG('call')) ?></a> › <a href="/call?id=<?= (int)$call['id'] ?>"><?= e($call['call_code']) ?></a> › <?= $job ? e($job['job_code']) : 'Allocate' ?></div>
 <div class="master-head">
   <div><h1><?= $job ? 'Edit ' . e(Tl('job')) . ' ' . e($job['job_code']) : 'Allocate ' . e(Tl('call')) . ' ' . e($call['call_code']) ?></h1>
     <p class="sub" style="margin:2px 0 0">Everything agreed on the <?= e(Tl('call')) ?> is already filled in below. Pick who does it and when — the <?= e(Tl('engineer')) ?> is e-mailed once a date is set.</p></div>
-  <a class="btn secondary" href="/call?id=<?= (int)$call['id'] ?>">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
 <?php // Only appears once the gate has actually stopped somebody, and only for

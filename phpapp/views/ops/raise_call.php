@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Raise inspection <?= e(Tl('call')) ?></div>
 <div class="master-head">
   <div><h1>Raise an inspection <?= e(Tl('call')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Pick the <?= e(Tl('client')) ?>, then the contract the work is under — the <?= e(Tl('call')) ?> fills itself in from there.</p></div>

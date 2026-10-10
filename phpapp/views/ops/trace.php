@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Thread</div>
 <div class="master-head">
   <div><h1>The whole thread</h1>
   <p class="sub" style="margin:2px 0 0">From the first enquiry to the money in the bank. A stage with nothing in it is shown too — that is where the handover was skipped.</p></div>

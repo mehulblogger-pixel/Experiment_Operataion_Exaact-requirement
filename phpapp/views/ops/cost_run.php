@@ -23,7 +23,6 @@ $basisLabel = [
     'THE_JOB_IT_WAS_FOR' => 'the job it was paid for',
 ];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Month-end cost run</div>
 <div class="master-head">
   <div><h1>Month-end cost run</h1>
     <p class="sub">Turns one month for one <?= e(Tl('office')) ?> into a cost against each <?= e(Tl('sbu')) ?>, activity code and <?= e(T('boss')) ?> number. Look at it first; nothing is stored until you say so.</p></div>

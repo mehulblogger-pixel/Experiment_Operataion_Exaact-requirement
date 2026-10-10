@@ -2,7 +2,6 @@
 $rbadge = ['LOW' => 'GREEN', 'MEDIUM' => 'AMBER', 'HIGH' => 'RED', 'CRITICAL' => 'RED'];
 $sbadge = ['OPEN' => 'AMBER', 'TREATING' => 'BLUE', 'MONITORING' => 'BLUE', 'CLOSED' => 'GREEN'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Quality &amp; accreditation › Risks &amp; opportunities</div>
 <div class="master-head">
   <div><h1>Risks &amp; opportunities</h1>
     <p class="sub"><?= (int)($counts['open'] ?? 0) ?> open<?php if (!empty($counts['high'])): ?> · <span style="color:#b3402f"><?= (int)$counts['high'] ?> high / critical</span><?php endif; ?> · actions to address risk (ISO §8.5)</p></div>

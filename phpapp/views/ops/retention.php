@@ -1,5 +1,4 @@
 <?php $ed = $edit; ?>
-<div class="crumbs"><a href="/">Home</a> › Quality &amp; accreditation › Retention schedule</div>
 <div class="master-head"><div><h1>Record-retention schedule</h1>
   <p class="sub">How long each kind of record is kept, and what happens to it at the end (ISO §8.4)</p></div></div>
 

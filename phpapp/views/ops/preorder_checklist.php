@@ -1,5 +1,4 @@
 <?php // Configure the pre-order review checklist — editable, on/off. ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(THP('quote')) ?></a> › Pre-order checklist</div>
 <div class="master-head"><div><h1>Pre-order review checklist</h1>
   <p class="sub" style="margin:2px 0 0">The points reviewed before a <?= e(Tl('quote')) ?> is approved — enquiry / tender / contract review and the commercial checks. Fully editable, and you can switch it on or off.</p></div></div>
 

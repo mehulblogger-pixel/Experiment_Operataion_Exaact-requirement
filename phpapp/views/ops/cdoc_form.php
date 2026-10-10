@@ -5,7 +5,6 @@ $val = fn($k, $dv = '') => e($doc[$k] ?? $dv);
 $sel = function ($opts, $cur) { foreach ($opts as $code => $label) {
     echo '<option value="' . e($code) . '"' . ($cur === $code ? ' selected' : '') . '>' . e($label) . '</option>'; } };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/cdocs">Controlled documents</a> › <?= $doc ? e($doc['doc_code']) : 'Add a document' ?></div>
 <div class="master-head"><div><h1><?= $doc ? 'Edit ' . e($doc['doc_code']) : 'Add a controlled document' ?></h1>
   <p class="sub">A new document is a draft; record its approval and set it Current when it is in force.</p></div></div>
 

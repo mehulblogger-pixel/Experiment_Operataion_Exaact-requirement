@@ -14,7 +14,6 @@
   $num = function($v){ return $v===null ? '—' : rtrim(rtrim(number_format((float)$v,1),'0'),'.'); };
   $fmtD = function($s){ $s=trim((string)$s); if($s==='')return '—'; $t=strtotime($s); return $t?date('d-M-Y',$t):$s; };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/expediting">Expediting</a> › Projects</div>
 <div class="master-head">
   <div><h1>Project delivery consolidation</h1>
     <p class="sub" style="margin:2px 0 0">Every project rolled up from its purchase orders — one project, many POs, one delivery view. <?= (int)$counts['projects'] ?> project(s) · <?= (int)$counts['pos'] ?> PO(s).</p></div>

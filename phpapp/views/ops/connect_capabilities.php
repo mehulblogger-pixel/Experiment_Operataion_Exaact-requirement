@@ -8,7 +8,6 @@ $configured = !empty($configured); $pools = $pools ?? ['internal'=>0,'associated
 $is_supplier = !empty($is_supplier);
 $owner = (int)($owner ?? 0); $is_owner = !empty($is_owner); $does_inspection = !empty($does_inspection);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Company capabilities</div>
 <div class="master-head">
   <div><h1>Company business capabilities</h1>
     <p class="sub" style="margin:2px 0 0">A company is not one fixed type. Turn on the capabilities it actually delivers —

@@ -7,7 +7,6 @@
              ($t['days'] <= 30 ? ['p-ok', $t['days'] . ' days ago'] :
              ($t['days'] <= 90 ? ['p-warn', $t['days'] . ' days ago'] : ['p-bad', $t['days'] . ' days ago']));
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/clients">Customers</a> › <?= e($name) ?></div>
 <div class="master-head">
   <div><h1><?= e($name) ?></h1>
     <p class="sub" style="margin:2px 0 0">

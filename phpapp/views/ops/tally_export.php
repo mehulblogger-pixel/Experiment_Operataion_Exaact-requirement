@@ -6,7 +6,6 @@
   $readyTotal = 0.0;
   foreach ($ready as $r) $readyTotal += $isRcp ? $r['receipt_amount'] : $r['total'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Billing › Tally export</div>
 <?php billing_tabs('tally'); ?>
 <div class="master-head">
   <div><h1>Tally export</h1>

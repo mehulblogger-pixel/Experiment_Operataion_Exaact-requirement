@@ -5,7 +5,7 @@
 // the client never edits the claim, only accepts or returns it.
 $v = $v ?? null; $lines = $lines ?? []; $heads = $heads ?? []; $files = $files ?? []; $reports = $reports ?? []; $cleared = $cleared ?? false;
 $terms = $terms ?? []; $termLabels = $termLabels ?? []; $engQty = (float)($engQty ?? 0);
-if (!$v) { echo '<p class="pempty">Voucher not found. <a href="/portal/hire">Back</a></p>'; return; }
+if (!$v) { echo '<p class="pempty">Voucher not found. <a href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a></p>'; return; }
 $exclusive = strtoupper((string)$v['rate_inclusive']) === 'EXCLUSIVE';
 $status    = strtoupper((string)$v['status']);
 $money     = function_exists('connect_engv_money') ? connect_engv_money($v) : [];

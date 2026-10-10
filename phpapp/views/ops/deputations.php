@@ -10,7 +10,6 @@
   };
   $fmtDate = fn($s) => $s ? date('d M Y', strtotime($s)) : '—';
 ?>
-<div class="crumbs"><a href="/">Home</a> › Deputation &amp; site operations</div>
 <div class="master-head">
   <div><h1>Deputation &amp; site operations</h1>
     <p class="sub" style="margin:2px 0 0">Personnel deputed to a client / project / site — lifecycle, mobilization,

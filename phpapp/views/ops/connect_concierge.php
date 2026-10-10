@@ -38,7 +38,6 @@ foreach ($sectors as $s) if (($s['code'] ?? '') === $data['sector_code']) $secNa
   @media(max-width:520px){.grid2{grid-template-columns:1fr}}
 </style>
 
-<div class="crumbs"><a href="/">Home</a> › <a href="/connect-requirements">Marketplace</a> › Guided post</div>
 <div class="cwrap">
   <div class="cbar"><?php for ($i = 1; $i <= $total; $i++): ?><div class="<?= $i <= $step ? 'on' : '' ?>"></div><?php endfor; ?></div>
   <div class="csub">Step <?= (int)$step ?> of <?= (int)$total ?></div>

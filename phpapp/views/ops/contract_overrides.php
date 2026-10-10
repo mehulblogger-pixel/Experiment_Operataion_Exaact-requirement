@@ -11,7 +11,6 @@
   };
   $waitingMe = array_values(array_filter($open, $mine));
 ?>
-<div class="crumbs"><a href="/">Home</a> › Contract exceptions</div>
 <div class="master-head">
   <div><h1>Contract exceptions</h1>
     <p class="sub" style="margin:2px 0 0">Requests to schedule work against an order whose contract has expired,

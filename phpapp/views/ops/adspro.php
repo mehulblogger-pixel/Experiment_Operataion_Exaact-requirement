@@ -3,7 +3,6 @@
 // looks clever is one where nobody can tell whether it is actually working.
 $c = $cfg;
 ?>
-<div class="crumbs"><a href="/">Home</a> › Ads Pro</div>
 <div class="master-head">
   <div><h1>Ads Pro connection</h1>
   <p class="sub" style="margin:2px 0 0">Ads Pro runs the campaigns and knows what they cost. This system knows what was invoiced and what was paid. Joined, the two answer the question neither can answer alone: which advertising brought back money that actually arrived.</p></div>

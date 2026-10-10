@@ -8,7 +8,6 @@ $selTiles = array_flip((array)($cfg['tiles'] ?? []));
 $byArea = [];
 foreach ($catalog as $c) { $byArea[$c['area'] ?: 'Other'][] = $c; }
 ?>
-<div class="crumbs"><a href="/">Home</a> › Role workspaces</div>
 <div class="master-head">
   <div><h1>Role workspaces</h1>
     <p class="sub" style="margin:2px 0 0">Choose where each role lands after sign-in and the quick-access screens on their home. Everything here stays permission-safe — a role only ever sees screens it is already allowed to open.</p></div>

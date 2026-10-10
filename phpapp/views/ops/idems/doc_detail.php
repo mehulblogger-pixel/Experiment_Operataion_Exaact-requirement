@@ -1,5 +1,4 @@
 <?php // Report instance detail — Phase 1 (header, references, lifecycle actions, audit) ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <?= e($doc['irn']) ?></div>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('report', $doc['irn'])) ?> <?= $doc['finalized'] ? '🔒' : '' ?></h1>
     <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($doc['type_code']) ?></span> <?= e($doc['type_name'] ?: $doc['title']) ?> · <span class="pill <?= idems_status_pill($doc['status']) ?>"><?= e(lk_options_or('report_status', IDEMS_STATUS)[$doc['status']] ?? $doc['status']) ?></span></p></div>

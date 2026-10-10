@@ -1,8 +1,7 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/clients"><?= e(T_REG('client')) ?></a> › Import from a spreadsheet</div>
 <div class="master-head">
   <div><h1>Import <?= e(Tlp('client')) ?> &amp; <?= e(Tlp('vendor')) ?></h1>
     <p class="sub">Download the format, fill it in, upload it. You see exactly what will happen before anything is saved.</p></div>
-  <div><a class="btn ghost" href="/clients">Back</a></div>
+  <div><a class="btn ghost" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a></div>
 </div>
 
 <?php if (!$rows): ?>

@@ -1,5 +1,4 @@
 <?php $forms = $forms ?? []; $groups = $groups ?? []; $counts = $counts ?? []; $fieldCounts = $fieldCounts ?? []; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Custom forms</div>
 <div class="master-head"><div>
   <h1>Custom forms</h1>
   <p class="sub" style="margin:2px 0 0">Build a whole new register — no coding. Name it, choose where it sits in the menu, then add its

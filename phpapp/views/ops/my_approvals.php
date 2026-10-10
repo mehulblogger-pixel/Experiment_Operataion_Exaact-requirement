@@ -39,7 +39,6 @@ $slaPill = function ($st) {
 };
 $urgent = fn($st) => in_array($st, ['OVERDUE', 'ESCALATED', 'DUE'], true);
 ?>
-<div class="crumbs"><a href="/">Home</a> › My approvals</div>
 <div class="master-head">
   <div><h1>My approvals</h1>
     <p class="sub" style="margin:2px 0 0">Items waiting on your decision. Approving passes the item to the next level (if any); rejecting sends it back to the requester.</p></div>

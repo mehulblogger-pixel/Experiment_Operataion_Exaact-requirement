@@ -3,7 +3,6 @@ $v = fn($k, $d = '') => e($m[$k] ?? $d);
 $sel = function ($opts, $cur) { foreach ($opts as $code => $label) {
     echo '<option value="' . e($code) . '"' . ($cur === $code ? ' selected' : '') . '>' . e($label) . '</option>'; } };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/methods">Method library</a> › <?= $m ? e($m['method_code']) : 'Add a method' ?></div>
 <div class="master-head"><div><h1><?= $m ? 'Edit ' . e($m['method_code']) : 'Add a method' ?></h1>
   <p class="sub">A new method is saved as a draft; validate it and set it Current when it is in force.</p></div></div>
 

@@ -1,5 +1,4 @@
 <?php $c = $counts; $view = $view ?? 'board'; ?>
-<div class="crumbs"><a href="/">Home</a> › Opportunities</div>
 <div class="master-head">
   <div><h1>Opportunities</h1>
   <p class="sub" style="margin:2px 0 0">Pieces of business you are trying to win. Kept apart from quotations on purpose: one deal often carries three quotations, and counting quotations makes the forecast three times too big. A deal can also be lost before anyone quotes — that loss is the one worth recording.</p></div>

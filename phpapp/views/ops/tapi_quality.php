@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/analytics">Analytics</a> › <span>Data quality</span></div>
 <div class="master-head"><div>
   <h1>Data quality</h1>
   <p class="sub" style="margin:2px 0 0">Weak data distorts every KPI. These checks surface it rather than letting analytics quietly mislead.</p>

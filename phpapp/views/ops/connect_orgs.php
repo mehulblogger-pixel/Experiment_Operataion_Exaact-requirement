@@ -4,7 +4,6 @@
 $orgs = $orgs ?? []; $types = $types ?? [];
 $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','reporting'=>'Reporting','money'=>'Money','hr'=>'People/Hiring','connect'=>'Marketplace','pro'=>'Self-service'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/marketplace">Marketplace</a> › Organisations</div>
 <div class="master-head">
   <div><h1>Organisations</h1>
     <p class="sub" style="margin:2px 0 0">Each organisation on the platform carries a type, and the type sets which modules it gets — a TPIA gets the full operations platform, a manpower agency the marketplace. Everyone shares the professional pool; private data stays private (Phase B design).

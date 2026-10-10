@@ -1,10 +1,9 @@
 <?php $isEdit = !empty($e); ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/equipment">Equipment</a> › <?= $isEdit ? e($e['code']) : 'New' ?></div>
 <div class="master-head">
   <div><h1><?= $isEdit ? e($e['code'] . ' ' . $e['name']) : 'Add an instrument' ?></h1>
     <p class="sub" style="margin:2px 0 0">The identity somebody can read off the label, and every calibration
       certificate it has ever held.</p></div>
-  <a class="btn secondary" href="/equipment">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
 <?php if ($isEdit && $block !== ''): ?>

@@ -1,5 +1,4 @@
 <?php $d = $def ?: ['kpi_key'=>'','name'=>'','category'=>'OPERATIONS','formula'=>'','unit'=>'count','period'=>'MONTH','direction'=>'INFO','target'=>'','threshold'=>'','status'=>'ACTIVE','description'=>'']; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/analytics-kpis">KPI library</a> › <span><?= e($d['name'] ?: 'New KPI') ?></span></div>
 <div class="master-head"><div><h1><?= e($d['name'] ?: 'New KPI') ?></h1></div></div>
 <form method="post" action="/analytics-kpi-edit" class="panel" style="max-width:720px">
   <div style="display:grid;gap:12px;grid-template-columns:1fr 1fr">

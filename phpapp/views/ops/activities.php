@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Activity</div>
 <div class="master-head">
   <div><h1>Activity</h1>
   <p class="sub" style="margin:2px 0 0">Everything that has happened, in date order. Most of it writes itself — a quote sent, a report issued, a complaint raised. What a person typed is marked apart from what the system recorded, because a timeline where the two look identical teaches you to distrust both.</p></div>

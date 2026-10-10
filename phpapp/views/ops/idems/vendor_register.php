@@ -13,7 +13,6 @@
   };
   $scoreCol = function($s){ $s=(float)$s; if($s>=90) return '#15803d'; if($s>=75) return '#2563eb'; if($s>=60) return '#b45309'; if($s>=40) return '#c2410c'; return 'var(--bad)'; };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Vendors</div>
 <div class="master-head">
   <div><h1>Vendor register</h1>
     <p class="sub" style="margin:2px 0 0">Approved-vendor list with the latest assessment score, approval status and re-assessment due date. <?= (int)$counts['total'] ?> vendor(s).</p></div>

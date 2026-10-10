@@ -3,7 +3,6 @@ $badge = ['DRAFT' => 'AMBER', 'CURRENT' => 'GREEN', 'SUPERSEDED' => 'GREY', 'WIT
 $ee = fn($x) => e((string)$x);
 $row = fn($lbl, $val) => $val !== '' && $val !== null ? '<tr><th style="text-align:left;width:200px;color:#697787;font-weight:600">' . e($lbl) . '</th><td>' . $val . '</td></tr>' : '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/drules">Decision rules</a> › <?= e($r['rule_code']) ?></div>
 <div class="master-head">
   <div><h1><?= e($r['rule_code']) ?> <span class="badge <?= $badge ?>"><?= e($r['status']) ?></span></h1>
     <p class="sub"><?= e($r['title']) ?></p></div>

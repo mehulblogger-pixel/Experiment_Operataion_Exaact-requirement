@@ -2,7 +2,6 @@
 $p = $p ?? []; $usage = $usage ?? []; $sym = $sym ?? '₹';
 $mods = $p['modules'] ?? [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Plans, pricing &amp; usage</div>
 <div class="master-head"><div>
   <h1>Plans, pricing &amp; usage</h1>
   <p class="sub" style="margin:2px 0 0">Set what each module and seat costs, the monthly AI allowance and the AI top-up pack — then push them to your workspaces. Below, see each workspace's usage.</p>

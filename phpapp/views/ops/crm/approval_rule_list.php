@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes">Approval rules</a> › <?= e(T('quote')) ?> approvals</div>
 <div class="master-head">
   <div><h1>Approval rules</h1>
     <p class="sub" style="margin:2px 0 0">Who must approve a <?= e(Tl('quote')) ?> — by <strong>amount band</strong> and/or <strong><?= e(T('sbu')) ?></strong>. When a <?= e(Tl('quote')) ?> is submitted, matching rules become its approval chain (lower levels first).</p></div>

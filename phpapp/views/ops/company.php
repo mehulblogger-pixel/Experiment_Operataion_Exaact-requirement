@@ -1,5 +1,4 @@
 <?php $p = $p ?? []; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Your company</div>
 <div class="master-head"><div>
   <h1>Your company</h1>
   <p class="sub" style="margin:2px 0 0">Enter your business once. It appears on your quotations, invoices, e-mails and records.</p>

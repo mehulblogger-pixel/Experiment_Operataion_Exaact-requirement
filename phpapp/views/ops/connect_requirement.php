@@ -26,7 +26,6 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   .cxmeta{color:var(--muted,#5b6b6a);font-size:13px}
   .inline{display:inline}
 </style>
-<div class="crumbs"><a href="/">Home</a> › <a href="/connect-requirements">Marketplace</a> › <?= e($req['ref_code']) ?></div>
 <div class="master-head">
   <div><h1><?= e($req['title']) ?> <?= $pill($req['status']) ?></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($req['ref_code']) ?><?php if (!empty($req['location'])): ?> · <?= e($req['location']) ?><?php endif; ?>

@@ -1,9 +1,8 @@
-<div class="crumbs"><a href="/">Home</a> › Evidence review</div>
 <div class="master-head">
   <div><h1>Evidence review</h1>
     <p class="sub" style="margin:2px 0 0">Where and when each photograph was <strong>taken</strong> — read from the
       photograph itself, not from where it was uploaded. Flagged, never blocked.</p></div>
-  <a class="btn secondary" href="/">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <div class="panel" style="border-left:4px solid var(--accent)">

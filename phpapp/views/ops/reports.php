@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Dashboards</div>
 <h1>Dashboards</h1>
 <p class="sub">Live figures within your access. <?= role_label() ?> · scope applied automatically.</p>
 

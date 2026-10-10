@@ -2,7 +2,6 @@
   $stars = function($n){ $full=floor($n); $half=($n-$full)>=0.5; $s=str_repeat('★',(int)$full).($half?'⯪':'').str_repeat('☆',5-(int)$full-($half?1:0)); return $s; };
   $tone = fn($v)=> $v>=80?'p-ok':($v>=50?'p-warn':'p-bad');
 ?>
-<div class="crumbs"><a href="/">Home</a> › Inspector ratings</div>
 <div class="master-head"><div>
   <h1>Inspector ratings</h1>
   <p class="sub" style="margin:2px 0 0">An honest score over the last <?= (int)$cfg['months'] ?> months, from timely reporting, inspections done and complaints. Every number is shown.</p>

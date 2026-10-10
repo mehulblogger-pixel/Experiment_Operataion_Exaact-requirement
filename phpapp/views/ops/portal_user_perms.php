@@ -1,6 +1,5 @@
 <?php $held = trim((string)($u['perms'] ?? '')); $heldArr = $held === '' ? array_keys(PORTAL_PERMS) : array_filter(explode(',', $held));
       $mySites = array_filter(array_map('intval', explode(',', (string)($u['site_ids'] ?? '')))); ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/portal-users">Client portal</a> › <?= e($u['name'] ?: $u['email']) ?></div>
 <div class="master-head"><div>
   <h1><?= e($u['name'] ?: $u['email']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($u['partner_name'] ?: '') ?> · <?= e($u['email']) ?></p></div></div>

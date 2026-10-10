@@ -1,7 +1,6 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <a href="/quote-approval-rules">Approval rules</a> › <?= $r ? 'Edit' : 'Add' ?></div>
 <div class="master-head">
   <div><h1><?= $r ? 'Edit approval rule' : 'Add approval rule' ?></h1></div>
-  <a class="btn secondary" href="/quote-approval-rules">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <form method="post" action="/<?= $r ? 'quote-approval-rule-edit?id=' . (int)$r['id'] : 'quote-approval-rule-new' ?>" class="panel">

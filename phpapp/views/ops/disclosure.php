@@ -2,7 +2,6 @@
 $ed = $edit;
 $sbadge = ['REQUESTED' => 'AMBER', 'CONSENTED' => 'GREEN', 'DECLINED' => 'RED', 'WITHDRAWN' => 'GREY'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Quality &amp; accreditation › Public-disclosure consent</div>
 <div class="master-head"><div><h1>Public-disclosure consent</h1>
   <p class="sub">Where the body intends to make a client's information public, the client's advance consent is recorded here (ISO §4.2)</p></div></div>
 

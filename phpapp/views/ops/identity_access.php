@@ -1,6 +1,5 @@
 <?php // Module 26 — DPO access review: every look at an identity document, across all
       // people. Reasons, recipients and actors — never a document number. ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/identity">Identity documents</a> › Access review</div>
 <div class="master-head">
   <div><h1>Identity-document access review</h1>
     <p class="sub" style="margin:2px 0 0">Every look, reveal, copy-out and redaction — across everyone — in one place, for a

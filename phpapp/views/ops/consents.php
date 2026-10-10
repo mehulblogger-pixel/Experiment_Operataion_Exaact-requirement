@@ -1,5 +1,4 @@
 <?php $rows = $rows ?? []; $live = 0; foreach ($rows as $r) if (trim((string)$r['withdrawn_at']) === '') $live++; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/compliance">Where we stand</a> › Consent register</div>
 <div class="master-head">
   <div><h1>Consent &amp; lawful basis</h1>
     <p class="sub" style="margin:2px 0 0">For each person whose personal data we hold — what we use it for, and on what

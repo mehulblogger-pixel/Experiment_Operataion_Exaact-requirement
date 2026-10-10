@@ -102,11 +102,24 @@ t_ok(strpos($css, '@media (pointer:coarse)') !== false && strpos($coarse, '@medi
     'CL-6 · every one of these lives inside the coarse-pointer query — desktop is untouched');
 
 // ---- CL-5 · breadcrumbs, with real hierarchy and permission-safe links -------
-foreach ([['views/ops/job_detail.php','/jobs','mod.jobs.view'], ['views/ops/call_detail.php','/calls','mod.calls.view']] as [$f,$reg,$perm]) {
-    $src = (string) file_get_contents($root . '/' . $f);
-    t_ok(strpos($src, 'class="crumbs"') !== false, 'CL-5 · ' . basename($f) . ' has breadcrumbs');
-    t_ok(strpos($src, "href=\"/operations\"") !== false, 'CL-5 · …through Operations, the actual parent');
-    t_ok(strpos($src, $reg) !== false, 'CL-5 · …then its own register ' . $reg);
-    t_ok(strpos($src, "can('" . $perm . "')") !== false,
-        'CL-5 · …and the register link is conditional on ' . $perm . ' — no door it cannot open');
+//
+//  R-24 — these three properties are no longer typed into job_detail.php and
+//  call_detail.php. They are properties of the navigation model, which draws the
+//  trail once for every screen, so asserting them here now covers all 405
+//  screens instead of these two files. The questions are unchanged.
+t_as_admin();
+foreach ([['job', '/jobs'], ['call', '/calls']] as [$route, $reg]) {
+    $trail = nav_trail($route);
+    $labels = array_map(fn($s) => $s['label'], $trail);
+    $urls   = array_map(fn($s) => $s['url'], $trail);
+    t_ok(count($trail) > 1, 'CL-5 · /' . $route . ' has breadcrumbs');
+    t_ok(in_array('Operations', $labels, true), 'CL-5 · …through Operations, the actual parent');
+    t_ok(in_array($reg, $urls, true), 'CL-5 · …then its own register ' . $reg);
 }
+//  "No door it cannot open": the module step is withheld from anybody without
+//  that module's view right, so a breadcrumb can never offer a refusal. Asserted
+//  on the one place that decides it, rather than on each screen that shows it.
+$navSrc = (string) file_get_contents($root . '/lib/nav.php');
+t_ok(strpos($navSrc, "can('mod.' . \$mod . '.view')") !== false,
+    'CL-5 · …and every register link is conditional on that module\'s view right');
+t_as_nobody();

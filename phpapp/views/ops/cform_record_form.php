@@ -1,5 +1,4 @@
 <?php $form = $form ?? []; $rec = $rec ?? null; $hasFields = $hasFields ?? false; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/cform?f=<?= e($form['slug']) ?>"><?= e($form['name']) ?></a> › <?= $rec ? 'Edit' : 'New' ?></div>
 <div class="master-head"><div>
   <h1><?= $rec ? 'Edit' : 'New' ?> — <?= e($form['name']) ?></h1>
 </div></div>

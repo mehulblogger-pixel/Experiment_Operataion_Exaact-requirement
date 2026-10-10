@@ -7,7 +7,6 @@
   $extra = $extra ?? [];                                   // extra hidden fields (e.g. modules)
   $amtMajor = isset($amt['major']) ? (int) $amt['major'] : (isset($amt['total']) ? (int) $amt['total'] : 0);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/billing">Users &amp; billing</a> › Payment</div>
 <div class="master-head"><div><h1>Complete your payment</h1>
   <p class="sub" style="margin:2px 0 0"><?= (int)$amt['seats'] ?> <?= (int)$amt['seats']===1?'person':'people' ?>,
     <?= e($amt['period']==='year'?'annual':'monthly') ?> — <strong><?= e($sym . number_format((int)$amt['major'])) ?></strong>.</p></div></div>

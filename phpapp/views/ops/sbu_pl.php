@@ -4,7 +4,6 @@ $mName = date('F Y', mktime(0, 0, 0, $mon, 1, $yr));
 $money = function ($v) { return ($v < 0 ? '−₹' : '₹') . number_format(abs((float)$v), 0); };
 $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <?= e(T('sbu')) ?> profit &amp; loss</div>
 <div class="master-head">
   <div><h1><?= e(T('sbu')) ?> profit &amp; loss — <?= e($spanLabel) ?></h1>
     <p class="sub">Revenue billed against the cost that landed on it. Real money on both sides.</p></div>

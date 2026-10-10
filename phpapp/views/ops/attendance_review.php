@@ -2,7 +2,6 @@
 // Phase 3 §35 — attendance review queue. Only the anomalous self-marks; the reviewer sends back,
 // clears, or escalates. Advisory — the attendance already counts; this catches and corrects errors.
 ?>
-<div class="crumbs"><a href="/">Home</a> › Attendance review</div>
 <div class="master-head">
   <div>
     <h1>Attendance review</h1>

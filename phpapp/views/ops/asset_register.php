@@ -3,7 +3,6 @@
   $selPerson = null;
   foreach ($people as $p) if ((int)$p['id'] === (int)$fPerson) $selPerson = $p;
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › Asset issuance</div>
 <div class="master-head">
   <div><h1>Asset issuance register</h1>
     <p class="sub" style="margin:2px 0 0">What is given to each <?= e(Tl('engineer')) ?> — stamps, diaries, safety gear, ID, devices — acknowledged and tracked until it comes back.</p></div>

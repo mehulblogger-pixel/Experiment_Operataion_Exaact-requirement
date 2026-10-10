@@ -5,7 +5,6 @@ $said = ['OK' => 'Signed in', 'OK_2FA' => 'Accepted, asked for the code',
          'REPLAY' => 'Token reused — refused', 'REFUSED' => 'Refused',
          'NO_ACCOUNT' => 'No account here', 'INACTIVE' => 'Account switched off'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Single sign-on</div>
 <div class="master-head"><div>
   <h1>Single sign-on</h1>
   <p class="sub" style="margin:2px 0 0">One login across the MGH applications. Somebody signing in to Books, BlogPro or Ads Pro arrives here already identified — but with the role, office and permissions <b>this</b> system holds for them, never the ones the other application holds.</p>

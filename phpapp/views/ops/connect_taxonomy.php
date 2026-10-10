@@ -8,7 +8,6 @@
   $standards = $standards ?? []; $certs = $certs ?? [];
   $chip = fn($t) => '<span class="chip">' . e($t) . '</span>';
 ?>
-<div class="crumbs"><a href="/">Home</a> › Industry taxonomy</div>
 <div class="master-head">
   <?php if (function_exists('connect_taxonomy_admin_can') && connect_taxonomy_admin_can()): ?>
     <a class="btn" href="/connect-taxonomy-admin" style="float:right">⚙ Manage graph →</a>

@@ -1,6 +1,4 @@
 <?php $isEdit = !empty($inc); $v = function ($k, $d = '') use ($inc) { return e($inc[$k] ?? $d); }; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/incidents">Incident register</a> ›
-  <span><?= $isEdit ? e($inc['ref']) : 'Record an incident' ?></span></div>
 
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Update ' . e($inc['ref']) : 'Record an incident' ?></h1>

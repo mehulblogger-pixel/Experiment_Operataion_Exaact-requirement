@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Masters</div>
 <div class="master-head">
   <div><h1>Masters</h1>
     <p class="sub" style="margin:2px 0 0">The ready-made answers your forms offer. Set them up once, and everyone picks from the same list instead of re-typing.</p></div>

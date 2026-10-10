@@ -8,7 +8,6 @@
   $master = function_exists('is_master') && is_master();
   $licSeats = (int)($lic['seats'] ?? 0);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Users &amp; billing</div>
 <div class="master-head">
   <div><h1>Users &amp; billing</h1>
     <p class="sub" style="margin:2px 0 0">Pay per person. Add or renew seats online — the moment a payment clears, the

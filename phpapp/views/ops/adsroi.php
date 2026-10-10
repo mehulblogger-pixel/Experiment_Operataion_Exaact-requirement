@@ -8,7 +8,6 @@ $mult  = function ($v) {
     return (float)$v >= 1 ? '<b>' . e($s) . '</b>' : '<b style="color:var(--bad,#b42318)">' . e($s) . '</b>';
 };
 ?>
-<div class="crumbs"><a href="/">Home</a> › What the advertising actually earned</div>
 <div class="master-head">
   <div><h1>What the advertising actually earned</h1>
   <p class="sub" style="margin:2px 0 0">Not conversion value from a pixel, and not closed-won from a text box. This follows campaign → lead → deal → order → invoice → <b>receipt</b>, and reports the four figures separately, because averaging them is how a campaign that brings in customers who never pay goes on being funded.</p></div>

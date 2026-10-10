@@ -6,7 +6,6 @@
     'draft'   => ['n'=>$c['draft'],   'l'=>'Draft',           'ic'=>'✎', 'tone'=>'tone-warn'],
   ];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Billing › Invoices</div>
 <?php billing_tabs('invoices'); ?>
 <div class="master-head">
   <div><h1>Invoices</h1>

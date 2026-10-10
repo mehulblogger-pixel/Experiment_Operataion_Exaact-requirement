@@ -531,6 +531,26 @@
 <?php foreach (take_flash() as $m): ?>
       <div class="msg msg-<?= e($m['tag']) ?>"><?= e($m['text']) ?></div>
 <?php endforeach; ?>
+<?php // ---- R-24: the breadcrumb, drawn once for every screen ----------------
+      //  It used to be typed by hand into each view: 277 of them, 80 different
+      //  parents, nothing checking any of it, and 128 screens with none at all.
+      //  Now it is derived from where the screen actually sits (lib/nav.php), so
+      //  a screen cannot disagree with the menu about its own place, and a new
+      //  screen gets a trail without anybody remembering to type one.
+      //
+      //  $nav_leaf is the record's own name when the handler knows it
+      //  ("INQ-2026-014"), passed through view(); $nav_crumbs = false turns the
+      //  trail off for a screen that genuinely has no parent (sign-in, setup).
+      $__trail = (function_exists('nav_trail') && ($nav_crumbs ?? true) && $cur !== '')
+                 ? nav_trail($cur, $nav_leaf ?? null) : [];
+      if (count($__trail) > 1): ?>
+      <nav class="crumbs" aria-label="Breadcrumb"><?php
+        foreach ($__trail as $__i => $__c):
+          if ($__i) echo ' › ';
+          if (!empty($__c['url'])) { ?><a href="<?= e($__c['url']) ?>"><?= e($__c['label']) ?></a><?php }
+          else { ?><span aria-current="page"><?= e($__c['label']) ?></span><?php }
+        endforeach; ?></nav>
+<?php endif; ?>
 <?php else: ?>
 <main class="container">
 <?php endif; ?>

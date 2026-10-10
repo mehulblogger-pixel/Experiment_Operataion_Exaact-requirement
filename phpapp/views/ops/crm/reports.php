@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Sales dashboard</div>
 <div class="master-head">
   <div><h1>Sales dashboard</h1>
     <p class="sub" style="margin:2px 0 0">Pipeline, win/loss and monthly performance · FY <?= e($fy) ?> · scope applied.</p></div>

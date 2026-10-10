@@ -1,5 +1,4 @@
 <?php $tab = $tab ?? 'people'; $r = $ready; ?>
-<div class="crumbs"><a href="/">Home</a> › Confidentiality</div>
 <div class="master-head"><div>
   <h1>Confidentiality</h1>
   <p class="sub" style="margin:2px 0 0">§4.2 asks for legally enforceable commitments over everything we learn on a job. Three questions: who has signed one, what a client has additionally imposed on us, and what has got out.</p></div></div>

@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/pipelines">Pipelines &amp; funnels</a> › <?= e($p['name']) ?></div>
 <div class="master-head">
   <div><h1><?= e($p['name']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($p['entity_kind'] === 'LEAD' ? 'Lead pipeline' : 'Opportunity funnel') ?>

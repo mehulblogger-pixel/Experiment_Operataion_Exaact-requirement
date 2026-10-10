@@ -18,7 +18,6 @@
   $today = date('Y-m-d');
   $vname = $partner['display_name'] ?: $partner['legal_name'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/vendors">Vendors</a> › <?= e($vname) ?></div>
 <div class="master-head">
   <div><h1><?= e($vname) ?> <span class="pill <?= $pc ?>" style="font-size:12px;vertical-align:middle"><?= e($pl) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?php if ($partner['code']): ?><?= e($partner['code']) ?> · <?php endif; ?>Vendor qualification profile</p></div>

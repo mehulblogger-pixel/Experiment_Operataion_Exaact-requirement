@@ -1,5 +1,4 @@
 <?php $closed = $b['status'] === 'CLOSED'; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/confidentiality?t=breaches">Confidentiality</a> › <?= e($b['ref']) ?></div>
 <div class="master-head"><div>
   <h1><?= e($b['ref']) ?> — <?= e(CONF_BREACH_KINDS[$b['kind']] ?? $b['kind']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><span class="pill <?= $closed?'p-ok':'p-warn' ?>"><?= e(CONF_BREACH_STATUS[$b['status']] ?? $b['status']) ?></span>

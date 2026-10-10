@@ -5,7 +5,6 @@ $aiOn  = $aiOn  ?? false;
 $forms = $forms ?? [];
 $typeLabel = ['text' => 'Text', 'textarea' => 'Paragraph', 'number' => 'Number', 'date' => 'Date', 'select' => 'Dropdown'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/workspace/setup">Workspace setup</a> › Build forms with AI</div>
 <div class="master-head"><div>
   <h1>Build forms from your process</h1>
   <p class="sub" style="margin:2px 0 0">Describe how your recruitment works — in your own words — and we’ll suggest the

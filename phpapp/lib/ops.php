@@ -3183,8 +3183,19 @@ function ops_module_family($route) {
     return null;
 }
 
-function ops_module_gate($route, $peek = false) {
-    $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
+// ============================================================================
+//  WHICH MODULE A ROUTE BELONGS TO                                      (R-24)
+// ============================================================================
+//  Lifted out of ops_module_gate() so it has exactly one home. The gate asks it
+//  to decide PERMISSION; lib/nav.php asks it to decide WHERE A SCREEN SITS.
+//  Those were separate concerns answered by separate (and in navigation's case,
+//  absent) knowledge — which is how the application ended up with 80 hand-typed
+//  breadcrumb parents and no map. One source, two readers.
+//
+//  Unmapped routes fall through to ops_module_family()'s prefix match, which the
+//  comment below the gate calls "where the route nobody added to the map hole
+//  closes" — so adding a screen never silently loses its place.
+function ops_route_module_map() {
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
         'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','job-visit-close'=>'jobs','job-qap-upload'=>'jobs','job-qap'=>'jobs','job-qap-del'=>'jobs','job-forward-report'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
@@ -3335,6 +3346,12 @@ function ops_module_gate($route, $peek = false) {
         'reset-data'=>'settings',
         'partner-import'=>'clients','partner-template'=>'clients','duplicates'=>'clients',
     ];
+    return $map;
+}
+
+function ops_module_gate($route, $peek = false) {
+    $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
+    $map = ops_route_module_map();
     $mod = $map[$base] ?? null;
     // An unmapped route inside a paid module's family is still that module's.
     // This is where the "route nobody added to the map" hole closes.

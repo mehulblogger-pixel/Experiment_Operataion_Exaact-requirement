@@ -2,7 +2,6 @@
 $money = function ($v) { return ($v < 0 ? '−' : '') . cur_sym() . number_format(abs((float)$v), 0); };
 $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Profit by <?= e(Tl('call')) ?></div>
 <div class="master-head">
   <div><h1>Profit by <?= e(Tl('call')) ?></h1>
     <p class="sub">What each inspection actually made, one line at a time. Revenue less the

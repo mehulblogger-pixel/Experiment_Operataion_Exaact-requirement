@@ -10,7 +10,6 @@ $all = $all ?? []; $editing = $editing ?? null; $dupe = $dupe ?? null; $mayEdit 
 $csrf = fn() => function_exists('csrf_field') ? csrf_field() : '';
 $show = fn($v) => function_exists('vocab_display') ? vocab_display($v) : ($v['label'] ?? '');
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/departments">Departments</a> › <?= $tab === 'review' ? 'Words to confirm' : 'Department list' ?></div>
 <div class="master-head">
   <div><h1><?= $tab === 'review' ? 'Words to confirm' : 'Department list' ?></h1>
     <p class="sub" style="margin:2px 0 0"><?= $tab === 'review'

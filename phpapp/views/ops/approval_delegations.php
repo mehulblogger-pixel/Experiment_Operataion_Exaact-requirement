@@ -25,7 +25,6 @@ $state = function ($r) use ($today) {
     return ['Live', 'p-ok'];
 };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/recruit-approvals">Approval rules</a> › Delegation</div>
 <div class="master-head">
   <div><h1>Approval delegation</h1>
     <p class="sub" style="margin:2px 0 0">While somebody is away, another person may approve in their place — for a stated period, and only for the authority they actually hold.</p></div>

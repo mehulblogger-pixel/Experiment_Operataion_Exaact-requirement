@@ -5,7 +5,6 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
 $reqs = $reqs ?? []; $enabled = $enabled ?? false; $intro = $intro ?? ''; $live = (int)($live ?? 0);
 $title = function ($r) use ($e) { return $e(trim((string)($r['designation'] ?? '')) ?: ('Opening ' . ($r['req_code'] ?? ''))); };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Careers page</div>
 <div class="master-head">
   <div><h1>Careers page</h1>
     <p class="sub" style="margin:2px 0 0">Publish selected open requirements to a public page where candidates apply directly. Every application creates a candidate on the recruiter's desk automatically.</p></div>

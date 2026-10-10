@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Scheduling › Capacity outlook</div>
 <?php if (function_exists('sched_tabs')) sched_tabs('capacity-outlook'); ?>
 <div class="master-head">
   <div><h1>Capacity outlook</h1>

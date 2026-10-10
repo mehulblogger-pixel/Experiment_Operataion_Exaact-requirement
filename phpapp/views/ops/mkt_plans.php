@@ -22,7 +22,6 @@
       echo '</tr>';
   };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/super-admin">Super Admin</a> › Marketplace plans</div>
 <div class="master-head">
   <div><h1>Marketplace plans &amp; limits</h1>
     <p class="sub">The subscription plans, prices, limits and launch promo for the Connect marketplace. Everything here is yours to change — nothing is fixed in code.</p></div>

@@ -27,7 +27,6 @@ $confirmOff = (string) ($confirmOff ?? '');
 </style>
 
 <div class="ck">
-  <div class="crumbs"><a href="/">Home</a> › <a href="/workspace/setup">Workspace setup</a> › Features</div>
   <h1 style="margin:.2em 0">Features</h1>
   <p class="muted" style="margin-top:0">Turn on only the parts of the software your company needs. Everything here uses your plan — turning a feature off simply hides it and its screens.</p>
 

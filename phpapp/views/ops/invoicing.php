@@ -7,7 +7,6 @@
     'credit'   => ['n'=>$c['credit'],   'l'=>'Credit not received','ic'=>'⇄', 'tone'=>'tone-ok'],
   ];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <?= e(T_REG('invoice')) ?></div>
 <div class="master-head">
   <div><h1><?= e(T_REG('invoice')) ?></h1>
   <p class="sub" style="margin:2px 0 0">Confirm invoicing, payment received and inter-office credit. Tick each job — it feeds profitability.</p></div>

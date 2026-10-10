@@ -25,7 +25,6 @@
     'receipt' => ['/receipt?id=',     'Money-in'],
   ];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › <?= e($title) ?></div>
 <div class="master-head"><div>
   <h1><?= e($title) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($intro) ?></p>

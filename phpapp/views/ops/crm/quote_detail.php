@@ -7,7 +7,6 @@
   };
   $locT = lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <?= e(quote_label($q)) ?></div>
 <?= function_exists('chain_strip') ? chain_strip('QUOTE', (int)$q['id'], 'QUOTE', (int)$q['id']) : '' ?>
 <div class="master-head">
   <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span>
@@ -29,7 +28,7 @@
     <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
     <a class="btn secondary" href="#quote-docs" title="Attach the enquiry e-mail, PO, QAP, scope of inspection or any document received">📎 Documents</a>
     <?php if ($canEdit && in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED'], true)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit</a><?php endif; ?>
-    <a class="btn secondary" href="/quotes">← Back</a>
+    <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
   </div>
 </div>
 

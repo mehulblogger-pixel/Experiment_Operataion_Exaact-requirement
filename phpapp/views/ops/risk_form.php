@@ -3,7 +3,6 @@ $val = fn($k, $dv = '') => e($r[$k] ?? $dv);
 $sel = function ($opts, $cur) { foreach ($opts as $code => $label) {
     echo '<option value="' . e($code) . '"' . ((string)$cur === (string)$code ? ' selected' : '') . '>' . e($label) . '</option>'; } };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/risks">Risks &amp; opportunities</a> › <?= $r ? e($r['risk_code']) : 'Add an entry' ?></div>
 <div class="master-head"><div><h1><?= $r ? 'Edit ' . e($r['risk_code']) : 'Add a risk or opportunity' ?></h1>
   <p class="sub">Rate the likelihood and impact, and say how it is being addressed.</p></div></div>
 

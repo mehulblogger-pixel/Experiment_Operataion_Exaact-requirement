@@ -20,7 +20,6 @@ $pill = function ($s) {
   .cxgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   @media(max-width:560px){.cxgrid{grid-template-columns:1fr}}
 </style>
-<div class="crumbs"><a href="/">Home</a> › Manpower marketplace</div>
 <div class="master-head">
   <div><h1>Manpower marketplace</h1>
     <p class="sub" style="margin:2px 0 0">Post a technical-manpower requirement, and manage who applies — from open to awarded. Read-only for the public until posted.</p></div>

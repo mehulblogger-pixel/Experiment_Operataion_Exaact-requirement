@@ -11,7 +11,6 @@
       return '<span style="display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;color:#fff;background:' . $c . ';border-radius:999px;padding:2px 9px">' . e($s) . '</span>';
   };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/super-admin">Super Admin</a> › Escrow</div>
 <div class="master-head">
   <div><h1>Marketplace escrow</h1>
     <p class="sub">Hold the client’s money when a job is booked; release it to the professional when the report is approved. Refund on cancellation, park on a dispute.</p></div>

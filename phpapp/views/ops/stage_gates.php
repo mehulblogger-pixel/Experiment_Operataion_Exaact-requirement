@@ -7,7 +7,6 @@ $r = $edit ?: [];
 $showForm = $edit || $new;
 $val = fn($k, $d = '') => htmlspecialchars((string)($r[$k] ?? $d), ENT_QUOTES);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/approvals">Approvals</a> › Rules</div>
 <div class="master-head">
   <div><h1>Approval rules for deal stages</h1>
   <p class="sub" style="margin:2px 0 0">Who has to agree before a deal moves. With no rules here nothing is gated and the pipeline behaves exactly as it does today — a gate is something you choose, not something the software insists on.</p></div>

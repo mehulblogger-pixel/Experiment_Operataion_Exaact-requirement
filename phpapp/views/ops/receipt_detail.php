@@ -3,7 +3,6 @@
   $leftCash = round((float)$r['amount'] - $allocCash, 2);
   $leftTds  = round((float)$r['tds_amount'] - $allocTds, 2);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/receipts">Money in</a> › <?= e($r['receipt_no']) ?></div>
 <div class="master-head">
   <div><h1><?= e($r['receipt_no']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><a href="/ledger?id=<?= (int)$r['partner_id'] ?>"><?= e($r['partner_name']) ?></a>

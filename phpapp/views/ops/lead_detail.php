@@ -7,7 +7,6 @@
   $converted = ($l['status'] ?? '') === 'CONVERTED' || !empty($l['converted_partner_id']) || !empty($l['converted_inquiry_id']);
   $effLbl = function_exists('act_effort_label') ? act_effort_label($effort ?? []) : '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/leads">Leads</a> › <?= e($l['ref']) ?></div>
 <?= function_exists('chain_strip') ? chain_strip('LEAD', (int)$l['id'], 'LEAD', (int)$l['id']) : '' ?>
 
 <div class="master-head"><div>

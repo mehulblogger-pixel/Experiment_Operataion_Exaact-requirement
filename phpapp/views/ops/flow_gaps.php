@@ -1,5 +1,4 @@
 <?php $tot = 0; foreach ($gaps as $g) $tot += $g['n']; ?>
-<div class="crumbs"><a href="/">Home</a> › Where the flow is broken</div>
 <div class="master-head">
   <div><h1>Where the flow is broken</h1>
   <p class="sub" style="margin:2px 0 0">Every place a handover was skipped, between selling, doing and billing. Each row links to the screen that closes it. Nothing here changes anything on its own — a report that quietly repaired the data would hide how often the handover is missed, and that number is the point.</p></div>

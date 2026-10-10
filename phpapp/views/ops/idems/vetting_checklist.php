@@ -1,5 +1,4 @@
 <?php // Configure the vetting authority's checklist — fully editable, on/off. ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <a href="/report-types">Report types</a> › Vetting checklist</div>
 <div class="master-head"><div><h1>Vetting checklist</h1>
   <p class="sub" style="margin:2px 0 0">The check points the vetting authority ticks before clearing a <?= e(Tl('report')) ?>. Fully editable, and you can switch it on or off — nothing is fixed by the system.</p></div></div>
 

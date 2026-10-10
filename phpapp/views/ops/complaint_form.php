@@ -1,10 +1,9 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/complaints">Complaints &amp; appeals</a> › Record one</div>
 <div class="master-head">
   <div><h1><?= $appealOf ? 'Record an appeal' : 'Record a complaint' ?></h1>
     <p class="sub" style="margin:2px 0 0"><?= $appealOf
       ? 'Against ' . e($appealOf['ref']) . ' — ' . e($appealOf['subject']) . '. It will be decided by somebody who did not make that decision.'
       : 'Anyone may complain about our work, not only the client who paid for it. Record it the day it arrives — the clock runs from then, not from when somebody got round to typing it in.' ?></p></div>
-  <a class="btn secondary" href="/complaints">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <form method="post" action="/complaint-new">

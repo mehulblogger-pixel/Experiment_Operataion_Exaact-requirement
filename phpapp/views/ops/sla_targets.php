@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › SLA targets</div>
 <div class="master-head">
   <div><h1>SLA targets</h1>
     <p class="sub" style="margin:2px 0 0">Turnaround targets, in days, for each stage of a service. Set a

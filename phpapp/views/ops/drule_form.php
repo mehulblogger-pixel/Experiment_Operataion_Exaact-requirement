@@ -3,7 +3,6 @@ $v = fn($k, $d = '') => e($r[$k] ?? $d);
 $sel = function ($opts, $cur) { foreach ($opts as $code => $label) {
     echo '<option value="' . e($code) . '"' . ((string)$cur === (string)$code ? ' selected' : '') . '>' . e($label) . '</option>'; } };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/drules">Decision rules</a> › <?= $r ? e($r['rule_code']) : 'Add a rule' ?></div>
 <div class="master-head"><div><h1><?= $r ? 'Edit ' . e($r['rule_code']) : 'Add a decision rule' ?></h1>
   <p class="sub">State exactly how the accept / reject call is made — the report cites this, so it is not left to opinion.</p></div></div>
 

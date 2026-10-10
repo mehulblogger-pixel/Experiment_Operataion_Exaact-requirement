@@ -6,7 +6,6 @@ $tone = ['OPEN' => 'info', 'TRIAL' => 'info', 'VALID' => 'success',
          'GRACE' => 'warning', 'READONLY' => 'error', 'INVALID' => 'error', 'MISSING' => 'error'];
 $t = $tone[$s['state']] ?? 'info';
 ?>
-<div class="crumbs"><a href="/">Home</a> › Licence</div>
 <div class="master-head"><div>
   <h1>Licence</h1>
   <p class="sub" style="margin:2px 0 0">What this installation is entitled to, and until when.</p>

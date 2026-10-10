@@ -6,7 +6,6 @@ $preview = $preview ?? null; $raw = $raw ?? ''; $note = $note ?? ''; $error = $e
 $format = $format ?? ''; $summary = $summary ?? null; $rowsJson = $rowsJson ?? '';
 $aiPool = function_exists('ai_pool_applies') && ai_pool_applies();
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/positions">Positions</a> › Import organogram</div>
 <div class="master-head">
   <div><h1>Import organogram</h1>
     <p class="sub" style="margin:2px 0 0">Upload your organisation chart and the system creates the <b>offices</b>, <b>designations</b>, <b>positions</b>, their <b>codes</b> and the <b>reporting lines</b> — you approve a preview before anything is saved. Re-running is safe: a position with the same code or name is updated, never duplicated.</p></div>

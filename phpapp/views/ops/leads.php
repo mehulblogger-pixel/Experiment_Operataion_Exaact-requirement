@@ -1,5 +1,4 @@
 <?php $c = $counts; $view = $view ?? 'board'; ?>
-<div class="crumbs"><a href="/">Home</a> › Leads</div>
 <div class="master-head">
   <div><h1>Leads</h1>
   <p class="sub" style="margin:2px 0 0">People we are chasing before they are customers. Winning one <b>converts</b> it — it becomes a customer and an inquiry, and nothing is typed twice.</p></div>

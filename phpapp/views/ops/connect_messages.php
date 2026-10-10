@@ -6,7 +6,6 @@
   $summaries = $summaries ?? []; $open = $open ?? null; $openId = $openId ?? 0; $meId = $meId ?? 0;
   $when = fn($iso) => $iso ? e(date('d M, H:i', strtotime((string)$iso))) : '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › Messages</div>
 <div class="master-head">
   <div><h1>Messages</h1>
     <p class="sub" style="margin:2px 0 0">Talk to applicants inside the platform — no WhatsApp, no lost context.

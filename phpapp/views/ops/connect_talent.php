@@ -16,7 +16,6 @@ $wtLabel = fn($k) => $work_types[$k] ?? ucfirst(str_replace('_', ' ', $k));
   .avail{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600}
   .avail.on{background:#e7f5ef;color:#0f7d5a}.avail.off{background:#eceff1;color:#5b6b6a}
 </style>
-<div class="crumbs"><a href="/">Home</a> › <a href="/marketplace">Marketplace</a> › Talent search</div>
 <div class="master-head">
   <div><h1>Talent search</h1>
     <p class="sub" style="margin:2px 0 0">Search the shared pool of self-listed professionals — <?= (int)$pool ?> registered. These are individuals who chose to be found; an organisation's own staff are never here.</p>

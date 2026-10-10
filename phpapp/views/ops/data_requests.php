@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/compliance">Where we stand</a> › <span>Requests about personal data</span></div>
 
 <div class="master-head">
   <div><h1>Requests about personal data</h1>

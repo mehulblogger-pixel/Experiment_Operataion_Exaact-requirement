@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Service scope</div>
 <div class="master-head">
   <div><h1>Service scope</h1>
     <p class="sub" style="margin:2px 0 0">Every service runs on its own. Inspection, Expediting, Vendor Assessment,

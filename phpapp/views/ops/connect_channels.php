@@ -10,7 +10,6 @@
   $stColor = ['SENT' => '#0b7a4a', 'LOGGED' => '#0f7d7d', 'QUEUED' => '#8a6d12', 'FAILED' => '#b91c1c', 'SKIPPED' => '#777'];
   $when = fn($iso) => $iso ? e(date('d M, H:i', strtotime((string)$iso))) : '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › Channels</div>
 <div class="master-head">
   <div><h1>WhatsApp, SMS &amp; email</h1>
     <p class="sub" style="margin:2px 0 0">Reach professionals where they already are — job alerts, “you're shortlisted”,

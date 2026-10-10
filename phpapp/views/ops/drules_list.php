@@ -1,5 +1,4 @@
 <?php $badge = ['DRAFT' => 'AMBER', 'CURRENT' => 'GREEN', 'SUPERSEDED' => 'GREY', 'WITHDRAWN' => 'RED']; ?>
-<div class="crumbs"><a href="/">Home</a> › Quality &amp; accreditation › Decision rules</div>
 <div class="master-head">
   <div><h1>Decision rules &amp; acceptance criteria</h1>
     <p class="sub"><?= (int)($counts['current'] ?? 0) ?> current · how accept / reject is decided, including measurement uncertainty (ISO §7.4)</p></div>

@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Corrective actions</div>
 <?php if (function_exists('nc_tabs')) nc_tabs('capa'); ?>
 <div class="master-head">
   <div><h1>Nonconformities &amp; corrective actions</h1>

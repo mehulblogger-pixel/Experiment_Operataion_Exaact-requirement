@@ -14,7 +14,6 @@
       return '<span style="display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;color:' . $c . ';background:' . $bg . '">' . e($l) . '</span>';
   };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Agency bench</div>
 <div class="master-head">
   <div><h1>Agency bench</h1>
     <p class="sub" style="margin:2px 0 0">An agency's own workforce — <strong>private to that agency</strong>, never shared to the marketplace pool.

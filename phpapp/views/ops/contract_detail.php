@@ -4,7 +4,6 @@
   $osTone = ['PENDING'=>'p-warn','OPEN'=>'p-ok','REJECTED'=>'p-bad','CLOSED'=>'p-mut'][$os] ?? 'p-mut';
   $clientName = $c['display_name'] ?: $c['legal_name'] ?: '—';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/partner?id=<?= (int)$c['partner_id'] ?>&tab=contracts"><?= e($clientName) ?></a> › Contract <?= e($c['contract_number'] ?: '#'.(int)$c['id']) ?></div>
 <div class="master-head">
   <div><h1>Contract <?= e($c['contract_number'] ?: '#'.(int)$c['id']) ?> <span class="pill <?= $osTone ?>" style="font-size:12px;vertical-align:middle"><?= e($osLbl) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><a href="/partner?id=<?= (int)$c['partner_id'] ?>"><?= e($clientName) ?></a><?= $c['title'] ? ' · '.e($c['title']) : '' ?><?= $c['branch_name'] ? ' · '.e($c['branch_name']) : '' ?></p></div>

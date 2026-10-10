@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <span>Client portal</span></div>
 
 <div class="master-head">
   <div><h1>Client portal</h1>

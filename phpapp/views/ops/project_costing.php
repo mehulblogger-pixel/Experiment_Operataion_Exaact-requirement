@@ -37,7 +37,6 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 </style>
 
 <div class="pc">
-<div class="crumbs"><a href="/">Home</a> › <a href="/project-costings">Project costing</a> › <?= $e($h['code']) ?></div>
 <div class="master-head">
   <div><h1 style="margin:0"><?= $e($h['title']) ?> <span class="pill <?= $stTone[$h['status']] ?? 'p-mut' ?>"><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= $e($h['code']) ?> · <?= $e(PC_BASES[$basis] ?? $basis) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?></p></div>

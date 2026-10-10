@@ -6,7 +6,6 @@ $ee = fn($x) => e((string)$x);
 $lvl = fn($c) => (RISK_LEVELS[$c] ?? '—');
 $row = fn($lbl, $val) => $val !== '' && $val !== null ? '<tr><th style="text-align:left;width:180px;color:#697787;font-weight:600">' . e($lbl) . '</th><td>' . $val . '</td></tr>' : '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/risks">Risks &amp; opportunities</a> › <?= e($r['risk_code']) ?></div>
 <div class="master-head">
   <div><h1><?= e($r['risk_code']) ?>
     <span class="badge <?= $r['kind'] === 'OPPORTUNITY' ? 'GREEN' : 'GREY' ?>"><?= e(ucfirst(strtolower($r['kind']))) ?></span>

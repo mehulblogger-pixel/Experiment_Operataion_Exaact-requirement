@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/receipts">Money in</a> › New</div>
 <div class="master-head"><div><h1>Record money received</h1>
   <p class="sub" style="margin:2px 0 0">What arrived, and what the customer withheld. The next screen decides which invoices it settles.</p></div></div>
 

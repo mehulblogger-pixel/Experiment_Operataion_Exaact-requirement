@@ -8,7 +8,6 @@ $calcs = ['FIXED' => 'Fixed amount', 'PCT_BASIC' => '% of Basic', 'PCT_GROSS' =>
 $byType = ['EARNING' => [], 'DEDUCTION' => [], 'EMPLOYER' => []];
 foreach ($defs as $d) $byType[$d['section']][] = $d;
 ?>
-<div class="crumbs"><a href="/">Home</a> › Compensation setup</div>
 <div class="master-head">
   <div><h1>Compensation setup</h1>
     <p class="sub" style="margin:2px 0 0">Define the salary headings your offers are built from — earnings, employee deductions and employer contributions — with their calculation rule and statutory flag. The salary structure computes CTC, net pay and employer cost from these.</p></div>

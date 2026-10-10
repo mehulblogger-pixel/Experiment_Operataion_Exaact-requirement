@@ -5,7 +5,6 @@
   $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n);
   $tone = ['PENDING' => 'p-warn', 'APPROVED' => 'p-info', 'BILLED' => 'p-ok', 'CANCELLED' => 'p-mut', 'DISPUTED' => 'p-bad'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/money">Money</a> › Billable events</div>
 <div class="master-head">
   <div><h1>Billable events</h1>
     <p class="sub" style="margin:2px 0 0">Approved operational work on its way to an invoice — so nothing done is lost before it is billed.

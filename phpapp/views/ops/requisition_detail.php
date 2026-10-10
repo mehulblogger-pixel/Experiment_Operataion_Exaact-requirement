@@ -4,7 +4,6 @@
   $hiredCost = $hired    ? ((float)$hired['salary_ctc']/12 + (float)$hired['agency_cost']) : 0;
   $stCls = ['OPEN'=>'p-warn','PROPOSED'=>'p-info','OFFERED'=>'p-info','HIRED'=>'p-ok','CLOSED'=>'p-ok','CANCELLED'=>'p-mut'][$req['status']] ?? 'p-mut';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/requisitions"><?= e(TP('requisition')) ?></a> › <?= e($req['req_code']) ?></div>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('requisition', $req['req_code'])) ?> <span class="pill <?= $stCls ?>" style="vertical-align:middle;font-size:12px"><?= e(lk_options_or('requisition_status', REQ_STATUS)[$req['status']] ?? $req['status']) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= e(DESIGNATIONS[$req['designation']] ?? ($req['designation'] ?: 'Position')) ?><?php if ((int)($req['quantity'] ?? 1) > 1): ?> <span class="pill p-info" style="font-size:11px">× <?= (int)$req['quantity'] ?></span><?php endif; ?> · <?= e(lk_options_or('requisition_type', REQ_TYPES)[$req['req_type']] ?? '') ?> · <?= e($req['office_name'] ?: '—') ?><?php if (!empty($req['client_name']) || !empty($req['client_legal'])): ?> · <?= e($req['client_name'] ?: $req['client_legal']) ?><?php endif; ?></p></div>

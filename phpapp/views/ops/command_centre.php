@@ -7,7 +7,6 @@ $worst = $health_worst ?? 'ok';
 $worstLabel = ['ok'=>'All systems healthy', 'warn'=>'Some items need attention', 'bad'=>'Action needed'][$worst] ?? 'Healthy';
 $attnHi = 0; foreach (($business ?? []) as $b) if (($b['sev'] ?? '') === 'bad' || ($b['sev'] ?? '') === 'warn') $attnHi++;
 ?>
-<div class="crumbs"><a href="/">Home</a> › Command Centre</div>
 <div class="master-head">
   <div>
     <h1>Command Centre</h1>

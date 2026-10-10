@@ -25,7 +25,6 @@ $types = $types ?? (function_exists('fd_field_types') ? fd_field_types() : []);
     .fd-up,.fd-down{min-width:46px;min-height:44px}
   }
 </style>
-<div class="crumbs"><a href="/">Home</a> › <a href="/admin">Admin</a> › Form Designer</div>
 <h1 style="margin:.2em 0">Form Designer</h1>
 <p class="muted" style="margin-top:0">Build your forms end to end — rename a field, change its order, hide one you don’t use, make it required, <strong>add a new field</strong>, <strong>delete a field you added</strong>, or <strong>create a dropdown with its own options</strong>. No coding, and it never changes data already captured.</p>
 

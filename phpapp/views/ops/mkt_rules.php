@@ -5,7 +5,6 @@
   $feePayers = $feePayers ?? []; $feeBases = $feeBases ?? []; $cur = $currency ?? '₹';
   $money = fn($n) => e($cur) . number_format((float)$n, 2);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/super-admin">Super Admin</a> › Compliance rules</div>
 <div class="master-head">
   <div><h1>Compliance rules &amp; fees</h1>
     <p class="sub">Every GST / SAC / RCM / TDS / TCS value and every marketplace fee is a <b>versioned, effective-dated rule</b> — never hard-coded. Add a new version when the law changes; old transactions keep the version they used.</p></div>

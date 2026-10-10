@@ -4,7 +4,6 @@
   $totalPeople = 0; $totalGap = 0;
   foreach ($groups as $people) foreach ($people as $p) { $totalPeople++; if (!$p['sum']['complete']) $totalGap++; }
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › Agency staff</div>
 <div class="master-head">
   <div><h1>Agency staff &amp; their documents</h1>
     <p class="sub" style="margin:2px 0 0">Freelancers and sub-contractors, grouped by agency, with what we hold on file for each.

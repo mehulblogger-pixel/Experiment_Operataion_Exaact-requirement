@@ -16,7 +16,6 @@
 //  which view() would extract over its own view identifier.
 // ============================================================================
 ?>
-<div class="crumbs"><a href="/">Home</a> › <?= e($noticeTitle) ?></div>
 <div class="master-head">
   <div>
     <h1><?= e($noticeTitle) ?></h1>

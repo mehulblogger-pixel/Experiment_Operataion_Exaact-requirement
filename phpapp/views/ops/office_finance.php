@@ -5,7 +5,6 @@ $qs    = function ($t) use ($sel, $ym) { return '/office-finance?tab=' . $t . '&
 $selOff = null;
 foreach ($offices as $o) if ((int)$o['id'] === (int)$sel) $selOff = $o;
 ?>
-<div class="crumbs"><a href="/">Home</a> › <?= e(T('office')) ?> costs</div>
 <div class="master-head">
   <div><h1><?= e(TH('office')) ?> costs &amp; overheads</h1>
     <p class="sub">What each <?= e(Tl('office')) ?> spends, so profit by <?= e(Tl('sbu')) ?>, activity code and <?= e(Tl("boss")) ?> is a real number rather than a percentage.</p></div>

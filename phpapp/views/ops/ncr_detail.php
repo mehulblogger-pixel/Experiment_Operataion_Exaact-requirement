@@ -1,5 +1,4 @@
 <?php $closed = $n['status'] === 'CLOSED'; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/ncr">Nonconformities</a> › <?= e($n['ref']) ?></div>
 <div class="master-head">
   <div><h1><?= e($n['ref']) ?> — <?= e($n['title']) ?></h1>
   <p class="sub" style="margin:2px 0 0">

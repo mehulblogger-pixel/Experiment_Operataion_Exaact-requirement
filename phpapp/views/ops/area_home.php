@@ -31,7 +31,6 @@ $multi = count($d['sections']) > 1 || ($d['sections'] && $d['sections'][0]['labe
   @media (max-width:820px){ .op-grid{grid-template-columns:1fr} }
 </style>
 
-<div class="crumbs"><a href="/">Home</a> › <?= e($d['title']) ?></div>
 <div class="master-head">
   <div>
     <h1><?= e($d['title']) ?></h1>

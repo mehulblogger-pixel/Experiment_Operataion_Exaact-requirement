@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <span>Analytics</span></div>
 <div class="master-head"><div>
   <h1>Analytics &amp; performance</h1>
   <p class="sub" style="margin:2px 0 0">What is happening in the business — every figure clicks through to the records behind it.</p>

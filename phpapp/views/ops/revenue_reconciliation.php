@@ -7,7 +7,6 @@
   $green = !empty($summary['green']);
   $mode = $mode ?? 'reconciled'; $modes = $modes ?? [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/money">Money</a> › Revenue reconciliation</div>
 <div class="master-head">
   <div><h1>Revenue reconciliation</h1>
     <p class="sub" style="margin:2px 0 0">Where a <?= e(Tl('job')) ?>'s legacy invoice figure disagrees with the books ledger.

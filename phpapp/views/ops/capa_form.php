@@ -1,10 +1,9 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/capa">Corrective actions</a> › Raise one</div>
 <div class="master-head">
   <div><h1>Raise a corrective action</h1>
     <p class="sub" style="margin:2px 0 0"><?= $from
       ? 'Following ' . e($from['ref']) . ', which was checked and found not to have worked.'
       : 'Something went wrong, or is about to. Record it here and the cause, the plan and the check that it worked all hang off it.' ?></p></div>
-  <a class="btn secondary" href="/capa">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <form method="post" action="/capa-new">

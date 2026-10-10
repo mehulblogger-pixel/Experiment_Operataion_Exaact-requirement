@@ -7,7 +7,6 @@ $scoreFrac = ($s['score'] !== null && $s['score'] !== '') ? $s['score'] / max(1,
 $scoreBadge = $scoreFrac === null ? 'GREY' : ($scoreFrac >= 0.8 ? 'GREEN' : ($scoreFrac >= 0.5 ? 'AMBER' : 'RED'));
 $needFollow = (int)$s['followup_needed'] === 1 && (int)$s['followup_done'] === 0;
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/satisfaction">Customer satisfaction</a> › <?= e($s['survey_code']) ?></div>
 <div class="master-head">
   <div><h1><?= e($s['survey_code']) ?>
     <span class="badge <?= $sbadge ?>"><?= e(ucfirst(strtolower($s['status']))) ?></span>

@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/invoices">Invoices</a> › New</div>
 <div class="master-head"><div><h1>New invoice</h1>
   <p class="sub mt-0">Start a draft. Nothing is numbered until it is issued, so an abandoned draft leaves no gap in the series.</p></div></div>
 

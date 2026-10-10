@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/compliance">Where we stand</a> › <span>Incident register</span></div>
 
 <div class="master-head">
   <div><h1>Incident register</h1>

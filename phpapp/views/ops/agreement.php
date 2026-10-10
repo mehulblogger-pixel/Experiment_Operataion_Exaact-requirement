@@ -1,5 +1,4 @@
 <?php $rec = $rec ?? []; $sections = $sections ?? []; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Licence agreement</div>
 <div class="master-head"><div>
   <h1>Licence agreement</h1>
   <p class="sub" style="margin:2px 0 0">The contract accepted when this installation was set up, and the record of who accepted it.</p>

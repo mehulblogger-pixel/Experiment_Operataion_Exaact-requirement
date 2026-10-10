@@ -1,5 +1,4 @@
 <?php $type = $type ?? []; $zipOk = $zipOk ?? false; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/report-types">Report types</a> › <a href="/report-builder?type=<?= (int)$type['id'] ?>"><?= e($type['name'] ?? '') ?></a> › Build from a file</div>
 <div class="master-head"><div>
   <h1>Build the form from your file</h1>
   <p class="sub" style="margin:2px 0 0">Upload your ordinary Word report format. The app reads it and builds the entry form

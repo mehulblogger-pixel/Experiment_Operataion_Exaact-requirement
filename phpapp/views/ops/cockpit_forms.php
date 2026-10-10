@@ -15,7 +15,6 @@ $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 </style>
 
 <div class="ck">
-  <div class="crumbs"><a href="/">Home</a> › <a href="/workspace/setup">Workspace setup</a> › Forms</div>
   <h1 style="margin:.2em 0">Forms</h1>
   <p class="muted" style="margin-top:0">These are the forms your team fills in. Open one to rename fields, reorder them, add your own field, or build a dropdown — all in the Form Designer.</p>
 

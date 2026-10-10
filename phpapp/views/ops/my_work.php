@@ -14,7 +14,6 @@
     ? ['reports', 'jobs', 'money', 'do', 'quality']
     : ['do', 'reports', 'jobs', 'money', 'quality'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › My Work</div>
 <div class="master-head">
   <div>
     <h1>My Work</h1>

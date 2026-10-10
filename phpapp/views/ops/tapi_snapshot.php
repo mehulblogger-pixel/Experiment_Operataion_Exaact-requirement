@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/analytics">Analytics</a> › <span>Periods &amp; snapshots</span></div>
 <div class="master-head"><div>
   <h1>Periods &amp; snapshots</h1>
   <p class="sub" style="margin:2px 0 0">Freeze a period's figures so a finalised management report stays reproducible even as live data moves on.</p>

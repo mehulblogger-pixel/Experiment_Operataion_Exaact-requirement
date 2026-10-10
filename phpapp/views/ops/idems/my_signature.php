@@ -1,5 +1,4 @@
 <?php // Self-service: capture your digital signature (added automatically to reports you approve). ?>
-<div class="crumbs"><a href="/">Home</a> › My signature</div>
 <div class="master-head"><div><h1>My signature</h1>
   <p class="sub" style="margin:2px 0 0">Draw or upload your signature once. It is added <strong>automatically</strong> to reports you approve, and to reports where you are the inspector — no manual upload each time.</p></div></div>
 

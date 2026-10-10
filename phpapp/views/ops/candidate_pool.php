@@ -10,7 +10,6 @@
   $reasonTone  = ['mobile' => 'p-ok', 'email' => 'p-ok', 'name' => 'p-warn'];
   $tierTone = fn($t) => in_array(strtolower((string)$t), ['verified','id_verified','engaged'], true) ? 'p-ok' : 'p-mut';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/recruitment">Recruitment</a> › Candidate pool</div>
 <div class="master-head">
   <div><h1>Candidate pool convergence</h1>
     <p class="sub" style="margin:2px 0 0">Where a recruitment candidate is also a known <strong>marketplace professional</strong>

@@ -7,7 +7,6 @@ $sel = function ($opts, $cur) { foreach ($opts as $code => $label) {
 $clients = ops_all("SELECT id, COALESCE(display_name, legal_name) nm FROM business_partners
                     WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' ORDER BY nm") ?: [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/samples">Items &amp; samples</a> › <?= $s ? e($s['item_code']) : 'Receive an item' ?></div>
 <div class="master-head"><div><h1><?= $s ? 'Edit ' . e($s['item_code']) : 'Receive an item' ?></h1>
   <p class="sub">Log what came in, in what condition, and where it is kept.</p></div></div>
 

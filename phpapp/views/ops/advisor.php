@@ -8,7 +8,6 @@ foreach ($found as $f) if ($f['severity'] === 'CASH') $cashCount++;
 $openKey = $open !== '' ? $open : ($found ? $found[0]['key'] : '');
 $tone = ['CASH' => 'tone-bad', 'SPEED' => 'tone-warn', 'RISK' => 'tone-warn', 'DATA' => 'tone-ok'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › What to fix</div>
 <div class="master-head">
   <div><h1>What to fix</h1>
   <p class="sub" style="margin:2px 0 0">Not a dashboard. Every item below says what it is costing you, why it happened, the exact steps to fix it on the screens in this system, and who should do it. Ordered by money, because twelve small problems matter less than one large one. Nothing here changes anything on its own.</p></div>

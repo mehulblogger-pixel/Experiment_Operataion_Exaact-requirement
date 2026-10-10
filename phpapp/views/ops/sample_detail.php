@@ -4,7 +4,6 @@ $badge = ['RECEIVED' => 'AMBER', 'IN_TESTING' => 'BLUE', 'HOLD' => 'AMBER',
 $open = in_array($s['status'], SAMPLE_OPEN, true);
 $row = fn($lbl, $val) => $val !== '' && $val !== null ? '<tr><th style="text-align:left;width:190px;color:#697787;font-weight:600">' . e($lbl) . '</th><td>' . e($val) . '</td></tr>' : '';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/samples">Items &amp; samples</a> › <?= e($s['item_code']) ?></div>
 <div class="master-head">
   <div><h1><?= e($s['item_code']) ?> <span class="badge <?= $badge ?>"><?= e(str_replace('_', ' ', $s['status'])) ?></span></h1>
     <p class="sub"><?= e($s['description']) ?></p></div>

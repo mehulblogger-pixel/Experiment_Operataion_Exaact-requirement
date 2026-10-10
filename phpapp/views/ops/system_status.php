@@ -7,7 +7,6 @@
   foreach ($rows as $r) if (($rank[$r['severity']] ?? 0) > $rank[$worst]) $worst = $r['severity'];
   $bad = 0; $warn = 0; foreach ($rows as $r) { if ($r['severity']==='bad') $bad++; elseif ($r['severity']==='warn') $warn++; }
 ?>
-<div class="crumbs"><a href="/">Home</a> › System status</div>
 <div class="master-head">
   <div><h1>System status</h1>
     <p class="sub" style="margin:2px 0 0">One place to see whether the platform itself is healthy — the audit trail, data integrity, compliance readiness, licence, integrations, email and the profit engine. Read-only; each line is that subsystem's own verdict.</p></div>

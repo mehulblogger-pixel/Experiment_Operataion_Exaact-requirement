@@ -3,7 +3,6 @@
   $saas = $saas ?? false; $billing = $billing ?? false;
   $nTenants = (int)($n_tenants ?? 0); $nIssued = (int)($n_issued ?? 0);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Super Admin</div>
 <div class="master-head"><div>
   <h1>Super Admin</h1>
   <p class="sub" style="margin:2px 0 0">Everything you run as the software provider, in one place — sell it on your own

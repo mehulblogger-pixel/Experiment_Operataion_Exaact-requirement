@@ -1,5 +1,4 @@
 <?php // Release Note register — Release Notes only, with the linked inspection report ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › Release Notes</div>
 <div class="master-head">
   <div><h1>Release Notes</h1>
     <p class="sub" style="margin:2px 0 0">Every Release Note, with the inspection report it was raised against and its release status. <?= (int)($counts['total'] ?? 0) ?> Release Note(s).</p></div>

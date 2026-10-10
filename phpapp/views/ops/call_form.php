@@ -6,11 +6,10 @@
   $curWd = array_filter(array_map('intval', explode(',', (string)($call['schedule_weekdays'] ?? ''))));
   $ex = credit_explainer($call['ibo_office_id'] ?? (current_user()['home_office_id'] ?? null), $call['executing_office_id'] ?? null);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/calls"><?= e(T_REG('call')) ?></a> › <?= $isEdit ? e($call['call_code']) : 'New' ?></div>
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit ' . e(Tl('call')) . ' ' . e($call['call_code']) : ucfirst(T_NEW('call')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Pick the <?= e(Tl('client')) ?> and the <?= e(Tl('quote')) ?> it is against — the commercial terms come across by themselves. Not in a list? Use <strong>+ Add new</strong> beside any dropdown.</p></div>
-  <a class="btn secondary" href="/calls">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 <?php if (!empty($error)): ?><div class="msg msg-error" id="call_err"><?= e($error) ?></div><?php endif; ?>
 <?php // A message at the top of a form this long, with nothing marked on the form

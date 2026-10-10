@@ -8,7 +8,6 @@
   $curInd = function_exists('industry_current') ? (string)industry_current() : '';
   $industries = defined('INDUSTRY_TEMPLATES') ? INDUSTRY_TEMPLATES : [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Set up</div>
 <div class="master-head">
   <div><h1>Welcome — let’s set up your system</h1>
     <p class="sub" style="margin:2px 0 0">Five quick things only you can decide. Every one of them can be changed later

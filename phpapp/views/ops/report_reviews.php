@@ -2,7 +2,6 @@
   $today = date('Y-m-d');
   $unack = count(array_filter($rejected, fn($r) => trim((string)$r['ack_at']) === ''));
 ?>
-<div class="crumbs"><a href="/">Home</a> › Client acceptance</div>
 <div class="master-head">
   <div><h1>Client acceptance of reports</h1>
   <p class="sub" style="margin:2px 0 0">What is sitting unanswered at a client, and what came back rejected. Nothing is ever accepted automatically by the passing of time — a silent client is not an approving one.</p></div>

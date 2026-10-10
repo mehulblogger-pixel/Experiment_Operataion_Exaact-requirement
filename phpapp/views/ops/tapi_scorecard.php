@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/analytics">Analytics</a> › <span>Scorecard</span></div>
 <div class="master-head"><div>
   <h1>Management scorecard</h1>
   <p class="sub" style="margin:2px 0 0">A weighted view — but never an opaque number. Every category shows its own weight, score and contribution.</p>

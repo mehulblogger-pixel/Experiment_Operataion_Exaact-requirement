@@ -14,7 +14,6 @@ $deptPicker = function ($valueId, $current) use ($e, $deptNames) {
     return $h . '</select></form>';
 };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Departments</div>
 <div class="master-head">
   <div><h1>Departments</h1>
     <p class="sub" style="margin:2px 0 0">Everything organised by department — its designations, positions, headcount and people. File each designation under a department for department-wise pickers, a clear org chart and approval routing.</p></div>

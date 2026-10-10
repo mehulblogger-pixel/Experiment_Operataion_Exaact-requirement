@@ -7,7 +7,6 @@ $scoreBadge = function ($score) use ($scale) {
     return $frac >= 0.8 ? 'GREEN' : ($frac >= 0.5 ? 'AMBER' : 'RED');
 };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Quality &amp; accreditation › Customer satisfaction</div>
 <div class="master-head">
   <div><h1>Customer satisfaction</h1>
     <p class="sub">How customers rate the work after it closes · ISO 9001 §9.1.2</p></div>

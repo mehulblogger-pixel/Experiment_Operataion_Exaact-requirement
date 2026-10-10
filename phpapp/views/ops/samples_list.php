@@ -5,7 +5,6 @@ $statusBadge = function ($s) {
     return $map[$s] ?? 'GREY';
 };
 ?>
-<div class="crumbs"><a href="/">Home</a> › Quality &amp; accreditation › Items &amp; samples</div>
 <div class="master-head">
   <div><h1>Inspection items &amp; samples</h1>
     <p class="sub"><?= (int)($counts['open'] ?? 0) ?> open · what was received, its condition, where it is kept, and how it left (ISO §7.2)</p></div>

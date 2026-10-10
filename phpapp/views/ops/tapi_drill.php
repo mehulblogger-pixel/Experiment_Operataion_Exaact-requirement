@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/analytics">Analytics</a> › <span>Details</span></div>
 <?php if (($mode ?? '')==='kpi' && !empty($def)): ?>
   <div class="master-head"><div><h1><?= e($def['name']) ?></h1></div></div>
   <div class="panel">

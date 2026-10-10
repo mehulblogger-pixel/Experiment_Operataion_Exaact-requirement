@@ -12,7 +12,6 @@ $onMods = $sub['modules'] ?? []; $addable = $sub['addable'] ?? [];
 $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
 $fmt = fn($n) => $sym . number_format((int) $n);
 ?>
-<div class="crumbs"><a href="/">Home</a> › Subscription</div>
 <div class="master-head">
   <div><h1>Your subscription</h1>
     <p class="sub" style="margin:2px 0 0">See what your plan includes, and add exactly the modules or seats you need — you pay only for what you use.</p></div>

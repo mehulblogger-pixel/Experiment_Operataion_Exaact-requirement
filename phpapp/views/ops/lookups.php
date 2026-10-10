@@ -12,7 +12,6 @@
   foreach (ops_all("SELECT type_id, COUNT(*) c FROM lookup_values GROUP BY type_id") as $r) $counts[(int)$r['type_id']] = (int)$r['c'];
   $q = trim($_GET['q'] ?? '');
 ?>
-<div class="crumbs"><a href="/">Home</a> › Masters</div>
 <div class="master-head">
   <div><h1>Masters</h1>
     <p class="sub" style="margin:2px 0 0">Every dropdown in the app, grouped by module. Edit the values, add your own list, and tick which forms it shows on — all in one place. A dependent list filters by a parent list's value. <?= count($types) ?> lists, <?= array_sum($counts) ?> values.</p></div>

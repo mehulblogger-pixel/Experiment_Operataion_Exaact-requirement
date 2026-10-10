@@ -7,7 +7,6 @@
   $stTone = fn($s) => in_array($s,['APPROVED'],true)?'p-ok':(in_array($s,['REJECTED','EXPIRED'],true)?'p-bad':'p-warn');
   $kindLabel = $kind !== '' ? ($kinds[$kind] ?? $kind) : 'Deviations, concessions &amp; waivers';
 ?>
-<div class="crumbs"><a href="/">Home</a> › Issues › Departures</div>
 <?php if (function_exists('nc_tabs')) nc_tabs('departures'); ?>
 <div class="master-head">
   <div><h1>Deviations, concessions &amp; waivers</h1>

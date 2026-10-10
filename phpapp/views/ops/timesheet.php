@@ -1,5 +1,4 @@
 <?php $inspectors = $inspectors ?? []; $ins = $ins ?? null; $insId = $insId ?? 0; $month = $month ?? date('Y-m'); $ts = $ts ?? []; $attStatus = $attStatus ?? []; ?>
-<div class="crumbs"><a href="/">Home</a> › Timesheet</div>
 <div class="master-head"><div>
   <h1>Timesheet</h1>
   <p class="sub" style="margin:2px 0 0">Built automatically from each inspector's site punches — hours on site, per day, with the day's attendance.</p>

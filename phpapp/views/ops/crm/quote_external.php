@@ -1,8 +1,7 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › Register an external <?= e(Tl('quote')) ?></div>
 <div class="master-head">
   <div><h1>Register an external <?= e(Tl('quote')) ?></h1>
     <p class="sub" style="margin:2px 0 0">For an offer submitted straight into the <?= e(Tl('client')) ?>'s portal, a tender portal or by e-mail, where our own format was never used. It still belongs in the register, so win/loss and follow-up numbers stay honest.</p></div>
-  <a class="btn secondary" href="/quotes">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <form method="post" action="/quote-external" class="panel">

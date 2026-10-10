@@ -57,7 +57,6 @@ $warns = array_values(array_filter($health ?? [], fn($h) => $h['level'] === 'war
 </style>
 
 <div class="ck">
-  <div class="crumbs"><a href="/">Home</a> › Workspace setup</div>
 
   <div class="ck-hero">
     <div class="ck-ring" style="--v:<?= $readiness ?>"><span><?= $readiness ?>%</span></div>

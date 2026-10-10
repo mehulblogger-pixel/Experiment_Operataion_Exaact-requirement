@@ -223,6 +223,7 @@ try {
     require __DIR__ . '/lib/projcosting.php';
     require __DIR__ . '/lib/areas.php';
     require __DIR__ . '/lib/navindex.php';
+    require __DIR__ . '/lib/nav.php';            // R-24 — where each screen sits (breadcrumbs, Back)
     require __DIR__ . '/lib/idems_autoform.php';
     require __DIR__ . '/lib/hwpoints.php';
     require __DIR__ . '/lib/seed_demo.php';

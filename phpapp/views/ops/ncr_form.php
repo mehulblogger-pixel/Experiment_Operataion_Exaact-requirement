@@ -1,5 +1,4 @@
 <?php $p = $prefill ?? []; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/ncr">Nonconformities</a> › New</div>
 <div class="master-head"><div><h1>Raise a nonconformity</h1>
   <p class="sub" style="margin:2px 0 0">Record the event. Whether it needs a corrective action is decided afterwards — most do not.</p></div></div>
 

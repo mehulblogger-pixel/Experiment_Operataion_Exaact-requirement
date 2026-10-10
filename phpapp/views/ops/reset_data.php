@@ -1,5 +1,4 @@
 <?php $grand = 0; foreach ($counts as $c) $grand += $c['total']; ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Clear records</div>
 <div class="master-head">
   <div><h1>Clear records</h1>
     <p class="sub">For setting up and testing. Tick what to remove, see how many records that is, and type DELETE to confirm.</p></div>

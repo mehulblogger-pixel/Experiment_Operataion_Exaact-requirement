@@ -1,5 +1,4 @@
 <?php $key = $key ?? ''; $claims = $claims ?? []; $ref = $ref ?? ''; $install = $install ?? ''; $amount = (int)($amount ?? 0); $currency = (string)($currency ?? ''); ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/issue-licence">Licence console</a> › Key</div>
 <div class="master-head"><div>
   <h1>Licence key ready</h1>
   <p class="sub" style="margin:2px 0 0"><?= e($claims['cust'] ?? '') ?> — <?= (int)($claims['seats'] ?? 0) ?: 'unlimited' ?>

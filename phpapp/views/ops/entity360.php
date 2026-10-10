@@ -3,7 +3,6 @@
 // entity: the same panels (tasks, history, and the kind-appropriate quality / party / money) in the
 // same order, whatever the entity is.
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="<?= e($e['back']) ?>"><?= e($e['label']) ?></a> › 360</div>
 <div class="master-head">
   <div>
     <h1><?= e($e['label']) ?> 360 — <?= e($e['title']) ?></h1>

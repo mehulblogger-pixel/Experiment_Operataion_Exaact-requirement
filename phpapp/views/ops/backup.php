@@ -5,7 +5,6 @@ $fmtWhen = function ($s) { $t = strtotime((string) $s); return $t ? date('d M Y,
 $reasonLabel = ['manual' => 'You clicked Back up now', 'daily' => 'Automatic daily', 'pre_restore' => 'Safety copy before a restore',
                 'clientimport' => 'Uploaded backup', 'pre_import_safesnap' => 'Safety copy before an import'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Backup &amp; restore</div>
 <div class="master-head">
   <div><h1>Backup &amp; restore</h1>
     <p class="sub">A complete, dated copy of this workspace's data — to download, keep safe, and restore from in two clicks.</p></div>

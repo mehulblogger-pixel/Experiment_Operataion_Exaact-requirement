@@ -1,5 +1,4 @@
 <?php // Working norms: weekly days + hours per designation per office ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › Working norms</div>
 <div class="master-head">
   <div><h1>Working norms</h1>
     <p class="sub" style="margin:2px 0 0">Standard weekly <strong>days</strong> and <strong>hours</strong> per designation and office. People inherit these unless overridden on their own record. Most-specific wins: a designation+office rule beats a designation-only rule, which beats an office default (blank designation), which beats the global default.</p></div>

@@ -1,4 +1,3 @@
-<div class="crumbs"><a href="/">Home</a> › Billing › Money in</div>
 <?php billing_tabs('receipts'); ?>
 <div class="master-head">
   <div><h1>Money in</h1>

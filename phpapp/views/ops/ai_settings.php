@@ -1,8 +1,7 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › AI providers</div>
 <div class="master-head">
   <div><h1>AI providers &amp; models</h1>
     <p class="sub" style="margin:2px 0 0">Store an API key per provider, refresh its live model list, and choose which models to use. Keys are masked and never shown in full.</p></div>
-  <a class="btn secondary" href="/settings">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <form method="post" action="/ai-settings">

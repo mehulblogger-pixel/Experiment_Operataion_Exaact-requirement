@@ -1,5 +1,4 @@
 <?php // Put a client on hold / block, or clear it — a pre-order control. ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/clients"><?= e(T_REG('client')) ?></a> › Client holds</div>
 <div class="master-head"><div><h1>Client holds &amp; blocks</h1>
   <p class="sub" style="margin:2px 0 0">A pre-order control: put a client <b>on hold</b> (a warning shows when raising a quote or call) or <b>block</b> them (raising work is stopped for non-managers). Always with a reason.</p></div></div>
 

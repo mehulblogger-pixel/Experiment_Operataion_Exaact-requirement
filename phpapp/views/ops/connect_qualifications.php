@@ -14,7 +14,6 @@
   $byBand = [];
   foreach ($levels as $l) { $byBand[strtoupper((string)($l['band'] ?? ''))][] = $l; }
 ?>
-<div class="crumbs"><a href="/">Home</a> › Qualification &amp; role taxonomy</div>
 <div class="master-head">
   <div><h1>Qualification &amp; role taxonomy</h1>
     <p class="sub" style="margin:2px 0 0">One ladder for everyone in technical services — from <strong>ITI</strong> and

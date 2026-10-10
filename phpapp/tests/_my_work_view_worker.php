@@ -74,7 +74,10 @@ try {
     $out['ok']          = true;
     $out['len']         = strlen($html);
     $out['isMyWork']    = (strpos($html, '<h1>My Work</h1>') !== false)
-                       && (strpos($html, '› My Work</div>') !== false)
+                       // R-24 — the trail is now drawn once, centrally, as a <nav>
+                       // instead of a hand-typed <div> in each view. Same assertion:
+                       // the breadcrumb must still name this screen My Work.
+                       && (strpos($html, '>My Work</span></nav>') !== false)
                        && (strpos($html, 'could not be loaded') === false);
     $out['isAdminArea'] = (strpos($html, '<h1>Admin</h1>') !== false)
                        || (strpos($html, 'Nothing is removed.') !== false);

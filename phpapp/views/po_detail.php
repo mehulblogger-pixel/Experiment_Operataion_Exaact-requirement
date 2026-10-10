@@ -1,9 +1,8 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">Purchase Orders</a> › <?= e($po['po_number'] ?: 'Open Order') ?></div>
 <div class="master-head">
   <div><h1><?= e($po['po_number'] ?: 'Open order') ?></h1>
     <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(lk_options_or('po_type', PO_TYPES)[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong><?= e(cur_sym()) ?><?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
       <?php $psb = array_filter(explode(',', $po['sbu'] ?? '')); if ($psb): ?> · <?= e(T("sbu")) ?>: <?= e(implode(', ', array_map(fn($s)=>lk_options_or('sbu',OPS_SBUS)[$s]??$s, $psb))) ?><?php endif; ?></p></div>
-  <a class="btn secondary" href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">← Back</a>
+  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
 <?php // An order raised against a quotation that has since been revised is the

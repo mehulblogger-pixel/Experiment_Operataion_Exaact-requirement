@@ -1,5 +1,4 @@
 <?php // Report templates — upload client-specific .docx formats and map fields with tokens. ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/templates">Document templates</a> › <?= e(T('report')) ?> formats</div>
 <div class="master-head"><div><h1>Document templates</h1>
   <p class="sub" style="margin:2px 0 0">Upload a <?= e(Tl('client')) ?>'s approved Word format and place <code>{{tokens}}</code> where values go. Generated <?= e(Tlp('report')) ?> come out in exactly that format — fonts, headers, footers, logo and tables preserved. The most specific template (by <?= e(Tl('report')) ?> type, <?= e(Tl('client')) ?>, <?= e(T('office')) ?>) is used automatically.</p></div></div>
 <?= template_tabs('/templates?kind=report') ?>

@@ -1,5 +1,4 @@
 <?php $isDraft = $inv['status'] === 'DRAFT'; $isLive = in_array($inv['status'], ['ISSUED','PART_PAID','PAID'], true); ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/invoices">Invoices</a> › <?= e($inv['invoice_no'] ?: 'Draft') ?></div>
 <?= function_exists('chain_strip') ? chain_strip('INVOICE', (int)$inv['id'], 'INVOICE', (int)$inv['id']) : '' ?>
 <?php $co = function_exists('company_profile') ? company_profile() : []; ?>
 <?php if (!empty($co['legal_name']) || !empty($co['brand'])): ?>

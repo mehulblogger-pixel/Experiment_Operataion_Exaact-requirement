@@ -2,7 +2,6 @@
   // Show up to two field columns beyond the title, for a useful list.
   $preview = array_slice(array_values(array_filter($fields, fn($f)=>!in_array($f['field_type'],[],true))), 0, 2);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <?= e($form['name']) ?></div>
 <div class="master-head"><div>
   <h1><?= e($form['icon']) ?> <?= e($form['name']) ?></h1>
   <?php if ($form['help']): ?><p class="sub" style="margin:2px 0 0"><?= e($form['help']) ?></p><?php endif; ?></div>
