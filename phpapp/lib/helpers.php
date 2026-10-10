@@ -451,3 +451,37 @@ function send_uploaded_file($bytes, $name, $mime) {
     header('Content-Security-Policy: default-src \'none\'; sandbox');
     echo $bytes;
 }
+
+// ============================================================================
+//  A PICKER THAT IS EMPTY MUST SAY SO                                   (R-23)
+// ============================================================================
+//  The owner's UAT A2/A7: "Business-unit and department pickers do not fetch
+//  their lists." They fetch them correctly — the lists were simply empty on a
+//  fresh install, and the form said nothing. A dropdown containing only "—",
+//  with no explanation and no way out, reads as broken software rather than as
+//  "nobody has set this up yet", and there is no way to tell the difference
+//  from the screen.
+//
+//  user_form.php already did the right thing ("Missing one? Add it to the X
+//  master and it appears here"). This is that, in one place, so the next form
+//  does not have to remember — which is the same disease as the 277 hand-typed
+//  breadcrumbs, in miniature.
+//
+//  $count  how many options the picker has
+//  $what   what they are, in the user's words ("departments")
+//  $url    where they are managed
+//  $link   what to call that screen
+function picker_hint($count, $what, $url, $link) {
+    $e = fn($x) => htmlspecialchars((string)$x, ENT_QUOTES, 'UTF-8');
+    if ((int)$count > 0) {
+        return '<small class="muted">Missing one? Add it to the <a href="' . $e($url) . '">'
+             . $e($link) . '</a> and it appears here.</small>';
+    }
+    //  Empty is the case that mattered: louder, and it names the action rather
+    //  than the screen, because somebody meeting this has not set the list up
+    //  and does not yet know what that screen is called.
+    return '<small class="msg msg-warning" style="display:block;margin-top:4px;padding:6px 8px">'
+         . 'No ' . $e($what) . ' have been set up yet — '
+         . '<a href="' . $e($url) . '"><strong>add the first one</strong></a>, '
+         . 'then come back and it will be here.</small>';
+}

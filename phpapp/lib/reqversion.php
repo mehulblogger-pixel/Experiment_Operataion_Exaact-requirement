@@ -274,6 +274,19 @@ function rver_migrate() {
 }
 
 //  Configurable vocabularies, through the existing lookup engine.
+//
+//  The qualification list is CREATED by the one registry that creates every
+//  other editable master list — lk_module_lists() in lib/lookups.php, which also
+//  back-fills codes added after an install was set up. Until R-23 nothing
+//  created it at all: this function only topped up a list somebody else was
+//  assumed to have made, so the qualification order was never editable, never
+//  appeared in Masters, and a screen offering to take you there got a 404.
+//
+//  What remains here is a safety net for the one ordering the registry cannot
+//  cover: rver_migrate() can run before the registry does on a workspace built
+//  by an older version. It only tops up the shipped codes the comparison relies
+//  on, and never re-orders a list a workspace has customised — the order IS the
+//  ranking, so re-ordering it would silently change what counts as stricter.
 function rver_ensure_vocab() {
     if (!function_exists('lk_ensure_value') || !function_exists('lk_type')) return;
     try {
@@ -586,13 +599,60 @@ function rver_ensure_initial($entity, $id, array $row = null, array $meta = []) 
 //  move TOWARDS the floor, which is never treated as a weakening.
 // ---------------------------------------------------------------------------
 
-//  The qualification order this workspace uses, weakest first.
-function rver_qual_rank($code) {
-    $order = function_exists('lk_options_or')
+//  The qualification order this workspace uses, weakest first. ONE reader, so a
+//  screen that offers the choice and the comparison that judges it can never
+//  disagree about what the list is or what order it runs in.
+function rver_qual_options() {
+    return function_exists('lk_options_or')
         ? lk_options_or('qualification_level', RVER_QUAL_ORDER) : RVER_QUAL_ORDER;
+}
+
+function rver_qual_rank($code) {
+    $order = rver_qual_options();
     $keys = array_keys($order);
     $i = array_search(strtoupper(trim((string) $code)), array_map('strtoupper', $keys), true);
     return $i === false ? -1 : (int) $i;          // -1 = not specified / unknown
+}
+
+//  THE FLOOR, IN WORDS, FOR A SCREEN. One reader, so the requirement an
+//  approver signs, the floor a requisition is judged against and the evidence a
+//  candidate is reviewed against are always described in the same order with the
+//  same labels and the same vocabulary. Returns plain text — never HTML — so the
+//  caller escapes it exactly once.
+//
+//  A field that was never stated is RETURNED, marked 'stated' => false, rather
+//  than left out: "no minimum experience stated" is information an approver
+//  needs, and silently omitting the line is how a request with no requirement at
+//  all came to look complete.
+function rver_spec_summary(array $fields) {
+    $quals = rver_qual_options();
+    $out = [];
+    foreach (RVER_SPEC_FLOOR as $f => $spec) {
+        $raw = $fields[$f] ?? null;
+        $txt = '';
+        if ($f === 'min_experience_years') {
+            if ($raw !== null && trim((string) $raw) !== '') {
+                $n = (float) $raw;
+                $txt = rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.')
+                     . ' ' . ($n == 1.0 ? 'year' : 'years');
+            }
+        } elseif ($f === 'min_qualification') {
+            $code = strtoupper(trim((string) $raw));
+            if ($code !== '') $txt = (string) ($quals[$code] ?? $code);
+        } else {
+            $txt = trim((string) $raw);
+        }
+        $out[$f] = ['field' => $f, 'label' => ucfirst($spec['label']),
+                    'value' => $txt, 'stated' => $txt !== ''];
+    }
+    return $out;
+}
+
+//  Is any part of the core specification stated at all? Used to tell "nobody has
+//  said what is required" apart from "the requirement is deliberately open".
+function rver_spec_stated(array $fields) {
+    foreach (rver_spec_summary($fields) as $l) if ($l['stated']) return true;
+    return false;
 }
 
 //  The approved CORE floor of the hiring request a requisition belongs to, or

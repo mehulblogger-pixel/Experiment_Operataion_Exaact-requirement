@@ -210,6 +210,13 @@ function lk_module_lists() {
         ['asset_type',          'Asset type',                ASSET_TYPES,            'People'],
         ['roll_type',           'Whose roll',                ROLL_TYPES,             'People'],
         ['fee_status',          'Placement fee status',      FEE_STATUS,             'People'],
+        //  Gate 2's core person specification. The ORDER of this list is the
+        //  ranking the floor comparison uses (weakest first), which is why it is
+        //  registered here like any other editable list rather than hard-wired:
+        //  a workspace that works to NSQF bands, or that simply does not use
+        //  "ITI", can re-order and re-word it, and rver_qual_rank() reads the
+        //  same list it offers on the form.
+        ['qualification_level', 'Qualification level',       defined('RVER_QUAL_ORDER') ? RVER_QUAL_ORDER : [], 'People'],
         ['requisition_type',    'Requisition type',          REQ_TYPES,              'People'],
         ['requisition_status',  'Requisition status',        REQ_STATUS,             'People'],
         ['req_sourcing_model',  'Sourcing model (cost)',     defined('REQ_SOURCING_MODELS') ? REQ_SOURCING_MODELS : [], 'People'],
@@ -615,6 +622,52 @@ function lk_prune_offplan_lists() {
             db()->prepare("DELETE FROM lookup_types  WHERE id=?")->execute([(int) $t['id']]);
         } catch (Throwable $e) { /* referenced or locked — leave it, the screen still collapses it */ }
     }
+}
+
+// ---------------------------------------------------------------------------
+//  IS A REGISTERED MASTER LIST MISSING FROM THIS INSTALL?
+//
+//  Adding a row to lk_module_lists() creates the list on a FRESH install and on
+//  any install whose boot() runs — but a live workspace that is merely upgraded
+//  never re-seeds: index.php probes for a missing table or column, finds none,
+//  and runs migrate_all(), which is DDL only. So a list added in a later build
+//  silently never arrived: it was absent from Masters, could not be edited, and
+//  a screen that offered a link to it answered 404. R-23 found this through the
+//  qualification-level list, but it was never specific to that list.
+//
+//  index.php's own pattern for exactly this case is a self-cancelling check that
+//  throws, which runs the idempotent boot() once and clears itself — the same
+//  shape as file_columns_pending() and deliverables_pending(). This is that
+//  check, and it is deliberately asked of the registry rather than of one list,
+//  so every future addition is covered without touching index.php again.
+//
+//  THE LOOP THIS MUST NOT CAUSE. lk_ensure_type_map() legitimately declines to
+//  create a list — before the base lists exist at all, and for a module a hosted
+//  plan excludes (lk_prune_offplan_lists() would delete it again on the very
+//  next boot). Reporting such a list as "pending" would make every request throw
+//  and re-boot for ever. So the same two conditions are applied here, and the
+//  answer is false unless boot() would really create the list.
+// ---------------------------------------------------------------------------
+function lk_lists_pending() {
+    try {
+        //  Before the base lists exist, this is a fresh install: lk_seed() owns
+        //  it, and nothing is "pending an upgrade".
+        if ((int) ops_val("SELECT COUNT(*) FROM lookup_types") === 0) return false;
+        $have = [];
+        foreach (ops_all("SELECT type_key FROM lookup_types") as $r) $have[(string) $r['type_key']] = true;
+        $tenant = function_exists('current_tenant') && current_tenant() !== '';
+        foreach (lk_module_lists() as [$key, , $map, $module]) {
+            if (isset($have[$key])) continue;
+            //  An empty shipped list has nothing to create.
+            if (!is_array($map) || !$map) continue;
+            //  A module this plan excludes: boot() would not create it, and the
+            //  pruner would remove it if it did.
+            if ($tenant && $module !== '' && function_exists('lk_group_enabled')
+                && !lk_group_enabled($module)) continue;
+            return true;
+        }
+    } catch (Throwable $e) { return false; }   // no lookup engine yet — not our call
+    return false;
 }
 
 // A friendlier heading for each module group on the Masters screen.

@@ -194,8 +194,16 @@ h2{font-weight:700;letter-spacing:-.01em}
 .btn.small:not(.secondary):not(.danger){box-shadow:0 2px 8px color-mix(in srgb,var(--brand) 26%,transparent)}
 
 /* Form fields — soft ground + focus ring */
+/*  font-family is NAMED, not left to the browser. A <textarea> defaults to
+    monospace while <input> and <select> do not, so every multi-line field in the
+    application — job descriptions, reasons, decision notes, complaint text, 128
+    of them — was typeset in a different typeface from the single-line field
+    beside it. Nobody chose that; it is the browser default showing through a
+    rule that never said. Measured in Chromium: inputs Arial, textareas
+    monospace. */
 .form-control{background:var(--field);border:1px solid var(--field-line);border-radius:var(--radius-sm);
-  padding:10px 12px;color:var(--ink);transition:border-color .15s,box-shadow .15s,background .15s}
+  padding:10px 12px;color:var(--ink);font-family:inherit;
+  transition:border-color .15s,box-shadow .15s,background .15s}
 .form-control::placeholder{color:var(--muted);opacity:1}
 .form-control:focus{outline:none;border-color:var(--focus);background:var(--card);
   box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 20%,transparent)}

@@ -176,10 +176,25 @@ t_nothrow('the money does NOT silently redefine existing amount-band rules', fun
 });
 
 t_nothrow('an approved estimate becomes the requisition\'s budget baseline', function () {
+    //  SCOPED TO THE FUNCTION, NOT TO A CHARACTER COUNT.
+    //
+    //  This read a fixed window of 1200 characters either side of the insert.
+    //  Adding a comment above the insert pushed the budget assignment out of the
+    //  window and the test failed while the property it guards was untouched —
+    //  a test that reports on its own formatting is a test nobody can trust.
+    //  The whole function body is the honest scope: the claim is "this function
+    //  carries the approved estimate across", so that is what is searched.
     $src = (string) @file_get_contents(dirname(__DIR__) . '/lib/hiringreq.php');
-    $ins = strpos($src, 'INSERT INTO requisitions');
-    t_ok($ins !== false, 'ARMING · the requisition insert was located');
-    $body = substr($src, max(0, $ins - 1200), 2400);
+    $fn  = strpos($src, 'function hreq_to_requisition');
+    t_ok($fn !== false, 'ARMING · hreq_to_requisition() was located');
+    $ins = strpos($src, 'INSERT INTO requisitions', $fn === false ? 0 : $fn);
+    t_ok($ins !== false, 'ARMING · the requisition insert was located inside it');
+    //  From the start of the function to the end of the statement that runs the
+    //  insert — never past it, so a later function cannot satisfy the check.
+    $end  = strpos($src, 'lastInsertId', $ins === false ? 0 : $ins);
+    $body = substr($src, (int) $fn, max(0, (int) $end - (int) $fn));
+    t_ok(strpos($body, 'INSERT INTO requisitions') !== false,
+         'ARMING · the scope really does contain the insert it is asked about');
     t_ok(strpos($body, 'budgeted_cost') !== false, 'the insert sets the requisition budget');
     t_ok(strpos($body, 'est_cost_per_person') !== false, 'from the approved estimate');
     //  Without this, the placement commercial approved later is measured against

@@ -621,6 +621,15 @@ try {
         throw new RuntimeException('pending upgrade: shared work-type list');
     if (function_exists('deliverables_pending') && deliverables_pending())
         throw new RuntimeException('pending upgrade: deliverables from the report register');
+    //  A MASTER LIST ADDED IN A LATER BUILD is not a missing table or column, so
+    //  nothing above would ever notice it and migrate_all() (DDL only) does not
+    //  create it. A live workspace therefore never received it: absent from
+    //  Masters, not editable, and a 404 from any screen that linked to it.
+    //  Self-cancelling — boot() registers every pending list, and the check then
+    //  answers false. Asked of the whole registry, so a list added next year is
+    //  covered without editing this file again.
+    if (function_exists('lk_lists_pending') && lk_lists_pending())
+        throw new RuntimeException('pending upgrade: a master list this build registers is missing');
     // Every probe above passed, but the code fingerprint moved — a deploy has
     // happened. Run the schema migrations directly (idempotent DDL, and NEVER
     // re-seeds) so ANY table or column added in this build is created, even one

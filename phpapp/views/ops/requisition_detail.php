@@ -130,6 +130,21 @@ $h = $health ?? null; if ($h): [$hband, $htone] = $h['band']; ?>
   <?php if ($reqLocs): ?><div><span class="k">Locations required</span><span><?php foreach ($reqLocs as $L): ?><span class="pill p-mut" style="margin:0 4px 3px 0;display:inline-block"><?= e($L) ?></span><?php endforeach; ?></span></div><?php endif; ?>
   <div><span class="k"><?= e(T("sbu")) ?></span><?= e(OPS_SBUS[$req['sbu']] ?? ($req['sbu'] ?: '—')) ?></div>
   <div><span class="k">Approval</span><?= e($req['approval_ref'] ?: '—') ?><?= $req['approval_date'] ? ' · '.e($req['approval_date']) : '' ?><?= $req['approved_by'] ? ' · by '.e($req['approved_by']) : '' ?></div>
+  <?php
+    //  R-23 — THE APPROVED MINIMUM, WHICH THIS SCREEN NEVER SHOWED.
+    //
+    //  These three lines are binding, not descriptive: this recruitment may ask
+    //  for more than them, and cannot ask for less without going back for
+    //  approval. A recruiter who cannot see them is being asked to screen people
+    //  against a bar nobody has told them about.
+    //
+    //  Only stated lines are shown here. A requisition raised directly, with no
+    //  hiring request behind it, has no floor at all, and an empty "Minimum
+    //  qualification —" would read as a requirement rather than its absence.
+    $__spec = function_exists('rver_spec_summary') ? rver_spec_summary($req) : [];
+    foreach ($__spec as $__l): if (!$__l['stated']) continue; ?>
+    <div<?= $__l['field'] === 'essential_skills' ? ' class="kv-wide"' : '' ?>><span class="k"><?= e($__l['label']) ?></span><?= e($__l['value']) ?></div>
+  <?php endforeach; ?>
   <?php if ($seeSal): ?><div><span class="k">Budgeted monthly cost</span><?= fmoney($req['budgeted_cost']) ?></div><?php endif; ?>
   <?php if ($req['notes']): ?><div class="kv-wide"><span class="k">Notes</span><?= e($req['notes']) ?></div><?php endif; ?>
   <?php if (function_exists('custom_display')) foreach (custom_display('requisition', $req['id']) as $cf): ?>

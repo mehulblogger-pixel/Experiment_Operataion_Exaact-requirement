@@ -214,10 +214,13 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
     <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
       <div class="ff"><label>Job title *</label><input class="form-control" name="job_title" required value="<?= $v('job_title') ?>" placeholder="e.g. Mechanical Engineer"></div>
       <div class="ff"><label>Designation</label>
+        <?php $__desig = lk_options_or('designation', DESIGNATIONS); ?>
         <select class="form-control searchable" name="designation"><option value="">—</option>
-          <?php foreach (lk_options_or('designation', DESIGNATIONS) as $k => $lbl): ?><option value="<?= $e($k) ?>" <?= ($r['designation'] ?? '') === $k ? 'selected' : '' ?>><?= $e($lbl) ?></option><?php endforeach; ?>
-        </select></div>
-      <div class="ff"><label>Which department will they join?</label><?= $deptSel('hiring_department_id', (int) ($r['hiring_department_id'] ?? 0)) ?></div>
+          <?php foreach ($__desig as $k => $lbl): ?><option value="<?= $e($k) ?>" <?= ($r['designation'] ?? '') === $k ? 'selected' : '' ?>><?= $e($lbl) ?></option><?php endforeach; ?>
+        </select>
+        <?= picker_hint(count($__desig), 'designations', '/lookup?key=designation', 'designation master') ?></div>
+      <div class="ff"><label>Which department will they join?</label><?= $deptSel('hiring_department_id', (int) ($r['hiring_department_id'] ?? 0)) ?>
+        <?= picker_hint(count($depts), 'departments', '/departments', 'department hub') ?></div>
       <div class="ff"><label>Against which position? <span class="muted">— optional</span></label>
         <select class="form-control searchable" name="position_id"><option value="">— none / a new one is needed —</option>
           <?php foreach ($positions as $p): ?><option value="<?= (int) $p['id'] ?>" <?= (int) ($r['position_id'] ?? 0) === (int) $p['id'] ? 'selected' : '' ?>><?= $e($p['name']) ?><?= $p['department'] ? ' · ' . $e($p['department']) : '' ?></option><?php endforeach; ?>
@@ -226,13 +229,47 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
         <textarea class="form-control" name="job_description" rows="3"><?= $e($r['job_description'] ?? '') ?></textarea></div>
     </div>
 
+    <?php
+      //  R-23 / A6 — THE REQUIREMENT ITSELF, WHICH THIS FORM NEVER ASKED.
+      //
+      //  These three columns have existed since Gate 2, the save handler reads
+      //  them, the approved snapshot carries them, a requisition's floor is
+      //  measured against them and the candidate-review evidence panel reads
+      //  them. Nothing ever offered them to the person raising the request, so
+      //  they were saved empty on every single save — which meant an approver
+      //  signed "hire a Mechanical Engineer" with no stated minimum at all, and
+      //  every protection built on top of the floor was guarding nothing.
+      //
+      //  All three are optional by design: a request that states no minimum has
+      //  no floor, and an absent value must never be read as a floor of zero
+      //  (lib/hiringreq.php makes the same distinction when it saves them).
+    ?>
+    <h3 class="tab-sub">What must the person have? <span class="muted" style="font-weight:400;font-size:12.5px">— the minimum, not the ideal</span></h3>
+    <p class="muted" style="margin:-4px 0 10px;font-size:12.5px">Whatever you set here becomes the floor. The <?= $e(strtolower($L('requisition'))) ?> raised from this request may ask for <em>more</em>, but it cannot ask for less without coming back for approval — and candidates are shown against these lines when someone reviews them. Leave a line blank if there genuinely is no minimum.</p>
+    <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+      <div class="ff"><label>Minimum qualification</label>
+        <?php $__qual = function_exists('rver_qual_options') ? rver_qual_options() : []; ?>
+        <select class="form-control" name="min_qualification"><option value="">— no minimum —</option>
+          <?php foreach ($__qual as $k => $lbl): ?><option value="<?= $e($k) ?>" <?= strtoupper(trim((string) ($r['min_qualification'] ?? ''))) === (string) $k ? 'selected' : '' ?>><?= $e($lbl) ?></option><?php endforeach; ?>
+        </select>
+        <?= picker_hint(count($__qual), 'qualification levels', '/lookup?key=qualification_level', 'qualification list') ?></div>
+      <div class="ff"><label>Minimum experience <span class="muted">— years</span></label>
+        <input class="form-control" type="number" min="0" max="60" step="0.5" name="min_experience_years"
+               value="<?= ($r['min_experience_years'] ?? null) === null || $r['min_experience_years'] === '' ? '' : $e(rtrim(rtrim(number_format((float) $r['min_experience_years'], 2, '.', ''), '0'), '.')) ?>"
+               placeholder="e.g. 5"></div>
+      <div class="ff ff-wide" style="grid-column:1/-1"><label>Essential skills <span class="muted">— a candidate without these is not eligible</span></label>
+        <textarea class="form-control" name="essential_skills" rows="2" maxlength="600" placeholder="e.g. Welding inspection, CSWIP 3.1, offshore experience"><?= $e($r['essential_skills'] ?? '') ?></textarea>
+        <small class="muted">Separate them with commas. Keep it to what is genuinely essential — anything desirable belongs in the job description above.</small></div>
+    </div>
+
     <h3 class="tab-sub">Where, how many, and when?</h3>
     <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
       <div class="ff"><label>How many people? *</label><input class="form-control" type="number" min="1" name="quantity" required value="<?= (int) ($r['quantity'] ?? 1) ?>"></div>
       <div class="ff"><label>Branch</label>
         <select class="form-control" name="office_id"><option value="">—</option>
           <?php foreach ($offices as $o): ?><option value="<?= (int) $o['id'] ?>" <?= (int) ($r['office_id'] ?? 0) === (int) $o['id'] ? 'selected' : '' ?>><?= $e($o['name']) ?></option><?php endforeach; ?>
-        </select></div>
+        </select>
+        <?= picker_hint(count($offices), 'branches', '/hierarchy?tab=offices', 'offices list') ?></div>
       <div class="ff"><label>Work location</label><input class="form-control" name="work_location" value="<?= $v('work_location') ?>" placeholder="e.g. ABC Refinery, Jamnagar"></div>
       <div class="ff"><label>Project / contract reference</label><input class="form-control" name="project_ref" value="<?= $v('project_ref') ?>"></div>
       <div class="ff"><label>Needed by</label><input class="form-control" type="date" name="required_by" value="<?= $e(substr((string) ($r['required_by'] ?? ''), 0, 10)) ?>"></div>
@@ -366,6 +403,24 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
       <tr><th style="width:30%">Requested by</th><td><?= $v('requested_by_name') ?: $v('created_by') ?></td></tr>
       <tr><th>What</th><td><?= $v('job_title') ?><?= $r['job_description'] ? '<div class="muted" style="font-size:11.5px">' . $e($r['job_description']) . '</div>' : '' ?></td></tr>
       <tr><th>How many</th><td><?= (int) $r['quantity'] ?></td></tr>
+      <?php
+        //  R-23 / A6 — WHAT THE APPROVER IS ACTUALLY AGREEING TO.
+        //
+        //  An approver lands on this very screen from their inbox, and until now
+        //  it showed them a job title, a headcount and a date. The minimum a
+        //  candidate must meet — the floor every requisition and every candidate
+        //  review is later judged against — was never on the page, so nobody
+        //  could approve it or question it. A line that was left blank is shown
+        //  as "not stated" rather than hidden, because a request with no stated
+        //  requirement is a thing an approver should be able to see and send back.
+        $__spec = function_exists('rver_spec_summary') ? rver_spec_summary($r) : [];
+      ?>
+      <?php foreach ($__spec as $__l): ?>
+      <tr><th><?= $e($__l['label']) ?></th><td>
+        <?php if ($__l['stated']): ?><?= $e($__l['value']) ?>
+        <?php else: ?><span class="muted">not stated</span><?php endif; ?>
+      </td></tr>
+      <?php endforeach; ?>
       <tr><th>Needed by</th><td><?= $v('required_by') ?: '—' ?></td></tr>
       <?php $sC = function_exists('hreq_commitment') ? hreq_commitment($r) : ['has' => false];
             $sSym = function_exists('cur_sym') ? cur_sym() : ''; ?>

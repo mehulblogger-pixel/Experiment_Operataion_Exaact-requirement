@@ -869,6 +869,32 @@ function hreq_save($id, array $post) {
         return [false, 'That is not a rate basis this workspace uses.', 0];
     if ($estPer !== null && $estPer > 0 && $estBasis === '') $estBasis = 'MONTHLY';
 
+    //  GATE 2 · R-23 — THE CORE PERSON SPECIFICATION, VALIDATED.
+    //
+    //  These three are the floor every requisition and every candidate review is
+    //  judged against, so a value the comparison cannot read is worse than no
+    //  value at all: rver_qual_rank() answers -1 for a code it does not know,
+    //  which reads as "no minimum stated" and silently switches the protection
+    //  off. A typo must therefore be refused here, not absorbed.
+    $minQual = strtoupper(trim((string) ($post['min_qualification'] ?? '')));
+    if ($minQual !== '') {
+        $qualList = function_exists('rver_qual_options') ? rver_qual_options() : [];
+        $qualKeys = array_map('strtoupper', array_map('strval', array_keys($qualList)));
+        if (!in_array($minQual, $qualKeys, true))
+            return [false, 'That is not a qualification level this workspace uses.', 0];
+    }
+    //  Years, not a lifetime. The column holds DECIMAL(5,2), so an unbounded
+    //  number would be truncated by the database instead of questioned here, and
+    //  a floor nobody can meet is a request that can never be filled.
+    $minExp = null;
+    if (array_key_exists('min_experience_years', $post)
+        && trim((string) $post['min_experience_years']) !== '') {
+        $minExp = (float) $post['min_experience_years'];
+        if ($minExp < 0)  return [false, 'The minimum experience cannot be a negative number.', 0];
+        if ($minExp > 60) return [false, 'Please enter the minimum experience in years (60 at most).', 0];
+        $minExp = round($minExp, 2);
+    }
+
     $cols = [
         'status'                   => $existing ? (string) $existing['status'] : 'DRAFT',
         'requested_by_id'          => $byId,
@@ -903,11 +929,9 @@ function hreq_save($id, array $post) {
         //
         //  Nullable on purpose: a request that states no minimum has no floor, and
         //  an absent value must never be read as a floor of zero.
-        'min_experience_years'     => (array_key_exists('min_experience_years', $post)
-                                       && trim((string) $post['min_experience_years']) !== '')
-                                      ? max(0, (float) $post['min_experience_years']) : null,
-        'min_qualification'        => strtoupper(trim((string) ($post['min_qualification'] ?? ''))),
-        'essential_skills'         => substr(trim((string) ($post['essential_skills'] ?? '')), 0, 600),
+        'min_experience_years'     => $minExp,
+        'min_qualification'        => $minQual,
+        'essential_skills'         => mb_substr(trim((string) ($post['essential_skills'] ?? '')), 0, 600),
     ];
     $now = hreq_now(); $who = hreq_who();
     //  GATE 2 — AN APPROVED REQUIREMENT IS NOT EDITED IN PLACE.
@@ -1495,16 +1519,45 @@ function hreq_to_requisition($id, $qty = 0) {
     $estCost  = ($r['est_cost_per_person'] ?? null) !== null ? (float) $r['est_cost_per_person'] : 0.0;
     $estBasis = (string) ($r['est_cost_basis'] ?? '') ?: 'MONTHLY';
 
+    //  R-23 — THE APPROVED SPECIFICATION BECOMES THE REQUISITION'S STARTING POINT.
+    //
+    //  The floor only works if the requisition actually carries it. It did not:
+    //  the three specification columns exist on requisitions, rver_floor_breaches()
+    //  measures against them, and this insert left all three empty. Because
+    //  "removing the requirement entirely" is the strongest weakening there is,
+    //  an empty value counts as a breach — so a request that stated a minimum
+    //  produced requisitions that breached their own parent's floor from the
+    //  moment they were created, and a request that stated nothing produced a
+    //  recruitment with no stated requirement at all.
+    //
+    //  The APPROVED version is carried across, never the live row: the floor is
+    //  what a named person agreed to, which is the whole point of having one.
+    //  A request with no approved version yet (or approved before Gate 2) falls
+    //  back the same way rver_hr_floor() does, so the two always agree.
+    $spec = function_exists('rver_approved_fields')
+        ? rver_approved_fields('HIRING_REQUEST', (int) $id) : null;
+    if (!is_array($spec)) {
+        $snap = hreq_approved_snapshot($r);
+        $spec = is_array($snap['fields'] ?? null) ? $snap['fields'] : $r;
+    }
+    $specExp  = ($spec['min_experience_years'] ?? null) !== null
+                && trim((string) $spec['min_experience_years']) !== ''
+                ? (float) $spec['min_experience_years'] : null;
+    $specQual = strtoupper(trim((string) ($spec['min_qualification'] ?? '')));
+    $specSkil = trim((string) ($spec['essential_skills'] ?? ''));
+
     db()->prepare("INSERT INTO requisitions
         (req_code, hiring_request_id, office_id, client_id, department, department_id, designation, grade,
          position_id, quantity, req_type, project_site, deploy_location, start_date, responsibilities,
          budgeted_cost, rate_basis,
+         min_experience_years, min_qualification, essential_skills,
          status, approved_by, approval_date, created_by, created_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'OPEN', ?, ?, ?, ?)")
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'OPEN', ?, ?, ?, ?)")
         ->execute([$code, (int) $id, $r['office_id'], $r['client_id'], $deptCode, $deptId,
                    $r['designation'], $r['grade'], $r['position_id'], $qty, $r['request_type'],
                    $r['project_ref'], $r['work_location'], $r['required_by'], $r['job_description'],
                    $estCost, $estBasis,
+                   $specExp, $specQual, $specSkil,
                    (string) $r['decided_by'], (string) substr((string) $r['decided_at'], 0, 10),
                    hreq_who(), hreq_now()]);
     $rid = (int) db()->lastInsertId();
@@ -1641,7 +1694,22 @@ function ops_hiring_requests($route, $method) {
             ops_require($mayDecide, 'You are not permitted to approve or reject a hiring request.');
             // Segregation of duties — the requestor is not the approver.
             ops_require(hreq_may_decide($id), 'You raised this request, so somebody else has to decide it.');
-            [$ok, $msg] = hreq_decide($id, ($_POST['decision'] ?? '') === 'approve', (string) ($_POST['note'] ?? ''));
+            //  THE DECISION MUST BE SAID, NOT INFERRED.
+            //
+            //  This read `=== 'approve'`, which made EVERYTHING ELSE a rejection:
+            //  a missing parameter, a mis-cased value, a button whose value a
+            //  browser or proxy dropped, a replayed form from an older build. A
+            //  rejection is not the safe default — it ends the request, tells the
+            //  requester they were turned down, and is not a state anybody can
+            //  quietly take back. Doing nothing and saying why is the safe
+            //  default, so an unrecognised decision is refused outright.
+            $decision = strtolower(trim((string) ($_POST['decision'] ?? '')));
+            if ($decision !== 'approve' && $decision !== 'reject') {
+                flash('That decision did not come through — nothing has been changed. '
+                    . 'Please press Approve or Reject again.', 'error');
+                redirect('/hiring-request?id=' . $id); return true;
+            }
+            [$ok, $msg] = hreq_decide($id, $decision === 'approve', (string) ($_POST['note'] ?? ''));
             flash($msg, $ok ? 'success' : 'error'); redirect('/hiring-request?id=' . $id); return true;
         }
         if ($do === 'raise-requisition') {
