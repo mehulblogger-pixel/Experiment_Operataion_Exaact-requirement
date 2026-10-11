@@ -23,7 +23,13 @@
 //  into one middle. This screen is desk-first, but it must still work in a hand.
 $pvRec = $pvRec ?? fn($k) => false;
 ?>
-<div class="vgrid-block mgroup">
+<?php
+  //  data-group names the block for the undo message, and scopes every bulk
+  //  control inside it (see _perm_verb_grid_assets.php). Before R-20b the column
+  //  control reached the whole page, so "View" at the top of Recruitment also
+  //  ticked View on Sales, Money and everything else — UAT 1.5.3.
+?>
+<div class="vgrid-block mgroup" data-group="<?= e($pvGroup ?? 'this group') ?>">
 <?php if (!empty($pvGroup)): ?>
   <?php // The heading sits ABOVE the table, not in a row inside it. Rendered as a
         // row, the column headers printed before the group name, so each header
@@ -36,17 +42,40 @@ $pvRec = $pvRec ?? fn($k) => false;
 <?php endif; ?>
 <div class="tbl-scroll vgrid-wrap">
 <table class="dt vgrid">
-  <thead><tr>
+  <thead>
+  <tr>
     <th>Module</th>
     <?php foreach (PERM_VERBS as $v): ?>
-    <th class="vh" title="<?= e(perm_verb_help($v)) ?>">
-      <label class="chk vcol"><input type="checkbox" class="col-all" data-verb="<?= e($v) ?>"> <?= e(perm_verb_label($v)) ?></label>
+    <th class="vh" title="<?= e(perm_verb_help($v)) ?>"><?= e(perm_verb_label($v)) ?></th>
+    <?php endforeach; ?>
+  </tr>
+  <?php
+    //  THE BULK ROW, SAID OUT LOUD.
+    //
+    //  These ticks used to BE the column headings. A heading is something you
+    //  read; people do not expect reading a table to change 31 modules at once,
+    //  and the owner's verdict on finding out was exactly right. The capability
+    //  is worth keeping — setting up a role one column at a time beats 186
+    //  individual ticks — so it stays, but as its own labelled row that says
+    //  what it does and what it covers, with an Undo beneath the table.
+  ?>
+  <tr class="vbulk">
+    <th scope="row"><span class="vbulk-lbl">Apply to every module in <?= e($pvGroup ?? 'this group') ?></span></th>
+    <?php foreach (PERM_VERBS as $v): ?>
+    <th class="vh">
+      <label class="chk vcol" title="Give or remove <?= e(perm_verb_label($v)) ?> on every module in <?= e($pvGroup ?? 'this group') ?>">
+        <input type="checkbox" class="col-all" data-verb="<?= e($v) ?>"
+               data-verb-label="<?= e(perm_verb_label($v)) ?>"
+               aria-label="<?= e(perm_verb_label($v)) ?> on every module in <?= e($pvGroup ?? 'this group') ?>">
+        <span class="vcol-all">all</span>
+      </label>
     </th>
     <?php endforeach; ?>
-  </tr></thead>
+  </tr>
+  </thead>
   <tbody>
     <?php foreach ($pvModules as $k): $verbs = access_module_verbs($k); ?>
-    <tr class="vrow">
+    <tr class="vrow" data-modlabel="<?= e(access_module_label($k)) ?>">
       <td class="vname">
         <label class="chk rowall"><input type="checkbox" class="row-all"> <b><?= e(access_module_label($k)) ?></b></label>
         <?= $pvRec("mod.$k.view") ? ' <span class="pill p-ok" style="padding:0 5px;font-size:10px">recommended</span>' : '' ?>

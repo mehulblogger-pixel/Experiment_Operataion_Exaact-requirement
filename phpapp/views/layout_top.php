@@ -528,6 +528,34 @@
       <div class="msg msg-warning">Your role requires two-step sign-in and it is not set up yet.
         <a href="/two-factor"><strong>Set it up now</strong></a> — it takes about a minute and needs only your phone.</div>
 <?php endif; ?>
+<?php
+  //  ---- NOBODY IS LEFT STARING AT AN EMPTY SCREEN -------------------------
+  //
+  //  A role the permission matrix confines to its own branch used to receive
+  //  EVERY branch when nobody had given it one (UAT 1.5.4 / H10). That now
+  //  closes instead of opening — which is right, but it means a person whose
+  //  account was never finished sees empty lists everywhere. An empty list with
+  //  no explanation is its own defect: they conclude the system has lost their
+  //  work. So the reason is said plainly, once, on whatever screen they are on.
+  if (function_exists('scope_needs_home') && scope_needs_home()): ?>
+      <div class="msg msg-warning">
+        <b>Your account has not been given a branch yet.</b>
+        That is why these lists look empty — the system does not yet know whose work to show you.
+        Ask your workspace administrator to set your home office on your user record; nothing of yours has been lost.
+      </div>
+<?php endif; ?>
+<?php
+  //  And the administrator is told who is affected BEFORE those people call,
+  //  rather than finding out from them.
+  if (function_exists('scope_unplaced_users') && function_exists('can')
+      && (can('users.manage.global') || can('users.manage.branch'))
+      && ($__unplaced = scope_unplaced_users())): ?>
+      <div class="msg msg-warning">
+        <b><?= count($__unplaced) ?> <?= count($__unplaced) === 1 ? 'person has' : 'people have' ?> no branch set</b>,
+        so <?= count($__unplaced) === 1 ? 'they see' : 'they see' ?> none of their work.
+        <a href="/users"><strong>Set their home office</strong></a> — their records are untouched.
+      </div>
+<?php endif; ?>
 <?php foreach (take_flash() as $m): ?>
       <div class="msg msg-<?= e($m['tag']) ?>"><?= e($m['text']) ?></div>
 <?php endforeach; ?>

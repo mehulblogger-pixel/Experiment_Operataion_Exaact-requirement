@@ -24,8 +24,18 @@ $out = ['mode'=>$mode, 'role'=>$role, 'ok'=>false];
 try {
     $un = 'b10w_' . strtolower($role);
     db()->prepare("DELETE FROM users WHERE username=?")->execute([$un]);
-    db()->prepare("INSERT INTO users (username, first_name, last_name, role, is_active, is_superuser)
-                   VALUES (?,?,?,?,1,?)")->execute([$un, 'Probe', ucfirst(strtolower($role)), $role, $role === 'ADMIN' ? 1 : 0]);
+    //  THE PROBE USER IS GIVEN A BRANCH, because a real one has one.
+    //
+    //  This probe used to be created with no home office. A role the permission
+    //  matrix confines to its own branch — Coordinator here — then resolved to
+    //  "every office", which is the defect UAT 1.5.4 reported and the fix in
+    //  lib/access.php closes: an account nobody has placed in a branch now sees
+    //  nothing rather than everything. Left as it was, this probe would be
+    //  asserting that the defect is still present. The arming call below is
+    //  created in this same office, so the card the test is about is in scope.
+    $homeOffice = (int) ops_val("SELECT id FROM offices ORDER BY id LIMIT 1") ?: null;
+    db()->prepare("INSERT INTO users (username, first_name, last_name, role, is_active, is_superuser, home_office_id)
+                   VALUES (?,?,?,?,1,?,?)")->execute([$un, 'Probe', ucfirst(strtolower($role)), $role, $role === 'ADMIN' ? 1 : 0, $homeOffice]);
     $_SESSION['uid'] = (int) db()->lastInsertId();
     current_user(true); if (function_exists('ua')) ua(true);
     $out['mayAllocate'] = function_exists('is_coordinator_level') ? (bool) is_coordinator_level() : null;

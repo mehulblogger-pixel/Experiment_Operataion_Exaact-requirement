@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'bd69ac3 · 2026-10-10 07:07 UTC · 682 files';
+$RELEASE = '80ec012 · 2026-10-11 16:12 UTC · 682 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -32,7 +32,7 @@ $EXPECT  = [
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>123644,'h'=>'3b4a3f0ee0deb5b1'],
-    'lib/access.php' => ['s'=>108906,'h'=>'66fd957255c52864'],
+    'lib/access.php' => ['s'=>114775,'h'=>'3b9b4d9319bd1751'],
     'lib/access_state.php' => ['s'=>9063,'h'=>'aeed1346f40b86bc'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
@@ -311,7 +311,7 @@ $EXPECT  = [
     'views/layout_bottom.php' => ['s'=>880,'h'=>'e6b33e19b84eb59f'],
     'views/layout_embed_bottom.php' => ['s'=>65,'h'=>'63f4c118c80caf4b'],
     'views/layout_embed_top.php' => ['s'=>730,'h'=>'b20991bedef34be0'],
-    'views/layout_top.php' => ['s'=>32999,'h'=>'a125779001d5bb82'],
+    'views/layout_top.php' => ['s'=>34670,'h'=>'c710e8bd182fbe8f'],
     'views/list.php' => ['s'=>3275,'h'=>'b234af3a9590aae2'],
     'views/login.php' => ['s'=>602,'h'=>'ff266c37dfd19bb0'],
     'views/login_page.php' => ['s'=>10767,'h'=>'c18991133beffa78'],
@@ -321,8 +321,8 @@ $EXPECT  = [
     'views/ops/_glance_strip.php' => ['s'=>5257,'h'=>'ffa16f7b9f2ab7b2'],
     'views/ops/_issue_panel.php' => ['s'=>8621,'h'=>'8f7e08e2edf793d4'],
     'views/ops/_ops_registers.php' => ['s'=>6510,'h'=>'403bb12d7870ae8e'],
-    'views/ops/_perm_verb_grid.php' => ['s'=>4352,'h'=>'d68d0e601820a876'],
-    'views/ops/_perm_verb_grid_assets.php' => ['s'=>5401,'h'=>'9d11458fdc14e39e'],
+    'views/ops/_perm_verb_grid.php' => ['s'=>5876,'h'=>'8c4af262a49e2628'],
+    'views/ops/_perm_verb_grid_assets.php' => ['s'=>9794,'h'=>'6a34014ee132d672'],
     'views/ops/_subscription_builder.php' => ['s'=>3772,'h'=>'05ed06dcfe749785'],
     'views/ops/access.php' => ['s'=>9240,'h'=>'faa8963e6437c387'],
     'views/ops/access_notice.php' => ['s'=>2060,'h'=>'b25acc590f21d59a'],

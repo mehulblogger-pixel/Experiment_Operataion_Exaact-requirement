@@ -32,6 +32,52 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 > asserted in `tests/test_role_scope_matrix.php`. Office scope stays **ALL**: finance
 > reconciles across offices, which is a decision, not an oversight.
 
+> **R-30 (UAT 1.5.4 / H10, 2026-10-11) — "OWN office" now means own office.**
+> This matrix confines **Coordinator, Inspector and Branch Manager** to their own
+> branch. The engine did not. `ua()` read:
+> `$offices = $u['home_office_id'] ? [home] : 'ALL';` — so a role this matrix
+> confines to one branch received **every branch** the moment nobody filled in
+> that person's home office. The comment on the line said "OWN default"; it was
+> the opposite, and nothing anywhere reported it. The owner found it from the
+> outside: *"Even Mumbai office coordinator has all access"*, *"All things are
+> available to other offices coordinator including the new inspection call."*
+>
+> Corrected so the failure direction is **closed, not open**: a person this
+> matrix confines to a branch, whom the workspace cannot place in one, now sees
+> **no** branch. Four readers of that scope had the same hole and are fixed with
+> it — `scope_office_clause()`, `scope_clause()`, `scope_allows()` and
+> `scope_office_allows()` each treated an empty office list as "no filter".
+>
+> Two things deliberately did **not** change. **Finance stays company-wide**
+> (the note above): it is a decision, not an oversight, and `scope_needs_home()`
+> never flags a role this matrix gives ALL. And a run with **no signed-in user**
+> — the nightly export, the Tally run, the CLI — stays unscoped, because those
+> authorise themselves and have always run that way; reading their empty scope
+> as "see nothing" emptied a working credit-note export, which is how that
+> distinction came to be measured rather than assumed.
+>
+> Closing a hole must not strand anybody, so the misconfiguration is now
+> **visible from both sides**: the person is told their account has no branch yet
+> and what to ask for, and any administrator is told how many people are in that
+> state with a link to fix them. Proven by `tests/test_scope_playbook.php` (33
+> checks, four mutations killed) — the scope playbook the owner asked for.
+>
+> **Still a decision for the owner, not a defect:** which modules each role holds
+> *by default*. A shipped Coordinator holds view on 15 of the 31 modules,
+> including Invoicing, Client portal, Clients and Vendors. That is this matrix's
+> to state, and no code change may widen or narrow it first.
+
+> **R-31 (UAT 1.5.3, 2026-10-11) — one filing system for modules.** The role
+> editor grouped the 31 modules under its own seven headings while the per-user
+> editor and the left-hand menu used the navigation's nine areas. Measured: **26
+> of 31 modules sat under a different heading on the two screens**, so Invoicing
+> and Profitability were filed under "Operations" and Overheads under "Directory
+> & masters" — and an administrator looking for **Money** on the role screen
+> found no Money at all. This is R-14 (one module with two names) at full scale.
+> Fixed the same way R-14 was: the second map is deleted, not synchronised —
+> `access_module_areas()` is now the only one. Grouping and labels only; **no
+> permission key changed, nothing granted, nothing removed.**
+
 > **R-20 (decided by the owner, 2026-10-09) — the six-verb model.** Until now a
 > module produced exactly two rights: `mod.<key>.view`, and one tick the code
 > itself labelled *"add / edit"*. The owner could not say *"may edit a job but

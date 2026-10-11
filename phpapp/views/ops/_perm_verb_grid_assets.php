@@ -40,7 +40,34 @@
   .vgrid td.vcell input{width:24px;height:24px}
   .vgrid td.vcell.vna::before,.vgrid td.vcell.vlock::before{opacity:.55}
 }
+/*  The bulk row — deliberately NOT styled like the headings above it. It is a
+    control, it says so, and it is visually separated so nobody reads it as part
+    of the table's title row. */
+.vgrid tr.vbulk th{background:var(--soft);border-top:1px solid var(--line);
+  font-weight:400;padding-top:4px;padding-bottom:4px}
+.vgrid tr.vbulk .vbulk-lbl{font-size:11px;font-weight:600;letter-spacing:.02em;
+  text-transform:none;color:var(--muted)}
+.vgrid tr.vbulk .vcol{justify-content:center}
+.vgrid tr.vbulk .vcol-all{font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+/*  ONE undo bar for the page, pinned to the bottom of the viewport so it is
+    where your eye already is after a bulk change, whichever block you were in.
+    Hidden until a bulk action has actually happened. */
+.vgrid-undo{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:60;
+  display:flex;align-items:center;gap:12px;padding:9px 12px 9px 14px;max-width:min(620px,calc(100vw - 24px));
+  border:1px solid var(--line);border-radius:999px;background:var(--card);
+  box-shadow:0 6px 24px rgba(0,0,0,.16);font-size:12.5px;color:var(--ink)}
+.vgrid-undo[hidden]{display:none}
+.vgrid-undo-what{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vgrid-undo button{flex:none}
+@media (max-width:760px){
+  .vgrid tr.vbulk{display:none}   /* the phone layout has no columns to bulk-set */
+}
 </style>
+
+<div class="vgrid-undo" id="vgrid-undo" hidden>
+  <span class="vgrid-undo-what"></span>
+  <button type="button" class="btn secondary small">Undo</button>
+</div>
 
 <script>
 (function(){
@@ -52,6 +79,19 @@
   // would be told something was saved that was not.
   var IMPLIES = {add:['view'], edit:['view'], archive:['view','edit'],
                  delete:['view','edit'], approve:['view']};
+  //  EVERY BULK CONTROL IS SCOPED TO ITS OWN BLOCK.
+  //
+  //  UAT 1.5.3: "when any heading like view, edit, delete etc. at top of any
+  //  modules is changed it is reflected to every module." Exactly so, and it was
+  //  a plain bug: colBoxes() asked the whole DOCUMENT for boxes of that verb, so
+  //  the View header inside the Recruitment block toggled View on Sales,
+  //  Operations, Money and every other block on the page — and its own tick-state
+  //  was read from the whole page too, which is why it showed a dash that had
+  //  nothing to do with the modules underneath it. A control inside a block must
+  //  act on that block and report that block, and nothing else.
+  function block(el){ return el.closest('.vgrid-block') || document; }
+  function boxesIn(root, sel){ return [].slice.call(root.querySelectorAll(sel)); }
+
   var byMod = {};
   [].slice.call(document.querySelectorAll('.vbox')).forEach(function(b){
     (byMod[b.dataset.mod] = byMod[b.dataset.mod] || {})[b.dataset.verb] = b;
@@ -72,14 +112,56 @@
     el.checked = on === boxes.length && boxes.length > 0;
     el.indeterminate = on > 0 && on < boxes.length;
   }
-  function colBoxes(v){ return [].slice.call(document.querySelectorAll('.vbox[data-verb="'+v+'"]')); }
+  //  The boxes for one verb WITHIN one block — never the whole page.
+  function colBoxes(c){ return boxesIn(block(c), '.vbox[data-verb="' + c.dataset.verb + '"]'); }
   var cols = [].slice.call(document.querySelectorAll('.col-all'));
   var rows = [].slice.call(document.querySelectorAll('tr.vrow'));
 
-  // "Give this one thing everywhere" / "full control of this module".
+  //  ---- UNDO -------------------------------------------------------------
+  //  A bulk control changes many ticks at once, and before this there was no way
+  //  back: one click rewrote a column and the only recovery was to remember what
+  //  had been there. Every bulk action now photographs the grid first, and the
+  //  Undo button puts it back. Nothing here saves anything — Save is still the
+  //  only thing that writes — but an administrator should not have to know that
+  //  to feel safe pressing a button.
+  function snapshot(){
+    return [].slice.call(document.querySelectorAll('.vbox')).map(function(b){ return b.checked; });
+  }
+  function restore(shot){
+    [].slice.call(document.querySelectorAll('.vbox')).forEach(function(b,i){ b.checked = !!shot[i]; });
+    window.permGridRefresh();
+  }
+  var undoStack = [];
+  function remember(what){
+    undoStack.push({shot: snapshot(), what: what});
+    if(undoStack.length > 25) undoStack.shift();
+    showUndo();
+  }
+  function showUndo(){
+    var bar = document.getElementById('vgrid-undo');
+    if(!bar) return;
+    var top = undoStack[undoStack.length - 1];
+    bar.hidden = !top;
+    if(top) bar.querySelector('.vgrid-undo-what').textContent = top.what;
+  }
+  window.permGridRemember = remember;
+  document.addEventListener('click', function(ev){
+    var b = ev.target.closest('#vgrid-undo button');
+    if(!b) return;
+    ev.preventDefault();
+    var top = undoStack.pop();
+    if(top) restore(top.shot);
+    showUndo();
+  });
+
+  // "Give this one thing to every module IN THIS GROUP" / "full control of this
+  // module". Both photograph the grid first, so either can be taken back.
   cols.forEach(function(c){
     c.addEventListener('change', function(){
-      colBoxes(c.dataset.verb).forEach(function(b){ b.checked = c.checked; cascade(b); });
+      var grp = block(c).getAttribute('data-group') || 'this group';
+      remember((c.checked ? 'Gave ' : 'Removed ') + (c.dataset.verbLabel || c.dataset.verb)
+               + ' on every module in ' + grp);
+      colBoxes(c).forEach(function(b){ b.checked = c.checked; cascade(b); });
       window.permGridRefresh();
     });
   });
@@ -87,7 +169,9 @@
     var t = tr.querySelector('.row-all');
     if(!t) return;
     t.addEventListener('change', function(){
-      [].slice.call(tr.querySelectorAll('.vbox')).forEach(function(b){ b.checked = t.checked; });
+      remember((t.checked ? 'Gave full control of ' : 'Removed everything on ')
+               + (tr.getAttribute('data-modlabel') || 'that module'));
+      boxesIn(tr, '.vbox').forEach(function(b){ b.checked = t.checked; });
       window.permGridRefresh();
     });
   });
@@ -99,8 +183,9 @@
   // remember what any other toggle did. Exposed so the page's own group and
   // "select everything" toggles can call it after they run.
   window.permGridRefresh = function(){
-    cols.forEach(function(c){ sync(c, colBoxes(c.dataset.verb)); });
-    rows.forEach(function(tr){ sync(tr.querySelector('.row-all'), [].slice.call(tr.querySelectorAll('.vbox'))); });
+    cols.forEach(function(c){ sync(c, colBoxes(c)); });
+    rows.forEach(function(tr){ sync(tr.querySelector('.row-all'), boxesIn(tr, '.vbox')); });
+    showUndo();
   };
   window.permGridCascade = cascade;
   window.permGridRefresh();

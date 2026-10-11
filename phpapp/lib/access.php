@@ -231,21 +231,50 @@ function permission_groups() {
 // happened to five of them. The catch-all at the end makes it impossible to
 // happen again: anything in the catalogue that no group claims is shown anyway,
 // under a heading that says what it is.
-function module_groups() {
-    $g = [
-        'Marketing & Sales (CRM)' => ['leads','inquiries','quotes','crm_orders','crm_reports'],
-        'Inspection documentation' => ['idems'],
-        'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','reconcile'],
-        //  Recruitment stands on its own. It was filed under Operations and
-        //  labelled "Hiring / candidates" while its permission group said
-        //  "Recruitment", so an administrator looking for recruitment access
-        //  could not find it (UAT 1.5.3, R-14). Grouping and labels only —
-        //  this grants nothing and takes nothing away.
+// ---------------------------------------------------------------------------
+//  WHERE EACH MODULE LIVES — ONE MAP, READ BY EVERY SCREEN THAT GROUPS MODULES.
+//
+//  There were two maps. The role editor (/access) had its own seven headings;
+//  the per-user editor and the left-hand menu used the nine areas of the
+//  navigation. Measured: **26 of the 31 modules sat under a different heading
+//  on the two screens.** Invoicing and Profitability were filed under
+//  "Operations" and Overheads under "Directory & masters", so an administrator
+//  looking for Money on the role screen found no Money at all — which is UAT
+//  1.5.4, in the owner's words: "There is no money module even when provided in
+//  permission. It shows jobs and my voucher."
+//
+//  This is R-14 again at full scale. R-14 was one module with two names; this
+//  was twenty-six modules under two filing systems. The fix is the same one that
+//  held for R-14: delete the second map rather than synchronise it.
+//
+//  The NAVIGATION's grouping wins, because it is the one an administrator has
+//  already learnt — they find a screen in the menu, then look for its
+//  permission under the same heading. The headings are the nine areas exactly as
+//  the menu prints them.
+//
+//  Grouping and labels only. This grants nothing, removes nothing, and renames
+//  no permission key — only the heading a tick-box is printed under.
+// ---------------------------------------------------------------------------
+function access_module_areas() {
+    return [
+        'Sales'                   => ['leads','inquiries','quotes','crm_orders','crm_reports'],
+        'Operations'              => ['calls','jobs','vouchers','reconcile'],
         'Recruitment'             => ['hiring'],
-        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','ncr','capa','audits','datacontrol','identity','confidentiality'],
-        'Directory & masters'     => ['clients','vendors','masters','overheads','portal'],
-        'Insights & admin'        => ['reports','users','settings'],
+        'Reporting'               => ['idems'],
+        'Money'                   => ['invoicing','profitability','overheads'],
+        'Quality & Accreditation' => ['equipment','competence','impartiality','identity',
+                                      'complaints','ncr','confidentiality','capa','audits','datacontrol'],
+        'Insights'                => ['reports'],
+        'Directory'               => ['clients','vendors','masters','portal'],
+        'Admin'                   => ['users','settings'],
     ];
+}
+
+function module_groups() {
+    $g = access_module_areas();
+    //  A module nobody filed is SHOWN, under its own heading, rather than
+    //  dropped. A permission that silently does not appear on the screen that
+    //  grants it is how Money went missing in the first place.
     $claimed = array_merge(...array_values($g));
     $orphans = array_values(array_diff(array_keys(ACCESS_MODULES), $claimed));
     if ($orphans) $g['Not yet grouped'] = $orphans;
@@ -309,17 +338,10 @@ function permission_nav_groups() {
         'Admin'                   => ['users.manage.branch','users.manage.global','settings.manage','org.hierarchy.view'],
     ];
     // module view/edit access, by nav area — each key expands to .view + .edit
-    $mods = [
-        'Sales'                   => ['leads','inquiries','quotes','crm_orders','crm_reports'],
-        'Operations'              => ['calls','jobs','vouchers','reconcile'],
-        'Recruitment'             => ['hiring'],
-        'Reporting'               => ['idems'],
-        'Money'                   => ['invoicing','profitability','overheads'],
-        'Quality & Accreditation' => ['equipment','competence','impartiality','identity','complaints','ncr','confidentiality','capa','audits','datacontrol'],
-        'Insights'                => ['reports'],
-        'Directory'               => ['clients','vendors','masters','portal'],
-        'Admin'                   => ['users','settings'],
-    ];
+    //  The SAME map the role editor uses — see access_module_areas(). Two copies
+    //  of this list is what put 26 of 31 modules under different headings on the
+    //  two permission screens.
+    $mods = access_module_areas();
     $groups = [];
     foreach ($fine as $g => $keys) $groups[$g] = $keys;
     //  R-20 — expand EVERY verb the module has, not just view and edit. The
@@ -1118,7 +1140,26 @@ function ua($fresh = false) {
     if ($role === 'MASTER_ADMIN' || $def['offices'] === 'ALL' && $so === '') $offices = 'ALL';
     elseif ($so === 'ALL') $offices = 'ALL';
     elseif ($so !== '') $offices = array_map('intval', array_filter(explode(',', $so)));
-    else $offices = $u['home_office_id'] ? [(int)$u['home_office_id']] : 'ALL'; // OWN default
+    //  OWN, AND OWN MEANS OWN.
+    //
+    //  This read: own office if one is set, otherwise EVERY office. So a
+    //  Coordinator, Inspector or Branch Manager — all of whom the permission
+    //  matrix confines to their own branch — silently received the whole
+    //  company the moment nobody filled in their home office. Measured, and it
+    //  is exactly the owner's UAT 1.5.4 and H10: "Even Mumbai office coordinator
+    //  has all access", "All things are available to other offices coordinator
+    //  including the new inspection call."
+    //
+    //  The failure direction was wrong. When the system does not know which
+    //  branch somebody belongs to, the honest answer is "none of them" — not
+    //  "all of them". An empty scope shows an administrator something is missing
+    //  on the next screen the person opens; a wide-open one shows nobody
+    //  anything, and the first time you learn is when a branch reads another
+    //  branch's commercial terms.
+    //
+    //  scope_needs_home() tells the screens apart from an ordinary empty result,
+    //  so the person is told what to ask for instead of staring at a blank list.
+    else $offices = $u['home_office_id'] ? [(int)$u['home_office_id']] : [];     // OWN, unresolved → nothing
     // sbu scope
     $ss = trim((string)($u['scope_sbus'] ?? ''));
     if ($role === 'MASTER_ADMIN' || ($def['sbus'] === 'ALL' && $ss === '')) $sbus = 'ALL';
@@ -1168,6 +1209,38 @@ function can_direct($perm) {
     return $a['master'] || in_array($perm, $a['perms'], true);
 }
 function scope_offices() { return ua()['offices']; } // 'ALL' or int[]
+
+//  Is this account confined to its own branch but has not been given one?
+//  Returns true only for that specific misconfiguration — never for a user who
+//  legitimately has an empty result. The screens use it to say "your account has
+//  no branch yet" instead of showing an empty list with no explanation, and
+//  /users uses it to show an administrator who is affected BEFORE they call.
+function scope_needs_home($u = null) {
+    $u = $u ?: (function_exists('current_user') ? current_user() : null);
+    if (!$u) return false;
+    $role = strtoupper((string) ($u['role'] ?? ''));
+    if ($role === 'MASTER_ADMIN' || !empty($u['is_superuser'])) return false;
+    if (trim((string) ($u['scope_offices'] ?? '')) !== '') return false;   // explicitly scoped
+    if (!function_exists('role_defaults')) return false;
+    $def = role_defaults($role);
+    if (($def['offices'] ?? 'OWN') === 'ALL') return false;               // company-wide by design
+    return (int) ($u['home_office_id'] ?? 0) <= 0;
+}
+
+//  Every account this workspace cannot place in a branch. An administrator sees
+//  this on /users, so a person is never quietly left unable to see their work.
+function scope_unplaced_users() {
+    //  Asked once per request: the banner that reports it is drawn on every
+    //  screen, and the /users screen asks again to mark the rows.
+    static $cache = null, $at = -1;
+    $epoch = function_exists('db_epoch') ? db_epoch() : 0;
+    if ($cache !== null && $at === $epoch) return $cache;
+    try { $rows = ops_all("SELECT id, username, first_name, last_name, role, home_office_id, scope_offices
+                           FROM users WHERE COALESCE(is_active,1)=1"); }
+    catch (Throwable $e) { return []; }
+    $at = $epoch;
+    return $cache = array_values(array_filter($rows, 'scope_needs_home'));
+}
 function scope_sbus() { return ua()['sbus']; }        // 'ALL' or string[]
 
 // Scope by office ALONE, for registers that have a branch but no Business Unit
@@ -1182,7 +1255,25 @@ function scope_sbus() { return ua()['sbus']; }        // 'ALL' or string[]
 // branch — that is how things get lost.
 function scope_office_clause($officeCol) {
     $off = scope_offices();
-    if ($off === 'ALL' || !is_array($off) || !$off) return ['1=1', []];
+    if ($off === 'ALL' || !is_array($off)) return ['1=1', []];
+    //  AN EMPTY SCOPE IS "NOTHING" — BUT ONLY FOR THE ONE CASE THAT MEANS IT.
+    //
+    //  This read `|| !$off` and answered 1=1, no filter, for an empty list. That
+    //  would have undone the ua() fix entirely: an account confined to a branch
+    //  nobody gave it would have been handed the whole company by the very
+    //  clause meant to confine it.
+    //
+    //  It cannot simply become 1=0, because an empty list also arises where
+    //  there is no signed-in user at all — the nightly export, the Tally run,
+    //  the CLI, the test bootstrap. Those authorise themselves and have always
+    //  run unscoped; turning them off would break working exports to fix a
+    //  permission bug, which is not a trade anybody asked for. (Measured: the
+    //  credit-note export went empty the moment this returned a blanket 1=0.)
+    //
+    //  So the question asked is the specific one: is there a PERSON here whom
+    //  this workspace cannot place in a branch? Then they see nothing. Any other
+    //  empty list behaves exactly as it did before.
+    if (!$off) return [scope_needs_home() ? '1=0' : '1=1', []];
     $ids = implode(',', array_map('intval', $off));
     return ["($officeCol IS NULL OR $officeCol IN ($ids))", []];
 }
@@ -1192,6 +1283,10 @@ function scope_office_clause($officeCol) {
 function scope_clause($officeCol, $sbuCol) {
     $off = scope_offices(); $sbu = scope_sbus();
     $w = []; $args = [];
+    //  Same rule as scope_office_clause(): an account resolved to no branch sees
+    //  no rows, never every row. Without this the `&& $off` below quietly skips
+    //  the office condition for an empty list and returns 1=1.
+    if ($off !== 'ALL' && is_array($off) && !$off && scope_needs_home()) return ['1=0', []];
     if ($off !== 'ALL' && is_array($off) && $off) {
         static $ahm = null;
         if ($ahm === null) $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
@@ -1333,6 +1428,10 @@ function call_office_clause($execCol, $contractCol) {
 function scope_allows($officeId, $sbu = null) {
     if (function_exists('is_master') && is_master()) return true;
     $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
+    //  No branch resolved → no record. The scalar guards have to answer the same
+    //  way as the clause builders they are twins of, or a list would hide a row
+    //  that its own detail screen still opened.
+    if ($off !== 'ALL' && is_array($off) && !$off && scope_needs_home()) return false;
     if ($off !== 'ALL' && is_array($off) && $off) {
         static $ahm = null;
         if ($ahm === null) $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
@@ -1365,7 +1464,8 @@ function scope_allows($officeId, $sbu = null) {
 function scope_office_allows($officeId) {
     if (function_exists('is_master') && is_master()) return true;
     $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
-    if ($off === 'ALL' || !is_array($off) || !$off) return true;
+    if ($off === 'ALL' || !is_array($off)) return true;
+    if (!$off) return !scope_needs_home();   // a person with no branch sees no record; a CLI run is unscoped
     // Unassigned → visible, exactly as scope_office_clause() has it.
     if ($officeId === null || $officeId === '' || (int)$officeId === 0) return true;
     return in_array((int)$officeId, array_map('intval', $off), true);
