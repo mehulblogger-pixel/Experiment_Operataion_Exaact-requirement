@@ -2696,7 +2696,22 @@ function ops_approval_delegations($route, $method) {
     }
     view('ops/approval_delegations', [
         'rows'     => appr_delegations(false),
-        'people'   => function_exists('rcc_users') ? rcc_users() : ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name"),
+        //  ROWS, because that is what the screen reads.
+        //
+        //  This passed rcc_users() when it exists — which is always — and that
+        //  returns a map of id => NAME, a list of strings. The view iterates it
+        //  as database rows and asks each one for ['id'], ['first_name'] and
+        //  ['username'], so PHP 8 threw "Cannot access offset of type string on
+        //  string" halfway through drawing the first dropdown. The page had
+        //  already started, so the crash arrived INSIDE the markup and the
+        //  screen answered HTTP 500 while still looking half-built. In other
+        //  words /approval-delegations has never worked for anybody; the
+        //  fallback branch beside it, which nothing ever reached, is the one
+        //  that was right. Found by sweeping all 156 screens at 390px (R-19) —
+        //  no test opened this page, so nothing else could have found it.
+        'people'   => ops_all("SELECT id, first_name, last_name, username
+                                 FROM users WHERE COALESCE(is_active,1)=1
+                                ORDER BY first_name, last_name, username"),
         'offices'  => function_exists('offices_list') ? offices_list() : [],
         'entities' => APPR_ENTITIES,
     ]);

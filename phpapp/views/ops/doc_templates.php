@@ -14,7 +14,11 @@ $ca = function_exists('setting_get') ? setting_get('company_address', '') : '';
   <div class="row-actions"><form method="post" style="display:inline"><input type="hidden" name="do" value="save"><input type="hidden" name="name" value="New template"><button class="btn">＋ New template</button></form></div>
 </div>
 
-<div style="display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start">
+<?php //  R-19 — a fixed 260px column plus a flexible one does not fit a 390px
+      //  phone, and nothing told it to collapse, so this screen dragged the page
+      //  244px sideways — the worst of the 156 swept. The class collapses it to
+      //  one column on a phone and keeps the two-column layout on a desk. ?>
+<div class="dt-split" style="display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start">
   <!-- List -->
   <div class="panel" style="padding:0">
     <div style="padding:12px 15px;border-bottom:1px solid var(--line,#e5e7eb);font-weight:700;font-size:14px">Templates</div>

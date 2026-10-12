@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'cb7df1f · 2026-10-12 16:46 UTC · 682 files';
+$RELEASE = 'e2fac85 · 2026-10-12 17:18 UTC · 682 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -195,7 +195,7 @@ $EXPECT  = [
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
     'lib/recruit.php' => ['s'=>138522,'h'=>'0d2186f83e7fa8ee'],
-    'lib/recruit_approval.php' => ['s'=>171690,'h'=>'0fa9966f711c8227'],
+    'lib/recruit_approval.php' => ['s'=>172675,'h'=>'0356cda8134cc52e'],
     'lib/recruit_assign.php' => ['s'=>40788,'h'=>'bcdcf294d7fa64a5'],
     'lib/recruit_cc.php' => ['s'=>33057,'h'=>'bba9d9edaf43ee16'],
     'lib/recruit_exec.php' => ['s'=>24603,'h'=>'0546b6c003d3493c'],
@@ -438,7 +438,7 @@ $EXPECT  = [
     'views/ops/departures.php' => ['s'=>6072,'h'=>'e741ab44fd0e3992'],
     'views/ops/deputations.php' => ['s'=>9928,'h'=>'64f37c872f20d2ad'],
     'views/ops/disclosure.php' => ['s'=>4387,'h'=>'ed150ed2c62611a3'],
-    'views/ops/doc_templates.php' => ['s'=>5459,'h'=>'63767e1c0cdfca15'],
+    'views/ops/doc_templates.php' => ['s'=>5800,'h'=>'4d07685a58e926ac'],
     'views/ops/drule_detail.php' => ['s'=>2851,'h'=>'bcc2e35358281ff2'],
     'views/ops/drule_form.php' => ['s'=>3210,'h'=>'c78899841dbba75e'],
     'views/ops/drules_list.php' => ['s'=>1711,'h'=>'386819892e490314'],
