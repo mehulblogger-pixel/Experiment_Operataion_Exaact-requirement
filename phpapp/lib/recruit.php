@@ -240,7 +240,21 @@ function recruit_cand_code($req) {
 // form, the handler and the detail stay in step.
 function req_extra_fields() {
     return ['client_id','contact_name','contact_email','contact_phone','contract_ref','po_ref',
-        'quantity','discipline','category','trade_id','skill_id','skills','qualification','experience_min','relevant_experience',
+        'quantity','discipline','category','trade_id','skill_id','relevant_experience',
+        //  R-28 — ONE REQUIREMENT, NOT TWO.
+        //  A requisition carried BOTH an unprotected free-text set
+        //  (skills / qualification / experience_min) and the Gate-2
+        //  controlled set below. Only the controlled set is inherited from
+        //  the approved hiring request, change-controlled (a change needs
+        //  re-approval) and read by the candidate review. The form wrote the
+        //  OTHER one — so the floor a manager approved was never what a
+        //  recruiter edited, and two screens scored the same candidate
+        //  against two different requirements: req_fit() read the free-text
+        //  set while crev_evidence() read the controlled one.
+        //  The form now writes the controlled columns. The legacy columns are
+        //  left exactly as they are, as historical data, the same way the
+        //  pipeline left candidates.stage.
+        'min_qualification','min_experience_years','essential_skills',
         'start_date','end_date','duty_hours','shift','work_model','deploy_location',
         'prov_travel','prov_accommodation','prov_food','prov_food_by','prov_accom_by','prov_travel_by','prov_local_by','other_allowances',
         'sel_client_interview','sel_tech_interview','sel_hr_interview','client_approval_req','training_req',
@@ -640,13 +654,19 @@ function recruit_fit_score($cand, $req) {
     else $add('Discipline', 'part', 'any', 20);
 
     // Skills / certifications (15)
-    $sk = _rk_tokens($req['skills'] ?? '');
+    //  R-28 — the controlled column, with the legacy one as the fallback for a
+    //  requisition raised before the two were merged.
+    $sk = _rk_tokens(($req['essential_skills'] ?? '') !== '' ? $req['essential_skills'] : ($req['skills'] ?? ''));
     if ($sk) { $hit = array_filter($sk, fn($t) => strpos($candText, $t) !== false);
         $add('Skills', count($hit) === count($sk) ? 'ok' : (count($hit) ? 'part' : 'no'), count($hit) . '/' . count($sk) . ' matched', 15); }
     else $add('Skills', 'part', 'none required', 15);
 
     // Experience (15)
-    $need = (float)($req['experience_min'] ?? 0); $have = (float)($cand['experience_years'] ?? 0);
+    //  R-28 — the SAME requirement the candidate review reads. Falls back to the
+    //  legacy column for a requisition raised before the two were merged, so no
+    //  existing record loses its score.
+    $need = (float)($req['min_experience_years'] ?? 0) ?: (float)($req['experience_min'] ?? 0);
+    $have = (float)($cand['experience_years'] ?? 0);
     if ($need > 0) $add('Experience', $have >= $need ? 'ok' : ($have >= $need - 1 ? 'part' : 'no'), $have . ' vs ' . $need . ' yrs', 15);
     else $add('Experience', 'ok', $have . ' yrs', 15);
 
@@ -688,7 +708,9 @@ function recruit_pro_fit_score($pro, $req) {
     else $add('Discipline', 'part', 'any', 25);
 
     // Skills (20)
-    $sk = _rk_tokens($req['skills'] ?? '');
+    //  R-28 — the controlled column, with the legacy one as the fallback for a
+    //  requisition raised before the two were merged.
+    $sk = _rk_tokens(($req['essential_skills'] ?? '') !== '' ? $req['essential_skills'] : ($req['skills'] ?? ''));
     if ($sk) { $hit = array_filter($sk, fn($t) => strpos($proText, $t) !== false);
         $add('Skills', count($hit) === count($sk) ? 'ok' : (count($hit) ? 'part' : 'no'), count($hit) . '/' . count($sk) . ' matched', 20); }
     else $add('Skills', 'part', 'none required', 20);

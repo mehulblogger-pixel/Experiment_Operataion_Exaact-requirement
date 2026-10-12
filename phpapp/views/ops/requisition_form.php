@@ -357,10 +357,35 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
 
       <?php // Qualification — the NSQF-banded ladder already seeded in every
             // workspace. Typeable, for the degree nobody listed. ?>
-      <?php $rqQuals = function_exists('req_qual_options') ? req_qual_options() : []; ?>
-      <div class="ff rq-adv"><label>Minimum qualification</label>
-        <input class="form-control" name="qualification" value="<?= $v('qualification') ?>" list="rq_qual_list" placeholder="e.g. B.E. Mechanical">
-        <?php if ($rqQuals): ?><datalist id="rq_qual_list"><?php foreach ($rqQuals as $qlabel): ?><option value="<?= e($qlabel) ?>"></option><?php endforeach; ?></datalist><?php endif; ?>
+      <?php
+        //  R-28 — ONE QUALIFICATION LADDER.
+        //
+        //  This offered the NSQF taxonomy (cx_qualification_levels) and wrote the
+        //  free-text `qualification` column, while the floor inherited from the
+        //  approved hiring request lives in `min_qualification` and is ranked
+        //  against a DIFFERENT ladder. Two ranked ladders for one fact: the floor
+        //  comparison could not read what a recruiter picked, so it never bit.
+        //  The requisition now speaks the floor's vocabulary — the one every
+        //  other part of the product already reasons with. The NSQF taxonomy
+        //  stays where it belongs, describing professionals in the marketplace.
+        $rqQuals = function_exists('rver_qual_options') ? rver_qual_options() : [];
+        $rqQualCur = strtoupper(trim((string) ($r['min_qualification'] ?? '')));
+      ?>
+      <div class="ff rq-adv"><label>Minimum qualification
+          <span class="muted">— the floor a candidate must meet</span></label>
+        <select class="form-control" name="min_qualification">
+          <option value="">— no minimum —</option>
+          <?php foreach ($rqQuals as $qk => $qlabel): ?>
+            <option value="<?= e($qk) ?>" <?= $rqQualCur === (string) $qk ? 'selected' : '' ?>><?= e($qlabel) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <?php //  What the approved request set, so a recruiter can SEE the floor
+              //  they must not go below instead of discovering it on save. ?>
+        <?php if (function_exists('rver_spec_summary') && !empty($r['hiring_request_id'])):
+                $__f = rver_spec_summary($r);
+                if (!empty($__f['min_qualification']['stated'])): ?>
+          <small class="muted">Approved floor: <strong><?= e($__f['min_qualification']['value']) ?></strong> — you may ask for more, not less.</small>
+        <?php endif; endif; ?>
       </div>
 
       <?php
@@ -399,16 +424,22 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
             <div class="muted" id="rq_cert_msg" style="margin-top:4px;font-size:12.5px"></div>
           <?php endif; ?>
           <div class="rq-chips" id="rq_cert_chips"></div>
-          <input type="hidden" name="skills" id="rq_skills_val" value="<?= $v('skills') ?>">
+          <?php //  R-28 — the certification picker now fills the CONTROLLED column,
+                //  the one the candidate review reads. The control itself is
+                //  unchanged; only the column it writes has stopped being the
+                //  unprotected twin. ?>
+          <input type="hidden" name="essential_skills" id="rq_skills_val" value="<?= $v('essential_skills') ?: $v('skills') ?>">
           <script>window.RQ_CERTS_HAVE = <?= json_encode($rqHave, JSON_UNESCAPED_UNICODE) ?>;
                    window.RQ_CERT_CSRF = <?= json_encode(function_exists('csrf_token') ? csrf_token() : '') ?>;</script>
           <small class="muted">Pick as many as the role needs.
             <?= $rqCanAddCert ? 'Anything you add here joins the list for everyone.' : 'Maintained under Admin → Qualifications &amp; certifications.' ?></small>
         <?php else: ?>
-          <input class="form-control" name="skills" value="<?= $v('skills') ?>" placeholder="e.g. CSWIP 3.1, NDT UT-II">
+          <input class="form-control" name="essential_skills" value="<?= $v('essential_skills') ?: $v('skills') ?>" placeholder="e.g. CSWIP 3.1, NDT UT-II">
         <?php endif; ?>
       </div>
-      <div class="ff rq-adv"><label>Experience (min years)</label><input class="form-control" type="number" step="0.5" name="experience_min" value="<?= $v('experience_min') ?>"></div>
+      <div class="ff rq-adv"><label>Experience (min years)</label>
+        <input class="form-control" type="number" step="0.5" min="0" max="60" name="min_experience_years"
+               value="<?= $v('min_experience_years') !== '' ? $v('min_experience_years') : $v('experience_min') ?>"></div>
       <div class="ff rq-adv"><label>Relevant experience</label><input class="form-control" name="relevant_experience" value="<?= $v('relevant_experience') ?>" placeholder="in the required scope"></div>
       <div class="ff rq-adv" style="grid-column:1/-1"><label>Key responsibilities</label><textarea class="form-control" name="responsibilities" rows="3" placeholder="One responsibility per line — feeds the auto-generated job description &amp; careers posting."><?= $v('responsibilities') ?></textarea></div>
     </div>

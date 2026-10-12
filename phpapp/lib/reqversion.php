@@ -271,6 +271,67 @@ function rver_migrate() {
 
     } catch (Throwable $e) { /* never break boot */ }
     rver_ensure_vocab();
+    rver_backfill_spec();
+}
+
+//  R-28 — CARRY THE OLD REQUIREMENT ACROSS, ONCE, WITHOUT LOSING ANYTHING.
+//
+//  A requisition used to hold its requirement twice: an unprotected free-text
+//  set (`qualification` / `skills` / `experience_min`) that the form wrote, and
+//  the Gate-2 controlled set that the floor, the change control and the
+//  candidate review all read. The form now writes the controlled set — but
+//  every requisition raised before that still has its requirement in the old
+//  columns, and those people's work must not go blank.
+//
+//  Three rules, all of them the conservative direction:
+//    · only ever FILLS an empty controlled field — never overwrites one, so an
+//      approved floor inherited from a hiring request always wins;
+//    · the legacy columns are left exactly as they are, as historical data, the
+//      same posture the pipeline took with candidates.stage;
+//    · a qualification is carried only when the old free text names a code the
+//      floor comparison can actually rank. Anything else is left alone rather
+//      than guessed at, because a code the comparison reads as -1 switches the
+//      floor OFF silently — worse than an empty field somebody can see is empty.
+//
+//  Runs inside the migration, which is idempotent: once a row is filled the
+//  WHERE clause stops matching it.
+function rver_backfill_spec() {
+    try {
+        //  The REAL columns of the table, not rver_table_fields() — that one is
+        //  the versioned-snapshot list and deliberately filters bookkeeping
+        //  columns out, so `experience_min` was absent from it and every pair
+        //  below was skipped. The back-fill ran and did nothing, silently.
+        $cols = [];
+        try {
+            $q = db_driver() === 'sqlite' ? "PRAGMA table_info(requisitions)" : "SHOW COLUMNS FROM requisitions";
+            foreach (db()->query($q)->fetchAll(PDO::FETCH_ASSOC) ?: [] as $c)
+                $cols[] = (string) ($c['name'] ?? $c['Field'] ?? '');
+        } catch (Throwable $e) { return; }
+        //  "Empty" is not the same word for a number and for text, and getting
+        //  that wrong is a silent no-op: min_experience_years is DECIMAL with a
+        //  default of 0, so asking COALESCE(...,'')='' never matched and the
+        //  back-fill filled nothing at all. Each column is asked in its own terms.
+        foreach ([
+            ['experience_min', 'min_experience_years', 'num'],
+            ['skills',         'essential_skills',     'txt'],
+        ] as [$old, $new, $kind]) {
+            if (!in_array($old, $cols, true) || !in_array($new, $cols, true)) continue;
+            $newEmpty = $kind === 'num' ? "($new IS NULL OR $new = 0)" : "COALESCE($new,'') = ''";
+            $oldSet   = $kind === 'num' ? "($old IS NOT NULL AND $old <> 0)" : "COALESCE($old,'') <> ''";
+            db()->exec("UPDATE requisitions SET $new = $old WHERE $newEmpty AND $oldSet");
+        }
+        //  Qualification is the one that cannot be copied blindly: the old column
+        //  held a label from a different ladder. Only an exact code match moves.
+        if (in_array('qualification', $cols, true) && in_array('min_qualification', $cols, true)) {
+            $valid = array_keys(rver_qual_options());
+            foreach ($valid as $code) {
+                $st = db()->prepare("UPDATE requisitions SET min_qualification = ?
+                                      WHERE COALESCE(min_qualification,'') = ''
+                                        AND UPPER(TRIM(COALESCE(qualification,''))) = ?");
+                $st->execute([strtoupper((string) $code), strtoupper((string) $code)]);
+            }
+        }
+    } catch (Throwable $e) { /* never break boot */ }
 }
 
 //  Configurable vocabularies, through the existing lookup engine.

@@ -697,9 +697,16 @@ function fd_forms_recruitment() {
                 'locations'       => $F('Locations required', 'textarea', 'Client & position'),
                 'discipline'      => $F('Discipline', 'text', 'Client & position'),
                 'category'        => $F('Category / sub-category', 'text', 'Client & position'),
-                'qualification'   => $F('Qualification', 'text', 'Client & position'),
-                'skills'          => $F('Skills / certifications', 'text', 'Client & position'),
-                'experience_min'  => $F('Experience (min years)', 'number', 'Client & position'),
+                //  R-28 — the CONTROLLED columns, which is what the form now
+                //  writes. These three were declared under their free-text twins
+                //  (qualification / skills / experience_min); the form wrote the
+                //  unprotected set while the floor, the change control and the
+                //  candidate review all read the controlled one. Declaring the
+                //  old names here would send a customer's custom-field work back
+                //  to the column nothing protects.
+                'min_qualification'    => $F('Minimum qualification', 'text', 'Client & position'),
+                'essential_skills'     => $F('Skills / certifications', 'text', 'Client & position'),
+                'min_experience_years' => $F('Experience (min years)', 'number', 'Client & position'),
                 'relevant_experience' => $F('Relevant experience', 'text', 'Client & position'),
                 'responsibilities'=> $F('Key responsibilities', 'textarea', 'Client & position'),
                 'work_model'      => $F('Work model', 'dropdown', 'Deployment'),

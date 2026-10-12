@@ -190,9 +190,22 @@ $commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 ||
   <?php if ((int)($req['quantity'] ?? 1) > 0): ?><div><span class="k">Headcount</span><?= (int)($req['quantity'] ?? 1) ?></div><?php endif; ?>
   <?php if ($has('discipline')): ?><div><span class="k">Discipline</span><?= e($req['discipline']) ?></div><?php endif; ?>
   <?php if ($has('category')): ?><div><span class="k">Category</span><?= e($req['category']) ?></div><?php endif; ?>
-  <?php if ($has('qualification')): ?><div><span class="k">Qualification</span><?= e($req['qualification']) ?></div><?php endif; ?>
-  <?php if ($has('skills')): ?><div><span class="k">Skills / certifications</span><?= e($req['skills']) ?></div><?php endif; ?>
-  <?php if ($has('experience_min')): ?><div><span class="k">Min experience</span><?= e($req['experience_min']) ?> yrs<?= $has('relevant_experience') ? ' · '.e($req['relevant_experience']).' relevant' : '' ?></div><?php endif; ?>
+  <?php //  R-28 — the requirement is printed ONCE, at the top of this screen,
+        //  from the controlled columns (see rver_spec_summary above). These three
+        //  lines printed the old free-text twins beside it, so the same screen
+        //  could show "Qualification: B.E. Mechanical" and "Minimum
+        //  qualification: Diploma" and leave a recruiter to guess which bound.
+        //  The old values are not deleted — they are shown only where they
+        //  survive un-migrated and still say something the controlled column
+        //  does not, clearly marked as the older record. ?>
+  <?php foreach ([['qualification','min_qualification','Qualification (older record)'],
+                  ['skills','essential_skills','Skills / certifications (older record)'],
+                  ['experience_min','min_experience_years','Min experience (older record)']] as [$oldC,$newC,$lbl]):
+          if (!$has($oldC)) continue;
+          if (trim((string)($req[$newC] ?? '')) !== '' && (string)$req[$newC] !== '0') continue; ?>
+    <div><span class="k"><?= e($lbl) ?></span><?= e($req[$oldC]) ?></div>
+  <?php endforeach; ?>
+  <?php if ($has('relevant_experience')): ?><div><span class="k">Relevant experience</span><?= e($req['relevant_experience']) ?></div><?php endif; ?>
   <?php if ($has('work_model')): ?><div><span class="k">Work model</span><?= e($WM) ?></div><?php endif; ?>
   <?php if ($has('deploy_location')): ?><div><span class="k">Location</span><?= e($req['deploy_location']) ?></div><?php endif; ?>
   <?php if ($has('start_date') || $has('end_date')): ?><div><span class="k">Period</span><?= e($req['start_date'] ?: '—') ?> → <?= e($req['end_date'] ?: '—') ?><?= (float)($req['duration_months'] ?? 0) > 0 ? ' · '.rtrim(rtrim(number_format((float)$req['duration_months'],2),'0'),'.').' mo' : '' ?></div><?php endif; ?>
