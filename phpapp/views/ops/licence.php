@@ -160,6 +160,19 @@ $t = $tone[$s['state']] ?? 'info';
       </tbody>
     </table>
   </div>
+  <?php
+    //  WHAT YOU OWN vs WHAT YOU HAVE SWITCHED ON — two different questions, and
+    //  this screen only ever answered the first. An owner checking "enabled
+    //  modules" here found a read-only list and concluded there was no way to
+    //  change anything (UAT 1.6.3). The control exists and always has; it was
+    //  simply never linked from the screen that raises the question.
+    if (function_exists('cockpit_can') && cockpit_can()): ?>
+    <p class="muted" style="margin:12px 0 0;font-size:12.5px">
+      This table is what your company <strong>owns</strong>. Switching a part of the software
+      on or off for your own workspace — within what you own — is done on
+      <a href="/workspace/setup/modules"><strong>Modules &amp; features</strong></a>.
+    </p>
+  <?php endif; ?>
 </div>
 
 <p class="muted" style="margin-top:16px;font-size:12.5px;max-width:760px">

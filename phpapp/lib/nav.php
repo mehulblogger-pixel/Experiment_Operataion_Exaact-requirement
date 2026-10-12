@@ -109,6 +109,13 @@ function nav_screen_label($route) {
         'approval-delegations'  => 'Approval delegations',
         'my-approvals'          => 'My approvals',
         'recruit-approvals'     => 'Recruitment approvals',
+        //  R-33 — the cockpit's nested routes title-case into nonsense
+        //  ("Workspace setup modules"). Named as the menu names them, so the
+        //  trail, the tile and the screen's own heading all agree.
+        'approval-rules'          => 'Quote & report approvals',
+        'workspace/setup'         => 'Company setup',
+        'workspace/setup/modules' => 'Modules & features',
+        'workspace/setup/forms'   => 'Forms & fields',
         'data-control'          => 'Data & information control',
         'office-finance'        => 'Office finance',
         'attendance-recon'      => 'Attendance reconcile',
@@ -140,13 +147,36 @@ function nav_screen_label($route) {
 //  out rather than shown broken. The last entry carries no url — it is where
 //  you already are. $leaf is the record's own name when a handler knows it
 //  ("INQ-2026-014"), passed through view().
+//  A HANDFUL OF SCREENS BELONG TO AN AREA WITHOUT BELONGING TO ONE MODULE.
+//
+//  The trail normally reads route → module → area. That works for the 400-odd
+//  screens that sit inside one module, and gives nothing at all for the few that
+//  deliberately span several: the cockpit configures the whole workspace, and
+//  the quote & report approvals screen governs two modules at once. Those were
+//  left with a two-step trail — "Home › Modules & features" — which tells you
+//  the one thing you already knew and loses the step you would actually click.
+//
+//  Stating their area directly is honest: these screens genuinely have an area
+//  and genuinely have no single module. It is a map of EXCEPTIONS and is checked
+//  only after the module route fails, so it can never override the real one.
+function nav_route_area($route) {
+    static $m = [
+        'workspace/setup'         => 'Admin',
+        'workspace/setup/modules' => 'Admin',
+        'workspace/setup/forms'   => 'Admin',
+        'approval-rules'          => 'Admin',
+        'licence'                 => 'Admin',
+    ];
+    return $m[trim((string)$route, '/')] ?? null;
+}
+
 function nav_trail($route, $leaf = null) {
     $route = trim((string)$route, '/');
     $trail = [['label' => 'Home', 'url' => '/']];
     if ($route === '') return $trail;
 
     $mod  = nav_module_of($route);
-    $area = $mod ? nav_area_of_module($mod) : null;
+    $area = $mod ? nav_area_of_module($mod) : nav_route_area($route);
 
     if ($area !== null) {
         $ar = nav_area_routes()[$area] ?? null;

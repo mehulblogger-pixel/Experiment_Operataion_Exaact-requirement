@@ -27,7 +27,10 @@ $confirmOff = (string) ($confirmOff ?? '');
 </style>
 
 <div class="ck">
-  <h1 style="margin:.2em 0">Features</h1>
+  <?php //  Named as the menu names it. "Features" alone did not contain the
+        //  word an owner would search for, which is half of why this screen
+        //  could not be found at all (UAT 1.6.3). ?>
+  <h1 style="margin:.2em 0">Modules &amp; features</h1>
   <p class="muted" style="margin-top:0">Turn on only the parts of the software your company needs. Everything here uses your plan — turning a feature off simply hides it and its screens.</p>
 
   <?php

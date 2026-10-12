@@ -23,8 +23,17 @@ $applySummary = function ($r) use ($e) {
 };
 ?>
 <div class="master-head">
-  <div><h1>Approval rules &amp; matrix</h1>
-    <p class="sub" style="margin:2px 0 0">Configure who approves what, in how many steps — by entity, department, grade or value band — each level with its own SLA, reminder cadence and escalation. The narrowest matching rule applies.</p></div>
+  <div><h1>Recruitment approvals</h1>
+    <p class="sub" style="margin:2px 0 0">Who approves <?= e(function_exists('Tlp') ? Tlp('requisition') : 'requisitions') ?>, offers and salaries — in how many steps, by department, grade or value band, each level with its own SLA, reminder cadence and escalation. The narrowest matching rule applies.
+    <?php //  There is a SECOND approvals screen, for quotations and inspection
+          //  reports. Until R-33 both were called "Approval rules", so an owner
+          //  who opened one concluded the other did not exist (UAT 1.7.1).
+          //  Each now says what it governs and points at the other.
+      if (function_exists('can') && (can('idems.type.manage') || can('mod.quotes.view') || (function_exists('is_master') && is_master()))): ?>
+      <br><span class="muted">Quotations and inspection reports are approved under
+      <a href="/approval-rules"><strong>Quote &amp; report approvals</strong></a>, which is a separate chain.</span>
+    <?php endif; ?>
+    </p></div>
   <div class="row-actions"><form method="post" style="display:inline"><input type="hidden" name="do" value="rule_save"><input type="hidden" name="name" value="New rule"><button class="btn">＋ New rule</button></form></div>
 </div>
 

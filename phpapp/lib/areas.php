@@ -275,12 +275,22 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','workspace/setup','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','workspace/setup','workspace/setup/modules','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             // Phase 1 — the Company Setup Cockpit is the single front door to all
             // configuration below. Shown first so a non-technical admin starts here.
             $sec('Set up your workspace');
             $t(($fx('cockpit_can') && cockpit_can()), '🚀', 'Company setup', '/workspace/setup', 'Configure your whole workspace in one place — features, forms, dropdowns, people, wording and setup health.');
+            //  THE JOB, NAMED AS THE JOB.
+            //
+            //  Turning a part of the software on or off already existed, and
+            //  worked, at /workspace/setup/modules — but the only way in was a
+            //  tile called "Company setup", so an owner looking for modules
+            //  could not find it and reported there was no such control at all
+            //  (UAT 1.6.3). A menu should name the job somebody came to do, in
+            //  the words they would use for it. Same screen, one honest door.
+            $t(($fx('cockpit_can') && cockpit_can()), '🧰', 'Modules & features', '/workspace/setup/modules',
+               'Turn parts of the software on or off for your company — Operations, Sales, Money, Recruitment and the rest.');
 
             $sec('Masters');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
@@ -318,7 +328,16 @@ function ops_area_def($area) {
 
             $sec('Report configuration');
             $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global')), '👤', 'Approver mapping', '/approver-map', 'Who signs which report.');
-            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Approval rules', '/approval-rules', 'Routing rules for approval.',
+            //  TWO SCREENS WERE BOTH CALLED "Approval rules".
+            //
+            //  This one routes QUOTES and REPORTS. A second, at /recruit-approvals
+            //  under Operations, routes RECRUITMENT and carries the Review Required
+            //  triggers. Same name, two areas, different jobs — so an owner opened
+            //  this one, saw only quotes and reporting, and reported that
+            //  recruitment approvals did not exist (UAT 1.7.1), and separately
+            //  could not find the Review Required switch at all (UAT-G6B-01).
+            //  R-14 a third time. Each screen is now named for what it governs.
+            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Quote & report approvals', '/approval-rules', 'Who signs off quotations and inspection reports.',
                 $num(fn() => $fx('appr_cond_unarmed_count') ? appr_cond_unarmed_count() : 0), 'amber');
             // R11 — the crm.template.manage grant moved to Sales (Document templates), so
             // holding only that permission no longer forces a marketing manager into Admin.

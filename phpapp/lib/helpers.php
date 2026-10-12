@@ -154,7 +154,24 @@ function current_user($fresh = false) {
     }
     return $u;
 }
-function require_login() { if (!current_user()) redirect('login'); }
+//  THE LEADING SLASH IS THE WHOLE FIX.
+//
+//  This said redirect('login') — a RELATIVE path. A browser resolves that
+//  against the current directory, so it only ever worked for screens at the top
+//  level: /calls → /login, by luck rather than design. For a screen with a path
+//  in it the answer was wrong, and for one particular family it was fatal:
+//
+//      /calls                     →  /login                    (worked)
+//      /workspace/setup           →  /workspace/login          (does not exist)
+//      /workspace/setup/modules   →  /workspace/setup/login    (loops for ever)
+//
+//  The last one is caught by the cockpit's own route prefix, which requires a
+//  login, which redirects to itself — so a signed-out visitor got an infinite
+//  redirect instead of a sign-in page. That is why the Features screen, where a
+//  workspace turns its modules on and off, could not be reached by anybody whose
+//  session had lapsed: UAT 1.6.3, "there is no option to disable or enable any
+//  of the modules".
+function require_login() { if (!current_user()) redirect('/login'); }
 function user_name($u) {
     // Nobody is signed in when this runs from cron or a month-end job, so a
     // null must give a usable word rather than a warning in the middle of a

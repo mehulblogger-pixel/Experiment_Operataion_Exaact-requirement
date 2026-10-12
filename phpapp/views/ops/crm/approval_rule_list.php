@@ -1,6 +1,15 @@
 <div class="master-head">
-  <div><h1>Approval rules</h1>
-    <p class="sub" style="margin:2px 0 0">Who must approve a <?= e(Tl('quote')) ?> — by <strong>amount band</strong> and/or <strong><?= e(T('sbu')) ?></strong>. When a <?= e(Tl('quote')) ?> is submitted, matching rules become its approval chain (lower levels first).</p></div>
+  <div><h1>Quote &amp; report approvals</h1>
+    <p class="sub" style="margin:2px 0 0">Who must approve a <?= e(Tl('quote')) ?> — by <strong>amount band</strong> and/or <strong><?= e(T('sbu')) ?></strong>. When a <?= e(Tl('quote')) ?> is submitted, matching rules become its approval chain (lower levels first).
+    <?php //  R-33 — the second approvals screen, named. Both were called
+          //  "Approval rules", in two different areas, so an owner who opened
+          //  this one reported that recruitment approvals did not exist.
+      if (function_exists('licence_enabled') && licence_enabled('hr')
+          && function_exists('can') && (can('mod.hiring.view') || (function_exists('is_master') && is_master()))): ?>
+      <br><span class="muted"><?= e(ucfirst(function_exists('Tlp') ? Tlp('requisition') : 'requisitions')) ?>, offers and salaries are approved under
+      <a href="/recruit-approvals"><strong>Recruitment approvals</strong></a>, which is a separate chain.</span>
+    <?php endif; ?>
+    </p></div>
   <a class="btn" href="/quote-approval-rule-new">+ Add rule</a>
 </div>
 <?= approval_rule_tabs('/approval-rules?module=quote') ?>

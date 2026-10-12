@@ -39,9 +39,19 @@ t_ok(strpos($reporting, "case 'money':") === false && strpos($admin, "case 'dire
 //
 // The home-move assertion below is unchanged in substance: move the tile back to
 // Reporting and it still fails. It simply no longer pins the old wording.
-foreach ([['Approver mapping', '/approver-map'], ['Approval rules', '/approval-rules']] as [$lbl, $rt]) {
-    t_ok(strpos($reporting, "'$lbl', '$rt'") === false, "$lbl is removed from Reporting");
-    t_ok(strpos($admin, "'$lbl', '$rt'") !== false, "$lbl now lives under Admin");
+//  R-33 — MATCHED ON THE ROUTE, WHICH IS WHAT "WHERE IT LIVES" MEANS.
+//
+//  The note above says this assertion is "about WHERE the tile lives, not what
+//  it is called" — but it matched on "'<label>', '<route>'", so it pinned the
+//  label after all, and renaming the tile failed a test whose stated subject was
+//  its home. R-33 renamed /approval-rules to "Quote & report approvals" because
+//  a SECOND screen, /recruit-approvals, carried the identical name in another
+//  area and an owner concluded recruitment approvals did not exist (UAT 1.7.1).
+//  The route is the identity; the wording is allowed to improve. Move either
+//  tile back to Reporting and this still fails, which is the whole point.
+foreach (['/approver-map', '/approval-rules'] as $rt) {
+    t_ok(strpos($reporting, "', '$rt'") === false, "$rt is removed from Reporting");
+    t_ok(strpos($admin, "', '$rt'") !== false, "$rt now lives under Admin");
 }
 t_ok(strpos($reporting, "'/templates") === false, 'the templates tile is removed from Reporting');
 t_ok(strpos($admin, "'/templates?kind=report'") !== false, 'the report-template tile now lives under Admin');

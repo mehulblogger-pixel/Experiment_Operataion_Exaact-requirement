@@ -136,7 +136,9 @@ function ops_nav_index($fresh = false) {
                 $add('Hiring workflows', '/recruit-pipelines', $A, '⇥', 'Configure the recruitment pipeline & stages.');
                 $add('Compensation setup', '/comp-setup', $A, '₹', 'Configure salary headings & statutory components.');
                 $add('Document templates', '/doc-templates', $A, '📄', 'Configure offer / appointment letter templates.');
-                $add('Approval rules', '/recruit-approvals', $A, '🧷', 'Configure approval matrix, SLA & escalations.');
+                //  Named for what it governs — see the note in lib/areas.php on the
+                //  quote & report screen, which carried the same name until R-33.
+                $add('Recruitment approvals', '/recruit-approvals', $A, '🧷', 'Who approves ' . ($fx('Tlp') ? Tlp('requisition') : 'requisitions') . ', offers and salaries — the matrix, SLAs, escalations and the Review Required triggers.');
                 $add('Approval delegation', '/approval-delegations', $A, '🤝', 'Who may approve for whom while somebody is away.');
                 $add('Careers page', '/careers-admin', $A, '🌐', 'Publish openings to a public careers page.');
             }

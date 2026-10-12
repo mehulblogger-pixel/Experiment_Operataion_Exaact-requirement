@@ -1,6 +1,17 @@
 <?php // IDEMS approval rules (configurable multi-level chain) ?>
-<div class="master-head"><div><h1>Approval rules</h1>
-  <p class="sub" style="margin:2px 0 0">Design the approval chain by <?= e(Tl('report')) ?> type, <?= e(T('office')) ?>, <?= e(Tl('client')) ?> or <?= e(T('sbu')) ?>. Leave a match blank for "any". Multiple levels run in order. No rule ⇒ the <?= e(Tl('engineer')) ?>'s mapped approver is used (single level).</p></div>
+<div class="master-head"><div><h1>Quote &amp; report approvals</h1>
+  <p class="sub" style="margin:2px 0 0">Design the approval chain by <?= e(Tl('report')) ?> type, <?= e(T('office')) ?>, <?= e(Tl('client')) ?> or <?= e(T('sbu')) ?>. Leave a match blank for "any". Multiple levels run in order. No rule ⇒ the <?= e(Tl('engineer')) ?>'s mapped approver is used (single level).
+  <?php //  R-33 — this screen and /recruit-approvals were both called "Approval
+        //  rules", in two different menu areas. An owner opened this one, saw
+        //  only quotations and reports, and reported that recruitment approvals
+        //  were missing (UAT 1.7.1) — and separately could not find the Review
+        //  Required switch, which lives on the other one (UAT-G6B-01).
+    if (function_exists('licence_enabled') && licence_enabled('hr')
+        && function_exists('can') && (can('mod.hiring.view') || (function_exists('is_master') && is_master()))): ?>
+    <br><span class="muted"><?= e(ucfirst(function_exists('Tlp') ? Tlp('requisition') : 'requisitions')) ?>, offers and salaries are approved under
+    <a href="/recruit-approvals"><strong>Recruitment approvals</strong></a>, which is a separate chain.</span>
+  <?php endif; ?>
+  </p></div>
   <a class="btn secondary" href="/approver-map">Approver mapping →</a>
 </div>
 <?= approval_rule_tabs('/approval-rules?module=report') ?>
