@@ -438,7 +438,28 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
 <?php // RB-2 — HIRED IS NOT JOINED. Accepted (Hired) means the requirement was
       // filled by a hired person; it says nothing about whether they started.
       // Recorded by somebody who knows, never derived from the stage. ?>
-<?php if (strtoupper((string)($cand['stage'] ?? '')) === 'ACCEPTED' && !empty($cand['inspector_id'])): ?>
+<?php
+  //  DRAWN FOR SOMEBODY WHO IS ACTUALLY HIRED — asked of the configured stage
+  //  kind, not of candidates.stage, which the pipeline stopped writing. On the
+  //  default pipeline this condition was never true, so the control the owner
+  //  went looking for did not exist on the page at all.
+  $__hired = function_exists('rpipe_cand_hired')
+      ? rpipe_cand_hired($cand)
+      : strtoupper((string)($cand['stage'] ?? '')) === 'ACCEPTED';
+?>
+<?php if ($__hired && empty($cand['inspector_id'])): ?>
+  <?php //  Hired, but nothing to put on the roster. Silence here is how this
+        //  became invisible: say what is missing and where it is done. ?>
+  <div class="panel" style="background:var(--soft);margin:10px 0;padding:11px 14px">
+    <strong>No team record yet.</strong>
+    <span class="muted" style="font-size:12.5px">
+      This person has reached the end of the recruitment process, but their team record has not been
+      created — so there is nobody to put on the roster and their joining cannot be recorded yet.
+      Record the hire under <strong>Move this candidate</strong> below; that is what creates it.
+    </span>
+  </div>
+<?php endif; ?>
+<?php if ($__hired && !empty($cand['inspector_id'])): ?>
   <?php $joinedOn = trim((string)($cand['joined_at'] ?? '')); ?>
   <?php //  B3 anchor — the next-action band at the top links here, so its button
         //  jumps to this control instead of reloading the same page. ?>

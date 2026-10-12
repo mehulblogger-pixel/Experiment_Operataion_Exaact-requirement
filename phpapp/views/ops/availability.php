@@ -79,12 +79,32 @@
       //  lost, or worse, goes looking for a way to schedule them anyway. This
       //  states the fact and points at the list where their joining is recorded.
       //  It reports; it decides nothing. The roster above is unchanged. ?>
-<?php $jp = (int) ($joiningPending ?? 0); if ($jp > 0): ?>
+<?php
+  //  NAMED, not counted. This said "3 people have been hired but not yet joined
+  //  — See who →", which sends a coordinator off the board to answer the one
+  //  question the board is for. They are now named here, in their own group,
+  //  with no controls: present, so nobody is hidden, and plainly not bookable.
+  $jp   = (int) ($joiningPending ?? 0);
+  $jpWho = is_array($joiningPendingPeople ?? null) ? $joiningPendingPeople : [];
+  if ($jp > 0): ?>
   <div class="msg msg-info" style="margin:0 0 14px">
-    <strong><?= $jp ?></strong> <?= $jp === 1 ? 'person has' : 'people have' ?> been hired but
-    <strong>not yet joined</strong>, so <?= $jp === 1 ? 'they are' : 'they are' ?> not available for
-    scheduling until their joining is recorded.
-    <a href="/m/inspectors?status=<?= e(WF_ST_JOINING) ?>">See who &rarr;</a>
+    <div><strong><?= $jp ?></strong> <?= $jp === 1 ? 'person has' : 'people have' ?> been hired but
+      <strong>not yet joined</strong>, so <?= $jp === 1 ? 'they are' : 'they are' ?> not available for
+      scheduling until their joining is recorded.</div>
+    <?php if ($jpWho): ?>
+      <div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:6px">
+        <?php foreach ($jpWho as $p): ?>
+          <span class="pill p-warn" style="font-size:11.5px">
+            <?= e($p['name'] ?: 'Unnamed') ?><?= !empty($p['office_name']) ? ' · ' . e($p['office_name']) : '' ?>
+            <span class="muted">— awaited</span>
+          </span>
+        <?php endforeach; ?>
+        <?php if ($jp > count($jpWho)): ?>
+          <span class="muted" style="font-size:11.5px">and <?= $jp - count($jpWho) ?> more</span>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+    <div style="margin-top:6px"><a href="/m/inspectors?status=<?= e(WF_ST_JOINING) ?>">Open the team register &rarr;</a></div>
   </div>
 <?php endif; ?>
 

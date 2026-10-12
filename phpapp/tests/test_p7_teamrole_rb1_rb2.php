@@ -235,8 +235,20 @@ t_ok($posGuard !== false, 'RB2UI1 · …and the screen still hides the move pane
 t_ok($posPanel !== false && $posGuard !== false && $posPanel < $posGuard,
      'RB2UI · the control sits OUTSIDE that guard, so an accepted candidate can actually reach it');
 //  …and it is shown only for somebody who is both hired and has a team record.
-t_ok(strpos($cdSrc, "=== 'ACCEPTED' && !empty(\$cand['inspector_id'])") !== false,
-     'RB2UI2 · …and only for a hired person who has a workforce record');
+//
+//  R-34 — ASSERTED AS A PROPERTY, NOT AS A SPELLING. This matched the literal
+//  "=== 'ACCEPTED' && !empty(...)". That literal WAS the defect: the configured
+//  pipeline stopped writing candidates.stage, so on the default pipeline the
+//  condition was never true and the control was never drawn — the same class of
+//  unreachability this block was written to catch, one layer down. The two
+//  requirements are unchanged and both still asserted; what may no longer be
+//  pinned is which column answers "is this person hired".
+t_ok(strpos($cdSrc, "!empty(\$cand['inspector_id'])") !== false,
+     'RB2UI2a · the control still requires a workforce record');
+t_ok(strpos($cdSrc, 'rpipe_cand_hired') !== false,
+     'RB2UI2b · …and asks the authoritative "is this person hired", not a dead column');
+t_ok(!preg_match("~\\\$cand\['stage'\][^\n]*===\s*'ACCEPTED'\s*&&\s*!empty~", $cdSrc),
+     'RB2UI2c · …and must not go back to comparing the legacy stage column');
 
 // ---------------------------------------------------------------------------
 t_section('P7 · RB2 — hired is not joined');

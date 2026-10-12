@@ -6430,12 +6430,32 @@ function ops_candidates($route, $method) {
         //  Only a hired person can have joined, and only one who actually has a
         //  team record — otherwise "joined" would again mean something the
         //  system cannot back up.
-        if (strtoupper((string)($cand['stage'] ?? '')) !== 'ACCEPTED') {
-            flash('Only an accepted (hired) person can be marked as joined.', 'error');
+        //  ASKED OF THE AUTHORITY, NOT OF THE ABANDONED COLUMN.
+        //
+        //  This compared candidates.stage with the literal 'ACCEPTED'. The
+        //  configured pipeline stopped writing that column on purpose, so on the
+        //  default pipeline a genuinely hired person — terminal stage, classified
+        //  FILLED — was refused here, and the control was never even drawn.
+        //  rpipe_cand_hired() asks the configured stage kind, and still answers
+        //  yes for a pre-pipeline candidate whose legacy value is ACCEPTED.
+        $isHired = function_exists('rpipe_cand_hired')
+            ? rpipe_cand_hired($cand)
+            : strtoupper((string)($cand['stage'] ?? '')) === 'ACCEPTED';
+        if (!$isHired) {
+            flash('Only somebody who has been hired can be marked as joined.', 'error');
             redirect('/candidate?id=' . $id);
         }
+        //  A JOINING NEEDS SOMEBODY TO JOIN. This guard stays — "joined" must
+        //  mean something the system can back up — but it is no longer a dead
+        //  end. There is exactly ONE mechanism that creates a team record
+        //  (rcv_convert, through the hire action), because it also runs the
+        //  duplicate check, the employee number and the team-role questions.
+        //  Inventing a second one here would bypass all of them, so the person
+        //  is told what is missing and where it is done instead.
         if ((int)($cand['inspector_id'] ?? 0) <= 0) {
-            flash('This person has no team record yet, so their joining cannot be recorded.', 'error');
+            flash('This person has reached the end of the recruitment process but has no team record yet, '
+                . 'so there is nothing to put on the roster. Use "Move this candidate" to record the hire '
+                . 'first — that is what creates their team record — then mark the joining.', 'error');
             redirect('/candidate?id=' . $id);
         }
         $when = trim((string)($_POST['joined_on'] ?? ''));

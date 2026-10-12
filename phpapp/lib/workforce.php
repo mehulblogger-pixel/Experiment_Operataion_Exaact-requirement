@@ -202,6 +202,30 @@ function wf_joining_pending_ids() {
     return $out;
 }
 
+//  WHO they are, not merely how many. The availability board said "3 people have
+//  been hired but not yet joined — See who →", which makes a coordinator leave
+//  the board to answer the one question the board exists to answer. The UAT step
+//  states the expectation plainly: they are NAMED as awaited, and not offered as
+//  bookable. Naming them costs one query and saves a round trip.
+//
+//  Deliberately SEPARATE from the bookable roster rather than merged into it:
+//  the roster drives scheduling, and Gate 5's whole point is that a person who
+//  has not started cannot be given work. Being kept off jobs is not the same as
+//  being hidden — which is exactly why they belong on the screen, in their own
+//  group, with no controls.
+function wf_joining_pending_people($offices, $limit = 50) {
+    $where = "UPPER(TRIM(COALESCE(i.status,'')))='" . WF_ST_JOINING . "' AND COALESCE(i.staff_kind,'ASSET')<>'SUBCON'";
+    if (is_array($offices)) {
+        if (!$offices) return [];
+        $where .= ' AND (i.home_office_id IN (' . implode(',', array_map('intval', $offices)) . '))';
+    }
+    try {
+        return ops_all("SELECT i.id, i.name, i.home_office_id, o.name AS office_name
+                          FROM inspectors i LEFT JOIN offices o ON o.id = i.home_office_id
+                         WHERE $where ORDER BY i.name LIMIT " . max(1, (int) $limit)) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
 function wf_joining_pending_in_offices($offices) {
     $where = "UPPER(TRIM(COALESCE(status,'')))='" . WF_ST_JOINING . "' AND COALESCE(staff_kind,'ASSET')<>'SUBCON'";
     if (is_array($offices)) {
@@ -711,10 +735,12 @@ function ops_inspector_availability($method) {
     //  D2 — how many people in this scope are hired but have not started. The
     //  board explains their absence instead of leaving it silent.
     $joiningPending = function_exists('wf_joining_pending_in_offices') ? wf_joining_pending_in_offices($offices) : 0;
+    $joiningPendingPeople = function_exists('wf_joining_pending_people') ? wf_joining_pending_people($offices) : [];
 
     view('ops/availability', [
         'rows' => $filtered, 'allRows' => $rows, 'day' => $day, 'offices' => $offices,
         'joiningPending' => $joiningPending,
+        'joiningPendingPeople' => $joiningPendingPeople,
         'freeBoth' => $freeBoth, 'tomorrow' => $tomorrow,
         'check' => $check, 'grid' => $grid, 'month' => $month,
         'officeList' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),

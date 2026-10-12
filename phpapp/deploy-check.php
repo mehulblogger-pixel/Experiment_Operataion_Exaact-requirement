@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '4257779 · 2026-10-12 15:19 UTC · 682 files';
+$RELEASE = '09362ec · 2026-10-12 16:00 UTC · 682 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -174,7 +174,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>711089,'h'=>'8810965925a72e3b'],
+    'lib/ops.php' => ['s'=>712521,'h'=>'9f274442e864cc97'],
     'lib/orgadmin.php' => ['s'=>77714,'h'=>'c66e5bb654e8e16d'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -205,7 +205,7 @@ $EXPECT  = [
     'lib/recruit_jd.php' => ['s'=>11577,'h'=>'fa60a38877273cec'],
     'lib/recruit_kpi.php' => ['s'=>44791,'h'=>'01e1256f752079c1'],
     'lib/recruit_offer.php' => ['s'=>50420,'h'=>'ca79a631b18f0fe2'],
-    'lib/recruitpipe.php' => ['s'=>82698,'h'=>'508ab85becc96cf4'],
+    'lib/recruitpipe.php' => ['s'=>84599,'h'=>'3f819e8218eb2251'],
     'lib/reportreview.php' => ['s'=>23222,'h'=>'ae43c4d37883823d'],
     'lib/reqfulfil.php' => ['s'=>16474,'h'=>'aeda367b914bbe2e'],
     'lib/reqversion.php' => ['s'=>86517,'h'=>'af794e21b3565a11'],
@@ -265,7 +265,7 @@ $EXPECT  = [
     'lib/visibility.php' => ['s'=>4843,'h'=>'281d50af3a4d26fa'],
     'lib/vocab.php' => ['s'=>19053,'h'=>'a9a1c5c84a2f8d0b'],
     'lib/webhookq.php' => ['s'=>7844,'h'=>'10e0dde19b283fdf'],
-    'lib/workforce.php' => ['s'=>58084,'h'=>'4ab7d01681a0d870'],
+    'lib/workforce.php' => ['s'=>59684,'h'=>'81ca94d772f98501'],
     'lib/workspace.php' => ['s'=>15210,'h'=>'7cf36505c40be5c2'],
     'manifest.php' => ['s'=>1665,'h'=>'cd62f3f83b1a7969'],
     'phase1-inventory.php' => ['s'=>23590,'h'=>'37dcca72c7f637f2'],
@@ -345,7 +345,7 @@ $EXPECT  = [
     'views/ops/audit_detail.php' => ['s'=>6317,'h'=>'12f351cdcc6a464b'],
     'views/ops/audit_form.php' => ['s'=>2331,'h'=>'a9a442d6ca2ccadb'],
     'views/ops/audits_list.php' => ['s'=>4123,'h'=>'be8889ef0738b867'],
-    'views/ops/availability.php' => ['s'=>16445,'h'=>'37b02b2d2d47be55'],
+    'views/ops/availability.php' => ['s'=>17528,'h'=>'37e0f573cb2082d9'],
     'views/ops/backup.php' => ['s'=>5050,'h'=>'fee58886e8fab69a'],
     'views/ops/billable_events.php' => ['s'=>8005,'h'=>'8bced33ab4bff106'],
     'views/ops/billing.php' => ['s'=>8709,'h'=>'2308aaa2d21e75bd'],
@@ -355,7 +355,7 @@ $EXPECT  = [
     'views/ops/call_form.php' => ['s'=>68264,'h'=>'157ad0c573f2f7fc'],
     'views/ops/call_profit.php' => ['s'=>10745,'h'=>'c94f52543758b527'],
     'views/ops/calls.php' => ['s'=>11689,'h'=>'d7865a3523e372f3'],
-    'views/ops/candidate_detail.php' => ['s'=>54303,'h'=>'ca9992d36850b771'],
+    'views/ops/candidate_detail.php' => ['s'=>55428,'h'=>'358f20439bad1a6c'],
     'views/ops/candidate_form.php' => ['s'=>22976,'h'=>'5ee8fe3d830f65bb'],
     'views/ops/candidate_list.php' => ['s'=>2664,'h'=>'c0eca4a60f7dff4c'],
     'views/ops/candidate_pool.php' => ['s'=>4341,'h'=>'8e83a233d98c8708'],

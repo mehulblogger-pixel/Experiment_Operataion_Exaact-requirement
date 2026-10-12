@@ -93,6 +93,38 @@ function rpipe_kind_is_closed($kind) { return (string) $kind === 'closed'; }
 // Is this kind a successful completion?
 function rpipe_kind_is_terminal($kind) { return (string) $kind === 'terminal'; }
 
+//  IS THIS CANDIDATE HIRED? ONE READER, FOR THE ONE QUESTION THAT MATTERS MOST.
+//
+//  recruitpipe_cand_goto() deliberately stopped writing candidates.stage, on the
+//  stated grounds that "every consumer now classifies from the configured stage
+//  kind". Every consumer did not. The JOINING gate — the transition that puts a
+//  real person on the roster — still compared that abandoned column with the
+//  literal 'ACCEPTED', in three places: the route's own check, its second check
+//  for a team record, and the candidate screen's decision whether to draw the
+//  control at all.
+//
+//  Measured on the DEFAULT shipped pipeline (15 stages, terminal "Onboarding"):
+//  a candidate moved to the terminal stage is authoritatively terminal/FILLED,
+//  while candidates.stage still reads 'RECEIVED'. So the button was not merely
+//  refusing — it was never drawn. The owner reported it as "Mark as joined
+//  button is not at all working transferring from last pipeline stage to
+//  joined", and because nobody could ever join, nobody could ever be
+//  joining-pending either: the availability board had no one to name and the
+//  utilisation report had no one to exclude. One defect, three symptoms.
+//
+//  This asks the authority — the configured stage kind, with the one-way legacy
+//  map already translating a pre-pipeline 'ACCEPTED' to 'terminal' — so the two
+//  paths give the same answer instead of disagreeing.
+function rpipe_cand_hired($cand) {
+    $st = rpipe_current_state($cand);
+    if (!is_array($st)) return false;
+    if (rpipe_kind_is_terminal((string) ($st['eff_kind'] ?? ''))) return true;
+    //  Belt and braces for a workspace with no pipeline at all, where
+    //  rpipe_current_state() may not establish a kind: the legacy value is still
+    //  the only thing there is to read.
+    return strtoupper(trim((string) ($st['legacy_stage'] ?? ''))) === 'ACCEPTED';
+}
+
 //  C47 — THE CONFIGURABLE CLOSED OUTCOMES.
 //
 //  One semantic closed KIND, many configurable outcomes beneath it. These are
