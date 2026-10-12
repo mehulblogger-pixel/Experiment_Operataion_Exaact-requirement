@@ -37,7 +37,20 @@ function lk_ensure_schema() {
 }
 function lk_migrate() {
     lk_ensure_schema();
-    ensure_column('lookup_types', 'module', "VARCHAR(30) DEFAULT ''"); // groups the Masters screen
+    //  R-18 — a list may belong to MORE THAN ONE module group, stored as a
+    //  comma-separated set in this one column. 30 characters held exactly one
+    //  group name and not two, which is the shape that made the picker
+    //  single-select. Widened, never narrowed: an existing single value is a
+    //  valid set of one and needs no migration.
+    ensure_column('lookup_types', 'module', "VARCHAR(160) DEFAULT ''"); // groups the Masters screen
+    //  An install set up before R-18 already HAS the column, so ensure_column()
+    //  leaves it at 30 — wide enough for one group name and not two, which would
+    //  truncate a set silently. Widened in place, the same way recruit.php and
+    //  access.php widen theirs. SQLite has no length limit and throws here,
+    //  which is why it is driver-guarded rather than merely wrapped.
+    if (function_exists('db_driver') && db_driver() !== 'sqlite') {
+        try { db()->exec("ALTER TABLE lookup_types MODIFY module VARCHAR(160)"); } catch (Throwable $e) {}
+    }
     // Idempotent: seed lists that were added after the first release.
     // The record is now called a Deputation, so the old "Deputation type" list —
     // which describes how the visit is structured — is renamed to avoid a clash.
@@ -167,6 +180,37 @@ function lk_ensure_type_map($key, $label, $map, $module = '') {
     foreach ($map as $code => $lab) lk_add_value($tid, null, $code, $lab, $so++);
     if ($module !== '') lk_set_module($key, $module);
 }
+//  ---------------------------------------------------------------------------
+//  WHICH GROUPS A LIST BELONGS TO — one reader, for a value that is now a set.
+//
+//  UAT 1.3.4, raised twice: "Still modules is single selection instead of
+//  multiple." A list such as Designation is genuinely used by Recruitment AND by
+//  Administration; filing it under one meant it went missing from the other.
+//  The column now holds a comma-separated set, and everything that asks reads it
+//  through here, so no caller has to know that.
+//
+//  A single legacy value is a set of one, so nothing needed migrating.
+//  ---------------------------------------------------------------------------
+function lk_modules_of($t) {
+    $raw = is_array($t) ? (string) ($t['module'] ?? '') : (string) $t;
+    $out = [];
+    foreach (explode(',', $raw) as $m) {
+        $m = trim($m);
+        if ($m !== '' && !in_array($m, $out, true)) $out[] = $m;
+    }
+    return $out;
+}
+
+//  Normalise a set for storage: trimmed, de-duplicated, order preserved.
+function lk_modules_csv(array $mods) {
+    $out = [];
+    foreach ($mods as $m) {
+        $m = trim((string) $m);
+        if ($m !== '' && !in_array($m, $out, true)) $out[] = $m;
+    }
+    return implode(',', $out);
+}
+
 function lk_set_module($key, $module) {
     try { db()->prepare("UPDATE lookup_types SET module=? WHERE type_key=? AND (module IS NULL OR module='')")->execute([$module, $key]); }
     catch (Throwable $e) {}
@@ -615,8 +659,17 @@ function lk_prune_offplan_lists() {
     try { $rows = ops_all("SELECT id, module FROM lookup_types WHERE module IS NOT NULL AND module <> ''"); }
     catch (Throwable $e) { return; }
     foreach ($rows as $t) {
-        $mod = (string) ($t['module'] ?? '');
-        if ($mod === '' || lk_group_enabled($mod)) continue;   // untagged, or its module is on → keep
+        //  R-18 — A LIST IS PRUNED ONLY WHEN EVERY GROUP IT BELONGS TO IS OFF.
+        //
+        //  This read one value and deleted on it. With a set, asking "is the
+        //  first group off?" would delete a list that is still in daily use
+        //  under its second group — and this function DELETES, so the safe
+        //  direction is the only acceptable one: keep it if ANY group is on.
+        $mods = lk_modules_of($t);
+        if (!$mods) continue;                                  // untagged → keep
+        $anyOn = false;
+        foreach ($mods as $m) if (lk_group_enabled($m)) { $anyOn = true; break; }
+        if ($anyOn) continue;                                  // still in use somewhere → keep
         try {
             db()->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([(int) $t['id']]);
             db()->prepare("DELETE FROM lookup_types  WHERE id=?")->execute([(int) $t['id']]);
@@ -685,7 +738,13 @@ function lk_module_group_label($tag) {
 function lk_types_grouped() {
     $order = ['People', 'Directory', 'Sales', 'Operations', 'Reporting', 'Money', ''];
     $groups = [];
-    foreach (lk_types() as $t) $groups[(string)($t['module'] ?? '')][] = $t;
+    //  R-18 — a list belongs to every group it names, so it is listed under each
+    //  of them. A list with no group keeps its place under the blank heading.
+    foreach (lk_types() as $t) {
+        $mods = lk_modules_of($t);
+        if (!$mods) { $groups[''][] = $t; continue; }
+        foreach ($mods as $m) $groups[$m][] = $t;
+    }
     uksort($groups, function ($a, $b) use ($order) {
         $ia = array_search($a, $order, true); $ib = array_search($b, $order, true);
         if ($ia === false) $ia = 900;
@@ -1098,9 +1157,15 @@ function lk_admin($route, $method) {
             // "Module" panel — move this list into another module group. A direct
             // update (not lk_set_module, which only fills a blank) so an admin can
             // re-file a list that already has a module.
-            $module = trim($_POST['module'] ?? '');
+            //  R-18 — the picker is now multi-select, so the post is an array.
+            //  A single string is still accepted, because an older form, a
+            //  bookmarked POST or a script should not silently clear the field.
+            $picked = $_POST['module'] ?? '';
+            $module = lk_modules_csv(is_array($picked) ? $picked : [$picked]);
             $pdo->prepare("UPDATE lookup_types SET module=? WHERE id=?")->execute([$module, $t['id']]);
-            flash($module !== '' ? 'Moved to “' . (function_exists('lk_module_group_label') ? lk_module_group_label($module) : $module) . '”.' : 'Moved to General.');
+            $names = array_map(fn($m) => function_exists('lk_module_group_label') ? lk_module_group_label($m) : $m,
+                               lk_modules_of($module));
+            flash($names ? 'Now listed under ' . implode(' and ', $names) . '.' : 'Moved to General.');
             redirect('/lookup?key=' . $t['type_key']);
         }
         if ($method === 'POST') {

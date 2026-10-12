@@ -67,13 +67,29 @@
 <?php endif; ?>
 
 <table class="grid">
-  <tr><th>Username</th><th>Name</th><th>Email</th><th>Role</th><th>Signature</th><th>Two-step</th><th>Last seen</th><th>Active</th><th>Actions</th></tr>
+  <tr><th>Username</th><th>Name</th><th>Email</th><th>Role</th><th><?= e(T('office')) ?></th><th>Signature</th><th>Two-step</th><th>Last seen</th><th>Active</th><th>Actions</th></tr>
   <?php foreach ($rows as $u): ?>
   <tr>
     <td><?= e($u['username']) ?></td>
     <td><?= e(trim(($u['first_name'] ?? '').' '.($u['last_name'] ?? '')) ?: '—') ?></td>
     <td><?= e($u['email'] ?: '—') ?></td>
     <td><?= e(!empty($u['is_superuser']) ? 'Master Admin' : (function_exists('role_name') ? role_name($u['role'] ?? 'ADMIN') : (ORG_ROLES[strtoupper($u['role'] ?? 'ADMIN')] ?? $u['role']))) ?></td>
+    <?php //  WHICH BRANCH THIS PERSON BELONGS TO.
+          //
+          //  Not decoration. A role this workspace confines to its own branch,
+          //  with no branch set, sees none of its work (R-30) — so "no branch"
+          //  is a fault to be fixed, not a blank to be ignored, and it is called
+          //  out here rather than left as an empty cell. scope_needs_home() is
+          //  the same question the person's own banner and the administrator's
+          //  warning ask, so all three can never disagree.
+          $__noBranch = function_exists('scope_needs_home') && scope_needs_home($u); ?>
+    <td><?php if (trim((string)($u['home_office_name'] ?? '')) !== ''): ?>
+          <?= e($u['home_office_name']) ?>
+        <?php elseif ($__noBranch): ?>
+          <span class="pill p-warn" title="This person is confined to their own branch but has not been given one, so they see none of their work">not set</span>
+        <?php else: ?>
+          <span class="muted" title="This role is not confined to one branch">—</span>
+        <?php endif; ?></td>
     <?php // A user with no signature on file has their approvals and quotations
           // printed without one, so it belongs in the register, not hidden. ?>
     <td><?= trim((string)($u['signature'] ?? '')) !== ''

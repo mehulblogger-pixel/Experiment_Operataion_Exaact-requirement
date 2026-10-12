@@ -74,10 +74,31 @@ function access_state_for($accessModule, $why = null) {
     // resolves since M9).
     if ($product === null && defined('PRODUCT_MODULES') && isset(PRODUCT_MODULES[$mod])) $product = $mod;
 
-    // Never show an internal key to a user (§22). Fall back to a neutral word.
-    $label = ($product !== null && defined('PRODUCT_MODULES') && isset(PRODUCT_MODULES[$product]))
+    //  R-26 — NAME THE THING THEY ASKED FOR, NOT THE PACK IT IS SOLD IN.
+    //
+    //  This named the sellable PRODUCT, always. So somebody refused a client
+    //  screen was told "You don't have permission to open **Administration**" —
+    //  because Clients happens to be sold inside the Administration pack. That
+    //  is actively misleading: it sends a person to ask for administrator
+    //  rights when what they need is client access. The owner caught it on
+    //  /customer, /duplicates and /partner-import, and it read that way for
+    //  every clients-module refusal there has ever been.
+    //
+    //  Two different questions need two different words:
+    //    · a PERMISSION refusal is about this screen → name the module;
+    //    · a SUBSCRIPTION refusal is about what the company bought → name the
+    //      pack, because the pack is the thing somebody would actually buy.
+    //  Both labels are resolved here; which one is used is decided below, where
+    //  the state is known.
+    $packLabel = ($product !== null && defined('PRODUCT_MODULES') && isset(PRODUCT_MODULES[$product]))
         ? PRODUCT_MODULES[$product][0]
         : 'This feature';
+    //  Never show an internal key to a user (§22) — access_module_label() falls
+    //  back to a readable form, and an unknown key keeps the neutral word.
+    $modLabel = (function_exists('access_module_label') && defined('ACCESS_MODULES') && isset(ACCESS_MODULES[$mod]))
+        ? access_module_label($mod)
+        : $packLabel;
+    $label = $packLabel;
 
     $state = 'UNKNOWN';
     if ($product === null)                     $state = 'INVALID_MODULE';
@@ -125,7 +146,9 @@ function access_state_for($accessModule, $why = null) {
             $act  = ['label' => null, 'route' => null];
             break;
         case 'NO_PERMISSION':
-            $msg = 'You don’t have permission to open ' . $label . '.';
+            //  The module, not the pack — this is about this screen and this
+            //  person, and the pack has nothing to do with it.
+            $msg = 'You don’t have permission to open ' . $modLabel . '.';
             $act = ['label' => null, 'route' => null];
             $hint = $ask;
             break;

@@ -143,8 +143,16 @@ function org_head($tab, $subtitle = '', $back = '', $backLabel = '', $actions = 
     $back = $back ?: '/hierarchy?tab=' . ($tab === 'users' ? 'people' : 'chart');
     $backLabel = $backLabel ?: 'Back';
     ob_start(); ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/hierarchy">Organisation &amp; people</a>
-  <?= $tab && isset($tabs[$tab]) ? ' › ' . e($tabs[$tab][0]) : '' ?></div>
+<?php //  R-24 removed 277 hand-typed breadcrumbs; this one survived because it is
+      //  not typed into a screen — it is typed into a SHARED HEADER, so one copy
+      //  produced a second trail on every screen in this module at once. The
+      //  owner's own screenshot of Login accounts shows both, stacked:
+      //
+      //      Home › Admin › Users                          (drawn centrally)
+      //      Home › Organisation & people › Login accounts (typed here)
+      //
+      //  The central one is derived from where the screen actually sits and is
+      //  permission-checked, so it is the one that stays. ?>
 <div class="master-head">
   <div style="display:flex;align-items:flex-start;gap:12px">
     <?php // Every screen in this module has this. It is the single most-asked-for

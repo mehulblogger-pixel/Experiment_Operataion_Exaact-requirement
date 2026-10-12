@@ -94,24 +94,36 @@
 
 <?php // Which module this list belongs to — move it to another group here. ?>
 <details class="panel" style="margin-bottom:14px">
-  <summary style="cursor:pointer;font-weight:600">🗂️ Module — <?= e(function_exists('lk_module_group_label') ? lk_module_group_label($t['module'] ?? '') : ($t['module'] ?: 'General')) ?></summary>
+  <?php
+    $curMods = function_exists('lk_modules_of') ? lk_modules_of($t) : array_filter([(string)($t['module'] ?? '')]);
+    $lbl = fn($m) => function_exists('lk_module_group_label') ? lk_module_group_label($m) : $m;
+    $curNames = array_map($lbl, $curMods);
+  ?>
+  <summary style="cursor:pointer;font-weight:600">🗂️ Appears under — <?= e($curNames ? implode(', ', $curNames) : 'General') ?></summary>
   <form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" style="margin-top:12px">
     <input type="hidden" name="set_module" value="1">
-    <div class="ff" style="max-width:340px"><label>This list belongs to</label>
-      <select class="form-control" name="module">
+    <?php //  R-18 — TICKS, NOT A SINGLE CHOICE.
+          //
+          //  This was one dropdown, so a list could sit under exactly one
+          //  heading. Designation is genuinely used by Recruitment AND by
+          //  Administration; filing it under one made it missing from the other,
+          //  and the owner reported it twice (UAT 1.3.4). A list may now name
+          //  as many groups as it belongs to, and appears under each of them.
+          //
+          //  A group that is switched off is still offered when this list is
+          //  already in it, so re-filing is never blocked by a module being off. ?>
+    <div class="ff" style="max-width:420px"><label>This list appears under</label>
+      <div style="display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:4px">
         <?php
-          $cur = (string)($t['module'] ?? '');
-          $modOpts = ['' => 'General'];
           foreach (['People', 'Directory', 'Sales', 'Operations', 'Reporting', 'Money'] as $mtag) {
-              // Always include the list's current module even if that module is off,
-              // so moving is never blocked; otherwise only offer enabled modules.
-              if ($mtag !== $cur && function_exists('lk_group_enabled') && !lk_group_enabled($mtag)) continue;
-              $modOpts[$mtag] = function_exists('lk_module_group_label') ? lk_module_group_label($mtag) : $mtag;
+              $on = in_array($mtag, $curMods, true);
+              if (!$on && function_exists('lk_group_enabled') && !lk_group_enabled($mtag)) continue;
+              echo '<label class="chk"><input type="checkbox" name="module[]" value="' . e($mtag) . '"'
+                 . ($on ? ' checked' : '') . '> ' . e($lbl($mtag)) . '</label>';
           }
-          foreach ($modOpts as $mv => $ml) echo '<option value="' . e($mv) . '"' . ($mv === $cur ? ' selected' : '') . '>' . e($ml) . '</option>';
         ?>
-      </select>
-      <small class="muted">Changes which heading it sits under on the Masters screen.</small></div>
+      </div>
+      <small class="muted">Tick every heading this list belongs under on the Masters screen. Tick none to leave it under General.</small></div>
     <div style="margin-top:12px"><button class="btn small" type="submit">Save module</button></div>
   </form>
 </details>

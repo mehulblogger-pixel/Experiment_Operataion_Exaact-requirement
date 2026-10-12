@@ -10140,7 +10140,19 @@ function ops_users($route, $method) {
     // Deactivated people drop to the bottom rather than sitting among the staff
     // who are actually here. They are never hidden: their work is still on file
     // and somebody will need to find them.
-    $rows = ops_all("SELECT * FROM users WHERE $where ORDER BY is_active DESC, username");
+    //  THE BRANCH COMES WITH THE ROW.
+    //
+    //  The register showed username, name, e-mail, role and sign-in state but
+    //  never WHICH BRANCH the person belongs to — so the one question an
+    //  administrator asks of this list ("who is in Mumbai?") could only be
+    //  answered by opening every record. It matters more since R-30: a person
+    //  this matrix confines to their own branch, whom nobody has given one, now
+    //  sees none of their work, and this is the screen where that is fixed.
+    //  One LEFT JOIN, no second query, no change to who is listed.
+    $rows = ops_all("SELECT u.*, o.name AS home_office_name
+                       FROM users u LEFT JOIN offices o ON o.id = u.home_office_id
+                      WHERE " . str_replace('home_office_id', 'u.home_office_id', $where) . "
+                      ORDER BY u.is_active DESC, u.username");
     $seats = getenv('SEAT_LIMIT') ?: '';
     view('ops/users', ['rows'=>$rows,'seats'=>$seats,'active'=>(int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"),
         'globalMgr'=>$globalMgr, 'defaults'=>accounts_on_default_password(), 'locked'=>accounts_locked_now(),

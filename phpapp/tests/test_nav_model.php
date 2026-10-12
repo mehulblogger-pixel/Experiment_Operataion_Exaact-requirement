@@ -195,3 +195,29 @@ t_ok(in_array(access_module_label('equipment'), array_map(fn($x) => $x['label'],
      '*** and the module it belongs to is still named in the trail above it');
 
 t_as_nobody();   // leave the session as this file found it
+
+// ---------------------------------------------------------------------------
+//  R-35 — ONE TRAIL PER SCREEN, INCLUDING THE ONES DRAWN BY A SHARED HEADER.
+//
+//  R-24 removed 277 hand-typed breadcrumbs, but org_head() in lib/orgadmin.php
+//  is a shared HEADER rather than a screen, so its typed crumb survived and
+//  produced a second trail on every screen in the Organisation & people module
+//  at once. The owner's screenshot of Login accounts shows both, stacked.
+//  A screen with two breadcrumbs saying different things is worse than one with
+//  none: it tells you that the application does not know where you are.
+// ---------------------------------------------------------------------------
+t_section('R-35 — no screen draws its own second breadcrumb');
+$crumbSources = [];
+foreach (array_merge(glob(dirname(__DIR__) . '/views/ops/*.php') ?: [],
+                     glob(dirname(__DIR__) . '/views/ops/*/*.php') ?: [],
+                     glob(dirname(__DIR__) . '/lib/*.php') ?: []) as $f) {
+    $src = (string) @file_get_contents($f);
+    //  The one legitimate writer is the central model in layout_top.php.
+    if (basename($f) === 'layout_top.php') continue;
+    //  A CSS rule that merely hides .crumbs when printing is not a second trail.
+    $code = (string) preg_replace('~<style.*?</style>~s', '', $src);
+    if (preg_match('~<(nav|div)\s+class="crumbs"~', $code)) $crumbSources[] = basename($f);
+}
+t_eq($crumbSources, [], '*** nothing outside layout_top.php draws a breadcrumb'
+     . ($crumbSources ? ' — found in ' . implode(', ', $crumbSources) : ''));
+
