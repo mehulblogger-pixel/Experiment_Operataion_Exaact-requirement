@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '3d1f892 · 2026-10-12 17:49 UTC · 682 files';
+$RELEASE = 'dbd6e74 · 2026-10-13 02:35 UTC · 682 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -87,7 +87,7 @@ $EXPECT  = [
     'lib/connect_disputes.php' => ['s'=>4865,'h'=>'56ecbec1a7a03f91'],
     'lib/connect_engage.php' => ['s'=>20986,'h'=>'59720837c5273d27'],
     'lib/connect_engvoucher.php' => ['s'=>31752,'h'=>'24272b8bfe5ea6a6'],
-    'lib/connect_geo.php' => ['s'=>15539,'h'=>'5a1f51ac70ec64d2'],
+    'lib/connect_geo.php' => ['s'=>19346,'h'=>'9ee996bdd62de2ca'],
     'lib/connect_govern.php' => ['s'=>7181,'h'=>'22ce5ad54e44ce2a'],
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
     'lib/connect_identity.php' => ['s'=>58186,'h'=>'6500583342a99ab1'],
@@ -99,7 +99,7 @@ $EXPECT  = [
     'lib/connect_passport.php' => ['s'=>11025,'h'=>'651b739f219f52b4'],
     'lib/connect_person.php' => ['s'=>7701,'h'=>'7210f0cae01d84e9'],
     'lib/connect_privacy.php' => ['s'=>17610,'h'=>'74640b7aef0d480c'],
-    'lib/connect_pro.php' => ['s'=>62286,'h'=>'e807b7400ce28688'],
+    'lib/connect_pro.php' => ['s'=>62970,'h'=>'ca33c1c6aad91a4e'],
     'lib/connect_qualtax.php' => ['s'=>24846,'h'=>'ff8da4316ac1a9d6'],
     'lib/connect_rating_disputes.php' => ['s'=>8981,'h'=>'0152a5d87d7e6917'],
     'lib/connect_ratings.php' => ['s'=>7478,'h'=>'cf59bcdbfc71b896'],
@@ -406,7 +406,7 @@ $EXPECT  = [
     'views/ops/connect_requirement.php' => ['s'=>47980,'h'=>'85feee0182528893'],
     'views/ops/connect_requirements.php' => ['s'=>8250,'h'=>'8af69297db529e13'],
     'views/ops/connect_source.php' => ['s'=>4918,'h'=>'a8882cf9e99ec24b'],
-    'views/ops/connect_talent.php' => ['s'=>6988,'h'=>'381e26f8e01e875b'],
+    'views/ops/connect_talent.php' => ['s'=>9173,'h'=>'1b391a894a2345f8'],
     'views/ops/connect_taxonomy.php' => ['s'=>6402,'h'=>'0357e7d5e840b119'],
     'views/ops/connect_taxonomy_admin.php' => ['s'=>11051,'h'=>'db0b340f99a00f89'],
     'views/ops/connect_verify.php' => ['s'=>4960,'h'=>'4645eaaf41e844ce'],

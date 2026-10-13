@@ -18,6 +18,29 @@ BM=BRANCH_MANAGER, BAM=BRANCH_APP_MANAGER, OM=OPERATION_MANAGER, CO=COORDINATOR,
 AM=ASST_MANAGER, FIN=FINANCE, INS=INSPECTOR. (SR_INSPECTOR = INSPECTOR + `idems.finalize`;
 sales roles BDM/KAM/MM/ME are in the CRM mini-matrix below.)
 
+> ### RATIFIED BY THE OWNER, 2026-10-13 — defaults ship, each company decides
+>
+> The open question "which modules should each role hold by default?" is
+> **answered**, in the owner's words: *"Modules — I think so that is configurable
+> with respect to the company."* So this matrix is a **starting point, not a
+> fixed policy**: it records what a role holds the day a company is created, and
+> every company may then change it for itself. Three layers, each per company and
+> each already built:
+>
+> | Layer | Where the company changes it | Stored as |
+> |---|---|---|
+> | What the company has **bought** | Licence / product package (provider-side) | entitlement, `PRODUCT_MODULES` |
+> | Which modules are **switched on** for the company | **Admin → Modules & features** | `modules_off` setting, per tenant |
+> | Which modules **each role** holds | **Admin → Roles & permissions** | `role_access` setting, per tenant |
+>
+> `role_defaults()` in `lib/access.php` supplies the shipped default; a company's
+> own `role_access` overrides it (`role_grant_perm()` writes through
+> `setting_set`, so it lives in that company's own database and never leaks
+> across tenants). **Nothing below is hard-coded policy a customer is stuck
+> with** — which is why this document states defaults and the hard rule in
+> `CLAUDE.md` is about never granting a right the matrix does not *list*, not
+> about forbidding a company from narrowing its own roles.
+
 **How to read cells:** the cell shows the strongest right the role holds *by default*.
 Master (MA) bypasses every gate (`access.php:530`). "Edit" implies View. Per-user
 overrides and the Settings→Roles editor can change any of this at runtime.
@@ -229,6 +252,32 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 19. **CRM modules** — module gates `mod.inquiries/quotes/crm_orders/crm_reports.*`; fine-grained `crm.quote.create/approve/send`, `crm.template.manage` per `access.php:456-461`. Quote-approve default = MARKETING_MANAGER only (`access.php:459`); **not** BRANCH_MANAGER.
 
 ## Connect — marketplace (external portals, K2b)
+
+> ### RATIFIED BY THE OWNER, 2026-10-13 — the Coordinator and the marketplace
+>
+> The open question "should a Coordinator see Marketplace?" is **answered: yes.**
+> The owner's words: *"Coordinator can see market place to find any resource if
+> available in applicable region. Suppose Ahmedabad coordinator is looking for
+> freelancer in Chennai he should be able to filter it accordingly."*
+>
+> This needed **no new permission** — `connect_market_can()` already admits the
+> coordinator band. What it does settle is a rule that must not be "tidied away"
+> later, because the whole module depends on it:
+>
+> | | Office-scoped? | Why |
+> |---|---|---|
+> | **Discovery** — searching the shared pool (`/connect-talent`, `/connect-bench`) | **No, deliberately** | A marketplace that shows a coordinator only their own branch is not a marketplace. The owner's Ahmedabad→Chennai case *is* the requirement. |
+> | **Action** — invite, source, award, assign (`/connect-source`, award, `rasg_assign`) | **Yes, unchanged** | Finding somebody is not hiring them. Every action keeps its own module right and, where a job or requirement is involved, that record's own scope. |
+>
+> The region question is answered by **the professional's own declared mobility**
+> (`connect_location_match`: exact city → within their stated travel radius →
+> a city/state they selected → Pan-India → international), **never** by the
+> searcher's branch. So a Chennai search returns the people who have said they
+> will work in Chennai and **excludes** those who have not — a coordinator is
+> never handed somebody who cannot take the job. This is the one place the
+> R-30 office-scope tightening is intentionally not applied, and
+> `tests/test_marketplace_region_filter.php` fails if anyone wraps the pool
+> search in `scope_clause()`.
 
 The manpower-marketplace staff desk (K2a) reuses coordinator/master and adds **no**
 permission. The **professional-identity console** (`/connect-identity`, linking an

@@ -99,10 +99,87 @@ function connect_geo_search($q, $kinds = ['CITY','STATE'], $limit = 20) {
                     ORDER BY (slug LIKE ?) DESC, kind, name LIMIT " . max(1, (int)$limit),
                    array_merge(['%' . $n . '%'], $ka, [$n . '%'])) ?: [];
 }
-/** Resolve a free-text location to the best place (city preferred). */
+/**
+ *  Former / colloquial Indian place names -> the name this system seeds.
+ *
+ *  A coordinator who has worked in this industry for twenty years types
+ *  "Madras", not "Chennai"; the people who post jobs say "Bombay" and
+ *  "Bangalore". Without this, an honest search for a city that plainly has
+ *  professionals in it returns nothing, and the user concludes the marketplace
+ *  is empty rather than that their spelling was not recognised.
+ *
+ *  Kept as data next to the resolver, so EVERY caller gets it: the talent
+ *  search, the client-portal search, the requirement -> candidate matcher
+ *  (connect_match) and a professional stating their own base city.
+ */
+function connect_geo_alias_map() {
+    return [
+        'madras' => 'Chennai',          'bombay' => 'Mumbai',
+        'calcutta' => 'Kolkata',        'bangalore' => 'Bengaluru',
+        'poona' => 'Pune',              'baroda' => 'Vadodara',
+        'trivandrum' => 'Thiruvananthapuram', 'cochin' => 'Kochi',
+        'mysore' => 'Mysuru',           'mangalore' => 'Mangaluru',
+        'pondicherry' => 'Puducherry',  'gurgaon' => 'Gurugram',
+        'simla' => 'Shimla',            'cawnpore' => 'Kanpur',
+        'benares' => 'Varanasi',        'banaras' => 'Varanasi',
+        'vizag' => 'Visakhapatnam',     'waltair' => 'Visakhapatnam',
+        'trichy' => 'Tiruchirappalli',  'tanjore' => 'Thanjavur',
+        'ootacamund' => 'Udhagamandalam', 'ooty' => 'Udhagamandalam',
+        'jubbulpore' => 'Jabalpur',     'ahmadabad' => 'Ahmedabad',
+        'bhubaneshwar' => 'Bhubaneswar', 'orissa' => 'Odisha',
+        'ncr' => 'Delhi',               'new delhi' => 'Delhi',
+        'bangaluru' => 'Bengaluru',     'bengalooru' => 'Bengaluru',
+    ];
+}
+
+/** Resolve a free-text location to the best place (city preferred).
+ *  Falls back to the former-name map so "Madras" finds Chennai. */
 function connect_geo_resolve($q) {
     $hits = connect_geo_search($q, ['CITY','STATE','COUNTRY'], 5);
-    return $hits[0] ?? null;
+    if ($hits) return $hits[0];
+    $alias = connect_geo_alias_map()[geo_norm($q)] ?? '';
+    if ($alias !== '') {
+        $hits = connect_geo_search($alias, ['CITY','STATE','COUNTRY'], 5);
+        if ($hits) return $hits[0];
+    }
+    return null;
+}
+
+/**
+ *  "Did you mean …" for a location the resolver could not place.
+ *
+ *  Silence is the worst answer here: a coordinator who typed a typo and saw an
+ *  empty list has no way to tell "nobody works there" from "I misspelled it".
+ *  The place list is small (tens of rows), so a straight edit-distance pass over
+ *  it is both cheap and better than a prefix match, which cannot catch "Chenai".
+ *  Returns place rows, nearest spelling first.
+ */
+function connect_geo_suggest($q, $limit = 3) {
+    connect_geo_migrate();
+    $n = geo_norm($q);
+    if ($n === '' || strlen($n) < 3) return [];
+    $rows = ops_all("SELECT * FROM cx_geo_places WHERE status='ACTIVE' AND kind IN ('CITY','STATE')") ?: [];
+    $scored = [];
+    foreach ($rows as $r) {
+        $cand = geo_norm((string)$r['name']);
+        if ($cand === '') continue;
+        //  Substring either way is a strong signal ("chenn" -> "chennai").
+        $d = (strpos($cand, $n) !== false || strpos($n, $cand) !== false)
+            ? 0 : levenshtein($n, $cand);
+        //  Only near-misses, scaled to the word's length, so unrelated places
+        //  are never offered as a correction.
+        if ($d <= max(2, (int)floor(strlen($cand) / 3))) $scored[] = [$d, $r];
+    }
+    usort($scored, fn($a, $b) => $a[0] <=> $b[0] ?: strcmp((string)$a[1]['name'], (string)$b[1]['name']));
+    return array_map(fn($x) => $x[1], array_slice($scored, 0, max(1, (int)$limit)));
+}
+
+/** Every place a human may pick, for a picker/datalist. Small by design. */
+function connect_geo_pick_list() {
+    connect_geo_migrate();
+    return ops_all("SELECT id, kind, name, state_name FROM cx_geo_places
+                    WHERE status='ACTIVE' AND kind IN ('CITY','STATE')
+                    ORDER BY CASE kind WHEN 'CITY' THEN 0 ELSE 1 END, name") ?: [];
 }
 
 // ---- the priority-tier matcher (used by search + matching) ------------------

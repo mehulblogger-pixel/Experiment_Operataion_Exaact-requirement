@@ -438,9 +438,18 @@ function ops_connect_talent($method) {
         }
         redirect('/connect-talent' . (($_POST['qs'] ?? '') !== '' ? '?' . $_POST['qs'] : ''));
     }
+    //  Tell the screen whether the typed location was actually understood. An
+    //  empty result for an unrecognised place reads as "nobody works there",
+    //  which is a different and much more damaging statement.
+    $locTerm  = trim((string)$f['location']);
+    $locPlace = ($locTerm !== '' && function_exists('connect_geo_resolve')) ? connect_geo_resolve($locTerm) : null;
     view('ops/connect_talent', [
         'f'           => $f,
         'rows'        => connect_pro_search_smart($f),
+        'loc_place'   => $locPlace,
+        'loc_suggest' => ($locTerm !== '' && !$locPlace && function_exists('connect_geo_suggest'))
+                            ? connect_geo_suggest($locTerm, 3) : [],
+        'places'      => function_exists('connect_geo_pick_list') ? connect_geo_pick_list() : [],
         'pool'        => connect_pro_pool_count(),
         'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
         'work_types'  => cx_pro_work_types(),

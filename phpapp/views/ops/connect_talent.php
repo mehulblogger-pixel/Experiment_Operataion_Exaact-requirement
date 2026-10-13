@@ -30,10 +30,42 @@ $wtLabel = fn($k) => $work_types[$k] ?? ucfirst(str_replace('_', ' ', $k));
     <?php foreach ($disciplines as $d): ?><option value="<?= e($d['code']) ?>" <?= ($f['discipline']??'')===$d['code']?'selected':'' ?>><?= e($d['name']) ?></option><?php endforeach; ?></select>
   <select name="work_type"><option value="">Any work type</option>
     <?php foreach ($work_types as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($f['work_type']??'')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
-  <input type="text" name="location" value="<?= e($f['location'] ?? '') ?>" placeholder="Location" style="min-width:130px">
+  <input type="text" name="location" value="<?= e($f['location'] ?? '') ?>" list="talentPlaces"
+         placeholder="Any city — e.g. Chennai" style="min-width:160px"
+         title="Type any city or state. You are not limited to your own branch — this searches everyone willing to work there.">
+  <datalist id="talentPlaces">
+    <?php foreach (($places ?? []) as $pl): ?>
+      <option value="<?= e($pl['name']) ?>"><?= e($pl['kind'] === 'STATE' ? 'State' : (string)$pl['state_name']) ?></option>
+    <?php endforeach; ?>
+  </datalist>
   <label style="display:flex;align-items:center;gap:5px;font-size:13px"><input type="checkbox" name="available_only" value="1" <?= !empty($f['available_only'])?'checked':'' ?>> Available now</label>
   <button class="btn" type="submit">Search</button>
 </form>
+
+<?php
+//  Say plainly what the location did — a coordinator must never have to guess
+//  whether an empty list means "nobody there" or "I spelt it wrong".
+$locTyped = trim((string)($f['location'] ?? ''));
+if ($locTyped !== ''):
+  if (!empty($loc_place)): ?>
+    <p class="muted" style="margin:8px 0 0;font-size:13px">
+      📍 Showing everyone willing to work in <strong><?= e($loc_place['name']) ?></strong><?php
+        if (strcasecmp(trim((string)$loc_place['name']), $locTyped) !== 0): ?> <span class="muted">(you typed “<?= e($locTyped) ?>”)</span><?php endif;
+        if (!empty($loc_place['state_name']) && $loc_place['kind'] !== 'STATE'): ?>, <?= e($loc_place['state_name']) ?><?php endif; ?>
+      — nearest first. People who have not offered to work there are left out.
+    </p>
+  <?php else: ?>
+    <div class="panel" style="margin-top:8px;border-left:3px solid #c08a00;background:#fffaf0">
+      <p style="margin:0;font-size:13px">
+        <strong>“<?= e($locTyped) ?>” is not a place we recognise</strong>, so these results are
+        name matches only — they are <em>not</em> filtered or ranked by who can actually travel there.
+        <?php if (!empty($loc_suggest)): ?><br>Did you mean:
+          <?php foreach ($loc_suggest as $i => $sg): $qs = $_GET; $qs['location'] = $sg['name']; ?><?= $i ? ' · ' : ' ' ?><a href="/connect-talent?<?= e(http_build_query($qs)) ?>"><strong><?= e($sg['name']) ?></strong></a><?php if (!empty($sg['state_name']) && $sg['kind'] !== 'STATE'): ?> <span class="muted">(<?= e($sg['state_name']) ?>)</span><?php endif; endforeach; ?>
+        <?php else: ?><br>Pick a city from the list in the box, or clear the location to search everywhere.<?php endif; ?>
+      </p>
+    </div>
+  <?php endif;
+endif; ?>
 
 <div class="panel" style="margin-top:12px">
   <p class="muted" style="margin:0 0 10px"><?= count($rows) ?> professional<?= count($rows)===1?'':'s' ?> found.</p>
