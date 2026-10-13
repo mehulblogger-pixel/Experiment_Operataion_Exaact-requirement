@@ -5,15 +5,22 @@
 
 > ## ⚠ READ THIS BEFORE YOU TEST ANYTHING
 >
-> Your last two runs were both recorded against candidate `0f2123d`. **Thirty-five fixes
-> have been made since, and none of them is on your live site.** Running this guide against
-> an un-deployed build re-finds defects that are already closed and costs you a full day
-> for nothing.
+> Your last two runs were both recorded against candidate `0f2123d`, and **thirty-five
+> fixes have been made since**. Running this guide against an un-deployed build re-finds
+> defects that are already closed and costs you a full day for nothing — which is exactly
+> what happened twice.
 >
-> **Upload the branch first.** Then confirm you are testing the new build: the sign-in page
-> footer must read **`v2026.10.1`** (it is printed with a leading “v”), and `/users` must
-> show an **Office** column. If it does
-> not show that column, you are on the old build — stop, and deploy.
+> **Deployed on 2026-10-13.** Before you record a single result, take thirty seconds and
+> prove you are on the new build:
+>
+> 1. The sign-in page footer reads **`v2026.10.1`** (printed with a leading “v”).
+> 2. **Admin → Organisation → Login accounts** shows an **Office** column, between
+>    *Role* and *Signature*.
+>
+> If either is missing you are still on the old code — **stop, and fix the deployment
+> first.** Signed in as an administrator, open `/deploy-check.php`: it compares every file
+> on the server against the release and names the folders that did not land. **Delete that
+> file once the deployment is confirmed.**
 >
 > ### What is already fixed — do not spend time re-finding these
 >
@@ -1013,10 +1020,13 @@ Still open after UAT, and not part of it:
 
 - **B-2** — a production backup taken, restored into a scratch database, and proven
 - **B-3** — production environment verification
-- **B-4** — deployment, checksum verification, production smoke test
+- **B-4** — checksum verification and a production smoke test (`/deploy-check.php`)
 
-**Deployment happens after all of those, not before.** Your live site will keep reporting
-`2026.07.1` until then, and that is correct.
+> **Note on sequence.** The plan put deployment *after* B-2–B-4; in practice the build was
+> deployed on **2026-10-13**, ahead of them. That is not a disaster — the upgrade is
+> **additive only** (it adds columns, tables and indexes; it deletes no data) — but it does
+> mean **B-2 is now the most urgent item, not the least.** Take a production backup and
+> prove it restores. Until that is done there is no way back from anything.
 
 ---
 
