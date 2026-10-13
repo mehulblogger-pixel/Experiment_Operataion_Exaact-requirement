@@ -15,6 +15,10 @@
 <div class="master-head">
   <div><h1>Masters</h1>
     <p class="sub" style="margin:2px 0 0">Every dropdown in the app, grouped by module. Edit the values, add your own list, and tick which forms it shows on — all in one place. A dependent list filters by a parent list's value. <?= count($types) ?> lists, <?= array_sum($counts) ?> values.</p></div>
+  <?php // UAT 1.3.5 — reached from Admin, with nothing to go back to. ?>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn secondary" href="/admin">← Admin</a>
+  </div>
 </div>
 
 <form method="get" action="/lookups" class="panel" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">

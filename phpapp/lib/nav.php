@@ -159,15 +159,61 @@ function nav_screen_label($route) {
 //  Stating their area directly is honest: these screens genuinely have an area
 //  and genuinely have no single module. It is a map of EXCEPTIONS and is checked
 //  only after the module route fails, so it can never override the real one.
+/**
+ *  Which area a route belongs to — asked of the MENU, not of a hand-kept list.
+ *
+ *  This was five routes typed out by hand, so every screen the list did not
+ *  name fell through to no area at all. Reported from UAT 1.3.5: opening a
+ *  master list from Admin → Masters produced the trail "Home › Lookups" — no
+ *  Admin step, because `lookups` was not one of the five.
+ *
+ *  The trail's job is to retrace the path the person actually walked, so the
+ *  authority has to be the thing they walked through: the menu in areas.php.
+ *  Asking the permission grouping instead (nav_area_of_module) is what put
+ *  Masters under "Directory" while the menu lists it under Admin — a trail that
+ *  contradicts the menu is worse than no trail, because it teaches the wrong
+ *  place to look next time.
+ *
+ *  Prefix entries in the menu ("m/") match the routes beneath them, which is how
+ *  every individual master list inherits the trail without being listed.
+ */
 function nav_route_area($route) {
-    static $m = [
-        'workspace/setup'         => 'Admin',
-        'workspace/setup/modules' => 'Admin',
-        'workspace/setup/forms'   => 'Admin',
-        'approval-rules'          => 'Admin',
-        'licence'                 => 'Admin',
-    ];
-    return $m[trim((string)$route, '/')] ?? null;
+    static $cache = null;
+    $route = trim((string)$route, '/');
+    if ($route === '') return null;
+    if ($cache === null) {
+        $cache = [];
+        if (function_exists('ops_area_routes')) {
+            foreach (nav_area_routes() as $label => $areaRoute) {
+                foreach ((array) ops_area_routes($areaRoute) as $r) {
+                    //  Only the LEADING slash goes: a trailing one is the menu
+                    //  saying "and everything under here" ("m/"), and trimming
+                    //  it turns the prefix into a plain route that matches
+                    //  nothing but itself.
+                    $r = ltrim((string) $r, '/');
+                    if ($r === '') continue;
+                    //  An area's OWN home is not inside itself. Mapping it to
+                    //  its area makes the trail end on the area's name, and the
+                    //  Back link then reads "Quality & Accreditation" where it
+                    //  should read the screen's own name, "Quality".
+                    if ($r === ltrim((string) $areaRoute, '/')) continue;
+                    if (!isset($cache[$r])) $cache[$r] = $label;
+                }
+            }
+        }
+        //  Kept for the handful of routes the area engine does not enumerate.
+        foreach ([
+            'workspace/setup' => 'Admin', 'workspace/setup/modules' => 'Admin',
+            'workspace/setup/forms' => 'Admin', 'approval-rules' => 'Admin',
+            'licence' => 'Admin',
+        ] as $r => $a) { if (!isset($cache[$r])) $cache[$r] = $a; }
+    }
+    if (isset($cache[$route])) return $cache[$route];
+    //  A prefix the menu declared, e.g. "m/" owning "m/designations".
+    foreach ($cache as $r => $label) {
+        if (substr($r, -1) === '/' && strncmp($route, $r, strlen($r)) === 0) return $label;
+    }
+    return null;
 }
 
 function nav_trail($route, $leaf = null) {
@@ -176,7 +222,17 @@ function nav_trail($route, $leaf = null) {
     if ($route === '') return $trail;
 
     $mod  = nav_module_of($route);
-    $area = $mod ? nav_area_of_module($mod) : nav_route_area($route);
+    //  Where a route BELONGS TO A MODULE, the module's own area wins. The Admin
+    //  menu is a grab-bag of configuration tiles that belong to other modules —
+    //  report approval rules appear there but are owned by inspection reports,
+    //  and the owner asked specifically for that screen to sit under Reporting
+    //  so Back reaches the reports, not the admin index. Letting the menu
+    //  override ownership moved it to Admin and broke that.
+    //
+    //  The menu answers for a route with NO module at all. That is the case the
+    //  old five-route list missed: /lookups is owned by nothing, so it got no
+    //  area and the trail read "Home › Lookups" for a screen reached from Admin.
+    $area = ($mod ? nav_area_of_module($mod) : null) ?: nav_route_area($route);
 
     if ($area !== null) {
         $ar = nav_area_routes()[$area] ?? null;

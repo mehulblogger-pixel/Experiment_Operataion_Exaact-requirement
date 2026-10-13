@@ -1,6 +1,12 @@
 <div class="master-head">
   <div><h1><?= e($cfg['label']) ?></h1><p class="sub"><?= count($rows) ?> record(s)</p></div>
-  <div style="display:flex;gap:6px">
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <?php // UAT 1.3.5 — this screen is reached from Admin → Masters, and had no
+          //  way back to it. The browser button is not an answer: somebody who
+          //  arrived from a dropdown elsewhere has no idea what it will do. The
+          //  wording matches the one already on the lookup-values screen, so the
+          //  two master screens read the same. ?>
+    <a class="btn secondary" href="/masters">← All master lists</a>
     <?php // Offices are also editable as a nested structure — same table, same
           // rows, arranged as a tree with heads and head-counts. ?>
     <?php if ($key === 'offices'): ?><a class="btn secondary" href="/hierarchy?tab=offices">Edit as a structure</a><?php endif; ?>
