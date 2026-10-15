@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '2f0e531 · 2026-10-15 16:23 UTC · 684 files';
+$RELEASE = '58b717c · 2026-10-15 16:51 UTC · 684 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -167,8 +167,8 @@ $EXPECT  = [
     'lib/mkt_plans.php' => ['s'=>10762,'h'=>'513801027f92ce90'],
     'lib/mkt_rules.php' => ['s'=>12129,'h'=>'f541702a11884133'],
     'lib/mkt_subs.php' => ['s'=>10123,'h'=>'7a5b146d8a81d7ce'],
-    'lib/nav.php' => ['s'=>17762,'h'=>'ea9c2fcd1845e6fe'],
-    'lib/navindex.php' => ['s'=>14310,'h'=>'5f9fcb04d113870e'],
+    'lib/nav.php' => ['s'=>19957,'h'=>'26898140a9e72a0c'],
+    'lib/navindex.php' => ['s'=>15020,'h'=>'4c1358b191af1b1d'],
     'lib/ncdca.php' => ['s'=>44960,'h'=>'d64c2c2e6eddc5e1'],
     'lib/ncr.php' => ['s'=>34005,'h'=>'c798485b2013d240'],
     'lib/nextaction.php' => ['s'=>15255,'h'=>'85f9797146341fa6'],

@@ -29,6 +29,16 @@
 function nav_area_routes() {
     return [
         'Sales'                   => 'sales',
+        //  MARKETPLACE WAS MISSING FROM THIS LIST UNTIL 2026-10-15, and the rail
+        //  has carried it for months. The cost was invisible until something
+        //  checked: all fourteen Marketplace screens had NO area step in their
+        //  breadcrumb and nothing to go back to but Home — "Home › Connect
+        //  talent", from a tile the menu calls "Talent search".
+        //
+        //  Found by tests/test_uat_guide_locations.php, which cross-checks the
+        //  owner's test guide against the real rail. The guide said "Left menu →
+        //  🧑‍🏭 Marketplace", the rail agreed, and this list did not.
+        'Marketplace'             => 'marketplace',
         'Operations'              => 'operations',
         'Recruitment'             => 'recruitment',
         'Reporting'               => 'reporting',
@@ -136,8 +146,41 @@ function nav_screen_label($route) {
     //  already named one step up the trail, so the verb alone is clearer.
     if (preg_match('/^(.*)-(new|edit|add)$/', $route, $vm))
         return $vm[2] === 'edit' ? 'Edit' : 'New';
+    //  CALL IT WHAT THE TILE CALLED IT.
+    //
+    //  Title-casing the route is a guess, and it guessed wrong wherever the
+    //  menu had chosen better words: the Marketplace tile reads "Talent
+    //  search", and the trail under it read "Connect talent". The person
+    //  clicked a tile; the trail should repeat the words on that tile back to
+    //  them, not a tidied-up version of the address.
+    //
+    //  Asked AFTER the explicit overrides above, so a deliberate name still
+    //  wins, and after the new/edit rule, so "New" stays "New".
+    $tile = nav_menu_label($route);
+    if ($tile !== null) return $tile;
     $words = trim(str_replace(['-', '/', '_'], ' ', $route));
     return $words === '' ? 'Home' : ucfirst($words);
+}
+
+//  The label the MENU gives a route, if any tile points at it. Built once from
+//  the same area definitions the rail and the area homes are drawn from, so
+//  there is no second list of names to keep in step.
+function nav_menu_label($route) {
+    static $cache = null;
+    if ($cache === null) {
+        $cache = [];
+        if (function_exists('ops_area_def')) {
+            foreach (nav_area_routes() as $areaRoute) {
+                $def = ops_area_def($areaRoute);
+                foreach (($def['sections'] ?? []) as $sec)
+                    foreach ($sec['tiles'] as $t) {
+                        $r = ltrim((string) parse_url((string) $t['route'], PHP_URL_PATH), '/');
+                        if ($r !== '' && !isset($cache[$r])) $cache[$r] = $t['label'];
+                    }
+            }
+        }
+    }
+    return $cache[ltrim((string) $route, '/')] ?? null;
 }
 
 //  THE TRAIL: Home > Area > Module > this screen.

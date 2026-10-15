@@ -103,44 +103,56 @@ function ops_nav_index($fresh = false) {
         if ($can('mod.vouchers.view')) $add($thp('voucher'), '/vouchers', $A, '🧾', 'Field expenses raised against a job.');
         if ($fx('rating_can') && rating_can()) $add('Inspector ratings', '/ratings', $A, '⭐', 'Post-job quality & conduct.');
         if ($can('mod.hiring.view')) {
+            //  RECRUITMENT IS ITS OWN RAIL ITEM, SO SAY SO.
+            //
+            //  Every screen below was registered with $A — 'Operations' — while
+            //  the left rail has carried a separate "Recruitment" item since
+            //  R-14. So "Find a screen" answered "Candidates … Operations" and
+            //  the menu beside it said Recruitment. That is the same defect the
+            //  owner has now reported three times in different places: a screen
+            //  filed under an area that has no route to it.
+            //
+            //  $A is left alone so the Operations entries above keep their area;
+            //  these use their own.
+            $R = 'Recruitment';
             // M4 correction §1 — the locked words. "Requirement" on its own is
             // ambiguous (a hiring request, a recruitment requisition and a
             // marketplace requirement are three different things), so the rail
             // names each one. hreq_label() honours a workspace's own wording and
             // only qualifies it when the word it chose is one of the ambiguous ones.
             $hl = fn($k, $pl = false) => $fx('hreq_label') ? hreq_label($k, $pl) : ($pl ? 'Requisitions' : 'Requisition');
-            $add('Recruitment', '/recruitment-cc', $A, '🧭', 'Command centre — pipeline & demand.');
+            $add('Recruitment', '/recruitment-cc', $R, '🧭', 'Command centre — pipeline & demand.');
             // M4 correction §3 — the GOVERNED path (request → approval → requisition)
             // and the DIRECT path (requisition raised straight away) are both real
             // and both shown. Which one a workspace uses is its own choice.
-            $add('Hiring requests', '/hiring-requests', $A, '📝', 'What the business has asked to recruit, before it is approved.');
-            $add($hl('requisition', true), '/requisitions', $A, '📌', 'Approved demand being recruited against.');
-            $add('Candidates', '/candidates', $A, '👤', 'Candidate pipeline.');
+            $add('Hiring requests', '/hiring-requests', $R, '📝', 'What the business has asked to recruit, before it is approved.');
+            $add($hl('requisition', true), '/requisitions', $R, '📌', 'Approved demand being recruited against.');
+            $add('Candidates', '/candidates', $R, '👤', 'Candidate pipeline.');
             // Offer the two "create" actions only to someone who actually holds the
             // right to create. The rail is not the boundary — the routes and the
             // helpers refuse regardless — it simply stops offering a dead end.
             if ($can('mod.hiring.edit'))
-                $add('New hiring request', '/hiring-request', $A, '➕', 'Ask to recruit — it becomes a ' . mb_strtolower($hl('requisition')) . ' once approved.', 'action');
+                $add('New hiring request', '/hiring-request', $R, '➕', 'Ask to recruit — it becomes a ' . mb_strtolower($hl('requisition')) . ' once approved.', 'action');
             if ($fx('is_coordinator_level') && is_coordinator_level())
-                $add('New ' . mb_strtolower($hl('requisition')), '/requisition-new', $A, '➕', 'Raise approved demand directly, without a hiring request.', 'action');
-            $add('Add candidate', '/candidate-new', $A, '➕', 'Add a candidate.', 'action');
-            $add('Positions', '/positions', $A, '🏷️', 'Position master — sanctioned roles & headcount.');
-            $add('Departments', '/departments', $A, '🏛️', 'Designations, positions, headcount & people by department.');
-            $add('Org chart', '/positions-org', $A, '🗂️', 'Reporting hierarchy from the position master.');
+                $add('New ' . mb_strtolower($hl('requisition')), '/requisition-new', $R, '➕', 'Raise approved demand directly, without a hiring request.', 'action');
+            $add('Add candidate', '/candidate-new', $R, '➕', 'Add a candidate.', 'action');
+            $add('Positions', '/positions', $R, '🏷️', 'Position master — sanctioned roles & headcount.');
+            $add('Departments', '/departments', $R, '🏛️', 'Designations, positions, headcount & people by department.');
+            $add('Org chart', '/positions-org', $R, '🗂️', 'Reporting hierarchy from the position master.');
             if ($fx('is_coordinator_level') && is_coordinator_level())
-                $add('Import org chart', '/positions-import', $A, '⬆️', 'Import an existing organogram from a spreadsheet.', 'action');
+                $add('Import org chart', '/positions-import', $R, '⬆️', 'Import an existing organogram from a spreadsheet.', 'action');
             $apc = ($fx('appr_inbox_count') ? (int)appr_inbox_count() : 0);
-            $add('My approvals' . ($apc > 0 ? ' (' . $apc . ')' : ''), '/my-approvals', $A, '✅', 'Items waiting on your approval.');
-            $add('Export data', '/recruit-export?dataset=candidates', $A, '⬇️', 'Download candidates, ' . mb_strtolower($hl('requisition', true)) . ' & offers as CSV.');
+            $add('My approvals' . ($apc > 0 ? ' (' . $apc . ')' : ''), '/my-approvals', $R, '✅', 'Items waiting on your approval.');
+            $add('Export data', '/recruit-export?dataset=candidates', $R, '⬇️', 'Download candidates, ' . mb_strtolower($hl('requisition', true)) . ' & offers as CSV.');
             if ($fx('hiring_admin_can') ? hiring_admin_can() : ($fx('is_admin_level') && is_admin_level())) {
-                $add('Hiring workflows', '/recruit-pipelines', $A, '⇥', 'Configure the recruitment pipeline & stages.');
-                $add('Compensation setup', '/comp-setup', $A, '₹', 'Configure salary headings & statutory components.');
-                $add('Document templates', '/doc-templates', $A, '📄', 'Configure offer / appointment letter templates.');
+                $add('Hiring workflows', '/recruit-pipelines', $R, '⇥', 'Configure the recruitment pipeline & stages.');
+                $add('Compensation setup', '/comp-setup', $R, '₹', 'Configure salary headings & statutory components.');
+                $add('Document templates', '/doc-templates', $R, '📄', 'Configure offer / appointment letter templates.');
                 //  Named for what it governs — see the note in lib/areas.php on the
                 //  quote & report screen, which carried the same name until R-33.
-                $add('Recruitment approvals', '/recruit-approvals', $A, '🧷', 'Who approves ' . ($fx('Tlp') ? Tlp('requisition') : 'requisitions') . ', offers and salaries — the matrix, SLAs, escalations and the Review Required triggers.');
-                $add('Approval delegation', '/approval-delegations', $A, '🤝', 'Who may approve for whom while somebody is away.');
-                $add('Careers page', '/careers-admin', $A, '🌐', 'Publish openings to a public careers page.');
+                $add('Recruitment approvals', '/recruit-approvals', $R, '🧷', 'Who approves ' . ($fx('Tlp') ? Tlp('requisition') : 'requisitions') . ', offers and salaries — the matrix, SLAs, escalations and the Review Required triggers.');
+                $add('Approval delegation', '/approval-delegations', $R, '🤝', 'Who may approve for whom while somebody is away.');
+                $add('Careers page', '/careers-admin', $R, '🌐', 'Publish openings to a public careers page.');
             }
         }
         if ($fx('pc_can') && pc_can())

@@ -14,8 +14,10 @@
 > prove you are on the new build:
 >
 > 1. The sign-in page footer reads **`v2026.10.1`** (printed with a leading “v”).
-> 2. **Admin → Organisation → Login accounts** shows an **Office** column, between
->    *Role* and *Signature*.
+> 2. **Left menu → ⚙️ Admin → tab “People” → card “Organisation” → tab “Login accounts”**
+>    shows an **Office** column, between *Role* and *Signature*.
+> 3. On any screen inside Admin, the **← back chip** above the heading names the same
+>    screen as the breadcrumb directly beneath it. They can no longer disagree.
 >
 > If either is missing you are still on the old code — **stop, and fix the deployment
 > first.** Signed in as an administrator, open `/deploy-check.php`: it compares every file
@@ -35,10 +37,37 @@
 > | A2 / A6 Requisition asks what the hiring request should have | The hiring request now asks for the minimum qualification, experience and skills, and the approver sees them |
 > | A21.1 "Mark as joined" does nothing | It was never drawn on the default pipeline. Fixed |
 > | A21.7 Joining-pending person not on the availability board | Named there now, marked awaited and not bookable |
+> | **Back does not go one step above — "it is pathetic"** | Back now goes **up the breadcrumb**, never to the screen you arrived from. Standing on Admin it read "← Approvals setup" — a screen *inside* Admin; on Organisation it read "← Masters" while the trail beneath said "Users & access". Both impossible now: the chip is built from the trail |
+> | **Masters said "Directory" in the trail, but lives under Admin** | The breadcrumb names the area the **menu** puts a screen in. It was naming the area its *permissions* are grouped under, which nobody navigates by |
+> | **"Approvals" sat under the heading "Report configuration"** | It governs recruitment, quotations, reports *and* delegation, so it has its own heading in Admin now |
+> | Candidates / Requisitions answered "Operations" in **Find a screen** | Filed under **Recruitment**, which is what the left menu has said since R-14 |
+> | *(found while writing this revision)* All 14 **Marketplace** screens had no breadcrumb and nothing to go back to but Home — "Home › Connect talent", from a tile the menu calls "Talent search" | Marketplace was missing from the trail's area list. Added; and a screen is now named in the trail by **the words on the tile you clicked** |
 >
 > Two things you flagged are **your decision, not defects**, and I have not changed them:
 > which modules each role holds by default, and whether a Coordinator should see
 > Marketplace.
+
+> ### Every check now says exactly where to go
+>
+> You asked for this in these words: *"incorporate exact location where to access the
+> testing point… it's stupidity when you mention screen from above. I am not a code
+> person."* You were right, and it was worse than you knew: **71 of the 335 checks
+> carried no location at all** — including every one of the six approval checks you
+> failed — and the interactive record printed *"Stay on the screen from the previous
+> step"* in their place. That is useless to anybody starting in the middle of the list,
+> or picking it up the next morning.
+>
+> Every check now carries its own **How to get there — exactly**: who to sign in as, the
+> clicks from the left menu, the address you can type instead, and the control to look
+> for once you are on the screen. Nothing refers to another step.
+>
+> Two things make that trustworthy rather than merely tidy. The click paths are **read
+> out of the application's own menu**, not written up from memory — so a screen that
+> moves cannot leave this guide behind, and `tests/test_uat_guide_locations.php` fails
+> the build if it ever does. And **every address was opened and checked** before this
+> revision was issued; none of them is a screen that does not exist. (An earlier draft
+> invented `/connect-match`. That is the mistake this check exists to stop — and the
+> same check is what found the missing Marketplace breadcrumbs listed above.)
 
 **Companion:** `EXAACT-BUSINESS-UAT-END-TO-END-PLAYBOOK.md` (the original journey detail)
 
@@ -145,17 +174,17 @@ refers back to them by name, so you never have to guess which record a step mean
 > recruitment registers are filed under **Operations**, not under Recruitment. If you cannot
 > find something, type the name into **Find a screen** rather than hunting the menu.
 
-| # | Make this | Where — exact menu path | Call it | Which steps need it |
+| # | Make this | How to get there — exactly | Call it | Which steps need it |
 |---|---|---|---|---|
-| D1 | A **client** | **Directory → Client register** → *Add* | `ZZ Test Client` | B, D, quotes, invoices |
-| D2 | A **work order** for D1 | **Operations → Project Deputation** — *that is the work-order register; the name is unexpected* — then **New work order** | `ZZ Test Call` | B, scheduling, job |
-| D3 | A **job** from D2 | Open D2 → allocate. It then appears under **Operations → Jobs** | — | B, reports, G |
-| D4 | A **hiring request**, approved | **Operations → Hiring requests** → **New hiring request**, then submit and approve as the Master Admin | `ZZ Test Hire` | A, A6, approvals |
+| D1 | A **client** | Left menu → 🏢 **Directory** → card **Client register** → *Add*<br>*or type* `operations.mghaiapps.com/clients` | `ZZ Test Client` | B, D, quotes, invoices |
+| D2 | A **work order** for D1 | Left menu → 🛠️ **Operations** → card **Project Deputation** — *that is the work-order register; the name is unexpected* — then **New work order**<br>*or type* `operations.mghaiapps.com/call-new` | `ZZ Test Call` | B, scheduling, job |
+| D3 | A **job** from D2 | Open D2 → **allocate**. It then appears under Left menu → 🛠️ **Operations** → card **Jobs**<br>*or type* `operations.mghaiapps.com/jobs` | — | B, reports, G |
+| D4 | A **hiring request**, approved | Left menu → 🧑‍💼 **Recruitment** → card **Hiring requests** → **New hiring request**, then submit and approve as the Master Admin<br>*or type* `operations.mghaiapps.com/hiring-requests`<br>*(it was under Operations until 2026-10-15; the menu said Recruitment and the search index said Operations)* | `ZZ Test Hire` | A, A6, approvals |
 | D5 | A **recruitment requirement** from D4 | Open D4 → **Start recruiting**. *(This is the only way in — `/requisition-new` deliberately refuses, and says so.)* | — | A, A6, A7 |
-| D6 | A **candidate** on D5 | **Operations → Candidates** → **Add candidate** | `ZZ Test Candidate` | A, A7, G6B-01 |
+| D6 | A **candidate** on D5 | Left menu → 🧑‍💼 **Recruitment** → card **Candidates** → **Add candidate**<br>*or type* `operations.mghaiapps.com/candidates` | `ZZ Test Candidate` | A, A7, G6B-01 |
 | D7 | **D6 hired, but NOT marked as joined** | Move D6 to the final stage, record the hire — then **stop**. Do **not** press *Mark as joined* | — | **A21, G6B-02 — the hired-not-joined person every one of those steps asks for** |
-| D8 | A **second branch**, and a coordinator homed to it | **Admin → Organisation** → the **Offices** tab for the branch, then the **People** tab to set that coordinator's office | `ZZ Branch B` / `zz.coordB` | **H10, scope** |
-| D9 | A **quotation** for D1 | **Sales → Quotes** → New | `ZZ Test Quote` | D, approvals, 1.7 |
+| D8 | A **second branch**, and a coordinator homed to it | Left menu → ⚙️ **Admin** → tab **People** → card **Organisation** → its **Offices** tab for the branch, then its **People** tab to set that coordinator's office<br>*or type* `operations.mghaiapps.com/hierarchy` | `ZZ Branch B` / `zz.coordB` | **H10, scope** |
+| D9 | A **quotation** for D1 | Left menu → 🎯 **Sales** → card **Quotes** → **New**<br>*or type* `operations.mghaiapps.com/quotes` | `ZZ Test Quote` | D, approvals, 1.7 |
 
 **D7 is the one that defeated both runs.** Steps A21.1–A21.7 and G6B-02.1–02.8 all ask you
 to find "your hired-not-joined person". If nobody is in that state, those twelve steps
@@ -189,14 +218,14 @@ These are the only results that stop a release. Everything else we classify and 
 
 ## 1.1 Getting in
 
-| # | What to do | What you should see |
-|---|---|---|
-| 1.1.1 | Open the site address in Chrome | The EXAACT sign-in page. Not an error, not a blank page, not a PHP warning |
-| 1.1.2 | Look at the bottom of the sign-in page | A small version line, printed with a leading “v”. **After deployment it must read `v2026.10.1`.** Before deployment it will read `v2026.07.1` — that is expected and correct, and is not a failure |
-| 1.1.3 | Sign in as the Master Admin | The home page, headed "Good morning/afternoon/evening, *your name*" |
-| 1.1.4 | *(Mode B, fresh install only)* The licence agreement appears first | A "Software Licence Agreement" page that will not let you past until accepted. Read it, accept |
-| 1.1.5 | *(Mode B, fresh install only)* The first-run setup wizard appears | A short wizard asking only what nobody else can decide — database and administrator. Complete it |
-| 1.1.6 | Open `/preflight` by typing it into the address bar — **it has no menu tile**, so do not hunt for one | A page listing the version, the build date, the database driver, and a checklist of server requirements. **Every required row must be green/OK** |
+| # | How to get there — exactly | What to do | What you should see |
+|---|---|---|---|
+| 1.1.1 | Open the site address in Chrome<br>*or type* `operations.mghaiapps.com` | Open the site address in Chrome | The EXAACT sign-in page. Not an error, not a blank page, not a PHP warning |
+| 1.1.2 | Open the site address in Chrome<br>*or type* `operations.mghaiapps.com`<br>**Look for:** the small version line at the very bottom of the sign-in page | Look at the bottom of the sign-in page | A small version line, printed with a leading “v”. **After deployment it must read `v2026.10.1`.** Before deployment it will read `v2026.07.1` — that is expected and correct, and is not a failure |
+| 1.1.3 | Open the site address in Chrome<br>*or type* `operations.mghaiapps.com`<br>**Look for:** the username and password boxes on the sign-in page | Sign in as the Master Admin | The home page, headed "Good morning/afternoon/evening, *your name*" |
+| 1.1.4 | Open the site address in Chrome<br>*or type* `operations.mghaiapps.com`<br>**Look for:** appears by itself, before the sign-in page, on a brand-new install only | *(Mode B, fresh install only)* The licence agreement appears first | A "Software Licence Agreement" page that will not let you past until accepted. Read it, accept |
+| 1.1.5 | Open the site address in Chrome<br>*or type* `operations.mghaiapps.com`<br>**Look for:** appears immediately after the first sign-in, on a brand-new install only | *(Mode B, fresh install only)* The first-run setup wizard appears | A short wizard asking only what nobody else can decide — database and administrator. Complete it |
+| 1.1.6 | Left menu → ⚙️ Admin → Tab “Configuration” → Card “System settings” → On that screen: the “Server check & version” link at the top<br>*or type* `operations.mghaiapps.com/preflight` | Open `/preflight` by typing it into the address bar — **it has no menu tile**, so do not hunt for one | A page listing the version, the build date, the database driver, and a checklist of server requirements. **Every required row must be green/OK** |
 
 **1.1.6 is the single most useful screen in this whole guide.** It tells you the version, the
 database, and whether the server has what the application needs. If anything there is red,
@@ -207,15 +236,15 @@ missing a requirement.
 
 Open **Admin → System settings** (`/settings`).
 
-| # | Check | What right looks like |
-|---|---|---|
-| 1.2.1 | Company / organisation name | Your real trading name, spelled as you want it on documents |
-| 1.2.2 | Logo | Present and not stretched |
-| 1.2.3 | Financial year start month | Your actual FY start — April for most Indian businesses. **Fixed 2026-10-04:** this dropdown never showed the stored month and always displayed January, and saving the tab wrote January back. Re-check after re-uploading `views/ops/settings.php`. If it still shows January, the value really was overwritten — set it to April and tell me |
-| 1.2.4 | Currency and number format | Correct for your invoices |
-| 1.2.5 | Address, GST/tax identifiers | Exactly as they must appear on a legal document |
-| 1.2.6 | E-mail sending configuration | Configured, and the outbox shows recent successful sends |
-| 1.2.7 | Cloud mode / base domain | **Only applies if you sell EXAACT to other companies**, each on its own sub-domain (`acme.yourdomain.com`). You run one company, so this should be **blank**. If it is blank, that is a PASS |
+| # | How to get there — exactly | Check | What right looks like |
+|---|---|---|---|
+| 1.2.1 | Left menu → ⚙️ Admin → Tab “Configuration” → Card “Company profile”<br>*or type* `operations.mghaiapps.com/company-profile`<br>**Look for:** field “Legal name — as registered”. (The name in the blue top bar is a different setting: System settings → tab “Branding & theme” → “Application name”.) | Company / organisation name | Your real trading name, spelled as you want it on documents |
+| 1.2.2 | Left menu → ⚙️ Admin → Tab “Configuration” → Card “System settings”<br>*or type* `operations.mghaiapps.com/settings`<br>**Look for:** tab “Branding & theme” → “Logo”. (The logo printed on quotations and reports is a separate upload: Admin → Configuration → Company profile → “Logo — shown on quotations and reports”.) | Logo | Present and not stretched |
+| 1.2.3 | Left menu → ⚙️ Admin → Tab “Configuration” → Card “System settings”<br>*or type* `operations.mghaiapps.com/settings`<br>**Look for:** tab “Financial & norms” → section “Financial & operations” → “Financial year starts in” | Financial year start month | Your actual FY start — April for most Indian businesses. **Fixed 2026-10-04:** this dropdown never showed the stored month and always displayed January, and saving the tab wrote January back. Re-check after re-uploading `views/ops/settings.php`. If it still shows January, the value really was overwritten — set it to April and tell me |
+| 1.2.4 | Left menu → ⚙️ Admin → Tab “Configuration” → Card “System settings”<br>*or type* `operations.mghaiapps.com/settings`<br>**Look for:** tab “Display & terms” → section “Display” → “Currency symbol” and “Date format” | Currency and number format | Correct for your invoices |
+| 1.2.5 | Left menu → ⚙️ Admin → Tab “Configuration” → Card “Company profile”<br>*or type* `operations.mghaiapps.com/company-profile`<br>**Look for:** fields “Address”, “GSTIN”, “PAN” and “State”. PAN and State fill themselves from the GSTIN | Address, GST/tax identifiers | Exactly as they must appear on a legal document |
+| 1.2.6 | Left menu → ⚙️ Admin → Tab “Configuration” → Card “System settings”<br>*or type* `operations.mghaiapps.com/settings`<br>**Look for:** tab “Security” → section “Email — automatic sending (SMTP)” | E-mail sending configuration | Configured, and the outbox shows recent successful sends |
+| 1.2.7 | Left menu → ⚙️ Admin → Tab “Super admin” → Card “Control panel”<br>*or type* `operations.mghaiapps.com/super-admin`<br>**Look for:** the cloud / base-domain panel. Platform owner only — if you do not see it, your sign-in is not a platform owner and that is correct | Cloud mode / base domain | **Only applies if you sell EXAACT to other companies**, each on its own sub-domain (`acme.yourdomain.com`). You run one company, so this should be **blank**. If it is blank, that is a PASS |
 
 **Mode B:** set each of these and confirm it saves and survives a page reload.
 **Mode A:** confirm only. If one is wrong, that is a real finding — note it, don't fix it mid-test.
@@ -227,19 +256,19 @@ Open **Admin → System settings** (`/settings`).
 > back as "nothing such found". They live on **four** different screens. The addresses
 > below are taken from the application's own registries and verified.
 
-| # | List | Where it really is | Why it matters |
+| # | List | How to get there — exactly | Why it matters |
 |---|---|---|---|
-| 1.3.1 | **Offices / branches** | `/hierarchy?tab=offices` — the `/masters` card forwards you here on purpose, because this screen also owns the tree and each office's head | Everything is scoped by office |
-| 1.3.2 | **Business Units (SBU)** | `/lookup?key=sbu` | Revenue and cost split by unit |
-| 1.3.3 | **Departments** | `/lookup?key=department` | Hiring requests and requisitions choose one |
-| 1.3.4 | **Designations** | `/lookup?key=designation` | Job titles on requisitions and offers |
-| 1.3.5 | **Trades / disciplines** | `/lookup?key=trade` | Which inspector can do which job |
-| 1.3.6 | **Activities / services** | **Not a master.** Admin → **Service scope** (`/service-scope`) and **Report formats by service** (`/service-formats`). Both screens exist and always did; nothing in the menu pointed at them, which is why you found "nothing such". Reach them from the Admin area page, or type *service* into **Find a screen** | What you sell and execute |
-| 1.3.7 | **Expense heads (voucher columns)** | `/masters` → "Expense heads (voucher columns)" | What an engineer claims on a job |
-| 1.3.8 | **Office expense heads** | `/masters` → "Office expense heads" | A branch's own running costs, and how each spreads across business units. **A different list from 1.3.7, deliberately** |
-| 1.3.9 | **Public holidays** | `/masters` → "Public holidays" | Working-day and capacity maths |
-| 1.3.10 | **Agencies / subcontractors** | `/masters` → "Recruitment / manpower agencies" | Outsourced manpower |
-| 1.3.11 | **Back-office staff** | `/masters` card forwards to `/hierarchy?tab=people` | People live in one register, so the card sends you there rather than keeping a second copy |
+| 1.3.1 | **Offices / branches** | Left menu → ⚙️ Admin → Tab “People” → Card “Organisation”<br>*or type* `operations.mghaiapps.com/hierarchy?tab=offices`<br>**Look for:** the /masters card forwards you here on purpose, because this screen also owns the tree and each office's head | Everything is scoped by office |
+| 1.3.2 | **Business Units (SBU)** | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters” → On that screen: the card named after the list you want (Department, Designation, Trade…)<br>*or type* `operations.mghaiapps.com/lookup?key=sbu` | Revenue and cost split by unit |
+| 1.3.3 | **Departments** | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters” → On that screen: the card named after the list you want (Department, Designation, Trade…)<br>*or type* `operations.mghaiapps.com/lookup?key=department` | Hiring requests and requisitions choose one |
+| 1.3.4 | **Designations** | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters” → On that screen: the card named after the list you want (Department, Designation, Trade…)<br>*or type* `operations.mghaiapps.com/lookup?key=designation` | Job titles on requisitions and offers |
+| 1.3.5 | **Trades / disciplines** | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters” → On that screen: the card named after the list you want (Department, Designation, Trade…)<br>*or type* `operations.mghaiapps.com/lookup?key=trade` | Which inspector can do which job |
+| 1.3.6 | **Activities / services** | Left menu → ⚙️ Admin → Tab “Configuration” → Card “Service scope”<br>*or type* `operations.mghaiapps.com/service-scope`<br>**Look for:** Not a master. Admin → Service scope ( ) and Report formats by service (/service-formats). Both screens exist and always did; nothing in the menu pointed at them, which is why you found "nothing such". Reach them from the Admin area page, or type service into Find a screen | What you sell and execute |
+| 1.3.7 | **Expense heads (voucher columns)** | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters”<br>*or type* `operations.mghaiapps.com/masters`<br>**Look for:** "Expense heads (voucher columns)" | What an engineer claims on a job |
+| 1.3.8 | **Office expense heads** | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters”<br>*or type* `operations.mghaiapps.com/masters`<br>**Look for:** "Office expense heads" | A branch's own running costs, and how each spreads across business units. **A different list from 1.3.7, deliberately** |
+| 1.3.9 | **Public holidays** | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters”<br>*or type* `operations.mghaiapps.com/masters`<br>**Look for:** "Public holidays" | Working-day and capacity maths |
+| 1.3.10 | **Agencies / subcontractors** | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters”<br>*or type* `operations.mghaiapps.com/masters`<br>**Look for:** "Recruitment / manpower agencies" | Outsourced manpower |
+| 1.3.11 | **Back-office staff** | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters”<br>*or type* `operations.mghaiapps.com/masters`<br>**Look for:** card forwards to /hierarchy?tab=people | People live in one register, so the card sends you there rather than keeping a second copy |
 
 For each: **does it open, does it list, can you add one, and does the new one appear in
 the place that uses it?** That last part is the real test — add a test designation at
@@ -255,15 +284,15 @@ logged as **R-12** and is not closed by this correction.
 
 Open **Admin → User register** (`/users`).
 
-| # | What to do | What you should see |
-|---|---|---|
-| 1.4.1 | Review the user list | Every real person who should have access, nobody who should not. **Look for leavers who still have logins** — that is a genuine finding |
-| 1.4.2 | Create a new user (`/user-new`) | The form asks for name, login, e-mail, **role**, **home office**, and the **person** they are |
-| 1.4.3 | On `/user-new`, open the **Position / designation** dropdown | It lists the designations from the master **and** ends with "**+ Add a designation not on this list…**". Choose that, type a new title, save — the new designation is added to the master and appears for the next person. Below the field, "Manage the designation master" must open the list (**fixed 2026-10-04** — it used to say "Not found") |
-| 1.4.4 | Save, then sign in as that user in a private window | They land on a home page appropriate to their role, not an error |
-| 1.4.5 | Edit `uat.coord`: change the **home office** to another branch, save, reload | The new office sticks. Then change it back. Nothing else about the user changes |
-| 1.4.6 | Retire a user (`/user-retire`) — **use your test user only** | They can no longer sign in; their historical records remain |
-| 1.4.7 | Find the reactivate / unlock control for a retired user | Available to an administrator. **Your finding stands:** the screen calls it *reactivate*, there is no *unlock*, and there is no control on the screen where you retire someone. Logged as **R-13** |
+| # | How to get there — exactly | What to do | What you should see |
+|---|---|---|---|
+| 1.4.1 | Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** the list of people, one row each | Review the user list | Every real person who should have access, nobody who should not. **Look for leavers who still have logins** — that is a genuine finding |
+| 1.4.2 | Left menu → ⚙️ Admin → Tab “People” → Card “User register” → On that screen: the “+ Add a person” button, top right<br>*or type* `operations.mghaiapps.com/user-new` | Create a new user (`/user-new`) | The form asks for name, login, e-mail, **role**, **home office**, and the **person** they are |
+| 1.4.3 | Left menu → ⚙️ Admin → Tab “People” → Card “User register” → On that screen: the “+ Add a person” button, top right<br>*or type* `operations.mghaiapps.com/user-new` | On `/user-new`, open the **Position / designation** dropdown | It lists the designations from the master **and** ends with "**+ Add a designation not on this list…**". Choose that, type a new title, save — the new designation is added to the master and appears for the next person. Below the field, "Manage the designation master" must open the list (**fixed 2026-10-04** — it used to say "Not found") |
+| 1.4.4 | Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** the person you just saved. Then open a private browsing window and sign in as them | Save, then sign in as that user in a private window | They land on a home page appropriate to their role, not an error |
+| 1.4.5 | **Sign in as uat.coord.**<br>Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** click uat.coord, change “Home office”, Save, then reload | Edit `uat.coord`: change the **home office** to another branch, save, reload | The new office sticks. Then change it back. Nothing else about the user changes |
+| 1.4.6 | Left menu → ⚙️ Admin → Tab “People” → Card “User register” → On that screen: open a person, then “Retire / deactivate”<br>*or type* `operations.mghaiapps.com/users` | Retire a user (`/user-retire`) — **use your test user only** | They can no longer sign in; their historical records remain |
+| 1.4.7 | Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** use the “Show retired” filter, open the retired person, and look for “Reactivate” | Find the reactivate / unlock control for a retired user | Available to an administrator. **Your finding stands:** the screen calls it *reactivate*, there is no *unlock*, and there is no control on the screen where you retire someone. Logged as **R-13** |
 
 **Create these four test users now — Parts 2 and especially Journey H need them:**
 
@@ -281,36 +310,36 @@ them in Journey H. Retire them when UAT finishes.
 
 Open **Admin → Roles & permissions** (`/access`) — the menu does not call it “Access”.
 
-| # | Check | What right looks like |
-|---|---|---|
-| 1.5.1 | The role list | The real roles: Master Admin, Business Director, Business Unit Head, Branch Manager, Operation Manager, Coordinator, Finance, Senior Inspector, Inspector, and the sales/marketing roles |
-| 1.5.2 | What each role can do | Every module now has **six separate rights** — View, Add, Edit, Archive, Delete, Approve. Check a few rows against how you actually work. **If a Coordinator can do something only a Manager should, that is a finding** — but note that *which* modules a role holds by default is a business decision I have deliberately left to you, not a defect |
-| 1.5.3 | On `/access`, find the **Recruitment** heading, and the **Money** heading | Both are now present. The module list is filed under the same nine headings as the left-hand menu, so what you see here matches what you navigate by. **Also check the bulk row:** the row reading *"Apply to every module in <group>"* changes only that group, and an **Undo** button appears naming what it just did. If ticking one thing changes another group, that is a finding |
-| 1.5.4 | Office scope | Use **D8**. Sign in as `zz.coordB` (homed to ZZ Branch B) and open Work orders: you must see Branch B's work and **not** Branch A's. Then, as the Master Admin, open `/users` — there is now an **Office** column, and anyone with no branch is flagged **not set** in amber. An account marked *not set* now sees **nothing** rather than everything; that is the fix, and a banner tells both the person and you |
-| 1.5.5 | Open `/access-requests` (type *access requests* into **Find a screen**; it has no menu tile because it belongs to Marketplace) | **My earlier description was wrong.** This is not internal staff asking for permissions — it is the **Marketplace partner queue**: outside organisations asking to connect to you. If you do not use Marketplace it is correctly empty, and empty is a PASS. Internal access is granted directly on `/access`, and per person from `/users` → open the person → **Edit** |
+| # | How to get there — exactly | Check | What right looks like |
+|---|---|---|---|
+| 1.5.1 | **Sign in as uat.coord.**<br>Left menu → ⚙️ Admin → Tab “People” → Card “Roles & permissions”<br>*or type* `operations.mghaiapps.com/access`<br>**Look for:** the list of roles down the left | The role list | The real roles: Master Admin, Business Director, Business Unit Head, Branch Manager, Operation Manager, Coordinator, Finance, Senior Inspector, Inspector, and the sales/marketing roles |
+| 1.5.2 | **Sign in as uat.coord.**<br>Left menu → ⚙️ Admin → Tab “People” → Card “Roles & permissions”<br>*or type* `operations.mghaiapps.com/access`<br>**Look for:** pick a role, then read the permission grid for it | What each role can do | Every module now has **six separate rights** — View, Add, Edit, Archive, Delete, Approve. Check a few rows against how you actually work. **If a Coordinator can do something only a Manager should, that is a finding** — but note that *which* modules a role holds by default is a business decision I have deliberately left to you, not a defect |
+| 1.5.3 | Left menu → ⚙️ Admin → Tab “People” → Card “Roles & permissions”<br>*or type* `operations.mghaiapps.com/access` | On `/access`, find the **Recruitment** heading, and the **Money** heading | Both are now present. The module list is filed under the same nine headings as the left-hand menu, so what you see here matches what you navigate by. **Also check the bulk row:** the row reading *"Apply to every module in <group>"* changes only that group, and an **Undo** button appears naming what it just did. If ticking one thing changes another group, that is a finding |
+| 1.5.4 | Left menu → ⚙️ Admin → Tab “People” → Card “Roles & permissions”<br>*or type* `operations.mghaiapps.com/access`<br>**Look for:** the “Office scope” column for each role. Then prove it: sign in as uat.coord and compare the dashboard counts with the administrator’s | Office scope | Use **D8**. Sign in as `zz.coordB` (homed to ZZ Branch B) and open Work orders: you must see Branch B's work and **not** Branch A's. Then, as the Master Admin, open `/users` — there is now an **Office** column, and anyone with no branch is flagged **not set** in amber. An account marked *not set* now sees **nothing** rather than everything; that is the fix, and a banner tells both the person and you |
+| 1.5.5 | Left menu → 🧑‍🏭 Marketplace → Card “Access requests”<br>*or type* `operations.mghaiapps.com/access-requests` | Open `/access-requests` (type *access requests* into **Find a screen**; it has no menu tile because it belongs to Marketplace) | **My earlier description was wrong.** This is not internal staff asking for permissions — it is the **Marketplace partner queue**: outside organisations asking to connect to you. If you do not use Marketplace it is correctly empty, and empty is a PASS. Internal access is granted directly on `/access`, and per person from `/users` → open the person → **Edit** |
 
 ## 1.6 Licence and modules
 
-| # | Check | What right looks like |
-|---|---|---|
-| 1.6.1 | **Admin → Licence** (`/licence`) | Valid, not expired, covering the modules you use |
-| 1.6.2 | Seat count | Matches what you pay for; current users within it |
-| 1.6.3 | Enabled modules | `/licence` shows what you **own**. To see and change what is switched **on**, open **Admin → Modules & features** — the link is on the licence screen itself. All seven modules are listed with an on/off control; Administration is always on and correctly has none |
-| 1.6.4 | Type `/billing` into the address bar — **it has no menu tile either** | Your subscription state is readable |
-| 1.6.5 | A disabled module | **Now testable.** On **Admin → Modules & features**, switch **Money** off (it lists what will be hidden and asks you to confirm). Then type `/invoicing` into the address bar: you must be **refused**, not merely find it missing from the menu. Switch Money back on and confirm `/invoicing` opens again. *(Verified here: refused with a 403, restored on switching back.)* |
+| # | How to get there — exactly | Check | What right looks like |
+|---|---|---|---|
+| 1.6.1 | Left menu → ⚙️ Admin → Tab “Connections” → Card “Licence”<br>*or type* `operations.mghaiapps.com/licence` | **Admin → Licence** (`/licence`) | Valid, not expired, covering the modules you use |
+| 1.6.2 | Left menu → ⚙️ Admin → Tab “Connections” → Card “Licence”<br>*or type* `operations.mghaiapps.com/licence`<br>**Look for:** the seat / user count panel | Seat count | Matches what you pay for; current users within it |
+| 1.6.3 | Left menu → ⚙️ Admin → Tab “Set up your workspace” → Card “Modules & features”<br>*or type* `operations.mghaiapps.com/workspace/setup/modules`<br>**Look for:** the on/off switch for each module. (Licence answers what you OWN; this screen answers what is switched ON.) | Enabled modules | `/licence` shows what you **own**. To see and change what is switched **on**, open **Admin → Modules & features** — the link is on the licence screen itself. All seven modules are listed with an on/off control; Administration is always on and correctly has none |
+| 1.6.4 | Left menu → ⚙️ Admin → Tab “Configuration” → Card “System settings” → On that screen: the “Users & billing” card<br>*or type* `operations.mghaiapps.com/billing` | Type `/billing` into the address bar — **it has no menu tile either** | Your subscription state is readable |
+| 1.6.5 | Left menu → ⚙️ Admin → Tab “Set up your workspace” → Card “Modules & features”<br>*or type* `operations.mghaiapps.com/workspace/setup/modules`<br>**Look for:** switch one module off, confirm, then try to open one of its screens | A disabled module | **Now testable.** On **Admin → Modules & features**, switch **Money** off (it lists what will be hidden and asks you to confirm). Then type `/invoicing` into the address bar: you must be **refused**, not merely find it missing from the menu. Switch Money back on and confirm `/invoicing` opens again. *(Verified here: refused with a 403, restored on switching back.)* |
 
 ## 1.7 Approval configuration
 
 Open **Recruitment approvals** (`/recruit-approvals`) for recruitment chains, and **Quote & report approvals** (`/approval-rules`) for quotations and inspection reports. They are two different screens governing two different things.
 
-| # | Check | What right looks like |
-|---|---|---|
-| 1.7.1 | The rules list | **There are two approval screens, and they used to share one name.** `/approval-rules` is now **Quote & report approvals**; recruitment lives on **Recruitment approvals** (`/recruit-approvals`), and each screen names the other. Check the chain that matches what you are testing — and that is also where UAT-G6B-01's Review Required panel lives |
-| 1.7.2 | Who approves what, at what level | Matches your authority matrix |
-| 1.7.3 | Self-approval policy panel | Set as your business intends. **Default and correct answer: a requester may not approve their own submission** |
-| 1.7.4 | Superuser exception | Enabled only if you genuinely want it |
-| 1.7.5 | Delegation (`/approval-delegations`) | Any standing delegations are intended and current |
-| 1.7.6 | **Review Required triggers panel** | This is **UAT-G6B-01** — Part 3 tests it in full |
+| # | How to get there — exactly | Check | What right looks like |
+|---|---|---|---|
+| 1.7.1 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” — the list of approval rules | The rules list | **There are two approval screens, and they used to share one name.** `/approval-rules` is now **Quote & report approvals**; recruitment lives on **Recruitment approvals** (`/recruit-approvals`), and each screen names the other. Check the chain that matches what you are testing — and that is also where UAT-G6B-01's Review Required panel lives |
+| 1.7.2 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → the “Levels” section. Department, Business unit, Grade and Position are pick-lists: click in the box and your company’s own values drop down | Who approves what, at what level | Matches your authority matrix |
+| 1.7.3 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → the self-approval panel. It is company-wide on purpose | Self-approval policy panel | Set as your business intends. **Default and correct answer: a requester may not approve their own submission** |
+| 1.7.4 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → the superuser-exception line in the same self-approval panel | Superuser exception | Enabled only if you genuinely want it |
+| 1.7.5 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🤝 Delegation” | Delegation (`/approval-delegations`) | Any standing delegations are intended and current |
+| 1.7.6 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → the panel “When does a requirement change need its candidates re-checked?” | **Review Required triggers panel** | This is **UAT-G6B-01** — Part 3 tests it in full |
 
 **Part 1 is complete when:** the server check is green, company settings are right, every
 master list is populated and feeds the screens that use it, your four test users exist and can
@@ -333,29 +362,29 @@ wrongly?
 **The flow:** Hiring Request → Approval → Requisition → Candidate → Pipeline → Offer →
 Joining → Workforce.
 
-| # | Step | Where | What must be true |
+| # | Step | How to get there — exactly | What must be true |
 |---|---|---|---|
-| A1 | Raise a hiring request | `/hiring-request` | Only somebody permitted can raise one. It asks for department, designation, quantity, office, reason — **and now, under "What must the person have?", the minimum qualification, minimum experience and essential skills**. Those three are the floor the recruitment is held to. Fill them in; D4 depends on it |
-| A2 | Submit it for approval | same | It goes to the right approver per your rules. **On the pickers:** each list-backed field now says where its list is kept, and says something different when the list is genuinely empty. A dropdown with nothing in it on a new workspace is a setup gap, not a broken dropdown — follow the link it offers and add the first entry |
-| A3 | **Try to approve your own request** | `/approvals` | **It must be refused** unless you deliberately enabled the exception. This is a core control |
-| A4 | Approve as the correct approver | `/approvals` | Approved, with who and when recorded |
-| A5 | Turn it into a requisition | `/requisitions` | A requisition is created. **A hiring request and a requisition are different things** — confirm both still exist separately |
-| A6 | Open the requisition | `/requisitions` → **click the requisition** (don't type `/requisition` — a detail screen needs a record, so typing it alone gives *not found*) | Shows the approved requirement **on the screen itself, without pressing Edit**: minimum qualification, minimum experience and essential skills, carried across from what was approved in A1. Check they match A1 exactly — this is the floor, and the recruitment may ask for more but not less |
-| A7 | Add a candidate | `/candidate-new` | Attaches to the requisition |
-| A8 | Move the candidate along the pipeline | `/candidates` → **click your candidate** | The **configured pipeline** is what shows their current stage. The old single "stage" field must not be telling a different story |
-| A9 | Record an interview / assessment | On the **candidate screen** — the *Interviews* panel. Not a separate address | Saved and visible in history |
-| A10 | **Change the requirement** — raise minimum experience | The **requisition screen** from A6 → *Edit* | A **proposed new version** is created. **The approved version must not be overwritten** |
-| A11 | Approve the new version | `/approvals` | Version 2 becomes current; version 1 remains readable |
-| A12 | Look at your candidate again | `/candidates` → **your candidate** | **Review Required** has appeared on them, because the bar moved up after they were judged |
-| A13 | Try to advance them | The **candidate screen** — same place as A8 | **Refused** while the review is open |
-| A14 | Try to clear the review as an unauthorised user | On the **candidate screen** — the *Review required* panel. Not a separate address | **Refused** |
-| A15 | Clear it as the authorised user, with a reason | Same *Review required* panel on the **candidate screen** | Allowed, reason recorded |
-| A16 | Reject a test candidate | The **candidate screen** | Rejection is recorded and **stays in history** |
-| A17 | Reconsider them | The **candidate screen** | Only by deliberate action — never automatic. They return to the stage before the rejection |
-| A18 | **Offer** — on a test candidate only | On the **candidate screen** — the *Offer* panel. Not a separate address | Generates for review. **Do not send it to a real person** |
-| A19 | Mark joined — test candidate only | The **candidate screen** → **Mark as joined** | They become an active team member **at this moment and not before** |
-| A20 | Check the team register | `/m/inspectors` | Before A19 they are listed as **joining pending**; after A19, active |
-| A21 | **The critical one:** before marking joined, try to allocate them to a job | `/jobs` → **open a job** → *Assignment lifecycle* | **They must not be offered.** A person who has not started cannot be given work. **Do not test this from the one-line version — use Part 2★, step by step.** The wrong dropdown passes by accident |
+| A1 | Raise a hiring request | Left menu → 🧑‍💼 Recruitment → Card “New hiring request”<br>*or type* `operations.mghaiapps.com/hiring-request` | Only somebody permitted can raise one. It asks for department, designation, quantity, office, reason — **and now, under "What must the person have?", the minimum qualification, minimum experience and essential skills**. Those three are the floor the recruitment is held to. Fill them in; D4 depends on it |
+| A2 | Submit it for approval | Left menu → 🧑‍💼 Recruitment → Card “Hiring requests”<br>*or type* `operations.mghaiapps.com/hiring-requests`<br>**Look for:** open the hiring request you just raised, then “Submit for approval” | It goes to the right approver per your rules. **On the pickers:** each list-backed field now says where its list is kept, and says something different when the list is genuinely empty. A dropdown with nothing in it on a new workspace is a setup gap, not a broken dropdown — follow the link it offers and add the first entry |
+| A3 | **Try to approve your own request** | Left menu → 🎯 Sales → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals` | **It must be refused** unless you deliberately enabled the exception. This is a core control |
+| A4 | Approve as the correct approver | Left menu → 🎯 Sales → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals` | Approved, with who and when recorded |
+| A5 | Turn it into a requisition | Left menu → 🧑‍💼 Recruitment → Card “Requisitions”<br>*or type* `operations.mghaiapps.com/requisitions` | A requisition is created. **A hiring request and a requisition are different things** — confirm both still exist separately |
+| A6 | Open the requisition | Left menu → 🧑‍💼 Recruitment → Card “Requisitions”<br>*or type* `operations.mghaiapps.com/requisitions`<br>**Look for:** click the requisition (don't type /requisition — a detail screen needs a record, so typing it alone gives not found) | Shows the approved requirement **on the screen itself, without pressing Edit**: minimum qualification, minimum experience and essential skills, carried across from what was approved in A1. Check they match A1 exactly — this is the floor, and the recruitment may ask for more but not less |
+| A7 | Add a candidate | Left menu → 🧑‍💼 Recruitment → Card “Add candidate”<br>*or type* `operations.mghaiapps.com/candidate-new` | Attaches to the requisition |
+| A8 | Move the candidate along the pipeline | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** click your candidate | The **configured pipeline** is what shows their current stage. The old single "stage" field must not be telling a different story |
+| A9 | Record an interview / assessment | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** open the candidate → the Interviews panel. Not a separate screen | Saved and visible in history |
+| A10 | **Change the requirement** — raise minimum experience | Left menu → 🧑‍💼 Recruitment → Card “Requisitions”<br>*or type* `operations.mghaiapps.com/requisitions`<br>**Look for:** open the requisition you raised in A6 → “Edit” | A **proposed new version** is created. **The approved version must not be overwritten** |
+| A11 | Approve the new version | Left menu → 🎯 Sales → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals` | Version 2 becomes current; version 1 remains readable |
+| A12 | Look at your candidate again | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** your candidate | **Review Required** has appeared on them, because the bar moved up after they were judged |
+| A13 | Try to advance them | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** open the same candidate as A8 → try to advance their stage | **Refused** while the review is open |
+| A14 | Try to clear the review as an unauthorised user | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** open the candidate → the “Review required” panel, while signed in as a user who may NOT clear it | **Refused** |
+| A15 | Clear it as the authorised user, with a reason | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** open the candidate → the same “Review required” panel, as the authorised user, with a reason | Allowed, reason recorded |
+| A16 | Reject a test candidate | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** open a TEST candidate → reject | Rejection is recorded and **stays in history** |
+| A17 | Reconsider them | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** the same test candidate → reconsider | Only by deliberate action — never automatic. They return to the stage before the rejection |
+| A18 | **Offer** — on a test candidate only | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** open a TEST candidate → the Offer panel. Not a separate screen | Generates for review. **Do not send it to a real person** |
+| A19 | Mark joined — test candidate only | Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** open the TEST candidate → “Mark as joined” | They become an active team member **at this moment and not before** |
+| A20 | Check the team register | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters” → On that screen: the “Inspectors” card<br>*or type* `operations.mghaiapps.com/m/inspectors` | Before A19 they are listed as **joining pending**; after A19, active |
+| A21 | **The critical one:** before marking joined, try to allocate them to a job | Left menu → 🛠️ Operations → Card “Jobs”<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** open a job → Assignment lifecycle | **They must not be offered.** A person who has not started cannot be given work. **Do not test this from the one-line version — use Part 2★, step by step.** The wrong dropdown passes by accident |
 
 **A21 is the single most important check in Journey A.** It is the defect this release's Gate 6
 fixed. If a hired-but-not-joined person can be assigned a job, stop and tell me.
@@ -364,111 +393,111 @@ fixed. If a hired-but-not-joined person can be assigned a job, stop and tell me.
 
 **The business question:** has the recruitment work damaged the business that pays the bills?
 
-| # | Step | Where | What must be true |
+| # | Step | How to get there — exactly | What must be true |
 |---|---|---|---|
-| B1 | Open a customer | `/clients` | Opens, shows contacts and commercial terms per your permission |
-| B2 | Raise a call / order | `/call-new` | Creates. Use a **test customer** |
-| B3 | Schedule it | `/schedule` or the call | Dates accepted |
-| B4 | Allocate an inspector | the call/job | **Only active people are offered.** Joining-pending and leavers must not appear |
-| B5 | Open the availability board | `/availability` | Shows who is free. A hired-not-joined person is **named as awaited, not offered as bookable** |
-| B6 | Open a job | `/jobs` → **click a job** | Full detail, status, history |
-| B7 | Record execution | The **job screen** → **Edit** | Saves |
-| B8 | Report and QA flow | The **job screen** → the **QAP / report** buttons | Reachable, status visible |
-| B9 | Billing readiness | `/job-bill`, `/billable-events` | Shows whether the job is ready to bill |
-| B10 | **Invoice visibility only** | `/invoices` → **open one** | You can see invoices. **Do not issue one** |
-| B11 | Attendance | `/attendance-review` | Readable. **Do not change real attendance** |
-| B12 | Vouchers | `/vouchers` | Readable |
+| B1 | Open a customer | Left menu → 🏢 Directory → Card “Client register”<br>*or type* `operations.mghaiapps.com/clients` | Opens, shows contacts and commercial terms per your permission |
+| B2 | Raise a call / order | Left menu → 🛠️ Operations → Card “New work order”<br>*or type* `operations.mghaiapps.com/call-new` | Creates. Use a **test customer** |
+| B3 | Schedule it | Left menu → 🛠️ Operations → Card “Scheduling board”<br>*or type* `operations.mghaiapps.com/schedule`<br>**Look for:** or the call | Dates accepted |
+| B4 | Allocate an inspector | Left menu → 🛠️ Operations → Card “Jobs” → On that screen: any job reference in the list<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** the call | **Only active people are offered.** Joining-pending and leavers must not appear |
+| B5 | Open the availability board | Left menu → 🛠️ Operations → Card “Team member availability”<br>*or type* `operations.mghaiapps.com/availability` | Shows who is free. A hired-not-joined person is **named as awaited, not offered as bookable** |
+| B6 | Open a job | Left menu → 🛠️ Operations → Card “Jobs”<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** click a job | Full detail, status, history |
+| B7 | Record execution | Left menu → 🛠️ Operations → Card “Jobs”<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** open the job → “Edit” → record execution | Saves |
+| B8 | Report and QA flow | Left menu → 🛠️ Operations → Card “Jobs”<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** open the job → the QAP / report buttons | Reachable, status visible |
+| B9 | Billing readiness | Left menu → 🛠️ Operations → Card “Jobs” → On that screen: open a job, then the “Billing” tab<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** /billable-events | Shows whether the job is ready to bill |
+| B10 | **Invoice visibility only** | Not on the menu — type the address<br>*or type* `operations.mghaiapps.com/invoices`<br>**Look for:** open one | You can see invoices. **Do not issue one** |
+| B11 | Attendance | Left menu → 🛠️ Operations → Card “Attendance reconciliation” → On that screen: the review link on a reconciliation row<br>*or type* `operations.mghaiapps.com/attendance-recon` | Readable. **Do not change real attendance** |
+| B12 | Vouchers | Left menu → 🛠️ Operations → Card “Vouchers”<br>*or type* `operations.mghaiapps.com/vouchers` | Readable |
 
 ## Journey C — Marketplace
 
-| # | Step | Where | What must be true |
+| # | Step | How to get there — exactly | What must be true |
 |---|---|---|---|
-| C1 | Open Marketplace | `/connect` | Opens |
-| C2 | Requirements | `/connect-requirements` | Listed |
-| C3 | Professionals / bench | `/connect-bench` | Listed |
-| C4 | A marketplace requirement vs a recruitment requisition | both | **They are different things and must stay separate.** A marketplace requirement is not a hiring requisition |
-| C5 | Matching / sourcing | `/jobs` → open a job → **🔎 Source manpower**. (Admins can tune the ranking at `/connect-match-weights`. **There is no `/connect-match` screen** — my earlier draft named one that does not exist; typing it gives *not found*, and that is not a defect) | Works, respects permission |
-| C6 | Permissions | as an unauthorised user | Marketplace admin screens refused |
-| **C7** | **Find a resource in another city — the case you ratified on 2026-10-13.** Sign in as the **Ahmedabad coordinator** (D8). Open **Marketplace → Talent search**, type **Chennai** in the city box | You get Chennai people even though you are an Ahmedabad user — **the marketplace is deliberately not limited to your own branch.** Each result carries a 📍 reason (*Based here* / *Within N km* / *Works in Tamil Nadu* / *Available Pan-India*) and the **nearest are listed first** | ☐ ok ☐ problem |
-| **C8** | On the same search, read the line above the results | It states plainly: *“Showing everyone willing to work in **Chennai**, Tamil Nadu — nearest first. People who have not offered to work there are left out.”* **Somebody who has not offered to work in Chennai must NOT appear** — a coordinator should never be handed a person who cannot take the job | ☐ ok ☐ problem |
-| **C9** | Type an old city name — **Madras**. Then a typo — **Chenai** | **Madras** finds Chennai and says *(you typed “Madras”)*. **Chenai** is not silently empty: it says it is not a recognised place and offers a clickable **Did you mean: Chennai**. An empty list must never leave you unable to tell *“nobody there”* from *“I spelt it wrong”* | ☐ ok ☐ problem |
-| **C10** | Still as the coordinator, try to **act** — invite that Chennai person onto a requirement, or use **🔎 Source manpower** on a job that is **not** in your branch | **Finding is not hiring.** Searching anywhere is allowed; *acting* still obeys the module right and the job's own branch scope. A refusal here is a **PASS** | ☐ ok ☐ problem |
+| C1 | Open Marketplace | Left menu → 🧑‍🏭 Marketplace → Card “Marketplace”<br>*or type* `operations.mghaiapps.com/marketplace`<br>**Look for:** the Marketplace area home. (The public-facing page at /connect is a different thing — it is what an outsider sees.) | Opens |
+| C2 | Requirements | Left menu → 🧑‍🏭 Marketplace → Card “Requirements”<br>*or type* `operations.mghaiapps.com/connect-requirements` | Listed |
+| C3 | Professionals / bench | Left menu → 🧑‍🏭 Marketplace → Card “Agency bench”<br>*or type* `operations.mghaiapps.com/connect-bench` | Listed |
+| C4 | A marketplace requirement vs a recruitment requisition | Left menu → 🧑‍🏭 Marketplace → Card “Requirements”<br>*or type* `operations.mghaiapps.com/connect-requirements`<br>**Look for:** open a marketplace requirement here, then open a recruitment requisition at Recruitment → Requisitions, and compare the two | **They are different things and must stay separate.** A marketplace requirement is not a hiring requisition |
+| C5 | Matching / sourcing | Left menu → 🛠️ Operations → Card “Jobs”<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** open a job → 🔎 Source manpower. (Admins can tune the ranking at /connect-match-weights. There is no /connect-match screen — my earlier draft named one that does not exist; typing it gives not found, and that is not a defect) | Works, respects permission |
+| C6 | Permissions | Left menu → 🧑‍🏭 Marketplace → Card “Talent search”<br>*or type* `operations.mghaiapps.com/connect-talent`<br>**Look for:** sign in as a user who is NOT a coordinator or master, and try to open it | Marketplace admin screens refused |
+| **C7** | **Find a resource in another city — the case you ratified on 2026-10-13.** Sign in as the **Ahmedabad coordinator** (D8). Open **Marketplace → Talent search**, type **Chennai** in the city box | **Sign in as uat.coord.**<br>Left menu → 🧑‍🏭 Marketplace → Card “Talent search”<br>*or type* `operations.mghaiapps.com/connect-talent`<br>**Look for:** the city / location filter. Type “Chennai” while signed in at Ahmedabad | ☐ ok ☐ problem |
+| **C8** | On the same search, read the line above the results | **Sign in as uat.coord.**<br>Left menu → 🧑‍🏭 Marketplace → Card “Talent search”<br>*or type* `operations.mghaiapps.com/connect-talent`<br>**Look for:** the line directly above the result list, which says how each person matched | ☐ ok ☐ problem |
+| **C9** | Type an old city name — **Madras**. Then a typo — **Chenai** | Left menu → 🧑‍🏭 Marketplace → Card “Talent search”<br>*or type* `operations.mghaiapps.com/connect-talent`<br>**Look for:** the same city box — type “Madras”, then “Chenai” | ☐ ok ☐ problem |
+| **C10** | Still as the coordinator, try to **act** — invite that Chennai person onto a requirement, or use **🔎 Source manpower** on a job that is **not** in your branch | **Sign in as uat.coord.**<br>Left menu → 🧑‍🏭 Marketplace → Card “Talent search”<br>*or type* `operations.mghaiapps.com/connect-talent`<br>**Look for:** open a Chennai person and try to invite them, or use “🔎 Source manpower” from a job | ☐ ok ☐ problem |
 
 ## Journey D — Money and billing *(protected module — read only)*
 
-| # | Step | Where | What must be true |
+| # | Step | How to get there — exactly | What must be true |
 |---|---|---|---|
-| D1 | Invoice register | `/invoices` | Lists your invoices |
-| D2 | One invoice's detail | `/invoices` → **open one** | Figures, lines, tax correct |
-| D3 | Payments | payment screens | Visible |
-| D4 | Financial reports | `/reports`, `/financial-control` | Open, figures plausible |
-| D5 | Credit notes | `/invoices` → open an invoice → **Credit note**. Not a separate address | **Screen opens — create nothing** |
-| D6 | As Finance user | sign in as `uat.finance` | Sees money, **cannot** perform recruitment or operational actions |
-| D7 | As Coordinator | sign in as `uat.coord` | **Cannot** see what finance-only should hide |
-| D8 | Office boundary | as a branch user | Does **not** see another branch's revenue |
+| D1 | Invoice register | Not on the menu — type the address<br>*or type* `operations.mghaiapps.com/invoices` | Lists your invoices |
+| D2 | One invoice's detail | Not on the menu — type the address<br>*or type* `operations.mghaiapps.com/invoices`<br>**Look for:** open one | Figures, lines, tax correct |
+| D3 | Payments | Left menu → 💰 Money → Tab “Billing” → Card “Invoice tracker”<br>*or type* `operations.mghaiapps.com/invoicing`<br>**Look for:** open an invoice → the payments / receipts panel | Visible |
+| D4 | Financial reports | Left menu → 📊 Insights → Card “Dashboards”<br>*or type* `operations.mghaiapps.com/reports`<br>**Look for:** /financial-control | Open, figures plausible |
+| D5 | Credit notes | Not on the menu — type the address<br>*or type* `operations.mghaiapps.com/invoices`<br>**Look for:** open an invoice → Credit note. Not a separate address | **Screen opens — create nothing** |
+| D6 | As Finance user | **Sign in as uat.finance.**<br>Left menu → 💰 Money → Card “Money”<br>*or type* `operations.mghaiapps.com/money`<br>**Look for:** the whole Money area, signed in as uat.finance | Sees money, **cannot** perform recruitment or operational actions |
+| D7 | As Coordinator | **Sign in as uat.coord.**<br>Left menu → 💰 Money → Card “Money”<br>*or type* `operations.mghaiapps.com/money`<br>**Look for:** the whole Money area, signed in as uat.coord — note what is missing compared with finance | **Cannot** see what finance-only should hide |
+| D8 | Office boundary | Left menu → 💰 Money → Tab “Billing” → Card “Invoice tracker”<br>*or type* `operations.mghaiapps.com/invoicing`<br>**Look for:** signed in as a branch user — the list must show that branch only | Does **not** see another branch's revenue |
 
 **Write nothing in Journey D.** If a figure looks wrong, record it — do not correct it.
 
 ## Journey E — Dashboards
 
-| # | Step | Where | What must be true |
+| # | Step | How to get there — exactly | What must be true |
 |---|---|---|---|
-| E1 | Home / Command Centre | `/` | Opens, shows your work |
-| E2 | Recruitment dashboard | recruitment home | Funnel counts match what you can count by hand on the lists |
-| E3 | Operations dashboard | operations home | Same |
-| E4 | KPI / SLA displays | `/mis`, `/reports` | Figures present and plausible |
-| E5 | Filters | any dashboard | Change one; the numbers change consistently |
-| E6 | **Utilisation report** | `/reports` | This is **UAT-G6B-02** — Part 3 |
-| E7 | Each role's home | sign in as each test user | Each sees a home suited to their job, with nothing they shouldn't |
-| E8 | Any number that looks wrong | — | **Write it down. Do not fix it during UAT** |
+| E1 | Home / Command Centre | Left menu → Dashboard<br>*or type* `operations.mghaiapps.com/`<br>**Look for:** the home dashboard, and the “Command Centre →” link on it | Opens, shows your work |
+| E2 | Recruitment dashboard | Left menu → 🧑‍💼 Recruitment → Card “Recruitment”<br>*or type* `operations.mghaiapps.com/recruitment-cc`<br>**Look for:** the recruitment dashboard | Funnel counts match what you can count by hand on the lists |
+| E3 | Operations dashboard | Left menu → 🛠️ Operations → Card “Operations”<br>*or type* `operations.mghaiapps.com/operations`<br>**Look for:** the operations dashboard | Same |
+| E4 | KPI / SLA displays | Left menu → 📊 Insights → Card “Management dashboard”<br>*or type* `operations.mghaiapps.com/mis`<br>**Look for:** /reports | Figures present and plausible |
+| E5 | Filters | Left menu → 📊 Insights → Card “Insights”<br>*or type* `operations.mghaiapps.com/insights`<br>**Look for:** the date-range and office filters at the top | Change one; the numbers change consistently |
+| E6 | **Utilisation report** | Left menu → 📊 Insights → Card “Dashboards”<br>*or type* `operations.mghaiapps.com/reports` | This is **UAT-G6B-02** — Part 3 |
+| E7 | Each role's home | Left menu → Dashboard<br>*or type* `operations.mghaiapps.com/`<br>**Look for:** the home dashboard — sign in as each of uat.coord, uat.finance and uat.inspector in turn | Each sees a home suited to their job, with nothing they shouldn't |
+| E8 | Any number that looks wrong | Left menu → 📊 Insights → Card “Insights”<br>*or type* `operations.mghaiapps.com/insights`<br>**Look for:** any figure that looks wrong — click into it and check it against the register behind it | **Write it down. Do not fix it during UAT** |
 
 ## Journey F — Search
 
-| # | Step | Where | What must be true |
+| # | Step | How to get there — exactly | What must be true |
 |---|---|---|---|
-| F1 | Press Ctrl+K, search a candidate name | anywhere | Found; clicking opens the record |
-| F2 | Search a requisition | | Found |
-| F3 | Search a hiring request | | Found |
-| F4 | Search an inspector / team member | | Found |
-| F5 | Search a call / job / customer | | Found |
-| F6 | As a branch user, search something from another branch | sign in as a scoped user | **Not found, or found without the parts they may not see** |
-| F7 | **Multi-workspace only:** search for something you know exists in another company | | **Absolutely nothing from the other company.** If anything appears, stop immediately |
+| F1 | Press Ctrl+K, search a candidate name | Left menu → Dashboard<br>*or type* `operations.mghaiapps.com/`<br>**Look for:** press Ctrl+K (⌘K on a Mac) from any screen, then type a candidate name | Found; clicking opens the record |
+| F2 | Search a requisition | Left menu → Search records<br>*or type* `operations.mghaiapps.com/search`<br>**Look for:** the single search box at the top | Found |
+| F3 | Search a hiring request | Left menu → Search records<br>*or type* `operations.mghaiapps.com/search`<br>**Look for:** the single search box at the top | Found |
+| F4 | Search an inspector / team member | Left menu → Search records<br>*or type* `operations.mghaiapps.com/search`<br>**Look for:** the single search box at the top | Found |
+| F5 | Search a call / job / customer | Left menu → Search records<br>*or type* `operations.mghaiapps.com/search`<br>**Look for:** the single search box at the top | Found |
+| F6 | As a branch user, search something from another branch | Left menu → Search records<br>*or type* `operations.mghaiapps.com/search`<br>**Look for:** signed in as uat.coord — search for a record you know belongs to another branch | **Not found, or found without the parts they may not see** |
+| F7 | **Multi-workspace only:** search for something you know exists in another company | Left menu → Search records<br>*or type* `operations.mghaiapps.com/search`<br>**Look for:** the single search box, while signed into the OTHER company | **Absolutely nothing from the other company.** If anything appears, stop immediately |
 
 ## Journey G — The inspector's phone
 
 **Use a real phone if you have one.** Resizing a desktop browser is a fallback, not the test.
 
-| # | Step | What must be true |
-|---|---|---|
-| G1 | Sign in as `uat.inspector` on the phone | Works; the keyboard doesn't cover the fields |
-| G2 | The home screen | Shows their work, readable without zooming |
-| G3 | My Jobs / My Work | Their jobs, not everybody's |
-| G4 | Open one job | Readable; buttons big enough to hit with a thumb |
-| G5 | Status and next action | Clear what to do next |
-| G6 | The menu drawer | Opens, and the **close button is easy to hit** (this release raised it to a proper touch size) |
-| G7 | Scroll every screen sideways | **Nothing should scroll sideways.** Check at the three common widths — roughly 360, 390 and 412 pixels, i.e. a small Android, an iPhone, a large Android |
-| G8 | Try to reach an admin screen as the inspector | **Refused** |
-| G9 | Attendance / punch, if used | Works on the phone |
+| # | How to get there — exactly | Step | What must be true |
+|---|---|---|---|
+| G1 | **Sign in as uat.inspector.**<br>Open the site address in Chrome<br>*or type* `operations.mghaiapps.com`<br>**Look for:** the sign-in page, on a real phone or a 390px-wide browser window | Sign in as `uat.inspector` on the phone | Works; the keyboard doesn't cover the fields |
+| G2 | **Sign in as uat.inspector.**<br>Left menu → Dashboard<br>*or type* `operations.mghaiapps.com/`<br>**Look for:** the whole home screen | The home screen | Shows their work, readable without zooming |
+| G3 | **Sign in as uat.inspector.**<br>Left menu → My Work<br>*or type* `operations.mghaiapps.com/my-work`<br>**Look for:** the menu items “My jobs” and “My Work” | My Jobs / My Work | Their jobs, not everybody's |
+| G4 | **Sign in as uat.inspector.**<br>Left menu → group “My work” → Item “My jobs”<br>*or type* `operations.mghaiapps.com/my-jobs`<br>**Look for:** tap any job in the list | Open one job | Readable; buttons big enough to hit with a thumb |
+| G5 | **Sign in as uat.inspector.**<br>Left menu → group “My work” → Item “My jobs”<br>*or type* `operations.mghaiapps.com/my-jobs`<br>**Look for:** tap a job, then read its status line and the next-action button | Status and next action | Clear what to do next |
+| G6 | **Sign in as uat.inspector.**<br>Left menu → group “My work” → Item “My jobs”<br>*or type* `operations.mghaiapps.com/my-jobs`<br>**Look for:** the ☰ menu button, top left | The menu drawer | Opens, and the **close button is easy to hit** (this release raised it to a proper touch size) |
+| G7 | **Sign in as uat.inspector.**<br>Left menu → group “My work” → Item “My jobs”<br>*or type* `operations.mghaiapps.com/my-jobs`<br>**Look for:** every screen you have opened — try to drag each one sideways | Scroll every screen sideways | **Nothing should scroll sideways.** Check at the three common widths — roughly 360, 390 and 412 pixels, i.e. a small Android, an iPhone, a large Android |
+| G8 | **Sign in as uat.inspector.**<br>Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** type this address while signed in as the inspector | Try to reach an admin screen as the inspector | **Refused** |
+| G9 | **Sign in as uat.inspector.**<br>Left menu → group “My work” → Item “My jobs”<br>*or type* `operations.mghaiapps.com/my-jobs`<br>**Look for:** the attendance / punch control, if your workspace uses one | Attendance / punch, if used | Works on the phone |
 
 ## Journey H — Negative and security **(mandatory — a failure here blocks the release)**
 
 Sign in as the *wrong* person and try things. Nothing here is destructive.
 
-| # | Attempt | As | What must happen |
-|---|---|---|---|
-| H1 | Open `/approval-rules` | `uat.coord` | **Refused** — "only an administrator can configure approval rules" |
-| H2 | Open `/users` | `uat.coord` | **Refused** |
-| H3 | Open `/licence` or `/billing` | `uat.coord` | **Refused** |
-| H4 | Approve your own hiring request | `uat.coord` | **Refused** (unless you deliberately enabled the exception) |
-| H5 | Clear a Review Required flag | `uat.coord` without the permission | **Refused** — being able to *see* it must not mean being able to *clear* it |
-| H6 | Perform a recruitment action | `uat.finance` | **Refused** |
-| H7 | Open an admin screen | `uat.inspector` | **Refused** |
-| H8 | View somebody's salary / CTC | `uat.coord` | **Hidden or refused** |
-| H9 | **Type a forbidden address straight into the browser bar** | each test user | **Still refused.** Hiding a menu item is not security. **Use Part 2★** — a refusal here bounces you to the home page with a red message rather than showing an error page, and a tester who does not know that can record a breach as a pass |
-| H10 | Open another branch's client commercial terms | a branch-scoped user | **Refused or hidden** |
-| H11 | **Multi-company only:** try to reach a record ID belonging to another company | any user | **Refused.** If other-company data appears, **STOP THE ENTIRE UAT**. **Use Part 2★** — it tells you first how to check whether this applies to you at all, and what to test instead if it does not |
-| H12 | Sign in with a retired user | retired test user | **Refused** |
-| H13 | Sign in with a wrong password three times | any | Sensibly handled; no crash, no information leak |
+| # | How to get there — exactly | Attempt | As | What must happen |
+|---|---|---|---|---|
+| H1 | **Sign in as uat.coord.**<br>Left menu → ⚙️ Admin → Card “Quotes & reports approvals”<br>*or type* `operations.mghaiapps.com/approval-rules`<br>**Look for:** type this address while signed in as uat.coord | Open `/approval-rules` | `uat.coord` | **Refused** — "only an administrator can configure approval rules" |
+| H2 | **Sign in as uat.coord.**<br>Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** type this address while signed in as uat.coord | Open `/users` | `uat.coord` | **Refused** |
+| H3 | **Sign in as uat.coord.**<br>Left menu → ⚙️ Admin → Tab “Connections” → Card “Licence”<br>*or type* `operations.mghaiapps.com/licence`<br>**Look for:** type this address while signed in as uat.coord, then try the billing address too | Open `/licence` or `/billing` | `uat.coord` | **Refused** |
+| H4 | **Sign in as uat.coord.**<br>Left menu → 🧑‍💼 Recruitment → Card “Hiring requests”<br>*or type* `operations.mghaiapps.com/hiring-requests`<br>**Look for:** as uat.coord, raise a hiring request and then try to approve your own | Approve your own hiring request | `uat.coord` | **Refused** (unless you deliberately enabled the exception) |
+| H5 | **Sign in as uat.coord.**<br>Left menu → 🧑‍💼 Recruitment → Card “Candidates”<br>*or type* `operations.mghaiapps.com/candidates`<br>**Look for:** open a candidate with a “Review required” flag and try to clear it, signed in as uat.coord (who does not hold hiring.review.clear) | Clear a Review Required flag | `uat.coord` without the permission | **Refused** — being able to *see* it must not mean being able to *clear* it |
+| H6 | **Sign in as uat.finance.**<br>Left menu → 🧑‍💼 Recruitment → Card “Requisitions”<br>*or type* `operations.mghaiapps.com/requisitions`<br>**Look for:** try to raise or approve a requisition, signed in as uat.finance | Perform a recruitment action | `uat.finance` | **Refused** |
+| H7 | **Sign in as uat.inspector.**<br>Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** type this address while signed in as uat.inspector | Open an admin screen | `uat.inspector` | **Refused** |
+| H8 | **Sign in as uat.coord.**<br>Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** open a person and look for salary / CTC figures, signed in as uat.coord | View somebody's salary / CTC | `uat.coord` | **Hidden or refused** |
+| H9 | Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** type each of the six forbidden addresses straight into the browser bar, as each test user in turn | **Type a forbidden address straight into the browser bar** | each test user | **Still refused.** Hiding a menu item is not security. **Use Part 2★** — a refusal here bounces you to the home page with a red message rather than showing an error page, and a tester who does not know that can record a breach as a pass |
+| H10 | Left menu → 🏢 Directory → Card “Client register”<br>*or type* `operations.mghaiapps.com/clients`<br>**Look for:** open a client belonging to ANOTHER branch and try its commercial terms, as a branch-scoped user | Open another branch's client commercial terms | a branch-scoped user | **Refused or hidden** |
+| H11 | Type the address into the browser bar<br>**Look for:** type a record address from company A while signed into company B | **Multi-company only:** try to reach a record ID belonging to another company | any user | **Refused.** If other-company data appears, **STOP THE ENTIRE UAT**. **Use Part 2★** — it tells you first how to check whether this applies to you at all, and what to test instead if it does not |
+| H12 | Open the site address in Chrome<br>*or type* `operations.mghaiapps.com`<br>**Look for:** the sign-in page — use the retired user uat.retired | Sign in with a retired user | retired test user | **Refused** |
+| H13 | Open the site address in Chrome<br>*or type* `operations.mghaiapps.com`<br>**Look for:** the sign-in page — give the wrong password three times | Sign in with a wrong password three times | any | Sensibly handled; no crash, no information leak |
 
 **H9 and H11 are the two that matter most.** H9 catches the commonest real security mistake —
 hiding a button but leaving the door open. H11 is the one that would end a release.
@@ -527,15 +556,15 @@ Also note the name of one person who **is** active, in the same office. You need
 
 ### The test
 
-| # | Do this | What a PASS looks like |
-|---|---|---|
-| A21.1 | On `/m/inspectors`, confirm your joining-pending person **is listed** | Present, marked as joining pending. Being kept off jobs is not the same as being hidden — if they have vanished from the register, that is a different defect: record it |
-| A21.2 | Open `/jobs` and open any job, or go straight to `/job?id=…` | The job screen opens on its Overview tab |
-| A21.3 | Find the collapsible section headed **"Assignment lifecycle"** (subtitle: *hold, reschedule, reassign, no-show — with history*) and expand it | The panel opens |
-| A21.4 | Open the **engineer / inspector dropdown** inside that panel | A list of people you could assign |
-| A21.5 | **Read every name in that dropdown.** Your joining-pending person must **not** be there | Their name is absent |
-| A21.6 | Check your **active** person **is** in the same dropdown | Present — this proves you are reading the right control and it is not simply empty |
-| A21.7 | Open `/availability` | The joining-pending person is **named as awaited**, not offered as bookable |
+| # | How to get there — exactly | Do this | What a PASS looks like |
+|---|---|---|---|
+| A21.1 | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters” → On that screen: the “Inspectors” card<br>*or type* `operations.mghaiapps.com/m/inspectors` | On `/m/inspectors`, confirm your joining-pending person **is listed** | Present, marked as joining pending. Being kept off jobs is not the same as being hidden — if they have vanished from the register, that is a different defect: record it |
+| A21.2 | Left menu → 🛠️ Operations → Card “Jobs”<br>*or type* `operations.mghaiapps.com/jobs` | Open `/jobs` and open any job, or go straight to `/job?id=…` | The job screen opens on its Overview tab |
+| A21.3 | Left menu → 🛠️ Operations → Card “Jobs” → On that screen: any job reference in the list<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** open a job, then the collapsible section “Assignment lifecycle” | Find the collapsible section headed **"Assignment lifecycle"** (subtitle: *hold, reschedule, reassign, no-show — with history*) and expand it | The panel opens |
+| A21.4 | Left menu → 🛠️ Operations → Card “Jobs” → On that screen: any job reference in the list<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** inside “Assignment lifecycle”, open the engineer / inspector dropdown | Open the **engineer / inspector dropdown** inside that panel | A list of people you could assign |
+| A21.5 | Left menu → 🛠️ Operations → Card “Jobs” → On that screen: any job reference in the list<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** read every name in that dropdown | **Read every name in that dropdown.** Your joining-pending person must **not** be there | Their name is absent |
+| A21.6 | Left menu → 🛠️ Operations → Card “Jobs” → On that screen: any job reference in the list<br>*or type* `operations.mghaiapps.com/jobs`<br>**Look for:** the same dropdown — your active person must be in it | Check your **active** person **is** in the same dropdown | Present — this proves you are reading the right control and it is not simply empty |
+| A21.7 | Left menu → 🛠️ Operations → Card “Team member availability”<br>*or type* `operations.mghaiapps.com/availability` | Open `/availability` | The joining-pending person is **named as awaited**, not offered as bookable |
 
 ### How to read the result
 
@@ -576,22 +605,22 @@ Sign in as **`uat.coord`** in a **private / incognito window** (so your administ
 session is not reused). Then type each address into the browser bar by hand — do not click
 a menu, do not paste a link from elsewhere.
 
-| # | Type this address | What a PASS looks like |
+| # | How to get there — exactly | What a PASS looks like |
 |---|---|---|
-| H9.1 | `/users` | Bounced home, red message |
-| H9.2 | `/user-new` | Bounced home, red message |
-| H9.3 | `/approval-rules` | Bounced home — message reads **"Only an administrator can configure approval rules."** |
-| H9.4 | `/licence` | Bounced home, red message |
-| H9.5 | `/settings` | Bounced home, red message |
-| H9.6 | `/audit-log` | Bounced home, red message |
-| H9.7 | Repeat all six as **`uat.finance`** | Same six refusals |
-| H9.8 | Repeat all six as **`uat.inspector`** | Same six refusals |
+| H9.1 | Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users` | Bounced home, red message |
+| H9.2 | Left menu → ⚙️ Admin → Tab “People” → Card “User register” → On that screen: the “+ Add a person” button, top right<br>*or type* `operations.mghaiapps.com/user-new` | Bounced home, red message |
+| H9.3 | Left menu → ⚙️ Admin → Card “Quotes & reports approvals”<br>*or type* `operations.mghaiapps.com/approval-rules` | Bounced home — message reads **"Only an administrator can configure approval rules."** |
+| H9.4 | Left menu → ⚙️ Admin → Tab “Connections” → Card “Licence”<br>*or type* `operations.mghaiapps.com/licence` | Bounced home, red message |
+| H9.5 | Left menu → ⚙️ Admin → Tab “Configuration” → Card “System settings”<br>*or type* `operations.mghaiapps.com/settings` | Bounced home, red message |
+| H9.6 | Left menu → ⚙️ Admin → Tab “Report configuration” → Card “Report audit trail”<br>*or type* `operations.mghaiapps.com/audit-log` | Bounced home, red message |
+| H9.7 | **Sign in as uat.finance.**<br>Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** repeat the six addresses while signed in as uat.finance | Same six refusals |
+| H9.8 | **Sign in as uat.inspector.**<br>Left menu → ⚙️ Admin → Tab “People” → Card “User register”<br>*or type* `operations.mghaiapps.com/users`<br>**Look for:** repeat the six addresses while signed in as uat.inspector | Same six refusals |
 
 Then one more, which is the other half of the same question:
 
-| # | Do this | What a PASS looks like |
-|---|---|---|
-| H9.9 | As each of the three, look at the menu | None of those six screens is offered. Both must be true: not in the menu **and** refused by address |
+| # | How to get there — exactly | Do this | What a PASS looks like |
+|---|---|---|---|
+| H9.9 | Left menu → Dashboard<br>*or type* `operations.mghaiapps.com/`<br>**Look for:** the left menu itself, as each of the three | As each of the three, look at the menu | None of those six screens is offered. Both must be true: not in the menu **and** refused by address |
 
 ### How to read the result
 
@@ -626,12 +655,12 @@ signed off. If it does not apply, say so.
 
 ### If you run more than one company
 
-| # | Do this | What a PASS looks like |
-|---|---|---|
-| H11.1 | Sign into **company A**. Open any job, candidate or invoice. Note the number at the end of the address — e.g. `/job?id=412` | You have a real record id belonging to company A |
-| H11.2 | Sign out completely. Sign into **company B** as any user | You are in the other company |
-| H11.3 | Type that exact address from H11.1 into the browser bar | **Refused, or "not found".** Nothing of company A appears |
-| H11.4 | Repeat with a candidate id and an invoice id | Same — refused or not found |
+| # | How to get there — exactly | Do this | What a PASS looks like |
+|---|---|---|---|
+| H11.1 | Left menu → 🛠️ Operations → Card “Jobs” → On that screen: any job reference in the list<br>*or type* `operations.mghaiapps.com/jobs` | Sign into **company A**. Open any job, candidate or invoice. Note the number at the end of the address — e.g. `/job?id=412` | You have a real record id belonging to company A |
+| H11.2 | Open the site address in Chrome<br>*or type* `operations.mghaiapps.com`<br>**Look for:** sign out fully, then sign into company B | Sign out completely. Sign into **company B** as any user | You are in the other company |
+| H11.3 | Type the address into the browser bar<br>**Look for:** type company A’s record address into the browser bar while signed into company B | Type that exact address from H11.1 into the browser bar | **Refused, or "not found".** Nothing of company A appears |
+| H11.4 | Type the address into the browser bar<br>**Look for:** the same, with a candidate id and an invoice id | Repeat with a candidate id and an invoice id | Same — refused or not found |
 
 **If any company A data appears in company B — even a name, even a number — STOP THE ENTIRE
 UAT and tell me immediately.** Do not continue testing. That is the only finding in this
@@ -641,12 +670,12 @@ whole guide that ends a release outright.
 
 The equivalent boundary for you is between **offices**, not companies.
 
-| # | Do this | What a PASS looks like |
-|---|---|---|
-| H10.1 | Sign in as a user whose home office is branch A | You are scoped to that branch |
-| H10.2 | Open `/clients` and find a customer belonging to branch B | You may see the customer exists — that is deliberate |
-| H10.3 | Try to open that customer's **commercial terms** and contacts | **Refused or hidden.** Basic identity visible, commercial detail not |
-| H10.4 | Open `/reports` and look for branch B's revenue | Branch B's revenue figures are not shown |
+| # | How to get there — exactly | Do this | What a PASS looks like |
+|---|---|---|---|
+| H10.1 | Open the site address in Chrome<br>*or type* `operations.mghaiapps.com`<br>**Look for:** sign in as a person whose home office is branch A | Sign in as a user whose home office is branch A | You are scoped to that branch |
+| H10.2 | Left menu → 🏢 Directory → Card “Client register”<br>*or type* `operations.mghaiapps.com/clients` | Open `/clients` and find a customer belonging to branch B | You may see the customer exists — that is deliberate |
+| H10.3 | Left menu → 🏢 Directory → Card “Client register”<br>*or type* `operations.mghaiapps.com/clients`<br>**Look for:** open the branch-B customer and try its commercial terms and contacts | Try to open that customer's **commercial terms** and contacts | **Refused or hidden.** Basic identity visible, commercial detail not |
+| H10.4 | Left menu → 📊 Insights → Card “Dashboards”<br>*or type* `operations.mghaiapps.com/reports` | Open `/reports` and look for branch B's revenue | Branch B's revenue figures are not shown |
 
 ---
 
@@ -670,20 +699,20 @@ Sign in as `uat.admin`. Go to **Recruitment approvals** — `/recruit-approvals`
 *recruitment approvals* into **Find a screen**. (Not `/approval-rules`: that is the
 quotation and report chain.) Scroll to the panel described below.
 
-| # | Step | What must be true |
-|---|---|---|
-| G6B-01.1 | Find the panel "When does a requirement change need its candidates re-checked?" | Present |
-| G6B-01.2 | Read it | You understand what it does **without asking me**. If you don't, that is a finding — write down what confused you |
-| G6B-01.3 | Note the state | Tick is **ON**, pill reads **Redefined: ON** |
-| G6B-01.4 | Find a control for "stricter" | **There is none, deliberately.** The screen states a stricter requirement *always* raises a review and that this is not configurable |
-| G6B-01.5 | Untick, press **Save triggers** | Confirmation appears |
-| G6B-01.6 | Reload the page | Still **OFF**, pill reads **Redefined: OFF** — it stuck |
-| G6B-01.7 | Check the audit trail (`/audit-log`) | Your change is recorded — who, when, from what to what |
-| G6B-01.8 | With it OFF: change a test requisition's **designation** and approve the new version | Candidates **do not** get Review Required |
-| G6B-01.9 | With it OFF: raise a test requisition's **minimum experience** and approve | Candidates **do** get Review Required — the mandatory rule survived |
-| G6B-01.10 | Tick it back ON, save, reload | **ON** again |
-| G6B-01.11 | With it ON: change a designation and approve | Candidates **do** get Review Required |
-| G6B-01.12 | As `uat.coord`, open `/approval-rules` | **Refused**, and no trigger control visible |
+| # | How to get there — exactly | Step | What must be true |
+|---|---|---|---|
+| G6B-01.1 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → panel “When does a requirement change need its candidates re-checked?” | Find the panel "When does a requirement change need its candidates re-checked?" | Present |
+| G6B-01.2 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → the same panel — read it | Read it | You understand what it does **without asking me**. If you don't, that is a finding — write down what confused you |
+| G6B-01.3 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → note which triggers are ticked | Note the state | Tick is **ON**, pill reads **Redefined: ON** |
+| G6B-01.4 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → find the “stricter” trigger in that panel | Find a control for "stricter" | **There is none, deliberately.** The screen states a stricter requirement *always* raises a review and that this is not configurable |
+| G6B-01.5 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → untick it, then press “Save triggers” | Untick, press **Save triggers** | Confirmation appears |
+| G6B-01.6 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → reload and look at the panel again | Reload the page | Still **OFF**, pill reads **Redefined: OFF** — it stuck |
+| G6B-01.7 | Left menu → ⚙️ Admin → Tab “Report configuration” → Card “Report audit trail”<br>*or type* `operations.mghaiapps.com/audit-log` | Check the audit trail (`/audit-log`) | Your change is recorded — who, when, from what to what |
+| G6B-01.8 | Left menu → 🧑‍💼 Recruitment → Card “Requisitions”<br>*or type* `operations.mghaiapps.com/requisitions`<br>**Look for:** open a test requisition, change its designation, approve the new version | With it OFF: change a test requisition's **designation** and approve the new version | Candidates **do not** get Review Required |
+| G6B-01.9 | Left menu → 🧑‍💼 Recruitment → Card “Requisitions”<br>*or type* `operations.mghaiapps.com/requisitions`<br>**Look for:** open a test requisition, raise its minimum experience, approve | With it OFF: raise a test requisition's **minimum experience** and approve | Candidates **do** get Review Required — the mandatory rule survived |
+| G6B-01.10 | Left menu → ⚙️ Admin → Tab “Approvals” → Card “Approvals”<br>*or type* `operations.mghaiapps.com/approvals-setup`<br>**Look for:** tab “🧷 Recruitment” → tick it back on, Save triggers, reload | Tick it back ON, save, reload | **ON** again |
+| G6B-01.11 | Left menu → 🧑‍💼 Recruitment → Card “Requisitions”<br>*or type* `operations.mghaiapps.com/requisitions`<br>**Look for:** change a designation and approve, with the trigger ON | With it ON: change a designation and approve | Candidates **do** get Review Required |
+| G6B-01.12 | **Sign in as uat.coord.**<br>Left menu → ⚙️ Admin → Card “Quotes & reports approvals”<br>*or type* `operations.mghaiapps.com/approval-rules` | As `uat.coord`, open `/approval-rules` | **Refused**, and no trigger control visible |
 
 **Leave it ON** at the end unless you have a business reason not to — ON is how every workspace
 behaved before this screen existed.
@@ -709,16 +738,16 @@ You need three real people in one office: one **active**, one **hired but not ye
 **leaver**. Use people already in those states. **Do not change anybody's status to make this
 test work** — that would invalidate it.
 
-| # | Step | Where | What must be true |
+| # | Step | How to get there — exactly | What must be true |
 |---|---|---|---|
-| G6B-02.1 | Open the Utilization panel | `/reports` | A row per person with man-days and a percentage |
-| G6B-02.2 | Find your **active** person | | **Present** — the report still works |
-| G6B-02.3 | Find your **hired-not-joined** person | | **Absent** |
-| G6B-02.4 | Find your **leaver** | | **Present** — they may have worked in the period, and those days count |
-| G6B-02.5 | Open the **person filter** on that same screen | | The hired-not-joined person is **still selectable.** Left out of a total is not hidden from the business |
-| G6B-02.6 | Open the availability board | `/availability` | They are **named as hired but not yet joined**, and not offered as bookable |
-| G6B-02.7 | Open the team register | `/m/inspectors` | They **are** listed, as before |
-| G6B-02.8 | Filter the register to "Joining pending" | `/m/inspectors` | They appear; the active person and leaver do not |
+| G6B-02.1 | Open the Utilization panel | Left menu → 📊 Insights → Card “Dashboards”<br>*or type* `operations.mghaiapps.com/reports` | A row per person with man-days and a percentage |
+| G6B-02.2 | Find your **active** person | Left menu → 🛠️ Operations → Card “Team member availability”<br>*or type* `operations.mghaiapps.com/availability`<br>**Look for:** find your active person in the board | **Present** — the report still works |
+| G6B-02.3 | Find your **hired-not-joined** person | Left menu → 🛠️ Operations → Card “Team member availability”<br>*or type* `operations.mghaiapps.com/availability`<br>**Look for:** find your hired-but-not-joined person | **Absent** |
+| G6B-02.4 | Find your **leaver** | Left menu → 🛠️ Operations → Card “Team member availability”<br>*or type* `operations.mghaiapps.com/availability`<br>**Look for:** find your leaver | **Present** — they may have worked in the period, and those days count |
+| G6B-02.5 | Open the **person filter** on that same screen | Left menu → 🛠️ Operations → Card “Team member availability”<br>*or type* `operations.mghaiapps.com/availability`<br>**Look for:** the person filter on the same screen | The hired-not-joined person is **still selectable.** Left out of a total is not hidden from the business |
+| G6B-02.6 | Open the availability board | Left menu → 🛠️ Operations → Card “Team member availability”<br>*or type* `operations.mghaiapps.com/availability` | They are **named as hired but not yet joined**, and not offered as bookable |
+| G6B-02.7 | Open the team register | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters” → On that screen: the “Inspectors” card<br>*or type* `operations.mghaiapps.com/m/inspectors` | They **are** listed, as before |
+| G6B-02.8 | Filter the register to "Joining pending" | Left menu → ⚙️ Admin → Tab “Masters” → Card “Masters” → On that screen: the “Inspectors” card<br>*or type* `operations.mghaiapps.com/m/inspectors` | They appear; the active person and leaver do not |
 
 **If G6B-02.3 shows them, or G6B-02.5 does not,** stop and tell me — those two are the whole
 point of the change.
