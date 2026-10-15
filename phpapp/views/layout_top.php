@@ -571,6 +571,29 @@
       //  trail off for a screen that genuinely has no parent (sign-in, setup).
       $__trail = (function_exists('nav_trail') && ($nav_crumbs ?? true) && $cur !== '')
                  ? nav_trail($cur, $nav_leaf ?? null) : [];
+      //  ---- UAT 1.3.5 / 1.5.5 / 1.6.1 / 1.6.4 / 1.7.1 — ONE STEP BACK --------
+      //
+      //  Reported eight separate times in one session, in the owner's words:
+      //  "when clicked on back does not go one step upward but goes directly to
+      //  the admin", and "no option to move just one step back like back arrow
+      //  or button".
+      //
+      //  Both halves were true. The breadcrumb said where you were but offered
+      //  no single obvious way back, and the BROWSER's Back button is no answer
+      //  for a screen reached by typing its address — there is no history to go
+      //  back to, so it leaves the application entirely.
+      //
+      //  nav_back_info() already worked out the right destination (the referrer
+      //  when it is ours, otherwise the trail's parent) and 27 views hand-rolled
+      //  their own button from it. The other 129 screens had nothing. Drawing it
+      //  here gives every screen the same control, in the same place, and a new
+      //  screen gets one without anybody remembering to add it.
+      $__back = (function_exists('nav_back_info') && ($nav_crumbs ?? true) && $cur !== '')
+                ? nav_back_info($cur) : null;
+      if ($__back && !empty($__back['url']) && trim($__back['url'], '/') !== $cur):
+?>      <a class="crumb-back" href="<?= e($__back['url']) ?>"
+         title="Back to <?= e($__back['label']) ?>">&larr; <?= e($__back['label']) ?></a>
+<?php endif;
       if (count($__trail) > 1): ?>
       <nav class="crumbs" aria-label="Breadcrumb"><?php
         foreach ($__trail as $__i => $__c):

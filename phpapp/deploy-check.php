@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'cc259a5 · 2026-10-13 15:07 UTC · 682 files';
+$RELEASE = 'cdf0dd3 · 2026-10-15 00:33 UTC · 682 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -311,7 +311,7 @@ $EXPECT  = [
     'views/layout_bottom.php' => ['s'=>880,'h'=>'e6b33e19b84eb59f'],
     'views/layout_embed_bottom.php' => ['s'=>65,'h'=>'63f4c118c80caf4b'],
     'views/layout_embed_top.php' => ['s'=>730,'h'=>'b20991bedef34be0'],
-    'views/layout_top.php' => ['s'=>34670,'h'=>'c710e8bd182fbe8f'],
+    'views/layout_top.php' => ['s'=>36121,'h'=>'0dcde8850fdf6957'],
     'views/list.php' => ['s'=>3275,'h'=>'b234af3a9590aae2'],
     'views/login.php' => ['s'=>602,'h'=>'ff266c37dfd19bb0'],
     'views/login_page.php' => ['s'=>10767,'h'=>'c18991133beffa78'],
