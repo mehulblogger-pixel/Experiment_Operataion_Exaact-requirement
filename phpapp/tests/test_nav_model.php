@@ -95,11 +95,34 @@ t_section('The owner\'s own example');
 
 // "I am in approval-rules - Reporting and I click back it goes directly to the
 //  reporting modules which is of no use."
+//
+//  UPDATED 2026-10-15, ON THE OWNER'S SECOND REPORT, AND THE CHANGE IS RECORDED
+//  BECAUSE IT REVERSES AN EARLIER ONE.
+//
+//  The area step read "Reporting" because the trail asked the PERMISSION
+//  grouping where this screen lives. The menu never agreed: this screen is
+//  reached from Admin → Approvals, and there is no route to it from Reporting
+//  at all. The owner then found the Approvals entry filed under a heading
+//  called "Report configuration" and asked: "Really under reporting???" — the
+//  same disagreement, seen from the menu side.
+//
+//  So the trail now names the area the MENU puts the screen in, and the module
+//  step below it still says which module's rules these are. The owner's
+//  original complaint is unaffected and still guarded: the point was that Back
+//  must not dump you at an area index, and it does not — it goes to the
+//  inspection-report register, one step up, as the next assertions require.
 $t = nav_trail('idems-approval-rules');
 $labels = array_map(fn($s) => $s['label'], $t);
-t_ok(in_array('Reporting', $labels, true), '*** report approval rules sit under Reporting');
+t_ok(in_array('Admin', $labels, true),
+     '*** report approval rules sit where the menu puts them, under Admin');
+t_ok(!in_array('Reporting', $labels, true),
+     '*** and NOT under Reporting, which has no route to this screen');
 t_ok(in_array(access_module_label('idems'), $labels, true),
      '*** and under the inspection-reports module, not straight under the area');
+//  Back goes one step up to that module's own register — never to the area index.
+$b = nav_back_info('idems-approval-rules');
+t_eq($b['label'], access_module_label('idems'),
+     '*** so Back lands on the inspection reports, which was the owner\'s whole point');
 t_eq(end($labels), 'Report approval rules', '*** the trail ends on the screen you are on');
 
 // The same screen name under Sales must land somewhere different, which is the
@@ -127,63 +150,83 @@ foreach (['jobs' => 'Operations', 'calls' => 'Operations', 'candidates' => 'Recr
 t_eq($lost, [], '*** every area reaches the trail of the screens beneath it'
      . ($lost ? ' — ' . implode('; ', $lost) : ''));
 
-t_section('Back follows where you came from');
+t_section('Back goes one step UP — never where you came from');
+
+//  THIS SECTION ASSERTED THE OPPOSITE UNTIL 2026-10-15, AND WAS CHANGED ON THE
+//  OWNER'S REPORT. It is written down here because reversing a test is the one
+//  edit that can quietly destroy the thing the test protected.
+//
+//  It used to assert that Back follows the referrer. Two screenshots killed it:
+//
+//    · Standing on /admin, arrived from /approvals-setup, the control read
+//      "← Approvals setup" — a screen INSIDE Admin. Back pointed downwards.
+//    · Standing on /hierarchy, arrived from /masters, it read "← Masters"
+//      while the breadcrumb an inch below said the parent was "Users & access".
+//      Two navigation controls on one screen, contradicting each other.
+//
+//  "Check the breadcrumbs which does not go one step above it is pathetic."
+//
+//  The browser already has "where I came from" — a button on every desktop, a
+//  swipe on every phone. Spending the one in-page control on a duplicate of it
+//  left "what is this screen inside of?" with no control at all, which is the
+//  question you need precisely when the browser's Back is useless: you typed
+//  the address, followed a link from an email, or arrived after a redirect.
+//
+//  So the contract below is now the strict one, and it is stronger than what it
+//  replaced in three ways: the destination is DERIVED from the trail rather
+//  than kept in step with it by hand; the two controls cannot disagree, because
+//  one is built from the other; and no referrer — including one an attacker
+//  chooses — can move it.
 
 $_SERVER['HTTP_HOST'] = 'example.test';
-$_SERVER['HTTP_REFERER'] = 'https://example.test/masters';
-t_eq(nav_back('m/agencies'), '/masters', '*** arriving from Masters, Back returns to Masters');
-
-$_SERVER['HTTP_REFERER'] = 'https://example.test/operations?tab=backlog';
-t_eq(nav_back('m/agencies'), '/operations?tab=backlog',
-     '*** arriving from Operations, Back returns there — query string and all');
-
-// A referrer pointing at the page you are on must not trap you there.
-$_SERVER['HTTP_REFERER'] = 'https://example.test/jobs';
-t_ok(nav_back('jobs') !== '/jobs', '*** Back never returns to the screen you are already on');
-
-// Another site, or none at all, falls back to the real parent.
-$_SERVER['HTTP_REFERER'] = 'https://somewhere-else.example/page';
-t_ok(strpos(nav_back('job-edit'), '/job') === 0 || nav_back('job-edit') === '/operations',
-     '*** an outside referrer falls back to the true parent, never off-site');
 unset($_SERVER['HTTP_REFERER']);
-$b = nav_back('quote-approval-rules');
-t_ok($b !== '' && $b[0] === '/', '*** with no referrer at all, Back still goes somewhere real: ' . $b);
 
-t_section('The Back link and its words always agree');
+//  Back IS the trail's last link. Not "usually", not "when there is no
+//  referrer" — by construction, on every screen the router serves.
+foreach (['m/agencies', 'equip-new', 'jobs', 'hierarchy', 'users', 'masters',
+          'approvals-setup', 'approval-rules', 'recruit-approvals', 'documents'] as $r) {
+    $i = nav_back_info($r);
+    $t = nav_trail($r);
+    $parent = null;
+    for ($k = count($t) - 1; $k >= 0; $k--) if (!empty($t[$k]['url'])) { $parent = $t[$k]; break; }
+    t_eq($i['url'],   $parent['url'] ?? '/',    "*** /$r — Back is the trail's own parent link");
+    t_eq($i['label'], $parent['label'] ?? 'Home', "*** /$r — and is labelled exactly as the trail labels it");
+}
 
-//  TWO BUGS LIVED HERE, AND BOTH ARE THE KIND NO UNIT TEST WOULD HAVE FOUND
-//  WITHOUT BEING TOLD TO LOOK.
-//
-//  1. parse_url() returns the referrer host WITHOUT its port; HTTP_HOST keeps
-//     it. Compared raw, they never matched on any host carrying a port, so the
-//     referrer was treated as off-site and Back fell back to the parent EVERY
-//     time — the exact behaviour this function exists to remove, hiding behind
-//     a function that looked correct.
-//  2. The url and the label were computed separately and drifted at once: the
-//     link went back to Masters while the words still read "Equipment &
-//     calibration". That is worse than a wrong link, because people read the
-//     words and never look at where they land.
-$_SERVER['HTTP_HOST'] = 'example.test:8891';          // a host WITH a port
-$_SERVER['HTTP_REFERER'] = 'http://example.test:8891/masters';
-$i = nav_back_info('equip-new');
-t_eq($i['url'], '/masters', '*** a referrer on a host with a port is still recognised as ours');
-t_eq($i['label'], 'Masters', '*** and the words name where the link actually goes');
-
-$_SERVER['HTTP_REFERER'] = 'http://example.test:8891/quality';
-$i = nav_back_info('equip-new');
-t_eq($i['url'], '/quality', '*** came from Quality, Back returns to Quality');
-t_eq($i['label'], 'Quality', '*** labelled Quality, not the parent module');
-
-// the url and the label must never be able to disagree
-foreach (['masters', 'documents', 'operations', 'quality'] as $from) {
-    $_SERVER['HTTP_REFERER'] = 'http://example.test:8891/' . $from;
-    $i = nav_back_info('equip-new');
-    $t = nav_trail(trim((string)parse_url($i['url'], PHP_URL_PATH), '/'));
-    t_eq($i['label'], end($t)['label'],
-         "*** Back to /$from is labelled exactly as that screen is named");
+//  A REFERRER CANNOT MOVE IT. This is the assertion that would fail first if
+//  anybody reinstated the old behaviour, and it is also a small security
+//  property: the referrer is attacker-chosen on any cross-site navigation, and
+//  an in-page control that follows it is a control somebody else aims.
+foreach (['https://example.test/operations?tab=backlog',
+          'https://example.test/masters',
+          'https://somewhere-else.example/page',
+          'http://example.test:8891/quality'] as $ref) {
+    $_SERVER['HTTP_REFERER'] = $ref;
+    t_eq(nav_back('equip-new'), nav_back_info('equip-new')['url'],
+         '*** the referrer does not move Back: ' . $ref);
 }
 unset($_SERVER['HTTP_REFERER']);
-$_SERVER['HTTP_HOST'] = 'example.test';
+$fixed = nav_back('equip-new');
+$_SERVER['HTTP_REFERER'] = 'https://example.test/quality';
+t_eq(nav_back('equip-new'), $fixed, '*** and the answer is the same with a referrer as without one');
+unset($_SERVER['HTTP_REFERER']);
+
+//  Back never returns to the screen you are standing on, which would trap you.
+foreach (['jobs', 'masters', 'admin', 'quality'] as $r)
+    t_ok(trim((string) nav_back($r), '/') !== $r, "*** /$r — Back never points at the screen you are on");
+
+//  And it always goes somewhere the application actually serves.
+foreach (['quote-approval-rules', 'equip-new', 'm/designations'] as $r) {
+    $b = nav_back($r);
+    t_ok($b !== '' && $b[0] === '/', "*** /$r — Back goes somewhere real: $b");
+}
+
+//  An area Home's parent is Home — never a screen inside that area. This is the
+//  exact defect the owner photographed on /admin.
+foreach (['admin', 'quality', 'reporting', 'money', 'directory'] as $home) {
+    $b = nav_back_info($home);
+    t_eq($b['url'], '/', "*** /$home is an area Home, so one step up is Home itself");
+}
 
 t_section('Add and edit screens read like English');
 

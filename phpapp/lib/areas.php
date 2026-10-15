@@ -326,7 +326,17 @@ function ops_area_def($area) {
             // coordinators / asst. managers into Admin. See the 'quality' area above.
             $t(can('settings.manage') || is_master(), '🏢', 'Company profile', '/company-profile', 'Legal name, logo and details.');
 
-            $sec('Report configuration');
+            //  APPROVALS IS NOT REPORT CONFIGURATION.
+            //
+            //  The one Approvals entry was dropped into the existing "Report
+            //  configuration" section, because that is where the quote & report
+            //  approval tile it replaced had always lived. But the entry it
+            //  became reaches recruitment, quotations, reports AND delegation,
+            //  so filing it under reporting tells an administrator looking for
+            //  hiring approvals to look somewhere they have no reason to open.
+            //  The owner found it there and asked, reasonably: "Really under
+            //  reporting???" It gets its own heading.
+            $sec('Approvals');
             //  UAT 1.7.3 — Admin carried TWO approval tiles and two more lived in
             //  other areas, so "where do I change who approves this?" had four
             //  answers in three places. One entry now, and it lists whichever of
@@ -336,6 +346,8 @@ function ops_area_def($area) {
                '✅', 'Approvals', '/approvals-setup',
                'Who signs off what — recruitment, quotations, reports and delegation, in one place.',
                $num(fn() => $fx('appr_cond_unarmed_count') ? appr_cond_unarmed_count() : 0), 'amber');
+
+            $sec('Report configuration');
             //  TWO SCREENS WERE BOTH CALLED "Approval rules".
             //
             //  This one routes QUOTES and REPORTS. A second, at /recruit-approvals

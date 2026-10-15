@@ -45,9 +45,18 @@ t_ok(substr_count($css, '{') === substr_count($css, '}'),
     'the stylesheet is still balanced');
 
 // ---- where back actually goes, for the screens that were dead ends --------
-//  nav_back_info falls back to the trail's nearest parent when there is no
-//  referrer, which is exactly the "typed the address" case the owner hit.
+//  Back is the trail's own parent link. The referrer is not consulted at all —
+//  see the "Back goes one step UP" section of tests/test_nav_model.php for why
+//  that was reversed on 2026-10-15.
 unset($_SERVER['HTTP_REFERER']);
+
+//  SIGN IN FIRST. Without a session every permission-gated step drops out of
+//  the trail, so Back collapses to Home and the assertions below pass without
+//  testing anything: "/m/designations does not go straight to Admin" is true of
+//  "/" as well. The real complaint was about a signed-in administrator, so the
+//  test now asks as one. (This is why the deep-screen check below moved from
+//  "not Admin" to naming the exact parent it must land on.)
+t_as_admin();
 
 foreach (['licence', 'lookups', 'approval-rules', 'billing', 'preflight'] as $r) {
     $i = nav_back_info($r);
@@ -58,24 +67,34 @@ foreach (['licence', 'lookups', 'approval-rules', 'billing', 'preflight'] as $r)
 
 //  A screen one level deeper must go up ONE step, not all the way out. This is
 //  the specific thing the owner reported: back jumped straight to Admin.
-$deep = nav_back_info('m/designations');
-t_ok(is_array($deep) && !empty($deep['url']), 'an individual master list has a way back');
-t_ok(trim((string)$deep['url'], '/') !== 'admin',
-    'and it goes up one step (to the master lists), not straight out to Admin');
-
-//  A referrer that is ours is preferred, so Back returns where you came from.
 $_SERVER['HTTP_HOST'] = 'example.test';
-$_SERVER['HTTP_REFERER'] = 'http://example.test/masters';
-$fromMasters = nav_back_info('m/designations');
-t_eq($fromMasters['url'], '/masters', 'arriving from the master lists, Back returns there');
+$deep = nav_back_info('m/designations');
+t_eq($deep['url'], '/masters',
+    'an individual master list goes up one step, to the master lists');
+t_eq($deep['label'], 'Masters', 'and says so');
+
+//  NO REFERRER CAN MOVE IT — not one of ours, and not one from another site.
+//  The second owner report was a control reading "← Masters" while the trail an
+//  inch below said the parent was "Users & access"; following the referrer is
+//  what made that possible, and nothing may bring it back.
+foreach (['http://example.test/masters',
+          'http://example.test/operations?tab=backlog',
+          'https://example.org/somewhere'] as $ref) {
+    $_SERVER['HTTP_REFERER'] = $ref;
+    $i = nav_back_info('m/designations');
+    t_eq($i['url'], '/masters', "the referrer does not move Back: $ref");
+    t_ok(strpos((string)$i['url'], 'example.org') === false,
+        'and a referrer from another site is never followed off-site');
+}
 unset($_SERVER['HTTP_REFERER']);
 
-//  An off-site referrer must be ignored rather than followed out of the app.
-$_SERVER['HTTP_REFERER'] = 'https://example.org/somewhere';
-$off = nav_back_info('licence');
-t_ok(strpos((string)$off['url'], 'example.org') === false,
-    'a referrer from another site is ignored, never followed');
-unset($_SERVER['HTTP_REFERER']);
+//  AN AREA HOME'S PARENT IS HOME. The owner photographed /admin offering
+//  "← Approvals setup" — a screen inside Admin, so Back pointed downwards.
+foreach (['admin', 'quality', 'directory'] as $home)
+    t_eq(nav_back_info($home)['url'], '/',
+        "/$home is an area home, so one step up is Home — never a screen inside it");
+
+t_as_nobody();
 
 //  Home itself has no parent, and must not claim one.
 $layoutGuard = strpos($layout, "\$cur !== ''") !== false;

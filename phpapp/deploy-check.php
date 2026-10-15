@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '9586af2 · 2026-10-15 07:45 UTC · 684 files';
+$RELEASE = '2f0e531 · 2026-10-15 16:23 UTC · 684 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -44,7 +44,7 @@ $EXPECT  = [
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
     'lib/approvals_hub.php' => ['s'=>4789,'h'=>'e8b2f6a01ef230b0'],
     'lib/approvals_setup.php' => ['s'=>6622,'h'=>'8b679264ad47f3de'],
-    'lib/areas.php' => ['s'=>40962,'h'=>'b005b666bb1303f8'],
+    'lib/areas.php' => ['s'=>41673,'h'=>'7ba6d2f669b13c52'],
     'lib/assets.php' => ['s'=>14415,'h'=>'019c1f61103da27d'],
     'lib/attend.php' => ['s'=>13919,'h'=>'695a4eae1fd9e2a9'],
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
@@ -167,7 +167,7 @@ $EXPECT  = [
     'lib/mkt_plans.php' => ['s'=>10762,'h'=>'513801027f92ce90'],
     'lib/mkt_rules.php' => ['s'=>12129,'h'=>'f541702a11884133'],
     'lib/mkt_subs.php' => ['s'=>10123,'h'=>'7a5b146d8a81d7ce'],
-    'lib/nav.php' => ['s'=>17430,'h'=>'080551d79b51891c'],
+    'lib/nav.php' => ['s'=>17762,'h'=>'ea9c2fcd1845e6fe'],
     'lib/navindex.php' => ['s'=>14310,'h'=>'5f9fcb04d113870e'],
     'lib/ncdca.php' => ['s'=>44960,'h'=>'d64c2c2e6eddc5e1'],
     'lib/ncr.php' => ['s'=>34005,'h'=>'c798485b2013d240'],

@@ -222,17 +222,26 @@ function nav_trail($route, $leaf = null) {
     if ($route === '') return $trail;
 
     $mod  = nav_module_of($route);
-    //  Where a route BELONGS TO A MODULE, the module's own area wins. The Admin
-    //  menu is a grab-bag of configuration tiles that belong to other modules —
-    //  report approval rules appear there but are owned by inspection reports,
-    //  and the owner asked specifically for that screen to sit under Reporting
-    //  so Back reaches the reports, not the admin index. Letting the menu
-    //  override ownership moved it to Admin and broke that.
+    //  THE MENU DECIDES WHERE A SCREEN LIVES. The permission grouping only
+    //  answers for screens the menu does not list.
     //
-    //  The menu answers for a route with NO module at all. That is the case the
-    //  old five-route list missed: /lookups is owned by nothing, so it got no
-    //  area and the trail read "Home › Lookups" for a screen reached from Admin.
-    $area = ($mod ? nav_area_of_module($mod) : null) ?: nav_route_area($route);
+    //  This order was the other way round, and it produced a trail that
+    //  contradicted the menu the person had just used. /masters is reached by
+    //  every single user through Admin → Masters, and the breadcrumb said
+    //  "Home › Directory › Masters", because permission_nav_groups() files the
+    //  masters module under Directory. So Back landed them in Directory — an
+    //  area some of them had never opened.
+    //
+    //  The two maps answer different questions and only one of them is about
+    //  place. permission_nav_groups() groups PERMISSIONS for the access editor:
+    //  it says which checkboxes sit together, not which menu a screen hangs
+    //  under. areas.php IS the menu. A trail that disagrees with the menu is
+    //  worse than a short one, because it teaches the wrong place to look next
+    //  time — and the owner reported exactly that outcome.
+    //
+    //  The module step below is unchanged, so a record still trails through its
+    //  own register (Home › Admin › Users & access › Hierarchy).
+    $area = nav_route_area($route) ?: ($mod ? nav_area_of_module($mod) : null);
 
     if ($area !== null) {
         $ar = nav_area_routes()[$area] ?? null;
@@ -286,37 +295,35 @@ function nav_trail($route, $leaf = null) {
 
 //  WHERE BACK SHOULD GO, AND WHAT TO CALL IT.
 //
-//  Where you actually came from, when that is a real screen in this application
-//  and not the page you are already standing on. Otherwise the true parent from
-//  the trail. Never a hard-coded guess — that is the whole of R-21 and R-22.
+//  ONE STEP UP THE TRAIL. Always. Never where you came from.
 //
-//  The url and its label are worked out TOGETHER, in one place. Computed apart,
-//  they drifted immediately: the link went back to Masters while the words still
-//  said "Equipment & calibration", which is worse than a wrong link, because the
-//  person reads the words and does not look at where they land.
+//  This used to prefer the referrer, on the reasoning that "where you actually
+//  came from" is the most useful destination. Measured against the real app,
+//  it is not — it is actively wrong, and the owner reported it twice in one
+//  session: "Check the breadcrumbs which does not go one step above it is
+//  pathetic."
+//
+//  Two failures, both reproduced over HTTP before this was changed:
+//
+//    · Standing on /admin having arrived from /approvals-setup, the control
+//      read "← Approvals setup" — a screen INSIDE Admin. "Back" pointed down.
+//    · Standing on /hierarchy having arrived from /masters, it read
+//      "← Masters" while the breadcrumb directly underneath it said the parent
+//      was "Users & access". The two controls contradicted each other on the
+//      same screen, an inch apart.
+//
+//  The deeper reason is that the browser ALREADY has "where I came from", on
+//  every device, with a swipe on a phone. Spending the one in-page control on a
+//  duplicate of it leaves the question it cannot answer — "what is this screen
+//  inside of?" — with no control at all. That question is the one you need when
+//  you arrived by typing an address, by following a link from an email, or
+//  after a redirect, which is exactly when the browser's own Back is useless.
+//
+//  So: the first linked step from the end of the trail, which is the parent.
+//  The trail is drawn immediately below this control, so the two now always
+//  agree by construction — the control is literally the trail's own last link.
 function nav_back_info($route) {
     $route = trim((string)$route, '/');
-    $ref   = (string)($_SERVER['HTTP_REFERER'] ?? '');
-    if ($ref !== '') {
-        //  parse_url() hands back the host WITHOUT the port while HTTP_HOST keeps
-        //  it, so comparing them raw never matches on any host that carries one
-        //  (a dev server, a staging box on :8080). The referrer was then treated
-        //  as off-site and silently ignored — Back fell back to the parent every
-        //  single time, which is the bug this whole function exists to kill.
-        $host = (string)parse_url($ref, PHP_URL_HOST);
-        $here = explode(':', (string)($_SERVER['HTTP_HOST'] ?? ''))[0];
-        $path = (string)parse_url($ref, PHP_URL_PATH);
-        $q    = (string)parse_url($ref, PHP_URL_QUERY);
-        $came = trim($path, '/');
-        if (($host === '' || $host === $here) && $path !== ''
-            && $came !== $route && strncmp($came, 'login', 5) !== 0) {
-            //  Name it the way the trail would name that screen, so "← Masters"
-            //  means the Masters screen and nothing else.
-            $t     = nav_trail($came);
-            $label = end($t)['label'];
-            return ['url' => $path . ($q !== '' ? '?' . $q : ''), 'label' => $label];
-        }
-    }
     $trail = nav_trail($route);
     for ($i = count($trail) - 1; $i >= 0; $i--)
         if (!empty($trail[$i]['url']))

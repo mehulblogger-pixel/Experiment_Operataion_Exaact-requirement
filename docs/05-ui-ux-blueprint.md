@@ -121,6 +121,37 @@ These should always appear on inspector cards.
 Maximum **five** bottom navigation tabs. Recommended: **Home · Jobs · Messages ·
 Notifications · Profile.** Everything else goes under "More".
 
+#### Back means UP. Always. (ratified 2026-10-15)
+
+Every screen carries one back control, and it goes **one step up the breadcrumb
+trail** — to the screen this one sits inside. It never goes to the screen you
+happened to arrive from.
+
+Why, in business terms: the browser already has "where I came from", on every
+device, including a swipe on a phone. Spending our one control on a duplicate of
+it leaves the question the browser *cannot* answer — "what is this screen inside
+of?" — with no control at all. That is the question you need exactly when the
+browser's own Back is useless: you typed the address, followed a link from an
+e-mail, or landed here after a save.
+
+Two consequences are binding:
+
+- **The back control and the breadcrumb may never disagree.** The control is
+  built from the trail, so they are the same answer shown twice. An owner
+  photographed a screen whose back control said "← Masters" while the trail an
+  inch below said the parent was "Users & access"; that must be impossible.
+- **An area home's one step up is Home.** Never a screen inside that area. The
+  same report showed Admin offering "← Approvals setup" — a screen *within*
+  Admin, so "back" pointed downwards.
+
+#### The menu decides where a screen lives
+
+The breadcrumb names the area **the menu puts the screen in**, not the area its
+permissions are grouped under. These are different questions and only one of
+them is about place: permission grouping decides which checkboxes sit together
+on the access editor. A trail that contradicts the menu the person just used is
+worse than a short one, because it teaches the wrong place to look next time.
+
 ### Dashboards
 
 Do not build dashboards like Excel. Build **action dashboards**.
