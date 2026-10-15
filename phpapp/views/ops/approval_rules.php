@@ -204,10 +204,37 @@ $sp = $selfPolicy ?? ['self_approval' => false, 'master_exception' => false, 'mi
           <div class="ff"><label>Applies to</label><select class="form-control" name="entity"><?php foreach ($entities as $k=>$v): ?><option value="<?= $k ?>" <?= $sel['entity']===$k?'selected':'' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-          <div class="ff"><label>Department</label><input class="form-control" name="applies_department" value="<?= $e($sel['applies_department']) ?>"></div>
-          <div class="ff"><label>Business unit</label><input class="form-control" name="applies_sbu" value="<?= $e($sel['applies_sbu']) ?>"></div>
-          <div class="ff"><label>Grade</label><input class="form-control" name="applies_grade" value="<?= $e($sel['applies_grade']) ?>"></div>
-          <div class="ff"><label>Position</label><input class="form-control" name="applies_position" value="<?= $e($sel['applies_position']) ?>"></div>
+<?php
+          //  UAT 1.7.1 — these four were free-text boxes, so a rule matched only
+          //  if the administrator re-typed the value exactly as a requisition
+          //  spells it. A rule that silently matches nothing is worse than no
+          //  rule at all: the request goes to the fallback approver and nobody
+          //  notices it skipped the chain.
+          //
+          //  A LIST, not a <select>: a datalist offers the company's master
+          //  values and still accepts anything already stored, so no existing
+          //  rule loses its value and no migration is needed. Blank still means
+          //  "applies to all", which is why none of them is required.
+          $pick = function ($name, $label, $values, $current) use ($e) {
+              $id = 'dl_' . $name;
+              echo '<div class="ff"><label>' . $e($label) . '</label>';
+              echo '<input class="form-control" name="' . $e($name) . '" list="' . $e($id) . '"'
+                 . ' value="' . $e($current) . '" placeholder="Any" autocomplete="off">';
+              echo '<datalist id="' . $e($id) . '">';
+              foreach ((array) $values as $k => $v) {
+                  $opt = is_int($k) ? (string) $v : (string) $k;
+                  $lbl = is_int($k) ? '' : (string) $v;
+                  if ($opt === '') continue;
+                  echo '<option value="' . $e($opt) . '">' . $e($lbl) . '</option>';
+              }
+              echo '</datalist>';
+              echo '<span class="hint">Leave blank to apply to all</span></div>';
+          };
+          $pick('applies_department', 'Department',    $l_depts     ?? [], $sel['applies_department']);
+          $pick('applies_sbu',        'Business unit', $l_sbus      ?? [], $sel['applies_sbu']);
+          $pick('applies_grade',      'Grade',         $l_grades    ?? [], $sel['applies_grade']);
+          $pick('applies_position',   'Position',      $l_positions ?? [], $sel['applies_position']);
+?>
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
           <div class="ff"><label>Amount from (0 = any)</label><input class="form-control" type="number" step="any" name="min_amount" value="<?= (float)$sel['min_amount'] ?>"></div>
@@ -226,7 +253,11 @@ $sp = $selfPolicy ?? ['self_approval' => false, 'master_exception' => false, 'mi
       </form>
     </div>
 
-    <div class="panel">
+    <?php // UAT 1.7.2 — saving a level returned to the TOP of the screen, so on
+          //  a rule with several levels the administrator had to scroll all the
+          //  way back down after every single edit. The handler now returns to
+          //  this anchor instead. ?>
+    <div class="panel" id="levels" style="scroll-margin-top:72px">
       <h3 class="tab-sub">Approval chain (levels)</h3>
       <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:760px">
         <tr><th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--muted,#656e7a);padding:6px 8px">Step</th><th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--muted,#656e7a);padding:6px 8px">Label</th><th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--muted,#656e7a);padding:6px 8px">Approver role</th><th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--muted,#656e7a);padding:6px 8px">SLA days</th><th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--muted,#656e7a);padding:6px 8px">Remind after</th><th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--muted,#656e7a);padding:6px 8px">Escalate to</th><th></th></tr>

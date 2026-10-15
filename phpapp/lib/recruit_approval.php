@@ -2594,8 +2594,9 @@ function ops_recruit_approvals($route, $method) {
         $do = (string)($_POST['do'] ?? '');
         if ($do === 'rule_save') { $id = appr_rule_save((int)($_POST['id'] ?? 0), $_POST); flash('Rule saved.'); redirect('/recruit-approvals?id=' . $id); return true; }
         if ($do === 'rule_toggle') { $r = appr_rule((int)($_POST['id'] ?? 0)); if ($r) appr_rule_set_active($r['id'], (int)$r['active'] === 0); flash('Rule updated.'); redirect('/recruit-approvals'); return true; }
-        if ($do === 'level_save') { appr_level_save($_POST); flash('Level saved.'); redirect('/recruit-approvals?id=' . (int)($_POST['rule_id'] ?? 0)); return true; }
-        if ($do === 'level_delete') { appr_level_delete((int)($_POST['level_id'] ?? 0)); flash('Level removed.'); redirect('/recruit-approvals?id=' . (int)($_POST['rule_id'] ?? 0)); return true; }
+        //  UAT 1.7.2 — return to the chain, not the top of the screen.
+        if ($do === 'level_save') { appr_level_save($_POST); flash('Level saved.'); redirect('/recruit-approvals?id=' . (int)($_POST['rule_id'] ?? 0) . '#levels'); return true; }
+        if ($do === 'level_delete') { appr_level_delete((int)($_POST['level_id'] ?? 0)); flash('Level removed.'); redirect('/recruit-approvals?id=' . (int)($_POST['rule_id'] ?? 0) . '#levels'); return true; }
         //  GATE 4 — the organisation's own self-approval policy. Written through
         //  setting_set(), which already records who changed which key and from what
         //  to what on the sealed audit chain, so §13's configuration audit needed
@@ -2665,6 +2666,44 @@ function ops_recruit_approvals($route, $method) {
         'orphans'  => $orphans,
         'ties'     => $ties,
         'offices'  => function_exists('offices_list') ? offices_list() : [],
+        //  UAT 1.7.1 / 1.7.2 — "there are no drop downs as per company setting
+        //  or master for department, business unit, grade, position".
+        //
+        //  All four were free-text boxes, so a rule matched only if the admin
+        //  re-typed the value exactly as the requisition spells it. A rule that
+        //  silently matches nothing is worse than no rule: the request goes
+        //  straight to the fallback approver and nobody notices.
+        //
+        //  lk_options_or() is the established reader — the COMPANY's master list
+        //  where it has one, the shipped default where it does not — so these
+        //  follow Masters without a second place to maintain.
+        'l_depts' => function_exists('lk_options_or') && defined('DEPARTMENTS')
+                        ? lk_options_or('department', DEPARTMENTS) : [],
+        'l_sbus'  => function_exists('lk_options_or') && defined('OPS_SBUS')
+                        ? lk_options_or('sbu', OPS_SBUS) : [],
+        //  Grade has no shipped list and no master type of its own, so the
+        //  company's master list answers where one exists and the grades
+        //  already in use answer where it does not — an empty picker on a
+        //  workspace that plainly uses grades would just send the admin back
+        //  to typing, which is the defect being fixed.
+        'l_grades' => (function () {
+            $m = function_exists('lk_options_or') ? lk_options_or('grade', []) : [];
+            if ($m) return $m;
+            $seen = [];
+            foreach (['requisitions', 'positions', 'hiring_requests'] as $t) {
+                try {
+                    foreach (ops_all("SELECT DISTINCT grade g FROM $t WHERE COALESCE(grade,'') <> '' ORDER BY grade") ?: [] as $r)
+                        $seen[(string) $r['g']] = true;
+                } catch (Throwable $e) {}
+            }
+            return array_keys($seen);
+        })(),
+        //  Positions are a register, not a dropdown list, so they come from it.
+        'l_positions' => (function () {
+            try { return array_column(ops_all(
+                "SELECT name FROM positions WHERE COALESCE(name,'') <> '' ORDER BY name") ?: [], 'name'); }
+            catch (Throwable $e) { return []; }
+        })(),
         'preview'  => (isset($_GET['pv']) && $sel) ? appr_preview($sel['entity'], [
             'department'  => (string) ($_GET['pv_department'] ?? ''),
             'sbu'         => (string) ($_GET['pv_sbu'] ?? ''),

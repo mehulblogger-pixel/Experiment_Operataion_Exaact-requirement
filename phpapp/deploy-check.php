@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'cdf0dd3 · 2026-10-15 00:33 UTC · 682 files';
+$RELEASE = '38fd684 · 2026-10-15 00:55 UTC · 682 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -195,7 +195,7 @@ $EXPECT  = [
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
     'lib/recruit.php' => ['s'=>140121,'h'=>'2f028091332609a7'],
-    'lib/recruit_approval.php' => ['s'=>172675,'h'=>'0356cda8134cc52e'],
+    'lib/recruit_approval.php' => ['s'=>175044,'h'=>'fd58571c0596c63d'],
     'lib/recruit_assign.php' => ['s'=>40788,'h'=>'bcdcf294d7fa64a5'],
     'lib/recruit_cc.php' => ['s'=>33057,'h'=>'bba9d9edaf43ee16'],
     'lib/recruit_exec.php' => ['s'=>24603,'h'=>'0546b6c003d3493c'],
@@ -336,7 +336,7 @@ $EXPECT  = [
     'views/ops/ai_settings.php' => ['s'=>3916,'h'=>'ac3a734628f292f8'],
     'views/ops/ai_topup_pay.php' => ['s'=>2408,'h'=>'a6c85b5a75f2bc3e'],
     'views/ops/approval_delegations.php' => ['s'=>6151,'h'=>'dbb7ef0112381a62'],
-    'views/ops/approval_rules.php' => ['s'=>24363,'h'=>'466efe0ae6853b5a'],
+    'views/ops/approval_rules.php' => ['s'=>26057,'h'=>'27083d4619065189'],
     'views/ops/approvals.php' => ['s'=>9059,'h'=>'10797e07fd17f681'],
     'views/ops/area_home.php' => ['s'=>4611,'h'=>'718227061d3895e3'],
     'views/ops/asset_register.php' => ['s'=>12566,'h'=>'5973afebeb7207d5'],
