@@ -28,6 +28,9 @@ $state = function ($r) use ($today) {
 <div class="master-head">
   <div><h1>Approval delegation</h1>
     <p class="sub" style="margin:2px 0 0">While somebody is away, another person may approve in their place — for a stated period, and only for the authority they actually hold.</p></div>
+<?php // UAT 1.7.3 — the four approval screens share one tab strip, so they read
+      //  as one workbench instead of four destinations in three areas.
+      if (function_exists('apsetup_strip')) echo apsetup_strip('delegation'); ?>
 </div>
 
 <div class="panel" style="padding:0">

@@ -1297,3 +1297,19 @@ body.embed .container.embed-main{max-width:none;margin:0}
   .crumb-back{min-height:44px;padding:0 14px;margin-bottom:8px}
   .crumbs{display:block}
 }
+
+/* ---- UAT 1.7.3 — the approvals workbench tab strip ------------------------
+   The four approval screens live in three different areas; this strip is what
+   makes them read as one place. Scrolls rather than wraps on a phone so the
+   tabs never push the page sideways. */
+.appr-tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 8px;margin:0 0 12px;
+  border-bottom:1px solid var(--line);scrollbar-width:thin}
+.appr-tab{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;
+  padding:7px 13px;border:1px solid var(--line);border-bottom:none;
+  border-radius:9px 9px 0 0;background:var(--soft);color:var(--muted);
+  text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap}
+.appr-tab:hover{background:var(--card);color:var(--ink)}
+.appr-tab.on{background:var(--card);color:var(--brand-ink);border-color:var(--line);
+  box-shadow:inset 0 -2px 0 var(--brand)}
+.appr-tab:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (max-width:760px){.appr-tab{min-height:44px}}

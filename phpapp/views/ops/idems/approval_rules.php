@@ -12,6 +12,8 @@
     <a href="/recruit-approvals"><strong>Recruitment approvals</strong></a>, which is a separate chain.</span>
   <?php endif; ?>
   </p></div>
+<?php // UAT 1.7.3 — shared tab strip across the approval screens.
+      if (function_exists('apsetup_strip')) echo apsetup_strip('quotes'); ?>
   <a class="btn secondary" href="/approver-map">Approver mapping →</a>
 </div>
 <?= approval_rule_tabs('/approval-rules?module=report') ?>

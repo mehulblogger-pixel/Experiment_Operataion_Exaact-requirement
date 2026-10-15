@@ -34,6 +34,9 @@ $applySummary = function ($r) use ($e) {
       <a href="/approval-rules"><strong>Quote &amp; report approvals</strong></a>, which is a separate chain.</span>
     <?php endif; ?>
     </p></div>
+<?php // UAT 1.7.3 — the four approval screens share one tab strip, so they read
+      //  as one workbench instead of four destinations in three areas.
+      if (function_exists('apsetup_strip')) echo apsetup_strip('recruitment'); ?>
   <div class="row-actions"><form method="post" style="display:inline"><input type="hidden" name="do" value="rule_save"><input type="hidden" name="name" value="New rule"><button class="btn">＋ New rule</button></form></div>
 </div>
 

@@ -224,6 +224,7 @@ try {
     require __DIR__ . '/lib/areas.php';
     require __DIR__ . '/lib/navindex.php';
     require __DIR__ . '/lib/approvals_hub.php';   // R-27 — one answer to "what needs me?"
+    require __DIR__ . '/lib/approvals_setup.php'; // UAT 1.7.3 — and one answer to "where are the rules?"
     require __DIR__ . '/lib/nav.php';            // R-24 — where each screen sits (breadcrumbs, Back)
     require __DIR__ . '/lib/idems_autoform.php';
     require __DIR__ . '/lib/hwpoints.php';

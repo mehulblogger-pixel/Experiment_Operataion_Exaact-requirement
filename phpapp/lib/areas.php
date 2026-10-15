@@ -275,7 +275,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','workspace/setup','workspace/setup/modules','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','workspace/setup','workspace/setup/modules','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approvals-setup','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             // Phase 1 — the Company Setup Cockpit is the single front door to all
             // configuration below. Shown first so a non-technical admin starts here.
@@ -327,7 +327,15 @@ function ops_area_def($area) {
             $t(can('settings.manage') || is_master(), '🏢', 'Company profile', '/company-profile', 'Legal name, logo and details.');
 
             $sec('Report configuration');
-            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global')), '👤', 'Approver mapping', '/approver-map', 'Who signs which report.');
+            //  UAT 1.7.3 — Admin carried TWO approval tiles and two more lived in
+            //  other areas, so "where do I change who approves this?" had four
+            //  answers in three places. One entry now, and it lists whichever of
+            //  the four this person may actually open. The individual screens keep
+            //  their routes and their own gates; only the way in is unified.
+            $t(function_exists('apsetup_open') ? (bool) apsetup_open() : false,
+               '✅', 'Approvals', '/approvals-setup',
+               'Who signs off what — recruitment, quotations, reports and delegation, in one place.',
+               $num(fn() => $fx('appr_cond_unarmed_count') ? appr_cond_unarmed_count() : 0), 'amber');
             //  TWO SCREENS WERE BOTH CALLED "Approval rules".
             //
             //  This one routes QUOTES and REPORTS. A second, at /recruit-approvals
@@ -337,8 +345,7 @@ function ops_area_def($area) {
             //  recruitment approvals did not exist (UAT 1.7.1), and separately
             //  could not find the Review Required switch at all (UAT-G6B-01).
             //  R-14 a third time. Each screen is now named for what it governs.
-            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Quote & report approvals', '/approval-rules', 'Who signs off quotations and inspection reports.',
-                $num(fn() => $fx('appr_cond_unarmed_count') ? appr_cond_unarmed_count() : 0), 'amber');
+            //  (The quote & report tile folded into the Approvals entry above.)
             // R11 — the crm.template.manage grant moved to Sales (Document templates), so
             // holding only that permission no longer forces a marketing manager into Admin.
             $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '📝', 'Report templates', '/templates?kind=report', 'The report template library.');   // M11 — explicit destination

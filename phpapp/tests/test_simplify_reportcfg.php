@@ -49,10 +49,24 @@ t_ok(strpos($reporting, "case 'money':") === false && strpos($admin, "case 'dire
 //  area and an owner concluded recruitment approvals did not exist (UAT 1.7.1).
 //  The route is the identity; the wording is allowed to improve. Move either
 //  tile back to Reporting and this still fails, which is the whole point.
+//  UAT 1.7.3 moved the assertion from the SOURCE to the RESOLVER, and it is
+//  stronger for it. Admin no longer carries a tile each for these two: they are
+//  reached through the one Approvals workbench (/approvals-setup), because the
+//  owner found four approval screens in three areas and asked for the admin
+//  panel to be decluttered. A substring match on the tile list therefore no
+//  longer describes where a screen lives — nav_route_area() does, and it reads
+//  the menu itself. Move either screen back to Reporting and this still fails,
+//  which was always the point; remove its findability and test_findability
+//  fails, which is the other half.
 foreach (['/approver-map', '/approval-rules'] as $rt) {
     t_ok(strpos($reporting, "', '$rt'") === false, "$rt is removed from Reporting");
-    t_ok(strpos($admin, "', '$rt'") !== false, "$rt now lives under Admin");
+    $bare = ltrim($rt, '/');
+    t_eq(function_exists('nav_route_area') ? nav_route_area($bare) : null, 'Admin',
+        "$rt now lives under Admin");
 }
+//  And the way in is still there, exactly once.
+t_ok(strpos($admin, "'/approvals-setup'") !== false,
+    'Admin offers the one Approvals workbench that reaches them');
 t_ok(strpos($reporting, "'/templates") === false, 'the templates tile is removed from Reporting');
 t_ok(strpos($admin, "'/templates?kind=report'") !== false, 'the report-template tile now lives under Admin');
 t_ok(strpos($admin, "'Report templates'") !== false, 'M11 — and names the library it opens');

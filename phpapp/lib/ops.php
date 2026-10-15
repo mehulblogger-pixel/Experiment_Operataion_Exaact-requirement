@@ -3660,6 +3660,11 @@ function ops_dispatch($route, $method) {
             return ops_doc_templates($route, $method);
         case $route === 'candidate-letter':                          // Phase 5.1B — generate a letter from a template
             return ops_candidate_letter($route, $method);
+        //  UAT 1.7.3 — the approvals SETUP workbench. Distinct from
+        //  /approvals, which is the inbox (R-27): one is where the rules
+        //  are set, the other is what is waiting on you.
+        case $route === 'approvals-setup':
+            return ops_approvals_setup($route, $method);
         case $route === 'approval-delegations':                      // Phase 3 · M2 — who may act for whom, and when
             return ops_approval_delegations($route, $method);
         case $route === 'recruit-approvals':                         // Phase 6 — configurable recruitment approval matrix + SLA

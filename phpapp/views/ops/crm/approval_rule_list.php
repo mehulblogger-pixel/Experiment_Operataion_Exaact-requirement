@@ -10,6 +10,9 @@
       <a href="/recruit-approvals"><strong>Recruitment approvals</strong></a>, which is a separate chain.</span>
     <?php endif; ?>
     </p></div>
+<?php // UAT 1.7.3 — shared tab strip, so the approval screens read as one
+      //  workbench instead of four destinations in three areas.
+      if (function_exists('apsetup_strip')) echo apsetup_strip('quotes'); ?>
   <a class="btn" href="/quote-approval-rule-new">+ Add rule</a>
 </div>
 <?= approval_rule_tabs('/approval-rules?module=quote') ?>

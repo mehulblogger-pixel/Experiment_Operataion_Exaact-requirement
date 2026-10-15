@@ -155,6 +155,26 @@ function ops_nav_index($fresh = false) {
         }
     }
 
+    //  ---- UAT 1.7.3 — the approval screens, which no longer have their own
+    //  Admin tiles ----------------------------------------------------------
+    //
+    //  Admin used to carry a tile each for Quote & report approvals and the
+    //  Approver map; they are now reached through the one Approvals workbench,
+    //  which is what the owner asked for ("declutter the admin panel").
+    //
+    //  But THIS index is built from those same tiles, so removing them also
+    //  removed both screens from "Find a screen" — and being unfindable is the
+    //  original complaint (R-14, R-33: "recruitment approvals do not exist").
+    //  Decluttering a menu must never cost a screen its findability, so they
+    //  are registered here directly, behind the same questions their tiles
+    //  asked. Searching "approval" still finds every one of them.
+    if ($fx('apsetup_areas')) {
+        foreach (apsetup_areas() as $ap) {
+            if (empty($ap['can'])) continue;
+            $add($ap['label'] . ' approvals', $ap['url'], 'Admin', $ap['icon'], $ap['what']);
+        }
+    }
+
     // ---- The seven flat areas, flattened from their gated tile lists --------
     if ($fx('ops_area_def')) {
         foreach (['sales', 'marketplace', 'quality', 'reporting', 'money', 'insights', 'directory', 'admin'] as $area) {

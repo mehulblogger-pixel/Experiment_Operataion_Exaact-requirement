@@ -251,6 +251,35 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 18. **IDEMS reports** — view `mod.idems.view` (`ops.php:2290`); create/edit `mod.idems.edit` + `idems_can_edit_doc` (`idems.php:4185,3467`); approve step `idems_can_act_step` (`idems.php:5732`); finalise `is_master()||idems.finalize` with **approver≠issuer** (`idems.php:4456,4460`); type/format config `idems.type.manage` (`idems.php:4604+`); timestamps `idems.timestamp.edit` → BAM (`idems.php:7357`); audit log `idems.audit.view` (`idems.php:9772`).
 19. **CRM modules** — module gates `mod.inquiries/quotes/crm_orders/crm_reports.*`; fine-grained `crm.quote.create/approve/send`, `crm.template.manage` per `access.php:456-461`. Quote-approve default = MARKETING_MANAGER only (`access.php:459`); **not** BRANCH_MANAGER.
 
+> ### RATIFIED BY THE OWNER, 2026-10-15 — one way in to approval configuration
+>
+> The owner found four approval **configuration** screens scattered across three
+> areas and asked for them to be brought together:
+>
+> | Screen | Was filed under |
+> |---|---|
+> | Recruitment approvals (`/recruit-approvals`) | Recruitment |
+> | Quote & report approvals (`/approval-rules`) | Admin |
+> | Report approver map (`/approver-map`) | Reporting › Reports (IDEMS) |
+> | Approval delegation (`/approval-delegations`) | Recruitment |
+>
+> `/approvals-setup` is now one workbench listing them, Admin carries **one**
+> Approvals entry instead of two, and all four screens share a tab strip so they
+> read as one place. **This is a way IN, not a merge:** every screen keeps its
+> own route, its own handler and its own gate, and the workbench offers only
+> what the viewer may already open — `apsetup_areas()` asks exactly the
+> questions the menu tiles asked.
+>
+> **It grants nothing.** A recruitment administrator (`hiring.admin`) still
+> reaches recruitment approvals and still cannot reach quote approvals;
+> `lib/approvals_setup.php` contains no `ops_require()` at all, because it
+> decides nothing. `tests/test_approvals_workbench.php` (51 assertions) fails if
+> an area is ever offered to somebody whose own `can` is false.
+>
+> Not to be confused with **`/approvals`**, which remains the approvals **inbox**
+> (R-27, `lib/approvals_hub.php`) — "what is waiting on me?" as against "where
+> are the rules set?". The two screens link to each other.
+
 ## Connect — marketplace (external portals, K2b)
 
 > ### RATIFIED BY THE OWNER, 2026-10-13 — the Coordinator and the marketplace
