@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'a860e50 · 2026-10-18 08:16 UTC · 686 files';
+$RELEASE = '5a0acd0 · 2026-10-18 08:44 UTC · 686 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -136,7 +136,7 @@ $EXPECT  = [
     'lib/formdesign.php' => ['s'=>70839,'h'=>'bc087592b594d2e3'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
     'lib/helpers.php' => ['s'=>26953,'h'=>'640ad4ec78e2fff8'],
-    'lib/hiringreq.php' => ['s'=>102909,'h'=>'d7dd93468b6072db'],
+    'lib/hiringreq.php' => ['s'=>108078,'h'=>'1bfe20e4d86caa14'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
     'lib/idems.php' => ['s'=>786654,'h'=>'ac696b399296a300'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
@@ -452,7 +452,7 @@ $EXPECT  = [
     'views/ops/flow_gaps.php' => ['s'=>3287,'h'=>'f2bdad6e4475e0b2'],
     'views/ops/form_designer.php' => ['s'=>19293,'h'=>'27b031e7b0dc2719'],
     'views/ops/hierarchy.php' => ['s'=>57939,'h'=>'802fb089e84bfc73'],
-    'views/ops/hiring_request.php' => ['s'=>35956,'h'=>'276f0599a6b618ed'],
+    'views/ops/hiring_request.php' => ['s'=>41297,'h'=>'d2298c8a5cb3c681'],
     'views/ops/hiring_request_list.php' => ['s'=>2937,'h'=>'73541f4428e82608'],
     'views/ops/hwpoints.php' => ['s'=>3338,'h'=>'679fdb6488397c4a'],
     'views/ops/idems/approval_rules.php' => ['s'=>7590,'h'=>'20729ce1dceb96ce'],

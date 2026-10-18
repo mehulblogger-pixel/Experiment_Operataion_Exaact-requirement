@@ -714,6 +714,24 @@ function hreq_material_diff($r, array $incoming = null) {
  * whole order and needs none. That mirrors the rule on placement commercials,
  * deliberately: the same business shapes apply at both ends of the journey.
  */
+//  WHICH EMPLOYMENT TYPES HAVE NO END DATE.                  (UAT A1, 2026-10-18)
+//
+//    "When the employee is considered as permanant the period shall not be
+//     required and yearly costing shall be considered. When it is fixed term
+//     contract then months or something has to be entered."
+//
+//  Exactly right, and the form asked everybody the same question. "For how long
+//  (months)" has no sensible answer for a permanent hire — somebody either
+//  leaves it blank, and the estimate reads as one month of salary, or invents a
+//  number, and the approver is shown a commitment nobody intends to end.
+//
+//  A permanent hire is costed the way every business actually costs one: ANNUAL
+//  run-rate. The duration is not asked, it is 12 months by definition, and the
+//  total is labelled as a yearly cost so nobody reads it as the whole liability.
+function hreq_is_openended($employmentType) {
+    return in_array(strtoupper((string) $employmentType), ['PERMANENT'], true);
+}
+
 function hreq_commitment($r) {
     $n = function ($v) { return ($v === null || $v === '') ? 0.0 : (float) $v; };
     $per     = $n($r['est_cost_per_person'] ?? null);
@@ -722,6 +740,13 @@ function hreq_commitment($r) {
     $qty     = max(1, (int) ($r['quantity'] ?? 1));
     $basis   = (string) ($r['est_cost_basis'] ?? '');
     $perPeriod = in_array($basis, ['MONTHLY', 'MANMONTH', 'MANDAY', 'DAILY'], true);
+
+    //  OPEN-ENDED: twelve months, whatever the form holds. Computed here rather
+    //  than trusted from the post, so a stale duration saved before the type was
+    //  changed — or a crafted one — cannot show the approver a different number
+    //  from the one the screen showed.
+    $openEnded = hreq_is_openended($r['employment_type'] ?? '');
+    if ($openEnded && $perPeriod) $months = 12.0;
 
     //  A rate with no duration is not multiplied by a guess. It contributes what
     //  it can be known to contribute — one period — and the screen says so.
@@ -743,7 +768,15 @@ function hreq_commitment($r) {
         'recurring'  => $recurring,
         'total'      => $total,
         'per_period' => $perPeriod,
-        'partial'    => $partial,   // a rate was given but no duration
+        'partial'    => $partial && !$openEnded,   // a rate was given but no duration
+        //  Open-ended hires are costed as an annual run-rate, and every screen
+        //  that prints a total must say so rather than implying a finite
+        //  commitment. $partial is forced off above: twelve months is not a
+        //  missing answer, it is the definition.
+        'open_ended' => $openEnded,
+        'period_note'=> $openEnded
+            ? 'per year — a permanent role has no end date, so this is the annual run-rate'
+            : '',
     ];
 }
 
@@ -1433,6 +1466,58 @@ function hreq_cancel($id, $note = '') {
     return [true, 'Request cancelled.'];
 }
 
+// ---- Reopening a rejected request (UAT A1, 2026-10-18) ---------------------
+//
+//    "Once Hiring Request is Rejected, it cannot be edited. Suppose there is
+//     mistake in period of something like that then it will be a problem or if
+//     there is any typo mistake."
+//
+//  He is right, and the shape of the fix matters. A rejected request was
+//  terminal, so a request rejected because somebody typed 6 months instead of
+//  16, or put the wrong branch, could only be abandoned and retyped from
+//  scratch — losing the discussion, the approval history and the trail that
+//  explains why the company hired at all.
+//
+//  The transition added is REJECTED -> DRAFT, and it is recorded in
+//  docs/03-object-lifecycles.md in the same commit as this code. Three
+//  properties make it safe, and each is here deliberately:
+//
+//    · IT DOES NOT UN-REJECT ANYTHING. The request returns to DRAFT — the
+//      state it was in before anybody approved anything — so it must be
+//      submitted and approved again on its own merits. There is no path from
+//      REJECTED to APPROVED that does not pass an approver.
+//    · THE REJECTION SURVIVES. The decision, who made it and their note stay
+//      in the approval history; reopening adds an entry, it erases none. An
+//      approver looking at the resubmission can see it was rejected before and
+//      why, which is exactly what they need to judge it.
+//    · IT IS THE SAME RIGHT AS RAISING ONE, plus the same office scope. It
+//      grants nobody anything they did not already have.
+function hreq_reopen($id, $why = '') {
+    if (!hreq_can_create()) return [false, 'You do not have the right to reopen a hiring request.'];
+    hreq_migrate();
+    $r = hreq_get($id); if (!$r) return [false, 'That hiring request no longer exists.'];
+    if (!hreq_in_scope($r)) return [false, 'This hiring request is outside your office / branch scope.'];
+    $st = strtoupper((string) $r['status']);
+    if ($st !== 'REJECTED')
+        return [false, 'Only a rejected request can be reopened. This one is ' . $st . '.'];
+    $why = trim((string) $why);
+    if ($why === '')
+        return [false, 'Say what you are correcting, so the approver who rejected it can see what changed.'];
+
+    db()->prepare("UPDATE hiring_requests SET status='DRAFT', updated_by=?, updated_at=? WHERE id=?")
+        ->execute([hreq_who(), hreq_now(), (int) $id]);
+    //  Any approval chain from the rejected round is closed, so the old round
+    //  cannot be acted on after the request has moved on.
+    if (function_exists('appr_cancel_open'))
+        appr_cancel_open('HIRING_REQUEST', (int) $id, 'The request was reopened for correction.');
+    if (function_exists('act_log'))
+        act_log('HIRING_REQUEST', (int) $id, 'SYSTEM',
+                'Reopened for correction after rejection',
+                ['auto' => 1, 'outcome' => 'DRAFT', 'body' => substr($why, 0, 400)]);
+    return [true, 'Reopened as a draft. Correct it and submit it again — it needs a fresh approval, '
+                . 'and the earlier rejection stays in its history.'];
+}
+
 // ---- Request -> Requisition (§18, §20) ------------------------------------
 //  THE boundary this milestone exists to create: recruitment execution cannot
 //  begin from a request that is not ready. M4 makes that refusable; Phase 3 adds
@@ -1687,6 +1772,7 @@ function ops_hiring_requests($route, $method) {
         }
         if ($do === 'submit')  { [$ok, $msg] = hreq_submit($id);  flash($msg, $ok ? 'success' : 'error'); redirect('/hiring-request?id=' . $id); return true; }
         if ($do === 'cancel')  { [$ok, $msg] = hreq_cancel($id, (string) ($_POST['note'] ?? '')); flash($msg, $ok ? 'success' : 'error'); redirect('/hiring-request?id=' . $id); return true; }
+        if ($do === 'reopen')  { [$ok, $msg] = hreq_reopen($id, (string) ($_POST['reopen_why'] ?? '')); flash($msg, $ok ? 'success' : 'error'); redirect('/hiring-request?id=' . $id); return true; }
         if ($do === 'decide') {
             // Recording a decision is an administrator's act. Phase 3 replaces
             // this with the approval engine; the state change stays here so both

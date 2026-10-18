@@ -649,8 +649,11 @@ three are defined in `phase2/M4-TERMINOLOGY-LOCK.md`.
 
 ```
 DRAFT ─▶ SUBMITTED ─▶ UNDER_REVIEW ─▶ APPROVED ─▶ (raise a requisition)
-  │          │             │       └─▶ REJECTED
-  └──────────┴─────────────┴─────────▶ CANCELLED
+  ▲        │             │       └─▶ REJECTED
+  │        │             │              │
+  │        │             │              └── reopen for correction ──┐
+  └────────┴─────────────┴─────────▶ CANCELLED                      │
+  └───────────────────────────────────────────────────────────────── ┘
 ```
 
 - Values come from the `hiring_request_status` **lookup**, created through the
@@ -662,6 +665,26 @@ DRAFT ─▶ SUBMITTED ─▶ UNDER_REVIEW ─▶ APPROVED ─▶ (raise a requi
   directly, exactly as M4 behaved — a workspace that configured nothing is not
   forced into an approval process. No new status was added; `UNDER_REVIEW` **is**
   "approval pending".
+- **`REJECTED` → `DRAFT` — reopen for correction** (added 2026-10-18, on the
+  owner's UAT A1: *"Once Hiring Request is Rejected, it cannot be edited.
+  Suppose there is mistake in period of something like that then it will be a
+  problem or if there is any typo mistake."*). A rejected request was terminal,
+  so one rejected because a duration was typed as 6 instead of 16 could only be
+  abandoned and retyped — losing the discussion, the approval history and the
+  record of why the company hired at all. `hreq_reopen()` performs it. Three
+  properties keep it safe and all three are asserted in
+  `tests/test_hreq_reopen.php`:
+    - it returns the request to **`DRAFT`**, never to `APPROVED`. It must be
+      submitted and decided again; there is no path from `REJECTED` to
+      `APPROVED` that does not pass an approver.
+    - the **rejection is not erased**. The decision, the decider and the note
+      stay in the approval history, and the reopening is added to it with a
+      mandatory reason — so the next approver can see it was rejected before,
+      why, and what was changed.
+    - it needs the **same right as raising a request** (`hreq_can_create()`) and
+      obeys the same office scope. It grants nobody anything new, and any
+      approval chain left open from the rejected round is closed so it cannot
+      be acted on afterwards.
 - **`APPROVED` is the only executable state** (`HREQ_EXECUTABLE`).
   `hreq_is_executable()` is the single question, and `hreq_to_requisition()` asks
   it **before it writes anything**: recruitment cannot begin from a `DRAFT` or a

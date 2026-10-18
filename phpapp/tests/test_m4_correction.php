@@ -78,10 +78,25 @@ setting_set('terms', $savedTerms); setting_set('terms_pack', $savedPack);
 term_overrides($savedTerms ? (json_decode($savedTerms, true) ?: []) : []);
 t_eq(T('requisition'), 'Requisition', 'A4 · the suite wording is restored');
 
-// No screen prints a bare "Requirement" as the NAME of an object.
+// No screen PRINTS a bare "Requirement" as the NAME of an object.
+//
+//  ASKED OF WHAT THE SCREEN PRINTS, NOT OF THE FILE (fixed 2026-10-18). This
+//  searched the whole source, comments included, so it failed the moment a
+//  comment quoted the owner's own UAT words back — "but we have many new
+//  requirements already listed". A comment prints nothing to anybody, and a
+//  test that a comment can fail is not measuring what its own name says. It is
+//  also the kind of failure that pushes the next person to edit the COMMENT to
+//  satisfy the test, which is exactly backwards.
+//
+//  Third one of these found this week; test_b6_forms_disclosure counted the
+//  word "required" in a label, and test_b2_navigation_cc matched a '$d =' in a
+//  comment describing a bug. Same stripper as test_recruit_terminology uses.
 foreach (['views/ops/hiring_request.php', 'views/ops/hiring_request_list.php',
           'views/ops/requisition_form.php'] as $vf) {
     $src = file_get_contents(__DIR__ . '/../' . $vf);
+    $src = preg_replace('~/\*.*?\*/~s', '', $src);       // block comments
+    $src = preg_replace('~^\s*//.*$~m', '', $src);        // whole-line comments
+    $src = preg_replace('~//[^\n\'"]*$~m', '', $src);     // trailing comments
     $bare = preg_match('/(New requirement|Save requirement|Edit requirement|>Requirement<|>Requirements<)/i', $src);
     t_ok(!$bare, 'A5 · no bare "Requirement" object label in ' . basename($vf));
 }
@@ -353,15 +368,23 @@ if (preg_match_all('/(INSERT INTO|UPDATE |DELETE FROM)/', $src, $wm, PREG_OFFSET
 //  entities while THIS file owns the hiring_requests table. Rather than weaken the
 //  boundary asserted a few lines below, the versioning engine asks here — so the
 //  table still has exactly one owner.
+//  UAT A1 added one more, and it belongs here for the same reason as the rest —
+//  it writes, and it audits what it writes:
+//
+//    hreq_reopen   returns a REJECTED request to DRAFT so a mistake in it can be
+//                  corrected and put back for a fresh decision. Audited with the
+//                  mandatory reason; it deletes nothing, so the rejection and its
+//                  note stay readable. See docs/03-object-lifecycles.md, which
+//                  documents the transition.
 $AUDITED = ['hreq_migrate', 'hreq_save', 'hreq_submit', 'hreq_apply_decision', 'hreq_cancel',
             'hreq_to_requisition', 'hreq_require_reapproval', 'hreq_qty_enforce_after_write',
             'hreq_apply_approved_version', 'hreq_write_version_fields',
-            'hreq_write_approved_snapshot', 'hreq_set_reapproval'];
+            'hreq_write_approved_snapshot', 'hreq_set_reapproval', 'hreq_reopen'];
 $unaudited = array_values(array_diff(array_keys($writes), $AUDITED));
 t_ok(!$unaudited, 'D0 · every database write in the layer lives in an audited function'
      . ($unaudited ? ' — audit these: ' . implode(', ', $unaudited) : ''));
-t_eq(count($writes), 10, 'D0 · and there are exactly ten of them — M4 added the re-approval writer '
-     . 'and the headcount-ceiling compensator, both of which audit what they do');
+t_eq(count($writes), 11, 'D0 · and there are exactly eleven of them — M4 added the re-approval writer '
+     . 'and the headcount-ceiling compensator, and UAT A1 added hreq_reopen; all of them audit what they do');
 
 // For each mutation path: the chain, in order, BEFORE the first write.
 //   entitlement+capability -> tenant/branch scope -> state / input validation -> mutation -> audit

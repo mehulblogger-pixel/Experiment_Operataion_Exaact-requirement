@@ -266,10 +266,38 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
         <?= picker_hint(count($__desig), 'designations', '/lookup?key=designation', 'designation master') ?></div>
       <div class="ff"><label>Which department will they join?</label><?= $deptSel('hiring_department_id', (int) ($r['hiring_department_id'] ?? 0)) ?>
         <?= picker_hint(count($depts), 'departments', '/departments', 'department hub') ?></div>
+      <?php //  ---- "AGAINST WHICH POSITION?" (UAT A1) -------------------------
+            //
+            //    "Check this drop down Against which position? — optional
+            //     — none / a new one is needed — which is not having any data
+            //     but we have many new requirements already listed. Is this OK."
+            //
+            //  Yes, it is correct — and the fact that it had to be asked is the
+            //  defect. A POSITION is a sanctioned seat on the establishment
+            //  ("Senior Inspector, Quality, Ahmedabad — 3 sanctioned, 2 filled");
+            //  a REQUIREMENT is demand being recruited against. Many companies
+            //  never run a position register at all, which is why this field is
+            //  optional and why an empty list is a normal state rather than
+            //  missing data.
+            //
+            //  Every other picker on this form carries a picker_hint() saying
+            //  where its list is kept and what to do when it is empty. This one
+            //  did not, so an empty dropdown looked like a fault. It now says
+            //  what a position is, in business words, and where they live. ?>
       <div class="ff"><label>Against which position? <span class="muted">— optional</span></label>
         <select class="form-control searchable" name="position_id"><option value="">— none / a new one is needed —</option>
           <?php foreach ($positions as $p): ?><option value="<?= (int) $p['id'] ?>" <?= (int) ($r['position_id'] ?? 0) === (int) $p['id'] ? 'selected' : '' ?>><?= $e($p['name']) ?><?= $p['department'] ? ' · ' . $e($p['department']) : '' ?></option><?php endforeach; ?>
-        </select></div>
+        </select>
+        <?php if (!$positions): ?>
+          <small class="muted" style="display:block;margin-top:4px">A <b>position</b> is a sanctioned seat on your
+            establishment — “Senior Inspector, Quality, Ahmedabad: 3 sanctioned, 2 filled”. It is not the same
+            thing as the request you are raising now: a seat is something your organisation has approved to exist,
+            a request is you asking to fill one. Many companies do not keep a register of seats at all, so
+            <b>leaving this empty is normal</b> and nothing is missing. If you do want headcount tracked against
+            sanctioned seats, set them up in the <a href="/positions">position register</a>.</small>
+        <?php else: ?>
+          <?= picker_hint(count($positions), 'positions', '/positions', 'position register') ?>
+        <?php endif; ?></div>
       <div class="ff ff-wide" style="grid-column:1/-1"><label>Job description <span class="muted">— what this person will actually do</span></label>
         <textarea class="form-control" name="job_description" rows="3"><?= $e($r['job_description'] ?? '') ?></textarea></div>
     </div>
@@ -351,7 +379,11 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
         <select class="form-control" name="est_cost_basis" id="hq_basis">
           <?php foreach ($hqBas as $k => $lbl): ?><option value="<?= $e($k) ?>" <?= (($r['est_cost_basis'] ?? 'MONTHLY') ?: 'MONTHLY') === $k ? 'selected' : '' ?>><?= $e($lbl) ?></option><?php endforeach; ?>
         </select></div>
-      <div class="ff"><label>For how long (months)</label>
+      <?php //  UAT A1 — a permanent role has no "for how long". The field is
+            //  hidden for open-ended types and the total becomes an annual
+            //  run-rate; see hreq_commitment() for why the server recomputes it
+            //  rather than trusting whatever is posted. ?>
+      <div class="ff" id="hq_months_wrap"><label>For how long (months)</label>
         <input class="form-control" type="number" step="0.5" min="0" name="est_duration_months" id="hq_months"
                value="<?= $r && ($r['est_duration_months'] ?? null) !== null && (float) $r['est_duration_months'] > 0 ? $e(rtrim(rtrim(number_format((float) $r['est_duration_months'], 2, '.', ''), '0'), '.')) : '' ?>"
                placeholder="e.g. 12"></div>
@@ -362,6 +394,11 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
     <?php //  The arithmetic, live. Seeing "12 x 75,000 x 12 = 1,08,00,000" while
           //  typing is the entire point: the person raising the request feels the
           //  size of what they are asking for, before anyone else has to. ?>
+    <div class="ff" id="hq_openended" style="display:none;margin-top:4px">
+      <small class="muted">A <b>permanent</b> role has no end date, so the estimate below is the
+        <b>annual run-rate</b> — twelve months of the figure above, plus any one-time cost.
+        That is the number the approver is agreeing to carry each year.</small>
+    </div>
     <div id="hq_total" class="msg" style="margin-top:8px;display:none"></div>
 
     <h3 class="tab-sub">Why?</h3>
@@ -389,9 +426,17 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
     //  raising the request sees the size of the ask before submitting it.
     var perEl = document.getElementById('hq_per'), monEl = document.getElementById('hq_months'),
         oneEl = document.getElementById('hq_one'), basEl = document.getElementById('hq_basis'),
-        qtyEl = document.querySelector('input[name="quantity"]'), out = document.getElementById('hq_total');
+        qtyEl = document.querySelector('input[name="quantity"]'), out = document.getElementById('hq_total'),
+        empEl = document.querySelector('select[name="employment_type"]'),
+        monWrap = document.getElementById('hq_months_wrap'),
+        openNote = document.getElementById('hq_openended');
     if (!perEl || !out) return;
     var SYM = <?= json_encode($hqSym) ?>, PERIODIC = ['MONTHLY','MANMONTH','MANDAY','DAILY'];
+    //  UAT A1 — the types with no end date. Kept in step with
+    //  hreq_is_openended() in lib/hiringreq.php, which is the authority; this
+    //  only decides what the form asks for.
+    var OPEN_ENDED = ['PERMANENT'];
+    function isOpenEnded() { return empEl && OPEN_ENDED.indexOf((empEl.value || '').toUpperCase()) >= 0; }
     function money(n) {
       //  Indian grouping: 1,08,00,000 rather than 108,000,000 — the numbers on
       //  this screen are read aloud in lakhs and crores.
@@ -400,7 +445,12 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
       return SYM + rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + last3;
     }
     function draw() {
-      var per = parseFloat(perEl.value) || 0, mon = parseFloat(monEl.value) || 0,
+      //  A permanent role is not asked "for how long" — the answer is twelve
+      //  months by definition, and the total is an annual run-rate.
+      var open = isOpenEnded();
+      if (monWrap)  monWrap.style.display  = open ? 'none' : '';
+      if (openNote) openNote.style.display = open ? '' : 'none';
+      var per = parseFloat(perEl.value) || 0, mon = open ? 12 : (parseFloat(monEl.value) || 0),
           one = parseFloat(oneEl.value) || 0, qty = parseInt(qtyEl && qtyEl.value, 10) || 1,
           basis = basEl ? basEl.value : 'MONTHLY', periodic = PERIODIC.indexOf(basis) >= 0;
       if (per <= 0 && one <= 0) { out.style.display = 'none'; return; }
@@ -411,18 +461,18 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
           bits.push(qty + ' x ' + money(per) + ' (no duration entered yet)');
           total += per * qty;
         } else {
-          bits.push(qty + ' x ' + money(per) + (periodic ? ' x ' + mon + ' months' : ''));
+          bits.push(qty + ' x ' + money(per) + (periodic ? ' x ' + mon + ' months' + (open ? ' (one year)' : '') : ''));
           total += per * qty * (periods > 0 ? periods : 1);
         }
       }
       if (one > 0) { bits.push('one-time ' + money(one)); total += one; }
-      var warn = (per > 0 && periodic && mon <= 0);
+      var warn = (per > 0 && periodic && mon <= 0 && !open);
       out.className = 'msg ' + (warn ? 'msg-warn' : 'msg-info');
       out.style.display = '';
-      out.innerHTML = '<b>' + money(total) + '</b> &mdash; ' + bits.join(' + ')
+      out.innerHTML = '<b>' + money(total) + (open ? ' a year' : '') + '</b> &mdash; ' + bits.join(' + ')
         + (warn ? '<br><span style="font-size:12px">Add the duration and the approver sees the whole commitment, not one month of it.</span>' : '');
     }
-    [perEl, monEl, oneEl, basEl, qtyEl].forEach(function (el) {
+    [perEl, monEl, oneEl, basEl, qtyEl, empEl].forEach(function (el) {
       if (el) { el.addEventListener('input', draw); el.addEventListener('change', draw); }
     });
     draw();
@@ -441,6 +491,8 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
     <span class="muted">Nothing is recruited until this is approved.</span>
   </div>
 <?php endif; ?>
+
+
 
 <?php elseif ($r): ?>
   <div class="panel">
@@ -484,6 +536,34 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
       <tr><th>Where</th><td><?= $v('work_location') ?: '—' ?></td></tr>
       <tr><th>Why</th><td><?= $v('reason') ?: '—' ?></td></tr>
     </table>
+  </div>
+<?php endif; ?>
+
+<?php //  ---- A REJECTED REQUEST CAN BE CORRECTED (UAT A1) ---------------------
+      //
+      //    "Once Hiring Request is Rejected, it cannot be edited. Suppose there
+      //     is mistake in period of something like that then it will be a
+      //     problem or if there is any typo mistake."
+      //
+      //  Reopening returns it to DRAFT — not to approved. It must be submitted
+      //  and approved again on its own merits, and the rejection stays in the
+      //  history for the approver to see. See hreq_reopen().
+      if ($r && $status === 'REJECTED' && $mayRaise): ?>
+  <div class="panel">
+    <h3 class="tab-sub" style="margin-top:0">Correct and try again</h3>
+    <p class="muted" style="margin:0 0 9px">This request was rejected. If it was rejected over something
+      you can put right — a wrong figure, the wrong branch, a typo — reopen it as a draft, correct it and
+      submit it again. <b>It does not become approved:</b> it goes back for a fresh decision, and the
+      rejection and its reason stay in the history below.</p>
+    <form method="post">
+      <?= $csrf() ?><input type="hidden" name="do" value="reopen"><input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
+      <div class="ff ff-wide">
+        <label for="reopen_why">What are you correcting? <span class="muted">— required, and the approver will see it</span></label>
+        <input class="form-control" id="reopen_why" name="reopen_why" maxlength="400"
+               placeholder="e.g. the duration was typed as 6 months; it should be 16">
+      </div>
+      <div style="margin-top:10px"><button class="btn">Reopen as a draft</button></div>
+    </form>
   </div>
 <?php endif; ?>
 
