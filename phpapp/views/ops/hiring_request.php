@@ -409,6 +409,75 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
         </select></div>
       <div class="ff ff-wide" style="grid-column:1/-1"><label>Reason</label><input class="form-control" name="reason" value="<?= $v('reason') ?>" placeholder="e.g. New contract awarded; existing team fully committed"></div>
     </div>
+
+    <?php //  ---- WHO IS BEING REPLACED (UAT A1) -----------------------------
+          //
+          //    "if there is a replacement then we must be able to add the left
+          //     engineer details like name, department, reporting manager,
+          //     revenue he was generating, automatically fetching his month
+          //     salary and other details which hiring request approver must
+          //     know. Research it well and make it more detailed."
+          //
+          //  Shown only for a replacement or a backfill. The requester names
+          //  three things — who, when, why — and everything else is FETCHED
+          //  live from the team register and the job book, because a cost typed
+          //  by hand into a request is a figure nobody can audit, and the person
+          //  raising a backfill is rarely the person who knows it.
+          //
+          //  The fourth question is the one that makes this worth asking at
+          //  all: does the seat still need to exist? A replacement request that
+          //  never asks it is how headcount grows without anybody deciding to
+          //  grow it.
+          $replLeavers = function_exists('hreq_leaver_choices') ? hreq_leaver_choices() : [];
+          $replCur     = (int) ($r['replacing_inspector_id'] ?? 0);
+    ?>
+    <div id="hq_replblk" style="display:none">
+      <h3 class="tab-sub">Who is being replaced?
+        <span class="muted" style="font-weight:400;font-size:12px">— the approver sees this, and it is most of
+          what they need to judge a backfill</span></h3>
+      <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+        <div class="ff"><label>Who is leaving</label>
+          <select class="form-control searchable" name="replacing_inspector_id" id="hq_repl_who">
+            <option value="">— not named yet —</option>
+            <?php foreach ($replLeavers as $lv):
+                  $lnm = trim((string) ($lv['name'] ?? '')) ?: trim(($lv['first_name'] ?? '') . ' ' . ($lv['last_name'] ?? ''));
+                  if ($lnm === '') continue; ?>
+              <option value="<?= (int) $lv['id'] ?>" <?= $replCur === (int) $lv['id'] ? 'selected' : '' ?>>
+                <?= $e($lnm) ?><?= ($lv['designation'] ?? '') !== '' ? ' · ' . $e($lv['designation']) : '' ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <?= picker_hint(count($replLeavers), 'team members', '/m/inspectors', 'team register') ?></div>
+        <div class="ff"><label>Last working day</label>
+          <input class="form-control" type="date" name="replacing_last_working_day"
+                 value="<?= $e(substr((string) ($r['replacing_last_working_day'] ?? ''), 0, 10)) ?>"></div>
+        <div class="ff"><label>Why are they leaving</label>
+          <select class="form-control" name="replacing_reason"><option value="">—</option>
+            <?php foreach (hreq_leaver_reasons() as $k => $lbl): ?>
+              <option value="<?= $e($k) ?>" <?= ($r['replacing_reason'] ?? '') === $k ? 'selected' : '' ?>><?= $e($lbl) ?></option>
+            <?php endforeach; ?>
+          </select></div>
+        <div class="ff ff-wide" style="grid-column:1/-1">
+          <label>Does this seat still need to exist? <span class="muted">— the approver will ask; answer it here</span></label>
+          <input class="form-control" name="replacement_justification" maxlength="500"
+                 value="<?= $e((string) ($r['replacement_justification'] ?? '')) ?>"
+                 placeholder="e.g. the contract runs to Mar-2028 and needs two inspectors on site; the work does not stop when they leave"></div>
+      </div>
+      <?php //  What the system already knows, shown as soon as somebody is named.
+            //  Rendered server-side from the stamped snapshot where there is one,
+            //  so re-opening a saved request shows what the approver saw.
+            $replShow = function_exists('hreq_leaver_stamped') ? hreq_leaver_stamped($r ?: []) : [];
+            $replStamped = (bool) $replShow;
+            if (!$replShow && $replCur > 0 && function_exists('hreq_leaver_snapshot'))
+                $replShow = hreq_leaver_snapshot($replCur);
+            if ($replShow): ?>
+        <div class="msg msg-info" id="hq_repl_facts" style="margin-top:8px">
+          <?= hreq_leaver_facts_html($replShow, $replStamped) ?>
+        </div>
+      <?php else: ?>
+        <div class="msg msg-info" id="hq_repl_facts" style="margin-top:8px;display:none"></div>
+      <?php endif; ?>
+    </div>
     <?php if (function_exists('custom_fields_for') && custom_fields_for('hiring_request')): ?>
       <h3 class="tab-sub">More details</h3>
       <div class="form-grid"><?php render_custom_fields('hiring_request', $cfvals ?? []); ?></div>
@@ -437,6 +506,46 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
     //  only decides what the form asks for.
     var OPEN_ENDED = ['PERMANENT'];
     function isOpenEnded() { return empEl && OPEN_ENDED.indexOf((empEl.value || '').toUpperCase()) >= 0; }
+
+    //  ---- the replacement block (UAT A1) --------------------------------
+    //  Shown only when the request IS a replacement. Kept in step with
+    //  hreq_is_replacement() in lib/hiringreq.php, which is the authority —
+    //  this only decides what the form asks for; the server decides what is
+    //  stored, and clears these fields when the type is not a replacement.
+    var REPLACEMENT_TYPES = ['REPLACEMENT', 'BACKFILL'];
+    var typeEl = document.querySelector('select[name="request_type"]'),
+        replBlk = document.getElementById('hq_replblk'),
+        replWho = document.getElementById('hq_repl_who'),
+        replFacts = document.getElementById('hq_repl_facts');
+    function syncRepl() {
+      if (!replBlk) return;
+      var on = typeEl && REPLACEMENT_TYPES.indexOf((typeEl.value || '').toUpperCase()) >= 0;
+      replBlk.style.display = on ? '' : 'none';
+    }
+    if (typeEl) typeEl.addEventListener('change', syncRepl);
+    //  Picking somebody fetches what the system knows about them, so the
+    //  requester sees the same facts the approver will — before submitting,
+    //  not after being asked.
+    if (replWho && replFacts) {
+      replWho.addEventListener('change', function () {
+        var id = parseInt(replWho.value, 10) || 0;
+        if (!id) { replFacts.style.display = 'none'; replFacts.innerHTML = ''; return; }
+        replFacts.style.display = '';
+        replFacts.innerHTML = '<span class="muted">Looking them up…</span>';
+        fetch('/hiring-request-leaver?id=' + id, { headers: { 'X-Requested-With': 'fetch' } })
+          .then(function (r) { return r.ok ? r.text() : ''; })
+          .then(function (html) {
+            if (html) { replFacts.innerHTML = html; }
+            else { replFacts.innerHTML = '<span class="muted">Could not look them up just now — '
+                 + 'saving the request will still record who it is.</span>'; }
+          })
+          .catch(function () {
+            replFacts.innerHTML = '<span class="muted">Could not look them up just now — '
+                 + 'saving the request will still record who it is.</span>';
+          });
+      });
+    }
+    syncRepl();
     function money(n) {
       //  Indian grouping: 1,08,00,000 rather than 108,000,000 — the numbers on
       //  this screen are read aloud in lakhs and crores.
@@ -533,8 +642,30 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
           <?php if (!empty($sC['partial'])): ?><span class="pill p-warn" style="font-size:11px;margin-left:6px">no duration — one period only</span><?php endif; ?>
         <?php endif; ?>
       </td></tr>
+      <?php if (!empty($sC['open_ended'])): ?>
+      <tr><th></th><td><span class="muted" style="font-size:12px"><?= $e($sC['period_note']) ?></span></td></tr>
+      <?php endif; ?>
       <tr><th>Where</th><td><?= $v('work_location') ?: '—' ?></td></tr>
       <tr><th>Why</th><td><?= $v('reason') ?: '—' ?></td></tr>
+      <?php //  ---- WHO IS BEING REPLACED (UAT A1) --------------------------
+            //  The whole point of capturing it: the approver reads this.
+            //  Rendered from the STAMPED snapshot, so what they see is what was
+            //  true when the request was raised — a salary edited since, or a
+            //  job re-invoiced since, does not rewrite the case they decided on.
+            $apSnap = function_exists('hreq_leaver_stamped') ? hreq_leaver_stamped($r) : [];
+            if ($apSnap): ?>
+      <tr><th>Replacing</th><td><?= hreq_leaver_facts_html($apSnap) ?></td></tr>
+      <?php if (($r['replacing_last_working_day'] ?? '') !== '' || ($r['replacing_reason'] ?? '') !== ''): ?>
+      <tr><th>Leaving</th><td>
+        <?= $e(substr((string) ($r['replacing_last_working_day'] ?? ''), 0, 10) ?: '—') ?>
+        <?php $lr = (string) ($r['replacing_reason'] ?? '');
+              if ($lr !== ''): ?><span class="muted"> · <?= $e(hreq_leaver_reasons()[$lr] ?? $lr) ?></span><?php endif; ?>
+      </td></tr>
+      <?php endif; ?>
+      <?php if (($r['replacement_justification'] ?? '') !== ''): ?>
+      <tr><th>Is the seat still needed?</th><td><?= $e((string) $r['replacement_justification']) ?></td></tr>
+      <?php endif; ?>
+      <?php endif; ?>
     </table>
   </div>
 <?php endif; ?>

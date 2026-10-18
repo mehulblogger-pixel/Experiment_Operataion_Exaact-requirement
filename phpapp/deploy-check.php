@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '5a0acd0 · 2026-10-18 08:44 UTC · 686 files';
+$RELEASE = '0b59dff · 2026-10-18 09:01 UTC · 686 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -136,7 +136,7 @@ $EXPECT  = [
     'lib/formdesign.php' => ['s'=>70839,'h'=>'bc087592b594d2e3'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
     'lib/helpers.php' => ['s'=>26953,'h'=>'640ad4ec78e2fff8'],
-    'lib/hiringreq.php' => ['s'=>108078,'h'=>'1bfe20e4d86caa14'],
+    'lib/hiringreq.php' => ['s'=>122075,'h'=>'c4cb0a3a4ea9ff9f'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
     'lib/idems.php' => ['s'=>786654,'h'=>'ac696b399296a300'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
@@ -175,7 +175,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>716302,'h'=>'291e06f56d7f0e0f'],
+    'lib/ops.php' => ['s'=>717090,'h'=>'b07dbeb69c7111e8'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -452,7 +452,7 @@ $EXPECT  = [
     'views/ops/flow_gaps.php' => ['s'=>3287,'h'=>'f2bdad6e4475e0b2'],
     'views/ops/form_designer.php' => ['s'=>19293,'h'=>'27b031e7b0dc2719'],
     'views/ops/hierarchy.php' => ['s'=>57939,'h'=>'802fb089e84bfc73'],
-    'views/ops/hiring_request.php' => ['s'=>41297,'h'=>'d2298c8a5cb3c681'],
+    'views/ops/hiring_request.php' => ['s'=>49513,'h'=>'710e6f6313da2416'],
     'views/ops/hiring_request_list.php' => ['s'=>2937,'h'=>'73541f4428e82608'],
     'views/ops/hwpoints.php' => ['s'=>3338,'h'=>'679fdb6488397c4a'],
     'views/ops/idems/approval_rules.php' => ['s'=>7590,'h'=>'20729ce1dceb96ce'],

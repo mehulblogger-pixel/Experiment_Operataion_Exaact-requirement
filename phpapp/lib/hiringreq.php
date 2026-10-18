@@ -231,6 +231,33 @@ function hreq_migrate() {
         try { ensure_column('hiring_requests', 'approved_snapshot_json', 'TEXT'); } catch (Throwable $e) {}
         try { ensure_column('hiring_requests', 'approved_snapshot_at',   "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
         try { ensure_column('hiring_requests', 'reapproval_started_at',  "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
+        //  ---- WHO IS BEING REPLACED (UAT A1, 2026-10-18) --------------------
+        //
+        //    "if there is a replacement then we must be able to add the left
+        //     engineer details like name, department, reporting manager,
+        //     revenue he was generating, automatically fetching his month
+        //     salary and other details which hiring request approver must know.
+        //     Research it well and make it more detailed."
+        //
+        //  A replacement request asked for none of it, so an approver was shown
+        //  "Inspector x 1" with no way to tell a like-for-like backfill from a
+        //  quiet upgrade, and no way to ask the question that actually decides
+        //  a backfill: was this seat earning its keep?
+        //
+        //  What is STORED is only what a person entered. Everything the system
+        //  already knows — designation, branch, manager, monthly cost, what the
+        //  person was billing — is fetched from the team register and the job
+        //  book rather than re-typed, because a figure typed by hand into a
+        //  request is a figure nobody can audit.
+        try { ensure_column('hiring_requests', 'replacing_inspector_id',    'INT'); } catch (Throwable $e) {}
+        try { ensure_column('hiring_requests', 'replacing_last_working_day', "VARCHAR(20) DEFAULT ''"); } catch (Throwable $e) {}
+        try { ensure_column('hiring_requests', 'replacing_reason',          "VARCHAR(80) DEFAULT ''"); } catch (Throwable $e) {}
+        try { ensure_column('hiring_requests', 'replacement_justification', "VARCHAR(500) DEFAULT ''"); } catch (Throwable $e) {}
+        //  The fetched figures are STAMPED when the request is saved, so what
+        //  the approver saw cannot change afterwards because somebody edited a
+        //  salary or a job was re-invoiced. Same discipline as the approved
+        //  snapshot above.
+        try { ensure_column('hiring_requests', 'replacing_snapshot_json',   'TEXT'); } catch (Throwable $e) {}
     }
 
     // Vocabularies, through the engine that already exists.
@@ -928,6 +955,28 @@ function hreq_save($id, array $post) {
         $minExp = round($minExp, 2);
     }
 
+    //  ---- the replacement block, worked out before the write --------------
+    //  The snapshot is taken HERE rather than at render time, so what the
+    //  approver is shown cannot change later because a salary was edited or a
+    //  job re-invoiced. Taken only when a person is actually named, and only
+    //  re-taken when the named person changes — editing a request's wording
+    //  must not quietly restate last year's billing as this month's.
+    $replId = hreq_is_replacement($rtype) ? (int) ($post['replacing_inspector_id'] ?? 0) : 0;
+    $replLwd = $replId > 0 ? substr(trim((string) ($post['replacing_last_working_day'] ?? '')), 0, 10) : '';
+    $replReason = '';
+    if ($replId > 0) {
+        $rr = strtoupper(trim((string) ($post['replacing_reason'] ?? '')));
+        if ($rr !== '' && array_key_exists($rr, hreq_leaver_reasons())) $replReason = $rr;
+    }
+    $replWhy  = $replId > 0 ? substr(trim((string) ($post['replacement_justification'] ?? '')), 0, 500) : '';
+    $replSnap = '';
+    if ($replId > 0) {
+        $wasSame = $existing && (int) ($existing['replacing_inspector_id'] ?? 0) === $replId
+                   && trim((string) ($existing['replacing_snapshot_json'] ?? '')) !== '';
+        $replSnap = $wasSame ? (string) $existing['replacing_snapshot_json']
+                             : (string) json_encode(hreq_leaver_snapshot($replId));
+    }
+
     $cols = [
         'status'                   => $existing ? (string) $existing['status'] : 'DRAFT',
         'requested_by_id'          => $byId,
@@ -948,6 +997,16 @@ function hreq_save($id, array $post) {
         'required_by'              => substr($reqBy, 0, 10),
         'employment_type'          => $emp,
         'request_type'             => $rtype,
+        //  ---- WHO IS BEING REPLACED (UAT A1) -----------------------------
+        //  Cleared when the type is not a replacement, so changing a request
+        //  from "replacement" to "new position" cannot leave a leaver silently
+        //  attached to it and shown to an approver who is no longer being told
+        //  about one. The fetched figures are stamped below.
+        'replacing_inspector_id'    => $replId,
+        'replacing_last_working_day'=> $replLwd,
+        'replacing_reason'          => $replReason,
+        'replacement_justification' => $replWhy,
+        'replacing_snapshot_json'   => $replSnap,
         'priority'                 => $prio,
         'reason'                   => trim((string) ($post['reason'] ?? '')),
         'approval_required'        => isset($post['approval_required']) ? (int) !!$post['approval_required'] : 1,
@@ -1830,4 +1889,193 @@ function ops_hiring_requests($route, $method) {
     }
     view('ops/hiring_request_list', ['rows' => hreq_list((string) ($_GET['status'] ?? '')), 'mayRaise' => $mayRaise]);
     return true;
+}
+
+// ============================================================================
+//  WHO IS BEING REPLACED — the facts an approver needs.      (UAT A1, 2026-10-18)
+//
+//    "if there is a replacement then we must be able to add the left engineer
+//     details like name, department, reporting manager, revenue he was
+//     generating, automatically fetching his month salary and other details
+//     which hiring request approver must know."
+//
+//  Everything below is FETCHED, not asked. A requester types who is leaving,
+//  when, and why; the designation, branch, reporting line, monthly cost and
+//  what the person was billing come from the team register and the job book.
+//  A cost typed by hand into a request is a number nobody can audit, and the
+//  person raising a backfill is rarely the person who knows it.
+//
+//  MONEY OBEYS THE MATRIX. The salary figure needs data.salary and the billing
+//  figure needs data.revenue — both permissions the matrix already defines.
+//  A coordinator without them raises the request and simply does not see those
+//  two lines; the approver, who normally holds them, does. Nothing here grants
+//  anything, and no figure is smuggled into a field the viewer may not read.
+// ============================================================================
+
+//  Which request types are a replacement. BACKFILL is included deliberately:
+//  covering somebody on leave or secondment asks exactly the same questions.
+function hreq_is_replacement($requestType) {
+    return in_array(strtoupper((string) $requestType), ['REPLACEMENT', 'BACKFILL'], true);
+}
+
+//  Why somebody left. A lookup so a workspace can use its own words.
+function hreq_leaver_reasons() {
+    $def = [
+        'RESIGNED'       => 'Resigned',
+        'CONTRACT_ENDED' => 'Contract ended',
+        'TERMINATED'     => 'Terminated',
+        'TRANSFERRED'    => 'Transferred to another branch / unit',
+        'RETIRED'        => 'Retired',
+        'ABSCONDED'      => 'Absconded / stopped attending',
+        'ON_LEAVE'       => 'On long leave (this is a temporary backfill)',
+        'OTHER'          => 'Other',
+    ];
+    return function_exists('lk_options_or') ? lk_options_or('leaver_reason', $def) : $def;
+}
+
+//  Everybody who could be the person being replaced. The team register, not the
+//  user list: somebody can leave the company without ever having had a login.
+function hreq_leaver_choices() {
+    try {
+        return ops_all("SELECT id, name, first_name, last_name, COALESCE(designation,'') designation,
+                               COALESCE(sbu,'') sbu, COALESCE(status,'') status, home_office_id
+                          FROM inspectors ORDER BY name, id");
+    } catch (Throwable $e) { return []; }
+}
+
+//  WHAT THE PERSON WAS BILLING. Twelve months of their own jobs, from the job
+//  book. Returned as nulls rather than zeros when it cannot be computed, so a
+//  screen can say "not known" instead of printing a confident 0.
+function hreq_leaver_billing($inspectorId, $months = 12) {
+    $inspectorId = (int) $inspectorId;
+    if ($inspectorId <= 0) return ['jobs' => null, 'revenue' => null, 'from' => null];
+    $from = date('Y-m-d', strtotime('-' . max(1, (int) $months) . ' month'));
+    try {
+        $row = ops_one("SELECT COUNT(*) n, COALESCE(SUM(COALESCE(j.invoice_value,0)),0) v
+                          FROM jobs j
+                         WHERE j.inspector_id = ?
+                           AND COALESCE(j.scheduled_date, substr(j.created_at,1,10)) >= ?", [$inspectorId, $from]);
+    } catch (Throwable $e) { return ['jobs' => null, 'revenue' => null, 'from' => $from]; }
+    return ['jobs' => (int) ($row['n'] ?? 0), 'revenue' => (float) ($row['v'] ?? 0), 'from' => $from];
+}
+
+//  The whole picture of the person being replaced, ready to render or to stamp.
+//  Money keys are ABSENT — not zero, not null — when the viewer may not see
+//  them, so a snapshot taken by somebody without the right cannot later leak a
+//  figure to a screen that would happily print it.
+function hreq_leaver_snapshot($inspectorId) {
+    $inspectorId = (int) $inspectorId;
+    if ($inspectorId <= 0) return [];
+    try { $i = ops_one("SELECT * FROM inspectors WHERE id=?", [$inspectorId]); }
+    catch (Throwable $e) { return []; }
+    if (!$i) return [];
+
+    $name = trim((string) ($i['name'] ?? ''));
+    if ($name === '') $name = trim(($i['first_name'] ?? '') . ' ' . ($i['last_name'] ?? ''));
+
+    $out = [
+        'id'          => $inspectorId,
+        'name'        => $name,
+        'emp_code'    => (string) ($i['emp_code'] ?? ''),
+        'designation' => (string) ($i['designation'] ?? ''),
+        'department'  => (string) ($i['sbu'] ?? ''),
+        'status'      => (string) ($i['status'] ?? ''),
+        'taken_at'    => function_exists('now_iso') ? now_iso() : date('c'),
+    ];
+
+    //  Branch, in the workspace's own words.
+    if (!empty($i['home_office_id']) && function_exists('office_name'))
+        $out['branch'] = (string) office_name((int) $i['home_office_id']);
+
+    //  Reporting line — who the seat answered to, which is who feels the gap.
+    if (!empty($i['reports_to_id'])) {
+        try {
+            $m = ops_one("SELECT name, first_name, last_name FROM inspectors WHERE id=?", [(int) $i['reports_to_id']]);
+            if ($m) {
+                $mn = trim((string) ($m['name'] ?? ''));
+                if ($mn === '') $mn = trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? ''));
+                if ($mn !== '') $out['reports_to'] = $mn;
+            }
+        } catch (Throwable $e) { /* a missing manager is not an error */ }
+    }
+
+    //  ---- money, only for eyes the matrix allows -------------------------
+    $maySalary  = !function_exists('can') || can('data.salary');
+    $mayRevenue = function_exists('can_see_revenue') ? can_see_revenue()
+                 : (!function_exists('can') || can('data.revenue'));
+
+    if ($maySalary && ($i['salary_ctc'] ?? null) !== null && (float) $i['salary_ctc'] > 0)
+        $out['monthly_cost'] = (float) $i['salary_ctc'];
+
+    if ($mayRevenue) {
+        $b = hreq_leaver_billing($inspectorId, 12);
+        if ($b['jobs'] !== null) {
+            $out['jobs_12m']    = $b['jobs'];
+            $out['revenue_12m'] = $b['revenue'];
+            $out['billing_from']= $b['from'];
+        }
+    }
+    return $out;
+}
+
+//  Read a stamped snapshot back. Returns [] for anything that is not one, so a
+//  caller never has to guard the json_decode itself.
+function hreq_leaver_stamped($r) {
+    $j = (string) ($r['replacing_snapshot_json'] ?? '');
+    if ($j === '') return [];
+    $a = json_decode($j, true);
+    return is_array($a) ? $a : [];
+}
+
+//  The fetched facts, as one block of HTML — used on the form while raising the
+//  request AND on the read-only view the approver sees, so the two can never
+//  describe the same person differently.
+//
+//  Money lines appear only when the snapshot HOLDS them, and
+//  hreq_leaver_snapshot() only puts them there for a viewer the matrix allows.
+//  A stamped snapshot taken by somebody with the rights is therefore still safe
+//  to render to somebody without them — the keys are simply absent.
+//  $stamped says whether this came from the request's saved snapshot or is a
+//  live lookup. Without it the live preview told the requester the figures were
+//  "as recorded when this request was saved" before they had saved anything,
+//  which is a small lie that would teach somebody to distrust the bigger claim.
+function hreq_leaver_facts_html($snap, $stamped = true) {
+    if (!is_array($snap) || empty($snap['name'])) return '';
+    $e = fn($x) => htmlspecialchars((string) $x, ENT_QUOTES);
+    $money = function ($v) use ($e) {
+        $sym = function_exists('cur_sym') ? cur_sym() : '';
+        return $e($sym . number_format((float) $v, 0));
+    };
+    $bits = [];
+    $bits[] = '<b>' . $e($snap['name']) . '</b>'
+            . ($snap['emp_code'] ?? '' ? ' <span class="muted">· ' . $e($snap['emp_code']) . '</span>' : '');
+    if (($snap['designation'] ?? '') !== '') $bits[] = $e($snap['designation']);
+    if (($snap['department'] ?? '')  !== '') $bits[] = $e($snap['department']);
+    if (($snap['branch'] ?? '')      !== '') $bits[] = $e($snap['branch']);
+    if (($snap['reports_to'] ?? '')  !== '') $bits[] = 'reports to ' . $e($snap['reports_to']);
+
+    $line2 = [];
+    if (isset($snap['monthly_cost']))
+        $line2[] = 'Monthly cost <b>' . $money($snap['monthly_cost']) . '</b>';
+    if (isset($snap['revenue_12m'])) {
+        $line2[] = 'Billed <b>' . $money($snap['revenue_12m']) . '</b> over the last 12 months'
+                 . (isset($snap['jobs_12m']) ? ' across ' . (int) $snap['jobs_12m'] . ' job'
+                        . ((int) $snap['jobs_12m'] === 1 ? '' : 's') : '');
+    }
+    //  Say plainly when there is nothing to show, rather than printing a
+    //  confident zero — "billed 0" and "we cannot see what they billed" are
+    //  very different things to an approver.
+    $note = $line2 ? '' : '<br><span class="muted" style="font-size:12px">No cost or billing figures are '
+          . 'shown — either they are not recorded for this person, or they are not yours to see.</span>';
+
+    return implode(' <span class="muted">·</span> ', $bits)
+         . ($line2 ? '<br>' . implode(' <span class="muted">·</span> ', $line2) : '')
+         . $note
+         . ($stamped && ($snap['taken_at'] ?? '') !== ''
+             ? '<br><span class="muted" style="font-size:11.5px">As recorded when this request was saved ('
+               . htmlspecialchars(substr((string) $snap['taken_at'], 0, 10))
+               . ') — later changes to their record do not rewrite what the approver saw.</span>'
+             : ($stamped ? '' : '<br><span class="muted" style="font-size:11.5px">Read from their record and the '
+               . 'job book just now. Saving this request stamps these figures, so the approver sees what you '
+               . 'see here.</span>'));
 }

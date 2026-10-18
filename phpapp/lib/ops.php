@@ -3625,6 +3625,17 @@ function ops_dispatch($route, $method) {
         //  UAT A9 — an interviewer's own diary. Open to anyone signed in,
         //  because panel members are usually senior people in the discipline
         //  with no recruitment access; gating it would hide their own diary.
+        //  UAT A1 — the facts about a person being replaced, for the form to
+        //  show while the request is being raised. Read-only, one person, and
+        //  gated the same as raising a request; the money lines inside are
+        //  filtered by hreq_leaver_snapshot() against data.salary / data.revenue.
+        case $route === 'hiring-request-leaver':
+            ops_require(function_exists('hreq_can_create') && hreq_can_create(),
+                        'You do not have the right to raise or change a hiring request.');
+            header('Content-Type: text/html; charset=utf-8');
+            echo function_exists('hreq_leaver_facts_html')
+                 ? hreq_leaver_facts_html(hreq_leaver_snapshot((int) ($_GET['id'] ?? 0)), false) : '';
+            return true;
         case $route === 'my-interviews':
             return ops_my_interviews($method);
         case $route === 'candidate-pool':   // Revamp P11 — candidate pool convergence (read-only)
