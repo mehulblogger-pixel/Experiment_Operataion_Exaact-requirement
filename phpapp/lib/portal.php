@@ -565,6 +565,13 @@ function portal_request_create($post) {
     $pid = portal_partner_id();
     $u = portal_user();
     if (!$pid || !$u) return 'Sign in again.';
+    // The right is checked HERE as well as on the route, for the same reason
+    // portal_call() puts the partner id in the WHERE clause instead of checking
+    // it afterwards: a write that defends itself cannot be reached by a door
+    // somebody forgets to lock. (The route's portal_need() stays -- it is what
+    // gives the user the sentence that tells them who to ask.)
+    if (!pcan('request')) return 'Your access here does not include asking for new work. '
+        . 'Ask your main contact at ' . portal_client_name() . ' to have it added.';
     $subject = trim((string)($post['subject'] ?? ''));
     $detail  = trim((string)($post['detail'] ?? ''));
     if ($subject === '' || $detail === '') return 'Tell us what you need and where — a line each is enough.';
@@ -1081,6 +1088,12 @@ function portal_route($route, $method) {
             exit;
 
         case 'portal/request':
+            // "Ask for a new job" is a right the administrator can withhold
+            // (PORTAL_PERMS['request']), and the nav hides the link when it is
+            // -- but the ADDRESS was reachable regardless, so an Accounts-only
+            // or read-only contact could raise a request by typing it. That is
+            // precisely the bug portal_need() exists to prevent; see its note.
+            portal_need('request', 'asking us for a new ' . Tl('call'));
             $err = '';
             if ($method === 'POST') {
                 $err = portal_request_create($_POST);
@@ -1470,10 +1483,12 @@ function portal_route($route, $method) {
             $q = ''; $ans = ''; $aerr = '';
             if ($method === 'POST') {
                 $q = trim((string)($_POST['q'] ?? ''));
-                [$ans, $aerr] = cvp_ai_answer('CLIENT', portal_partner_id(), $q);
+                [$ans, $aerr] = cvp_ai_answer('CLIENT', portal_partner_id(), $q, 'pcan');
                 portal_log('ASSISTANT', substr($q, 0, 120));
             }
-            portal_view('assistant', ['q' => $q, 'ans' => $ans, 'aerr' => $aerr, 'available' => cvp_ai_available()]);
+            portal_view('assistant', ['q' => $q, 'ans' => $ans, 'aerr' => $aerr,
+                'available' => cvp_ai_available(),
+                'scope' => function_exists('cvp_ai_scope_keys') ? cvp_ai_scope_keys('CLIENT', 'pcan') : ['reports','issues']]);
             exit;
 
         case 'portal/password':

@@ -73,6 +73,14 @@ ok(in_array($live, $ids, true) && in_array($newId, $ids, true), 'the team list s
 ok(!in_array($rivalUser, $ids, true), "the team list excludes another company's users");
 
 head('5. The assistant context is scoped by construction');
+// The assistant is scoped TWICE -- by company AND by the signed-in user's own
+// permissions (GAP-014) -- so this section must sign somebody in. Section 2
+// deliberately leaves the session on a LAPSED account, which resolves to no
+// user and therefore to no rights at all; reading the context from there would
+// prove only that a signed-out caller sees nothing. $live has no stored
+// permission list, which portal_perms() reads as "every right" (portal.php:1707).
+$_SESSION = ['cuid' => $live];
+ok(pcan('reports') && pcan('issues'), 'the signed-in user may read both assistant sections');
 db()->prepare("INSERT INTO report_docs (irn,client_id,title,result,release_status,inspection_date,finalized,deleted,created_at,updated_at)
     VALUES ('IR/MINE/1',?, 'My inspection','ACCEPTED','RELEASED','2026-08-01',1,0,?,?)")->execute([$CLI, date('c'), date('c')]);
 db()->prepare("INSERT INTO report_docs (irn,client_id,title,result,release_status,inspection_date,finalized,deleted,created_at,updated_at)
@@ -80,6 +88,18 @@ db()->prepare("INSERT INTO report_docs (irn,client_id,title,result,release_statu
 $ctx = cvp_ai_scope_context('CLIENT', $CLI);
 ok(strpos($ctx, 'IR/MINE/1') !== false, 'the context includes the party\'s own report');
 ok(strpos($ctx, 'IR/RIVAL/9') === false, "the context NEVER includes another company's report");
+
+// ...and the SECOND boundary: a colleague at the SAME company who was not
+// granted reports must not reach that same report by asking the assistant.
+db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,perms,created_at)
+    VALUES (?,'accounts@buyer.com','Accounts','x',1,'invoices,complaint',?)")->execute([$CLI, date('c')]);
+$_SESSION = ['cuid' => (int)db()->lastInsertId()];
+ok(!pcan('reports') && !pcan('issues'), 'a colleague on an invoices-only access holds neither right');
+$ctx2 = cvp_ai_scope_context('CLIENT', $CLI);
+ok(strpos($ctx2, 'IR/MINE/1') === false,
+   "nor does it include their OWN company's report when they were not granted reports");
+ok(strpos($ctx2, 'NONCONFORMITIES') === false, 'nor a nonconformity section');
+$_SESSION = ['cuid' => $live];   // back to a fully-permitted user for section 5's tail
 // With AI unconfigured, the answer degrades gracefully (no crash, no data).
 [$ans, $err] = cvp_ai_answer('CLIENT', $CLI, 'which reports are released?');
 ok($ans === '' && $err !== '', 'with AI off the assistant returns a friendly message, not a leak or a crash');

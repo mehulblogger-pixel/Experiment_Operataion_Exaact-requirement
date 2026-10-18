@@ -7,8 +7,8 @@ foreach ($rows as $i) {
 }
 ?>
 <h2 class="ptitle">Your invoices</h2>
-<p class="plead">What we have billed and what is still outstanding. If any line is in query with us, say so on the
-  <a href="/portal/request">request form</a> and it will reach the same desk.</p>
+<p class="plead">What we have billed and what is still outstanding.<?php if (pcan('request')): ?> If any line is in query
+  with us, say so on the <a href="/portal/request">request form</a> and it will reach the same desk.<?php endif; ?></p>
 
 <div class="ptiles">
   <div class="ptile"><div class="n"><?= (int)count($rows) ?></div><div class="l">invoices raised</div></div>

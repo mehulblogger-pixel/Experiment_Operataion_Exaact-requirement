@@ -76,6 +76,13 @@ correction linked, rather than quietly edited away.
 
 ## GAP-012 — the three external portals were never audited, and the audit's universe was incomplete
 
+> **Reduced, not closed, 18 Oct 2026.** The 77 portal routes are now inventoried
+> and both security questions are answered: cross-party isolation **holds** on
+> all 25 routes that read an id, and the two enforcement defects found are fixed
+> (**GAP-013**, **GAP-014**). What remains is the *quality* audit of those 77
+> screens — fields, terminology, 390px, accessibility. See
+> `11-EXTERNAL-PORTAL-AUDIT.md` §3.
+
 **CONFIRMED · P1 · coverage · the largest single gap in this audit**
 
 Full account: **`00a-ERRATUM-COVERAGE.md`.** Summary here.
@@ -661,6 +668,66 @@ is the actual risk.
 **Acceptance.** Such a test exists and passes; re-running
 `evidence/ungated-triage.py` shows no route in OPEN-WIDE or OPEN-ONE that can
 post to a business record or list another person's data.
+
+---
+
+## GAP-014 — the portal assistant answered questions the user had been refused
+
+**CONFIRMED BY EXECUTION · P1 · Client and vendor portals · FIXED 18 Oct 2026**
+
+Both portals offer an **Assistant**. Its context was built by
+`cvp_ai_scope_context()`, which scoped by **company** and never consulted the
+signed-in user's own permissions.
+
+A contact on the **ACCOUNTS** preset — *"invoices only"*, refused
+`/portal/reports` and `/portal/issues` at the front door — was handed
+`IRN/PROBE/0001 · Pressure vessel weld inspection · result: FAIL · release:
+NOT_RELEASED`, plus every nonconformity's reference, severity, status and due
+date, by asking the assistant instead.
+
+A failed, unreleased inspection result is exactly what a client's quality
+manager withholds from a purchasing contact. The per-colleague permission
+control the product advertises was bypassable by typing a question.
+
+**Not a tenant leak** — every query stayed bound to the one company. The control
+it defeated was the one *inside* the client company, which is the control the
+portal team editor exists to provide.
+
+**Fixed.** `cvp_ai_scope_context()` now takes the audience's permission test —
+the same signature `cvp_action_centre()` two functions away already used
+correctly — and includes each section only on the matching right. The permission
+guard runs ahead of the availability guard. The model is told its context may be
+a subset. Both menus hide the Assistant from a user who can read nothing through
+it, and both screens say what it can and cannot see.
+
+**Evidence.** `evidence/portal-assistant-scope.php` (prints the leak before the
+fix, nothing after it) · `phpapp/tests/test_portal_perm_enforcement.php`.
+
+---
+
+## GAP-013 — "Ask for a new job" was offered to the administrator and never enforced
+
+**CONFIRMED BY EXECUTION · P2 · Client portal · FIXED 18 Oct 2026**
+
+`/portal/request` had no permission check. The menu link was correctly hidden
+from a user without the right; the **address** was reachable by anyone signed in.
+A contact on **ACCOUNTS** (*"invoices only"*) or **READONLY** (*"sees
+everything, changes nothing"*) could raise a job request in the company's name.
+
+Three screens **invited them to** — the invoices screen, which an Accounts-only
+contact can open, carried *"say so on the request form"* with the link
+unconditional.
+
+This is the precise bug `lib/portal.php:1745` says the file exists to avoid:
+*"Refuse rather than hide: hiding a link but leaving the address reachable."*
+
+**Fixed** in three places: `portal_need()` on the route; the same check inside
+`portal_request_create()`, so the write defends itself whichever door calls it;
+and all three invitations behind `pcan('request')`. Ten of the eleven client
+portal permissions were already enforced correctly — this was the one.
+
+**Evidence.** `evidence/portal-perm-enforcement.php` ·
+`phpapp/tests/fixtures/portal_routes_gated.tsv` (a lost gate now fails by name).
 
 ---
 

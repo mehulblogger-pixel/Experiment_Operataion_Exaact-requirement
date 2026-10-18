@@ -2,8 +2,10 @@
 <p class="plead">Every inspection you have asked us for, newest first, and where each one has got to.</p>
 
 <?php if (!$rows): ?>
-  <p class="pempty">Nothing here yet. <a href="/portal/request">Ask us for an inspection</a> and it will appear
-    once a coordinator has raised it.</p>
+  <p class="pempty">Nothing here yet.
+    <?php if (pcan('request')): ?><a href="/portal/request">Ask us for an inspection</a> and it will appear
+    once a coordinator has raised it.<?php else: ?>Anything we are asked to inspect for you will appear here
+    once a coordinator has raised it.<?php endif; ?></p>
 <?php else: ?>
 <div class="pscroll"><table class="ptable">
   <thead><tr>

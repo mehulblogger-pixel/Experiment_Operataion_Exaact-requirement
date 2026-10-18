@@ -14,7 +14,11 @@ if (function_exists('cvp_notify_count')) {
     $__vn = cvp_notify_count('VENDOR', cvp_vendor_id());
     $links['vendor/alerts'] = 'Alerts' . ($__vn ? ' (' . $__vn . ')' : '');
 }
-if (function_exists('cvp_ai_available') && cvp_ai_available()) $links['vendor/assistant'] = 'Assistant';
+// Offered only where it can actually answer: the assistant reads reports and
+// nonconformities, so a user permitted neither is not shown a dead box.
+if (function_exists('cvp_ai_available') && cvp_ai_available()
+    && (!function_exists('cvp_ai_scope_keys') || cvp_ai_scope_keys('VENDOR')))
+    $links['vendor/assistant'] = 'Assistant';
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

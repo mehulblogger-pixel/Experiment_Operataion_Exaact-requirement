@@ -575,10 +575,12 @@ function cvp_vendor_route($route, $method) {
             $q = ''; $ans = ''; $aerr = '';
             if ($method === 'POST') {
                 $q = trim((string)($_POST['q'] ?? ''));
-                [$ans, $aerr] = cvp_ai_answer('VENDOR', cvp_vendor_id(), $q);
+                [$ans, $aerr] = cvp_ai_answer('VENDOR', cvp_vendor_id(), $q, 'vcan');
                 cvp_vendor_log('ASSISTANT', substr($q, 0, 120));
             }
-            cvp_vendor_view('assistant', ['q' => $q, 'ans' => $ans, 'aerr' => $aerr, 'available' => cvp_ai_available()]);
+            cvp_vendor_view('assistant', ['q' => $q, 'ans' => $ans, 'aerr' => $aerr,
+                'available' => cvp_ai_available(),
+                'scope' => cvp_ai_scope_keys('VENDOR', 'vcan')]);
             exit;
 
         case 'vendor/password':
@@ -924,10 +926,18 @@ function cvp_client_team_expiry($partnerId, $userId, $date) {
 // ============================================================================
 function cvp_ai_available() { return function_exists('ai_active') && ai_active(); }
 
-// The ONLY data the assistant sees — this party's own records, already gated.
-function cvp_ai_scope_context($audience, $partnerId) {
+// The context the assistant may read. Scoped TWICE, and both scopes matter:
+// by COMPANY (the partner id in every WHERE clause, so no other client's data
+// is reachable) and by the signed-in USER'S OWN PERMISSIONS -- because the
+// portal team editor lets a client's main contact withhold reports from a
+// commercial contact and nonconformities from an accounts clerk, and a question
+// put to the assistant must not be a way around that. $can is the permission
+// test for this audience, passed in exactly as cvp_action_centre() takes it.
+function cvp_ai_scope_context($audience, $partnerId, $can = null) {
     $audience = strtoupper((string)$audience); $partnerId = (int)$partnerId;
+    if ($can === null) $can = $audience === 'VENDOR' ? 'vcan' : 'pcan';
     $lines = [];
+    if ($can('reports')) {
     if ($audience === 'CLIENT') {
         $reps = portal_try(fn() => ops_all(
             "SELECT irn, title, result, release_status, inspection_date FROM report_docs
@@ -940,25 +950,51 @@ function cvp_ai_scope_context($audience, $partnerId) {
     $lines[] = 'REPORTS (' . count($reps) . '):';
     foreach ($reps as $r) $lines[] = '- ' . $r['irn'] . ' | ' . ($r['title'] ?: '') . ' | result: ' . ($r['result'] ?: '-')
         . ' | release: ' . ($r['release_status'] ?: '-') . ' | inspected: ' . ($r['inspection_date'] ?: '-');
-    $issues = function_exists('cvp_issues_for') ? cvp_issues_for($audience, $partnerId) : [];
-    $lines[] = '';
-    $lines[] = 'NONCONFORMITIES (' . count($issues) . '):';
-    foreach ($issues as $n) $lines[] = '- ' . ($n['ref'] ?: ('#' . $n['id'])) . ' | ' . ($n['title'] ?: '')
-        . ' | severity: ' . ($n['severity'] ?: '-') . ' | status: ' . ($n['status'] ?: '-') . ' | due: ' . ($n['due_on'] ?: '-');
+    }
+    if ($can('issues')) {
+        $issues = function_exists('cvp_issues_for') ? cvp_issues_for($audience, $partnerId) : [];
+        if ($lines) $lines[] = '';
+        $lines[] = 'NONCONFORMITIES (' . count($issues) . '):';
+        foreach ($issues as $n) $lines[] = '- ' . ($n['ref'] ?: ('#' . $n['id'])) . ' | ' . ($n['title'] ?: '')
+            . ' | severity: ' . ($n['severity'] ?: '-') . ' | status: ' . ($n['status'] ?: '-') . ' | due: ' . ($n['due_on'] ?: '-');
+    }
     return implode("\n", $lines);
 }
 
-function cvp_ai_answer($audience, $partnerId, $question) {
+// Which assistant sections this user may read at all. Empty = the assistant has
+// nothing to tell them, so the screen says so instead of offering a box that
+// can only ever answer "I do not have that here".
+function cvp_ai_scope_keys($audience, $can = null) {
+    $audience = strtoupper((string)$audience);
+    if ($can === null) $can = $audience === 'VENDOR' ? 'vcan' : 'pcan';
+    $out = [];
+    if ($can('reports')) $out[] = 'reports';
+    if ($can('issues'))  $out[] = 'issues';
+    return $out;
+}
+
+function cvp_ai_answer($audience, $partnerId, $question, $can = null) {
     $question = trim((string)$question);
     if ($question === '') return ['', 'Type a question.'];
+    // The permission guard runs FIRST, ahead of the availability guard: it is
+    // the one that stops a withheld record reaching the model, and keeping it
+    // first means no later change to how availability is decided can get in
+    // front of it. (The nav already hides the screen from a user who may read
+    // nothing, so reaching this line means the address was typed.)
+    if (!cvp_ai_scope_keys($audience, $can))
+        return ['', 'Your access here does not include the records the assistant can read. '
+                  . 'Ask your main contact to add reports or nonconformities if you need them.'];
     if (!cvp_ai_available()) return ['', 'The assistant is not switched on. You can still find everything on the pages here.'];
     $who = strtoupper((string)$audience) === 'VENDOR' ? 'vendor/supplier' : 'client';
-    $ctx = cvp_ai_scope_context($audience, $partnerId);
+    $ctx = cvp_ai_scope_context($audience, $partnerId, $can);
     $system = "You are a helpful assistant inside the $who portal of a third-party inspection agency. "
         . "Answer ONLY from the CONTEXT below, which contains this $who's OWN records and nothing else. "
         . "Never invent a report, a result or a date. If the answer is not in the context, say you do not have "
         . "that here and suggest they contact their inspection agency. Be brief and factual. "
-        . "Never mention another company.\n\nCONTEXT:\n" . $ctx;
+        . "Never mention another company. The context may be a SUBSET of this "
+        . "$who's records -- this particular signed-in user is only permitted to "
+        . "see what is below -- so never say or imply that it is everything they "
+        . "have, and never speculate about what is not shown.\n\nCONTEXT:\n" . $ctx;
     return ai_chat($system, $question, 700);
 }
 

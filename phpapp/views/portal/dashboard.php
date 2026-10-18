@@ -85,7 +85,8 @@
 <?php if (pcan('calls')): ?>
 <h3 class="ptitle" style="font-size:16px;margin-top:30px">Open <?= e(Tlp('call')) ?></h3>
 <?php if (!$d['upcoming']): ?>
-  <p class="pempty">Nothing open. <a href="/portal/request">Ask us for an inspection</a> when you need one.</p>
+  <p class="pempty">Nothing open.<?php if (pcan('request')): ?>
+    <a href="/portal/request">Ask us for an inspection</a> when you need one.<?php endif; ?></p>
 <?php else: ?>
 <div class="pscroll"><table class="ptable">
   <thead><tr><th>Reference</th><th>Required by</th><th>Where it has got to</th></tr></thead>

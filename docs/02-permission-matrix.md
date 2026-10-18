@@ -505,6 +505,64 @@ permissions, in the portals' own permission systems — separate from `ORG_ROLES
 20. **Client portal — post a requirement + search the pool** — `pcan('market.post')` (`portal.php` `PORTAL_PERMS`; routes `portal/hire`, `portal/hire-req`, `portal/find`). A logged-in **client (company)** posts a technical-manpower requirement (posted to its own `poster_party_id`) and manages **its own** requirements' applications (shortlist / offer / award / reject) — ownership enforced in the route. The **same** permission also gates `portal/find` and `portal/hiring`: the client searches the shared professional pool (one keyword + filters), sees privacy-safe cards, **requests contact** (the professional approves — no contact is exposed by the search itself; enforced by `connect_privacy_resolve`), **invites** a professional onto one of **its own** open requirements (ownership re-checked in the route), and — on `portal/hiring`, the **buyer home** for a marketplace-first client — sees its own open requirements, applicants awaiting a decision, sent contact requests and saved searches (all scoped to `portal_partner_id()`). A marketplace-first client (a self-service `cx_organisations` signup with no inspection footprint) is routed to `portal/hiring` as its home and its nav drops the inspection menu; an established inspection client keeps its dashboard and merely gains a hiring shortcut. The same right also gates `portal/roster` — the client's **private bench**: a relationship over `cx_professionals` (add from marketplace/previous/manual, private notes & ratings, rehire onto its own open requirement), with the private relationship data scoped to `client_party_id` and never exposed to the professional or other clients. No new permission — browsing/inviting/the buyer home/the private bench are the discovery half of the same hire right. Granted by default to a full-access client user; removable per client user via the portal team editor. Maps `company` → client portal (adopted role→portal mapping).
 21. **Vendor portal — apply to requirements** — `vcan('market.apply')` (`cvp.php` `VENDOR_PERMS`; route `vendor/opportunities`). A logged-in **vendor / agency** browses OPEN/SHORTLISTING requirements and applies as itself (`applicant_party_id` = the vendor party; one application per requirement). Maps `agency` → vendor portal. (Agency-side *posting* reuses the same engine and is a later toggle; not enabled in K2b.)
 
+### Client portal — the eleven permissions, and where each is enforced
+
+The client portal has its **own** permission system (`PORTAL_PERMS` in
+`lib/portal.php`), granted and withheld per colleague by the client's own main
+contact through the portal team editor. It is separate from `ORG_ROLES` and
+grants nothing on the staff side.
+
+The governing rule is stated in the code (`lib/portal.php:1745`) and is a
+**hard rule for this project**:
+
+> *"Refuse rather than hide: hiding a link but leaving the address reachable is
+> the bug this whole file exists to avoid."*
+
+So every portal permission must be enforced **at the address**, not only in the
+menu — and, where it guards a write, **inside the write** as well, so a second
+caller cannot reach it through a door nobody locked.
+
+| Permission | Enforced at |
+|---|---|
+| `calls` | `portal/calls`, `portal/call` |
+| `reports` | `portal/reports`, `portal/report` |
+| `reports.decide` | `portal/report-decision` |
+| `invoices` | `portal/invoices` |
+| `request` | `portal/request` **and inside `portal_request_create()`** |
+| `complaint` | `portal/complaints`, `portal/complaint-new` |
+| `deputation` | `portal/deputations`, `portal/dep-gate` |
+| `deputation.approve` | `portal/dep-approve` |
+| `issues` | `portal/issues`, `portal/issue` |
+| `market.post` | `portal/hiring`, `portal/hire`, `portal/hire-req`, `portal/find`, `portal/talent`, `portal/roster` |
+| `market.vouchers` | `portal/voucher`, `portal/voucher-file`, `portal/report-file` |
+
+Frozen as `phpapp/tests/fixtures/portal_routes_gated.tsv`; a lost gate fails
+`test_portal_perm_enforcement.php` **by route name**.
+
+**The portal assistant is bound by these same permissions.** `/portal/assistant`
+and `/vendor/assistant` read the signed-in user's rights before assembling
+anything: the reports section requires `reports`, the nonconformity section
+requires `issues`, and a user entitled to neither is told so instead of being
+shown a box. The assistant is **not** a second route to a record the user was
+refused — which it was until 18 Oct 2026 (**GAP-014**). Any new assistant
+section must extend `cvp_ai_scope_keys()` with the permission that guards the
+screen showing the same data.
+
+Routes deliberately open to any signed-in portal user: `portal` (each tile tests
+`pcan()` itself), `portal/login`, `portal/logout`, `portal/accept`,
+`portal/password`, `portal/alerts`, `portal/reputation`, `portal/plans`,
+`portal/pay`. Two are gated **harder** than a permission: `portal/team` requires
+`cvp_client_is_admin()` and answers **404** to everyone else, and `portal/bench`
+requires the signed-in party to resolve to an active agency organisation.
+
+The **professional portal** (`/pro/*`, `cx_professionals`) has no per-user
+permission layer by design: an account there is **one individual**, with no
+colleagues to restrict. Its routes are bounded by the signed-in professional's
+own id.
+
+See `docs/audit-2026-10/11-EXTERNAL-PORTAL-AUDIT.md` for the measured audit of
+all 77 external-portal routes.
+
 Neither touches `ORG_ROLES` or any staff permission; the staff desk lifecycle
 (K2a) and these external capabilities operate on the same additive
 `cx_requirements` / `cx_applications` tables.

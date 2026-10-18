@@ -31,7 +31,11 @@ if (function_exists('cvp_notify_count')) {
     $__cn = cvp_notify_count('CLIENT', portal_partner_id());
     $links['portal/alerts'] = 'Alerts' . ($__cn ? ' (' . $__cn . ')' : '');
 }
-if (function_exists('cvp_ai_available') && cvp_ai_available()) $links['portal/assistant'] = 'Assistant';
+// Offered only where it can actually answer: the assistant reads reports and
+// nonconformities, so a user permitted neither is not shown a dead box.
+if (function_exists('cvp_ai_available') && cvp_ai_available()
+    && (!function_exists('cvp_ai_scope_keys') || cvp_ai_scope_keys('CLIENT')))
+    $links['portal/assistant'] = 'Assistant';
 if (function_exists('cvp_client_is_admin') && cvp_client_is_admin()) $links['portal/team'] = 'Your team';
 ?><!doctype html>
 <html lang="en"><head>

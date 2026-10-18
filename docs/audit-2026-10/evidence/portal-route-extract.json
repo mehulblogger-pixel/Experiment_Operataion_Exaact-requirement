@@ -1,0 +1,772 @@
+[
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/login",
+  "perm": "(login only)",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 12
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/accept",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 16
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/logout",
+  "perm": "(login only)",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 12
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/plans",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 36
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/reputation",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 24
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/pay",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 15
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 14
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/hiring",
+  "perm": "market.post",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 20
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/alerts",
+  "perm": "",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 12
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/calls",
+  "perm": "calls",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 6
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/call",
+  "perm": "calls",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "portal_call",
+  "lines": 8
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/reports",
+  "perm": "reports",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 9
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/deputations",
+  "perm": "deputation,deputation.approve",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 12
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/dep-gate",
+  "perm": "deputation",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 12
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/dep-approve",
+  "perm": "deputation.approve",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "portal_report",
+  "lines": 19
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/report-decision",
+  "perm": "reports.decide",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "portal_report",
+  "lines": 19
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/report",
+  "perm": "reports",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "portal_report",
+  "lines": 11
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/complaints",
+  "perm": "complaint",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 6
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/complaint-new",
+  "perm": "complaint",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 24
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/invoices",
+  "perm": "invoices",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 6
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/request",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 17
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/hire",
+  "perm": "market.post",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 58
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/find",
+  "perm": "market.post",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 53
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/talent",
+  "perm": "market.post",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 50
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/roster",
+  "perm": "market.post",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 32
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/hire-req",
+  "perm": "market.post",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 38
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/bench",
+  "perm": "",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 30
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/voucher",
+  "perm": "market.vouchers",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 39
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/report-file",
+  "perm": "market.vouchers",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 14
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/voucher-file",
+  "perm": "market.vouchers",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 16
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/issues",
+  "perm": "issues",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 7
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/issue",
+  "perm": "issues",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 20
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/team",
+  "perm": "",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 24
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/assistant",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 12
+ },
+ {
+  "portal": "client",
+  "file": "lib/portal.php",
+  "route": "/portal/password",
+  "perm": "(login only)",
+  "takes_id": true,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 436
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/login",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 12
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/accept",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 13
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/logout",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 12
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 7
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/alerts",
+  "perm": "",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "cvp_notify_sync",
+  "lines": 11
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/reports",
+  "perm": "reports",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 6
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/report",
+  "perm": "reports",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "cvp_vendor_report",
+  "lines": 9
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/qualification",
+  "perm": "qualification",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 13
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/opportunities",
+  "perm": "market.apply",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 24
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/assistant",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 11
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/password",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 115
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/issues",
+  "perm": "issues",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 6
+ },
+ {
+  "portal": "vendor",
+  "file": "lib/cvp.php",
+  "route": "/vendor/issue",
+  "perm": "issues",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 409
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/login",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 7
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/register",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 7
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/logout",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 3
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/forgot",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 7
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/reset",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 17
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 20
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/credentials",
+  "perm": "",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 28
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/privacy",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 22
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/cv",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 34
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/tax-roots",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 3
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/tax-children",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 3
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/tax-suggest",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 3
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/tax-resolve",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 3
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/geo",
+  "perm": "",
+  "takes_id": false,
+  "scoped": false,
+  "scoped_via": "",
+  "lines": 5
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/profile",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 38
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/jobs",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 43
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/plans",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 36
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/pay",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 15
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/applications",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 8
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/reputation",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 21
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/bookings",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 7
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/vouchers",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 15
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/voucher",
+  "perm": "",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 43
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/report-file",
+  "perm": "",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 11
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/voucher-file",
+  "perm": "",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 13
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/documents",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 9
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/file",
+  "perm": "",
+  "takes_id": true,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 10
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/messages",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 24
+ },
+ {
+  "portal": "professional",
+  "file": "lib/connect_pro.php",
+  "route": "/pro/verify",
+  "perm": "",
+  "takes_id": false,
+  "scoped": true,
+  "scoped_via": "",
+  "lines": 22
+ }
+]

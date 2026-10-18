@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'c2da858 · 2026-10-18 13:06 UTC · 686 files';
+$RELEASE = 'df5f588 · 2026-10-18 16:20 UTC · 686 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -119,7 +119,7 @@ $EXPECT  = [
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>24205,'h'=>'04ed75b284858be6'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
-    'lib/cvp.php' => ['s'=>61127,'h'=>'d51dac70fda3b174'],
+    'lib/cvp.php' => ['s'=>63269,'h'=>'4efc72432755e463'],
     'lib/datacontrol.php' => ['s'=>37308,'h'=>'be66a03dcb445dac'],
     'lib/datatable.php' => ['s'=>15699,'h'=>'dfea30bbc69ccef3'],
     'lib/db.php' => ['s'=>58746,'h'=>'72427b242481ba0b'],
@@ -185,7 +185,7 @@ $EXPECT  = [
     'lib/pdf.php' => ['s'=>26663,'h'=>'356a367da31c40a6'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
-    'lib/portal.php' => ['s'=>114128,'h'=>'afcf984120ca04b3'],
+    'lib/portal.php' => ['s'=>115305,'h'=>'6a06ff2ce702436b'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>10272,'h'=>'7f36c21dab0d782d'],
@@ -642,20 +642,20 @@ $EXPECT  = [
     'views/po_detail.php' => ['s'=>9572,'h'=>'90a76e6f2d63395d'],
     'views/portal/accept.php' => ['s'=>1611,'h'=>'f3da5a665bc10077'],
     'views/portal/alerts.php' => ['s'=>1519,'h'=>'77aa6e37d664f4cc'],
-    'views/portal/assistant.php' => ['s'=>1279,'h'=>'ed9cc6341e5302e1'],
+    'views/portal/assistant.php' => ['s'=>2284,'h'=>'59037917099f7b3f'],
     'views/portal/bench.php' => ['s'=>8652,'h'=>'b789ca4d3e77c630'],
     'views/portal/bottom.php' => ['s'=>260,'h'=>'38c0e9ceb9238454'],
     'views/portal/call.php' => ['s'=>2348,'h'=>'e9bfa6995655492b'],
-    'views/portal/calls.php' => ['s'=>1346,'h'=>'d9647d8d744a4798'],
+    'views/portal/calls.php' => ['s'=>1504,'h'=>'5bd2edcba3454040'],
     'views/portal/complaint_new.php' => ['s'=>3662,'h'=>'c53862ab78ef4620'],
     'views/portal/complaints.php' => ['s'=>1893,'h'=>'c898dd644d85604a'],
-    'views/portal/dashboard.php' => ['s'=>5211,'h'=>'7f114d902246a289'],
+    'views/portal/dashboard.php' => ['s'=>5260,'h'=>'94c018fa73d13a60'],
     'views/portal/deputations.php' => ['s'=>5877,'h'=>'d80f8cb2f7a73958'],
     'views/portal/find.php' => ['s'=>12261,'h'=>'078a098140aaefe8'],
     'views/portal/hire.php' => ['s'=>22534,'h'=>'3b1243f6965c49f4'],
     'views/portal/hire_req.php' => ['s'=>16348,'h'=>'00f04064a8121cf1'],
     'views/portal/hiring.php' => ['s'=>8831,'h'=>'eedf44396241f48c'],
-    'views/portal/invoices.php' => ['s'=>2441,'h'=>'bbdcb859642b93a3'],
+    'views/portal/invoices.php' => ['s'=>2486,'h'=>'ff5b9b4f07b9fb21'],
     'views/portal/issue.php' => ['s'=>4197,'h'=>'233509febb755e4f'],
     'views/portal/issues.php' => ['s'=>1308,'h'=>'6c16b1e94a076203'],
     'views/portal/login.php' => ['s'=>2228,'h'=>'e3075e6f552c05a6'],
@@ -671,7 +671,7 @@ $EXPECT  = [
     'views/portal/roster.php' => ['s'=>9251,'h'=>'cc1f322c0ecdda96'],
     'views/portal/talent.php' => ['s'=>10080,'h'=>'1dec998e9609120c'],
     'views/portal/team.php' => ['s'=>3308,'h'=>'15cc2ab9399b15d8'],
-    'views/portal/top.php' => ['s'=>5893,'h'=>'ee346148c3a22442'],
+    'views/portal/top.php' => ['s'=>6126,'h'=>'fdeb44de9be581c2'],
     'views/portal/voucher.php' => ['s'=>13222,'h'=>'e40de6aa8a83b8a2'],
     'views/pro/applications.php' => ['s'=>2208,'h'=>'7c4febd8703426aa'],
     'views/pro/bookings.php' => ['s'=>3693,'h'=>'f348f74b6510728f'],
@@ -698,7 +698,7 @@ $EXPECT  = [
     'views/reset_password.php' => ['s'=>3677,'h'=>'bbbee0a4f6e37827'],
     'views/vendor/accept.php' => ['s'=>1615,'h'=>'1f104d773e83c106'],
     'views/vendor/alerts.php' => ['s'=>1519,'h'=>'e3e2bb09680b5ee1'],
-    'views/vendor/assistant.php' => ['s'=>1244,'h'=>'ac3213837c04474f'],
+    'views/vendor/assistant.php' => ['s'=>2174,'h'=>'3e867d28da2320fb'],
     'views/vendor/bottom.php' => ['s'=>192,'h'=>'80ac2cd745fce93c'],
     'views/vendor/dashboard.php' => ['s'=>3322,'h'=>'145b9fb19730bf7b'],
     'views/vendor/issue.php' => ['s'=>4197,'h'=>'41b1c1fbf9282782'],
@@ -711,7 +711,7 @@ $EXPECT  = [
     'views/vendor/password.php' => ['s'=>1140,'h'=>'0ce31e97ab05f47a'],
     'views/vendor/qualification.php' => ['s'=>3160,'h'=>'076c8ef2c6e314e4'],
     'views/vendor/reports.php' => ['s'=>1594,'h'=>'1930c8ce4c8b021e'],
-    'views/vendor/top.php' => ['s'=>4428,'h'=>'769fac7db59f28af'],
+    'views/vendor/top.php' => ['s'=>4661,'h'=>'12e53d7682db81b6'],
 ];
 
 $IS_CLI = (PHP_SAPI === 'cli');
