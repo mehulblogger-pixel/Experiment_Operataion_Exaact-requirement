@@ -659,6 +659,63 @@ function recruit_iv_panel($cand) {
             </form>
           </details>
           <?php endif; ?>
+
+          <?php //  ---- WHEN THE INTERVIEW DECIDES SOMETHING, OFFER THE MOVE ----
+                //                                            (UAT A16 / A8)
+                //
+                //    "It records as fail but there is no option of reject the
+                //     test candidate."
+                //    "Hiring Work flow shall automatically updated stage wise
+                //     when either Pipeline, Overview, Interviews, documents
+                //     etc. is updated. IF there is any duplicacy of the work
+                //     that must be unified."
+                //
+                //  Both true. Recording Fail / No hire left the candidate sitting
+                //  at "Interview scheduled", and the control that would move them
+                //  was a dropdown in another panel far down the page — so the
+                //  owner looked where the decision was made, found nothing, and
+                //  logged it as missing.
+                //
+                //  OFFERED, NOT AUTOMATIC, and the distinction is the whole
+                //  design. A failed L1 does not always mean rejected: the
+                //  recruiter may want an L2 with a different panel, or a hold
+                //  pending a client's view. Moving them automatically would make
+                //  a lifecycle decision on their behalf and be wrong often
+                //  enough to matter. So the screen states the consequence and
+                //  offers it in one click, pre-filled, where the decision was
+                //  taken.
+                //
+                //  It posts to /candidate-stage — the SAME endpoint the "Move
+                //  this candidate" panel uses. No second path, no second set of
+                //  guards, one audit trail. That is the "duplicacy ... must be
+                //  unified" half of the ask.
+                $ivMove = null;
+                $ivStageNow = strtoupper((string) ($cand['stage'] ?? ''));
+                if ($can && !in_array($ivStageNow, ['ACCEPTED', 'WITHDRAWN', 'REJECTED'], true)) {
+                    if (in_array($st, ['FAIL', 'NO_SHOW'], true))
+                        $ivMove = ['REJECTED', 'Reject this candidate',
+                                   $st === 'NO_SHOW' ? 'did not attend' : 'were not successful'];
+                    elseif ($st === 'HOLD')
+                        $ivMove = ['HOLD', 'Put this candidate on hold', 'were put on hold'];
+                    elseif ($st === 'PASS' && $ivStageNow !== 'OFFERED')
+                        $ivMove = ['OFFERED', 'Move to offer', 'passed'];
+                }
+                if ($ivMove): [$ivTo, $ivLabel, $ivWhy] = $ivMove;
+                      $ivStageName = (function_exists('lk_options_or') ? lk_options_or('candidate_stage', CAND_STAGES) : CAND_STAGES)[$ivTo] ?? $ivTo; ?>
+          <form method="post" action="/candidate-stage?id=<?= (int)$cand['id'] ?>"
+                style="margin-top:8px;padding:9px 11px;border:1px solid var(--line,#e5e7eb);border-radius:9px;background:var(--soft,#f8fafc)">
+            <div style="font-size:12.5px;margin-bottom:6px">
+              This person is still at <b><?= $e((function_exists('lk_options_or') ? lk_options_or('candidate_stage', CAND_STAGES) : CAND_STAGES)[$ivStageNow] ?? $ivStageNow) ?></b>.
+              They <?= $e($ivWhy) ?> at <?= $e($iv['round']) ?><?= ((int)($iv['attempt'] ?? 1) > 1 ? ' (re-interview ' . (int)$iv['attempt'] . ')' : '') ?> —
+              move them to <b><?= $e($ivStageName) ?></b>?
+            </div>
+            <input type="hidden" name="to_stage" value="<?= $e($ivTo) ?>">
+            <input type="hidden" name="remark" value="<?= $e($iv['round'] . ': ' . (IV_RESULTS[$st] ?? $st)
+                   . ((string)$iv['recommendation'] !== '' ? ' — ' . $iv['recommendation'] : '')) ?>">
+            <button class="btn small"><?= $e($ivLabel) ?></button>
+            <span class="muted" style="font-size:11.5px;margin-left:6px">or leave them where they are and decide later</span>
+          </form>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
     </div>
