@@ -44,9 +44,18 @@ These bound every claim in this audit.
    covered by controlled, scripted tests instead.
 4. **GET-only.** The probe issues GET. A route that only acts on POST shows as
    a redirect or as its parent screen; it is not evidence that the action works.
-5. **Sibling projects not yet audited.** `licence-server/`, `mgh-hire/`,
-   `mgh_books_receiver/`, `sop/` sit in this repository but are separate
-   deployables. Whether they are in scope is **open question Q1**.
+5. **Sibling projects — now in scope.** `licence-server/`, `mgh-hire/`,
+   `mgh_books_receiver/`, `sop/` sit in this repository as separate deployables.
+   The owner confirmed on 2026-10-18 that **everything is in scope** (Q1
+   closed). `mgh_books_receiver` is mapped in `02-MODULE-DEPENDENCY-MAP.md`;
+   `mgh-hire` is raised as GAP-007; `licence-server` and `sop` are Phase F/G.
+6. **The role probe used purpose-made accounts, not the owner's real users.**
+   Six accounts (Business Director, Branch Manager, Operation Manager,
+   Coordinator, Inspector, Finance) were created in a **throwaway copy** of the
+   database, each holding only its role's own permissions. If a real user at the
+   live site holds extra permissions, that user sees more than the matrix in
+   `evidence/role-access-matrix.md` shows. The matrix states what the **role**
+   grants, which is the thing the audit needs.
 
 ### Two measurement errors made and corrected during Phase A
 
@@ -66,16 +75,20 @@ Recorded because they affect how much the numbers can be trusted.
 | Phase | Deliverable | State |
 |---|---|---|
 | **A** Repository discovery & existing-document review | §4 of this file + `01-APPLICATION-INVENTORY.md` | **DONE** |
-| **B** Navigation & module inventory | `01-APPLICATION-INVENTORY.md` | **DONE (admin role only)** |
-| **C** Cross-module dependency & data ownership | `02-MODULE-DEPENDENCY-MAP.md` | not started |
+| **B** Navigation & module inventory | `01-APPLICATION-INVENTORY.md` | **DONE — all 7 roles, headline corrected** |
+| **C** Cross-module dependency & data ownership | `02-MODULE-DEPENDENCY-MAP.md` | **in progress** — money chain done |
 | **D** End-to-end workflow mapping | `03-WORKFLOW-CATALOGUE.md` | not started |
 | **E** Screen, field, terminology & usability audit | `04-SCREEN-AND-FIELD-AUDIT.md`, `05-BUSINESS-GLOSSARY.md` | not started |
 | **F** Security, permissions, calculations & reporting | `06-DATA-AND-PERMISSION-AUDIT.md`, `07-DASHBOARD-AND-KPI-AUDIT.md` | not started |
 | **G** Test design & controlled verification | `09-UAT-PLAN.md` | not started |
 | **H** Consolidated gap register & roadmap | `08-GAP-REGISTER.md`, `10-ROADMAP.md` | seeded in Phase B |
 
-Phase B is marked done **for the administrator role only**. It is not complete
-until the probe has been repeated for coordinator, inspector and finance.
+**Phase B close-out (2026-10-18).** The probe was repeated for all seven roles
+(`evidence/route-probe-by-role.py`, `role-access-matrix.md`), and reachability
+was rebuilt as a link-following crawl after the first method was found to
+over-report. Screens that render, per role: Admin 256 · Director 154 · Branch
+Manager 152 · Operation Manager 122 · Coordinator 112 · Inspector 32 ·
+Finance 59. Corrected reachability (admin): **194 reached, 62 not**.
 
 ---
 
@@ -129,6 +142,12 @@ docs/audit-2026-10/
 | `action-handler-aliases.tsv` | 21 routes that re-render a parent screen (not lost) |
 | `routes-not-probed.txt` | 18 destructive routes deliberately not fired |
 | `navigation-dump.json` | the live menu: areas, sections, tiles, find-a-screen index |
+| `route-probe-by-role.py` | the seven-role probe — creates its own test accounts in a throwaway database |
+| `route-probe-by-role.json` | every route × every role: status and classification |
+| `role-access-matrix.md` | the readable who-can-open-what table built from the above |
+| `reachability-crawl.py` | the link-following crawl that replaced the door-counting method |
+| `reachability-crawl.json` | shortest click path to every screen reached |
+| `unreachable-after-crawl-admin.tsv` | the 62 screens no link reaches, with their headings |
 
 ---
 

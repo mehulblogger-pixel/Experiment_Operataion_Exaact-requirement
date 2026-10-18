@@ -1,0 +1,44 @@
+{
+ "Master Admin": {
+  "matrix": "Full",
+  "receipt": "CAN RECORD MONEY",
+  "draft": "CAN RAISE AN INVOICE",
+  "cancel": "CAN CANCEL"
+ },
+ "Business Director": {
+  "matrix": "\u2014",
+  "receipt": "CAN RECORD MONEY",
+  "draft": "CAN RAISE AN INVOICE",
+  "cancel": "refused"
+ },
+ "Branch Manager": {
+  "matrix": "View",
+  "receipt": "CAN RECORD MONEY",
+  "draft": "CAN RAISE AN INVOICE",
+  "cancel": "refused"
+ },
+ "Operation Manager": {
+  "matrix": "\u2014",
+  "receipt": "refused (no form)",
+  "draft": "refused (no form)",
+  "cancel": "not tested (no draft of its own)"
+ },
+ "Coordinator": {
+  "matrix": "View",
+  "receipt": "CAN RECORD MONEY",
+  "draft": "CAN RAISE AN INVOICE",
+  "cancel": "refused"
+ },
+ "Inspector": {
+  "matrix": "\u2014",
+  "receipt": "refused (no form)",
+  "draft": "refused (no form)",
+  "cancel": "not tested (no draft of its own)"
+ },
+ "Finance": {
+  "matrix": "Issue",
+  "receipt": "CAN RECORD MONEY",
+  "draft": "CAN RAISE AN INVOICE",
+  "cancel": "CAN CANCEL"
+ }
+}

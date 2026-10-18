@@ -56,6 +56,25 @@ Full table: `evidence/route-probe-admin.tsv`.
 
 ## 3. THE HEADLINE FINDING — 95 working screens have no way in
 
+> **SUPERSEDED — 2026-10-18. The number 95 is wrong, and so was the method
+> that produced it.** It counted *doors* (area tiles and "Find a screen"
+> entries) and never followed the **links on the screens themselves**. The
+> Money area's *Billing workspace* tile opens `/to-bill`, and that screen links
+> onward to `/invoices`, `/receipts`, `/receivables` and `/tally` — so all four
+> are two clicks from the menu, not unreachable.
+>
+> A link-following crawl from the whole rail
+> (`evidence/reachability-crawl.py`) gives the corrected figures: **194 of 256
+> screens reached, 62 not reached** (15 at 0 clicks, 123 at 1, 50 at 2, 6 at 3).
+> Of the 62, most are correctly address-only — POST handlers, public pages,
+> platform-owner consoles. The twelve that are real findings are listed as
+> **GAP-002** in `08-GAP-REGISTER.md`, where this correction is recorded in
+> full.
+>
+> The original section is left below **unedited**, as written, so the error is
+> visible rather than quietly removed. Read it as history, not as a finding.
+
+
 | | Count |
 |---|---|
 | Screens that render | **256** |
@@ -102,6 +121,18 @@ receivables ageing without typing the address. Same pattern elsewhere:
 
 This is the mechanism behind the owner's repeated UAT reports that features
 "do not exist". It is not a missing feature — it is a missing door.
+
+> **Correction to the Money paragraph above.** The "Menu entry: none" column is
+> accurate — none of those six screens has a tile of its own. The conclusion
+> drawn from it was not. They are reached from **Money → Billing workspace**,
+> which links to all of them, so an administrator can reach the invoice
+> register, record a receipt and open receivables ageing in two clicks without
+> typing an address. What survives of this finding is narrower and is carried
+> forward properly: the billing chain hangs off a **single tile** whose
+> description over-promises (GAP-010), and that tile is gated more narrowly than
+> the module, so an Operation Manager gets no door at all (GAP-003). The
+> genuinely door-less screens are GAP-002. `/ncr` is not one of them — it is
+> reachable for an administrator; its finding is a permission one (GAP-004).
 
 ---
 
