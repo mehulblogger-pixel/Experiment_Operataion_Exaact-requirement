@@ -74,6 +74,76 @@ correction linked, rather than quietly edited away.
 
 ---
 
+## GAP-012 — the three external portals were never audited, and the audit's universe was incomplete
+
+**CONFIRMED · P1 · coverage · the largest single gap in this audit**
+
+Full account: **`00a-ERRATUM-COVERAGE.md`.** Summary here.
+
+`evidence/routes-dispatched.txt` was built by parsing route literals out of
+**`phpapp/lib/ops.php` alone**, and every count in this folder rested on it.
+Routes dispatched from the other 20-odd `lib/` files, and the three portals
+dispatched from `index.php`, were never in the universe.
+
+Found while tracing KPI functions: `/analytics`, `/analytics-kpis`,
+`/analytics-quality` and `/analytics-drill` all serve **HTTP 200 with real
+headings** and were absent from the inventory.
+
+Re-parsed and then **probed** (`evidence/route-list-recount.py`,
+`route-recount-probe.py`):
+
+| | Count |
+|---|---|
+| Real routes the list was missing | **160** |
+| …rendering as a usable screen | **70** |
+| False candidates (field types, provider names, columns) | 178 |
+| **Corrected totals** | **≈725 routes · ≈326 screens** (was 565 · 256) |
+
+**The part that matters:** the 160 include the **entire external-facing
+surface** —
+
+| Family | Routes | As a staff admin |
+|---|---|---|
+| Client portal `/portal/*` | 33 | 404 (portal off in the test workspace) |
+| Vendor portal `/vendor/*` | 11 | 404 (same) |
+| Professional portal `/pro/*` | 26 | 23 redirect, 3 screen |
+| Analytics (TAPI) | 10 | 9 screen, 1 partial |
+
+The 404s are **correct behaviour and good architecture**: `index.php:1024`
+dispatches the portals *before* staff authentication, because "`require_login()`
+means a STAFF account — a client has none and must never be pushed towards
+one", and the vendor portal is "a THIRD audience… its own table
+(`vendor_users`), its own session key (`vuid`), its own `/vendor` addresses".
+Three audiences, three tables, three session keys, dispatched ahead of staff
+login — a stronger separation than most products manage.
+
+**But none of it was audited.** Not inventoried, not probed per external role,
+no forms tested, no isolation check. Portal access runs on a **separate**
+permission system (`PORTAL_PERMS`, `pcan()`, matrix fn. 20) which states that a
+client sees only its own requirements and privacy-safe professional cards —
+**and that was never verified.**
+
+**What is NOT affected:** every per-screen measurement stands. The four
+empty-record forms and the records they wrote, the per-role access matrix for
+probed routes, the books write-authority test, the concurrency finding, the
+terminology analysis, the GAP-011 fix and its guard test. **A coverage error,
+not an accuracy error.**
+
+**Why it happened:** one file was treated as the router, and the route list was
+never validated against the running application. A probe that only asks about
+routes it already knows cannot discover one it does not.
+
+**Acceptance.** The three portals are inventoried and probed as each external
+role; **party isolation is tested** (can a client reach another client's
+reports? a vendor another vendor's assessment?); the module-gate classification
+and the reachability crawl are re-run over all ≈725 routes; and the application
+enumerates its own routes so the inventory cannot drift again.
+
+**Priority within this gap:** the isolation test first. Everything else is
+arithmetic; that one is about whether one customer can see another's data.
+
+---
+
 ## GAP-001 — "Find a screen…" searches 15 items; the 167-screen index is behind a keyboard shortcut
 
 **CONFIRMED · P1 · navigation · every role**

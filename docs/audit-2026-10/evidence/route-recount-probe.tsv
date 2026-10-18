@@ -1,0 +1,339 @@
+route	class	heading
+abs	NOTFOUND	Not found
+adspro-backfill	SCREEN	Ads Pro connection
+adspro-import	SCREEN	Ads Pro connection
+adspro-save	SCREEN	Ads Pro connection
+adspro-spend	SCREEN	Ads Pro connection
+adspro-sync	SCREEN	Ads Pro connection
+adspro-test	SCREEN	Ads Pro connection
+all	NOTFOUND	Not found
+analytics	SCREEN	Analytics &amp; performance
+analytics-alerts	SCREEN	Alerts
+analytics-drill	SCREEN	Breakdown —
+analytics-export	PARTIAL	
+analytics-kpi-edit	SCREEN	New KPI
+analytics-kpis	SCREEN	KPI library
+analytics-quality	SCREEN	Data quality
+analytics-review	SCREEN	Management review
+analytics-scorecard	SCREEN	Management scorecard
+analytics-snapshot	SCREEN	Periods &amp; snapshots
+anthropic	NOTFOUND	Not found
+asset-ack	SCREEN	Asset issuance register
+asset-file	NOTFOUND	Not found
+asset-issue-new	SCREEN	Asset issuance register
+asset-return	SCREEN	Asset issuance register
+audit-close	REDIRECT	
+audit-finding-add	REDIRECT	
+audit-finding-capa	REDIRECT	
+audit-record	REDIRECT	
+audit-settings	REDIRECT	
+audits	NOTFOUND	Not found
+auth-add	REDIRECT	
+auth-enforce	REDIRECT	
+auth-status	REDIRECT	
+awaiting	NOTFOUND	Not found
+bad	NOTFOUND	Not found
+band	NOTFOUND	Not found
+bearer	NOTFOUND	Not found
+billable-approve	SCREEN	Billable events
+billable-bill	SCREEN	Billable events
+billable-bill-partial	SCREEN	Billable events
+billable-cancel	SCREEN	Billable events
+billable-dispute	SCREEN	Billable events
+billable-sync	SCREEN	Billable events
+blank	NOTFOUND	Not found
+calc	NOTFOUND	Not found
+capa-action-add	REDIRECT	
+capa-action-cancel	REDIRECT	
+capa-action-done	REDIRECT	
+capa-action-reopen	REDIRECT	
+capa-cause	REDIRECT	
+capa-close	REDIRECT	
+capa-done	REDIRECT	
+capa-escalate	REDIRECT	
+capa-from-complaint	REDIRECT	
+capa-item	NOTFOUND	Not found
+capa-new	SCREEN	Raise a corrective action
+capa-plan	REDIRECT	
+capa-settings	REDIRECT	
+capa-verify	REDIRECT	
+cdoc	NOTFOUND	Not found
+cdoc-edit	NOTFOUND	Not found
+cdoc-file	NOTFOUND	Not found
+cdoc-new	SCREEN	Add a controlled document
+cdoc-status	NOTFOUND	Not found
+cdoc-supersede	NOTFOUND	Not found
+cdocs	SCREEN	Controlled documents
+cf	NOTFOUND	Not found
+checkbox	NOTFOUND	Not found
+city	NOTFOUND	Not found
+closed	NOTFOUND	Not found
+coalesce	NOTFOUND	Not found
+code	NOTFOUND	Not found
+complaint-ack	REDIRECT	
+complaint-capa	REDIRECT	
+complaint-close	REDIRECT	
+complaint-decide	REDIRECT	
+complaint-investigate	REDIRECT	
+complaint-new	SCREEN	Record a complaint
+complaint-notify	REDIRECT	
+complaint-reopen	REDIRECT	
+complaint-settings	REDIRECT	
+complaint-validity	REDIRECT	
+conf-breach	NOTFOUND	Not found
+conf-breach-add	REDIRECT	
+conf-breach-close	REDIRECT	
+conf-nda-add	REDIRECT	
+conf-undertaking-add	REDIRECT	
+copilot	NOTFOUND	Not found
+country	NOTFOUND	Not found
+credit	NOTFOUND	Not found
+date	NOTFOUND	Not found
+disclosure-edit	SCREEN	Public-disclosure consent
+disclosure-new	SCREEN	Public-disclosure consent
+document-revise	NOTFOUND	Not found
+donut	NOTFOUND	Not found
+drule	NOTFOUND	Not found
+drule-edit	NOTFOUND	Not found
+drule-new	SCREEN	Add a decision rule
+drule-status	NOTFOUND	Not found
+drule-supersede	NOTFOUND	Not found
+drules	SCREEN	Decision rules &amp; acceptance criteria
+empty	NOTFOUND	Not found
+eq	NOTFOUND	Not found
+equip-cal-add	REDIRECT	
+equip-cert	NOTFOUND	Not found
+equip-edit	NOTFOUND	Not found
+equip-new	SCREEN	Add an instrument
+equipment	SCREEN	Equipment register
+failure-add	REDIRECT	
+failure-capa	REDIRECT	
+failure-resolve	REDIRECT	
+failure-update	REDIRECT	
+form-designer-field-add	SCREEN	Form Designer
+form-designer-field-edit	SCREEN	Form Designer
+form-designer-option-add	SCREEN	Form Designer
+form-designer-save	SCREEN	Form Designer
+funnel	NOTFOUND	Not found
+fy	NOTFOUND	Not found
+g	NOTFOUND	Not found
+gemini	NOTFOUND	Not found
+gte	NOTFOUND	Not found
+hbar	NOTFOUND	Not found
+hw-point-cancel	FORBIDDEN	This feature
+hw-point-clear	FORBIDDEN	This feature
+hw-point-derive	FORBIDDEN	This feature
+hw-point-new	FORBIDDEN	This feature
+hw-point-reopen	FORBIDDEN	This feature
+hw-point-waive	FORBIDDEN	This feature
+iddoc-access	SCREEN	Identity-document access review
+iddoc-add	REDIRECT	
+iddoc-file	NOTFOUND	Not found
+iddoc-redact	REDIRECT	
+iddoc-retention	REDIRECT	
+iddoc-reveal	REDIRECT	
+iddoc-share	REDIRECT	
+imp-declare	REDIRECT	
+imp-threat-add	REDIRECT	
+imp-threat-decide	REDIRECT	
+imp-type	REDIRECT	
+improvements	NOTFOUND	Not found
+in	NOTFOUND	Not found
+instrument	NOTFOUND	Not found
+int	NOTFOUND	Not found
+invoice-set-branch	NOTFOUND	Not found
+k	NOTFOUND	Not found
+lastmonth	NOTFOUND	Not found
+lead	NOTFOUND	Not found
+lead-contact	REDIRECT	
+lead-convert	NOTFOUND	Not found
+lead-edit	REDIRECT	
+lead-file	NOTFOUND	
+lead-files	REDIRECT	
+lead-move	REDIRECT	
+lead-new	SCREEN	New lead
+leads-bulk	REDIRECT	
+line	NOTFOUND	Not found
+line1	NOTFOUND	Not found
+line2	NOTFOUND	Not found
+m	NOTFOUND	Not found
+major	NOTFOUND	Not found
+manday	NOTFOUND	Not found
+max	NOTFOUND	Not found
+method	NOTFOUND	Not found
+method-edit	NOTFOUND	Not found
+method-file	NOTFOUND	Not found
+method-new	SCREEN	Add a method
+method-status	NOTFOUND	Not found
+method-supersede	NOTFOUND	Not found
+method-validate	NOTFOUND	Not found
+methods	SCREEN	Inspection methods &amp; standards
+min	NOTFOUND	Not found
+month	NOTFOUND	Not found
+multiselect	NOTFOUND	Not found
+muted	NOTFOUND	Not found
+ncr-assign	NOTFOUND	Not found
+ncr-capa	NOTFOUND	Not found
+ncr-close	NOTFOUND	Not found
+ncr-contain	NOTFOUND	Not found
+ncr-disposition	NOTFOUND	Not found
+ncr-item	NOTFOUND	Not found
+ncr-new	SCREEN	Raise a nonconformity
+ncr-reopen	NOTFOUND	Not found
+ne	NOTFOUND	Not found
+nodisp	NOTFOUND	Not found
+none	NOTFOUND	Not found
+nonempty	NOTFOUND	Not found
+number	NOTFOUND	Not found
+offers	NOTFOUND	Not found
+ok	NOTFOUND	Not found
+open	NOTFOUND	Not found
+openai	NOTFOUND	Not found
+opportunity	NOTFOUND	Not found
+opportunity-contract	NOTFOUND	Not found
+opportunity-edit	NOTFOUND	Not found
+opportunity-from-lead	NOTFOUND	Not found
+opportunity-generate-quote	NOTFOUND	Not found
+opportunity-move	NOTFOUND	Not found
+opportunity-new	SCREEN	New opportunity
+opportunity-new-quote	NOTFOUND	Not found
+opportunity-quote	NOTFOUND	Not found
+opportunity-raise-order	NOTFOUND	Not found
+opportunity-send-to-accounts	NOTFOUND	Not found
+overdue	NOTFOUND	Not found
+pareto	NOTFOUND	Not found
+pending	NOTFOUND	Not found
+perplexity	NOTFOUND	Not found
+pincode	NOTFOUND	Not found
+pipeline	NOTFOUND	Not found
+pipeline-default	NOTFOUND	Not found
+pipeline-new	NOTFOUND	Not found
+pipeline-save	NOTFOUND	Not found
+pipeline-stage-add	NOTFOUND	Not found
+portal/accept	NOTFOUND	Not found
+portal/alerts	NOTFOUND	Not found
+portal/assistant	NOTFOUND	Not found
+portal/bench	NOTFOUND	Not found
+portal/call	NOTFOUND	Not found
+portal/calls	NOTFOUND	Not found
+portal/complaint-new	NOTFOUND	Not found
+portal/complaints	NOTFOUND	Not found
+portal/dep-approve	NOTFOUND	Not found
+portal/dep-gate	NOTFOUND	Not found
+portal/deputations	NOTFOUND	Not found
+portal/find	NOTFOUND	Not found
+portal/hire	NOTFOUND	Not found
+portal/hire-req	NOTFOUND	Not found
+portal/hiring	NOTFOUND	Not found
+portal/invoices	NOTFOUND	Not found
+portal/issue	NOTFOUND	Not found
+portal/issues	NOTFOUND	Not found
+portal/login	NOTFOUND	Not found
+portal/password	NOTFOUND	Not found
+portal/pay	NOTFOUND	Not found
+portal/plans	NOTFOUND	Not found
+portal/report	NOTFOUND	Not found
+portal/report-decision	NOTFOUND	Not found
+portal/report-file	NOTFOUND	Not found
+portal/reports	NOTFOUND	Not found
+portal/reputation	NOTFOUND	Not found
+portal/request	NOTFOUND	Not found
+portal/roster	NOTFOUND	Not found
+portal/talent	NOTFOUND	Not found
+portal/team	NOTFOUND	Not found
+portal/voucher	NOTFOUND	Not found
+portal/voucher-file	NOTFOUND	Not found
+pro/applications	REDIRECT	
+pro/bookings	REDIRECT	
+pro/credentials	REDIRECT	
+pro/cv	REDIRECT	
+pro/documents	REDIRECT	
+pro/file	REDIRECT	
+pro/forgot	SCREEN	Reset your password
+pro/geo	REDIRECT	
+pro/jobs	REDIRECT	
+pro/login	SCREEN	Welcome back
+pro/messages	REDIRECT	
+pro/pay	REDIRECT	
+pro/plans	REDIRECT	
+pro/privacy	REDIRECT	
+pro/profile	REDIRECT	
+pro/register	SCREEN	List yourself for work
+pro/report-file	REDIRECT	
+pro/reputation	REDIRECT	
+pro/tax-children	REDIRECT	
+pro/tax-resolve	REDIRECT	
+pro/tax-roots	REDIRECT	
+pro/tax-suggest	REDIRECT	
+pro/verify	REDIRECT	
+pro/voucher	REDIRECT	
+pro/voucher-file	REDIRECT	
+pro/vouchers	REDIRECT	
+project-costing	NOTFOUND	Not found
+project-costing-approve	SCREEN	Project costing
+project-costing-attach	SCREEN	Project costing
+project-costing-line-save	SCREEN	Project costing
+project-costing-new	SCREEN	Project costing
+project-costing-print	NOTFOUND	Not found
+project-costing-reject	SCREEN	Project costing
+project-costing-reopen	SCREEN	Project costing
+project-costing-save	SCREEN	Project costing
+project-costing-submit	SCREEN	Project costing
+project-costing-to-quote	SCREEN	Project costing
+project-costing-to-req	SCREEN	Project costing
+query	NOTFOUND	Not found
+radio	NOTFOUND	Not found
+resources	NOTFOUND	Not found
+retention-edit	SCREEN	Record-retention schedule
+retention-new	SCREEN	Record-retention schedule
+review-action-add	REDIRECT	
+review-action-capa	REDIRECT	
+review-action-done	REDIRECT	
+review-complete	REDIRECT	
+review-header	REDIRECT	
+review-input	REDIRECT	
+review-refresh	REDIRECT	
+risk	NOTFOUND	Not found
+risk-edit	NOTFOUND	Not found
+risk-new	SCREEN	Add a risk or opportunity
+risk-status	NOTFOUND	Not found
+risks	SCREEN	Risks &amp; opportunities
+role	NOTFOUND	Not found
+rootcause	NOTFOUND	Not found
+round	NOTFOUND	Not found
+sample	NOTFOUND	Not found
+sample-edit	NOTFOUND	Not found
+sample-event	NOTFOUND	Not found
+sample-new	SCREEN	Receive an item
+sample-status	NOTFOUND	Not found
+samples	SCREEN	Inspection items &amp; samples
+satisfaction	SCREEN	Customer satisfaction
+satisfaction-decline	NOTFOUND	Not found
+satisfaction-followup	NOTFOUND	Not found
+satisfaction-new	SCREEN	Request feedback
+satisfaction-record	NOTFOUND	Not found
+satisfaction-survey	NOTFOUND	Not found
+select	NOTFOUND	Not found
+shutdown	NOTFOUND	Not found
+stage-gate-save	SCREEN	Approval rules for deal stages
+table	NOTFOUND	Not found
+textarea	NOTFOUND	Not found
+time	NOTFOUND	Not found
+vendor/accept	NOTFOUND	Not found
+vendor/alerts	NOTFOUND	Not found
+vendor/assistant	NOTFOUND	Not found
+vendor/issue	NOTFOUND	Not found
+vendor/issues	NOTFOUND	Not found
+vendor/login	NOTFOUND	Not found
+vendor/opportunities	NOTFOUND	Not found
+vendor/password	NOTFOUND	Not found
+vendor/qualification	NOTFOUND	Not found
+vendor/report	NOTFOUND	Not found
+vendor/reports	NOTFOUND	Not found
+warn	NOTFOUND	Not found
+work	NOTFOUND	Not found
+workspace/setup/forms	SCREEN	Forms
+workspace/setup/module-toggle	SCREEN	Set up your workspace
+workspace/setup/modules	SCREEN	Modules &amp; features
+workspace/setup/profile	REDIRECT	
+workspace/setup/profile-save	SCREEN	Set up your workspace

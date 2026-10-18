@@ -1,0 +1,106 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+=========== A. HOW MANY HEADLINE-NUMBER FUNCTIONS ===========
+155 functions whose name says they compute a headline number.
+
+=========== B. ONE NUMBER, HOW MANY IMPLEMENTATIONS ===========
+
+-- REVENUE: 10 function(s) mention it
+   can_see_revenue                    1, 1, 1, 1
+   costing_office_revenue             NO CALLERS FOUND
+   costing_sbu_revenue                NO CALLERS FOUND
+   job_revenue_for                    3
+   mkt_ledger_revenue_by_stream       NO CALLERS FOUND
+   mkt_revenue_streams                1
+   reports_revenue_office             NO CALLERS FOUND
+   revenue_reader_mode                1, 4
+   revenue_reader_modes               3
+   revenue_reader_set_mode            NO CALLERS FOUND
+
+-- PROFIT: 6 function(s) mention it
+   boss_profit                        1, 1
+   callprofit_rows                    NO CALLERS FOUND
+   job_profit                         1, 2, 5, 4, 3, 3, 1
+   ops_call_profit                    1
+   ops_profitability                  NO CALLERS FOUND
+   profit_reconciliation              2
+
+-- MARGIN: 0 function(s) mention it
+
+-- OUTSTANDING: 3 function(s) mention it
+   books_outstanding                  1, 1, 2, 2
+   ops_receivables                    1
+   settlement_outstanding_total       NO CALLERS FOUND
+
+-- MAN-DAYS: 3 function(s) mention it
+   job_mandays                        2, 3
+   mis_person_utilisation             2
+   mis_utilisation                    1
+
+-- COST: 23 function(s) mention it
+   call_cost_incurred                 NO CALLERS FOUND
+   cost_dualwrite_count               1, 1
+   cost_dualwrite_flag                NO CALLERS FOUND
+   cost_dualwrite_render              1
+   cost_dualwrite_scan                2
+   cost_dualwrite_summary             NO CALLERS FOUND
+   cost_month_frozen                  1, 3
+   cost_reader_mode                   4
+   cost_reader_modes                  3
+   cost_reader_set_mode               NO CALLERS FOUND
+   cost_run_status                    3
+   cost_sources                       2
+   demo_seed_costing                  NO CALLERS FOUND
+   inspector_daily_cost               NO CALLERS FOUND
+   … and 9 more
+
+=========== C. DOES ANYTHING RECOMPUTE WHAT BOOKS OWNS? ===========
+   advisor.php            SUM(x.amount)
+   advisor.php            SUM(x.amount)
+   books.php              SUM(amount)
+   books.php              SUM(amount)
+   books.php              SUM(amount)
+   books.php              SUM(a.amount)
+   books.php              SUM(r.amount + r.tds_amount)
+   books.php              SUM(a.amount)
+   books.php              SUM(x.amount)
+   books.php              sum("i.status IN ('ISSUED','PART_PAID')
+   books.php              SUM(x.amount)
+   books.php              SUM(x.amount)
+   chain.php              SUM(a.amount)
+   chain.php              SUM(x.amount)
+   connect_client_dash.php SUM(amount)
+   contracts.php          SUM(j.invoice_amount)
+   contracts.php          SUM(invoice_amount)
+   costrecon.php          SUM(amount)
+   costrecon.php          SUM(amount)
+   crm.php                SUM(j.invoice_amount)
+   crm.php                SUM(CASE WHEN j.payment_received=1 THEN j.payment_amount ELSE 0 END)
+   mis.php                SUM(amount)
+   ops.php                SUM(j.invoice_amount)
+   recruit_kpi.php        SUM(alloc)
+   recruit_kpi.php        SUM(CASE WHEN q - canc - alloc - dir > 0 THEN q - canc - alloc - dir E
+   recruit_kpi.php        SUM(CASE WHEN alloc + dir - (q - canc)
+   recruit_kpi.php        SUM(CASE WHEN a.allocated_qty > 0 THEN a.allocated_qty ELSE 0 END)
+   revrecon.php           SUM(il.amount)
+   revrecon.php           SUM(il.amount)
+   revrecon.php           SUM(il.amount)
+   revrecon.php           SUM(invoice_amount)
+   seed_demo_c.php        SUM(amount)
+   tapi.php               SUM(jobs.invoice_amount)
+   tapi.php               SUM(j.invoice_amount)
+   34 place(s) to read: each must be a DISPLAY of EXAACT's own records,
+   not a recomputation of what Books reports back.
+
+=========== D. IS THE KPI FRAMEWORK USED? ===========
+   kpi_defs         rows=14   referenced in: tapi.php, tapi_dash.php, tapi_gov.php, tapi_score.php
+   kpi_targets      rows=0    referenced in: seed_demo.php, seed_demo_c.php, tapi_score.php
+   kpi_snapshots    rows=0    referenced in: seed_demo.php, seed_demo_c.php, tapi_dash.php, tapi_gov.php
+   kpi_versions     rows=0    referenced in: seed_demo_c.php, tapi_gov.php
+   kpi_alerts       rows=0    referenced in: seed_demo.php, seed_demo_c.php, tapi_score.php
+
+=========== E. THE DISAGREEMENT COUNTERS ===========
+   billable_mismatch_count            called by: NO CALLERS
+   calls_status_disagreement_count    called by: NO CALLERS
+   revrecon_count                     called by: areas.php, ops.php
+   costrecon_count                    called by: areas.php, ops.php
+   reimb_dedup_count                  (not defined)

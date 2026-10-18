@@ -1,0 +1,1375 @@
+{
+ "probed": {
+  "abs": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "adspro-backfill": {
+   "class": "SCREEN",
+   "heading": "Ads Pro connection"
+  },
+  "adspro-import": {
+   "class": "SCREEN",
+   "heading": "Ads Pro connection"
+  },
+  "adspro-save": {
+   "class": "SCREEN",
+   "heading": "Ads Pro connection"
+  },
+  "adspro-spend": {
+   "class": "SCREEN",
+   "heading": "Ads Pro connection"
+  },
+  "adspro-sync": {
+   "class": "SCREEN",
+   "heading": "Ads Pro connection"
+  },
+  "adspro-test": {
+   "class": "SCREEN",
+   "heading": "Ads Pro connection"
+  },
+  "all": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "analytics": {
+   "class": "SCREEN",
+   "heading": "Analytics &amp; performance"
+  },
+  "analytics-alerts": {
+   "class": "SCREEN",
+   "heading": "Alerts"
+  },
+  "analytics-drill": {
+   "class": "SCREEN",
+   "heading": "Breakdown \u2014"
+  },
+  "analytics-export": {
+   "class": "PARTIAL",
+   "heading": ""
+  },
+  "analytics-kpi-edit": {
+   "class": "SCREEN",
+   "heading": "New KPI"
+  },
+  "analytics-kpis": {
+   "class": "SCREEN",
+   "heading": "KPI library"
+  },
+  "analytics-quality": {
+   "class": "SCREEN",
+   "heading": "Data quality"
+  },
+  "analytics-review": {
+   "class": "SCREEN",
+   "heading": "Management review"
+  },
+  "analytics-scorecard": {
+   "class": "SCREEN",
+   "heading": "Management scorecard"
+  },
+  "analytics-snapshot": {
+   "class": "SCREEN",
+   "heading": "Periods &amp; snapshots"
+  },
+  "anthropic": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "asset-ack": {
+   "class": "SCREEN",
+   "heading": "Asset issuance register"
+  },
+  "asset-file": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "asset-issue-new": {
+   "class": "SCREEN",
+   "heading": "Asset issuance register"
+  },
+  "asset-return": {
+   "class": "SCREEN",
+   "heading": "Asset issuance register"
+  },
+  "audit-close": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "audit-finding-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "audit-finding-capa": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "audit-record": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "audit-settings": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "audits": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "auth-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "auth-enforce": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "auth-status": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "awaiting": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "bad": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "band": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "bearer": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "billable-approve": {
+   "class": "SCREEN",
+   "heading": "Billable events"
+  },
+  "billable-bill": {
+   "class": "SCREEN",
+   "heading": "Billable events"
+  },
+  "billable-bill-partial": {
+   "class": "SCREEN",
+   "heading": "Billable events"
+  },
+  "billable-cancel": {
+   "class": "SCREEN",
+   "heading": "Billable events"
+  },
+  "billable-dispute": {
+   "class": "SCREEN",
+   "heading": "Billable events"
+  },
+  "billable-sync": {
+   "class": "SCREEN",
+   "heading": "Billable events"
+  },
+  "blank": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "calc": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "capa-action-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-action-cancel": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-action-done": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-action-reopen": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-cause": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-close": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-done": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-escalate": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-from-complaint": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-item": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "capa-new": {
+   "class": "SCREEN",
+   "heading": "Raise a corrective action"
+  },
+  "capa-plan": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-settings": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "capa-verify": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "cdoc": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "cdoc-edit": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "cdoc-file": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "cdoc-new": {
+   "class": "SCREEN",
+   "heading": "Add a controlled document"
+  },
+  "cdoc-status": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "cdoc-supersede": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "cdocs": {
+   "class": "SCREEN",
+   "heading": "Controlled documents"
+  },
+  "cf": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "checkbox": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "city": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "closed": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "coalesce": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "code": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "complaint-ack": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "complaint-capa": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "complaint-close": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "complaint-decide": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "complaint-investigate": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "complaint-new": {
+   "class": "SCREEN",
+   "heading": "Record a complaint"
+  },
+  "complaint-notify": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "complaint-reopen": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "complaint-settings": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "complaint-validity": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "conf-breach": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "conf-breach-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "conf-breach-close": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "conf-nda-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "conf-undertaking-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "copilot": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "country": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "credit": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "date": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "disclosure-edit": {
+   "class": "SCREEN",
+   "heading": "Public-disclosure consent"
+  },
+  "disclosure-new": {
+   "class": "SCREEN",
+   "heading": "Public-disclosure consent"
+  },
+  "document-revise": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "donut": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "drule": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "drule-edit": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "drule-new": {
+   "class": "SCREEN",
+   "heading": "Add a decision rule"
+  },
+  "drule-status": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "drule-supersede": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "drules": {
+   "class": "SCREEN",
+   "heading": "Decision rules &amp; acceptance criteria"
+  },
+  "empty": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "eq": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "equip-cal-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "equip-cert": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "equip-edit": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "equip-new": {
+   "class": "SCREEN",
+   "heading": "Add an instrument"
+  },
+  "equipment": {
+   "class": "SCREEN",
+   "heading": "Equipment register"
+  },
+  "failure-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "failure-capa": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "failure-resolve": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "failure-update": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "form-designer-field-add": {
+   "class": "SCREEN",
+   "heading": "Form Designer"
+  },
+  "form-designer-field-edit": {
+   "class": "SCREEN",
+   "heading": "Form Designer"
+  },
+  "form-designer-option-add": {
+   "class": "SCREEN",
+   "heading": "Form Designer"
+  },
+  "form-designer-save": {
+   "class": "SCREEN",
+   "heading": "Form Designer"
+  },
+  "funnel": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "fy": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "g": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "gemini": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "gte": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "hbar": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "hw-point-cancel": {
+   "class": "FORBIDDEN",
+   "heading": "This feature"
+  },
+  "hw-point-clear": {
+   "class": "FORBIDDEN",
+   "heading": "This feature"
+  },
+  "hw-point-derive": {
+   "class": "FORBIDDEN",
+   "heading": "This feature"
+  },
+  "hw-point-new": {
+   "class": "FORBIDDEN",
+   "heading": "This feature"
+  },
+  "hw-point-reopen": {
+   "class": "FORBIDDEN",
+   "heading": "This feature"
+  },
+  "hw-point-waive": {
+   "class": "FORBIDDEN",
+   "heading": "This feature"
+  },
+  "iddoc-access": {
+   "class": "SCREEN",
+   "heading": "Identity-document access review"
+  },
+  "iddoc-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "iddoc-file": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "iddoc-redact": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "iddoc-retention": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "iddoc-reveal": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "iddoc-share": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "imp-declare": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "imp-threat-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "imp-threat-decide": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "imp-type": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "improvements": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "in": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "instrument": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "int": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "invoice-set-branch": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "k": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "lastmonth": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "lead": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "lead-contact": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "lead-convert": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "lead-edit": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "lead-file": {
+   "class": "NOTFOUND",
+   "heading": ""
+  },
+  "lead-files": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "lead-move": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "lead-new": {
+   "class": "SCREEN",
+   "heading": "New lead"
+  },
+  "leads-bulk": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "line": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "line1": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "line2": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "m": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "major": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "manday": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "max": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "method": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "method-edit": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "method-file": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "method-new": {
+   "class": "SCREEN",
+   "heading": "Add a method"
+  },
+  "method-status": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "method-supersede": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "method-validate": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "methods": {
+   "class": "SCREEN",
+   "heading": "Inspection methods &amp; standards"
+  },
+  "min": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "month": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "multiselect": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "muted": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "ncr-assign": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "ncr-capa": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "ncr-close": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "ncr-contain": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "ncr-disposition": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "ncr-item": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "ncr-new": {
+   "class": "SCREEN",
+   "heading": "Raise a nonconformity"
+  },
+  "ncr-reopen": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "ne": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "nodisp": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "none": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "nonempty": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "number": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "offers": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "ok": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "open": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "openai": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity-contract": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity-edit": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity-from-lead": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity-generate-quote": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity-move": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity-new": {
+   "class": "SCREEN",
+   "heading": "New opportunity"
+  },
+  "opportunity-new-quote": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity-quote": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity-raise-order": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "opportunity-send-to-accounts": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "overdue": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "pareto": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "pending": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "perplexity": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "pincode": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "pipeline": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "pipeline-default": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "pipeline-new": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "pipeline-save": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "pipeline-stage-add": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/accept": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/alerts": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/assistant": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/bench": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/call": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/calls": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/complaint-new": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/complaints": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/dep-approve": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/dep-gate": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/deputations": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/find": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/hire": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/hire-req": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/hiring": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/invoices": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/issue": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/issues": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/login": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/password": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/pay": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/plans": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/report": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/report-decision": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/report-file": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/reports": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/reputation": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/request": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/roster": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/talent": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/team": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/voucher": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "portal/voucher-file": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "pro/applications": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/bookings": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/credentials": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/cv": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/documents": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/file": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/forgot": {
+   "class": "SCREEN",
+   "heading": "Reset your password"
+  },
+  "pro/geo": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/jobs": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/login": {
+   "class": "SCREEN",
+   "heading": "Welcome back"
+  },
+  "pro/messages": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/pay": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/plans": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/privacy": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/profile": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/register": {
+   "class": "SCREEN",
+   "heading": "List yourself for work"
+  },
+  "pro/report-file": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/reputation": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/tax-children": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/tax-resolve": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/tax-roots": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/tax-suggest": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/verify": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/voucher": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/voucher-file": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "pro/vouchers": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "project-costing": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "project-costing-approve": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "project-costing-attach": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "project-costing-line-save": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "project-costing-new": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "project-costing-print": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "project-costing-reject": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "project-costing-reopen": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "project-costing-save": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "project-costing-submit": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "project-costing-to-quote": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "project-costing-to-req": {
+   "class": "SCREEN",
+   "heading": "Project costing"
+  },
+  "query": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "radio": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "resources": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "retention-edit": {
+   "class": "SCREEN",
+   "heading": "Record-retention schedule"
+  },
+  "retention-new": {
+   "class": "SCREEN",
+   "heading": "Record-retention schedule"
+  },
+  "review-action-add": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "review-action-capa": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "review-action-done": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "review-complete": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "review-header": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "review-input": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "review-refresh": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "risk": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "risk-edit": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "risk-new": {
+   "class": "SCREEN",
+   "heading": "Add a risk or opportunity"
+  },
+  "risk-status": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "risks": {
+   "class": "SCREEN",
+   "heading": "Risks &amp; opportunities"
+  },
+  "role": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "rootcause": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "round": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "sample": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "sample-edit": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "sample-event": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "sample-new": {
+   "class": "SCREEN",
+   "heading": "Receive an item"
+  },
+  "sample-status": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "samples": {
+   "class": "SCREEN",
+   "heading": "Inspection items &amp; samples"
+  },
+  "satisfaction": {
+   "class": "SCREEN",
+   "heading": "Customer satisfaction"
+  },
+  "satisfaction-decline": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "satisfaction-followup": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "satisfaction-new": {
+   "class": "SCREEN",
+   "heading": "Request feedback"
+  },
+  "satisfaction-record": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "satisfaction-survey": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "select": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "shutdown": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "stage-gate-save": {
+   "class": "SCREEN",
+   "heading": "Approval rules for deal stages"
+  },
+  "table": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "textarea": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "time": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/accept": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/alerts": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/assistant": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/issue": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/issues": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/login": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/opportunities": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/password": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/qualification": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/report": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "vendor/reports": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "warn": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "work": {
+   "class": "NOTFOUND",
+   "heading": "Not found"
+  },
+  "workspace/setup/forms": {
+   "class": "SCREEN",
+   "heading": "Forms"
+  },
+  "workspace/setup/module-toggle": {
+   "class": "SCREEN",
+   "heading": "Set up your workspace"
+  },
+  "workspace/setup/modules": {
+   "class": "SCREEN",
+   "heading": "Modules &amp; features"
+  },
+  "workspace/setup/profile": {
+   "class": "REDIRECT",
+   "heading": ""
+  },
+  "workspace/setup/profile-save": {
+   "class": "SCREEN",
+   "heading": "Set up your workspace"
+  }
+ },
+ "skipped_destructive": [
+  "asset-issue-delete",
+  "audit-finding-delete",
+  "disclosure-del",
+  "equip-cal-del",
+  "form-designer-field-del",
+  "form-designer-option-del",
+  "lead-delete",
+  "lead-file-delete",
+  "opportunity-delete",
+  "pipeline-stage-delete",
+  "portal/logout",
+  "pro/logout",
+  "pro/reset",
+  "project-costing-line-delete",
+  "retention-del",
+  "stage-gate-delete",
+  "vendor/logout"
+ ]
+}
