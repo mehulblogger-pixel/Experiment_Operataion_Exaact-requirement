@@ -7,6 +7,18 @@ This is a **discovery and audit** exercise. No application code, schema,
 configuration, permission or business record is modified by it. Everything in
 this folder is evidence or analysis.
 
+> ## ⚠ READ `00a-ERRATUM-COVERAGE.md` FIRST
+>
+> The route inventory this audit was built on was parsed from **one file**
+> (`lib/ops.php`) and was **~160 routes short**, including the **three external
+> portals** — client, vendor and professional — which were therefore never
+> audited at all. Corrected totals: **≈725 routes and ≈326 screens**, against
+> the 565 and 256 quoted throughout this folder.
+>
+> It is a **coverage error, not an accuracy error**: every per-screen
+> measurement stands. But any **count** in this folder is a floor, not a total,
+> and the external surface is unverified (**GAP-012, P1**).
+
 ---
 
 ## 1. What "evidence" means here
@@ -76,12 +88,17 @@ Recorded because they affect how much the numbers can be trusted.
 |---|---|---|
 | **A** Repository discovery & existing-document review | §4 of this file + `01-APPLICATION-INVENTORY.md` | **DONE** |
 | **B** Navigation & module inventory | `01-APPLICATION-INVENTORY.md` | **DONE — all 7 roles, headline corrected** |
-| **C** Cross-module dependency & data ownership | `02-MODULE-DEPENDENCY-MAP.md` | **in progress** — money chain done |
-| **D** End-to-end workflow mapping | `03-WORKFLOW-CATALOGUE.md` | not started |
-| **E** Screen, field, terminology & usability audit | `04-SCREEN-AND-FIELD-AUDIT.md`, `05-BUSINESS-GLOSSARY.md` | not started |
-| **F** Security, permissions, calculations & reporting | `06-DATA-AND-PERMISSION-AUDIT.md`, `07-DASHBOARD-AND-KPI-AUDIT.md` | not started |
-| **G** Test design & controlled verification | `09-UAT-PLAN.md` | not started |
-| **H** Consolidated gap register & roadmap | `08-GAP-REGISTER.md`, `10-ROADMAP.md` | seeded in Phase B |
+| **C** Cross-module dependency & data ownership | `02-MODULE-DEPENDENCY-MAP.md` | **in progress** — money chain and ownership done |
+| **D** End-to-end workflow mapping | `03-WORKFLOW-CATALOGUE.md` + `workflows/` (ten per-area documents, 5,194 lines) | **DONE** |
+| **E** Screen, field, terminology & usability audit | `04-SCREEN-AND-FIELD-AUDIT.md`, `05-BUSINESS-GLOSSARY.md` | **DONE** for the 256 screens then known |
+| **F** Security, permissions, calculations & reporting | `06-DATA-AND-PERMISSION-AUDIT.md`, `07-DASHBOARD-AND-KPI-AUDIT.md` | **DONE** for definitions and sources; **figures not reconciled** (needs a populated database) |
+| **G** Test design & controlled verification | `09-UAT-PLAN.md` | **DONE** — 34 tests, ordered by consequence |
+| **H** Consolidated gap register & roadmap | `08-GAP-REGISTER.md`, `10-ROADMAP.md` | **DONE** |
+
+**All ten deliverables exist.** What remains is listed in `10-ROADMAP.md`
+stage 6 — re-running the inventory over the corrected ≈725-route universe,
+auditing the three portals, reconciling the figures against real data, and the
+sibling deployables.
 
 **Phase B close-out (2026-10-18).** The probe was repeated for all seven roles
 (`evidence/route-probe-by-role.py`, `role-access-matrix.md`), and reachability
