@@ -1,7 +1,7 @@
 # 11 — The three external portals
 
-**Audited** 18 October 2026 · **Status** first pass complete · closes the client
-and vendor halves of **GAP-012**
+**Audited** 18 October 2026 · **Status** security pass complete on all three
+portals · reduces **GAP-012** to a screen-quality audit
 
 ---
 
@@ -190,9 +190,78 @@ Ten client routes carry no `portal_need()`. Each was read; all ten are right:
 | `/portal/bench` | gated structurally: the signed-in party must resolve to an active agency organisation |
 | `/portal/assistant` | now bounded by what the user may read (GAP-014) |
 
-The **professional portal** has no per-user permission model at all, and that is
-correct: a professional account is **one individual**, with no colleagues to
-restrict. Its 29 routes are bounded by the signed-in professional's own id.
+---
+
+### 2.4 The vendor portal — clean, and the assistant fix verified there
+
+The vendor portal carries **four** permissions (`VENDOR_PERMS`): `reports`,
+`issues`, `qualification`, `market.apply`. **All four are enforced at their
+routes** — nothing like GAP-013 exists here. Evidence:
+`evidence/portal-perm-enforcement-vendor.php`.
+
+The assistant fix was written once, for a function **both** portals share. That
+is a reason to test both, not to test one: a shared function still takes a
+different permission test and reads a different column per audience. Run on the
+vendor side, a vendor user holding only `qualification` is handed **nothing**,
+is refused by the **permission** guard specifically, and a vendor who *does*
+hold `reports` still receives their own shared report and still **not** the
+nonconformity section. Frozen in the test as its own section.
+
+> **Method note — a wrong row I caught before publishing.** The first run of the
+> vendor probe reported `issues` as being enforced at **`/vendor/password`**,
+> which is nonsense. The cause was a regex of mine: written `"…\$route…"` inside
+> a double-quoted PHP string, PHP collapses `\$` to `$` and PCRE then reads it
+> as an **end-of-line anchor**, so the `if ($route === …)` dispatch form never
+> matched. Only the `case` arms were found, the last of them ran to the end of
+> the file, and it was credited with every gate below it —
+> `/vendor/issues` and `/vendor/issue` live in their own function further down.
+>
+> That flaw also sat in the **client** fixture generator, which split on `case`
+> alone. I checked rather than assumed: in `lib/portal.php` there are **zero**
+> `portal_need()` calls after the last `case`, so nothing had been mis-credited
+> and the committed fixture was right — but it was right by luck. Both fixtures
+> now split on **both** dispatch forms (the client one grew from 32 routes to 35,
+> gaining the three sign-in routes), and the test asserts that the gates after
+> the final route mark are **exactly** what the fixture records for that route,
+> so a gate added below the router can never again be silently attributed to it.
+
+---
+
+### 2.5 The professional portal — isolation proven by execution
+
+It has no per-user permission model at all, and that is correct: a professional
+account is **one individual**, with no colleagues to restrict. So its only
+security question is ownership — and it matters most on the **three routes that
+serve files**, because a document handed to the wrong person cannot be recalled.
+
+Signed in as professional A, pushing professional B's ids through the same
+ownership checks each route performs
+(`evidence/pro-portal-isolation.php`):
+
+| Route | A tried to reach | Result |
+|---|---|---|
+| `/pro/file` | B's uploaded certificate | **refused** |
+| `/pro/documents` | **delete** B's document | **refused**, B's row untouched |
+| `/pro/voucher` | B's payment voucher | **refused** |
+| `/pro/voucher-file` | B's expense receipt | **refused** (two hops: file → voucher → subject) |
+| `/pro/report-file` | B's site-report deliverable | **refused** |
+| `/pro/messages` | B's message thread | **refused** |
+
+Each refusal is paired with a **control** — the rightful owner reaching the same
+record — and with a **sanity check** that the row was found at all, so a refusal
+can never be mistaken for an empty table. The file routes answer **404**, not
+403; that is the right choice, because a 403 confirms the record exists.
+
+> **Method note.** The message-thread control failed on the first run: B was
+> refused B's own thread. That was my seed, not the product —
+> `connect_msg_app()` inner-joins `cx_requirements`, and I had pointed the
+> application at a requirement that did not exist, making the row invisible to
+> everyone. Without that control, the refusal beside it would have looked like
+> proof of a working ownership check when it proved only that the row could not
+> be seen by anybody. **A probe needs a control as much as it needs a
+> precondition.** (An earlier run also died because I invented a `status` column
+> on `cx_professionals`, which has `is_active`. Cheap failure; the schema is now
+> read, not assumed.)
 
 ---
 
@@ -204,11 +273,14 @@ what deliverables 04 and 05 did for the staff application:
 | Outstanding | Why it matters |
 |---|---|
 | Field-by-field screen audit of all 77 routes | the terminology, validation and empty-state work done for staff screens has not been done here |
-| The **professional portal's** 29 routes in detail | the largest of the three by route count, audited here only for isolation |
 | Phone-width pass at 390px | a professional in the field is phone-first by definition |
 | Accessibility | these screens are used by people outside your organisation, on equipment you do not control |
-| The vendor portal's 13 routes against `VENDOR_PERMS` | the same enforcement test, run per vendor permission |
-| What the assistant is handed for a **vendor** | the fix covers it; the probe was run client-side only |
+| The professional portal's **write** paths | isolation is proven on reads and on the one delete tested; the profile, CV, credentials and voucher-line writes are not each individually driven |
+| `/pro/tax-*` (4 routes) and `/pro/geo` | small lookup endpoints, read only for isolation so far |
+
+Closed since the first pass: the vendor portal's four permissions (§2.4), the
+assistant on the vendor side (§2.4), and the professional portal's isolation
+including all three file routes (§2.5).
 
 **GAP-012 is therefore reduced, not closed.** The coverage hole is mapped and its
 two security defects are fixed; the quality audit of these 77 screens remains.
@@ -222,5 +294,8 @@ two security defects are fixed; the quality audit of these 77 screens remains.
 | `evidence/portal-route-extract.py` | the 77 routes, their gates, and the owner constraint on each of the 25 that read an id |
 | `evidence/portal-perm-enforcement.php` | per-permission enforcement; executes the write a withheld user should not be able to make, and asserts its own precondition first |
 | `evidence/portal-assistant-scope.php` | what the assistant is handed for a user denied reports and nonconformities |
-| `phpapp/tests/test_portal_perm_enforcement.php` | 45 assertions freezing both fixes |
-| `phpapp/tests/fixtures/portal_routes_gated.tsv` | every client route and its gate; a lost gate fails by name |
+| `evidence/portal-perm-enforcement-vendor.php` | the vendor portal's four permissions, and the assistant fix on the vendor side |
+| `evidence/pro-portal-isolation.php` | professional A against professional B's files, voucher, receipt, deliverable and messages — each with a control and a sanity check |
+| `phpapp/tests/test_portal_perm_enforcement.php` | 62 assertions freezing both fixes, across the client and vendor portals |
+| `phpapp/tests/fixtures/portal_routes_gated.tsv` | all 35 client routes and their gates; a lost gate fails by name |
+| `phpapp/tests/fixtures/vendor_routes_gated.tsv` | all 13 vendor routes and their gates |

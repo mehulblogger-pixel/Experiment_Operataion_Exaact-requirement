@@ -1,0 +1,28 @@
+# Every vendor-portal route and the permission it is GATED by.
+# Generated from lib/cvp.php, splitting on BOTH dispatch forms --
+#   case 'vendor/x':        and        if ($route === 'vendor/x')
+# -- because vendor/issues and vendor/issue use the second, in their own
+# function (cvp_vendor_route_issues). A `case`-only split misses them AND lets
+# the last case arm swallow their gates: an early run of the vendor probe
+# reported `issues` as enforced at /vendor/password for precisely that reason.
+#
+# A blank second column means the route is reachable by any signed-in vendor
+# user -- correct for sign-in, the dashboard, alerts, the assistant (which is
+# bounded by what the user may read, not by a route gate) and one's own
+# password. The whole portal is additionally behind cvp_vendor_enabled().
+#
+# Frozen so a lost gate fails test_portal_perm_enforcement.php BY ROUTE NAME.
+#route	cvp_vendor_need keys
+vendor	
+vendor/accept	
+vendor/alerts	
+vendor/assistant	
+vendor/issue	issues
+vendor/issues	issues
+vendor/login	
+vendor/logout	
+vendor/opportunities	market.apply
+vendor/password	
+vendor/qualification	qualification
+vendor/report	reports
+vendor/reports	reports

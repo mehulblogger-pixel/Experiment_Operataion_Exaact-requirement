@@ -1,10 +1,21 @@
 # Every client-portal route and the permission it is GATED by.
-# Generated from lib/portal.php; frozen so a lost gate fails a test by name.
+# Generated from lib/portal.php, splitting on BOTH dispatch forms --
+#   case 'portal/x':        and        if ($route === 'portal/x')
+# -- because the sign-in routes use the second and were missing from the first
+# version of this fixture, which split on `case` alone.
+#
 # A blank second column means the route is reachable by any signed-in portal
-# user -- correct only for sign-in, the dashboard and self-service screens.
-# Regenerate deliberately: php tools/… no tool; edit alongside the code change.
+# user. That is correct ONLY for sign-in, the dashboard frame (whose tiles each
+# test pcan() for themselves) and a user's own self-service screens. Two routes
+# are gated harder than a permission and so also read blank here:
+#   portal/team  -- cvp_client_is_admin(), and answers 404 to everyone else
+#   portal/bench -- the signed-in party must resolve to an active agency org
+#
+# Frozen so a lost gate fails test_portal_perm_enforcement.php BY ROUTE NAME.
+# Edit it deliberately, in the same commit as the code change it records.
 #route	portal_need keys
 portal	
+portal/accept	
 portal/alerts	
 portal/assistant	
 portal/bench	
@@ -22,6 +33,8 @@ portal/hiring	market.post
 portal/invoices	invoices
 portal/issue	issues
 portal/issues	issues
+portal/login	
+portal/logout	
 portal/password	
 portal/pay	
 portal/plans	

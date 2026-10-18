@@ -33,10 +33,33 @@ try {
     }
     t_ok(count($want) > 25, 'the portal route fixture lists the routes (' . count($want) . ')');
 
+    // Split on BOTH dispatch forms. Splitting on `case` alone misses the three
+    // sign-in routes, and -- the part that actually bites -- leaves the LAST
+    // case arm running to the end of the file, so every gate below it is
+    // credited to that one route. A sibling probe reported `issues` as enforced
+    // at `/vendor/password` for exactly that reason. The dollar in $route has to
+    // reach PCRE escaped; in a double-quoted PHP string that needs "\\$route",
+    // or a single-quoted pattern as used here.
     $src = file_get_contents(__DIR__ . '/../lib/portal.php');
-    preg_match_all("/case '(portal(?:\/[a-z0-9\-]*)?)':/", $src, $m, PREG_OFFSET_CAPTURE);
+    preg_match_all('/(?:case|if\s*\(\s*\$route\s*===)\s*\x27(portal(?:\/[a-z0-9\-]*)?)\x27/',
+                   $src, $m, PREG_OFFSET_CAPTURE);
     $marks = [];
     foreach ($m[1] as $hit) $marks[] = [$hit[1], $hit[0]];
+    t_eq(count($marks), count($want),
+         'the split finds every route the fixture lists (' . count($marks) . ') — fewer means a '
+         . 'dispatch form was missed and the last arm is swallowing the gates below it');
+
+    // The last arm runs to the end of the file, so a gate added BELOW the router
+    // would be silently credited to it and this whole test would then be
+    // asserting the wrong thing. The honest check is not a fixed count -- the
+    // last route may legitimately gain or lose a gate of its own -- but that the
+    // gates in that tail are EXACTLY the ones the fixture records for it.
+    [$lastPos, $lastRoute] = $marks[count($marks) - 1];
+    preg_match_all('/portal_need\(\x27([^\x27]+)\x27/', substr($src, $lastPos), $tg);
+    $tailKeys = array_values(array_unique($tg[1])); sort($tailKeys);
+    t_eq(implode(',', $tailKeys), $want[$lastRoute] ?? '',
+         "nothing is gated below the router: the keys at or after the last route mark "
+         . "(/$lastRoute) are exactly what the fixture records for it");
     $got = [];
     foreach ($marks as $i => [$pos, $route]) {
         $end = $marks[$i + 1][0] ?? strlen($src);
@@ -140,6 +163,83 @@ try {
     t_eq(cvp_ai_scope_keys('CLIENT', 'pcan'), [],
          'nav guard: scope_keys is empty, so views/portal/top.php omits the Assistant link');
 
+    // ---- 6. the VENDOR portal — the same two questions ---------------------
+    // The assistant fix was written once, for a function both portals share.
+    // That is a reason to test both, not a reason to test one: a shared
+    // function can still behave differently per audience, because each takes a
+    // different permission test and reads a different column.
+    t_section('external portals — the vendor portal');
+    unset($_SESSION['cuid']);
+
+    $vfx = __DIR__ . '/fixtures/vendor_routes_gated.tsv';
+    $vwant = [];
+    foreach (file($vfx, FILE_IGNORE_NEW_LINES) as $line) {
+        if ($line === '' || $line[0] === '#') continue;
+        $pp = explode("\t", $line);
+        $vwant[$pp[0]] = $pp[1] ?? '';
+    }
+    $vsrc = file_get_contents(__DIR__ . '/../lib/cvp.php');
+    preg_match_all('/(?:case|if\s*\(\s*\$route\s*===)\s*\x27(vendor(?:\/[a-z0-9\-]*)?)\x27/',
+                   $vsrc, $vm, PREG_OFFSET_CAPTURE);
+    $vmarks = [];
+    foreach ($vm[1] as $hit) $vmarks[] = [$hit[1], $hit[0]];
+    t_eq(count($vmarks), count($vwant),
+         'the vendor split finds every route the fixture lists (' . count($vmarks) . ')');
+    $vgot = [];
+    foreach ($vmarks as $i => [$pos, $route]) {
+        $end = $vmarks[$i + 1][0] ?? strlen($vsrc);
+        preg_match_all('/cvp_vendor_need\(\x27([^\x27]+)\x27/', substr($vsrc, $pos, $end - $pos), $g);
+        $keys = array_values(array_unique($g[1])); sort($keys);
+        $vgot[$route] = implode(',', $keys);
+    }
+    foreach ($vwant as $route => $keys) {
+        if ($keys === '') continue;
+        t_eq($vgot[$route] ?? '(route gone)', $keys,
+             "/$route is still gated by cvp_vendor_need('" . str_replace(',', "','", $keys) . "')");
+    }
+
+    db()->prepare("INSERT INTO business_partners (legal_name,is_subcontractor,status,created_at)
+                   VALUES ('Perm Test Vendor',1,'ACTIVE',?)")->execute([$now]);
+    $vid = (int)db()->lastInsertId();
+    db()->prepare("INSERT INTO report_docs (vendor_id,irn,title,type_code,result,release_status,
+                   inspection_date,finalized,finalized_at,vendor_visible,rev,created_at)
+                   VALUES (?,?,?,?,?,?,?,1,?,1,1,?)")
+        ->execute([$vid, 'IRN/VPT/0001', 'Casting radiography', 'IR', 'FAIL',
+                   'NOT_RELEASED', '2026-09-11', $now, $now]);
+
+    // cvp_vendor_user() memoises on the signed-in id exactly as portal_user()
+    // does, so each case needs a FRESH vendor user here too.
+    $vSignIn = function (array $perms) use ($vid, $now) {
+        static $n = 0; $n++;
+        if (!$perms) throw new RuntimeException('an empty perms list means ALL perms');
+        db()->prepare("INSERT INTO vendor_users (vendor_id,email,name,password_hash,is_active,perms,created_at)
+                       VALUES (?,?,?,'x',1,?,?)")
+            ->execute([$vid, "vpt$n@test", "VPT $n", implode(',', $perms), $now]);
+        return $_SESSION['vuid'] = (int)db()->lastInsertId();
+    };
+
+    $vSignIn(['qualification']);                     // neither reports nor issues
+    t_ok(!vcan('reports') && !vcan('issues'),
+         'a vendor user on qualification-only holds neither reports nor issues');
+    t_eq(cvp_ai_scope_keys('VENDOR', 'vcan'), [], 'so they may read NO assistant section');
+    $vctx = cvp_ai_scope_context('VENDOR', $vid, 'vcan');
+    t_eq(strpos($vctx, 'IRN/VPT/0001'), false,
+         'and the vendor assistant context holds no report of theirs');
+    [$vans, $verr] = cvp_ai_answer('VENDOR', $vid, 'what were our results?', 'vcan');
+    t_eq($vans, '', 'cvp_ai_answer() returns no answer on the vendor side either');
+    t_ok(strpos($verr, 'does not include the records') !== false,
+         'and it is the PERMISSION guard that refuses, not the AI-not-configured one');
+
+    $vSignIn(['reports', 'qualification']);          // reports, but NOT issues
+    t_eq(cvp_ai_scope_keys('VENDOR', 'vcan'), ['reports'],
+         'a vendor granted reports reads the reports section alone');
+    $vctx = cvp_ai_scope_context('VENDOR', $vid, 'vcan');
+    t_ok(strpos($vctx, 'IRN/VPT/0001') !== false,
+         'their own shared report IS in the context — the fix does not over-block');
+    t_eq(strpos($vctx, 'NONCONFORMITIES'), false,
+         'and the nonconformity section they were denied is NOT');
+
+    unset($_SESSION['vuid']);
     unset($_SESSION['cuid']);
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
