@@ -1,0 +1,162 @@
+
+==============================================================================
+1. STRUCTURE — screens missing the furniture every screen should have
+==============================================================================
+no heading (1): connect-concierge
+no breadcrumb (5): complaints-policy, connect, get-started, join, verify
+
+==============================================================================
+2. VALIDATION — screens that ask for data but demand none of it
+==============================================================================
+69 screens have >3 fields and ZERO marked required. Worst 20:
+   201 fields  /access                       Roles &amp; permissions
+   184 fields  /settings                     System settings
+   154 fields  /role-workspaces              Role workspaces
+   121 fields  /duplicates                   Possible duplicates
+    75 fields  /comp-setup                   Compensation setup
+    65 fields  /terminology                  Terminology
+    49 fields  /connect-channels             WhatsApp, SMS &amp; email
+    43 fields  /ai-settings                  AI providers &amp; models
+    40 fields  /company-profile              Your company
+    37 fields  /feature-gates                Feature gates
+    29 fields  /connect-capabilities         Company business capabilities
+    25 fields  /office-finance               Office costs &amp; overheads
+    24 fields  /connect-concierge            
+    21 fields  /irn-rules                    IRN numbering rules
+    20 fields  /tally-export                 Tally export
+    20 fields  /tally                        Tally export
+    20 fields  /pricing-usage                Plans, pricing &amp; usage
+    20 fields  /departments                  Departments
+    15 fields  /service-formats              Report formats by service line
+    15 fields  /identity                     Identity documents
+
+==============================================================================
+3. FORM LENGTH — one screen, how many questions
+==============================================================================
+25 screens carry more than 25 visible fields:
+   619 fields (234 required)  /connect-qualifications     Qualification &amp; role taxonomy
+   259 fields ( 1 required)  /user-new                   Add a person
+   206 fields (21 required)  /recruit-pipelines          Hiring workflows
+   201 fields ( 0 required)  /access                     Roles &amp; permissions
+   184 fields ( 0 required)  /settings                   System settings
+   154 fields ( 0 required)  /role-workspaces            Role workspaces
+   140 fields ( 1 required)  /call-new                   New work order
+   121 fields ( 0 required)  /duplicates                 Possible duplicates
+    97 fields ( 1 required)  /quote-new                  New quote
+    75 fields ( 0 required)  /comp-setup                 Compensation setup
+    73 fields ( 2 required)  /quote-external             Register an external quote
+    66 fields ( 1 required)  /partner-new                New business partner
+    65 fields ( 0 required)  /terminology                Terminology
+    49 fields ( 0 required)  /connect-channels           WhatsApp, SMS &amp; email
+    43 fields ( 0 required)  /ai-settings                AI providers &amp; models
+    40 fields ( 0 required)  /company-profile            Your company
+    38 fields ( 3 required)  /join                       Set up your organisation
+    37 fields ( 0 required)  /feature-gates              Feature gates
+    34 fields ( 5 required)  /marketplace-plans          Marketplace plans &amp; limits
+    31 fields ( 3 required)  /hiring-request             New hiring request
+    29 fields ( 2 required)  /candidate-new              Add candidate CV
+    29 fields ( 0 required)  /connect-capabilities       Company business capabilities
+    28 fields ( 1 required)  /lookups                    Masters
+    27 fields ( 2 required)  /companies                  Companies
+    27 fields ( 1 required)  /internal-audit-new         Plan an internal audit
+
+==============================================================================
+4. TABLES — columns that cannot fit a phone
+==============================================================================
+    16 cols  /call-profit              Profit by work order           Job | Client | Team Member | Office | Days | R
+    15 cols  /schedule                 Scheduling board               Inspector | Sun 18 Oct | Mon 19 Oct | Tue 20 O
+    14 cols  /user-new                 Add a person                   Module | View | Add | Edit | Archive | Delete
+    14 cols  /user-new                 Add a person                   Module | View | Add | Edit | Archive | Delete
+    14 cols  /user-new                 Add a person                   Module | View | Add | Edit | Archive | Delete
+    14 cols  /user-new                 Add a person                   Module | View | Add | Edit | Archive | Delete
+    14 cols  /user-new                 Add a person                   Module | View | Add | Edit | Archive | Delete
+    14 cols  /user-new                 Add a person                   Module | View | Add | Edit | Archive | Delete
+    14 cols  /user-new                 Add a person                   Module | View | Add | Edit | Archive | Delete
+    14 cols  /user-new                 Add a person                   Module | View | Add | Edit | Archive | Delete
+    14 cols  /user-new                 Add a person                   Module | View | Add | Edit | Archive | Delete
+    14 cols  /access                   Roles &amp; permissions        Module | View | Add | Edit | Archive | Delete
+    14 cols  /access                   Roles &amp; permissions        Module | View | Add | Edit | Archive | Delete
+    14 cols  /access                   Roles &amp; permissions        Module | View | Add | Edit | Archive | Delete
+    14 cols  /access                   Roles &amp; permissions        Module | View | Add | Edit | Archive | Delete
+    14 cols  /access                   Roles &amp; permissions        Module | View | Add | Edit | Archive | Delete
+    14 cols  /access                   Roles &amp; permissions        Module | View | Add | Edit | Archive | Delete
+    14 cols  /access                   Roles &amp; permissions        Module | View | Add | Edit | Archive | Delete
+    14 cols  /access                   Roles &amp; permissions        Module | View | Add | Edit | Archive | Delete
+    14 cols  /access                   Roles &amp; permissions        Module | View | Add | Edit | Archive | Delete
+
+==============================================================================
+5. BUTTON WORDS — the same act, said differently
+==============================================================================
+456 distinct button labels across 4919 buttons.
+
+  [save] 46 different wordings:
+   "Save changes"(151) · "Save"(78) · "Apply"(13) · "Save pricing &amp; keys"(4) · "Apply the key"(4) · "Save provider key"(4) · "Save connection"(3) · "Save settings"(3) · "Save prices"(2) · "Save letterhead"(2) · "Save signature"(2) · "Apply EXAACT TPIA"(2)
+
+  [create] 49 different wordings:
+   "Record it"(7) · "Add rule"(4) · "Add template"(4) · "Create form &amp; add fields →"(3) · "Add"(3) · "Record"(3) · "Add &amp; select"(2) · "Add phrase"(2) · "Create the invitation"(2) · "Add type"(2) · "Add delegation"(1) · "Add candidate"(1)
+
+  [delete] 5 different wordings:
+   "Delete"(304) · "Remove"(90) · "Clear"(4) · "Remove demo data"(2) · "Clear all"(1)
+
+  [cancel] 8 different wordings:
+   "Cancel"(20) · "Back to dashboard"(3) · "Cancel changes"(1) · "Close job &amp; record expenses"(1) · "Back to Quotes"(1) · "Back to service scope"(1) · "Back to settings"(1) · "Back to report types"(1)
+
+  [submit] 3 different wordings:
+   "Issue them"(1) · "Release Notes"(1) · "Issue reports"(1)
+
+  [export] 1 different wordings:
+   "Print"(2)
+
+==============================================================================
+6. FIELD LABELS — the same thing, named differently (glossary input)
+==============================================================================
+How often each business word appears as a field label:
+   office               31 uses,  19 distinct labels   e.g. Office · Office (blank = any) · Overheads (office fina
+   branch               10 uses,   4 distinct labels   e.g. Branch · Office / branch · Branch Manager · Branch App
+   client               34 uses,  20 distinct labels   e.g. Client + Add new · Client · Add to both Client &amp; V
+   customer             14 uses,   9 distinct labels   e.g. Customer · TDS ledger (tax the customer withheld) · Se
+   party                11 uses,   5 distinct labels   e.g. Third-Party Inspection Agency · Inspection (third-part
+   vendor               26 uses,  17 distinct labels   e.g. Vendor Inspection · Vendor Surveillance · Vendor asses
+   supplier              3 uses,   3 distinct labels   e.g. Supplier Prequalification · Vendor / Supplier Audit · 
+   job                  57 uses,   5 distinct labels   e.g. Job family · Legacy job field (pre-switch) · Job title
+   call                  1 uses,   1 distinct labels   e.g. Inspection Call
+   work order            2 uses,   2 distinct labels   e.g. Work order form · 🧾 Profit by work order
+   inspector            12 uses,   7 distinct labels   e.g. Freelance Inspector Supply · Inspector · Shorthand — w
+   report               69 uses,  60 distinct labels   e.g. Report type · Report type (blank = any) · Final Inspec
+   document             18 uses,  13 distinct labels   e.g. Desktop / Document review · Document number · Document
+   invoice               9 uses,   6 distinct labels   e.g. Invoice · Invoice from · The invoice amount recorded h
+   contract             16 uses,  12 distinct labels   e.g. Contract Staffing · Contract Recruitment · See profita
+   purchase order        4 uses,   2 distinct labels   e.g. Purchase order · Purchase Order
+   candidate             1 uses,   1 distinct labels   e.g. Candidate
+   requisition           1 uses,   1 distinct labels   e.g. Requisition
+   nonconformity         2 uses,   2 distinct labels   e.g. NCR / Nonconformity Report · ⚠️ Nonconformity &amp; CA
+   ncr                   1 uses,   1 distinct labels   e.g. NCR / Nonconformity Report
+   corrective action     2 uses,   2 distinct labels   e.g. Corrective Action Verification Report · Corrective act
+   capa                  2 uses,   2 distinct labels   e.g. CAPA Report · ⚠️ Nonconformity &amp; CAPA
+   business unit        18 uses,   6 distinct labels   e.g. Business Unit · Business unit · Business Unit (primary
+
+==============================================================================
+7. FIELD NAMES — the same data, stored under different names
+==============================================================================
+   office_id      -> executing_office_id, home_office_id, ibo_office_id, office_id
+   inspector_id   -> inspector_id, replacing_inspector_id
+   user_id        -> approver_user_id, delegate_user_id, delegator_user_id, signatory_user_id, temp_user_id
+   date           -> call_received_date, cv_received_date, date_format, date_guard, end_date, inspection_date, inspection_required_date, invoice_date, issue_date, receipt_date
+   remarks        -> remarks, review_remarks
+   notes          -> exp_notes, notes
+
+==============================================================================
+8. THE LARGEST SCREENS BY BYTES — where a phone pays for it
+==============================================================================
+       549 KB  /connect-qualifications     Qualification &amp; role taxonomy
+       269 KB  /connect-taxonomy-admin     Taxonomy graph — admin
+       242 KB  /vendor-profile-save        Vendor register
+       211 KB  /duplicates                 Possible duplicates
+       196 KB  /user-new                   Add a person
+       172 KB  /quote-new                  New quote
+       164 KB  /lookups                    Masters
+       160 KB  /call-new                   New work order
+       158 KB  /access                     Roles &amp; permissions
+       153 KB  /service-formats            Report formats by service line
+       153 KB  /settings                   System settings
+       142 KB  /report-types               Report types

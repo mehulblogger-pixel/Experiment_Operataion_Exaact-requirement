@@ -1,0 +1,257 @@
+route	heading	crumbs	fields	required	labels	buttons	tables	max_cols	rows	bytes
+access	Roles &amp; permissions	y	201	0	142	14	9	14	31	161767
+access-requests	Access requests	y	1	0	1	8	0	0	0	47333
+activities	Activity	y	18	1	19	31	2	5	25	62162
+activity-add	Activity	y	18	1	19	31	2	5	25	62156
+admin	Admin	y	1	0	1	9	0	0	0	59227
+ads-roi	What the advertising actually earned	y	3	0	3	9	0	0	0	48151
+adspro	Ads Pro connection	y	5	0	5	19	1	2	2	56251
+advisor	What to fix	y	1	0	1	8	0	0	0	47888
+agency-staff	Agency staff &amp; their documents	y	3	0	2	10	0	0	0	48499
+agreement	Licence agreement	y	1	0	1	8	0	0	0	58056
+ai-forms	Build forms from your process	y	2	0	2	18	0	0	0	94726
+ai-settings	AI providers &amp; models	y	43	0	48	15	0	0	0	58646
+approval-act	Approvals	y	1	0	1	13	0	0	0	48035
+approval-delegations	Approval delegation	y	8	2	8	9	1	8	1	51590
+approval-rules	Quote &amp; report approvals	y	12	0	12	10	1	6	1	68537
+approvals	Approvals	y	1	0	1	13	0	0	0	47961
+approvals-setup	Approvals	y	1	0	1	8	0	0	0	50541
+approver-map	Approver mapping	y	5	0	1	10	1	5	1	49739
+asset-register	Asset issuance register	y	21	1	8	13	2	6	3	56283
+attendance-recon	Attendance reconciliation	y	3	1	3	9	0	0	0	48077
+attendance-review	Attendance review	y	1	0	1	8	0	0	0	47352
+audit-log	Audit trail	y	8	0	8	11	2	7	191	122072
+availability	Team member availability	y	10	0	3	12	2	5	2	57809
+backup	Backup &amp; restore	y	2	1	1	24	1	5	7	55632
+billable-events	Billable events	y	2	0	2	10	0	0	0	49015
+billing	Users &amp; billing	y	9	0	9	10	0	0	0	50046
+billing-config	Users &amp; billing	y	9	0	9	10	0	0	0	50005
+billing-order	Users &amp; billing	y	9	0	9	10	0	0	0	50004
+billing-verify	Users &amp; billing	y	9	0	9	10	0	0	0	50005
+books-bridge	📗 MGH Books connection	y	6	0	6	9	0	0	0	49861
+books-bridge-drain	📗 MGH Books connection	y	6	0	6	9	0	0	0	49834
+books-bridge-save	📗 MGH Books connection	y	6	0	6	9	0	0	0	49833
+call-new	New work order	y	140	1	159	15	0	0	0	163657
+call-profit	Profit by work order	y	6	0	6	11	2	16	10	53530
+calls	Work order register	y	3	0	1	11	0	0	0	48199
+candidate-new	Add candidate CV	y	29	2	32	14	0	0	0	84831
+candidate-pool	Candidate pool convergence	y	1	0	1	9	0	0	0	48289
+candidates	Candidate register	y	2	0	1	21	1	9	1	48715
+capa	Nonconformities &amp; corrective actions	y	3	0	3	10	1	8	1	50185
+capacity-outlook	Capacity outlook	y	3	0	3	9	1	7	9	52330
+careers-admin	Careers page	y	7	0	7	11	0	0	0	52161
+cform-def-del	Custom forms	y	5	1	5	9	0	0	0	48782
+cform-def-save	Custom forms	y	5	1	5	9	0	0	0	48783
+cforms	Custom forms	y	5	1	5	9	0	0	0	48811
+change-password	Change password	y	4	3	4	10	0	0	0	47662
+client-holds	Client holds &amp; blocks	y	4	1	4	9	1	3	1	67602
+clients	Client register	y	3	0	1	134	1	7	40	67590
+command-centre	Command Centre	y	1	0	1	8	0	0	0	56556
+comp-setup	Compensation setup	y	75	0	3	30	3	6	0	69505
+companies	Companies	y	27	2	14	10	1	3	7	58549
+company-profile	Your company	y	40	0	40	9	0	0	0	60961
+competence	Competence &amp; authorisation	y	1	0	1	10	1	5	1	49653
+complaints	Complaints &amp; appeals	y	4	0	4	11	1	9	1	51508
+complaints-policy	Complaints and appeals	n	0	0	0	0	0	0	0	3161
+compliance	Where we stand	y	1	0	1	14	16	4	41	72181
+compliance-rules	Compliance rules &amp; fees	y	17	3	17	14	2	7	11	59002
+confidentiality	Confidentiality	y	8	1	8	9	1	5	1	50292
+connect	Post a job. Find the right inspector. Get it done.	n	1	0	0	3	0	0	0	9021
+connect-analytics	Labour-market analytics	y	1	0	1	8	0	0	0	55772
+connect-bench	Agency bench	y	2	0	2	8	0	0	0	49545
+connect-capabilities	Company business capabilities	y	29	0	29	11	0	0	0	90421
+connect-channels	WhatsApp, SMS &amp; email	y	49	0	25	23	1	5	12	69952
+connect-concierge		y	24	0	23	10	0	0	0	52614
+connect-identity	Professional identity	y	3	2	3	9	0	0	0	49845
+connect-match-weights	Matching weights	y	12	0	1	10	0	0	0	52685
+connect-messages	Messages	y	1	0	1	8	0	0	0	49762
+connect-orgs	Organisations	y	3	1	1	9	0	0	0	49079
+connect-qualifications	Qualification &amp; role taxonomy	y	619	234	769	468	5	8	150	562252
+connect-requirements	Manpower marketplace	y	14	1	14	12	0	0	0	94224
+connect-talent	Talent search	y	6	0	2	9	0	0	0	53895
+connect-taxonomy	Industry taxonomy	y	1	0	1	9	0	0	0	74453
+connect-taxonomy-admin	Taxonomy graph — admin	y	7	1	5	210	1	4	200	275798
+connect-verify	Verification desk	y	1	0	1	8	0	0	0	49935
+consent-add	Consent &amp; lawful basis	y	7	2	7	9	1	6	1	49308
+consent-withdraw	Consent &amp; lawful basis	y	7	2	7	9	1	6	1	49321
+consents	Consent &amp; lawful basis	y	7	2	7	9	1	6	1	49313
+contract-openings	Contract openings	y	1	0	1	8	0	0	0	47276
+contract-override	Contract exceptions	y	1	0	1	9	0	0	0	49340
+contract-overrides	Contract exceptions	y	1	0	1	9	0	0	0	49344
+control-panel	Super Admin — Control Panel	y	1	0	1	11	2	5	11	71036
+cost-reconciliation	Cost reconciliation	y	4	0	4	10	0	0	0	49923
+cost-run	Month-end cost run	y	3	0	3	12	1	0	3	51325
+cpanel-save	Cloud workspaces	y	2	1	2	9	0	0	0	48390
+cpanel-test	Cloud workspaces	y	2	1	2	9	0	0	0	48390
+crm-dashboard	Sales dashboard	y	1	0	1	15	0	0	0	56081
+crm-reports	Sales dashboard	y	2	0	1	9	1	5	1	49263
+crm-template-new	Add quote / e-mail template	y	12	1	12	11	0	0	0	53773
+crm-templates	Document templates	y	9	0	9	11	1	8	1	50562
+custom-fields	Custom fields —	y	7	2	7	9	1	5	1	60716
+data-control	Control of data &amp; information	y	21	4	18	13	6	12	35	72300
+data-requests	Requests about personal data	y	6	1	6	9	1	7	1	49473
+db-selfcreate-test	Cloud workspaces	y	2	1	2	9	0	0	0	48397
+departments	Departments	y	20	0	1	11	0	0	0	93174
+departures	Deviations, concessions &amp; waivers	y	14	1	14	9	0	0	0	69733
+deputations	Deputation &amp; site operations	y	8	2	7	10	0	0	0	70057
+directory	Directory	y	1	0	1	9	0	0	0	52536
+doc-templates	Document Studio	y	4	0	4	10	0	0	0	56985
+document-new	New report	y	14	1	14	11	0	0	0	83132
+documents	Report register	y	4	0	1	15	1	7	1	54728
+duplicates	Possible duplicates	y	121	0	121	70	60	2	420	215711
+endorsement-new	New endorsement	y	22	1	22	10	0	0	0	75985
+endorsements	Endorsement register	y	4	0	1	10	1	6	1	49662
+evidence-review	Evidence review	y	6	0	7	10	1	7	1	51602
+expediting	Expediting register	y	3	0	1	12	1	10	1	49485
+expediting-projects	Project delivery consolidation	y	2	0	1	10	0	0	0	48550
+feature-gates	Feature gates	y	37	0	37	10	1	3	12	57624
+financial-control	Financial control	y	3	0	3	10	0	0	0	51262
+flow-gaps	Where the flow is broken	y	1	0	1	9	0	0	0	48887
+get-started	Run your inspection company on Inspection Ops	n	0	0	0	0	0	0	0	5363
+hierarchy	Organisation &amp; people	y	8	0	2	23	1	2	5	80155
+hiring-request	New hiring request	y	31	3	29	13	0	0	0	70569
+hiring-requests	Hiring requests	y	1	0	1	10	1	8	1	47943
+idems-approval-rule-edit	Quote &amp; report approvals	y	12	0	12	10	1	6	1	68585
+idems-approval-rules	Quote &amp; report approvals	y	12	0	12	10	1	6	1	68597
+identity	Identity documents	y	15	0	16	12	1	4	1	52282
+impartiality	Impartiality &amp; conflicts of interest	y	7	1	7	11	2	6	2	71236
+incident-new	Record an incident	y	15	2	15	10	0	0	0	51974
+incidents	Incident register	y	1	0	1	9	1	8	1	48272
+industry	Your industry	y	1	0	1	22	2	4	11	53303
+industry-apply	Your industry	y	1	0	1	22	2	4	11	53309
+inquiries	Inquiry register	y	4	0	1	10	1	8	1	48382
+inquiry-new	New client inquiry	y	14	0	14	11	0	0	0	69835
+insights	Insights	y	1	0	1	9	0	0	0	51235
+integrations	Integration health	y	1	0	1	8	0	0	0	47246
+internal-audit-new	Plan an internal audit	y	27	1	28	11	0	0	0	51744
+internal-audits	Internal audits	y	2	0	2	11	1	8	1	51637
+invoice-new	New invoice	y	9	2	9	10	0	0	0	75558
+invoices	Invoices	y	12	0	13	14	1	7	1	54581
+invoicing	Invoice register	y	1	0	1	11	0	0	0	48460
+irn-rules	IRN numbering rules	y	21	0	4	26	1	3	0	61224
+issue-licence	Licence console	y	1	0	1	9	0	0	0	49008
+issue-licence-new	Licence console	y	1	0	1	9	0	0	0	48998
+issue-licence-reissue	Licence console	y	1	0	1	9	0	0	0	49016
+issues	Issues	y	3	0	3	12	0	0	0	50288
+jobs	Job register	y	9	0	2	10	0	0	0	49745
+join	Set up your organisation	n	38	3	39	1	0	0	0	12179
+leads	Leads	y	3	0	3	13	0	0	0	52679
+learning	Learning insights	y	1	0	1	9	1	5	1	49431
+licence	Licence	y	3	0	2	11	1	3	7	53754
+licence-check	Licence	y	3	0	2	11	1	3	7	53724
+licence-pubkey	Licence	y	3	0	2	11	1	3	7	53725
+licence-save	Licence	y	3	0	2	11	1	3	7	53723
+lookups	Masters	y	28	1	29	319	20	6	154	167926
+management-reviews	Management review	y	6	0	6	10	1	6	1	49590
+marketplace	Marketplace	y	1	0	1	9	0	0	0	54969
+marketplace-escrow	Marketplace escrow	y	3	0	3	11	0	0	0	51081
+marketplace-plans	Marketplace plans &amp; limits	y	34	5	36	35	3	4	10	68429
+masters	Masters	y	1	0	2	9	0	0	0	85116
+mis	Management dashboard	y	9	0	9	18	8	10	8	81088
+money	Money	y	1	0	1	9	0	0	0	53715
+my-approvals	My approvals	y	1	0	1	8	0	0	0	47317
+my-interviews	Interviews to attend	y	1	0	1	8	0	0	0	47290
+my-jobs	My Jobs	y	8	0	8	11	0	0	0	53643
+my-signature	My signature	y	2	0	3	10	0	0	0	49052
+my-work	My Work	y	1	0	1	10	0	0	0	47527
+ncr	Nonconformities	y	13	0	14	12	1	9	1	54759
+notifications	Notification log	y	4	0	2	9	1	5	1	48706
+office-finance	Office costs &amp; overheads	y	25	0	3	12	1	4	11	56861
+operations	Operations	y	1	0	1	16	3	8	3	62727
+opportunities	Opportunities	y	3	0	3	13	0	0	0	52703
+owner	Home — welcome, admin 👋	y	8	0	9	9	0	0	0	54149
+partner-import	Import clients &amp; vendors	y	3	1	3	13	1	2	6	50242
+partner-new	New business partner	y	66	1	66	14	0	0	0	73147
+passport-share	Professional passport	y	1	0	1	9	0	0	0	47533
+phrase-edit	Phrase library	y	6	1	6	80	1	5	35	81099
+phrase-library	Phrase library	y	6	1	6	80	1	5	35	81112
+pipelines	Pipelines &amp; funnels	y	5	1	5	12	2	5	2	51208
+portal-users	Client portal	y	4	2	5	10	2	7	2	77901
+positions	Position master	y	13	1	13	11	0	0	0	51868
+positions-import	Import organogram	y	3	0	2	10	0	0	0	50147
+positions-org	Organisation chart	y	1	0	1	11	0	0	0	47565
+preflight	Server check	y	1	0	1	9	2	4	20	53046
+preorder-checklist	Pre-order review checklist	y	4	0	4	10	0	0	0	49070
+pricing-usage	Plans, pricing &amp; usage	y	20	0	6	19	1	3	7	98927
+privacy	Privacy notice	y	1	0	1	8	0	0	0	47499
+product-package	Product package	y	1	0	1	15	0	0	0	57513
+product-package-apply	Product package	y	1	0	1	15	0	0	0	57483
+profitability	Contract number register	y	1	0	1	11	0	0	0	49861
+project-costings	Project costing	y	6	1	6	9	0	0	0	58543
+quality	Quality &amp; Accreditation	y	1	0	1	9	0	0	0	56583
+quote-approval-rule-new	Add approval rule	y	10	1	10	11	0	0	0	51119
+quote-approval-rules	Quote &amp; report approvals	y	1	0	1	9	1	7	1	48642
+quote-external	Register an external quote	y	73	2	56	15	1	6	3	90011
+quote-new	New quote	y	97	1	78	15	3	11	2	175706
+quotes	Quote register	y	3	0	1	14	1	7	1	49965
+raise-call	Raise an inspection work order	y	2	0	2	9	0	0	0	71983
+rating-disputes	Rating-integrity desk	y	1	0	1	8	0	0	0	47617
+ratings	Inspector ratings	y	8	0	8	9	1	6	1	50019
+ratings-config	Inspector ratings	y	8	0	8	9	1	6	1	50026
+receipt-new	Record money received	y	11	2	11	10	0	0	0	75403
+receipts	Money in	y	2	0	2	13	1	7	1	49868
+receivables	Receivables ageing	y	1	0	1	11	0	0	0	49490
+recruit-approvals	Recruitment approvals	y	4	0	4	11	0	0	0	52843
+recruit-pipelines	Hiring workflows	y	206	21	38	53	1	6	0	104264
+recruitment	Recruitment &amp; Workforce	y	6	0	6	16	0	0	0	76574
+recurring	Recurring services	y	9	1	9	10	1	7	1	61146
+reimbursable-dedup	Reimbursable duplication	y	3	0	3	10	0	0	0	49677
+release-notes	Release Notes	y	3	0	1	10	1	7	1	49048
+report-ack	Client acceptance of reports	y	1	0	1	9	0	0	0	48376
+report-reviews	Client acceptance of reports	y	1	0	1	9	0	0	0	48402
+report-template-edit	Document templates	y	14	1	12	10	1	6	1	77630
+report-templates	Document templates	y	14	1	12	10	1	6	1	77637
+report-type-edit	Report types	y	8	2	8	318	1	5	83	145034
+report-types	Report types	y	8	2	8	318	1	5	83	145042
+reporting	Reporting	y	1	0	1	9	0	0	0	52619
+reports	Dashboards	y	9	0	1	13	6	7	11	80881
+requisitions	Requisition register	y	2	0	1	10	0	0	0	47697
+revenue-reconciliation	Revenue reconciliation	y	4	0	4	10	0	0	0	49870
+role-workspaces	Role workspaces	y	154	0	154	9	0	0	0	134086
+sales	Sales	y	1	0	1	9	0	0	0	52748
+sbu-pl	Business Unit profit &amp; loss — October 2026	y	5	0	5	12	3	9	3	53099
+schedule	Scheduling board	y	4	1	4	12	1	15	2	62263
+search	Search	y	2	0	2	9	0	0	0	49195
+service-formats	Report formats by service line	y	15	0	1	10	1	3	7	156952
+service-scope	Service scope	y	23	2	23	11	1	4	7	82013
+settings	System settings	y	184	0	146	32	2	7	33	156781
+setup	Welcome — let’s set up your system	y	9	0	9	9	0	0	0	52169
+setup-save	Welcome — let’s set up your system	y	9	0	9	9	0	0	0	52174
+signing-setup	Super Admin	y	1	0	1	12	0	0	0	50606
+site-docs	What each site requires before the gate opens	y	7	1	7	9	0	0	0	75154
+sla-targets	SLA targets	y	5	0	5	9	1	4	1	58127
+sso	Single sign-on	y	1	0	1	8	0	0	0	49638
+subscription	Your subscription	y	1	0	1	8	0	0	0	49159
+subscription-order	Your subscription	y	1	0	1	8	0	0	0	49165
+subscription-verify	Your subscription	y	1	0	1	8	0	0	0	49166
+super-admin	Super Admin — Control Panel	y	1	0	1	11	2	5	11	71036
+system-status	System status	y	1	0	1	8	1	4	11	50886
+tally	Tally export	y	20	0	20	10	0	0	0	55873
+tally-export	Tally export	y	20	0	20	10	0	0	0	55880
+tasks	My tasks	y	5	1	5	18	0	0	0	95945
+templates	Document templates	y	14	1	12	10	1	6	1	77572
+tenant-add	Cloud workspaces	y	2	1	2	9	0	0	0	48382
+tenant-enable	Cloud workspaces	y	2	1	2	9	0	0	0	48392
+tenant-remove	Cloud workspaces	y	2	1	2	9	0	0	0	48392
+tenant-request-approve	Cloud workspaces	y	2	1	2	9	0	0	0	48401
+tenant-request-provisioned	Cloud workspaces	y	2	1	2	9	0	0	0	48405
+tenant-request-reject	Cloud workspaces	y	2	1	2	9	0	0	0	48400
+tenant-status	Cloud workspaces	y	2	1	2	9	0	0	0	48392
+tenants	Cloud workspaces	y	2	1	2	9	0	0	0	48386
+terminology	Terminology	y	65	0	1	23	7	4	32	74370
+timesheet	Timesheet	y	3	0	3	10	1	6	1	49393
+to-bill	Work waiting to be billed	y	2	0	2	9	0	0	0	48975
+two-factor	Two-step sign-in	y	1	0	1	9	0	0	0	48496
+user-new	Add a person	y	259	1	202	12	9	14	31	200724
+users	Organisation &amp; people	y	1	0	1	28	1	10	8	57077
+vendor-profile-save	Vendor register	y	5	0	1	10	1	8	451	248013
+vendor-users	Vendor portal	y	4	2	5	10	2	5	2	87151
+vendors	Vendor register	y	3	0	1	134	1	7	40	67743
+verify	Verify an inspection report	n	1	0	0	1	0	0	0	2905
+vetting-checklist	Vetting checklist	y	5	1	5	10	0	0	0	49986
+vouchers	Inspector vouchers	y	3	2	2	9	1	4	1	48603
+welcome	👋 Welcome!	y	1	0	1	9	0	0	0	50125
+work-norms	Working norms	y	5	0	5	9	1	4	1	50556
+workspace-signup-toggle	Cloud workspaces	y	2	1	2	9	0	0	0	48402
+workspace/setup	Set up your workspace	y	2	0	1	19	0	0	0	54937
+writing-assistant	Technical writing assistant	y	2	0	2	10	0	0	0	63970

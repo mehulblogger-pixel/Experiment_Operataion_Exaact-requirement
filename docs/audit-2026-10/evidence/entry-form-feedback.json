@@ -1,0 +1,66 @@
+{
+ "partner-new": {
+  "table": "business_partners",
+  "http": "200",
+  "redirect_to": "",
+  "created": false,
+  "tag": "error",
+  "message": "Select at least one role (Client / Vendor / Both)."
+ },
+ "user-new": {
+  "table": "users",
+  "http": "200",
+  "redirect_to": "",
+  "created": false,
+  "tag": "error",
+  "message": "A login must belong to a team member. Pick the person from the team, or enter their name (first / last) so they are added to the team."
+ },
+ "call-new": {
+  "table": "calls",
+  "http": "302",
+  "redirect_to": "/call?id=1",
+  "created": true,
+  "tag": "success",
+  "message": "CALL-00001 created. Now allocate a job."
+ },
+ "candidate-new": {
+  "table": "candidates",
+  "http": "302",
+  "redirect_to": "/candidate?id=1",
+  "created": true,
+  "tag": "success",
+  "message": "CV-00001 added to the hiring pipeline."
+ },
+ "hiring-request": {
+  "table": "hiring_requests",
+  "http": "200",
+  "redirect_to": "",
+  "created": false,
+  "tag": "",
+  "message": ""
+ },
+ "internal-audit-new": {
+  "table": "internal_audits",
+  "http": "302",
+  "redirect_to": "/internal-audit-new",
+  "created": false,
+  "tag": "error",
+  "message": "Name the auditor. An audit with no auditor on it is not evidence of anything."
+ },
+ "incident-new": {
+  "table": "security_incidents",
+  "http": "302",
+  "redirect_to": "/incident?id=1",
+  "created": true,
+  "tag": "warning",
+  "message": "Incident INC-2026-001 recorded. The six-hour clock started when it was detected, not now."
+ },
+ "endorsement-new": {
+  "table": "endorsements",
+  "http": "302",
+  "redirect_to": "/endorsement?id=1",
+  "created": true,
+  "tag": "success",
+  "message": "Endorsement created \u2014 MGH/AHM/2026/GEN/END/000001. Upload the manufacturer document and any supporting evidence."
+ }
+}

@@ -1,0 +1,128 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+================ A. STATUS SETS DEFINED IN CODE (D3) ================
+ADS_OUT_STATUS                4  PENDING · SENT · FAILED · SKIPPED
+ASSET_STATUS                  4  ISSUED · RETURNED · LOST · DAMAGED
+ATT_STATUS                    7  PRESENT_NB · TRAINING · MEETING · LEAVE · WFH · COMPOFF · HOLIDAY
+AUDIT_STATUS                  4  PLANNED · IN_PROGRESS · REPORTED · CLOSED
+AUTH_STATUS                   4  ACTIVE · SUSPENDED · EXPIRED · WITHDRAWN
+AVAIL_STATUS                  8  AVAILABLE · ON_JOB · OFFICE · LEAVE · TRAINING · WFH · HALF_DAY · TRAVEL
+BILLABLE_STATUS               5  PENDING · APPROVED · BILLED · CANCELLED · DISPUTED
+BOSS_STATUS                   3  ACTIVE · CLOSED · HOLD
+CALL_STATUSES                15  RECEIVED · DRAFT · UNDER_REVIEW · CLARIFICATION · ACCEPTED · REJECTED · ON_HOLD · READY_TO_SCHEDULE · SCHEDULED · ASSIGNED · IN_PROGRESS · COMPLETED
+CAPA_STATUS                   5  OPEN · IN_PROGRESS · VERIFYING · CLOSED · CLOSED_FAILED
+CDOC_STATUSES                 4  DRAFT · CURRENT · SUPERSEDED · WITHDRAWN
+COCKPIT_STATUSES              5  not_started · in_progress · configured · needs_attention · complete
+CONF_BREACH_STATUS            3  OPEN · CONTAINED · CLOSED
+CREDENTIAL_STATUS             7  VALID · EXPIRING · EXPIRED · UNDER_VERIFICATION · REJECTED · SUPERSEDED · MISSING
+CREV_STATUSES                 3  OPEN · CONTINUED · REJECTED
+CX_APP_STATUSES               7  APPLIED · SHORTLISTED · OFFERED · ACCEPTED · DECLINED · WITHDRAWN · REJECTED
+CX_DISPUTE_STATUSES           4  OPEN · UNDER_REVIEW · RESOLVED · WITHDRAWN
+CX_REQ_STATUSES               7  DRAFT · OPEN · SHORTLISTING · AWARDED · CLOSED · CANCELLED · EXPIRED
+DISCLOSURE_STATUSES           4  REQUESTED · CONSENTED · DECLINED · WITHDRAWN
+DOCUMENT_STATUSES             9  AWAITED_CLIENT · RECEIVED_CLIENT · AWAITED_VENDOR · RECEIVED_VENDOR · NOT_AVAILABLE · UNDER_REVIEW · APPROVED · ISSUED · SUPERSEDED
+DOC_STATUSES                  9  NOT_REQUIRED · REQUIRED · REQUESTED · UPLOADED · UNDER_REVIEW · VERIFIED · REJECTED · RESUBMIT · EXPIRED
+DRULE_STATUSES                4  DRAFT · CURRENT · SUPERSEDED · WITHDRAWN
+ENDORSE_STATUS                5  UPLOADED · UNDER_REVIEW · ENDORSED · REJECTED · ARCHIVED
+EQUIP_STATUS                  5  ACTIVE · CALIBRATION · REPAIR · QUARANTINE · RETIRED
+FAILURE_STATUS                2  OPEN · RESOLVED
+FEE_STATUS                    3  PROVISIONAL · CONFIRMED · WAIVED
+GATE_STATUS                   4  PENDING · APPROVED · REJECTED · CANCELLED
+HREQ_STATUS                   6  DRAFT · SUBMITTED · UNDER_REVIEW · APPROVED · REJECTED · CANCELLED
+HW_POINT_STATUS               4  OPEN · CLEARED · WAIVED · CANCELLED
+IDEMS_APPR_STATUS             5  PENDING · APPROVED · REJECTED · SENTBACK · DELEGATED
+IDEMS_STATUS                  8  DRAFT · SUBMITTED · VETTING · UNDER_REVIEW · APPROVED · ISSUED · REJECTED · ARCHIVED
+IDEMS_VET_STATUS              3  VETTED · RETURNED · DEBRIEFED
+IMP_STATUS                    4  OPEN · MITIGATED · ACCEPTED · UNACCEPTABLE
+INQUIRY_STATUS                3  OPEN · QUOTED · DROPPED
+INV_STATUS                    5  DRAFT · ISSUED · PART_PAID · PAID · CANCELLED
+LEAD_STATUS                   3  OPEN · CONVERTED · LOST
+METHOD_STATUSES               4  DRAFT · CURRENT · SUPERSEDED · WITHDRAWN
+NCDCA_DEPARTURE_STATUS        8  DRAFT · SUBMITTED · TECH_REVIEW · CLIENT_REVIEW · APPROVED · REJECTED · EXPIRED · CLOSED
+NCDCA_DISPUTE_STATUS          5  OPEN · UNDER_REVIEW · UPHELD · REVISED · WITHDRAWN
+NCR_STATUS                    4  OPEN · CONTAINED · DISPOSITIONED · CLOSED
+OFFER_STATUS                  9  DRAFT · PENDING_APPROVAL · APPROVED · ISSUED · VIEWED · ACCEPTED · DECLINED · EXPIRED · WITHDRAWN
+OPP_STATUS                    3  OPEN · WON · LOST
+OVERRIDE_STATUS               4  PENDING · ENDORSED · APPROVED · REFUSED
+PC_STATUS                     4  DRAFT · SUBMITTED · APPROVED · REJECTED
+PDSO_APPROVAL_STATUS          7  DRAFT · SUBMITTED · CLIENT_REVIEW · RETURNED · APPROVED · REJECTED · LOCKED
+PDSO_LOG_STATUS               5  OPEN · IN_PROGRESS · ON_HOLD · CLOSED · CANCELLED
+PDSO_MOB_STATUS               7  REQUIRED · SUBMITTED · APPROVED · PENDING · REJECTED · COMPLETED · NOT_APPLICABLE
+PDSO_STATUS                  12  PLANNED · APPROVED · MOB_PENDING · MOBILIZED · ACTIVE · ON_LEAVE · SUSPENDED · REPLACEMENT_REQ · DEMOB_PLANNED · DEMOBILIZED · CANCELLED · CLOSED
+PORTAL_REQ_STATUS             4  NEW · ACCEPTED · DECLINED · CONVERTED
+QUOTE_STATUS                  8  DRAFT · PENDING_APPROVAL · APPROVED · SENT · REJECTED · ACCEPTED · LOST · EXPIRED
+REQF_MANUAL_STATUSES          3  CLOSED · CANCELLED · DRAFT
+REQ_STATUS                    7  OPEN · PROPOSED · OFFERED · PARTIALLY_FILLED · HIRED · CLOSED · CANCELLED
+RISK_STATUSES                 4  OPEN · TREATING · MONITORING · CLOSED
+RVER_STATUSES                 4  PENDING · APPROVED · REJECTED · WITHDRAWN
+SAMPLE_STATUSES               5  RECEIVED · IN_TESTING · HOLD · RETURNED · DISPOSED
+SAT_STATUSES                  3  REQUESTED · RECEIVED · DECLINED
+STATUSES                      5  ACTIVE · INACTIVE · ON_HOLD · BLACKLISTED · PROSPECT
+TEMPLATE_STATUS               5  DRAFT · IN_REVIEW · PUBLISHED · SUPERSEDED · ARCHIVED
+TOSRM_CLAR_STATUS             3  OPEN · ANSWERED · CLOSED
+TOSRM_READY_STATUS            6  NOT_CHECKED · READY · PARTIAL · NOT_READY · BLOCKED · NA
+TOSRM_SLA_STATUS              4  WITHIN · AT_RISK · BREACHED · NA
+UIRE_POINT_STATUS            11  PLANNED · REQUESTED · SCHEDULED · READY · WITNESSED · COMPLETED · ACCEPTED · REJECTED · WAIVED · CANCELLED · NA
+VOCAB_STATUSES                3  APPROVED · PENDING · REJECTED
+status vocabularies found: 63
+
+================ B. TABLES AND WHO OWNS THEM (D2) ================
+tables in the live schema: 317
+  Sales           23 tables
+  Operations      32 tables
+  Reporting       29 tables
+  Quality         46 tables
+  Money           22 tables
+  Recruitment     28 tables
+  Directory       30 tables
+  People/Access   14 tables
+  Platform        22 tables
+  Marketplace     68 tables
+  UNCLAIMED      3   tables
+
+unclaimed tables (the ones worth reading — duplicates and orphans hide here):
+  requirement_change_proposals, requirement_versions, site_doc_requirements
+
+================ C. ROW COUNTS, FOR SCALE (D6) ================
+tables with rows: 65 · empty: 252 · unreadable: 0
+largest: report_fields(1578) lookup_values(1280) business_partners(665) report_sections(621) cx_tax_aliases(478) cx_tax_nodes(348) lookup_types(148) report_lib_fields(144) report_lib_section_fields(135) report_types(83) 
+
+================ D. HEADLINE-NUMBER FUNCTIONS (D7) ================
+149 candidate metric functions:
+  _ck_count, _onb_count, access_summary, act_counts
+  ads_counts, ads_link_counts, ads_outbox_counts, appr_cond_unarmed_count
+  appr_inbox_count, appr_sla_summary, approvals_hub_count, asset_counts
+  attend_review_count, attention_summary, audits_readiness, billable_mismatch_count
+  billable_pending_count, books_counts, books_invoices_count, books_outbox_counts
+  bulk_plan_summary, calls_status_disagreement_count, candpool_count, candpool_summary
+  capa_readiness, cdoc_counts, cdoc_readiness, cform_field_counts
+  cform_record_counts, cmp_readiness, cockpit_readiness, competence_due_counts
+  competence_readiness, competence_training_watch_counts, compliance_counts, conf_open_breach_count
+  conf_readiness, connect_access_requests_count, connect_bench_summary, connect_channels_counts
+  connect_client_bench_count, connect_commission_summary, connect_engv_file_count, connect_msg_unread_total
+  connect_org_pending_count, connect_person_summary, connect_pro_pool_count, connect_qualtax_summary
+  connect_tax_admin_summary, connect_taxonomy_summary, connect_trust_verified_count, connect_verify_pending_count
+  consent_open_count, contract_pending_summary, contracts_expiring_count, controlled_changes_count
+  cost_dualwrite_count, cost_dualwrite_summary, costrecon_count, costrecon_summary
+  cvp_notify_count, cx_an_count, cx_applications_count, cx_crew_summary
+  cx_disputes_open_count, cx_market_summary, cx_rating_disputes_open_count, datacontrol_readiness
+  disclosure_counts, drule_counts, dsr_overdue_count, email_failed_count
+  evidence_reuse_count, gate_pending_count, hwp_job_summary, hwp_open_count
+  iddoc_access_summary, iddoc_plaintext_count, iddoc_readiness, idems_awaiting_my_approval_count
+  idems_evidence_readiness, idems_expediting_dispatch_readiness, idems_issue_readiness, idems_seal_failed_count
+  imp_readiness, inquiries_due_count, inspector_availability_summary, inspector_shared_login_count
+  integrity_summary, invoice_readiness, iv_my_upcoming_count, iv_score_summary
+  job_expenses_total, job_recovered_total, job_voucher_total, leads_count
+  leads_counts, leads_due_count, licence_summary, lk_dangling_total
+  lk_summary, method_counts, mis_summary, mobilization_readiness
+  ncdca_issue_stats, ncr_count, ncr_counts, ncr_readiness
+  office_expense_total, opp_count, opp_counts, ops_area_tile_count
+  ops_invoicing_counts, orga_preview_summary, pdso_mob_readiness, person_assets_summary
+  person_docs_summary, placement_fee_summary, quote_qty_total, quotes_awaiting_contract_count
+  quotes_expired_count, rcr_counts, recruit_cv_autofill_summary, recruit_deploy_readiness
+  recruit_overdue_interviews_count, req_groups_total, reqf_counts, reset_counts
+  reviews_readiness, revrecon_count, revrecon_summary, rful_count
+  rful_summary, risk_counts, rver_spec_summary, sal_total
+  sample_counts, sat_summary, sched_summary, settlement_outstanding_total
+  split_total, tapi_ai_summary, task_open_count, tenant_requests_pending_count
+  tosrm_clar_open_count, tosrm_ops_summary, trust_readiness, voucher_summary
+  webhookq_counts

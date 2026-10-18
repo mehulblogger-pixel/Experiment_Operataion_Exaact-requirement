@@ -1,0 +1,66 @@
+{
+ "partner-new": {
+  "table": "business_partners",
+  "required_in_html": 1,
+  "before": 665,
+  "after": 665,
+  "verdict": "refused",
+  "message": "(no message found)"
+ },
+ "call-new": {
+  "table": "calls",
+  "required_in_html": 0,
+  "before": 0,
+  "after": 1,
+  "verdict": "*** ACCEPTED ***",
+  "message": "a record was created from an empty form"
+ },
+ "quote-new": {
+  "table": "quotes",
+  "required_in_html": 0,
+  "before": null,
+  "after": null,
+  "verdict": "table unknown",
+  "message": ""
+ },
+ "user-new": {
+  "table": "users",
+  "required_in_html": 1,
+  "before": 8,
+  "after": 8,
+  "verdict": "refused",
+  "message": "(no message found)"
+ },
+ "candidate-new": {
+  "table": "candidates",
+  "required_in_html": 2,
+  "before": 0,
+  "after": 1,
+  "verdict": "*** ACCEPTED ***",
+  "message": "a record was created from an empty form"
+ },
+ "hiring-request": {
+  "table": "hiring_requests",
+  "required_in_html": 2,
+  "before": 1,
+  "after": 1,
+  "verdict": "refused",
+  "message": "(no message found)"
+ },
+ "internal-audit-new": {
+  "table": "internal_audits",
+  "required_in_html": 1,
+  "before": 0,
+  "after": 0,
+  "verdict": "refused",
+  "message": "(no message found)"
+ },
+ "inquiry-new": {
+  "table": "inquiries",
+  "required_in_html": 0,
+  "before": null,
+  "after": null,
+  "verdict": "table unknown",
+  "message": ""
+ }
+}

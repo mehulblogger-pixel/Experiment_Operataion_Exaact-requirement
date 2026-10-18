@@ -1,0 +1,85 @@
+objects with a written lifecycle (document headings) : 26
+status vocabularies defined in code                  : 63
+  matched to a documented object                     : 19
+  NOT matched — read these                           : 44
+
+--- matched ---
+  ATT_STATUS                  7 statuses -> Workforce operational status
+  AVAIL_STATUS                8 statuses -> Workforce operational status
+  BILLABLE_STATUS             5 statuses -> Billable event
+  BOSS_STATUS                 3 statuses -> Profitability
+  CALL_STATUSES              15 statuses -> Call
+  CREDENTIAL_STATUS           7 statuses -> Credential
+  CX_APP_STATUSES             7 statuses -> Connect Application
+  CX_DISPUTE_STATUSES         4 statuses -> Connect Dispute
+  CX_REQ_STATUSES             7 statuses -> Connect Requirement
+  DOCUMENT_STATUSES           9 statuses -> (by stem)
+  DOC_STATUSES                9 statuses -> Candidate document
+  GATE_STATUS                 4 statuses -> Approval request
+  HREQ_STATUS                 6 statuses -> Hiring request
+  IDEMS_APPR_STATUS           5 statuses -> Approval request
+  IDEMS_STATUS                8 statuses -> Inspection report
+  IDEMS_VET_STATUS            3 statuses -> Inspection report
+  OFFER_STATUS                9 statuses -> Job offer
+  QUOTE_STATUS                8 statuses -> Quotation
+  UIRE_POINT_STATUS          11 statuses -> (by stem)
+
+--- not matched: a status vocabulary with no lifecycle section found ---
+  PDSO_STATUS                12 statuses   PLANNED · APPROVED · MOB_PENDING · MOBILIZED · ACTIVE · ON_LEA
+  NCDCA_DEPARTURE_STATUS      8 statuses   DRAFT · SUBMITTED · TECH_REVIEW · CLIENT_REVIEW · APPROVED · R
+  PDSO_APPROVAL_STATUS        7 statuses   DRAFT · SUBMITTED · CLIENT_REVIEW · RETURNED · APPROVED · REJE
+  PDSO_MOB_STATUS             7 statuses   REQUIRED · SUBMITTED · APPROVED · PENDING · REJECTED · COMPLET
+  REQ_STATUS                  7 statuses   OPEN · PROPOSED · OFFERED · PARTIALLY_FILLED · HIRED · CLOSED 
+  TOSRM_READY_STATUS          6 statuses   NOT_CHECKED · READY · PARTIAL · NOT_READY · BLOCKED · NA
+  CAPA_STATUS                 5 statuses   OPEN · IN_PROGRESS · VERIFYING · CLOSED · CLOSED_FAILED
+  COCKPIT_STATUSES            5 statuses   not_started · in_progress · configured · needs_attention · com
+  ENDORSE_STATUS              5 statuses   UPLOADED · UNDER_REVIEW · ENDORSED · REJECTED · ARCHIVED
+  EQUIP_STATUS                5 statuses   ACTIVE · CALIBRATION · REPAIR · QUARANTINE · RETIRED
+  INV_STATUS                  5 statuses   DRAFT · ISSUED · PART_PAID · PAID · CANCELLED
+  NCDCA_DISPUTE_STATUS        5 statuses   OPEN · UNDER_REVIEW · UPHELD · REVISED · WITHDRAWN
+  PDSO_LOG_STATUS             5 statuses   OPEN · IN_PROGRESS · ON_HOLD · CLOSED · CANCELLED
+  SAMPLE_STATUSES             5 statuses   RECEIVED · IN_TESTING · HOLD · RETURNED · DISPOSED
+  STATUSES                    5 statuses   ACTIVE · INACTIVE · ON_HOLD · BLACKLISTED · PROSPECT
+  TEMPLATE_STATUS             5 statuses   DRAFT · IN_REVIEW · PUBLISHED · SUPERSEDED · ARCHIVED
+  ADS_OUT_STATUS              4 statuses   PENDING · SENT · FAILED · SKIPPED
+  ASSET_STATUS                4 statuses   ISSUED · RETURNED · LOST · DAMAGED
+  AUDIT_STATUS                4 statuses   PLANNED · IN_PROGRESS · REPORTED · CLOSED
+  AUTH_STATUS                 4 statuses   ACTIVE · SUSPENDED · EXPIRED · WITHDRAWN
+  CDOC_STATUSES               4 statuses   DRAFT · CURRENT · SUPERSEDED · WITHDRAWN
+  DISCLOSURE_STATUSES         4 statuses   REQUESTED · CONSENTED · DECLINED · WITHDRAWN
+  DRULE_STATUSES              4 statuses   DRAFT · CURRENT · SUPERSEDED · WITHDRAWN
+  HW_POINT_STATUS             4 statuses   OPEN · CLEARED · WAIVED · CANCELLED
+  IMP_STATUS                  4 statuses   OPEN · MITIGATED · ACCEPTED · UNACCEPTABLE
+  METHOD_STATUSES             4 statuses   DRAFT · CURRENT · SUPERSEDED · WITHDRAWN
+  NCR_STATUS                  4 statuses   OPEN · CONTAINED · DISPOSITIONED · CLOSED
+  OVERRIDE_STATUS             4 statuses   PENDING · ENDORSED · APPROVED · REFUSED
+  PC_STATUS                   4 statuses   DRAFT · SUBMITTED · APPROVED · REJECTED
+  PORTAL_REQ_STATUS           4 statuses   NEW · ACCEPTED · DECLINED · CONVERTED
+  RISK_STATUSES               4 statuses   OPEN · TREATING · MONITORING · CLOSED
+  RVER_STATUSES               4 statuses   PENDING · APPROVED · REJECTED · WITHDRAWN
+  TOSRM_SLA_STATUS            4 statuses   WITHIN · AT_RISK · BREACHED · NA
+  CONF_BREACH_STATUS          3 statuses   OPEN · CONTAINED · CLOSED
+  CREV_STATUSES               3 statuses   OPEN · CONTINUED · REJECTED
+  FEE_STATUS                  3 statuses   PROVISIONAL · CONFIRMED · WAIVED
+  INQUIRY_STATUS              3 statuses   OPEN · QUOTED · DROPPED
+  LEAD_STATUS                 3 statuses   OPEN · CONVERTED · LOST
+  OPP_STATUS                  3 statuses   OPEN · WON · LOST
+  REQF_MANUAL_STATUSES        3 statuses   CLOSED · CANCELLED · DRAFT
+  SAT_STATUSES                3 statuses   REQUESTED · RECEIVED · DECLINED
+  TOSRM_CLAR_STATUS           3 statuses   OPEN · ANSWERED · CLOSED
+  VOCAB_STATUSES              3 statuses   APPROVED · PENDING · REJECTED
+  FAILURE_STATUS              2 statuses   OPEN · RESOLVED
+
+--- document headings with no status vocabulary matched to them ---
+  Job
+  Voucher
+  Contract opening (`partner_contracts.open_status`)
+  Connect Engagement / Booking (`cx_engagements.status`) — marketplace (K20)
+  Connect Engagement Voucher (`cx_engagement_vouchers.status`) — marketplace + on-roll (K21)
+  Connect Rating-Integrity Dispute (`cx_rating_disputes.status`) — Review & Reputation
+  Candidate (`candidates.stage`) — recruitment
+  Interview (`interviews.result`) — recruitment (Phase 4)
+  Fulfilment allocation (`requisition_allocations.status`) — recruitment (Phase 4)
+  Requirement change proposal (`requirement_change_proposals.status`) — recruitment (Gate 2)
+  Requirement review (`candidate_reviews.status`) — recruitment (Gate 3)
+  `tenant_requests.status` — public workspace signup (operations tenants)
