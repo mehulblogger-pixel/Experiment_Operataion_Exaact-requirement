@@ -153,7 +153,7 @@
               // supply/recruitment (the 'hr' module); a pure inspection body without
               // staffing/recruitment capabilities does not see it. Permissive default. ?>
         <?php if (can('mod.hiring.view') && (!function_exists('connect_cap_owner_shows')||connect_cap_owner_shows('hr'))): ?>
-        <a class="s-item<?= $navOn(['recruitment-cc','recruitment','requisitions','requisition','requisition-new','requisition-edit','candidates','candidate','recruit-config','req-ai-extract']) ?>" href="/recruitment-cc"><span class="s-ic">🧑‍💼</span><span>Recruitment</span></a>
+        <a class="s-item<?= $navOn(['recruitment-cc','recruitment','requisitions','requisition','requisition-new','requisition-edit','candidates','candidate','recruit-config','req-ai-extract']) ?>" href="/recruitment"><span class="s-ic">🧑‍💼</span><span>Recruitment</span></a>
         <?php endif; ?>
 
         <?php if (ops_area_has('quality')): ?>

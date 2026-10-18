@@ -539,10 +539,32 @@ function rcc_projects($reqRows) {
     return array_slice($out, 0, 6);
 }
 
+//  THE ONE RECRUITMENT HOME (2026-10-18).
+//
+//  There were two, under one menu item, each with a button pointing at the
+//  other: /recruitment ("Recruitment & Workforce" — Today / Risks /
+//  Opportunities) and /recruitment-cc ("Recruitment Command Centre" — the
+//  pipeline and the analysis). The breadcrumb landed on one and the left menu
+//  on the other, which the owner reported as "duplication of work ... hampering
+//  launching".
+//
+//  They were not duplicates. One answers "who do we have, who is free, whose
+//  deployment ends this month"; the other "what are we recruiting and how is it
+//  going". Retiring either would have lost a real answer, so they are merged:
+//  the workforce triage is drawn first, because it is what needs doing today,
+//  and the command centre's analysis follows it.
+//
+//  Both data sets are loaded. recruit_data() is the workforce half and is
+//  best-effort — a failure there must not take the whole screen down, because
+//  the recruitment half is the one people open this screen for.
 function ops_recruitment_cc($method) {
     ops_require(recruit_home_can(), 'You do not have access to Recruitment.');
     $f = rcc_filters();
     $d = rcc_data($f);
-    view('ops/recruitment_cc', ['d' => $d]);
+    $rd = [];
+    if (function_exists('recruit_data')) {
+        try { $rd = recruit_data(); } catch (Throwable $e) { $rd = []; }
+    }
+    view('ops/recruitment_cc', ['d' => $d, 'rd' => $rd]);
     return true;
 }

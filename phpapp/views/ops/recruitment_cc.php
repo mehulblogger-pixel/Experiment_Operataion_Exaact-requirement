@@ -112,8 +112,12 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
 <div class="rcc">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
     <div>
-      <h1>Recruitment Command Centre</h1>
-      <p class="sub">What needs attention today, then the analysis behind it — every number responds to the filters.</p>
+      <?php //  Named for the merged job, 2026-10-18. "Command Centre" described
+            //  only half of what this screen now shows, and the other half
+            //  arrived from a screen called "Recruitment & Workforce". ?>
+      <h1>Recruitment &amp; Workforce</h1>
+      <p class="sub">What needs doing today — your people, their deployments and the pipeline —
+         then the analysis behind it. Every number below the filters responds to them.</p>
       <?php //  B2 — the two supported ways in, stated neutrally. Which one a
             //  workspace SHOULD prefer is ADR-001, open since Phase 2 and a
             //  business decision; this sentence deliberately does not take it.
@@ -165,7 +169,9 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
       <?php endif; ?>
       <a class="btn secondary" href="/candidates">Candidates</a>
       <?php if (function_exists('pc_can') && pc_can()): ?><a class="btn secondary" href="/project-costings">🧮 Project costing</a><?php endif; ?>
-      <a class="btn secondary" href="/recruitment">Action view</a>
+      <?php //  "Action view" pointed at the SECOND recruitment home, which no
+            //  longer exists — its panels are on this page now, under "What
+            //  needs doing". The button would have been a link to itself. ?>
       <?php // Recruitment setup — the configuration screens, one click, admins only. ?>
       <?php if (function_exists('hiring_admin_can') ? hiring_admin_can() : (function_exists('is_admin_level') && is_admin_level())): ?>
       <span class="rcc-setup" style="position:relative;display:inline-block">
@@ -225,8 +231,19 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
   </form>
   <p class="sub" style="margin-top:6px">Every dropdown is driven by Masters &amp; Settings — an admin edits Department, Source, Stages and FY there with no code.</p>
 
+  <?php //  ---- THE WORKFORCE HALF (2026-10-18) -------------------------------
+        //  Today / Risks / Opportunities, moved here from the second
+        //  Recruitment home that used to exist beside this one. It is drawn
+        //  BEFORE the analysis because it is the part somebody acts on, and the
+        //  analysis is the part they read. See lib/recruit_cc.php for why the
+        //  two screens became one. ?>
+  <?php if (!empty($rd)): ?>
+    <div class="band"><h2>What needs doing</h2><span class="bd">— your people, their deployments and what is slipping</span></div>
+    <?php include __DIR__ . '/_recruit_triage.php'; ?>
+  <?php endif; ?>
+
   <!-- 6. NEEDS ATTENTION -->
-  <div class="band"><h2>Needs attention today</h2><span class="bd">— longest-waiting candidates and the biggest open demand</span></div>
+  <div class="band"><h2>The recruitment pipeline</h2><span class="bd">— longest-waiting candidates and the biggest open demand</span></div>
   <div class="g2">
     <div class="panel"><div class="ph"><h3>Longest-waiting candidates</h3><span class="note">chase these first</span></div>
       <div class="pb scroll"><?php if (!$d['waiting']): ?><div class="empty">Nobody is waiting — pipeline is clear.</div><?php else: ?>

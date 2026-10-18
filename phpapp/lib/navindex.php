@@ -121,7 +121,7 @@ function ops_nav_index($fresh = false) {
             // names each one. hreq_label() honours a workspace's own wording and
             // only qualifies it when the word it chose is one of the ambiguous ones.
             $hl = fn($k, $pl = false) => $fx('hreq_label') ? hreq_label($k, $pl) : ($pl ? 'Requisitions' : 'Requisition');
-            $add('Recruitment', '/recruitment-cc', $R, '🧭', 'Command centre — pipeline & demand.');
+            $add('Recruitment', '/recruitment', $R, '🧭', 'Everything recruitment and workforce — what needs doing today, then the analysis.');
             // M4 correction §3 — the GOVERNED path (request → approval → requisition)
             // and the DIRECT path (requisition raised straight away) are both real
             // and both shown. Which one a workspace uses is its own choice.

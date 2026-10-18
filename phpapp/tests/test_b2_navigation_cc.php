@@ -47,7 +47,7 @@ $idx = function ($needle) use ($b2bands) {
     foreach ($b2bands as $i => $b) if (stripos($b, $needle) !== false) return $i;
     return -1;
 };
-$iAttention = $idx('Needs attention today');
+$iAttention = $idx('The recruitment pipeline');
 $iTracker   = $idx('Ownership, deployment');
 $iAnalysis  = $idx('Analysis');
 $iConv      = $idx('Conversion, speed');
@@ -55,12 +55,22 @@ $iFunnel    = $idx('Funnel, outcomes');
 $iTrend     = $idx('Trend, department load');
 $iDrop      = $idx('Why we lose candidates');
 
-foreach (['Needs attention today' => $iAttention, 'Ownership/tracker' => $iTracker,
+//  RENAMED IN THE MERGE (2026-10-18). This section was called "Needs attention
+//  today" and was the first thing on the page — B2's whole point. The merge put
+//  the WORKFORCE triage ("What needs doing": Today / Risks / Opportunities)
+//  above it and renamed this one "The recruitment pipeline", because with both
+//  halves present the old name described two sections at once.
+//
+//  B2's intent is unchanged and is asserted more strictly below: what needs
+//  DOING is still first, and the analysis still follows it.
+$iDoing = $idx('What needs doing');
+foreach (['What needs doing' => $iDoing, 'The recruitment pipeline' => $iAttention, 'Ownership/tracker' => $iTracker,
           'Analysis divider' => $iAnalysis, 'Conversion' => $iConv, 'Funnel' => $iFunnel,
           'Trend' => $iTrend, 'Drop reasons' => $iDrop] as $n => $i)
     t_ok($i >= 0, "B ARMING · the '$n' section is still on the page (index $i)");
 
-t_eq($iAttention, 0, 'B1 · "Needs attention today" is the FIRST section on the page (was 14th of 20)');
+t_eq($iDoing, 0, 'B1 · what needs DOING is the first section on the page');
+t_ok($iAttention > $iDoing, 'B1b · and the recruitment pipeline follows it');
 t_ok($iTracker < $iConv, 'B2 · the requirement tracker — active work — comes before the analytics');
 t_ok($iAnalysis < $iConv && $iAnalysis < $iFunnel && $iAnalysis < $iTrend && $iAnalysis < $iDrop,
      'B3 · every analytics section sits BELOW the Analysis divider');
@@ -79,12 +89,18 @@ $b2before = [
  '/my-approvals','/positions','/positions-import','/positions-org','/project-costings',
  '/recruit-approvals','/recruit-export?dataset=candidates','/recruit-export?dataset=funnel',
  '/recruit-export?dataset=offers','/recruit-export?dataset=requisitions','/recruit-pipelines',
- '/recruitment','/requisition-new','/requisition?id=','/requisitions',
+ '/requisition-new','/requisition?id=','/requisitions',
 ];
+//  '/recruitment' WAS IN THIS LIST and is deliberately out of it now. It was a
+//  button called "Action view" pointing at the second recruitment home; that
+//  screen was merged INTO this one on 2026-10-18, so the link would point at
+//  the page you are already on. The destination is not lost — its content is
+//  here, under "What needs doing".
+$b2before[] = null; array_pop($b2before);
 preg_match_all('/href="([^"]+)"/', $b2cc, $mH);
 $b2now = array_values(array_unique(array_map(fn($h) => preg_replace('/<\?=.*/', '', $h), $mH[1] ?? [])));
 $b2gone = array_values(array_diff($b2before, $b2now));
-t_ok(count($b2before) === 25, 'C ARMING · 25 destinations were pinned from the pre-B2 screen');
+t_ok(count($b2before) === 24, 'C ARMING · 24 destinations were pinned (25 before the merge folded one in)');
 t_eq($b2gone, [], 'C1 · every destination the screen offered before B2 is still offered');
 $b2added = array_values(array_diff($b2now, $b2before));
 //  Two destinations have been added, both deliberately and both recorded here:
@@ -146,11 +162,48 @@ foreach ($b2now as $h) {
 }
 t_eq($b2missing, [], 'F1 · every link on the page points at a route the app already dispatches');
 
-// ---- G · the two recruitment homes are both still reachable --------------
-t_ok(function_exists('ops_recruitment_home'), 'G1 · the compact recruitment home still exists');
-t_ok(function_exists('ops_recruitment_cc'),   'G2 · and so does the Command Centre — neither was merged away');
-t_ok(strpos($b2cc, 'href="/recruitment"') !== false,
-     'G3 · the Command Centre still links to the compact one');
+// ---- G · THERE IS NOW ONE RECRUITMENT HOME --------------------------------
+//
+//  REVERSED 2026-10-18. This asserted that both homes stayed reachable and
+//  linked to each other — "neither was merged away" was the point of it. The
+//  owner tested the result:
+//
+//    "When we go back to recuirtment from bread crump ... it takes to following
+//     screen. However when we directly click in Left Navigation - Recuirtment
+//     it shows following screen. This duplication of work is hampering
+//     launching."
+//
+//  Two landing screens under one menu item, each with a button pointing at the
+//  other, is not a feature however well each one works. They were MERGED rather
+//  than one deleted, because they answered different questions — one "who do we
+//  have and whose deployment ends", the other "what are we recruiting" — and
+//  deleting either would have lost a real answer.
+t_ok(strpos($b2src, "case \$route === 'recruitment-cc':\n            redirect('/recruitment')") !== false
+     || preg_match("/'recruitment-cc':\s*\n\s*redirect\('\/recruitment'\)/", $b2src) === 1,
+     'G1 · /recruitment-cc redirects, so old links and bookmarks still land');
+t_ok(function_exists('ops_recruitment_cc'), 'G2 · one handler serves the one home');
+t_ok(strpos($b2cc, 'href="/recruitment"') === false,
+     'G3 · and it no longer links to a second home, because there is not one');
+//  Nothing was lost in the merge: the workforce triage is on the page.
+t_ok(is_file(__DIR__ . '/../views/ops/_recruit_triage.php'),
+     'G4 · the Today / Risks / Opportunities panels survived as a partial');
+t_ok(strpos($b2cc, "include __DIR__ . '/_recruit_triage.php'") !== false,
+     'G5 · and the one home draws them');
+//  A PARTIAL MUST NOT OVERWRITE ITS HOST'S VARIABLES. The first version of this
+//  one opened with `$d = $rd`, replacing the command centre's own data for
+//  everything drawn after the include; the page rendered the panels and then
+//  died on the next section with a 500.
+//  ASKED OF THE CODE, NOT OF THE FILE. The first version of this assertion
+//  searched the whole file for '$d =' and was broken by the COMMENT four lines
+//  above it, which quotes the bug it describes. A test a prose edit can fail is
+//  not measuring what it names — the same trap that had test_b6_forms_disclosure
+//  counting the word "required" in a label.
+$b2tri = file_get_contents(__DIR__ . '/../views/ops/_recruit_triage.php');
+$b2code = preg_replace(['~/\*.*?\*/~s', '~//[^\n]*~'], '', $b2tri);
+t_ok(strpos($b2code, '$d[') === false,
+     'G6 · *** the partial never READS the host view\'s $d');
+t_ok(preg_match('/\$d\s*=(?!=)/', $b2code) !== 1,
+     'G7 · *** and never ASSIGNS it, which is what took the page down at 500');
 
 // ---- H · PERMISSION AND ENTITLEMENT — navigation is not a security boundary
 //  The whole point of B2 is to make things easier to FIND. That must not make

@@ -3611,12 +3611,23 @@ function ops_dispatch($route, $method) {
             ops_crm_reports(); return true;
         case $route === 'requisitions' || $route === 'requisition-new' || $route === 'requisition-edit' || $route === 'requisition':
             ops_requisitions($route, $method); return true;
+        //  ONE RECRUITMENT HOME (2026-10-18). There were two, under one menu
+        //  item, each with a button pointing at the other — the breadcrumb
+        //  landed on this one and the left menu on /recruitment-cc. The owner
+        //  reported it as "duplication of work ... hampering launching".
+        //
+        //  They were merged rather than one being deleted: see
+        //  lib/recruit_cc.php. This address wins because it is the one the area
+        //  map, the breadcrumb and every trail already call the Recruitment
+        //  home, and because "recruitment-cc" is not a name anybody would type.
         case $route === 'recruitment':
-            return ops_recruitment_home($method);
+            return ops_recruitment_cc($method);
         case $route === 'candidate-pool':   // Revamp P11 — candidate pool convergence (read-only)
             return ops_candpool($method);
+        //  Kept so bookmarks, old links and anything printed before the merge
+        //  still land somewhere real, instead of on Not found.
         case $route === 'recruitment-cc':
-            return ops_recruitment_cc($method);
+            redirect('/recruitment');
         case $route === 'recruit-pipelines':   // Phase 2 — configurable hiring workflows (admin)
             return ops_recruit_pipelines($route, $method);
         case $route === 'candidate-flow':      // Phase 2b — move a candidate along its configured pipeline
