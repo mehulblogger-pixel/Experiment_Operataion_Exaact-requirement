@@ -1,0 +1,391 @@
+{
+ "Inspector": {
+  "approvals-setup": {
+   "code": "200",
+   "h1": "Approvals",
+   "size": 25252,
+   "writes": [],
+   "rows": 0,
+   "says_no": true,
+   "verdict": "read-only"
+  },
+  "complaints-policy": {
+   "code": "200",
+   "h1": "Complaints and appeals",
+   "size": 3161,
+   "writes": [],
+   "rows": 0,
+   "says_no": true,
+   "verdict": "read-only"
+  },
+  "connect": {
+   "code": "200",
+   "h1": "Post a job. Find the",
+   "size": 9021,
+   "writes": [
+    "/connect/start"
+   ],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "CAN POST"
+  },
+  "get-started": {
+   "code": "200",
+   "h1": "Run your inspection company on",
+   "size": 5363,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "my-approvals": {
+   "code": "200",
+   "h1": "My approvals",
+   "size": 24893,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "my-signature": {
+   "code": "200",
+   "h1": "My signature",
+   "size": 26628,
+   "writes": [
+    "/my-signature"
+   ],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "CAN POST"
+  },
+  "quality": {
+   "code": "200",
+   "h1": "Quality &amp; Accreditation",
+   "size": 27540,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "writing-assistant": {
+   "code": "200",
+   "h1": "Technical writing assistant",
+   "size": 41477,
+   "writes": [
+    "/writing-assistant"
+   ],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "CAN POST"
+  },
+  "advisor": {
+   "code": "302",
+   "verdict": "refused"
+  },
+  "command-centre": {
+   "code": "403",
+   "verdict": "refused"
+  },
+  "cost-reconciliation": {
+   "code": "302",
+   "verdict": "refused"
+  },
+  "directory": {
+   "code": "403",
+   "verdict": "refused"
+  },
+  "flow-gaps": {
+   "code": "302",
+   "verdict": "refused"
+  },
+  "insights": {
+   "code": "403",
+   "verdict": "refused"
+  },
+  "money": {
+   "code": "403",
+   "verdict": "refused"
+  },
+  "operations": {
+   "code": "403",
+   "verdict": "refused"
+  },
+  "passport-share": {
+   "code": "302",
+   "verdict": "refused"
+  },
+  "project-costings": {
+   "code": "302",
+   "verdict": "refused"
+  },
+  "ratings": {
+   "code": "302",
+   "verdict": "refused"
+  },
+  "ratings-config": {
+   "code": "302",
+   "verdict": "refused"
+  },
+  "reimbursable-dedup": {
+   "code": "302",
+   "verdict": "refused"
+  },
+  "reporting": {
+   "code": "200",
+   "h1": "Reporting",
+   "size": 29132,
+   "writes": [],
+   "rows": 0,
+   "says_no": true,
+   "verdict": "read-only"
+  },
+  "revenue-reconciliation": {
+   "code": "302",
+   "verdict": "refused"
+  },
+  "sales": {
+   "code": "403",
+   "verdict": "refused"
+  },
+  "timesheet": {
+   "code": "302",
+   "verdict": "refused"
+  }
+ },
+ "Finance": {
+  "approvals-setup": {
+   "code": "200",
+   "h1": "Approvals",
+   "size": 29347,
+   "writes": [],
+   "rows": 0,
+   "says_no": true,
+   "verdict": "read-only"
+  },
+  "complaints-policy": {
+   "code": "200",
+   "h1": "Complaints and appeals",
+   "size": 3161,
+   "writes": [],
+   "rows": 0,
+   "says_no": true,
+   "verdict": "read-only"
+  },
+  "connect": {
+   "code": "200",
+   "h1": "Post a job. Find the",
+   "size": 9021,
+   "writes": [
+    "/connect/start"
+   ],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "CAN POST"
+  },
+  "get-started": {
+   "code": "200",
+   "h1": "Run your inspection company on",
+   "size": 5363,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "my-approvals": {
+   "code": "200",
+   "h1": "My approvals",
+   "size": 28985,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "my-signature": {
+   "code": "200",
+   "h1": "My signature",
+   "size": 30720,
+   "writes": [
+    "/my-signature"
+   ],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "CAN POST"
+  },
+  "quality": {
+   "code": "200",
+   "h1": "Quality &amp; Accreditation",
+   "size": 32445,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "writing-assistant": {
+   "code": "200",
+   "h1": "Technical writing assistant",
+   "size": 45513,
+   "writes": [
+    "/writing-assistant"
+   ],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "CAN POST"
+  },
+  "advisor": {
+   "code": "200",
+   "h1": "What to fix",
+   "size": 29457,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "command-centre": {
+   "code": "200",
+   "h1": "Command Centre",
+   "size": 38224,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "cost-reconciliation": {
+   "code": "200",
+   "h1": "Cost reconciliation",
+   "size": 31591,
+   "writes": [
+    "/cost-reconciliation"
+   ],
+   "rows": 0,
+   "says_no": true,
+   "verdict": "CAN POST"
+  },
+  "directory": {
+   "code": "200",
+   "h1": "Directory",
+   "size": 32093,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "flow-gaps": {
+   "code": "200",
+   "h1": "Where the flow is broken",
+   "size": 30555,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "insights": {
+   "code": "200",
+   "h1": "Insights",
+   "size": 32903,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "money": {
+   "code": "200",
+   "h1": "Money",
+   "size": 34865,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "operations": {
+   "code": "200",
+   "h1": "Operations",
+   "size": 43702,
+   "writes": [],
+   "rows": 3,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "passport-share": {
+   "code": "200",
+   "h1": "Professional passport",
+   "size": 29137,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "project-costings": {
+   "code": "200",
+   "h1": "Project costing",
+   "size": 28931,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "ratings": {
+   "code": "200",
+   "h1": "Inspector ratings",
+   "size": 29838,
+   "writes": [],
+   "rows": 1,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "ratings-config": {
+   "code": "200",
+   "h1": "Inspector ratings",
+   "size": 29845,
+   "writes": [],
+   "rows": 1,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "reimbursable-dedup": {
+   "code": "200",
+   "h1": "Reimbursable duplication",
+   "size": 31345,
+   "writes": [
+    "/reimbursable-dedup"
+   ],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "CAN POST"
+  },
+  "reporting": {
+   "code": "403",
+   "verdict": "refused"
+  },
+  "revenue-reconciliation": {
+   "code": "200",
+   "h1": "Revenue reconciliation",
+   "size": 31538,
+   "writes": [
+    "/revenue-reconciliation"
+   ],
+   "rows": 0,
+   "says_no": true,
+   "verdict": "CAN POST"
+  },
+  "sales": {
+   "code": "200",
+   "h1": "Sales",
+   "size": 32939,
+   "writes": [],
+   "rows": 0,
+   "says_no": false,
+   "verdict": "read-only"
+  },
+  "timesheet": {
+   "code": "200",
+   "h1": "Timesheet",
+   "size": 31061,
+   "writes": [
+    "/timesheet"
+   ],
+   "rows": 1,
+   "says_no": false,
+   "verdict": "CAN POST"
+  }
+ }
+}

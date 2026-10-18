@@ -493,17 +493,71 @@ They share no code. Two implementations of one business process will diverge.
 
 ---
 
-## GAP-008 — 99 dispatched routes have no module
+## GAP-008 — 200 dispatched routes have no module gate — TESTED, no live exposure found
 
-**CONFIRMED (count) · SUSPECTED (impact) · P1 · security**
+**CONFIRMED · P2** (was P1, before it was tested) **· security · defence in depth**
 
-565 routes are dispatched; `ops_route_module_map()` places **466** of them in a
-module. `ops_module_family()` recovers some by prefix; the rest have **no
-module**, and therefore no module gate and no area. A route with no module may
-escape the licence switch and the per-module permission check.
+Full write-up: **`06-DATA-AND-PERMISSION-AUDIT.md` §2–3.** Summary here.
 
-**This is the highest-value Phase F task.** Each of the 99 must be tested
-server-side, as each role, for whether it enforces anything.
+**The count was wrong, and it was wrong in the unsafe direction.** This read
+"99 routes have no module", from `ops_route_module_map()` having **466 keys** —
+which I took for "466 of the 565 dispatched routes are gated". It is not the
+same thing: **140 of those keys are not dispatched routes at all** (`lead`,
+`lead-new`, `lead-move` …), and many dispatched routes are absent from the map.
+Resolved properly, exactly as the dispatcher does
+(`evidence/ungated-routes-list.php`):
+
+| | Count |
+|---|---|
+| Dispatched routes | 565 |
+| Module from the map | 326 |
+| Module recovered by the prefix fallback | 39 |
+| **No module at all** | **200** — twice what was reported |
+
+**Then it was tested, which is the point of the finding.** Inspector and Finance
+(32 and 59 of 256 screens) were used as probes, because "no gate" only matters
+if the screen opens for someone who should not be there
+(`evidence/ungated-triage.py`, `evidence/ungated-deep-probe.py`):
+
+| | Count |
+|---|---|
+| Refuse a least-privileged role anyway — the handler checks for itself | **158** |
+| Open for one probe | 17 |
+| Open for both | 8 |
+| Personal screens (the signed-in person's own record) | 8 |
+| Public by design | 9 |
+
+All 25 that open were then read for the only two things that matter — can they
+**change** anything (every form target on the page) and can they **see** another
+person's records (data-table row count).
+
+**Result: no reachable hole.** Every ungated route an inspector can open is a
+read-only explainer, a hub showing only tiles they can use, their own signature,
+a local phrase expander with no external call, or the public marketplace
+storefront whose form is a GET search. **Zero data rows on every one; no write
+reached a business record.** `approvals-setup` answers an inspector with the
+heading *"Nothing here is yours to change"* and simply omits the editable half —
+better behaviour than most systems manage. Finance's four writable screens are
+all reconciliation screens, which is what `finance.reconcile` is for.
+
+**Severity lowered to P2, and the risk restated honestly.** The weakness is
+about tomorrow, not today: protection rests on 200 handlers each remembering to
+check, 158 of which do, and a route added next month inherits nothing. The one
+place it already bites is the money module, where the write gate accepts
+`data.credit` (GAP-010) and is safe *only* because every money route also
+carries a module — two of the seventeen getting theirs from the prefix fallback,
+a rename away from losing it.
+
+**Recommendation — a guard rail, not a repair.** Not "add a module to 200
+routes"; many have none to add. Instead make the absence deliberate: an explicit
+allow-list of routes intended to be module-free (public, personal, hub, action
+handler), plus a test that fails when a dispatched route is in neither the module
+map nor that list. That stops a new ungated route being added by accident, which
+is the actual risk.
+
+**Acceptance.** Such a test exists and passes; re-running
+`evidence/ungated-triage.py` shows no route in OPEN-WIDE or OPEN-ONE that can
+post to a business record or list another person's data.
 
 ---
 
@@ -527,3 +581,7 @@ screen is changed.
 | **Q-B** | Who may raise a nonconformity — inspectors and coordinators, or managers only? | GAP-004 |
 | **Q-C** | Is `mgh-hire` live, a prototype, or dead? | GAP-007; also decides whether it is audited further |
 | **Q-D** | Is a non-production workspace available on the live host? | Everything is currently "verified locally" |
+| **Q-B1** | Who may **raise** a nonconformity? Today nobody below Business Director can open the register, and an inspector cannot. *Recommend: inspectors and coordinators raise, quality closes.* | GAP-004 |
+| **Q-B2** | Should the five roles who see a corrective action also see the nonconformity behind it? *Recommend: yes, read-only.* | GAP-004 |
+| **Q-B3** | Should the two administrator logins keep the right to close a nonconformity? Strictly *"only Quality or Technical Head"* would remove it. | GAP-004 |
+| **Q-G** | Who should see the **vendor register** — the people who write reports against a vendor's work, the people who pay the vendor, or both? Today it is the former; **Finance is the one role refused**, which looks backwards. | `06-DATA-AND-PERMISSION-AUDIT.md` §4 |
