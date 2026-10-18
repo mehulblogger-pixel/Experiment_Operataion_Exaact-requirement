@@ -3622,6 +3622,11 @@ function ops_dispatch($route, $method) {
         //  home, and because "recruitment-cc" is not a name anybody would type.
         case $route === 'recruitment':
             return ops_recruitment_cc($method);
+        //  UAT A9 — an interviewer's own diary. Open to anyone signed in,
+        //  because panel members are usually senior people in the discipline
+        //  with no recruitment access; gating it would hide their own diary.
+        case $route === 'my-interviews':
+            return ops_my_interviews($method);
         case $route === 'candidate-pool':   // Revamp P11 — candidate pool convergence (read-only)
             return ops_candpool($method);
         //  Kept so bookmarks, old links and anything printed before the merge
@@ -9091,6 +9096,35 @@ function ops_pending_tasks() {
     // own follow-ups sit alongside the system-derived approvals on My Work.
     if (function_exists('task_open_count'))
         $add(task_open_count($myId), '✅', 'my tasks', 'follow-ups you added and haven\'t ticked off', '/tasks', 'info', 'do');
+
+    //  ---- INTERVIEWS I AM SITTING ON (UAT A9, 2026-10-18) -------------------
+    //
+    //    "Even the panel people are not reflected any details of the today
+    //     scheduled interviews on there dashboard or daily task."
+    //
+    //  They could not be. The panel was stored as a comma-joined string of
+    //  NAMES, so "which interviews is this person on" had no answer that was
+    //  safe to give — two people share a name, people get renamed. The ids are
+    //  kept now (see lib/recruit_iv.php), and this is the first thing to use
+    //  them: an interviewer opens My Work and sees the ones they must attend.
+    //
+    //  Scoped to the person asking, so it reveals nobody else's panels, and the
+    //  window is the next seven days — far enough ahead to prepare, near enough
+    //  to still be "what I must do".
+    if (function_exists('iv_my_upcoming')) {
+        try {
+            $ivMine = iv_my_upcoming($myId, 7);
+            if ($ivMine) {
+                $ivToday = 0;
+                $today = date('Y-m-d');
+                foreach ($ivMine as $r) if (substr((string)$r['scheduled_at'], 0, 10) === $today) $ivToday++;
+                $add(count($ivMine), '🎤', count($ivMine) === 1 ? 'interview to attend' : 'interviews to attend',
+                     $ivToday > 0 ? $ivToday . ' of them today — you are on the panel'
+                                  : 'you are on the panel, in the next 7 days',
+                     '/my-interviews', $ivToday > 0 ? 'warn' : 'info', 'do');
+            }
+        } catch (Throwable $e) { /* never let this take My Work down */ }
+    }
 
     // ---- Approvals waiting on ME -------------------------------------------
     // Quotations — the current step is mine to sign (named, by role, or generic).

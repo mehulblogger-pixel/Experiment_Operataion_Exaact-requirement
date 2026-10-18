@@ -1897,3 +1897,46 @@
   if (document.readyState !== 'loading') init();
   else document.addEventListener('DOMContentLoaded', init);
 })();
+
+/*  ---- THE INTERVIEW PANEL PICKER (UAT A9) --------------------------------
+    Search + department filter over the panel checkboxes. The list is a FILTER,
+    never a gate: everybody stays one click away under "All departments",
+    because the right technical interviewer for a role very often holds no
+    recruitment access at all. Ticked people are never hidden — losing sight of
+    somebody you have already chosen is how a panel gets booked wrong. */
+(function () {
+  function wire(form) {
+    var find = form.querySelector('.ivp-find'),
+        dept = form.querySelector('.ivp-dept'),
+        none = form.querySelector('.ivp-none');
+    if (!find && !dept) return;
+    function apply() {
+      var q = (find && find.value || '').trim().toLowerCase(),
+          d = (dept && dept.value) || '', shown = 0;
+      form.querySelectorAll('.ivp-grp').forEach(function (g) {
+        var any = 0;
+        g.querySelectorAll('.ivp-row').forEach(function (r) {
+          var box = r.querySelector('input[type="checkbox"]');
+          var hit = (!q || (r.getAttribute('data-nm') || '').indexOf(q) >= 0)
+                 && (!d || g.getAttribute('data-dept') === d);
+          //  Always keep a chosen person visible.
+          if (box && box.checked) hit = true;
+          r.style.display = hit ? '' : 'none';
+          if (hit) any++;
+        });
+        g.style.display = any ? '' : 'none';
+        shown += any;
+      });
+      if (none) none.style.display = shown ? 'none' : '';
+    }
+    if (find) find.addEventListener('input', apply);
+    if (dept) dept.addEventListener('change', apply);
+    form.addEventListener('change', function (e) {
+      if (e.target && e.target.type === 'checkbox') apply();
+    });
+    apply();
+  }
+  function init() { document.querySelectorAll('form').forEach(wire); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();

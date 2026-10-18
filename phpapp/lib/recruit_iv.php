@@ -77,6 +77,24 @@ function recruit_iv_migrate() {
             created_at VARCHAR(30) DEFAULT '',
             done_at VARCHAR(30) DEFAULT ''
         )");
+        //  WHO IS ON THE PANEL, AS IDS.                        (UAT A9, 2026-10-18)
+        //
+        //  `panel` has always been a comma-joined string of NAMES, built at save
+        //  time and thrown away as data. That made one of the owner's findings
+        //  unanswerable by construction:
+        //
+        //    "the panel people are not reflected any details of the today
+        //     scheduled interviews on there dashboard or daily task"
+        //
+        //  Nothing could tell which interviews a given person sits on, because
+        //  "Mehul Rathod" is not a key: two people share a name, a person gets
+        //  renamed, a middle name appears. The ids are now kept alongside the
+        //  display string, so the text people read is unchanged and legacy rows
+        //  still render, while "which interviews am I on" has a real answer.
+        ensure_column('interviews', 'panel_user_ids', "VARCHAR(240) DEFAULT ''");
+        //  Attempt number within a round, so a re-interview is visible as one
+        //  rather than looking like a duplicate booking.
+        ensure_column('interviews', 'attempt', 'INT DEFAULT 1');
         db()->exec("CREATE TABLE IF NOT EXISTS candidate_docs (
             id $pk,
             candidate_id INT,
@@ -175,19 +193,120 @@ function iv_get($id) { recruit_iv_migrate(); return ops_one("SELECT * FROM inter
 //  step. Recording the OUTCOME of an interview that has already happened is not
 //  gated: refusing to write down what took place would destroy information, and
 //  it advances nothing.
+//  WHY A ROUND CANNOT SIMPLY BE BOOKED TWICE.               (UAT A9, 2026-10-18)
+//
+//    "once L1 interview if completed and candidate has been rated it allows to
+//     schedule L1 interview second, third and as many times it requires. Yes
+//     there must be option to retry or reassess the candidate with reinterview
+//     of rescheduling of the interveiw but to have scheduling multiple times
+//     same level interview is a bug."
+//
+//  Exactly the right distinction, and the code made none: iv_schedule() wrote a
+//  row every time it was called. Three L1s then sat in the list with no way to
+//  tell a genuine re-assessment from a double booking somebody made by pressing
+//  Schedule twice — and the owner's screenshot shows precisely that, two L1s
+//  scheduled and a third already rated.
+//
+//  So the two cases are separated:
+//
+//    · the round is still SCHEDULED — there is nothing to re-assess yet, so a
+//      second booking is a mistake. Refused, naming the one that exists.
+//    · the round is finished (passed, failed, held, no-show) — a re-interview
+//      is legitimate, and is now a deliberate act: it needs the re-interview
+//      box ticked, and it is recorded as attempt 2, 3 … so the history reads
+//      "L1 · re-interview 2" instead of three identical rows.
+//
+//  Returns 0 on refusal, with the reason in iv_last_error() for the caller to
+//  flash — the route already flashes a reason when one is available.
+function iv_last_error($set = null) {
+    static $msg = '';
+    if ($set !== null) $msg = (string) $set;
+    return $msg;
+}
+
+function iv_round_state($candidateId, $round) {
+    recruit_iv_migrate();
+    try {
+        $rows = ops_all("SELECT id, result, scheduled_at, attempt FROM interviews
+                          WHERE candidate_id=? AND round=? ORDER BY id", [(int)$candidateId, (string)$round]);
+    } catch (Throwable $e) { return ['open' => null, 'done' => 0, 'attempts' => 0]; }
+    $open = null; $done = 0;
+    foreach ($rows as $r) {
+        if ((string)$r['result'] === 'SCHEDULED') $open = $r; else $done++;
+    }
+    return ['open' => $open, 'done' => $done, 'attempts' => count($rows)];
+}
+
 function iv_schedule($candidateId, $post) {
     recruit_iv_migrate();
+    iv_last_error('');
     if (function_exists('rexec_cand_block_reason')
         && rexec_cand_block_reason((int) $candidateId, 'INTERVIEW') !== '') return 0;
     $round = in_array($post['round'] ?? '', IV_ROUNDS, true) ? $post['round'] : 'L1';
     $mode  = in_array($post['mode'] ?? '', IV_MODES, true) ? $post['mode'] : 'In person';
-    db()->prepare("INSERT INTO interviews (candidate_id,round,mode,location,scheduled_at,panel,competencies,result,created_by,created_at)
-                   VALUES (?,?,?,?,?,?,?,'SCHEDULED',?,?)")
-        ->execute([(int)$candidateId, $round, $mode, trim((string)($post['location'] ?? '')),
-            trim((string)($post['scheduled_at'] ?? '')), iv_panel_from_post($post),
+
+    $state = iv_round_state($candidateId, $round);
+    if ($state['open']) {
+        $when = trim((string)($state['open']['scheduled_at'] ?? ''));
+        iv_last_error($round . ' is already scheduled' . ($when !== '' ? ' for ' . $when : '')
+            . ' and has no outcome yet. Record its outcome first, or change the date on the one that exists —'
+            . ' booking a second ' . $round . ' would leave two of them open.');
+        return 0;
+    }
+    if ($state['done'] > 0 && empty($post['reinterview'])) {
+        iv_last_error($round . ' has already been held and assessed. If you mean to re-assess this person,'
+            . ' tick "This is a re-interview" and it will be recorded as ' . $round . ' attempt '
+            . ($state['attempts'] + 1) . ' — that keeps the first result in the history instead of hiding it.');
+        return 0;
+    }
+    $attempt = $state['attempts'] + 1;
+
+    db()->prepare("INSERT INTO interviews (candidate_id,round,attempt,mode,location,scheduled_at,panel,panel_user_ids,competencies,result,created_by,created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,'SCHEDULED',?,?)")
+        ->execute([(int)$candidateId, $round, $attempt, $mode, trim((string)($post['location'] ?? '')),
+            trim((string)($post['scheduled_at'] ?? '')), iv_panel_from_post($post), iv_panel_ids_from_post($post),
             trim((string)($post['competencies'] ?? '')), _iv_actor(), _iv_now()]);
     return (int)db()->lastInsertId();
 }
+
+//  The panel as ids. Separate from iv_panel_from_post() because that one also
+//  carries free-text names for people who have no account (a client-side
+//  interviewer), and those can never have an id.
+function iv_panel_ids_from_post($post) {
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)($post['panel_users'] ?? [])))));
+    return $ids ? implode(',', $ids) : '';
+}
+
+function iv_panel_user_ids($iv) {
+    return array_values(array_filter(array_map('intval', explode(',', (string)($iv['panel_user_ids'] ?? '')))));
+}
+
+//  INTERVIEWS THIS PERSON IS SITTING ON. The answer the dashboard could not
+//  give. Scoped to the person asking — it reveals nothing about anybody else's
+//  panels, and an empty list is the correct answer for most people.
+function iv_my_upcoming($userId, $days = 7) {
+    recruit_iv_migrate();
+    $userId = (int) $userId;
+    if ($userId <= 0) return [];
+    $from = date('Y-m-d');
+    $to   = date('Y-m-d', strtotime('+' . max(0, (int)$days) . ' day'));
+    try {
+        $rows = ops_all("SELECT i.*, c.first_name c_first, c.last_name c_last
+                           FROM interviews i LEFT JOIN candidates c ON c.id = i.candidate_id
+                          WHERE i.result='SCHEDULED' AND COALESCE(i.panel_user_ids,'') <> ''
+                       ORDER BY i.scheduled_at");
+    } catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($rows as $r) {
+        if (!in_array($userId, iv_panel_user_ids($r), true)) continue;
+        $d = substr(trim((string)$r['scheduled_at']), 0, 10);
+        if ($d === '' || $d < $from || $d > $to) continue;
+        $out[] = $r;
+    }
+    return $out;
+}
+
+function iv_my_upcoming_count($userId, $days = 7) { return count(iv_my_upcoming($userId, $days)); }
 function iv_record($id, $post) {
     recruit_iv_migrate();
     $result = array_key_exists($post['result'] ?? '', IV_RESULTS) ? $post['result'] : 'SCHEDULED';
@@ -344,7 +463,12 @@ function ops_candidate_interview($route, $method) {
             $ivNew = iv_schedule($id, $_POST);
             if ((int) $ivNew > 0) flash('Interview scheduled.');
             else {
-                $ivWhy = function_exists('rexec_cand_block_reason') ? rexec_cand_block_reason($id, 'INTERVIEW') : '';
+                //  iv_schedule()'s own reason first — it is the specific one
+                //  ("L1 is already scheduled for ...") and the only one that
+                //  tells the person what to do instead.
+                $ivWhy = iv_last_error();
+                if ($ivWhy === '' && function_exists('rexec_cand_block_reason'))
+                    $ivWhy = rexec_cand_block_reason($id, 'INTERVIEW');
                 flash($ivWhy !== '' ? $ivWhy : 'The interview could not be scheduled.', 'error');
             }
         }
@@ -406,22 +530,78 @@ function recruit_iv_panel($cand) {
         <?php // Interview panel — pick one or more interviewers from your people.
               //  Those in the candidate's own department are pre-ticked; change
               //  them freely, and add anyone not in the system in the box below. ?>
+        <?php //  ---- THE PANEL PICKER (UAT A9) ---------------------------------
+              //
+              //    "No filter on the interviewer panel as all the people without
+              //     recruitment module also shows in the interview panel list"
+              //
+              //  Correct: the list was every active user, alphabetically — so
+              //  Finance and a site inspector sat beside the people who would
+              //  actually interview a QA engineer.
+              //
+              //  It is a FILTER and not a gate, deliberately. The right
+              //  technical interviewer for a role very often has no recruitment
+              //  access at all — they are the senior person in that discipline.
+              //  Hiding them would have replaced a cluttered list with a list
+              //  missing the people you need, which is the worse failure.
+              //
+              //  So: the candidate's own department first and pre-ticked, a
+              //  search box, a department filter that starts on that department,
+              //  and everybody still reachable in one click of "All".
+              $ivByDept = [];
+              foreach ($ivUsers as $u) {
+                  $nm = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''));
+                  if ($nm === '') continue;
+                  $d = trim((string)($u['department'] ?? ''));
+                  $ivByDept[$d === '' ? '—' : $d][] = $u + ['_nm' => $nm];
+              }
+              ksort($ivByDept);
+              //  The candidate's department leads the list.
+              $ivDeptName = iv_candidate_department($cand);
+              if ($ivDeptName !== '' && isset($ivByDept[$ivDeptName]))
+                  $ivByDept = [$ivDeptName => $ivByDept[$ivDeptName]] + $ivByDept;
+        ?>
         <div style="margin-top:10px">
-          <label class="ff-l">Interview panel — choose interviewers<?= $ivDept !== '' ? ' <span class="muted" style="font-weight:400">(people in the ' . $e(iv_candidate_department($cand)) . ' department are pre-selected)</span>' : '' ?></label>
+          <label class="ff-l">Interview panel — choose interviewers<?= $ivDept !== '' ? ' <span class="muted" style="font-weight:400">(' . $e($ivDeptName) . ' is pre-selected — this is the candidate\'s department)</span>' : '' ?></label>
           <?php if ($ivUsers): ?>
-          <div style="display:flex;flex-wrap:wrap;gap:6px 14px;max-height:150px;overflow:auto;border:1px solid var(--line,#e5e7eb);border-radius:9px;padding:9px 11px;background:var(--surface,#fff)">
-            <?php foreach ($ivUsers as $u): $nm = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')); if ($nm === '') continue;
-                  $udept = strtolower(trim((string)($u['department'] ?? '')));
-                  $pre = ($ivDept !== '' && $udept === $ivDept); ?>
-              <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap">
-                <input type="checkbox" name="panel_users[]" value="<?= (int)$u['id'] ?>" <?= $pre ? 'checked' : '' ?>>
-                <?= $e($nm) ?><?= ($u['department'] ?? '') !== '' ? ' <span class="muted" style="font-size:11px">· ' . $e($u['department']) . '</span>' : '' ?>
-              </label>
+          <div style="display:flex;gap:8px;margin:6px 0 7px;flex-wrap:wrap">
+            <input class="form-control ivp-find" type="search" placeholder="Find a person…" style="flex:1 1 180px;min-width:0" aria-label="Find a panel member">
+            <select class="form-control ivp-dept" style="flex:0 1 200px" aria-label="Filter the panel list by department">
+              <option value="">All departments</option>
+              <?php foreach (array_keys($ivByDept) as $dn): ?>
+                <option value="<?= $e($dn) ?>" <?= ($ivDeptName !== '' && $dn === $ivDeptName) ? 'selected' : '' ?>><?= $e($dn) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="ivp-list" style="max-height:170px;overflow:auto;border:1px solid var(--line,#e5e7eb);border-radius:9px;padding:9px 11px;background:var(--surface,#fff)">
+            <?php foreach ($ivByDept as $dn => $us): ?>
+              <div class="ivp-grp" data-dept="<?= $e($dn) ?>">
+                <div class="muted" style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin:4px 0 3px"><?= $e($dn) ?></div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px 14px">
+                <?php foreach ($us as $u):
+                      $pre = ($ivDept !== '' && strtolower(trim((string)($u['department'] ?? ''))) === $ivDept); ?>
+                  <label class="ivp-row" data-nm="<?= $e(mb_strtolower($u['_nm'])) ?>"
+                         style="display:inline-flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap">
+                    <input type="checkbox" name="panel_users[]" value="<?= (int)$u['id'] ?>" <?= $pre ? 'checked' : '' ?>>
+                    <?= $e($u['_nm']) ?>
+                    <?php if (($u['role'] ?? '') !== ''): ?><span class="muted" style="font-size:11px">· <?= $e((defined('ORG_ROLES') && isset(ORG_ROLES[$u['role']])) ? ORG_ROLES[$u['role']] : $u['role']) ?></span><?php endif; ?>
+                  </label>
+                <?php endforeach; ?>
+                </div>
+              </div>
             <?php endforeach; ?>
+            <p class="muted ivp-none" style="display:none;font-size:12px;margin:6px 0">Nobody matches that. Clear the search, or choose All departments.</p>
           </div>
           <?php endif; ?>
           <input class="form-control" name="panel_extra" placeholder="<?= $ivUsers ? 'Other panelists not in the system (e.g. a client-side interviewer)' : 'Panel / interviewers (names)' ?>" style="margin-top:7px">
         </div>
+        <?php //  A re-interview is a deliberate act, not an accidental second
+              //  booking. iv_schedule() refuses a repeat of a finished round
+              //  unless this is ticked, and records it as attempt 2, 3 … ?>
+        <label style="display:inline-flex;align-items:center;gap:7px;margin-top:10px;font-size:13px">
+          <input type="checkbox" name="reinterview" value="1">
+          This is a <b>re-interview</b> — the same round has already been held and assessed
+        </label>
         <div style="margin-top:10px"><button class="btn">Schedule</button></div>
       </form>
       <?php endif; ?>
@@ -548,4 +728,26 @@ function recruit_docs_panel($cand) {
     // not only at the foot of the Offer tab. Merge tokens are filled from the
     // candidate's own data; missing fields are highlighted in the letter.
     if (function_exists('recruit_letters_block')) recruit_letters_block($cand);
+}
+
+// ============================================================================
+//  MY INTERVIEWS — what an interviewer must attend.            (UAT A9)
+//
+//  The owner's finding was that a panel member had nowhere to see the
+//  interviews they had been put on. My Work now counts them; this is the screen
+//  behind that count, because a count that links nowhere is worse than no count.
+//
+//  Deliberately NOT gated on recruitment access. The people who sit on panels
+//  are usually the senior person in the discipline, with no recruitment module
+//  at all — gating this would hide an interviewer's own diary from them. It
+//  shows one thing: interviews where THIS person is named on the panel. It
+//  carries no candidate assessment, no salary, no other panel's work.
+// ============================================================================
+function ops_my_interviews($method) {
+    recruit_iv_migrate();
+    $u  = function_exists('current_user') ? current_user() : null;
+    if (!$u) { redirect('/login'); return true; }
+    $rows = iv_my_upcoming((int) ($u['id'] ?? 0), 30);
+    view('ops/my_interviews', ['rows' => $rows]);
+    return true;
 }

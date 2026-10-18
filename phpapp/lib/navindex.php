@@ -142,6 +142,7 @@ function ops_nav_index($fresh = false) {
             if ($fx('is_coordinator_level') && is_coordinator_level())
                 $add('Import org chart', '/positions-import', $R, '⬆️', 'Import an existing organogram from a spreadsheet.', 'action');
             $apc = ($fx('appr_inbox_count') ? (int)appr_inbox_count() : 0);
+            $add('Interviews to attend', '/my-interviews', $R, '🎤', 'Interviews you are on the panel for.');
             $add('My approvals' . ($apc > 0 ? ' (' . $apc . ')' : ''), '/my-approvals', $R, '✅', 'Items waiting on your approval.');
             $add('Export data', '/recruit-export?dataset=candidates', $R, '⬇️', 'Download candidates, ' . mb_strtolower($hl('requisition', true)) . ' & offers as CSV.');
             if ($fx('hiring_admin_can') ? hiring_admin_can() : ($fx('is_admin_level') && is_admin_level())) {

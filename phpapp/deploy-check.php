@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '6d4bf8d · 2026-10-18 07:57 UTC · 685 files';
+$RELEASE = '728a1fb · 2026-10-18 08:04 UTC · 686 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -168,14 +168,14 @@ $EXPECT  = [
     'lib/mkt_rules.php' => ['s'=>12129,'h'=>'f541702a11884133'],
     'lib/mkt_subs.php' => ['s'=>10123,'h'=>'7a5b146d8a81d7ce'],
     'lib/nav.php' => ['s'=>27426,'h'=>'8ba2e16c1ef74f38'],
-    'lib/navindex.php' => ['s'=>15063,'h'=>'a2077ab384969e22'],
+    'lib/navindex.php' => ['s'=>15175,'h'=>'f2d2af0122462c84'],
     'lib/ncdca.php' => ['s'=>44960,'h'=>'d64c2c2e6eddc5e1'],
     'lib/ncr.php' => ['s'=>34005,'h'=>'c798485b2013d240'],
     'lib/nextaction.php' => ['s'=>15255,'h'=>'85f9797146341fa6'],
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>714369,'h'=>'441d3dd4a18c483e'],
+    'lib/ops.php' => ['s'=>716302,'h'=>'291e06f56d7f0e0f'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -202,7 +202,7 @@ $EXPECT  = [
     'lib/recruit_exec.php' => ['s'=>24603,'h'=>'0546b6c003d3493c'],
     'lib/recruit_export.php' => ['s'=>7887,'h'=>'70fa492cdd1a8d35'],
     'lib/recruit_fulfil.php' => ['s'=>51701,'h'=>'3c914bbeb1483e3d'],
-    'lib/recruit_iv.php' => ['s'=>38102,'h'=>'f42fdb14f4c786dc'],
+    'lib/recruit_iv.php' => ['s'=>49306,'h'=>'007cd8a85034aa04'],
     'lib/recruit_jd.php' => ['s'=>11577,'h'=>'fa60a38877273cec'],
     'lib/recruit_kpi.php' => ['s'=>44791,'h'=>'01e1256f752079c1'],
     'lib/recruit_offer.php' => ['s'=>50420,'h'=>'ca79a631b18f0fe2'],
@@ -531,6 +531,7 @@ $EXPECT  = [
     'views/ops/mkt_rules.php' => ['s'=>8883,'h'=>'1eb57c8a8e0937b3'],
     'views/ops/module_locked.php' => ['s'=>2419,'h'=>'82de67be8483b36c'],
     'views/ops/my_approvals.php' => ['s'=>7347,'h'=>'a280d5d2e43a13ea'],
+    'views/ops/my_interviews.php' => ['s'=>2245,'h'=>'e27bb0992ced1b42'],
     'views/ops/my_jobs.php' => ['s'=>15228,'h'=>'bb2e2bb4879b97c4'],
     'views/ops/my_work.php' => ['s'=>5843,'h'=>'ec265183f9eba395'],
     'views/ops/ncr_detail.php' => ['s'=>8922,'h'=>'c24f08a446353eef'],
