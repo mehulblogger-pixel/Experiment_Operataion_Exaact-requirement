@@ -127,6 +127,22 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Accountable for:** billing, collections, and the numbering integrity of invoices.
 - **Must never:** allocate/close jobs or edit operations records; manage users/settings.
 
+## QUALITY_HEAD — "Quality Head"
+- **Key:** `QUALITY_HEAD` · `ncr.close, capa.close, idems.audit.view, dash.operations`; offices/sbus `ALL`; edits `ncr`/`capa`, views `calls`/`jobs`/`idems`/`reports`/`complaints`. **Not in `MGMT_ROLES`, not `is_admin_level`.**
+- **Who:** the person answerable for the quality system — raises nonconformities, drives corrective actions, and signs off that a disposition was actually carried out.
+- **Context:** desk, laptop.
+- **Sees:** Quality & Accreditation (nonconformity workspace, corrective actions, complaints — read), Operations and Reporting **read-only** for the context a finding needs, Insights (operations dashboard).
+- **Accountable for:** that every nonconformity is closed on evidence, and that the closure would stand up to an assessor.
+- **Must never:** run operations (no raising work orders, no allocating jobs), touch money, manage users or settings. It judges the work; it does not do the work.
+- **Added:** 2026-10-18, on the owner's rule *"only Quality or Technical Head can close it"*. Before this, closing a nonconformity needed a system administrator. The accreditation registers (equipment, competence, impartiality, internal audits, data control) are **not** granted — an open decision, see `docs/02-permission-matrix.md` footnote 20.
+
+## TECHNICAL_HEAD — "Technical Head"
+- **Key:** `TECHNICAL_HEAD` · identical to `QUALITY_HEAD` above.
+- **Who:** the person answerable for technical operations, who under ISO/IEC 17020 shares the closing authority for technical nonconformities.
+- **Why identical to Quality Head:** the owner named both positions for the same authority. They are separate roles rather than one because they are separate posts in the organisation and must be distinguishable on a person's record and in the audit trail; an administrator can tick extra rights per user where the two posts diverge.
+- **Must never:** the same list as Quality Head.
+- **Added:** 2026-10-18, with QUALITY_HEAD.
+
 ## SR_INSPECTOR — "Senior Inspector"
 - **Key:** `SR_INSPECTOR` · `idems.finalize`; offices/sbus `OWN` (`access.php:466-470`); edits `idems` only (`:360`). **`is_inspector()` is false** (matches literal `INSPECTOR` only, `ops.php:549`).
 - **Who:** an experienced inspector who also acts as an approver / can finalise reports.

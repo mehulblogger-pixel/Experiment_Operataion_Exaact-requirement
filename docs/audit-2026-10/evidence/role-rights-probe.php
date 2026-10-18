@@ -16,10 +16,18 @@ $root = dirname(__DIR__, 3) . '/phpapp';
 require $root . '/tests/lib.php';
 require $root . '/tests/bootstrap.php';
 
-$roles = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER',
-          'BRANCH_ADMIN_MANAGER','OPERATION_MANAGER','COORDINATOR','ASSISTANT_MANAGER',
-          'FINANCE','INSPECTOR','BUSINESS_DEV_MANAGER','KEY_ACCOUNT_MANAGER',
-          'MARKETING_MANAGER','MARKETING_EXEC'];
+//  CORRECTED 2026-10-18. The first version of this script carried a HAND-TYPED
+//  role list, and four of the names were wrong — BRANCH_ADMIN_MANAGER for
+//  BRANCH_APP_MANAGER, ASSISTANT_MANAGER for ASST_MANAGER, KEY_ACCOUNT_MANAGER
+//  for KEY_ACCOUNTS_MANAGER, MARKETING_EXEC for MARKETING_EXECUTIVE. A role key
+//  that does not exist falls through role_defaults_base() to an empty set, so
+//  those four rows printed "NO" for every right and looked like findings. Two of
+//  them reached the gap register before it was caught (an Assistant Manager does
+//  hold mod.capa.view; a Key Accounts Manager does hold data.credit).
+//
+//  The list is now read from the application's own ORG_ROLES, so it cannot drift
+//  from the roles that exist and a newly added role appears here automatically.
+$roles = array_keys(ORG_ROLES);
 
 $groups = [
     'Money — who can reach and change the books' => [

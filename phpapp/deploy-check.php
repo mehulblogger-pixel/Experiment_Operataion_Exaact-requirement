@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '2e97935 · 2026-10-18 09:24 UTC · 686 files';
+$RELEASE = 'cc2f800 · 2026-10-18 12:41 UTC · 686 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -32,7 +32,7 @@ $EXPECT  = [
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>123752,'h'=>'15d8eceedebad56d'],
-    'lib/access.php' => ['s'=>114775,'h'=>'3b9b4d9319bd1751'],
+    'lib/access.php' => ['s'=>117130,'h'=>'97aabd3848174284'],
     'lib/access_state.php' => ['s'=>10512,'h'=>'25d820df4d27fbd9'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
     'lib/adspro.php' => ['s'=>27606,'h'=>'f2df3f7d9b3f3fbc'],
@@ -44,7 +44,7 @@ $EXPECT  = [
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
     'lib/approvals_hub.php' => ['s'=>4789,'h'=>'e8b2f6a01ef230b0'],
     'lib/approvals_setup.php' => ['s'=>6622,'h'=>'8b679264ad47f3de'],
-    'lib/areas.php' => ['s'=>41673,'h'=>'7ba6d2f669b13c52'],
+    'lib/areas.php' => ['s'=>42841,'h'=>'d2451022fd2247b5'],
     'lib/assets.php' => ['s'=>14415,'h'=>'019c1f61103da27d'],
     'lib/attend.php' => ['s'=>13919,'h'=>'695a4eae1fd9e2a9'],
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],

@@ -9,7 +9,32 @@ Severity: **P0** security / data integrity / business control · **P1** core
 workflow failure · **P2** missing function, validation or important usability ·
 **P3** refinement.
 
-Nothing here has been changed in the application. This is a discovery register.
+This began as a discovery register. Where the owner has since given a rule, the
+change made is named in the finding.
+
+---
+
+## ERRATUM — 2026-10-18: four role names in my own evidence were wrong
+
+`evidence/role-rights-probe.php` originally carried a **hand-typed** role list,
+and four of the sixteen names did not exist: `BRANCH_ADMIN_MANAGER` for
+`BRANCH_APP_MANAGER`, `ASSISTANT_MANAGER` for `ASST_MANAGER`,
+`KEY_ACCOUNT_MANAGER` for `KEY_ACCOUNTS_MANAGER`, `MARKETING_EXEC` for
+`MARKETING_EXECUTIVE`. A role key that does not exist falls through
+`role_defaults_base()` to an empty permission set, so those four rows printed
+"no right held" for everything — and read as findings.
+
+Two of them reached this register before it was caught:
+
+| Claimed | Actually |
+|---|---|
+| Assistant Manager holds no CAPA right | **Holds `mod.capa.view`** — so **five** roles see a corrective action without the nonconformity behind it, not four (GAP-004) |
+| Key Accounts Manager holds no `data.credit` | **Holds `data.credit`** — it shares a `case` with the Business Development Manager. It still cannot reach the billing chain, which also needs `mod.invoicing.view` |
+
+The script now reads the role list from the application's own `ORG_ROLES`, so it
+cannot drift and a newly added role appears automatically. Every role table in
+this folder was regenerated from it. Recorded here rather than quietly fixed,
+because a reader needs to know which numbers were re-derived and why.
 
 ---
 
@@ -221,6 +246,29 @@ accredited inspection body this is a control weakness an assessor will look
 for. It also contradicts the design principle the repository states for itself
 — that Accounts owns the money.
 
+### OWNER'S DECISION, 2026-10-18 — accepted, severity lowered to P2
+
+Put to the owner as Q-E and Q-F, the answer was **"That's ok"**: a coordinator,
+branch manager and business director recording a receipt and starting a draft
+invoice is how this company intends to work. Accounts still issues.
+
+So **no code was changed**, and the *outcome* is no longer a defect. What moved
+instead was the documentation: `docs/02-permission-matrix.md` row 215 read
+`BD — · SBU — · BM View · CO View`, which contradicted the code, and now reads
+`Raise` for those four — may open the billing workspace, record a receipt, start
+a draft; may not issue, cancel or credit-note. CLAUDE.md requires the docs and
+the code to agree, and here it was the table that was wrong.
+
+**The mechanism remains a defect, at P2.** `data.credit` — *"See the
+inter-office credit figures"* — is still the key to the write gate. It is
+harmless only because every money route also demands `mod.invoicing.view`
+(verified: all 17 routes in the books handler are module-gated, two of them via
+the `ops_module_family()` prefix fallback). A money route added without a module
+gate would be writable on a read permission alone, and 99 routes already have no
+module (GAP-008). The permanent fix stands: a named `finance.books.write`
+granted to exactly the roles in row 215, leaving `data.credit` to do its own
+job. Worth doing when the money module is next touched; not urgent on its own.
+
 **Why it happened.** One three-key test, `finance.reconcile ‖ data.credit ‖
 master`, is used in three places for three different questions: may you open
 the module (`books_can()`), may you see a tile (`areas.php:219`), and **may you
@@ -235,20 +283,15 @@ roles the matrix intends, and use it at `booksui.php:225` in place of
 `data.credit`. Leave `data.credit` doing only the job it is named for. The same
 three-key test at `billable.php:150` should be reviewed with it.
 
-**This needs the owner's decision before anything is changed**, because
-tightening it removes an ability three roles have today, and because CLAUDE.md
-forbids granting or changing a role's permissions without asking. Two
-questions, in business language:
-
-- **Q-E.** Today a coordinator can record money received from a customer.
-  Should they? (If the answer is no, who should — Accounts only?)
-- **Q-F.** Today a coordinator and a branch manager can start a draft invoice,
-  which Accounts then issues. Is that the intended way of working, or should
-  only Accounts start one?
+~~**Q-E.** Today a coordinator can record money received from a customer. Should
+they?~~ · ~~**Q-F.** Today a coordinator and a branch manager can start a draft
+invoice. Is that intended?~~ — **both answered 2026-10-18: accepted.** See the
+owner's decision above.
 
 **Acceptance.** Re-running `evidence/books-write-authority.py` produces a table
-that matches row 215 of the permission matrix, and no role writes to the books
-without a right that says so by name.
+that matches row 215 of the permission matrix (it now does), and — when the
+mechanism is eventually fixed — no role writes to the books without a right that
+says so by name.
 
 ---
 
@@ -267,10 +310,10 @@ assumed.
 | Business Director | yes | yes | **no** | **no** |
 | SBU Head | **no** | yes | no | no |
 | Branch Manager | **no** | yes | no | no |
-| Branch Admin Manager | no | no | no | no |
+| Branch Application Manager | no | no | no | no |
 | Operation Manager | **no** | yes | no | no |
 | Coordinator | **no** | yes | no | no |
-| Assistant Manager | no | no | no | no |
+| Assistant Manager | no | **yes** (see erratum) | no | no |
 | Finance | no | no | no | no |
 | Inspector | **no** | **no** | no | no |
 
@@ -284,34 +327,118 @@ assumed.
    disagrees with its own role presets — `access.php:498` says `ncr.close` is
    for *"the responsible quality / coordinator"*, and no coordinator holds it.
 
-2. **Four roles can see the corrective action but not the finding that caused
-   it.** SBU Head, Branch Manager, Operation Manager and Coordinator all hold
-   `mod.capa.view` and none holds `mod.ncr.view`. A CAPA exists *because of* an
-   NCR; being shown the remedy with the finding hidden is incoherent, and it is
-   the kind of thing that reads as a broken screen rather than a permission.
+2. **Five roles can see the corrective action but not the finding that caused
+   it.** SBU Head, Branch Manager, Operation Manager, Coordinator and Assistant
+   Manager all hold `mod.capa.view` and none holds `mod.ncr.view`. A CAPA exists
+   *because of* an NCR; being shown the remedy with the finding hidden is
+   incoherent, and it reads as a broken screen rather than a permission.
+   *(Four in the first version of this register — see the erratum at the top.)*
 
 3. **An inspector can see neither.** The people who meet the nonconformity in
    the field cannot record or read one. Whether that is intended is the owner's
-   call (Q-B), but it is worth stating plainly: under ISO/IEC 17020 the
-   inspecting staff are normally expected to raise nonconformities, and today
-   they cannot.
+   call, but it is worth stating plainly: under ISO/IEC 17020 the inspecting
+   staff are normally expected to raise nonconformities, and today they cannot.
 
-**The permission matrix does not cover this.** `docs/02-permission-matrix.md`
-has no NCR or CAPA row in its module table — the only mentions are in footnotes
-about the `ncr.close` and `ncr-reopen` guards (lines 124, 143, 177). So unlike
-GAP-003, this cannot be settled against the documentation; the documentation is
-missing. **Per CLAUDE.md the matrix must be written before any of this is
-changed** — a new audience for a module is a new permission, and that is a stop
-and ask.
+**The permission matrix did not cover this.** `docs/02-permission-matrix.md` had
+no NCR or CAPA row in its module table — the only mentions were footnotes about
+the `ncr.close` and `ncr-reopen` guards. So unlike GAP-003 this could not be
+settled against the documentation, because the documentation was missing.
 
-**Open question Q-B, restated precisely.** Three answers are needed, not one:
-(a) who may **raise** a nonconformity — inspectors? coordinators? managers
-only? (b) who may **close** one, given that today only a system administrator
-can; (c) should everyone who can see a CAPA also see the NCR behind it?
+---
 
-**Acceptance.** `docs/02-permission-matrix.md` carries an NCR row and a CAPA row
-with an agreed audience; the measured per-role table matches them; and closing a
-nonconformity is possible for a named quality role without administrator rights.
+### RESOLVED (part 1) — the owner's rule, 2026-10-18
+
+> **"Yes only Quality or Technical Head can close it."**
+
+Neither position existed in the system, so two roles were added:
+**`QUALITY_HEAD` ("Quality Head")** and **`TECHNICAL_HEAD` ("Technical Head")**,
+each holding `mod.ncr.view/edit`, `mod.capa.view/edit`, `ncr.close`,
+`capa.close`, `idems.audit.view` and a read of the work the finding came off
+(calls, jobs, inspection reports, complaints). Scope **ALL / ALL** — a
+nonconformity raised in one branch is the company's nonconformity. Neither role
+is in `MGMT_ROLES`, so no operational widget leaks to them: quality judges the
+work, it does not run it.
+
+Changed together, as CLAUDE.md requires: `phpapp/lib/access.php` (the roles),
+`docs/02-permission-matrix.md` (a **Quality roles** table, an NCR row, a CAPA
+row and footnote 20 — all three generated from `role_perms()`, not hand-typed),
+`docs/01-roles.md` (both role entries) and
+`phpapp/tests/test_quality_head_roles.php` (68 assertions, including one that
+fails if the roles are ever quietly widened).
+
+**Deliberately not done:** the accreditation registers (equipment, competence,
+impartiality, confidentiality, internal audits, data control) were **not**
+granted to the quality roles. A quality head plausibly owns them; nobody has
+said so, and granting ten modules unasked is how a role becomes an
+administrator by accident. A test asserts they are still absent.
+
+**Still open, and worth one line from the owner:**
+
+- **Q-B1.** Who may **raise** a nonconformity? Today nobody below Business
+  Director can even open the register, and an inspector — the person who meets
+  the problem — cannot. Recommendation: inspectors and coordinators may raise,
+  quality closes.
+- **Q-B2.** Should the five roles who see a corrective action also see the
+  nonconformity behind it? Recommendation: yes, read-only. It is one loop.
+- **Q-B3.** MASTER_ADMIN and ADMIN still hold the closing rights, because they
+  resolve to the whole permission list. Strictly, *"only Quality or Technical
+  Head"* would remove ADMIN's. That is a removal, not an addition, so it was not
+  done unasked.
+
+**Acceptance (met for part 1).** The matrix carries an NCR row and a CAPA row;
+the measured per-role table matches them; and closing a nonconformity is
+possible for a named quality role without administrator rights.
+
+---
+
+## GAP-011 — the Quality menu offered five roles a door that answered 403 — FIXED
+
+**CONFIRMED BY EXECUTION · was P1 · Quality · fixed 2026-10-18**
+
+Found while implementing the owner's quality rule, by asking a question the
+first reachability crawl had not: *not "is there a door", but "does the door
+open for the person being shown it".*
+
+`areas.php:134` offered the **Nonconformity workspace** tile to anybody holding
+`mod.ncr.view` **or** `mod.capa.view`, and always pointed it at `/issues` (or
+`/ncr`) — both module `ncr`. Five roles hold `capa` and not `ncr`. So the tile
+was a visible, inviting door onto a refusal.
+
+Driven before the fix (`evidence/quality-door-check-before.py`):
+
+| Role | Tile offered | `/issues` | `/ncr` | `/capa` |
+|---|---|---|---|---|
+| Master Admin · Business Director | yes | opens | opens | opens |
+| **Branch Manager** | **yes** | **403** | **403** | opens |
+| **Operation Manager** | **yes** | **403** | **403** | opens |
+| **Coordinator** | **yes** | **403** | **403** | opens |
+| Inspector · Finance | no | 403 | 403 | 403 |
+
+And after (`evidence/quality-door-check.py`), reading each role's tile href out
+of its own rendered page and following it:
+
+| Role | Tile now says | Points at | And it |
+|---|---|---|---|
+| Master Admin · Business Director | Nonconformity workspace | `/issues` | **opens** |
+| Branch Manager · Operation Manager · Coordinator | Corrective actions | `/capa` | **opens** |
+| Inspector · Finance | not offered | — | — |
+
+**The fix sends the tile where the person can actually go, and names it for what
+they will find.** Nobody gained or lost a right: gating the tile on
+`mod.ncr.view` instead would have been the obvious move and would have taken
+away a CAPA reader's only link to `/capa`. The open-nonconformity badge is also
+withheld from a CAPA-only reader — a count of records they cannot open is an
+errand they cannot run.
+
+**Why this matters beyond one tile.** This is a measurable class of defect, not
+a one-off: *a tile whose visibility condition is weaker than its destination's
+gate.* Phase E should test every tile in every area this way, because the
+reachability crawl cannot see it — the crawl runs as one role and asks only
+whether a link exists.
+
+**Guarded.** `tests/test_quality_head_roles.php` walks every role, and for each
+one that is offered the tile, asserts it holds the module the destination
+requires. That assertion would have failed on the original code.
 
 ---
 

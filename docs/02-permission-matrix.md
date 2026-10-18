@@ -212,8 +212,37 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 | **Users** ¹⁴ | E(global) | E(global) | — | — | E(own office) | E(own office) | — | — | — | — | — |
 | **Dashboards** ¹⁵ | View | View | View | View | View | View(ops) | View | View | View | View(money) | View(own) |
 | **Settings** ¹⁶ | E | E | — | — | — | — | — | — | — | — | — |
-| **Invoicing / Receipts** ¹⁷ | Full | Full | — | — | View | — | — | View | — | Issue | — |
+| **Invoicing / Receipts** ¹⁷ | Full | Full | Raise | Raise | Raise | — | — | Raise | — | Issue | — |
 | **Inspection reports (IDEMS)** ¹⁸ | Full | Full | View | Finalise | Finalise | config only | Finalise | Edit | Edit | View | Edit(own) |
+| **Nonconformities** ²⁰ | Full | Full | View | — | — | — | — | — | — | — | — |
+| **Corrective actions (CAPA)** ²⁰ | Full | Full | View | View | Edit | — | Edit | View | View | — | — |
+
+**Quality roles** — added 2026-10-18 on the owner's rule, *"only Quality or
+Technical Head can close it"*. Before that rule, `ncr.close` and `capa.close`
+were held by MASTER_ADMIN and ADMIN alone, so closing a nonconformity was a
+system-administrator act. These two roles sit outside the operations line on
+purpose: quality judges the work, it does not run it, so neither is in
+`MGMT_ROLES` and neither is `is_admin_level`.
+
+| Module / Object | QH (Quality Head) | TH (Technical Head) |
+|---|---|---|
+| **Nonconformities** ²⁰ | Edit · **Close** | Edit · **Close** |
+| **Corrective actions (CAPA)** ²⁰ | Edit · **Close** | Edit · **Close** |
+| Complaints & appeals | View | View |
+| Calls · Jobs · Inspection reports | View | View |
+| Reports (insights) | View | View |
+| Audit trail (`idems.audit.view`) | View | View |
+| Everything else — users, settings, money, sales, recruitment, accreditation registers | — | — |
+
+Scope is **offices ALL · business units ALL** for both: a nonconformity raised
+in one branch is the company's nonconformity, and a quality function scoped to
+its own office could not close it.
+
+**Deliberately NOT granted, pending a decision:** the accreditation registers
+(equipment & calibration, competence, impartiality, confidentiality, internal
+audits, data control). A quality head plausibly owns them; nobody has said so,
+and granting ten modules unasked is how a role quietly becomes an
+administrator. Raise it with the owner before widening.
 
 **Sales / CRM roles** (they touch only the CRM modules; `—` elsewhere):
 
@@ -248,8 +277,14 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 15. **Dashboards** — landing `/` only needs login; `ops_reports` needs a `dash.*` perm (`ops.php:6416`), each tile gated individually. Inspector gets the personal branch (`dashboard.php:23`).
 16. **Settings** — `can('settings.manage')` (`ops.php:6806`); module-licence toggle `is_master()` (`ops.php:6812`); seed/reset `is_master()` (`ops.php:2531+`).
 17. **Invoicing/Receipts** — open/view `books_can()`=finance.reconcile||data.credit||master (`booksui.php:87`) → FIN, CO, BD/SBU/BM (via data.credit), MA; all mutations `$canIssue||data.credit` (`booksui.php:190`); **issue** `books_can_issue()`=finance.reconcile||master (`booksui.php:257`) → FIN; cancel same (`booksui.php:265`).
+    **CORRECTED 2026-10-18.** This row read `BD — · SBU — · BM View · CO View` and the code did not match it. Driven as each role against a throwaway database (`docs/audit-2026-10/evidence/books-write-authority.py`), a **Business Director, SBU Head, Branch Manager and Coordinator can each record money received and start a draft invoice** — a coordinator really wrote receipt RCP/2627/0001 in the test. **The owner reviewed this on 2026-10-18 and accepted the current behaviour**, so the row now says `Raise`: may open the billing workspace, record a receipt and start a draft invoice. The table was wrong, not the code.
+    `Raise` is deliberately not `Full`. **Issuing** an invoice, **cancelling** one and raising a **credit note** remain `finance.reconcile || is_master()` and were each tested and refused for BD, BM and CO. Accounts still owns the issued document.
+    **The mechanism is still a defect even though the outcome is accepted** (GAP-010, P2 after the owner's decision): the write gate's key is `data.credit`, whose own definition is *"See the inter-office credit figures"* (`access.php:133`) — a read permission about a figure on a job screen, standing in for a right that should say "may change the books". It is harmless today only because every money route also requires `mod.invoicing.view`; a money route added without a module gate would be writable on `data.credit` alone. The permanent fix is a named `finance.books.write` right granted to exactly the roles in this row, leaving `data.credit` to do the job it is named for. **No code was changed for this** — the owner accepted the behaviour, so only the documentation moved.
 18. **IDEMS reports** — view `mod.idems.view` (`ops.php:2290`); create/edit `mod.idems.edit` + `idems_can_edit_doc` (`idems.php:4185,3467`); approve step `idems_can_act_step` (`idems.php:5732`); finalise `is_master()||idems.finalize` with **approver≠issuer** (`idems.php:4456,4460`); type/format config `idems.type.manage` (`idems.php:4604+`); timestamps `idems.timestamp.edit` → BAM (`idems.php:7357`); audit log `idems.audit.view` (`idems.php:9772`).
 19. **CRM modules** — module gates `mod.inquiries/quotes/crm_orders/crm_reports.*`; fine-grained `crm.quote.create/approve/send`, `crm.template.manage` per `access.php:456-461`. Quote-approve default = MARKETING_MANAGER only (`access.php:459`); **not** BRANCH_MANAGER.
+20. **Nonconformities / corrective actions** — module gates `mod.ncr.*` and `mod.capa.*`; closing is `ncr.close` / `capa.close` (`access.php:617`, `access.php:209`). Both rows above are **generated from the application's own `role_perms()`**, not written by hand — see `docs/audit-2026-10/evidence/role-rights-probe.php`, which reads the role list from `ORG_ROLES` so it cannot drift. Routes: `/issues`, `/ncr`, `/departures` are module `ncr`; `/capa` is module `capa` (`ops.php:3313`).
+    **Added 2026-10-18, on the owner's rule *"only Quality or Technical Head can close it"*.** Before that, `ncr.close` and `capa.close` were held by MASTER_ADMIN and ADMIN alone — closing a nonconformity was a system-administrator act, which for an accredited inspection body is both a bottleneck and a segregation-of-duties weakness. The two quality roles are in the **Quality roles** table above. MASTER_ADMIN and ADMIN keep the rights because they resolve to the whole permission list; whether ADMIN should lose them is an open question for the owner, not an audit decision.
+    **Still open (recorded, not guessed):** (a) who may **raise** a nonconformity — today nobody below Business Director can even open the register, and inspectors, who meet the nonconformity in the field, cannot; (b) whether everyone who may see a corrective action should also see the nonconformity behind it — five roles currently see the remedy with the finding hidden. See `docs/audit-2026-10/08-GAP-REGISTER.md`, GAP-004.
 
 > ### RATIFIED BY THE OWNER, 2026-10-15 — one way in to approval configuration
 >

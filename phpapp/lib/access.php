@@ -15,7 +15,13 @@ const ORG_ROLES = [
     // Marketing & Sales (CRM) roles
     'BUSINESS_DEV_MANAGER' => 'Business Development Manager', 'KEY_ACCOUNTS_MANAGER' => 'Key Accounts Manager',
     'MARKETING_MANAGER' => 'Marketing Manager', 'MARKETING_EXECUTIVE' => 'Marketing Executive',
-    'FINANCE' => 'Finance', 'SR_INSPECTOR' => 'Senior Inspector', 'INSPECTOR' => 'Inspector', 'ADMIN' => 'Admin (legacy)',
+    'FINANCE' => 'Finance',
+    // Quality roles. An inspection body's quality loop has to be owned by somebody
+    // who is not the person who did the work, so these two sit outside the
+    // operations line and are deliberately NOT in MGMT_ROLES below: they
+    // investigate the work, they do not run it.
+    'QUALITY_HEAD' => 'Quality Head', 'TECHNICAL_HEAD' => 'Technical Head',
+    'SR_INSPECTOR' => 'Senior Inspector', 'INSPECTOR' => 'Inspector', 'ADMIN' => 'Admin (legacy)',
 ];
 // Operations/branch management roles — the ones is_admin_level()/is_coordinator_level()
 // are meant to identify (they run calls, jobs, scheduling, vouchers, recruitment).
@@ -844,6 +850,25 @@ function module_defaults($role) {
             //  operations menu, which is what UAT 1.5.4 reported.
             $edit = ['invoicing','crm_orders'];
             $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers']; break;
+        case 'QUALITY_HEAD': case 'TECHNICAL_HEAD':
+            //  The owner's rule, 2026-10-18: "only Quality or Technical Head can
+            //  close it". Closing a nonconformity means owning the whole loop —
+            //  raise it, investigate it, record the corrective action, assert the
+            //  disposition was carried out — so both modules are EDIT, not view.
+            //
+            //  Everything else is read-only and deliberately narrow: quality
+            //  judges the work, it does not do the work. The context a
+            //  nonconformity actually needs is the work order, the job and the
+            //  report it came off, plus the complaints register a finding may
+            //  have arrived through.
+            //
+            //  The accreditation registers (equipment, competence, impartiality,
+            //  internal audits, data control) are NOT granted here. A quality
+            //  head plausibly owns them, but that is a second decision and nobody
+            //  has made it; granting ten modules nobody asked for is how a role
+            //  quietly becomes an administrator. Ask before widening.
+            $edit = ['ncr','capa'];
+            $view = ['calls','jobs','idems','reports','complaints']; break;
         case 'INSPECTOR': case 'SR_INSPECTOR': $edit = ['idems']; break; // inspectors write reports; else My Jobs / My Voucher
     }
     // Identity documents are never handed out by a blanket "everything" grant.
@@ -1107,6 +1132,16 @@ function role_defaults_base($role) {
             return ['perms' => ['crm.quote.create','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'FINANCE':
             return ['perms' => ['dash.financial','data.credit','data.revenue','data.salary','data.profitability','finance.reconcile','crm.contract.register'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+        case 'QUALITY_HEAD': case 'TECHNICAL_HEAD':
+            //  ncr.close and capa.close are the two rights the owner named on
+            //  2026-10-18. idems.audit.view is what makes a closure defensible to
+            //  an assessor: you cannot assert that a disposition was carried out
+            //  without being able to see what actually happened.
+            //
+            //  Scope is ALL / ALL on purpose. A nonconformity raised in one branch
+            //  is the company's nonconformity; a quality function scoped to its
+            //  own office could not close it.
+            return ['perms' => ['ncr.close','capa.close','idems.audit.view','dash.operations'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'INSPECTOR':
             return ['perms' => [], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'SR_INSPECTOR':

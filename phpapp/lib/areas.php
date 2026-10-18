@@ -131,10 +131,27 @@ function ops_area_def($area) {
             // one tabbed workspace. The tile lands on the umbrella Issue register
             // and the tab strip carries you across NCR / CAPA / Departures. The
             // count badge is open nonconformities, the thing worth chasing.
-            $t($inspPack && (can('mod.ncr.view') || can('mod.capa.view')), '⚠', 'Nonconformity workspace',
-                (($fx('ncdca_enabled') && ncdca_enabled()) ? '/issues' : '/ncr'),
-                'Issues, NCRs, corrective actions and departures — one screen with tabs.',
-                $num(fn() => $fx('ncr_counts') ? ncr_counts()['open'] : 0), 'red');
+            //
+            //  AUDIT 2026-10, measured: this tile was offered on ncr OR capa but
+            //  always pointed at an NCR-gated route, so a Branch Manager,
+            //  Operation Manager and Coordinator — who hold capa and not ncr —
+            //  were each shown a door that answered 403. Three roles, one dead
+            //  end, and "the screen does not work" is exactly how it reads.
+            //
+            //  The tile now goes where the person can actually go, and says what
+            //  they will actually find. Nobody gains or loses a right here: a
+            //  CAPA-only reader kept their only link to /capa, which gating the
+            //  tile on mod.ncr.view would have taken away.
+            $ncrOk = can('mod.ncr.view');
+            $t($inspPack && ($ncrOk || can('mod.capa.view')), '⚠',
+                $ncrOk ? 'Nonconformity workspace' : 'Corrective actions',
+                $ncrOk ? (($fx('ncdca_enabled') && ncdca_enabled()) ? '/issues' : '/ncr') : '/capa',
+                $ncrOk ? 'Issues, NCRs, corrective actions and departures — one screen with tabs.'
+                       : 'Corrective actions raised against nonconformities.',
+                //  The badge counts open NONconformities. Showing it to somebody
+                //  who may not open one is a number they cannot act on, so a
+                //  CAPA-only reader gets no badge rather than a false errand.
+                $ncrOk ? $num(fn() => $fx('ncr_counts') ? ncr_counts()['open'] : 0) : null, 'red');
 
             // ── Accreditation registers — the set-once/periodic records an assessor asks for. ──
             $sec('Accreditation registers');

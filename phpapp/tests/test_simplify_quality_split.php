@@ -6,7 +6,17 @@
 t_section('Quality split into everyday vs accreditation (simplify step 6)');
 
 $a = (string)file_get_contents(__DIR__ . '/../lib/areas.php');
-$quality = substr($a, strpos($a, "case 'quality':"), 6000);
+//  Slice to the END OF THE CASE, not to a fixed byte count.
+//
+//  This read `substr(..., 6000)` — a magic window that happened to be long
+//  enough when it was written. Adding a comment to the Quality block in the
+//  2026-10 audit pushed the last six accreditation tiles past 6000 characters
+//  and failed six assertions, none of which had anything to do with the change.
+//  A test that measures a byte offset is measuring the wrong thing; it now ends
+//  where the area actually ends, so prose can grow without breaking it.
+$qAt     = strpos($a, "case 'quality':");
+$qEnd    = strpos($a, "        case '", $qAt + 10);          // the next area in the switch
+$quality = $qEnd === false ? substr($a, $qAt) : substr($a, $qAt, $qEnd - $qAt);
 
 $everyday_at = strpos($quality, "\$sec('Everyday quality')");
 $accred_at   = strpos($quality, "\$sec('Accreditation registers')");
