@@ -1,0 +1,21 @@
+activity-add	Activity	activities
+approval-act	Approvals	approvals
+books-bridge-drain	📗 MGH Books connection	books-bridge
+books-bridge-save	📗 MGH Books connection	books-bridge
+contract-override	Contract exceptions	contract-overrides
+control-panel	Super Admin — Control Panel	super-admin
+crm-reports	Sales dashboard	crm-dashboard
+crm-templates	Document templates	templates
+idems-approval-rule-edit	Quote & report approvals	approval-rules
+idems-approval-rules	Quote & report approvals	approval-rules
+licence-check	Licence	licence
+licence-pubkey	Licence	licence
+licence-save	Licence	licence
+lookups	Masters	masters
+product-package-apply	Product package	product-package
+quote-approval-rules	Quote & report approvals	approval-rules
+ratings-config	Inspector ratings	ratings
+report-ack	Client acceptance of reports	report-reviews
+report-template-edit	Document templates	templates
+report-templates	Document templates	templates
+vendor-profile-save	Vendor register	vendors

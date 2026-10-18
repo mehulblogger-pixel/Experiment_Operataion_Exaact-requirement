@@ -1,0 +1,547 @@
+access	200	SCREEN	Roles &amp; permissions
+access-requests	200	SCREEN	Access requests
+activities	200	SCREEN	Activity
+activity-add	200	SCREEN	Activity
+address-geo	404	NOTFOUND	Not found
+admin	200	SCREEN	Admin
+ads-roi	200	SCREEN	What the advertising actually earned
+adspro	200	SCREEN	Ads Pro connection
+advisor	200	SCREEN	What to fix
+agency-staff	200	SCREEN	Agency staff &amp; their documents
+agreement	200	SCREEN	Licence agreement
+ai-forms	200	SCREEN	Build forms from your process
+ai-settings	200	SCREEN	AI providers &amp; models
+ai-topup-order	302	REDIRECT	
+ai-topup-verify	302	REDIRECT	
+approval-act	200	SCREEN	Approvals
+approval-delegations	200	SCREEN	Approval delegation
+approval-rules	200	SCREEN	Quote &amp; report approvals
+approvals	200	SCREEN	Approvals
+approvals-setup	200	SCREEN	Approvals
+approver-map	200	SCREEN	Approver mapping
+asset-register	200	SCREEN	Asset issuance register
+assign-accept	302	REDIRECT	
+assign-cancel	302	REDIRECT	
+assign-hold	302	REDIRECT	
+assign-issue	302	REDIRECT	
+assign-noshow	302	REDIRECT	
+assign-reassign	302	REDIRECT	
+assign-reschedule	302	REDIRECT	
+attend-mark	302	REDIRECT	
+attendance-recon	200	SCREEN	Attendance reconciliation
+attendance-review	200	SCREEN	Attendance review
+audit-log	200	SCREEN	Audit trail
+availability	200	SCREEN	Team member availability
+backup	200	SCREEN	Backup &amp; restore
+bill-add	404	NOTFOUND	Not found
+bill-file	404	NOTFOUND	Not found
+billable-events	200	SCREEN	Billable events
+billing	200	SCREEN	Users &amp; billing
+billing-config	200	SCREEN	Users &amp; billing
+billing-order	200	SCREEN	Users &amp; billing
+billing-verify	200	SCREEN	Users &amp; billing
+books-bridge	200	SCREEN	📗 MGH Books connection
+books-bridge-drain	200	SCREEN	📗 MGH Books connection
+books-bridge-save	200	SCREEN	📗 MGH Books connection
+boss-renew	302	REDIRECT	
+buy	404	NOTFOUND	
+buy-verify	404	NOTFOUND	
+call	404	NOTFOUND	Not found
+call-attrs	302	REDIRECT	
+call-clar-new	302	REDIRECT	
+call-clar-respond	302	REDIRECT	
+call-clar-status	302	REDIRECT	
+call-credit	404	NOTFOUND	Not found
+call-edit	404	NOTFOUND	Not found
+call-link-commercial	404	NOTFOUND	Not found
+call-new	200	SCREEN	New work order
+call-override	302	REDIRECT	
+call-profit	200	SCREEN	Profit by work order
+call-status	302	REDIRECT	
+calls	200	SCREEN	Work order register
+candidate	404	NOTFOUND	Not found
+candidate-client	200	PARTIAL	
+candidate-commercial	404	NOTFOUND	Not found
+candidate-credential	200	PARTIAL	
+candidate-cv	200	PARTIAL	
+candidate-doc	404	NOTFOUND	Not found
+candidate-edit	404	NOTFOUND	Not found
+candidate-flow	404	NOTFOUND	Not found
+candidate-interview	404	NOTFOUND	Not found
+candidate-joined	404	NOTFOUND	Not found
+candidate-letter	404	NOTFOUND	Not found
+candidate-link-person	302	REDIRECT	
+candidate-link-pro	302	REDIRECT	
+candidate-new	200	SCREEN	Add candidate CV
+candidate-offer	404	NOTFOUND	Not found
+candidate-pipestage	404	NOTFOUND	Not found
+candidate-pool	200	SCREEN	Candidate pool convergence
+candidate-review	404	NOTFOUND	Not found
+candidate-stage	404	NOTFOUND	Not found
+candidate-unlink-pro	302	REDIRECT	
+candidates	200	SCREEN	Candidate register
+capa	200	SCREEN	Nonconformities &amp; corrective actions
+capacity-outlook	200	SCREEN	Capacity outlook
+careers	404	NOTFOUND	
+careers-admin	200	SCREEN	Careers page
+cert-add	200	PARTIAL	
+cert-verify	302	REDIRECT	
+cform	302	REDIRECT	
+cform-def-del	200	SCREEN	Custom forms
+cform-def-save	200	SCREEN	Custom forms
+cform-del	302	REDIRECT	
+cform-edit	302	REDIRECT	
+cform-new	302	REDIRECT	
+cform-save	302	REDIRECT	
+cform-view	302	REDIRECT	
+cforms	200	SCREEN	Custom forms
+change-password	200	SCREEN	Change password
+checkin-photo	404	NOTFOUND	Not found
+checkin-settings	302	REDIRECT	
+client-contacts	200	PARTIAL	
+client-holds	200	SCREEN	Client holds &amp; blocks
+client-quotes	200	PARTIAL	
+clients	200	SCREEN	Client register
+comm-add	302	REDIRECT	
+command-centre	200	SCREEN	Command Centre
+comp-setup	200	SCREEN	Compensation setup
+companies	200	SCREEN	Companies
+company-profile	200	SCREEN	Your company
+competence	200	SCREEN	Competence &amp; authorisation
+complaint	404	NOTFOUND	Not found
+complaints	200	SCREEN	Complaints &amp; appeals
+complaints-policy	200	SCREEN	Complaints and appeals
+compliance	200	SCREEN	Where we stand
+compliance-rules	200	SCREEN	Compliance rules &amp; fees
+confidentiality	200	SCREEN	Confidentiality
+connect	200	SCREEN	Post a job. Find the right inspector. Get it done.
+connect-analytics	200	SCREEN	Labour-market analytics
+connect-bench	200	SCREEN	Agency bench
+connect-capabilities	200	SCREEN	Company business capabilities
+connect-channels	200	SCREEN	WhatsApp, SMS &amp; email
+connect-concierge	200	SCREEN	
+connect-identity	200	SCREEN	Professional identity
+connect-match-weights	200	SCREEN	Matching weights
+connect-messages	200	SCREEN	Messages
+connect-orgs	200	SCREEN	Organisations
+connect-qualifications	200	SCREEN	Qualification &amp; role taxonomy
+connect-requirement	302	REDIRECT	
+connect-requirements	200	SCREEN	Manpower marketplace
+connect-source	302	REDIRECT	
+connect-talent	200	SCREEN	Talent search
+connect-taxonomy	200	SCREEN	Industry taxonomy
+connect-taxonomy-admin	200	SCREEN	Taxonomy graph — admin
+connect-verify	200	SCREEN	Verification desk
+connect-voucher-file	404	NOTFOUND	Not found
+connect/start	302	REDIRECT	
+consent-add	200	SCREEN	Consent &amp; lawful basis
+consent-withdraw	200	SCREEN	Consent &amp; lawful basis
+consents	200	SCREEN	Consent &amp; lawful basis
+contract	404	NOTFOUND	Not found
+contract-edit	404	NOTFOUND	Not found
+contract-no-check	200	PARTIAL	
+contract-open	404	NOTFOUND	Not found
+contract-openings	200	SCREEN	Contract openings
+contract-override	200	SCREEN	Contract exceptions
+contract-overrides	200	SCREEN	Contract exceptions
+contract-renumber	404	NOTFOUND	Not found
+control-panel	200	SCREEN	Super Admin — Control Panel
+cost-reconciliation	200	SCREEN	Cost reconciliation
+cost-run	200	SCREEN	Month-end cost run
+cpanel-save	200	SCREEN	Cloud workspaces
+cpanel-test	200	SCREEN	Cloud workspaces
+credential-req-init	302	REDIRECT	
+credit-note-new	404	NOTFOUND	Not found
+crm-dashboard	200	SCREEN	Sales dashboard
+crm-letterhead	200	PARTIAL	
+crm-reports	200	SCREEN	Sales dashboard
+crm-signature	200	PARTIAL	
+crm-template-download	302	REDIRECT	
+crm-template-edit	404	NOTFOUND	Not found
+crm-template-new	200	SCREEN	Add quote / e-mail template
+crm-templates	200	SCREEN	Document templates
+custom-fields	200	SCREEN	Custom fields —
+customer	404	NOTFOUND	Not found
+customer-parent	404	NOTFOUND	Not found
+data-check-run	302	REDIRECT	
+data-control	200	SCREEN	Control of data &amp; information
+data-requests	200	SCREEN	Requests about personal data
+db-selfcreate-test	200	SCREEN	Cloud workspaces
+delay-add	302	REDIRECT	
+dep-approval	302	REDIRECT	
+dep-approval-status	302	REDIRECT	
+dep-check-seed	302	REDIRECT	
+dep-check-set	302	REDIRECT	
+dep-manpower-add	302	REDIRECT	
+dep-manpower-del	302	REDIRECT	
+dep-manpower-update	302	REDIRECT	
+dep-site-log	302	REDIRECT	
+dep-site-log-close	302	REDIRECT	
+dep-status	302	REDIRECT	
+dep-timesheet	302	REDIRECT	
+departments	200	SCREEN	Departments
+departure-new	302	REDIRECT	
+departure-status	302	REDIRECT	
+departures	200	SCREEN	Deviations, concessions &amp; waivers
+deputations	200	SCREEN	Deputation &amp; site operations
+directory	200	SCREEN	Directory
+dispute-decide	302	REDIRECT	
+dispute-new	302	REDIRECT	
+doc-templates	200	SCREEN	Document Studio
+document	404	NOTFOUND	Not found
+document-ai-review	404	NOTFOUND	Not found
+document-approve	302	REDIRECT	
+document-docx	404	NOTFOUND	
+document-edit	404	NOTFOUND	Not found
+document-evidence	404	NOTFOUND	Not found
+document-fill	404	NOTFOUND	Not found
+document-finalize	404	NOTFOUND	Not found
+document-new	200	SCREEN	New report
+document-pdf	404	NOTFOUND	
+document-polish-text	200	PARTIAL	
+document-release-note	302	REDIRECT	
+document-review	404	NOTFOUND	Not found
+document-rn-flag	404	NOTFOUND	Not found
+document-scope-from-qap	302	REDIRECT	
+document-smart	404	NOTFOUND	Not found
+document-submit	404	NOTFOUND	Not found
+document-timestamp	302	REDIRECT	
+document-vet	302	REDIRECT	
+document-vet-review	404	NOTFOUND	Not found
+documents	200	SCREEN	Report register
+dt-columns	302	REDIRECT	
+duplicates	200	SCREEN	Possible duplicates
+endorsement	404	NOTFOUND	Not found
+endorsement-approve	404	NOTFOUND	Not found
+endorsement-cert	404	NOTFOUND	
+endorsement-edit	404	NOTFOUND	Not found
+endorsement-file	404	NOTFOUND	
+endorsement-new	200	SCREEN	New endorsement
+endorsement-submit	404	NOTFOUND	Not found
+endorsements	200	SCREEN	Endorsement register
+entity-360	302	REDIRECT	
+evidence-review	200	SCREEN	Evidence review
+evidence-reviewed	302	REDIRECT	
+expediting	200	SCREEN	Expediting register
+expediting-projects	200	SCREEN	Project delivery consolidation
+extension-approve	302	REDIRECT	
+feature-gates	200	SCREEN	Feature gates
+financial-control	200	SCREEN	Financial control
+flow-gaps	200	SCREEN	Where the flow is broken
+followup-compose	404	NOTFOUND	Not found
+forgot	302	REDIRECT	
+get-started	200	SCREEN	Run your inspection company on Inspection Ops
+hierarchy	200	SCREEN	Organisation &amp; people
+hiring-request	200	SCREEN	New hiring request
+hiring-request-leaver	200	PARTIAL	
+hiring-requests	200	SCREEN	Hiring requests
+hold-points	403	FORBIDDEN	This feature — not available
+idems-approval-rule-edit	200	SCREEN	Quote &amp; report approvals
+idems-approval-rules	200	SCREEN	Quote &amp; report approvals
+identity	200	SCREEN	Identity documents
+impartiality	200	SCREEN	Impartiality &amp; conflicts of interest
+incident	404	NOTFOUND	Not found
+incident-edit	404	NOTFOUND	Not found
+incident-new	200	SCREEN	Record an incident
+incident-report	404	NOTFOUND	Not found
+incidents	200	SCREEN	Incident register
+industry	200	SCREEN	Your industry
+industry-apply	200	SCREEN	Your industry
+inquiries	200	SCREEN	Inquiry register
+inquiry-edit	404	NOTFOUND	Not found
+inquiry-new	200	SCREEN	New client inquiry
+insights	200	SCREEN	Insights
+inspector-profile	302	REDIRECT	
+install-mode-set	302	REDIRECT	
+integrations	200	SCREEN	Integration health
+internal-audit	404	NOTFOUND	Not found
+internal-audit-new	200	SCREEN	Plan an internal audit
+internal-audits	200	SCREEN	Internal audits
+invoice	404	NOTFOUND	Not found
+invoice-cancel	404	NOTFOUND	Not found
+invoice-issue	404	NOTFOUND	Not found
+invoice-line-add	404	NOTFOUND	Not found
+invoice-new	200	SCREEN	New invoice
+invoice-print	404	NOTFOUND	Not found
+invoices	200	SCREEN	Invoices
+invoicing	200	SCREEN	Invoice register
+irn-rules	200	SCREEN	IRN numbering rules
+issue-classify	302	REDIRECT	
+issue-extend	302	REDIRECT	
+issue-licence	200	SCREEN	Licence console
+issue-licence-new	200	SCREEN	Licence console
+issue-licence-reissue	200	SCREEN	Licence console
+issues	200	SCREEN	Issues
+jd-generate	200	PARTIAL	
+job	404	NOTFOUND	Not found
+job-advance	200	PARTIAL	
+job-bill	200	PARTIAL	
+job-close	404	NOTFOUND	Not found
+job-confirm	302	REDIRECT	
+job-confirm-req	302	REDIRECT	
+job-edit	404	NOTFOUND	Not found
+job-forward-report	404	NOTFOUND	Not found
+job-geo	404	NOTFOUND	Not found
+job-invoice	404	NOTFOUND	Not found
+job-new	302	REDIRECT	
+job-qap	404	NOTFOUND	
+job-qap-del	302	REDIRECT	
+job-qap-upload	302	REDIRECT	
+job-ready-seed	302	REDIRECT	
+job-ready-set	302	REDIRECT	
+job-reassign	200	PARTIAL	
+job-unlock	302	REDIRECT	
+job-visit-close	200	PARTIAL	
+jobs	200	SCREEN	Job register
+join	200	SCREEN	Set up your organisation
+leads	200	SCREEN	Leads
+learning	200	SCREEN	Learning insights
+ledger	404	NOTFOUND	Not found
+licence	200	SCREEN	Licence
+licence-check	200	SCREEN	Licence
+licence-pubkey	200	SCREEN	Licence
+licence-save	200	SCREEN	Licence
+login	302	REDIRECT	
+lookup	404	NOTFOUND	Not found
+lookups	200	SCREEN	Masters
+management-review	404	NOTFOUND	Not found
+management-review-new	302	REDIRECT	
+management-reviews	200	SCREEN	Management review
+marketplace	200	SCREEN	Marketplace
+marketplace-escrow	200	SCREEN	Marketplace escrow
+marketplace-plans	200	SCREEN	Marketplace plans &amp; limits
+marketplace-toggle	302	REDIRECT	
+masters	200	SCREEN	Masters
+mis	200	SCREEN	Management dashboard
+money	200	SCREEN	Money
+my-approvals	200	SCREEN	My approvals
+my-interviews	200	SCREEN	Interviews to attend
+my-jobs	200	SCREEN	My Jobs
+my-signature	200	SCREEN	My signature
+my-start	302	REDIRECT	
+my-work	200	SCREEN	My Work
+ncr	200	SCREEN	Nonconformities
+notifications	200	SCREEN	Notification log
+offer-letter	404	NOTFOUND	Not found
+office-finance	200	SCREEN	Office costs &amp; overheads
+operations	200	SCREEN	Operations
+opportunities	200	SCREEN	Opportunities
+ops-desk	302	REDIRECT	
+org-template	200	PARTIAL	
+owner	200	SCREEN	Home — welcome, admin 👋
+packs-save	302	REDIRECT	
+partner	404	NOTFOUND	Not found
+partner-add	404	NOTFOUND	Not found
+partner-address	200	PARTIAL	
+partner-contact	200	PARTIAL	
+partner-edit	404	NOTFOUND	Not found
+partner-gaps	200	PARTIAL	
+partner-geo	404	NOTFOUND	Not found
+partner-import	200	SCREEN	Import clients &amp; vendors
+partner-meta	200	PARTIAL	
+partner-new	200	SCREEN	New business partner
+partner-pos	200	PARTIAL	
+partner-reg-file	404	NOTFOUND	Not found
+partner-sites	200	PARTIAL	
+partner-template	200	PARTIAL	
+passport-share	200	SCREEN	Professional passport
+person-data	404	NOTFOUND	Not found
+phrase-edit	200	SCREEN	Phrase library
+phrase-library	200	SCREEN	Phrase library
+pipelines	200	SCREEN	Pipelines &amp; funnels
+po	404	NOTFOUND	Not found
+po-lines	200	PARTIAL	
+portal	404	NOTFOUND	Not found
+portal-request	302	REDIRECT	
+portal-settings	302	REDIRECT	
+portal-user-perms	404	NOTFOUND	Not found
+portal-user-reinvite	302	REDIRECT	
+portal-user-toggle	302	REDIRECT	
+portal-users	200	SCREEN	Client portal
+positions	200	SCREEN	Position master
+positions-import	200	SCREEN	Import organogram
+positions-org	200	SCREEN	Organisation chart
+preflight	200	SCREEN	Server check
+preorder-checklist	200	SCREEN	Pre-order review checklist
+pricing-usage	200	SCREEN	Plans, pricing &amp; usage
+privacy	200	SCREEN	Privacy notice
+pro	302	REDIRECT	
+product-package	200	SCREEN	Product package
+product-package-apply	200	SCREEN	Product package
+profitability	200	SCREEN	Contract number register
+project-costings	200	SCREEN	Project costing
+punch	302	REDIRECT	
+quality	200	SCREEN	Quality &amp; Accreditation
+quick-add	200	PARTIAL	
+quote	404	NOTFOUND	Not found
+quote-add-contract	200	PARTIAL	
+quote-approval-rule-edit	404	NOTFOUND	Not found
+quote-approval-rule-new	200	SCREEN	Add approval rule
+quote-approval-rules	200	SCREEN	Quote &amp; report approvals
+quote-approve	200	PARTIAL	
+quote-client	200	PARTIAL	
+quote-compose	404	NOTFOUND	Not found
+quote-context	200	PARTIAL	
+quote-contract	200	PARTIAL	
+quote-doc	404	NOTFOUND	Not found
+quote-edit	404	NOTFOUND	Not found
+quote-external	200	SCREEN	Register an external quote
+quote-file	404	NOTFOUND	
+quote-files	200	PARTIAL	
+quote-final	200	PARTIAL	
+quote-float	200	PARTIAL	
+quote-followup	200	PARTIAL	
+quote-new	200	SCREEN	New quote
+quote-pdf	404	NOTFOUND	Not found
+quote-preorder-save	200	PARTIAL	
+quote-revise	200	PARTIAL	
+quote-status	200	PARTIAL	
+quote-unapprove	200	PARTIAL	
+quote-unlock	200	PARTIAL	
+quotes	200	SCREEN	Quote register
+quotes-export	200	PARTIAL	
+raise-call	200	SCREEN	Raise an inspection work order
+rating-disputes	200	SCREEN	Rating-integrity desk
+ratings	200	SCREEN	Inspector ratings
+ratings-config	200	SCREEN	Inspector ratings
+receipt	404	NOTFOUND	Not found
+receipt-allocate	404	NOTFOUND	Not found
+receipt-new	200	SCREEN	Record money received
+receipt-unallocate	404	NOTFOUND	Not found
+receipts	200	SCREEN	Money in
+receivables	200	SCREEN	Receivables ageing
+recruit-approvals	200	SCREEN	Recruitment approvals
+recruit-config	302	REDIRECT	
+recruit-export	200	PARTIAL	
+recruit-pipelines	200	SCREEN	Hiring workflows
+recruitment	200	SCREEN	Recruitment &amp; Workforce
+recruitment-cc	302	REDIRECT	
+recurring	200	SCREEN	Recurring services
+reimbursable-dedup	200	SCREEN	Reimbursable duplication
+release-notes	200	SCREEN	Release Notes
+report-ack	200	SCREEN	Client acceptance of reports
+report-approve	302	REDIRECT	
+report-autoform	302	REDIRECT	
+report-builder	302	REDIRECT	
+report-equip-add	302	REDIRECT	
+report-equip-del	302	REDIRECT	
+report-field-edit	302	REDIRECT	
+report-file	404	NOTFOUND	
+report-form-from-template	302	REDIRECT	
+report-preview	302	REDIRECT	
+report-reviews	200	SCREEN	Client acceptance of reports
+report-template-download	404	NOTFOUND	
+report-template-edit	200	SCREEN	Document templates
+report-template-preview	302	REDIRECT	
+report-templates	200	SCREEN	Document templates
+report-type-edit	200	SCREEN	Report types
+report-type-preview	404	NOTFOUND	
+report-types	200	SCREEN	Report types
+reporting	200	SCREEN	Reporting
+reports	200	SCREEN	Dashboards
+req-ai-extract	200	PARTIAL	
+requisition	404	NOTFOUND	Not found
+requisition-allocations	302	REDIRECT	
+requisition-cancel-vacancies	404	NOTFOUND	Not found
+requisition-edit	404	NOTFOUND	Not found
+requisition-new	403	FORBIDDEN	New requisition
+requisition-position	404	NOTFOUND	Not found
+requisitions	200	SCREEN	Requisition register
+revenue-reconciliation	200	SCREEN	Revenue reconciliation
+role-workspaces	200	SCREEN	Role workspaces
+sales	200	SCREEN	Sales
+sbu-pl	200	SCREEN	Business Unit profit &amp; loss — October 2026
+sched-preview	200	PARTIAL	
+schedule	200	SCREEN	Scheduling board
+search	200	SCREEN	Search
+seed-demo	302	REDIRECT	
+seed-demo-remove	302	REDIRECT	
+seed-scenario-s01	302	REDIRECT	
+seed-scenario-s01-remove	302	REDIRECT	
+seed-scenario-s02	302	REDIRECT	
+seed-scenario-s02-remove	302	REDIRECT	
+seed-scenario-s03	302	REDIRECT	
+seed-scenario-s03-remove	302	REDIRECT	
+seed-scenario-s04	302	REDIRECT	
+seed-scenario-s04-remove	302	REDIRECT	
+seed-scenario-s05	302	REDIRECT	
+seed-scenario-s05-remove	302	REDIRECT	
+seed-scenario-s06	302	REDIRECT	
+seed-scenario-s06-remove	302	REDIRECT	
+service-formats	200	SCREEN	Report formats by service line
+service-scope	200	SCREEN	Service scope
+settings	200	SCREEN	System settings
+setup	200	SCREEN	Welcome — let’s set up your system
+setup-save	200	SCREEN	Welcome — let’s set up your system
+signing-setup	200	SCREEN	Super Admin
+site-checkin	302	REDIRECT	
+site-docs	200	SCREEN	What each site requires before the gate opens
+site-docs-add	302	REDIRECT	
+site-geo-capture	404	NOTFOUND	Not found
+sla-targets	200	SCREEN	SLA targets
+sso	200	SCREEN	Single sign-on
+subscription	200	SCREEN	Your subscription
+subscription-order	200	SCREEN	Your subscription
+subscription-verify	200	SCREEN	Your subscription
+super-admin	200	SCREEN	Super Admin — Control Panel
+sw-validation-add	302	REDIRECT	
+system-status	200	SCREEN	System status
+tally	200	SCREEN	Tally export
+tally-export	200	SCREEN	Tally export
+tally-settings	302	REDIRECT	
+tally-undo	302	REDIRECT	
+tasks	200	SCREEN	My tasks
+templates	200	SCREEN	Document templates
+tenant-add	200	SCREEN	Cloud workspaces
+tenant-enable	200	SCREEN	Cloud workspaces
+tenant-remove	200	SCREEN	Cloud workspaces
+tenant-request-approve	200	SCREEN	Cloud workspaces
+tenant-request-provisioned	200	SCREEN	Cloud workspaces
+tenant-request-reject	200	SCREEN	Cloud workspaces
+tenant-status	200	SCREEN	Cloud workspaces
+tenants	200	SCREEN	Cloud workspaces
+terminology	200	SCREEN	Terminology
+timesheet	200	SCREEN	Timesheet
+to-bill	200	SCREEN	Work waiting to be billed
+trace	404	NOTFOUND	Not found
+trace-audit	302	REDIRECT	
+trace-audit-remove	302	REDIRECT	
+trace-thread	302	REDIRECT	
+trace-thread-remove	302	REDIRECT	
+two-factor	200	SCREEN	Two-step sign-in
+user-edit	404	NOTFOUND	Not found
+user-new	200	SCREEN	Add a person
+user-retire	302	REDIRECT	
+user-unlock	302	REDIRECT	
+users	200	SCREEN	Organisation &amp; people
+vendor	404	NOTFOUND	Not found
+vendor-profile	302	REDIRECT	
+vendor-profile-save	200	SCREEN	Vendor register
+vendor-settings	302	REDIRECT	
+vendor-share	302	REDIRECT	
+vendor-user-reinvite	302	REDIRECT	
+vendor-user-toggle	302	REDIRECT	
+vendor-users	200	SCREEN	Vendor portal
+vendors	200	SCREEN	Vendor register
+verify	200	SCREEN	Verify an inspection report
+verify-pdf	400	HTTP400	
+vetting-checklist	200	SCREEN	Vetting checklist
+voucher	302	REDIRECT	
+voucher-csv	404	NOTFOUND	
+voucher-entry	200	PARTIAL	
+voucher-file	404	NOTFOUND	
+voucher-generate	200	PARTIAL	
+voucher-header	200	PARTIAL	
+voucher-line-receipt	404	NOTFOUND	Not found
+voucher-print	404	NOTFOUND	Not found
+voucher-quick-add	200	PARTIAL	
+voucher-save	200	PARTIAL	
+voucher-status	200	PARTIAL	
+vouchers	200	SCREEN	Inspector vouchers
+welcome	200	SCREEN	👋 Welcome!
+witness-add	302	REDIRECT	
+work-norms	200	SCREEN	Working norms
+workspace-signup-toggle	200	SCREEN	Cloud workspaces
+workspace/setup	200	SCREEN	Set up your workspace
+writing-assistant	200	SCREEN	Technical writing assistant
+xo-nudge	302	REDIRECT	

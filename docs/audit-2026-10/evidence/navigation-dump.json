@@ -1,0 +1,2197 @@
+{
+    "areas": {
+        "Sales": {
+            "home": "/sales",
+            "sections": [
+                {
+                    "section": "",
+                    "tiles": [
+                        {
+                            "label": "Leads",
+                            "route": "/leads",
+                            "desc": "A company worth pursuing — before any specific job."
+                        },
+                        {
+                            "label": "Opportunities",
+                            "route": "/opportunities",
+                            "desc": "A live deal you are working to win or lose."
+                        },
+                        {
+                            "label": "Inquiries",
+                            "route": "/inquiries",
+                            "desc": "A specific request to quote — a quote is raised from it."
+                        },
+                        {
+                            "label": "Quotes",
+                            "route": "/quotes",
+                            "desc": "Quotations, revisions and approvals."
+                        },
+                        {
+                            "label": "Quote templates",
+                            "route": "/templates?kind=quote",
+                            "desc": "Letter and covering-note templates for quotes."
+                        },
+                        {
+                            "label": "Pre-order checklist",
+                            "route": "/preorder-checklist",
+                            "desc": "Enquiry / tender / contract review before a quote is approved."
+                        },
+                        {
+                            "label": "Project costing",
+                            "route": "/project-costings",
+                            "desc": "Team cost build-ups → man-month / man-day / lump rates and margin."
+                        },
+                        {
+                            "label": "Approvals",
+                            "route": "/approvals",
+                            "desc": "Deals held at a stage gate."
+                        },
+                        {
+                            "label": "Pipelines & funnels",
+                            "route": "/pipelines",
+                            "desc": "Stages and conversion."
+                        }
+                    ]
+                }
+            ],
+            "routes": [
+                "sales",
+                "leads",
+                "lead",
+                "opportunities",
+                "opportunity",
+                "inquiries",
+                "inquiry",
+                "quotes",
+                "quote",
+                "pipelines",
+                "pipeline",
+                "approvals",
+                "stage-gates",
+                "ads-roi",
+                "project-costings",
+                "project-costing",
+                "preorder-checklist",
+                "templates"
+            ],
+            "served_by_area_engine": true
+        },
+        "Marketplace": {
+            "home": "/marketplace",
+            "sections": [
+                {
+                    "section": "",
+                    "tiles": [
+                        {
+                            "label": "Requirements",
+                            "route": "/connect-requirements",
+                            "desc": "Post a manpower requirement and manage who applies."
+                        },
+                        {
+                            "label": "Guided post",
+                            "route": "/connect-concierge",
+                            "desc": "Build a requirement by answering a few questions."
+                        },
+                        {
+                            "label": "Talent search",
+                            "route": "/connect-talent",
+                            "desc": "Search the shared pool of self-listed professionals."
+                        },
+                        {
+                            "label": "Passports",
+                            "route": "/passport-share",
+                            "desc": "A professional's public, verifiable credential page."
+                        },
+                        {
+                            "label": "Industry taxonomy",
+                            "route": "/connect-taxonomy",
+                            "desc": "Sectors, equipment, materials, disciplines, standards, certifications."
+                        },
+                        {
+                            "label": "Qualification taxonomy",
+                            "route": "/connect-qualifications",
+                            "desc": "ITI → diploma → engineer → MBA ladder, job families, roles and certifications."
+                        },
+                        {
+                            "label": "Verification desk",
+                            "route": "/connect-verify",
+                            "desc": "Confirm identity & credential checks; move professionals up the trust ladder."
+                        },
+                        {
+                            "label": "Rating-integrity desk",
+                            "route": "/rating-disputes",
+                            "desc": "Investigate reported ratings; uphold, annotate or remove them from scores."
+                        },
+                        {
+                            "label": "Messages",
+                            "route": "/connect-messages",
+                            "desc": "Two-way chat with applicants, tied to each requirement."
+                        },
+                        {
+                            "label": "Channels",
+                            "route": "/connect-channels",
+                            "desc": "WhatsApp / SMS / email alerts, templates and delivery log."
+                        },
+                        {
+                            "label": "Agency bench",
+                            "route": "/connect-bench",
+                            "desc": "An agency's own private roster — add people and allocate them to jobs."
+                        },
+                        {
+                            "label": "Market analytics",
+                            "route": "/connect-analytics",
+                            "desc": "Supply vs demand, fill funnel, time-to-award, rate benchmarks, pool growth."
+                        },
+                        {
+                            "label": "Organisations",
+                            "route": "/connect-orgs",
+                            "desc": "Register organisations and their module entitlements (TPIA / agency / company)."
+                        },
+                        {
+                            "label": "Access requests",
+                            "route": "/access-requests",
+                            "desc": "People who signed up for a company we already work with — decide, then invite them the usual way."
+                        }
+                    ]
+                }
+            ],
+            "routes": [
+                "connect-requirements",
+                "connect-requirement",
+                "connect-concierge",
+                "connect-talent",
+                "connect-orgs",
+                "passport-share",
+                "connect-taxonomy",
+                "connect-qualifications",
+                "connect-verify",
+                "connect-messages",
+                "connect-channels",
+                "connect-bench",
+                "connect-analytics"
+            ],
+            "served_by_area_engine": true
+        },
+        "Operations": {
+            "home": "/operations",
+            "sections": [],
+            "routes": [
+                "operations"
+            ],
+            "served_by_area_engine": false
+        },
+        "Recruitment": {
+            "home": "/recruitment",
+            "sections": [],
+            "routes": [
+                "recruitment"
+            ],
+            "served_by_area_engine": false
+        },
+        "Reporting": {
+            "home": "/reporting",
+            "sections": [
+                {
+                    "section": "Reports",
+                    "tiles": [
+                        {
+                            "label": "Report register",
+                            "route": "/documents",
+                            "desc": "The report register."
+                        },
+                        {
+                            "label": "New report",
+                            "route": "/document-new",
+                            "desc": "Start a new report."
+                        },
+                        {
+                            "label": "Endorsement register",
+                            "route": "/endorsements",
+                            "desc": "Manufacturer document endorsements."
+                        }
+                    ]
+                },
+                {
+                    "section": "Expediting",
+                    "tiles": [
+                        {
+                            "label": "Expediting register",
+                            "route": "/expediting",
+                            "desc": "Chasing vendor delivery."
+                        },
+                        {
+                            "label": "Project delivery",
+                            "route": "/expediting-projects",
+                            "desc": "Multi-vendor projects by milestone."
+                        }
+                    ]
+                },
+                {
+                    "section": "Writing",
+                    "tiles": [
+                        {
+                            "label": "Technical writing",
+                            "route": "/writing-assistant",
+                            "desc": "Phrase library and writing help."
+                        },
+                        {
+                            "label": "Learning insights",
+                            "route": "/learning",
+                            "desc": "Suggestions learned from past reports."
+                        }
+                    ]
+                },
+                {
+                    "section": "Governance",
+                    "tiles": [
+                        {
+                            "label": "Where we stand",
+                            "route": "/compliance",
+                            "desc": "Which obligations are met, measured live."
+                        }
+                    ]
+                }
+            ],
+            "routes": [
+                "reporting",
+                "documents",
+                "document",
+                "endorsements",
+                "endorsement",
+                "vendors",
+                "vendor-profile",
+                "expediting",
+                "expediting-projects",
+                "writing-assistant",
+                "phrase-library",
+                "learning",
+                "compliance"
+            ],
+            "served_by_area_engine": true
+        },
+        "Money": {
+            "home": "/money",
+            "sections": [
+                {
+                    "section": "Billing",
+                    "tiles": [
+                        {
+                            "label": "Billable events",
+                            "route": "/billable-events",
+                            "desc": "Approved operational work waiting to be invoiced."
+                        },
+                        {
+                            "label": "Invoice tracker",
+                            "route": "/invoicing",
+                            "desc": "Tick each job: invoiced, paid, inter-office credit."
+                        },
+                        {
+                            "label": "Billing workspace",
+                            "route": "/to-bill",
+                            "desc": "Bill, invoice, collect, age and export — one screen with tabs."
+                        },
+                        {
+                            "label": "Revenue reconciliation",
+                            "route": "/revenue-reconciliation",
+                            "desc": "Where a job’s legacy invoice figure disagrees with the books ledger."
+                        }
+                    ]
+                },
+                {
+                    "section": "Costs & margins",
+                    "tiles": [
+                        {
+                            "label": "Contract number register",
+                            "route": "/profitability",
+                            "desc": "Profit and margin by job."
+                        },
+                        {
+                            "label": "Office costs & overheads",
+                            "route": "/office-finance",
+                            "desc": "Per-office cost model."
+                        },
+                        {
+                            "label": "Month-end cost run",
+                            "route": "/cost-run",
+                            "desc": "Roll up costs for the month."
+                        },
+                        {
+                            "label": "Cost reconciliation",
+                            "route": "/cost-reconciliation",
+                            "desc": "Where a job’s legacy sub-contractor cost disagrees with the committed cost ledger."
+                        },
+                        {
+                            "label": "Reimbursable duplication",
+                            "route": "/reimbursable-dedup",
+                            "desc": "Jobs whose reimbursables are recorded on both doors — reconcile so profit is not double-charged."
+                        },
+                        {
+                            "label": "Business Unit profit & loss",
+                            "route": "/sbu-pl",
+                            "desc": "P&L by business unit."
+                        },
+                        {
+                            "label": "Profit by work order",
+                            "route": "/call-profit",
+                            "desc": "What each inspection made."
+                        }
+                    ]
+                }
+            ],
+            "routes": [
+                "money",
+                "invoicing",
+                "to-bill",
+                "invoices",
+                "invoice",
+                "receipts",
+                "receipt",
+                "receivables",
+                "tally",
+                "profitability",
+                "sbu-pl",
+                "office-finance",
+                "cost-run",
+                "call-profit",
+                "billable-events",
+                "revenue-reconciliation",
+                "cost-reconciliation",
+                "reimbursable-dedup"
+            ],
+            "served_by_area_engine": true
+        },
+        "Quality & Accreditation": {
+            "home": "/quality",
+            "sections": [
+                {
+                    "section": "Everyday quality",
+                    "tiles": [
+                        {
+                            "label": "Complaints & appeals",
+                            "route": "/complaints",
+                            "desc": "Complaints and appeals register."
+                        },
+                        {
+                            "label": "Client acceptance",
+                            "route": "/report-reviews",
+                            "desc": "Reports accepted or rejected."
+                        },
+                        {
+                            "label": "Customer satisfaction",
+                            "route": "/satisfaction",
+                            "desc": "Surveys and follow-up."
+                        },
+                        {
+                            "label": "Items & samples",
+                            "route": "/samples",
+                            "desc": "Items received for verification."
+                        },
+                        {
+                            "label": "Hold & witness points",
+                            "route": "/hold-points",
+                            "desc": "Points where work pauses for us."
+                        },
+                        {
+                            "label": "Evidence review",
+                            "route": "/evidence-review",
+                            "desc": "Field evidence awaiting review."
+                        },
+                        {
+                            "label": "Nonconformity workspace",
+                            "route": "/issues",
+                            "desc": "Issues, NCRs, corrective actions and departures — one screen with tabs."
+                        }
+                    ]
+                },
+                {
+                    "section": "Accreditation registers",
+                    "tiles": [
+                        {
+                            "label": "Equipment & calibration",
+                            "route": "/equipment",
+                            "desc": "Instruments and calibration status."
+                        },
+                        {
+                            "label": "Method library",
+                            "route": "/methods",
+                            "desc": "Standards and methods applied."
+                        },
+                        {
+                            "label": "Decision rules",
+                            "route": "/drules",
+                            "desc": "Statements of conformity rules."
+                        },
+                        {
+                            "label": "Controlled documents",
+                            "route": "/cdocs",
+                            "desc": "The controlled document set."
+                        },
+                        {
+                            "label": "Retention schedule",
+                            "route": "/retention",
+                            "desc": "How long records are kept."
+                        },
+                        {
+                            "label": "Data & information control",
+                            "route": "/data-control",
+                            "desc": "Information management controls."
+                        },
+                        {
+                            "label": "Risks & opportunities",
+                            "route": "/risks",
+                            "desc": "The risk register."
+                        },
+                        {
+                            "label": "Competence & authorisation",
+                            "route": "/competence",
+                            "desc": "Training, assessment and authorisation."
+                        },
+                        {
+                            "label": "Impartiality",
+                            "route": "/impartiality",
+                            "desc": "Threats to impartiality and controls."
+                        },
+                        {
+                            "label": "Disclosure consent",
+                            "route": "/disclosure",
+                            "desc": "Consents to disclose."
+                        },
+                        {
+                            "label": "Internal audits",
+                            "route": "/internal-audits",
+                            "desc": "The internal audit programme."
+                        },
+                        {
+                            "label": "Management review",
+                            "route": "/management-reviews",
+                            "desc": "Management review records."
+                        },
+                        {
+                            "label": "Confidentiality",
+                            "route": "/confidentiality",
+                            "desc": "Undertakings, NDAs and breaches."
+                        },
+                        {
+                            "label": "Site entry documents",
+                            "route": "/site-docs",
+                            "desc": "Papers needed for site access."
+                        },
+                        {
+                            "label": "Identity documents",
+                            "route": "/identity",
+                            "desc": "ID that gates site access."
+                        },
+                        {
+                            "label": "SLA targets",
+                            "route": "/sla-targets",
+                            "desc": "Turnaround targets for service delivery."
+                        }
+                    ]
+                }
+            ],
+            "routes": [
+                "quality",
+                "equipment",
+                "samples",
+                "sample",
+                "methods",
+                "method",
+                "drules",
+                "drule",
+                "cdocs",
+                "cdoc",
+                "risks",
+                "risk",
+                "retention",
+                "disclosure",
+                "competence",
+                "impartiality",
+                "complaints",
+                "complaint",
+                "satisfaction",
+                "confidentiality",
+                "conf-breach",
+                "site-docs",
+                "report-reviews",
+                "ncr",
+                "issues",
+                "departures",
+                "hold-points",
+                "capa",
+                "internal-audits",
+                "internal-audit",
+                "management-reviews",
+                "management-review",
+                "evidence-review",
+                "data-control",
+                "identity",
+                "sla-targets"
+            ],
+            "served_by_area_engine": true
+        },
+        "Insights": {
+            "home": "/insights",
+            "sections": [
+                {
+                    "section": "",
+                    "tiles": [
+                        {
+                            "label": "Dashboards",
+                            "route": "/reports",
+                            "desc": "Role dashboards across the business."
+                        },
+                        {
+                            "label": "Analytics & performance",
+                            "route": "/analytics",
+                            "desc": "KPI cards, trends and drill-down."
+                        },
+                        {
+                            "label": "Sales dashboard",
+                            "route": "/crm-dashboard",
+                            "desc": "Win rates and value by stage."
+                        },
+                        {
+                            "label": "Management dashboard",
+                            "route": "/mis",
+                            "desc": "The MIS overview."
+                        }
+                    ]
+                }
+            ],
+            "routes": [
+                "insights",
+                "reports",
+                "analytics",
+                "analytics-kpis",
+                "analytics-quality",
+                "analytics-drill",
+                "crm-dashboard",
+                "mis"
+            ],
+            "served_by_area_engine": true
+        },
+        "Directory": {
+            "home": "/directory",
+            "sections": [
+                {
+                    "section": "",
+                    "tiles": [
+                        {
+                            "label": "Activity",
+                            "route": "/activities",
+                            "desc": "A timeline of what happened."
+                        },
+                        {
+                            "label": "Client register",
+                            "route": "/clients",
+                            "desc": "The client register."
+                        },
+                        {
+                            "label": "Vendor register",
+                            "route": "/vendors",
+                            "desc": "The vendor register."
+                        },
+                        {
+                            "label": "Client holds",
+                            "route": "/client-holds",
+                            "desc": "Put a client on hold or block them before ordering."
+                        },
+                        {
+                            "label": "Find duplicates",
+                            "route": "/duplicates",
+                            "desc": "Companies recorded twice — review and merge them."
+                        },
+                        {
+                            "label": "Asset issuance",
+                            "route": "/asset-register",
+                            "desc": "Stamps, diaries, safety gear & devices issued to engineers — acknowledged and tracked."
+                        }
+                    ]
+                },
+                {
+                    "section": "Portals",
+                    "tiles": [
+                        {
+                            "label": "Client portal",
+                            "route": "/portal-users",
+                            "desc": "Client portal users and requests."
+                        },
+                        {
+                            "label": "Vendor portal",
+                            "route": "/vendor-users",
+                            "desc": "Vendor portal access."
+                        }
+                    ]
+                }
+            ],
+            "routes": [
+                "directory",
+                "activities",
+                "clients",
+                "client",
+                "vendors",
+                "vendor",
+                "client-holds",
+                "asset-register",
+                "duplicates",
+                "portal-users",
+                "vendor-users"
+            ],
+            "served_by_area_engine": true
+        },
+        "Admin": {
+            "home": "/admin",
+            "sections": [
+                {
+                    "section": "Set up your workspace",
+                    "tiles": [
+                        {
+                            "label": "Company setup",
+                            "route": "/workspace/setup",
+                            "desc": "Configure your whole workspace in one place — features, forms, dropdowns, people, wording and setup health."
+                        },
+                        {
+                            "label": "Modules & features",
+                            "route": "/workspace/setup/modules",
+                            "desc": "Turn parts of the software on or off for your company — Operations, Sales, Money, Recruitment and the rest."
+                        }
+                    ]
+                },
+                {
+                    "section": "Masters",
+                    "tiles": [
+                        {
+                            "label": "Masters",
+                            "route": "/masters",
+                            "desc": "The lists behind every dropdown."
+                        }
+                    ]
+                },
+                {
+                    "section": "People",
+                    "tiles": [
+                        {
+                            "label": "User register",
+                            "route": "/users",
+                            "desc": "People who can sign in."
+                        },
+                        {
+                            "label": "Organisation",
+                            "route": "/hierarchy",
+                            "desc": "The reporting hierarchy."
+                        },
+                        {
+                            "label": "Roles & permissions",
+                            "route": "/access",
+                            "desc": "Who can do what."
+                        },
+                        {
+                            "label": "Role workspaces",
+                            "route": "/role-workspaces",
+                            "desc": "Per-role landing page & quick-access launchpad."
+                        },
+                        {
+                            "label": "Single sign-on",
+                            "route": "/sso",
+                            "desc": "Identity provider settings."
+                        }
+                    ]
+                },
+                {
+                    "section": "Configuration",
+                    "tiles": [
+                        {
+                            "label": "System settings",
+                            "route": "/settings",
+                            "desc": "Company-wide settings and terminology."
+                        },
+                        {
+                            "label": "Backup & restore",
+                            "route": "/backup",
+                            "desc": "Download a copy of this workspace, or restore one."
+                        },
+                        {
+                            "label": "AI settings",
+                            "route": "/ai-settings",
+                            "desc": "Connect and tune the assistant used by the form and document builders."
+                        },
+                        {
+                            "label": "Terminology / wording",
+                            "route": "/terminology",
+                            "desc": "Rename what things are called on every screen — e.g. “Requirement”, “Candidate”, “Client” — to match your business."
+                        },
+                        {
+                            "label": "Form Designer",
+                            "route": "/form-designer",
+                            "desc": "Build your Requirement & Candidate forms end to end — add or delete a field, create a dropdown with its options, rename, reorder, hide or require — all on one screen, no coding."
+                        },
+                        {
+                            "label": "Build forms with AI",
+                            "route": "/ai-forms",
+                            "desc": "Describe your recruitment process and let AI suggest the extra fields and dropdown lists to capture it — you review and approve before anything is added."
+                        },
+                        {
+                            "label": "Service scope",
+                            "route": "/service-scope",
+                            "desc": "Which services are offered and where."
+                        },
+                        {
+                            "label": "Report formats by service",
+                            "route": "/service-formats",
+                            "desc": "The report format each service allocates."
+                        },
+                        {
+                            "label": "Company profile",
+                            "route": "/company-profile",
+                            "desc": "Legal name, logo and details."
+                        }
+                    ]
+                },
+                {
+                    "section": "Approvals",
+                    "tiles": [
+                        {
+                            "label": "Approvals",
+                            "route": "/approvals-setup",
+                            "desc": "Who signs off what — recruitment, quotations, reports and delegation, in one place."
+                        }
+                    ]
+                },
+                {
+                    "section": "Report configuration",
+                    "tiles": [
+                        {
+                            "label": "Report templates",
+                            "route": "/templates?kind=report",
+                            "desc": "The report template library."
+                        },
+                        {
+                            "label": "Report audit trail",
+                            "route": "/audit-log",
+                            "desc": "Who changed what, and when."
+                        }
+                    ]
+                },
+                {
+                    "section": "Super admin",
+                    "tiles": [
+                        {
+                            "label": "Control panel",
+                            "route": "/super-admin",
+                            "desc": "Licence, seats, modules, subscription, tenants and system tools in one place."
+                        },
+                        {
+                            "label": "Companies",
+                            "route": "/companies",
+                            "desc": "Every company on the platform — plan, seats, modules, suspend and log in as. (Super-Admin.)"
+                        },
+                        {
+                            "label": "Product package",
+                            "route": "/product-package",
+                            "desc": "TPIA, Staffing, Recruitment or Enterprise — set the pack & bundles in one click."
+                        }
+                    ]
+                },
+                {
+                    "section": "Connections",
+                    "tiles": [
+                        {
+                            "label": "Ads Pro connection",
+                            "route": "/adspro",
+                            "desc": "Connect the advertising source."
+                        },
+                        {
+                            "label": "Licence",
+                            "route": "/licence",
+                            "desc": "The product licence and its state."
+                        },
+                        {
+                            "label": "MGH Books",
+                            "route": "/books-bridge",
+                            "desc": "The accounts bridge."
+                        }
+                    ]
+                }
+            ],
+            "routes": [
+                "admin",
+                "workspace/setup",
+                "workspace/setup/modules",
+                "masters",
+                "m/",
+                "lookups",
+                "custom-fields",
+                "cforms",
+                "cform",
+                "form-designer",
+                "ai-forms",
+                "users",
+                "user-new",
+                "user-edit",
+                "hierarchy",
+                "access",
+                "role-workspaces",
+                "adspro",
+                "sso",
+                "licence",
+                "product-package",
+                "pricing-usage",
+                "settings",
+                "terminology",
+                "service-scope",
+                "service-formats",
+                "company-profile",
+                "backup",
+                "ai-settings",
+                "books-bridge",
+                "approvals-setup",
+                "approver-map",
+                "approval-rules",
+                "idems-approval-rules",
+                "templates",
+                "report-templates",
+                "audit-log"
+            ],
+            "served_by_area_engine": true
+        }
+    },
+    "index": [
+        {
+            "label": "Dashboard",
+            "url": "/",
+            "area": "Home",
+            "icon": "🏠",
+            "desc": "Your landing dashboard.",
+            "kind": "screen"
+        },
+        {
+            "label": "My Work",
+            "url": "/my-work",
+            "area": "Home",
+            "icon": "📌",
+            "desc": "Everything waiting on you, in one place.",
+            "kind": "screen"
+        },
+        {
+            "label": "My tasks",
+            "url": "/tasks",
+            "area": "Home",
+            "icon": "✅",
+            "desc": "Follow-ups you write down and tick off.",
+            "kind": "screen"
+        },
+        {
+            "label": "Command Centre",
+            "url": "/command-centre",
+            "area": "Home",
+            "icon": "🛰️",
+            "desc": "The state of the business — attention, money, health.",
+            "kind": "screen"
+        },
+        {
+            "label": "Search records",
+            "url": "/search",
+            "area": "Home",
+            "icon": "🔍",
+            "desc": "Search across every register.",
+            "kind": "screen"
+        },
+        {
+            "label": "What to fix",
+            "url": "/advisor",
+            "area": "Home",
+            "icon": "🧭",
+            "desc": "The one action list, money attached.",
+            "kind": "screen"
+        },
+        {
+            "label": "Where the flow is broken",
+            "url": "/flow-gaps",
+            "area": "Home",
+            "icon": "🔗",
+            "desc": "Hand-offs that were skipped.",
+            "kind": "screen"
+        },
+        {
+            "label": "My signature",
+            "url": "/my-signature",
+            "area": "Me",
+            "icon": "✍️",
+            "desc": "The signature on your documents & quotations.",
+            "kind": "screen"
+        },
+        {
+            "label": "Change password",
+            "url": "/change-password",
+            "area": "Me",
+            "icon": "🔑",
+            "desc": "Update your password.",
+            "kind": "screen"
+        },
+        {
+            "label": "Two-step sign-in",
+            "url": "/two-factor",
+            "area": "Me",
+            "icon": "🛡️",
+            "desc": "A phone code as well as a password.",
+            "kind": "screen"
+        },
+        {
+            "label": "Operations",
+            "url": "/operations",
+            "area": "Operations",
+            "icon": "🛠️",
+            "desc": "The operations landing.",
+            "kind": "screen"
+        },
+        {
+            "label": "Clients",
+            "url": "/clients",
+            "area": "Operations",
+            "icon": "🏢",
+            "desc": "Who the work is for.",
+            "kind": "screen"
+        },
+        {
+            "label": "Vendors",
+            "url": "/vendors",
+            "area": "Operations",
+            "icon": "🚚",
+            "desc": "Who the work is subcontracted to.",
+            "kind": "screen"
+        },
+        {
+            "label": "Work orders",
+            "url": "/calls",
+            "area": "Operations",
+            "icon": "📋",
+            "desc": "Work orders from the client.",
+            "kind": "screen"
+        },
+        {
+            "label": "New work order",
+            "url": "/call-new",
+            "area": "Operations",
+            "icon": "➕",
+            "desc": "Raise a new work order.",
+            "kind": "action"
+        },
+        {
+            "label": "Jobs",
+            "url": "/jobs",
+            "area": "Operations",
+            "icon": "🗂️",
+            "desc": "Allocation, execution & closure.",
+            "kind": "screen"
+        },
+        {
+            "label": "Scheduling board",
+            "url": "/schedule",
+            "area": "Operations",
+            "icon": "🗓️",
+            "desc": "Assign inspectors to dates — board, capacity and availability tabs.",
+            "kind": "screen"
+        },
+        {
+            "label": "Capacity outlook",
+            "url": "/capacity-outlook",
+            "area": "Operations",
+            "icon": "📈",
+            "desc": "Who is free, who is stretched — a tab of the scheduling board.",
+            "kind": "screen"
+        },
+        {
+            "label": "Recurring services",
+            "url": "/recurring",
+            "area": "Operations",
+            "icon": "🔁",
+            "desc": "Contracts that raise work on a schedule.",
+            "kind": "screen"
+        },
+        {
+            "label": "Contract exceptions",
+            "url": "/contract-overrides",
+            "area": "Operations",
+            "icon": "🛑",
+            "desc": "Exhausted or expired contract overrides.",
+            "kind": "screen"
+        },
+        {
+            "label": "Contract openings",
+            "url": "/contract-openings",
+            "area": "Operations",
+            "icon": "✍",
+            "desc": "Endorse / approve won orders so they open to operations.",
+            "kind": "screen"
+        },
+        {
+            "label": "Team member availability",
+            "url": "/availability",
+            "area": "Operations",
+            "icon": "🟢",
+            "desc": "Daily availability board — a tab of the scheduling board.",
+            "kind": "screen"
+        },
+        {
+            "label": "Attendance reconciliation",
+            "url": "/attendance-recon",
+            "area": "Operations",
+            "icon": "✅",
+            "desc": "Entry / exit vs billed.",
+            "kind": "screen"
+        },
+        {
+            "label": "Timesheet",
+            "url": "/timesheet",
+            "area": "Operations",
+            "icon": "⏱️",
+            "desc": "Hours logged against jobs.",
+            "kind": "screen"
+        },
+        {
+            "label": "Vouchers",
+            "url": "/vouchers",
+            "area": "Operations",
+            "icon": "🧾",
+            "desc": "Field expenses raised against a job.",
+            "kind": "screen"
+        },
+        {
+            "label": "Inspector ratings",
+            "url": "/ratings",
+            "area": "Operations",
+            "icon": "⭐",
+            "desc": "Post-job quality & conduct.",
+            "kind": "screen"
+        },
+        {
+            "label": "Recruitment",
+            "url": "/recruitment",
+            "area": "Recruitment",
+            "icon": "🧭",
+            "desc": "Everything recruitment and workforce — what needs doing today, then the analysis.",
+            "kind": "screen"
+        },
+        {
+            "label": "Hiring requests",
+            "url": "/hiring-requests",
+            "area": "Recruitment",
+            "icon": "📝",
+            "desc": "What the business has asked to recruit, before it is approved.",
+            "kind": "screen"
+        },
+        {
+            "label": "Requisitions",
+            "url": "/requisitions",
+            "area": "Recruitment",
+            "icon": "📌",
+            "desc": "Approved demand being recruited against.",
+            "kind": "screen"
+        },
+        {
+            "label": "Candidates",
+            "url": "/candidates",
+            "area": "Recruitment",
+            "icon": "👤",
+            "desc": "Candidate pipeline.",
+            "kind": "screen"
+        },
+        {
+            "label": "New hiring request",
+            "url": "/hiring-request",
+            "area": "Recruitment",
+            "icon": "➕",
+            "desc": "Ask to recruit — it becomes a requisition once approved.",
+            "kind": "action"
+        },
+        {
+            "label": "New requisition",
+            "url": "/requisition-new",
+            "area": "Recruitment",
+            "icon": "➕",
+            "desc": "Raise approved demand directly, without a hiring request.",
+            "kind": "action"
+        },
+        {
+            "label": "Add candidate",
+            "url": "/candidate-new",
+            "area": "Recruitment",
+            "icon": "➕",
+            "desc": "Add a candidate.",
+            "kind": "action"
+        },
+        {
+            "label": "Positions",
+            "url": "/positions",
+            "area": "Recruitment",
+            "icon": "🏷️",
+            "desc": "Position master — sanctioned roles & headcount.",
+            "kind": "screen"
+        },
+        {
+            "label": "Departments",
+            "url": "/departments",
+            "area": "Recruitment",
+            "icon": "🏛️",
+            "desc": "Designations, positions, headcount & people by department.",
+            "kind": "screen"
+        },
+        {
+            "label": "Org chart",
+            "url": "/positions-org",
+            "area": "Recruitment",
+            "icon": "🗂️",
+            "desc": "Reporting hierarchy from the position master.",
+            "kind": "screen"
+        },
+        {
+            "label": "Import org chart",
+            "url": "/positions-import",
+            "area": "Recruitment",
+            "icon": "⬆️",
+            "desc": "Import an existing organogram from a spreadsheet.",
+            "kind": "action"
+        },
+        {
+            "label": "Interviews to attend",
+            "url": "/my-interviews",
+            "area": "Recruitment",
+            "icon": "🎤",
+            "desc": "Interviews you are on the panel for.",
+            "kind": "screen"
+        },
+        {
+            "label": "My approvals",
+            "url": "/my-approvals",
+            "area": "Recruitment",
+            "icon": "✅",
+            "desc": "Items waiting on your approval.",
+            "kind": "screen"
+        },
+        {
+            "label": "Export data",
+            "url": "/recruit-export?dataset=candidates",
+            "area": "Recruitment",
+            "icon": "⬇️",
+            "desc": "Download candidates, requisitions & offers as CSV.",
+            "kind": "screen"
+        },
+        {
+            "label": "Hiring workflows",
+            "url": "/recruit-pipelines",
+            "area": "Recruitment",
+            "icon": "⇥",
+            "desc": "Configure the recruitment pipeline & stages.",
+            "kind": "screen"
+        },
+        {
+            "label": "Compensation setup",
+            "url": "/comp-setup",
+            "area": "Recruitment",
+            "icon": "₹",
+            "desc": "Configure salary headings & statutory components.",
+            "kind": "screen"
+        },
+        {
+            "label": "Document templates",
+            "url": "/doc-templates",
+            "area": "Recruitment",
+            "icon": "📄",
+            "desc": "Configure offer / appointment letter templates.",
+            "kind": "screen"
+        },
+        {
+            "label": "Recruitment approvals",
+            "url": "/recruit-approvals",
+            "area": "Recruitment",
+            "icon": "🧷",
+            "desc": "Who approves requisitions, offers and salaries — the matrix, SLAs, escalations and the Review Required triggers.",
+            "kind": "screen"
+        },
+        {
+            "label": "Approval delegation",
+            "url": "/approval-delegations",
+            "area": "Recruitment",
+            "icon": "🤝",
+            "desc": "Who may approve for whom while somebody is away.",
+            "kind": "screen"
+        },
+        {
+            "label": "Careers page",
+            "url": "/careers-admin",
+            "area": "Recruitment",
+            "icon": "🌐",
+            "desc": "Publish openings to a public careers page.",
+            "kind": "screen"
+        },
+        {
+            "label": "Project costing",
+            "url": "/project-costings",
+            "area": "Operations",
+            "icon": "🧮",
+            "desc": "Team cost build-ups → rates & margin.",
+            "kind": "screen"
+        },
+        {
+            "label": "Inspection",
+            "url": "/documents",
+            "area": "Operations",
+            "icon": "🔬",
+            "desc": "Third-party / in-process / final inspection reporting.",
+            "kind": "screen"
+        },
+        {
+            "label": "Expediting",
+            "url": "/expediting",
+            "area": "Operations",
+            "icon": "🚚",
+            "desc": "Supplier progress, schedule and delivery expediting.",
+            "kind": "screen"
+        },
+        {
+            "label": "Vendor Assessment",
+            "url": "/documents",
+            "area": "Operations",
+            "icon": "🏢",
+            "desc": "Vendor prequalification, qualification and supplier evaluation.",
+            "kind": "screen"
+        },
+        {
+            "label": "Vendor Audit",
+            "url": "/documents",
+            "area": "Operations",
+            "icon": "🔍",
+            "desc": "Vendor / process / management-system audits against defined criteria.",
+            "kind": "screen"
+        },
+        {
+            "label": "Release",
+            "url": "/documents",
+            "area": "Operations",
+            "icon": "🎫",
+            "desc": "Release notes / acceptance / disposition as a controlled consequence of verification.",
+            "kind": "screen"
+        },
+        {
+            "label": "Project Deputation",
+            "url": "/calls",
+            "area": "Operations",
+            "icon": "👷",
+            "desc": "Manpower / project deputation and site assignments.",
+            "kind": "screen"
+        },
+        {
+            "label": "Nonconformity & CAPA",
+            "url": "/issues",
+            "area": "Operations",
+            "icon": "⚠️",
+            "desc": "Universal issue engine — NCR, nonconformity, CAPA, deviation, concession & corrective action.",
+            "kind": "screen"
+        },
+        {
+            "label": "Quotes & reports approvals",
+            "url": "/approval-rules",
+            "area": "Admin",
+            "icon": "🔀",
+            "desc": "Who signs off quotations and inspection reports before they leave the building.",
+            "kind": "screen"
+        },
+        {
+            "label": "Report approver map approvals",
+            "url": "/approver-map",
+            "area": "Admin",
+            "icon": "👤",
+            "desc": "Which person signs which kind of inspection report.",
+            "kind": "screen"
+        },
+        {
+            "label": "Delegation approvals",
+            "url": "/approval-delegations",
+            "area": "Admin",
+            "icon": "🤝",
+            "desc": "Who may approve on somebody else's behalf while they are away, and until when. Company-wide on purpose: cover for somebody on leave applies to everything they approve, not one module at a time.",
+            "kind": "screen"
+        },
+        {
+            "label": "Sales",
+            "url": "/sales",
+            "area": "Sales",
+            "icon": "🎯",
+            "desc": "Leads, opportunities, inquiries, quotes and the pipeline.",
+            "kind": "screen"
+        },
+        {
+            "label": "Leads",
+            "url": "/leads",
+            "area": "Sales",
+            "icon": "🎯",
+            "desc": "A company worth pursuing — before any specific job.",
+            "kind": "screen"
+        },
+        {
+            "label": "Opportunities",
+            "url": "/opportunities",
+            "area": "Sales",
+            "icon": "💡",
+            "desc": "A live deal you are working to win or lose.",
+            "kind": "screen"
+        },
+        {
+            "label": "Inquiries",
+            "url": "/inquiries",
+            "area": "Sales",
+            "icon": "📨",
+            "desc": "A specific request to quote — a quote is raised from it.",
+            "kind": "screen"
+        },
+        {
+            "label": "Quotes",
+            "url": "/quotes",
+            "area": "Sales",
+            "icon": "📝",
+            "desc": "Quotations, revisions and approvals.",
+            "kind": "screen"
+        },
+        {
+            "label": "Quote templates",
+            "url": "/templates?kind=quote",
+            "area": "Sales",
+            "icon": "📝",
+            "desc": "Letter and covering-note templates for quotes.",
+            "kind": "screen"
+        },
+        {
+            "label": "Pre-order checklist",
+            "url": "/preorder-checklist",
+            "area": "Sales",
+            "icon": "☑",
+            "desc": "Enquiry / tender / contract review before a quote is approved.",
+            "kind": "screen"
+        },
+        {
+            "label": "Approvals",
+            "url": "/approvals",
+            "area": "Sales",
+            "icon": "🛂",
+            "desc": "Deals held at a stage gate.",
+            "kind": "screen"
+        },
+        {
+            "label": "Pipelines & funnels",
+            "url": "/pipelines",
+            "area": "Sales",
+            "icon": "🪜",
+            "desc": "Stages and conversion.",
+            "kind": "screen"
+        },
+        {
+            "label": "Marketplace",
+            "url": "/marketplace",
+            "area": "Marketplace",
+            "icon": "🧑‍🏭",
+            "desc": "Post technical-manpower requirements, match and shortlist professionals, and their public passports.",
+            "kind": "screen"
+        },
+        {
+            "label": "Requirements",
+            "url": "/connect-requirements",
+            "area": "Marketplace",
+            "icon": "📋",
+            "desc": "Post a manpower requirement and manage who applies.",
+            "kind": "screen"
+        },
+        {
+            "label": "Guided post",
+            "url": "/connect-concierge",
+            "area": "Marketplace",
+            "icon": "💬",
+            "desc": "Build a requirement by answering a few questions.",
+            "kind": "screen"
+        },
+        {
+            "label": "Talent search",
+            "url": "/connect-talent",
+            "area": "Marketplace",
+            "icon": "🔎",
+            "desc": "Search the shared pool of self-listed professionals.",
+            "kind": "screen"
+        },
+        {
+            "label": "Passports",
+            "url": "/passport-share",
+            "area": "Marketplace",
+            "icon": "🪪",
+            "desc": "A professional's public, verifiable credential page.",
+            "kind": "screen"
+        },
+        {
+            "label": "Industry taxonomy",
+            "url": "/connect-taxonomy",
+            "area": "Marketplace",
+            "icon": "🏭",
+            "desc": "Sectors, equipment, materials, disciplines, standards, certifications.",
+            "kind": "screen"
+        },
+        {
+            "label": "Qualification taxonomy",
+            "url": "/connect-qualifications",
+            "area": "Marketplace",
+            "icon": "🎓",
+            "desc": "ITI → diploma → engineer → MBA ladder, job families, roles and certifications.",
+            "kind": "screen"
+        },
+        {
+            "label": "Verification desk",
+            "url": "/connect-verify",
+            "area": "Marketplace",
+            "icon": "✅",
+            "desc": "Confirm identity & credential checks; move professionals up the trust ladder.",
+            "kind": "screen"
+        },
+        {
+            "label": "Rating-integrity desk",
+            "url": "/rating-disputes",
+            "area": "Marketplace",
+            "icon": "⚖️",
+            "desc": "Investigate reported ratings; uphold, annotate or remove them from scores.",
+            "kind": "screen"
+        },
+        {
+            "label": "Messages",
+            "url": "/connect-messages",
+            "area": "Marketplace",
+            "icon": "💬",
+            "desc": "Two-way chat with applicants, tied to each requirement.",
+            "kind": "screen"
+        },
+        {
+            "label": "Channels",
+            "url": "/connect-channels",
+            "area": "Marketplace",
+            "icon": "📲",
+            "desc": "WhatsApp / SMS / email alerts, templates and delivery log.",
+            "kind": "screen"
+        },
+        {
+            "label": "Agency bench",
+            "url": "/connect-bench",
+            "area": "Marketplace",
+            "icon": "🏗️",
+            "desc": "An agency's own private roster — add people and allocate them to jobs.",
+            "kind": "screen"
+        },
+        {
+            "label": "Market analytics",
+            "url": "/connect-analytics",
+            "area": "Marketplace",
+            "icon": "📊",
+            "desc": "Supply vs demand, fill funnel, time-to-award, rate benchmarks, pool growth.",
+            "kind": "screen"
+        },
+        {
+            "label": "Organisations",
+            "url": "/connect-orgs",
+            "area": "Marketplace",
+            "icon": "🏢",
+            "desc": "Register organisations and their module entitlements (TPIA / agency / company).",
+            "kind": "screen"
+        },
+        {
+            "label": "Access requests",
+            "url": "/access-requests",
+            "area": "Marketplace",
+            "icon": "🔑",
+            "desc": "People who signed up for a company we already work with — decide, then invite them the usual way.",
+            "kind": "screen"
+        },
+        {
+            "label": "Quality & Accreditation",
+            "url": "/quality",
+            "area": "Quality & Accreditation",
+            "icon": "🛡️",
+            "desc": "Two halves: the everyday quality work you touch during jobs, and the accreditation registers an assessor asks for.",
+            "kind": "screen"
+        },
+        {
+            "label": "Complaints & appeals",
+            "url": "/complaints",
+            "area": "Quality & Accreditation",
+            "icon": "📮",
+            "desc": "Complaints and appeals register.",
+            "kind": "screen"
+        },
+        {
+            "label": "Client acceptance",
+            "url": "/report-reviews",
+            "area": "Quality & Accreditation",
+            "icon": "📬",
+            "desc": "Reports accepted or rejected.",
+            "kind": "screen"
+        },
+        {
+            "label": "Customer satisfaction",
+            "url": "/satisfaction",
+            "area": "Quality & Accreditation",
+            "icon": "⭐",
+            "desc": "Surveys and follow-up.",
+            "kind": "screen"
+        },
+        {
+            "label": "Items & samples",
+            "url": "/samples",
+            "area": "Quality & Accreditation",
+            "icon": "📦",
+            "desc": "Items received for verification.",
+            "kind": "screen"
+        },
+        {
+            "label": "Hold & witness points",
+            "url": "/hold-points",
+            "area": "Quality & Accreditation",
+            "icon": "✋",
+            "desc": "Points where work pauses for us.",
+            "kind": "screen"
+        },
+        {
+            "label": "Evidence review",
+            "url": "/evidence-review",
+            "area": "Quality & Accreditation",
+            "icon": "📍",
+            "desc": "Field evidence awaiting review.",
+            "kind": "screen"
+        },
+        {
+            "label": "Nonconformity workspace",
+            "url": "/issues",
+            "area": "Quality & Accreditation",
+            "icon": "⚠",
+            "desc": "Issues, NCRs, corrective actions and departures — one screen with tabs.",
+            "kind": "screen"
+        },
+        {
+            "label": "Equipment & calibration",
+            "url": "/equipment",
+            "area": "Quality & Accreditation",
+            "icon": "📏",
+            "desc": "Instruments and calibration status.",
+            "kind": "screen"
+        },
+        {
+            "label": "Method library",
+            "url": "/methods",
+            "area": "Quality & Accreditation",
+            "icon": "📚",
+            "desc": "Standards and methods applied.",
+            "kind": "screen"
+        },
+        {
+            "label": "Decision rules",
+            "url": "/drules",
+            "area": "Quality & Accreditation",
+            "icon": "⚖️",
+            "desc": "Statements of conformity rules.",
+            "kind": "screen"
+        },
+        {
+            "label": "Controlled documents",
+            "url": "/cdocs",
+            "area": "Quality & Accreditation",
+            "icon": "📄",
+            "desc": "The controlled document set.",
+            "kind": "screen"
+        },
+        {
+            "label": "Retention schedule",
+            "url": "/retention",
+            "area": "Quality & Accreditation",
+            "icon": "🗄️",
+            "desc": "How long records are kept.",
+            "kind": "screen"
+        },
+        {
+            "label": "Data & information control",
+            "url": "/data-control",
+            "area": "Quality & Accreditation",
+            "icon": "🗃",
+            "desc": "Information management controls.",
+            "kind": "screen"
+        },
+        {
+            "label": "Risks & opportunities",
+            "url": "/risks",
+            "area": "Quality & Accreditation",
+            "icon": "🎲",
+            "desc": "The risk register.",
+            "kind": "screen"
+        },
+        {
+            "label": "Competence & authorisation",
+            "url": "/competence",
+            "area": "Quality & Accreditation",
+            "icon": "🎓",
+            "desc": "Training, assessment and authorisation.",
+            "kind": "screen"
+        },
+        {
+            "label": "Impartiality",
+            "url": "/impartiality",
+            "area": "Quality & Accreditation",
+            "icon": "⚖️",
+            "desc": "Threats to impartiality and controls.",
+            "kind": "screen"
+        },
+        {
+            "label": "Disclosure consent",
+            "url": "/disclosure",
+            "area": "Quality & Accreditation",
+            "icon": "📢",
+            "desc": "Consents to disclose.",
+            "kind": "screen"
+        },
+        {
+            "label": "Internal audits",
+            "url": "/internal-audits",
+            "area": "Quality & Accreditation",
+            "icon": "🔍",
+            "desc": "The internal audit programme.",
+            "kind": "screen"
+        },
+        {
+            "label": "Management review",
+            "url": "/management-reviews",
+            "area": "Quality & Accreditation",
+            "icon": "🏛",
+            "desc": "Management review records.",
+            "kind": "screen"
+        },
+        {
+            "label": "Confidentiality",
+            "url": "/confidentiality",
+            "area": "Quality & Accreditation",
+            "icon": "🔒",
+            "desc": "Undertakings, NDAs and breaches.",
+            "kind": "screen"
+        },
+        {
+            "label": "Site entry documents",
+            "url": "/site-docs",
+            "area": "Quality & Accreditation",
+            "icon": "🛂",
+            "desc": "Papers needed for site access.",
+            "kind": "screen"
+        },
+        {
+            "label": "Identity documents",
+            "url": "/identity",
+            "area": "Quality & Accreditation",
+            "icon": "🪪",
+            "desc": "ID that gates site access.",
+            "kind": "screen"
+        },
+        {
+            "label": "SLA targets",
+            "url": "/sla-targets",
+            "area": "Quality & Accreditation",
+            "icon": "⏳",
+            "desc": "Turnaround targets for service delivery.",
+            "kind": "screen"
+        },
+        {
+            "label": "Reporting",
+            "url": "/reporting",
+            "area": "Reporting",
+            "icon": "📑",
+            "desc": "Where inspection reports are written, endorsed, expedited and the formats that govern them.",
+            "kind": "screen"
+        },
+        {
+            "label": "Report register",
+            "url": "/documents",
+            "area": "Reporting",
+            "icon": "📑",
+            "desc": "The report register.",
+            "kind": "screen"
+        },
+        {
+            "label": "New report",
+            "url": "/document-new",
+            "area": "Reporting",
+            "icon": "➕",
+            "desc": "Start a new report.",
+            "kind": "screen"
+        },
+        {
+            "label": "Endorsement register",
+            "url": "/endorsements",
+            "area": "Reporting",
+            "icon": "✅",
+            "desc": "Manufacturer document endorsements.",
+            "kind": "screen"
+        },
+        {
+            "label": "Expediting register",
+            "url": "/expediting",
+            "area": "Reporting",
+            "icon": "🚚",
+            "desc": "Chasing vendor delivery.",
+            "kind": "screen"
+        },
+        {
+            "label": "Project delivery",
+            "url": "/expediting-projects",
+            "area": "Reporting",
+            "icon": "🗂️",
+            "desc": "Multi-vendor projects by milestone.",
+            "kind": "screen"
+        },
+        {
+            "label": "Technical writing",
+            "url": "/writing-assistant",
+            "area": "Reporting",
+            "icon": "✒️",
+            "desc": "Phrase library and writing help.",
+            "kind": "screen"
+        },
+        {
+            "label": "Learning insights",
+            "url": "/learning",
+            "area": "Reporting",
+            "icon": "🧠",
+            "desc": "Suggestions learned from past reports.",
+            "kind": "screen"
+        },
+        {
+            "label": "Where we stand",
+            "url": "/compliance",
+            "area": "Reporting",
+            "icon": "⚖️",
+            "desc": "Which obligations are met, measured live.",
+            "kind": "screen"
+        },
+        {
+            "label": "Money",
+            "url": "/money",
+            "area": "Money",
+            "icon": "💰",
+            "desc": "From what is waiting to be billed, through invoices and money in, to the profit each business unit makes.",
+            "kind": "screen"
+        },
+        {
+            "label": "Billable events",
+            "url": "/billable-events",
+            "area": "Money",
+            "icon": "🧾",
+            "desc": "Approved operational work waiting to be invoiced.",
+            "kind": "screen"
+        },
+        {
+            "label": "Invoice tracker",
+            "url": "/invoicing",
+            "area": "Money",
+            "icon": "💳",
+            "desc": "Tick each job: invoiced, paid, inter-office credit.",
+            "kind": "screen"
+        },
+        {
+            "label": "Billing workspace",
+            "url": "/to-bill",
+            "area": "Money",
+            "icon": "🧾",
+            "desc": "Bill, invoice, collect, age and export — one screen with tabs.",
+            "kind": "screen"
+        },
+        {
+            "label": "Revenue reconciliation",
+            "url": "/revenue-reconciliation",
+            "area": "Money",
+            "icon": "⚖️",
+            "desc": "Where a job’s legacy invoice figure disagrees with the books ledger.",
+            "kind": "screen"
+        },
+        {
+            "label": "Contract number register",
+            "url": "/profitability",
+            "area": "Money",
+            "icon": "💹",
+            "desc": "Profit and margin by job.",
+            "kind": "screen"
+        },
+        {
+            "label": "Office costs & overheads",
+            "url": "/office-finance",
+            "area": "Money",
+            "icon": "📐",
+            "desc": "Per-office cost model.",
+            "kind": "screen"
+        },
+        {
+            "label": "Month-end cost run",
+            "url": "/cost-run",
+            "area": "Money",
+            "icon": "🧮",
+            "desc": "Roll up costs for the month.",
+            "kind": "screen"
+        },
+        {
+            "label": "Cost reconciliation",
+            "url": "/cost-reconciliation",
+            "area": "Money",
+            "icon": "⚖️",
+            "desc": "Where a job’s legacy sub-contractor cost disagrees with the committed cost ledger.",
+            "kind": "screen"
+        },
+        {
+            "label": "Reimbursable duplication",
+            "url": "/reimbursable-dedup",
+            "area": "Money",
+            "icon": "🧾",
+            "desc": "Jobs whose reimbursables are recorded on both doors — reconcile so profit is not double-charged.",
+            "kind": "screen"
+        },
+        {
+            "label": "Business Unit profit & loss",
+            "url": "/sbu-pl",
+            "area": "Money",
+            "icon": "📊",
+            "desc": "P&L by business unit.",
+            "kind": "screen"
+        },
+        {
+            "label": "Profit by work order",
+            "url": "/call-profit",
+            "area": "Money",
+            "icon": "🧾",
+            "desc": "What each inspection made.",
+            "kind": "screen"
+        },
+        {
+            "label": "Insights",
+            "url": "/insights",
+            "area": "Insights",
+            "icon": "📊",
+            "desc": "One home for every dashboard — role views, the sales view, the management overview and the live analytics hub.",
+            "kind": "screen"
+        },
+        {
+            "label": "Dashboards",
+            "url": "/reports",
+            "area": "Insights",
+            "icon": "📊",
+            "desc": "Role dashboards across the business.",
+            "kind": "screen"
+        },
+        {
+            "label": "Analytics & performance",
+            "url": "/analytics",
+            "area": "Insights",
+            "icon": "📈",
+            "desc": "KPI cards, trends and drill-down.",
+            "kind": "screen"
+        },
+        {
+            "label": "Sales dashboard",
+            "url": "/crm-dashboard",
+            "area": "Insights",
+            "icon": "📈",
+            "desc": "Win rates and value by stage.",
+            "kind": "screen"
+        },
+        {
+            "label": "Management dashboard",
+            "url": "/mis",
+            "area": "Insights",
+            "icon": "📉",
+            "desc": "The MIS overview.",
+            "kind": "screen"
+        },
+        {
+            "label": "Directory",
+            "url": "/directory",
+            "area": "Directory",
+            "icon": "🏢",
+            "desc": "The people and companies the work is done with — and the portals they sign in to.",
+            "kind": "screen"
+        },
+        {
+            "label": "Activity",
+            "url": "/activities",
+            "area": "Directory",
+            "icon": "🕘",
+            "desc": "A timeline of what happened.",
+            "kind": "screen"
+        },
+        {
+            "label": "Client register",
+            "url": "/clients",
+            "area": "Directory",
+            "icon": "🏢",
+            "desc": "The client register.",
+            "kind": "screen"
+        },
+        {
+            "label": "Vendor register",
+            "url": "/vendors",
+            "area": "Directory",
+            "icon": "🚚",
+            "desc": "The vendor register.",
+            "kind": "screen"
+        },
+        {
+            "label": "Client holds",
+            "url": "/client-holds",
+            "area": "Directory",
+            "icon": "⛔",
+            "desc": "Put a client on hold or block them before ordering.",
+            "kind": "screen"
+        },
+        {
+            "label": "Find duplicates",
+            "url": "/duplicates",
+            "area": "Directory",
+            "icon": "🔍",
+            "desc": "Companies recorded twice — review and merge them.",
+            "kind": "screen"
+        },
+        {
+            "label": "Asset issuance",
+            "url": "/asset-register",
+            "area": "Directory",
+            "icon": "📦",
+            "desc": "Stamps, diaries, safety gear & devices issued to engineers — acknowledged and tracked.",
+            "kind": "screen"
+        },
+        {
+            "label": "Client portal",
+            "url": "/portal-users",
+            "area": "Directory",
+            "icon": "🌐",
+            "desc": "Client portal users and requests.",
+            "kind": "screen"
+        },
+        {
+            "label": "Vendor portal",
+            "url": "/vendor-users",
+            "area": "Directory",
+            "icon": "🏭",
+            "desc": "Vendor portal access.",
+            "kind": "screen"
+        },
+        {
+            "label": "Admin",
+            "url": "/admin",
+            "area": "Admin",
+            "icon": "⚙️",
+            "desc": "For administrators: masters, people, access, licensing and system configuration.",
+            "kind": "screen"
+        },
+        {
+            "label": "Company setup",
+            "url": "/workspace/setup",
+            "area": "Admin",
+            "icon": "🚀",
+            "desc": "Configure your whole workspace in one place — features, forms, dropdowns, people, wording and setup health.",
+            "kind": "screen"
+        },
+        {
+            "label": "Modules & features",
+            "url": "/workspace/setup/modules",
+            "area": "Admin",
+            "icon": "🧰",
+            "desc": "Turn parts of the software on or off for your company — Operations, Sales, Money, Recruitment and the rest.",
+            "kind": "screen"
+        },
+        {
+            "label": "Masters",
+            "url": "/masters",
+            "area": "Admin",
+            "icon": "📋",
+            "desc": "The lists behind every dropdown.",
+            "kind": "screen"
+        },
+        {
+            "label": "User register",
+            "url": "/users",
+            "area": "Admin",
+            "icon": "👥",
+            "desc": "People who can sign in.",
+            "kind": "screen"
+        },
+        {
+            "label": "Organisation",
+            "url": "/hierarchy",
+            "area": "Admin",
+            "icon": "🗂️",
+            "desc": "The reporting hierarchy.",
+            "kind": "screen"
+        },
+        {
+            "label": "Roles & permissions",
+            "url": "/access",
+            "area": "Admin",
+            "icon": "🔐",
+            "desc": "Who can do what.",
+            "kind": "screen"
+        },
+        {
+            "label": "Role workspaces",
+            "url": "/role-workspaces",
+            "area": "Admin",
+            "icon": "🧭",
+            "desc": "Per-role landing page & quick-access launchpad.",
+            "kind": "screen"
+        },
+        {
+            "label": "Single sign-on",
+            "url": "/sso",
+            "area": "Admin",
+            "icon": "🔑",
+            "desc": "Identity provider settings.",
+            "kind": "screen"
+        },
+        {
+            "label": "System settings",
+            "url": "/settings",
+            "area": "Admin",
+            "icon": "⚙️",
+            "desc": "Company-wide settings and terminology.",
+            "kind": "screen"
+        },
+        {
+            "label": "Backup & restore",
+            "url": "/backup",
+            "area": "Admin",
+            "icon": "💾",
+            "desc": "Download a copy of this workspace, or restore one.",
+            "kind": "screen"
+        },
+        {
+            "label": "AI settings",
+            "url": "/ai-settings",
+            "area": "Admin",
+            "icon": "🤖",
+            "desc": "Connect and tune the assistant used by the form and document builders.",
+            "kind": "screen"
+        },
+        {
+            "label": "Terminology / wording",
+            "url": "/terminology",
+            "area": "Admin",
+            "icon": "🔤",
+            "desc": "Rename what things are called on every screen — e.g. “Requirement”, “Candidate”, “Client” — to match your business.",
+            "kind": "screen"
+        },
+        {
+            "label": "Form Designer",
+            "url": "/form-designer",
+            "area": "Admin",
+            "icon": "🧱",
+            "desc": "Build your Requirement & Candidate forms end to end — add or delete a field, create a dropdown with its options, rename, reorder, hide or require — all on one screen, no coding.",
+            "kind": "screen"
+        },
+        {
+            "label": "Build forms with AI",
+            "url": "/ai-forms",
+            "area": "Admin",
+            "icon": "✨",
+            "desc": "Describe your recruitment process and let AI suggest the extra fields and dropdown lists to capture it — you review and approve before anything is added.",
+            "kind": "screen"
+        },
+        {
+            "label": "Service scope",
+            "url": "/service-scope",
+            "area": "Admin",
+            "icon": "🧩",
+            "desc": "Which services are offered and where.",
+            "kind": "screen"
+        },
+        {
+            "label": "Report formats by service",
+            "url": "/service-formats",
+            "area": "Admin",
+            "icon": "📄",
+            "desc": "The report format each service allocates.",
+            "kind": "screen"
+        },
+        {
+            "label": "Company profile",
+            "url": "/company-profile",
+            "area": "Admin",
+            "icon": "🏢",
+            "desc": "Legal name, logo and details.",
+            "kind": "screen"
+        },
+        {
+            "label": "Approvals",
+            "url": "/approvals-setup",
+            "area": "Admin",
+            "icon": "✅",
+            "desc": "Who signs off what — recruitment, quotations, reports and delegation, in one place.",
+            "kind": "screen"
+        },
+        {
+            "label": "Report templates",
+            "url": "/templates?kind=report",
+            "area": "Admin",
+            "icon": "📝",
+            "desc": "The report template library.",
+            "kind": "screen"
+        },
+        {
+            "label": "Report audit trail",
+            "url": "/audit-log",
+            "area": "Admin",
+            "icon": "🛡️",
+            "desc": "Who changed what, and when.",
+            "kind": "screen"
+        },
+        {
+            "label": "Control panel",
+            "url": "/super-admin",
+            "area": "Admin",
+            "icon": "🛰️",
+            "desc": "Licence, seats, modules, subscription, tenants and system tools in one place.",
+            "kind": "screen"
+        },
+        {
+            "label": "Companies",
+            "url": "/companies",
+            "area": "Admin",
+            "icon": "🏢",
+            "desc": "Every company on the platform — plan, seats, modules, suspend and log in as. (Super-Admin.)",
+            "kind": "screen"
+        },
+        {
+            "label": "Product package",
+            "url": "/product-package",
+            "area": "Admin",
+            "icon": "📦",
+            "desc": "TPIA, Staffing, Recruitment or Enterprise — set the pack & bundles in one click.",
+            "kind": "screen"
+        },
+        {
+            "label": "Ads Pro connection",
+            "url": "/adspro",
+            "area": "Admin",
+            "icon": "📢",
+            "desc": "Connect the advertising source.",
+            "kind": "screen"
+        },
+        {
+            "label": "Licence",
+            "url": "/licence",
+            "area": "Admin",
+            "icon": "📜",
+            "desc": "The product licence and its state.",
+            "kind": "screen"
+        },
+        {
+            "label": "MGH Books",
+            "url": "/books-bridge",
+            "area": "Admin",
+            "icon": "📗",
+            "desc": "The accounts bridge.",
+            "kind": "screen"
+        }
+    ],
+    "rail": []
+}
