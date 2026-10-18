@@ -66,14 +66,14 @@
     <label>Certification</label>
     <div class="ac"><input type="text" name="name" id="certName" autocomplete="off" required placeholder="e.g. CSWIP 3.1, ASNT NDT Level II, NEBOSH"><div class="ac-list" id="certList"></div></div>
     <div class="grid2">
-      <div><label>Issuing authority</label><input name="authority" placeholder="e.g. TWI, ASNT, BINDT"></div>
-      <div><label>Certificate number</label><input name="cert_number"></div>
-      <div><label>Level (if any)</label><input name="level" placeholder="e.g. II, 3.1"></div>
-      <div><label>Discipline</label><input name="discipline" placeholder="e.g. NDT, Welding"></div>
-      <div><label>Issue date</label><input type="date" name="issue_date"></div>
-      <div><label>Expiry date</label><input type="date" name="expiry_date"></div>
+      <div><label for="f-authority">Issuing authority</label><input id="f-authority" name="authority" placeholder="e.g. TWI, ASNT, BINDT"></div>
+      <div><label for="f-cert_number">Certificate number</label><input id="f-cert_number" name="cert_number"></div>
+      <div><label for="f-level">Level (if any)</label><input id="f-level" name="level" placeholder="e.g. II, 3.1"></div>
+      <div><label for="f-discipline">Discipline</label><input id="f-discipline" name="discipline" placeholder="e.g. NDT, Welding"></div>
+      <div><label for="f-issue_date">Issue date</label><input id="f-issue_date" type="date" name="issue_date"></div>
+      <div><label for="f-expiry_date">Expiry date</label><input id="f-expiry_date" type="date" name="expiry_date"></div>
     </div>
-    <label>Certificate document (optional)</label><input type="file" name="cert_file">
+    <label for="f-cert_file">Certificate document (optional)</label><input id="f-cert_file" type="file" name="cert_file">
     <button class="btn" type="submit" style="margin-top:12px">Add certification</button>
   </form>
 </div>
@@ -104,17 +104,17 @@
 
   <form method="post" action="/pro/credentials" style="border-top:1px solid var(--line,#eee);margin-top:8px;padding-top:12px">
     <input type="hidden" name="action" value="project_save">
-    <label>Project title</label><input name="title" required placeholder="e.g. Refinery shutdown 2025 — RT/UT inspection">
+    <label for="f-title">Project title</label><input id="f-title" name="title" required placeholder="e.g. Refinery shutdown 2025 — RT/UT inspection">
     <div class="grid2">
-      <div><label>Your role</label><input name="role" placeholder="e.g. NDT Technician"></div>
-      <div><label>Client / owner (optional)</label><input name="client"></div>
-      <div><label>Industry</label><input name="industry" placeholder="e.g. Oil &amp; Gas"></div>
-      <div><label>Location</label><input name="location" placeholder="e.g. Dahej, Gujarat"></div>
-      <div><label>Start</label><input type="date" name="start_date"></div>
-      <div><label>End</label><input type="date" name="end_date"></div>
+      <div><label for="f-role">Your role</label><input id="f-role" name="role" placeholder="e.g. NDT Technician"></div>
+      <div><label for="f-client">Client / owner (optional)</label><input id="f-client" name="client"></div>
+      <div><label for="f-industry">Industry</label><input id="f-industry" name="industry" placeholder="e.g. Oil &amp; Gas"></div>
+      <div><label for="f-location">Location</label><input id="f-location" name="location" placeholder="e.g. Dahej, Gujarat"></div>
+      <div><label for="f-start_date">Start</label><input id="f-start_date" type="date" name="start_date"></div>
+      <div><label for="f-end_date">End</label><input id="f-end_date" type="date" name="end_date"></div>
     </div>
-    <label>Equipment / systems</label><input name="equipment" placeholder="e.g. Pressure vessels, piping, storage tanks">
-    <label>Scope of work</label><textarea name="scope" rows="2" placeholder="What you did on this project…"></textarea>
+    <label for="f-equipment">Equipment / systems</label><input id="f-equipment" name="equipment" placeholder="e.g. Pressure vessels, piping, storage tanks">
+    <label for="f-scope">Scope of work</label><textarea id="f-scope" name="scope" rows="2" placeholder="What you did on this project…"></textarea>
     <button class="btn" type="submit" style="margin-top:12px">Add project</button>
   </form>
 </div>

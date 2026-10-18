@@ -12,7 +12,16 @@ $me = $me ?? (function_exists('connect_pro_user') ? connect_pro_user() : null);
   *{box-sizing:border-box}
   body{margin:0;font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
   .top{background:linear-gradient(135deg,var(--teal),var(--teal-d));color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
-  .top a{color:#fff;text-decoration:none;font-size:14px;opacity:.9}
+  /* 24px minimum hit area (WCAG 2.5.8) on the controls that stand alone --
+     a prose link inside a sentence is exempt and is left as it is. */
+  .top a{color:#fff;text-decoration:none;font-size:14px;opacity:.9;
+         display:inline-flex;align-items:center;min-height:26px;padding:0 4px}
+  .card p > a:only-child,.card > a:only-child,.wrap > p > a:only-child{
+         display:inline-flex;align-items:center;min-height:26px}
+  /* the small remove control on a chip: 14px of glyph is not a target */
+  .chip button,.xchip button,button[title=Remove]{min-width:26px;min-height:26px;
+         display:inline-flex;align-items:center;justify-content:center;
+         background:none;border:0;color:var(--muted);cursor:pointer;font-size:14px}
   .top .brand{font-weight:700;letter-spacing:-.01em}
   .wrap{max-width:640px;margin:0 auto;padding:20px 16px 60px}
   .nav{display:flex;gap:4px;flex-wrap:wrap;max-width:640px;margin:10px auto 0;padding:0 16px}
@@ -51,3 +60,14 @@ $me = $me ?? (function_exists('connect_pro_user') ? connect_pro_user() : null);
 </div>
 <?php endif; ?>
 <div class="wrap">
+<?php
+// The one-shot message after a redirect. Ten places in lib/connect_pro.php
+// write it -- payment, subscription, credit pack, rating report -- and until
+// this block existed NONE of them reached the professional: the text went into
+// the session and stayed there. role=alert so it is announced, not just seen,
+// and the tag so a failed payment does not arrive wearing the success colour.
+if (!empty($_SESSION['pro_flash']) && function_exists('connect_pro_flash_take')):
+    [$pfMsg, $pfTag] = connect_pro_flash_take();
+    if ($pfMsg !== ''): ?>
+  <div class="msg <?= $pfTag === 'err' ? 'err' : 'ok' ?>" role="alert"><?= e($pfMsg) ?></div>
+<?php endif; endif; ?>

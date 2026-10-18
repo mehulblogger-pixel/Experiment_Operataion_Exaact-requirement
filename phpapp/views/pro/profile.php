@@ -37,11 +37,11 @@
 <form method="post" action="/pro/profile">
   <div class="card">
     <h2>You</h2>
-    <label>Name</label><input name="name" value="<?= e($me['name'] ?? '') ?>">
-    <label>Headline</label><input name="headline" value="<?= e($me['headline'] ?? '') ?>" placeholder="e.g. Senior QA/QC &amp; Welding Inspector, CSWIP 3.1">
-    <label>Mobile</label><input name="mobile" value="<?= e($me['mobile'] ?? '') ?>">
-    <label>Skills (free text — the structured ones are below)</label><input name="skills" value="<?= e($me['skills'] ?? '') ?>" placeholder="e.g. Welding inspection, NDT (UT/RT)">
-    <label>Languages</label><input name="languages" value="<?= e($me['languages'] ?? '') ?>" placeholder="e.g. English, Hindi, Gujarati">
+    <label for="f-name">Name</label><input id="f-name" name="name" value="<?= e($me['name'] ?? '') ?>">
+    <label for="f-headline">Headline</label><input id="f-headline" name="headline" value="<?= e($me['headline'] ?? '') ?>" placeholder="e.g. Senior QA/QC &amp; Welding Inspector, CSWIP 3.1">
+    <label for="f-mobile">Mobile</label><input id="f-mobile" name="mobile" value="<?= e($me['mobile'] ?? '') ?>">
+    <label for="f-skills">Skills (free text — the structured ones are below)</label><input id="f-skills" name="skills" value="<?= e($me['skills'] ?? '') ?>" placeholder="e.g. Welding inspection, NDT (UT/RT)">
+    <label for="f-languages">Languages</label><input id="f-languages" name="languages" value="<?= e($me['languages'] ?? '') ?>" placeholder="e.g. English, Hindi, Gujarati">
     <p style="margin:12px 0 0"><a href="/pro/documents" class="btn sec" style="width:100%;text-align:center">📎 Manage photo, CV &amp; certificates →</a></p>
     <p style="margin:8px 0 0"><a href="/pro/credentials" class="btn sec" style="width:100%;text-align:center">🎖 Certifications &amp; project experience →</a></p>
     <p style="margin:8px 0 0"><a href="/pro/privacy" class="btn sec" style="width:100%;text-align:center">🔒 Privacy — who sees your contact &amp; rate →</a></p>
@@ -55,16 +55,16 @@
   <div class="card">
     <h2>Availability &amp; rates</h2>
     <div class="grid2">
-      <div><label>Availability</label>
-        <select name="availability">
+      <div><label for="f-availability">Availability</label>
+        <select id="f-availability" name="availability">
           <?php foreach (['AVAILABLE'=>'Available now','FROM'=>'Available from a date','BUSY'=>'Currently busy'] as $k=>$v): ?>
             <option value="<?= $k ?>" <?= ($me['availability']??'')===$k?'selected':'' ?>><?= e($v) ?></option>
           <?php endforeach; ?></select></div>
-      <div><label>Available from</label><input type="date" name="available_from" value="<?= e($me['available_from'] ?? '') ?>"></div>
-      <div><label>Notice needed (days)</label><input type="number" name="notice_days" value="<?= (int)($me['notice_days'] ?? 0) ?>"></div>
-      <div><label>Per-visit rate (₹)</label><input type="number" name="per_visit_rate" value="<?= $me['per_visit_rate']?(int)$me['per_visit_rate']:'' ?>"></div>
-      <div><label>Day-rate from (₹)</label><input type="number" name="day_rate_min" value="<?= $me['day_rate_min']?(int)$me['day_rate_min']:'' ?>"></div>
-      <div><label>Day-rate to (₹)</label><input type="number" name="day_rate_max" value="<?= $me['day_rate_max']?(int)$me['day_rate_max']:'' ?>"></div>
+      <div><label for="f-available_from">Available from</label><input id="f-available_from" type="date" name="available_from" value="<?= e($me['available_from'] ?? '') ?>"></div>
+      <div><label for="f-notice_days">Notice needed (days)</label><input id="f-notice_days" type="number" name="notice_days" value="<?= (int)($me['notice_days'] ?? 0) ?>"></div>
+      <div><label for="f-per_visit_rate">Per-visit rate (₹)</label><input id="f-per_visit_rate" type="number" name="per_visit_rate" value="<?= $me['per_visit_rate']?(int)$me['per_visit_rate']:'' ?>"></div>
+      <div><label for="f-day_rate_min">Day-rate from (₹)</label><input id="f-day_rate_min" type="number" name="day_rate_min" value="<?= $me['day_rate_min']?(int)$me['day_rate_min']:'' ?>"></div>
+      <div><label for="f-day_rate_max">Day-rate to (₹)</label><input id="f-day_rate_max" type="number" name="day_rate_max" value="<?= $me['day_rate_max']?(int)$me['day_rate_max']:'' ?>"></div>
     </div>
   </div>
   <div class="card">
@@ -99,11 +99,11 @@
       <span><b>I am registered under GST</b><span class="muted" style="display:block;font-size:12.5px">You have a GSTIN and charge GST. Your invoices will show it, and you file &amp; pay your own GST.</span></span>
     </label>
     <div id="gstinBlk" class="<?= $gstReg ? '' : 'hide' ?>">
-      <label>Your GSTIN</label>
-      <input name="gstin" value="<?= e($me['gstin'] ?? '') ?>" placeholder="e.g. 24ABCDE1234F1Z5" maxlength="15" style="text-transform:uppercase">
+      <label for="f-gstin">Your GSTIN</label>
+      <input id="f-gstin" name="gstin" value="<?= e($me['gstin'] ?? '') ?>" placeholder="e.g. 24ABCDE1234F1Z5" maxlength="15" style="text-transform:uppercase">
     </div>
-    <label>PAN <span class="muted" style="font-weight:400">(optional — used for TDS)</span></label>
-    <input name="pan" value="<?= e($me['pan'] ?? '') ?>" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform:uppercase">
+    <label for="f-pan">PAN <span class="muted" style="font-weight:400">(optional — used for TDS)</span></label>
+    <input id="f-pan" name="pan" value="<?= e($me['pan'] ?? '') ?>" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform:uppercase">
     <button class="btn" type="submit" style="width:100%;margin-top:12px">Save tax details</button>
   </form>
   <p class="muted" style="margin:10px 0 0;font-size:12px">You are solely responsible for the correctness, filing and payment of your own taxes. The platform is a facilitator and is not the supplier of your services.</p>
@@ -130,11 +130,11 @@
     <input type="hidden" name="action" value="attach_node">
     <input type="hidden" name="node_id" id="expNode" value="">
     <div class="grid2">
-      <div><label>Domain</label>
+      <div><label for="expDomain">Domain</label>
         <select id="expDomain"><option value="">— choose —</option>
           <?php foreach ($tax_domains as $d): ?><option value="<?= (int)$d['id'] ?>"><?= e($d['name']) ?></option><?php endforeach; ?>
         </select></div>
-      <div><label>Then narrow it (optional)</label>
+      <div><label for="expChild">Then narrow it (optional)</label>
         <select id="expChild" disabled><option value="">— pick a domain first —</option></select></div>
     </div>
     <label style="margin-top:10px">Or type to find a role / skill / certification</label>
@@ -142,16 +142,16 @@
     <div id="expSug" style="margin-top:8px"></div>
     <div id="expChosen" class="muted" style="margin-top:10px;font-size:13px"></div>
     <div class="grid2" style="margin-top:6px">
-      <div><label>Add as</label>
+      <div><label for="expRel">Add as</label>
         <select name="relation" id="expRel">
           <?php foreach ($tax_relations as $r): ?><option value="<?= e($r) ?>"><?= e($relLabel[$r] ?? $r) ?></option><?php endforeach; ?>
         </select></div>
-      <div><label>Competency (optional)</label>
-        <select name="competency"><option value="">—</option>
+      <div><label for="f-competency">Competency (optional)</label>
+        <select id="f-competency" name="competency"><option value="">—</option>
           <?php foreach (['BEGINNER','WORKING','ADVANCED','EXPERT'] as $c): ?><option value="<?= $c ?>"><?= e(ucfirst(strtolower($c))) ?></option><?php endforeach; ?>
         </select></div>
     </div>
-    <label>Years on this (optional)</label><input type="number" name="years" min="0" step="0.5" style="max-width:140px">
+    <label for="f-years">Years on this (optional)</label><input id="f-years" type="number" name="years" min="0" step="0.5" style="max-width:140px">
     <button class="btn" type="submit" id="expAdd" style="margin-top:12px" disabled>Add to my expertise</button>
   </form>
 </div>
@@ -170,7 +170,7 @@
     <p style="margin:16px 0 6px;font-weight:600">Where are you willing to work?</p>
     <label class="chip" style="display:block;margin:5px 0"><input type="radio" name="mobility_mode" value="RADIUS" <?= $mode==='RADIUS'?'checked':'' ?> class="mm"> Within a travel radius of my base</label>
     <div id="blkRadius" class="<?= $mode==='RADIUS'?'':'hide' ?>" style="padding:2px 0 8px 26px">
-      <label>Maximum travel distance</label>
+      <label for="radiusPreset">Maximum travel distance</label>
       <select id="radiusPreset">
         <?php $cur=(int)($me['travel_radius_km']??0); $isPreset=in_array($cur,$geo_presets,true); foreach ($geo_presets as $km): ?>
           <option value="<?= $km ?>" <?= $cur===$km?'selected':'' ?>>Within <?= $km ?> km</option>

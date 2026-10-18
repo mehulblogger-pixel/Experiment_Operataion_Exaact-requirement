@@ -24,23 +24,23 @@ $pill = function ($s) {
   <input class="form-control" name="title" maxlength="200" required value="<?= e($prefillTitle) ?>" placeholder="e.g. Welding inspector for a pressure-vessel FAT at Dahej"<?= $prefillTitle !== '' ? ' autofocus' : '' ?>>
   <?php if ($prefillTitle !== ''): ?><div class="muted" style="font-size:12.5px;margin-top:5px">✓ Carried over from the landing page — review it and post.</div><?php endif; ?>
   <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:14px">
-    <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Discipline</label>
-      <select class="form-control" name="discipline_code"><option value="">— any —</option>
+    <div><label for="f-discipline_code" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Discipline</label>
+      <select id="f-discipline_code" class="form-control" name="discipline_code"><option value="">— any —</option>
         <?php foreach ($disciplines as $d): ?><option value="<?= e($d['code']) ?>"><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
-    <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Sector</label>
-      <select class="form-control" name="sector_code"><option value="">— any —</option>
+    <div><label for="f-sector_code" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Sector</label>
+      <select id="f-sector_code" class="form-control" name="sector_code"><option value="">— any —</option>
         <?php foreach ($sectors as $s): ?><option value="<?= e($s['code']) ?>"><?= e($s['name']) ?></option><?php endforeach; ?></select></div>
-    <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Where</label>
-      <input class="form-control" name="location" maxlength="160" placeholder="e.g. Dahej, Gujarat"></div>
-    <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Positions</label>
-      <input class="form-control" name="positions" type="number" min="1" value="1"></div>
-    <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Start</label>
-      <input class="form-control" name="start_date" type="date"></div>
-    <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Rate up to (₹)</label>
-      <input class="form-control" name="rate_max" type="number" min="0"></div>
+    <div><label for="f-location" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Where</label>
+      <input id="f-location" class="form-control" name="location" maxlength="160" placeholder="e.g. Dahej, Gujarat"></div>
+    <div><label for="f-positions" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Positions</label>
+      <input id="f-positions" class="form-control" name="positions" type="number" min="1" value="1"></div>
+    <div><label for="f-start_date" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Start</label>
+      <input id="f-start_date" class="form-control" name="start_date" type="date"></div>
+    <div><label for="f-rate_max" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Rate up to (₹)</label>
+      <input id="f-rate_max" class="form-control" name="rate_max" type="number" min="0"></div>
   </div>
-  <label style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Details</label>
-  <textarea class="form-control" name="description" rows="3" placeholder="Standards, stage, material, what the professional will do…"></textarea>
+  <label for="f-description" style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Details</label>
+  <textarea id="f-description" class="form-control" name="description" rows="3" placeholder="Standards, stage, material, what the professional will do…"></textarea>
 
   <?php
     // K21 — the same engagement / rate terms the ops desk sets, offered to the
@@ -60,7 +60,7 @@ $pill = function ($s) {
     <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))">
       <?php if ($bases): ?>
       <div>
-        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Deputation</label>
+        <label for="dep_basis" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Deputation</label>
         <select class="form-control" name="deputation_basis" id="dep_basis">
           <?php foreach ($bases as $k => $b): ?>
             <option value="<?= e($k) ?>" data-unit="<?= e($b['unit']) ?>"<?= $k === 'MAN_DAYS' ? ' selected' : '' ?>><?= e($b['label']) ?></option>
@@ -71,7 +71,7 @@ $pill = function ($s) {
       <?php endif; ?>
       <?php if ($rateM): ?>
       <div>
-        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Rate model</label>
+        <label for="rate_model" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Rate model</label>
         <select class="form-control" name="rate_inclusive" id="rate_model">
           <?php foreach ($rateM as $k => $m): ?>
             <option value="<?= e($k) ?>"<?= $k === 'INCLUSIVE' ? ' selected' : '' ?>><?= e($m['label']) ?></option>
@@ -82,8 +82,8 @@ $pill = function ($s) {
       <?php endif; ?>
       <?php if ($cadences): ?>
       <div>
-        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Vouchers</label>
-        <select class="form-control" name="voucher_cadence">
+        <label for="f-voucher_cadence" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Vouchers</label>
+        <select id="f-voucher_cadence" class="form-control" name="voucher_cadence">
           <?php foreach ($cadences as $k => $c): ?>
             <option value="<?= e($k) ?>"<?= $k === 'PER_DEPLOYMENT' ? ' selected' : '' ?>><?= e($c['label']) ?></option>
           <?php endforeach; ?>
@@ -96,25 +96,25 @@ $pill = function ($s) {
     <?php // --- Base fee + estimated quantity: the numbers the estimate is built from --- ?>
     <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-top:14px">
       <div>
-        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Base fee (₹ per <span class="unit-word">day</span>) <span id="fee_kind" style="color:#0f7d5a"></span></label>
+        <label for="est_rate" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Base fee (₹ per <span class="unit-word">day</span>) <span id="fee_kind" style="color:#0f7d5a"></span></label>
         <input class="form-control" name="est_rate" id="est_rate" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 6000">
       </div>
       <div>
-        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Estimated <span class="unit-word">day</span>s</label>
+        <label for="est_qty" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Estimated <span class="unit-word">day</span>s</label>
         <input class="form-control" name="est_qty" id="est_qty" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 10">
       </div>
       <div>
-        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">GST %</label>
+        <label for="est_tax" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">GST %</label>
         <input class="form-control" name="est_tax_pct" id="est_tax" type="number" min="0" step="0.5" value="18">
         <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Charged on top (extra).</div>
       </div>
       <div>
-        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">TDS %</label>
+        <label for="est_tds" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">TDS %</label>
         <input class="form-control" name="est_tds_pct" id="est_tds" type="number" min="0" step="0.5" value="2">
         <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Withheld by client on the pre-GST value (194C 1–2% · 194J 10%).</div>
       </div>
       <div>
-        <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">SAC / HSN</label>
+        <label for="est_sac" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">SAC / HSN</label>
         <input class="form-control" name="est_sac" id="est_sac" type="text" maxlength="20" value="998519">
         <div style="font-size:11.5px;color:var(--muted);margin-top:5px">Manpower supply = 998519.</div>
       </div>

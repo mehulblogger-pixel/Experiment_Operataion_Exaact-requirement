@@ -265,6 +265,137 @@ can never be mistaken for an empty table. The file routes answer **404**, not
 
 ---
 
+### 2.6 Screen quality at phone width, and the accessibility basics
+
+Measured by rendering every screen in a real browser at **390×844** (an iPhone
+12/13/14 viewport) as four signed-in personas, and reading the painted boxes
+rather than the stylesheet: `tools/portal-mobile-a11y-check.js`.
+
+**The layout holds. Zero horizontal overflow on any of the 39 screens walked.**
+
+That deserves saying plainly, because the client portal carries **no `@media`
+query at all** — 33 lines of CSS. It fits a phone anyway, through `clamp()` type,
+`flex-wrap` on the header and nav, an `auto-fit` tile grid and
+`overflow-x:auto` on tables. I did **not** record the missing media query as a
+defect, and measuring proved that right. The professional portal does have a
+breakpoint and a dark-mode palette.
+
+Three real defects were found and fixed.
+
+---
+
+#### GAP-015 (P1) — the professional portal wrote messages nobody ever read · **FIXED**
+
+`lib/connect_pro.php` wrote `$_SESSION['pro_flash']` in **ten** places. Every
+one is the outcome of **money or reputation**: a payment, a subscription, a
+credit pack, a rating report. Among them, verbatim:
+
+- *"That payment is no longer available."*
+- the error branch of starting a subscription (`mkt_pay_start` → `'error'`)
+- the result of verifying a Razorpay payment
+- *"That rating could not be reported."*
+
+**No view read that key.** Confirmed by execution
+(`evidence/pro-flash-lost.php`): the message was set, a real `/pro` screen was
+rendered, and it does not appear — and it was never cleared either, so it
+accumulated in the professional's session.
+
+So a professional whose payment failed was told **nothing at all**. They were
+redirected to the plans page and left to guess. The other two portals both
+rendered their channel; the professional portal was the one that was missed.
+
+**Fixed:** `connect_pro_flash_set()` / `connect_pro_flash_take()` carrying a
+severity, rendered in `views/pro/top.php` using the `.msg.err` / `.msg.ok`
+styles that **already existed** in that portal for inline errors. All ten
+writes now go through the helper, each tagged by its own outcome flag, so none
+can skip the tag.
+
+---
+
+#### GAP-016 (P2) — a refusal arrived wearing the success colour · **FIXED**
+
+`views/portal/top.php` hardcoded `class="pmsg ok"`, so **every** message in the
+client portal was painted as a success. Of 42 message sites, at least nine are
+refusals or failures — *"That deployment is not yours."*, *"That payment is no
+longer available."*, *"Your access here does not include…"* — plus the failure
+branch of several `$ok ? 'Done.' : $msg` pairs. The CSS defined `.pmsg.err` and
+never used it for the flash.
+
+**Fixed:** the same tagged-channel treatment, plus `role="alert"` on all three
+renderers so the message is **announced**, not merely seen.
+
+> **Honest scope.** The vendor portal has the same hardcoded class but **not the
+> same defect**: its only flash is a genuine confirmation, and a permission
+> refusal there goes to its own "Not available to you" page via
+> `cvp_vendor_need()`. Its renderer was made tag-capable so a failure added
+> later cannot go green, and that is all it needed. Reporting it as a third
+> instance of the bug would have been inflating the finding.
+
+---
+
+#### GAP-017 (P2) — 113 fields had a label that was never attached to them · **FIXED**
+
+The pattern across all three portals was:
+
+```php
+<label>Name</label><input name="name">
+```
+
+Adjacent, never **associated** — no `for`, no wrapping. It looks correct and is
+invisible: a screen reader announces the field as unlabelled, and tapping the
+label does not focus it. On the professional portal that matters most, because a
+professional is on a phone on a site. The browser pass found unnamed fields on
+eight screens, including `name`, `mobile`, `day_rate_min`, `cert_number`,
+`expiry_date` and the file pickers.
+
+**Fixed:** 113 pairs wired with matching `for`/`id`, derived from each field's
+own `name`; the four whose name is built in PHP carry an explicit `for` or an
+`aria-label`. The convention already existed in the codebase — 18 labels used
+`for=` — it simply had not been applied consistently.
+
+> **Method note — a regression I introduced, caught by the browser.** My first
+> transform used `<label…>(.*?)</label>\s*<control>` with `DOTALL`. On a
+> **wrapping** label — `<label>Rating <select…></select></label>`, which needs no
+> `for=` because the control is already inside it — that match fails in the right
+> place and the engine **backtracks**, extending `.*?` forward until it finds
+> some later `</label>` that *is* followed by a control. In
+> `views/portal/roster.php` it swallowed 35 lines and pointed a label reading
+> **"Rating" at the name field** — worse than no label, because a screen reader
+> then announces the wrong one with confidence.
+>
+> I had copied the views to a backup before running it, restored them, and
+> rewrote the rule so the label's content may not contain a control or another
+> label — which excludes every wrapping label by construction. I also added a
+> **duplicate-id check to the browser probe** before re-running, because a
+> template inside a `foreach` is exactly what would emit a repeated id, and
+> static analysis cannot see it. The rendered pages reported zero collisions.
+
+---
+
+#### Tap targets: counted honestly
+
+The first run reported **48 failures**, almost all of them text links inside
+sentences. That was wrong of the probe, not of the portal: **WCAG 2.5.8 exempts
+a target "in a sentence or whose size is otherwise constrained by the
+line-height of non-target text."** Counting *"say so on the request form"* as a
+failure buries the ones that matter.
+
+The probe now applies that exemption and counts only controls that **stand
+alone**. On that basis the real list was the header **Sign out**, the
+`← My passport` back-links, the **`✕`** remove controls at **14px** — a
+destructive action with a 14-pixel target — and the client dashboard's
+**"Awaiting you"** links, which are the one block a client is meant to act on.
+
+All now clear 24px. Final measurement: **234 passed, 0 failed, 51 warnings.**
+
+The 51 warnings are deliberately left: targets between 24 and 40px (compliant,
+below Apple's 44px suggestion) and tile micro-labels at 10.5–11.5px
+(*"Inspections"*, *"Billed to you"*). Changing the type scale is a design
+decision under `docs/05-ui-ux-blueprint.md`, not an audit fix, so it is recorded
+rather than altered.
+
+---
+
 ## 3. Still to do on these portals
 
 This pass answered the two security questions. It did **not** do for the portals
@@ -272,15 +403,17 @@ what deliverables 04 and 05 did for the staff application:
 
 | Outstanding | Why it matters |
 |---|---|
-| Field-by-field screen audit of all 77 routes | the terminology, validation and empty-state work done for staff screens has not been done here |
-| Phone-width pass at 390px | a professional in the field is phone-first by definition |
-| Accessibility | these screens are used by people outside your organisation, on equipment you do not control |
+| Terminology against `lib/terms.php` | whether these screens use the canonical 33 terms or their own wording has not been checked |
+| Field-level **validation** messages | what each form says when the input is wrong, screen by screen |
+| Empty states on the 38 screens not walked | the 39 walked were reachable by the four seeded personas |
+| Colour contrast | `tools/b1-contrast-check.js` exists for the staff app and has not been pointed at the portals |
 | The professional portal's **write** paths | isolation is proven on reads and on the one delete tested; the profile, CV, credentials and voucher-line writes are not each individually driven |
 | `/pro/tax-*` (4 routes) and `/pro/geo` | small lookup endpoints, read only for isolation so far |
 
 Closed since the first pass: the vendor portal's four permissions (§2.4), the
-assistant on the vendor side (§2.4), and the professional portal's isolation
-including all three file routes (§2.5).
+assistant on the vendor side (§2.4), the professional portal's isolation
+including all three file routes (§2.5), and phone-width layout, message delivery
+and field labelling across 39 screens (§2.6).
 
 **GAP-012 is therefore reduced, not closed.** The coverage hole is mapped and its
 two security defects are fixed; the quality audit of these 77 screens remains.
@@ -299,3 +432,6 @@ two security defects are fixed; the quality audit of these 77 screens remains.
 | `phpapp/tests/test_portal_perm_enforcement.php` | 62 assertions freezing both fixes, across the client and vendor portals |
 | `phpapp/tests/fixtures/portal_routes_gated.tsv` | all 35 client routes and their gates; a lost gate fails by name |
 | `phpapp/tests/fixtures/vendor_routes_gated.tsv` | all 13 vendor routes and their gates |
+| `evidence/pro-flash-lost.php` | renders a real `/pro` screen with a message set and reports whether the professional sees it |
+| `phpapp/tools/portal-mobile-a11y-check.js` | 39 screens at 390px as four personas: overflow, tap targets (with the WCAG inline exemption), tiny text, unnamed fields, duplicate ids, missing alt, header-less tables |
+| `phpapp/tests/test_portal_flash_and_labels.php` | 34 assertions freezing all three fixes |

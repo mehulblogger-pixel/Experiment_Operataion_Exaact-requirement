@@ -26,21 +26,21 @@ $rateLbl = ['public'=>'Rate on card','band'=>'Rate range on request','hidden'=>'
   We rank by how well each person fits, and by how close they are to your site. Contact details unlock when you’re engaged or the professional approves your request.</p>
 
 <form method="get" action="/portal/find" class="pcard" style="max-width:820px">
-  <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Search</label>
-  <input class="form-control" name="q" value="<?= e($f['q'] ?? '') ?>" placeholder="e.g. pressure vessel inspector · CSWIP · phased array UT · shutdown">
+  <label for="f-q" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Search</label>
+  <input id="f-q" class="form-control" name="q" value="<?= e($f['q'] ?? '') ?>" placeholder="e.g. pressure vessel inspector · CSWIP · phased array UT · shutdown">
   <div class="fc-filters">
-    <div><label style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Discipline</label>
-      <select class="form-control" name="discipline"><option value="">— any —</option>
+    <div><label for="f-discipline" style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Discipline</label>
+      <select id="f-discipline" class="form-control" name="discipline"><option value="">— any —</option>
         <?php foreach ($disciplines as $d): ?><option value="<?= e($d['code']) ?>"<?= ($f['discipline']??'')===$d['code']?' selected':'' ?>><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
-    <div><label style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Work type</label>
-      <select class="form-control" name="work_type"><option value="">— any —</option>
+    <div><label for="f-work_type" style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Work type</label>
+      <select id="f-work_type" class="form-control" name="work_type"><option value="">— any —</option>
         <?php foreach ($work_types as $wt): $v=is_array($wt)?($wt['code']??$wt['name']??''):$wt; $l=is_array($wt)?($wt['name']??$v):$wt; ?><option value="<?= e($v) ?>"<?= ($f['work_type']??'')===$v?' selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
-    <div><label style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Near</label>
-      <input class="form-control" name="location" value="<?= e($f['location'] ?? '') ?>" placeholder="e.g. Dahej, Gujarat"></div>
+    <div><label for="f-location" style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Near</label>
+      <input id="f-location" class="form-control" name="location" value="<?= e($f['location'] ?? '') ?>" placeholder="e.g. Dahej, Gujarat"></div>
     <?php // Stage 4 — supplier-type filter (§17/§19): individuals vs supplier companies.
           $supOpts = $supplier_options ?? []; if ($supOpts): ?>
-    <div><label style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Supplied by</label>
-      <select class="form-control" name="supplier">
+    <div><label for="f-supplier" style="display:block;font-size:12px;color:var(--muted);margin:0 0 4px">Supplied by</label>
+      <select id="f-supplier" class="form-control" name="supplier">
         <?php foreach ($supOpts as $code => $label): ?><option value="<?= e($code) ?>"<?= ($f['supplier']??'')===$code?' selected':'' ?>><?= e($label) ?></option><?php endforeach; ?>
       </select></div>
     <?php endif; ?>

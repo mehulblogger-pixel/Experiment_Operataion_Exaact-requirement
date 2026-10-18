@@ -51,7 +51,13 @@ if (function_exists('cvp_client_is_admin') && cvp_client_is_admin()) $links['por
   .phead .who{font-size:13px;color:var(--muted)}
   .phead h1{margin:0;font-size:clamp(19px,2.4vw,25px);letter-spacing:-.02em}
   .pnav{display:flex;flex-wrap:wrap;gap:4px;margin:14px 0 26px}
-  .pnav a{padding:7px 13px;border-radius:8px;text-decoration:none;color:var(--muted);font-size:14px}
+  .pnav a{padding:7px 13px;border-radius:8px;text-decoration:none;color:var(--muted);font-size:14px;
+    display:inline-flex;align-items:center;min-height:26px}
+  /* 24px minimum hit area (WCAG 2.5.8) on standalone controls. A link inside a
+     sentence is exempt by that rule and keeps its natural inline height. */
+  .phead a,.ptile a,.ptable td > a:only-child,.pcard > p > a:only-child,
+  .pnote > a,.pwrap p > a:only-child,a.fc-name,.pact a{
+    display:inline-flex;align-items:center;min-height:26px}
   .pnav a.on{background:var(--panel,rgba(0,0,0,.05));color:var(--ink);font-weight:600}
   .ptitle{margin:0 0 6px;font-size:20px;letter-spacing:-.01em}
   .plead{margin:0 0 22px;color:var(--muted);font-size:14px;line-height:1.6;max-width:62ch}
@@ -92,7 +98,9 @@ if (function_exists('cvp_client_is_admin') && cvp_client_is_admin()) $links['por
       <?php endforeach; ?>
     </nav>
   <?php endif; ?>
-  <?php if (!empty($_SESSION['portal_flash'])): ?>
-    <div class="pmsg ok"><?= e($_SESSION['portal_flash']) ?></div>
-    <?php unset($_SESSION['portal_flash']); ?>
+  <?php if (!empty($_SESSION['portal_flash'])):
+          [$pfMsg, $pfTag] = portal_flash_take(); ?>
+    <?php /* role=alert so a screen reader announces it without being asked, and
+             the tag so a refusal does not arrive wearing the success colour. */ ?>
+    <div class="pmsg <?= $pfTag === 'err' ? 'err' : 'ok' ?>" role="alert"><?= e($pfMsg) ?></div>
   <?php endif; ?>

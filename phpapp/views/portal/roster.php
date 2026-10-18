@@ -97,12 +97,12 @@ $stars = function ($n) { $n=(int)$n; return str_repeat('★',$n) . str_repeat('�
   <form method="post" action="/portal/roster">
     <input type="hidden" name="action" value="add"><input type="hidden" name="source" value="manual">
     <div class="rb-add">
-      <div><label style="display:block;font-size:12px;color:var(--muted)">Name *</label><input class="form-control" name="manual_name" required></div>
-      <div><label style="display:block;font-size:12px;color:var(--muted)">Role</label><input class="form-control" name="manual_role" placeholder="e.g. Welding inspector"></div>
-      <div><label style="display:block;font-size:12px;color:var(--muted)">Discipline</label><input class="form-control" name="manual_discipline" placeholder="e.g. NDT"></div>
-      <div><label style="display:block;font-size:12px;color:var(--muted)">Base city</label><input class="form-control" name="manual_city"></div>
-      <div><label style="display:block;font-size:12px;color:var(--muted)">Mobile</label><input class="form-control" name="manual_mobile"></div>
-      <div><label style="display:block;font-size:12px;color:var(--muted)">Your rate ₹</label><input class="form-control" name="preferred_rate" type="number" min="0"></div>
+      <div><label for="f-manual_name" style="display:block;font-size:12px;color:var(--muted)">Name *</label><input id="f-manual_name" class="form-control" name="manual_name" required></div>
+      <div><label for="f-manual_role" style="display:block;font-size:12px;color:var(--muted)">Role</label><input id="f-manual_role" class="form-control" name="manual_role" placeholder="e.g. Welding inspector"></div>
+      <div><label for="f-manual_discipline" style="display:block;font-size:12px;color:var(--muted)">Discipline</label><input id="f-manual_discipline" class="form-control" name="manual_discipline" placeholder="e.g. NDT"></div>
+      <div><label for="f-manual_city" style="display:block;font-size:12px;color:var(--muted)">Base city</label><input id="f-manual_city" class="form-control" name="manual_city"></div>
+      <div><label for="f-manual_mobile" style="display:block;font-size:12px;color:var(--muted)">Mobile</label><input id="f-manual_mobile" class="form-control" name="manual_mobile"></div>
+      <div><label for="f-preferred_rate" style="display:block;font-size:12px;color:var(--muted)">Your rate ₹</label><input id="f-preferred_rate" class="form-control" name="preferred_rate" type="number" min="0"></div>
     </div>
     <textarea name="private_note" rows="2" class="form-control" style="margin-top:10px" placeholder="Private note…"></textarea>
     <button class="btn" type="submit" style="margin-top:12px">Add to my bench</button>

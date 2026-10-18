@@ -12,8 +12,8 @@
   <?php if ($err): ?><div class="msg err"><?= e($err) ?></div><?php endif; ?>
   <form method="post" action="/pro/reset" class="card">
     <input type="hidden" name="t" value="<?= e($token) ?>">
-    <label>New password (8+ characters)</label><input type="password" name="password" required minlength="8" autofocus>
-    <label>Confirm new password</label><input type="password" name="password2" required minlength="8">
+    <label for="f-password">New password (8+ characters)</label><input id="f-password" type="password" name="password" required minlength="8" autofocus>
+    <label for="f-password2">Confirm new password</label><input id="f-password2" type="password" name="password2" required minlength="8">
     <button class="btn" type="submit" style="margin-top:16px;width:100%">Set new password</button>
   </form>
 <?php endif; ?>

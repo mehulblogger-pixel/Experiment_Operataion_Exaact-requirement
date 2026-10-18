@@ -182,8 +182,8 @@ $canReview = $status === 'SUBMITTED';
   <p class="plead" style="margin:0 0 14px">Approve the voucher, or return it to <?= e($v['subject_name'] ?: 'the professional') ?> with a note if a day or an expense needs clarifying.</p>
   <form method="post" action="/portal/voucher" style="margin:0 0 16px">
     <input type="hidden" name="id" value="<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="return">
-    <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">What needs clarifying?</label>
-    <textarea class="form-control" name="note" rows="2" placeholder="e.g. please attach the hotel folio for 26 Aug" required></textarea>
+    <label for="f-note" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">What needs clarifying?</label>
+    <textarea id="f-note" class="form-control" name="note" rows="2" placeholder="e.g. please attach the hotel folio for 26 Aug" required></textarea>
     <button class="btn" type="submit" style="margin-top:10px;background:#9a2a2a">↩ Return for clarification</button>
   </form>
   <form method="post" action="/portal/voucher" onsubmit="return confirm('Approve this voucher for <?= e($inr($v['grand_total'])) ?>?');" style="margin:0">

@@ -37,7 +37,7 @@
     <input type="radio" name="decision" value="REJECTED">
     <span><b>Reject</b> — something needs to change before we can use it.</span></label>
 
-  <label style="<?= $lbl ?>" for="rreason">If you are rejecting it, why?</label>
+  <label for="rreason" style="<?= $lbl ?>" for="rreason">If you are rejecting it, why?</label>
   <select class="form-control" id="rreason" name="reason">
     <option value="">— choose —</option>
     <?php foreach (RCR_REASONS as $k => $v): ?>
@@ -45,7 +45,7 @@
     <?php endforeach; ?>
   </select>
 
-  <label style="<?= $lbl ?>" for="rnote">What should change? <span style="opacity:.75">(required if you are rejecting)</span></label>
+  <label for="rnote" style="<?= $lbl ?>" for="rnote">What should change? <span style="opacity:.75">(required if you are rejecting)</span></label>
   <textarea class="form-control" id="rnote" name="note" rows="5"
     placeholder="Be as specific as you can — the section, the page, what is wrong and what it should say."></textarea>
 

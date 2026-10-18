@@ -11,8 +11,8 @@
 
 <form method="post" action="/pro/cv" class="card">
   <input type="hidden" name="action" value="scan">
-  <label>Paste your CV (optional — leave blank to scan your uploaded CV)</label>
-  <textarea name="cv_text" rows="8" placeholder="Paste your résumé text here…"><?= e($text) ?></textarea>
+  <label for="f-cv_text">Paste your CV (optional — leave blank to scan your uploaded CV)</label>
+  <textarea id="f-cv_text" name="cv_text" rows="8" placeholder="Paste your résumé text here…"><?= e($text) ?></textarea>
   <button class="btn" type="submit" style="margin-top:12px">Scan &amp; suggest</button>
   <p class="muted" style="margin:10px 0 0;font-size:13px">No CV uploaded yet? <a href="/pro/documents">Upload one →</a></p>
 </form>

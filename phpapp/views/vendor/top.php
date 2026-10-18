@@ -74,7 +74,13 @@ if (function_exists('cvp_ai_available') && cvp_ai_available()
       <?php endforeach; ?>
     </nav>
   <?php endif; ?>
-  <?php if (!empty($_SESSION['vendor_flash'])): ?>
-    <div class="pmsg ok"><?= e($_SESSION['vendor_flash']) ?></div>
-    <?php unset($_SESSION['vendor_flash']); ?>
+  <?php if (!empty($_SESSION['vendor_flash'])):
+          $vf = $_SESSION['vendor_flash']; unset($_SESSION['vendor_flash']);
+          $vfMsg = is_array($vf) ? (string)($vf['m'] ?? '') : (string)$vf;
+          $vfTag = (is_array($vf) && ($vf['t'] ?? '') === 'err') ? 'err' : 'ok'; ?>
+    <?php /* Tag-capable like the client portal's: today every vendor flash is a
+             confirmation (a permission refusal goes to its own page via
+             cvp_vendor_need), but a failure added here must not arrive wearing
+             the success colour. role=alert so it is announced, not just seen. */ ?>
+    <div class="pmsg <?= $vfTag ?>" role="alert"><?= e($vfMsg) ?></div>
   <?php endif; ?>

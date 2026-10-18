@@ -26,7 +26,10 @@
 <div class="pcard" style="border-left:5px solid var(--warn)">
   <div style="font-weight:600;margin-bottom:8px">Awaiting you</div>
   <?php foreach ($d['actions'] as $a): ?>
-    <div style="margin:4px 0"><a href="<?= e($a['url']) ?>"><?= e($a['label']) ?> →</a></div>
+    <?php /* .pact so the hit area clears 24px -- this is the one block on the
+             dashboard a client is meant to act on, so it is the last place to
+             make the target hard to hit on a phone. */ ?>
+    <div class="pact" style="margin:4px 0"><a href="<?= e($a['url']) ?>"><?= e($a['label']) ?> →</a></div>
   <?php endforeach; ?>
 </div>
 <?php endif; ?>

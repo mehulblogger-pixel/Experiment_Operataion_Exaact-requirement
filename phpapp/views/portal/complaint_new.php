@@ -8,7 +8,7 @@
 <form method="post" action="/portal/complaint-new" class="pcard" style="max-width:660px">
 
   <?php if ($appealable): ?>
-    <label style="<?= $lbl ?>;margin-top:0" for="cap">Is this an appeal against a decision we already made?</label>
+    <label for="cap" style="<?= $lbl ?>;margin-top:0" for="cap">Is this an appeal against a decision we already made?</label>
     <select class="form-control" id="cap" name="appeal_of_id">
       <option value="">No — this is a new complaint</option>
       <?php foreach ($appealable as $a): ?>
@@ -23,18 +23,18 @@
     <input type="hidden" name="appeal_of_id" value="">
   <?php endif; ?>
 
-  <label style="<?= $lbl ?>" for="csub">What is it about? *</label>
+  <label for="csub" style="<?= $lbl ?>" for="csub">What is it about? *</label>
   <input class="form-control" id="csub" name="subject" maxlength="255" required
          value="<?= e($p['subject'] ?? '') ?>"
          placeholder="One line — e.g. Inspector did not attend on the agreed date">
 
-  <label style="<?= $lbl ?>" for="cdet">What happened? *</label>
+  <label for="cdet" style="<?= $lbl ?>" for="cdet">What happened? *</label>
   <textarea class="form-control" id="cdet" name="description" rows="6" required
     placeholder="Dates, who was involved, what was agreed and what actually happened. The more specific you are, the faster we can look into it."><?= e($p['description'] ?? '') ?></textarea>
 
   <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:4px">
     <div>
-      <label style="<?= $lbl ?>" for="cjob">Against which visit? <span style="opacity:.75">(if it applies)</span></label>
+      <label for="cjob" style="<?= $lbl ?>" for="cjob">Against which visit? <span style="opacity:.75">(if it applies)</span></label>
       <select class="form-control" id="cjob" name="job_id">
         <option value="">— none in particular —</option>
         <?php foreach ($jobs as $j): ?>
@@ -45,11 +45,11 @@
       </select>
     </div>
     <div>
-      <label style="<?= $lbl ?>" for="cirn">Report number <span style="opacity:.75">(if it applies)</span></label>
+      <label for="cirn" style="<?= $lbl ?>" for="cirn">Report number <span style="opacity:.75">(if it applies)</span></label>
       <input class="form-control" id="cirn" name="report_irn" maxlength="120" value="<?= e($p['report_irn'] ?? '') ?>">
     </div>
     <div>
-      <label style="<?= $lbl ?>" for="cph">Your telephone <span style="opacity:.75">(if we should ring you)</span></label>
+      <label for="cph" style="<?= $lbl ?>" for="cph">Your telephone <span style="opacity:.75">(if we should ring you)</span></label>
       <input class="form-control" id="cph" name="phone" maxlength="60">
     </div>
   </div>
@@ -58,5 +58,6 @@
     straight away so the acknowledgement clock starts. You will be written to with the outcome.</p>
 
   <button class="btn" type="submit" style="margin-top:14px">Send it</button>
-  <a href="/portal/complaints" style="margin-left:12px;font-size:14px">Cancel</a>
+  <a href="/portal/complaints" style="margin-left:12px;font-size:14px;display:inline-flex;
+     align-items:center;min-height:26px">Cancel</a>
 </form>

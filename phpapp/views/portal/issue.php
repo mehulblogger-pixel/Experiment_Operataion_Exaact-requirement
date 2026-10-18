@@ -21,21 +21,21 @@
 <h3 class="ptitle" style="font-size:16px;margin-top:22px">Your response</h3>
 <form method="post" action="/portal/issue" class="pcard" style="max-width:640px">
   <input type="hidden" name="id" value="<?= (int)$n['id'] ?>">
-  <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">How are you responding?</label>
-  <select class="form-control" name="response_kind" required>
+  <label for="f-response_kind" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">How are you responding?</label>
+  <select id="f-response_kind" class="form-control" name="response_kind" required>
     <option value="">Choose…</option>
     <?php foreach ($kinds as $k => $label): ?>
       <option value="<?= e($k) ?>"><?= e($label) ?></option>
     <?php endforeach; ?>
   </select>
-  <label style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Your response</label>
-  <textarea class="form-control" name="response" rows="3" required placeholder="What you accept, dispute or will do."></textarea>
-  <label style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Root cause <span style="opacity:.7">(if known)</span></label>
-  <textarea class="form-control" name="reason" rows="2" placeholder="Why it happened."></textarea>
-  <label style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Proposed corrective action <span style="opacity:.7">(optional)</span></label>
-  <textarea class="form-control" name="proposed_action" rows="2" placeholder="What you will do to correct and prevent recurrence."></textarea>
-  <label style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Evidence reference <span style="opacity:.7">(optional)</span></label>
-  <input class="form-control" name="evidence_ref" maxlength="300" placeholder="e.g. CAR-2026-014, inspection photo set, test certificate no.">
+  <label for="f-response" style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Your response</label>
+  <textarea id="f-response" class="form-control" name="response" rows="3" required placeholder="What you accept, dispute or will do."></textarea>
+  <label for="f-reason" style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Root cause <span style="opacity:.7">(if known)</span></label>
+  <textarea id="f-reason" class="form-control" name="reason" rows="2" placeholder="Why it happened."></textarea>
+  <label for="f-proposed_action" style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Proposed corrective action <span style="opacity:.7">(optional)</span></label>
+  <textarea id="f-proposed_action" class="form-control" name="proposed_action" rows="2" placeholder="What you will do to correct and prevent recurrence."></textarea>
+  <label for="f-evidence_ref" style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Evidence reference <span style="opacity:.7">(optional)</span></label>
+  <input id="f-evidence_ref" class="form-control" name="evidence_ref" maxlength="300" placeholder="e.g. CAR-2026-014, inspection photo set, test certificate no.">
   <div style="margin-top:16px"><button class="btn" type="submit">Send your response</button></div>
 </form>
 <?php else: ?>

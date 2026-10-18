@@ -79,7 +79,8 @@
       <div style="width:104px;height:104px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;flex:0 0 auto"><?= qr_svg($passport_url, 92) ?></div>
     <?php endif; ?>
     <div style="flex:1;min-width:180px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <input id="ppurl" value="<?= e($passport_url) ?>" readonly onclick="this.select()" style="flex:1;min-width:160px;font-size:13px">
+      <input id="ppurl" value="<?= e($passport_url) ?>" readonly onclick="this.select()"
+             aria-label="Your public Passport link" style="flex:1;min-width:160px;font-size:13px">
       <button class="btn" type="button" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('ppurl').value);this.textContent='Copied ✓'">Copy link</button>
       <a class="btn sec" href="<?= e($passport_url) ?>" target="_blank" rel="noopener">Open ↗</a>
       <div class="muted" style="font-size:12px;flex-basis:100%">Scan the QR to open your public Passport — print it on a card or CV.</div>

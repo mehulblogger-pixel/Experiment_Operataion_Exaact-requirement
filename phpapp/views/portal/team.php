@@ -14,12 +14,12 @@
 <form method="post" action="/portal/team" class="pcard" style="max-width:640px">
   <input type="hidden" name="act" value="invite">
   <div style="font-weight:600;margin-bottom:10px">Invite a colleague</div>
-  <label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Their name</label>
-  <input class="form-control" name="name" maxlength="150">
-  <label style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Their e-mail</label>
-  <input class="form-control" name="email" type="email" required>
-  <label style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Access ends on <span style="opacity:.7">(optional)</span></label>
-  <input class="form-control" name="access_expires" type="date">
+  <label for="f-name" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Their name</label>
+  <input id="f-name" class="form-control" name="name" maxlength="150">
+  <label for="f-email" style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Their e-mail</label>
+  <input id="f-email" class="form-control" name="email" type="email" required>
+  <label for="f-access_expires" style="display:block;font-size:13px;color:var(--muted);margin:14px 0 5px">Access ends on <span style="opacity:.7">(optional)</span></label>
+  <input id="f-access_expires" class="form-control" name="access_expires" type="date">
   <div style="margin-top:16px"><button class="btn" type="submit">Create the invitation</button></div>
 </form>
 

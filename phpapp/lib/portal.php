@@ -894,8 +894,8 @@ function portal_route($route, $method) {
                 if ($rt && (int)$rt['ratee_party_id'] === (int)$party && strtoupper((string)$rt['direction']) === 'PRO_TO_CLIENT') {
                     $nid = cx_rating_dispute_raise($rid, ['category' => (string)($_POST['category'] ?? 'UNFAIR'), 'detail' => (string)($_POST['detail'] ?? ''),
                         'raised_by_kind' => 'CLIENT', 'raised_by_id' => (int)$party, 'raised_by_name' => portal_client_name(), 'subject' => 'Client reports a professional rating']);
-                    $_SESSION['portal_flash'] = $nid ? 'Reported — the moderation desk will review this rating.' : 'That rating already has an open report.';
-                } else $_SESSION['portal_flash'] = 'That rating could not be reported.';
+                    portal_flash_set($nid ? 'Reported — the moderation desk will review this rating.' : 'That rating already has an open report.', $nid ? 'ok' : 'err');
+                } else portal_flash_set('That rating could not be reported.', 'err');
                 redirect('/portal/reputation');
             }
             $about = ops_all("SELECT * FROM cx_ratings WHERE ratee_party_id=? AND direction='PRO_TO_CLIENT' ORDER BY id DESC", [(int)$party]) ?: [];
@@ -919,7 +919,7 @@ function portal_route($route, $method) {
                 redirect('/portal/plans');
             }
             $row = function_exists('mkt_pay_order') ? mkt_pay_order((int)($_GET['o'] ?? 0), 'CLIENT', $party) : null;
-            if (!$row || (string)$row['status'] !== 'PENDING') { $_SESSION['portal_flash'] = 'That payment is no longer available.'; redirect('/portal/plans'); }
+            if (!$row || (string)$row['status'] !== 'PENDING') { portal_flash_set('That payment is no longer available.', 'err'); redirect('/portal/plans'); }
             mkt_pay_render_checkout($row, '/portal/pay', '/portal/plans', mkt_pay_label((string)$row['purpose'], (int)$row['ref_id'], (string)$row['period']));
             exit;
 
@@ -1005,7 +1005,7 @@ function portal_route($route, $method) {
                 if ((string)($_POST['action'] ?? '') === 'revoke') [, $gmsg] = mobilization_gate_revoke($jid, (string)(portal_user()['name'] ?? 'Client'));
                 else [, $gmsg] = mobilization_gate_issue($jid, (string)(portal_user()['name'] ?? 'Client'), (string)($_POST['note'] ?? ''));
                 $_SESSION['portal_flash'] = $gmsg; portal_log('DEP_GATE', $jid);
-            } elseif (!$owns) { $_SESSION['portal_flash'] = 'That deployment is not yours.'; }
+            } elseif (!$owns) { portal_flash_set('That deployment is not yours.', 'err'); }
             redirect('/portal/deputations');
 
         case 'portal/dep-approve':
@@ -1120,8 +1120,8 @@ function portal_route($route, $method) {
                     $src = function_exists('cx_requirement_get') ? cx_requirement_get((int)($_POST['id'] ?? 0)) : null;
                     if ($src && (int)$src['poster_party_id'] === (int)$party) {
                         $nid = connect_requirement_duplicate((int)$src['id'], $party); // new DRAFT
-                        $_SESSION['portal_flash'] = $nid ? 'Duplicated as a draft — edit and post it below.' : 'Could not duplicate.';
-                    } else $_SESSION['portal_flash'] = 'That requirement is not yours.';
+                        portal_flash_set($nid ? 'Duplicated as a draft — edit and post it below.' : 'Could not duplicate.', $nid ? 'ok' : 'err');
+                    } else portal_flash_set('That requirement is not yours.', 'err');
                     redirect('/portal/hire');
                 } elseif ($act === 'save_template' && function_exists('connect_reqtemplate_save_from_requirement')) {
                     $src = function_exists('cx_requirement_get') ? cx_requirement_get((int)($_POST['id'] ?? 0)) : null;
@@ -1760,10 +1760,27 @@ function pcan($key) {
 // Refuse rather than hide: hiding a link but leaving the address reachable is
 // the bug this whole file exists to avoid. (portal_require() above is the
 // sign-in gate; this is the permission gate that runs after it.)
+// One flash channel, but WITH a severity -- the staff side has had flash($msg,
+// $tag) all along; the portal had a single channel painted green whatever it
+// said, so a refusal ("your access does not include...") and a failed payment
+// arrived looking like a confirmation. A bare string stays valid and still
+// reads as a confirmation, so no existing call site had to change to keep
+// working; the ones that report a refusal or a failure now say so.
+function portal_flash_set($msg, $tag = 'ok') {
+    $_SESSION['portal_flash'] = ['m' => (string)$msg, 't' => $tag === 'err' ? 'err' : 'ok'];
+}
+/** [message, tag] for the renderer, from either shape, and clears it. */
+function portal_flash_take() {
+    $f = $_SESSION['portal_flash'] ?? null;
+    unset($_SESSION['portal_flash']);
+    if (is_array($f)) return [(string)($f['m'] ?? ''), ($f['t'] ?? 'ok') === 'err' ? 'err' : 'ok'];
+    return [(string)$f, 'ok'];
+}
+
 function portal_need($key, $what = 'that') {
     if (pcan($key)) return;
-    $_SESSION['portal_flash'] = 'Your access here does not include ' . $what . '. '
-        . 'Ask your main contact at ' . portal_client_name() . ' to have it added.';
+    portal_flash_set('Your access here does not include ' . $what . '. '
+        . 'Ask your main contact at ' . portal_client_name() . ' to have it added.', 'err');
     redirect('/portal');
 }
 

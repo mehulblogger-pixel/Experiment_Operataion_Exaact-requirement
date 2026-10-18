@@ -177,6 +177,24 @@ function connect_pro_require() {
     if (!connect_pro_user()) redirect('/pro/login');
 }
 
+// The one-shot message shown after a redirect. It existed as a bare session key
+// written in ten places -- every one of them the outcome of a payment, a
+// subscription, a credit pack or a rating report -- and NO view ever read it, so
+// a professional whose payment failed was told nothing at all and the text
+// accumulated in their session. It now carries a severity and is rendered by
+// views/pro/top.php, matching what the client and vendor portals already did.
+// A bare string stays valid and reads as a confirmation.
+function connect_pro_flash_set($msg, $tag = 'ok') {
+    $_SESSION['pro_flash'] = ['m' => (string)$msg, 't' => $tag === 'err' ? 'err' : 'ok'];
+}
+/** [message, tag] for the renderer, from either shape, and clears it. */
+function connect_pro_flash_take() {
+    $f = $_SESSION['pro_flash'] ?? null;
+    unset($_SESSION['pro_flash']);
+    if (is_array($f)) return [(string)($f['m'] ?? ''), ($f['t'] ?? 'ok') === 'err' ? 'err' : 'ok'];
+    return [(string)$f, 'ok'];
+}
+
 /** Self-registration. Returns '' on success (and logs in), else an error. */
 /** Digits-only phone key for matching (last 10, so +91 / 0-prefix agree). */
 function connect_pro_phone_key($num) {
@@ -673,7 +691,7 @@ function connect_pro_route($route, $method) {
                     redirect('/pro/profile#mobility');
                 } elseif ($act === 'save_tax' && function_exists('connect_pro_tax_save')) {
                     [$tok, $tmsg] = connect_pro_tax_save((int)$me['id'], $_POST);
-                    $_SESSION['pro_flash'] = $tmsg;
+                    connect_pro_flash_set($tmsg, $tok ? 'ok' : 'err');
                     redirect('/pro/profile#tax');
                 } else {
                     connect_pro_profile_save((int)$me['id'], $_POST);
@@ -700,9 +718,9 @@ function connect_pro_route($route, $method) {
                 // free during the launch promo. Only blocks once paid access is on and
                 // this professional has used up their monthly applications.
                 if (function_exists('mkt_can_use') && !mkt_can_use('PRO', (int)$me['id'], 'applications')) {
-                    $_SESSION['pro_flash'] = (function_exists('mkt_has_access') && !mkt_has_access('PRO', (int)$me['id']))
+                    connect_pro_flash_set((function_exists('mkt_has_access') && !mkt_has_access('PRO', (int)$me['id']))
                         ? 'A membership is needed to apply — see Plans.'
-                        : 'You have used all your applications this month — upgrade your plan or add a credit pack.';
+                        : 'You have used all your applications this month — upgrade your plan or add a credit pack.', 'err');
                     redirect('/pro/jobs');
                 }
                 $rq = cx_requirement_get((int)$_POST['requirement_id']);
@@ -742,7 +760,7 @@ function connect_pro_route($route, $method) {
                 $pAct = (string)($_POST['action'] ?? '');
                 if ($pAct === 'cancel_sub' && function_exists('mkt_sub_cancel')) {
                     [$cok, $cmsg] = mkt_sub_cancel('PRO', $meId, (string)($_POST['mode'] ?? 'END'));
-                    $_SESSION['pro_flash'] = $cmsg; redirect('/pro/plans');
+                    connect_pro_flash_set($cmsg, $cok ? 'ok' : 'err'); redirect('/pro/plans');
                 }
                 $pack = $pAct === 'buy_pack';
                 $purpose = $pack ? 'PACK' : 'SUB';
@@ -753,9 +771,9 @@ function connect_pro_route($route, $method) {
                 // price; otherwise (no keys, or a free/promo price) activate immediately.
                 $start = function_exists('mkt_pay_start') ? mkt_pay_start('PRO', $meId, $purpose, $refId, $period, $who) : ['mode' => 'unconfigured'];
                 if (($start['mode'] ?? '') === 'pay')   redirect('/pro/pay?o=' . (int)$start['row_id']);
-                if (($start['mode'] ?? '') === 'error') { $_SESSION['pro_flash'] = $start['msg']; redirect('/pro/plans'); }
-                if ($pack && function_exists('mkt_credit_buy'))     { [$bok, $bmsg] = mkt_credit_buy('PRO', $meId, $refId, $who); $_SESSION['pro_flash'] = $bmsg; }
-                elseif (!$pack && function_exists('mkt_subscribe')) { [$ok, $msg]  = mkt_subscribe('PRO', $meId, $refId, $period, $who, $coupon); $_SESSION['pro_flash'] = $msg; }
+                if (($start['mode'] ?? '') === 'error') { connect_pro_flash_set($start['msg'], 'err'); redirect('/pro/plans'); }
+                if ($pack && function_exists('mkt_credit_buy'))     { [$bok, $bmsg] = mkt_credit_buy('PRO', $meId, $refId, $who); connect_pro_flash_set($bmsg, $bok ? 'ok' : 'err'); }
+                elseif (!$pack && function_exists('mkt_subscribe')) { [$ok, $msg]  = mkt_subscribe('PRO', $meId, $refId, $period, $who, $coupon); connect_pro_flash_set($msg, $ok ? 'ok' : 'err'); }
                 redirect('/pro/plans');
             }
             connect_pro_view('plans', [
@@ -777,11 +795,11 @@ function connect_pro_route($route, $method) {
                 [$ok, $msg] = function_exists('mkt_pay_verify')
                     ? mkt_pay_verify((string)($_POST['razorpay_order_id'] ?? ''), (string)($_POST['razorpay_payment_id'] ?? ''), (string)($_POST['razorpay_signature'] ?? ''))
                     : [false, 'Payment is not available.'];
-                $_SESSION['pro_flash'] = $msg;
+                connect_pro_flash_set($msg, $ok ? 'ok' : 'err');
                 redirect('/pro/plans');
             }
             $row = function_exists('mkt_pay_order') ? mkt_pay_order((int)($_GET['o'] ?? 0), 'PRO', $meId) : null;
-            if (!$row || (string)$row['status'] !== 'PENDING') { $_SESSION['pro_flash'] = 'That payment is no longer available.'; redirect('/pro/plans'); }
+            if (!$row || (string)$row['status'] !== 'PENDING') { connect_pro_flash_set('That payment is no longer available.', 'err'); redirect('/pro/plans'); }
             mkt_pay_render_checkout($row, '/pro/pay', '/pro/plans', mkt_pay_label((string)$row['purpose'], (int)$row['ref_id'], (string)$row['period']));
             exit;
 
@@ -799,8 +817,8 @@ function connect_pro_route($route, $method) {
                 if ($rt && (int)$rt['ratee_inspector_id'] === (int)$me['id'] && strtoupper((string)$rt['direction']) === 'CLIENT_TO_PRO') {
                     $nid = cx_rating_dispute_raise($rid, ['category' => (string)($_POST['category'] ?? 'UNFAIR'), 'detail' => (string)($_POST['detail'] ?? ''),
                         'raised_by_kind' => 'PRO', 'raised_by_id' => (int)$me['id'], 'raised_by_name' => (string)$me['name'], 'subject' => 'Professional reports a client rating']);
-                    $_SESSION['pro_flash'] = $nid ? 'Reported — the moderation desk will review this rating.' : 'That rating already has an open report.';
-                } else $_SESSION['pro_flash'] = 'That rating could not be reported.';
+                    connect_pro_flash_set($nid ? 'Reported — the moderation desk will review this rating.' : 'That rating already has an open report.', $nid ? 'ok' : 'err');
+                } else connect_pro_flash_set('That rating could not be reported.', 'err');
                 redirect('/pro/reputation');
             }
             $mine = ops_all("SELECT * FROM cx_ratings WHERE ratee_inspector_id=? AND direction='CLIENT_TO_PRO' ORDER BY id DESC", [(int)$me['id']]) ?: [];

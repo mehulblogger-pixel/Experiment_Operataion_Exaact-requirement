@@ -38,11 +38,11 @@
             <summary style="cursor:pointer;font-size:13px;color:var(--muted)">Report this rating</summary>
             <form method="post" action="/pro/reputation" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
               <input type="hidden" name="action" value="report_rating"><input type="hidden" name="rating_id" value="<?= (int)$r['id'] ?>">
-              <div class="ff"><label style="font-size:12px">Why</label>
-                <select name="category" class="form-control" style="width:auto">
+              <div class="ff"><label for="f-category" style="font-size:12px">Why</label>
+                <select id="f-category" name="category" class="form-control" style="width:auto">
                   <?php foreach ($categories as $k => $lbl): ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?>
                 </select></div>
-              <div class="ff" style="flex:1;min-width:200px"><label style="font-size:12px">Details</label><input name="detail" class="form-control" placeholder="What’s wrong with it?"></div>
+              <div class="ff" style="flex:1;min-width:200px"><label for="f-detail" style="font-size:12px">Details</label><input id="f-detail" name="detail" class="form-control" placeholder="What’s wrong with it?"></div>
               <button class="btn sec" type="submit">Submit report</button>
             </form>
           </details>

@@ -17,12 +17,12 @@
     </div>
   <?php endif; ?>
   <form method="post" action="/pro/documents" enctype="multipart/form-data">
-    <label>Type</label>
-    <select name="kind">
+    <label for="f-kind">Type</label>
+    <select id="f-kind" name="kind">
       <?php foreach ($kinds as $k => $lbl): ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?>
     </select>
-    <label style="margin-top:10px">File</label>
-    <input type="file" name="file" required>
+    <label for="f-file" style="margin-top:10px">File</label>
+    <input id="f-file" type="file" name="file" required>
     <button class="btn" type="submit" style="margin-top:14px;width:100%">Upload</button>
   </form>
 </div>

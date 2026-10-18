@@ -139,8 +139,8 @@
     <p class="muted" style="margin:0 0 10px;font-size:13px">Upload the inspection report for the client. It stays locked to them until the payment is settled.</p>
     <form method="post" action="/pro/voucher" enctype="multipart/form-data">
       <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="report_upload">
-      <label>Title</label><input type="text" name="title" placeholder="e.g. RT film review report — Dahej FAT">
-      <label>File</label><input type="file" name="file" required>
+      <label for="f-title">Title</label><input id="f-title" type="text" name="title" placeholder="e.g. RT film review report — Dahej FAT">
+      <label for="f-file">File</label><input id="f-file" type="file" name="file" required>
       <button class="btn" type="submit" style="margin-top:10px">Upload report</button>
     </form>
   <?php endif; ?>
@@ -219,10 +219,10 @@
     <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>">
     <input type="hidden" name="action" value="add_file">
     <div class="grid2">
-      <div><label>Choose a file</label><input type="file" name="file" required></div>
+      <div><label for="f-file-2">Choose a file</label><input id="f-file-2" type="file" name="file" required></div>
       <?php if ($lines): ?>
-      <div><label>For which day? (optional)</label>
-        <select name="line_id">
+      <div><label for="f-line_id">For which day? (optional)</label>
+        <select id="f-line_id" name="line_id">
           <option value="0">— whole voucher —</option>
           <?php foreach ($lines as $ln): ?>
             <option value="<?= (int)$ln['id'] ?>"><?= e(substr((string)$ln['work_date'], 0, 10) ?: ('Day #' . (int)$ln['id'])) ?><?php if (!empty($ln['receipt_ref'])): ?> · <?= e($ln['receipt_ref']) ?><?php endif; ?></option>
@@ -244,23 +244,23 @@
     <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>">
     <input type="hidden" name="action" value="add_line">
     <div class="grid2">
-      <div><label>Date</label><input type="date" name="work_date"></div>
-      <div><label><?= e(ucfirst($unit)) ?>s</label><input type="number" name="units" value="1" min="0.5" step="0.5"></div>
+      <div><label for="f-work_date">Date</label><input id="f-work_date" type="date" name="work_date"></div>
+      <div><label for="f-units"><?= e(ucfirst($unit)) ?>s</label><input id="f-units" type="number" name="units" value="1" min="0.5" step="0.5"></div>
     </div>
     <?php if ($exclusive): ?>
       <?php if ($claimHeadCols): ?>
         <p class="muted" style="margin:12px 0 4px;font-size:12px">Reimbursable expenses (against receipts)<?= count($claimHeadCols) < 5 ? ' — only what your client agreed to reimburse' : '' ?></p>
         <div class="grid2">
           <?php foreach ($claimHeadCols as $hk => $hl): ?>
-            <div><label><?= e($hl) ?></label><input type="number" name="<?= e($hk) ?>" value="0" min="0" step="1"></div>
+            <div><label for="f-exp-<?= e($hk) ?>"><?= e($hl) ?></label><input type="number" id="f-exp-<?= e($hk) ?>" name="<?= e($hk) ?>" value="0" min="0" step="1"></div>
           <?php endforeach; ?>
         </div>
-        <label>Receipt reference</label><input type="text" name="receipt_ref" placeholder="e.g. cab bill #, hotel folio">
+        <label for="f-receipt_ref">Receipt reference</label><input id="f-receipt_ref" type="text" name="receipt_ref" placeholder="e.g. cab bill #, hotel folio">
       <?php else: ?>
         <p class="muted" style="margin:12px 0 4px;font-size:12px">Your client covers all expenses directly (or they're in your rate) — just add your <?= e($unit) ?>s, no expense claim needed.</p>
       <?php endif; ?>
     <?php endif; ?>
-    <label>Note</label><input type="text" name="note" placeholder="optional">
+    <label for="f-note">Note</label><input id="f-note" type="text" name="note" placeholder="optional">
     <button class="btn" type="submit" style="margin-top:14px">Add <?= e($unit) ?></button>
   </form>
 </div>

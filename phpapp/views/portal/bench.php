@@ -38,17 +38,17 @@ $avail = array_values(array_filter($bench, fn($b) => (int)($b['is_active'] ?? 1)
   <form method="post" action="/portal/bench">
     <input type="hidden" name="action" value="add">
     <div class="bgrid">
-      <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Name *</label>
-        <input class="form-control" name="name" required placeholder="e.g. Ajay Sharma"></div>
-      <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Job title</label>
-        <input class="form-control" name="job_title" placeholder="e.g. CSWIP welding inspector"></div>
-      <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Discipline</label>
-        <select class="form-control" name="discipline_code"><option value="">— any —</option>
+      <div><label for="f-name" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Name *</label>
+        <input id="f-name" class="form-control" name="name" required placeholder="e.g. Ajay Sharma"></div>
+      <div><label for="f-job_title" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Job title</label>
+        <input id="f-job_title" class="form-control" name="job_title" placeholder="e.g. CSWIP welding inspector"></div>
+      <div><label for="f-discipline_code" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Discipline</label>
+        <select id="f-discipline_code" class="form-control" name="discipline_code"><option value="">— any —</option>
           <?php foreach ($disciplines as $d): ?><option value="<?= e($d['code']) ?>"><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
-      <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Base city</label>
-        <input class="form-control" name="base_city" placeholder="e.g. Surat"></div>
-      <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Day rate (₹)</label>
-        <input class="form-control" name="day_rate" type="number" min="0"></div>
+      <div><label for="f-base_city" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Base city</label>
+        <input id="f-base_city" class="form-control" name="base_city" placeholder="e.g. Surat"></div>
+      <div><label for="f-day_rate" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Day rate (₹)</label>
+        <input id="f-day_rate" class="form-control" name="day_rate" type="number" min="0"></div>
     </div>
     <button class="btn" type="submit" style="margin-top:14px">Add to bench</button>
   </form>
@@ -62,17 +62,17 @@ $avail = array_values(array_filter($bench, fn($b) => (int)($b['is_active'] ?? 1)
   <form method="post" action="/portal/bench">
     <input type="hidden" name="action" value="allocate">
     <div class="bgrid">
-      <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Who</label>
-        <select class="form-control" name="bench_id" required>
+      <div><label for="f-bench_id" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">Who</label>
+        <select id="f-bench_id" class="form-control" name="bench_id" required>
           <?php foreach ($avail as $b): ?><option value="<?= (int)$b['id'] ?>"><?= e($b['name']) ?><?= $b['job_title'] ? ' · ' . e($b['job_title']) : '' ?></option><?php endforeach; ?>
         </select></div>
-      <div><label style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">For which job</label>
-        <select class="form-control" name="requirement_id" required>
+      <div><label for="f-requirement_id" style="display:block;font-size:13px;color:var(--muted);margin:0 0 5px">For which job</label>
+        <select id="f-requirement_id" class="form-control" name="requirement_id" required>
           <?php foreach ($reqs as $r): ?><option value="<?= (int)$r['id'] ?>"><?= e($r['ref_code']) ?> · <?= e($r['title']) ?></option><?php endforeach; ?>
         </select></div>
     </div>
-    <label style="display:block;font-size:13px;color:var(--muted);margin:12px 0 5px">Note (optional)</label>
-    <input class="form-control" name="note" placeholder="e.g. available from Monday, 8 yrs pressure-vessel">
+    <label for="f-note" style="display:block;font-size:13px;color:var(--muted);margin:12px 0 5px">Note (optional)</label>
+    <input id="f-note" class="form-control" name="note" placeholder="e.g. available from Monday, 8 yrs pressure-vessel">
     <button class="btn" type="submit" style="margin-top:12px">Put forward</button>
   </form>
 </div>

@@ -45,7 +45,7 @@
 <div class="card">
   <h2>Submit a check</h2>
   <form method="post" action="/pro/verify">
-    <label style="display:block;font-weight:600;margin:8px 0 4px">What are you verifying?</label>
+    <label for="ct" style="display:block;font-weight:600;margin:8px 0 4px">What are you verifying?</label>
     <select name="check_type" id="ct" onchange="var v=this.value;var needs=<?= json_encode(array_map(fn($c)=>!empty($c['value']), $proTypes)) ?>;document.getElementById('valwrap').style.display=needs[v]?'block':'none';">
       <?php foreach ($proTypes as $code => $c): ?>
         <option value="<?= e($code) ?>"><?= e($c['label']) ?><?= ($c['method'] ?? '')==='deterministic' ? ' (instant format check)' : '' ?></option>
@@ -53,13 +53,13 @@
     </select>
     <?php $firstNeedsValue = false; foreach ($proTypes as $c) { $firstNeedsValue = !empty($c['value']); break; } ?>
     <div id="valwrap" style="margin-top:10px;display:<?= $firstNeedsValue ? 'block' : 'none' ?>">
-      <label style="display:block;font-weight:600;margin:0 0 4px">Number</label>
-      <input type="text" name="value" placeholder="e.g. ABCDE1234F" autocomplete="off">
+      <label for="f-value" style="display:block;font-weight:600;margin:0 0 4px">Number</label>
+      <input id="f-value" type="text" name="value" placeholder="e.g. ABCDE1234F" autocomplete="off">
       <p class="muted" style="font-size:12px;margin:6px 0 0">We store only the last 4 digits, masked. Your full number is never kept.</p>
     </div>
     <div style="margin-top:10px">
-      <label style="display:block;font-weight:600;margin:0 0 4px">Note / document reference (optional)</label>
-      <input type="text" name="evidence" placeholder="e.g. 'uploaded PAN scan' or a reference">
+      <label for="f-evidence" style="display:block;font-weight:600;margin:0 0 4px">Note / document reference (optional)</label>
+      <input id="f-evidence" type="text" name="evidence" placeholder="e.g. 'uploaded PAN scan' or a reference">
     </div>
     <button class="btn" type="submit" style="margin-top:12px">Submit for verification</button>
   </form>

@@ -671,6 +671,66 @@ post to a business record or list another person's data.
 
 ---
 
+## GAP-017 — 113 fields had a label that was never attached to them
+
+**CONFIRMED BY EXECUTION · P2 · All three portals · FIXED 18 Oct 2026**
+
+Across the portals the pattern was `<label>Name</label><input name="name">` --
+adjacent, never associated. No `for`, no wrapping. It looks correct and is
+invisible to a screen reader, and tapping the label does not focus the field.
+It matters most on the professional portal, used on a phone on a site.
+
+**Fixed.** 113 pairs wired with matching `for`/`id` derived from each field's own
+name; the four with a PHP-built name carry an explicit `for` or `aria-label`.
+The convention already existed -- 18 labels used `for=` -- it had just not been
+applied consistently. See `11-EXTERNAL-PORTAL-AUDIT.md` §2.6 for the regression
+my first transform introduced (a label reading "Rating" pointed at the name
+field) and how the browser caught it.
+
+---
+
+## GAP-016 — in the client portal a refusal arrived wearing the success colour
+
+**CONFIRMED · P2 · Client portal · FIXED 18 Oct 2026**
+
+`views/portal/top.php` hardcoded `class="pmsg ok"`, so every message was painted
+as a success. Of 42 message sites at least nine are refusals or failures --
+*"That deployment is not yours."*, *"That payment is no longer available."*,
+*"Your access here does not include…"* -- plus the failure branch of several
+`$ok ? 'Done.' : $msg` pairs. The CSS defined `.pmsg.err` and never used it here.
+
+**Fixed.** A tagged channel, plus `role="alert"` on all three renderers so a
+message is announced and not merely seen. The vendor portal shares the
+hardcoded class but **not** the defect (its only flash is a genuine
+confirmation, and a refusal there goes to its own page); its renderer was made
+tag-capable and nothing else.
+
+---
+
+## GAP-015 — the professional portal wrote messages nobody ever read
+
+**CONFIRMED BY EXECUTION · P1 · Professional portal · FIXED 18 Oct 2026**
+
+`lib/connect_pro.php` wrote `$_SESSION['pro_flash']` in **ten** places. Every one
+is the outcome of money or reputation: a payment, a subscription, a credit pack,
+a rating report -- including *"That payment is no longer available."*, the
+payment-verification result, and the error branch of starting a subscription.
+
+**No view read that key.** Proven by rendering a real `/pro` screen with the
+message set (`evidence/pro-flash-lost.php`): it does not appear, and it was
+never cleared, so it accumulated in the professional's session.
+
+A professional whose payment failed was therefore told **nothing at all** --
+redirected to the plans page and left to guess. The client and vendor portals
+both rendered their channel; this one was missed.
+
+**Fixed.** `connect_pro_flash_set()` / `connect_pro_flash_take()` with a
+severity, rendered in `views/pro/top.php` with the `.msg.err` / `.msg.ok` styles
+that already existed there. All ten writes go through the helper, each tagged by
+its own outcome flag.
+
+---
+
 ## GAP-014 — the portal assistant answered questions the user had been refused
 
 **CONFIRMED BY EXECUTION · P1 · Client and vendor portals · FIXED 18 Oct 2026**

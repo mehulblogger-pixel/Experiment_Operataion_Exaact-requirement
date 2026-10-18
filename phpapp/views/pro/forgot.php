@@ -9,7 +9,7 @@
 <?php else: ?>
   <p class="muted" style="margin:0 0 16px">Enter your e-mail and we'll send you a link to set a new password.</p>
   <form method="post" action="/pro/forgot" class="card">
-    <label>E-mail</label><input type="email" name="email" required autofocus>
+    <label for="f-email">E-mail</label><input id="f-email" type="email" name="email" required autofocus>
     <button class="btn" type="submit" style="margin-top:16px;width:100%">Send reset link</button>
   </form>
   <p class="muted"><a href="/pro/login">← Back to sign in</a></p>
