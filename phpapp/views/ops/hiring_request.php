@@ -330,9 +330,68 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
         <input class="form-control" type="number" min="0" max="60" step="0.5" name="min_experience_years"
                value="<?= ($r['min_experience_years'] ?? null) === null || $r['min_experience_years'] === '' ? '' : $e(rtrim(rtrim(number_format((float) $r['min_experience_years'], 2, '.', ''), '0'), '.')) ?>"
                placeholder="e.g. 5"></div>
-      <div class="ff ff-wide" style="grid-column:1/-1"><label>Essential skills <span class="muted">— a candidate without these is not eligible</span></label>
-        <textarea class="form-control" name="essential_skills" rows="2" maxlength="600" placeholder="e.g. Welding inspection, CSWIP 3.1, offshore experience"><?= $e($r['essential_skills'] ?? '') ?></textarea>
-        <small class="muted">Separate them with commas. Keep it to what is genuinely essential — anything desirable belongs in the job description above.</small></div>
+    </div>
+
+    <?php //  ---- "ALL OF" vs "ANY ONE OF" (UAT A1) --------------------------
+          //
+          //    "Still unable to add multiple skills, multiple qualification
+          //     with and or selection."
+          //
+          //  Both lines were one box, so "Welding inspection, CSWIP 3.1,
+          //  offshore" meant three things a candidate must ALL have — and there
+          //  was no way to write what a real requirement says:
+          //
+          //      CSWIP 3.1 AND (B.E. Mechanical OR Diploma with 10 years)
+          //
+          //  Each row below is one group, and the groups are joined by AND.
+          //  Inside a row you choose whether the listed items are all required
+          //  or any one of them will do. Two levels covers every requirement
+          //  anybody actually writes down; a third costs more confusion at the
+          //  keyboard than it buys in precision.
+          $grpRows = function ($prefix, $groups, $ph) use ($e) {
+              if (!$groups) $groups = [['mode' => 'ALL', 'items' => []]];
+              $h = '<div class="rqb" data-rqb="' . $e($prefix) . '">';
+              foreach ($groups as $g) {
+                  $h .= '<div class="rqb-row" style="display:flex;gap:8px;margin-bottom:6px;align-items:flex-start;flex-wrap:wrap">'
+                     .  '<select class="form-control" name="' . $e($prefix) . '_mode[]" style="flex:0 0 150px">'
+                     .  '<option value="ALL"' . ($g['mode'] === 'ALL' ? ' selected' : '') . '>must have all of</option>'
+                     .  '<option value="ANY"' . ($g['mode'] === 'ANY' ? ' selected' : '') . '>any one of</option>'
+                     .  '</select>'
+                     .  '<input class="form-control" name="' . $e($prefix) . '_items[]" style="flex:1 1 220px;min-width:0"'
+                     .  ' placeholder="' . $e($ph) . '" value="' . $e(implode(', ', $g['items'])) . '">'
+                     .  '<button type="button" class="btn secondary small rqb-del" title="Remove this line">&times;</button>'
+                     .  '</div>';
+              }
+              $h .= '<button type="button" class="btn secondary small rqb-add">+ Add another line</button>'
+                 .  '<div class="muted rqb-preview" style="font-size:12px;margin-top:6px"></div></div>';
+              return $h;
+          };
+          $skillGroupsNow = hreq_req_groups_decode($r['essential_skills_json'] ?? '')
+                            ?: hreq_req_groups_from_text($r['essential_skills'] ?? '');
+          $qualGroupsNow  = hreq_req_groups_decode($r['min_qualification_json'] ?? '')
+                            ?: hreq_req_groups_from_text($r['min_qualification'] ?? '');
+    ?>
+    <div class="ff ff-wide" style="margin-top:4px">
+      <label>Essential skills <span class="muted">— a candidate without these is not eligible</span></label>
+      <?php //  The name the save handler reads, kept in step by the builder.
+            //  The server REGENERATES this from the rows and never trusts the
+            //  hidden value when rows are present — it is here so the form
+            //  still carries the field it has always carried (a save with
+            //  JavaScript off keeps the existing wording rather than wiping
+            //  it), and so the wiring stays visible to anybody reading the
+            //  form for where a value comes from. ?>
+      <input type="hidden" name="essential_skills" id="hq_skills_text" value="<?= $e($r['essential_skills'] ?? '') ?>">
+      <?= $grpRows('skills_grp', $skillGroupsNow, 'e.g. CSWIP 3.1, ASNT Level II') ?>
+      <small class="muted">Separate the items on a line with commas. Each line is joined to the next by
+        <b>and</b> — so two lines means both must be satisfied. Keep it to what is genuinely essential;
+        anything desirable belongs in the job description above.</small>
+    </div>
+
+    <div class="ff ff-wide" style="margin-top:10px">
+      <label>Qualification <span class="muted">— often "a degree OR a diploma with more years"</span></label>
+      <?= $grpRows('qual_grp', $qualGroupsNow, 'e.g. B.E. Mechanical, Diploma with 10 years') ?>
+      <small class="muted">Leave this empty if there is genuinely no minimum. Filling it in here replaces the
+        single choice above, because a real qualification bar is usually a choice between routes.</small>
     </div>
 
     <h3 class="tab-sub">Where, how many, and when?</h3>

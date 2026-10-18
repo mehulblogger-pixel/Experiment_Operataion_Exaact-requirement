@@ -1940,3 +1940,77 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
+
+/*  ---- THE REQUIREMENT BUILDER (UAT A1) ------------------------------------
+    Rows of "must have all of / any one of" + a comma list. Rows are joined by
+    AND. A live preview under them shows the sentence being built, because the
+    whole complaint was that people could not SEE what the requirement said:
+
+        CSWIP 3.1 AND (B.E. Mechanical OR Diploma with 10 years)
+
+    The server regenerates that same sentence from the same rows on save --
+    this preview is a courtesy, never the source of what is stored. */
+(function () {
+  function sentence(box) {
+    var parts = [], rows = [];
+    box.querySelectorAll('.rqb-row').forEach(function (row) {
+      var mode = row.querySelector('select').value,
+          raw  = row.querySelector('input').value || '',
+          items = raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      if (!items.length) return;
+      rows.push({ mode: mode, items: items });
+    });
+    //  Must match hreq_req_groups_text() EXACTLY. A preview that disagrees with
+    //  what is stored is worse than no preview: a plain "all of" list stays a
+    //  comma list, because those two columns are material fields and rewriting
+    //  an existing one would demand re-approval for a change nobody made.
+    var single = rows.length === 1;
+    rows.forEach(function (g) {
+      if (g.items.length === 1) { parts.push(g.items[0]); return; }
+      var joined = g.items.join(g.mode === 'ANY' ? ' OR ' : ', ');
+      parts.push(single ? joined : '(' + joined + ')');
+    });
+    return parts.join(' AND ');
+  }
+  function sync(box) {
+    var out = box.querySelector('.rqb-preview');
+    if (!out) return;
+    var s = sentence(box);
+    out.innerHTML = s ? 'Reads as: <b>' + s.replace(/[<>&]/g, '') + '</b>' : '';
+    //  Keep the field the save handler has always read in step with the rows.
+    //  The server regenerates it from the rows regardless; this only means the
+    //  form still carries the name, and a submit with scripting disabled does
+    //  not silently blank an existing requirement.
+    var mirror = box.getAttribute('data-rqb') === 'skills_grp'
+               ? document.getElementById('hq_skills_text') : null;
+    if (mirror) mirror.value = s;
+    //  One row left is not removable: a builder you can empty into nothing
+    //  leaves no way back to typing anything at all.
+    var rows = box.querySelectorAll('.rqb-row');
+    rows.forEach(function (r) {
+      var del = r.querySelector('.rqb-del');
+      if (del) del.style.visibility = rows.length > 1 ? '' : 'hidden';
+    });
+  }
+  function wire(box) {
+    box.addEventListener('input',  function () { sync(box); });
+    box.addEventListener('change', function () { sync(box); });
+    box.addEventListener('click', function (e) {
+      var add = e.target.closest('.rqb-add'), del = e.target.closest('.rqb-del');
+      if (add) {
+        var first = box.querySelector('.rqb-row'), copy = first.cloneNode(true);
+        copy.querySelector('input').value = '';
+        copy.querySelector('select').selectedIndex = 0;
+        first.parentNode.insertBefore(copy, add);
+        copy.querySelector('input').focus();
+        sync(box);
+      } else if (del) {
+        if (box.querySelectorAll('.rqb-row').length > 1) { del.closest('.rqb-row').remove(); sync(box); }
+      }
+    });
+    sync(box);
+  }
+  function init() { document.querySelectorAll('[data-rqb]').forEach(wire); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();

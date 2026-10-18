@@ -258,6 +258,12 @@ function hreq_migrate() {
         //  salary or a job was re-invoiced. Same discipline as the approved
         //  snapshot above.
         try { ensure_column('hiring_requests', 'replacing_snapshot_json',   'TEXT'); } catch (Throwable $e) {}
+        //  UAT A1 — the structured form of the two requirement lines. The TEXT
+        //  columns stay canonical (the floor, the snapshot and the version diff
+        //  all read them); these hold the groups that generated that text, so
+        //  reopening a request shows the builder the way it was filled in.
+        try { ensure_column('hiring_requests', 'essential_skills_json',  'TEXT'); } catch (Throwable $e) {}
+        try { ensure_column('hiring_requests', 'min_qualification_json', 'TEXT'); } catch (Throwable $e) {}
     }
 
     // Vocabularies, through the engine that already exists.
@@ -955,6 +961,24 @@ function hreq_save($id, array $post) {
         $minExp = round($minExp, 2);
     }
 
+    //  ---- UAT A1: the requirement builder, before the write ---------------
+    //
+    //  THE TEXT STAYS CANONICAL. essential_skills and min_qualification are
+    //  material fields — the requisition's floor is measured against them, the
+    //  approved snapshot carries them and the version diff decides re-approval
+    //  from them. The builder GENERATES that text rather than replacing it, so
+    //  every existing reader is untouched.
+    //
+    //  And a request saved WITHOUT the builder keeps whatever text it had:
+    //  $skillGroups is empty, the old branch runs, and no existing approved
+    //  request suddenly diffs as materially changed because the format moved.
+    $skillGroups = hreq_req_groups_from_post($post, 'skills_grp');
+    $qualGroups  = hreq_req_groups_from_post($post, 'qual_grp');
+    $skillText   = $skillGroups ? mb_substr(hreq_req_groups_text($skillGroups), 0, 600) : '';
+    $qualText    = $qualGroups  ? mb_substr(hreq_req_groups_text($qualGroups), 0, 200)  : $minQual;
+    $skillJson   = $skillGroups ? (string) json_encode($skillGroups) : '';
+    $qualJson    = $qualGroups  ? (string) json_encode($qualGroups)  : '';
+
     //  ---- the replacement block, worked out before the write --------------
     //  The snapshot is taken HERE rather than at render time, so what the
     //  approver is shown cannot change later because a salary was edited or a
@@ -1022,8 +1046,10 @@ function hreq_save($id, array $post) {
         //  Nullable on purpose: a request that states no minimum has no floor, and
         //  an absent value must never be read as a floor of zero.
         'min_experience_years'     => $minExp,
-        'min_qualification'        => $minQual,
-        'essential_skills'         => mb_substr(trim((string) ($post['essential_skills'] ?? '')), 0, 600),
+        'min_qualification'        => $skillGroups ? $qualText   : $minQual,
+        'essential_skills'         => $skillGroups ? $skillText  : mb_substr(trim((string) ($post['essential_skills'] ?? '')), 0, 600),
+        'essential_skills_json'    => $skillJson,
+        'min_qualification_json'   => $qualJson,
     ];
     $now = hreq_now(); $who = hreq_who();
     //  GATE 2 — AN APPROVED REQUIREMENT IS NOT EDITED IN PLACE.
@@ -2078,4 +2104,122 @@ function hreq_leaver_facts_html($snap, $stamped = true) {
              : ($stamped ? '' : '<br><span class="muted" style="font-size:11.5px">Read from their record and the '
                . 'job book just now. Saving this request stamps these figures, so the approver sees what you '
                . 'see here.</span>'));
+}
+
+// ============================================================================
+//  "MUST HAVE ALL OF" vs "ANY ONE OF".                      (UAT A1, 2026-10-18)
+//
+//    "Still unable to add multiple skills, multiple qualification with and or
+//     selection."
+//
+//  Both lines were a single box. "Welding inspection, CSWIP 3.1, offshore" was
+//  read as three things a candidate must ALL have, with no way to say the thing
+//  real requirements actually say:
+//
+//      CSWIP 3.1  AND  (B.E. Mechanical OR Diploma with 10 years)
+//
+//  So a recruiter either over-specified and screened out people who could do
+//  the job, or under-specified and let through people who could not.
+//
+//  THE SHAPE: a requirement is a list of GROUPS, joined by AND. Inside a group
+//  the items are joined by ALL or ANY. Two levels is enough for every real
+//  requirement anybody writes down, and a third would cost more in confusion at
+//  the keyboard than it buys in precision.
+//
+//  WHY THIS IS ADDITIVE, WHICH IS THE PART THAT MATTERS. essential_skills and
+//  min_qualification are MATERIAL fields: the requisition's floor is measured
+//  against them, the approved snapshot carries them, and the version diff
+//  reports a change to them as needing re-approval. So the structure does not
+//  replace the text — it GENERATES it. Every existing reader keeps working
+//  unchanged, and a request saved without using the builder has its text
+//  untouched, so no existing approved request suddenly diffs as changed.
+// ============================================================================
+
+//  Decode stored JSON into groups. Anything that is not a well-formed group
+//  list yields [], so a corrupt or hand-edited value degrades to "no structure"
+//  rather than to a fatal.
+function hreq_req_groups_decode($json) {
+    if (is_array($json)) { $a = $json; }
+    else {
+        $json = trim((string) $json);
+        if ($json === '') return [];
+        $a = json_decode($json, true);
+    }
+    if (!is_array($a)) return [];
+    $out = [];
+    foreach ($a as $g) {
+        if (!is_array($g)) continue;
+        $mode  = strtoupper((string) ($g['mode'] ?? 'ALL'));
+        if ($mode !== 'ANY') $mode = 'ALL';
+        $items = [];
+        foreach ((array) ($g['items'] ?? []) as $it) {
+            $it = trim((string) $it);
+            if ($it !== '' && !in_array($it, $items, true)) $items[] = $it;
+        }
+        if ($items) $out[] = ['mode' => $mode, 'items' => $items];
+    }
+    return $out;
+}
+
+//  Groups -> the sentence a person reads, and the text the floor is measured
+//  against.
+//
+//  A PLAIN "ALL OF" LIST STAYS A COMMA LIST, and that is not cosmetic. These
+//  two columns are MATERIAL fields: a change to them sends an approved request
+//  back for re-approval. Every request written before the builder existed holds
+//  a comma list, because that is what the old box asked for — so if opening one
+//  and saving it rewrote "Welding inspection, CSWIP 3.1" as "Welding inspection
+//  AND CSWIP 3.1", the version diff would report a material change and demand
+//  re-approval for a change nobody made.
+//
+//  Caught by round-tripping real stored values rather than by assuming. The
+//  rules below keep that round trip exact:
+//
+//    one group, all of   ->  A, B, C          (unchanged from the old format)
+//    one group, any of   ->  A OR B
+//    several groups      ->  (A, B) AND (C OR D)
+//
+//  Brackets appear only where a reader would otherwise have to guess the
+//  precedence.
+function hreq_req_groups_text($groups) {
+    $groups = hreq_req_groups_decode($groups);
+    if (!$groups) return '';
+    $single = count($groups) === 1;
+    $parts = [];
+    foreach ($groups as $g) {
+        $n = count($g['items']);
+        if ($n === 1) { $parts[] = $g['items'][0]; continue; }
+        $joined = implode($g['mode'] === 'ANY' ? ' OR ' : ', ', $g['items']);
+        $parts[] = $single ? $joined : '(' . $joined . ')';
+    }
+    return implode(' AND ', $parts);
+}
+
+//  Read the builder's rows off a POST. One row per group: a mode and a
+//  comma-separated list. Returns [] when nothing was entered, which is how the
+//  caller knows to leave the existing text alone.
+function hreq_req_groups_from_post($post, $prefix) {
+    $modes = (array) ($post[$prefix . '_mode'] ?? []);
+    $lists = (array) ($post[$prefix . '_items'] ?? []);
+    $groups = [];
+    foreach ($lists as $i => $raw) {
+        $items = array_values(array_filter(array_map('trim', explode(',', (string) $raw)), fn($x) => $x !== ''));
+        if (!$items) continue;
+        $groups[] = ['mode' => strtoupper((string) ($modes[$i] ?? 'ALL')) === 'ANY' ? 'ANY' : 'ALL',
+                     'items' => $items];
+    }
+    return hreq_req_groups_decode($groups);
+}
+
+//  A plain text value, turned into the one group it means, so somebody opening
+//  an old request sees their existing wording in the builder rather than an
+//  empty form that would wipe it on save.
+function hreq_req_groups_from_text($text) {
+    $text = trim((string) $text);
+    if ($text === '') return [];
+    //  Already structured? Leave it alone rather than re-parsing our own output
+    //  into something subtly different.
+    if (strpos($text, ' AND ') !== false || strpos($text, ' OR ') !== false) return [];
+    $items = array_values(array_filter(array_map('trim', explode(',', $text)), fn($x) => $x !== ''));
+    return $items ? [['mode' => 'ALL', 'items' => $items]] : [];
 }
