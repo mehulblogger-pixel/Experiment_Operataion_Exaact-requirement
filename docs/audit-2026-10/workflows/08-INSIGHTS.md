@@ -38,11 +38,15 @@ reasonable pattern. But it means two things worth saying plainly:
    `/crm-dashboard` and `/capacity-outlook`, each with its own filters and its
    own definition of a period.
 2. **Nothing in this area is reconciled.** Every number here is computed by one
-   of **149 candidate metric functions** found in the code
-   (`../evidence/lifecycle-and-ownership.txt` §D), and this audit has not
-   verified that any two of them agree. That work is
-   `../07-DASHBOARD-AND-KPI-AUDIT.md`, and it is **not yet done** — which is why
-   this document describes the screens rather than vouching for the figures.
+   of **155 candidate metric functions** found in the code, and this audit has
+   not verified that any two of them agree. That work is
+   `../07-DASHBOARD-AND-KPI-AUDIT.md` — which is why this document describes the
+   screens rather than vouching for the figures.
+3. **And there is a fourth screen it does not list: `/analytics`.** The
+   **analytics and performance hub** (ten routes, a KPI master with 28 named
+   metrics, a formula evaluator and definition versioning) was missing from this
+   document because it was missing from the audit's route inventory altogether.
+   See `../00a-ERRATUM-COVERAGE.md` and `../07-DASHBOARD-AND-KPI-AUDIT.md` §2.
 
 ---
 
@@ -152,9 +156,9 @@ Insights is almost entirely a **consumer**. It writes nothing.
 | **Operations** | Inspections, Closed, Man-days, unallocated demand, capacity | **CONFIRMED** (columns render) |
 | **Money** | Revenue, Direct cost, Profit, Margin, Credit, Loaded cost, Net, ageing | **CONFIRMED** |
 | **Sales** | Funnel stages, win rates, value by stage | **CONFIRMED** |
-| **Recruitment** | Nothing measured reaches Insights, although the data exists (`drop_point`, time-to-hire, source effectiveness) | **CONFIRMED (absence)** |
-| **Quality** | Open nonconformities, overdue corrective actions, `capa_readiness`, `audits_readiness` — the functions exist; **no Insights screen measured shows them** | **SUSPECTED** |
-| **Marketplace** | `/connect-analytics` is its own screen in its own area and does not feed here | **CONFIRMED (absence)** |
+| **Quality** | **Reaches it after all.** The analytics hub's named metrics include `ncr.total`, `ncr.open`, **`ncr.closure_avg_days`**, `capa.rated`, **`capa.effective`**, plus `sla.within` / `sla.breached`, `release.*` and `vendor.reassess_due` | **READ** — `tapi_metrics()`, `lib/tapi.php` *(I first recorded this as absent — wrong)* |
+| **Recruitment** | **Genuinely absent from the 28 named metrics** — no hire, candidate or requisition metric, although `recruit_kpi.php` exists and the data does (`drop_point`, time-to-hire, source effectiveness) | **READ (absence from the metric registry)** |
+| **Marketplace** | Partly: `portal.active_users` and `portal.events` are named metrics. `/connect-analytics` remains its own screen in its own area | **READ** |
 
 ### Leaves for
 
@@ -235,7 +239,7 @@ area does not carry them.
 | E-4 | Cross-office job: whose revenue is it? | The **contracting** office books client revenue; the executing office earns the **Credit**. `data.revenue` says *whether* you see revenue, never *whose* | **READ** (ADR-005) |
 | E-5 | Two dashboards disagree about the same month | **Untested, and the central question of `../07-DASHBOARD-AND-KPI-AUDIT.md`.** `billable_mismatch_count` and `calls_status_disagreement_count` exist as functions, so the system anticipates disagreement | **UNTESTED** |
 | E-6 | A period filter means different things on different screens | `/mis` uses `fy` + `m`; `/reports` uses `fy` + `month`; `/crm-dashboard` uses rolling buttons (30/90 days, 6/12 months, 2 years). **Comparing them requires care** | **CONFIRMED (the fields differ)** |
-| E-7 | A KPI target is set | **No screen measured reads `kpi_targets`** (I-F1) | **CONFIRMED (absence)** |
+| E-7 | A KPI target is set | **Targets are set and read.** `/analytics-kpi-edit` saves a `target` and a `threshold` on the KPI definition (`tapi_dash.php:199`), and `tapi_target_effective()` resolves it when a period is snapshotted (`tapi_gov.php:111`, reachable from the **Take snapshot** action at `tapi_dash.php:244`). The one thing with no screen is the **scoped override**: `tapi_target_set()`, which would write a different target per office, per SBU or per period into `kpi_targets`, is called from nowhere outside its own file — so a target today is one number for the whole company. *(I-F1 as written is withdrawn; what survives is the narrower I-F1a below)* | **READ — traced from form to snapshot** |
 | E-8 | Figures at real volume | The test database has **0 work orders and 0 jobs**, so nothing here was exercised with data. Every dashboard rendered empty | **NOT MEASURED** |
 
 ---
@@ -245,7 +249,8 @@ area does not carry them.
 | Id | Severity | Finding |
 |---|---|---|
 | **I-F1** | **P2** | A **KPI framework exists in the schema** — `kpi_defs`, `kpi_targets`, `kpi_snapshots`, `kpi_versions`, `kpi_alerts` — and **no screen measured in this audit reads it**. Versioned definitions with targets and snapshots is exactly what the business needs; ask whether it was abandoned or is next |
-| **I-F2** | **P2** | **Recruitment, Quality and Marketplace do not reach Insights.** Time-to-hire, where candidates are lost, open nonconformities, overdue corrective actions and marketplace supply/demand all exist as data and none appears in the management dashboard |
+| **I-F1a** | **P3** | **A KPI target cannot be varied by office, SBU or period.** The engine supports it — `kpi_targets` carries `office_id`, `sbu` and `period_key`, and `tapi_target_effective()` picks the most specific match — but the writer `tapi_target_set()` is wired to no screen, so every branch is held to the same number. Matters once branches of different sizes are judged against one target. A small screen on `/analytics-kpis`, no engine work |
+| **I-F2** | **P2, narrowed** | ~~Recruitment, **Quality** and Marketplace do not reach Insights~~ — **Quality does**, via the named metrics `ncr.total`, `ncr.open`, `ncr.closure_avg_days`, `capa.rated`, `capa.effective`, `sla.*`. What is genuinely missing is **Recruitment**: no hire, candidate or requisition metric exists in the registry of 28, although `recruit_kpi.php` and the data do. **The fix is defining them as TAPI metrics, not writing new code** |
 | **I-F3** | **P2** | **Three screens, three definitions of a period** (`fy`+`m`, `fy`+`month`, rolling buttons). Cross-reading them is error-prone |
 | **I-F4** | **P2** | Two screens headed **"Sales dashboard"**, neither with a Sales tile (also `01-SALES.md` S-F2) |
 | **I-F5** | **P3** | The area is mostly **shortcuts into other areas**; only `/reports` is a genuine aggregator. There is no single "how is the business doing" screen |

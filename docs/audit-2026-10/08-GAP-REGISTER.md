@@ -546,20 +546,53 @@ does not exist, 302 only after a successful action.
 
 ---
 
-## GAP-007 — two recruitment products in one repository
+## GAP-007 — `mgh-hire/` is a second recruitment product — NARROWED by the owner's correction
 
 **CONFIRMED · P2 · scope · owner decision**
 
-`mgh-hire/` is a **standalone white-label Recruitment & Selection product**
-(2,555 lines) with its own `requisitions`, `candidates`, `interviews`, `offers`,
-`stages`, `documents` tables — covering, by its own README, "Staff Requisition
-through sourcing, screening, interviews, documents, salary structure, offer and
-onboarding". `phpapp` contains a full recruitment module doing the same job,
-and that is the one in UAT.
+**This finding was originally stated far too widely, and the owner corrected it
+on 2026-10-18.**
 
-They share no code. Two implementations of one business process will diverge.
+I wrote that EXAACT contained **four implementations of matching people to
+work** — Recruitment, Deputation, Marketplace and `mgh-hire/` — and asked which
+was the business. **Three of those four are one coherent design:**
+
+- **Recruitment** is the **internal** branch: hiring into your own
+  organisation, and supplying people to clients.
+- **Marketplace** is the **external** branch: when a position is open and no
+  suitable manpower is available internally, you search the market **by
+  location** for somebody suitable, subject to a marketplace subscription.
+- **Deputation** is not a module at all — it is an **engagement basis**
+  (man-day or man-month), alongside **direct on-roll** (`roll_type` = OWN).
+
+And the two branches are **joined in code**, which I had claimed they were not:
+
+| Join | Where |
+|---|---|
+| A requisition automatically sees the ranked marketplace pool, scored on **location** (`base_city`, `preferred_locations`, `pan_india`), discipline, skills, work type, availability and verification tier, with **explainable factors** | `recruit_pro_pool()` / `recruit_pro_fit_score()`, `lib/recruit.php:697-780` |
+| A marketplace professional is linked to a candidate row — this is what `/candidate-pool` ("candidate pool convergence") is for | `candidate-link-pro` / `candidate-unlink-pro` |
+| An **awarded** requirement becomes a **PENDING billable event** in the core ledger, which finance then attests into an invoice — *"We do NOT build a new invoicing engine; we hand the award to the existing one"* | `lib/connect_bridge.php` |
+| The engagement basis sets the billing unit — visit · day · engagement | `connect_bridge_unit()` |
+
+**What remains, and it is the original question properly scoped:**
+**`mgh-hire/`** is a standalone recruitment product (2,555 lines, its own
+`requisitions`, `candidates`, `interviews`, `offers`, `stages`, `documents`
+tables) with **no shared code** with `phpapp`'s recruitment module, which is the
+one in UAT. Two implementations of one business process will diverge.
 
 **Open question Q-C.** Is `mgh-hire` a live product, a prototype, or dead code?
+Note that `/product-package` offers four product packs — TPIA, Technical
+Staffing, Recruitment, Recruitment In-house HR — so the answer may be that
+`mgh-hire` was an earlier attempt at the pack that `phpapp` now serves.
+
+**Why I got it wrong:** I inferred four competing implementations from the
+*absence of a link in the navigation*, having never read `recruit_pro_pool()`,
+`connect_bridge.php` or `candidate-link-pro` — all in files my route inventory
+never covered (`00a-ERRATUM-COVERAGE.md`). I graded it **"CONFIRMED
+(absence)"**, and that was the wrong grade: **absence of evidence in an
+incomplete map is not evidence of absence.** Every "CONFIRMED (absence)" in
+this folder should be read with that in mind; they are now the gradings I trust
+least.
 
 ---
 

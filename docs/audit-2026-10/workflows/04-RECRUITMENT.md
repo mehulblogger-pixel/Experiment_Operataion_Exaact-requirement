@@ -31,20 +31,52 @@ Reading the candidate record's own fields makes it unmistakable:
 be screened to join your company, or screened and *submitted to a client* who
 gives feedback and accepts or rejects them.
 
-That is an efficient design — one pipeline, one register — but it has a
-consequence worth naming: **EXAACT now has four ways to match a person to
-work.**
+That is an efficient design — one pipeline, one register.
 
-| Route | What it is | Where |
-|---|---|---|
-| **Recruitment** | Hire onto payroll, *or* supply to a client | this area |
-| **Deputation** | Place manpower at a client site long-term, 31 states | Operations |
-| **Marketplace** | Post a requirement to a public pool, take commission | Marketplace |
-| **`mgh-hire/`** | A standalone recruitment product, 2,555 lines, own tables | a separate deployable in this repository |
+### ~~"EXAACT has four ways to match a person to work"~~ — WITHDRAWN, corrected by the owner 2026-10-18
 
-**This is open question Q-M3 / Q-C** in `../08-GAP-REGISTER.md`, and it is the
-most consequential scope question in the audit. Four implementations of one idea
-will diverge; three of them already have no shared code.
+I wrote that Recruitment, Deputation, Marketplace and `mgh-hire/` were **four
+implementations of one idea** that would inevitably diverge, and asked which was
+"the business". **That was wrong, and it was the most consequential thing I got
+wrong in the audit.**
+
+**They are one supply chain with two branches and an engagement basis:**
+
+| | What it actually is |
+|---|---|
+| **Recruitment** | The **internal** branch — hiring into your own organisation, and supplying people to clients |
+| **Marketplace** | The **external** branch — when a position is open and **no suitable manpower is available internally**, you search the market *by location* for somebody suitable (subscription required) |
+| **Deputation** | Not a module competing with either. It is an **engagement basis** — man-day or man-month — alongside **direct on-roll** (`roll_type` = OWN) |
+| **`mgh-hire/`** | **The only genuine duplication question left.** A standalone product, 2,555 lines, own tables, no shared code (GAP-007, Q-C) |
+
+**And the two branches are joined in code.** `recruit_pro_pool($req)`
+(`lib/recruit.php:754`) scores every active marketplace professional against a
+requisition and returns the ranked shortlist:
+
+> *"a recruiter filling a requisition **automatically sees benched / verified
+> people from the marketplace who fit** — not only existing candidate rows."*
+
+`recruit_pro_fit_score()` scores on **`base_city`, `preferred_locations`,
+`pan_india`** — the location match — plus `disciplines`, `skills`,
+`work_types`, `availability`, `verification_tier` and the day-rate band, and it
+returns **explainable `factors`**, not just a number, so a recruiter can see
+*why* somebody fits.
+
+`candidate-link-pro` / `candidate-unlink-pro` then link that professional to a
+candidate row — which is what **`/candidate-pool` ("candidate pool
+convergence")** is for. I had listed that screen as having no door and no
+confirmed purpose; **it is the convergence point of the internal and external
+branches**, and it deserves a door rather than retirement.
+
+Full description, with the engagement bases and the billing bridge, in
+`02-MARKETPLACE.md` §1.
+
+**Why I got it wrong:** I inferred "four competing implementations" from the
+*absence of a link in the navigation*, having never read `recruit_pro_pool()`,
+`connect_bridge.php` or `candidate-link-pro` — all in files my route inventory
+never covered. **Absence of evidence in an incomplete map is not evidence of
+absence**, and I graded it "CONFIRMED (absence)", which was the wrong grade
+entirely. Same root cause as `../00a-ERRATUM-COVERAGE.md`.
 
 ---
 
@@ -414,7 +446,7 @@ opened the offer, before they accept or decline, is a real recruiting advantage.
 | **Directory / Clients** | `client_id`, `proposed_site` for manpower supply | **CONFIRMED** |
 | **Public** | Applications from the careers page | **READ** |
 | **Agencies** | `agency_id`, `agency_cost` — candidates sourced through an agency | **CONFIRMED** (fields exist; `agencies` table) |
-| **Marketplace** | Nothing automatic. Two separate pools (`candidate-pool` hints at convergence) | **CONFIRMED (absence)** |
+| **Marketplace** | **The ranked professional shortlist for a requisition** — `recruit_pro_pool()`, scored on location, discipline, skills, work type, availability and verification tier. `candidate-link-pro` links a professional to a candidate row | **READ** — `lib/recruit.php:754` *(I first recorded this as "nothing automatic" — wrong)* |
 
 ### Leaves for
 
@@ -552,10 +584,10 @@ a request rejected for a typo no longer has to be abandoned.
 | Id | Severity | Finding |
 |---|---|---|
 | **R-F2** | **P1** | `/candidate-new` creates `CV-00001` from an empty submit **although two fields are marked required** — the attribute is there, the server does not enforce it |
-| **R-F4** | **P1 (owner decision)** | **Four implementations** of matching people to work: Recruitment, Deputation, Marketplace, and the standalone `mgh-hire/` |
+| ~~R-F4~~ | — | ~~Four implementations of matching people to work~~ — **WITHDRAWN** by the owner's correction of 2026-10-18. Recruitment and Marketplace are the **internal and external branches of one supply chain**, joined by `recruit_pro_pool()`; deputation is an **engagement basis**, not a module. **`mgh-hire/` remains the only genuine duplication question** (GAP-007, Q-C). See §1 |
 | **R-F1** | **P2** | `/hiring-request` refuses an empty submit **silently** — the only one of eight tested that says nothing |
 | **R-F3** | **P2** | The candidate record carries **106 fields and 38 controls**; `/recruit-pipelines` carries 205 |
-| **R-F5** | **P2** | `/candidate-pool` has **no menu door** and no confirmed purpose |
+| **R-F5** | **P2** | `/candidate-pool` has **no menu door** — and its purpose is now confirmed: it is where the **internal pipeline and the marketplace pool converge** (`candidate-link-pro`). It should get a door, not be retired |
 | **R-F6** | **P2** | `/comp-setup` holds salary structure and has **no module gate** |
 | **R-F7** | **P3** | A **third** template system (`/doc-templates`), alongside `/templates` and `/crm-templates` |
 | **R-F8** | **P3** | `REQ_STATUS` — the requisition's own 7 states — has no lifecycle section |

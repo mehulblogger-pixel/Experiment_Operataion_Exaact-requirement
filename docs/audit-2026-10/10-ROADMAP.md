@@ -237,8 +237,8 @@ Six findings cannot be closed without these. Three are one-line answers.
 | **Q-B2** | Should the five roles who see a **corrective action** also see the **nonconformity** behind it? *Recommend: yes, read-only. It is one loop* | GAP-004 |
 | **Q-B3** | Should your two **administrator logins** keep the right to close a nonconformity? Strictly "only Quality or Technical Head" would remove it | GAP-004 |
 | **Q-C** | **Is Marketplace live?** It is 68 of 317 tables — the largest block in the schema, bigger than Quality | scope of everything |
-| **Q-M3** | **Which product packs are you selling?** `/product-package` offers four — TPIA, Technical Staffing, Recruitment, Recruitment In-house HR. That is why there are four ways to match people to work, and it decides whether `mgh-hire/` is a product or a fifth wheel | GAP-007, R-F4 |
-| **Q-M1/2** | Should **marketplace revenue** reach the same P&L as inspection revenue? Nothing joins them today. And who may change a **commission rate, fee rule or escrow release**? | M-F6 |
+| **Q-M3** | **Which product packs are you selling?** `/product-package` offers four — TPIA, Technical Staffing, Recruitment, Recruitment In-house HR. It decides whether **`mgh-hire/`** is a product or a fifth wheel. *(The "four ways to match people to work" half of this question is withdrawn — see GAP-007)* | GAP-007, Q-C |
+| **Q-M2** | Who may change a **commission rate, a fee rule, or release escrow**? Observed as "Coordinator and above"; documented nowhere. *(Q-M1 — "should marketplace revenue reach the same P&L" — is **answered**: it already does, via `connect_bridge.php` → billable event → finance attests → invoice)* | M-F6a |
 | **Q-G** | **Who should see the vendor register?** Today 17 of 18 roles can, and the **only role refused is Finance** — who pays the vendors | `06-DATA-AND-PERMISSION-AUDIT.md` §4 |
 | **Q-D** | Is a **non-production workspace** available? Every test in `09-UAT-PLAN.md` needs one | the whole plan |
 
@@ -246,17 +246,33 @@ Six findings cannot be closed without these. Three are one-line answers.
 
 ## 7. A closing note on what this audit is worth
 
-Three of my own findings were withdrawn after checking them properly: the audit
-trail's "Clear" button (it clears the filter), Vendor-versus-Supplier (five
-separately defined parties, not synonyms), and "a KPI framework nobody uses"
-(a built analytics subsystem I had not found). A fourth — my route inventory —
-turned out to be short by ~160 routes and three whole portals.
+Five of my own findings were withdrawn after checking them properly, or after
+the owner corrected me:
+
+| Withdrawn | What it actually was |
+|---|---|
+| "The audit trail has a **Clear** button" | It clears the **filter** |
+| "**Vendor** and **Supplier** are synonyms" | Two of **five separately defined parties** |
+| "A **KPI framework** nobody uses" | A built analytics subsystem I had not found |
+| "**Four implementations** of matching people to work" | **One supply chain**, internal and external branches, joined in code — the owner's correction, and the most consequential one |
+| "Marketplace runs a **second set of books** with nothing joining them" | `connect_bridge.php` hands an award to the existing invoicing chain. The `mkt_*` tables are the platform's own commission economics, correctly separate |
+
+A sixth — my route inventory — was short by ~160 routes and three whole
+portals.
 
 Each is recorded in place rather than edited away, because **a reader needs to
-know which numbers were re-derived and why.** The pattern in all four is the
-same: I measured something real and drew a conclusion one step beyond the
-measurement. The fix each time was to go and look at what the thing was actually
-wired to.
+know which conclusions were re-derived and why.**
+
+**The pattern in all six is the same, and it is worth naming precisely: I
+inferred an absence from my own incomplete map.** No link in the navigation
+became "nothing joins them"; one file's routes became "the routes"; a button's
+label became what the button does. The fix each time was to go and look at what
+the thing was actually wired to.
+
+**So the gradings to trust least in this folder are the ones that assert a
+negative** — anything marked *"CONFIRMED (absence)"*. Those were the three that
+turned out wrong. The positive measurements — a field that exists, a record that
+was written, a role that was refused — all held.
 
 **So: trust the measurements in this folder, and treat any conclusion that
 rests on a label, a count or a single file as provisional until it has been

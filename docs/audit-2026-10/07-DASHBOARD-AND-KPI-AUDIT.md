@@ -262,9 +262,9 @@ measured**:
 
 | Area | Figures that exist but do not surface |
 |---|---|
-| **Quality** | open nonconformities, overdue corrective actions, `capa_readiness`, `audits_readiness`, cdoc readiness, complaint clocks |
-| **Recruitment** | time-to-hire, `drop_point` analysis (where in 15 stages candidates are lost), source effectiveness, `recruit_kpi.php` exists with its own SUMs |
-| **Marketplace** | supply vs demand, fill funnel, time-to-award, rate benchmarks — all on `/connect-analytics`, which does not feed Insights |
+| **Recruitment** | time-to-hire, `drop_point` analysis (where in 15 stages candidates are lost), source effectiveness. `recruit_kpi.php` exists with its own SUMs, and **no TAPI metric covers any of it** |
+| **Quality** | ~~absent~~ — **covered**: `ncr.total`, `ncr.open`, `ncr.closure_avg_days`, `capa.rated`, `capa.effective`, `sla.evaluable/within/breached`, `release.released/conditional/not_released`, `vendor.reassess_due`. What is *not* in the registry is `audits_readiness` and the complaint clocks |
+| **Marketplace** | partly — `portal.active_users`, `portal.events`. Supply vs demand, fill funnel, time-to-award and rate benchmarks live on `/connect-analytics` in its own area |
 
 **But note:** `recruit_kpi.php` and `audits_readiness` / `capa_readiness`
 *exist as functions*, and TAPI's whole purpose is composing named metrics into
@@ -285,7 +285,7 @@ them as TAPI metrics**, not writing new code.
 | **D7-2** | **P1** | **Revenue has two sources** — the legacy figure stamped on the job and the invoice ledger — and **four files sum the legacy one, including `tapi.php`**. The product knows they diverge (that is what `/revenue-reconciliation` is for), so two dashboards reading different sources *will* disagree. Which source each screen reads must be established, and said on the screen |
 | **D7-1** | **P2** | **Margin has no named function.** The first figure a director reads is computed inline and cannot be traced, reused or unit-tested |
 | **D7-3** | **P2** | **Two self-disagreement counters have no callers** — `billable_mismatch_count` and `calls_status_disagreement_count`. `revrecon_count` and `costrecon_count` drive amber tile badges; these two should too |
-| **D7-4** | **P2** | **Quality, Recruitment and Marketplace figures reach no dashboard.** Likely a configuration gap — define them as TAPI metrics — rather than missing code |
+| **D7-4** | **P2, narrowed** | **Recruitment** has no metric in TAPI's registry of 28 — no hire, candidate or requisition figure — although `recruit_kpi.php` and the data exist. **Quality is covered** (`ncr.total`, `ncr.open`, `ncr.closure_avg_days`, `capa.rated`, `capa.effective`, `sla.*`, `release.*`, `vendor.reassess_due`) and Marketplace partly (`portal.active_users`, `portal.events`). **The fix is defining the missing metrics, not writing code** |
 | **D7-5** | **P2** | **Three utilisation implementations** (`job_mandays`, `mis_utilisation`, `mis_person_utilisation`) and it is unverified that all three use the same `/work-norms` denominator |
 | **D7-6** | **P3** | **Five revenue functions with no callers** — `costing_office_revenue`, `costing_sbu_revenue`, `reports_revenue_office`, `mkt_ledger_revenue_by_stream`, `revenue_reader_set_mode`. Dead code, or dynamic calls a static scan cannot see; either way a hazard for the next person needing a revenue figure |
 | ~~I-F1~~ | — | **WITHDRAWN.** "A KPI framework exists and no screen reads it" was wrong: TAPI is a built, wired analytics subsystem with ten routes, a KPI master, a formula evaluator and definition versioning. `kpi_defs` has 14 rows. Finding it is what exposed the audit's own coverage error (`00a-ERRATUM-COVERAGE.md`) |

@@ -152,6 +152,19 @@ Now that everything is in scope, these are the deployables found:
 `mgh-hire` is the finding here: two implementations of recruitment in one
 repository (GAP-007). `phpapp`'s module is the one in UAT.
 
+**Corrected 2026-10-18, by the owner.** I originally extended this finding to
+say that `phpapp` itself contained *four* competing ways to match people to
+work — Recruitment, Deputation, Marketplace and `mgh-hire`. **Three of those
+four are one coherent design:** Recruitment is the internal branch, Marketplace
+is the external branch for when no suitable manpower is available internally
+(searched **by location**, with a subscription), and deputation is an
+**engagement basis** — man-day or man-month — alongside direct on-roll. The two
+branches are joined by `recruit_pro_pool()`, `candidate-link-pro` and
+`lib/connect_bridge.php`, which hands an awarded engagement to the **existing**
+billable-event ledger rather than building a second invoicing engine. Only
+`mgh-hire` remains a duplication question. Full account in
+`workflows/02-MARKETPLACE.md` §1 and GAP-007.
+
 ---
 
 ## 4. Still to do in Phase C

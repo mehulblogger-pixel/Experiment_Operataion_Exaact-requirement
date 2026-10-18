@@ -10,12 +10,66 @@ Business Director, Branch Manager, Operation Manager and Coordinator.
 
 ---
 
-## 1. What this area is for, and why it is unlike the rest of EXAACT
+## 1. What this area is for — corrected by the owner, 2026-10-18
 
-Everything else in EXAACT runs *your* inspection business. Marketplace (called
-**Connect** in the code) is a **two-sided marketplace product**: companies post
-manpower requirements, self-listed professionals and agencies apply, and the
-platform takes a commission.
+> **I had this wrong, and the correction matters enough to lead with it.**
+> I first described Marketplace as a separate two-sided product that duplicated
+> Recruitment, and asked which of them was "the business". **It is neither
+> separate nor a duplicate.**
+
+**The owner's description:** Marketplace is the **external sourcing channel for
+technical manpower**. It exists for the moment when a position is open and
+there is **no suitable manpower available internally** — or the business simply
+wants to go to the market. With a marketplace subscription, the user clicks and
+**finds manpower in that location suitable for the open position**.
+
+Whoever is found is engaged on one of three bases:
+
+| Basis | Where it lives in the code |
+|---|---|
+| **Man-day deputation** | `cx_pro_work_types()['manday']` — *"Man-day / man-month deputation"* |
+| **Man-month deputation** | the same work type; `engagement_type` = `MONTHLY`, with `manmonth_basis` on the job allocation |
+| **Direct, on the company's own roll** | `roll_type` = **OWN** (against **AGENCY**) |
+
+So **Recruitment and Marketplace are the internal and external branches of one
+supply chain**, not two implementations of one idea:
+
+```mermaid
+flowchart LR
+  OP["An open position<br/>(requisition, or unfillable work)"] --> INT{"Suitable manpower<br/>available internally?"}
+  INT -->|yes| OWN["Allocate own workforce<br/>→ Operations"]
+  INT -->|"no, or go to market"| SUB{"Marketplace<br/>subscription?"}
+  SUB -->|yes| POOL["Search the pool by LOCATION<br/>and suitability for THIS position"]
+  POOL --> ENG["Engage: man-day · man-month<br/>· or direct on-roll"]
+  ENG --> BILL["Award → billable event<br/>→ finance attests → invoice"]
+```
+
+**And the product implements exactly that.** `recruit_pro_pool($req)`
+(`lib/recruit.php:754`) reads the marketplace pool and scores every active
+professional against the requisition, keeping those at or above a fit
+threshold, strongest first. Its own comment says why:
+
+> *"a recruiter filling a requisition **automatically sees benched / verified
+> people from the marketplace who fit** — not only existing candidate rows."*
+
+The fit score (`recruit_pro_fit_score()`) is computed over
+**`base_city`, `preferred_locations`, `pan_india`** — the location match the
+owner described — plus `disciplines`, `skills`, `work_types`, `availability`,
+`verification_tier` and `day_rate_min`/`day_rate_max`. It returns explainable
+`factors`, not just a number.
+
+And `candidate-link-pro` / `candidate-unlink-pro` link a marketplace
+professional to a candidate row — which is what **`/candidate-pool`
+("candidate pool convergence")** is for. That screen, which I listed as having
+no door and no confirmed purpose, is the convergence point of the two branches.
+
+---
+
+## 1a. The product as a product
+
+Marketplace (called **Connect** in the code) is also a genuine two-sided
+platform: companies post manpower requirements, self-listed professionals and
+agencies apply, and the platform takes a commission.
 
 Three facts set the scale:
 
@@ -345,7 +399,7 @@ documented it properly.
 | **Directory** | `poster_party_id` on a requirement points at a business partner | **CONFIRMED** — the field exists |
 | **Admin / Settings** | `connect_enabled()` — whether the company has bought Marketplace at all; `/connect-capabilities` for what it does | **CONFIRMED** |
 | **Admin / Marketplace plans** | `/marketplace-plans` (34 fields, 5 required) sets plans and limits — it sits in **Admin**, not here | **CONFIRMED** |
-| **Recruitment** | Nothing automatic. See the finding below | **CONFIRMED (absence)** |
+| **Recruitment** | **A requisition automatically sees the marketplace pool** — `recruit_pro_pool()` scores every active professional against it on location, discipline, skills, work type, availability and verification tier, strongest first. *(I first recorded this as "nothing automatic" — wrong; see §1)* | **READ** — `lib/recruit.php:754` |
 
 ### Leaves for
 
@@ -357,30 +411,52 @@ documented it properly.
 | **Insights** | `/connect-analytics` | **CONFIRMED** (renders) |
 | **External** | WhatsApp / SMS / email via `/connect-channels` in Live mode | **READ** — not fired |
 
-### **The structural finding of this area (M-F6, P1 for the owner's attention)**
+### ~~M-F6 — "Marketplace has its own money system, parallel to the invoice chain"~~ **WITHDRAWN**
 
-**Marketplace has its own money system, parallel to the invoice chain.**
-`mkt_ledger`, `mkt_escrow`, `mkt_credit_balance`, `mkt_credit_packs`,
-`mkt_credit_purchases`, `mkt_orders`, `mkt_fee_rules`, `mkt_subscriptions`,
-`mkt_usage`, `mkt_coupons` — none of which is the `invoices` / `receipts` chain
-that Money and MGH Books govern.
+I wrote that there were **two sets of books with nothing joining them**, because
+I found the `mkt_*` tables and no link in the navigation. **There is a link, and
+it is deliberate and well built:** `lib/connect_bridge.php`.
 
-So **there are two sets of books in EXAACT**: the inspection business's
-invoices (where MGH Books owns paid/outstanding) and the marketplace's ledger
-and escrow. Nothing measured connects them, and nothing in
-`docs/02-permission-matrix.md` governs who may touch the marketplace ledger.
+> *"when a marketplace requirement is AWARDED, turn it into a billable
+> engagement that flows through the invoicing chain EXAACT already has — the P4
+> Billable Event ledger → finance attestation → books invoice. **We do NOT
+> build a new invoicing engine; we hand the award to the existing one.**"*
+>
+> *"this is an explicit staff action ('Send to billing'), and it creates a
+> **PENDING** billable event — **finance still approves and attests** the real
+> invoice, so **the books ledger stays the single money truth**."*
 
-Three questions the owner needs to answer:
+`connect_engagement_billable()` calls
+`billable_event_upsert('connect', 'MARKETPLACE_AWARD', $requirementId, …)`
+with the party, the contract reference, the quantity, the **unit derived from
+the engagement basis** (`connect_bridge_unit()`: visit · day · engagement) and
+the rate from the awarded bid or the requirement's band. A **crew** requirement
+bills the whole position manifest by headcount.
 
-- **Q-M1.** Does marketplace revenue need to appear in the same P&L as
-  inspection revenue? If yes, nothing currently joins them.
-- **Q-M2.** Who may change a `commission_pct`, a fee rule, or an escrow
-  release? Today it is "Coordinator and above" by observation, and nothing by
-  documentation.
-- **Q-M3.** **Marketplace, Recruitment and `mgh-hire/` are three
-  implementations of matching people to work.** Marketplace posts requirements
-  to a public pool; Recruitment hires staff onto your payroll; `mgh-hire` is a
-  standalone product doing the second again. Which of the three is the business?
+**So marketplace engagement revenue already reaches the same chain, the same
+ledger and the same invoice as inspection work** — and it arrives as PENDING so
+Accounts attests it, which is the right control.
+
+**What the `mkt_*` tables actually are:** the **platform's own** economics —
+subscriptions, credit packs, commission, fee rules, escrow. That is the
+marketplace operator's revenue, which legitimately sits apart from the
+customer's client billing. **Two different kinds of money, correctly
+separated** — not two sets of books for one thing.
+
+**Q-M1 is therefore answered** (customer-facing engagement revenue does reach
+the P&L) and **Q-M3 is withdrawn** (see §1 — Recruitment and Marketplace are
+one supply chain).
+
+**What survives, and it is narrower:**
+
+- **Q-M2 stands.** Who may change a `commission_pct`, a fee rule or release
+  escrow? Observed as "Coordinator and above"; **documented nowhere**. The
+  marketplace operator's money has no permission-matrix coverage.
+- **M-F6a (P2, new).** The bridge is an **explicit staff action**
+  ("Send to billing"). Nothing measured shows **what happens if nobody presses
+  it** — an awarded engagement that is never sent to billing is unbilled work,
+  and there is no "awarded but not billed" screen equivalent to Money's
+  `/billable-events`. *Worth one test and possibly one tile.*
 
 ---
 
