@@ -1,0 +1,917 @@
+{
+ "call": {
+  "table": "calls",
+  "available": true,
+  "id": 1,
+  "heading": "Work order CALL-00001",
+  "fields": [
+   {
+    "n": "reason",
+    "t": "text",
+    "r": true
+   },
+   {
+    "n": "op_status",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "reason",
+    "t": "text",
+    "r": true
+   },
+   {
+    "n": "override",
+    "t": "checkbox",
+    "r": false
+   },
+   {
+    "n": "priority",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "criticality",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "source",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "raised_to",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "subject",
+    "t": "text",
+    "r": true
+   },
+   {
+    "n": "detail",
+    "t": "text",
+    "r": false
+   },
+   {
+    "n": "kind",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "subject",
+    "t": "text",
+    "r": true
+   },
+   {
+    "n": "body",
+    "t": "text",
+    "r": false
+   }
+  ],
+  "required": 4,
+  "buttons": [
+   "Delete call",
+   "Override &amp; proceed",
+   "Set",
+   "Save",
+   "Raise",
+   "Log",
+   "Edit call",
+   "+ Allocate Job",
+   "\ud83d\udcd1 New report",
+   "Allocate a job \u2192",
+   "Add it on this work order",
+   "Complete details",
+   "Allocate a job",
+   "Open jobs",
+   "Jobs"
+  ],
+  "tables": [
+   [
+    "Stage",
+    "Target",
+    "Actual",
+    "Status"
+   ],
+   [
+    "Job",
+    "Inspector",
+    "Engineer",
+    "Scheduled",
+    "Stage",
+    "Expected credit",
+    "Closed",
+    ""
+   ]
+  ],
+  "size": 69735
+ },
+ "job": {
+  "table": "jobs",
+  "available": false
+ },
+ "voucher": {
+  "table": "vouchers",
+  "available": false
+ },
+ "partner": {
+  "table": "business_partners",
+  "available": true,
+  "id": 1,
+  "heading": "2MM BETON",
+  "fields": [],
+  "required": 0,
+  "buttons": [
+   "Customer 360",
+   "Edit"
+  ],
+  "tables": [],
+  "size": 48618
+ },
+ "candidate": {
+  "table": "candidates",
+  "available": true,
+  "id": 1,
+  "heading": "(no name) CV received",
+  "fields": [
+   {
+    "n": "remark",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "pipeline_id",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "cv_file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "cv_text",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "submitted_client_date",
+    "t": "date",
+    "r": false
+   },
+   {
+    "n": "client_feedback",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "client_feedback_date",
+    "t": "date",
+    "r": false
+   },
+   {
+    "n": "interview_required",
+    "t": "checkbox",
+    "r": true
+   },
+   {
+    "n": "interview_date",
+    "t": "date",
+    "r": false
+   },
+   {
+    "n": "interview_done_date",
+    "t": "date",
+    "r": false
+   },
+   {
+    "n": "interview_outcome",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "client_feedback_note",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "to_stage",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "remark",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "team_role",
+    "t": "select",
+    "r": true
+   },
+   {
+    "n": "agency_id",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "roll_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "placement_fee",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "agency_cost",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "drop_point",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "drop_reason",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "notes",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "round",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "scheduled_at",
+    "t": "datetime-local",
+    "r": false
+   },
+   {
+    "n": "mode",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "location",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "competencies",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "panel_users[]",
+    "t": "checkbox",
+    "r": false
+   },
+   {
+    "n": "panel_users[]",
+    "t": "checkbox",
+    "r": false
+   },
+   {
+    "n": "panel_users[]",
+    "t": "checkbox",
+    "r": false
+   },
+   {
+    "n": "panel_users[]",
+    "t": "checkbox",
+    "r": false
+   },
+   {
+    "n": "panel_users[]",
+    "t": "checkbox",
+    "r": false
+   },
+   {
+    "n": "panel_users[]",
+    "t": "checkbox",
+    "r": false
+   },
+   {
+    "n": "panel_extra",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "reinterview",
+    "t": "checkbox",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "doc_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "file",
+    "t": "file",
+    "r": false
+   },
+   {
+    "n": "expiry_date",
+    "t": "date",
+    "r": false
+   },
+   {
+    "n": "solve_ctc",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "solve_period",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "c_BASIC",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "c_CONVEY",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "c_SPECIAL",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "c_PT",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "c_TDS",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "candidate_expected",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "internal_benchmark",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "approved_budget",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "discussion_date",
+    "t": "date",
+    "r": false
+   },
+   {
+    "n": "hr_rep",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "outcome",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "candidate_expectation",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "offered_amount",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "agreed_amount",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "terms",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "comments",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "ctc",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "joining_date",
+    "t": "date",
+    "r": false
+   },
+   {
+    "n": "expiry_date",
+    "t": "date",
+    "r": false
+   },
+   {
+    "n": "offer_terms",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "reason",
+    "t": "textarea",
+    "r": false
+   }
+  ],
+  "required": 2,
+  "buttons": [
+   "2. Organogram Verification",
+   "3. Candidate Sourcing",
+   "4. CV Screening",
+   "5. HOD Shortlisting",
+   "6. L1 Interview",
+   "7. Document Collection",
+   "8. Salary Structure",
+   "9. HR Discussion",
+   "10. Salary Acceptance",
+   "11. Reference Verification",
+   "12. One-Pager Approval",
+   "13. Offer Letter",
+   "14. Offer Acceptance",
+   "15. Onboarding",
+   "Advance \u2192 Organogram Verification",
+   "Apply",
+   "Analyse &amp; save keywords",
+   "Save tracking",
+   "Update stage",
+   "Save notes",
+   "Upload to this stage",
+   "Move candidate here \u2192",
+   "Schedule",
+   "Add to checklist",
+   "Upload",
+   "Save structure",
+   "Save discussion",
+   "Draft offer",
+   "Erase the details",
+   "Edit",
+   "\u2190 Home",
+   "Move to Organogram Verification &rarr;",
+   "Standard appointment letter \u2192",
+   "Standard offer letter \u2192",
+   "Candidate one-pager (profile) \u2192",
+   "Confirmation of employment \u2192",
+   "Internship offer letter \u2192",
+   "Relieving &amp; experience letter \u2192"
+  ],
+  "tables": [],
+  "size": 149196
+ },
+ "hiring-request": {
+  "table": "hiring_requests",
+  "available": true,
+  "id": 1,
+  "heading": "HRQ-TEST-0001 Approved",
+  "fields": [
+   {
+    "n": "qty",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "change_reason",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "requested_by_id",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "requesting_department_id",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "job_title",
+    "t": "textarea",
+    "r": true
+   },
+   {
+    "n": "designation",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "hiring_department_id",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "position_id",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "job_description",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "min_qualification",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "min_experience_years",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "skills_grp_mode[]",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "skills_grp_items[]",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "qual_grp_mode[]",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "qual_grp_items[]",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "quantity",
+    "t": "number",
+    "r": true
+   },
+   {
+    "n": "office_id",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "work_location",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "project_ref",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "required_by",
+    "t": "date",
+    "r": true
+   },
+   {
+    "n": "employment_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "priority",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "est_cost_per_person",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "est_cost_basis",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "est_duration_months",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "est_onetime_cost",
+    "t": "number",
+    "r": false
+   },
+   {
+    "n": "request_type",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "reason",
+    "t": "textarea",
+    "r": false
+   },
+   {
+    "n": "replacing_inspector_id",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "replacing_last_working_day",
+    "t": "date",
+    "r": false
+   },
+   {
+    "n": "replacing_reason",
+    "t": "select",
+    "r": false
+   },
+   {
+    "n": "replacement_justification",
+    "t": "textarea",
+    "r": false
+   }
+  ],
+  "required": 3,
+  "buttons": [
+   "Start recruiting",
+   "&times;",
+   "+ Add another line",
+   "Propose this change",
+   "Start recruiting &rarr;",
+   "\u2190 Recruitment"
+  ],
+  "tables": [
+   [
+    "What changes",
+    "Approved now",
+    "Proposed",
+    "Why it needs a decision"
+   ]
+  ],
+  "size": 75086
+ },
+ "quote": {
+  "table": "quotations",
+  "available": false
+ },
+ "invoice": {
+  "table": "invoices",
+  "available": false
+ },
+ "document": {
+  "table": "documents",
+  "available": false
+ },
+ "ncr": {
+  "table": "nonconformities",
+  "available": false
+ }
+}
