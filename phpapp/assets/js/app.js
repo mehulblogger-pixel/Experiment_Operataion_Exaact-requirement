@@ -1744,7 +1744,61 @@
           try { bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
         };
         backBtn.addEventListener('click', function () { goto(Math.max(0, curIdx - 1)); });
-        nextBtn.addEventListener('click', function () { goto(Math.min(groups.length - 1, curIdx + 1)); });
+
+        //  ---- VALIDATION HAS TO KNOW ABOUT STEPS (UAT A7) -------------------
+        //
+        //  A required field on a HIDDEN panel cannot be reported by the browser:
+        //  Chrome refuses to focus it and logs "An invalid form control ... is
+        //  not focusable", then does nothing. The form simply will not submit
+        //  and the screen says nothing about why — which reads as a dead button.
+        //
+        //  So two rules, both about showing the person the field in question:
+        //    · Next checks the panel being left, so a missing answer is caught
+        //      where it is asked rather than four steps later;
+        //    · Save opens whichever panel holds the first invalid field and
+        //      focuses it, then lets the browser say its piece.
+        //
+        //  The owner asked for the save button to be "activated when minimum
+        //  required information is completed". This is that, done so the person
+        //  is told WHICH answer is missing instead of being left with an inert
+        //  button and no explanation.
+        var panelOf = function (el) {
+          for (var i = 0; i < groups.length; i++)
+            for (var j = 0; j < groups[i].panels.length; j++)
+              if (groups[i].panels[j].contains(el)) return i;
+          return -1;
+        };
+        var firstInvalid = function (scope) {
+          var all = scope.querySelectorAll('input, select, textarea');
+          for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (el.disabled || el.type === 'hidden') continue;
+            if (typeof el.checkValidity === 'function' && !el.checkValidity()) return el;
+          }
+          return null;
+        };
+        var complain = function (el) {
+          var p = panelOf(el);
+          if (p >= 0 && p !== curIdx) goto(p);
+          try { el.focus({ preventScroll: false }); } catch (e) { try { el.focus(); } catch (e2) {} }
+          if (typeof el.reportValidity === 'function') el.reportValidity();
+        };
+
+        nextBtn.addEventListener('click', function () {
+          var panels = groups[curIdx].panels, bad = null;
+          for (var i = 0; i < panels.length && !bad; i++) bad = firstInvalid(panels[i]);
+          if (bad) { complain(bad); return; }
+          goto(Math.min(groups.length - 1, curIdx + 1));
+        });
+
+        Array.prototype.forEach.call(wrap.querySelectorAll('form'), function (f) {
+          f.addEventListener('submit', function (ev) {
+            if (f.checkValidity && !f.checkValidity()) {
+              var bad = firstInvalid(wrap);
+              if (bad) { ev.preventDefault(); complain(bad); }
+            }
+          });
+        });
       }
 
       //  CARRY THE OPEN PANEL THROUGH A SUBMIT.

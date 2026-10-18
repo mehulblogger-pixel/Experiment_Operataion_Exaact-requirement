@@ -35,17 +35,33 @@ t_nothrow('the four panels are a stepped form, not four loose panels', function 
     t_ok(count($m[1]) >= 4, 'ARMING · ' . count($m[1]) . ' panels found');
 });
 
-t_nothrow('Save stays reachable from any step — bulk CV entry is not sacrificed', function () use ($cfSrc, $jsSrc) {
-    t_ok(strpos($cfSrc, 'data-tabs-save="always"') !== false,
-        'the form opts into save-from-any-step');
+//  REVERSED 2026-10-18 ON UAT A7. This block asserted the opposite — that the
+//  candidate form opts into save-from-any-step — and the reasoning was that a
+//  recruiter loading forty CVs should not walk four panels each time. The owner
+//  tested it and the reasoning did not survive:
+//
+//    "Clicking on Add Candidate it directly adds the candidate even when the
+//     information is either complete or incorrect or not reviewed by the
+//     recuirter. So this button shall only popup in last tab and activated when
+//     minimum required information is completed."
+//
+//  The engine's save-always MODE is deliberately still asserted to exist: it is
+//  shared, other forms may want it, and deleting a capability because one form
+//  stopped using it is how a codebase loses options it paid for. What is pinned
+//  is that THIS form no longer uses it.
+t_nothrow('Save appears on the last step only — UAT A7', function () use ($cfSrc, $jsSrc) {
+    t_ok(strpos($cfSrc, 'data-tabs-save="always"') === false,
+        'the candidate form does NOT opt into save-from-any-step');
     t_ok(strpos($jsSrc, "getAttribute('data-tabs-save') === 'always'") !== false,
-        'and the shared engine implements it');
-    //  Without this the engine hides Save on every panel but the last.
+        'the shared engine still offers that mode to forms that want it');
     t_ok(strpos($jsSrc, '(last || saveAlways)') !== false,
-        'the engine shows Save on the last panel OR whenever save-always is set');
+        'and with the attribute gone, Save is drawn on the last panel only');
 });
 
-t_nothrow('saving early says what it leaves undone', function () use ($jsSrc) {
+//  The hint belongs to save-always, which this form no longer uses, so it is
+//  asserted on the ENGINE rather than on this screen — it must keep working for
+//  any form that does opt in.
+t_nothrow('a form that DOES save early still says what it leaves undone', function () use ($jsSrc) {
     t_ok(strpos($jsSrc, 'fs-savehint') !== false, 'there is a hint element');
     t_ok(strpos($jsSrc, 'can be filled in later') !== false,
         'and it tells the person the rest can be completed later, rather than leaving them guessing');

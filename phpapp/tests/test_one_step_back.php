@@ -99,3 +99,73 @@ t_as_nobody();
 //  Home itself has no parent, and must not claim one.
 $layoutGuard = strpos($layout, "\$cur !== ''") !== false;
 t_ok($layoutGuard, 'the home page is not given a back control');
+
+// ---------------------------------------------------------------------------
+//  THE PATH ACTUALLY WALKED                                   (owner, 2026-10-18)
+//
+//    "when a person has entered to Any of the lists or drop-down from masters
+//     when he press back he must return to only the previous or one step up
+//     screen here it is masters"
+//    "no option to go back on the same path in reverse of what we entered"
+//
+//  Masters carries cards that open the Organisation screen, because people live
+//  in ONE register. Organisation's own home is Users & access, so arriving from
+//  Masters put the visitor one click from a screen they had never opened.
+//
+//  The arrival is now a step in the trail, and Back still just reads the trail —
+//  so the two controls cannot disagree, which was the complaint a week earlier.
+// ---------------------------------------------------------------------------
+t_section('the trail follows the path actually walked');
+t_as_admin();
+$_SERVER['HTTP_HOST'] = 'example.test';
+$lab = fn($t) => implode(' > ', array_map(fn($x) => $x['label'], $t));
+$from = function ($ref) { $_SERVER['HTTP_REFERER'] = 'http://example.test' . $ref; };
+
+$from('/masters');
+t_eq($lab(nav_trail('hierarchy')), 'Home > Admin > Masters > Organisation',
+    '*** arriving at Organisation from Masters, the trail says Masters');
+t_eq(nav_back_info('hierarchy')['label'], 'Masters',
+    '*** and Back agrees, because it reads that same trail');
+
+//  THE ARRIVAL REPLACES THE CANONICAL PARENT, never stacks on it: two parents
+//  in one trail names a screen the visitor did not walk through.
+t_ok(strpos($lab(nav_trail('hierarchy')), 'Users & access') === false,
+    '*** the canonical parent is replaced, not added alongside');
+
+unset($_SERVER['HTTP_REFERER']);
+t_eq($lab(nav_trail('hierarchy')), 'Home > Admin > Users & access > Organisation',
+    '*** with no arrival to go on, the canonical trail is unchanged');
+
+//  NEVER DOWNWARDS. Standing on an area home having come from a screen inside
+//  it, "back" must not point at that screen — the 2026-10-15 defect.
+$from('/approvals-setup');
+t_eq($lab(nav_trail('admin')), 'Home > Admin', '*** an area home takes no arrival step');
+t_eq(nav_back_info('admin')['url'], '/', '*** so Back from Admin is still Home');
+
+//  A HUB THAT SPANS AREAS is still the right parent for what it offers. The
+//  Approvals workbench reaches recruitment, quotes, reports and delegation.
+$from('/approvals-setup');
+foreach (['recruit-approvals', 'approver-map', 'approval-delegations'] as $r) {
+    t_ok(strpos($lab(nav_trail($r)), 'Approvals >') !== false,
+        "*** /$r reached through the Approvals workbench trails through it");
+    t_eq(nav_back_info($r)['label'], 'Approvals', "*** and Back returns there, not to the area");
+}
+
+//  BUT AN ORDINARY CROSS-AREA LINK DOES NOT write the other area into the path.
+$from('/quotes');
+t_ok(strpos($lab(nav_trail('hierarchy')), 'Quote') === false,
+    '*** arriving from another area does not put that area in this trail');
+
+//  AND AN OUTSIDE SITE IS IGNORED.
+$_SERVER['HTTP_REFERER'] = 'https://example.org/somewhere';
+t_eq($lab(nav_trail('hierarchy')), 'Home > Admin > Users & access > Organisation',
+    '*** a referrer from another site changes nothing');
+unset($_SERVER['HTTP_REFERER']);
+
+//  UAT 1.6.4 — /billing had no area at all: "Home › Billing", Back to the
+//  dashboard, on a screen reached from System settings.
+$t = nav_trail('billing');
+t_ok(in_array('Admin', array_map(fn($x) => $x['label'], $t), true),
+    '*** /billing sits under Admin, instead of hanging off Home');
+t_eq(end($t)['label'], 'Users & billing', '*** and is named as its own heading names it');
+t_as_nobody();

@@ -68,12 +68,30 @@
       //  learning the other three existed — which is exactly what the owner hit.
       //
       //  form-tabs turns on the sequence the shared engine already knows how to
-      //  draw. data-tabs-save="always" keeps Save reachable from any step,
-      //  because a recruiter loading forty CVs must not walk four panels each
-      //  time — only the FIRST panel is needed to create a usable record, and the
-      //  rest is enrichment that is often not knowable yet. The engine then
-      //  prints, under the buttons, exactly what saving early leaves undone. ?>
-<div class="form-tabs" data-tabs data-tabs-key="candform" data-tabs-save="always">
+      //  draw.
+      //
+      //  SAVE-FROM-ANY-STEP WAS TURNED OFF ON 2026-10-18 (UAT A7). It kept Save
+      //  reachable from panel one, on the reasoning that a recruiter loading
+      //  forty CVs should not walk four panels each time, and the engine printed
+      //  a line under the button saying what saving early left undone.
+      //
+      //  The owner tested it and the reasoning did not survive contact:
+      //
+      //    "Check the Next button as well as Add Candidate button. Clicking on
+      //     Add Candidate it directly adds the candidate even when the
+      //     information is either complete or incorrect or not reviewed by the
+      //     recuirter. So this button shall only popup in last tab and activated
+      //     when minimum required information is completed."
+      //
+      //  Two green buttons side by side, one of which quietly ends the task, is
+      //  a trap however well the small print explains it — and a half-filled
+      //  candidate record costs more to find and repair later than the four
+      //  clicks it saved. Dropping the attribute puts this form in the engine's
+      //  ordinary strict mode: Save appears on the last panel only.
+      //
+      //  Bulk CV loading is not forgotten — it is a different job and wants its
+      //  own screen, not a shortcut hidden inside this one. ?>
+<div class="form-tabs" data-tabs data-tabs-key="candform">
 <section class="fs-pane" data-tab="Requirement &amp; person">
   <h3 class="tab-sub" style="margin-top:0">Requirement &amp; person</h3>
   <div class="form-grid">

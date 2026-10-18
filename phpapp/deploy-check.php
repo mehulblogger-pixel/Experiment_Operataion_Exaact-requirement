@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '58b717c · 2026-10-15 16:51 UTC · 684 files';
+$RELEASE = '6483d1e · 2026-10-18 06:13 UTC · 684 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -167,7 +167,7 @@ $EXPECT  = [
     'lib/mkt_plans.php' => ['s'=>10762,'h'=>'513801027f92ce90'],
     'lib/mkt_rules.php' => ['s'=>12129,'h'=>'f541702a11884133'],
     'lib/mkt_subs.php' => ['s'=>10123,'h'=>'7a5b146d8a81d7ce'],
-    'lib/nav.php' => ['s'=>19957,'h'=>'26898140a9e72a0c'],
+    'lib/nav.php' => ['s'=>27426,'h'=>'8ba2e16c1ef74f38'],
     'lib/navindex.php' => ['s'=>15020,'h'=>'4c1358b191af1b1d'],
     'lib/ncdca.php' => ['s'=>44960,'h'=>'d64c2c2e6eddc5e1'],
     'lib/ncr.php' => ['s'=>34005,'h'=>'c798485b2013d240'],
@@ -358,7 +358,7 @@ $EXPECT  = [
     'views/ops/call_profit.php' => ['s'=>10745,'h'=>'c94f52543758b527'],
     'views/ops/calls.php' => ['s'=>11689,'h'=>'d7865a3523e372f3'],
     'views/ops/candidate_detail.php' => ['s'=>55428,'h'=>'358f20439bad1a6c'],
-    'views/ops/candidate_form.php' => ['s'=>22976,'h'=>'5ee8fe3d830f65bb'],
+    'views/ops/candidate_form.php' => ['s'=>23912,'h'=>'90683fc31fe39634'],
     'views/ops/candidate_list.php' => ['s'=>2664,'h'=>'c0eca4a60f7dff4c'],
     'views/ops/candidate_pool.php' => ['s'=>4341,'h'=>'8e83a233d98c8708'],
     'views/ops/capa_detail.php' => ['s'=>15203,'h'=>'ecabaafcce017518'],
@@ -451,7 +451,7 @@ $EXPECT  = [
     'views/ops/flow_gaps.php' => ['s'=>3287,'h'=>'f2bdad6e4475e0b2'],
     'views/ops/form_designer.php' => ['s'=>19293,'h'=>'27b031e7b0dc2719'],
     'views/ops/hierarchy.php' => ['s'=>57939,'h'=>'802fb089e84bfc73'],
-    'views/ops/hiring_request.php' => ['s'=>33082,'h'=>'1a13dfa59dd6271f'],
+    'views/ops/hiring_request.php' => ['s'=>35956,'h'=>'276f0599a6b618ed'],
     'views/ops/hiring_request_list.php' => ['s'=>2937,'h'=>'73541f4428e82608'],
     'views/ops/hwpoints.php' => ['s'=>3338,'h'=>'679fdb6488397c4a'],
     'views/ops/idems/approval_rules.php' => ['s'=>7590,'h'=>'20729ce1dceb96ce'],

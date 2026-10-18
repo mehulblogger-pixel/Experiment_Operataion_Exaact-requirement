@@ -139,6 +139,11 @@ function nav_screen_label($route) {
         'my-work'               => 'My Work',
         'my-approvals'          => 'My approvals',
         'report-types'          => 'Report types',
+        //  Named as their own headings name them, because title-casing the
+        //  route produced "Billing" for a screen headed "Users & billing" and
+        //  "Recruitment cc" for one headed "Recruitment Command Centre".
+        'billing'               => 'Users & billing',
+        'recruitment-cc'        => 'Command centre',
     ];
     if (isset($override[$route])) return $override[$route];
     if (strncmp($route, 'm/', 2) === 0) $route = substr($route, 2);
@@ -249,6 +254,12 @@ function nav_route_area($route) {
             'workspace/setup' => 'Admin', 'workspace/setup/modules' => 'Admin',
             'workspace/setup/forms' => 'Admin', 'approval-rules' => 'Admin',
             'licence' => 'Admin',
+            //  UAT 1.6.4 — "/billing ... pathetic breadcrumb with no option to
+            //  go one step above also there is no back or any other options."
+            //  Correct: it had no area, so its whole trail was "Home › Billing"
+            //  and Back went to the dashboard. It is reached from System
+            //  settings → "Users & billing", and it is Admin's.
+            'billing' => 'Admin',
         ] as $r => $a) { if (!isset($cache[$r])) $cache[$r] = $a; }
     }
     if (isset($cache[$route])) return $cache[$route];
@@ -257,6 +268,88 @@ function nav_route_area($route) {
         if (substr($r, -1) === '/' && strncmp($route, $r, strlen($r)) === 0) return $label;
     }
     return null;
+}
+
+//  Does $hub deliberately offer $route as one of its destinations?
+//
+//  Only screens that exist to gather other screens answer yes. They are the
+//  ones for which "the area this screen belongs to" is the wrong parent: you
+//  reached it through the hub, and the hub is where Back belongs.
+function nav_hub_offers($hub, $route) {
+    $hub = trim((string) $hub, '/'); $route = trim((string) $route, '/');
+    if ($hub === '' || $route === '') return false;
+    if ($hub === 'approvals-setup' && function_exists('apsetup_areas')) {
+        foreach (apsetup_areas() as $a)
+            if (trim((string) ($a['url'] ?? ''), '/') === $route) return true;
+    }
+    return false;
+}
+
+//  The screen the visitor arrived THROUGH, when it belongs above this one.
+//  Returns a trail step, or null when the arrival adds nothing or would mislead.
+//  See the long note in nav_trail() for why each test is here.
+function nav_arrival_step($route, array $trail, $area) {
+    $ref = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+    if ($ref === '') return null;
+
+    //  parse_url() drops the port, HTTP_HOST keeps it, so they are compared
+    //  with the port stripped from both — comparing them raw never matches on
+    //  a host that carries one, which is a bug this file has had before.
+    $host = (string) parse_url($ref, PHP_URL_HOST);
+    $here = explode(':', (string) ($_SERVER['HTTP_HOST'] ?? ''))[0];
+    if ($host !== '' && $host !== $here) return null;
+
+    $came = trim((string) parse_url($ref, PHP_URL_PATH), '/');
+    if ($came === '' || $came === $route) return null;
+    if (strncmp($came, 'login', 5) === 0 || strncmp($came, 'logout', 6) === 0) return null;
+
+    //  Same area only — unless the arrival is a HUB that deliberately offers
+    //  this screen. Without the first rule every cross-area link would write
+    //  the previous area into this one's path. Without the second, the one
+    //  screen built to span areas is the one the rule breaks: the Approvals
+    //  workbench reaches recruitment, quotes, reports and delegation, and the
+    //  owner reported exactly that case —
+    //
+    //    "When clicked on Recruitment it goes to Home - recruitment -
+    //     Recruitment approvals with no option to go back on the same path in
+    //     reverse of what we entered."
+    //
+    //  A hub is asked whether it offers this route, rather than being named
+    //  here, so a second hub needs no edit to this function.
+    if (!nav_hub_offers($came, $route)) {
+        if ($area === null || nav_route_area($came) !== $area) {
+            //  A route the menu does not place can still be placed by its
+            //  module, which is how a record screen keeps its area.
+            $cmod = nav_module_of($came);
+            if (!$cmod || nav_area_of_module($cmod) !== $area) return null;
+        }
+    }
+
+    //  Never a screen that sits BELOW this one: that is "back" pointing down.
+    //  Asked of the arrival's own canonical trail, which cannot recurse here
+    //  because this function is not called when building it for $came — the
+    //  referrer is not consulted for a trail we build ourselves.
+    $save = $_SERVER['HTTP_REFERER'] ?? null;
+    unset($_SERVER['HTTP_REFERER']);
+    $cameTrail = nav_trail($came);
+    if ($save !== null) $_SERVER['HTTP_REFERER'] = $save;
+    foreach ($cameTrail as $step)
+        if (trim((string) ($step['url'] ?? ''), '/') === $route) return null;
+
+    //  Already on the path? Then it is not a detour and needs no step.
+    foreach ($trail as $step)
+        if (trim((string) ($step['url'] ?? ''), '/') === $came) return null;
+
+    //  And the viewer must be able to go there, like every other step.
+    if (function_exists('ops_module_gate') && !ops_module_gate($came, true)) return null;
+
+    $label = end($cameTrail)['label'] ?? null;
+    if ($label === null || $label === '') return null;
+    //  A step that repeats the one above it reads as a stutter.
+    $last = end($trail);
+    if ($last && $last['label'] === $label) return null;
+
+    return ['label' => $label, 'url' => '/' . $came];
 }
 
 function nav_trail($route, $leaf = null) {
@@ -306,7 +399,17 @@ function nav_trail($route, $leaf = null) {
                 || !function_exists('ops_area_has') || ops_area_has($ar));
         if ($open) $trail[] = ['label' => $area, 'url' => '/' . $ar];
     }
-    if ($mod) {
+    //  THE ARRIVAL REPLACES THE CANONICAL PARENT — it does not stack on top of
+    //  it. Both answer the same question, "what is one step up?", and printing
+    //  both gives a trail with two parents: "Home › Admin › Users & access ›
+    //  Masters › Organisation" names two screens the visitor did not walk
+    //  through on the way to one they did.
+    //
+    //  The module step is the canonical GUESS at that parent. Where we know the
+    //  real one, the guess is not worth a step.
+    $via = nav_arrival_step($route, $trail, $area);
+
+    if (!$via && $mod) {
         $home   = nav_module_home($mod);
         $label  = access_module_label($mod);
         $canSee = !function_exists('can') || can('mod.' . $mod . '.view');
@@ -317,6 +420,40 @@ function nav_trail($route, $leaf = null) {
         if ($home && $home !== $route && $canSee && $label !== $last['label'])
             $trail[] = ['label' => $label, 'url' => '/' . $home];
     }
+    if ($via) $trail[] = $via;
+    //  ---- THE STEP YOU ACTUALLY CAME THROUGH ------------------------------
+    //
+    //  The owner, twice, about the same thing:
+    //
+    //    "when a person has entered to Any of the lists or drop-down from
+    //     masters when he press back he must return to only the previous or one
+    //     step up screen here it is masters"
+    //    "no option to go back on the same path in reverse of what we entered"
+    //
+    //  He is right, and the canonical trail alone cannot answer him. Masters
+    //  carries cards for "Offices / branches" and "Back-office staff" that open
+    //  the Organisation screen, because people live in ONE register and a second
+    //  copy would drift. But Organisation's own home is Users & access, so the
+    //  trail read "Home › Admin › Users & access › Organisation" and Back landed
+    //  him in a screen he had never opened. 228 of 404 screens are reachable
+    //  from more than one place; for all of them a single fixed parent is right
+    //  for one arrival and wrong for the rest.
+    //
+    //  So the screen you arrived THROUGH is inserted as the step above this one.
+    //  Back still simply reads the trail, so the two controls cannot disagree —
+    //  which was the owner's OTHER complaint, a week earlier, and the reason
+    //  this does not simply go back to following the referrer blindly.
+    //
+    //  Four conditions, and all of them matter:
+    //
+    //    · it is OUR screen, not an outside site;
+    //    · it is in the SAME AREA, so a trail never jumps sideways between
+    //      areas — arriving at Admin from Sales does not put Sales in the path;
+    //    · it is NOT a descendant of this screen. Standing on Admin having come
+    //      from Approvals setup, "back" must not point at a screen inside Admin.
+    //      That is the exact defect the owner photographed on 2026-10-15;
+    //    · it is NOT already in the trail, so Masters → a master list, which is
+    //      already Home › Admin › Masters › Designations, gains nothing.
     //  Finally, the screen itself. When the trail already names it — you are
     //  standing on an area Home, or on the module's own list — the step stays
     //  for its name but loses its link rather than being dropped: a trail must

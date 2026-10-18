@@ -17,6 +17,33 @@ $csrf = fn() => function_exists('csrf_field') ? csrf_field() : '';
 $L  = fn($k, $pl = false) => function_exists('hreq_label') ? hreq_label($k, $pl) : ucfirst($k);
 $status = strtoupper((string) ($r['status'] ?? 'DRAFT'));
 $editable = !$r || in_array($status, ['DRAFT'], true);
+//  ---- UAT A10 — AN APPROVED REQUEST COULD NEVER BE CHANGED ----------------
+//
+//    "There is no option to edit the hiring request once approved or rejected."
+//
+//  He was right, and the cause was this screen alone. The CHANGE-CONTROL engine
+//  behind it is complete: hreq_save() (lib/hiringreq.php) already classifies a
+//  change to an approved request against the approved snapshot, and routes a
+//  material one through rver_propose() into Gate 2, leaving the approved row
+//  exactly as the approver left it until somebody decides the proposal. It even
+//  reads a `change_reason` from the post — a field no screen has ever drawn.
+//
+//  Because the form was only rendered for a DRAFT, none of that was reachable.
+//  Three UAT steps (A11, A12, A13) could not be run at all as a result.
+//
+//  So the form is offered for an APPROVED request too, to whoever may propose a
+//  change. That grants nothing: rver_can_propose() asks the permission the
+//  matrix already defines (hiring.material_change.propose, lib/access.php:168)
+//  or the role default that could raise the request in the first place, and
+//  applies the same office scope. What changes is that an existing, tested path
+//  now has a door.
+//
+//  REJECTED and CANCELLED are deliberately NOT included. Re-opening one needs a
+//  transition that docs/03-object-lifecycles.md does not define, and CLAUDE.md
+//  forbids inventing one. That half of the owner's report is referred back to
+//  him as a decision, not quietly implemented.
+$proposable = $r && $status === 'APPROVED'
+              && function_exists('rver_can_propose') && rver_can_propose('HIRING_REQUEST', $r);
 $depts = function_exists('dept_form_options') ? dept_form_options('') : [];
 $deptSel = function ($field, $cur) use ($depts, $e) {
     $h = '<select class="form-control searchable" name="' . $e($field) . '"><option value="">—</option>';
@@ -195,10 +222,28 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
   </div>
 <?php endif; ?>
 
-<?php if ($mayRaise && $editable): ?>
+<?php if (($mayRaise && $editable) || $proposable): ?>
 <div class="panel">
   <form method="post">
     <?= $csrf() ?><input type="hidden" name="do" value="save"><input type="hidden" name="id" value="<?= (int) ($r['id'] ?? 0) ?>">
+
+    <?php if ($proposable): ?>
+    <div class="msg msg-warning" style="margin:0 0 14px">
+      <b>This request is approved — changes go to change control.</b>
+      Edit what you need to and give a reason below. If the change touches what the
+      approver actually authorised — the role, the headcount, the branch, the cost,
+      or the qualification, experience and skills a candidate is judged against — it
+      is recorded as a <b>proposed new version</b> and goes back for a decision.
+      <b>Nothing changes on this request until that decision is made</b>, and
+      recruitment keeps working to the version in force. Anything else saves at once.
+    </div>
+    <h3 class="tab-sub" style="margin-top:0">Why is this changing?</h3>
+    <div class="ff ff-wide" style="margin-bottom:14px">
+      <label for="change_reason">Reason for the change <span class="muted">— required, and kept with the version</span></label>
+      <input class="form-control" id="change_reason" name="change_reason" maxlength="500"
+             placeholder="e.g. the client moved the site to Vadodara, so the branch and the travel cost change">
+    </div>
+    <?php endif; ?>
 
     <h3 class="tab-sub" style="margin-top:0">Who is asking?</h3>
     <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
@@ -333,7 +378,7 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
     <?php endif; ?>
 
     <div style="margin-top:14px;display:flex;gap:8px">
-      <button class="btn" type="submit"><?= $r ? 'Save draft' : 'Create request' ?></button>
+      <button class="btn" type="submit"><?= $proposable ? 'Propose this change' : ($r ? 'Save draft' : 'Create request') ?></button>
       <?php if ($r): ?><a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a><?php endif; ?>
     </div>
   </form>

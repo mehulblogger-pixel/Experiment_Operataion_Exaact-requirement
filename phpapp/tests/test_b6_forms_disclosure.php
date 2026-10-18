@@ -76,17 +76,30 @@ foreach (['agency_id', 'home_office_id', 'weekly_working_days', 'reports_to_id',
 //  The owner reported exactly that.
 //
 //  These assertions used to pin the IMPLEMENTATION (no .form-tabs) rather than
-//  the intent, which is why they now read the other way round. The intent is
-//  unchanged and is finally met in full: the sequence is visible AND Save is
-//  reachable from step one, through the engine's data-tabs-save="always" mode.
+//  the intent, which is why they read the way they do.
+//
+//  REVERSED 2026-10-18, ON THE OWNER'S UAT A7, and recorded here because
+//  flipping an assertion is the edit that can quietly undo what it protected.
+//  Save WAS reachable from step one (data-tabs-save="always"), so that a
+//  recruiter loading forty CVs need not walk four panels each time. Tested:
+//
+//    "Clicking on Add Candidate it directly adds the candidate even when the
+//     information is either complete or incorrect or not reviewed by the
+//     recuirter. So this button shall only popup in last tab..."
+//
+//  Two green buttons side by side, one of which quietly ends the task, is a
+//  trap however well the small print explains it. The ORIGINAL intent of this
+//  test is untouched and still asserted below: the form must look like the
+//  four-step sequence it is, rather than like one step with a live Save under
+//  it. What changed is only where Save appears within that sequence.
 t_ok(substr_count($b6cand, 'data-tabs data-tabs-key') === 1
   || substr_count($b6cand, '<div class="form-tabs" data-tabs') === 1,
      'C1 · the candidate form declares one panel container');
 t_eq(substr_count($b6cand, '<section class="fs-pane" data-tab='), 4, 'C2 · four panels');
 t_ok(strpos($b6cand, 'class="form-tabs"') !== false,
      'C3 · it IS a stepped form now — Back, Next and "Step n of 4" are drawn');
-t_ok(strpos($b6cand, 'data-tabs-save="always"') !== false,
-     'C3 · …and Save is still available from step one, so bulk CV entry is not punished');
+t_ok(strpos($b6cand, 'data-tabs-save="always"') === false,
+     'C3 · …and Save is NOT available from step one — UAT A7, it appears on the last panel');
 t_ok(strpos($b6cand, 'fs-actions') !== false,
      'C4 · its action row is folded into the panel nav, where the engine manages it');
 $b6save = strrpos($b6cand, '</div>');
@@ -113,13 +126,31 @@ foreach ($b6candFields as $b6f)
 // ---- E · the validation contract did not move -----------------------------
 //  Required stays required, and nowhere else became required. If disclosure
 //  ever silently relaxed a rule this is the assertion that says so.
-//  Five, measured on the file as it stood before B6 — the sixth "required"
-//  a line count finds is the words "Required for work" in a checkbox label.
-t_eq(substr_count($b6ins, ' required'), 5, 'E1 · the team-member form marks the same five controls required');
+//
+//  COUNTED ON THE MARKUP, NOT ON THE FILE (fixed 2026-10-18). These counted the
+//  string " required" anywhere in the source, so the word in a comment or a
+//  label counted as a required control. E1 already carried a note explaining
+//  that one of its five was really the label "Required for work"; E4 then broke
+//  for real when a comment explaining UAT A7 used the phrase "minimum required
+//  information". A test that a prose edit can fail is not measuring the thing
+//  it names. Both now count the ATTRIBUTE, inside a tag.
+$reqAttrs = function ($html) {
+    $n = 0;
+    if (preg_match_all('/<(?:input|select|textarea)\b[^>]*>/i', $html, $m))
+        foreach ($m[0] as $tag) if (preg_match('/\brequired\b(?![-\w])/i', $tag)) $n++;
+    return $n;
+};
+//  TWO, not five. Counting the attribute instead of the word changed this
+//  number, so it was checked against history before being accepted: at the
+//  commit that introduced this test (2938e53) the team-member form already had
+//  exactly two required controls — first_name and cert_name. Nothing was
+//  silently relaxed; the assertion never measured what its own words claimed,
+//  and "five" was three occurrences of the word "required" in prose and labels.
+t_eq($reqAttrs($b6ins), 2, 'E1 · the team-member form marks its two controls required');
 t_ok(strpos($b6cand, 'name="requisition_id" id="cand_req" required') !== false,
      'E2 · the candidate form still requires the requisition');
 t_ok(strpos($b6cand, 'name="first_name" required') !== false, 'E3 · …and the first name');
-t_eq(substr_count($b6cand, ' required'), 2, 'E4 · and nothing else was quietly made required');
+t_eq($reqAttrs($b6cand), 2, 'E4 · and nothing else was quietly made required');
 
 // ---- F · a hidden box can still be pointed at -----------------------------
 //  The submit guard skips a failing box it judges off screen and lets the
