@@ -511,7 +511,7 @@ not explain the difference between **Override & proceed** (commercial) and
 | E-12 | An inspector with no linked inspector record opens `/my-jobs` | **403, with a clear explanation.** Verified as a **test-data artefact**, not a defect: linking the record fixed it | **CONFIRMED** |
 | E-13 | Finance opens the work order register | **Opens, view-only** — correct, Accounts bills from work orders and jobs (matrix fn. for FINANCE) | **CONFIRMED** |
 | E-14 | Inspector opens `/operations` | **403.** Correct — inspectors are phone-first and use `/my-jobs` | **CONFIRMED** |
-| E-15 | Delete a work order that already has jobs and a report | **Not tested** — destructive routes were deliberately not fired. **This is a priority test**: a cascade here could orphan reports and billable events | **NOT TESTED, by design** |
+| E-15 | Delete a work order that already has jobs and a report | **Partly answered by reading the control.** `Delete call` is gated `is_master() \|\| can('ops.call.delete')` — and of the role presets, only the **Branch Application Manager** holds that right. It is styled as a danger button and carries the confirmation **"Delete this call and its jobs? This cannot be undone."**, so the **cascade to jobs is stated to the person**. What is still unknown: what becomes of an **inspection report** and a **billable event** already attached. The route was **not fired** | **READ (gate + cascade warning), UNTESTED (effect on reports and billing)** |
 | E-16 | A deputation position mobilised then cancelled mid-contract | 31 states exist across four vocabularies; which transitions are legal is undocumented | **UNTESTED** |
 
 ---
@@ -527,6 +527,7 @@ not explain the difference between **Override & proceed** (commercial) and
 | **O-F6** | **P2** | `/capacity-outlook`, `/deputations`, `/attendance-review`, `/ratings-config` have **no menu tile** (GAP-002) |
 | **O-F4** | **P3** | `/contract-override` and `/contract-overrides` both render "Contract exceptions" |
 | **O-F7** | **P3** | The work order screen offers **Override & proceed** (commercial) and **Raise** (quality) with nothing explaining which to use |
+| **O-F9** | **P2** | Deleting a work order warns that **its jobs** go too, but what happens to an attached **inspection report** or an already-approved **billable event** is unestablished. A work order is the parent of billable work; an orphan there is a money problem |
 | **O-F8** | — | *Credit:* mandatory reason on a contract override · the stale-edit message · **HALF_DAY** and **TRAVEL** as availability states · **Check** for "free for the next N days" · the **Gap/Signal** capacity outlook · `/vouchers` requiring both its fields · **Complete details** acknowledging an incomplete record · sub-contractor cost as a first-class path |
 
 ---
