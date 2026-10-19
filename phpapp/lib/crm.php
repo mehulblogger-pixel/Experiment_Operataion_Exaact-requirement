@@ -624,6 +624,29 @@ function crm_quote_recalc($qid) {
     db()->prepare("UPDATE quotations SET subtotal=?, gst_amount=?, total_amount=?, updated_at=? WHERE id=?")
         ->execute([$sub, $gst, $sub + $gst, date('c'), (int)$qid]);
 }
+// What would make a quotation's figures wrong, as a sentence, or ''. A line may
+// carry a NEGATIVE RATE -- that is how a discount line is written on this form, and
+// there is no other discount field -- but never a negative quantity, and the
+// quotation as a whole may not total less than nothing. GST must be 0-100%.
+// (GAP-047.) Checked before anything is written, so a refused save changes nothing.
+function crm_quote_figures_problem(array $b) {
+    $f = [[$b['gst_pct'] ?? '', 'GST %', 0, 100], [$b['advance_pct'] ?? '', 'Advance %', 0, 100]];
+    $desc = (array)($b['l_desc'] ?? []); $svc = (array)($b['l_service'] ?? []);
+    $qty = (array)($b['l_qty'] ?? []); $rate = (array)($b['l_rate'] ?? []);
+    $sum = 0.0; $n = 0;
+    foreach ($desc as $i => $d) {
+        if (trim((string)$d) === '' && trim((string)($svc[$i] ?? '')) === '') continue;
+        $n++;
+        $f[] = [$qty[$i] ?? '', 'The quantity on line ' . $n, 0, null];
+        $f[] = [$rate[$i] ?? '', 'The rate on line ' . $n, -1e15, null];
+        if (is_numeric(trim((string)($qty[$i] ?? ''))) && is_numeric(trim((string)($rate[$i] ?? ''))))
+            $sum += (float)$qty[$i] * (float)$rate[$i];
+    }
+    if (($p = figures_problem($f)) !== '') return $p;
+    if ($sum < -0.005) return 'The lines total less than nothing. A discount line can reduce the quotation, not take it below zero.';
+    return '';
+}
+
 // Replace all line items from the posted arrays (parallel field arrays per row).
 function crm_save_lines($qid, $b) {
     db()->prepare("DELETE FROM quote_lines WHERE quote_id=?")->execute([(int)$qid]);
@@ -1476,6 +1499,9 @@ function ops_crm_quotes($route, $method) {
         if ($method === 'POST') {
             $b = $_POST;
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
+            // The same figure rules as a quotation written here, plus the total typed in.
+            $qp = crm_quote_figures_problem($b) ?: figures_problem([[$b['total_amount'] ?? '', 'The quotation total', 0, null]]);
+            if ($qp !== '') { flash($qp . ' Nothing was saved.', 'error'); redirect('/quote-external'); }
             $no = trim($b['quote_no'] ?? '') ?: crm_next_quote_no();
             // §3 — an external quotation carries the number the client or the
             // portal gave it, so it is the one place a duplicate can be typed in.
@@ -1591,6 +1617,10 @@ function ops_crm_quotes($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
+            if (($qp = crm_quote_figures_problem($b)) !== '') {
+                flash($qp . ' Nothing was saved.', 'error');
+                redirect($q ? '/quote-edit?id=' . $q['id'] : '/quote-new');
+            }
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
             // Pre-order control: a BLOCKED client stops a non-manager from quoting
             // (a manager may proceed but is warned); HOLD always warns, never stops.

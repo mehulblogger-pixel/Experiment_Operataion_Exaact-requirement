@@ -721,6 +721,49 @@ per-address limit is the conventional answer; recorded, not built.
 
 ---
 
+## GAP-046 — an engineer's claim sheet took negative hours, km and amounts, and a negative row beat the daily cap
+
+**CONFIRMED BY EXECUTION (live, over HTTP) · P2 · `/voucher-save`, `/voucher-entry`, job closure · FIXED 19 Oct 2026**
+
+The claim sheet enforces an 8.5-hour daily cap by adding up the hours posted
+for each date. A negative row counts too. Posting **−5 h and 12 h** on the same
+day added to 7, passed the cap, and stored a **12-hour row** -- proven on a
+throwaway copy of the last commit. Hours, km and every expense head were read
+with a bare number cast, so negative km became negative travel money and
+"abc" became 0, with no message. The expenses booked at job closure had the
+same gap.
+
+**Fixed:** one shared check (`figures_problem()`) runs over every figure on the
+sheet before anything is written: hours 0 to the daily cap, km and amounts 0 or
+more, all real numbers. A refusal names the field and says nothing was saved.
+The add-a-day and edit-a-day forms and the job-closure expenses use the same
+check. The form fields now carry minimums, so the browser says no first.
+Re-driven live: −5 + 12, "abc" and km −40 refused with plain messages; 4 + 4
+saved; 6 + 6 still refused by the cap. Evidence
+`evidence/live-claims-quotes/`; guard rail `tests/test_claims_quote_figures.php`.
+
+---
+
+## GAP-047 — a quotation could total less than nothing, or carry 500% GST
+
+**CONFIRMED BY EXECUTION (live, over HTTP) · P2 · `/quote-new`, `/quote-edit`, `/quote-external` · FIXED 19 Oct 2026**
+
+Proven on the last commit: a quotation with **quantity −3** saved at
+**−17,700**; one at **GST 500%** saved at **60,000** on 10,000 of work; a
+discount line bigger than the work saved at **−4,720**. A quotation is a
+document sent to a client and the basis of the contract and the invoice.
+
+**A deliberate allowance:** a negative **rate** stays allowed. The form has no
+discount field, so a "Less: discount" line at a negative rate is how a discount
+is written today, and refusing it would break real use. What is refused is a
+negative quantity, a GST or advance outside 0-100%, a non-number, and lines
+that add up to less than zero. Re-driven live: the three probes refused with
+messages naming the line; the ordinary quotation and the discount line saved
+with the same figures as before. **Recommended next:** a proper discount field
+on the quotation, so a discount is a named figure rather than a negative line.
+
+---
+
 ## GAP-044 — the Tally sales voucher did not balance for any invoice with a round-off
 
 **CONFIRMED BY EXECUTION · P1 · `tally_sales_voucher()` · FIXED 19 Oct 2026**

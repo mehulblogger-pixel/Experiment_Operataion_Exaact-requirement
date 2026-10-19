@@ -153,7 +153,7 @@
   <div class="form-grid">
     <div class="ff"><label>Validity (days)</label><input class="form-control" type="number" name="validity_days" value="<?= e($g('validity_days','30')) ?>"></div>
     <div class="ff"><label>Currency</label><input class="form-control" name="currency" value="<?= e($g('currency','INR')) ?>"></div>
-    <div class="ff"><label>GST %</label><input class="form-control" type="number" step="0.01" id="gst_pct" name="gst_pct" value="<?= e($g('gst_pct','18')) ?>"></div>
+    <div class="ff"><label>GST %</label><input class="form-control" type="number" step="0.01" min="0" max="100" id="gst_pct" name="gst_pct" value="<?= e($g('gst_pct','18')) ?>"></div>
 
     <?php // A plain select on purpose. As a .searchable select the enhancer
           // replaced it with a text box and hid the real control, so the terms
@@ -237,7 +237,7 @@
           <input type="hidden" name="l_office[]" value="<?= e((string)($ln['office_id'] ?? '')) ?>"></td>
       <td><select class="form-control l_loc" name="l_location[]" data-cur="<?= (int)($ln['location_id'] ?? 0) ?>"><option value="">— add a site above —</option></select></td>
       <td><select class="form-control" name="l_order[]"><?php foreach ($orderOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['order_type'] ?? 'LINE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
-      <td><input class="form-control num l_qty" type="number" step="0.01" name="l_qty[]" value="<?= e($ln['qty'] ?? '') ?>"></td>
+      <td><input class="form-control num l_qty" type="number" step="0.01" min="0" name="l_qty[]" value="<?= e($ln['qty'] ?? '') ?>"></td>
       <td><select class="form-control" name="l_unit[]"><?php foreach ($unitOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['unit'] ?? 'MANDAY')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
       <td><input class="form-control num l_rate" type="number" step="0.01" name="l_rate[]" value="<?= e($ln['rate'] ?? '') ?>"></td>
       <td class="num l_amt"><?= isset($ln['amount']) ? number_format((float)$ln['amount'],0) : '0' ?></td>

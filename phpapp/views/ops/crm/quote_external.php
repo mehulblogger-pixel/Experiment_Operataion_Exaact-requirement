@@ -73,7 +73,7 @@
         <td><select class="form-control" name="l_service[]"><option value="">—</option>
             <?php foreach ($svcOpts as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
           </select></td>
-        <td><input class="form-control l-qty" type="number" step="0.01" name="l_qty[]" placeholder="0"></td>
+        <td><input class="form-control l-qty" type="number" step="0.01" min="0" name="l_qty[]" placeholder="0"></td>
         <td><select class="form-control" name="l_unit[]">
             <?php foreach ($unitOpts as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
           </select></td>

@@ -67,7 +67,7 @@
       <select class="form-control" name="office_code"><option value="">—</option><?php foreach ($dayOpts as $k=>$vv): ?><option value="<?= e($k) ?>"><?= e($vv) ?></option><?php endforeach; ?></select></div>
     <div class="ff" id="add_leave" style="display:none"><label>Leave code</label>
       <select class="form-control" name="leave_code"><option value="">—</option><?php foreach ($leaveOpts as $k=>$vv): ?><option value="<?= e($k) ?>"><?= e($vv) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Hours</label><input class="form-control" style="width:90px" type="number" step="0.25" name="hours" value="0"></div>
+    <div class="ff"><label>Hours</label><input class="form-control" style="width:90px" type="number" step="0.25" min="0" max="<?= e(hours_cap()) ?>" name="hours" value="0"></div>
     <button class="btn small" type="submit">Add day</button>
   </form>
 </div>
@@ -171,13 +171,13 @@
       <?php if ($canEdit): ?>
       <td data-label="File No (<?= e(T('boss')) ?>)"><input form="vform" class="form-control" style="width:110px" name="<?= $P ?>[file_no]" value="<?= e($e['file_no']) ?>" <?= $isWork?'':'readonly' ?>></td>
       <td data-label="Line No"><input form="vform" class="form-control" style="width:80px" name="<?= $P ?>[line_no]" value="<?= e($e['line_no']) ?>" placeholder="acct"></td>
-      <td data-label="Hours"><input form="vform" class="form-control v-hours" style="width:64px" type="number" step="0.25" name="<?= $P ?>[hours]" value="<?= e($fmt($e['hours'])) ?>"></td>
+      <td data-label="Hours"><input form="vform" class="form-control v-hours" style="width:64px" type="number" step="0.25" min="0" max="<?= e(hours_cap()) ?>" name="<?= $P ?>[hours]" value="<?= e($fmt($e['hours'])) ?>"></td>
       <td data-label="Mode"><select form="vform" class="form-control v-mode" style="width:110px" name="<?= $P ?>[mode]"><option value="">—</option>
         <?php foreach ($modes as $m): ?><option value="<?= e($m['code']) ?>" <?= $modeVal===$m['code']?'selected':'' ?>><?= e($m['label']) ?></option><?php endforeach; ?></select></td>
-      <td data-label="KM"><input form="vform" class="form-control v-km" style="width:70px" type="number" step="0.1" name="<?= $P ?>[km]" value="<?= e($kmVal!==''?$fmt($kmVal):'') ?>"></td>
+      <td data-label="KM"><input form="vform" class="form-control v-km" style="width:70px" type="number" step="0.1" min="0" name="<?= $P ?>[km]" value="<?= e($kmVal!==''?$fmt($kmVal):'') ?>"></td>
       <td class="v-travel" data-label="Travel <?= e(cur_sym()) ?>" data-eid="<?= $eid ?>"><?= e(cur_sym()) ?><?= $fmt($e['travel_amount']) ?></td>
       <?php foreach ($heads as $h): ?>
-        <td data-label="<?= e($h['label']) ?>"><input form="vform" class="form-control v-amt" data-code="<?= e($h['code']) ?>" style="width:80px" type="number" step="0.01" name="<?= $P ?>[amt][<?= e($h['code']) ?>]" value="<?= e(isset($amt[$h['code']])?$fmt($amt[$h['code']]):'') ?>" <?= $h['head_type']==='BILL'?'title="actual bill"':'' ?>></td>
+        <td data-label="<?= e($h['label']) ?>"><input form="vform" class="form-control v-amt" data-code="<?= e($h['code']) ?>" style="width:80px" type="number" step="0.01" min="0" name="<?= $P ?>[amt][<?= e($h['code']) ?>]" value="<?= e(isset($amt[$h['code']])?$fmt($amt[$h['code']]):'') ?>" <?= $h['head_type']==='BILL'?'title="actual bill"':'' ?>></td>
       <?php endforeach; ?>
       <td class="v-rowtotal" data-label="Row total <?= e(cur_sym()) ?>" data-eid="<?= $eid ?>"><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
       <td class="row-actions" data-label=""><button form="del_<?= $eid ?>" class="btn small danger" type="submit" onclick="return confirm('Remove this row?')">✕</button></td>

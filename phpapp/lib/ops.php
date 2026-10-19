@@ -7734,6 +7734,15 @@ function ops_vouchers($route, $method) {
         ops_require(can_edit_voucher($v), voucher_lock_reason($v) ?: 'This voucher can no longer be edited.');
         $heads = voucher_heads_for($v['inspector_id']);
         $rates = voucher_mode_rates($v['inspector_id']);
+        // Every figure on the sheet first. A negative hours row used to pull the
+        // day's total back under the cap so another row on the same date could
+        // claim 12 hours; a negative km or amount reduced the claim and hid what was
+        // really spent on the head beside it (GAP-046).
+        foreach (($_POST['rows'] ?? []) as $eid => $r) {
+            $f = [[$r['hours'] ?? '', 'Hours', 0, hours_cap()], [$r['km'] ?? '', 'KM', 0, null]];
+            foreach ((array)($r['amt'] ?? []) as $code => $a) $f[] = [$a, 'An amount', 0, null];
+            if (($p = figures_problem($f)) !== '') { flash($p . ' Nothing was saved — correct the row and save again.', 'error'); redirect('/voucher?id=' . $v['id']); }
+        }
         // 8.5-hour daily cap: no inspector may log more than DAILY_HOURS_CAP working
         // hours on any single date. Validate the whole submission before saving.
         $hoursByDate = [];
@@ -7783,6 +7792,9 @@ function ops_vouchers($route, $method) {
         if (!$v) { http_response_code(404); view('notfound'); return; }
         ops_require(can_edit_voucher($v), voucher_lock_reason($v) ?: 'This voucher can no longer be edited.');
         $b = $_POST; $do = $b['_do'] ?? '';
+        if (($do === 'update' || $do === 'add') && ($p = figures_problem([[$b['hours'] ?? '', 'Hours', 0, hours_cap()]])) !== '') {
+            flash($p, 'error'); redirect('/voucher?id=' . $v['id']);
+        }
         if ($do === 'update') {
             $ent = ops_one("SELECT entry_date FROM voucher_entries WHERE id=? AND voucher_id=?", [(int)$b['entry_id'], $v['id']]);
             if ($ent && $ent['entry_date']) {
@@ -8398,6 +8410,12 @@ function ops_jobs($route, $method) {
                     return;
                 }
             }
+            // The day's expenses are real money the engineer is paid back: none may be
+            // negative or anything but a number (GAP-046).
+            $expF = [];
+            foreach (['travel', 'local', 'food', 'lodging', 'misc'] as $k) $expF[] = [$b[$k] ?? '', ucfirst($k) . ' expense', 0, null];
+            foreach ((array)($_POST['extra'] ?? []) as $code => $a) $expF[] = [$a, 'An expense', 0, null];
+            if (($p = figures_problem($expF)) !== '') { view('ops/job_close', ['job' => $job, 'error' => $p]); return; }
             // collect any configurable (extra) headings into JSON {code:amount}
             $extra = [];
             foreach (expense_extra_headings() as $code=>$label) {
@@ -8611,6 +8629,22 @@ function partner_full($id) {
     ];
 }
 function num($v) { return $v === '' || $v === null ? 0 : (float)$v; }
+
+// The first figure in a set that no accountant would accept, as a sentence, or ''.
+// Each entry is [raw value, label, min, max|null]; a blank is fine (it reads as 0).
+// One rule for every claim and expense form, so an engineer's voucher, a day on the
+// sheet and the expenses booked at job closure refuse the same things the same way.
+function figures_problem(array $fields) {
+    foreach ($fields as [$raw, $label, $min, $max]) {
+        $raw = trim((string)$raw);
+        if ($raw === '') continue;
+        if (!is_numeric($raw) || !is_finite((float)$raw)) return $label . ' must be a number.';
+        $v = (float)$raw;
+        if ($v < $min) return $label . ($min == 0 ? ' cannot be negative.' : ' must be at least ' . $min . '.');
+        if ($max !== null && $v > $max) return $label . ' cannot be more than ' . rtrim(rtrim(number_format((float)$max, 2, '.', ''), '0'), '.') . '.';
+    }
+    return '';
+}
 
 // Grant comp-off if any of the job's inspection dates falls on a Sunday.
 function ops_check_compoff($jobId) {

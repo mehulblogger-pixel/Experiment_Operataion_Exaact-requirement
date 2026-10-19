@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '3777e9b · 2026-10-19 12:54 UTC · 687 files';
+$RELEASE = '281b56c · 2026-10-19 14:00 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -115,7 +115,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>237768,'h'=>'bbfaba6630e78614'],
+    'lib/crm.php' => ['s'=>239694,'h'=>'6357dffe788259a0'],
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>24205,'h'=>'04ed75b284858be6'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -175,7 +175,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>719092,'h'=>'7a5398e40186a3c5'],
+    'lib/ops.php' => ['s'=>721493,'h'=>'355da390e480d763'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -424,8 +424,8 @@ $EXPECT  = [
     'views/ops/crm/inquiry_form.php' => ['s'=>4541,'h'=>'bd15d063e6debfc5'],
     'views/ops/crm/inquiry_list.php' => ['s'=>4641,'h'=>'5917461194b40e2e'],
     'views/ops/crm/quote_detail.php' => ['s'=>69276,'h'=>'ef601cf8a95464dc'],
-    'views/ops/crm/quote_external.php' => ['s'=>8833,'h'=>'9214fa347b102a30'],
-    'views/ops/crm/quote_form.php' => ['s'=>41786,'h'=>'f886e84b980e37fe'],
+    'views/ops/crm/quote_external.php' => ['s'=>8841,'h'=>'9ed3247f7022fc3f'],
+    'views/ops/crm/quote_form.php' => ['s'=>41812,'h'=>'381c2d3b1ed59ace'],
     'views/ops/crm/quote_list.php' => ['s'=>8038,'h'=>'36be301c9d7ffe37'],
     'views/ops/crm/reports.php' => ['s'=>3263,'h'=>'f9d0840a7994e767'],
     'views/ops/crm/template_form.php' => ['s'=>3958,'h'=>'3671a20d6c01c474'],
@@ -503,7 +503,7 @@ $EXPECT  = [
     'views/ops/invoices.php' => ['s'=>4032,'h'=>'143bc30c85bb2872'],
     'views/ops/invoicing.php' => ['s'=>4380,'h'=>'01efe77afde56500'],
     'views/ops/issues.php' => ['s'=>5267,'h'=>'dcb81bc09ecdf357'],
-    'views/ops/job_close.php' => ['s'=>6109,'h'=>'490c017ab59cb999'],
+    'views/ops/job_close.php' => ['s'=>6149,'h'=>'ee8cf863f4f975de'],
     'views/ops/job_detail.php' => ['s'=>89346,'h'=>'4df7513eaf19c61b'],
     'views/ops/job_form.php' => ['s'=>58267,'h'=>'fc27fcee363d06e0'],
     'views/ops/jobs.php' => ['s'=>7058,'h'=>'54c963c415ee7600'],
@@ -634,7 +634,7 @@ $EXPECT  = [
     'views/ops/vendor.php' => ['s'=>5070,'h'=>'bb8cb8c9dd7e8a3d'],
     'views/ops/vendor_users.php' => ['s'=>8866,'h'=>'a6d6c696ee0d48f8'],
     'views/ops/verify.php' => ['s'=>8818,'h'=>'985a249a4ed58388'],
-    'views/ops/voucher_detail.php' => ['s'=>28466,'h'=>'f40ba5f2999e741c'],
+    'views/ops/voucher_detail.php' => ['s'=>28554,'h'=>'f97b29dbdd1bb9e2'],
     'views/ops/voucher_list.php' => ['s'=>4388,'h'=>'e18c3d811b6157f3'],
     'views/ops/voucher_print.php' => ['s'=>5478,'h'=>'81b9eb2a01ced931'],
     'views/ops/welcome.php' => ['s'=>2992,'h'=>'9b2e2982b431759f'],

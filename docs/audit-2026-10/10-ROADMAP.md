@@ -193,6 +193,8 @@ Closed during the audit, with tests:
 | ✓ | **A priced marketplace plan or credit pack is never granted free when payment keys are missing; the credit wallet stops at zero** (**GAP-037/038**, 19 Oct). Proration recorded as GAP-039 for a pricing decision |
 | ✓ | **Dashboards reconciled by execution** (**GAP-040…043**, 19 Oct): /mis, /analytics, the contract view and the home rollup now read the same sources for the same month; margin named; the per-person utilisation denominator is the period reported. Evidence `kpi-reconcile-probe.php`, guard rail `test_kpi_reconcile.php` |
 | ✓ | **The Tally export balances** (**GAP-044/045**, 19 Oct): the round-off is its own ledger entry so every sales voucher imports; the CSVs now say what the XML says. Bank charges on a receipt recorded as **Q-J** for the owner |
+| ✓ | **Claim sheets, job-closure expenses and quotations refuse impossible figures** (**GAP-046/047**, 19 Oct), proven live over HTTP against throwaway copies. A negative row can no longer beat the daily hours cap |
+| ☐ | **A discount field on the quotation** — today a discount is a negative-rate line, which GAP-047 had to keep allowed. A named discount figure is clearer for the client and checkable |
 | ✓ | Earlier in the project: the navigation model, Back going up, approvals unified and moved out of "Report configuration", hiring-request change control, interview panel, the office-scope failure closing instead of falling open |
 
 ---
