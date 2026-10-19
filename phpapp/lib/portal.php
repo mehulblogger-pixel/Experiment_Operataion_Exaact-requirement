@@ -1137,15 +1137,25 @@ function portal_route($route, $method) {
                 } elseif (trim((string)($_POST['title'] ?? '')) !== '') {
                     // Marketplace gate — a no-op while enforcement is OFF (open marketplace).
                     if (function_exists('mkt_can_use') && !mkt_can_use('CLIENT', $party, 'posts')) {
-                        $_SESSION['portal_flash'] = (function_exists('mkt_has_access') && !mkt_has_access('CLIENT', $party))
+                        portal_flash_set((function_exists('mkt_has_access') && !mkt_has_access('CLIENT', $party))
                             ? 'A marketplace plan is needed to post a requirement — see Plans.'
-                            : 'You have used all the job posts in your plan this month — upgrade your plan or add a credit pack.';
+                            : 'You have used all the job posts in your plan this month — upgrade your plan or add a credit pack.', 'err');
                         redirect('/portal/hire');
                     }
                     $in = $_POST; $in['poster_party_id'] = $party; $in['poster_name'] = portal_client_name();
                     cx_requirement_create($in, true); // posted straight to OPEN
                     if (function_exists('mkt_consume')) mkt_consume('CLIENT', $party, 'posts');
-                    $_SESSION['portal_flash'] = 'Your requirement is posted and open for applications.';
+                    portal_flash_set('Your requirement is posted and open for applications.');
+                    redirect('/portal/hire');
+                } else {
+                    // An empty title matched none of the branches above, so the page
+                    // simply re-rendered and said NOTHING: the client pressed "Post
+                    // requirement" and was left believing it had worked. Its four
+                    // sibling forms all answer plainly ("Tell us what you need and
+                    // where — a line each is enough."), and this is the marketplace's
+                    // front door, so silence here is the worst place for it.
+                    portal_flash_set('Give the requirement a one-line title — for example '
+                        . '"Welding inspector, Ahmedabad, 20 man-days". Nothing was posted.', 'err');
                     redirect('/portal/hire');
                 }
             }

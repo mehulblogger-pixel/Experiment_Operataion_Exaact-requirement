@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '2cb8c19 · 2026-10-19 01:00 UTC · 686 files';
+$RELEASE = 'afb41db · 2026-10-19 01:26 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -100,7 +100,7 @@ $EXPECT  = [
     'lib/connect_passport.php' => ['s'=>11025,'h'=>'651b739f219f52b4'],
     'lib/connect_person.php' => ['s'=>7701,'h'=>'7210f0cae01d84e9'],
     'lib/connect_privacy.php' => ['s'=>17610,'h'=>'74640b7aef0d480c'],
-    'lib/connect_pro.php' => ['s'=>64094,'h'=>'8b7650ceef80a278'],
+    'lib/connect_pro.php' => ['s'=>65603,'h'=>'2f9d925f6fdd14b8'],
     'lib/connect_qualtax.php' => ['s'=>24846,'h'=>'ff8da4316ac1a9d6'],
     'lib/connect_rating_disputes.php' => ['s'=>8981,'h'=>'0152a5d87d7e6917'],
     'lib/connect_ratings.php' => ['s'=>7478,'h'=>'cf59bcdbfc71b896'],
@@ -185,7 +185,7 @@ $EXPECT  = [
     'lib/pdf.php' => ['s'=>26663,'h'=>'356a367da31c40a6'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
-    'lib/portal.php' => ['s'=>116231,'h'=>'e8963f0ceb08b500'],
+    'lib/portal.php' => ['s'=>116990,'h'=>'314c9edc4f314e4e'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>10272,'h'=>'7f36c21dab0d782d'],
@@ -683,6 +683,7 @@ $EXPECT  = [
     'views/pro/forgot.php' => ['s'=>913,'h'=>'ede3db2555c64c3c'],
     'views/pro/jobs.php' => ['s'=>4859,'h'=>'432f9d51e8157c92'],
     'views/pro/login.php' => ['s'=>949,'h'=>'d8336c5e1def98ad'],
+    'views/pro/message.php' => ['s'=>242,'h'=>'c7e07209f778aa1a'],
     'views/pro/messages.php' => ['s'=>4605,'h'=>'709ca4e9a174af0d'],
     'views/pro/plans.php' => ['s'=>6291,'h'=>'857e15f984f785a0'],
     'views/pro/privacy.php' => ['s'=>7620,'h'=>'f7e936c5cbb53131'],

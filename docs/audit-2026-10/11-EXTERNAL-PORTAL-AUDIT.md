@@ -466,6 +466,105 @@ three portals.
 
 ---
 
+### 2.8 What the forms do with bad input — and the hole that found
+
+HTML `required` is a courtesy to the browser. It is client-side only, trivially
+bypassed, and absent entirely from a crafted request. What decides whether a
+blank record lands in the database is the **server** — and that matters here
+because the same failure was already proven on the **staff** side of this
+application: four forms created numbered ghost records (`CALL-00001`,
+`CV-00001`, `INC-2026-001`) from an empty submission while three siblings
+refused properly (`04-SCREEN-AND-FIELD-AUDIT.md`). A demonstrated bug class,
+not a hypothetical one.
+
+Every creating form in the portals was submitted **empty**, over HTTP, with a
+valid token so that the refusal under test was the *validation* and not the CSRF
+gate (`evidence/portal-empty-submit.py`). **Nothing created a blank row.** The
+messages are in the house voice:
+
+| Form | What it said |
+|---|---|
+| `/portal/request` | *"Tell us what you need and where — a line each is enough."* |
+| `/portal/complaint-new` | *"Please give it a one-line subject."* |
+| `/portal/roster` | *"Add a professional from the pool, or enter a name."* |
+| `/portal/bench` | *"A name is required."* |
+| `/portal/hire` | **nothing at all** — see GAP-021 |
+
+---
+
+#### GAP-020 (P1) — the professional portal had no protection against forged requests · **FIXED**
+
+Looking for the two professional forms the empty-submit probe had **skipped** —
+and a skip is not a pass — turned up something much worse: `/pro/credentials`
+served **two forms and zero CSRF tokens**.
+
+All three portals are dispatched **before** `require_login()`, so nothing
+downstream applies the application's CSRF gate. `portal.php` and `cvp.php` each
+carry their own: they stamp a token into every POST form and refuse a POST
+without it. `connect_pro.php` carried **neither** — no stamping, no gate, no
+mention of CSRF anywhere in the file.
+
+**Proven by execution** (`evidence/pro-csrf-probe.sh`): a POST to `/pro/profile`
+with **no token at all** and `Referer: https://evil.example/attack` returned
+**HTTP 200** and rewrote the professional's record.
+
+Every POST route in that portal was forgeable. A signed-in professional who
+opened a hostile page in another tab could have:
+
+- their **rates, availability and contact details** rewritten
+- their **certificates and documents deleted**
+- their **job applications withdrawn**
+- their **contact details revealed to a client** (`reveal_approve`)
+- their subscription cancelled or a credit pack bought
+- and worst, a voucher marked **"payment received"** — the handshake that
+  releases the deliverable to the client and settles the engagement. Forging it
+  releases the work product for a payment the professional never got.
+
+**Fixed** by mirroring the two sibling portals exactly: `connect_pro_view()`
+buffers and calls `csrf_stamp_forms()`; `connect_pro_csrf_or_die()` refuses any
+POST without a valid token, with a 400 and the same plain-words page the other
+portals use (and a new `views/pro/message.php` for it to render).
+
+Checked for collateral damage rather than assumed: the four `/pro/tax-*` lookup
+endpoints the screens `fetch()` are **GET**, so a POST-only gate cannot touch
+them, and a test asserts they stay that way. All 43 portal screens still render
+(`tools/portal-crawl.js`), and a **real browser** was driven through the profile
+form to confirm a legitimate save still works.
+
+> **Method note — my probe reported the fix as broken.** The first run of
+> `pro-csrf-probe.sh` showed the forged request refused (400) *and the
+> legitimate one refused too*, which would have meant the fix broke the portal.
+> It had not: the same steps by hand returned 200. The script defined a shell
+> function named **`head`**, which shadowed the `head` **command** used in
+> `| head -1` to extract the tokens, so both tokens came out as garbage. Renamed
+> to `say`. **A tool that shadows a builtin can make a working fix look
+> broken — and the next person's instinct would have been to revert it.**
+
+---
+
+#### GAP-021 (P2) — the marketplace's own posting form refused in silence · **FIXED**
+
+`/portal/hire` is where a client posts a manpower requirement — the front door
+of the marketplace. Its handler reads
+`elseif (trim($_POST['title']) !== '')`, so an **empty title matched no branch
+at all**: the page re-rendered, nothing was saved, and **nothing was said**.
+
+The client types their need, presses *Post requirement*, the page comes back
+looking the same, and they believe it is posted. Its four sibling forms all
+answer plainly. This one — the one that earns marketplace revenue — did not.
+
+The codebase already states the principle, in `portal_request_create()`:
+
+> *"A request nobody sees is worse than no portal at all — the client believes
+> they have asked, and nothing happens for a week."*
+
+**Fixed:** *"Give the requirement a one-line title — for example 'Welding
+inspector, Ahmedabad, 20 man-days'. Nothing was posted."* — tagged as a
+refusal, so it is no longer painted green either (§2.6). The two marketplace
+plan limits on the same route were tagged as refusals at the same time.
+
+---
+
 ## 3. Still to do on these portals
 
 This pass answered the two security questions. It did **not** do for the portals
@@ -473,7 +572,7 @@ what deliverables 04 and 05 did for the staff application:
 
 | Outstanding | Why it matters |
 |---|---|
-| Field-level **validation** messages | what each form says when the input is wrong, screen by screen — the one substantial piece of §2 still unmeasured |
+| Bad-input (not just empty) validation | §2.8 drove every creating form **empty**; it did not drive each field with the *wrong* value — a date in the past, a negative rate, an oversized file, a malformed email |
 | Empty states on the 38 screens not walked | the 39 walked were those the four seeded personas could reach |
 | The professional portal's **write** paths | isolation is proven on reads and on the one delete tested; the profile, CV, credentials and voucher-line writes are not each individually driven |
 | `/pro/tax-*` (4 routes) and `/pro/geo` | small lookup endpoints, read only for isolation so far |
@@ -482,8 +581,8 @@ what deliverables 04 and 05 did for the staff application:
 Closed since the first pass: the vendor portal's four permissions (§2.4), the
 assistant on the vendor side (§2.4), the professional portal's isolation
 including all three file routes (§2.5), phone-width layout, message delivery
-and field labelling across 39 screens (§2.6), and terminology and colour
-contrast (§2.7).
+and field labelling across 39 screens (§2.6), terminology and colour
+contrast (§2.7), and what the forms do with empty input (§2.8).
 
 **GAP-012 is therefore reduced, not closed.** The coverage hole is mapped and its
 two security defects are fixed; the quality audit of these 77 screens remains.
@@ -505,3 +604,6 @@ two security defects are fixed; the quality audit of these 77 screens remains.
 | `evidence/pro-flash-lost.php` | renders a real `/pro` screen with a message set and reports whether the professional sees it |
 | `phpapp/tools/portal-mobile-a11y-check.js` | 39 screens at 390px as four personas: overflow, tap targets (with the WCAG inline exemption), tiny text, unnamed fields, duplicate ids, missing alt, header-less tables |
 | `phpapp/tests/test_portal_flash_and_labels.php` | 49 assertions freezing the message, label and terminology fixes — including that the marketplace trade names are left alone |
+| `evidence/portal-empty-submit.py` | every creating form submitted empty, with the row count before and after and the message quoted |
+| `evidence/pro-csrf-probe.sh` | a forged POST with no token and a hostile referer, then the legitimate one, against the running application |
+| `phpapp/tests/test_pro_portal_csrf.php` | 30 assertions: all three portals define a gate, call it from their router, and stamp their forms; the lookup endpoints stay GET; the empty-title refusal speaks |

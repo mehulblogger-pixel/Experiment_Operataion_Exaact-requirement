@@ -671,6 +671,60 @@ post to a business record or list another person's data.
 
 ---
 
+## GAP-021 — the marketplace's own posting form refused in silence
+
+**CONFIRMED BY EXECUTION · P2 · Client portal · FIXED 19 Oct 2026**
+
+`/portal/hire` is where a client posts a manpower requirement -- the front door
+of the marketplace. Its handler reads `elseif (trim($_POST['title']) !== '')`,
+so an **empty title matched no branch at all**: the page re-rendered, nothing
+was saved and **nothing was said**. The client types their need, presses *Post
+requirement*, the page comes back looking the same, and they believe it is
+posted.
+
+Its four sibling forms all answer plainly. This one -- the one that earns
+marketplace revenue -- did not. The codebase already states the principle, in
+`portal_request_create()`: *"A request nobody sees is worse than no portal at
+all -- the client believes they have asked, and nothing happens for a week."*
+
+**Fixed:** *"Give the requirement a one-line title -- for example 'Welding
+inspector, Ahmedabad, 20 man-days'. Nothing was posted."*, tagged as a refusal.
+
+---
+
+## GAP-020 — the professional portal had no protection against forged requests
+
+**CONFIRMED BY EXECUTION · P1 · Professional portal · FIXED 19 Oct 2026**
+
+All three portals are dispatched **before** `require_login()`, so nothing
+downstream applies the application's CSRF gate. `portal.php` and `cvp.php` each
+carry their own -- stamping a token into every POST form and refusing a POST
+without it. `connect_pro.php` carried **neither**.
+
+**Proven by execution:** a POST to `/pro/profile` with no token at all and
+`Referer: https://evil.example/attack` returned **HTTP 200** and rewrote the
+professional's record.
+
+Every POST route there was forgeable. A signed-in professional who opened a
+hostile page in another tab could have their rates and contact details
+rewritten, their documents deleted, their applications withdrawn, their contact
+details revealed to a client, their subscription changed -- and worst, a voucher
+marked **"payment received"**, the handshake that releases the deliverable to
+the client and settles the engagement. Forging it releases the work product for
+a payment the professional never received.
+
+**Fixed** by mirroring the sibling portals: `connect_pro_view()` buffers and
+stamps every POST form; `connect_pro_csrf_or_die()` refuses any POST without a
+valid token with a 400 and a plain-words page. Collateral damage checked, not
+assumed -- the four `/pro/tax-*` endpoints the screens fetch are GET, all 43
+portal screens still render, and a real browser was driven through the profile
+form to confirm a legitimate save still works.
+
+Found by chasing two forms an earlier probe had **skipped**. A skip is not a
+pass.
+
+---
+
 ## GAP-019 — the professional portal's header failed colour contrast
 
 **CONFIRMED · P3 · Professional portal · FIXED 19 Oct 2026**

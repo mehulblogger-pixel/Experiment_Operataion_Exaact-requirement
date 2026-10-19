@@ -517,15 +517,42 @@ function connect_pro_withdraw($proId, $applicationId) {
 function connect_pro_view($name, $vars = []) {
     extract($vars);
     $u = connect_pro_user();
+    // Buffered so every POST form leaves here carrying a CSRF token, exactly as
+    // portal_view() and cvp_vendor_view() already did. Without it the forms on
+    // these pages had no token at all and connect_pro_csrf_or_die() below would
+    // reject every one of them.
+    ob_start();
     require __DIR__ . '/../views/pro/top.php';
     require __DIR__ . "/../views/pro/$name.php";
     require __DIR__ . '/../views/pro/bottom.php';
+    echo csrf_stamp_forms((string)ob_get_clean());
+}
+
+// This portal is dispatched BEFORE require_login(), so nothing downstream
+// applies the application's CSRF gate -- the same reason the client and vendor
+// portals carry their own. This one was missing, which left every POST route
+// here open to a forged cross-site request: a signed-in professional visiting a
+// hostile page could have their rates and contact details rewritten, their
+// documents deleted, their applications withdrawn, their contact details
+// revealed to a client, and -- worst -- a voucher marked "payment received",
+// which is the handshake that releases the deliverable and settles the
+// engagement. Proven by execution before this gate existed; see
+// docs/audit-2026-10/evidence/pro-csrf-probe.sh.
+function connect_pro_csrf_or_die($method) {
+    if ($method !== 'POST') return;
+    if (csrf_ok($_POST['_csrf'] ?? '')) return;
+    http_response_code(400);
+    connect_pro_view('message', ['title' => 'Please try that again',
+        'body' => 'That form was not sent from this page, or it had expired. '
+                . 'Open the page again and retype it — nothing was changed.']);
+    exit;
 }
 
 /** The /pro portal router. Always exits. Dispatched in front of require_login(). */
 function connect_pro_route($route, $method) {
     if (!connect_pro_portal_on()) { http_response_code(404); echo 'Not available.'; exit; }
     connect_pro_migrate();
+    connect_pro_csrf_or_die($method);
 
     if ($route === 'pro/login') {
         if (connect_pro_user()) redirect('/pro');
