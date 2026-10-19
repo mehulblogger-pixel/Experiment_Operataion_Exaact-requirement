@@ -27,6 +27,7 @@ Per the matrix: Users = `E(global)` for MA/AD, `E(own office)` for BM/BAM,
 | Licence server hardened | Replayed payments, unbounded terms and unlimited password guesses fixed | GAP-025–027 | Execution |
 | **Test-copy switch** | `'test_copy' => true` in a copy's `config.local.php` stops every e-mail and puts a TEST COPY banner on every page. Never set on live | Live guide, Part 7 | Test |
 | Confirming a release landed | The footer version (2026.10.1) never changes; `/deploy-check.php` is the check | — | `../14-LIVE-CHECKS-GUIDE.md` Part 3 |
+| **Restore is safe against the wrong file** | A file that is not an EXAACT backup, or is damaged, is refused. Another workspace's backup is refused unless a master types this workspace's name. The restorer keeps their account; every restore is logged | GAP-048 (P0), closes A-F3 | **Execution**: the old code accepted another company's backup, locked the restorer out, and let a non-backup empty a table |
 
 ---
 
@@ -317,6 +318,8 @@ determines which report format the job gets.
 
 **That a customer can take their own backup and download it is a genuine
 strength** — no dependence on the vendor to get their data out.
+
+**(updated 19 Oct) A-F3 is answered and fixed — see GAP-048: restore needed `settings.manage`, did not validate the file, accepted another company's backup, deleted the restorer and logged nothing. All four are fixed.** The original finding, kept for the record:
 
 **FINDING (A-F3, P1 — the most consequential finding in this area).**
 **Restore** and **Upload & restore** replace the workspace's data, and this

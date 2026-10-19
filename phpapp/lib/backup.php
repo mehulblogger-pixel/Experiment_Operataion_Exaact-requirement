@@ -210,16 +210,49 @@ function _backup_meta_only($path) {
     return is_array($j) ? $j : [];
 }
 
+// ---- May this backup be restored HERE? ----------------------------------------
+// Audit 2026-10 (A-F3): an uploaded file used to be restored if it merely had a
+// 'data' key. Another company's backup was accepted -- its records and its user
+// accounts replaced this workspace's, its administrator could sign in at this
+// workspace's address, and the person who pressed Restore was locked out. A file
+// that was not a backup at all emptied the tables it named. Now:
+//   * not an EXAACT backup, an unknown format, or a damaged table -> refused;
+//   * another workspace's backup -> refused, unless a MASTER administrator types
+//     this workspace's name to confirm that replacing it is really intended.
+// Returns [ok, foreign, message].
+function backup_check(array $b, $confirm = '') {
+    if (($b['app'] ?? '') !== 'EXAACT' || !isset($b['data']) || !is_array($b['data']))
+        return [false, false, 'That file is not an EXAACT backup, so nothing was changed.'];
+    if ((int)($b['version'] ?? 0) !== 1)
+        return [false, false, 'That backup was made in a format this version of EXAACT cannot read, so nothing was changed.'];
+    foreach ($b['data'] as $t => $rows)
+        if (!is_string($t) || !is_array($rows))
+            return [false, false, 'That backup is damaged (a table in it is not a list of records), so nothing was changed.'];
+    $from = (string)($b['tenant'] ?? ''); $here = backup_tenant_id();
+    if ($from === $here) return [true, false, ''];
+    $who = $from === '' ? 'a workspace with no name' : 'the workspace "' . $from . '"' . (!empty($b['company']) ? ' (' . $b['company'] . ')' : '');
+    $msg = 'This backup belongs to ' . $who . ', not to this one ("' . $here . '"). Restoring it would replace this company\'s records and its user accounts with another company\'s.';
+    if (!(function_exists('is_master') && is_master())) return [false, true, $msg . ' Only a master administrator can do that.'];
+    if (trim((string)$confirm) !== $here)
+        return [false, true, $msg . ' If that is truly intended, upload it again and type this workspace\'s name ("' . $here . '") in the confirmation box.'];
+    return [true, true, ''];
+}
+
 // ---- Restore ----------------------------------------------------------------
 // Replaces every table present in the snapshot with the snapshot's rows. Takes a
 // safety snapshot first, runs inside a transaction, and rolls back on any error.
-function backup_restore($id) {
+// The person restoring keeps their own sign-in, so they can always undo it.
+function backup_restore($id, $confirm = '') {
     $path = _backup_path($id);
     if ($path === '') return ['error' => 'That backup could not be found.'];
     $raw = _backup_read($path);
     $backup = $raw ? json_decode($raw, true) : null;
     if (!is_array($backup) || !isset($backup['data']) || !is_array($backup['data']))
         return ['error' => 'That backup file is not readable.'];
+    [$ok, $foreign, $why] = backup_check($backup, $confirm);
+    if (!$ok) return ['error' => $why, 'foreign' => $foreign];
+    $me = function_exists('current_user') ? current_user() : null;
+    $meRow = ($me && !empty($me['id'])) ? (ops_one("SELECT * FROM users WHERE id=?", [(int)$me['id']]) ?: null) : null;
 
     // Never a one-way door: snapshot the current state before overwriting it.
     backup_create('pre_restore', true);
@@ -250,6 +283,25 @@ function backup_restore($id) {
             }
             $tablesDone++;
         }
+        // Keep the restorer able to sign in: a backup taken before their account
+        // existed (or another workspace's, once confirmed) would otherwise delete
+        // the very person who could undo it.
+        $kept = false;
+        if ($meRow && array_key_exists('users', $backup['data'])) {
+            $st = $pdo->prepare("SELECT COUNT(*) FROM users WHERE id=? AND username=?");
+            $st->execute([(int)$meRow['id'], (string)$meRow['username']]);
+            $byName = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username=?");
+            $byName->execute([(string)$meRow['username']]);
+            if (!(int)$st->fetchColumn() && !(int)$byName->fetchColumn()) {
+                $row = array_intersect_key($meRow, array_flip(backup_table_columns($pdo, 'users')));
+                $taken = $pdo->prepare("SELECT COUNT(*) FROM users WHERE id=?"); $taken->execute([(int)$meRow['id']]);
+                if ((int)$taken->fetchColumn()) unset($row['id']);
+                $cl = implode(',', array_map(fn($c) => '`' . str_replace('`', '', $c) . '`', array_keys($row)));
+                $pdo->prepare('INSERT INTO users (' . $cl . ') VALUES (' . implode(',', array_fill(0, count($row), '?')) . ')')->execute(array_values($row));
+                if (!isset($row['id'])) $_SESSION['uid'] = (int)$pdo->lastInsertId();
+                $kept = true;
+            }
+        }
         $pdo->commit();
     } catch (Throwable $e) {
         try { $pdo->rollBack(); } catch (Throwable $e2) {}
@@ -258,7 +310,15 @@ function backup_restore($id) {
     }
     if ($drv !== 'sqlite') { try { $pdo->exec('SET FOREIGN_KEY_CHECKS=1'); } catch (Throwable $e) {} }
     if (function_exists('licence_disabled')) licence_disabled(true);   // settings may have changed
-    return ['restored' => $restored, 'tables' => $tablesDone, 'created_at' => $backup['created_at'] ?? ''];
+    // Recorded AFTER the restore, so the entry lands in the restored log and the
+    // next reader sees that the data they are looking at came from a backup.
+    if (function_exists('act_log')) try {
+        act_log('SYSTEM', 0, 'SYSTEM', 'Workspace restored from backup ' . $id . ' (made ' . ($backup['created_at'] ?? '?')
+            . ', workspace ' . ((string)($backup['tenant'] ?? '') ?: 'unnamed') . ($foreign ? ', ANOTHER WORKSPACE, confirmed' : '') . ') by '
+            . ($meRow ? (string)$meRow['username'] : 'unknown') . ': ' . $restored . ' records in ' . $tablesDone . ' tables'
+            . ($kept ? '; the restorer\'s own account was kept' : ''));
+    } catch (Throwable $e) {}
+    return ['restored' => $restored, 'tables' => $tablesDone, 'created_at' => $backup['created_at'] ?? '', 'kept_me' => $kept, 'foreign' => $foreign];
 }
 
 // Raw bytes for download (always valid JSON — decompressed if needed).
@@ -270,10 +330,12 @@ function backup_export($id) {
 
 // Restore from an uploaded backup file's JSON (a workspace can carry its data to
 // another install, or recover from a copy kept off-server).
-function backup_import_json($jsonString) {
+function backup_import_json($jsonString, $confirm = '') {
     $backup = json_decode((string) $jsonString, true);
-    if (!is_array($backup) || !isset($backup['data']) || !is_array($backup['data']))
-        return ['error' => 'That file is not a valid EXAACT backup.'];
+    if (!is_array($backup)) return ['error' => 'That file is not an EXAACT backup, so nothing was changed.'];
+    // Checked BEFORE the file is stored, so a refused upload leaves nothing behind.
+    [$ok, $foreign, $why] = backup_check($backup, $confirm);
+    if (!$ok) return ['error' => $why, 'foreign' => $foreign];
     // Persist it into this workspace's folder, then restore from it (which also
     // takes its own pre-restore safety snapshot).
     [$dir] = backup_dir();
@@ -284,7 +346,7 @@ function backup_import_json($jsonString) {
     if ($body === false) { $body = $json; $name = str_replace('.json.gz', '.json', $name); }
     if (@file_put_contents($dir . '/' . $name, $body) === false) return ['error' => 'Could not store the uploaded backup.'];
     _backup_cleanup($dir);
-    return backup_restore($name);
+    return backup_restore($name, $confirm);
 }
 
 // ---- Automatic daily backup (throttled) ------------------------------------
@@ -337,10 +399,11 @@ function ops_backup($method) {
             redirect('/backup');
         }
         if ($do === 'restore') {
-            $r = backup_restore((string) ($_POST['id'] ?? ''));
+            $r = backup_restore((string) ($_POST['id'] ?? ''), (string) ($_POST['confirm_workspace'] ?? ''));
             if (!empty($r['error'])) flash('Restore did not run: ' . $r['error'], 'error');
             else flash('Restored ' . (int) $r['restored'] . ' records across ' . (int) $r['tables']
-                . ' tables from the backup. (A safety copy of the previous state was saved first.)');
+                . ' tables from the backup. (A safety copy of the previous state was saved first.)'
+                . (!empty($r['kept_me']) ? ' Your own account was kept so you can still sign in.' : ''));
             redirect('/backup');
         }
         if ($do === 'import' && !empty($_FILES['file']['tmp_name']) && (int) $_FILES['file']['error'] === 0) {
@@ -348,9 +411,10 @@ function ops_backup($method) {
             if ($raw !== false && str_ends_with(strtolower((string) $_FILES['file']['name']), '.gz') && function_exists('gzdecode')) {
                 $d = @gzdecode($raw); if ($d !== false) $raw = $d;
             }
-            $r = backup_import_json($raw);
-            if (!empty($r['error'])) flash('Import failed: ' . $r['error'], 'error');
-            else flash('Imported and restored ' . (int) ($r['restored'] ?? 0) . ' records from the uploaded backup.');
+            $r = backup_import_json($raw, (string) ($_POST['confirm_workspace'] ?? ''));
+            if (!empty($r['error'])) flash('Import did not run: ' . $r['error'], 'error');
+            else flash('Imported and restored ' . (int) ($r['restored'] ?? 0) . ' records from the uploaded backup.'
+                . (!empty($r['kept_me']) ? ' Your own account was kept so you can still sign in.' : ''));
             redirect('/backup');
         }
         redirect('/backup');

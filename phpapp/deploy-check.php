@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '5345481 · 2026-10-19 15:34 UTC · 687 files';
+$RELEASE = '7fcac52 · 2026-10-19 15:54 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -49,7 +49,7 @@ $EXPECT  = [
     'lib/attend.php' => ['s'=>13919,'h'=>'695a4eae1fd9e2a9'],
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
     'lib/audits.php' => ['s'=>41605,'h'=>'f362d70e80a1632d'],
-    'lib/backup.php' => ['s'=>18340,'h'=>'cd0bafb29a6b4a8e'],
+    'lib/backup.php' => ['s'=>23534,'h'=>'f46dd929ef6ec98f'],
     'lib/billable.php' => ['s'=>28937,'h'=>'912d22dd3639fc99'],
     'lib/billing.php' => ['s'=>14639,'h'=>'f1395bd56bae517b'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
@@ -349,7 +349,7 @@ $EXPECT  = [
     'views/ops/audit_form.php' => ['s'=>2331,'h'=>'a9a442d6ca2ccadb'],
     'views/ops/audits_list.php' => ['s'=>4123,'h'=>'be8889ef0738b867'],
     'views/ops/availability.php' => ['s'=>17528,'h'=>'37e0f573cb2082d9'],
-    'views/ops/backup.php' => ['s'=>5050,'h'=>'fee58886e8fab69a'],
+    'views/ops/backup.php' => ['s'=>5717,'h'=>'c25db9a0eab5b54d'],
     'views/ops/billable_events.php' => ['s'=>8005,'h'=>'8bced33ab4bff106'],
     'views/ops/billing.php' => ['s'=>8709,'h'=>'2308aaa2d21e75bd'],
     'views/ops/billing_pay.php' => ['s'=>3306,'h'=>'68bea9d75e2df591'],

@@ -66,7 +66,7 @@ where being wrong is unrecoverable.
 | 1.2 | **Party isolation:** can client B fetch client A's report, invoice or requirement **by id**? Vendor B another vendor's assessment? A professional another's documents? | T-1 | **GAP-012** |
 | 1.3 | **Tenant isolation** from outside | T-2 | — |
 | 1.4 | **Verify the privacy-safe talent cards** — inspect the HTML and JSON, not the rendering | T-3 | matrix fn. 20 |
-| 1.5 | **Restore a *foreign* backup.** If a backup from another workspace is accepted, that is a P0 | T-5 | **A-F3** |
+| 1.5 | **Restore a *foreign* backup.** If a backup from another workspace is accepted, that is a P0 | T-5 | **A-F3** — **DONE 19 Oct: a foreign backup WAS accepted (P0, GAP-048); now refused unless a master confirms by name** |
 
 **Why first:** 1.1–1.4 cover the surface this audit never touched, and it is the
 surface where a mistake is a breach rather than a bug. 1.5 is here because a
@@ -83,7 +83,7 @@ restore is the one action that can import another customer's data wholesale.
 | 2.1 | **Fix the four forms that create numbered ghost records** — `/call-new`, `/candidate-new`, `/incident-new`, `/endorsement-new`. **Server-side**: three already carry `required` attributes the server ignores. Copy the pattern from `/internal-audit-new` | T-10 | **S4-1** |
 | 2.2 | **Test `/quote-new`** the same way — 96 fields, 1 required, never tested, and a quote goes to a customer | T-11 | **S4-2** — **PARTLY DONE 19 Oct: figures validated and proven live (GAP-047); the empty-submit test is still open** |
 | 2.3 | **Establish the delete cascade:** work order → job → report → billable event → voucher. Refuse the delete or remove the dependents; never orphan | T-4 | **O-F9** |
-| 2.4 | **Backup/restore authority:** gate it, validate the archive, log every restore, add it to the permission matrix | T-5 | **A-F3** |
+| 2.4 | **Backup/restore authority:** gate it, validate the archive, log every restore, add it to the permission matrix | T-5 | **A-F3** — **DONE 19 Oct: gated (settings.manage), file validated, every restore logged, matrix row 16a (GAP-048)** |
 | 2.5 | **Impersonation:** confirm every impersonated action is attributable to the real person, log it, make it visible to the customer, document it in the matrix | T-9 | **A-F5** |
 | 2.6 | **Merge:** make `reason` required, confirm no record points at the discarded id, and say on the screen if it cannot be undone | T-6 | **D5-3/D-F3** |
 | 2.7 | **Mid-year numbering change** — protect the existing series or refuse the change | T-18 | **A-F7** |

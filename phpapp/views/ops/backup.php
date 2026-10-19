@@ -70,6 +70,13 @@ $reasonLabel = ['manual' => 'You clicked Back up now', 'daily' => 'Automatic dai
     <input type="hidden" name="do" value="import">
     <input type="file" name="file" accept=".json,.gz,application/json,application/gzip" required>
     <button class="btn" style="margin-left:8px;background:#b45309">↺ Upload &amp; restore</button>
+    <?php if (function_exists('is_master') && is_master()): ?>
+    <div class="ff" style="margin-top:10px;max-width:520px">
+      <label for="confirm_workspace">Only for a backup from <b>another</b> workspace: type this workspace's name to confirm</label>
+      <input class="form-control" id="confirm_workspace" name="confirm_workspace" autocomplete="off" placeholder="<?= e(function_exists('backup_tenant_id') ? backup_tenant_id() : '') ?>">
+      <span class="muted" style="font-size:12px">Leave empty for this workspace's own backups. Another workspace's backup replaces this company's records and user accounts with theirs.</span>
+    </div>
+    <?php endif; ?>
   </form>
 </details>
 

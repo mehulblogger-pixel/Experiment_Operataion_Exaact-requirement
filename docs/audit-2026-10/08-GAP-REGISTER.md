@@ -728,6 +728,41 @@ per-address limit is the conventional answer; recorded, not built.
 
 ---
 
+## GAP-048 — restore accepted another company's backup, and a file that was not a backup at all
+
+**CONFIRMED BY EXECUTION · P0 · `/backup` (Upload & restore) · FIXED 19 Oct 2026 · closes A-F3, roadmap 1.5 and 2.4**
+
+Driven on a throwaway database with backups in a scratch folder
+(`evidence/backup-restore-probe.php`, BEFORE and AFTER in its header):
+
+- **Another workspace's backup was accepted.** Uploaded by an ordinary
+  administrator, it replaced this company's records *and its user accounts*:
+  the only user left was the other company's administrator, who could sign in
+  at **this** workspace's address with **their own** password, and the other
+  company's confidential client was now here.
+- **The person who pressed Restore was deleted** — locked out of their own
+  workspace, so the safety copy the restore had just taken could not be used.
+- **A file that was not a backup at all** (`{"data":{"business_partners":[]}}`)
+  was accepted and **emptied the client and vendor table**.
+- **Nothing was logged.**
+
+Restore needed `settings.manage` (administrators only), so this is not open to
+staff; it is P0 because one wrong file in an administrator's hand — easy on a
+platform that hosts many companies and keeps their backups side by side —
+breaks the one boundary a multi-company product exists to keep.
+
+**Fixed** (`backup_check()`): a file that is not an EXAACT backup, an unknown
+format or a damaged table is refused to everyone, before anything is stored.
+Another workspace's backup is refused, naming where it came from and what it
+would replace; only a **master administrator who types this workspace's name**
+may go ahead. Every restore keeps the restorer's own account and is written to
+the activity log. Re-driven: all refusals hold, the confirmed restore runs and
+is logged, and an administrator restoring a backup older than their own account
+can still sign in. Guard rail `tests/test_backup_restore_guard.php`; matrix row
+*Backup & restore*, footnote 16ᵃ.
+
+---
+
 ## GAP-046 — an engineer's claim sheet took negative hours, km and amounts, and a negative row beat the daily cap
 
 **CONFIRMED BY EXECUTION (live, over HTTP) · P2 · `/voucher-save`, `/voucher-entry`, job closure · FIXED 19 Oct 2026**
