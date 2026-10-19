@@ -1,0 +1,10 @@
+  operation_manager: mod.quotes.view=N can_endorse=Y can_approve=N
+  business_director: mod.quotes.view=Y can_endorse=Y can_approve=N
+  branch_manager: mod.quotes.view=Y can_endorse=Y can_approve=Y
+  OM endorse -> rendered 24 bytes, flash []; endorsed_by=''
+  OM opens /contract-openings -> rendered 28 bytes, flash []
+  > BD endorse
+      flash  success: Endorsed — it is now with the branch manager for approval.
+  > BM approve
+      flash  success: Contract PHQ/C/2026-27/00001 opened and floated to operations.
+  contract: {"open_status":"OPEN","mgr_endorsed_by":"Pbd Probe","bm_approved_by":"Pbm Probe","value":500000,"end_date":"2027-03-31"}

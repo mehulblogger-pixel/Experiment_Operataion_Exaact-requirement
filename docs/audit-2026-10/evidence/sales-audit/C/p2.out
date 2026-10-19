@@ -1,0 +1,63 @@
+[2a] BDM (no crm.contract.register) tries to register on an ACCEPTED quote
+  > BDM quote-contract
+      flash  error: Only Accounts / back-office can register the contract.
+  contracts on quote: 0
+
+[2b] FINANCE registers (one-click: auto number, nothing else posted)
+  > FIN quote-contract #1
+      flash  warning: Contract PHQ/C/2026-27/00001 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+  quote: {"id":8,"status":"ACCEPTED","contract_number":"PHQ\/C\/2026-27\/00001","contract_id":1,"client_id":666,"subtotal":100000,"gst_pct":18,"gst_amount":18000,"total_amount":118000,"validity_days":30,"po_number":"PO-4500123","payment_terms":"","office_id":18}
+  contract: {"id":1,"partner_id":666,"contract_number":"PHQ\/C\/2026-27\/00001","title":"Annual TPI rate contract","value":118000,"start_date":"2026-10-19","end_date":"","branch_id":18,"open_status":"PENDING","is_active":0,"quotation_id":8,"qty_total":null,"qty_unit":""}
+  contract_line_items copied from quote: 0 (quote has 2 lines)
+  contract_state(): {"state":"OK","end_date":"","qty_total":14,"qty_used":0,"qty_left":14}  <- quote_qty_total sums MANDAY 10 + VISIT 4
+
+[2c] FINANCE registers the SAME accepted quote again (auto number)
+  > FIN quote-contract #2 auto
+      flash  error: This quote is already registered under contract PHQ/C/2026-27/00001 (pending approval). A won deal gets one contract — it cannot be forwarded to Finance again under a new number. For a related group company, add a group-company contract below; to revive
+
+[2c'] ... and again typing the SAME number
+  > FIN quote-contract #3 same no
+      flash  warning: This number already exists for this client (pending approval). Nothing new will be created — the work is recorded against that same contract.
+      flash  warning: Registered against contract PHQ/C/2026-27/00001, which is still pending approval.
+  contracts for this client+quote: [{"id":1,"contract_number":"PHQ\/C\/2026-27\/00001","open_status":"PENDING"}]
+
+[2d] FINANCE registers a contract on a DRAFT quote (never approved, never sent, never accepted)
+  > FIN quote-contract on DRAFT
+      flash  warning: Contract PHQ/C/2026-27/00002 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+  draft quote now: {"status":"DRAFT","contract_number":"PHQ\/C\/2026-27\/00002","contract_id":2}
+
+[2d'] ... and on a LOST quote
+  > FIN quote-contract on LOST
+      flash  warning: Contract PHQ/C/2026-27/00003 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+  lost quote now: {"status":"LOST","contract_number":"PHQ\/C\/2026-27\/00003","contract_id":3}
+
+[2e] Mid-way failure: an injected fault on the quote UPDATE after the contract INSERT
+  > FIN quote-contract with fault
+      EXC    PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 probe injected fault @crm.php:2305
+  partner_contracts rows: before 3, after 4; orphan: {"id":4,"contract_number":"PROBE\/C\/FAULT\/1","open_status":"PENDING","quotation_id":null}
+  quote after fault: {"status":"ACCEPTED","contract_number":"","contract_id":null}
+  > FIN retries the same number
+      flash  warning: This number already exists for this client (pending approval). Nothing new will be created — the work is recorded against that same contract.
+      flash  warning: Registered against contract PROBE/C/FAULT/1, which is still pending approval.
+  quote after retry: {"contract_number":"PROBE\/C\/FAULT\/1","contract_id":4}
+
+[2f] Open the contract (endorse by OM, approve by BM), then amend it
+  > OM endorse
+      view   ops/module_locked
+  > BM approve
+      flash  error: It needs a manager to endorse it first.
+  contract: {"id":1,"partner_id":666,"contract_number":"PHQ\/C\/2026-27\/00001","title":"Annual TPI rate contract","value":118000,"start_date":"2026-10-19","end_date":"","branch_id":18,"open_status":"PENDING","is_active":0,"quotation_id":8,"qty_total":null,"qty_unit":""}
+  > FIN edits OPEN contract value 118000 -> 500000 and end date
+      flash  success: Contract updated.
+  contract: {"id":1,"partner_id":666,"contract_number":"PHQ\/C\/2026-27\/00001","title":"Annual TPI rate contract","value":500000,"start_date":"2026-10-19","end_date":"2027-03-31","branch_id":18,"open_status":"PENDING","is_active":0,"quotation_id":8,"qty_total":null,"qty_unit":""}
+  audit trail (activities): [{"subject":"Contract PHQ\/C\/2026-27\/00001 edited","body":""}]
+  quote value vs contract value: quote total 118000 / contract 500000
+
+[2g] 'Reopen' an OPEN contract (no status guard?)
+  > FIN contract-open do=reopen on OPEN
+      flash  success: Re-opening requested — pending manager & branch-manager approval.
+  contract now: {"open_status":"PENDING","mgr_endorsed_by":"","bm_approved_by":""}
+  > OM endorse
+      view   ops/module_locked
+  > BM approve
+      flash  error: It needs a manager to endorse it first.

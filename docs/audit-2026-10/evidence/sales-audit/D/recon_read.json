@@ -1,0 +1,491 @@
+[
+    {
+        "who": "master",
+        "crm_reports": {
+            "fy": "2026-27",
+            "total": 7,
+            "totVal": 486600,
+            "openVal": 262400,
+            "wonVal": 188800,
+            "nWon": 2,
+            "nLost": 2,
+            "winRate": 50,
+            "months": {
+                "2026-10": {
+                    "raised": 3,
+                    "won": 0,
+                    "lost": 0,
+                    "wonVal": 0
+                },
+                "2026-09": {
+                    "raised": 1,
+                    "won": 0,
+                    "lost": 1,
+                    "wonVal": 0
+                },
+                "2026-08": {
+                    "raised": 1,
+                    "won": 0,
+                    "lost": 1,
+                    "wonVal": 0
+                },
+                "2026-07": {
+                    "raised": 1,
+                    "won": 1,
+                    "lost": 0,
+                    "wonVal": 70800
+                },
+                "2026-05": {
+                    "raised": 1,
+                    "won": 1,
+                    "lost": 0,
+                    "wonVal": 118000
+                }
+            },
+            "lost": {
+                "\u2014": 1,
+                "Price too high \/ lost on price": 1
+            },
+            "bySbu": {
+                "Industrial": 486600
+            }
+        },
+        "crm_dashboard": {
+            "head": {
+                "open": 3,
+                "value": 1700000,
+                "weighted": 1020000,
+                "stalled": 0,
+                "closing_soon": 2,
+                "won": 1,
+                "lost": 1,
+                "rate": 50,
+                "won_value": 300000,
+                "avg_deal": 300000,
+                "cycle_days": 141
+            },
+            "top": {
+                "leads": 2,
+                "to_opp": 2,
+                "quotes": 8,
+                "won": 1,
+                "lead_to_opp": 100
+            },
+            "losses": [
+                {
+                    "reason": "Price too high \/ lost on price",
+                    "n": 1,
+                    "value": 100000
+                }
+            ],
+            "funnel": [
+                {
+                    "0": "Qualified",
+                    "now": 1,
+                    "value": 200000,
+                    "weighted": 20000,
+                    "reached": 1,
+                    "conv": null
+                },
+                {
+                    "0": "Needs understood",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 0,
+                    "conv": 0
+                },
+                {
+                    "0": "Quotation sent",
+                    "now": 1,
+                    "value": 500000,
+                    "weighted": 250000,
+                    "reached": 1,
+                    "conv": null
+                },
+                {
+                    "0": "Negotiation",
+                    "now": 1,
+                    "value": 1000000,
+                    "weighted": 750000,
+                    "reached": 1,
+                    "conv": 100
+                },
+                {
+                    "0": "Won",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 1,
+                    "conv": 100
+                },
+                {
+                    "0": "Lost",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 1,
+                    "conv": 100
+                }
+            ],
+            "owners": [
+                {
+                    "owner": "Pmaster Probe",
+                    "open_n": 3,
+                    "open_value": 1700000,
+                    "won_n": 1,
+                    "won_value": 300000,
+                    "lost_n": 1
+                }
+            ]
+        },
+        "home": {
+            "open_n": 3,
+            "open_val": 262400,
+            "sent_n": 1,
+            "won_val": 424800,
+            "won_n": 3,
+            "lost_n": 2,
+            "pendApprove_tile": 2,
+            "winRate": 60
+        },
+        "command_centre_committed": 483800,
+        "crm_quotes_awaiting_me": 0,
+        "inquiries_due_count": 1,
+        "quotes_expired_count": 1,
+        "quotes_awaiting_contract_count": 3,
+        "quote_register_counts": {
+            "open": 3,
+            "pending": 2,
+            "closed": 2,
+            "lost": 1,
+            "expired": 1
+        }
+    },
+    {
+        "who": "bmA",
+        "crm_reports": {
+            "fy": "2026-27",
+            "total": 7,
+            "totVal": 486600,
+            "openVal": 262400,
+            "wonVal": 188800,
+            "nWon": 2,
+            "nLost": 2,
+            "winRate": 50,
+            "months": {
+                "2026-10": {
+                    "raised": 3,
+                    "won": 0,
+                    "lost": 0,
+                    "wonVal": 0
+                },
+                "2026-09": {
+                    "raised": 1,
+                    "won": 0,
+                    "lost": 1,
+                    "wonVal": 0
+                },
+                "2026-08": {
+                    "raised": 1,
+                    "won": 0,
+                    "lost": 1,
+                    "wonVal": 0
+                },
+                "2026-07": {
+                    "raised": 1,
+                    "won": 1,
+                    "lost": 0,
+                    "wonVal": 70800
+                },
+                "2026-05": {
+                    "raised": 1,
+                    "won": 1,
+                    "lost": 0,
+                    "wonVal": 118000
+                }
+            },
+            "lost": {
+                "\u2014": 1,
+                "Price too high \/ lost on price": 1
+            },
+            "bySbu": {
+                "Industrial": 486600
+            }
+        },
+        "crm_dashboard": {
+            "head": {
+                "open": 2,
+                "value": 700000,
+                "weighted": 270000,
+                "stalled": 0,
+                "closing_soon": 2,
+                "won": 1,
+                "lost": 1,
+                "rate": 50,
+                "won_value": 300000,
+                "avg_deal": 300000,
+                "cycle_days": 141
+            },
+            "top": {
+                "leads": 1,
+                "to_opp": 2,
+                "quotes": 8,
+                "won": 1,
+                "lead_to_opp": 200
+            },
+            "losses": [
+                {
+                    "reason": "Price too high \/ lost on price",
+                    "n": 1,
+                    "value": 100000
+                }
+            ],
+            "funnel": [
+                {
+                    "0": "Qualified",
+                    "now": 1,
+                    "value": 200000,
+                    "weighted": 20000,
+                    "reached": 1,
+                    "conv": null
+                },
+                {
+                    "0": "Needs understood",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 0,
+                    "conv": 0
+                },
+                {
+                    "0": "Quotation sent",
+                    "now": 1,
+                    "value": 500000,
+                    "weighted": 250000,
+                    "reached": 1,
+                    "conv": null
+                },
+                {
+                    "0": "Negotiation",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 0,
+                    "conv": 0
+                },
+                {
+                    "0": "Won",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 1,
+                    "conv": null
+                },
+                {
+                    "0": "Lost",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 1,
+                    "conv": 100
+                }
+            ],
+            "owners": [
+                {
+                    "owner": "Pmaster Probe",
+                    "open_n": 2,
+                    "open_value": 700000,
+                    "won_n": 1,
+                    "won_value": 300000,
+                    "lost_n": 1
+                }
+            ]
+        },
+        "home": {
+            "open_n": 3,
+            "open_val": 262400,
+            "sent_n": 1,
+            "won_val": 424800,
+            "won_n": 3,
+            "lost_n": 2,
+            "pendApprove_tile": 0,
+            "winRate": 60
+        },
+        "command_centre_committed": 483800,
+        "crm_quotes_awaiting_me": 1,
+        "inquiries_due_count": 1,
+        "quotes_expired_count": 1,
+        "quotes_awaiting_contract_count": 3,
+        "quote_register_counts": {
+            "open": 3,
+            "pending": 2,
+            "closed": 2,
+            "lost": 1,
+            "expired": 1
+        }
+    },
+    {
+        "who": "mm",
+        "crm_reports": {
+            "fy": "2026-27",
+            "total": 7,
+            "totVal": 486600,
+            "openVal": 262400,
+            "wonVal": 188800,
+            "nWon": 2,
+            "nLost": 2,
+            "winRate": 50,
+            "months": {
+                "2026-10": {
+                    "raised": 3,
+                    "won": 0,
+                    "lost": 0,
+                    "wonVal": 0
+                },
+                "2026-09": {
+                    "raised": 1,
+                    "won": 0,
+                    "lost": 1,
+                    "wonVal": 0
+                },
+                "2026-08": {
+                    "raised": 1,
+                    "won": 0,
+                    "lost": 1,
+                    "wonVal": 0
+                },
+                "2026-07": {
+                    "raised": 1,
+                    "won": 1,
+                    "lost": 0,
+                    "wonVal": 70800
+                },
+                "2026-05": {
+                    "raised": 1,
+                    "won": 1,
+                    "lost": 0,
+                    "wonVal": 118000
+                }
+            },
+            "lost": {
+                "\u2014": 1,
+                "Price too high \/ lost on price": 1
+            },
+            "bySbu": {
+                "Industrial": 486600
+            }
+        },
+        "crm_dashboard": {
+            "head": {
+                "open": 3,
+                "value": 1700000,
+                "weighted": 1020000,
+                "stalled": 0,
+                "closing_soon": 2,
+                "won": 1,
+                "lost": 1,
+                "rate": 50,
+                "won_value": 300000,
+                "avg_deal": 300000,
+                "cycle_days": 141
+            },
+            "top": {
+                "leads": 2,
+                "to_opp": 2,
+                "quotes": 8,
+                "won": 1,
+                "lead_to_opp": 100
+            },
+            "losses": [
+                {
+                    "reason": "Price too high \/ lost on price",
+                    "n": 1,
+                    "value": 100000
+                }
+            ],
+            "funnel": [
+                {
+                    "0": "Qualified",
+                    "now": 1,
+                    "value": 200000,
+                    "weighted": 20000,
+                    "reached": 1,
+                    "conv": null
+                },
+                {
+                    "0": "Needs understood",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 0,
+                    "conv": 0
+                },
+                {
+                    "0": "Quotation sent",
+                    "now": 1,
+                    "value": 500000,
+                    "weighted": 250000,
+                    "reached": 1,
+                    "conv": null
+                },
+                {
+                    "0": "Negotiation",
+                    "now": 1,
+                    "value": 1000000,
+                    "weighted": 750000,
+                    "reached": 1,
+                    "conv": 100
+                },
+                {
+                    "0": "Won",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 1,
+                    "conv": 100
+                },
+                {
+                    "0": "Lost",
+                    "now": 0,
+                    "value": 0,
+                    "weighted": 0,
+                    "reached": 1,
+                    "conv": 100
+                }
+            ],
+            "owners": [
+                {
+                    "owner": "Pmaster Probe",
+                    "open_n": 3,
+                    "open_value": 1700000,
+                    "won_n": 1,
+                    "won_value": 300000,
+                    "lost_n": 1
+                }
+            ]
+        },
+        "home": {
+            "open_n": 3,
+            "open_val": 262400,
+            "sent_n": 1,
+            "won_val": 424800,
+            "won_n": 3,
+            "lost_n": 2,
+            "pendApprove_tile": 2,
+            "winRate": 60
+        },
+        "command_centre_committed": 483800,
+        "crm_quotes_awaiting_me": 0,
+        "inquiries_due_count": 1,
+        "quotes_expired_count": 1,
+        "quotes_awaiting_contract_count": 3,
+        "quote_register_counts": {
+            "open": 3,
+            "pending": 2,
+            "closed": 2,
+            "lost": 1,
+            "expired": 1
+        }
+    }
+]

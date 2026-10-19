@@ -1,0 +1,17 @@
+{
+    "office": 18,
+    "master": 1,
+    "finance": 2,
+    "business_dev_manager": 3,
+    "marketing_executive": 4,
+    "marketing_manager": 5,
+    "business_director": 6,
+    "branch_manager": 7,
+    "operation_manager": 8,
+    "coordinator": 9,
+    "p_active": 666,
+    "p_black": 667,
+    "p_inact": 668,
+    "p_blocked": 669,
+    "p_hold": 670
+}

@@ -1,0 +1,15 @@
+P11b  MARKETING_MANAGER approves the step on his OWN quote Q-00007 (step routed to role MARKETING_MANAGER)
+      expected: refused — creator ≠ approver
+      actual:   [success] All approvals complete — quote approved and ready to send.; quote status=APPROVED
+P11c  MARKETING_MANAGER one-click approves his own small quote Q-00011 (total 11800, no rule matches)
+      expected: refused, or at least logged as self-approval
+      actual:   [success] Quotation moved to Approved (ready to send).; status=APPROVED; revisions log rows=0
+P11d  BRANCH_MANAGER (no crm.quote.approve) one-click APPROVED
+      expected: refused
+      actual:   [error] You cannot approve quotations.; status=DRAFT
+P11e  BRANCH_MANAGER (quotes view only) sets the same DRAFT to REJECTED via quote-status
+      expected: refused (only an approver rejects, with a reason)
+      actual:   [success] Quotation moved to Rejected by approver.; status=REJECTED
+P9b   After L1 and L2 approve Q-00005, L3 is the deactivated user; MARKETING_MANAGER tries L3
+      expected: the system says the approver is inactive and offers a re-route
+      actual:   mm on L3: [error] You are not an approver for this step.; quote status=PENDING_APPROVAL; crm_pending_with()/awaiting: Pgone Probe (Marketing Manager) | mm awaiting=0 | master awaiting=0

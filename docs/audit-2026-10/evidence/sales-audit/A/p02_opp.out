@@ -1,0 +1,54 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== 1. who can open / create an opportunity ===
+    MM   /opportunities http=403 flash=
+    BDM  /opportunities http=403 flash=
+    FIN  /opportunities http=403 flash=
+    BM   /opportunities http=403 flash=
+    BD   /opportunities http= flash=
+
+=== 2. WON: does it raise an enquiry or quotation by itself? ===
+    [opportunity-move -> WON] success: Won. Raise the order when the customer confirms.
+    {"id":1,"ref":"OPP-2026-0001","status":"WON","stage_id":12,"value":100000,"partner_id":666,"contract_id":null,"call_id":null} ; inquiries +0, quotations +0
+    [opportunity-move WON -> OPEN stage (reopen?)] error: That opportunity is already won.
+    [opportunity-move WON -> LOST] error: That opportunity is already won.
+    [opportunity-edit on WON deal (value 1, renamed)] success: Saved.
+    after edit: {"id":1,"ref":"OPP-2026-0001","status":"WON","stage_id":12,"value":1,"partner_id":666,"contract_id":null,"call_id":null}
+    history rows for the edit (activities): 0 ; all activity subjects: ["Opportunity OPP-2026-0001 opened \u2014 Deal won directly","Moved to Won \u2014 won"]
+
+=== 3. two alternative quotations on one deal: one is LOST, the other is later ACCEPTED ===
+    [link quote A] (no flash)
+    [link quote B] (no flash)
+    [MM marks A LOST (client chose option B)] success: Quotation moved to Lost / regretted.
+    deal after A lost: {"id":2,"ref":"OPP-2026-0002","status":"LOST","stage_id":13,"value":100000,"partner_id":666,"contract_id":null,"call_id":null}
+    [MM marks B ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master, 1 contact(s) carried across. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Comp
+    deal after B accepted: {"id":2,"ref":"OPP-2026-0002","status":"LOST","stage_id":13,"value":100000,"partner_id":666,"contract_id":null,"call_id":null}   quote B: #2 Q-00002 r0 cur=1 ACCEPTED total=59000 contract=-
+
+=== 4. deal already LOST by hand, then its quotation is ACCEPTED ===
+    [deal -> LOST] success: Recorded as lost, with the reason.
+    [quote ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+    deal: {"id":3,"ref":"OPP-2026-0003","status":"LOST","stage_id":13,"value":100000,"partner_id":666,"contract_id":null,"call_id":null}   quote: #3 Q-00003 r0 cur=1 ACCEPTED total=59000 contract=-
+
+=== 5. one won deal, two contracts: quote-contract AND opportunity-contract ===
+    [quote ACCEPTED (wins the deal)] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+    deal: {"id":4,"ref":"OPP-2026-0004","status":"WON","stage_id":12,"value":100000,"partner_id":666,"contract_id":null,"call_id":null}
+    [FIN quote-contract (auto number)] warning: Contract GEN/C/2026-27/00001 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+    quote: #4 Q-00004 r0 cur=1 ACCEPTED total=59000 contract=GEN/C/2026-27/00001
+    [FIN opportunity-contract on the same won deal (auto number)] (no flash)
+    deal: {"id":4,"ref":"OPP-2026-0004","status":"WON","stage_id":12,"value":100000,"partner_id":666,"contract_id":null,"call_id":null}
+    contract #1 GEN/C/2026-27/00001 q=4 PENDING — From quotation Q-00004
+
+=== 6. attach a quotation of a DIFFERENT client to a deal, accept it ===
+    [link Other-Client quote to Acme deal] (no flash)
+    [accept it] success: quote marked accepted. Other Client is now linked to the client master, 1 contact(s) carried across. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Co
+    deal (partner should be Acme=666): {"id":5,"ref":"OPP-2026-0005","status":"WON","stage_id":12,"value":100000,"partner_id":666,"contract_id":null,"call_id":null}  quote client_id=667
+
+=== 7. direct RFQ: quotation with no lead, no deal, no inquiry ===
+    #6 Q-00006 r0 cur=1 DRAFT total=59000 contract=- lead_id=NULL inquiry_id=NULL linked deals=0
+
+=== 5b. same as 5, the direct-win contract registered by ADMIN (Finance is refused the route: module gate leads) ===
+    [ADMIN opportunity-contract on the won deal that already has a quote contract] warning: Contract GEN/C/2026-27/00002 registered and awaiting approval — a manager endorses it and the branch manager approves it before it opens and the work orders can be raised from it.
+    deal: {"id":4,"ref":"OPP-2026-0004","status":"WON","stage_id":12,"value":100000,"partner_id":666,"contract_id":2,"call_id":null}
+    contract #1 GEN/C/2026-27/00001 q=4 PENDING — From quotation Q-00004
+    contract #2 GEN/C/2026-27/00002 q= PENDING — From opportunity OPP-2026-0004 (won without a quotation)
+    [FIN /opportunity?id (can Finance even see the deal queue?)] (no flash)

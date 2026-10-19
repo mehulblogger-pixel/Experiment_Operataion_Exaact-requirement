@@ -1,0 +1,32 @@
+check	master	bd	bmA	coA	mm	bdmA	kamA	meA	fin	insA
+mod.leads.view	Y	Y	-	-	-	-	-	-	-	-
+mod.leads.edit	Y	Y	-	-	-	-	-	-	-	-
+mod.leads.delete	Y	Y	-	-	-	-	-	-	-	-
+leads_can_view()	Y	Y	Y	-	Y	Y	Y	Y	-	-
+opp_can_edit()	Y	Y	Y	-	Y	Y	Y	Y	-	-
+mod.inquiries.view	Y	Y	Y	-	Y	Y	Y	Y	-	-
+mod.inquiries.edit	Y	Y	Y	-	Y	Y	Y	Y	-	-
+mod.inquiries.delete	Y	Y	Y	-	-	-	-	-	-	-
+inquiry-delete guard (is_admin_level)	Y	Y	Y	-	-	-	-	-	-	-
+mod.quotes.view	Y	Y	Y	-	Y	Y	Y	Y	Y	-
+mod.quotes.edit	Y	-	-	-	Y	Y	Y	Y	-	-
+crm.quote.create	Y	-	-	-	Y	Y	Y	Y	-	-
+crm.quote.approve	Y	-	-	-	Y	-	-	-	-	-
+crm.quote.send	Y	-	-	-	Y	Y	Y	-	-	-
+crm.contract.register	Y	-	-	-	-	-	-	-	Y	-
+crm.template.manage	Y	-	-	-	Y	-	-	-	-	-
+mod.crm_orders.edit	Y	-	-	-	Y	Y	Y	-	Y	-
+mod.crm_reports.view	Y	Y	Y	-	Y	Y	Y	Y	Y	-
+crmdash_can()	Y	Y	Y	-	Y	Y	Y	Y	Y	-
+pipe_can_view()	Y	Y	Y	-	Y	Y	Y	Y	Y	-
+pipe_can()	Y	Y	-	-	-	-	-	-	-	-
+industry_can()	Y	Y	-	-	-	-	-	-	-	-
+gate_can_view()	Y	Y	-	-	-	-	-	-	-	-
+pc_can()	Y	Y	Y	Y	Y	Y	Y	Y	Y	-
+pc_can_edit()	Y	Y	Y	Y	Y	Y	Y	Y	-	-
+pc_can_approve()	Y	Y	Y	-	Y	-	-	-	-	-
+data.profitability	Y	Y	Y	-	Y	-	-	-	Y	-
+data.salary	Y	Y	Y	-	-	-	-	-	Y	-
+is_admin_level()	Y	Y	Y	-	-	-	-	-	-	-
+scope offices	ALL	ALL	18	18	ALL	18	18	18	ALL	18
+scope sbus	ALL	ALL	ALL	ALL	ALL	ALL	ALL	ALL	ALL	ALL

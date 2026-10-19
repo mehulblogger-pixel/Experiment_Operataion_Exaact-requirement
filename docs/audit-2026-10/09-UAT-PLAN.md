@@ -245,6 +245,13 @@ approval band's `max_amount` — does it need no approval, or is it blocked?
 site/line pairing is unambiguous; and **no value falls through the top of the
 approval bands** (a gap at the top is the dangerous direction).
 
+**Result, 19 Oct 2026 — run on throwaway databases (`sales/`, `evidence/sales-audit/`): FAIL on all four.**
+An empty submit created a numbered DRAFT with no customer and ₹0, which could be
+taken to ACCEPTED (SA-26); a quote with no lines was accepted; a line stored
+another quote's site and one that does not exist (SA-24); a value above every
+band got one generic step and was approved directly (SA-08). Re-run as
+`sales/SALES-END-TO-END-TEST-MATRIX.md` TM-Q01, Q50…Q52, A03…A06 after the fixes.
+
 ### T-12 · `/hiring-request`'s silent refusal
 
 **Why:** **S4-3.** The only one of eight forms that refuses and says nothing —
@@ -300,6 +307,11 @@ which have WAIVED.
 
 **Pass:** with `require_all` on and one item unticked, approval is refused. Then
 ask the owner: **should there be a recorded waiver?**
+
+**Result, 19 Oct 2026 — PARTLY.** Chain-step approval is refused; **direct approval,
+sending and acceptance are not**. Ticks record no who or when, the quote's
+author can tick everything, and ticks carry onto a revision (SA-13). The waiver
+question is `sales/SALES-BUSINESS-DECISIONS.md` **D-10**. Re-run as TM-A30…A35.
 
 ---
 

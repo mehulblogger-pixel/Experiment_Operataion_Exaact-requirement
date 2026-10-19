@@ -1,0 +1,12 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+role   leads.view      leads.edit      inquiries.view  inquiries.edit  quotes.view     quotes.edit     quote.create    quote.approve   quote.send      contract.register  admin_lvl
+ADMIN  Y               Y               Y               Y               Y               Y               Y               Y               Y               Y                Y
+MM     .               .               Y               Y               Y               Y               Y               Y               Y               .                .
+MM2    .               .               Y               Y               Y               Y               Y               Y               Y               .                .
+BDM    .               .               Y               Y               Y               Y               Y               .               Y               .                .
+MEX    .               .               Y               Y               Y               Y               Y               .               .               .                .
+FIN    .               .               .               .               Y               .               .               .               .               Y                .
+BM     .               .               Y               Y               Y               .               .               .               .               .                Y
+BD     Y               Y               Y               Y               Y               .               .               .               .               .                Y
+COORD  .               .               .               .               .               .               .               .               .               .                .
+INSP   .               .               .               .               .               .               .               .               .               .                .

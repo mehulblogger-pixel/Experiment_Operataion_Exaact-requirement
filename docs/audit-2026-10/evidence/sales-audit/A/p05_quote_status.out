@@ -1,0 +1,87 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== 1. DRAFT -> SENT directly (no approval) by a sender ===
+    [MM SENT] warning: Marked sent and follow-ups scheduled; e-mail could not be sent now (check Settings → SMTP) — it has been logged.
+      -> #1 Q-00001 r0 cur=1 SENT total=59000 contract=-
+      approvals rows on it: 0
+    [BDM SENT] warning: Marked sent and follow-ups scheduled; e-mail could not be sent now (check Settings → SMTP) — it has been logged.
+      -> #2 Q-00002 r0 cur=1 SENT total=59000 contract=-
+
+=== 2. DRAFT -> ACCEPTED directly ===
+    [MM ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master, 1 contact(s) carried across. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Comp
+      -> #3 Q-00003 r0 cur=1 ACCEPTED total=59000 contract=-
+    [MEX ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+      -> #4 Q-00004 r0 cur=1 ACCEPTED total=59000 contract=-
+
+=== 3. DRAFT -> APPROVED by the creator (no rule configured): self-approval ===
+    [MM APPROVED] success: Quotation moved to Approved (ready to send).
+      -> #5 Q-00005 r0 cur=1 APPROVED total=59000 contract=-
+      log: []
+
+=== 4. view-only roles moving a quotation (route gate = mod.quotes.view) ===
+    [FIN ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+      -> #6 Q-00006 r0 cur=1 ACCEPTED total=59000 contract=-
+    [FIN LOST] success: Quotation moved to Lost / regretted.
+      -> #7 Q-00007 r0 cur=1 LOST total=59000 contract=-
+    [FIN EXPIRED] success: Quotation moved to Expired.
+      -> #8 Q-00008 r0 cur=1 EXPIRED total=59000 contract=-
+    [FIN REJECTED] success: Quotation moved to Rejected by approver.
+      -> #8 Q-00008 r0 cur=1 REJECTED total=59000 contract=-
+    [BM ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+      -> #9 Q-00009 r0 cur=1 ACCEPTED total=59000 contract=-
+    [BM LOST] success: Quotation moved to Lost / regretted.
+      -> #10 Q-00010 r0 cur=1 LOST total=59000 contract=-
+    [BM EXPIRED] success: Quotation moved to Expired.
+      -> #11 Q-00011 r0 cur=1 EXPIRED total=59000 contract=-
+    [BM REJECTED] success: Quotation moved to Rejected by approver.
+      -> #11 Q-00011 r0 cur=1 REJECTED total=59000 contract=-
+    [BD ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+      -> #12 Q-00012 r0 cur=1 ACCEPTED total=59000 contract=-
+    [BD LOST] success: Quotation moved to Lost / regretted.
+      -> #13 Q-00013 r0 cur=1 LOST total=59000 contract=-
+    [BD EXPIRED] success: Quotation moved to Expired.
+      -> #14 Q-00014 r0 cur=1 EXPIRED total=59000 contract=-
+    [BD REJECTED] success: Quotation moved to Rejected by approver.
+      -> #14 Q-00014 r0 cur=1 REJECTED total=59000 contract=-
+
+=== 5. terminal states: ACCEPTED <-> LOST, back to DRAFT ===
+    [MM ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+      -> #15 Q-00015 r0 cur=1 ACCEPTED total=59000 contract=-
+    [MM LOST] success: Quotation moved to Lost / regretted.
+      -> #15 Q-00015 r0 cur=1 LOST total=59000 contract=-
+    [MM ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+      -> #15 Q-00015 r0 cur=1 ACCEPTED total=59000 contract=-
+    [MM DRAFT] error: This quote has gone to the client on 19 Oct 2026, so nothing on it can be changed. To change the price or the scope, raise a revision: it takes a new revision number, goes through approval again, and is sent again.
+      -> #15 Q-00015 r0 cur=1 ACCEPTED total=59000 contract=-
+    [ADMIN DRAFT] error: This quote has gone to the client on 19 Oct 2026, so nothing on it can be changed. To change the price or the scope, raise a revision: it takes a new revision number, goes through approval again, and is sent again.
+      -> #15 Q-00015 r0 cur=1 ACCEPTED total=59000 contract=-
+      log rows for #15: []
+    [MM ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+      -> #16 Q-00016 r0 cur=1 ACCEPTED total=59000 contract=-
+    [ADMIN DRAFT] success: Quotation moved to Draft.
+      -> #16 Q-00016 r0 cur=1 DRAFT total=59000 contract=-
+    [MM LOST] success: Quotation moved to Lost / regretted.
+      -> #16 Q-00016 r0 cur=1 LOST total=59000 contract=-
+    [MM DRAFT] error: This quote is closed (LOST) and is locked. Raise a re-edit request — only the Super Admin can grant it.
+      -> #16 Q-00016 r0 cur=1 LOST total=59000 contract=-
+
+=== 6. LOST without a reason ===
+    [MM LOST] success: Quotation moved to Lost / regretted.
+      -> #17 Q-00017 r0 cur=1 LOST total=59000 contract=-
+      lost_reason=''
+
+=== 7. expiry: SENT 40 days ago with 30-day validity, then the daily sweep ===
+      crm_expire_quotes() stamped 1
+      #18 Q-00018 r0 cur=1 EXPIRED total=59000 contract=- | #19 Q-00019 r0 cur=1 APPROVED total=59000 contract=- | validity 0: #20 Q-00020 r0 cur=1 SENT total=59000 contract=-
+    [MM ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+      -> #18 Q-00018 r0 cur=1 ACCEPTED total=59000 contract=-
+      log: ["Expired \u2014 validity lapsed on 09 Oct 2026 (no reply within 30 days). Raise a revision to re-issue.","Accepted after validity had lapsed on 09 Oct 2026."]
+    [MM SENT] error: This quote has gone to the client on 09 Sep 2026, so nothing on it can be changed. To change the price or the scope, raise a revision: it takes a new revision number, goes through approval again, and is sent again.
+      -> #21 Q-00021 r0 cur=1 EXPIRED total=59000 contract=-
+    [MM LOST] success: Quotation moved to Lost / regretted.
+      -> #21 Q-00021 r0 cur=1 LOST total=59000 contract=-
+
+=== 8. which status changes leave a trace in quote_revisions (the quote history) or activities ===
+      DRAFT->SENT      quote_revisions=0 activities=0
+      DRAFT->ACCEPTED  quote_revisions=0 activities=0
+      SENT->LOST       quote_revisions=0 activities=0

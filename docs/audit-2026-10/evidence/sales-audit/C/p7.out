@@ -1,0 +1,16 @@
+contract #1 before: {"contract_number":"PHQ\/C\/2026-27\/00001","quotation_id":8,"value":500000,"open_status":"OPEN"}
+
+[7a] A NEW quote for a repeat order, registered under the EXISTING open contract number
+  > FIN quote-contract with existing number
+      flash  warning: This number already exists for this client (open / in force). Nothing new will be created — the work is recorded against that same contract.
+      flash  warning: Client & contract registered. The ops packet was logged (configure SMTP in Settings to e-mail it).
+  contract #1 after: {"contract_number":"PHQ\/C\/2026-27\/00001","quotation_id":20,"value":500000,"open_status":"OPEN"}
+  original quote #8 still says contract_id=1; contract now points at quote #20
+  contract_state_row(contract) now reads quote #20: {"state":"OK","qty_total":5,"qty_used":0,"qty_left":5}
+  contract_state(original quote #8): {"state":"OK","qty_total":14,"qty_used":5,"qty_left":9}
+  call-new?contract_id=1 now prefills quotation_id=20
+
+[7b] PO with lines pulled from the quote, then a work order off the contract: is the rate carried?
+  po_pull_quote_lines: {"ok":true,"count":1}
+  prefill: {"quotation_id":20,"client_id":666,"vendor_id":null,"contract_number":"PHQ\/C\/2026-27\/00001","sbu":"TPI","activity_id":null,"ibo_office_id":18,"coordinator_id":null,"po_id":1,"po_line_item_id":1,"billable_rate":7500,"billable_basis":"MANDAY","_prefill_note":"Read off PO PO-REP-1 \u2014 including the agreed rate.","inspection_type":"TPI"}
+  call_commercial_prefill: {"po_id":1,"po_line_item_id":1,"billable_rate":7500,"billable_basis":"MANDAY","from":{"po_id":"PO PO-REP-1","po_line_item_id":"PO PO-REP-1","billable_rate":"PO PO-REP-1 line","billable_basis":"PO PO-REP-1 line"}}

@@ -1,0 +1,29 @@
+quote #8 lines: [[15,"MANDAY",10,8000,80000],[16,"VISIT",4,5000,20000]]
+contract #1: {"contract_number":"PHQ\/C\/2026-27\/00001","value":500000,"end_date":"2027-03-31","open_status":"OPEN"}
+
+[3a] Coordinator opens call-new?contract_id=1 — what does the form open with?
+  prefilled: {"quotation_id":8,"client_id":666,"vendor_id":null,"contract_number":"PHQ\/C\/2026-27\/00001","sbu":"TPI","activity_id":null,"ibo_office_id":18,"coordinator_id":null}
+  quote-context endpoint offers line rates to the browser JS: (see raw)
+
+[3b] Save the work order with a TYPED rate 9500 (quote line says 8000) and qty 3
+  > call-new POST to /call-new?contract_id= (NOT what the form does)
+      flash  success: Call updated.
+  > call-new POST to /call-new (the form action, views/ops/call_form.php:67)
+      flash  success: CALL-00001 created. Now allocate a job.
+  call: {"id":1,"call_code":"CALL-00001","status":"OPEN","client_id":666,"quotation_id":8,"quote_line_id":15,"contract_number":"PHQ\/C\/2026-27\/00001","billable_rate":9500,"billable_qty":3,"billable_value":28500,"billable_basis":"MANDAY","po_id":null}
+
+[3c] A work order typed against a contract number that does not exist (no quote, no contract)
+  > call-new direct/typo
+      flash  success: CALL-00002 created. Now allocate a job.
+  created: {"call_code":"CALL-00002","contract_number":"TYPO-NOT-A-CONTRACT","quotation_id":null,"billable_value":12000}
+
+[3d] A work order against the DRAFT quote #9 (never approved/sent/accepted), contract box left blank
+  > call-new on DRAFT quote
+      flash  success: CALL-00003 created. Now allocate a job.
+  created: {"call_code":"CALL-00003","contract_number":"","quotation_id":9,"status":"OPEN"}
+  the DRAFT quote's own contract number (registered in P2, PENDING): PHQ/C/2026-27/00002
+
+[3e] Allocate a job on the 3b work order (coordinator)
+  > job-new POST
+      view   ops/job_form  ERROR: Choose who will carry out this job — an inspector / engineer, or a sub-contracting agency — before it can be allocated.
+  job: false

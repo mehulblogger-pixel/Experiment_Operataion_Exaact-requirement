@@ -1,0 +1,46 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== 1. empty submit of /quote-new ===
+    [empty POST] success: Q-00001 created.
+    STORED: #1 Q-00001 status=DRAFT client_id=NULL client_name='' subject='' sbu='' total=0 lines=0
+    [POST with no fields at all] success: Q-00002 created.
+    last: #2 Q-00002 r0 cur=1 DRAFT total=0 contract=-
+
+=== 1b. can the empty draft go forward? ===
+    [submit empty draft for approval] success: Submitted for approval — 1 step(s). Now with admin (Admin (legacy)), p_mm Probe (Marketing Manager), p_mm2 Probe (Marketing Manager).
+    #1 Q-00001 r0 cur=1 PENDING_APPROVAL total=0 contract=- steps=1
+    [MM2 approves it] success: All approvals complete — quote approved and ready to send.
+    [MM sends it] warning: Marked sent and follow-ups scheduled; no customer e-mail on the quotation (it was not e-mailed).
+    [MM marks it ACCEPTED] success: quote marked accepted. No client name was on it, so nothing could be put on file — add the name and mark it accepted again.
+    #1 Q-00001 r0 cur=1 ACCEPTED total=0 contract=-
+
+=== 2. the same /quote-new POST submitted twice (double click / resubmit) ===
+    [submit #1] success: Q-00003 created.
+    [submit #2 (identical)] success: Q-00004 created.
+    quotations +2 with subject 'Double submit probe': ["Q-00003","Q-00004"]
+    concurrent identical submits (barrier):
+    [race worker0] (no flash)  EXC=PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: quotations.quote_no, quotations.rev
+    [race worker1] success: Q-00005 created.
+    rows: [{"id":5,"quote_no":"Q-00005","rev":0}]
+    idempotency/nonce field in the form? no
+
+=== 3. /quote-external takes status from the form ===
+    [external status=ACCEPTED] success: Q-00006 registered.
+    #6 Q-00006 r0 cur=1 ACCEPTED total=100000 contract=- approvals=0
+    [external status=APPROVED] success: Q-00007 registered.
+    #7 Q-00007 r0 cur=1 APPROVED total=100000 contract=- approvals=0
+    [external status=BOGUS] success: Q-00008 registered.
+    #8 Q-00008 r0 cur=1 BOGUS total=100000 contract=- approvals=0
+    [MEX (create only, no approve/send) registers an external quote straight to ACCEPTED] success: Q-00009 registered.
+    #9 Q-00009 r0 cur=1 ACCEPTED total=900000 contract=-
+
+=== 4. who may create a quotation ===
+    FIN   refused  error: You cannot create or edit quotations.
+    BM    refused  error: You cannot create or edit quotations.
+    BD    refused  error: You cannot create or edit quotations.
+    COORD refused  
+    MEX   created #10 Q-00010 r0 cur=1 DRAFT total=59000 contract=-  success: Q-00010 created.
+    BDM   created #11 Q-00011 r0 cur=1 DRAFT total=59000 contract=-  success: Q-00011 created.
+
+=== 5. a quote line pointing at a site of ANOTHER quotation (E-3) ===
+    quote B line location_id=1 location text='' (site belongs to quote A #12)

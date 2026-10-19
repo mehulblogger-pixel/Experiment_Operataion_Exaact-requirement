@@ -1,0 +1,42 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+pc_defaults() (settings fallback)                                      => {"overhead_pct":8,"insurance_pct":0.5,"baddebt_pct":0,"contingency_pct":0.5,"negotiation_pct":5,"food_per_day":250}
+cost heads catalogue                                                   => ["PERSONNEL","STATUTORY","TRANSPORT","ACCOMMODATION","FOOD","SITE_ALLOWANCE","PPE","UNIFORM","CAPEX","TOOLS","CALIBRATION","CONSUMABLES","COMMUNICATION","MEDICAL","TRAINING","HOUSEKEEPING","INSURANCE_LINE","MISC"]
+
+== A. COST-loaded, man-month, target margin 20% ==
+header %                                                               => {"basis":"LONG","load_on":"COST","overhead_pct":8,"insurance_pct":0.5,"baddebt_pct":0,"contingency_pct":0.5,"negotiation_pct":5}
+rollup                                                                 => {"lines":[{"direct":55000,"loaded":59950,"rate":74937.5,"proposed":78684.38,"qty":12,"oneoff":0,"revenue":944212.5,"cost":719400,"profit":224812.5,"margin":23.81}],"totals":{"revenue":944212.5,"cost":719400,"profit":224812.5,"direct":55000,"oneoff":0,"lines":1,"margin":23.81},"status":"DRAFT"}
+hand calc loaded / rate / proposed / margin                            => [59950,74937.5,78684.38,23.81]
+
+== B. load on RATE (client sheet mode) ==
+rollup load_on=RATE                                                    => {"lines":[{"direct":55000,"loaded":61971.83,"rate":77464.79,"proposed":81338.03,"qty":12,"oneoff":0,"revenue":976056.34,"cost":743661.97,"profit":232394.37,"margin":23.81}],"totals":{"revenue":976056.34,"cost":743661.97,"profit":232394.37,"direct":55000,"oneoff":0,"lines":1,"margin":23.81},"status":"DRAFT"}
+
+== C. costs exceed price (manual rate below cost) ==
+rollup (manual rate 2000 vs direct 3250/day)                           => {"lines":[{"direct":3250,"loaded":3542.5,"rate":2000,"proposed":2100,"qty":20,"oneoff":0,"revenue":42000,"cost":70850,"profit":-28850,"margin":-68.69}],"totals":{"revenue":42000,"cost":70850,"profit":-28850,"direct":3250,"oneoff":0,"lines":1,"margin":-68.69},"status":"DRAFT"}
+BDM submits loss-making costing                                        => [success] Costing submitted for approval.
+MM approves loss-making costing                                        => [success] Costing approved. status=APPROVED
+
+== D. odd inputs ==
+negative cost head (-60000 transport)                                  => {"direct":-20000,"loaded":-21800,"rate":-24222.22,"proposed":-25433.33,"qty":6,"oneoff":0,"revenue":-152600,"cost":-130800,"profit":-21800,"margin":0}
+  line 1                                                               => {"direct":40000,"loaded":43600,"rate":43600,"proposed":45780,"qty":6,"oneoff":0,"revenue":274680,"cost":261600,"profit":13080,"margin":4.76}
+  line 2                                                               => {"direct":40000,"loaded":43600,"rate":43600,"proposed":45780,"qty":6,"oneoff":0,"revenue":274680,"cost":261600,"profit":13080,"margin":4.76}
+  line 3                                                               => {"direct":40000,"loaded":43600,"rate":48444.44,"proposed":50866.67,"qty":0,"oneoff":0,"revenue":0,"cost":0,"profit":0,"margin":0}
+  line 4                                                               => {"direct":40000,"loaded":43600,"rate":48444.44,"proposed":50866.67,"qty":6,"oneoff":0,"revenue":305200,"cost":261600,"profit":43600,"margin":14.29}
+  line 5                                                               => {"direct":40000,"loaded":43600,"rate":48444.44,"proposed":50866.67,"qty":6,"oneoff":-100000,"revenue":305200,"cost":161600,"profit":143600,"margin":47.05}
+header overhead -50%, negotiation -40% accepted?                       => [success] Costing saved. {"overhead_pct":-50,"negotiation_pct":-40}
+RATE mode, target 95% + loadings 9% (denominator <0)                   => {"direct":50000,"loaded":54500,"rate":50000,"proposed":50000,"qty":12,"oneoff":0,"revenue":600000,"cost":654000,"profit":-54000,"margin":-9}
+
+== E. costing approval controls ==
+MM approves own DRAFT costing without submitting                       => [success] Costing approved. status=APPROVED approved_by=Mm1 Probe
+BDM tries to approve                                                   => [error] Only an approver can approve a costing.
+BDM reopens the APPROVED costing                                       => [success] Reopened as draft. status=DRAFT approved_by still=Mm1 Probe
+  BDM then adds a loss line; rollup                                    => {"revenue":870975,"cost":1308000,"profit":-437025,"direct":100000,"oneoff":0,"lines":2,"margin":-50.18}
+
+== F. costing -> quote ==
+quote from a DRAFT (unapproved) costing                                => [success] Quotation Q-00001 drafted from this costing — review and send.
+  quote header                                                         => {"id":1,"status":"DRAFT","sbu":"","owner_id":null,"office_id":1,"gst_pct":18,"subtotal":944212.5,"total_amount":1114170.75}
+  quote lines                                                          => [{"qty":12,"unit":"MANMONTH","rate":78684.38,"amount":944212.5}]
+  costing figures                                                      => {"exp_revenue":944212.5,"exp_cost":719400,"exp_profit":224812.5}
+BDM cuts the quote rate to 10,000/month (cost ~59,950/month)           => [success] Quote saved.
+  quote now                                                            => {"status":"DRAFT","subtotal":120000,"total_amount":141600}
+  costing panel on the quote shows (exp_* unchanged)                   => {"exp_revenue":944212.5,"exp_profit":224812.5,"margin_pct":23.8}
+MM approves the below-cost quote directly (no rules)                   => [success] Quotation moved to Approved (ready to send). status=APPROVED

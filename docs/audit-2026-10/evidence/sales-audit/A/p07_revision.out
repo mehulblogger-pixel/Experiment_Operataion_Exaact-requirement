@@ -1,0 +1,62 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== 1. revise a SENT quotation; then accept the SUPERSEDED rev 0 ===
+    [MM quote-revise #1] success: Created revision 01 with 1 line(s) and 0 site(s) carried over. Edit it below.
+      #1 Q-00001 r0 cur=0 SENT total=59000 contract=-
+      #2 Q-00001 r1 cur=1 DRAFT total=59000 contract=-
+      rev1 lines=1 ; snapshot rows=2
+    [MM #1 -> ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master, 1 contact(s) carried across. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Comp
+      #1 Q-00001 r0 cur=0 ACCEPTED total=59000 contract=-
+      #2 Q-00001 r1 cur=1 DRAFT total=59000 contract=-
+      register 'awaiting contract' list shows: [] (is_current=1 filter hides the accepted rev 0)
+    [FIN registers contract on the superseded-but-accepted rev 0] warning: Contract GEN/C/2026-27/00001 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+      #1 Q-00001 r0 cur=0 ACCEPTED total=59000 contract=GEN/C/2026-27/00001
+      #2 Q-00001 r1 cur=1 DRAFT total=59000 contract=GEN/C/2026-27/00001
+
+=== 2. revise an ACCEPTED quotation that already has a contract ===
+    [MM #3 -> ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+    [FIN contract] warning: Contract GEN/C/2026-27/00002 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+    [MM quote-revise #3] success: Created revision 01 with 1 line(s) and 0 site(s) carried over. Edit it below.
+      #3 Q-00002 r0 cur=0 ACCEPTED total=59000 contract=GEN/C/2026-27/00002
+      #4 Q-00002 r1 cur=1 DRAFT total=59000 contract=GEN/C/2026-27/00002
+      the new DRAFT revision already carries contract_id=2 / number=GEN/C/2026-27/00002
+    [MM #4 -> SENT] warning: Marked sent and follow-ups scheduled; e-mail could not be sent now (check Settings → SMTP) — it has been logged.
+    [MM #4 -> LOST] success: Quotation moved to Lost / regretted.
+      #3 Q-00002 r0 cur=0 ACCEPTED total=59000 contract=GEN/C/2026-27/00002
+      #4 Q-00002 r1 cur=1 LOST total=106200 contract=GEN/C/2026-27/00002
+      contract still points at quotation_id=3 ; current revision is LOST while its contract is live
+
+=== 3. revise a DRAFT (UI hides the button; server allows?) and a LOST one ===
+    [MM quote-revise #5] success: Created revision 01 with 1 line(s) and 0 site(s) carried over. Edit it below.
+      #5 Q-00003 r0 cur=0 DRAFT total=59000 contract=-
+      #6 Q-00003 r1 cur=1 DRAFT total=59000 contract=-
+    [MM #7 -> LOST] success: Quotation moved to Lost / regretted.
+    [MM quote-revise #7] success: Created revision 01 with 1 line(s) and 0 site(s) carried over. Edit it below.
+      #7 Q-00004 r0 cur=0 LOST total=59000 contract=-
+      #8 Q-00004 r1 cur=1 DRAFT total=59000 contract=-
+
+=== 4. revise rev 0 AGAIN after rev 1 exists (stale page) ===
+    [MM quote-revise #9] success: Created revision 01 with 1 line(s) and 0 site(s) carried over. Edit it below.
+    [MM quote-revise #9] (no flash)  EXC=PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: quotations.quote_no, quotations.rev
+      #9 Q-00005 r0 cur=0 SENT total=59000 contract=-
+      #10 Q-00005 r1 cur=1 DRAFT total=59000 contract=-
+
+=== 5. revise rev 1, then is rev 0 still acceptable / sendable? ===
+    [MM #11 -> APPROVED] success: Quotation moved to Approved (ready to send).
+    [MM quote-revise #11] success: Created revision 01 with 1 line(s) and 0 site(s) carried over. Edit it below.
+    [MM #11 -> SENT] warning: Marked sent and follow-ups scheduled; e-mail could not be sent now (check Settings → SMTP) — it has been logged.
+      #11 Q-00006 r0 cur=0 SENT total=59000 contract=-
+      #12 Q-00006 r1 cur=1 DRAFT total=59000 contract=-
+      two live offers out of one quote number? is_current: [{"rev":0,"is_current":0,"status":"SENT"},{"rev":1,"is_current":1,"status":"DRAFT"}]
+
+=== 6. who may revise ===
+    [FIN quote-revise #13] error: You cannot revise quotations.
+      FIN -> refused
+    [BM quote-revise #13] error: You cannot revise quotations.
+      BM -> refused
+    [MEX quote-revise #13] success: Created revision 01 with 1 line(s) and 0 site(s) carried over. Edit it below.
+      MEX -> created #14 Q-00007 r1 cur=1 DRAFT total=59000 contract=-
+
+=== 7. costing link survives a revision? ===
+    [MM quote-revise #15] success: Created revision 01 with 1 line(s) and 0 site(s) carried over. Edit it below.
+      pc_for_quote(rev0)=PC-T1 pc_for_quote(rev1)=none

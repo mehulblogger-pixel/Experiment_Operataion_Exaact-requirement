@@ -1,0 +1,59 @@
+books_connected=true dryrun=true
+
+[1a] BDM creates a quote (expect DRAFT)
+  > quote-new
+      flash  success: Q-00001 created.
+  quote: {"id":1,"quote_no":"Q-00001","status":"DRAFT","subtotal":100000,"gst_amount":18000,"total_amount":118000}
+
+[1b] FINANCE (mod.quotes.view only) moves a DRAFT quote #2 straight to ACCEPTED
+  > quote-status ACCEPTED
+      flash  success: quote marked accepted. Acme Valves Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master.
+  status now: ACCEPTED, approvals rows: 0, sent_at=''
+
+[1b] BUSINESS_DIRECTOR (view only) moves a DRAFT quote #3 straight to ACCEPTED
+  > quote-status ACCEPTED
+      flash  success: quote marked accepted. Acme Valves Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master.
+  status now: ACCEPTED, approvals rows: 0, sent_at=''
+
+[1b] MARKETING_EXECUTIVE (create, no send) moves a DRAFT quote #4 straight to ACCEPTED
+  > quote-status ACCEPTED
+      flash  success: quote marked accepted. Acme Valves Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master.
+  status now: ACCEPTED, approvals rows: 0, sent_at=''
+
+[1c] BDM sends a DRAFT quote without any approval (DRAFT -> SENT)
+  > quote-status SENT
+      flash  warning: Marked sent and follow-ups scheduled; no customer e-mail on the quotation (it was not e-mailed).
+  status now: SENT (approval rules active: 0)
+
+[1d] FINANCE marks the SENT quote ACCEPTED, then a second time
+  > ACCEPTED #1
+      flash  success: quote marked accepted. Acme Valves Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master.
+  books_outbox after #1: [{"kind":"PARTY","local_id":666,"status":"PENDING"},{"kind":"QUOTE","local_id":5,"status":"PENDING"}]
+  > ACCEPTED #2 (locked quote, non-master)
+      flash  success: quote marked accepted. Acme Valves Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master.
+  > ACCEPTED #3 (master)
+      flash  success: quote marked accepted. Acme Valves Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master.
+  books_outbox QUOTE rows for #5: 1
+  quote_revisions trail rows for #5: []
+
+[1e] Revision after SENT: R00 SENT -> revise -> R01; accept BOTH revisions
+  > quote-revise
+      flash  success: Created revision 01 with 2 line(s) and 0 site(s) carried over. Edit it below.
+  > accept R01 (current)
+      flash  success: quote marked accepted. Acme Valves Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master.
+  > accept R00 (superseded, is_current=0)
+      flash  success: quote marked accepted. Acme Valves Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master.
+  {"id":6,"rev":0,"is_current":0,"status":"ACCEPTED","total_amount":118000}
+  {"id":7,"rev":1,"is_current":1,"status":"ACCEPTED","total_amount":106200}
+  books_outbox QUOTE payloads for this deal: [{"local_id":7,"status":"PENDING","qno":"Q-00006 Rev 01","total":106200},{"local_id":6,"status":"PENDING","qno":"Q-00006","total":118000}]
+  quotes_awaiting_contract lists: ["7\/R1"]
+
+[1f] Drain the outbox in dry run (no network) and re-accept: loop-breaker?
+Array
+(
+    [sent] => 7
+    [failed] => 0
+    [skipped] => 0
+)
+  outbox rows QUOTE #5 after drain + re-accept (unchanged payload): [{"id":5,"status":"DONE"}]
+  outbox rows QUOTE #5 after payload change + re-accept: [{"id":5,"status":"DONE","s":"Probe quote"},{"id":8,"status":"PENDING","s":"changed after push"}]

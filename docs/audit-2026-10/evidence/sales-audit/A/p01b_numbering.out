@@ -1,0 +1,18 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== A. lead ref after deleting a lead ===
+    created L-2026-0001, L-2026-0002
+    [lead-delete first] success: Lead L-2026-0001 deleted.
+    next lead gets L-2026-0003 (the deleted lead's ref was L-2026-0001)
+
+=== B. converted-inquiry number after deleting an inquiry ===
+    1 INQ-2610-001
+    2 INQ-2610-002
+    3 INQ-2610-003
+    [inquiry-delete first converted inquiry] success: Inquiry INQ-2610-001 deleted.
+    [lead-convert fourth] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    2 INQ-2610-002
+    3 INQ-2610-003
+    4 INQ-2610-003
+    *** DUPLICATE inquiry_no INQ-2610-003 x2
+    indexes on crm_inquiries: [{"name":"ix_inq_status","sql":"CREATE INDEX ix_inq_status ON crm_inquiries (status)"},{"name":"ix_inq_client","sql":"CREATE INDEX ix_inq_client ON crm_inquiries (client_id)"},{"name":"ix_inq_assigned","sql":"CREATE INDEX ix_inq_assigned ON crm_inquiries (assigned_to)"}]

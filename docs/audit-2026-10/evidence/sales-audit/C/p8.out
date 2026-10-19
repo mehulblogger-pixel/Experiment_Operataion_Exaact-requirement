@@ -1,0 +1,16 @@
+rule active; crm_quote_needs_chain=true
+  > BDM APPROVED directly (expect: routed to chain)
+      flash  error: You cannot approve quotations.
+  status: DRAFT
+  > BDM DRAFT -> SENT with chain required
+      flash  warning: Marked sent and follow-ups scheduled; no customer e-mail on the quotation (it was not e-mailed).
+  status: SENT, approvals rows 0
+  > FIN DRAFT -> ACCEPTED with chain required
+      flash  success: quote marked accepted. Acme Valves Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master.
+  status: ACCEPTED
+
+[8b] quote-external registered straight as ACCEPTED
+  > BDM quote-external status=ACCEPTED
+      flash  success: Q-00023 registered.
+  {"id":24,"status":"ACCEPTED","origin":"TENDER_PORTAL","total_amount":2500000,"accepted_date":"","sent_at":"2026-10-19T17:08:39+00:00"} approvals rows 0
+  appears in quotes_awaiting_contract: yes

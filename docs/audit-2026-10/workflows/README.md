@@ -7,7 +7,7 @@ then end-to-end scenarios and edge cases.
 
 | # | Area | Screens | Document |
 |---|---|---|---|
-| 1 | Sales | 24 | [01-SALES.md](01-SALES.md) |
+| 1 | Sales | 24 | [01-SALES.md](01-SALES.md) · deep business-user audit: [../sales/](../sales/SALES-USER-AND-INDUSTRY-AUDIT.md) |
 | 2 | Marketplace | 18 | [02-MARKETPLACE.md](02-MARKETPLACE.md) |
 | 3 | Operations | 65 | [03-OPERATIONS.md](03-OPERATIONS.md) |
 | 4 | Recruitment | 29 | [04-RECRUITMENT.md](04-RECRUITMENT.md) |

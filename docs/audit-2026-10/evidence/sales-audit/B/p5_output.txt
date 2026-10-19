@@ -1,0 +1,64 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+can BD approve (role default)?                                         => no
+
+== A. SENT / ACCEPTED without approval ==
+BDM sends a DRAFT quote (rule requires MM approval)                    => [warning] Marked sent and follow-ups scheduled; no customer e-mail on the quotation (it was not e-mailed). -> SENT (sent_at set) steps=0
+BDM sends a PENDING_APPROVAL quote                                     => [warning] Marked sent and follow-ups scheduled; no customer e-mail on the quotation (it was not e-mailed). -> SENT (sent_at set) | L1:MARKETING_MANAGER=PENDING
+  then MM approves its still-pending step                              => [success] All approvals complete — quote approved and ready to send. -> APPROVED (sent_at set)
+BDM sends a REJECTED quote                                             => [warning] Marked sent and follow-ups scheduled; no customer e-mail on the quotation (it was not e-mailed). -> SENT (sent_at set)
+FINANCE (quotes: view only) marks a DRAFT quote ACCEPTED               => [success] quote marked accepted. Probe Client Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact person. Complete it before the first work order is raised against it. -> ACCEPTED
+BDM marks own DRAFT quote ACCEPTED (never approved, never sent)        => [success] quote marked accepted. Probe Client Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact person. Complete it before the first work order is raised against it. -> ACCEPTED
+BRANCH_MANAGER (view only) moves PENDING quote to DRAFT                => [success] Quotation moved to Draft. -> DRAFT
+BRANCH_MANAGER (view only) moves PENDING quote to REJECTED             => [success] Quotation moved to Rejected by approver. -> REJECTED
+BRANCH_MANAGER (view only) moves PENDING quote to EXPIRED              => [success] Quotation moved to Expired. -> EXPIRED
+BRANCH_MANAGER (view only) moves PENDING quote to LOST                 => [success] Quotation moved to Lost / regretted. -> LOST
+COORDINATOR (no quotes module) tries ACCEPTED                          =>  -> PENDING_APPROVAL
+
+== B. a quote moved back to DRAFT keeps live approval steps ==
+MM approves a step of a quote that is now DRAFT                        => [success] All approvals complete — quote approved and ready to send. -> APPROVED
+
+== C. self-approval ==
+settings appr_self_approval / master_exception                         => ["0","1"]
+MM creates, submits and approves own quote (chain)                     => [success] All approvals complete — quote approved and ready to send. -> APPROVED owner=2 mm=2
+MM creates and directly approves own quote (no rules)                  => [success] Quotation moved to Approved (ready to send). -> APPROVED
+  ...and sends it                                                      => [warning] Marked sent and follow-ups scheduled; no customer e-mail on the quotation (it was not e-mailed). -> SENT (sent_at set)
+same, with org self-approval OFF and master exception OFF              => [success] All approvals complete — quote approved and ready to send. -> APPROVED
+
+== D. sequencing of levels ==
+BD approves LEVEL 2 while level 1 is still pending                     => [success] Your approval is recorded. Now with Mm1 Probe (Marketing Manager). -> PENDING_APPROVAL | L1:MARKETING_MANAGER=PENDING, L2:BUSINESS_DIRECTOR=APPROVED(Bd1 Probe)
+  then MM approves level 1                                             => [success] All approvals complete — quote approved and ready to send. -> APPROVED | L1:MARKETING_MANAGER=APPROVED(Mm1 Probe), L2:BUSINESS_DIRECTOR=APPROVED(Bd1 Probe)
+
+== E. approver availability ==
+step routed to an INACTIVE named user; pending with                    => Gone1 Probe (Marketing Manager)
+  another MM (has crm.quote.approve) tries                             => [error] You are not an approver for this step. -> PENDING_APPROVAL
+  BD tries                                                             => [error] You are not an approver for this step. -> PENDING_APPROVAL
+step routed to COORDINATOR role (no quotes module); coordinator approves =>  -> PENDING_APPROVAL
+step routed to a role nobody holds (SBU_HEAD); pending with            => anyone with the role Business Unit Head
+step routed to FINANCE role (view only on quotes); finance approves    => [success] All approvals complete — quote approved and ready to send. -> APPROVED
+
+== F. edits while pending / after approval ==
+BDM edits a PENDING quote from 50,000 to 50,00,000                     => [success] Quote saved. -> PENDING_APPROVAL total=5000000 | L1:MARKETING_MANAGER=PENDING
+  MM (band <=1L) approves ->                                           => [success] All approvals complete — quote approved and ready to send. -> APPROVED total=5000000
+BDM edits an APPROVED quote from 50,000 to 1 rupee                     => [success] Quote saved. -> APPROVED total=1 | L1:MARKETING_MANAGER=APPROVED(Mm1 Probe)
+  BDM sends it                                                         => [warning] Marked sent and follow-ups scheduled; no customer e-mail on the quotation (it was not e-mailed). -> SENT (sent_at set)
+  change log rows for that quote (crm_log_change)                      => ["Submitted for approval","Approved by Mm1 Probe","Edited"]
+
+== G. reject, resubmit, retract ==
+MM rejects with no comment                                             => [error] Enter a comment saying why you are rejecting it. -> PENDING_APPROVAL
+MM rejects with a comment                                              => [success] Rejected. The quote now shows as rejected by you, with your comment. -> REJECTED
+BDM resubmits unchanged                                                => [success] Submitted for approval — 1 step(s). Now with Mm1 Probe (Marketing Manager). -> PENDING_APPROVAL | L1:MARKETING_MANAGER=PENDING
+BDM tries to take back MM's approval                                   => [error] You have no approval on this quote to take back. -> APPROVED
+MM takes back own approval                                             => [success] Your approval has been taken back. The quote is waiting for approval again. -> PENDING_APPROVAL | L1:MARKETING_MANAGER=PENDING
+BDM withdraws a PENDING quote to DRAFT (generic status path)           => [success] Quotation moved to Draft. -> DRAFT | L1:MARKETING_MANAGER=PENDING
+
+== H. master bypass ==
+master approves directly although a rule matches                       => [success] Quotation moved to Approved (ready to send). -> APPROVED
+  logged?                                                              => ["Approved directly by admin, bypassing the required approval chain (master override)."]
+
+== I. delegation and the inbox ==
+APPR_ENTITIES (what delegation may name)                               => ["HIRING_REQUEST","REQUISITION","OFFER","SALARY","HREQ_CHANGE","REQ_CHANGE"]
+appr_delegation_save entity=QUOTE                                      => [false,"That is not something this workspace approves.",0]
+appr_delegation_save entity="" (everything)                            => [true,"Delegation created.",1]
+  delegate BDM acts on a step named to MM                              => [error] You are not an approver for this step. -> PENDING_APPROVAL
+MM: crm_quotes_awaiting_me()                                           => 2
+MM: approvals_hub_sections() keys (the /approvals inbox)               => []

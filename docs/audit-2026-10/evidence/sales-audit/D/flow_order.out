@@ -1,0 +1,6 @@
+H1    BDM posts quote-status to=ACCEPTED on DRAFT Q-00001 (never approved or sent; no approval rules configured in this run)
+      expected: refused — only a SENT (or EXPIRED) quote is accepted (03-object-lifecycles.md)
+      actual:   [success] quote marked accepted. Probe Client is now linked to the client master, 1 contact(s) carried across. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work order is raised against it.; status=ACCEPTED approvals=0
+H2    Raise the work order from won deal OPP-2026-0001 (estimate 250000) carrying accepted Q-00001 (subtotal 100000, total 118000)
+      expected: billable_value = the quote subtotal 100000 (the comment at opportunities.php:359-365 says so)
+      actual:   [success] Order CALL-00001 raised, carrying quotation Q-00001. Now allocate the work.; call={"call_code":"CALL-00001","quotation_id":1,"billable_value":250000}

@@ -1,0 +1,24 @@
+route	master	bd	bmA	coA	mm	bdmA	kamA	meA	fin	insA
+leads	open	open	403	403	403	403	403	403	403	403
+lead-new	open	open	403	403	403	403	403	403	403	403
+opportunities	open	open	403	403	403	403	403	403	403	403
+opportunity-new	open	open	403	403	403	403	403	403	403	403
+pipelines	open	open	403	403	403	403	403	403	403	403
+industry	open	open	403	403	403	403	403	403	403	403
+inquiries	open	open	open	403	open	open	open	open	403	403
+inquiry-new	open	open	open	403	open	open	open	open	403	403
+quotes	open	open	open	403	open	open	open	open	open	403
+quotes?mine=approve	open	open	open	403	open	open	open	open	open	403
+quote-new	open	refused:You cannot create or edit quotations.	refused:You cannot create or edit quotations.	403	open	open	open	open	refused:You cannot create or edit quotations.	403
+quote-external	open	refused:You cannot add quotes.	refused:You cannot add quotes.	403	open	open	open	open	refused:You cannot add quotes.	403
+crm-dashboard	open	open	open	403	open	open	open	open	open	403
+crm-reports	open	open	open	403	open	open	open	open	open	403
+crm-templates	open	refused:You cannot manage CRM templates.	refused:You cannot manage CRM templates.	403	open	refused:You cannot manage CRM templates.	refused:You cannot manage CRM templates.	refused:You cannot manage CRM templates.	refused:You cannot manage CRM templates.	403
+templates?kind=quote	open	refused:You cannot manage CRM templates.	refused:You cannot manage CRM templates.	refused:You cannot manage report templates.	open	refused:You cannot manage CRM templates.	refused:You cannot manage CRM templates.	refused:You cannot manage CRM templates.	refused:You cannot manage CRM templates.	refused:You cannot manage report templates.
+quote-approval-rules	open	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.	403	open	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.	403
+approval-rules?module=quote	open	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.	open	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.	refused:You cannot manage approval rules.
+preorder-checklist	open	refused:You cannot configure the pre-order check	refused:You cannot configure the pre-order check	403	open	refused:You cannot configure the pre-order check	refused:You cannot configure the pre-order check	refused:You cannot configure the pre-order check	refused:You cannot configure the pre-order check	403
+project-costings	open	open	open	open	open	open	open	open	open	refused:You do not have access to project costin
+approvals	open	open	open	open	open	open	open	open	open	open
+stage-gates	open	refused:You cannot manage approval rules.	403	403	403	403	403	403	403	403
+adspro	open	open	403	403	403	403	403	403	403	403

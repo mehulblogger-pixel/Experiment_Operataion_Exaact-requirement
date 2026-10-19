@@ -1,0 +1,48 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== 1. who can create / approve ===
+    MM create -> {"id":1,"code":"PC-00001","status":"DRAFT","quote_id":null,"approved_by":"","reject_note":"","created_by":"p_mm Probe","exp_revenue":1030050}
+    BDM create -> {"id":2,"code":"PC-00002","status":"DRAFT","quote_id":null,"approved_by":"","reject_note":"","created_by":"p_bdm Probe","exp_revenue":1030050}
+    MEX create -> {"id":3,"code":"PC-00003","status":"DRAFT","quote_id":null,"approved_by":"","reject_note":"","created_by":"p_mex Probe","exp_revenue":1030050}
+    [FIN project-costing-new] error: You cannot create a costing.
+    FIN create -> refused
+    BM create -> {"id":4,"code":"PC-00004","status":"DRAFT","quote_id":null,"approved_by":"","reject_note":"","created_by":"p_bm Probe","exp_revenue":1030050}
+    BD create -> {"id":5,"code":"PC-00005","status":"DRAFT","quote_id":null,"approved_by":"","reject_note":"","created_by":"p_bd Probe","exp_revenue":1030050}
+
+=== 2. transitions without a from-state guard ===
+    [MM2 project-costing-approve] success: Costing approved.
+      {"id":6,"code":"PC-00006","status":"APPROVED","quote_id":null,"approved_by":"p_mm2 Probe","reject_note":"","created_by":"p_mm Probe","exp_revenue":1030050}
+    [MM project-costing-reject] warning: Sent back with comments.
+      {"id":6,"code":"PC-00006","status":"REJECTED","quote_id":null,"approved_by":"p_mm2 Probe","reject_note":"","created_by":"p_mm Probe","exp_revenue":1030050}
+    [MM project-costing-approve] success: Costing approved.
+      {"id":6,"code":"PC-00006","status":"APPROVED","quote_id":null,"approved_by":"p_mm Probe","reject_note":"","created_by":"p_mm Probe","exp_revenue":1030050}
+    [MM project-costing-reopen] success: Reopened as draft.
+      {"id":6,"code":"PC-00006","status":"DRAFT","quote_id":null,"approved_by":"p_mm Probe","reject_note":"","created_by":"p_mm Probe","exp_revenue":1030050}
+    [edit a line on the reopened (formerly approved) sheet] success: Role saved.
+      {"id":6,"code":"PC-00006","status":"DRAFT","quote_id":null,"approved_by":"p_mm Probe","reject_note":"","created_by":"p_mm Probe","exp_revenue":1854090}
+    [BDM project-costing-submit] success: Costing submitted for approval.
+      {"id":6,"code":"PC-00006","status":"SUBMITTED","quote_id":null,"approved_by":"p_mm Probe","reject_note":"","created_by":"p_mm Probe","exp_revenue":1854090}
+    [BDM project-costing-approve] error: Only an approver can approve a costing.
+      {"id":6,"code":"PC-00006","status":"SUBMITTED","quote_id":null,"approved_by":"p_mm Probe","reject_note":"","created_by":"p_mm Probe","exp_revenue":1854090}
+    [BM project-costing-approve] success: Costing approved.
+      {"id":6,"code":"PC-00006","status":"APPROVED","quote_id":null,"approved_by":"p_bm Probe","reject_note":"","created_by":"p_mm Probe","exp_revenue":1854090}
+      history rows for costing (activities / any table): activities=0
+
+=== 3. a quotation from a costing that is DRAFT / REJECTED; twice from the same costing ===
+    [to-quote from DRAFT costing] success: Quotation Q-00001 drafted from this costing — review and send.
+      quote #1 Q-00001 r0 cur=1 DRAFT total=1215459 contract=- ; costing {"id":7,"code":"PC-00007","status":"DRAFT","quote_id":1,"approved_by":"","reject_note":"","created_by":"p_mm Probe","exp_revenue":1030050}
+    [MM2 project-costing-reject] warning: Sent back with comments.
+      {"id":7,"code":"PC-00007","status":"REJECTED","quote_id":1,"approved_by":"","reject_note":"margin too thin","created_by":"p_mm Probe","exp_revenue":1030050}
+    [to-quote again from the REJECTED costing] success: Quotation Q-00002 drafted from this costing — review and send.
+      quote #2 Q-00002 r0 cur=1 DRAFT total=1215459 contract=- ; costing now links quote_id=2 (first quote #1 is orphaned from it: pc_for_quote=none)
+    [first quote submitted & approved while its costing is REJECTED] success: Submitted for approval — 1 step(s). Now with admin (Admin (legacy)), p_mm Probe (Marketing Manager), p_mm2 Probe (Marketing Manager).
+    [MM2 approves] success: All approvals complete — quote approved and ready to send.
+      #1 Q-00001 r0 cur=1 APPROVED total=1215459 contract=-
+
+=== 4. one costing attached to two quotations; two costings attached to one quotation ===
+      after attaching to X then Y: pc_for_quote(X)=none pc_for_quote(Y)=PC-00008
+      two costings on quote X: rows=2 ; the quote screen shows only PC-00010
+    [attach to a quote that does not exist (quote_id=99999)] success: Costing linked.
+      {"id":10,"code":"PC-00010","status":"DRAFT","quote_id":99999,"approved_by":"","reject_note":"","created_by":"p_mm Probe","exp_revenue":1030050}
+    [edit costing header while it is linked to an ACCEPTED quote] success: Costing saved.
+      {"id":9,"code":"PC-00009","status":"DRAFT","quote_id":3,"approved_by":"","reject_note":"","created_by":"p_mm Probe","exp_revenue":900000}

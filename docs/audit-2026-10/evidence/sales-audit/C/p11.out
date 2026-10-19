@@ -1,0 +1,4 @@
+job {"id":4,"job_code":"JOB-00004","client_id":666} (client Acme Valves Pvt Ltd)
+invoice #8 addressed to Held Fittings Ltd
+books_line_add(job of another client): ''
+lines: [[4,"Inspection services \u2014 JOB-00004",33630]]

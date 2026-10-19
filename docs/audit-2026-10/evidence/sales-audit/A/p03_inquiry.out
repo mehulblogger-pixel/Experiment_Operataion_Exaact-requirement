@@ -1,0 +1,34 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== 1. empty submit of /inquiry-new ===
+    [empty] (no flash)  VIEW=ops/crm/inquiry_form ERROR=Please add a client (pick one, or type a name); the contact person; a contact e-mail or mobile; the business unit (business unit); a subject.
+    rows +0
+    [valid] success: INQ-00001 created. You can now raise a quotation against it.
+    {"id":1,"inquiry_no":"INQ-00001","status":"OPEN","client_id":666,"subject":"Need TPI"}  (number consumed by the refused empty submit? first number is the one above)
+
+=== 2. status is taken from the form as typed ===
+    [new with status=QUOTED (no quote exists)] success: INQ-00002 created. You can now raise a quotation against it.
+    {"id":2,"inquiry_no":"INQ-00002","status":"QUOTED","client_id":666,"subject":"Need TPI"}
+    [new with status=BANANA] success: INQ-00003 created. You can now raise a quotation against it.
+    {"id":3,"inquiry_no":"INQ-00003","status":"BANANA","client_id":666,"subject":"Need TPI"}
+
+=== 3. raising a quotation sets QUOTED; a DROPPED inquiry can be quoted; two quotes per inquiry ===
+    after quote 1: {"id":4,"inquiry_no":"INQ-00004","status":"QUOTED","client_id":666,"subject":"Need TPI"}  #1 Q-00001 r0 cur=1 DRAFT total=59000 contract=-
+    after quote 2 (alternative offer): {"id":4,"inquiry_no":"INQ-00004","status":"QUOTED","client_id":666,"subject":"Need TPI"}  #2 Q-00002 r0 cur=1 DRAFT total=59000 contract=-  quotes on inquiry=2
+    [inquiry-edit -> DROPPED] success: Inquiry updated.
+    {"id":5,"inquiry_no":"INQ-00005","status":"DROPPED","client_id":666,"subject":"S"}
+    quote raised on the DROPPED inquiry: #3 Q-00003 r0 cur=1 DRAFT total=59000 contract=- -> inquiry {"id":5,"inquiry_no":"INQ-00005","status":"QUOTED","client_id":666,"subject":"S"}
+    [inquiry-edit QUOTED -> OPEN while 2 quotes exist] success: Inquiry updated.
+    {"id":4,"inquiry_no":"INQ-00004","status":"OPEN","client_id":666,"subject":"S"}
+    [the only quote is LOST] success: Quotation moved to Lost / regretted.
+    inquiry after its only quote was lost: {"id":6,"inquiry_no":"INQ-00006","status":"QUOTED","client_id":666,"subject":"Need TPI"}
+    quote with inquiry_id=999999 (no such inquiry): #5 Q-00005 r0 cur=1 DRAFT total=59000 contract=- inquiry_id=999999
+
+=== 4. delete ===
+    [inquiry-delete with quotes (MM)] error: You can open CRM — Inquiries, but you do not have permission to delete here. Ask your administrator for the "Delete" tick on CRM — Inquiries.
+    [inquiry-delete with quotes (ADMIN)] error: A quote has been raised against INQ-00004, so it is part of the record and cannot be deleted. Set its status to Dropped instead.
+    [inquiry-delete, no quote (BM, admin-level)] success: Inquiry INQ-00003 deleted.
+    is there any quote-delete route? no
+
+=== 5. history for inquiry edits ===
+    activities for INQUIRY: ["Inquiry INQ-00003 deleted."]

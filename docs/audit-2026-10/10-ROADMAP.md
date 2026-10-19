@@ -81,7 +81,7 @@ restore is the one action that can import another customer's data wholesale.
 | # | Work | Test | Finding |
 |---|---|---|---|
 | 2.1 | **Fix the four forms that create numbered ghost records** — `/call-new`, `/candidate-new`, `/incident-new`, `/endorsement-new`. **Server-side**: three already carry `required` attributes the server ignores. Copy the pattern from `/internal-audit-new` | T-10 | **S4-1** |
-| 2.2 | **Test `/quote-new`** the same way — 96 fields, 1 required, never tested, and a quote goes to a customer | T-11 | **S4-2** — **PARTLY DONE 19 Oct: figures validated and proven live (GAP-047); the empty-submit test is still open** |
+| 2.2 | **Test `/quote-new`** the same way — 96 fields, 1 required, never tested, and a quote goes to a customer | T-11 | **S4-2** — **TESTED 19 Oct: figures validated (GAP-047); an empty submit creates a numbered ₹0 DRAFT — Sales audit SA-26, fix in Sales roadmap 2.2** |
 | 2.3 | **Establish the delete cascade:** work order → job → report → billable event → voucher. Refuse the delete or remove the dependents; never orphan | T-4 | **O-F9** |
 | 2.4 | **Backup/restore authority:** gate it, validate the archive, log every restore, add it to the permission matrix | T-5 | **A-F3** — **DONE 19 Oct: gated (settings.manage), file validated, every restore logged, matrix row 16a (GAP-048)** |
 | 2.5 | **Impersonation:** confirm every impersonated action is attributable to the real person, log it, make it visible to the customer, document it in the matrix | T-9 | **A-F5** |
@@ -107,6 +107,7 @@ people rely on it.
 | 3.3 | **Competence enforcement:** when switched on, refuse the allocation and say why | T-15 | **Q-F6** |
 | 3.4 | **Pre-order checklist** with `require_all` must block quote approval; decide whether a recorded waiver is needed | T-16 | **S-F / E-8** |
 | 3.5 | **Answer Q-B1/Q-B2:** who may *raise* a nonconformity (today an inspector cannot), and should the five roles who see a corrective action see the finding behind it | — | **GAP-004** — **ANSWERED 19 Oct (Q-B1): coordinator level and above record; built** |
+| 3.7 | **Sales commercial controls** — the approval, acceptance and contract bypasses and the billing defaults found by the Sales audit. Its own staged plan: `sales/SALES-REMEDIATION-ROADMAP.md` | `sales/SALES-END-TO-END-TEST-MATRIX.md` | **GAP-050** — awaiting the owner's scope approval and decisions D-01…D-12 |
 | 3.6 | **Make `test_m7_*` and `test_m8_*` pass on their own.** They pass only after other tests have run, so they could stay green while the rule they guard breaks | the two files, run alone | **GAP-049 note** |
 
 ---
@@ -191,10 +192,12 @@ of work: highest consequence first, cheapest first where equal.
 | S-2 | **Impersonation ("Login as"):** every action taken while impersonating must name the real person; it must be logged and listed in the matrix | Today it is not established who is accountable for an impersonated change | 2.5 | T-9 | untested |
 | S-3 | **Delete cascade:** work order → job → report → billable event → voucher | A delete that orphans a voucher leaves money with no source | 2.3 | T-4 | untested |
 | S-4 | **Four forms create numbered empty records** (`/call-new`, `/candidate-new`, `/incident-new`, `/endorsement-new`) | Gaps and ghosts in a numbered register are what an assessor finds first | 2.1 | T-10 | confirmed, not fixed |
-| S-5 | **`/quote-new` with an empty submit** — figures are validated (GAP-047); what an empty form stores is not established | A quotation goes to a customer | 2.2 | T-11 | part done |
+| S-5 | **`/quote-new` with an empty submit** — creates a numbered DRAFT with no customer and ₹0 that can be taken to ACCEPTED | A quotation goes to a customer | 2.2 | T-11 | confirmed 19 Oct, not fixed (SA-26) |
 | S-6 | **Merge:** reason required; nothing left pointing at the discarded record; say on the screen that it cannot be undone | One-way door with no record of why | 2.6 | T-6 | untested |
 | S-7 | **Changing the numbering scheme mid-year** — protect the existing series or refuse | Duplicate invoice or certificate numbers | 2.7 | T-18 | untested |
 | S-8 | **Staff sessions without a company stamp** are still accepted anywhere (kept deliberately: the overnight jobs act through them). A real sign-in always stamps, so only a session older than M13 could carry none | Low residual risk; closing it needs the overnight jobs to stamp first | — | `test_cross_company_session` | accepted for now, recorded |
+| S-10 | **A Branch Manager can approve another branch's quotation** — the quotation scope gate returns before it resolves an approval step to its quote | Branch segregation of commercial authority does not hold | Sales 1.1 | TM-A20 | confirmed, not fixed (GAP-050, SA-06) |
+| S-11 | **View is treated as decide on quotations** — anyone who can open a quote can mark it accepted, lost or back to draft, and the portal register stores any status | Read access changes the customer master, the pipeline and the accounting system | Sales 1.2, 1.5 | TM-Q20…Q33 | confirmed, not fixed (GAP-050, SA-03/04) |
 | S-9 | **Two test files pass only in the full suite** (`test_m7_*`, `test_m8_*`) | A guard rail that only holds in company can hide a regression | 3.6 | run alone | recorded |
 
 **Done this month, for the record:** GAP-008 (ungated routes, none reachable),

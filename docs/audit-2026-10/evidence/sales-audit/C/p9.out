@@ -1,0 +1,10 @@
+boss_numbers rows created from work: [{"id":1,"client_id":666,"boss_number":"PHQ\/C\/2026-27\/00001","start_date":"2026-10-19","end_date":"2027-03-31","status":"ACTIVE","comments":"Created automatically from Q-00007"},{"id":2,"client_id":666,"boss_number":"TYPO-NOT-A-CONTRACT","start_date":"","end_date":"","status":"ACTIVE","comments":"Created automatically from quote\/work order 2026-10-19"}]
+partner_contracts with that typo number: 0
+contract value vs quote subtotal/total (contract #1 at registration took total incl. GST): see p2.out [2b]
+requisitions commercial columns: ["client_id","contract_ref","work_model","billing_rate","rate_basis","target_margin","expected_revenue","quotation_ref","po_ref"]
+inspectors fee columns: ["agency_cost","agency_id","placement_fee","fee_status","guarantee_upto"]
+quote_lines columns: ["id","quote_id","line_no","sbu","service_type","subtypes","description","location","location_type","order_type","qty","unit","rate","amount","deliverables","notes","office_id","location_id","activity_id"]
+partner_contracts columns: ["id","partner_id","contract_number","title","value","start_date","end_date","is_active","notes","sbu","qty_total","qty_unit","expiry_notified","quotation_id","open_status","branch_id","requested_by","requested_by_id","requested_at","mgr_endorsed_by","mgr_endorsed_by_id","mgr_endorsed_at","bm_approved_by","bm_approved_by_id","bm_approved_at","opened_at","closed_at","close_reason","auto_closed","last_activity_at","idle_notified","coordinator_id"]
+contract_line_items columns: ["id","contract_id","description","unit","quantity","consumed","sort_order"]
+invoices has billing-address / client-GSTIN-per-site column? ["gstin"]
+partner_addresses types available: ["REGISTERED","CORPORATE","BRANCH","PURCHASE","BILLING","PLANT","FACTORY","WAREHOUSE","PROJECT_SITE","SITE_OFFICE"]

@@ -1,0 +1,25 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== 1. quotation raised straight off an OPEN lead is accepted ===
+    [accept] success: quote marked accepted. Quote Off Lead Ltd has been created in the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the
+    lead: {"id":1,"status":"CONVERTED","partner_id":667,"converted_partner_id":667}  quote client_id=667
+
+=== 2. quotation off a LOST lead is accepted ===
+    [accept] success: quote marked accepted. Lost Lead Quoted Ltd has been created in the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before t
+    lead: {"id":2,"status":"LOST","partner_id":null,"converted_partner_id":null}  (won customer, lead still LOST)
+
+=== 3. accept the same quotation twice ===
+    [accept again] success: quote marked accepted. Quote Off Lead Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the fi
+    partner_contacts +0 accepted_date=2026-10-19
+
+=== 4. client on BLOCK hold: create is stopped, but accept/send of an existing quote? ===
+    partner_hold_set exists
+    hold columns on partner: ["hold_status","hold_reason"]
+    [MM quote-new for BLOCKED client] error: This client is BLOCKED (Unpaid invoices > 180 days). A quote cannot be raised for them until a manager clears the block under Client holds.
+    created: no
+    [MM sends the already-APPROVED quote of the BLOCKED client] warning: Marked sent and follow-ups scheduled; e-mail could not be sent now (check Settings → SMTP) — it has been logged.
+    #3 Q-00003 r0 cur=1 SENT total=59000 contract=-
+    [MM marks it ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master, 1 contact(s) carried across. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Comp
+    #3 Q-00003 r0 cur=1 ACCEPTED total=59000 contract=-
+    [FIN registers contract for the BLOCKED client] warning: Contract GEN/C/2026-27/00001 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+    #3 Q-00003 r0 cur=1 ACCEPTED total=59000 contract=GEN/C/2026-27/00001

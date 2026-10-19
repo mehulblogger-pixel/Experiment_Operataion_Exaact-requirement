@@ -1,0 +1,55 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== 1. register a contract on a quotation that is NOT accepted ===
+    [FIN quote-contract #1 {"auto_contract":"1"}] warning: Contract GEN/C/2026-27/00001 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+      #1 Q-00001 r0 cur=1 DRAFT total=59000 contract=GEN/C/2026-27/00001
+    [MM #2 -> LOST] success: Quotation moved to Lost / regretted.
+    [FIN quote-contract #2 {"auto_contract":"1"}] warning: Contract GEN/C/2026-27/00002 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+      #2 Q-00002 r0 cur=1 LOST total=59000 contract=GEN/C/2026-27/00002
+    [MM #3 -> PENDING_APPROVAL] success: Submitted for approval — 1 step(s). Now with admin (Admin (legacy)), p_mm Probe (Marketing Manager), p_mm2 Probe (Marketing Manager).
+    [FIN quote-contract #3 {"auto_contract":"1"}] warning: Contract GEN/C/2026-27/00003 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+      #3 Q-00003 r0 cur=1 PENDING_APPROVAL total=59000 contract=GEN/C/2026-27/00003
+    [MM (no contract right) tries] error: Only Accounts / back-office can register the contract.
+      contract #1 GEN/C/2026-27/00001 quotation=1 PENDING
+      contract #2 GEN/C/2026-27/00002 quotation=2 PENDING
+      contract #3 GEN/C/2026-27/00003 quotation=3 PENDING
+
+=== 2. the same accepted quotation registered twice ===
+    [MM #4 -> ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master, 1 contact(s) carried across. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Comp
+    [FIN quote-contract #4 {"contract_number":"CN-PROBE-1"}] warning: Contract CN-PROBE-1 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+      #4 Q-00004 r0 cur=1 ACCEPTED total=59000 contract=CN-PROBE-1
+    [FIN quote-contract #4 {"contract_number":"CN-PROBE-2"}] error: This quote is already registered under contract CN-PROBE-1 (pending approval). A won deal gets one contract — it cannot be forwarded to Finance again under a new number. For a related group company, add a group-company contract below; to revive a closed one, reopen it.
+      #4 Q-00004 r0 cur=1 ACCEPTED total=59000 contract=CN-PROBE-1
+    [FIN quote-contract #4 {"contract_number":"CN-PROBE-1"}] warning: This number already exists for this client (pending approval). Nothing new will be created — the work is recorded against that same contract. | warning: Registered against contract CN-PROBE-1, which is still pending approval.
+      #4 Q-00004 r0 cur=1 ACCEPTED total=59000 contract=CN-PROBE-1
+    [BM rejects the opening] warning: Opening rejected.
+    [FIN quote-contract #4 {"contract_number":"CN-PROBE-3"}] warning: Contract CN-PROBE-3 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+      #4 Q-00004 r0 cur=1 ACCEPTED total=59000 contract=CN-PROBE-3
+      contract #1 GEN/C/2026-27/00001 quotation=1 PENDING
+      contract #2 GEN/C/2026-27/00002 quotation=2 PENDING
+      contract #3 GEN/C/2026-27/00003 quotation=3 PENDING
+      contract #4 CN-PROBE-1 quotation=4 REJECTED
+      contract #5 CN-PROBE-3 quotation=4 PENDING
+      contracts pointing at quote #4: 2
+
+=== 3. two concurrent registrations of the same accepted quotation (auto numbers) ===
+    [MM #5 -> ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+    [race worker0] (no flash)  EXC=PDOException: SQLSTATE[23000]: Integrity constraint violation: 19 UNIQUE constraint failed: partner_contracts.contract_number
+    [race worker1] warning: Contract GEN/C/2026-27/00004 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+      #5 Q-00005 r0 cur=1 ACCEPTED total=59000 contract=GEN/C/2026-27/00004 ; contracts with quotation_id=5: 1 ; all PENDING contracts for client: 1
+
+=== 4. accepted quotation with a live contract is then marked LOST ===
+    [MM #6 -> ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+    [FIN quote-contract #6 {"auto_contract":"1"}] warning: Contract GEN/C/2026-27/00005 registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+      #6 Q-00006 r0 cur=1 ACCEPTED total=59000 contract=GEN/C/2026-27/00005
+    [MM #6 -> LOST] success: Quotation moved to Lost / regretted.
+      #6 Q-00006 r0 cur=1 LOST total=59000 contract=GEN/C/2026-27/00005 ; contract #7 status PENDING
+
+=== 5. two different quotations of the same client registering the same number (rate-contract draw-down) ===
+    [MM #7 -> ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+    [FIN quote-contract #7 {"contract_number":"RC-SHARED"}] warning: Contract RC-SHARED registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.
+      #7 Q-00007 r0 cur=1 ACCEPTED total=59000 contract=RC-SHARED
+    [MM #8 -> ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work
+    [FIN quote-contract #8 {"contract_number":"RC-SHARED"}] warning: This number already exists for this client (pending approval). Nothing new will be created — the work is recorded against that same contract. | warning: Registered against contract RC-SHARED, which is still pending approval.
+      #8 Q-00008 r0 cur=1 ACCEPTED total=59000 contract=RC-SHARED
+      partner_contracts RC-SHARED rows=1 quotation_id=8

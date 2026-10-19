@@ -1,0 +1,5 @@
+contract #1: {"contract_number":"PHQ\/C\/2026-27\/00001","open_status":"CLOSED","is_active":0}
+  > job-new on a work order whose contract is CLOSED
+      flash  success: JOB-00004 allocated. Assignment email sent to the team member.
+  > call-new typing the CLOSED contract number
+      view   ops/call_form  ERROR: Contract PHQ/C/2026-27/00001 is not open yet — it needs a manager to endorse it and the branch manager to approve it (Contract openings) before work orders can be raised against it.

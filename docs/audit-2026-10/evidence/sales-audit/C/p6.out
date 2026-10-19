@@ -1,0 +1,56 @@
+ads_on=true base=http://127.0.0.1:8765
+manual lead: {"id":1,"ref":"L-2026-0001"}
+
+[6a] ads_pull() #1
+Array
+(
+    [ok] => 1
+    [made] => 4
+    [updated] => 0
+    [skipped] => 0
+    [failed] => 0
+    [errors] => Array
+        (
+        )
+
+    [msg] => 4 new (1 as enquiries), 0 updated, 0 unchanged
+)
+
+[6b] ads_pull() #2 (same payload)
+Array
+(
+    [ok] => 1
+    [made] => 0
+    [updated] => 0
+    [skipped] => 4
+    [failed] => 0
+    [errors] => Array
+        (
+        )
+
+    [msg] => 0 new, 0 updated, 4 unchanged
+)
+
+[6c] legacy ads_import_leads() on the same payload
+Array
+(
+    [ok] => 1
+    [made] => 0
+    [skipped] => 4
+    [failed] => 0
+    [errors] => Array
+        (
+        )
+
+    [msg] => 0 new, 4 already here
+)
+
+leads +3, inquiries +1
+  lead {"id":1,"ref":"L-2026-0001","company_name":"Manual First Ltd","partner_id":null,"contact_email":"kiran@manualfirst.invalid","contact_phone":"9800000004","source":"PHONE"}
+  lead {"id":2,"ref":"L-2026-0002","company_name":"Acme Valves Pvt Ltd","partner_id":null,"contact_email":"rshah@acme.invalid","contact_phone":"9800000001","source":"CAMPAIGN"}
+  lead {"id":3,"ref":"L-2026-0003","company_name":"Acme Valves","partner_id":null,"contact_email":"RShah@acme.invalid","contact_phone":"+91 98000 00001","source":"CAMPAIGN"}
+  lead {"id":4,"ref":"L-2026-0004","company_name":"Manual First Ltd","partner_id":null,"contact_email":"kiran@manualfirst.invalid","contact_phone":"9800000004","source":"CAMPAIGN"}
+  inquiry {"id":6,"inquiry_no":"INQ-00006","client_id":null,"client_name":"Zenith Gears LLP","contact_email":"meera@zenith.invalid"}
+  (Zenith Gears LLP already exists as client #673)
+  lead_possible_duplicate('Manual First Ltd') = {"kind":"lead","by":"name","row":{"id":1,"ref":"L-2026-0001","company_name":"Manual First Ltd","status":"OPEN"}}
+  ads_leads links: [{"ext_id":"AP-1","local_kind":"LEAD","local_id":2},{"ext_id":"AP-2","local_kind":"LEAD","local_id":3},{"ext_id":"AP-3","local_kind":"INQUIRY","local_id":6},{"ext_id":"AP-4","local_kind":"LEAD","local_id":4}]

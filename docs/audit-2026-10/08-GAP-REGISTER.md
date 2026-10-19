@@ -728,6 +728,38 @@ per-address limit is the conventional answer; recorded, not built.
 
 ---
 
+## GAP-050 — Sales: the approval and acceptance controls are enforced by hidden buttons, not by the server
+
+**CONFIRMED BY EXECUTION · P0 · Sales (quotations, approvals, contracts) · OPEN — investigation only, awaiting the owner's scope approval**
+
+The deep business-user audit of Sales (`sales/`, 19 Oct 2026; probes in
+`evidence/sales-audit/`) drove every Sales handler on throwaway databases as
+each role. Seven confirmed bypasses of a business control, each P0 on this
+register's scale:
+
+| | What happened | Sales id |
+|---|---|---|
+| 1 | A quote was sent to the customer from DRAFT, *awaiting approval* and *rejected* | SA-01 |
+| 2 | An approved ₹59,000 quote was re-priced to ₹1.06 crore with **Edit** and sent as approved | SA-02 |
+| 3 | Finance and a Branch Manager — view-only on quotes — marked a never-approved DRAFT **accepted**: customer created, deal won, lead converted, quote queued to Books | SA-03 |
+| 4 | The procurement-portal register stored ACCEPTED, APPROVED and an invented status as posted | SA-04 |
+| 5 | A level-1 rejection was overturned by a level-2 approval; a stale step re-approved a SENT quote | SA-05 |
+| 6 | A Branch Manager approved another branch's quote (the scope gate returns early on an approval) | SA-06 |
+| 7 | A contract was registered on DRAFT and LOST quotes | SA-09 |
+
+Also found (P1): sellers cannot open Leads or Opportunities (SA-11); no record
+of who accepted, sent or approved directly (SA-12); each job on a work order
+defaults to billing the whole order (SA-15); billable events are overwritten
+with the invoice total (SA-16); blacklisted customers are never stopped
+(SA-17); customers duplicated at acceptance and on simultaneous conversion
+(SA-18). 54 findings in all, 197 test scenarios, 30 owner decisions.
+
+**Not fixed, by instruction:** the audit was investigation-only. The proposed
+corrections are `sales/SALES-REMEDIATION-ROADMAP.md` Stage 1; eight of them wait
+on owner decisions D-01, 02, 03, 04, 06, 07, 08, 12.
+
+---
+
 ## GAP-049 — a portal session from one company was honoured by another
 
 **CONFIRMED BY EXECUTION (live, over HTTP) · P0 · client, vendor and professional portals · FIXED 19 Oct 2026 · roadmap 1.3**

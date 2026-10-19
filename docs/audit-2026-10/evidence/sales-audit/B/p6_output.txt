@@ -1,0 +1,33 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+MM (an approver) configures the checklist: enabled + require_all       => [success] Pre-order checklist saved.
+  settings now                                                         => ["1","1",["Enquiry reviewed","Client not blocked","Commercials within delegation"]]
+
+== A. chain approval with an unticked item ==
+MM approves with 0/3 ticked                                            => [error] Complete the pre-order review checklist before approving (0/3 done). -> PENDING_APPROVAL
+MM rejects with 0/3 ticked                                             => [success] Rejected. The quote now shows as rejected by you, with your comment. -> REJECTED
+BDM (the quote author) ticks 2/3                                       => [success] Pre-order checklist saved. progress={"done":2,"total":3,"complete":false}
+MM approves with 2/3                                                   => [error] Complete the pre-order review checklist before approving (2/3 done). -> PENDING_APPROVAL
+BDM ticks 3/3 himself                                                  => [success] Pre-order checklist saved.
+  what is stored about the ticks (who/when?)                           => {"c5b1f797dbb":1,"c9063477c9d":1,"c76864b9de3":1}
+MM approves with 3/3                                                   => [success] All approvals complete — quote approved and ready to send. -> APPROVED
+
+== B. paths the checklist does not gate ==
+no rule matches: MM approves directly with 0/3 ticked                  => [success] Quotation moved to Approved (ready to send). -> APPROVED
+BDM sends a DRAFT with 0/3 ticked                                      => [warning] Marked sent and follow-ups scheduled; no customer e-mail on the quotation (it was not e-mailed). -> SENT (sent_at set)
+BDM marks a DRAFT ACCEPTED with 0/3 ticked                             => [success] quote marked accepted. Probe Client Pvt Ltd is now linked to the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact person. Complete it before the first work order is raised against it. -> ACCEPTED
+
+== C. editing the checklist text after ticks ==
+3/3 ticked before the wording change                                   => {"done":3,"total":3,"complete":true}
+after adding a full stop to item 1                                     => {"done":2,"total":3,"complete":false}
+
+== D. revision carries the ticks ==
+new revision status / checklist column                                 => {"rev":1,"status":"DRAFT","preorder_checklist":"{\"c5b1f797dbb\":1,\"c9063477c9d\":1,\"c76864b9de3\":1}"}
+
+== E. empty item list with require_all on ==
+enabled+require_all but no items saved: MM approves                    => [success] All approvals complete — quote approved and ready to send. -> APPROVED
+
+== F. who can switch the control off ==
+BDM tries to switch it off                                             => [error] You cannot configure the pre-order checklist.
+COORDINATOR tries to switch it off                                     =>  / out: You don’t have permission to open CRM — Quotations.
+Ask your workspace administrator if this should be available to
+MM (the approver it gates) switches it off                             => [success] Pre-order checklist saved. (It is switched off, so it will not appear on quotations.) on=

@@ -20,6 +20,9 @@ can open `/sales`. **Inspector is refused (403).**
 | The same rules on an external quotation | `/quote-external` checks the same figures and the total typed in | GAP-047 | Guard-rail test |
 | Bank charges are the client's | The **built-in** default terms gain clause 11: bank and remittance charges are to the payer's account; foreign payments to be remitted OUR. Terms a company already saved are untouched | Q-J | Test |
 | Recommended, not built | A proper **discount** field on the quotation, so a discount is a named figure rather than a negative line | Roadmap | — |
+| **Deep business-user audit (19 Oct)** | Sales was driven end to end on throwaway databases as each role, across six business models. **The approval and acceptance controls are enforced by hidden buttons, not by the server**: a quote can be sent unapproved, an approval survives a re-price, anyone who can view a quote can mark it accepted. 54 findings (7 P0, 15 P1), 197 test scenarios, 30 owner decisions. Nothing was changed in the application | `../sales/` | 42 probes, `../evidence/sales-audit/` |
+
+**Seven statements below were found wrong by that audit** and are corrected where they stand, marked **(updated 19 Oct)**. Read `../sales/SALES-USER-AND-INDUSTRY-AUDIT.md` first; this document remains the screen-by-screen description.
 
 ---
 
@@ -34,7 +37,7 @@ different questions of each:
 | **Lead** | Is this company worth pursuing at all? | OPEN · CONVERTED · LOST |
 | **Opportunity** | Is there a live deal here, and will we win it? | OPEN · WON · LOST |
 | **Enquiry** | A client has asked us to quote something specific | OPEN · QUOTED · DROPPED |
-| **Quotation** | What we offered, at what price, and did they accept | DRAFT → SENT → ACCEPTED (with revisions) |
+| **Quotation** | What we offered, at what price, and did they accept | DRAFT · PENDING_APPROVAL · APPROVED · SENT · ACCEPTED · LOST · EXPIRED · REJECTED, with revisions (`crm.php:129-138`) **(updated 19 Oct)** |
 | **Project costing** | What the job will cost us, so the price has a floor | DRAFT · SUBMITTED · APPROVED · REJECTED |
 
 A lead is a *company*; an opportunity is a *deal*; an enquiry is a *request to
@@ -129,7 +132,7 @@ before anyone asks for that split.*
 | | `client_id`, `client_name`, `received_date`, `contact_name`, `contact_email`, `contact_mobile`, `sbu`, `source`, `status`, `assigned_to`, `subject`, `service_requirement`, `notes` |
 | Controls | **Create inquiry** · **← CRM — Inquiries** · **Cancel** |
 
-**FINDING (P2) — thirteen questions, none of them marked required.** The person
+**(updated 19 Oct) The server requires five of the thirteen** — client, contact, e-mail or mobile, business unit, subject — and refuses an empty form with one clear sentence (`crm.php:1342-1355`). The finding that remains is that the screen does not *show* which five. Original text: **FINDING (P2) — thirteen questions, none of them marked required.** The person
 cannot tell from the screen what the system needs. Compare `/partner-new`,
 which refuses an empty submit with *"Select at least one role (Client / Vendor /
 Both)"* — a model message. Here nothing is marked, so the guidance only arrives
@@ -175,7 +178,7 @@ Field groups, in the order the screen asks:
 3. **Where** — the repeating **site** block, added with **+ Add site**
 4. **How much** — the repeating **line** block, added with **+ Add line**
 
-**FINDING (P2) — 96 fields and one required.** This is the commercial document
+**(updated 19 Oct) Tested: an empty submit creates a numbered DRAFT with no customer and ₹0, which could be taken all the way to ACCEPTED — SA-26.** Original text: **FINDING (P2) — 96 fields and one required.** This is the commercial document
 the business lives on. A quote with no client, no line and no price would be
 meaningless, yet the screen marks almost nothing. *Not tested server-side* —
 `/quote-new` was excluded from the empty-submit test because its target table
@@ -229,6 +232,8 @@ menu door at all (GAP-002).
 | `/approvals` | **no module gate**; controls **Approval rules** · **Waiting** · **Approved** · **Rejected** · **Withdrawn** |
 | `/approval-act` | module `leads`; same controls — this is the handler that records a decision |
 
+**(updated 19 Oct) Quotation approvals are not listed here** — `approvals_hub.php` has no quotation section; they wait under **Quotes → To approve**. SA-25 recommends bringing them in.
+
 Four state tabs. This is the unified inbox built in an earlier milestone, and it
 is shared with other areas — the same screen serves quote gates, report
 approvals and hiring requests. **Measured: every one of the seven roles can open
@@ -247,7 +252,7 @@ asked to approve.
 `entity_kind` means a pipeline can be defined for leads, for opportunities, or
 for another record type — so the funnel is configurable per record, not global.
 `clone_from` copies an existing pipeline, and **Start from an industry template**
-goes to `/industry`, which offers twelve prepared industries (Inspection,
+goes to `/industry`, which offers **thirteen (updated 19 Oct)** prepared industries (Inspection,
 testing & certification · Testing & calibration laboratory · Manufacturing &
 engineering · Trading & distribution · Professional & consulting · Construction
 & infrastructure · IT & software · Healthcare & diagnostics · Education &
@@ -346,10 +351,12 @@ screen in Money.
 flowchart LR
   L["Lead<br/>OPEN"] -->|convert| LC["CONVERTED"]
   L -->|lose| LL["LOST"]
-  LC --> O["Opportunity<br/>OPEN"]
+  LC --> CU["Customer + Enquiry created<br/>(updated 19 Oct — not an opportunity)"]
+  O["Opportunity<br/>OPEN"]
   O -->|win| OW["WON"]
   O -->|lose| OL["LOST"]
-  OW --> I["Enquiry<br/>OPEN"]
+  CU --> I["Enquiry<br/>OPEN"]
+  QA -->|"wins the linked deal (updated 19 Oct)"| OW
   I -->|quote raised| IQ["QUOTED"]
   I -->|abandon| ID["DROPPED"]
   IQ --> Q["Quotation<br/>DRAFT"]
@@ -385,7 +392,7 @@ section; **Opportunity and Enquiry have none at all** (`../03-WORKFLOW-CATALOGUE
 |---|---|---|
 | **Operations** | An accepted quote becomes a **contract number**, and a work order (`/call-new`) is filed under it. The Quote register's **Contract** column is this join | **READ** — `crm.contract.register` → `contracts.php:1830` |
 | **Money** | Quote accepted → pushed to MGH Books as a `QUOTE` document (`books_bridge_on_quote_accepted()`) | **READ** — `booksbridge.php`; not executed against a live Books |
-| **Money** | The quote's line rates are the basis of the later invoice; project costing sets the margin floor | **SUSPECTED** — the figures are not yet reconciled end to end (`../07-DASHBOARD-AND-KPI-AUDIT.md`) |
+| **Money** | The quote's line rates are the basis of the later invoice; project costing sets the margin floor | **SETTLED 19 Oct — they are not.** The rate is retyped on the work order and never compared; no floor exists (`../sales/SALES-CROSS-MODULE-RECONCILIATION.md` §3) |
 | **Insights** | Funnel and conversion figures, via `/crm-dashboard` and `/crm-reports` | **CONFIRMED** — both screens render |
 | **Quality** | The **pre-order checklist** is the contract-review record an assessor asks for | **READ** |
 | **External: Ads Pro** | Leads and enquiries pushed out, with a visible outbox | **READ** |
@@ -417,10 +424,12 @@ then Accounts.
    **+ Add line** for each chargeable item, choosing which **Site** the line
    belongs to. Press **Create quote**.
 5. The quote's value lands it in an **approval band**
-   (`/quote-approval-rules`). It appears in **Approvals → Waiting** for the
-   approver that band names. *Quote-approve is MARKETING_MANAGER by default,
+   (`/quote-approval-rules`). It appears for the approver that band names under
+   **Quotes → To approve** (`/quotes?mine=approve`) — **not** in Approvals → Waiting,
+   which has no quotation section **(updated 19 Oct)**. *Quote-approve is MARKETING_MANAGER by default,
    **not** Branch Manager — permission matrix fn. 19.*
-6. Approver opens **Approvals → Waiting**, approves. Enquiry becomes QUOTED.
+6. Approver opens **Quotes → To approve**, approves. *(The enquiry became QUOTED
+   when the quote was created, at step 4 — updated 19 Oct.)*
 7. Client accepts. The quote becomes ACCEPTED, and **Accounts registers the
    contract** (`crm.contract.register` — FINANCE only). The contract number now
    appears in the Quote register's **Contract** column.
@@ -478,16 +487,16 @@ refused at exactly that step.
 
 | # | Edge case | What happens | Grade |
 |---|---|---|---|
-| E-1 | Submit `/inquiry-new` with nothing filled | **Untested.** 13 fields, 0 required, so the browser will not stop you. Behaviour unknown — listed in `../09-UAT-PLAN.md` | **UNTESTED** |
-| E-2 | Submit `/quote-new` with nothing filled | **Untested, and the highest-value test left in this area.** 96 fields, 1 required. Note that two comparable forms — `/call-new` and `/candidate-new` — **do** create an empty numbered record when submitted blank (`../04-SCREEN-AND-FIELD-AUDIT.md` §2) | **UNTESTED** |
-| E-3 | A quote with two sites and one line | The line block has a **Site** column, so the model allows it. Whether an invalid site/line pairing is refused is unknown | **UNTESTED** |
-| E-4 | A quote whose value sits in two overlapping approval bands | `min_amount`/`max_amount` can overlap; `level` orders them. Which rule wins, or whether both fire, is not documented | **UNTESTED** |
-| E-5 | A quote value *above* every band's `max_amount` | Does it need no approval, or is it blocked? A gap at the top of the range is the dangerous direction | **UNTESTED** |
+| E-1 | Submit `/inquiry-new` with nothing filled | **Refused** — the server requires five fields and says which (updated 19 Oct) | **CONFIRMED** |
+| E-2 | Submit `/quote-new` with nothing filled | **A numbered DRAFT is created with no customer and ₹0** (updated 19 Oct) — SA-26 | **CONFIRMED** |
+| E-3 | A quote with two sites and one line | A line will store **another quote's site, or one that does not exist**; posting another quote's site id deletes this quote's own site (updated 19 Oct) — SA-24 | **CONFIRMED** |
+| E-4 | A quote whose value sits in two overlapping approval bands | **Every matching band becomes a step**; on a shared boundary both levels are needed (updated 19 Oct) — D-04a | **CONFIRMED** |
+| E-5 | A quote value *above* every band's `max_amount` | **One generic step, and direct approval allowed** — a ₹9 lakh quote was approved by the Marketing Manager although the top band named the Business Director (updated 19 Oct) — SA-08 | **CONFIRMED** |
 | E-6 | Client not yet on file when the enquiry arrives | Handled well — type `client_name` instead of picking `client_id`. The register does not stall | **CONFIRMED** (the field pair exists on both `/inquiry-new` and `/quote-new`) |
 | E-7 | The Ads Pro connection breaks mid-sync | Visible: the outbox has a **Failed** tab. Nothing is silently lost | **READ** |
-| E-8 | Pre-order checklist set to `require_all` and one item cannot be met | The quote cannot be approved. There is no recorded waiver path — compare Quality's hold points, which have WAIVED | **READ** — a real business question for the owner |
-| E-9 | Two people edit the same quote at once | No optimistic-locking field was seen on `/quote-new`. Last save probably wins | **SUSPECTED** |
-| E-10 | A won opportunity whose client is later blacklisted | `STATUSES` on a partner includes BLACKLISTED. Whether that blocks quoting is not enforced on any Sales screen that was measured | **SUSPECTED** |
+| E-8 | Pre-order checklist set to `require_all` and one item cannot be met | **Blocks chain-step approval only** — direct approval, sending and acceptance pass; no waiver (updated 19 Oct) — SA-13 | **CONFIRMED** |
+| E-9 | Two people edit the same quote at once | **The second save silently wins** (updated 19 Oct) — SA-26 | **CONFIRMED** |
+| E-10 | A won opportunity whose client is later blacklisted | **Nothing is stopped** — enquiry, quote, approval, acceptance, contract, work order and draft invoice all succeed (updated 19 Oct) — SA-17 | **CONFIRMED** |
 | E-11 | Inspector tries to open Sales | **403.** Correct and clean | **CONFIRMED** |
 | E-12 | Finance opens Sales | **Opens.** Correct — Accounts registers contracts off won quotes | **CONFIRMED** |
 

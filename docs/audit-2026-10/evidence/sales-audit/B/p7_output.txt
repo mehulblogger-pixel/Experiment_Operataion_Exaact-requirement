@@ -1,0 +1,6 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+MARKETING_EXECUTIVE registers external quote with status=ACCEPTED      => [success] Q-00001 registered. {"status":"ACCEPTED","subtotal":100,"gst_pct":0,"gst_amount":0,"total_amount":100} steps=0
+MARKETING_EXECUTIVE registers external quote with status=APPROVED      => [success] Q-00002 registered. {"status":"APPROVED","subtotal":100,"gst_pct":0,"gst_amount":0,"total_amount":100} steps=0
+MARKETING_EXECUTIVE registers external quote with status=NOT_A_STATUS  => [success] Q-00003 registered. {"status":"NOT_A_STATUS","subtotal":100,"gst_pct":0,"gst_amount":0,"total_amount":100} steps=0
+typed total 100 vs line 1 x 1,000,000                                  => {"total_amount":100} lines=[{"qty":1,"rate":1000000,"amount":1000000}]
+line amount typed 5 for 1 x 1,000,000                                  => [{"qty":1,"rate":1000000,"amount":5}]

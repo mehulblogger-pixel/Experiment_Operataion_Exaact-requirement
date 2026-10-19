@@ -1,0 +1,42 @@
+[3e] allocate job on call #1 with inspector #1
+  > job-new POST
+      flash  success: JOB-00001 allocated. Assignment email sent to the team member.
+  job: {"id":1,"job_code":"JOB-00001","call_id":1,"quotation_id":8,"contract_number":"PHQ\/C\/2026-27\/00001","invoice_value":28500,"mandays":3,"closed_flag":0,"adv_required":0,"report_hold":0}
+  contract_state after allocation: {"state":"OK","qty_total":14,"qty_used":3,"qty_left":11}
+
+[3f] Close the job (closed_flag set directly; then the SAME hook the close handler calls)
+  billable event: {"id":1,"source_kind":"JOB_CLOSED","party_id":666,"contract_number":"PHQ\/C\/2026-27\/00001","qty":3,"rate":9500,"amount":28500,"derived_amount":28500,"status":"PENDING","calc_rule":"call.billable_value"}
+
+[3g] FINANCE drafts an invoice and adds the job (no rate typed) + a typed line
+  line_add(job): ''
+  line_add(typed travel reimbursement): ''
+    line: {"job_id":null,"description":"Travel reimbursement (typed)","qty":1,"rate":4200,"gst_pct":18,"contract_number":"","line_total":4956}
+    line: {"job_id":1,"description":"Inspection services \u2014 JOB-00001","qty":3,"rate":9500,"gst_pct":18,"contract_number":"PHQ\/C\/2026-27\/00001","line_total":33630}
+  invoice: subtotal 32700 total 38586 quotation_id 8 contract PHQ/C/2026-27/00001
+  quote line said MANDAY @ 8000; GST on quote 18%
+  client-chargeable bills on job (job_bills): 0 — the invoice has no path that reads them (READ)
+  issue: ''
+
+[3h] Billable reconciliation after issue
+Array
+(
+    [created] => 0
+    [billed] => 1
+)
+  event now: {"status":"BILLED","invoice_id":1,"amount":38586,"derived_amount":28500,"billed_amount":0}
+  billable_mismatch(): [{"event":1,"earned":28500,"billed":38586,"variance":10086}]
+
+[3i] Contract value ceiling: invoice far beyond the contract value (500000) and the PO
+  line_add 1 x 900000 under contract PHQ/C/2026-27/00001: ''
+  issue: ''
+  invoiced under contract PHQ/C/2026-27/00001: 1100586 vs contract value 500000 vs quote total 118000
+
+[3j] Two jobs on ONE invoice: does each event get the whole invoice total?
+  jobs: 2 (call 1), 3 (call 2 typo contract)
+  add job2: ''  add job3: ''
+  issue: ''
+  invoice #3 subtotal 40500 total 47790, contract_number on header ''
+    event {"id":2,"source_id":2,"contract_number":"PHQ\/C\/2026-27\/00001","amount":47790,"derived_amount":28500,"status":"BILLED","invoice_id":3}
+    event {"id":3,"source_id":3,"contract_number":"TYPO-NOT-A-CONTRACT","amount":47790,"derived_amount":12000,"status":"BILLED","invoice_id":3}
+  sum of event amounts for invoice #3 = 95580 vs invoice total 47790
+  billable_mismatch(): [{"event":1,"earned":28500,"billed":38586},{"event":2,"earned":28500,"billed":47790},{"event":3,"earned":12000,"billed":47790}]

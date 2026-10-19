@@ -1,0 +1,96 @@
+P0    Master saves an approval rule naming a DEACTIVATED user (id 13) as approver
+      expected: refused — approver must be an active user
+      actual:   [success] Approval rule added.; rules stored=3, L3 approver_user_id=13
+P1    BDM submits /quote-new completely empty
+      expected: refused with a message naming the missing client / line / price
+      actual:   [success] Q-00001 created.; quotations 1; new row Q-00001 status=DRAFT client_id=NULL client_name='' total=0
+P2    BDM (crm.quote.send) posts quote-status to=SENT on DRAFT Q-00003 total 59000 — rules match (L1 IND any amount), never submitted for approval
+      expected: refused: a quote matching an approval rule cannot go to the client before the chain is complete
+      actual:   [warning] Marked sent and follow-ups scheduled; e-mail could not be sent now (check Settings → SMTP) — it has been logged.; status now SENT, sent_at=set, approval steps=0
+P3    FINANCE (mod.quotes.view only, no crm.quote.*) posts quote-status to=ACCEPTED on SENT Q-00003
+      expected: refused — recording the customer's acceptance is a sales act (matrix: FIN has no quotation right)
+      actual:   [success] quote marked accepted. Probe Client is now linked to the client master, 1 contact(s) carried across. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Complete it before the first work order is raised against it.; status now ACCEPTED accepted_date=2026-10-19
+P4    BRANCH_MANAGER (quotes view) posts quote-status to=LOST on Q-00004 with NO lost_reason
+      expected: refused: no permission to change a quote, and a loss needs a reason (UI marks it required)
+      actual:   [success] Quotation moved to Lost / regretted.; status now LOST lost_reason=''
+P4b   FINANCE posts quote-status to=DRAFT on the LOST quote Q-00004
+      expected: refused
+      actual:   [error] This quote is closed (LOST) and is locked. Raise a re-edit request — only the Super Admin can grant it.; status now LOST
+P5    BDM submits Q-00002 (118000, IND) for approval
+      expected: two steps: L1 BRANCH_MANAGER, L2 MARKETING_MANAGER
+      actual:   [{"id":1,"level":1,"approver_role":"BRANCH_MANAGER","approver_user_id":null,"status":"PENDING"},{"id":2,"level":2,"approver_role":"MARKETING_MANAGER","approver_user_id":null,"status":"PENDING"}]
+P6    MARKETING_MANAGER approves the LEVEL-2 step while level 1 is still pending
+      expected: refused — level 2 is not yet the current step
+      actual:   [success] Your approval is recorded. Now with Pbma Probe (Branch Manager), Pbmb Probe (Branch Manager).; steps now [{"level":1,"status":"PENDING","acted_by":""},{"level":2,"status":"APPROVED","acted_by":"Pmm Probe"}]
+P7a   BRANCH_MANAGER of office B opens 'Awaiting my approval' and then the quote itself (Q-00002, office A)
+      expected: consistent: either the quote is not in B's inbox, or B may open it
+      actual:   inbox view=ops/crm/quote_list (rows listed via SQL with no office scope — crm.php:1433-1447); opening the quote: [error] This quotation is outside your office / branch scope.
+P7b   BRANCH_MANAGER office B posts quote-approve WITH ?id=<quote> (what the screen posts)
+      expected: refused — outside branch scope
+      actual:   [error] This quotation is outside your office / branch scope.; step1 status=PENDING
+P7c   BRANCH_MANAGER office B posts quote-approve with ONLY step=<id> in the body (no ?id)
+      expected: refused — outside branch scope (same as P7b)
+      actual:   [success] All approvals complete — quote approved and ready to send.; step1 status=APPROVED acted_by=Pbmb Probe
+P7d   MARKETING_MANAGER then approves level 2
+      expected: quote APPROVED (chain complete)
+      actual:   [error] You are not an approver for this step.; quote status=APPROVED total=118000
+P8    BDM edits the APPROVED Q-00002 (qty 10→30, total 118000→?) then sends it
+      expected: edit refused, or approval reset to DRAFT / re-approval required (total now crosses the 5L rule)
+      actual:   edit: [success] Quote saved.; after edit status=APPROVED total=354000; send: [warning] Marked sent and follow-ups scheduled; e-mail could not be sent now (check Settings → SMTP) — it has been logged.; final status=SENT total=354000
+P9    Quote Q-00005 (590000) submitted; L3 is the deactivated user
+      expected: chain refuses an inactive approver or reroutes to an active one
+      actual:   [{"id":3,"level":1,"approver_role":"BRANCH_MANAGER","approver_user_id":null,"username":null,"is_active":null},{"id":4,"level":2,"approver_role":"MARKETING_MANAGER","approver_user_id":null,"username":null,"is_active":null},{"id":5,"level":3,"approver_role":"","approver_user_id":13,"username":"pgone","is_active":0}]
+P10   FINANCE posts quote-contract on DRAFT Q-00006 (never approved, sent or accepted)
+      expected: refused — only an ACCEPTED quote becomes a contract
+      actual:   [warning] Contract CN-PROBE-DRAFT registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.; quote status=DRAFT contract_number=CN-PROBE-DRAFT contract row={"open_status":"PENDING","value":118000}
+P11   MARKETING_MANAGER creates Q-00007 and sets it APPROVED himself (one click)
+      expected: refused — the creator cannot approve his own quote (stage gates already enforce requestor≠approver)
+      actual:   [warning] This quote needs multi-level approval for its amount / business unit — it has been submitted for approval (1 step(s)) rather than approved directly.; status now PENDING_APPROVAL; owner_id=7 (mm=7)
+P12   FINANCE (holds crm.contract.register) registers the contract for OPP-2026-0001 — WON with no quotation and handed to Accounts
+      expected: allowed — Accounts is the only role that registers contracts
+      actual:   POST: 403 ops/module_locked; opening the deal: 403 ops/module_locked; deal status=WON sent_to_accounts=yes contract_id=NULL
+P13a  COORDINATOR creates a project costing (cost build-up, margins)
+      expected: matrix has no costing row — expected per doc 01-SALES: sales/management only
+      actual:   [success] PC-00001 created — add the team roles and their cost heads.; created=PC-00001 by Pcoa Probe
+P13b  BRANCH_MANAGER approves costing PC-00001 while it is still DRAFT (never submitted)
+      expected: refused — only a SUBMITTED costing can be approved
+      actual:   [success] Costing approved.; status now APPROVED approved_by=Pbma Probe
+P13c  COORDINATOR (no approve right) reopens the APPROVED costing to DRAFT
+      expected: refused — undoing an approval needs the approver
+      actual:   [success] Reopened as draft.; status now DRAFT
+P13d  BRANCH_MANAGER creates, submits and approves his OWN costing
+      expected: refused — creator ≠ approver
+      actual:   [success] Costing approved.; status=APPROVED created_by=Pbma Probe approved_by=Pbma Probe
+P13e  FINANCE opens a costing (cost heads, margin)
+      expected: matrix silent
+      actual:   view=ops/project_costing
+P14   BRANCH_MANAGER of office B: inquiry register, quote register, and editing office A's inquiry
+      expected: office B sees/edits only office B sales records
+      actual:   inquiries view=view=ops/crm/inquiry_list; quote register: view=ops/crm/quote_list; inquiry-edit POST: [success] Inquiry updated.; contact now "Changed by office B" (crm_inquiries has no office column)
+P15   BDM submits /inquiry-new empty
+      expected: refused with a message naming the missing fields; typed values kept
+      actual:   Please add a client (pick one, or type a name); the contact person; a contact e-mail or mobile; the business unit (business unit); a subject.
+P16a  Master submits /opportunity-new empty
+      expected: refused with message, form re-shown
+      actual:   view=ops/opportunity_form form_error="Give the opportunity a name — what is the piece of business?"
+P16b  Master submits /lead-new empty
+      expected: refused with message, typed values stashed
+      actual:   [error] A lead needs a company or person to chase. Pick one from the master, or type a name.
+P16c  Master submits project-costing-new empty (title is HTML-required)
+      expected: refused
+      actual:   [success] PC-00003 created — add the team roles and their cost heads.; title stored="Untitled costing"
+P16d  BDM submits /quote-external empty
+      expected: refused (origin and total are HTML-required)
+      actual:   [success] Q-00008 registered.; last quote: {"quote_no":"Q-00008","status":"SENT","origin":"CLIENT_PORTAL","total_amount":0,"client_name":""}
+P16e  BDM registers an external quote directly as ACCEPTED, 9,00,000 (above every approval band)
+      expected: approval chain still applies, or acceptance runs the same client/deal hand-off as /quote-status
+      actual:   [success] Q-00009 registered.; stored status=ACCEPTED total=900000 subtotal=900000 gst_pct=0 approvals=0
+P16f  BDM posts quote-external with status=WHATEVER (not a quote status)
+      expected: refused
+      actual:   [success] Q-00010 registered.; stored status=WHATEVER
+P17   Allocate an opportunity to a deactivated user
+      expected: refused
+      actual:   [error] That person is not an active user, so the deal cannot be allocated to them.
+P18   FINANCE posts quote-revise on an ACCEPTED quote
+      expected: refused
+      actual:   [error] You cannot revise quotations.

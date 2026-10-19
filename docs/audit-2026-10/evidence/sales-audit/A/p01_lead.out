@@ -1,0 +1,93 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== 1. who can create / convert a lead (module gate = mod.leads.*) ===
+    [ADMIN lead-new] success: Lead L-2026-0001 created.
+      created: yes #1
+    [MM lead-new] (no flash)
+      created: NO
+    [BDM lead-new] (no flash)
+      created: NO
+    [MEX lead-new] (no flash)
+      created: NO
+    [FIN lead-new] (no flash)
+      created: NO
+    [BM lead-new] (no flash)
+      created: NO
+    [BD lead-new] success: Lead L-2026-0002 created.
+      created: yes #2
+    [COORD lead-new] (no flash)
+      created: NO
+    [MM lead-convert] (no flash)
+    [BDM lead-convert] (no flash)
+    [FIN lead-convert] (no flash)
+    [BM lead-convert] (no flash)
+    [BD lead-convert] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+      -> converted by BD
+
+=== 2. convert the same lead twice (sequential) ===
+    [convert #1] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    [convert #2] error: That lead has already been converted.
+    partners +1, inquiries +1 ; lead={"id":4,"ref":"L-2026-0004","status":"CONVERTED","stage_id":1,"partner_id":668,"converted_partner_id":668,"converted_inquiry_id":2,"company_name":"Sequential Twice Ltd","value":250000}
+
+=== 3. convert the same lead twice CONCURRENTLY (two workers, one barrier) x3 attempts ===
+    [race1 worker0] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    [race1 worker1] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    attempt 1: partners +2, inquiries +2 (named 'Race1': 2 partners)
+    [race2 worker0] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    [race2 worker1] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    attempt 2: partners +2, inquiries +2 (named 'Race2': 2 partners)
+    [race3 worker0] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    [race3 worker1] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    attempt 3: partners +2, inquiries +2 (named 'Race3': 2 partners)
+
+=== 4. a LOST lead: move it, edit it, convert it ===
+    [lead-move -> LOST (no reason)] error: Say why it was lost — the reason is what makes win/loss analysis possible.
+    [lead-move -> LOST (reason)] success: Moved.
+    after lost: {"id":8,"ref":"L-2026-0008","status":"LOST","stage_id":7,"partner_id":null,"converted_partner_id":null,"converted_inquiry_id":null,"company_name":"Lost Then Won Ltd","value":250000}
+    [lead-move LOST -> open stage (reopen?)] error: That lead is already lost.
+    [lead-edit on LOST lead (value 999)] success: Saved.
+    after edit: {"id":8,"ref":"L-2026-0008","status":"LOST","stage_id":7,"partner_id":null,"converted_partner_id":null,"converted_inquiry_id":null,"company_name":"Lost Then Won Ltd","value":999}
+    [lead-convert on LOST lead] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    after convert: {"id":8,"ref":"L-2026-0008","status":"CONVERTED","stage_id":7,"partner_id":675,"converted_partner_id":675,"converted_inquiry_id":9,"company_name":"Lost Then Won Ltd","value":999}
+
+=== 5. a CONVERTED lead: edit, delete, opportunity from it ===
+    [lead-edit on CONVERTED (company renamed, value 1)] success: Saved.
+    after edit: {"id":4,"ref":"L-2026-0004","status":"CONVERTED","stage_id":1,"partner_id":668,"converted_partner_id":668,"converted_inquiry_id":2,"company_name":"Renamed After Conversion","value":1}
+    [lead-delete on CONVERTED] error: This lead has already been converted, so it is the record of where that customer came from. Mark it lost if it should not be chased, but it cannot be deleted.
+    [opportunity-from-lead on CONVERTED lead] success: Opportunity opened from the lead. The lead stays as the record of where it came from.
+    opportunity created: yes
+
+=== 6. delete an OPEN lead that has a quotation raised off it ===
+    quote #1 Q-00001 r0 cur=1 DRAFT total=59000 contract=- lead_id=9
+    [lead-delete (lead has a quote)] success: Lead L-2026-0009 deleted.
+    lead row exists: NO ; quote.lead_id still=9 (dangling)
+
+=== 7. inquiry numbering: lead conversion vs the inquiry form ===
+    inq #1 INQ-2610-001 lead=3
+    inq #2 INQ-2610-002 lead=4
+    inq #3 INQ-2610-003 lead=5
+    inq #4 INQ-2610-004 lead=5
+    inq #5 INQ-2610-005 lead=6
+    inq #6 INQ-2610-006 lead=6
+    inq #7 INQ-2610-007 lead=7
+    inq #8 INQ-2610-008 lead=7
+    inq #9 INQ-2610-009 lead=8
+    [inquiry-new] success: INQ-00001 created. You can now raise a quotation against it.
+    form inquiry -> INQ-00001
+    [inquiry-delete (an early converted one, no quote)] success: Inquiry INQ-2610-001 deleted.
+    [lead-convert] success: Converted. The customer is on the master and an inquiry has been raised — carry on from there.
+    unique index on crm_inquiries.inquiry_no: ix_quo_inquiry
+
+=== 8. history written for lead events ===
+    act 10 SYSTEM Lead L-2026-0009 converted — inquiry raised
+    act 10 SYSTEM Lead L-2026-0009 created — Numbering Collision Ltd
+    act 9 NOTE Lead L-2026-0009 deleted — Quoted Then Deleted Ltd
+    act 9 SYSTEM Lead L-2026-0009 created — Quoted Then Deleted Ltd
+    act 8 SYSTEM Lead L-2026-0008 converted — inquiry raised
+    act 8 SYSTEM Lead L-2026-0008 lost
+    act 8 SYSTEM Lead L-2026-0008 created — Lost Then Won Ltd
+    act 7 SYSTEM Lead L-2026-0007 converted — inquiry raised
+    act 7 SYSTEM Lead L-2026-0007 converted — inquiry raised
+    act 7 SYSTEM Lead L-2026-0007 created — Race3 Engineering Ltd
+    act 6 SYSTEM Lead L-2026-0006 converted — inquiry raised
+    act 6 SYSTEM Lead L-2026-0006 converted — inquiry raised

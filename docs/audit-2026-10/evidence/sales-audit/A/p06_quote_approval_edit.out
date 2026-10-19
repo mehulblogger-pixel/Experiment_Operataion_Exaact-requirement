@@ -1,0 +1,86 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+rules: L1 user MM2 (any amount), L2 role BRANCH_MANAGER (>= 1,00,000)
+
+=== A. rules configured, sender sends a DRAFT directly ===
+    [MM -> SENT] warning: Marked sent and follow-ups scheduled; e-mail could not be sent now (check Settings → SMTP) — it has been logged.
+      #1 Q-00001 r0 cur=1 SENT total=59000 contract=- steps=[]
+
+=== A2. rules configured, approver uses direct APPROVED (routed into chain) / master override ===
+    [MM -> APPROVED] warning: This quote needs multi-level approval for its amount / business unit — it has been submitted for approval (1 step(s)) rather than approved directly.
+      #2 Q-00002 r0 cur=1 PENDING_APPROVAL total=59000 contract=- steps=["L1:user3:PENDING"]
+    [ADMIN -> APPROVED] success: Quotation moved to Approved (ready to send).
+      #3 Q-00003 r0 cur=1 APPROVED total=59000 contract=- steps=[]
+      log: ["Approved directly by admin, bypassing the required approval chain (master override)."]
+
+=== B. price raised 10x WHILE pending approval (chain was built for the old amount) ===
+    [MM -> PENDING_APPROVAL] success: Submitted for approval — 1 step(s). Now with p_mm2 Probe (Marketing Manager).
+      #4 Q-00004 r0 cur=1 PENDING_APPROVAL total=59000 contract=- steps=["L1:user3:PENDING"]
+    [MM quote-edit rate=50000] success: Quote saved.
+      #4 Q-00004 r0 cur=1 PENDING_APPROVAL total=590000 contract=- steps=["L1:user3:PENDING"]
+    [MM2 approve step 2] success: All approvals complete — quote approved and ready to send.
+      FINAL: #4 Q-00004 r0 cur=1 APPROVED total=590000 contract=- steps=["L1:user3:APPROVED"] — needs BM for >=1,00,000? rule matches
+
+=== C. price changed AFTER approval, before sending ===
+    [MM -> PENDING_APPROVAL] success: Submitted for approval — 1 step(s). Now with p_mm2 Probe (Marketing Manager).
+      #5 Q-00005 r0 cur=1 PENDING_APPROVAL total=59000 contract=- steps=["L1:user3:PENDING"]
+    [MM2 approve step 3] success: All approvals complete — quote approved and ready to send.
+      approved at 59000
+    [MM quote-edit rate=900000] success: Quote saved.
+      #5 Q-00005 r0 cur=1 APPROVED total=10620000 contract=- steps=["L1:user3:APPROVED"]
+    [MM -> SENT] warning: Marked sent and follow-ups scheduled; e-mail could not be sent now (check Settings → SMTP) — it has been logged.
+      #5 Q-00005 r0 cur=1 SENT total=10620000 contract=- steps=["L1:user3:APPROVED"]
+      log: ["Submitted for approval","Approved by p_mm2 Probe","Edited"]
+
+=== D. level 1 REJECTS, level 2 then approves the remaining step ===
+    [MM -> PENDING_APPROVAL] success: Submitted for approval — 2 step(s). Now with p_mm2 Probe (Marketing Manager).
+      #6 Q-00006 r0 cur=1 PENDING_APPROVAL total=590000 contract=- steps=["L1:user3:PENDING","L2:BRANCH_MANAGER:PENDING"]
+    [MM2 reject step 4] success: Rejected. The quote now shows as rejected by you, with your comment.
+      #6 Q-00006 r0 cur=1 REJECTED total=590000 contract=- steps=["L1:user3:REJECTED","L2:BRANCH_MANAGER:PENDING"]
+    [BM approve step 5] success: All approvals complete — quote approved and ready to send.
+      FINAL: #6 Q-00006 r0 cur=1 APPROVED total=590000 contract=- steps=["L1:user3:REJECTED","L2:BRANCH_MANAGER:APPROVED"]
+
+=== E. re-submit after rejection: what happens to the rejected step record ===
+    [MM -> PENDING_APPROVAL] success: Submitted for approval — 1 step(s). Now with p_mm2 Probe (Marketing Manager).
+      #7 Q-00007 r0 cur=1 PENDING_APPROVAL total=59000 contract=- steps=["L1:user3:PENDING"]
+    [MM2 reject step 6] success: Rejected. The quote now shows as rejected by you, with your comment.
+    [MM -> PENDING_APPROVAL] success: Submitted for approval — 1 step(s). Now with p_mm2 Probe (Marketing Manager).
+      #7 Q-00007 r0 cur=1 PENDING_APPROVAL total=59000 contract=- steps=["L1:user3:PENDING"]
+      before: [{"id":6,"level":1,"status":"REJECTED","acted_by":"p_mm2 Probe","remarks":"Wrong scope"}]
+      after : [{"id":7,"level":1,"status":"PENDING","acted_by":"","remarks":""}]
+      rejection still in quote history? ["Submitted for approval","Rejected by p_mm2 Probe \u2014 Wrong scope","Submitted for approval"]
+
+=== F. self-approval through the chain: generic step (no rule matches), creator approves own quote ===
+    [MM -> PENDING_APPROVAL] success: Submitted for approval — 1 step(s). Now with admin (Admin (legacy)), p_mm Probe (Marketing Manager), p_mm2 Probe (Marketing Manager).
+      #8 Q-00008 r0 cur=1 PENDING_APPROVAL total=59000 contract=- steps=["L1:any:PENDING"]
+    [MM approve step 8] success: All approvals complete — quote approved and ready to send.
+      #8 Q-00008 r0 cur=1 APPROVED total=59000 contract=- created_by=p_mm Probe approved_by=p_mm Probe
+    [MM -> PENDING_APPROVAL] success: Submitted for approval — 1 step(s). Now with p_mm Probe (Marketing Manager), p_mm2 Probe (Marketing Manager).
+      #9 Q-00009 r0 cur=1 PENDING_APPROVAL total=59000 contract=- steps=["L1:MARKETING_MANAGER:PENDING"]
+    [MM approve step 9] success: All approvals complete — quote approved and ready to send.
+      role-routed: #9 Q-00009 r0 cur=1 APPROVED total=59000 contract=-
+
+=== G. edit after SENT / after ACCEPTED ===
+    [MM quote-edit rate=1] error: This quote is sent — awaiting reply and is locked. Raise a re-edit request from the quote page — only the Super Admin can grant it.
+      #10 Q-00010 r0 cur=1 SENT total=59000 contract=- steps=[]
+    [ADMIN quote-edit rate=1] error: This quote is sent — awaiting reply and is locked. Raise a re-edit request from the quote page — only the Super Admin can grant it.
+      #10 Q-00010 r0 cur=1 SENT total=59000 contract=- steps=[]
+    [MM -> ACCEPTED] success: quote marked accepted. Acme Probe is now linked to the client master, 1 contact(s) carried across. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an address and a contact mobile number. Comp
+      #11 Q-00011 r0 cur=1 ACCEPTED total=59000 contract=- steps=[]
+    [MM quote-edit rate=1] error: This quote is accepted / closed-won and is locked. Raise a re-edit request from the quote page — only the Super Admin can grant it.
+      #11 Q-00011 r0 cur=1 ACCEPTED total=59000 contract=- steps=[]
+    [ADMIN quote-edit rate=1] success: Quote saved.
+      #11 Q-00011 r0 cur=1 ACCEPTED total=11.8 contract=- steps=[]
+    [MM -> REJECTED] success: Quotation moved to Rejected by approver.
+      #12 Q-00012 r0 cur=1 REJECTED total=59000 contract=- steps=[]
+    [MM quote-edit rate=7] success: Quote saved.
+      #12 Q-00012 r0 cur=1 REJECTED total=82.6 contract=- steps=[]
+    [MM quote-edit rate=3] success: Quote saved.
+      #13 Q-00013 r0 cur=1 EXPIRED total=35.4 contract=- steps=[]
+
+=== H. two people edit the same DRAFT from the same starting copy (no version check) ===
+    [MM quote-edit rate=6000] success: Quote saved.
+      #14 Q-00014 r0 cur=1 DRAFT total=70800 contract=- steps=[]
+    [BDM quote-edit rate=4000] success: Quote saved.
+      #14 Q-00014 r0 cur=1 DRAFT total=47200 contract=- steps=[]
+      start 59000 ; both saves accepted, last one wins: 47200
+      version/updated_at check on quotations? stale_edit_block allow-list = calls, jobs only

@@ -1,0 +1,16 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+=== rows written by each action (a history/audit table must appear for a status or price change) ===
+    quote-edit (price changed)                           grew: quote_revisions+1
+    quote-status DRAFT -> APPROVED (direct, no rule)     grew: (nothing)
+    quote-status APPROVED -> SENT                        grew: email_log+1, quote_followups+5
+    quote-status SENT -> ACCEPTED                        grew: partner_contacts+1, idems_audit+1
+    quote-status ACCEPTED -> LOST                        grew: (nothing)
+    quote-contract (FIN)                                 grew: partner_contracts+1, quote_revisions+1
+    inquiry-edit (status -> DROPPED, subject changed)    grew: (nothing)
+    lead-edit (value 5 -> 500000)                        grew: (nothing)
+    opportunity-edit (value 5 -> 500000)                 grew: (nothing)
+    project-costing-approve                              grew: (nothing)
+    project-costing-reopen                               grew: (nothing)
+
+  quote_revisions summaries for #1: ["Edited","Contract GEN\/C\/2026-27\/00001 requested by p_fin Probe \u2014 pending manager & branch-manager approval before the order floats to operations."]

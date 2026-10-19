@@ -1,0 +1,54 @@
+[5a] Free-text client name that is the SAME company written differently
+  on file: {"id":666,"code":"P-435ed9","legal_name":"Acme Valves Pvt Ltd","gstin":"24AAACA1111A1Z5"}
+  loose inquiry #1 client_id=NULL (typed 'Acme Valves Ltd.', no warning shown)
+  > accept free-text quote
+      flash  success: quote marked accepted. ACME VALVES PRIVATE LIMITED has been created in the client master. Its line items can now be pulled straight onto a purchase order from the client master. The record is deliberately incomplete — it still needs GSTIN or PAN, an a
+  clients before 327 after 328; quote now points at #671 {"code":"GEN-ACME-0003","legal_name":"ACME VALVES PRIVATE LIMITED","gstin":"","status":"ACTIVE"}
+  audit note on the new record: ["Created from an accepted quotation. It looks similar to P-435ed9 \u2014 Acme Valves Pvt Ltd, which was already on file"]
+  the loose inquiry #1 is now linked to client_id=671
+  find_duplicate_partner now reports: ["name","POSSIBLE",671]
+
+[5b] Free-text name with a trading-style difference (no normalised match at all)
+  clients before 328 after 329; quote client {"id":672,"legal_name":"Acme Valves (Vadodara Works)","gstin":""}
+  quotations has a gstin column for the free-text path? no
+
+[5c] Same free-text name accepted twice (two different quotes)
+  quote #14 -> client 673
+  quote #15 -> client 673
+  clients before 329 after 330
+
+[5d] Status / hold gates — BLACKLISTED, INACTIVE (status column) and BLOCKED, HOLD (hold_status)
+  --- BLACKLISTED client #667
+    inquiry (BDM): CREATED  success: INQ-00002 created. You can now raise a quotation against it.
+    quote (BDM): CREATED  success: Q-00015 created.
+    approve (MARKETING_MANAGER): APPROVED
+    accept (FINANCE): ACCEPTED
+    contract register (FINANCE): REGISTERED PHQ/C/2026-27/00004
+    work order (COORDINATOR): CREATED  success: CALL-00004 created. Now allocate a job. | 
+    draft invoice (FINANCE, books_invoice_create): CREATED
+  --- INACTIVE client #668
+    inquiry (BDM): CREATED  success: INQ-00003 created. You can now raise a quotation against it.
+    quote (BDM): CREATED  success: Q-00016 created.
+    approve (MARKETING_MANAGER): APPROVED
+    accept (FINANCE): ACCEPTED
+    contract register (FINANCE): REGISTERED PHQ/C/2026-27/00005
+    work order (COORDINATOR): CREATED  success: CALL-00005 created. Now allocate a job. | 
+    draft invoice (FINANCE, books_invoice_create): CREATED
+  --- BLOCKED(hold) client #669
+    inquiry (BDM): CREATED  success: INQ-00004 created. You can now raise a quotation against it.
+    quote (BDM): refused  error: This client is BLOCKED (probe reason). A quote cannot be raised for them until a manager clears the block under Client holds.
+    quote (master): CREATED
+    approve (MARKETING_MANAGER): APPROVED
+    accept (FINANCE): ACCEPTED
+    contract register (FINANCE): REGISTERED PHQ/C/2026-27/00006
+    work order (COORDINATOR): CREATED  warning: Note: this client is Blocked — probe reason | success: CALL-00006 created. Now allocate a job. | 
+    draft invoice (FINANCE, books_invoice_create): CREATED
+  --- HOLD(hold) client #670
+    inquiry (BDM): CREATED  success: INQ-00005 created. You can now raise a quotation against it.
+    quote (BDM): CREATED  warning: Note: this client is On hold — probe reason | success: Q-00018 created.
+    approve (MARKETING_MANAGER): APPROVED
+    accept (FINANCE): ACCEPTED
+    contract register (FINANCE): REGISTERED PHQ/C/2026-27/00007
+    work order (COORDINATOR): CREATED  warning: Note: this client is On hold — probe reason | success: CALL-00007 created. Now allocate a job. | 
+    draft invoice (FINANCE, books_invoice_create): CREATED
+  is_coordinator_level() for COORDINATOR = true -> partner_hold_blocks(BLOCKED) = false

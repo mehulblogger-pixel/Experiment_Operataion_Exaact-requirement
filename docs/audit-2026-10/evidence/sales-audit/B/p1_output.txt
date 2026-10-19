@@ -1,0 +1,38 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+== P1 schema ==
+quotations columns                                                     => id,quote_no,rev,parent_id,is_current,inquiry_id,client_id,client_name,contact_name,contact_email,contact_mobile,sbu,office_id,subject,site_location,location_type,currency,validity_days,payment_terms,advance_pct,advance_required,report_vs_payment,subtotal,gst_pct,gst_amount,total_amount,status,lost_reason,lost_reason_other,template_id,sent_at,accepted_date,contract_id,contract_number,owner_id,created_by,created_at,updated_at,origin,origin_portal,origin_ref,inspection_types,product_category,terms_conditions,exec_office_ids,vendor_id,rejected_by,rejected_at,reject_remarks,locked,unlocked_until,signatory_user_id,po_number,po_date,submitted_at,lead_id,preorder_checklist,engagement_id,books_ref
+quote_lines columns                                                    => id,quote_id,line_no,sbu,service_type,subtypes,description,location,location_type,order_type,qty,unit,rate,amount,deliverables,notes,office_id,location_id,activity_id
+quote_locations columns                                                => id,quote_id,label,location_type,line1,line2,city,state,pincode,country,contact_name,contact_mobile,office_id,sort_order,vendor_id
+charge units (lookup charge_unit)                                      => {"MANDAY":"Man-day","MANMONTH":"Man-month","VISIT":"Per visit","AUDIT_DAY":"Audit day","LOT":"Per lot \/ lump sum","DOC":"Per document","PER_KM":"Per km","OTHER":"Other"}
+payment terms master                                                   => {"ADV100":"100% advance","ADV50":"50% advance, balance against report","ADV25":"25% advance, balance against report","AGAINST_REPORT":"Against submission of report","AGAINST_INV":"Against invoice","NET7":"7 days from invoice","NET10":"10 days from invoice","NET15":"15 days from invoice","NET21":"21 days from invoice","NET30":"30 days from invoice","NET45":"45 days from invoice","NET60":"60 days from invoice","NET90":"90 days from invoice","MILESTONE":"Milestone-linked","PROFORMA":"Against proforma invoice","LC":"Letter of credit","OTHER":"Other (see terms)"}
+
+== P1 formulas (through quote-new handler) ==
+3 x 3333.33 + 1 x -999.99 @18%                                         => {"id":1,"quote_no":"Q-00001","rev":0,"status":"DRAFT","subtotal":9000,"gst_pct":18,"gst_amount":1620,"total_amount":10620,"sent_at":"","owner_id":2,"created_by":"Bdm1 Probe"}
+  lines                                                                => [{"line_no":0,"qty":3,"unit":"MANDAY","rate":3333.33,"amount":9999.99},{"line_no":1,"qty":1,"unit":"MANDAY","rate":-999.99,"amount":-999.99}]
+qty 0.333 x 100.01 (qty col is DECIMAL(12,2))                          => [{"qty":0.333,"rate":100.01,"amount":33.3}]
+  header                                                               => {"id":2,"quote_no":"Q-00002","rev":0,"status":"DRAFT","subtotal":33.3,"gst_pct":18,"gst_amount":5.99,"total_amount":39.29,"sent_at":"","owner_id":2,"created_by":"Bdm1 Probe"}
+1 x 0.05 @18% (GST 0.009 → rounded?)                                 => {"id":3,"quote_no":"Q-00003","rev":0,"status":"DRAFT","subtotal":0.05,"gst_pct":18,"gst_amount":0.01,"total_amount":0.06,"sent_at":"","owner_id":2,"created_by":"Bdm1 Probe"}
+all-zero quote (1 x 0)                                                 => {"id":4,"quote_no":"Q-00004","rev":0,"status":"DRAFT","subtotal":0,"gst_pct":18,"gst_amount":0,"total_amount":0,"sent_at":"","owner_id":2,"created_by":"Bdm1 Probe"}
+quote with NO lines                                                    => {"id":5,"quote_no":"Q-00005","rev":0,"status":"DRAFT","subtotal":0,"gst_pct":18,"gst_amount":0,"total_amount":0,"sent_at":"","owner_id":2,"created_by":"Bdm1 Probe"}
+discount exactly equal to work (total 0)                               => {"id":6,"quote_no":"Q-00006","rev":0,"status":"DRAFT","subtotal":0,"gst_pct":18,"gst_amount":0,"total_amount":0,"sent_at":"","owner_id":2,"created_by":"Bdm1 Probe"}
+currency USD stored                                                    => {"currency":"USD","total_amount":1000}
+  amount_in_words_inr on the PDF for that USD total                    => One Thousand Rupees Only
+  cur_sym() used on screen totals                                      => ₹
+currency free text "NOT-A-CURRENCY-CODE" (column VARCHAR(8))           => NOT-A-CURRENCY-CODE
+validity_days -5                                                       => -5
+  quote_validity() of a 400-day-old SENT quote with validity -5        => {"expires_on":null,"days_left":null,"expired":false}
+  (quote-new refused: [error] Advance % cannot be more than 100. Nothing was saved.)
+advance 100.5%                                                         => refused
+qty 0 x 5000 line                                                      => [{"qty":0,"rate":5000,"amount":0}]
+unit code "BANANA" (not in master)                                     => BANANA
+
+== P2 line <-> site pairing ==
+quote A id=12 site id                                                  => 1
+quote B id=13 site id                                                  => 2
+edit B flash                                                           => [success] Quote saved.
+quote B lines after edit (location_id / location text)                 => [{"description":"Points at quote A site","location_id":1,"location":""},{"description":"Points at site 999999","location_id":999999,"location":""},{"description":"Own site","location_id":2,"location":"Plot 9, Surat, GJ 395001, India"}]
+edit B posting loc_id = A's site                                       => [success] Quote saved.
+  quote A site row after                                               => {"id":1,"quote_id":12,"label":"Site A"}
+  quote B sites after                                                  => []
+two sites + one line without a site: saved?                            => [{"description":"No site chosen","location_id":null}]

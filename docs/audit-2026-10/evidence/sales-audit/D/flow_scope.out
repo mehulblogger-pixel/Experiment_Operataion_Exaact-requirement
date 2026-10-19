@@ -1,0 +1,6 @@
+S1    BRANCH_MANAGER office A creates costing PC-00001 leaving 'Executing office' blank (form default '—'); BRANCH_MANAGER office B opens it
+      expected: refused — the costing belongs to office A (its creator)
+      actual:   office_id=NULL; office B opens it: view=ops/project_costing; list: view=ops/project_costings
+S2    BDM (office A) saves Q-00001 with the owning office left blank, then opens it
+      expected: the creator can still see his own quote
+      actual:   office_id=NULL; offices flagged is_ahmedabad=1; BDM opens it: [error] This quotation is outside your office / branch scope.

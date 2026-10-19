@@ -1,0 +1,46 @@
+bootstrap: app booted on a throwaway SQLITE db (234 libs)
+
+== 0. no rules at all ==
+no rules (total 50000)                                                 => needs_chain=N | steps=L1:ANY-APPROVER | PENDING_APPROVAL
+no rules: MM sets 5 crore quote APPROVED directly                      => [success] Quotation moved to Approved (ready to send). -> APPROVED steps=0
+
+== 1. single band L1 0..100000 -> MARKETING_MANAGER ==
+exactly on max 100000 (total 100000)                                   => needs_chain=Y | steps=L1:MARKETING_MANAGER | PENDING_APPROVAL
+max + 0.01 = 100000.01 (total 100000.01)                               => needs_chain=N | steps=L1:ANY-APPROVER | PENDING_APPROVAL
+exactly on min 0 (zero-value quote) (total 0)                          => needs_chain=Y | steps=L1:MARKETING_MANAGER | PENDING_APPROVAL
+
+== 2. adjacent bands sharing a boundary (L1 0..100000 MM, L2 100000..500000 BD) ==
+value 50000 (total 50000)                                              => needs_chain=Y | steps=L1:MARKETING_MANAGER | PENDING_APPROVAL
+value exactly 100000 (in both) (total 100000)                          => needs_chain=Y | steps=L1:MARKETING_MANAGER, L2:BUSINESS_DIRECTOR | PENDING_APPROVAL
+value 300000 (total 300000)                                            => needs_chain=Y | steps=L2:BUSINESS_DIRECTOR | PENDING_APPROVAL
+value exactly 500000 (L2 max) (total 500000)                           => needs_chain=Y | steps=L2:BUSINESS_DIRECTOR | PENDING_APPROVAL
+value 500001 (above highest max) (total 500001)                        => needs_chain=N | steps=L1:ANY-APPROVER | PENDING_APPROVAL
+above highest max: MM approves 9L directly                             => [success] Quotation moved to Approved (ready to send). -> APPROVED
+
+== 3. gap between bands (L1 0..100000, L2 200000..500000) ==
+value 150000 (in the gap) (total 150000)                               => needs_chain=N | steps=L1:ANY-APPROVER | PENDING_APPROVAL
+gap value: MM approves directly                                        => [success] Quotation moved to Approved (ready to send). -> APPROVED
+
+== 4. overlapping / cumulative ladder (L1 0..unlimited MM, L2 100000..unlimited BD) ==
+value 50000 (total 50000)                                              => needs_chain=Y | steps=L1:MARKETING_MANAGER | PENDING_APPROVAL
+value 5000000 (max=0 means no upper limit) (total 5000000)             => needs_chain=Y | steps=L1:MARKETING_MANAGER, L2:BUSINESS_DIRECTOR | PENDING_APPROVAL
+
+== 5. two rules at the SAME level overlapping ==
+value 10000 (total 10000)                                              => needs_chain=Y | steps=L1:MARKETING_MANAGER, L1:BUSINESS_DIRECTOR | PENDING_APPROVAL
+  MM approves the MM step                                              => [success] Your approval is recorded. Now with Bd1 Probe (Business Director). -> PENDING_APPROVAL
+
+== 6. SBU-only rule (rule for SBU INSP only, 0..unlimited) ==
+quote SBU INSP (total 10000)                                           => needs_chain=Y | steps=L1:BUSINESS_DIRECTOR | PENDING_APPROVAL
+quote SBU OTHER (total 10000)                                          => needs_chain=N | steps=L1:ANY-APPROVER | PENDING_APPROVAL
+quote with no SBU (total 10000)                                        => needs_chain=N | steps=L1:ANY-APPROVER | PENDING_APPROVAL
+
+== 7. pre-tax or post-tax? pre- or post-discount? (rule 0..100000 MM, rule 100000.01..0 BD) ==
+subtotal 90000 + 18% GST = 106200 (total 106200)                       => needs_chain=Y | steps=L2:BUSINESS_DIRECTOR | PENDING_APPROVAL
+gross 150000 less discount line 60000 = 90000                          => steps=["L1:MARKETING_MANAGER"]
+
+== 8. inactive rule and malformed rules ==
+only an inactive rule (total 10000)                                    => needs_chain=N | steps=L1:ANY-APPROVER | PENDING_APPROVAL
+rule form accepts min 500000 > max 100000?                             => [success] Approval rule added. rows=1
+value 300000 vs the inverted rule (total 300000)                       => needs_chain=N | steps=L1:ANY-APPROVER | PENDING_APPROVAL
+rule form: blank name, level -3, min -100, no approver at all          => [success] Approval rule added. {"name":"","level":1,"min_amount":-100,"approver_role":"","approver_user_id":null}
+BDM (no approve right) tries to add a rule                             => [error] You cannot manage approval rules.
