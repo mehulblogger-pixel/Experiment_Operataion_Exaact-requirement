@@ -73,6 +73,21 @@ try {
     mkt_credits_add('CLIENT', $party2, 'posts', 4);
     for ($i=0;$i<10;$i++) mkt_consume('CLIENT', $party2, 'posts');
     t_eq(mkt_credits_balance('CLIENT', $party2, 'posts'), 4, 'enforcement OFF → the wallet is never touched');
+
+    // ---- the wallet can never go below zero (GAP-038) ----
+    // The draw is a conditional UPDATE: called directly, past the balance read that
+    // mkt_credits_consume does first, it refuses anything the balance no longer covers.
+    db()->prepare("INSERT INTO business_partners (legal_name,is_client,status) VALUES ('Floor Co',1,'ACTIVE')")->execute();
+    $party3 = (int)db()->lastInsertId();
+    mkt_credits_add('CLIENT', $party3, 'posts', 2);
+    t_eq(mkt_credits_draw('CLIENT', $party3, 'posts', 3), 0, 'a draw of 3 against a balance of 2 writes nothing');
+    t_eq(mkt_credits_balance('CLIENT', $party3, 'posts'), 2, '...and the balance is untouched');
+    t_eq(mkt_credits_draw('CLIENT', $party3, 'posts', 2), 1, 'a draw of exactly the balance is written');
+    t_eq(mkt_credits_draw('CLIENT', $party3, 'posts', 1), 0, '...after which one more is refused (two simultaneous posts cannot both draw the last credit)');
+    t_eq(mkt_credits_balance('CLIENT', $party3, 'posts'), 0, 'the wallet rests at zero, never below');
+    t_eq(mkt_credits_consume('CLIENT', $party3, 'posts', 5), 0, 'consume on an empty wallet draws nothing');
+    mkt_credits_add('CLIENT', $party3, 'posts', 1);
+    t_eq(mkt_credits_consume('CLIENT', $party3, 'posts', 5), 1, 'consume of 5 against 1 draws the 1 that is there');
 } finally {
     setting_set('mkt_enforce', $enf0 ?? 0);
     if ($own && db()->inTransaction()) db()->rollBack();

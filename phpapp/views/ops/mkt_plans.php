@@ -28,6 +28,14 @@
   <a class="btn secondary" href="/super-admin">← Super Admin</a>
 </div>
 
+<?php if (!empty($payBlocked)): ?>
+<div class="panel" role="alert" style="max-width:820px;border-left:4px solid #b7791f;background:#fffbea">
+  <b>Paid items cannot be bought yet.</b> Online payment (Razorpay) is not set up, so nobody can buy
+  <?= e(implode(', ', array_slice($payBlocked, 0, 6))) ?><?= count($payBlocked) > 6 ? ' and ' . (count($payBlocked) - 6) . ' more' : '' ?>.
+  A buyer who tries is told to contact you. Free plans still work.
+  <a href="/billing">Enter the payment keys</a> to open them for sale.
+</div>
+<?php endif; ?>
 <?php // ---- Global knobs ---- ?>
 <div class="panel" style="max-width:820px">
   <h3 class="tab-sub" style="margin-top:0">Global settings</h3>

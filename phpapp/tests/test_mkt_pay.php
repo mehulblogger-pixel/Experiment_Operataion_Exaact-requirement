@@ -25,15 +25,24 @@ try {
     $free   = null; foreach (mkt_plans_all('PRO') as $p) if ($p['code'] === 'PR_FREE') $free = $p;
     t_ok($growth && (float)$growth['price_month'] > 0, 'a paid client plan exists');
 
-    // ---- no keys configured → immediate activation (safe fallback) ----
+    // ---- no keys configured → a PRICED item is refused, a free one still activates ----
+    // (Until 19 Oct 2026 a priced plan activated free here, "so the marketplace keeps
+    //  working until keys are added" — with charging on and keys missing, every paid
+    //  plan and pack was handed out for nothing. GAP-037.)
     setting_set('rzp_key_id', ''); setting_set('rzp_key_secret', '');
     t_ok(mkt_pay_configured() === false, 'payment is not configured without keys');
     $start = mkt_pay_start('CLIENT', $party, 'SUB', (int)$growth['id'], 'MONTH');
-    t_eq($start['mode'], 'unconfigured', 'no keys → caller activates directly (no charge)');
+    t_eq($start['mode'], 'error', 'no keys → a PRICED plan is refused, not granted free');
+    t_ok(stripos((string)($start['msg'] ?? ''), 'not set up') !== false, '...and the buyer is told payment is not set up yet');
+    t_ok(mkt_active_sub('CLIENT', $party) === null, '...and nothing was subscribed');
+    if ($free) { $f0 = mkt_pay_start('PRO', 999001, 'SUB', (int)$free['id'], 'MONTH'); t_eq($f0['mode'], 'free', 'a zero-price plan still activates without keys'); }
+    $blocked = mkt_pay_priced_items_blocked();
+    t_ok(count($blocked) > 0 && in_array('plan ' . $growth['name'], $blocked, true), 'the admin screen is told which priced items cannot be bought: ' . implode(', ', $blocked));
 
     // ---- keys configured ----
     setting_set('rzp_key_id', 'rzp_test_123'); setting_set('rzp_key_secret', $SECRET);
     t_ok(mkt_pay_configured() === true, 'payment is configured with keys');
+    t_eq(mkt_pay_priced_items_blocked(), [], 'with keys, nothing is blocked');
 
     // A free/zero-price plan never charges.
     if ($free) { $fstart = mkt_pay_start('PRO', 999001, 'SUB', (int)$free['id'], 'MONTH'); t_eq($fstart['mode'], 'free', 'a zero-price plan needs no payment'); }

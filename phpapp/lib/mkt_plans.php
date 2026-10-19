@@ -168,6 +168,7 @@ function ops_mkt_plans($method) {
         'proFreeUntil'=> mkt_pro_free_until(),
         'currency'    => mkt_currency(),
         'enforce'     => function_exists('mkt_enforce_on') ? mkt_enforce_on() : false,
+        'payBlocked'  => function_exists('mkt_pay_priced_items_blocked') ? mkt_pay_priced_items_blocked() : [],
         'addonOn'     => function_exists('marketplace_addon_on') ? marketplace_addon_on() : true,
         'installMode' => function_exists('install_mode_label') ? install_mode_label() : '',
         'isLicence'   => function_exists('install_is_licence') && install_is_licence(),

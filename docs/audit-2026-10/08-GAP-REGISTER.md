@@ -721,6 +721,65 @@ per-address limit is the conventional answer; recorded, not built.
 
 ---
 
+## GAP-037 — paid marketplace plans and credit packs were handed out free whenever the payment keys were missing
+
+**CONFIRMED BY READING + EXECUTION · P2 · `mkt_pay_start()`, `/portal/plans`, `/pro/plans` · FIXED 19 Oct 2026**
+
+The payment layer's own header called it a *safe fallback*: *"if no Razorpay
+keys are configured … we activate immediately with no charge — so the
+marketplace keeps working exactly as before until keys are added."* Both
+portals did exactly that. So with **Charge for the marketplace** switched on
+and the keys never entered (or removed), every priced plan and every credit
+pack was granted to any client or professional who clicked Buy, and no revenue
+was recorded anywhere -- `mkt_ledger_post()` runs only after a verified
+payment. The admin had no warning: the plans screen and the keys screen are
+separate pages that never mention each other. The old behaviour was pinned by a
+test (*"no keys → caller activates directly (no charge)"*).
+
+**Fixed:** a priced item with no keys is **refused** with *"Online payment is
+not set up on this marketplace yet … please contact us"*; a zero-price plan and
+the freelancer launch promo still activate at once. The admin plans screen now
+carries a notice naming the priced plans and packs nobody can buy, with a link
+to the keys screen. Tests rewritten to pin the new rule (`test_mkt_pay.php`).
+
+**For the owner:** this changes a documented design decision. If you ever ran
+the marketplace with charging on and no keys, those subscriptions and credits
+were free; the query `SELECT * FROM mkt_subscriptions WHERE amount > 0 AND id
+NOT IN (SELECT ref_id FROM mkt_orders WHERE status='PAID' AND purpose='SUB')`
+is a rough first look (it will also list manual grants and coupon-free rows).
+
+---
+
+## GAP-038 — the credit wallet could be drawn below zero by two posts at once
+
+**OBSERVED · P3 · `mkt_credits_consume()` · FIXED 19 Oct 2026**
+
+Read the balance, then `balance = balance − take`. Two posts landing together
+both read 1 and both took 1. The draw is now a conditional UPDATE
+(`mkt_credits_draw()`, `WHERE balance >= take`); the loser falls back to what is
+left, usually nothing. Tested by calling the draw directly past the read.
+The design (*book the credit after the action succeeds*) still means the losing
+post is not refused -- it has already happened -- only that the wallet stops at
+zero. Refusing it would need the draw to happen **before** the post, which is a
+small change in `mkt_consume()`'s callers and is left recorded, not built.
+
+---
+
+## GAP-039 — plan-change proration is dead code, and would discard the unused value on a downgrade
+
+**OBSERVED · P4 · `mkt_sub_change()`, `mkt_sub_proration_credit()` · recorded**
+
+Neither portal calls `mkt_sub_change()`; both call `mkt_subscribe()` directly,
+which cancels the current subscription and starts a new full-price one, so a
+client who changes plan mid-month pays twice for the overlap. The proration
+function that exists would, if wired, credit the unused value against the new
+price and **silently drop any excess** (`max(0, amount − credit)`) on a
+downgrade. Market practice (Stripe, Razorpay Subscriptions) carries the
+remainder as account credit against the next renewal. Not built: whether to
+prorate at all is a pricing decision for the owner.
+
+---
+
 ## GAP-035 — an invoice could be credited without limit
 
 **CONFIRMED BY EXECUTION · P1 · `books_credit_note()` · FIXED 19 Oct 2026**

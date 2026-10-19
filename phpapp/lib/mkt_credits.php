@@ -126,9 +126,23 @@ function mkt_credits_consume($kind, $subId, $metric, $n = 1) {
     $kind = _mkt_c_kind($kind); $subId = (int)$subId; $metric = (string)$metric; $n = (int)$n;
     $bal = mkt_credits_balance($kind, $subId, $metric);
     $take = max(0, min($n, $bal));
-    if ($take > 0) db()->prepare("UPDATE mkt_credit_balance SET balance=balance-?, updated_at=? WHERE subscriber_kind=? AND subscriber_id=? AND metric=?")
-        ->execute([$take, date('c'), $kind, $subId, $metric]);
+    // The draw is conditional on the balance still covering it: two draws landing
+    // together both read the same balance, and the plain "balance - take" let the
+    // second one push the wallet negative. When the condition fails, fall back to
+    // whatever is left now (possibly nothing).
+    if ($take > 0 && mkt_credits_draw($kind, $subId, $metric, $take) < 1) {
+        $take = max(0, min($n, mkt_credits_balance($kind, $subId, $metric)));
+        if ($take > 0 && mkt_credits_draw($kind, $subId, $metric, $take) < 1) $take = 0;
+    }
     return $take;
+}
+
+/** The conditional draw itself: rows updated (1), or 0 when the balance no longer covers $take. */
+function mkt_credits_draw($kind, $subId, $metric, $take) {
+    $st = db()->prepare("UPDATE mkt_credit_balance SET balance=balance-?, updated_at=?
+                         WHERE subscriber_kind=? AND subscriber_id=? AND metric=? AND balance >= ?");
+    $st->execute([(int)$take, date('c'), _mkt_c_kind($kind), (int)$subId, (string)$metric, (int)$take]);
+    return (int)$st->rowCount();
 }
 
 /** Buy a credit pack — adds the credits to the wallet and logs the purchase. [ok,msg,id]. */

@@ -10,9 +10,13 @@
 //    2. checkout page → Razorpay collects the card, hands back a signed result
 //    3. verify → confirm the HMAC signature, THEN activate (subscribe / add credits)
 //
-//  SAFE FALLBACK: if no Razorpay keys are configured, or the price is zero (a free
-//  plan, or the freelancer launch-promo), we activate immediately with no charge —
-//  so the marketplace keeps working exactly as before until keys are added.
+//  A zero price (a free plan, or the freelancer launch-promo) activates at once with
+//  no charge. A PRICED plan or pack with no Razorpay keys is REFUSED, not granted
+//  free: until 19 Oct 2026 it activated immediately "so the marketplace keeps working
+//  until keys are added", which meant that with charging switched on and the keys
+//  missing (never entered, or removed), every paid plan and credit pack was handed
+//  out for nothing and no revenue was recorded. The admin plans screen now says when
+//  priced items cannot be bought.
 //
 //  The money never touches the platform balance-sheet dishonestly: this is the
 //  customer paying the platform for their subscription/top-up, recorded per order.
@@ -32,6 +36,22 @@ function mkt_pay_migrate() {
     if (function_exists('act_index')) act_index('mkt_orders', 'ix_mord_who', '(subscriber_kind, subscriber_id, status)');
 }
 
+/** What a buyer is told when a priced item cannot be paid for (no keys). */
+function mkt_pay_unconfigured_msg() {
+    return 'Online payment is not set up on this marketplace yet, so a paid plan or credit pack cannot be bought right now. Please contact us to arrange it.';
+}
+/** Priced plans or packs that exist while payment is not configured — for the admin screen. */
+function mkt_pay_priced_items_blocked() {
+    if (mkt_pay_configured()) return [];
+    $out = [];
+    if (function_exists('mkt_plans_all'))
+        foreach (mkt_plans_all() as $p)
+            if (!empty($p['is_active']) && ((float)$p['price_month'] > 0 || (float)$p['price_annual'] > 0)) $out[] = 'plan ' . $p['name'];
+    if (function_exists('mkt_credit_packs_all'))
+        foreach (mkt_credit_packs_all(null, true) as $p)
+            if ((float)$p['price'] > 0) $out[] = 'pack ' . $p['name'];
+    return $out;
+}
 /** Is online payment capture available (Razorpay keys present)? */
 function mkt_pay_configured() { return function_exists('billing_configured') && billing_configured(); }
 
@@ -51,7 +71,6 @@ function mkt_pay_price($purpose, $refId, $period = 'MONTH') {
 /**
  * Begin a purchase. Returns one of:
  *   ['mode'=>'free']          → price is 0 (free plan / promo) — caller activates now
- *   ['mode'=>'unconfigured']  → no Razorpay keys — caller activates now (records only)
  *   ['mode'=>'pay','row_id'=>N] → a Razorpay order is waiting — send to the checkout page
  *   ['mode'=>'error','msg'=>…] → could not create the order
  */
@@ -62,7 +81,7 @@ function mkt_pay_start($kind, $subId, $purpose, $refId, $period = 'MONTH', $by =
     $period = strtoupper($period) === 'YEAR' ? 'YEAR' : 'MONTH';
     $amount = mkt_pay_price($purpose, $refId, $period);
     if ($amount <= 0) return ['mode' => 'free'];
-    if (!mkt_pay_configured()) return ['mode' => 'unconfigured'];
+    if (!mkt_pay_configured()) return ['mode' => 'error', 'msg' => mkt_pay_unconfigured_msg()];
 
     $cfg = billing_config();
     $paise = (int) round($amount * 100);

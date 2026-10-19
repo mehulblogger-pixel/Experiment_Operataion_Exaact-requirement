@@ -190,6 +190,7 @@ Closed during the audit, with tests:
 | ✓ | **A route-gate guard test** — fails, naming the route, if any of 365 gated routes loses its module gate, and asserts all 17 money routes stay gated (**GAP-008** mitigation) |
 | ✓ | **GAP-008 tested** — 200 ungated routes probed per role; **no reachable hole found** |
 | ✓ | **The invoicing engine validates every figure off a form and bounds credit notes cumulatively** (**GAP-034/035/036**, 19 Oct): an invoice can no longer be credited past zero, a negative receipt cannot be recorded, and the two money INSERTs re-check their ceilings in the database |
+| ✓ | **A priced marketplace plan or credit pack is never granted free when payment keys are missing; the credit wallet stops at zero** (**GAP-037/038**, 19 Oct). Proration recorded as GAP-039 for a pricing decision |
 | ✓ | Earlier in the project: the navigation model, Back going up, approvals unified and moved out of "Report configuration", hiring-request change control, interview panel, the office-scope failure closing instead of falling open |
 
 ---

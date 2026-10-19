@@ -873,7 +873,7 @@ function portal_route($route, $method) {
                 $coupon  = (string)($_POST['coupon'] ?? '');
                 // Slice 6 — take the money first when Razorpay is configured and there is a
                 // price to charge; otherwise (no keys, or a free/promo price) activate now.
-                $start = function_exists('mkt_pay_start') ? mkt_pay_start('CLIENT', $party, $purpose, $refId, $period, $who) : ['mode' => 'unconfigured'];
+                $start = function_exists('mkt_pay_start') ? mkt_pay_start('CLIENT', $party, $purpose, $refId, $period, $who) : ['mode' => 'free'];
                 if (($start['mode'] ?? '') === 'pay')   redirect('/portal/pay?o=' . (int)$start['row_id']);
                 if (($start['mode'] ?? '') === 'error') { $_SESSION['portal_flash'] = $start['msg']; redirect('/portal/plans'); }
                 if ($pack && function_exists('mkt_credit_buy'))      { [$bok, $bmsg] = mkt_credit_buy('CLIENT', $party, $refId, $who); $_SESSION['portal_flash'] = $bmsg; }

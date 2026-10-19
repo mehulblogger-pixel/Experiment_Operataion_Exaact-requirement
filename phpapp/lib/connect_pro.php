@@ -817,7 +817,7 @@ function connect_pro_route($route, $method) {
                 $coupon  = (string)($_POST['coupon'] ?? '');
                 // Slice 6 — collect payment first when Razorpay is configured and there is a
                 // price; otherwise (no keys, or a free/promo price) activate immediately.
-                $start = function_exists('mkt_pay_start') ? mkt_pay_start('PRO', $meId, $purpose, $refId, $period, $who) : ['mode' => 'unconfigured'];
+                $start = function_exists('mkt_pay_start') ? mkt_pay_start('PRO', $meId, $purpose, $refId, $period, $who) : ['mode' => 'free'];
                 if (($start['mode'] ?? '') === 'pay')   redirect('/pro/pay?o=' . (int)$start['row_id']);
                 if (($start['mode'] ?? '') === 'error') { connect_pro_flash_set($start['msg'], 'err'); redirect('/pro/plans'); }
                 if ($pack && function_exists('mkt_credit_buy'))     { [$bok, $bmsg] = mkt_credit_buy('PRO', $meId, $refId, $who); connect_pro_flash_set($bmsg, $bok ? 'ok' : 'err'); }

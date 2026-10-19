@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '4cb5a83 · 2026-10-19 08:56 UTC · 687 files';
+$RELEASE = 'dcf8d29 · 2026-10-19 11:07 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -100,7 +100,7 @@ $EXPECT  = [
     'lib/connect_passport.php' => ['s'=>11025,'h'=>'651b739f219f52b4'],
     'lib/connect_person.php' => ['s'=>7701,'h'=>'7210f0cae01d84e9'],
     'lib/connect_privacy.php' => ['s'=>17610,'h'=>'74640b7aef0d480c'],
-    'lib/connect_pro.php' => ['s'=>69627,'h'=>'2d06db188d555d80'],
+    'lib/connect_pro.php' => ['s'=>69619,'h'=>'fc6309e70438ed42'],
     'lib/connect_qualtax.php' => ['s'=>24846,'h'=>'ff8da4316ac1a9d6'],
     'lib/connect_rating_disputes.php' => ['s'=>8981,'h'=>'0152a5d87d7e6917'],
     'lib/connect_ratings.php' => ['s'=>7478,'h'=>'cf59bcdbfc71b896'],
@@ -158,13 +158,13 @@ $EXPECT  = [
     'lib/mghsso.php' => ['s'=>10002,'h'=>'80f043e73ff44d13'],
     'lib/mis.php' => ['s'=>26675,'h'=>'793805e19f98b98f'],
     'lib/mkt_billing.php' => ['s'=>8396,'h'=>'34d5dafe732275bb'],
-    'lib/mkt_credits.php' => ['s'=>9152,'h'=>'a415feb6c7997cff'],
+    'lib/mkt_credits.php' => ['s'=>9969,'h'=>'3165d4af5817062e'],
     'lib/mkt_escrow.php' => ['s'=>12953,'h'=>'38961c0e1478671e'],
     'lib/mkt_fees.php' => ['s'=>7830,'h'=>'d357fad88aebd4ae'],
     'lib/mkt_gates.php' => ['s'=>3563,'h'=>'33cc1d5744a2da96'],
     'lib/mkt_ledger.php' => ['s'=>10121,'h'=>'a26d0ec31a84af92'],
-    'lib/mkt_pay.php' => ['s'=>11640,'h'=>'85385f21129fdea6'],
-    'lib/mkt_plans.php' => ['s'=>10762,'h'=>'513801027f92ce90'],
+    'lib/mkt_pay.php' => ['s'=>12764,'h'=>'c885681c905b65a5'],
+    'lib/mkt_plans.php' => ['s'=>10874,'h'=>'c47b9e64a348f146'],
     'lib/mkt_rules.php' => ['s'=>12129,'h'=>'f541702a11884133'],
     'lib/mkt_subs.php' => ['s'=>10123,'h'=>'7a5b146d8a81d7ce'],
     'lib/nav.php' => ['s'=>27426,'h'=>'8ba2e16c1ef74f38'],
@@ -185,7 +185,7 @@ $EXPECT  = [
     'lib/pdf.php' => ['s'=>26663,'h'=>'356a367da31c40a6'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
-    'lib/portal.php' => ['s'=>117455,'h'=>'d69eea3a8f9d4ebe'],
+    'lib/portal.php' => ['s'=>117447,'h'=>'f0b3291ae176128f'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>10272,'h'=>'7f36c21dab0d782d'],
@@ -527,7 +527,7 @@ $EXPECT  = [
     'views/ops/mkt_escrow.php' => ['s'=>8227,'h'=>'91cc9ea78d55268a'],
     'views/ops/mkt_gates.php' => ['s'=>1969,'h'=>'af43ddabd3ca2144'],
     'views/ops/mkt_ledger.php' => ['s'=>5312,'h'=>'e317bc521f86c81f'],
-    'views/ops/mkt_plans.php' => ['s'=>18432,'h'=>'7410e6be555059e2'],
+    'views/ops/mkt_plans.php' => ['s'=>18975,'h'=>'972e0eedd1716518'],
     'views/ops/mkt_rules.php' => ['s'=>8883,'h'=>'1eb57c8a8e0937b3'],
     'views/ops/module_locked.php' => ['s'=>2419,'h'=>'82de67be8483b36c'],
     'views/ops/my_approvals.php' => ['s'=>7347,'h'=>'a280d5d2e43a13ea'],

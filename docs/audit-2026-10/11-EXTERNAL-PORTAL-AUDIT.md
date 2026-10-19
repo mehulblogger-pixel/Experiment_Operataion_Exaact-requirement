@@ -749,6 +749,27 @@ is 2 MB."*
 
 ---
 
+### 2.11 Buying a plan or a credit pack — what happens when there is nothing to pay with
+
+Both portals have a **Plans** page (`/portal/plans`, `/pro/plans`) where a
+client or professional subscribes to a plan or tops up a credit pack. The money
+path is: start a Razorpay order → checkout → verify the signature → activate.
+That path is sound (and GAP-032 made the activation exactly-once).
+
+The hole was beside it. When the platform has **no Razorpay keys**, the start
+step returned *unconfigured* and both portals **activated the purchase
+immediately, free** -- by design, per the code's own comment, "so the
+marketplace keeps working until keys are added". With charging switched on and
+keys missing, a priced plan or pack was a free click, and nothing reached the
+revenue ledger. **GAP-037, fixed:** a priced item is now refused with a plain
+message; free plans and the launch promo still activate at once; the admin
+plans screen says which priced items cannot be bought and links to the keys.
+
+Also found on this path: the credit wallet could be drawn below zero by two
+posts landing together (**GAP-038**, fixed with a conditional draw), and the
+plan-change proration code is never called, so a mid-month plan change pays
+twice for the overlap (**GAP-039**, recorded for a pricing decision).
+
 ## 3. Still to do on these portals
 
 This pass answered the two security questions. It did **not** do for the portals
