@@ -21,7 +21,8 @@
       <span class="muted" style="font-size:12px">What actually arrived, after any deduction.</span></div>
     <div><label>TDS the customer withheld</label><input class="form-control" name="tds_amount" type="number" step="0.01" placeholder="0.00">
       <span class="muted" style="font-size:12px">This settles the invoice too. Leaving it out is why an ageing report chases a customer who paid in full.</span></div>
-    <div><label>Bank charges</label><input class="form-control" name="bank_charges" type="number" step="0.01" placeholder="0.00"></div>
+    <div><label>Bank charges</label><input class="form-control" name="bank_charges" type="number" step="0.01" min="0" placeholder="0.00">
+      <span class="muted" style="font-size:12px">What the bank kept. These are the customer's to bear, so they do <b>not</b> settle the invoice — the shortfall stays owed on it.</span></div>
     <div><label>Bank</label><input class="form-control" name="bank" maxlength="120"></div>
     <div class="ff-wide"><label>Reference</label><input class="form-control" name="reference" maxlength="120" placeholder="UTR, cheque number, or whatever the statement shows"></div>
     <div class="ff-wide"><label>Notes</label><input class="form-control" name="notes" maxlength="500"></div>

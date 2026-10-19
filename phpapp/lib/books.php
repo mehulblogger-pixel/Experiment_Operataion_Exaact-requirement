@@ -1078,9 +1078,27 @@ function books_outstanding($partnerId) {
 }
 
 // ---- Registers --------------------------------------------------------------
+// What has settled an invoice beyond its own value: matched cash and TDS plus
+// issued credit notes, over the invoice total. Used by the register filter, the
+// red panel and the home screen, so all three can never disagree. (GAP-035:
+// before 19 Oct 2026 a credit note's ceiling did not count earlier notes, so this
+// is how an accounts person finds out whether it ever happened -- on a screen,
+// read only, instead of a database query.)
+const BOOKS_OVERCREDIT_SQL = "(COALESCE((SELECT SUM(oa.amount) FROM receipt_allocations oa WHERE oa.invoice_id = i.id),0)
+          + COALESCE((SELECT SUM(oc.total) FROM credit_notes oc WHERE oc.invoice_id = i.id AND oc.status='ISSUED'),0)
+          - i.total)";
+function books_overcredited() {
+    books_migrate();
+    [$w, $a] = scope_clause('i.office_id', 'i.sbu');
+    return books_try(fn() => ops_all("SELECT i.id, i.invoice_no, i.partner_name, i.total, " . BOOKS_OVERCREDIT_SQL . " AS excess
+        FROM invoices i WHERE $w AND i.status NOT IN ('DRAFT','CANCELLED') AND " . BOOKS_OVERCREDIT_SQL . " > 1
+        ORDER BY " . BOOKS_OVERCREDIT_SQL . " DESC", $a), []);
+}
+
 function books_invoice_where(array $f) {
     [$w, $a] = scope_clause('i.office_id', 'i.sbu');
     $wh = [$w];
+    if (!empty($f['overcredited'])) $wh[] = "i.status NOT IN ('DRAFT','CANCELLED') AND " . BOOKS_OVERCREDIT_SQL . " > 1";
     if (!empty($f['status'])) { $wh[] = 'i.status = ?'; $a[] = $f['status']; }
     if (!empty($f['open']))   { $wh[] = "i.status IN ('ISSUED','PART_PAID')"; }
     if (!empty($f['partner'])) { $wh[] = 'i.partner_id = ?'; $a[] = (int)$f['partner']; }

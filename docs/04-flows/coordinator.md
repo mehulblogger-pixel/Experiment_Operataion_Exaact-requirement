@@ -92,3 +92,14 @@ rather than a blanket "More options" fold. On the **job detail**, the *Hold & wi
 points* panel is now a fold that auto-opens only when a point is OPEN (action needed) and
 stays collapsed — with the count in its summary — otherwise, so the Reports & QA tab is not
 filled by an add-form when there is nothing to act on.
+
+## Change, 19 Oct 2026 — recording a nonconformity
+
+On the owner's rule (Q-B1), a coordinator — and every role above coordinator
+level — may **record** a nonconformity: **Quality & Accreditation →
+Nonconformity workspace → + Raise a nonconformity** (the tile shows when the
+inspection pack is switched on), or **+ Raise a nonconformity** on a job's
+*Quality — nonconformities* panel, or on a complaint. They can read the register. They cannot record containment,
+decide the disposition, open the corrective action or close it; those stay with
+the Quality Head, the Technical Head and administrators. See
+`docs/02-permission-matrix.md` footnote 20.

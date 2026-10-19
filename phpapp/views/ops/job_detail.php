@@ -840,7 +840,7 @@ if (function_exists('hwp_for_job')):
     <?php else: ?>
     <p class="muted" style="margin:0 0 8px">No nonconformities on this <?= e(Tl('job')) ?>.</p>
     <?php endif; ?>
-    <?php if (function_exists('ncr_can_raise') && ncr_can_raise()): ?>
+    <?php if (function_exists('ncr_can_record') && ncr_can_record()): ?>
       <p style="margin:8px 2px 0"><a class="btn small" href="/ncr-new?job=<?= (int)$job['id'] ?><?= !empty($job['call_id']) ? '&partner=' . (int)($jcall['client_id'] ?? 0) : '' ?>">+ Raise a nonconformity</a>
         <?php if ($jobNcrs): ?><a class="muted" style="font-size:12px;margin-left:8px" href="/ncr?job=<?= (int)$job['id'] ?>">See all in the register →</a><?php endif; ?></p>
     <?php endif; ?>

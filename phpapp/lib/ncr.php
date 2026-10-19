@@ -178,6 +178,11 @@ function ncr_dt_columns($today) {
 // ---- Who ------------------------------------------------------------------
 function ncr_can_view()  { return can('mod.ncr.view') || can('mod.capa.view') || is_master_of(['ncr','capa']); }
 function ncr_can_raise() { return can('mod.ncr.edit') || can('mod.capa.edit') || is_master_of(['ncr','capa']); }
+// RECORDING a nonconformity is narrower than working one: coordinator level and
+// above may write the finding down (owner, 2026-10-19, Q-B1); containing it,
+// deciding the disposition, opening the corrective action and closing stay with
+// ncr_can_raise() / ncr_can_close().
+function ncr_can_record() { return can('mod.ncr.add') || ncr_can_raise(); }
 // Closing is a separate act from raising, for the same reason approving is
 // separate from creating everywhere else in this application.
 function ncr_can_close() { return can('ncr.close') || can('capa.close') || is_master(); }
@@ -462,7 +467,7 @@ function ncr_run_reminders($today = null) {
 
 // ---- Screens ---------------------------------------------------------------
 function ops_ncr($route, $method) {
-    ops_require(ncr_can_view(), 'You cannot open the nonconformity register.');
+    ops_require(ncr_can_view() || ncr_can_record(), 'You cannot open the nonconformity register.');
     ncr_migrate();
 
     if ($route === 'ncr') {
@@ -496,7 +501,7 @@ function ops_ncr($route, $method) {
         $rows  = ncr_all($f, $extraW, $extraA, $dt['q'], dt_sql_tail($dt, $cols, NCR_ORDER));
         view('ops/ncr_list', ['rows' => $rows, 'total' => $total, 'dt' => $dt, 'cols' => $cols,
                               'f' => $f, 'counts' => ncr_counts(),
-                              'canRaise' => ncr_can_raise(), 'today' => date('Y-m-d'),
+                              'canRaise' => ncr_can_record(), 'today' => date('Y-m-d'),
                               'scopeJob' => $scopeJob, 'scopeReport' => $scopeReport]);
         return true;
     }
@@ -526,10 +531,9 @@ function ops_ncr($route, $method) {
         return true;
     }
 
-    // Everything below writes.
-    ops_require(ncr_can_raise(), 'You cannot raise or change a nonconformity.');
-
+    // Everything below writes. Recording a new one is the narrower right.
     if ($route === 'ncr-new') {
+        ops_require(ncr_can_record(), 'You cannot record a nonconformity.');
         if ($method === 'POST') {
             $title = trim((string)($_POST['title'] ?? ''));
             if ($title === '') { flash('A nonconformity needs a title — one line saying what was wrong.', 'error'); redirect('/ncr-new'); }
@@ -544,6 +548,8 @@ function ops_ncr($route, $method) {
         ]);
         return true;
     }
+    // Containment, disposition, the corrective action, assignment, closing: working it.
+    ops_require(ncr_can_raise(), 'You cannot change a nonconformity. Recording one is open to coordinators and above; working it is for quality.');
 
     $n = ncr_row($_POST['id'] ?? $_GET['id'] ?? 0);
     if (!$n) { http_response_code(404); view('notfound'); return true; }

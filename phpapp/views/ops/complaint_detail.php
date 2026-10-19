@@ -176,7 +176,7 @@
   <?php else: ?>
     <p class="sub" style="margin-top:0">We found fault, so something has to change. Raising it here carries the
       complaint and the cause across, so the two records cannot end up disagreeing.</p>
-    <?php if (function_exists('ncr_can_raise') && ncr_can_raise()): ?>
+    <?php if (function_exists('ncr_can_record') && ncr_can_record()): ?>
     <?php // Most upheld complaints are a nonconformity first: something was
           // wrong, and the work already delivered has to be put right. Whether
           // it also needs a corrective action is a separate judgement, taken on

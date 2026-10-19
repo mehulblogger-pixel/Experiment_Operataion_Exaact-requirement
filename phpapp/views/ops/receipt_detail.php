@@ -31,6 +31,15 @@
   <div class="qcard <?= ($leftCash+$leftTds) > 0.01 ? 'tone-warn' : '' ?>"><div class="qic">⇄</div><div class="qn" style="font-size:20px"><?= fmoney_short($leftCash + $leftTds) ?></div><div class="ql">Still to match</div></div>
 </div>
 
+<?php if ((float)($r['bank_charges'] ?? 0) > 0.005): ?>
+  <?php // The owner's rule, 2026-10-19 (Q-J): bank charges are the customer's to bear. ?>
+  <div class="panel" role="status" style="margin-top:12px;border-left:4px solid #b7791f">
+    <b>The bank kept <?= e(fmoney($r['bank_charges'])) ?> of this payment.</b>
+    Bank charges are the customer's to bear, so this does not settle any invoice: the invoice it pays stays short by <?= e(fmoney($r['bank_charges'])) ?> until the customer makes it good.
+    If you decide to absorb it instead, that is a bank-charges expense in the accounts, not a credit note — a credit note would reduce the GST on the sale.
+  </div>
+<?php endif; ?>
+
 <?php if ($allocs): ?>
 <div class="panel" style="margin-top:16px;padding:0;overflow:hidden">
   <div style="padding:12px 16px;background:var(--soft);border-bottom:1px solid var(--line)"><b style="font-size:13.5px">Matched to</b></div>

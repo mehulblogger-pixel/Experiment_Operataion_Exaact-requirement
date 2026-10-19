@@ -9423,6 +9423,13 @@ function attention_summary() {
             if ($od > 0) $push('ar_overdue', 'Overdue receivables', $odn, '/receivables', 'cash', fmoney_short($od), 'past due date');
         } catch (Throwable $e) {}
     }
+    // Money: an invoice settled beyond its own value (GAP-035). Empty, and so
+    // silent, on a clean ledger -- which is the answer the owner wants.
+    if (function_exists('books_can') && books_can() && function_exists('books_overcredited')) {
+        $oc = books_overcredited();
+        if ($oc) $push('inv_overcredit', 'Invoices credited beyond their value', count($oc), '/invoices?f=overcredited', 'risk',
+                       fmoney_short(array_sum(array_map(fn($o) => (float)$o['excess'], $oc))), 'payments and credit notes exceed the invoice');
+    }
     // Competence: certificates lapsed across the workforce.
     if ((function_exists('can') && can('mod.users.view')) || (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master_of') && is_master_of('users'))) {
         if (function_exists('competence_training_watch_counts')) {

@@ -33,6 +33,20 @@
 </div>
 <?php endif; ?>
 
+<?php $over = function_exists('books_overcredited') ? books_overcredited() : []; ?>
+<?php if ($over): ?>
+<div class="panel" role="alert" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 7%,transparent);margin-top:16px">
+  <b style="color:var(--bad)">⚠ Invoices credited beyond their value</b>
+  <div class="muted" style="margin-top:4px">Payments and credit notes against these come to more than the invoice was for. Either the customer
+    is owed the difference back, or a credit note was raised in error. The system now refuses this; these were recorded before that rule.</div>
+  <div style="margin-top:6px;font-size:13px">
+    <?php foreach (array_slice($over, 0, 12) as $o): ?><a class="pill p-bad" href="/invoice?id=<?= (int)$o['id'] ?>"><?= e($o['invoice_no'] ?: '#' . $o['id']) ?> · <?= e(fmoney($o['excess'])) ?> over</a> <?php endforeach; ?>
+    <?php if (count($over) > 12): ?><span class="muted">and <?= count($over) - 12 ?> more</span><?php endif; ?>
+    <a href="/invoices?f=overcredited" style="margin-left:8px">Show them as a list →</a>
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="qcards" style="margin-top:16px">
   <?php foreach ($cards as $key=>$q): ?>
     <a class="qcard <?= $q['tone'] ?><?= $f===$key?' on':'' ?>" href="/invoices?f=<?= e($key) ?>">
@@ -49,7 +63,7 @@
     <a href="/invoices?f=draft">review &amp; issue them →</a></div>
 <?php endif; ?>
 <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-  <b style="font-size:13.5px"><?= e($cards[$f]['l'] ?? ucfirst($f)) ?></b>
+  <b style="font-size:13.5px"><?= e($f === 'overcredited' ? 'Credited beyond their value' : ($cards[$f]['l'] ?? ucfirst($f))) ?></b>
   <span style="margin-left:auto">
     <?php foreach (['open'=>'Open','paid'=>'Paid','draft'=>'Draft','cancelled'=>'Cancelled','all'=>'All'] as $k=>$lbl): ?>
       <a href="/invoices?f=<?= e($k) ?>" style="margin-left:10px<?= $f===$k?';font-weight:700':'' ?>"><?= e($lbl) ?></a>

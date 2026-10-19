@@ -462,6 +462,13 @@ administrator by accident. A test asserts they are still absent.
   Head"* would remove ADMIN's. That is a removal, not an addition, so it was not
   done unasked.
 
+### RESOLVED (part 2) — who may record, 2026-10-19
+
+Q-B1 answered: coordinator level and above record; see the questions table.
+Problem 2 above (seeing the corrective action but not the finding) is gone for
+all five roles, since recording implies reading. Problem 3 (inspectors) is now
+the owner's decided position: inspectors do not record.
+
 **Acceptance (met for part 1).** The matrix carries an NCR row and a CAPA row;
 the measured per-role table matches them; and closing a nonconformity is
 possible for a named quality role without administrator rights.
@@ -803,7 +810,32 @@ line the voucher carries. **Fixed:** GST % derived from tax over taxable, a
 
 ## Q-J — bank charges on a receipt: do they settle the invoice, or stay with the customer?
 
-**QUESTION FOR THE OWNER · recorded 19 Oct 2026 · impact P3**
+**ANSWERED 19 Oct 2026 · impact P3 · BUILT**
+
+> *"Bank charges — yes that shall be chargeable to customer or it must be
+> included in our own price. Check which is best."*
+
+**Decision recorded: the customer bears bank charges.** Both of the owner's
+options lead to the same thing in the books -- the invoice is settled only by
+what actually reaches our account; "included in our own price" is how a
+salesperson prices so that a customer who will not pay charges still nets the
+right figure, which is a quoting choice, not a ledger one. This is also the
+usual Indian B2B practice: domestic NEFT/RTGS charges fall on the remitter's
+bank, and for remittances from abroad the invoice asks for charges **OUR**
+(all paid by the sender) rather than SHA or BEN, so the full invoice arrives.
+
+**Built:** the receipt form says bank charges are the customer's and do not
+settle the invoice; a receipt with bank charges shows a notice that the invoice
+it pays stays short by that amount, and that absorbing it would be a
+bank-charges expense, not a credit note (a credit note would wrongly reduce
+the GST on the sale). The **built-in** quotation terms gain clause 11:
+*"All bank and remittance charges are to the payer's account; payments from
+outside India are to be remitted with charges OUR."* Terms a company has
+already saved under Settings are **not** changed -- the guide says where to add
+the sentence. No change to what a receipt settles: the code already behaved
+this way; the screens now say why.
+
+**Original analysis, kept for the record:**
 
 The receipt form asks for *Bank charges*. The figure is stored and then **read
 nowhere**: not by the allocation (only *Amount in the bank* and *TDS* can
@@ -1082,6 +1114,35 @@ the reply rather than silence. Each import is now one transaction.
 **Owner decision needed (Q-H):** "on account, applied to the next invoice" is
 standard practice and the safe default. If MGH Books should instead refund, or
 hold for a human, say so and the rule changes in one function.
+
+---
+
+## Q-L — mid-month plan change on the marketplace: the owner's answer may be about something else
+
+**CLARIFICATION NEEDED · 19 Oct 2026 · relates to GAP-039**
+
+The owner answered: *"There must be a mutual acceptance between the client,
+inspector and or agency as the case may be. This shall be decided during
+negotiation only."* That is a rule about the **work price agreed between a
+client and an inspector or agency**. GAP-039 is about something narrower: a
+client or professional changing their **subscription plan with the platform**
+in the middle of a month, where today they are charged the full new price with
+no credit for the unused part of the old one. Recorded as the owner's rule for
+engagement prices; the subscription question is asked again, plainly, with a
+recommendation (upgrade now with the unused value credited; downgrade at the
+end of the paid period, no refund -- the common SaaS practice).
+
+---
+
+## Q-K — the matrix says Finance views business partners; the code still refuses Finance the client list
+
+**QUESTION FOR THE OWNER · recorded 19 Oct 2026 · impact P3**
+
+Row *Business Partners* in `docs/02-permission-matrix.md` gives Finance
+**View**. The owner's "yes" on Q-G gave Finance the **vendor** register; the
+**client** register is still refused to Finance in code, so the matrix and the
+code still disagree on clients. Finance raises and chases invoices against
+clients, so the recommendation is yes, read only. Not built unasked.
 
 ---
 
@@ -1485,8 +1546,8 @@ screen is changed.
 | ~~**Q-C**~~ | **Answered 19 Oct 2026 — dormant.** The owner has never deployed it and has seen only its first screen. Treated as a separate, parked product: not audited further, marked dormant in its README. Original question — is `mgh-hire` live, a prototype, or dead? **Evidence gathered:** zero references from the ERP or its docs; standalone by design (own login, own database, *"shares none of its data with any other system"*); last touched 2026-09-05. Nothing in the ERP depends on it. A grep-level pass found prepared statements throughout, hashed passwords, escaping and CSRF present -- and a **public** careers-page upload whose guard I could not find by grep (see `12-SIBLING-DEPLOYABLES.md`). | Decides whether a 2,555-line separate product gets a full pass |
 | ~~**Q-H**~~ | **Decided 19 Oct 2026 — on account stands.** The owner deferred; standard accounting practice (an unapplied receipt is an advance, applied to the next invoice) is the default and is what was built. Follow-up done in the same commit: the balance is now **shown to staff** on the invoice screen and in the customer's outstanding figures, so held money is visible, not merely not-lost. Original question -- money a customer pays that cannot be applied is now held on account and pays the next invoice; refund or hold for a human instead? | GAP-028 · P1 |
 | ~~**Q-I**~~ | **Decided 19 Oct 2026 — 60 months stands.** The owner deferred; five years permits any real sale and stops any plausible typo. The amount-against-price check is **deferred** until a price per month exists to check against (there is none today). Original question -- right ceiling, and should the amount be checked against a price? | GAP-026 |
-| **Q-D** | Is a non-production workspace available on the live host? | Everything is currently "verified locally" |
-| **Q-B1** | Who may **raise** a nonconformity? Today nobody below Business Director can open the register, and an inspector cannot. *Recommend: inspectors and coordinators raise, quality closes.* | GAP-004 |
-| **Q-B2** | Should the five roles who see a corrective action also see the nonconformity behind it? *Recommend: yes, read-only.* | GAP-004 |
+| **Q-D** | Is a non-production workspace available on the live host? **Owner, 19 Oct: "What you need let me know."** The list of what is needed is in `14-LIVE-CHECKS-GUIDE.md` §4. | Everything is currently "verified locally" |
+| ~~Q-B1~~ | ~~Who may raise a nonconformity?~~ **Answered 19 Oct 2026:** *"Coordinator, Manager, Branch Manager or application manager — in short all equal to coordinator and above — can record."* **Built:** `mod.ncr.add` (+ view) for those seven roles; working and closing unchanged. Verified by role over HTTP. | GAP-004 |
+| **Q-B2** | Should the five roles who see a corrective action also see the nonconformity behind it? **Now moot for all five:** recording implies reading the register (Q-B1), and all five are coordinator level or above. | GAP-004 |
 | **Q-B3** | Should the two administrator logins keep the right to close a nonconformity? Strictly *"only Quality or Technical Head"* would remove it. | GAP-004 |
-| **Q-G** | Who should see the **vendor register** — the people who write reports against a vendor's work, the people who pay the vendor, or both? Today it is the former; **Finance is the one role refused**, which looks backwards. | `06-DATA-AND-PERMISSION-AUDIT.md` §4 |
+| ~~Q-G~~ | ~~Who should see the vendor register?~~ **Answered 19 Oct 2026: "Yes"** — Finance sees it. **Built:** `mod.vendors.view` for FINANCE, read only; the matrix already said View. | `06-DATA-AND-PERMISSION-AUDIT.md` §4 |

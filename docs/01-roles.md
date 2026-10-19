@@ -33,7 +33,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Must never:** be assumed unbreakable — a per-user override or role change can strip it (this is what caused the recent lock-out). Keep a real `MASTER_ADMIN` as the recovery key.
 
 ## BUSINESS_DIRECTOR — "Business Director"
-- **Key:** `BUSINESS_DIRECTOR` · perms = all dashboards + all `data.*` figures + `org.hierarchy.view` + `idems.audit.view`; offices/sbus `ALL` (`access.php:439-440`); modules = **view all** except `identity` (`:329,366-369`).
+- **Key:** `BUSINESS_DIRECTOR` · perms = all dashboards + all `data.*` figures + `org.hierarchy.view` + `idems.audit.view`; offices/sbus `ALL` (`access.php:439-440`); modules = **view all** except `identity` (`:329,366-369`). **Records nonconformities** (`mod.ncr.add` + view; owner, 2026-10-19).
 - **Who:** the top executive who reads the whole business but does not run the desks — sees every number across every branch.
 - **Context:** desk, laptop; figures-first.
 - **Sees:** every area (view-only); Masters/Users tiles show, **System settings hidden** (no `settings.manage`, `areas.php:213`).
@@ -41,7 +41,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Must never:** edit operational records or see identity documents by default.
 
 ## SBU_HEAD — "Business Unit Head"
-- **Key:** `SBU_HEAD` · all dashboards + all `data.*` + `workforce.report.approve` + `org.hierarchy.view` + `idems.finalize` + `idems.audit.view`; offices `ALL`, **sbus `OWN`** (`access.php:441-442`); views a broad module set (`:330-331`).
+- **Key:** `SBU_HEAD` · all dashboards + all `data.*` + `workforce.report.approve` + `org.hierarchy.view` + `idems.finalize` + `idems.audit.view`; offices `ALL`, **sbus `OWN`** (`access.php:441-442`); views a broad module set (`:330-331`). **Records nonconformities** (`mod.ncr.add` + view; owner, 2026-10-19).
 - **Who:** the head of one business unit/segment across branches — owns that unit's numbers and sign-offs.
 - **Context:** desk, laptop.
 - **Sees:** Sales, Operations, Recruitment, Quality (pack-gated), Reporting, Money, Insights, Directory, Admin(Masters). No Users module.
@@ -49,7 +49,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Must never:** manage logins/settings; act outside their SBU's data.
 
 ## BRANCH_MANAGER — "Branch Manager"
-- **Key:** `BRANCH_MANAGER` · all dashboards + all `data.*` + `ops.call.create` + `ops.job.allocate` + `ops.job.close` + `workforce.availability` + `workforce.report.approve` + `master.manage` + `users.manage.branch` + `org.hierarchy.view` + `idems.finalize` + `idems.audit.view`; **offices `OWN`**, sbus `ALL` (`access.php:443-444`); edits calls/jobs/idems/vouchers/hiring/reconcile/clients/vendors/masters/reports/users/complaints/capa/datacontrol/portal (`:332-334`).
+- **Key:** `BRANCH_MANAGER` · all dashboards + all `data.*` + `ops.call.create` + `ops.job.allocate` + `ops.job.close` + `workforce.availability` + `workforce.report.approve` + `master.manage` + `users.manage.branch` + `org.hierarchy.view` + `idems.finalize` + `idems.audit.view`; **offices `OWN`**, sbus `ALL` (`access.php:443-444`); edits calls/jobs/idems/vouchers/hiring/reconcile/clients/vendors/masters/reports/users/complaints/capa/datacontrol/portal (`:332-334`). **Records nonconformities** (`mod.ncr.add` + view; owner, 2026-10-19).
 - **Who:** the person who runs a single branch and is accountable for that branch's margin, staffing and delivery.
 - **Context:** desk, laptop.
 - **Sees:** all seven areas + Operations + Recruitment; Admin shows Masters + Users; System settings hidden (no `settings.manage`).
@@ -57,7 +57,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Must never:** manage users **outside their own office** (`users.manage.branch`, not global); change system settings.
 
 ## BRANCH_APP_MANAGER — "Branch Application Manager"
-- **Key:** `BRANCH_APP_MANAGER` · `dash.operations, dash.utilization, users.manage.branch, master.manage, ops.call.delete, org.hierarchy.view, idems.type.manage, idems.timestamp.edit, idems.audit.view`; offices `OWN`, sbus `ALL` (`access.php:445-447`); edits masters/overheads/users, views calls/jobs/reports (`:335-337`). **Only role with `idems.timestamp.edit`.**
+- **Key:** `BRANCH_APP_MANAGER` · `dash.operations, dash.utilization, users.manage.branch, master.manage, ops.call.delete, org.hierarchy.view, idems.type.manage, idems.timestamp.edit, idems.audit.view`; offices `OWN`, sbus `ALL` (`access.php:445-447`); edits masters/overheads/users, views calls/jobs/reports (`:335-337`). **Only role with `idems.timestamp.edit`.** **Records nonconformities** (`mod.ncr.add` + view; owner, 2026-10-19).
 - **Who:** the branch's system/config custodian — sets up masters, report types/numbering, users, and can delete a wrongly-raised call.
 - **Context:** desk, laptop.
 - **Sees:** Operations (calls/jobs view), Money (overheads), Insights, Directory (client holds), Admin (Masters, Users, report-config tiles via `idems.type.manage`). **No Reporting rail item** despite IDEMS-config perms (see flag).
@@ -66,7 +66,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **⚠ Flag:** holds `idems.type.manage`/`idems.timestamp.edit` but not `mod.idems.view`, so the Reporting area doesn't appear — the config screens are reachable via Admin tiles only.
 
 ## OPERATION_MANAGER — "Operation Manager"
-- **Key:** `OPERATION_MANAGER` · `dash.operations, dash.utilization, data.revenue, data.profitability, ops.call.create, ops.job.allocate, ops.job.close, workforce.availability, workforce.report.approve, idems.finalize`; offices/sbus `OWN` (`access.php:448-450`); edits calls/jobs/idems/vouchers/hiring/reconcile/complaints/capa/portal, views crm_orders/clients/vendors/masters/profitability/reports (`:338-340`).
+- **Key:** `OPERATION_MANAGER` · `dash.operations, dash.utilization, data.revenue, data.profitability, ops.call.create, ops.job.allocate, ops.job.close, workforce.availability, workforce.report.approve, idems.finalize`; offices/sbus `OWN` (`access.php:448-450`); edits calls/jobs/idems/vouchers/hiring/reconcile/complaints/capa/portal, views crm_orders/clients/vendors/masters/profitability/reports (`:338-340`). **Records nonconformities** (`mod.ncr.add` + view; owner, 2026-10-19).
 - **Who:** the head of operations for a branch/unit — owns delivery: getting calls scheduled, jobs allocated, reports out.
 - **Context:** desk, laptop.
 - **Sees:** Operations + Recruitment, Quality (complaints/capa), Reporting, Money (profitability), Insights, Directory, Admin (Masters). **No Sales** (only `crm_orders`, which has no Sales tile).
@@ -74,7 +74,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Must never:** manage users or system settings; see salary/credit figures (has revenue+profit but not `data.salary`/`data.credit`).
 
 ## ASST_MANAGER — "Asst. Manager"
-- **Key:** `ASST_MANAGER` · `dash.operations, ops.call.create, ops.job.allocate, workforce.availability`; offices/sbus `OWN` (`access.php:451-452`); edits calls/jobs/idems/complaints, views clients/vendors/reports/capa (`:341-343`). **`is_coordinator_level` but NOT `is_admin_level`.**
+- **Key:** `ASST_MANAGER` · `dash.operations, ops.call.create, ops.job.allocate, workforce.availability`; offices/sbus `OWN` (`access.php:451-452`); edits calls/jobs/idems/complaints, views clients/vendors/reports/capa (`:341-343`). **`is_coordinator_level` but NOT `is_admin_level`.** **Records nonconformities** (`mod.ncr.add` + view; owner, 2026-10-19).
 - **Who:** a deputy who helps run the desk — raises calls, allocates jobs, keeps the board moving; no money authority.
 - **Context:** desk, laptop; scheduling-first (`dashboard.php:66`).
 - **Sees:** Operations, Quality (complaints/capa), Reporting, Insights, Directory; **no Money, no Recruitment, no Sales**. Admin appears **only** via the coordinator-level SLA-targets tile (`areas.php:216`).
@@ -82,7 +82,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Must never:** close jobs (no `ops.job.close`), see any money figures, manage users/settings.
 
 ## COORDINATOR — "Coordinator"
-- **Key:** `COORDINATOR` · `dash.operations, dash.financial, data.credit, ops.call.create, ops.job.allocate, ops.job.close, workforce.availability`; offices/sbus `OWN` (`access.php:453-455`); edits calls/jobs/idems/vouchers/hiring/reconcile/complaints/portal, views crm_orders/clients/vendors/masters/reports/invoicing/capa (`:344-346`). `is_coordinator_level`, not admin-level.
+- **Key:** `COORDINATOR` · `dash.operations, dash.financial, data.credit, ops.call.create, ops.job.allocate, ops.job.close, workforce.availability`; offices/sbus `OWN` (`access.php:453-455`); edits calls/jobs/idems/vouchers/hiring/reconcile/complaints/portal, views crm_orders/clients/vendors/masters/reports/invoicing/capa (`:344-346`). `is_coordinator_level`, not admin-level. **Records nonconformities** (`mod.ncr.add` + view; owner, 2026-10-19).
 - **Who:** the operational engine of a branch — receives contracts from accounts, raises inspection calls, allocates and schedules inspectors, chases reports, closes jobs.
 - **Context:** desk, laptop; scheduling-first.
 - **Sees:** Operations + Recruitment, Quality (complaints/capa), Reporting, Money (invoice tracker; billing workspace via `data.credit`), Insights, Directory, Admin (Masters, SLA targets).
@@ -120,7 +120,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Must never:** approve/send quotes, touch operations or money.
 
 ## FINANCE — "Finance"
-- **Key:** `FINANCE` · `dash.financial, data.credit, data.revenue, data.salary, data.profitability, finance.reconcile, crm.contract.register`; offices/sbus `ALL` (`access.php:462-463`); edits invoicing/crm_orders, views quotes/crm_reports/profitability/reports/jobs/calls/vouchers/idems (`:357-359`). **Not `is_admin_level`.**
+- **Key:** `FINANCE` · `dash.financial, data.credit, data.revenue, data.salary, data.profitability, finance.reconcile, crm.contract.register`; offices/sbus `ALL` (`access.php:462-463`); edits invoicing/crm_orders, views quotes/crm_reports/profitability/reports/jobs/calls/vouchers/idems (`:357-359`), **and vendors, read only (owner, 2026-10-19)**. **Not `is_admin_level`.**
 - **Who:** accounts/finance — registers contracts off won quotes, raises and issues invoices, records receipts, reconciles credit and attendance.
 - **Context:** desk, laptop; money-first dashboard (`dashboard.php:65`).
 - **Sees:** Sales (quotes view), Operations (calls/jobs/vouchers **view-only**), Reporting, Money (invoicing/profitability/billing), Insights. **No Directory, no Admin, no Recruitment, no Quality.**

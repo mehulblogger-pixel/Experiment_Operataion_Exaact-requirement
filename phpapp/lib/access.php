@@ -31,6 +31,9 @@ const ORG_ROLES = [
 // approve", an accountant seeing "raise inspection call"). Their own CRM/finance
 // access is enforced by module/permission can() checks, which is unaffected.
 const MGMT_ROLES = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','BRANCH_APP_MANAGER','OPERATION_MANAGER'];
+// "Coordinator and above" -- the same set is_coordinator_level() means. Who may
+// record a nonconformity (owner's rule, 2026-10-19, Q-B1).
+const ACCESS_NCR_RECORDERS = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','BRANCH_APP_MANAGER','OPERATION_MANAGER','ASST_MANAGER','COORDINATOR'];
 // Marketing & Sales roles (CRM funnel owners)
 const SALES_ROLES = ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'];
 
@@ -848,8 +851,11 @@ function module_defaults($role) {
             //  Inspection reports are not — they are the technical finding, with
             //  no figure on them. Carrying them made a finance login open on an
             //  operations menu, which is what UAT 1.5.4 reported.
+            //  Vendors: finance pays them. The owner's answer, 2026-10-19 (Q-G): yes,
+            //  Finance sees the vendor register -- it had been the one role refused,
+            //  while the matrix already said View. Read only.
             $edit = ['invoicing','crm_orders'];
-            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers']; break;
+            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers','vendors']; break;
         case 'QUALITY_HEAD': case 'TECHNICAL_HEAD':
             //  The owner's rule, 2026-10-18: "only Quality or Technical Head can
             //  close it". Closing a nonconformity means owning the whole loop —
@@ -871,6 +877,14 @@ function module_defaults($role) {
             $view = ['calls','jobs','idems','reports','complaints']; break;
         case 'INSPECTOR': case 'SR_INSPECTOR': $edit = ['idems']; break; // inspectors write reports; else My Jobs / My Voucher
     }
+    //  The owner's rule, 2026-10-19 (Q-B1): "Coordinator, Manager, Branch Manager
+    //  or application manager -- in short all equal to coordinator and above --
+    //  can record" a nonconformity. Recording is the Add verb, which implies View
+    //  (PERM_VERB_IMPLIES), so these roles also read the register. Containment,
+    //  disposition, the corrective action and closing are NOT granted here: they
+    //  stay with mod.ncr.edit and ncr.close (the quality roles). Inspectors are
+    //  below coordinator level and are deliberately not included.
+    $ncrRecord = in_array($role, ACCESS_NCR_RECORDERS, true) && !in_array('ncr', $edit, true);
     // Identity documents are never handed out by a blanket "everything" grant.
     // A Business Director gets every module by default; that is a reasonable
     // default for revenue figures and a bad one for passports, so it is taken
@@ -881,6 +895,7 @@ function module_defaults($role) {
     }
     $out = [];
     foreach ($view as $k) $out[] = "mod.$k.view";
+    if ($ncrRecord) { $out[] = 'mod.ncr.view'; $out[] = perm_verb_key('ncr', 'add'); }
     //  R-20 — the old edit tick meant "add / edit", so a role that had it must
     //  now receive BOTH Add and Edit, or every role quietly loses the ability to
     //  create records. And on the four modules where the edit tick also carried
@@ -1154,9 +1169,54 @@ function role_defaults_base($role) {
 }
 
 // ---- Effective access for the current user (cached) ------------------------
+// ---- Owner's rules that must reach a SAVED access grid ---------------------
+// A role default reaches only roles nobody has customised: once an administrator
+// saves Settings -> Roles & access, the stored grid wins, and a per-user override
+// wins over that. So a rule the owner gives ("coordinator and above may record a
+// nonconformity") is also written ONCE into every stored grid and per-user set it
+// applies to. Once: the rule's id is recorded, so an administrator who later
+// unticks it on purpose is not overruled on the next page load. Additive only --
+// nothing is ever removed here.
+function access_owner_grants() {
+    return [
+        'Q-B1-2026-10-19' => ['perms' => ['mod.ncr.view', 'mod.ncr.add'], 'roles' => ACCESS_NCR_RECORDERS],
+        'Q-G-2026-10-19'  => ['perms' => ['mod.vendors.view'],            'roles' => ['FINANCE']],
+    ];
+}
+function access_apply_owner_grants($force = false) {
+    static $ran = false;
+    if (($ran && !$force) || !function_exists('setting_get') || !function_exists('setting_set')) return [];
+    $ran = true;
+    try {
+        $applied = array_values(array_filter(array_map('trim', explode(',', (string)setting_get('access_owner_grants_applied', '')))));
+        $pending = array_diff_key(access_owner_grants(), array_flip($applied));
+        if (!$pending) return [];
+        $base = fn($r) => function_exists('role_effective_key') ? role_effective_key(strtoupper((string)$r)) : strtoupper((string)$r);
+        $raw = (string)setting_get('role_access', '');
+        $store = $raw !== '' ? json_decode($raw, true) : null;
+        if (is_array($store)) {
+            foreach ($pending as $g)
+                foreach ($store as $roleKey => $perms)
+                    if (is_array($perms) && in_array($base($roleKey), $g['roles'], true))
+                        $store[$roleKey] = array_values(array_unique(array_merge($perms, $g['perms'])));
+            setting_set('role_access', json_encode($store));
+        }
+        foreach (ops_all("SELECT id, role, permissions FROM users WHERE COALESCE(permissions,'')<>'' AND COALESCE(is_superuser,0)=0") ?: [] as $u) {
+            $perms = array_values(array_filter(explode(',', (string)$u['permissions'])));
+            $new = $perms;
+            foreach ($pending as $g) if (in_array($base($u['role']), $g['roles'], true)) $new = array_merge($new, $g['perms']);
+            $new = array_values(array_unique($new));
+            if ($new !== $perms) db()->prepare("UPDATE users SET permissions=? WHERE id=?")->execute([implode(',', $new), (int)$u['id']]);
+        }
+        setting_set('access_owner_grants_applied', implode(',', array_merge($applied, array_keys($pending))));
+        return array_keys($pending);
+    } catch (Throwable $e) { return []; }   // never block a sign-in over this; it retries next request
+}
+
 function ua($fresh = false) {
     static $a = null;
     if (!$fresh && $a !== null) return $a;
+    if (function_exists('access_apply_owner_grants')) access_apply_owner_grants();
     if ($fresh) $a = null;
     $u = current_user($fresh);
     if (!$u) return $a = ['role' => 'GUEST', 'perms' => [], 'offices' => [], 'sbus' => [], 'self' => true, 'home' => null, 'master' => false];

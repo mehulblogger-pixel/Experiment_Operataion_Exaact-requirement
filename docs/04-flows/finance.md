@@ -55,3 +55,9 @@ Charts → … The pending-tasks panel shows "contracts to register" (`ops.php:6
 **Click-count — most common task:**
 - **Issue an invoice:** `/to-bill` (1) → tick job(s) (1) → "Draft invoice" (1) → **Issue** (1) = **~4 clicks** for a single-job invoice.
 - **Record a receipt:** `/receipts` (1) → New receipt (1) → fill + Save (1) → Allocate (1) = **~4 clicks**.
+
+## Change, 19 Oct 2026 — the vendor register
+
+On the owner's answer (Q-G), Finance opens **Directory → Vendor register** (also listed under **Operations → Vendors**), read only, to
+see who it is paying. Finance does not edit vendors. See
+`docs/02-permission-matrix.md` footnote 5ᵃ.

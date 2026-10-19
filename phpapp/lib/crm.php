@@ -757,7 +757,9 @@ function crm_default_terms() {
          . "7. Reports are issued after receipt of payment where so agreed.\n"
          . "8. Inspection is carried out to the agreed scope, specification and standard only.\n"
          . "9. Any statutory approval or third-party endorsement is not included unless stated.\n"
-         . "10. Jurisdiction for any dispute is the location of our registered office.";
+         . "10. Jurisdiction for any dispute is the location of our registered office.\n"
+         // The owner's rule, 2026-10-19 (Q-J): bank charges are the client's to bear.
+         . "11. All bank and remittance charges are to the payer's account; payments from outside India are to be remitted with charges OUR. The amount credited to our account must equal the invoice.";
 }
 // People whose stored signature may be stamped on a quote PDF (§xx).
 function crm_signatories() {

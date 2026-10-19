@@ -98,6 +98,7 @@ function ops_books($route, $method) {
         if ($f === 'draft')   $filter['status'] = 'DRAFT';
         if ($f === 'paid')    $filter['status'] = 'PAID';
         if ($f === 'cancelled') $filter['status'] = 'CANCELLED';
+        if ($f === 'overcredited') $filter['overcredited'] = 1;
 
         if (wants_csv()) {
             $csv = [['Invoice','Date','Due','Customer','Branch','PO','Contract','Taxable','CGST','SGST','IGST','Round off','Total','Settled','Outstanding','Status']];
