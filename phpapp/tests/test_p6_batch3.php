@@ -851,7 +851,7 @@ db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_
 $kAdminId = (int)db()->lastInsertId();
 
 unset($_SESSION['uid']); current_user(true); ua(true);   // no longer staff
-$_SESSION['cuid'] = $kAdminId;
+$_SESSION['cuid'] = $kAdminId; auth_bind_identity('cuid');
 t_ok(function_exists('cvp_client_is_admin') && cvp_client_is_admin(), 'K5 . the probe really is signed in as a client admin');
 t_ok(!portal_can_manage(), 'K6 . and is NOT staff - so only the client-admin authority is in play');
 

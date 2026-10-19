@@ -57,6 +57,7 @@ $partnerId = (int) $pdo->lastInsertId();
 $pdo->prepare("INSERT INTO client_users (partner_id,name,email,perms,is_active)
                VALUES (?,'M6 Portal User','m6@example.test','',1)")->execute([$partnerId]);
 $_SESSION['cuid'] = (int) $pdo->lastInsertId();
+$_SESSION['cuid_ws'] = 'testco';   // stamped as a real portal sign-in now is (GAP-049)
 $asTenant();
 t_ok(portal_user() !== null, 'portal · the test portal user signs in');
 
@@ -112,6 +113,7 @@ try {
     $pdo->prepare("INSERT INTO vendor_users (vendor_id,name,email,perms,is_active)
                    VALUES (?,'M6 Vendor User','m6v@example.test','',1)")->execute([$vPartner]);
     $_SESSION['vuid'] = (int) $pdo->lastInsertId();
+    $_SESSION['vuid_ws'] = 'testco';   // stamped as a real vendor sign-in now is (GAP-049)
 } catch (Throwable $e) { $vendorOk = false; }
 t_ok($vendorOk && cvp_vendor_user() !== null, 'vendor · the test vendor-portal user signs in');
 if ($vendorOk && cvp_vendor_user() !== null) {

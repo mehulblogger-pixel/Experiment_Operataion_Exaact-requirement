@@ -142,6 +142,7 @@ function portal_enabled() { return setting_get('portal_enabled', '0') === '1'; }
 // ============================================================================
 function portal_user() {
     if (empty($_SESSION['cuid'])) return null;
+    if (function_exists('auth_identity_here') && !auth_identity_here('cuid')) return null;   // issued by another company
     static $u = null, $for = 0;
     if ($u === null || $for !== (int)$_SESSION['cuid']) {
         $for = (int)$_SESSION['cuid'];
@@ -304,6 +305,7 @@ function portal_start_session($clientUserId) {
     if (session_status() === PHP_SESSION_ACTIVE) session_regenerate_id(true);
     unset($_SESSION['csrf'], $_SESSION['uid'], $_SESSION['pending_uid']);
     $_SESSION['cuid'] = (int)$clientUserId;
+    if (function_exists('auth_bind_identity')) auth_bind_identity('cuid');   // GAP-049: this company's portal user only
 }
 
 // ============================================================================

@@ -28,6 +28,7 @@ Per the matrix: Users = `E(global)` for MA/AD, `E(own office)` for BM/BAM,
 | **Test-copy switch** | `'test_copy' => true` in a copy's `config.local.php` stops every e-mail and puts a TEST COPY banner on every page. Never set on live | Live guide, Part 7 | Test |
 | Confirming a release landed | The footer version (2026.10.1) never changes; `/deploy-check.php` is the check | — | `../14-LIVE-CHECKS-GUIDE.md` Part 3 |
 | **Restore is safe against the wrong file** | A file that is not an EXAACT backup, or is damaged, is refused. Another workspace's backup is refused unless a master types this workspace's name. The restorer keeps their account; every restore is logged | GAP-048 (P0), closes A-F3 | **Execution**: the old code accepted another company's backup, locked the restorer out, and let a non-backup empty a table |
+| **Sessions cannot cross companies** | Staff and all three portals: a session issued by one company is refused at another; an unstamped staff session is no longer accepted anywhere | GAP-049 (P0) | **Live over HTTP** + test |
 
 ---
 

@@ -26,7 +26,7 @@ try {
     $V2 = (int)$pdo->lastInsertId();
     $pdo->prepare("INSERT INTO vendor_users (vendor_id, email, name, password_hash, is_active) VALUES (?, 'v@x.test','Vee','x',1)")->execute([$V]);
     $vuid = (int)$pdo->lastInsertId();
-    $_SESSION['vuid'] = $vuid;
+    $_SESSION['vuid'] = $vuid; auth_bind_identity('vuid');
 
     // An APPROVED profile, valid a year out, WITH an internal score that must never surface.
     $future = date('Y-m-d', strtotime('+300 days'));

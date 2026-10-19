@@ -50,7 +50,7 @@ try {
     // Part-payment on iPart: 800 allocated (cash) → outstanding 1200.
     $pdo->prepare("INSERT INTO receipt_allocations (receipt_id, invoice_id, kind, amount) VALUES (0,?, 'CASH', 800)")->execute([$iPart]);
 
-    $_SESSION['cuid'] = $cuAll;
+    $_SESSION['cuid'] = $cuAll; auth_bind_identity('cuid');
 
     $reg = portal_invoices_register();
     $byNo = []; foreach ($reg as $r) $byNo[$r['invoice_number']] = $r;
@@ -85,11 +85,11 @@ try {
     $pdo->prepare("INSERT INTO calls (client_id, call_code, status, site_address_id) VALUES (?, 'C-B', 'OPEN', ?)")->execute([$P, $siteB]);
     $callB = (int)$pdo->lastInsertId();
 
-    $_SESSION['cuid'] = $cuA;                    // restricted to Site A
+    $_SESSION['cuid'] = $cuA; auth_bind_identity('cuid');                // restricted to Site A
     t_ok(portal_call($callA) !== null, 'a site-restricted user can open a call at their own site');
     t_ok(portal_call($callB) === null, 'a site-restricted user cannot open a same-company call at another site (single-fetch now scoped)');
 
-    $_SESSION['cuid'] = $cuAll;                  // all sites
+    $_SESSION['cuid'] = $cuAll; auth_bind_identity('cuid');            // all sites
     t_ok(portal_call($callB) !== null, 'a user with no site restriction still sees every site');
 } finally {
     if ($savedCuid === null) unset($_SESSION['cuid']); else $_SESSION['cuid'] = $savedCuid;

@@ -90,7 +90,7 @@ try {
         db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,perms,created_at)
                        VALUES (?,?,?,'x',1,?,?)")
             ->execute([$pid, "pt$n@test", "PT $n", implode(',', $perms), $now]);
-        return $_SESSION['cuid'] = (int)db()->lastInsertId();
+        $_SESSION['cuid'] = (int)db()->lastInsertId(); auth_bind_identity('cuid'); return $_SESSION['cuid'];
     };
 
     $signIn(PORTAL_PRESETS['ACCOUNTS']['perms']);                 // invoices, complaint
@@ -215,7 +215,7 @@ try {
         db()->prepare("INSERT INTO vendor_users (vendor_id,email,name,password_hash,is_active,perms,created_at)
                        VALUES (?,?,?,'x',1,?,?)")
             ->execute([$vid, "vpt$n@test", "VPT $n", implode(',', $perms), $now]);
-        return $_SESSION['vuid'] = (int)db()->lastInsertId();
+        $_SESSION['vuid'] = (int)db()->lastInsertId(); auth_bind_identity('vuid'); return $_SESSION['vuid'];
     };
 
     $vSignIn(['qualification']);                     // neither reports nor issues

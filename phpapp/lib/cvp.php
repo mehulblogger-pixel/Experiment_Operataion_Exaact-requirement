@@ -128,6 +128,7 @@ function cvp_vendor_enabled() { return setting_get('vendor_portal_enabled', '0')
 
 function cvp_vendor_user() {
     if (empty($_SESSION['vuid'])) return null;
+    if (function_exists('auth_identity_here') && !auth_identity_here('vuid')) return null;   // issued by another company
     static $u = null, $for = 0;
     if ($u === null || $for !== (int)$_SESSION['vuid']) {
         $for = (int)$_SESSION['vuid'];
@@ -228,6 +229,7 @@ function cvp_vendor_start_session($vendorUserId) {
     if (session_status() === PHP_SESSION_ACTIVE) session_regenerate_id(true);
     unset($_SESSION['csrf'], $_SESSION['uid'], $_SESSION['pending_uid'], $_SESSION['cuid']);
     $_SESSION['vuid'] = (int)$vendorUserId;
+    if (function_exists('auth_bind_identity')) auth_bind_identity('vuid');   // GAP-049
 }
 
 // ---- Vendor reads — every one filters by the session's vendor id -----------

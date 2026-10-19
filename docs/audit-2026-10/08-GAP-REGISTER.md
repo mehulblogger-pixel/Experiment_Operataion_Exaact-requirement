@@ -728,6 +728,50 @@ per-address limit is the conventional answer; recorded, not built.
 
 ---
 
+## GAP-049 — a portal session from one company was honoured by another
+
+**CONFIRMED BY EXECUTION (live, over HTTP) · P0 · client, vendor and professional portals · FIXED 19 Oct 2026 · roadmap 1.3**
+
+Every company's sessions live in one store on the server, and the three
+portals resolved their signed-in person from a bare row number in the session
+(`cuid`, `vuid`, `cxpid`) with no record of which company issued it. Driven on
+two companies in the platform's own subdomain mode
+(`evidence/live-cross-company-session/`): a client of **Acme** signed in at
+`acme.…`, took **their own** session id and sent it to `beta.…` — and was
+signed in as **Beta's** client user, with Beta's confidential client on the
+page. No Beta password was needed; any portal user of any company could do it,
+and row 1 exists in nearly every company.
+
+Staff sign-in already carried this binding (M13), with one stated exception: a
+session *without* a stamp was accepted anywhere.
+
+**Fixed:** one rule for all four identities (`auth_bind_identity()` /
+`auth_identity_here()` in `helpers.php`). Each sign-in is stamped with the
+company that issued it, and each read refuses a session stamped by another. An
+unstamped identity counts as the single-company install's own, so it is refused
+on every company workspace while a single install is unaffected. The
+professional portal also now issues a fresh session id at sign-in, as the other
+two portals already did. Re-driven: the replayed session is signed out at Beta,
+still works at Acme, and Beta's own client signs in normally. Guard rail
+`tests/test_cross_company_session.php`.
+
+**On the first run:** the attack looked blocked because the script let curl
+manage cookies while setting the address by hand, so the cookie was never sent
+to Beta. Recorded in the evidence note, because a test that cannot reach the
+door proves nothing about the lock.
+
+**Test side-effect:** seven older test files signed a portal user in by writing
+the row number into the session by hand. They now stamp it the way a real
+sign-in does; no test was weakened to make it pass. Full suite 17,812 passed.
+
+**Found on the way, not caused by this fix:** `test_m7_*` and `test_m8_*` fail
+when run on their own (6 and 3 checks), identically on the code before this
+change; they pass in the full suite. They depend on something an earlier test
+leaves behind. Harmless to the product, but a test that only passes in company
+is a weaker guard rail — roadmap 3.6.
+
+---
+
 ## GAP-048 — restore accepted another company's backup, and a file that was not a backup at all
 
 **CONFIRMED BY EXECUTION · P0 · `/backup` (Upload & restore) · FIXED 19 Oct 2026 · closes A-F3, roadmap 1.5 and 2.4**

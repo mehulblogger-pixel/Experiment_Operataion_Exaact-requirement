@@ -163,6 +163,7 @@ function connect_pro_portal_on() {
 /** The logged-in professional, or null. */
 function connect_pro_user() {
     if (empty($_SESSION['cxpid'])) return null;
+    if (function_exists('auth_identity_here') && !auth_identity_here('cxpid')) return null;   // issued by another company (GAP-049)
     static $u = null, $for = 0;
     if ($u === null || $for !== (int)$_SESSION['cxpid']) {
         $for = (int)$_SESSION['cxpid'];
@@ -244,7 +245,9 @@ function connect_pro_register(array $in) {
     db()->prepare("INSERT INTO cx_professionals (email,name,mobile,password_hash,is_active,verification_tier,passport_token,created_at)
                    VALUES (?,?,?,?,1,'registered',?,?)")
         ->execute([$email, $name, trim((string)($in['mobile'] ?? '')), password_hash($pw, PASSWORD_DEFAULT), $tok, date('c')]);
+    if (session_status() === PHP_SESSION_ACTIVE) session_regenerate_id(true);   // a planted id never becomes a signed-in one, as on the other two portals
     $_SESSION['cxpid'] = (int)db()->lastInsertId();
+    if (function_exists('auth_bind_identity')) auth_bind_identity('cxpid');   // GAP-049
     return '';
 }
 
@@ -256,7 +259,9 @@ function connect_pro_login($email, $password) {
     $u = ops_one("SELECT * FROM cx_professionals WHERE email=? AND is_active=1", [$email]);
     if (!$u || (string)$u['password_hash'] === '' || !password_verify((string)$password, (string)$u['password_hash']))
         return 'That e-mail address and password do not match.';
+    if (session_status() === PHP_SESSION_ACTIVE) session_regenerate_id(true);   // a planted id never becomes a signed-in one, as on the other two portals
     $_SESSION['cxpid'] = (int)$u['id'];
+    if (function_exists('auth_bind_identity')) auth_bind_identity('cxpid');   // GAP-049
     try { db()->prepare("UPDATE cx_professionals SET last_login_at=? WHERE id=?")->execute([date('c'), (int)$u['id']]); } catch (Throwable $e) {}
     return '';
 }

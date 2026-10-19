@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '7fcac52 · 2026-10-19 15:54 UTC · 687 files';
+$RELEASE = '67b1dbf · 2026-10-19 16:40 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -100,7 +100,7 @@ $EXPECT  = [
     'lib/connect_passport.php' => ['s'=>11025,'h'=>'651b739f219f52b4'],
     'lib/connect_person.php' => ['s'=>7701,'h'=>'7210f0cae01d84e9'],
     'lib/connect_privacy.php' => ['s'=>17610,'h'=>'74640b7aef0d480c'],
-    'lib/connect_pro.php' => ['s'=>69892,'h'=>'7f7afa793422db02'],
+    'lib/connect_pro.php' => ['s'=>70513,'h'=>'18bd1e9d5b5386ac'],
     'lib/connect_qualtax.php' => ['s'=>24846,'h'=>'ff8da4316ac1a9d6'],
     'lib/connect_rating_disputes.php' => ['s'=>8981,'h'=>'0152a5d87d7e6917'],
     'lib/connect_ratings.php' => ['s'=>7478,'h'=>'cf59bcdbfc71b896'],
@@ -119,7 +119,7 @@ $EXPECT  = [
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>24205,'h'=>'04ed75b284858be6'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
-    'lib/cvp.php' => ['s'=>63553,'h'=>'fac512b1108be1b3'],
+    'lib/cvp.php' => ['s'=>63763,'h'=>'f330370e06946d93'],
     'lib/datacontrol.php' => ['s'=>37308,'h'=>'be66a03dcb445dac'],
     'lib/datatable.php' => ['s'=>15699,'h'=>'dfea30bbc69ccef3'],
     'lib/db.php' => ['s'=>58746,'h'=>'72427b242481ba0b'],
@@ -135,7 +135,7 @@ $EXPECT  = [
     'lib/finevent.php' => ['s'=>10495,'h'=>'3b48a24a518565ce'],
     'lib/formdesign.php' => ['s'=>70839,'h'=>'bc087592b594d2e3'],
     'lib/geofence.php' => ['s'=>20775,'h'=>'0bda93308e9f8e10'],
-    'lib/helpers.php' => ['s'=>26953,'h'=>'640ad4ec78e2fff8'],
+    'lib/helpers.php' => ['s'=>28037,'h'=>'fa64eee7a5e2aa7c'],
     'lib/hiringreq.php' => ['s'=>129366,'h'=>'b5896066637f54e9'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
     'lib/idems.php' => ['s'=>786654,'h'=>'ac696b399296a300'],
@@ -185,7 +185,7 @@ $EXPECT  = [
     'lib/pdf.php' => ['s'=>26663,'h'=>'356a367da31c40a6'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
-    'lib/portal.php' => ['s'=>117761,'h'=>'be9fe975e3414500'],
+    'lib/portal.php' => ['s'=>118004,'h'=>'1d64feb993e81d1c'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>10272,'h'=>'7f36c21dab0d782d'],

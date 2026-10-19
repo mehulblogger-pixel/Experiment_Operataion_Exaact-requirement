@@ -64,7 +64,7 @@ where being wrong is unrecoverable.
 |---|---|---|---|
 | 1.1 | **Audit the three external portals** — client (33 routes), vendor (11), professional (26): inventory, probe per external role, test every form | T-1 | **GAP-012** |
 | 1.2 | **Party isolation:** can client B fetch client A's report, invoice or requirement **by id**? Vendor B another vendor's assessment? A professional another's documents? | T-1 | **GAP-012** |
-| 1.3 | **Tenant isolation** from outside | T-2 | — |
+| 1.3 | **Tenant isolation** from outside | T-2 | — — **DONE 19 Oct: a portal session from one company WAS honoured by another (P0, GAP-049); all four identities now bound to their company** |
 | 1.4 | **Verify the privacy-safe talent cards** — inspect the HTML and JSON, not the rendering | T-3 | matrix fn. 20 |
 | 1.5 | **Restore a *foreign* backup.** If a backup from another workspace is accepted, that is a P0 | T-5 | **A-F3** — **DONE 19 Oct: a foreign backup WAS accepted (P0, GAP-048); now refused unless a master confirms by name** |
 
@@ -107,6 +107,7 @@ people rely on it.
 | 3.3 | **Competence enforcement:** when switched on, refuse the allocation and say why | T-15 | **Q-F6** |
 | 3.4 | **Pre-order checklist** with `require_all` must block quote approval; decide whether a recorded waiver is needed | T-16 | **S-F / E-8** |
 | 3.5 | **Answer Q-B1/Q-B2:** who may *raise* a nonconformity (today an inspector cannot), and should the five roles who see a corrective action see the finding behind it | — | **GAP-004** — **ANSWERED 19 Oct (Q-B1): coordinator level and above record; built** |
+| 3.6 | **Make `test_m7_*` and `test_m8_*` pass on their own.** They pass only after other tests have run, so they could stay green while the rule they guard breaks | the two files, run alone | **GAP-049 note** |
 
 ---
 

@@ -50,7 +50,7 @@ ok((string)$u['password_hash'] !== '' && (int)$u['must_change'] === 0, 'the pass
 
 head('4. Separate identity — its own session key (vuid), never a client');
 $_SESSION = [];
-$_SESSION['vuid'] = $vuA;
+$_SESSION['vuid'] = $vuA; auth_bind_identity('vuid');
 ok(cvp_vendor_user() && (int)cvp_vendor_user()['id'] === $vuA, 'a vuid session resolves the vendor user');
 ok(cvp_vendor_id() === $vA, 'the vendor scope comes from the session, not the request');
 ok(!function_exists('portal_user') || portal_user() === null, 'a vendor session is NOT a client session (portal_user stays null)');
@@ -77,7 +77,7 @@ ok(cvp_vendor_report($rOther) === null, "another vendor's report does not exist 
 head('6. The staff share toggle is confidentiality-first');
 $_SESSION = [];   // act as staff for the toggle
 ok(cvp_report_set_vendor_visible($rHidden, true) === true, 'staff can share a finalized report that names a vendor');
-$_SESSION['vuid'] = $vuA;
+$_SESSION['vuid'] = $vuA; auth_bind_identity('vuid');
 $irns2 = array_map(fn($r) => $r['irn'], cvp_vendor_reports());
 ok(in_array('VR/A/HIDDEN', $irns2, true), 'once shared, it appears in the vendor portal');
 $_SESSION = [];

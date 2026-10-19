@@ -770,6 +770,15 @@ posts landing together (**GAP-038**, fixed with a conditional draw), and the
 plan-change proration code is never called, so a mid-month plan change pays
 twice for the overlap (**GAP-039**, recorded for a pricing decision).
 
+### 2.12 A session from one company, presented at another
+
+§2.5 proved that one client cannot reach another client's records **inside one
+company**. This is the boundary one level up: two companies on the same
+platform. A client of company A sending their own session id to company B's
+address was signed in as B's client user with the same row number (GAP-049,
+P0). Fixed by stamping each portal sign-in with its company and refusing it
+anywhere else; re-driven live on two companies.
+
 ## 3. Still to do on these portals
 
 This pass answered the two security questions. It did **not** do for the portals

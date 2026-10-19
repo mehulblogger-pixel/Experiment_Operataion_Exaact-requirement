@@ -132,14 +132,31 @@ function auth_workspace_key() {
 function auth_bind_workspace() {
     $_SESSION['uid_ws'] = auth_workspace_key();
 }
+// The same rule for any identity a session carries -- staff (uid), client portal
+// (cuid), vendor portal (vuid), professional portal (cxpid). Every company's
+// sessions live in one store on the server, so a session issued by one company
+// must never be honoured by another: a portal user of company A presenting their
+// own session at company B's address used to be taken as B's portal user with
+// the same row number (audit 2026-10, GAP-049). For a PORTAL identity, no stamp
+// counts as the plain single-company install's (key ''), so it is refused on every
+// company workspace and nothing changes for a single install. (Staff sessions keep
+// the M13 rule in current_user(); see there.)
+function auth_bind_identity($slot) {
+    $_SESSION[$slot . '_ws'] = auth_workspace_key();
+}
+function auth_identity_here($slot) {
+    return (string)($_SESSION[$slot . '_ws'] ?? '') === auth_workspace_key();
+}
 
 function current_user($fresh = false) {
     static $u = null;
     static $forUid = null;
     if (empty($_SESSION['uid'])) { if ($fresh) { $u = null; $forUid = null; } return null; }
     // M13 — the identity was issued in one workspace; it is not valid in another.
-    // A session stamped before this existed carries no binding and is left alone;
-    // it acquires one the next time the person signs in.
+    // A staff session with NO stamp is still accepted (the documented M13
+    // exception): every sign-in path stamps it, so no request can create one, and
+    // the scheduled jobs legitimately act as a staff member inside a company with
+    // an unstamped session (appr_as_user from cron). The portals are strict.
     if (isset($_SESSION['uid_ws']) && $_SESSION['uid_ws'] !== auth_workspace_key()) {
         $u = null; $forUid = null;
         return null;

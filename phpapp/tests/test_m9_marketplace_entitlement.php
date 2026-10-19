@@ -173,6 +173,7 @@ $pid = (int) $pdo->lastInsertId();
 $pdo->prepare("INSERT INTO client_users (partner_id,name,email,perms,is_active)
                VALUES (?,'M9 Portal','m9@example.test','',1)")->execute([$pid]);
 $_SESSION['cuid'] = (int) $pdo->lastInsertId();
+$_SESSION['cuid_ws'] = 'testco';   // stamped as a real portal sign-in now is (GAP-049)
 $ceiling('connect,operations'); $asTenant();
 t_ok(portal_user() !== null, 'G · the test portal user signs in');
 t_ok(pcan('market.post'),    'G · ALLOW — an entitled company offers marketplace hiring in the portal');
