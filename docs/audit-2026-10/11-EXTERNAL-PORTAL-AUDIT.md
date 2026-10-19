@@ -565,6 +565,80 @@ plan limits on the same route were tagged as refusals at the same time.
 
 ---
 
+### 2.9 Wrong values, not just missing ones — on the document a client pays
+
+§2.8 proved every creating form refuses an **empty** submission. That is a
+different question from what a form does with a value filled in **wrongly**, and
+the place it matters most is a **marketplace voucher line**: that is the document
+a client is asked to approve and pay.
+
+`/pro/voucher` passes `$_POST` straight into `connect_engv_add_line()`. Driven
+with the values a fat-fingered or hostile request would send
+(`evidence/portal-bad-input.php`), it accepted **every one of them**:
+
+| Posted | What was stored |
+|---|---|
+| `units = -5` | silently corrected to **1**, reported as *"Day added."* |
+| `units = 0` | silently corrected to **1** |
+| `units = abc` | silently corrected to **1** |
+| `units = 999999` | accepted — **Rs 2,499,997,500** on one line |
+| `units = 1e9` | accepted — **Rs 2.5 trillion** |
+| `travel = -100` | silently zeroed, reported as added |
+| `work_date = banana` | stored verbatim |
+| `work_date = 2026-13-45` | stored verbatim |
+| `work_date = 1899-01-01` | stored verbatim |
+| `work_date = 2099-01-01` | stored verbatim |
+
+One voucher reached a total of **Rs 2,502,500,020,000**.
+
+**Two things must be said with that, or the finding is overstated.** First, it is
+**not** a script-injection hole: both voucher views render `work_date` through
+`e()` (`htmlspecialchars`, `ENT_QUOTES`) and truncate it to ten characters, so
+nothing could be injected through it — this is data quality on a money document.
+Second, **none of it bills anyone by itself**: a voucher moves DRAFT →
+SUBMITTED → APPROVED and a human on the client side approves it. The finding is
+that a claim document should not be *able* to say those things, and that a
+professional should not be told *"Day added."* when the system quietly changed
+what they typed.
+
+---
+
+#### GAP-022 (P2) — a voucher line accepted any quantity and any date · **FIXED**
+
+- The **quantity** must now be a number greater than zero and no more than 366
+  (no voucher period is longer than a year). A negative, a zero, a letter or an
+  absurd figure is **refused and said so**, instead of being corrected in
+  silence.
+- An **expense** must be a non-negative number, refused the same way.
+- The **day** must be a real `YYYY-MM-DD` date. Where the voucher declares an
+  explicit period it must fall inside it; otherwise it must sit within a
+  plausibility window (five years back, one year forward), which rejects 1899
+  and 2099.
+- **The professional is now told.** `/pro/voucher` **discarded** this function's
+  return value, so every refusal it already produced — including the
+  long-standing *"Add lines only while the voucher is a draft."* — was invisible
+  to the one person filling the voucher in. The staff desk
+  (`connect_market.php`) had always captured it. The same lost-message pattern
+  as GAP-015.
+
+Still accepted, and asserted so by test: a half day, a full month on one line,
+a line with **no** day (a period voucher need not name one), and an ordinary
+day with an expense.
+
+> **Method note — my first rule was wrong, and an existing test caught it.** I
+> first derived the allowed date range from the voucher's `period_label`. That
+> label is **defaulted to the current month** when the caller gives none
+> (`connect_engv_open_for_engagement`), so it says nothing about which period
+> the work belongs to. Enforcing it refused a day two months earlier — and a
+> professional filing **last month's days** is ordinary practice, not an error.
+> `test_connect_engvoucher.php` failed on exactly that case. The explicit
+> `period_start`/`period_end` check survived, because an agreed period means
+> something; the label-derived one was replaced with the plausibility window.
+> **A validation rule that is too strict is a defect too**, and the regression
+> test now pins the back-dating case so my own mistake cannot return.
+
+---
+
 ## 3. Still to do on these portals
 
 This pass answered the two security questions. It did **not** do for the portals
@@ -572,7 +646,8 @@ what deliverables 04 and 05 did for the staff application:
 
 | Outstanding | Why it matters |
 |---|---|
-| Bad-input (not just empty) validation | §2.8 drove every creating form **empty**; it did not drive each field with the *wrong* value — a date in the past, a negative rate, an oversized file, a malformed email |
+| Bad input on the forms §2.9 did **not** reach | the voucher line is done; the requirement form's rates and dates, the credential expiry dates, and every email field are not |
+| **File uploads** | size and type limits on `/pro/documents`, `/pro/voucher` and the report deliverable were not tested at all — a base64 column and a large file deserve a measurement |
 | Empty states on the 38 screens not walked | the 39 walked were those the four seeded personas could reach |
 | The professional portal's **write** paths | isolation is proven on reads and on the one delete tested; the profile, CV, credentials and voucher-line writes are not each individually driven |
 | `/pro/tax-*` (4 routes) and `/pro/geo` | small lookup endpoints, read only for isolation so far |
@@ -582,7 +657,8 @@ Closed since the first pass: the vendor portal's four permissions (§2.4), the
 assistant on the vendor side (§2.4), the professional portal's isolation
 including all three file routes (§2.5), phone-width layout, message delivery
 and field labelling across 39 screens (§2.6), terminology and colour
-contrast (§2.7), and what the forms do with empty input (§2.8).
+contrast (§2.7), what the forms do with empty
+input (§2.8), and what the voucher line does with wrong values (§2.9).
 
 **GAP-012 is therefore reduced, not closed.** The coverage hole is mapped and its
 two security defects are fixed; the quality audit of these 77 screens remains.
@@ -607,3 +683,5 @@ two security defects are fixed; the quality audit of these 77 screens remains.
 | `evidence/portal-empty-submit.py` | every creating form submitted empty, with the row count before and after and the message quoted |
 | `evidence/pro-csrf-probe.sh` | a forged POST with no token and a hostile referer, then the legitimate one, against the running application |
 | `phpapp/tests/test_pro_portal_csrf.php` | 30 assertions: all three portals define a gate, call it from their router, and stamp their forms; the lookup endpoints stay GET; the empty-title refusal speaks |
+| `evidence/portal-bad-input.php` | eleven wrong values driven at a voucher line, with what each one stored |
+| `phpapp/tests/test_voucher_line_validation.php` | 33 assertions, including the back-dating case an over-strict first attempt of mine broke |

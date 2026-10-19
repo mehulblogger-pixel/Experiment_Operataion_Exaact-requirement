@@ -189,8 +189,67 @@ function connect_engv_add_line($voucherId, array $in) {
     if (!$v) return [false, 'Voucher not found.', 0];
     if (strtoupper((string)$v['status']) !== 'DRAFT') return [false, 'Add lines only while the voucher is a draft.', 0];
 
-    $units = max(0, (float)($in['units'] ?? 1));
-    if ($units <= 0) $units = 1;
+    // ---- the day -----------------------------------------------------------
+    // A voucher line is the document a client is asked to approve and pay, so a
+    // date on it has to be a date. This accepted ANY string: "banana",
+    // "2026-13-45" and "1899-01-01" were all stored verbatim. (The views escape
+    // and truncate what they print, so nothing could be injected through it --
+    // this is data quality on a money document, not a script hole.) An EMPTY
+    // date stays valid: a period voucher need not name a single day.
+    $wd = trim((string)($in['work_date'] ?? ''));
+    if ($wd !== '') {
+        $d = DateTime::createFromFormat('Y-m-d', $wd);
+        if (!$d || $d->format('Y-m-d') !== $wd)
+            return [false, 'Give the day as a date (YYYY-MM-DD). Nothing was added.', 0];
+        // Where the voucher declares its period EXPLICITLY, the day has to fall
+        // in it: a day outside an agreed period cannot have been worked under
+        // this voucher.
+        $ps = trim((string)($v['period_start'] ?? ''));
+        $pe = trim((string)($v['period_end'] ?? ''));
+        if ($ps !== '' && $wd < $ps)
+            return [false, 'That day is before this voucher\'s period starts (' . $ps . '). Nothing was added.', 0];
+        if ($pe !== '' && $wd > $pe)
+            return [false, 'That day is after this voucher\'s period ends (' . $pe . '). Nothing was added.', 0];
+
+        // Those two columns are OPTIONAL and usually blank, so most vouchers
+        // reach here unbounded. An earlier version of this check derived the
+        // bounds from period_label instead -- and that was WRONG: when the
+        // caller gives no label, connect_engv_open_for_engagement() defaults it
+        // to the CURRENT month, which says nothing about which period the work
+        // belongs to. Enforcing it would have refused a professional filing
+        // September's days in October, which is ordinary practice. (A test
+        // caught exactly that: a voucher opened with no label, then a day two
+        // months earlier.)
+        //
+        // What is left is a plausibility window, which is all an undeclared
+        // period can honestly support: it rejects the dates that were the real
+        // finding -- 1899-01-01, 2099-01-01 -- and leaves back-dating alone.
+        if ($ps === '' && $pe === '') {
+            $floor = date('Y-m-d', strtotime('-5 years'));
+            $ceil  = date('Y-m-d', strtotime('+1 year'));
+            if ($wd < $floor || $wd > $ceil)
+                return [false, 'That date looks wrong — a day on a voucher should be within the '
+                             . 'last few years, not ' . substr($wd, 0, 4) . '. Nothing was added.', 0];
+        }
+    }
+
+    // ---- the quantity ------------------------------------------------------
+    // This used to clamp anything odd to 1 and report "Day added." -- so a
+    // professional who typed -5, or 0, or a stray letter, was told their day was
+    // added and billed for 1 unit without being asked. Say so instead.
+    $rawUnits = $in['units'] ?? 1;
+    if ($rawUnits === '' || $rawUnits === null) $rawUnits = 1;
+    if (!is_numeric($rawUnits))
+        return [false, 'Give the quantity as a number. Nothing was added.', 0];
+    $units = (float)$rawUnits;
+    if ($units <= 0)
+        return [false, 'The quantity has to be more than zero. Nothing was added.', 0];
+    // An upper bound, because there was none: 999,999 man-days was accepted
+    // silently, and a single line was enough to put Rs 2.5 billion on a document
+    // a client is asked to approve. No voucher period is longer than a year.
+    if ($units > 366)
+        return [false, 'That quantity looks wrong — a voucher period is never longer than a year. '
+                     . 'Nothing was added. Raise a separate voucher if you really need more.', 0];
     $fee = connect_engv_line_fee($v, $units);
 
     $exclusive = connect_engv_is_exclusive($v);
@@ -203,6 +262,17 @@ function connect_engv_add_line($voucherId, array $in) {
         $eng = ops_one("SELECT reimb_terms FROM cx_engagements WHERE id=?", [(int)($v['engagement_id'] ?? 0)]);
         $claimable = array_flip(connect_reqterms_claimable_heads($eng ?: ''));
     }
+    // A negative expense used to be clamped silently to 0 and reported as
+    // "Day added." -- the same silent correction the quantity used to make. On a
+    // claim document, say so instead.
+    foreach (['travel', 'lodging', 'conveyance', 'allowance', 'misc'] as $k) {
+        $raw = $in[$k] ?? '';
+        if ($raw === '' || $raw === null) continue;
+        if (!is_numeric($raw))
+            return [false, 'Give each expense as a number. Nothing was added.', 0];
+        if ((float)$raw < 0)
+            return [false, 'An expense cannot be negative. Nothing was added.', 0];
+    }
     $head = function ($k) use ($in, $exclusive, $claimable) {
         if (!$exclusive) return 0.0;
         if ($claimable !== null && !isset($claimable[$k])) return 0.0; // client covers this itself
@@ -211,7 +281,7 @@ function connect_engv_add_line($voucherId, array $in) {
     db()->prepare("INSERT INTO cx_engagement_voucher_lines
         (voucher_id,work_date,units,fee,travel,lodging,conveyance,allowance,misc,receipt_ref,note,created_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-        ->execute([(int)$voucherId, trim((string)($in['work_date'] ?? '')), $units, $fee,
+        ->execute([(int)$voucherId, $wd, $units, $fee,
                    $head('travel'), $head('lodging'), $head('conveyance'), $head('allowance'), $head('misc'),
                    trim((string)($in['receipt_ref'] ?? '')), trim((string)($in['note'] ?? '')), date('c')]);
     $id = (int)db()->lastInsertId();

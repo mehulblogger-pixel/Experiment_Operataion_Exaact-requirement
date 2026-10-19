@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'afb41db · 2026-10-19 01:26 UTC · 687 files';
+$RELEASE = '2da5c1d · 2026-10-19 01:45 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -87,7 +87,7 @@ $EXPECT  = [
     'lib/connect_deploy.php' => ['s'=>8299,'h'=>'d3d261a16ddc833c'],
     'lib/connect_disputes.php' => ['s'=>4865,'h'=>'56ecbec1a7a03f91'],
     'lib/connect_engage.php' => ['s'=>20986,'h'=>'59720837c5273d27'],
-    'lib/connect_engvoucher.php' => ['s'=>31752,'h'=>'24272b8bfe5ea6a6'],
+    'lib/connect_engvoucher.php' => ['s'=>36076,'h'=>'7538f580ed37d22b'],
     'lib/connect_geo.php' => ['s'=>19346,'h'=>'9ee996bdd62de2ca'],
     'lib/connect_govern.php' => ['s'=>7181,'h'=>'22ce5ad54e44ce2a'],
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
@@ -100,7 +100,7 @@ $EXPECT  = [
     'lib/connect_passport.php' => ['s'=>11025,'h'=>'651b739f219f52b4'],
     'lib/connect_person.php' => ['s'=>7701,'h'=>'7210f0cae01d84e9'],
     'lib/connect_privacy.php' => ['s'=>17610,'h'=>'74640b7aef0d480c'],
-    'lib/connect_pro.php' => ['s'=>65603,'h'=>'2f9d925f6fdd14b8'],
+    'lib/connect_pro.php' => ['s'=>66122,'h'=>'72c2558bd4ef7dce'],
     'lib/connect_qualtax.php' => ['s'=>24846,'h'=>'ff8da4316ac1a9d6'],
     'lib/connect_rating_disputes.php' => ['s'=>8981,'h'=>'0152a5d87d7e6917'],
     'lib/connect_ratings.php' => ['s'=>7478,'h'=>'cf59bcdbfc71b896'],

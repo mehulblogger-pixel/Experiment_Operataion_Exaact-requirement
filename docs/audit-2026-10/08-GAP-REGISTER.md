@@ -671,6 +671,47 @@ post to a business record or list another person's data.
 
 ---
 
+## GAP-022 — a voucher line accepted any quantity and any date
+
+**CONFIRMED BY EXECUTION · P2 · Professional portal (billing) · FIXED 19 Oct 2026**
+
+A marketplace voucher line is the document a client is asked to approve and pay.
+`/pro/voucher` passes `$_POST` straight into `connect_engv_add_line()`, which
+accepted every wrong value put to it: `units = -5`, `0` and `abc` were silently
+corrected to **1** and reported as *"Day added."*; `units = 999999` put **Rs
+2,499,997,500** on one line and `1e9` put **Rs 2.5 trillion**; a negative
+expense was silently zeroed; and `work_date` of "banana", "2026-13-45",
+"1899-01-01" or "2099-01-01" was stored verbatim. One voucher reached **Rs
+2,502,500,020,000**.
+
+**Two qualifications, or the finding is overstated.** It is **not** a
+script-injection hole -- both voucher views render `work_date` through `e()` and
+truncate it to ten characters. And **none of it bills anyone by itself** -- a
+voucher goes DRAFT -> SUBMITTED -> APPROVED with a human approving on the client
+side. The finding is that a claim document should not be able to say those
+things, and that a professional should not be told "Day added." when the system
+quietly changed what they typed.
+
+**Fixed:** the quantity must be a number above zero and at most 366; an expense
+must be non-negative; the day must be a real date, inside an explicitly declared
+period where there is one and otherwise within a plausibility window (five years
+back, one year forward). A half day, a full month on one line and a line with no
+day at all are still accepted.
+
+**And the professional is now told.** `/pro/voucher` discarded the function's
+return value, so every refusal it already produced -- including the
+long-standing *"Add lines only while the voucher is a draft."* -- was invisible
+to the one person filling the voucher in. The staff desk always captured it.
+Same lost-message pattern as GAP-015.
+
+My first rule was too strict and an existing test caught it: it derived the
+allowed dates from `period_label`, which is defaulted to the current month when
+no label is given, so it refused a professional filing last month's days --
+ordinary practice. See `11-EXTERNAL-PORTAL-AUDIT.md` §2.9. **A validation rule
+that is too strict is a defect too.**
+
+---
+
 ## GAP-021 — the marketplace's own posting form refused in silence
 
 **CONFIRMED BY EXECUTION · P2 · Client portal · FIXED 19 Oct 2026**

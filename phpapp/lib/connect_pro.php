@@ -883,7 +883,15 @@ function connect_pro_route($route, $method) {
             if (!$v || strtoupper((string)$v['subject_kind']) !== 'PROFESSIONAL' || (int)$v['subject_id'] !== (int)$me['id']) { redirect('/pro/vouchers'); }
             if ($method === 'POST') {
                 $act = $_POST['action'] ?? '';
-                if ($act === 'add_line')      connect_engv_add_line($vid, $_POST);
+                // The result was discarded here, so every refusal this function
+                // produces -- including the pre-existing "Add lines only while the
+                // voucher is a draft." -- was invisible to the one person filling
+                // the voucher in. The staff desk (connect_market.php) always
+                // captured it; the professional's own portal did not.
+                if ($act === 'add_line') {
+                    [$lok, $lmsg] = connect_engv_add_line($vid, $_POST);
+                    connect_pro_flash_set($lmsg, $lok ? 'ok' : 'err');
+                }
                 elseif ($act === 'del_line')  connect_engv_delete_line((int)($_POST['line_id'] ?? 0), $vid);
                 elseif ($act === 'submit')    connect_engv_set_status($vid, 'SUBMITTED');
                 elseif ($act === 'reopen')    connect_engv_set_status($vid, 'DRAFT');   // revise a returned voucher
