@@ -810,6 +810,10 @@ function connect_pro_route($route, $method) {
                     [$cok, $cmsg] = mkt_sub_cancel('PRO', $meId, (string)($_POST['mode'] ?? 'END'));
                     connect_pro_flash_set($cmsg, $cok ? 'ok' : 'err'); redirect('/pro/plans');
                 }
+                if ($pAct === 'keep_plan' && function_exists('mkt_plan_change_cancel')) {
+                    [, $kmsg] = mkt_plan_change_cancel('PRO', $meId);
+                    connect_pro_flash_set($kmsg, 'ok'); redirect('/pro/plans');
+                }
                 $pack = $pAct === 'buy_pack';
                 $purpose = $pack ? 'PACK' : 'SUB';
                 $refId   = $pack ? (int)($_POST['pack_id'] ?? 0) : (int)($_POST['plan_id'] ?? 0);
@@ -821,7 +825,7 @@ function connect_pro_route($route, $method) {
                 if (($start['mode'] ?? '') === 'pay')   redirect('/pro/pay?o=' . (int)$start['row_id']);
                 if (($start['mode'] ?? '') === 'error') { connect_pro_flash_set($start['msg'], 'err'); redirect('/pro/plans'); }
                 if ($pack && function_exists('mkt_credit_buy'))     { [$bok, $bmsg] = mkt_credit_buy('PRO', $meId, $refId, $who); connect_pro_flash_set($bmsg, $bok ? 'ok' : 'err'); }
-                elseif (!$pack && function_exists('mkt_subscribe')) { [$ok, $msg]  = mkt_subscribe('PRO', $meId, $refId, $period, $who, $coupon); connect_pro_flash_set($msg, $ok ? 'ok' : 'err'); }
+                elseif (!$pack && function_exists('mkt_plan_change_apply')) { [$ok, $msg] = mkt_plan_change_apply('PRO', $meId, $refId, $period, $who, $coupon); connect_pro_flash_set($msg, $ok ? 'ok' : 'err'); }
                 redirect('/pro/plans');
             }
             connect_pro_view('plans', [

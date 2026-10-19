@@ -21,7 +21,7 @@ Per the matrix: Users = `E(global)` for MA/AD, `E(own office)` for BM/BAM,
 | Change | What it means in this area | Ref | How it was verified |
 |---|---|---|---|
 | Owner's rules reach a saved access grid | A rule the owner gives is written once into any role grid or per-user set an administrator already saved, then never re-applied, so a deliberate untick stands | Q-B1, Q-G | Test |
-| **Roles & access: two new grants** | Coordinator level and above: *Nonconformities → Add* (+ View). Finance: *Vendors → View* | Q-B1, Q-G | Role test + HTTP |
+| **Roles & access: three new grants** | Coordinator level and above: *Nonconformities → Add* (+ View). Finance: *Vendors → View* and *Clients → View* | Q-B1, Q-G, Q-K | Role test + HTTP |
 | Marketplace plans screen warns | When payment keys are missing, it names the priced plans and packs nobody can buy, with a link to the keys | GAP-037 | Test |
 | Self-service purchase is bound to the order | `/buy-verify` takes seats, period and amount from the recorded order and applies a payment exactly once | GAP-030, GAP-031 (P1) | Execution, Razorpay stubbed |
 | Licence server hardened | Replayed payments, unbounded terms and unlimited password guesses fixed | GAP-025–027 | Execution |

@@ -39,6 +39,11 @@ function mkt_subs_migrate() {
         ensure_column('mkt_subscriptions', 'coupon_code', "VARCHAR(40) DEFAULT ''");
         ensure_column('mkt_subscriptions', 'discount', 'REAL DEFAULT 0');
         ensure_column('mkt_subscriptions', 'proration_credit', 'REAL DEFAULT 0');
+        // A downgrade chosen mid-period waits here until the paid period ends
+        // (owner's rule, 2026-10-19). A field, not a status: the subscription is
+        // still ACTIVE on the plan the subscriber paid for.
+        ensure_column('mkt_subscriptions', 'pending_plan_id', 'INT DEFAULT 0');
+        ensure_column('mkt_subscriptions', 'pending_period', "VARCHAR(8) DEFAULT ''");
     }
 }
 
@@ -80,8 +85,15 @@ function mkt_subscribe($kind, $subId, $planId, $period = 'MONTH', $by = '', $cou
 /** The subscriber's current live subscription row (ACTIVE and not past expiry), or null. */
 function mkt_active_sub($kind, $subId) {
     mkt_subs_migrate();
-    return ops_one("SELECT * FROM mkt_subscriptions WHERE subscriber_kind=? AND subscriber_id=? AND status='ACTIVE' AND (expires_at='' OR expires_at>=?) ORDER BY id DESC LIMIT 1",
-        [_mkt_kind($kind), (int)$subId, date('Y-m-d')]) ?: null;
+    $t = date('Y-m-d');
+    // A renewal bought early starts when the current period ends, so a row that has
+    // not started yet is not today's subscription.
+    $row = ops_one("SELECT * FROM mkt_subscriptions WHERE subscriber_kind=? AND subscriber_id=? AND status='ACTIVE'
+                     AND (COALESCE(started_at,'')='' OR started_at<=?) AND (expires_at='' OR expires_at>=?) ORDER BY id DESC LIMIT 1",
+        [_mkt_kind($kind), (int)$subId, $t, $t]) ?: null;
+    // No live plan: a scheduled change to a FREE plan starts by itself.
+    if (!$row && function_exists('mkt_plan_change_due')) $row = mkt_plan_change_due(_mkt_kind($kind), (int)$subId);
+    return $row ?: null;
 }
 
 /** The plan the subscriber currently holds (from their live subscription), or null. */

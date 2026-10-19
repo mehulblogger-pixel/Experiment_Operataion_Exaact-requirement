@@ -49,19 +49,185 @@ function mkt_sub_cancel($kind, $subId, $mode = 'END') {
             ->execute([date('Y-m-d'), date('Y-m-d'), (int)$sub['id']]);
         return [true, 'Subscription cancelled — access ends today.'];
     }
-    db()->prepare("UPDATE mkt_subscriptions SET auto_renew=0, cancel_at=? WHERE id=?")->execute([(string)$sub['expires_at'], (int)$sub['id']]);
+    db()->prepare("UPDATE mkt_subscriptions SET auto_renew=0, cancel_at=?, pending_plan_id=0, pending_period='' WHERE id=?")->execute([(string)$sub['expires_at'], (int)$sub['id']]);
     return [true, 'Subscription will not renew — access continues until ' . $sub['expires_at'] . '.'];
 }
 
 /** The prorated credit for the UNUSED remainder of the current subscription (major units). */
 function mkt_sub_proration_credit($kind, $subId, $onDate = null) {
     $sub = function_exists('mkt_active_sub') ? mkt_active_sub($kind, $subId) : null;
-    if (!$sub || (string)$sub['expires_at'] === '' || (float)$sub['amount'] <= 0) return 0.0;
+    // The period is worth what was paid for it plus any credit carried into it from
+    // an earlier upgrade -- so a second upgrade does not lose the first one's credit.
+    $worth = $sub ? (float)$sub['amount'] + (float)($sub['proration_credit'] ?? 0) : 0.0;
+    if (!$sub || (string)$sub['expires_at'] === '' || $worth <= 0) return 0.0;
     $today = strtotime(substr((string)($onDate ?: date('Y-m-d')), 0, 10));
     $start = strtotime((string)$sub['started_at']); $end = strtotime((string)$sub['expires_at']);
     if ($end <= $start || $today >= $end) return 0.0;
     $total = ($end - $start) / 86400; $remaining = ($end - max($today, $start)) / 86400;
-    return round((float)$sub['amount'] * ($remaining / $total), 2);
+    return round($worth * ($remaining / $total), 2);
+}
+
+// ---------------------------------------------------------------------------
+//  CHANGING PLAN — the owner's rule, 2026-10-19 (Q-L, GAP-039)
+//
+//  * UPGRADE (a plan worth more per month, or the same plan monthly -> yearly)
+//    starts TODAY. The unused value of the current plan is taken off the new
+//    price; if it is worth more than the new price, the excess is given as extra
+//    days on the new plan, so nothing paid is ever lost.
+//  * DOWNGRADE starts when the paid period ENDS. Nothing is charged now and
+//    nothing is refunded; a free plan then starts by itself, a priced one is due
+//    and is paid for then.
+//  * RENEW (the same plan and period again) starts when the current one ends --
+//    buying early used to cancel the current plan and throw its days away.
+//  Same practice as the large subscription billers (immediate upgrade with
+//  credit, downgrade at period end).
+// ---------------------------------------------------------------------------
+function mkt_plan_monthly_value(array $plan, $period) {
+    return strtoupper((string)$period) === 'YEAR' ? (float)$plan['price_annual'] / 12 : (float)$plan['price_month'];
+}
+function mkt_period_end($start, $period) {
+    return date('Y-m-d', strtotime($start . (strtoupper((string)$period) === 'YEAR' ? ' +1 year' : ' +1 month')));
+}
+/** Days added to an upgrade when the credit is worth more than the new price. */
+function mkt_credit_extra_days($credit, $price, $start, $end) {
+    if ($credit <= $price + 0.005 || $price <= 0) return 0;
+    $days = max(1, (int)round((strtotime($end) - strtotime($start)) / 86400));
+    return (int)floor(($credit - $price) / ($price / $days));
+}
+/**
+ * What choosing this plan would do, before anything is charged or written:
+ * ['ok','type' => NEW|RENEW|UPGRADE|DOWNGRADE,'list','credit','price' (charged now),
+ *  'due' (charged later, downgrade only),'starts','expires','extra_days','current','plan','msg'].
+ */
+function mkt_plan_change_quote($kind, $subId, $planId, $period = 'MONTH', $onDate = null) {
+    mkt_billing_migrate();
+    $kind = strtoupper((string)$kind) === 'PRO' ? 'PRO' : 'CLIENT';
+    $period = strtoupper((string)$period) === 'YEAR' ? 'YEAR' : 'MONTH';
+    $today = substr((string)($onDate ?: date('Y-m-d')), 0, 10);
+    $plan = function_exists('mkt_plan_get') ? mkt_plan_get($planId) : null;
+    if (!$plan) return ['ok' => false, 'msg' => 'Choose a valid plan.'];
+    $list = round($period === 'YEAR' ? (float)$plan['price_annual'] : (float)$plan['price_month'], 2);
+    $cur = mkt_active_sub($kind, $subId);
+    $q = ['ok' => true, 'plan' => $plan, 'period' => $period, 'list' => $list, 'credit' => 0.0, 'price' => $list,
+          'due' => 0.0, 'extra_days' => 0, 'current' => $cur];
+    $fmt = fn($n) => number_format((float)$n, 2);
+    if (!$cur) return array_merge($q, ['type' => 'NEW', 'starts' => $today, 'expires' => mkt_period_end($today, $period),
+        'msg' => 'Starts today.']);
+    $curPeriod = strtoupper((string)$cur['period']) === 'YEAR' ? 'YEAR' : 'MONTH';
+    $after = date('Y-m-d', strtotime($cur['expires_at'] . ' +1 day'));
+    if ((int)$cur['plan_id'] === (int)$plan['id'] && $curPeriod === $period)
+        return array_merge($q, ['type' => 'RENEW', 'starts' => $after, 'expires' => mkt_period_end($after, $period),
+            'msg' => 'Extends your plan: the new period starts on ' . $after . ', when this one ends. No days are lost.']);
+    $curPlan = function_exists('mkt_plan_get') ? mkt_plan_get((int)$cur['plan_id']) : null;
+    $curVal = $curPlan ? mkt_plan_monthly_value($curPlan, $curPeriod) : 0.0;
+    $up = mkt_plan_monthly_value($plan, $period) > $curVal + 0.005
+        || ((int)$cur['plan_id'] === (int)$plan['id'] && $curPeriod === 'MONTH' && $period === 'YEAR');
+    if (!$up)
+        return array_merge($q, ['type' => 'DOWNGRADE', 'price' => 0.0, 'due' => $list, 'starts' => $after,
+            'expires' => mkt_period_end($after, $period),
+            'msg' => 'Starts on ' . $after . ', when your paid period ends. Nothing is charged now'
+                   . ($list > 0 ? '; you pay ' . $fmt($list) . ' for it then.' : '.')]);
+    $credit = mkt_sub_proration_credit($kind, $subId, $today);
+    $net = max(0.0, round($list - $credit, 2));
+    $end = mkt_period_end($today, $period);
+    $extra = mkt_credit_extra_days($credit, $list, $today, $end);
+    if ($extra > 0) $end = date('Y-m-d', strtotime($end . ' +' . $extra . ' days'));
+    return array_merge($q, ['type' => 'UPGRADE', 'credit' => round($credit, 2), 'price' => $net, 'starts' => $today,
+        'expires' => $end, 'extra_days' => $extra,
+        'msg' => 'Starts today. Your unused time is worth ' . $fmt($credit) . ' and is taken off, so you pay ' . $fmt($net)
+               . ($extra > 0 ? ', and the remaining ' . $extra . ' days are added to the new plan' : '') . '.']);
+}
+/**
+ * Do it. $paidCredit is the credit fixed when a payment was started (null on the
+ * no-payment path, where it is worked out now). A PAID change is never left
+ * waiting: a paid downgrade simply starts when the current period ends.
+ * Returns [ok, message, subscription id].
+ */
+function mkt_plan_change_apply($kind, $subId, $planId, $period = 'MONTH', $by = '', $coupon = '', $paidCredit = null) {
+    $q = mkt_plan_change_quote($kind, $subId, $planId, $period);
+    if (empty($q['ok'])) return [false, $q['msg'], 0];
+    if ((int)$subId <= 0) return [false, 'Unknown subscriber.', 0];
+    $kind = strtoupper((string)$kind) === 'PRO' ? 'PRO' : 'CLIENT';
+    $plan = $q['plan']; $paid = $paidCredit !== null;
+    if ($q['type'] === 'DOWNGRADE' && !$paid) {
+        db()->prepare("UPDATE mkt_subscriptions SET pending_plan_id=?, pending_period=? WHERE id=?")
+            ->execute([(int)$plan['id'], $q['period'], (int)$q['current']['id']]);
+        return [true, 'Your plan changes to ' . $plan['name'] . ' on ' . $q['starts'] . '. '
+            . ($q['due'] > 0 ? 'Nothing is charged now; you will pay ' . number_format($q['due'], 2) . ' for it then.' : 'Nothing is charged.'),
+            (int)$q['current']['id']];
+    }
+    $list = $q['list']; $discount = 0.0; $code = '';
+    if (trim((string)$coupon) !== '' && function_exists('mkt_coupon_apply')) {
+        [$list, $discount] = mkt_coupon_apply($coupon, $list, $kind);
+        if ($discount > 0) $code = strtoupper(trim((string)$coupon));
+    }
+    $credit = $q['type'] === 'UPGRADE' ? ($paid ? (float)$paidCredit : (float)$q['credit']) : 0.0;
+    $amount = max(0.0, round($list - $credit, 2));
+    $starts = $q['starts']; $expires = $q['expires'];
+    if ($q['type'] === 'UPGRADE') {
+        $expires = mkt_period_end($starts, $q['period']);
+        $extra = mkt_credit_extra_days($credit, $list, $starts, $expires);
+        if ($extra > 0) $expires = date('Y-m-d', strtotime($expires . ' +' . $extra . ' days'));
+    }
+    // Whatever was scheduled before is superseded by this choice.
+    db()->prepare("UPDATE mkt_subscriptions SET pending_plan_id=0, pending_period='' WHERE subscriber_kind=? AND subscriber_id=? AND COALESCE(pending_plan_id,0)<>0")
+        ->execute([$kind, (int)$subId]);
+    if ($q['type'] === 'UPGRADE' && $q['current'])
+        db()->prepare("UPDATE mkt_subscriptions SET status='CANCELLED', auto_renew=0, cancel_at=? WHERE id=?")
+            ->execute([date('Y-m-d'), (int)$q['current']['id']]);
+    db()->prepare("INSERT INTO mkt_subscriptions (subscriber_kind,subscriber_id,plan_id,plan_code,period,amount,started_at,expires_at,status,coupon_code,discount,proration_credit,auto_renew,created_by,created_at)
+                   VALUES (?,?,?,?,?,?,?,?, 'ACTIVE', ?,?,?, 1, ?, ?)")
+        ->execute([$kind, (int)$subId, (int)$plan['id'], (string)$plan['code'], $q['period'], $amount, $starts, $expires,
+                   $code, round($discount, 2), round($credit, 2), (string)$by, date('c')]);
+    $id = (int)db()->lastInsertId();
+    $msg = $q['type'] === 'UPGRADE'
+        ? 'Upgraded to ' . $plan['name'] . ' from today, until ' . $expires . '.' . ($credit > 0 ? ' Your unused time (' . number_format($credit, 2) . ') was taken off.' : '')
+        : ($starts > date('Y-m-d') ? $plan['name'] . ' is booked from ' . $starts . ' to ' . $expires . ', straight after your current period.'
+                                   : 'Subscribed to ' . $plan['name'] . ' until ' . $expires . '.');
+    return [true, $msg, $id];
+}
+/** One plain sentence for a plan card: what choosing it now would do. '' when there is no current plan. */
+function mkt_plan_change_hint($kind, $subId, $planId, $period) {
+    if ((int)$subId <= 0 || !mkt_active_sub($kind, $subId)) return '';
+    $q = mkt_plan_change_quote($kind, $subId, $planId, $period);
+    if (empty($q['ok'])) return '';
+    $label = ['UPGRADE' => 'Upgrade', 'DOWNGRADE' => 'Downgrade', 'RENEW' => 'Renew', 'NEW' => 'Start'][$q['type']] ?? '';
+    return ($period === 'YEAR' ? 'Yearly' : 'Monthly') . ' — ' . $label . ': ' . $q['msg'];
+}
+
+/** Withdraw a scheduled downgrade and keep the current plan. */
+function mkt_plan_change_cancel($kind, $subId) {
+    mkt_billing_migrate();
+    db()->prepare("UPDATE mkt_subscriptions SET pending_plan_id=0, pending_period='' WHERE subscriber_kind=? AND subscriber_id=? AND COALESCE(pending_plan_id,0)<>0")
+        ->execute([strtoupper((string)$kind) === 'PRO' ? 'PRO' : 'CLIENT', (int)$subId]);
+    return [true, 'The plan change is withdrawn. Your current plan carries on.'];
+}
+/** The scheduled change waiting on the subscriber's current plan: [plan, period, starts] or null. */
+function mkt_plan_change_pending($kind, $subId) {
+    mkt_billing_migrate();
+    $r = ops_one("SELECT * FROM mkt_subscriptions WHERE subscriber_kind=? AND subscriber_id=? AND status='ACTIVE' AND COALESCE(pending_plan_id,0)<>0 ORDER BY id DESC LIMIT 1",
+        [strtoupper((string)$kind) === 'PRO' ? 'PRO' : 'CLIENT', (int)$subId]);
+    if (!$r) return null;
+    $p = function_exists('mkt_plan_get') ? mkt_plan_get((int)$r['pending_plan_id']) : null;
+    if (!$p) return null;
+    $per = strtoupper((string)$r['pending_period']) === 'YEAR' ? 'YEAR' : 'MONTH';
+    return ['plan' => $p, 'period' => $per, 'starts' => date('Y-m-d', strtotime($r['expires_at'] . ' +1 day')),
+            'price' => round($per === 'YEAR' ? (float)$p['price_annual'] : (float)$p['price_month'], 2), 'from_sub' => $r];
+}
+/**
+ * Called when a subscriber has no live plan: if a downgrade to a FREE plan was
+ * scheduled and its day has come, start it now and return it. A priced one waits
+ * to be paid for (the plans page shows it as due).
+ */
+function mkt_plan_change_due($kind, $subId) {
+    $p = mkt_plan_change_pending($kind, $subId);
+    if (!$p || $p['price'] > 0 || $p['starts'] > date('Y-m-d')) return null;
+    db()->prepare("UPDATE mkt_subscriptions SET pending_plan_id=0, pending_period='' WHERE id=?")->execute([(int)$p['from_sub']['id']]);
+    $t = date('Y-m-d');
+    db()->prepare("INSERT INTO mkt_subscriptions (subscriber_kind,subscriber_id,plan_id,plan_code,period,amount,started_at,expires_at,status,auto_renew,created_by,created_at)
+                   VALUES (?,?,?,?,?,0,?,?, 'ACTIVE', 1, 'scheduled change', ?)")
+        ->execute([$kind, (int)$subId, (int)$p['plan']['id'], (string)$p['plan']['code'], $p['period'], $t, mkt_period_end($t, $p['period']), date('c')]);
+    return ops_one("SELECT * FROM mkt_subscriptions WHERE id=?", [(int)db()->lastInsertId()]) ?: null;
 }
 
 /**
@@ -72,16 +238,8 @@ function mkt_sub_change($kind, $subId, $newPlanId, $period = 'MONTH', $by = '') 
     mkt_billing_migrate();
     $plan = function_exists('mkt_plan_get') ? mkt_plan_get($newPlanId) : null;
     if (!$plan) return [false, 'Choose a valid plan.', 0];
-    $credit = mkt_sub_proration_credit($kind, $subId);
-    [$ok, $msg, $id] = mkt_subscribe($kind, $subId, (int)$newPlanId, $period, $by);
-    if (!$ok) return [$ok, $msg, $id];
-    if ($credit > 0 && $id > 0) {
-        $row = ops_one("SELECT amount FROM mkt_subscriptions WHERE id=?", [(int)$id]);
-        $net = max(0.0, round((float)$row['amount'] - $credit, 2));
-        db()->prepare("UPDATE mkt_subscriptions SET amount=?, proration_credit=? WHERE id=?")->execute([$net, $credit, (int)$id]);
-        $msg .= ' A prorated credit of ' . number_format($credit, 2) . ' was applied.';
-    }
-    return [true, $msg, $id];
+    // Kept for its callers; the rule itself lives in mkt_plan_change_apply().
+    return mkt_plan_change_apply($kind, $subId, (int)$newPlanId, $period, $by);
 }
 
 // ---- Coupons --------------------------------------------------------------

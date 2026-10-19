@@ -17,7 +17,7 @@ Manager · Operation Manager · Coordinator · Finance.
 | Change | What it means in this area | Ref | How it was verified |
 |---|---|---|---|
 | **Finance opens the vendor register** | Read only, at **Directory → Vendor register** (also **Operations → Vendors**). It had been the one role refused | Q-G (owner, "Yes") | **Live over HTTP**: 302 → 200 |
-| **Open** | The matrix also gives Finance *View* on clients; the code still refuses it | Q-K | — |
+| **Finance opens the client register** | Read only, at **Directory → Client register**. Adding or editing a client is still refused | Q-K (owner, "Yes read only") | **Live over HTTP**: 302 → 200; `/partner-new` still refused |
 | D-F1 re-read | The quotation save **does** refuse a BLOCKED client to a non-manager and warns on HOLD (read in `crm.php`, not driven). Work orders are still untested | D-F1 | Code read |
 
 ---

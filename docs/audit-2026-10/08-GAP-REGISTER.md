@@ -984,7 +984,7 @@ small change in `mkt_consume()`'s callers and is left recorded, not built.
 
 ## GAP-039 — plan-change proration is dead code, and would discard the unused value on a downgrade
 
-**OBSERVED · P4 · `mkt_sub_change()`, `mkt_sub_proration_credit()` · recorded**
+**OBSERVED · P4 · `mkt_sub_change()`, `mkt_sub_proration_credit()` · FIXED 19 Oct 2026 — see Q-L**
 
 Neither portal calls `mkt_sub_change()`; both call `mkt_subscribe()` directly,
 which cancels the current subscription and starts a new full-price one, so a
@@ -1119,7 +1119,31 @@ hold for a human, say so and the rule changes in one function.
 
 ## Q-L — mid-month plan change on the marketplace: the owner's answer may be about something else
 
-**CLARIFICATION NEEDED · 19 Oct 2026 · relates to GAP-039**
+**ANSWERED 19 Oct 2026: "Yes build as per your recommendation" · BUILT (closes GAP-039)**
+
+The rule now in the code (`mkt_plan_change_quote()` / `mkt_plan_change_apply()`):
+
+- **Upgrade** (a plan worth more per month, or the same plan monthly → yearly)
+  starts **today**; the unused value of the current plan is taken off the new
+  price; if it is worth more than the new price, the excess is given as **extra
+  days** on the new plan, so nothing paid is lost.
+- **Downgrade** starts **the day after the paid period ends**; nothing is
+  charged now and nothing is refunded. A **free** plan then starts by itself; a
+  **priced** one shows as due and is paid for then. *"Keep my current plan
+  instead"* withdraws it. Cancelling a plan also withdraws it.
+- **Renew** (the same plan and period again) starts when the current one ends.
+  Before, buying the same plan early **cancelled the current period and threw
+  its remaining days away** — a second unfairness, fixed with the first.
+- The paid route uses the same rule: the checkout is for the net price, the
+  credit is fixed on the order, and confirming the payment applies exactly that.
+- Both plans pages say, under each plan, what choosing it would do and when,
+  before anything is clicked.
+
+No new status: a waiting downgrade is a field on the ACTIVE subscription.
+Tests: `test_mkt_plan_change.php` (33); live: `evidence/live-plan-change-finance-clients/`.
+The owner's first answer — *"mutual acceptance between the client, inspector
+and/or agency … decided during negotiation"* — stands as the rule for **work
+prices**, which is how engagements already work. The original note:
 
 The owner answered: *"There must be a mutual acceptance between the client,
 inspector and or agency as the case may be. This shall be decided during
@@ -1136,7 +1160,9 @@ end of the paid period, no refund -- the common SaaS practice).
 
 ## Q-K — the matrix says Finance views business partners; the code still refuses Finance the client list
 
-**QUESTION FOR THE OWNER · recorded 19 Oct 2026 · impact P3**
+**ANSWERED 19 Oct 2026: "Yes read only" · BUILT** — Finance holds `mod.clients.view`,
+no edit; written once into any saved access grid. Verified over HTTP
+(`/clients` 302 → 200; adding a client still refused). The original question:
 
 Row *Business Partners* in `docs/02-permission-matrix.md` gives Finance
 **View**. The owner's "yes" on Q-G gave Finance the **vendor** register; the

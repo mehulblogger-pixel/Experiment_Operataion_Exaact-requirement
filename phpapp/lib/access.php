@@ -854,8 +854,10 @@ function module_defaults($role) {
             //  Vendors: finance pays them. The owner's answer, 2026-10-19 (Q-G): yes,
             //  Finance sees the vendor register -- it had been the one role refused,
             //  while the matrix already said View. Read only.
+            //  Clients: finance invoices and chases them. The owner's answer,
+            //  2026-10-19 (Q-K): yes, read only -- which is what the matrix said.
             $edit = ['invoicing','crm_orders'];
-            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers','vendors']; break;
+            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers','vendors','clients']; break;
         case 'QUALITY_HEAD': case 'TECHNICAL_HEAD':
             //  The owner's rule, 2026-10-18: "only Quality or Technical Head can
             //  close it". Closing a nonconformity means owning the whole loop —
@@ -1181,6 +1183,7 @@ function access_owner_grants() {
     return [
         'Q-B1-2026-10-19' => ['perms' => ['mod.ncr.view', 'mod.ncr.add'], 'roles' => ACCESS_NCR_RECORDERS],
         'Q-G-2026-10-19'  => ['perms' => ['mod.vendors.view'],            'roles' => ['FINANCE']],
+        'Q-K-2026-10-19'  => ['perms' => ['mod.clients.view'],            'roles' => ['FINANCE']],
     ];
 }
 function access_apply_owner_grants($force = false) {

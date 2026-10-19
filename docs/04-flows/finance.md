@@ -61,3 +61,9 @@ Charts → … The pending-tasks panel shows "contracts to register" (`ops.php:6
 On the owner's answer (Q-G), Finance opens **Directory → Vendor register** (also listed under **Operations → Vendors**), read only, to
 see who it is paying. Finance does not edit vendors. See
 `docs/02-permission-matrix.md` footnote 5ᵃ.
+
+## Change, 19 Oct 2026 — the client register
+
+On the owner's answer (Q-K), Finance also opens **Directory → Client register**,
+read only, to look up the customer it is invoicing or chasing. Finance does not
+add or edit clients.

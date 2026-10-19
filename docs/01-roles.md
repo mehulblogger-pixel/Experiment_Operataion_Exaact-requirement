@@ -120,7 +120,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Must never:** approve/send quotes, touch operations or money.
 
 ## FINANCE — "Finance"
-- **Key:** `FINANCE` · `dash.financial, data.credit, data.revenue, data.salary, data.profitability, finance.reconcile, crm.contract.register`; offices/sbus `ALL` (`access.php:462-463`); edits invoicing/crm_orders, views quotes/crm_reports/profitability/reports/jobs/calls/vouchers/idems (`:357-359`), **and vendors, read only (owner, 2026-10-19)**. **Not `is_admin_level`.**
+- **Key:** `FINANCE` · `dash.financial, data.credit, data.revenue, data.salary, data.profitability, finance.reconcile, crm.contract.register`; offices/sbus `ALL` (`access.php:462-463`); edits invoicing/crm_orders, views quotes/crm_reports/profitability/reports/jobs/calls/vouchers/idems (`:357-359`), **and vendors and clients, read only (owner, 2026-10-19, Q-G and Q-K)**. **Not `is_admin_level`.**
 - **Who:** accounts/finance — registers contracts off won quotes, raises and issues invoices, records receipts, reconciles credit and attendance.
 - **Context:** desk, laptop; money-first dashboard (`dashboard.php:65`).
 - **Sees:** Sales (quotes view), Operations (calls/jobs/vouchers **view-only**), Reporting, Money (invoicing/profitability/billing), Insights. **No Directory, no Admin, no Recruitment, no Quality.**

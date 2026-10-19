@@ -25,7 +25,7 @@ Business Director, Branch Manager, Operation Manager and Coordinator.
 | Portal screens: refusals look like refusals; fields labelled; contrast passes; the tenant's own words | | GAP-016–019 | Browser checks at 390 px |
 | Uploads say why a file was refused, with the real limit | | GAP-024 | Execution |
 | A voucher line rejects any quantity or any date | | GAP-022 | Execution |
-| **Open** | Mid-month plan change: the owner's answer ("mutual acceptance … decided during negotiation") reads as a rule for work prices; the subscription question is asked again | GAP-039, Q-L | — |
+| **Fair plan changes** | An upgrade starts today with the unused time credited (any excess becomes extra days); a downgrade starts when the paid period ends, nothing charged now; buying the same plan early extends it instead of cancelling it. Each plan card says what choosing it would do | GAP-039, Q-L (owner, "Yes build as per your recommendation") | 33-assertion test; **live over HTTP**: the downgrade is explained, booked for the day after the period, Pro carries on |
 
 ---
 

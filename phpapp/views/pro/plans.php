@@ -33,6 +33,21 @@
   </div>
 <?php endif; ?>
 
+<?php $pend = function_exists('mkt_plan_change_pending') ? mkt_plan_change_pending('PRO', $meId) : null; ?>
+<?php if ($pend): ?>
+  <div role="status" style="max-width:760px;margin:10px 0;padding:10px 12px;border-left:4px solid #b7791f;background:#fffbea;border-radius:8px;font-size:13.5px">
+    <?php if ($pend['starts'] > date('Y-m-d')): ?>
+      Your plan changes to <b><?= e($pend['plan']['name']) ?></b> on <b><?= e($pend['starts']) ?></b>, when your paid period ends.
+      <?= $pend['price'] > 0 ? 'Nothing is charged until then.' : 'It is free, so it starts by itself.' ?>
+    <?php else: ?>
+      Your switch to <b><?= e($pend['plan']['name']) ?></b> was due on <b><?= e($pend['starts']) ?></b>. Choose it below to start it.
+    <?php endif; ?>
+    <form method="post" action="/pro/plans" style="display:inline">
+      <input type="hidden" name="action" value="keep_plan">
+      <button class="btn sec" type="submit" style="font-size:12.5px;margin-left:6px">Keep my current plan instead</button>
+    </form>
+  </div>
+<?php endif; ?>
 <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:6px">
   <?php foreach ($plans as $p): if (empty($p['is_active'])) continue; $lim = function_exists('mkt_plan_limits') ? mkt_plan_limits($p) : []; $isCur = $current && (int)$current['id']===(int)$p['id']; $isFreePlan = (float)$p['price_month'] <= 0; ?>
     <div class="card" style="<?= $isCur ? 'border:2px solid var(--teal)' : '' ?>">
@@ -49,6 +64,10 @@
         <button class="btn" name="period" value="MONTH" type="submit"><?= $isFreePlan ? 'Choose Free' : 'Monthly' ?></button>
         <?php if (!$isFreePlan): ?><button class="btn sec" name="period" value="YEAR" type="submit">Yearly</button><?php endif; ?>
       </form>
+      <?php foreach (['MONTH', 'YEAR'] as $hp): $h = function_exists('mkt_plan_change_hint') ? mkt_plan_change_hint('PRO', $meId, (int)$p['id'], $hp) : ''; if ($h !== '' && !($hp === 'YEAR' && (float)$p['price_annual'] <= 0 && (float)$p['price_month'] <= 0)): ?>
+        <div class="muted" style="font-size:12px;margin-top:6px"><?= e($h) ?></div>
+      <?php endif; endforeach; ?>
+
     </div>
   <?php endforeach; ?>
 </div>

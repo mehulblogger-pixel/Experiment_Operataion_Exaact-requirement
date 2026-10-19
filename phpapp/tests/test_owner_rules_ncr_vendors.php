@@ -25,6 +25,7 @@ try {
     t_ok(in_array('mod.ncr.edit', role_defaults('QUALITY_HEAD')['perms'], true) && in_array('ncr.close', role_defaults('QUALITY_HEAD')['perms'], true), 'the Quality Head still works and closes nonconformities');
     t_ok(in_array('mod.vendors.view', role_defaults('FINANCE')['perms'], true), 'Finance reads the vendor register');
     t_ok(!in_array('mod.vendors.edit', role_defaults('FINANCE')['perms'], true), '...read only');
+    t_ok(in_array('mod.clients.view', role_defaults('FINANCE')['perms'], true) && !in_array('mod.clients.edit', role_defaults('FINANCE')['perms'], true), 'Finance reads the client register, read only (Q-K)');
 
     // ---- the right as the screens ask it ----------------------------------------------
     $as = function ($role) {
@@ -40,6 +41,7 @@ try {
     t_ok(!ncr_can_record(), 'an inspector may not record one');
     $as('FINANCE');
     t_ok(can('mod.vendors.view') && !can('mod.vendors.edit'), 'a finance login opens the vendor register, read only');
+    t_ok(can('mod.clients.view') && !can('mod.clients.edit'), '...and the client register, read only');
 
     // ---- a grid an administrator already SAVED gets the rule once ------------------------------
     setting_set('role_access', json_encode([
@@ -51,10 +53,10 @@ try {
     db()->prepare("INSERT INTO users (username,first_name,email,role,is_superuser,is_active,permissions) VALUES ('t.or.custom','Custom','custom.or@t.test','OPERATION_MANAGER',0,1,'mod.jobs.view,mod.calls.view')")->execute();
     $cu = (int)db()->lastInsertId();
     $done = access_apply_owner_grants(true);
-    t_eq($done, ['Q-B1-2026-10-19', 'Q-G-2026-10-19'], 'both rules are applied to the saved access');
+    t_eq($done, ['Q-B1-2026-10-19', 'Q-G-2026-10-19', 'Q-K-2026-10-19'], 'all three rules are applied to the saved access');
     $st = json_decode(setting_get('role_access', ''), true);
     t_ok(in_array('mod.ncr.add', $st['COORDINATOR'], true), 'the saved Coordinator grid now records nonconformities');
-    t_ok(in_array('mod.vendors.view', $st['FINANCE'], true), 'the saved Finance grid now reads vendors');
+    t_ok(in_array('mod.vendors.view', $st['FINANCE'], true) && in_array('mod.clients.view', $st['FINANCE'], true), 'the saved Finance grid now reads vendors and clients');
     t_eq($st['INSPECTOR'], ['mod.idems.view'], 'the saved Inspector grid is untouched');
     t_ok(in_array('dash.operations', $st['COORDINATOR'], true), 'nothing the administrator saved was removed');
     $perm = (string)ops_val("SELECT permissions FROM users WHERE id=?", [$cu]);

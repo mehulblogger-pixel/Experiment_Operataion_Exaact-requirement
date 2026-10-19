@@ -176,3 +176,5 @@ normally possible on your existing plan.
 | Finance | Record a receipt with **Bank charges** filled in | The receipt page explains the invoice stays short by that amount |
 | Finance | **Money → Billing workspace → Export** tab, export one month, import into Tally | Tally accepts every sales voucher, including invoices with rounding |
 | An engineer | On the claim sheet, enter a negative number of hours | Refused with *"Hours cannot be negative"* |
+| Finance | **Directory → Client register** | The list opens, read only; there is no way to add a client |
+| A client on a paid plan (client portal) | **Plans** → look under a cheaper plan | It says the change starts when the paid period ends and nothing is charged now |

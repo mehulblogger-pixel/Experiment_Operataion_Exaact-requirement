@@ -866,6 +866,10 @@ function portal_route($route, $method) {
                     [$cok, $cmsg] = mkt_sub_cancel('CLIENT', $party, (string)($_POST['mode'] ?? 'END'));
                     $_SESSION['portal_flash'] = $cmsg; redirect('/portal/plans');
                 }
+                if ($pAct === 'keep_plan' && function_exists('mkt_plan_change_cancel')) {
+                    [, $kmsg] = mkt_plan_change_cancel('CLIENT', $party);
+                    $_SESSION['portal_flash'] = $kmsg; redirect('/portal/plans');
+                }
                 $pack  = $pAct === 'buy_pack';
                 $purpose = $pack ? 'PACK' : 'SUB';
                 $refId   = $pack ? (int)($_POST['pack_id'] ?? 0) : (int)($_POST['plan_id'] ?? 0);
@@ -877,7 +881,7 @@ function portal_route($route, $method) {
                 if (($start['mode'] ?? '') === 'pay')   redirect('/portal/pay?o=' . (int)$start['row_id']);
                 if (($start['mode'] ?? '') === 'error') { $_SESSION['portal_flash'] = $start['msg']; redirect('/portal/plans'); }
                 if ($pack && function_exists('mkt_credit_buy'))      { [$bok, $bmsg] = mkt_credit_buy('CLIENT', $party, $refId, $who); $_SESSION['portal_flash'] = $bmsg; }
-                elseif (!$pack && function_exists('mkt_subscribe'))  { [$ok, $msg]  = mkt_subscribe('CLIENT', $party, $refId, $period, $who, $coupon); $_SESSION['portal_flash'] = $msg; }
+                elseif (!$pack && function_exists('mkt_plan_change_apply')) { [$ok, $msg] = mkt_plan_change_apply('CLIENT', $party, $refId, $period, $who, $coupon); $_SESSION['portal_flash'] = $ok ? $msg : ['m' => $msg, 't' => 'err']; }
                 redirect('/portal/plans');
             }
             portal_view('plans', [

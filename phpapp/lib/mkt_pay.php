@@ -33,6 +33,9 @@ function mkt_pay_migrate() {
         order_id VARCHAR(64) DEFAULT '', payment_id VARCHAR(64) DEFAULT '',
         status VARCHAR(10) DEFAULT 'PENDING',
         created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '', paid_at VARCHAR(30) DEFAULT '')");
+    // The upgrade credit fixed when the payment started, so what is applied on
+    // confirmation is exactly what the customer was shown and paid for.
+    if (function_exists('ensure_column')) ensure_column('mkt_orders', 'proration_credit', 'REAL DEFAULT 0');
     if (function_exists('act_index')) act_index('mkt_orders', 'ix_mord_who', '(subscriber_kind, subscriber_id, status)');
 }
 
@@ -80,6 +83,15 @@ function mkt_pay_start($kind, $subId, $purpose, $refId, $period = 'MONTH', $by =
     $purpose = strtoupper($purpose) === 'PACK' ? 'PACK' : 'SUB';
     $period = strtoupper($period) === 'YEAR' ? 'YEAR' : 'MONTH';
     $amount = mkt_pay_price($purpose, $refId, $period);
+    $credit = 0.0;
+    // A plan change is priced by the rule (owner, 2026-10-19): an upgrade is the new
+    // price less the unused time; a downgrade is not charged now at all.
+    if ($purpose === 'SUB' && function_exists('mkt_plan_change_quote')) {
+        $q = mkt_plan_change_quote($kind, $subId, $refId, $period);
+        if (empty($q['ok'])) return ['mode' => 'error', 'msg' => $q['msg']];
+        if ($q['type'] === 'DOWNGRADE') return ['mode' => 'scheduled', 'msg' => $q['msg']];
+        $amount = (float)$q['price']; $credit = (float)$q['credit'];
+    }
     if ($amount <= 0) return ['mode' => 'free'];
     if (!mkt_pay_configured()) return ['mode' => 'error', 'msg' => mkt_pay_unconfigured_msg()];
 
@@ -89,9 +101,9 @@ function mkt_pay_start($kind, $subId, $purpose, $refId, $period = 'MONTH', $by =
     $ord = rzp_create_order($paise, $receipt, ['kind' => $kind, 'purpose' => $purpose, 'ref' => (string)$refId]);
     if (empty($ord['ok'])) return ['mode' => 'error', 'msg' => $ord['error'] ?? 'Could not start the payment.'];
 
-    db()->prepare("INSERT INTO mkt_orders (subscriber_kind,subscriber_id,purpose,ref_id,period,amount,currency,order_id,status,created_by,created_at)
-                   VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?, ?)")
-        ->execute([$kind, $subId, $purpose, (int)$refId, $period, $amount, (string)$cfg['currency'], (string)$ord['id'], (string)$by, date('c')]);
+    db()->prepare("INSERT INTO mkt_orders (subscriber_kind,subscriber_id,purpose,ref_id,period,amount,currency,order_id,status,created_by,created_at,proration_credit)
+                   VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?, ?, ?)")
+        ->execute([$kind, $subId, $purpose, (int)$refId, $period, $amount, (string)$cfg['currency'], (string)$ord['id'], (string)$by, date('c'), round($credit, 2)]);
     return ['mode' => 'pay', 'row_id' => (int)db()->lastInsertId()];
 }
 
@@ -140,7 +152,9 @@ function mkt_pay_verify($orderId, $paymentId, $signature) {
         [$ok, $msg] = function_exists('mkt_credit_buy') ? mkt_credit_buy($kind, $subId, (int)$row['ref_id'], $by) : [true, 'Credits added.'];
         return [true, 'Payment received. ' . $msg];
     }
-    [$ok, $msg] = function_exists('mkt_subscribe') ? mkt_subscribe($kind, $subId, (int)$row['ref_id'], (string)$row['period'], $by) : [true, 'Subscribed.'];
+    [$ok, $msg] = function_exists('mkt_plan_change_apply')
+        ? mkt_plan_change_apply($kind, $subId, (int)$row['ref_id'], (string)$row['period'], $by, '', (float)($row['proration_credit'] ?? 0))
+        : (function_exists('mkt_subscribe') ? mkt_subscribe($kind, $subId, (int)$row['ref_id'], (string)$row['period'], $by) : [true, 'Subscribed.']);
     return [true, 'Payment received. ' . $msg];
 }
 
