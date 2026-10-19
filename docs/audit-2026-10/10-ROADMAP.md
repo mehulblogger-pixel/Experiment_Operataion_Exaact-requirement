@@ -62,8 +62,8 @@ where being wrong is unrecoverable.
 
 | # | Work | Test | Finding |
 |---|---|---|---|
-| 1.1 | **Audit the three external portals** — client (33 routes), vendor (11), professional (26): inventory, probe per external role, test every form | T-1 | **GAP-012** |
-| 1.2 | **Party isolation:** can client B fetch client A's report, invoice or requirement **by id**? Vendor B another vendor's assessment? A professional another's documents? | T-1 | **GAP-012** |
+| 1.1 | **Audit the three external portals** — client (33 routes), vendor (11), professional (26): inventory, probe per external role, test every form | T-1 | **GAP-012** — **DONE 18 Oct: security pass on all 77 portal routes, `11-EXTERNAL-PORTAL-AUDIT.md`; a screen-quality pass remains** |
+| 1.2 | **Party isolation:** can client B fetch client A's report, invoice or requirement **by id**? Vendor B another vendor's assessment? A professional another's documents? | T-1 | **GAP-012** — **DONE 18 Oct, same document §2** |
 | 1.3 | **Tenant isolation** from outside | T-2 | — — **DONE 19 Oct: a portal session from one company WAS honoured by another (P0, GAP-049); all four identities now bound to their company** |
 | 1.4 | **Verify the privacy-safe talent cards** — inspect the HTML and JSON, not the rendering | T-3 | matrix fn. 20 |
 | 1.5 | **Restore a *foreign* backup.** If a backup from another workspace is accepted, that is a P0 | T-5 | **A-F3** — **DONE 19 Oct: a foreign backup WAS accepted (P0, GAP-048); now refused unless a master confirms by name** |
@@ -175,6 +175,31 @@ Cheap, and it is what an assessor asks for.
 | 7.9 | **Say on `/connect-capabilities`** that switching a capability off removes tiles in other areas | **M-F7** |
 | 7.10 | **Replace `data.credit` as the books write key** with a named `finance.books.write`. Guarded for now by `test_route_gate_regression.php` | **GAP-010 / Y-F4** |
 | 7.11 | **Make the ungated-route absence deliberate** — an explicit allow-list plus a test that fails when a new route is neither gated nor listed | **GAP-008** |
+
+---
+
+## 2a. Security work still open — the register at 19 Oct 2026
+
+One list, so nothing on it is lost between sessions. Each line is either
+untested or known-unsafe; none has been verified as safe. Order is the order
+of work: highest consequence first, cheapest first where equal.
+
+| # | What is open | Why it matters | Roadmap | Test | State |
+|---|---|---|---|---|---|
+| S-0 | **Nothing fixed since the branch began is live.** GAP-048 (foreign backup) and GAP-049 (cross-company portal session) are fixed only in the branch | Both are P0 on the live site until the upload | 0.1 | guide Parts 2–3 | **owner action** |
+| S-1 | **Talent cards shown to clients:** confirm the HTML and JSON carry no contact or identity field the matrix withholds — not just the rendering | A leak of a professional's contact details to a client is a privacy breach and bypasses the marketplace | 1.4 | T-3 | untested |
+| S-2 | **Impersonation ("Login as"):** every action taken while impersonating must name the real person; it must be logged and listed in the matrix | Today it is not established who is accountable for an impersonated change | 2.5 | T-9 | untested |
+| S-3 | **Delete cascade:** work order → job → report → billable event → voucher | A delete that orphans a voucher leaves money with no source | 2.3 | T-4 | untested |
+| S-4 | **Four forms create numbered empty records** (`/call-new`, `/candidate-new`, `/incident-new`, `/endorsement-new`) | Gaps and ghosts in a numbered register are what an assessor finds first | 2.1 | T-10 | confirmed, not fixed |
+| S-5 | **`/quote-new` with an empty submit** — figures are validated (GAP-047); what an empty form stores is not established | A quotation goes to a customer | 2.2 | T-11 | part done |
+| S-6 | **Merge:** reason required; nothing left pointing at the discarded record; say on the screen that it cannot be undone | One-way door with no record of why | 2.6 | T-6 | untested |
+| S-7 | **Changing the numbering scheme mid-year** — protect the existing series or refuse | Duplicate invoice or certificate numbers | 2.7 | T-18 | untested |
+| S-8 | **Staff sessions without a company stamp** are still accepted anywhere (kept deliberately: the overnight jobs act through them). A real sign-in always stamps, so only a session older than M13 could carry none | Low residual risk; closing it needs the overnight jobs to stamp first | — | `test_cross_company_session` | accepted for now, recorded |
+| S-9 | **Two test files pass only in the full suite** (`test_m7_*`, `test_m8_*`) | A guard rail that only holds in company can hide a regression | 3.6 | run alone | recorded |
+
+**Done this month, for the record:** GAP-008 (ungated routes, none reachable),
+GAP-012 (portal party isolation), GAP-048 (foreign backup restore), GAP-049
+(cross-company portal session), the office-scope fallback that fell open.
 
 ---
 
