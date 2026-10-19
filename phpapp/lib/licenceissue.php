@@ -195,6 +195,107 @@ function licbeat_all() {
 // seats through Razorpay on THIS server, and on a verified payment we auto-issue
 // a signed key for that install id. Their install then pulls it via api.php.
 // Standalone pages, because the caller has no account on this site.
+// ---- The self-service purchase, bound to the ORDER rather than the form ----
+//
+// The Razorpay signature proves that payment P belongs to order O. It proves
+// nothing about seats or period: those were posted with the form, and the old
+// verify branch read them from $_POST a second time -- so a 1-seat, 1-month
+// payment carried a valid signature and could be verified into a 500-seat,
+// 1-year licence. And nothing recorded the payment id, so the same valid POST
+// re-issued and re-extended for ever.
+//
+// Now the order is recorded when it is CREATED, with the seats, period and
+// amount it was priced for; verification takes all three from that row, never
+// from the form; and the row is marked PAID with a conditional update that
+// succeeds exactly once -- the same shape mkt_pay_verify() already used.
+function buy_order_open($install, array $amt, array $ord) {
+    billing_migrate();
+    if (function_exists('ensure_column')) {
+        ensure_column('billing_orders', 'install_id', "VARCHAR(80) DEFAULT ''");
+        ensure_column('billing_orders', 'status', "VARCHAR(10) DEFAULT 'PAID'");   // rows from before this had all been paid
+    }
+    db()->prepare("INSERT INTO billing_orders (seats,period,amount,currency,order_id,payment_id,paid_until,by_user,created_at,install_id,status)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,'PENDING')")
+        ->execute([(int)$amt['seats'], (string)$amt['period'], (int)$amt['major'], (string)$amt['currency'],
+                   (string)$ord['id'], '', '', 'self-service', date('c'), (string)$install]);
+    return (int)db()->lastInsertId();
+}
+
+// Returns [ok, title, bodyHtml, httpStatus]. Pure of output so a test can call it.
+function buy_apply_payment($install, array $rec, $orderId, $payId, $sig) {
+    billing_migrate(); licissue_migrate();
+    // Every column this function reads or writes exists before ANY branch can
+    // return, so a caller that inspects issued_licences afterwards is safe
+    // whichever way this went.
+    if (function_exists('ensure_column')) {
+        ensure_column('billing_orders', 'install_id', "VARCHAR(80) DEFAULT ''");
+        ensure_column('billing_orders', 'status', "VARCHAR(10) DEFAULT 'PAID'");
+        ensure_column('issued_licences', 'order_id',   "VARCHAR(60) DEFAULT ''");
+        ensure_column('issued_licences', 'payment_id', "VARCHAR(60) DEFAULT ''");
+    }
+    if (lk_privkey() === '')
+        return [false, 'Online renewal is not available', '<p>This provider has not switched on online payment yet. Please pay them directly.</p>', 503];
+    $orderId = (string)$orderId; $payId = (string)$payId;
+    if ($orderId === '' || $payId === '')
+        return [false, 'Payment not verified', '<p>The payment details did not arrive. Nothing changed.</p>', 400];
+    $o = ops_one("SELECT * FROM billing_orders WHERE order_id=? AND install_id=?", [$orderId, (string)$install]);
+    if (!$o) return [false, 'Payment not verified', '<p>That order is not one this workspace started. Nothing changed.</p>', 400];
+    if ((string)($o['status'] ?? '') !== 'PENDING')
+        return [false, 'Already applied', '<p>That payment has already been applied to your plan. Open <b>Licence → “Just paid? Check now”</b> in your app.</p>', 200];
+    if (!rzp_verify_signature($orderId, $payId, $sig)) {
+        db()->prepare("UPDATE billing_orders SET status='FAILED', payment_id=? WHERE id=? AND status='PENDING'")->execute([$payId, (int)$o['id']]);
+        return [false, 'Payment not verified', '<p>That payment could not be verified. If money was taken it is refunded automatically, and nothing changed.</p>', 400];
+    }
+    // The figures the order was PRICED for, not the ones the form says now.
+    $seats  = max(1, (int)$o['seats']);
+    $period = (string)$o['period'] === 'year' ? 'year' : 'month';
+
+    // Extend from the later of today and the current expiry, so paying early adds time.
+    $from = ((string) $rec['exp'] >= date('Y-m-d')) ? (string) $rec['exp'] : date('Y-m-d');
+    $exp  = date('Y-m-d', strtotime($from . ($period === 'year' ? ' +1 year' : ' +1 month')));
+    $mods = array_filter(array_map('trim', explode(',', (string) $rec['mods']))) ?: array_keys(PRODUCT_MODULES);
+    $ref  = 'LIC-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+    $claims = ['cust' => (string) $rec['customer'], 'exp' => $exp, 'seats' => $seats,
+               'grace' => (int) $rec['grace'] ?: LICENCE_GRACE_DEFAULT, 'ref' => $ref, 'mods' => $mods];
+    if (!empty($rec['hosts'])) $claims['hosts'] = (string) $rec['hosts'];   // keep any host lock on renewal
+    $r = lk_issue($claims);     // signs; no side effects
+    if (empty($r['ok']))
+        return [false, 'Could not issue the licence', '<p>' . e($r['err'] ?? 'error') . ' Your payment succeeded — contact your provider and quote ' . e($payId) . '.</p>', 500];
+
+    // One transaction around the PAID mark and the licence record -- but only
+    // OURS if nobody else's is open: a caller already inside a transaction (the
+    // test harness, or a future batch) keeps its own, and a failure in here is
+    // rethrown to it rather than half-settled behind its back.
+    $db = db();
+    $own = !$db->inTransaction();
+    if ($own) $db->beginTransaction();
+    try {
+        // The replay guard. Exactly one caller can turn PENDING into PAID; a
+        // second delivery of the same valid POST -- or two that overlap --
+        // finds no PENDING row to update and is answered as a duplicate.
+        $u = $db->prepare("UPDATE billing_orders SET status='PAID', payment_id=?, paid_until=? WHERE id=? AND status='PENDING'");
+        $u->execute([$payId, $exp, (int)$o['id']]);
+        if ($u->rowCount() !== 1) {
+            if ($own) $db->rollBack();
+            return [false, 'Already applied', '<p>That payment has already been applied to your plan. Open <b>Licence → “Just paid? Check now”</b> in your app.</p>', 200];
+        }
+        // The record of what was issued is no longer optional: a swallowed
+        // failure here used to mean a licence with no trace of it.
+        $db->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,amount,currency,key_text,by_user,created_at,order_id,payment_id)
+                      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+           ->execute([$ref, (string) $rec['customer'], (string)$install, $seats, $exp, $claims['grace'], implode(',', $mods),
+                      (int)$o['amount'], (string)$o['currency'], $r['key'], 'self-service', date('c'), $orderId, $payId]);
+        if ($own) $db->commit();
+    } catch (Throwable $e) {
+        if (!$own) throw $e;
+        $db->rollBack();
+        return [false, 'Could not record the licence', '<p>Your payment succeeded but the licence could not be recorded. Contact your provider and quote ' . e($payId) . '. Nothing is lost — it can be applied by hand.</p>', 500];
+    }
+    return [true, 'Payment received — you are all set',
+        '<p>Your plan now covers <b>' . (int) $seats . '</b> ' . ((int)$seats === 1 ? 'person' : 'people') . ', paid to <b>' . e(fdate($exp)) . '</b>.</p>'
+        . '<p>Go back to your own app and open <b>Licence → “Just paid? Check now”</b> — the new users switch on straight away.</p>', 200];
+}
+
 function ops_buy($route, $method) {
     licissue_migrate();
     $install = trim((string) ($_GET['install'] ?? $_POST['install'] ?? ''));
@@ -208,29 +309,10 @@ function ops_buy($route, $method) {
     }
 
     if ($route === 'buy-verify' && $method === 'POST') {
-        $orderId = (string) ($_POST['razorpay_order_id'] ?? '');
-        $payId   = (string) ($_POST['razorpay_payment_id'] ?? '');
-        $sig     = (string) ($_POST['razorpay_signature'] ?? '');
-        $seats   = max(1, (int) ($_POST['seats'] ?? 0));
-        $period  = ($_POST['period'] ?? 'month') === 'year' ? 'year' : 'month';
-        if (!rzp_verify_signature($orderId, $payId, $sig))
-            buy_page_shell('Payment not verified', '<p>That payment could not be verified. If money was taken it is refunded automatically, and nothing changed.</p>', 400);
-        // Extend from the later of today and the current expiry, so paying early adds time.
-        $from = ((string) $rec['exp'] >= date('Y-m-d')) ? (string) $rec['exp'] : date('Y-m-d');
-        $exp  = date('Y-m-d', strtotime($from . ($period === 'year' ? ' +1 year' : ' +1 month')));
-        $mods = array_filter(array_map('trim', explode(',', (string) $rec['mods']))) ?: array_keys(PRODUCT_MODULES);
-        $ref  = 'LIC-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
-        $claims = ['cust' => (string) $rec['customer'], 'exp' => $exp, 'seats' => $seats,
-                   'grace' => (int) $rec['grace'] ?: LICENCE_GRACE_DEFAULT, 'ref' => $ref, 'mods' => $mods];
-        if (!empty($rec['hosts'])) $claims['hosts'] = (string) $rec['hosts'];   // keep any host lock on renewal
-        $r = lk_issue($claims);
-        if (empty($r['ok'])) buy_page_shell('Could not issue the licence', '<p>' . e($r['err'] ?? 'error') . ' Your payment succeeded — contact your provider and quote ' . e($payId) . '.</p>', 500);
-        try { db()->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,key_text,by_user,created_at)
-                             VALUES (?,?,?,?,?,?,?,?,?,?)")
-              ->execute([$ref, (string) $rec['customer'], $install, $seats, $exp, $claims['grace'], implode(',', $mods), $r['key'], 'self-service', date('c')]); } catch (Throwable $e) {}
-        buy_page_shell('Payment received — you are all set',
-            '<p>Your plan now covers <b>' . (int) $seats . '</b> ' . ((int)$seats === 1 ? 'person' : 'people') . ', paid to <b>' . e(fdate($exp)) . '</b>.</p>'
-            . '<p>Go back to your own app and open <b>Licence → “Just paid? Check now”</b> — the new users switch on straight away.</p>', 200);
+        // seats/period are deliberately NOT read here -- see buy_apply_payment().
+        [, $title, $body, $http] = buy_apply_payment($install, $rec,
+            (string)($_POST['razorpay_order_id'] ?? ''), (string)($_POST['razorpay_payment_id'] ?? ''), (string)($_POST['razorpay_signature'] ?? ''));
+        buy_page_shell($title, $body, $http);
     }
 
     if ($route === 'buy' && $method === 'POST') {
@@ -238,6 +320,7 @@ function ops_buy($route, $method) {
         if ($a['paise'] <= 0) buy_page_shell('No price set', '<p>This provider has not set a price yet.</p>', 200);
         $ord = rzp_create_order($a['paise'], 'buy-' . substr($install, 0, 20) . '-' . date('ymdHis'), ['install' => $install, 'seats' => $a['seats'], 'period' => $a['period']]);
         if (empty($ord['ok'])) buy_page_shell('Could not start payment', '<p>' . e($ord['error'] ?? '') . '</p>', 500);
+        buy_order_open($install, $a, $ord);     // what this order is FOR, recorded before anyone pays
         buy_pay_shell($a, $ord, billing_config(), $install);
     }
 

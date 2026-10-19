@@ -671,6 +671,56 @@ post to a business record or list another person's data.
 
 ---
 
+## GAP-030 — the ERP's own purchase page: pay for one seat, verify into five hundred
+
+**CONFIRMED BY EXECUTION · P1 · `/buy-verify` (public) · FIXED 19 Oct 2026**
+
+The Razorpay signature was verified correctly -- and it proves only that payment
+P belongs to order O. The old branch then read `seats` and `period` **from the
+form a second time** and issued the licence from those. Start the cheapest order
+(1 seat, 1 month), pay it, POST the genuine signature back with
+`seats=500&period=year`: a signed licence for **500 seats for a year**, paid as
+one seat for a month.
+
+**Fixed:** the order is recorded when created, with the seats, period and amount
+it was priced for; verification takes all three from that row and accepts no
+seats or period at all. See `13-PUBLIC-SURFACE.md` §2.
+
+---
+
+## GAP-031 — the same payment could be applied as many times as you like
+
+**CONFIRMED BY EXECUTION · P1 · `/buy-verify` (public) · FIXED 19 Oct 2026**
+
+No payment id was recorded anywhere, so the same valid POST re-signed a licence
+and extended the expiry on every repeat; the one record of what was issued sat in
+a swallowed `try/catch`. **Fixed:** the order is marked PAID with a conditional
+update that succeeds exactly once, in one transaction with the licence record,
+which now carries `order_id`, `payment_id` and the amount, and whose failure rolls
+the issue back. The same shape `mkt_pay_verify()` already had.
+
+---
+
+## GAP-032 — the marketplace payment check-then-update could apply twice
+
+**CONFIRMED · P3 · `mkt_pay_verify()` · FIXED 19 Oct 2026**
+
+Read `status='PENDING'`, then update, nothing atomic between -- two
+verifications arriving together could both apply. The update is now conditional
+on `PENDING` and the second caller is told the payment was already processed.
+
+---
+
+## GAP-033 — public organisation onboarding has no throttle
+
+**OBSERVED · P3 · `/join` (public) · recorded**
+
+A stranger can create pending organisations without limit (each needs a
+platform admin's approval, so the cost is admin time, not data). A CAPTCHA or a
+per-address limit is the conventional answer; recorded, not built.
+
+---
+
 ## GAP-028 — the Books receiver silently dropped money it could not apply
 
 **CONFIRMED BY EXECUTION · P1 · `mgh_books_receiver` · FIXED 19 Oct 2026**

@@ -150,7 +150,7 @@ Cheap, and it is what an assessor asks for.
 
 | # | Work | Test |
 |---|---|---|
-| 6.1 | **Re-run the inventory over all ≈725 routes** — screens, fields, module gates, reachability. Ideally make the application **enumerate its own routes** so it can never drift again | T-20 |
+| 6.1 | **Re-run the inventory over all ≈725 routes** — screens, fields, module gates, reachability. Ideally make the application **enumerate its own routes** so it can never drift again | T-20 | — **DONE 19 Oct 2026**: the public (pre-login) surface is `13-PUBLIC-SURFACE.md` (GAP-030…033); with `11-` and `12-` this closes the coverage erratum
 | 6.2 | **Inventory the record screens** — `/job?id=` first; it is the highest-value remaining measurement in the audit | T-19 |
 | 6.3 | **Document the analytics/TAPI hub** and audit its metric definitions against the domain functions they wrap | — |
 | 6.4 | **Audit the sibling deployables** — `licence-server/` (Razorpay webhook, issues licences), `mgh_books_receiver/`, `mgh-hire/`, `sop/` | — | — **DONE 19 Oct 2026**: see `12-SIBLING-DEPLOYABLES.md` (GAP-025…029); `mgh-hire` surveyed, full pass waits on Q-C

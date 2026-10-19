@@ -100,7 +100,12 @@ function mkt_pay_verify($orderId, $paymentId, $signature) {
         return [false, 'The payment could not be verified. If money was deducted it will be refunded.'];
     }
     // Mark PAID first so a double callback cannot activate twice.
-    db()->prepare("UPDATE mkt_orders SET status='PAID', payment_id=?, paid_at=? WHERE id=?")->execute([(string)$paymentId, date('c'), (int)$row['id']]);
+    // Conditional, so exactly one caller turns PENDING into PAID: the SELECT
+    // above and this UPDATE were not atomic, and two verifications of the same
+    // order arriving together could both pass the SELECT and both apply.
+    $u = db()->prepare("UPDATE mkt_orders SET status='PAID', payment_id=?, paid_at=? WHERE id=? AND status='PENDING'");
+    $u->execute([(string)$paymentId, date('c'), (int)$row['id']]);
+    if ($u->rowCount() !== 1) return [false, 'This payment was already processed.'];
 
     $kind = (string)$row['subscriber_kind']; $subId = (int)$row['subscriber_id']; $by = (string)$row['created_by'];
     $isPack = (string)$row['purpose'] === 'PACK';
