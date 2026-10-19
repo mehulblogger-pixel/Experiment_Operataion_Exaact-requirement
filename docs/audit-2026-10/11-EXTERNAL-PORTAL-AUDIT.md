@@ -639,6 +639,116 @@ day with an expense.
 
 ---
 
+### 2.10 File uploads — the validator was strong, everything round it was not
+
+Three portal paths accept a file: a professional's **documents**, a **voucher
+attachment**, and the **report deliverable** the client pays to receive. All
+three are stored base64-encoded inside a text column, so size matters, and all
+three are served back by `send_uploaded_file()`.
+
+**Both halves of the dangerous part are already right, and that deserves saying
+plainly rather than being dressed up as a finding.**
+
+`upload_reject_reason()` (`lib/security.php`) enforces a size cap, a banned
+extension list, the **double-extension trick** (`report.php.jpg`), `<?php` and
+shebang detection in the first kilobyte, a declared picture that must really be
+a picture by its magic bytes, **SVG refused outright** (a drawing that can carry
+script), and markup refused under any name. All three paths call it.
+
+`send_uploaded_file()` serves from an **allow-list**: anything not on it becomes
+`application/octet-stream` with `Content-Disposition: attachment`, plus
+`X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src
+'none'; sandbox`. The list holds no HTML and no SVG. So the attack I went
+looking for — a professional uploading a "report" that runs script in the
+client's browser — **is closed**, and the comments show it was closed
+deliberately.
+
+What was wrong was everything around it.
+
+---
+
+#### GAP-023 (P2) — nine actions threw away their own answer · **FIXED**
+
+GAP-015 found the professional portal's message channel was never rendered.
+Fixing that exposed the larger version: **nine calls in that router discarded
+the `[ok, message]` their function returned**, so even once the channel worked
+there was nothing to show.
+
+Every reason `upload_reject_reason()` gives was swallowed on the way out. The
+two that matter most:
+
+- **`/pro/documents`** — the busiest upload on the portal. A professional
+  attaching a certificate that is too large, or a program file, or an SVG, saw
+  a page with their file simply missing and **no reason at all**.
+- **`/pro/voucher` `report_upload`** — the **deliverable**. A refused upload left
+  the professional believing the client had their report, and the client waiting
+  for it, with the payment handshake stalled between them.
+
+Also silent: adding and removing a voucher day, submitting and reopening a
+voucher (**lifecycle** transitions that can legitimately fail), removing an
+attachment, saving a certificate, saving project experience, and saving the
+passport itself.
+
+**Fixed:** all nine now capture the result and show it, tagged by outcome.
+
+> **Method note — I introduced two bugs doing it.** My first version called
+> `connect_pro_profile_save()` **twice** (once for the message, once for the
+> tag) and `connect_engv_delete_line()` **three times** — so the first delete
+> would succeed and the next two fail, and a working delete would report a
+> failure. Caught by reading my own diff before running anything. Each action is
+> now invoked exactly once and tagged from that one result, and the test asserts
+> the call count so it cannot regress.
+
+---
+
+#### GAP-024 (P2) — two size failures, two misleading messages · **FIXED**
+
+Driving real files through `/pro/documents` (`evidence/pro-upload-feedback.sh`)
+found that **neither** size failure said anything about size:
+
+| What was uploaded | What the professional was told |
+|---|---|
+| 3 MB PDF — over php.ini's `upload_max_filesize`, under the app's own 12 MB | ***"Choose a file to upload."*** |
+| 14 MB file — over php.ini's `post_max_size` | ***"That form was not sent from this page, or it had expired."*** |
+
+Both are worse than silence, because both send the person somewhere useless.
+The first tells somebody who just chose a file to choose a file. The second
+blames their session, so they reload and try **the same file** again. Neither
+mentions size, and the app meanwhile advertises a 12 MB limit that this
+configuration cannot honour.
+
+The cause of each:
+- A file over php.ini's per-file limit reaches PHP as an **empty slot** with an
+  error code in `$_FILES`. The code never read the error code, so an empty slot
+  looked like "nothing chosen".
+- A POST over `post_max_size` loses `$_POST` **entirely, token included**, so it
+  surfaces in the CSRF gate — which blamed the form.
+
+**Fixed**, in one shared place so the staff application benefits too:
+- `upload_error_reason($file)` turns each `$_FILES` error code into plain words,
+  checked **before** the "choose a file" fallback in all three upload paths.
+- `upload_effective_max_mb()` quotes the **smaller** of the app's limit and
+  php.ini's, because quoting a number the server cannot honour is a lie somebody
+  will keep retrying against. (`lib/preflight.php` already warned the
+  administrator about that mismatch — this is what the person uploading needed.)
+- `upload_post_too_large()` recognises the lost-body case from `CONTENT_LENGTH`,
+  and **all three** portal gates now name the file instead of the form.
+
+Measured after the fix: *"mid.pdf is too large to upload. The limit is 2 MB."*
+and *"The file you attached is too large to upload — nothing was sent. The limit
+is 2 MB."*
+
+> **Method note — two of my own tools lied in this round.** The probe's
+> "stored?" column counted links on a redirected page and reported a
+> **successful** upload as refused; it now counts rows in the database. And a
+> test assertion checking that the error code is read *before* the "Choose a
+> file to upload." fallback failed on a correct function — because my own
+> explanatory **comment** above the check quotes that same phrase, and the
+> assertion found the comment first. It now matches the statement, not the
+> sentence describing it.
+
+---
+
 ## 3. Still to do on these portals
 
 This pass answered the two security questions. It did **not** do for the portals
@@ -647,7 +757,6 @@ what deliverables 04 and 05 did for the staff application:
 | Outstanding | Why it matters |
 |---|---|
 | Bad input on the forms §2.9 did **not** reach | the voucher line is done; the requirement form's rates and dates, the credential expiry dates, and every email field are not |
-| **File uploads** | size and type limits on `/pro/documents`, `/pro/voucher` and the report deliverable were not tested at all — a base64 column and a large file deserve a measurement |
 | Empty states on the 38 screens not walked | the 39 walked were those the four seeded personas could reach |
 | The professional portal's **write** paths | isolation is proven on reads and on the one delete tested; the profile, CV, credentials and voucher-line writes are not each individually driven |
 | `/pro/tax-*` (4 routes) and `/pro/geo` | small lookup endpoints, read only for isolation so far |
@@ -658,7 +767,8 @@ assistant on the vendor side (§2.4), the professional portal's isolation
 including all three file routes (§2.5), phone-width layout, message delivery
 and field labelling across 39 screens (§2.6), terminology and colour
 contrast (§2.7), what the forms do with empty
-input (§2.8), and what the voucher line does with wrong values (§2.9).
+input (§2.8), what the voucher line does with
+wrong values (§2.9), and the three file-upload paths (§2.10).
 
 **GAP-012 is therefore reduced, not closed.** The coverage hole is mapped and its
 two security defects are fixed; the quality audit of these 77 screens remains.
@@ -685,3 +795,5 @@ two security defects are fixed; the quality audit of these 77 screens remains.
 | `phpapp/tests/test_pro_portal_csrf.php` | 30 assertions: all three portals define a gate, call it from their router, and stamp their forms; the lookup endpoints stay GET; the empty-title refusal speaks |
 | `evidence/portal-bad-input.php` | eleven wrong values driven at a voucher line, with what each one stored |
 | `phpapp/tests/test_voucher_line_validation.php` | 33 assertions, including the back-dating case an over-strict first attempt of mine broke |
+| `evidence/pro-upload-feedback.sh` | a program file, a web page, a file over php.ini's cap and a file over the whole-POST cap, each driven at `/pro/documents` with what the professional is told |
+| `phpapp/tests/test_upload_feedback.php` | 41 assertions: the limit quoted is the one that applies, every upload error gets plain words, all three gates blame the file not the form, and all nine portal actions keep their answer — each invoked exactly once |

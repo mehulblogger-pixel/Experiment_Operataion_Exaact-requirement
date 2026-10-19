@@ -546,6 +546,81 @@ function file_real_kind($bytes) {
     return 'unknown';
 }
 
+// The limit that ACTUALLY applies, which is the smaller of what this app allows
+// and what PHP will carry. The app's own setting can be 12 MB while php.ini
+// stops at 2 MB, and in that case quoting 12 MB at somebody is a lie they will
+// keep retrying against. lib/preflight.php already warns an administrator about
+// the mismatch; this is what the person uploading needs to be told.
+function upload_effective_max_mb() {
+    $app = upload_max_mb();
+    $ini = 0;
+    $raw = trim((string)ini_get('upload_max_filesize'));
+    if ($raw !== '' && preg_match('/^(\d+(?:\.\d+)?)\s*([KMG]?)/i', $raw, $m)) {
+        $n = (float)$m[1];
+        switch (strtoupper($m[2])) {
+            case 'G': $n *= 1024; break;
+            case 'M': break;
+            case 'K': $n /= 1024; break;
+            default:  $n /= (1024 * 1024);   // plain bytes
+        }
+        $ini = (int)floor($n);
+    }
+    return ($ini > 0 && $ini < $app) ? $ini : $app;
+}
+
+// Why the BROWSER's upload never arrived intact, in plain words. $_FILES carries
+// an error code that the portals were ignoring, so a file over php.ini's own
+// limit reached the app as an empty slot and was reported as "Choose a file to
+// upload." -- to somebody who had just chosen one, and who will now try the same
+// file again. '' means the upload itself was fine.
+function upload_error_reason($file) {
+    if (!is_array($file)) return '';
+    $err = (int)($file['error'] ?? UPLOAD_ERR_OK);
+    if ($err === UPLOAD_ERR_OK) return '';
+    $name = trim((string)($file['name'] ?? ''));
+    $what = $name !== '' ? '"' . $name . '"' : 'That file';
+    switch ($err) {
+        case UPLOAD_ERR_INI_SIZE:
+        case UPLOAD_ERR_FORM_SIZE:
+            return $what . ' is too large to upload. The limit is '
+                 . upload_effective_max_mb() . ' MB.';
+        case UPLOAD_ERR_PARTIAL:
+            return $what . ' only arrived in part — the connection dropped. Try again.';
+        case UPLOAD_ERR_NO_FILE:
+            return '';   // genuinely nothing chosen; the caller's own words fit
+        case UPLOAD_ERR_NO_TMP_DIR:
+        case UPLOAD_ERR_CANT_WRITE:
+            return $what . ' could not be saved on the server. Nothing was stored — '
+                 . 'tell us if it keeps happening.';
+        case UPLOAD_ERR_EXTENSION:
+            return $what . ' was blocked by the server. Nothing was stored.';
+    }
+    return $what . ' could not be uploaded. Nothing was stored.';
+}
+
+// A POST whose body exceeded php.ini's post_max_size reaches PHP with $_POST
+// and $_FILES both EMPTY -- the token included. The CSRF gate then fires and
+// blames the form, which sends the person back to reload and retry the same
+// huge file forever. CONTENT_LENGTH still tells the truth, so ask it first.
+function upload_post_too_large() {
+    if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST') return false;
+    if (!empty($_POST) || !empty($_FILES)) return false;
+    $len = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+    if ($len <= 0) return false;
+    $raw = trim((string)ini_get('post_max_size'));
+    $max = 0;
+    if ($raw !== '' && preg_match('/^(\\d+(?:\\.\\d+)?)\\s*([KMG]?)/i', $raw, $m)) {
+        $n = (float)$m[1];
+        switch (strtoupper($m[2])) {
+            case 'G': $n *= 1024 * 1024 * 1024; break;
+            case 'M': $n *= 1024 * 1024; break;
+            case 'K': $n *= 1024; break;
+        }
+        $max = (int)$n;
+    }
+    return $max > 0 && $len > $max;
+}
+
 // '' when the file may be stored, otherwise the reason it may not.
 function upload_reject_reason($bytes, $name, $declaredMime) {
     $name = (string)$name;

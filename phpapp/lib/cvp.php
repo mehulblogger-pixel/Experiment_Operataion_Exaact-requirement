@@ -459,7 +459,10 @@ function cvp_vendor_csrf_or_die($method) {
     if ($method !== 'POST') return;
     if (csrf_ok($_POST['_csrf'] ?? '')) return;
     http_response_code(400);
-    $err = 'That form was not sent from this page, or it had expired. Open the page again and retype it — nothing was changed.';
+    $err = (function_exists('upload_post_too_large') && upload_post_too_large())
+        ? 'The file you attached is too large to upload — nothing was sent. '
+                 . 'The limit is ' . (function_exists('upload_effective_max_mb') ? upload_effective_max_mb() : 12) . ' MB.'
+        : 'That form was not sent from this page, or it had expired. Open the page again and retype it — nothing was changed.';
     cvp_vendor_view('message', ['title' => 'Please try that again', 'body' => $err], (bool)cvp_vendor_user());
     exit;
 }

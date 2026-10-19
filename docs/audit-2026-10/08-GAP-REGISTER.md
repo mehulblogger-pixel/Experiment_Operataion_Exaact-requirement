@@ -671,6 +671,65 @@ post to a business record or list another person's data.
 
 ---
 
+## GAP-024 — two upload size failures gave two misleading messages
+
+**CONFIRMED BY EXECUTION · P2 · All three portals · FIXED 19 Oct 2026**
+
+Neither size failure said anything about size. A 3 MB file -- over php.ini's
+`upload_max_filesize` but under the app's own 12 MB -- was answered with
+**"Choose a file to upload."**, to somebody who had just chosen one. A 14 MB
+file -- over `post_max_size` -- was answered with **"That form was not sent from
+this page, or it had expired."**, blaming their session.
+
+Both are worse than silence: each sends the person somewhere useless, so they
+retry the same file. The app meanwhile advertises a 12 MB limit this
+configuration cannot honour.
+
+**Fixed** in one shared place, so the staff application benefits too:
+`upload_error_reason()` turns each `$_FILES` error code into plain words and is
+checked BEFORE the "choose a file" fallback in all three upload paths;
+`upload_effective_max_mb()` quotes the smaller of the app's limit and php.ini's;
+`upload_post_too_large()` recognises the lost-body case from CONTENT_LENGTH and
+all three portal CSRF gates now name the file rather than the form.
+
+---
+
+## GAP-023 — nine professional-portal actions threw away their own answer
+
+**CONFIRMED BY EXECUTION · P2 · Professional portal · FIXED 19 Oct 2026**
+
+GAP-015 found that portal's message channel was never rendered. Fixing it
+exposed the larger version: **nine calls in the router discarded the
+`[ok, message]` their function returned**, so even with a working channel there
+was nothing to show.
+
+Every reason `upload_reject_reason()` gives was swallowed. The two that matter
+most: **`/pro/documents`**, the busiest upload on the portal, where a refused
+file simply vanished with no reason; and **the report deliverable**, where a
+refused upload left the professional believing the client had their report and
+the client waiting for it, with the payment handshake stalled between them.
+
+Also silent: adding and removing a voucher day, submitting and reopening a
+voucher (lifecycle transitions that can fail), removing an attachment, saving a
+certificate, saving project experience, and saving the passport.
+
+**Fixed:** all nine capture the result and show it, tagged by outcome.
+
+Two bugs of mine while doing it, caught by reading the diff: the first version
+called `connect_pro_profile_save()` twice and `connect_engv_delete_line()` THREE
+times, so a successful delete would have reported a failure. Each action is now
+invoked exactly once, and the test asserts the call count.
+
+**Worth recording separately: the dangerous half of uploads was already right.**
+`upload_reject_reason()` enforces a size cap, banned extensions, the
+`report.php.jpg` double-extension trick, `<?php` detection, a declared picture
+that must really be one, SVG refused outright and markup refused under any name;
+and `send_uploaded_file()` serves from an allow-list with `nosniff` and a
+locking-down CSP, so an uploaded web page cannot run in a client's browser.
+That was closed deliberately, not by luck.
+
+---
+
 ## GAP-022 — a voucher line accepted any quantity and any date
 
 **CONFIRMED BY EXECUTION · P2 · Professional portal (billing) · FIXED 19 Oct 2026**

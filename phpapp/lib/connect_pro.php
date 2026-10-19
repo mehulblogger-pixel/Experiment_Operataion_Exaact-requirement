@@ -271,6 +271,13 @@ function connect_pro_file_kinds() {
 function connect_pro_file_add($proId, $kind, $file) {
     connect_pro_migrate();
     $kind = isset(connect_pro_file_kinds()[$kind]) ? $kind : 'OTHER';
+    // The browser's own error comes FIRST: a file over php.ini's limit arrives
+    // as an empty slot, and "Choose a file to upload." is the wrong thing to say
+    // to somebody who just chose one.
+    if (function_exists('upload_error_reason')) {
+        $ue = upload_error_reason($file);
+        if ($ue !== '') return [false, $ue];
+    }
     if (!$file || ($file['tmp_name'] ?? '') === '' || !is_uploaded_file($file['tmp_name']))
         return [false, 'Choose a file to upload.'];
     $bytes = (string)@file_get_contents($file['tmp_name']);
@@ -542,9 +549,14 @@ function connect_pro_csrf_or_die($method) {
     if ($method !== 'POST') return;
     if (csrf_ok($_POST['_csrf'] ?? '')) return;
     http_response_code(400);
-    connect_pro_view('message', ['title' => 'Please try that again',
-        'body' => 'That form was not sent from this page, or it had expired. '
-                . 'Open the page again and retype it — nothing was changed.']);
+    $tooBig = function_exists('upload_post_too_large') && upload_post_too_large();
+    connect_pro_view('message', [
+        'title' => $tooBig ? 'That file is too large' : 'Please try that again',
+        'body'  => $tooBig
+            ? 'The file you attached is too large to upload — nothing was sent. '
+                 . 'The limit is ' . (function_exists('upload_effective_max_mb') ? upload_effective_max_mb() : 12) . ' MB.'
+            : 'That form was not sent from this page, or it had expired. '
+            . 'Open the page again and retype it — nothing was changed.']);
     exit;
 }
 
@@ -615,16 +627,21 @@ function connect_pro_route($route, $method) {
                 if ($act === 'cert_save' && function_exists('connect_cred_cert_save')) {
                     $in = $_POST;
                     if (!empty($_FILES['cert_file']['name']) && function_exists('connect_pro_file_add')) {
-                        [$fok] = connect_pro_file_add((int)$me['id'], 'CERT', $_FILES['cert_file']);
+                        [$fok, $fmsg] = connect_pro_file_add((int)$me['id'], 'CERT', $_FILES['cert_file']);
                         if ($fok) $in['file_id'] = (int)ops_val("SELECT id FROM cx_pro_files WHERE pro_id=? AND kind='CERT' ORDER BY id DESC LIMIT 1", [(int)$me['id']]);
+                        // A rejected certificate file -- over the size limit, a
+                        // program file, an SVG -- used to vanish without a word.
+                        elseif ($fmsg !== '') connect_pro_flash_set($fmsg, 'err');
                     }
-                    connect_cred_cert_save((int)$me['id'], $in);
+                    [$cok, $cmsg] = connect_cred_cert_save((int)$me['id'], $in);
+                    if ($cmsg !== '') connect_pro_flash_set($cmsg, $cok ? 'ok' : 'err');
                 } elseif ($act === 'cert_verify' && function_exists('connect_cred_cert_request_verify')) {
                     connect_cred_cert_request_verify((int)$me['id'], (int)($_POST['id'] ?? 0));
                 } elseif ($act === 'cert_del' && function_exists('connect_cred_cert_delete')) {
                     connect_cred_cert_delete((int)($_POST['id'] ?? 0), (int)$me['id']);
                 } elseif ($act === 'project_save' && function_exists('connect_cred_project_save')) {
-                    connect_cred_project_save((int)$me['id'], $_POST);
+                    [$pok, $pmsg] = connect_cred_project_save((int)$me['id'], $_POST);
+                    if ($pmsg !== '') connect_pro_flash_set($pmsg, $pok ? 'ok' : 'err');
                 } elseif ($act === 'project_del' && function_exists('connect_cred_project_delete')) {
                     connect_cred_project_delete((int)($_POST['id'] ?? 0), (int)$me['id']);
                 }
@@ -721,7 +738,11 @@ function connect_pro_route($route, $method) {
                     connect_pro_flash_set($tmsg, $tok ? 'ok' : 'err');
                     redirect('/pro/profile#tax');
                 } else {
-                    connect_pro_profile_save((int)$me['id'], $_POST);
+                    $savedOk = connect_pro_profile_save((int)$me['id'], $_POST);
+                    connect_pro_flash_set($savedOk
+                        ? 'Your passport is saved.'
+                        : 'Your passport could not be saved. Nothing was changed.',
+                        $savedOk ? 'ok' : 'err');
                     if (function_exists('connect_channel_set_consent')) connect_channel_set_consent((int)$me['id'], $_POST); // #5 — channel opt-ins
                     $saved = true; $me = connect_pro_user();
                 }
@@ -892,18 +913,40 @@ function connect_pro_route($route, $method) {
                     [$lok, $lmsg] = connect_engv_add_line($vid, $_POST);
                     connect_pro_flash_set($lmsg, $lok ? 'ok' : 'err');
                 }
-                elseif ($act === 'del_line')  connect_engv_delete_line((int)($_POST['line_id'] ?? 0), $vid);
-                elseif ($act === 'submit')    connect_engv_set_status($vid, 'SUBMITTED');
-                elseif ($act === 'reopen')    connect_engv_set_status($vid, 'DRAFT');   // revise a returned voucher
-                elseif ($act === 'add_file' && function_exists('connect_engv_file_add'))
-                    connect_engv_file_add($vid, (int)($_POST['line_id'] ?? 0), $_FILES['file'] ?? null, 'professional', (int)$me['id'], (string)$me['name']);
-                elseif ($act === 'del_file' && function_exists('connect_engv_file_delete'))
-                    connect_engv_file_delete((int)($_POST['file_id'] ?? 0), $vid);
+                elseif ($act === 'del_line')  {
+                    $delOk = connect_engv_delete_line((int)($_POST['line_id'] ?? 0), $vid);
+                    connect_pro_flash_set($delOk
+                        ? 'Day removed.'
+                        : 'That day could not be removed — a voucher can only be changed while it is a draft.',
+                        $delOk ? 'ok' : 'err');
+                }
+                elseif ($act === 'submit')    { [$sok, $smsg] = connect_engv_set_status($vid, 'SUBMITTED');
+                                                connect_pro_flash_set($smsg ?: ($sok ? 'Sent for review.' : 'That could not be sent.'), $sok ? 'ok' : 'err'); }
+                elseif ($act === 'reopen')    { [$rok, $rmsg] = connect_engv_set_status($vid, 'DRAFT');   // revise a returned voucher
+                                                connect_pro_flash_set($rmsg ?: ($rok ? 'Reopened as a draft.' : 'That could not be reopened.'), $rok ? 'ok' : 'err'); }
+                elseif ($act === 'add_file' && function_exists('connect_engv_file_add')) {
+                    [$aok, $amsg] = connect_engv_file_add($vid, (int)($_POST['line_id'] ?? 0), $_FILES['file'] ?? null, 'professional', (int)$me['id'], (string)$me['name']);
+                    connect_pro_flash_set($amsg, $aok ? 'ok' : 'err');
+                }
+                elseif ($act === 'del_file' && function_exists('connect_engv_file_delete')) {
+                    $dfOk = connect_engv_file_delete((int)($_POST['file_id'] ?? 0), $vid);
+                    connect_pro_flash_set($dfOk
+                        ? 'Document removed.'
+                        : 'That document could not be removed at this stage.',
+                        $dfOk ? 'ok' : 'err');
+                }
                 elseif ($act === 'confirm_received' && function_exists('connect_engv_confirm'))
                     connect_engv_confirm($vid, 'pro', (string)$me['name']);
                 elseif ($act === 'report_upload' && function_exists('connect_engv_report_add')) {
                     $vv = connect_engv_get($vid);
-                    if ($vv) connect_engv_report_add((int)$vv['engagement_id'], $_FILES['file'] ?? null, (string)($_POST['title'] ?? ''), 'professional', (int)$me['id'], (string)$me['name']);
+                    // The deliverable itself. Its result was discarded, so a
+                    // refusal ("larger than the 12 MB limit", "is a program
+                    // file") left the professional believing the client had
+                    // their report -- and the client waiting for it.
+                    if ($vv) {
+                        [$rok2, $rmsg2] = connect_engv_report_add((int)$vv['engagement_id'], $_FILES['file'] ?? null, (string)($_POST['title'] ?? ''), 'professional', (int)$me['id'], (string)$me['name']);
+                        connect_pro_flash_set($rmsg2, $rok2 ? 'ok' : 'err');
+                    }
                 }
                 redirect('/pro/voucher?id=' . $vid);
             }
@@ -951,8 +994,18 @@ function connect_pro_route($route, $method) {
 
         case 'pro/documents':   // photo / CV / certificates
             if ($method === 'POST') {
-                if (($_POST['action'] ?? '') === 'delete') connect_pro_file_delete((int)($_POST['file_id'] ?? 0), (int)$me['id']);
-                elseif (!empty($_FILES['file'])) connect_pro_file_add((int)$me['id'], (string)($_POST['kind'] ?? 'OTHER'), $_FILES['file']);
+                // The busiest upload on this portal, and its answer was thrown
+                // away too: every reason upload_reject_reason() gives -- over the
+                // size limit, a program file, an SVG, a web page, a picture whose
+                // contents are not a picture -- was swallowed, and the
+                // professional saw only a page with their file missing.
+                if (($_POST['action'] ?? '') === 'delete') {
+                    [$dok, $dmsg] = connect_pro_file_delete((int)($_POST['file_id'] ?? 0), (int)$me['id']);
+                    connect_pro_flash_set($dmsg, $dok ? 'ok' : 'err');
+                } elseif (!empty($_FILES['file'])) {
+                    [$uok, $umsg] = connect_pro_file_add((int)$me['id'], (string)($_POST['kind'] ?? 'OTHER'), $_FILES['file']);
+                    connect_pro_flash_set($umsg, $uok ? 'ok' : 'err');
+                }
                 redirect('/pro/documents');
             }
             connect_pro_view('documents', ['me' => $me, 'files' => connect_pro_files((int)$me['id']), 'kinds' => connect_pro_file_kinds()]); exit;

@@ -804,7 +804,13 @@ function portal_csrf_or_die($method) {
     if ($method !== 'POST') return;
     if (csrf_ok($_POST['_csrf'] ?? '')) return;
     http_response_code(400);
-    $err = 'That form was not sent from this page, or you had been away long enough for it to expire. '
+    // An oversized upload loses the whole body, token and all, so this gate is
+    // where it surfaces. Blaming the form for it sends somebody back to retry
+    // the same file.
+    $err = (function_exists('upload_post_too_large') && upload_post_too_large())
+        ? 'The file you attached is too large to upload — nothing was sent. '
+                 . 'The limit is ' . (function_exists('upload_effective_max_mb') ? upload_effective_max_mb() : 12) . ' MB.'
+        : 'That form was not sent from this page, or you had been away long enough for it to expire. '
          . 'Open the page again and retype it — nothing was changed.';
     portal_view('message', ['title' => 'Please try that again', 'body' => $err], (bool)portal_user());
     exit;

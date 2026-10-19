@@ -500,6 +500,10 @@ function connect_engv_file_add($voucherId, $lineId, $file, $byKind = '', $byId =
     $v = connect_engv_get($voucherId);
     if (!$v) return [false, 'Voucher not found.', 0];
     if (!connect_engv_can_attach($v)) return [false, 'Documents can be added only while the voucher is a draft or under review.', 0];
+    if (function_exists('upload_error_reason')) {
+        $ue = upload_error_reason($file);
+        if ($ue !== '') return [false, $ue, 0];
+    }
     if (!$file || ($file['tmp_name'] ?? '') === '' || !is_uploaded_file($file['tmp_name']))
         return [false, 'Choose a file to upload.', 0];
     $bytes = (string)@file_get_contents($file['tmp_name']);
@@ -560,6 +564,10 @@ function connect_engv_report_add($engagementId, $file, $title = '', $byKind = ''
     connect_engv_migrate();
     $eng = ops_one("SELECT * FROM cx_engagements WHERE id=?", [(int)$engagementId]);
     if (!$eng) return [false, 'Engagement not found.', 0];
+    if (function_exists('upload_error_reason')) {
+        $ue = upload_error_reason($file);
+        if ($ue !== '') return [false, $ue, 0];
+    }
     if (!$file || ($file['tmp_name'] ?? '') === '' || !is_uploaded_file($file['tmp_name']))
         return [false, 'Choose a file to upload.', 0];
     $bytes = (string)@file_get_contents($file['tmp_name']);
