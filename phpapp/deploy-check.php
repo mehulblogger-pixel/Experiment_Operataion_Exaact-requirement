@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'c92a25c · 2026-10-19 03:57 UTC · 687 files';
+$RELEASE = '76e2f08 · 2026-10-19 07:23 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -54,7 +54,7 @@ $EXPECT  = [
     'lib/billing.php' => ['s'=>14639,'h'=>'f1395bd56bae517b'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
     'lib/books.php' => ['s'=>62065,'h'=>'00aa2b6708be8169'],
-    'lib/booksbridge.php' => ['s'=>25742,'h'=>'083a31fe1d565994'],
+    'lib/booksbridge.php' => ['s'=>26219,'h'=>'b98194d999c7b90b'],
     'lib/booksui.php' => ['s'=>24679,'h'=>'1a45924f453699a8'],
     'lib/bulk.php' => ['s'=>2157,'h'=>'ca3be826f9a4414c'],
     'lib/callprofit.php' => ['s'=>5760,'h'=>'7f81b6e7a9d7835f'],
@@ -497,7 +497,7 @@ $EXPECT  = [
     'views/ops/inspector_list.php' => ['s'=>3816,'h'=>'0733dc81642bfc79'],
     'views/ops/inspector_profile.php' => ['s'=>7273,'h'=>'f3822457985b1a29'],
     'views/ops/integrations.php' => ['s'=>2215,'h'=>'1f2932ba4a67f99c'],
-    'views/ops/invoice_detail.php' => ['s'=>21600,'h'=>'dca5ddcca1c40643'],
+    'views/ops/invoice_detail.php' => ['s'=>22051,'h'=>'ebf1b02d4a707d58'],
     'views/ops/invoice_form.php' => ['s'=>7338,'h'=>'10f924f4e6ce968b'],
     'views/ops/invoice_print.php' => ['s'=>9333,'h'=>'821ed9c10083ae51'],
     'views/ops/invoices.php' => ['s'=>4032,'h'=>'143bc30c85bb2872'],

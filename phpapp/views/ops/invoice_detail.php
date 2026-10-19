@@ -36,7 +36,11 @@
     <?php if (trim((string)$bs['books_synced_at']) !== ''): ?>
       Books reports
       <?php if ($bs['books_status'] !== ''): ?><span class="pill <?= $bs['books_status']==='PAID'?'p-ok':'p-warn' ?>"><?= e($bs['books_status']) ?></span><?php endif; ?>
-      — paid <?= e(fmoney((float)$bs['books_paid'])) ?>, outstanding <?= e(fmoney((float)$bs['books_outstanding'])) ?>
+      — paid <?= e(fmoney((float)$bs['books_paid'])) ?>, outstanding <?= e(fmoney((float)$bs['books_outstanding'])) ?><?php
+        // Money this customer has paid that is not yet against any invoice. It
+        // will settle their next invoice automatically; the accounts desk should
+        // know it is there rather than chase a customer who is in credit.
+        if ((float)($bs['books_on_account'] ?? 0) > 0.005): ?>, and <b><?= e(fmoney((float)$bs['books_on_account'])) ?> held on account</b> for this customer (it will settle their next invoice)<?php endif; ?>
       <span style="font-size:11.5px">(as of <?= e(substr((string)$bs['books_synced_at'],0,10)) ?>)</span>.
       Books is the system of record for this figure.
     <?php else: ?>

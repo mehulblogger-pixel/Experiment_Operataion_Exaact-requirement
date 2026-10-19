@@ -116,8 +116,10 @@ them owing.
 
 **Fixed, the standard-practice way:** money with nowhere to go is held **on
 account** for the party and pays the next invoice down the moment it arrives.
-`status` reports the balance as an additive `on_account` key, which the ERP's
-reader ignores until it is taught to show it. Each import is now one
+`status` reports the balance as an additive `on_account` key — and the ERP
+now stores it and **shows it on the invoice screen** (*"₹5,000 held on account
+for this customer — it will settle their next invoice"*), so held money is
+visible to the accounts desk, not merely not-lost. Each import is now one
 transaction, so a crash between two rows cannot leave a receipt half-applied.
 
 The 13-method contract a real Books adapter implements is **untouched**: the

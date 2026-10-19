@@ -352,12 +352,18 @@ function books_apply_status($invId, array $st) {
     booksbridge_migrate();
     $invId = (int)$invId;
     if (!$invId || !ops_val("SELECT 1 FROM invoices WHERE id=? LIMIT 1", [$invId])) return false;
-    db()->prepare("UPDATE invoices SET books_irn=?, books_status=?, books_paid=?, books_outstanding=?, books_synced_at=? WHERE id=?")
+    // Books may also report money held ON ACCOUNT for this customer -- an
+    // overpayment, or a receipt that landed before its invoice. Before this it
+    // was dropped on the Books side (GAP-028); once held, it still has to be
+    // SEEN by somebody here, or it has only moved from lost to hidden.
+    if (function_exists('ensure_column')) ensure_column('invoices', 'books_on_account', 'REAL DEFAULT 0');
+    db()->prepare("UPDATE invoices SET books_irn=?, books_status=?, books_paid=?, books_outstanding=?, books_on_account=?, books_synced_at=? WHERE id=?")
         ->execute([
             substr((string)($st['irn'] ?? ''), 0, 80),
             substr((string)($st['status'] ?? ''), 0, 20),
             (float)($st['paid'] ?? 0),
             (float)($st['outstanding'] ?? 0),
+            (float)($st['on_account'] ?? 0),
             date('c'), $invId,
         ]);
     return true;

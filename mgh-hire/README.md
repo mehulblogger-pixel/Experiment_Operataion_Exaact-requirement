@@ -1,3 +1,10 @@
+> **Status (19 Oct 2026): dormant.** Not deployed anywhere, not connected to
+> the EXAACT ERP (nothing in `phpapp/` references it), untouched since
+> 2026-09-05. The owner has not used it beyond its first screen. It is kept
+> here as a separate product; it is **not** covered by the ERP's audit, tests or
+> deploy fingerprint. If it is ever put live, give it its own audit first --
+> see `docs/audit-2026-10/12-SIBLING-DEPLOYABLES.md` §5 for the one lead found.
+
 # MGH Hire
 
 A **standalone, white-label Recruitment & Selection product**. It runs the full
