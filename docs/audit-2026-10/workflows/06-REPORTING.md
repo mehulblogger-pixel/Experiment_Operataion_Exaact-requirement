@@ -13,6 +13,17 @@ Per the permission matrix (fn. 18): MA/AD **Full** · BD **View** · SBU/BM/OM
 **Finalise** · BAM **config only** · CO/AM **Edit** · FIN **View** · INS
 **Edit(own)**.
 
+
+---
+
+## Status at 19 Oct 2026 — what changed since this document was first written
+
+*First issued 18 Oct 2026. The changes below are in the code on branch `claude/testing-branch-setup-0gqe8n`; they reach the live site only when it is updated (`../14-LIVE-CHECKS-GUIDE.md`, Part 2). Statements in the body that they made untrue are corrected where they stand and marked **(updated 19 Oct)**.*
+
+| Change | What it means in this area | Ref | How it was verified |
+|---|---|---|---|
+| No change in this area | Checked on 19 Oct 2026: none of the fixes since first issue touches a Reporting screen, field or flow. Upload-message fixes (GAP-024) are in the external portals (`02-MARKETPLACE.md`) | — | Commit history read |
+
 ---
 
 ## 1. What this area is for

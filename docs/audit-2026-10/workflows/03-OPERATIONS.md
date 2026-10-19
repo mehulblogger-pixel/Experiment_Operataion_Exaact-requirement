@@ -17,6 +17,19 @@ desk hub, they use `/my-jobs` and `/my-voucher` on a phone.
 > document separates **Operations' own screens** from **the doors it offers
 > elsewhere**.
 
+
+---
+
+## Status at 19 Oct 2026 — what changed since this document was first written
+
+*First issued 18 Oct 2026. The changes below are in the code on branch `claude/testing-branch-setup-0gqe8n`; they reach the live site only when it is updated (`../14-LIVE-CHECKS-GUIDE.md`, Part 2). Statements in the body that they made untrue are corrected where they stand and marked **(updated 19 Oct)**.*
+
+| Change | What it means in this area | Ref | How it was verified |
+|---|---|---|---|
+| The claim sheet refuses impossible figures | Hours 0 to the daily cap, km and every amount 0 or more, all real numbers. **A negative row can no longer pull a day under the 8.5-hour cap** so another row claims 12 hours | GAP-046 | **Live over HTTP**: the old code stored −5 + 12; the new code refuses it, saves 4 + 4, still refuses 6 + 6 |
+| Job-closure expenses checked the same way | Travel, local, food, lodging, misc and extra heads may not be negative | GAP-046 | Guard-rail test |
+| Coordinators record nonconformities from the job | The job's *Quality — nonconformities* panel offers **+ Raise a nonconformity** to coordinator level and above | Q-B1 | **Live over HTTP**, per role |
+
 ---
 
 ## 1. What this area is for

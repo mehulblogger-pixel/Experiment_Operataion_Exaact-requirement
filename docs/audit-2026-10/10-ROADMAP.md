@@ -49,9 +49,9 @@ Four principles decided it:
 
 | # | Do | Why | Effort |
 |---|---|---|---|
-| 0.1 | **Confirm what is deployed.** Upload `deploy-check.php`, open `/deploy-check.php` | `APP_VERSION` has read `2026.10.1` all month, so the footer cannot tell you. Earlier UAT runs tested an old build | minutes |
+| 0.1 | **Confirm what is deployed.** Upload `deploy-check.php`, open `/deploy-check.php` | `APP_VERSION` has read `2026.10.1` all month, so the footer cannot tell you. Earlier UAT runs tested an old build | minutes — **Owner reports 2026.10.1 — that number never changes; the check is `/deploy-check.php`, guide Part 3** |
 | 0.2 | **Answer the eight open questions** in §6 | Six findings cannot be fixed without them, and three are one-line answers | an hour |
-| 0.3 | **Get a non-production workspace** (open question **Q-D**) | Every test in `09-UAT-PLAN.md` needs one, and T-5 explicitly involves restoring a backup | — |
+| 0.3 | **Get a non-production workspace** (open question **Q-D**) | Every test in `09-UAT-PLAN.md` needs one, and T-5 explicitly involves restoring a backup | — — **Owner asked what is needed 19 Oct — listed in `14-LIVE-CHECKS-GUIDE.md` Part 7; a test-copy no-e-mail switch is built** |
 
 ---
 
@@ -81,7 +81,7 @@ restore is the one action that can import another customer's data wholesale.
 | # | Work | Test | Finding |
 |---|---|---|---|
 | 2.1 | **Fix the four forms that create numbered ghost records** — `/call-new`, `/candidate-new`, `/incident-new`, `/endorsement-new`. **Server-side**: three already carry `required` attributes the server ignores. Copy the pattern from `/internal-audit-new` | T-10 | **S4-1** |
-| 2.2 | **Test `/quote-new`** the same way — 96 fields, 1 required, never tested, and a quote goes to a customer | T-11 | **S4-2** |
+| 2.2 | **Test `/quote-new`** the same way — 96 fields, 1 required, never tested, and a quote goes to a customer | T-11 | **S4-2** — **PARTLY DONE 19 Oct: figures validated and proven live (GAP-047); the empty-submit test is still open** |
 | 2.3 | **Establish the delete cascade:** work order → job → report → billable event → voucher. Refuse the delete or remove the dependents; never orphan | T-4 | **O-F9** |
 | 2.4 | **Backup/restore authority:** gate it, validate the archive, log every restore, add it to the permission matrix | T-5 | **A-F3** |
 | 2.5 | **Impersonation:** confirm every impersonated action is attributable to the real person, log it, make it visible to the customer, document it in the matrix | T-9 | **A-F5** |
@@ -106,7 +106,7 @@ people rely on it.
 | 3.2 | **Quarantined instrument:** block new allocation, and make the reports it produced findable — this is a recall question | T-14 | **Q-F9 / E-7** |
 | 3.3 | **Competence enforcement:** when switched on, refuse the allocation and say why | T-15 | **Q-F6** |
 | 3.4 | **Pre-order checklist** with `require_all` must block quote approval; decide whether a recorded waiver is needed | T-16 | **S-F / E-8** |
-| 3.5 | **Answer Q-B1/Q-B2:** who may *raise* a nonconformity (today an inspector cannot), and should the five roles who see a corrective action see the finding behind it | — | **GAP-004** |
+| 3.5 | **Answer Q-B1/Q-B2:** who may *raise* a nonconformity (today an inspector cannot), and should the five roles who see a corrective action see the finding behind it | — | **GAP-004** — **ANSWERED 19 Oct (Q-B1): coordinator level and above record; built** |
 
 ---
 
@@ -117,11 +117,11 @@ until a database is populated.
 
 | # | Work | Test | Finding |
 |---|---|---|---|
-| 4.1 | **Populate a realistic month** — work orders, jobs, reports, billable events, invoices, receipts, office costs, cross-office work | T-17 | prerequisite |
-| 4.2 | **Reconcile one month and one business unit by hand** against `/mis`, `/sbu-pl`, `/call-profit`, `/profitability`, `/reports` and `/analytics`. **Any two that disagree is a finding** | T-17 | — |
-| 4.3 | **Settle the two revenue sources.** The legacy figure stamped on the job vs the invoice ledger — four files sum the legacy one, **including `tapi.php`**. Decide which each screen reads and **say so on the screen** | T-17 | **D7-2** |
-| 4.4 | **Give margin a named function.** The first figure a director reads has none | — | **D7-1** |
-| 4.5 | **One utilisation denominator.** Check all three functions against the same `/work-norms` | — | **D7-5** |
+| 4.1 | **Populate a realistic month** — work orders, jobs, reports, billable events, invoices, receipts, office costs, cross-office work | T-17 | prerequisite — **DONE in test data 19 Oct** (one known month, `evidence/kpi-reconcile-probe.php`); **live data still to do — guide Part 4** |
+| 4.2 | **Reconcile one month and one business unit by hand** against `/mis`, `/sbu-pl`, `/call-profit`, `/profitability`, `/reports` and `/analytics`. **Any two that disagree is a finding** | T-17 | — — **DONE 19 Oct, in test data: four disagreements found and fixed (GAP-040…043)** |
+| 4.3 | **Settle the two revenue sources.** The legacy figure stamped on the job vs the invoice ledger — four files sum the legacy one, **including `tapi.php`**. Decide which each screen reads and **say so on the screen** | T-17 | **D7-2** — **DONE 19 Oct: one source per reader mode across every screen (GAP-040)** |
+| 4.4 | **Give margin a named function.** The first figure a director reads has none | — | **D7-1** — **DONE 19 Oct: `mis_margin_pct()`** |
+| 4.5 | **One utilisation denominator.** Check all three functions against the same `/work-norms` | — | **D7-5** — **DONE 19 Oct: shared denominators proven; `/reports` corrected (GAP-042)** |
 | 4.6 | **Surface the two orphaned disagreement counters** — `billable_mismatch_count`, `calls_status_disagreement_count` — on tile badges, as `revrecon_count` and `costrecon_count` already are | — | **D7-3** |
 | 4.7 | **Show the Books outbox.** A failed push is currently invisible in Money; Sales shows a **Failed** tab. Check whether `/integrations` already covers it | T-34 | **Y-F1** |
 

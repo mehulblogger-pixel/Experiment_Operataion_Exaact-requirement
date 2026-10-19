@@ -24,10 +24,10 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'af0e9b8 · 2026-10-19 14:40 UTC · 687 files';
+$RELEASE = '28470ee · 2026-10-19 14:58 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
-    'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
+    'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
     'cron.php' => ['s'=>23812,'h'=>'9a49ea3b6161e98c'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
@@ -175,7 +175,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>722056,'h'=>'27c1aaf1086b7680'],
+    'lib/ops.php' => ['s'=>722462,'h'=>'42aa6cb609c40e57'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -312,7 +312,7 @@ $EXPECT  = [
     'views/layout_bottom.php' => ['s'=>880,'h'=>'e6b33e19b84eb59f'],
     'views/layout_embed_bottom.php' => ['s'=>65,'h'=>'63f4c118c80caf4b'],
     'views/layout_embed_top.php' => ['s'=>730,'h'=>'b20991bedef34be0'],
-    'views/layout_top.php' => ['s'=>36118,'h'=>'7cf1df1e54e1465d'],
+    'views/layout_top.php' => ['s'=>36435,'h'=>'01a1c160550cf2c9'],
     'views/list.php' => ['s'=>3275,'h'=>'b234af3a9590aae2'],
     'views/login.php' => ['s'=>602,'h'=>'ff266c37dfd19bb0'],
     'views/login_page.php' => ['s'=>10767,'h'=>'c18991133beffa78'],

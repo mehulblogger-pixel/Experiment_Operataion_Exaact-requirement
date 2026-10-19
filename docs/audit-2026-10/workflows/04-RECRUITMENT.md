@@ -14,6 +14,18 @@ and INSPECTOR **nothing**.
 > lifecycle sections** in `docs/03-object-lifecycles.md` are recruitment
 > objects.
 
+
+---
+
+## Status at 19 Oct 2026 — what changed since this document was first written
+
+*First issued 18 Oct 2026. The changes below are in the code on branch `claude/testing-branch-setup-0gqe8n`; they reach the live site only when it is updated (`../14-LIVE-CHECKS-GUIDE.md`, Part 2). Statements in the body that they made untrue are corrected where they stand and marked **(updated 19 Oct)**.*
+
+| Change | What it means in this area | Ref | How it was verified |
+|---|---|---|---|
+| `mgh-hire/` is dormant | The owner has seen only its first screen; it was never deployed or connected. Marked dormant in its README; **not a duplication question any more** | Q-C, GAP-007 | Owner's answer |
+| No other change in this area | The recruitment screens, fields and flows below are as first measured | — | — |
+
 ---
 
 ## 1. The thing to understand first: this area runs two different businesses
@@ -47,7 +59,7 @@ wrong in the audit.**
 | **Recruitment** | The **internal** branch — hiring into your own organisation, and supplying people to clients |
 | **Marketplace** | The **external** branch — when a position is open and **no suitable manpower is available internally**, you search the market *by location* for somebody suitable (subscription required) |
 | **Deputation** | Not a module competing with either. It is an **engagement basis** — man-day or man-month — alongside **direct on-roll** (`roll_type` = OWN) |
-| **`mgh-hire/`** | **The only genuine duplication question left.** A standalone product, 2,555 lines, own tables, no shared code (GAP-007, Q-C) |
+| **`mgh-hire/`** | ~~The only genuine duplication question left.~~ **(updated 19 Oct)** **Dormant** — never deployed or connected; the owner has seen only its first screen (Q-C). A standalone product, 2,555 lines, own tables, no shared code |
 
 **And the two branches are joined in code.** `recruit_pro_pool($req)`
 (`lib/recruit.php:754`) scores every active marketplace professional against a

@@ -7,6 +7,20 @@
 Master Admin · Business Director · Branch Manager · Coordinator · **Finance**
 can open `/sales`. **Inspector is refused (403).**
 
+
+---
+
+## Status at 19 Oct 2026 — what changed since this document was first written
+
+*First issued 18 Oct 2026. The changes below are in the code on branch `claude/testing-branch-setup-0gqe8n`; they reach the live site only when it is updated (`../14-LIVE-CHECKS-GUIDE.md`, Part 2). Statements in the body that they made untrue are corrected where they stand and marked **(updated 19 Oct)**.*
+
+| Change | What it means in this area | Ref | How it was verified |
+|---|---|---|---|
+| A quotation refuses impossible figures | A negative quantity, GST or advance outside 0–100%, a non-number, or lines that total below zero are refused with a message naming the line. A **negative rate stays allowed**, because a negative-rate line is how a discount is written today | GAP-047 | **Live over HTTP**: the old code saved −17,700 and a 500% GST; the new code refuses both and saves the ordinary and discount controls unchanged |
+| The same rules on an external quotation | `/quote-external` checks the same figures and the total typed in | GAP-047 | Guard-rail test |
+| Bank charges are the client's | The **built-in** default terms gain clause 11: bank and remittance charges are to the payer's account; foreign payments to be remitted OUR. Terms a company already saved are untouched | Q-J | Test |
+| Recommended, not built | A proper **discount** field on the quotation, so a discount is a named figure rather than a negative line | Roadmap | — |
+
 ---
 
 ## 1. What this area is for

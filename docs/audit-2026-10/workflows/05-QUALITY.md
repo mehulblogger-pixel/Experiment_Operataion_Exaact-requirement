@@ -13,6 +13,18 @@ during jobs, and the accreditation registers an assessor asks for."* That is
 exactly right, and the two sections are named **Everyday quality** and
 **Accreditation registers**.
 
+
+---
+
+## Status at 19 Oct 2026 — what changed since this document was first written
+
+*First issued 18 Oct 2026. The changes below are in the code on branch `claude/testing-branch-setup-0gqe8n`; they reach the live site only when it is updated (`../14-LIVE-CHECKS-GUIDE.md`, Part 2). Statements in the body that they made untrue are corrected where they stand and marked **(updated 19 Oct)**.*
+
+| Change | What it means in this area | Ref | How it was verified |
+|---|---|---|---|
+| **Coordinator level and above record nonconformities** | Business Director, SBU Head, Branch Manager, Branch Application Manager, Operation Manager, Assistant Manager and Coordinator may **record** one and read the register. **Containment, disposition, the corrective action and closing stay with the Quality Head, the Technical Head and administrators.** Inspectors do not record | Q-B1 (owner, 19 Oct) | **Live over HTTP**: coordinator 403 → records; containment refused; Quality Head control contains |
+| "Corrective action without the finding" is gone | All five roles that saw a CAPA without its NCR now read the NCR register | Q-B2 (moot) | Role test |
+
 ---
 
 ## 1. What this area is for
@@ -61,18 +73,18 @@ the screens.
 | Screen | MA | BD | BM | OM | CO | INS | FIN | QH/TH |
 |---|---|---|---|---|---|---|---|---|
 | `/quality` (hub) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `/ncr`, `/issues`, `/departures` | ✓ | ✓ | **403** | **403** | **403** | **403** | **403** | **✓** |
+| `/ncr`, `/issues`, `/departures` | ✓ | ✓ | **✓ record** | **✓ record** | **✓ record** | **403** | **403** | **✓** |
 | `/capa` | ✓ | ✓ | ✓ | ✓ | ✓ | 403 | 403 | ✓ |
 | Close an NCR or CAPA | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | **✓** |
 
 **Three things follow from that table:**
 
-1. **Five roles can see a corrective action but not the nonconformity behind
-   it** (SBU Head, Branch Manager, Operation Manager, Coordinator, Assistant
-   Manager). You are shown the remedy with the finding hidden. *This reads as a
-   broken screen rather than a permission, and it is **open question Q-B2**.*
-2. **An inspector can reach neither** — the person who meets the nonconformity
-   on site cannot record or read one. *Open question Q-B1.*
+1. ~~Five roles can see a corrective action but not the nonconformity behind
+   it.~~ **(updated 19 Oct)** All five now read the register and may **record**
+   a nonconformity, on the owner's rule (Q-B1): *"all equal to coordinator and
+   above can record."* Working and closing one stays with quality.
+2. **An inspector can reach neither** — and that is now the owner's decided
+   position: recording starts at coordinator level. **(updated 19 Oct)**
 3. **Until 2026-10-18, only a system administrator could close either**, which
    for an accredited body is both a bottleneck and a segregation-of-duties
    weakness. Fixed with the two new quality roles.

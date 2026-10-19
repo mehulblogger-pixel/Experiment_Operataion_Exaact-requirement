@@ -2559,9 +2559,15 @@ function smtp_send($cfg, $to, $subject, $body, $cc = '', $attachments = []) {
     fclose($fp);
     return true;
 }
+// Is this a test copy of a live site (config.local.php 'test_copy' => true, or
+// OPS_TEST_COPY=1)? A copy holds real customers' addresses, so it must never mail one.
+function app_is_test_copy() { return !empty($GLOBALS['APP_TEST_COPY']) || (string)getenv('OPS_TEST_COPY') === '1'; }
+
 function ops_mail($to, $subject, $body, $cc = '', $kind = '', $attachments = []) {
     $ok = 0; $err = '';
-    if ($to) {
+    if ($to && app_is_test_copy()) {
+        $err = 'not sent: this is a test copy (config.local.php test_copy)';
+    } elseif ($to) {
         $smtp = smtp_config();
         if ($smtp) {
             try { smtp_send($smtp, $to, $subject, $body, $cc, $attachments); $ok = 1; }

@@ -8,6 +8,25 @@ Business Director, Branch Manager, Operation Manager and Coordinator.
 **Inspector and Finance get 403.** Two screens — `/connect-orgs` and
 `/access-requests` — are **Master Admin only**.
 
+
+---
+
+## Status at 19 Oct 2026 — what changed since this document was first written
+
+*First issued 18 Oct 2026. The changes below are in the code on branch `claude/testing-branch-setup-0gqe8n`; they reach the live site only when it is updated (`../14-LIVE-CHECKS-GUIDE.md`, Part 2). Statements in the body that they made untrue are corrected where they stand and marked **(updated 19 Oct)**.*
+
+| Change | What it means in this area | Ref | How it was verified |
+|---|---|---|---|
+| A paid plan or credit pack is never handed out free | With no payment keys, a priced item is **refused** with "Online payment is not set up yet"; free plans and the launch promo still activate. The admin plans screen names the priced items nobody can buy | GAP-037 | Test (`test_mkt_pay`) |
+| The credit wallet stops at zero | Two posts at once can no longer draw the last credit twice | GAP-038 | Test, draw called past the read |
+| Payment applied exactly once | Two verifications of one marketplace payment cannot both activate it | GAP-032 | Test |
+| Client portal: two offered permissions now enforced | "Ask for a new job" and the portal assistant obey the user's own rights | GAP-013, GAP-014 | Execution, per user |
+| Professional portal: forged-request protection added; messages delivered | Every form carries the anti-forgery token; nine actions that discarded their answer now show it | GAP-020, GAP-015, GAP-023 | Execution |
+| Portal screens: refusals look like refusals; fields labelled; contrast passes; the tenant's own words | | GAP-016–019 | Browser checks at 390 px |
+| Uploads say why a file was refused, with the real limit | | GAP-024 | Execution |
+| A voucher line rejects any quantity or any date | | GAP-022 | Execution |
+| **Open** | Mid-month plan change: the owner's answer ("mutual acceptance … decided during negotiation") reads as a rule for work prices; the subscription question is asked again | GAP-039, Q-L | — |
+
 ---
 
 ## 1. What this area is for — corrected by the owner, 2026-10-18

@@ -7,6 +7,19 @@
 Manager · Operation Manager · Coordinator · Finance.
 **Inspector gets 403 on `/directory`.**
 
+
+---
+
+## Status at 19 Oct 2026 — what changed since this document was first written
+
+*First issued 18 Oct 2026. The changes below are in the code on branch `claude/testing-branch-setup-0gqe8n`; they reach the live site only when it is updated (`../14-LIVE-CHECKS-GUIDE.md`, Part 2). Statements in the body that they made untrue are corrected where they stand and marked **(updated 19 Oct)**.*
+
+| Change | What it means in this area | Ref | How it was verified |
+|---|---|---|---|
+| **Finance opens the vendor register** | Read only, at **Directory → Vendor register** (also **Operations → Vendors**). It had been the one role refused | Q-G (owner, "Yes") | **Live over HTTP**: 302 → 200 |
+| **Open** | The matrix also gives Finance *View* on clients; the code still refuses it | Q-K | — |
+| D-F1 re-read | The quotation save **does** refuse a BLOCKED client to a non-manager and warns on HOLD (read in `crm.php`, not driven). Work orders are still untested | D-F1 | Code read |
+
 ---
 
 ## 1. What this area is for
@@ -65,9 +78,10 @@ thing that matters when reviewing many.
 **On `/vendors` being gated by `idems`:** this is the vendor register inside
 **Reporting** (vendor assessment, expediting, document control), covered in
 `06-REPORTING.md` §2.9. Its own handler admits any of `mod.idems.view`,
-`mod.idems.edit`, `mod.clients.view` or `mod.vendors.view` — **17 of 18 roles
-pass, and the only one refused is Finance**, who pays vendor invoices
-(**open question Q-G**).
+`mod.idems.edit`, `mod.clients.view` or `mod.vendors.view` — 17 of 18 roles
+passed, and the only one refused was Finance, who pays vendor invoices.
+**(updated 19 Oct)** On the owner's answer to Q-G, Finance now holds
+`mod.vendors.view` and opens the register, read only.
 
 ### 2.3 `/partner-new` — New business partner
 
@@ -397,7 +411,7 @@ permission matrix only partly reflects (`/clients`, `/partner-new`,
 | **D-F2** | **P2** | **No concurrency protection on `business_partners`** — the record every other area points at. Last save wins, silently (`03-OPERATIONS.md` §4) |
 | **D-F3** | **P2** | **A merge rewrites history across six areas and may not be reversible.** `reason` is not marked required in the HTML, and undo was not tested |
 | **D-F4** | **P2** | `/clients`, `/partner-new`, `/client-holds` and `/asset-register` have **no module gate**, on the area every other area depends on |
-| **D-F5** | **P2** | `/vendors` is gated by **`idems`**, and its handler admits **17 of 18 roles** while refusing only **Finance** (Q-G) |
+| **D-F5** | **P2** | `/vendors` is gated by **`idems`**; its handler admitted 17 of 18 roles and refused only Finance. **Finance part fixed 19 Oct (Q-G)**; the odd module gate remains |
 | **D-F6** | **P3** | **Working norms have no effective date**, so changing one silently moves historical utilisation figures |
 | **D-F7** | **P3** | The stamp **LOST** state has no traced consequence — invalidating the stamp and any endorsement made with it |
 | **D-F8** | — | *Credit:* one company record with **three role flags** and a **Roles** column · **🔍 Possible duplicates** on the register itself · a merge that asks **which to keep and why** · an import with **downloadable templates**, an **export-and-re-import** path, a **Column · What to put in it** map and a **preview** before committing · **four ways to capture a site location**, including the device's own GPS · **"Last anything"** as a column heading · **WhatsApp** as a first-class activity type · portals that are **off until switched on** and work by **invitation** · **"What they can do"** and **"Last signed in"** on the portal register · stamp tracking by **serial number with condition at issue** and **LOST** as a state · **working norms per designation *and* per office** · and the refusal *"Select at least one role (Client / Vendor / Both)."* |

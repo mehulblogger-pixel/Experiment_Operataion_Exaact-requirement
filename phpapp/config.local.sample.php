@@ -20,6 +20,12 @@ return [
         'user' => 'your_db_user',     // the real MySQL user
         'pass' => 'your_db_password', // that user's password
     ],
+    // ---------------------------------------------------------------------
+    //  TEST COPY ONLY. On a copy of the live site made for testing, set this to
+    //  true. The copy then sends NO e-mail (every message is logged as "not sent")
+    //  and shows a banner on every page. Never set it on the live site.
+    // ---------------------------------------------------------------------
+    // 'test_copy' => true,
     'admin' => [
         'user' => 'admin',            // your admin login name (usually 'admin')
         'pass' => 'admin12345',       // <-- change to your chosen admin password

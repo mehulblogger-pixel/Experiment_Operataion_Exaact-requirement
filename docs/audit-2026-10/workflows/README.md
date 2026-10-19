@@ -18,6 +18,12 @@ then end-to-end scenarios and edge cases.
 | 9 | Directory | 17 | [09-DIRECTORY.md](09-DIRECTORY.md) |
 | 10 | Admin | 60 | [10-ADMIN.md](10-ADMIN.md) |
 
+> **Updated 19 Oct 2026.** Each document now opens with a *Status at 19 Oct 2026*
+> section listing every change since first issue (18 Oct), with its gap or
+> question id and how it was verified. Passages those changes made untrue are
+> corrected in place and marked **(updated 19 Oct)**. The changes reach the
+> live site when it is updated — `../14-LIVE-CHECKS-GUIDE.md`.
+
 **303 screen slots in total** (a screen reachable from two areas is listed under
 both), **5,492 form fields**, **1,064 screen controls**, **463 tables**.
 

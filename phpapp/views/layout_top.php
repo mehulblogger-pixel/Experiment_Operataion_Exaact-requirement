@@ -60,6 +60,9 @@
   try { if (localStorage.getItem("navCollapsed") === "1") document.documentElement.classList.add("nav-collapsed"); } catch (e) {}
 </script>
 </head><body class="<?= $u ? 'app' : '' ?><?= $isInsp ? ' inspector' : '' ?>">
+<?php if (function_exists('app_is_test_copy') && app_is_test_copy()): ?>
+<div role="status" style="background:#7c2d12;color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:600;position:sticky;top:0;z-index:1000">TEST COPY — not the live system. No e-mail is sent from here.</div>
+<?php endif; ?>
 <?php if ($u): ?>
 <div class="shell">
   <aside class="side" id="side">

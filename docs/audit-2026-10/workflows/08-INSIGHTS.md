@@ -9,6 +9,22 @@ Manager · Operation Manager · Coordinator · Finance.
 **Inspector gets 403 on `/insights`** — inspectors have `View(own)` on
 dashboards per the matrix, which they get on their own phone screens, not here.
 
+
+---
+
+## Status at 19 Oct 2026 — what changed since this document was first written
+
+*First issued 18 Oct 2026. The changes below are in the code on branch `claude/testing-branch-setup-0gqe8n`; they reach the live site only when it is updated (`../14-LIVE-CHECKS-GUIDE.md`, Part 2). Statements in the body that they made untrue are corrected where they stand and marked **(updated 19 Oct)**.*
+
+| Change | What it means in this area | Ref | How it was verified |
+|---|---|---|---|
+| **Dashboards reconciled by execution** | One known month read the way each screen reads it; four disagreements found and fixed | GAP-040–043 | `../evidence/kpi-reconcile-probe.php` |
+| Revenue: one source per mode | The revenue switch now governs every reader — `/mis` revenue and invoiced, every profit figure, the contract view, `/analytics`. In the default mode no displayed figure changed | GAP-040 (D7-2) | Execution, three modes |
+| `/analytics` counts jobs and man-days as `/mis` does | Same date (inspection end) and same man-days rule | GAP-041 | Execution |
+| `/reports` utilisation divides by the period reported | Not by today's month | GAP-042 (D7-5) | Test on the code |
+| Margin has one definition | `mis_margin_pct()`, used by the screen and the CSV; "—" when there is no revenue | D7-1 | Test |
+| **Still to do on live data** | Run the three reconciliation screens on production and confirm "Nothing to reconcile" | §9 step 4 | `../14-LIVE-CHECKS-GUIDE.md` Part 4 |
+
 ---
 
 ## 1. What this area is, honestly

@@ -49,6 +49,9 @@ if (is_file($localFile)) {
         // SaaS one-click: a database-admin credential (allowed to CREATE DATABASE /
         // CREATE USER) lets the app build each new company's database itself. Kept
         // only here in config.local.php — never in the code package, never in git.
+        // A TEST COPY of a live site (same data, its own database): 'test_copy' => true
+        // stops every e-mail and marks every page, so a test can never reach a customer.
+        if (!empty($local['test_copy'])) $GLOBALS['APP_TEST_COPY'] = true;
         if (!empty($local['saas_db_admin']) && is_array($local['saas_db_admin'])) {
             $GLOBALS['SAAS_DB_ADMIN'] = $local['saas_db_admin'];
         }

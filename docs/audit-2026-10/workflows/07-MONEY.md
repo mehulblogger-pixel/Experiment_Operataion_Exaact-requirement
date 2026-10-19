@@ -11,6 +11,25 @@ Per `docs/02-permission-matrix.md` row 215, as corrected on the owner's decision
 of 2026-10-18: MA/AD **Full** · BD/SBU/BM/CO **Raise** · OM/AM/INS **—** ·
 FIN **Issue**.
 
+
+---
+
+## Status at 19 Oct 2026 — what changed since this document was first written
+
+*First issued 18 Oct 2026. The changes below are in the code on branch `claude/testing-branch-setup-0gqe8n`; they reach the live site only when it is updated (`../14-LIVE-CHECKS-GUIDE.md`, Part 2). Statements in the body that they made untrue are corrected where they stand and marked **(updated 19 Oct)**.*
+
+| Change | What it means in this area | Ref | How it was verified |
+|---|---|---|---|
+| **Credit notes are bounded cumulatively** | Notes against one invoice may not, together, exceed what it still owes. The old ceiling added earlier notes back, so an 11,800 invoice took four 5,900 notes | GAP-035 (P1) | Execution + test |
+| **Over-credited invoices are shown on screen** | **Money → Billing workspace → Invoices** shows a red panel and a *Credited beyond their value* filter; accounts also see it under *needs attention* on the home screen. Silent on a clean ledger | GAP-035 follow-up | Test |
+| Every figure off a form is validated | Negative rate, quantity, GST, receipt, TDS, bank charges; GST outside 0–100%; non-numbers — refused, naming the field | GAP-034 | Execution |
+| Allocation and credit-note writes re-check their ceiling in the database | Two accounts users at once cannot overdraw a receipt or over-credit an invoice | GAP-036 | Test, write called past the checks |
+| **Tally sales vouchers balance** | The round-off is its own ledger entry (a *Round-off ledger* on the Tally panel, default "Round Off"), so Tally accepts invoices printed to the whole rupee | GAP-044 (P1) | Execution: every voucher kind sums to zero |
+| Tally CSVs match the XML | GST %, round-off, the same voucher number, and TDS | GAP-045 | Test |
+| **Bank charges are the customer's** | They never settle an invoice; the receipt form and page say so, and that absorbing one is an expense, not a credit note | Q-J (owner) | Test |
+| Books' on-account money is visible | The invoice screen says when Books holds money on account for the customer | GAP-028, Q-H | Test |
+| Home-screen *Outstanding* follows the ledger | Money received but not yet matched no longer hides what is owed; it shows as its own figure | GAP-043 | Execution |
+
 ---
 
 ## 1. Who owns the money — settle this first
@@ -103,6 +122,12 @@ loses the navigation for all five screens at once.
 ascending puts the most overdue first, which is the right default for a
 collections screen.
 
+**(updated 19 Oct)** When any invoice has been settled beyond its own value
+(payments plus credit notes over the total — possible before GAP-035 was
+fixed), a red panel **"⚠ Invoices credited beyond their value"** heads this
+screen, with a **Show them as a list →** link to the filter
+`?f=overcredited`. On a clean ledger nothing appears.
+
 **PART_PAID is essential and often missing** in small systems: a customer who
 pays 60% of an invoice is neither unpaid nor paid.
 
@@ -177,7 +202,7 @@ offer one.
 
 | | |
 |---|---|
-| Module `invoicing` · **19 fields** each · Controls: **Show** · **Save** |
+| Module `invoicing` · **19 fields** each (**20 since 19 Oct**: the *Round-off ledger*) · Controls: **Show** · **Save** |
 | | `kind`, `from`, `to`, `done`, **`tally_company`**, **`tally_state`**, **`tally_sales_ledger`**, **`tally_bank_ledger`**, **`tally_tds_ledger`**, **`tally_cgst_ledger`**, **`tally_sgst_ledger`** (+ more) |
 
 **A full Tally ledger mapping.** Not "export a CSV and sort it out yourself" —
@@ -498,11 +523,11 @@ showing the disagreement is the honest response.
 | E-12 | Books is not connected | EXAACT keeps its own invoices, receipts and ageing. Default state | **READ** |
 | E-13 | Books is connected but unreachable mid-push | `books_outbox` exists — **but unlike Sales' Ads Pro outbox, no screen in Money shows Waiting / Sent / Failed**. A failed push would be invisible here | **SUSPECTED — worth fixing** |
 | E-14 | Export the same entries to Tally twice | The **`done`** flag tracks what has gone | **CONFIRMED** (field exists) |
-| E-15 | A credit note for more than the invoice still owes | **Refused:** *"Only ₹X is still outstanding on that invoice (credit notes already raised against it come to ₹Y)."* Before 19 Oct the ceiling added the earlier notes back and an invoice could be credited without limit (**GAP-035**) | **CONFIRMED by execution** (`tests/test_books_input_guard.php`) |
-| E-16 | A negative rate, quantity or GST on a line; a negative receipt; a GST rate off the scale on a credit note | **Refused, naming the field.** Before 19 Oct every one went into the ledger (**GAP-034**) | **CONFIRMED by execution** |
-| E-17 | Two accounts users allocate the same receipt at the same moment | The INSERT re-checks what is free in the database; the second is told *"Someone else allocated … a moment ago"* (**GAP-036**) | **CONFIRMED by execution** (the INSERT called directly past the pre-checks) |
-| E-18 | Export to Tally an invoice printed to the whole rupee | The voucher carries the round-off as its own entry and **balances**. Before 19 Oct it was off by the round-off and Tally refused it (**GAP-044**) | **CONFIRMED by execution** (`tests/test_tally_balance.php`) |
-| E-19 | A receipt with bank charges | The charge is stored and **used nowhere** — the invoice stays short by it (**Q-J**, owner's rule needed) | **CONFIRMED by execution** |
+| E-18 | A credit note for more than the invoice still owes | **Refused:** *"Only ₹X is still outstanding on that invoice (credit notes already raised against it come to ₹Y)."* Before 19 Oct the ceiling added the earlier notes back and an invoice could be credited without limit (**GAP-035**) | **CONFIRMED by execution** (`tests/test_books_input_guard.php`) |
+| E-19 | A negative rate, quantity or GST on a line; a negative receipt; a GST rate off the scale on a credit note | **Refused, naming the field.** Before 19 Oct every one went into the ledger (**GAP-034**) | **CONFIRMED by execution** |
+| E-20 | Two accounts users allocate the same receipt at the same moment | The INSERT re-checks what is free in the database; the second is told *"Someone else allocated … a moment ago"* (**GAP-036**) | **CONFIRMED by execution** (the INSERT called directly past the pre-checks) |
+| E-21 | Export to Tally an invoice printed to the whole rupee | The voucher carries the round-off as its own entry and **balances**. Before 19 Oct it was off by the round-off and Tally refused it (**GAP-044**) | **CONFIRMED by execution** (`tests/test_tally_balance.php`) |
+| E-22 | A receipt with bank charges | The invoice stays short by the charge — **the owner's rule (Q-J): bank charges are the customer's to bear.** The receipt form and page now say so | **CONFIRMED** (test) |
 | E-15 | An Operation Manager needs to see an invoice | **403 on the whole chain.** This is the documented intent (matrix row 215: OM = —), not a defect | **CONFIRMED** |
 | E-16 | Two people edit one invoice at once | **No protection** — `invoices` is outside the `['calls','jobs']` concurrency allow-list | **CONFIRMED** |
 | E-17 | `mod.invoicing.view` held, but no finance right | **No tile, and therefore no door** — the tile needs `mod.invoicing.view` **and** one of `finance.reconcile` / `data.credit` / master | **CONFIRMED** |
