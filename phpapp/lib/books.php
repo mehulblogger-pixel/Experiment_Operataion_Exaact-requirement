@@ -372,6 +372,25 @@ function books_recalc($invoiceId) {
        ->execute([$sub, $c, $s, $i, $round, $rounded, $tds, date('c'), (int)$invoiceId]);
 }
 
+// ---- Figures off a form ------------------------------------------------------
+// A money or percentage figure as it arrived from a form. Refuses what no
+// accountant would accept -- a negative amount, a GST rate off the scale, a value
+// that is not a number at all -- instead of casting it to 0 or letting it
+// through to the ledger. A blank is the caller's default, returned as $blank.
+// Returns [value, error]; error is '' when the figure is usable.
+function books_figure(array $b, $key, $label, $min, $max = null, $blank = null) {
+    $raw = trim((string)($b[$key] ?? ''));
+    if ($raw === '') return [$blank, ''];
+    if (!is_numeric($raw) || !is_finite((float)$raw)) return [null, $label . ' must be a number.'];
+    $v = (float)$raw;
+    if ($v < $min) return [null, $label . ($min == 0 ? ' cannot be negative.' : ' must be at least ' . $min . '.')];
+    if ($max !== null && $v > $max) return [null, $label . ' cannot be more than ' . $max . '.'];
+    return [$v, ''];
+}
+// GST in India runs 0-28% (plus cess); 100 is a generous ceiling that still stops
+// a mistyped 180 from becoming a tax figure on a legal document.
+const BOOKS_GST_PCT_MAX = 100;
+
 /** Net the customer actually pays after withholding TDS (total − TDS). */
 function books_net_payable($inv) {
     return round((float)($inv['total'] ?? 0) - (float)($inv['tds_amount'] ?? 0), 2);
@@ -642,14 +661,20 @@ function books_line_add($invoiceId, array $b) {
         }
         if (($b['qty'] ?? '') === '')  $b['qty']  = ((float)($j['billable_qty'] ?? 0) > 0) ? (float)$j['billable_qty'] : 1.0;
     }
+    // The figures, whether typed or taken off the job. A negative line is not a
+    // discount here: lower the rate on a draft, or raise a credit note against an
+    // issued invoice -- both leave a record that a negative line would not.
+    [$qty,  $e] = books_figure($b, 'qty',  'Quantity', 0, null, 1.0);   if ($e !== '') return $e;
+    if ($qty <= 0) return 'Quantity must be more than zero.';
+    [$rate, $e] = books_figure($b, 'rate', 'Rate', 0, null, 0.0);       if ($e !== '') return $e;
+    [$gst,  $e] = books_figure($b, 'gst_pct', 'GST %', 0, BOOKS_GST_PCT_MAX, books_default_gst()); if ($e !== '') return $e;
     $seq = (int)books_try(fn() => ops_val("SELECT COALESCE(MAX(seq),0) FROM invoice_lines WHERE invoice_id=?", [(int)$invoiceId]), 0) + 1;
-    $gst = ($b['gst_pct'] ?? '') === '' ? books_default_gst() : (float)$b['gst_pct'];
     $lineContract = trim((string)(($b['contract_number'] ?? '') ?: (isset($j) ? ($j['contract_number'] ?? '') : '')));
     db()->prepare("INSERT INTO invoice_lines (invoice_id,seq,job_id,call_id,description,hsn_sac,qty,unit,rate,gst_pct,contract_number)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?)")
        ->execute([(int)$invoiceId, $seq, $job, $callId, $desc,
-                  trim((string)($b['hsn_sac'] ?? '')) ?: books_default_sac(), (float)($b['qty'] ?? 1),
-                  (string)($b['unit'] ?? ''), (float)($b['rate'] ?? 0), $gst, $lineContract]);
+                  trim((string)($b['hsn_sac'] ?? '')) ?: books_default_sac(), $qty,
+                  (string)($b['unit'] ?? ''), $rate, $gst, $lineContract]);
     books_recalc($invoiceId);
     return '';
 }
@@ -797,8 +822,11 @@ function books_receipt_create(array $b) {
     books_migrate();
     $pid = (int)($b['partner_id'] ?? 0);
     if (!$pid) return ['err' => 'Say who the money came from.'];
-    $amt = (float)($b['amount'] ?? 0);
-    $tds = (float)($b['tds_amount'] ?? 0);
+    // Each figure on its own: a negative amount with a positive TDS used to pass
+    // the "nothing" test and land a negative receipt in the ledger.
+    [$amt, $e] = books_figure($b, 'amount',       'The amount',   0, null, 0.0); if ($e !== '') return ['err' => $e];
+    [$tds, $e] = books_figure($b, 'tds_amount',   'TDS',          0, null, 0.0); if ($e !== '') return ['err' => $e];
+    [$chg, $e] = books_figure($b, 'bank_charges', 'Bank charges', 0, null, 0.0); if ($e !== '') return ['err' => $e];
     if ($amt <= 0 && $tds <= 0) return ['err' => 'A receipt of nothing is not a receipt.'];
     $p = ops_one("SELECT * FROM business_partners WHERE id=?", [$pid]);
     if (!$p) return ['err' => 'That customer no longer exists.'];
@@ -810,7 +838,7 @@ function books_receipt_create(array $b) {
                   (int)($b['office_id'] ?? 0) ?: null,
                   trim((string)($b['receipt_date'] ?? '')) ?: date('Y-m-d'),
                   (string)($b['mode'] ?? 'NEFT'), (string)($b['reference'] ?? ''), (string)($b['bank'] ?? ''),
-                  $amt, $tds, (float)($b['bank_charges'] ?? 0), (string)($b['notes'] ?? ''),
+                  $amt, $tds, $chg, (string)($b['notes'] ?? ''),
                   $u ? user_name($u) : '', date('c')]);
     $id = (int)db()->lastInsertId();
     if (function_exists('act_log')) act_log('RECEIPT', $id, 'CREATED', 'Receipt ' . $no . ' — ' . fmoney($amt + $tds));
@@ -848,9 +876,12 @@ function books_allocate($receiptId, array $rows) {
             $owed = books_settled($invId)['outstanding'];
             if ($amt > $owed + 0.01) { $msg[] = $inv['invoice_no'] . ' only owes ' . fmoney($owed) . '.'; continue; }
 
-            db()->prepare("INSERT INTO receipt_allocations (receipt_id,invoice_id,kind,amount,allocated_by,allocated_at)
-                           VALUES (?,?,?,?,?,?)")
-               ->execute([(int)$receiptId, $invId, $kind, $amt, $u ? user_name($u) : '', $now]);
+            if (books_alloc_insert((int)$receiptId, $invId, $kind, $amt, $u ? user_name($u) : '', $now) < 1) {
+                // The checks above passed a moment ago; the database says no now --
+                // another allocation landed in between. Say so rather than overdraw.
+                $msg[] = 'Someone else allocated against ' . $inv['invoice_no'] . ' or this receipt a moment ago. Refresh and check what is still free.';
+                continue;
+            }
             if ($kind === 'CASH') $freeCash = round($freeCash - $amt, 2); else $freeTds = round($freeTds - $amt, 2);
             books_restatus($invId);
             $done++;
@@ -858,6 +889,30 @@ function books_allocate($receiptId, array $rows) {
     }
     if (!$done) return $msg ? implode(' ', array_unique($msg)) : 'Nothing was allocated — every figure was blank or zero.';
     return $msg ? implode(' ', array_unique($msg)) : '';
+}
+
+// The allocation row is written by an INSERT that re-checks both ceilings --
+// what is still free on the receipt and what the invoice still owes -- in the
+// same statement. Two accounts users allocating the same receipt at the same
+// moment each pass the PHP pre-checks on a stale read; here only one can win,
+// because the database evaluates the condition against what is actually there.
+// Returns the number of rows written: 1, or 0 when a ceiling would be crossed.
+function books_alloc_insert($receiptId, $invoiceId, $kind, $amount, $by, $at) {
+    $st = db()->prepare(
+        "INSERT INTO receipt_allocations (receipt_id,invoice_id,kind,amount,allocated_by,allocated_at)
+         SELECT r.id, ?, ?, ?, ?, ? FROM receipts r
+         WHERE r.id=?
+           AND (CASE WHEN ?='CASH' THEN r.amount ELSE r.tds_amount END)
+               - COALESCE((SELECT SUM(a.amount) FROM receipt_allocations a WHERE a.receipt_id=r.id AND a.kind=?),0)
+               + 0.01 >= (? + 0.0)
+           AND (SELECT i.total FROM invoices i WHERE i.id=?)
+               - COALESCE((SELECT SUM(a2.amount) FROM receipt_allocations a2 WHERE a2.invoice_id=?),0)
+               - COALESCE((SELECT SUM(c.total) FROM credit_notes c WHERE c.invoice_id=? AND c.status='ISSUED'),0)
+               + 0.01 >= (? + 0.0)");
+    $st->execute([(int)$invoiceId, (string)$kind, round((float)$amount, 2), (string)$by, (string)$at,
+                  (int)$receiptId, (string)$kind, (string)$kind, round((float)$amount, 2),
+                  (int)$invoiceId, (int)$invoiceId, (int)$invoiceId, round((float)$amount, 2)]);
+    return (int)$st->rowCount();
 }
 
 function books_allocated($receiptId, $kind = null) {
@@ -890,7 +945,8 @@ function books_credit_note(array $b) {
     if ($sub <= 0) return ['err' => 'Say how much is being credited, before tax.'];
     $owed = books_settled($invId)['outstanding'];
 
-    $pct = ($b['gst_pct'] ?? '') === '' ? books_default_gst() : (float)$b['gst_pct'];
+    [$pct, $e] = books_figure($b, 'gst_pct', 'GST %', 0, BOOKS_GST_PCT_MAX, books_default_gst());
+    if ($e !== '') return ['err' => $e];
     $tax = round($sub * $pct / 100, 2);
     $c = $s = $i = 0.0;
     if ((int)$inv['is_igst'] === 1) $i = $tax; else { $c = round($tax / 2, 2); $s = $tax - $c; }
@@ -899,19 +955,31 @@ function books_credit_note(array $b) {
     // money by a document that only ever charged them.
     if ($total > (float)$inv['total'] + 0.01)
         return ['err' => 'That is more than the invoice was for (' . fmoney($inv['total']) . ').'];
-    if ($total > $owed + books_settled($invId)['credit'] + 0.01)
-        return ['err' => 'Only ' . fmoney($owed) . ' is still outstanding on that invoice.'];
+    // ...and the notes against one invoice may not, between them, exceed what it
+    // still owes. $owed already nets off cash, TDS and every earlier credit note:
+    // adding the earlier notes back (as this check once did) let an invoice be
+    // credited again and again, each note under the total, until the customer
+    // was owed several times the bill.
+    if ($total > $owed + 0.01) {
+        $prior = books_settled($invId)['credit'];
+        return ['err' => 'Only ' . fmoney($owed) . ' is still outstanding on that invoice'
+            . ($prior > 0 ? ' (credit notes already raised against it come to ' . fmoney($prior) . ')' : '') . '.'];
+    }
 
     $u = current_user();
     $no = books_next_number('credit_notes', 'cn_no', 'CN', current_fy());
-    db()->prepare("INSERT INTO credit_notes (cn_no,fy,invoice_id,partner_id,partner_name,office_id,cn_date,reason,reason_note,
-                   subtotal,cgst,sgst,igst,total,status,created_by,created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ISSUED',?,?)")
-       ->execute([$no, current_fy(), $invId, (int)$inv['partner_id'], (string)$inv['partner_name'],
-                  $inv['office_id'] ? (int)$inv['office_id'] : null,
-                  trim((string)($b['cn_date'] ?? '')) ?: date('Y-m-d'),
-                  (string)$b['reason'], (string)($b['reason_note'] ?? ''),
-                  $sub, $c, $s, $i, $total, $u ? user_name($u) : '', date('c')]);
+    // Written by an INSERT that re-checks the ceiling in the database (see
+    // books_alloc_insert for why): two notes raised at the same moment cannot
+    // both squeeze under it on a stale read.
+    $wrote = books_cn_insert($invId, [
+        'cn_no' => $no, 'fy' => current_fy(), 'partner_id' => (int)$inv['partner_id'], 'partner_name' => (string)$inv['partner_name'],
+        'office_id' => $inv['office_id'] ? (int)$inv['office_id'] : null,
+        'cn_date' => trim((string)($b['cn_date'] ?? '')) ?: date('Y-m-d'),
+        'reason' => (string)$b['reason'], 'reason_note' => (string)($b['reason_note'] ?? ''),
+        'subtotal' => $sub, 'cgst' => $c, 'sgst' => $s, 'igst' => $i, 'total' => $total,
+        'created_by' => $u ? user_name($u) : '', 'created_at' => date('c')]);
+    if ($wrote < 1)
+        return ['err' => 'Another credit note was raised against this invoice a moment ago. Refresh and check what is still outstanding.'];
     $id = (int)db()->lastInsertId();
     books_restatus($invId);
     if (function_exists('act_log')) act_log('INVOICE', $invId, 'CREDIT', 'Credit note ' . $no . ' for ' . fmoney($total));
@@ -919,6 +987,23 @@ function books_credit_note(array $b) {
     // there too. No-op when Books is off.
     if (function_exists('books_bridge_on_creditnote')) { try { books_bridge_on_creditnote($id); } catch (Throwable $e) {} }
     return ['id' => $id, 'no' => $no];
+}
+
+/** The credit-note row, written only if the invoice still owes at least its total. */
+function books_cn_insert($invoiceId, array $r) {
+    $st = db()->prepare(
+        "INSERT INTO credit_notes (cn_no,fy,invoice_id,partner_id,partner_name,office_id,cn_date,reason,reason_note,
+                                   subtotal,cgst,sgst,igst,total,status,created_by,created_at)
+         SELECT ?,?,i.id,?,?,?,?,?,?,?,?,?,?,?,'ISSUED',?,? FROM invoices i
+         WHERE i.id=? AND i.status IN ('ISSUED','PART_PAID','PAID')
+           AND i.total
+               - COALESCE((SELECT SUM(a.amount) FROM receipt_allocations a WHERE a.invoice_id=i.id),0)
+               - COALESCE((SELECT SUM(c.total) FROM credit_notes c WHERE c.invoice_id=i.id AND c.status='ISSUED'),0)
+               + 0.01 >= (? + 0.0)");
+    $st->execute([$r['cn_no'], $r['fy'], $r['partner_id'], $r['partner_name'], $r['office_id'], $r['cn_date'],
+                  $r['reason'], $r['reason_note'], $r['subtotal'], $r['cgst'], $r['sgst'], $r['igst'], $r['total'],
+                  $r['created_by'], $r['created_at'], (int)$invoiceId, round((float)$r['total'], 2)]);
+    return (int)$st->rowCount();
 }
 
 // ---- The customer ledger ----------------------------------------------------

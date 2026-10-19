@@ -498,6 +498,9 @@ showing the disagreement is the honest response.
 | E-12 | Books is not connected | EXAACT keeps its own invoices, receipts and ageing. Default state | **READ** |
 | E-13 | Books is connected but unreachable mid-push | `books_outbox` exists — **but unlike Sales' Ads Pro outbox, no screen in Money shows Waiting / Sent / Failed**. A failed push would be invisible here | **SUSPECTED — worth fixing** |
 | E-14 | Export the same entries to Tally twice | The **`done`** flag tracks what has gone | **CONFIRMED** (field exists) |
+| E-15 | A credit note for more than the invoice still owes | **Refused:** *"Only ₹X is still outstanding on that invoice (credit notes already raised against it come to ₹Y)."* Before 19 Oct the ceiling added the earlier notes back and an invoice could be credited without limit (**GAP-035**) | **CONFIRMED by execution** (`tests/test_books_input_guard.php`) |
+| E-16 | A negative rate, quantity or GST on a line; a negative receipt; a GST rate off the scale on a credit note | **Refused, naming the field.** Before 19 Oct every one went into the ledger (**GAP-034**) | **CONFIRMED by execution** |
+| E-17 | Two accounts users allocate the same receipt at the same moment | The INSERT re-checks what is free in the database; the second is told *"Someone else allocated … a moment ago"* (**GAP-036**) | **CONFIRMED by execution** (the INSERT called directly past the pre-checks) |
 | E-15 | An Operation Manager needs to see an invoice | **403 on the whole chain.** This is the documented intent (matrix row 215: OM = —), not a defect | **CONFIRMED** |
 | E-16 | Two people edit one invoice at once | **No protection** — `invoices` is outside the `['calls','jobs']` concurrency allow-list | **CONFIRMED** |
 | E-17 | `mod.invoicing.view` held, but no finance right | **No tile, and therefore no door** — the tile needs `mod.invoicing.view` **and** one of `finance.reconcile` / `data.credit` / master | **CONFIRMED** |

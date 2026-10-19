@@ -721,6 +721,95 @@ per-address limit is the conventional answer; recorded, not built.
 
 ---
 
+## GAP-035 — an invoice could be credited without limit
+
+**CONFIRMED BY EXECUTION · P1 · `books_credit_note()` · FIXED 19 Oct 2026**
+
+The engine's own comment states the rule: *"a customer cannot end up owed money
+by a document that only ever charged them."* Each credit note was checked
+against the invoice total, and then against *"what is still outstanding"* --
+but that second check **added back the credit notes already raised**, so it
+could never bite. Proven with ordinary figures: an 11,800 invoice took a 5,900
+note, a second 5,900 note (correct: fully credited), then a **third and a
+fourth**. Outstanding went to **−11,800**. Because a fully-credited invoice
+reads as PAID, the customer ledger showed *billed 0, outstanding 0* -- the
+over-credit was invisible everywhere except the invoice's own figures, while
+every note flowed to Tally and to MGH Books as a real GST credit note.
+
+Needs `finance.reconcile`, so this is an accounts user's mistake (or an
+accounts user's fraud), not a stranger's. It is P1 because a credit note is a
+GST document and the amount was unbounded.
+
+**Fixed:** the ceiling is now cumulative -- a note may not exceed what the
+invoice still owes after cash, TDS and every earlier note -- and the refusal
+says what the earlier notes come to. The INSERT itself re-checks the ceiling in
+the database (`books_cn_insert()`), so two notes raised at the same moment cannot
+both squeeze under it. The invoice screen now says in words when history has
+left an invoice credited beyond its value, instead of *"Paid in full"*.
+
+**For the accounts person -- was this ever done on the live system?** Run on
+production, read-only:
+
+```sql
+SELECT i.invoice_no, i.total,
+       COALESCE((SELECT SUM(total) FROM credit_notes c WHERE c.invoice_id=i.id AND c.status='ISSUED'),0) AS credited,
+       COALESCE((SELECT SUM(amount) FROM receipt_allocations a WHERE a.invoice_id=i.id),0) AS received
+FROM invoices i
+WHERE i.status <> 'CANCELLED'
+HAVING credited + received > i.total + 1;
+```
+
+Any row is an invoice to look at; an empty result means it never happened.
+Evidence: `evidence/books-input-probe.php`; guard rail
+`tests/test_books_input_guard.php`.
+
+---
+
+## GAP-034 — the invoicing engine took any figure a form sent it
+
+**CONFIRMED BY EXECUTION · P2 · `books_line_add()`, `books_receipt_create()`, `books_credit_note()` · FIXED 19 Oct 2026**
+
+Twelve probes, each beside a control that was accepted:
+
+| Where | Figure sent | Before | After |
+|---|---|---|---|
+| Invoice line | rate −5,000 | accepted (reduced the invoice) | refused, naming the field |
+| Invoice line | quantity −1, quantity 0 | accepted | refused |
+| Invoice line | GST −18%, GST 500% | accepted (negative / 5× tax on a legal document) | refused, 0–100 |
+| Invoice line | rate "abc" | accepted as ₹0, silently | refused: *"Rate must be a number"* |
+| Receipt | amount −5,000 with TDS 100 | accepted -- a negative receipt in the ledger | refused |
+| Receipt | TDS −5,000, bank charges −999 | accepted | refused |
+| Credit note | GST −18%, GST 900% | accepted (a note with negative tax; a 10,000 note on a 1,000 credit) | refused |
+
+The job-derived path (figures taken off the deputation's quote) runs through
+the same validation, so a zero-rate line for a free item is still allowed; a
+negative one is not -- lower the rate on a draft or raise a credit note, both of
+which leave a record. The form fields already said `type=number`; that is a
+hint to the browser, not a rule, and the probe sent the figures as a form does.
+
+---
+
+## GAP-036 — two accounts users allocating the same receipt could overdraw it
+
+**OBSERVED · P3 · `books_allocate()` · FIXED 19 Oct 2026**
+
+The pre-checks (*more than arrived*, *more than the invoice owes*) read first
+and inserted after, with nothing atomic between -- the shape of GAP-032. Two
+allocations of one receipt landing together could both pass on a stale read.
+The allocation row is now written by an INSERT whose WHERE re-evaluates both
+ceilings against what is actually in the database (`books_alloc_insert()`);
+the loser is told someone else allocated a moment ago. Tested by calling that
+INSERT directly past the pre-checks: one rupee over is refused, the exact free
+amount is written, and 50 paise after that is refused.
+
+A detail worth recording for any future conditional SQL in this codebase:
+SQLite compares a bound parameter as **text** against a numeric expression, so
+`11800.01 >= ?` with 1180 bound was **false** -- the controls failed until the
+parameter was coerced (`? + 0.0`). MariaDB would have compared numerically and
+hidden the mistake until the SQLite test suite ran.
+
+---
+
 ## GAP-028 — the Books receiver silently dropped money it could not apply
 
 **CONFIRMED BY EXECUTION · P1 · `mgh_books_receiver` · FIXED 19 Oct 2026**

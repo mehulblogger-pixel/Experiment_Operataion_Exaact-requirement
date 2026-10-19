@@ -56,6 +56,11 @@
   <?php if ($inv['status'] === 'CANCELLED'): ?>
     <div class="step">Cancelled.</div>
     <p class="next">This invoice was cancelled — the number is kept so the GST series has no gaps. Nothing to do here.</p>
+  <?php elseif ($ivOut < -1.0): ?>
+    <?php // Only historical data can get here now: books_credit_note() refuses a note
+          // beyond what is owed. A PAID status hides it, so it is said in words. ?>
+    <div class="step">Credited beyond its value — needs accounts' attention.</div>
+    <p class="next">Payments and credit notes against this invoice come to <b><?= e(fmoney(-$ivOut)) ?> more than it was for</b>. Either the customer is owed that back, or a credit note below was raised in error and needs reversing.</p>
   <?php elseif ($inv['status'] === 'PAID'): ?>
     <div class="step">Paid in full — done.</div>
     <p class="next">The whole <?= e(fmoney($inv['total'])) ?> has settled. Nothing outstanding.</p>
