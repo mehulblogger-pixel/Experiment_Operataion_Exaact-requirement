@@ -124,6 +124,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ls_logged_in()) {
     }
 }
 
+// A guard that could not be installed is shown to the operator rather than
+// hidden -- every other message here is about one subscription; this one is
+// about whether replays are being refused at all.
+if (ls_logged_in() && !$bad && ls_index_problem() !== '') { $msg = ls_index_problem(); $bad = true; }
+
 $MODS = ['sales' => 'Sales & CRM', 'money' => 'Money (invoicing)', 'operations' => 'Operations',
          'reporting' => 'Inspection reporting', 'hr' => 'People & hiring'];
 ?><!doctype html>

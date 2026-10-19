@@ -189,9 +189,28 @@ function ls_migrate($db) {
     // could both pass the check and hand out a free year. The database is the
     // only thing that can refuse the second write, so it does. Partial, so
     // MANUAL rows with a blank reference are untouched.
-    $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_led_payref
-               ON ledger(reference) WHERE kind = 'PAYMENT' AND reference <> ''");
+    //
+    // Tolerant on purpose. A ledger that ALREADY holds a duplicated payment
+    // reference -- a double extension that really happened before this index
+    // existed -- would make CREATE UNIQUE INDEX throw, and because this runs
+    // inside ls_db() that would take every request down, webhook included. So
+    // the failure is kept, not thrown: the old COUNT check in api.php still
+    // guards those rows, the index arrives once the duplicates are resolved,
+    // and the console can say so.
+    try {
+        $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_led_payref
+                   ON ledger(reference) WHERE kind = 'PAYMENT' AND reference <> ''");
+        $GLOBALS['ls_index_problem'] = '';
+    } catch (Throwable $e) {
+        $GLOBALS['ls_index_problem'] = 'The replay guard index could not be created because the ledger already holds '
+            . 'the same payment reference more than once. Those payments extended a subscription twice. '
+            . 'List them with: SELECT reference, COUNT(*) FROM ledger WHERE kind=\'PAYMENT\' AND reference<>\'\' '
+            . 'GROUP BY reference HAVING COUNT(*)>1 -- then delete the surplus rows and reload this page.';
+    }
 }
+
+// '' when the replay-guard index exists; otherwise why it does not.
+function ls_index_problem() { ls_db(); return (string)($GLOBALS['ls_index_problem'] ?? ''); }
 
 // True when a PDO exception is the UNIQUE index above refusing a duplicate.
 function ls_is_duplicate_payment(Throwable $e) {

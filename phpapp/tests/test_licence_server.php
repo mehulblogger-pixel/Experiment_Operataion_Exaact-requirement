@@ -61,6 +61,24 @@ try {
     t_eq((int)$db->query("SELECT COUNT(*) FROM ledger WHERE kind='MANUAL' AND install_id='$iid'")->fetchColumn(), 2,
          'two manual extensions with a blank reference are both recorded — the index is partial');
 
+    // ---- 1b. a ledger that ALREADY holds a duplicate must not take the server down
+    // Simulate an old database: drop the index, insert the duplicate pair the
+    // index exists to prevent, then run the migration a fresh request would run.
+    $db->exec("DROP INDEX IF EXISTS uq_led_payref");
+    foreach ([1, 2] as $i)
+        $db->prepare("INSERT INTO ledger (install_id, kind, amount, reference, months, at) VALUES (?,?,?,?,?,?)")
+           ->execute([$iid, 'PAYMENT', 500, 'pay_OLD_DOUBLE', 12, ls_now()]);
+    $threw = false;
+    try { ls_migrate($db); } catch (Throwable $e) { $threw = true; }
+    t_ok(!$threw, 'the migration tolerates a pre-existing duplicate instead of throwing on every request');
+    t_ok(ls_index_problem() !== '', '...and reports it: ' . substr(ls_index_problem(), 0, 70) . '…');
+    $r = ls_extend($iid, 1, 'PAYMENT', 10, 'pay_STILL_WORKS', 'after a tolerated failure');
+    t_ok(empty($r['err']), 'the server keeps working — the old COUNT guard in api.php still covers the old rows');
+    // clean up and restore the index for the assertions that follow
+    $db->exec("DELETE FROM ledger WHERE reference='pay_OLD_DOUBLE'");
+    ls_migrate($db);
+    t_eq(ls_index_problem(), '', 'once the duplicates are removed, the next request installs the index');
+
     // ---- 2. term ---------------------------------------------------------
     $iid2 = $mk(date('Y-m-d'));
     $r = ls_extend($iid2, 1200, 'PAYMENT', 1, 'pay_TYPO', 'notes.months=1200');
