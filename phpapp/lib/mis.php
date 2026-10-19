@@ -136,6 +136,14 @@ function profit_reconciliation($F = null) {
 }
 
 // Everything the dashboard shows, from the one set of jobs.
+// Margin, as a percentage of revenue — the first figure a director reads, so it
+// has one definition: profit over revenue, one decimal, and NULL (shown as "—")
+// when there is no revenue to divide by. Every screen and the CSV call this.
+function mis_margin_pct($revenue, $profit) {
+    $revenue = (float)$revenue;
+    return $revenue > 0 ? round((float)$profit / $revenue * 100, 1) : null;
+}
+
 function mis_summary(array $F) {
     $jobs = mis_jobs($F);
     $blank = ['jobs'=>0, 'closed'=>0, 'open'=>0, 'mandays'=>0, 'revenue'=>0, 'labour'=>0,
@@ -164,6 +172,9 @@ function mis_summary(array $F) {
     // for all these jobs are read once here so the per-job reader stays arithmetic.
     $ledgerMap = function_exists('revrecon_ledger_net_map') ? revrecon_ledger_net_map(array_map(fn($j) => (int)$j['id'], $jobs)) : [];
     $invOf = fn($j) => function_exists('job_invoiced_amount') ? job_invoiced_amount($j, $ledgerMap[(int)$j['id']] ?? 0) : (float)($j['invoice_amount'] ?? 0);
+    // The same map primes job_money() inside job_profit(), so the revenue and the
+    // invoiced columns of one row can never read two different sources.
+    foreach ($jobs as &$j) $j['_ledger_net'] = $ledgerMap[(int)$j['id']] ?? 0.0; unset($j);
 
     $add = function (&$bucket, $key, $label, $j, $p, $delay) use ($blank, $unified, $invOf) {
         if ($key === '' || $key === null) { $key = '—'; $label = $label ?: '—'; }
@@ -462,7 +473,7 @@ function mis_export($what, array $F, array $S) {
                  $r['late'], $r['delayCounted'] ? round($r['delayDays'] / $r['delayCounted'], 1) : ''];
         if ($seeSalary) $line = array_merge($line, [round($r['labour'], 2), round($r['expenses'], 2),
             round($r['subcon'], 2), round($r['cost'], 2), round($r['profit'], 2),
-            $r['revenue'] > 0 ? round($r['profit'] / $r['revenue'] * 100, 1) : '']);
+            mis_margin_pct($r['revenue'], $r['profit']) ?? '']);
         $rows[] = $line;
     }
     $name = 'mis-' . $what . '-' . $F['fy'] . ($F['m'] !== '' ? '-' . $F['m'] : '') . '.csv';

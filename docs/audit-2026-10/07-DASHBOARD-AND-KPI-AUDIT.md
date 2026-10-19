@@ -282,11 +282,11 @@ them as TAPI metrics**, not writing new code.
 
 | Id | Severity | Finding |
 |---|---|---|
-| **D7-2** | **P1** | **Revenue has two sources** — the legacy figure stamped on the job and the invoice ledger — and **four files sum the legacy one, including `tapi.php`**. The product knows they diverge (that is what `/revenue-reconciliation` is for), so two dashboards reading different sources *will* disagree. Which source each screen reads must be established, and said on the screen |
-| **D7-1** | **P2** | **Margin has no named function.** The first figure a director reads is computed inline and cannot be traced, reused or unit-tested |
+| **D7-2** | **P1 — FIXED 19 Oct (GAP-040)** | **Revenue has two sources** — the legacy figure stamped on the job and the invoice ledger — and **four files sum the legacy one, including `tapi.php`**. The product knows they diverge (that is what `/revenue-reconciliation` is for), so two dashboards reading different sources *will* disagree. Which source each screen reads must be established, and said on the screen |
+| **D7-1** | **P2 — FIXED 19 Oct** | **Margin has no named function.** The first figure a director reads is computed inline and cannot be traced, reused or unit-tested |
 | **D7-3** | **P2** | **Two self-disagreement counters have no callers** — `billable_mismatch_count` and `calls_status_disagreement_count`. `revrecon_count` and `costrecon_count` drive amber tile badges; these two should too |
 | **D7-4** | **P2, narrowed** | **Recruitment** has no metric in TAPI's registry of 28 — no hire, candidate or requisition figure — although `recruit_kpi.php` and the data exist. **Quality is covered** (`ncr.total`, `ncr.open`, `ncr.closure_avg_days`, `capa.rated`, `capa.effective`, `sla.*`, `release.*`, `vendor.reassess_due`) and Marketplace partly (`portal.active_users`, `portal.events`). **The fix is defining the missing metrics, not writing code** |
-| **D7-5** | **P2** | **Three utilisation implementations** (`job_mandays`, `mis_utilisation`, `mis_person_utilisation`) and it is unverified that all three use the same `/work-norms` denominator |
+| **D7-5** | **P2 — RESOLVED 19 Oct (GAP-042)** | **Three utilisation implementations** (`job_mandays`, `mis_utilisation`, `mis_person_utilisation`) and it is unverified that all three use the same `/work-norms` denominator |
 | **D7-6** | **P3** | **Five revenue functions with no callers** — `costing_office_revenue`, `costing_sbu_revenue`, `reports_revenue_office`, `mkt_ledger_revenue_by_stream`, `revenue_reader_set_mode`. Dead code, or dynamic calls a static scan cannot see; either way a hazard for the next person needing a revenue figure |
 | ~~I-F1~~ | — | **WITHDRAWN.** "A KPI framework exists and no screen reads it" was wrong: TAPI is a built, wired analytics subsystem with ten routes, a KPI master, a formula evaluator and definition versioning. `kpi_defs` has 14 rows. Finding it is what exposed the audit's own coverage error (`00a-ERRATUM-COVERAGE.md`) |
 | **D7-7** | — | *Credit:* **no violation of the Books boundary found** — `books_outstanding` is the single source and it is the bridge · **`job_profit` is one function used in 19 places** · TAPI declares itself *"NOT a system of record"* and *"does NOT recompute what the domain modules already compute"* · a **formula evaluator with validation** over named metrics, with **`kpi_versions`** so a definition has history · **`revrecon_count` and `costrecon_count` on amber tile badges**, so disagreement is visible from the menu · and the **`cost_dualwrite_*` scanner**, a whole family of functions hunting the product's own double-counting |
@@ -320,3 +320,28 @@ In order:
 
 Steps 1 and 2 are the whole job. Until they are done, **this audit describes the
 dashboards; it does not validate them.**
+
+---
+
+## 10. Reconciled by execution — 19 Oct 2026
+
+Steps 1 and 2 of §9 were done in the test harness: one known July (three jobs,
+two books invoices, one unmatched receipt) and the same figures read the way
+each screen reads them. `evidence/kpi-reconcile-probe.php` is the run; it
+prints BEFORE and AFTER in its header.
+
+| Question | `/mis` | `/analytics` | contract view | home rollup | ledger | Before | After |
+|---|---|---|---|---|---|---|---|
+| Jobs finishing in July | 3 | **2** | — | — | — | disagree (date basis) | **3 / 3** |
+| Man-days | 8 | **2** | — | — | — | disagree (raw column) | **8 / 8** |
+| Invoiced, ledger mode | revenue **6,700** / invoiced 3,700 | **6,000** | **6,700** | — | 3,000 | four answers on three screens | **3,700 everywhere** (3,000 + a job never in the books, by design) |
+| Invoiced, default mode | 6,700 | 6,000 | 6,700 | — | — | /analytics differed | **6,700 everywhere** |
+| Outstanding | — | — | — | **0** | 3,000 | the rollup subtracted unmatched cash | **3,000 / 3,000**, cash shown as "not yet matched" |
+| Per-person utilisation denominator | month's days | — | — | — | — | **today's** month on `/reports` | the period reported |
+
+Findings GAP-040 to GAP-043 in `08-GAP-REGISTER.md`; guard rail
+`tests/test_kpi_reconcile.php` (33 assertions) fails if any two of these drift
+apart again. **What this audit still does not say:** whether the live database's
+figures are right. That needs the reconciliation screens (`/revenue-reconciliation`,
+`/cost-reconciliation`, `/reimbursable-dedup`) run on production and found empty
+-- §9 step 4, for the accounts person, read-only.

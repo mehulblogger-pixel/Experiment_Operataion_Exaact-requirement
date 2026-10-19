@@ -100,8 +100,32 @@ function financial_rollup(array $f = []) {
         elseif ($e['kind'] === 'CREDIT_NOTE')     $t['credited']  += $e['amount'];
     }
     $t['net_billed']  = round($t['billed'] - $t['cancelled'], 2);
-    $t['outstanding'] = round($t['net_billed'] - $t['received'] - $t['credited'], 2);
+    // Outstanding is what the LEDGER says is outstanding: billed less what has been
+    // MATCHED to invoices and credited. Money received but not yet matched to an
+    // invoice is real cash, but it has not settled anything yet — subtracting it
+    // here (as this once did) made the home screen show 0 outstanding while the
+    // ageing and the reminders chased the full amount (GAP-043). It is shown on its
+    // own line instead, so it is neither hidden nor double-counted.
+    $t['allocated'] = financial_allocated($f);
+    $t['unmatched']   = round(max(0.0, $t['received'] - $t['allocated']), 2);
+    $t['outstanding'] = round($t['net_billed'] - $t['allocated'] - $t['credited'], 2);
     return $t;
+}
+
+// Cash matched to invoices, under the same partner / office-scope / date window as
+// the receipt events it is compared with.
+function financial_allocated(array $f = []) {
+    $pid = (int)($f['partner_id'] ?? 0);
+    if (trim((string)($f['contract_number'] ?? '')) !== '') return 0.0;   // receipts are not in a contract view
+    $from = trim((string)($f['from'] ?? '')); $to = trim((string)($f['to'] ?? ''));
+    [$rs, $ra] = _finevent_scope('r.office_id');
+    $w = [$rs]; $a = $ra;
+    if ($pid) { $w[] = 'r.partner_id=?'; $a[] = $pid; }
+    if ($from !== '') { $w[] = "substr(r.receipt_date,1,10) >= ?"; $a[] = $from; }
+    if ($to   !== '') { $w[] = "substr(r.receipt_date,1,10) <= ?"; $a[] = $to; }
+    try {
+        return round((float)ops_val("SELECT COALESCE(SUM(a.amount),0) FROM receipt_allocations a JOIN receipts r ON r.id=a.receipt_id WHERE " . implode(' AND ', $w), $a), 2);
+    } catch (Throwable $e) { return 0.0; }
 }
 
 // A read-only "Money timeline" panel — the rollup chips plus the recent events. Renders nothing when
@@ -117,7 +141,9 @@ function financial_events_render(array $f = [], $title = 'Money timeline') {
     echo '<div class="panel"><h3 class="tab-sub" style="margin-top:0">' . $e($title)
        . ' <span class="muted" style="font-weight:400;font-size:12px">— quotes, invoices, receipts &amp; credits in one line</span></h3>';
     echo '<div style="display:flex;flex-wrap:wrap;gap:14px;margin:0 0 12px;font-size:13px">';
-    foreach ([['Committed','committed'],['Billed (net)','net_billed'],['Received','received'],['Outstanding','outstanding']] as [$lab,$k])
+    $chips = [['Committed','committed'],['Billed (net)','net_billed'],['Received','received'],['Outstanding','outstanding']];
+    if ($roll['unmatched'] > 0) $chips[] = ['Received, not yet matched', 'unmatched'];
+    foreach ($chips as [$lab,$k])
         echo '<div><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">' . $e($lab) . '</div>'
            . '<div style="font-weight:600;font-variant-numeric:tabular-nums">' . $e($m($roll[$k])) . '</div></div>';
     echo '</div><div style="display:flex;flex-direction:column;gap:3px">';

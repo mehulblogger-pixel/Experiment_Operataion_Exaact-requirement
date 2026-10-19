@@ -55,7 +55,16 @@ try {
     t_eq(round($r['net_billed'], 2), 85000.0, 'net billed = issued − cancelled');
     t_eq(round($r['received'], 2), 50000.0, 'received = the receipt');
     t_eq(round($r['credited'], 2), 5000.0, 'credited = the credit note');
-    t_eq(round($r['outstanding'], 2), 30000.0, 'outstanding = net billed − received − credited');
+    // The receipt above is NOT allocated to either invoice, so the ledger still shows
+    // both invoices as owed: outstanding follows the ledger (net billed − MATCHED −
+    // credited) and the cash sits on its own line. (Before 19 Oct 2026 the rollup
+    // subtracted the unmatched receipt and showed 30,000 — GAP-043.)
+    t_eq(round($r['outstanding'], 2), 80000.0, 'outstanding = net billed − allocated − credited (the ledger\'s definition)');
+    t_eq(round($r['unmatched'], 2), 50000.0, 'money received but not yet matched to an invoice is shown on its own line');
+    db()->prepare("INSERT INTO receipt_allocations (receipt_id, invoice_id, kind, amount) SELECT r.id, i.id, 'CASH', 50000 FROM receipts r, invoices i WHERE r.receipt_no='RC-27' AND i.invoice_no='INV-27a'")->execute();
+    $r2 = financial_rollup(['partner_id' => $pid]);
+    t_eq(round($r2['outstanding'], 2), 30000.0, '...and once the receipt is matched, outstanding drops to 30,000');
+    t_eq(round($r2['unmatched'], 2), 0.0, '...with nothing left unmatched');
 
     // Date filter narrows the window.
     $march = financial_events(['partner_id' => $pid, 'from' => '2026-03-01', 'to' => '2026-03-31']);

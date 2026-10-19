@@ -42,7 +42,7 @@ $table = function ($rows, $head, $exportKey) use ($money, $pill, $avg, $sal, $qs
         <?php if ($sal): ?>
           <td style="text-align:right"><?= $money($r['cost']) ?></td>
           <td style="text-align:right"><strong><?= $money($r['profit']) ?></strong></td>
-          <td><span class="pill <?= $pill($r['profit']) ?>"><?= $r['revenue'] > 0 ? round($r['profit'] / $r['revenue'] * 100, 1) . '%' : '—' ?></span></td>
+          <td><span class="pill <?= $pill($r['profit']) ?>"><?= ($mp = mis_margin_pct($r['revenue'], $r['profit'])) !== null ? $mp . '%' : '—' ?></span></td>
         <?php endif; ?>
         <td style="text-align:right"><?= $r['late'] ? '<span class="pill p-warn">' . (int)$r['late'] . '</span>' : '<span class="muted">0</span>' ?></td>
         <td style="text-align:right"><?= $a === null ? '<span class="muted">—</span>' : ($a > 0 ? '+' : '') . $a ?></td>
@@ -124,7 +124,7 @@ $table = function ($rows, $head, $exportKey) use ($money, $pill, $avg, $sal, $qs
   <div class="kpi"><span class="k-lab">Direct cost</span><span class="k-val"><?= $money($tot['cost']) ?></span>
     <span class="k-sub"><?= $money($tot['labour']) ?> time · <?= $money($tot['expenses']) ?> expenses · <?= $money($tot['subcon']) ?> sub-con</span></div>
   <div class="kpi"><span class="k-lab">Profit before branch costs</span><span class="k-val"><?= $money($tot['profit']) ?></span>
-    <span class="k-sub"><?= $tot['revenue'] > 0 ? round($tot['profit'] / $tot['revenue'] * 100, 1) . '% margin' : 'no revenue' ?></span>
+    <span class="k-sub"><?= ($mp = mis_margin_pct($tot['revenue'], $tot['profit'])) !== null ? $mp . '% margin' : 'no revenue' ?></span>
     <span class="k-sub"><?= $vs($tot['profit'], $LY['profit'], true) ?></span></div>
   <div class="kpi"><span class="k-lab">Branch costs allocated</span><span class="k-val"><?= $money($S['sharedTotal']) ?></span>
     <span class="k-sub"><?= $S['sharedTotal'] > 0 ? 'from the month-end run' : 'month-end run not stored yet' ?></span></div>

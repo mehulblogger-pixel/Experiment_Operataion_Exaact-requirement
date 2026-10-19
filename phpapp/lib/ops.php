@@ -2093,6 +2093,19 @@ function ops_invoicing() {
 
 // ---- Calculations ----------------------------------------------------------
 // Working days in a month = calendar days − Sundays − public holidays.
+// Working days across a date window, month by month — the denominator for any
+// utilisation figure that covers more than one month. A report over a quarter
+// divided by ONE month's days (as /reports once did) reads over 100%.
+function working_days_between($from, $to) {
+    $ts = strtotime(substr((string)$from, 0, 10)); $end = strtotime(substr((string)$to, 0, 10));
+    if (!$ts || !$end || $end < $ts) return 0;
+    $days = 0;
+    while ($ts <= $end) {
+        $days += working_days_in_month((int)date('Y', $ts), (int)date('n', $ts));
+        $ts = strtotime(date('Y-m-01', $ts) . ' +1 month');
+    }
+    return $days;
+}
 function working_days_in_month($year, $month) {
     $days = (int)date('t', mktime(0, 0, 0, $month, 1, $year));
     $sundays = 0;
@@ -2204,7 +2217,14 @@ function jobs_backfill_money() {
 function job_money($job) {
     // Billed if it has been billed, agreed if it has not. An invoice for zero
     // is not an invoice, so it does not displace the agreed figure.
-    $billed  = (float)($job['invoice_amount'] ?? 0);
+    // §28 (P9) — the billed figure honours the revenue reader switch, exactly as the
+    // "invoiced" column on /mis does. Until 19 Oct 2026 this read the legacy snapshot
+    // whatever the switch said, so in ledger mode one screen showed revenue from one
+    // source and invoiced from another (GAP-040). A bulk reader primes
+    // $job['_ledger_net'] from revrecon_ledger_net_map() to avoid a query per job.
+    $billed  = function_exists('job_invoiced_amount')
+             ? (float)job_invoiced_amount($job, array_key_exists('_ledger_net', $job) ? $job['_ledger_net'] : null)
+             : (float)($job['invoice_amount'] ?? 0);
     $agreed  = (float)($job['invoice_value'] ?? 0);
     if ($agreed <= 0 && !empty($job['call_id']))
         $agreed = (float)ops_val("SELECT billable_value FROM calls WHERE id=?", [(int)$job['call_id']]);
@@ -8788,6 +8808,10 @@ function chart_relabel_sbu($data) {
 function boss_profit($bossId) {
     $seeSal = can_see_salary();
     $jobs = ops_all("SELECT * FROM jobs WHERE boss_id=?", [$bossId]);
+    if (function_exists('revrecon_ledger_net_map')) {   // one query, then every reader below agrees
+        $lm = revrecon_ledger_net_map(array_map(fn($j) => (int)$j['id'], $jobs));
+        foreach ($jobs as &$j) $j['_ledger_net'] = $lm[(int)$j['id']] ?? 0.0; unset($j);
+    }
     // Phase 2 §28 — with the financial-truth switch ON, the owner view reads the ONE canonical engine
     // (frozen per §30) instead of recomputing a loaded-labour, no-recovered, non-frozen figure of its
     // own. The engine's components map onto this view's lines so they still add up to the margin, the
@@ -8797,7 +8821,7 @@ function boss_profit($bossId) {
     $revenue = 0; $labour = 0; $subcon = 0; $jobExp = 0; $invoiced = 0; $paid = 0; $contingency = 0; $vExp = 0;
     foreach ($jobs as $j) {
         $office = $j['executing_office_id'] ?? null;
-        $invoiced += (float)($j['invoice_amount'] ?? 0);
+        $invoiced += function_exists('job_invoiced_amount') ? (float)job_invoiced_amount($j, $j['_ledger_net'] ?? null) : (float)($j['invoice_amount'] ?? 0);
         $paid += !empty($j['payment_received']) ? (float)($j['payment_amount'] ?? 0) : 0;
         if ($unified) {
             // The whole per-job P&L from the canonical engine (full client charge = null office scope).
@@ -9803,7 +9827,12 @@ function ops_reports() {
     }
 
     // ---- UTILIZATION ----
-    $wd = working_days_in_month((int)date('Y'), (int)date('n'));
+    // The denominator is the PERIOD REPORTED, not the calendar month the screen is
+    // opened in: a month filter → that month's working days; no month → the whole
+    // financial year's. (Until 19 Oct 2026 this was always today's month — GAP-042.)
+    $wd = $F['month'] !== ''
+        ? working_days_in_month((int)substr($fyFrom, 0, 4) + ((int)$F['month'] < (int)substr($fyFrom, 5, 2) ? 1 : 0), (int)$F['month'])
+        : working_days_between($fyFrom, $fyTo);
     $util=[]; $mdBySbu=[]; $depMd=0;$inspMd=0;$subMd=0;
     foreach ($jobs as $j) { $md=job_mandays($j); $sk=$j['sbu']?:'—'; $mdBySbu[$sk]=($mdBySbu[$sk]??0)+$md;
         if (($j['job_type']??'')==='DEPUTATION') $depMd+=$md; else $inspMd+=$md; if ($j['subcon_id']) $subMd+=$md; }

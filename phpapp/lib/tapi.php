@@ -91,13 +91,20 @@ function tapi_scope($officeCol, $sbuCol) {
     return function_exists('scope_clause') ? scope_clause($officeCol, $sbuCol) : ['1=1', []];
 }
 
+// The date a job belongs to, for every job metric: the SAME expression /mis uses
+// (inspection end, else start, else scheduled, else created). Until 19 Oct 2026
+// TAPI counted by scheduled date, so a job scheduled in June and finished in July
+// was July's on /mis and June's on /analytics (GAP-041).
+function tapi_job_date_expr() {
+    return "COALESCE(NULLIF(j.inspection_end_date,''), NULLIF(j.inspection_start_date,''), NULLIF(j.scheduled_date,''), substr(j.created_at,1,10))";
+}
 function tapi_metrics() {
     static $reg = null;
     if ($reg !== null) return $reg;
     $countJobs = function ($extra) {
         return function ($ctx) use ($extra) {
             [$sw, $sa] = tapi_scope('j.executing_office_id', 'j.sbu');
-            [$pw, $pa] = tapi_period_sql("COALESCE(NULLIF(j.scheduled_date,''), substr(j.created_at,1,10))", $ctx);
+            [$pw, $pa] = tapi_period_sql(tapi_job_date_expr(), $ctx);
             $e = $extra !== '' ? " AND $extra" : '';
             return (int) ops_val("SELECT COUNT(*) FROM jobs j WHERE $sw AND $pw$e", array_merge($sa, $pa));
         };
@@ -109,17 +116,30 @@ function tapi_metrics() {
             'method'=>'COUNT(jobs) WHERE closed_flag=1', 'resolve'=>$countJobs('COALESCE(j.closed_flag,0)=1')],
         'jobs.open' => ['label'=>'Jobs open','unit'=>'count','agg'=>'count','source'=>'ops/jobs',
             'method'=>'COUNT(jobs) WHERE closed_flag=0', 'resolve'=>$countJobs('COALESCE(j.closed_flag,0)=0')],
+        // Man-days and invoiced value go through the SAME per-job readers /mis uses
+        // (job_mandays, job_invoiced_amount), not a raw column sum: a job with a blank
+        // man-days column is its date span, and the invoiced figure follows the
+        // revenue reader switch. TAPI's own rule — never recompute what the domain
+        // already computes.
         'jobs.mandays' => ['label'=>'Man-days','unit'=>'days','agg'=>'sum','source'=>'ops/jobs',
-            'method'=>'SUM(jobs.mandays) in period', 'resolve'=>function ($ctx) {
+            'method'=>'SUM(job_mandays(job)) in period — as /mis', 'resolve'=>function ($ctx) {
                 [$sw, $sa] = tapi_scope('j.executing_office_id', 'j.sbu');
-                [$pw, $pa] = tapi_period_sql("COALESCE(NULLIF(j.scheduled_date,''), substr(j.created_at,1,10))", $ctx);
-                return round((float) ops_val("SELECT COALESCE(SUM(j.mandays),0) FROM jobs j WHERE $sw AND $pw", array_merge($sa, $pa)), 1);
+                [$pw, $pa] = tapi_period_sql(tapi_job_date_expr(), $ctx);
+                $sum = 0.0;
+                foreach (ops_all("SELECT j.id, j.mandays, j.inspection_start_date, j.inspection_end_date FROM jobs j WHERE $sw AND $pw", array_merge($sa, $pa)) ?: [] as $j)
+                    $sum += function_exists('job_mandays') ? (float)job_mandays($j) : (float)$j['mandays'];
+                return round($sum, 1);
             }],
         'revenue.invoiced' => ['label'=>'Invoiced value','unit'=>'money','agg'=>'sum','source'=>'ops/jobs',
-            'method'=>'SUM(jobs.invoice_amount) WHERE invoice_raised=1', 'resolve'=>function ($ctx) {
+            'method'=>'SUM(job_invoiced_amount(job)) in period — honours the revenue reader switch, as /mis', 'resolve'=>function ($ctx) {
                 [$sw, $sa] = tapi_scope('j.executing_office_id', 'j.sbu');
-                [$pw, $pa] = tapi_period_sql("COALESCE(NULLIF(j.scheduled_date,''), substr(j.created_at,1,10))", $ctx);
-                return round((float) ops_val("SELECT COALESCE(SUM(j.invoice_amount),0) FROM jobs j WHERE COALESCE(j.invoice_raised,0)=1 AND $sw AND $pw", array_merge($sa, $pa)), 2);
+                [$pw, $pa] = tapi_period_sql(tapi_job_date_expr(), $ctx);
+                $rows = ops_all("SELECT j.id, j.invoice_amount FROM jobs j WHERE $sw AND $pw", array_merge($sa, $pa)) ?: [];
+                if (!function_exists('job_invoiced_amount')) return round(array_sum(array_map(fn($j) => (float)$j['invoice_amount'], $rows)), 2);
+                $map = function_exists('revrecon_ledger_net_map') ? revrecon_ledger_net_map(array_map(fn($j) => (int)$j['id'], $rows)) : [];
+                $sum = 0.0;
+                foreach ($rows as $j) $sum += (float)job_invoiced_amount($j, $map[(int)$j['id']] ?? 0.0);
+                return round($sum, 2);
             }],
         'calls.total' => ['label'=>'Calls','unit'=>'count','agg'=>'count','source'=>'ops/calls',
             'method'=>'COUNT(calls) in period', 'resolve'=>function ($ctx) {

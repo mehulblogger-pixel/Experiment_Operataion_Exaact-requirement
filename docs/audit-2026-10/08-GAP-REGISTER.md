@@ -721,6 +721,90 @@ per-address limit is the conventional answer; recorded, not built.
 
 ---
 
+## GAP-040 — one screen, two revenue sources: the revenue switch was only half wired
+
+**CONFIRMED BY EXECUTION · P1 · `job_money()`, `boss_profit()`, TAPI `revenue.invoiced` · FIXED 19 Oct 2026**
+
+D7-2 said revenue had two sources; this is what it does in practice. The
+revenue reader switch (`revenue_reader_mode`: legacy / reconciled / ledger)
+decides whether a job's invoiced figure is the snapshot on the job or the books
+ledger. **Only the "invoiced" column on `/mis` read it.** The "revenue" column
+beside it -- and every profit figure, through `job_money()` -- read the
+snapshot regardless, as did the contract view and the analytics metric. With the
+switch on *ledger*, one row of `/mis` showed **revenue 6,700 and invoiced
+3,700** for the same three jobs; `/analytics` said 6,000 and the contract view
+6,700, in every mode.
+
+**Fixed:** `job_money()` now takes its billed figure through the same reader,
+primed by the bulk ledger map where a screen loops jobs (`/mis`, the contract
+view, TAPI) so no extra query per job. In the default *reconciled* mode a
+diverging job keeps its snapshot, so **no figure anyone sees today changes**;
+in *ledger* mode every screen now agrees. The 3,700 that remains against the
+books' 3,000 is a job that was never invoiced through the books: the reader
+never zeroes a snapshot the books do not carry, by design.
+
+---
+
+## GAP-041 — `/analytics` counted jobs by a different date than `/mis`, and read man-days from the wrong place
+
+**CONFIRMED BY EXECUTION · P2 · `tapi_metrics()` · FIXED 19 Oct 2026**
+
+Same July, same office: `/mis` said **3 jobs, 8 man-days**; `/analytics` said
+**2 jobs, 2 man-days**. Two causes. TAPI's job metrics took the period from
+the *scheduled* date, `/mis` from the *inspection end* date, so a job scheduled
+on 30 June and finished on 2 July belonged to June on one screen and July on
+the other. And TAPI summed the raw `mandays` column, while `/mis` derives a
+blank column from the inspection date span (`job_mandays()`), so a 3-day job
+whose column was never filled counted 3 on one screen and 0 on the other.
+
+**Fixed:** one shared date expression (`tapi_job_date_expr()`, end → start →
+scheduled → created, as `/mis`) for every job metric, and man-days and invoiced
+value resolved per row through `job_mandays()` / `job_invoiced_amount()` -- the
+layer's own rule, *never recompute what the domain already computes*, applied
+to itself. The `method` text each metric declares now says so.
+
+---
+
+## GAP-042 — `/reports` divided each person's man-days by this month's working days, whatever period was reported
+
+**CONFIRMED BY READING · P2 · `ops_reports()` · FIXED 19 Oct 2026**
+
+The per-person utilisation table used `working_days_in_month(today)` as its
+denominator. A report for a full financial year divided twelve months of
+man-days by one month's working days and showed people at several hundred
+percent; a report for March opened in October used October's days. The
+company-level figures (`/mis`, `mis_utilisation`) already used the period's
+days, so the two tables on one screen disagreed. **Fixed:** a month filter uses
+that month's working days, no filter uses the whole year's
+(`working_days_between()`). The probe could not show this one numerically --
+October 2026 and July 2099 happen to have 27 working days each -- so it is
+pinned by a test on the code, not on a coincidence.
+
+---
+
+## GAP-043 — the home screen's "Outstanding" subtracted money that had not settled anything
+
+**CONFIRMED BY EXECUTION · P2 · `financial_rollup()` · FIXED 19 Oct 2026**
+
+The money rollup on the director's home (and the money timeline panel) computed
+*outstanding = billed − received − credited*, where *received* is every receipt
+recorded. The ledger -- and the ageing and the overdue reminders that run off it
+-- subtracts only money **matched to an invoice**. A customer who pays 3,000
+that nobody has matched yet: the home screen said **0 outstanding**, the ledger
+said **3,000 outstanding and 3,000 on account**, and the reminder went out
+anyway. **Fixed:** the rollup subtracts allocations, exactly as the ledger does,
+and shows *"Received, not yet matched"* as its own chip when there is any, so
+the cash is neither hidden nor counted as settled. `test_p3_finevent.php`
+pinned the old arithmetic and now pins the new, including the moment the
+receipt is matched and outstanding falls.
+
+Also closed this round: **D7-1** (margin now has one named function,
+`mis_margin_pct()`, used by the screen and the CSV) and **D7-5** (the three
+utilisation implementations proven to share the month's working-day
+denominator; the one that did not is GAP-042).
+
+---
+
 ## GAP-037 — paid marketplace plans and credit packs were handed out free whenever the payment keys were missing
 
 **CONFIRMED BY READING + EXECUTION · P2 · `mkt_pay_start()`, `/portal/plans`, `/pro/plans` · FIXED 19 Oct 2026**
