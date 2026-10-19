@@ -68,6 +68,25 @@ interface Bkrecv_Store {
     public function ensureSchema(): void;
 }
 
+// ---- Optional: money on account --------------------------------------------
+// A receipt larger than what a party owes, a receipt that lands before its
+// invoice, a credit note larger than the invoice it names: each leaves money
+// with nowhere to go, and before this existed the receiver DROPPED it -- the
+// ledger said 15,000 received and 10,000 applied and nothing held the 5,000.
+// Books is the only ledger of paid/outstanding, so a figure it drops is gone.
+//
+// Standard practice is to hold it ON ACCOUNT for the party and apply it to the
+// next invoice. That needs two more row methods, kept OUT of Bkrecv_Store so
+// the 13-method contract every adapter already implements is untouched: a
+// store that also implements this gets the behaviour; one that does not keeps
+// today's arithmetic but the unapplied figure is RETURNED in the reply rather
+// than lost, so nothing is silent either way.
+interface Bkrecv_OnAccount {
+    public function partyOnAccount(string $partyExt): float;
+    public function partyOnAccountSet(string $partyExt, float $amount): void;
+}
+function bkrecv_holds_on_account(): bool { return bkrecv_store() instanceof Bkrecv_OnAccount; }
+
 // The active store. Pass one to register it; call with nothing to read it.
 function bkrecv_store(?Bkrecv_Store $inject = null): Bkrecv_Store {
     static $store = null;
@@ -121,6 +140,22 @@ function bkrecv_import($kind, array $d) {
 
     $existing = bkrecv_store()->docByExt($ext);   // idempotency: already imported?
 
+    // Money moves in more than one row below, and a crash between two of them
+    // would leave a receipt half-applied. Where the store is the reference PDO
+    // one, each import is one transaction; an adapter manages its own.
+    $tx = bkrecv_store() instanceof Bkrecv_PdoStore ? bkrecv_store()->pdo() : null;
+    if ($tx && !$tx->inTransaction()) $tx->beginTransaction(); else $tx = null;
+    try {
+        $r = bkrecv_import_inner($kind, $ext, $d, $existing);
+        if ($tx) $tx->commit();
+        return $r;
+    } catch (Throwable $e) {
+        if ($tx) $tx->rollBack();
+        throw $e;
+    }
+}
+
+function bkrecv_import_inner($kind, $ext, array $d, $existing) {
     if ($kind === 'INVOICE') {
         $total = round((float)($d['total'] ?? 0), 2);
         $tax   = round((float)($d['cgst'] ?? 0) + (float)($d['sgst'] ?? 0) + (float)($d['igst'] ?? 0), 2);
@@ -141,6 +176,16 @@ function bkrecv_import($kind, array $d) {
             return ['ok' => true, 'ref' => (string)$existing['ref']];
         }
         $ref = bkrecv_store()->invoiceInsert($ext, $d, $total, $tax, $irn);
+        // Money already received for this party -- an earlier overpayment, or a
+        // receipt that got here before this invoice did -- pays it down now.
+        $party = (string)($d['party_ext'] ?? '');
+        if ($party !== '' && bkrecv_holds_on_account()) {
+            $held = round(bkrecv_store()->partyOnAccount($party), 2);
+            if ($held > 0) {
+                bkrecv_store()->partyOnAccountSet($party, 0.0);
+                bkrecv_apply_receipt($party, $held);      // re-banks any excess itself
+            }
+        }
         return ['ok' => true, 'ref' => $ref];
     }
 
@@ -160,8 +205,12 @@ function bkrecv_import($kind, array $d) {
             'party_ext' => (string)($d['party_ext'] ?? ''), 'party_name' => (string)($d['party_name'] ?? ''),
             'total' => $amt,
         ], $d, 'BK-RCP-', $existing);
-        if (!$existing) bkrecv_apply_receipt((string)($d['party_ext'] ?? ''), $amt);
-        return ['ok' => true, 'ref' => $ref];
+        $out = ['ok' => true, 'ref' => $ref];
+        if (!$existing) {
+            $left = bkrecv_apply_receipt((string)($d['party_ext'] ?? ''), $amt);
+            if ($left > 0 && !bkrecv_holds_on_account()) $out['unapplied'] = $left;   // never silent
+        }
+        return $out;
     }
 
     // CREDITNOTE
@@ -171,13 +220,19 @@ function bkrecv_import($kind, array $d) {
         'party_ext' => (string)($d['party_ext'] ?? ''), 'party_name' => (string)($d['party_name'] ?? ''),
         'against_ext' => (string)($d['against_inv'] ?? ''), 'total' => $amt,
     ], $d, 'BK-CN-', $existing);
-    if (!$existing) bkrecv_apply_creditnote((string)($d['against_inv'] ?? ''), $amt);
-    return ['ok' => true, 'ref' => $ref];
+    $out = ['ok' => true, 'ref' => $ref];
+    if (!$existing) {
+        $left = bkrecv_apply_creditnote((string)($d['against_inv'] ?? ''), $amt, (string)($d['party_ext'] ?? ''));
+        if ($left > 0 && !bkrecv_holds_on_account()) $out['unapplied'] = $left;
+    }
+    return $out;
 }
 
 // Money in: reduce the party's open invoices, oldest first, and restate each.
+// Returns what could NOT be applied. With an on-account store that remainder
+// is banked for the party; without one it is handed back to the caller.
 function bkrecv_apply_receipt($partyExt, $amount) {
-    if ($partyExt === '' || $amount <= 0) return;
+    if ($partyExt === '' || $amount <= 0) return 0.0;
     $left = round((float)$amount, 2);
     foreach (bkrecv_store()->openInvoicesByParty($partyExt) as $inv) {
         if ($left <= 0) break;
@@ -186,17 +241,31 @@ function bkrecv_apply_receipt($partyExt, $amount) {
         bkrecv_restatus((int)$inv['id']);
         $left = round($left - $take, 2);
     }
+    return bkrecv_bank_on_account($partyExt, $left);
 }
 
-// A credit note reduces the invoice it names.
-function bkrecv_apply_creditnote($againstExt, $amount) {
-    if ($againstExt === '' || $amount <= 0) return;
+// A credit note reduces the invoice it names; any excess goes on account for
+// the party (the note names its invoice, but the party is who is owed).
+function bkrecv_apply_creditnote($againstExt, $amount, $partyExt = '') {
+    if ($againstExt === '' || $amount <= 0) return 0.0;
     $inv = bkrecv_store()->invoiceByExt($againstExt);
-    if (!$inv) return;
+    if (!$inv) return bkrecv_bank_on_account($partyExt, round((float)$amount, 2));
     $take = min((float)$amount, (float)$inv['outstanding']);
     $newOut = round((float)$inv['outstanding'] - $take, 2);
     bkrecv_store()->invoiceSetOutstanding((int)$inv['id'], $newOut);
     bkrecv_restatus((int)$inv['id']);
+    return bkrecv_bank_on_account($partyExt, round((float)$amount - $take, 2));
+}
+
+// Add to a party's on-account balance where the store can hold one. Returns
+// what is still unbanked: 0 when held, the amount itself when it is not.
+function bkrecv_bank_on_account($partyExt, $amount) {
+    $amount = round((float)$amount, 2);
+    if ($amount <= 0) return 0.0;
+    if ($partyExt === '' || !bkrecv_holds_on_account()) return $amount;
+    $st = bkrecv_store();
+    $st->partyOnAccountSet($partyExt, round($st->partyOnAccount($partyExt) + $amount, 2));
+    return 0.0;
 }
 
 // The paid/part/unpaid label, derived from the figures. One definition.
@@ -214,12 +283,18 @@ function bkrecv_status($extId) {
     if ($extId === '') return ['ok' => false, 'error' => 'ext_id required'];
     $inv = bkrecv_store()->invoiceByExt($extId);
     if (!$inv) return ['ok' => false, 'error' => 'not found'];
-    return ['ok' => true, 'status' => [
+    $st = [
         'irn'         => (string)$inv['irn'],
         'status'      => (string)$inv['status'],
         'paid'        => (float)$inv['paid'],
         'outstanding' => (float)$inv['outstanding'],
-    ]];
+    ];
+    // Additive: the ERP reads the four keys above and ignores what it does not
+    // know, so money held on account for this party rides along without a
+    // contract change.
+    if (bkrecv_holds_on_account() && !empty($inv['party_ext']))
+        $st['on_account'] = (float)bkrecv_store()->partyOnAccount((string)$inv['party_ext']);
+    return ['ok' => true, 'status' => $st];
 }
 
 // ---- Dispatch -------------------------------------------------------------
@@ -240,7 +315,7 @@ function bkrecv_dispatch($action, $kind, array $data, $extId = '') {
 //  This is what a Books adapter replaces. Notice it holds no arithmetic: every
 //  method is a row read or a row write.
 // ============================================================================
-final class Bkrecv_PdoStore implements Bkrecv_Store {
+final class Bkrecv_PdoStore implements Bkrecv_Store, Bkrecv_OnAccount {
     private PDO $pdo;
     private bool $ready = false;
 
@@ -282,6 +357,22 @@ final class Bkrecv_PdoStore implements Bkrecv_Store {
             paid DECIMAL(16,2) DEFAULT 0, outstanding DECIMAL(16,2) DEFAULT 0,
             has_pdf INT DEFAULT 0, payload MEDIUMTEXT,
             ref VARCHAR(80) DEFAULT '', created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
+        // Additive column for money held on account; an existing table gains it.
+        try { $this->pdo->exec("ALTER TABLE bk_parties ADD COLUMN on_account DECIMAL(16,2) DEFAULT 0"); }
+        catch (Throwable $e) { /* already there */ }
+    }
+    public function partyOnAccount(string $partyExt): float {
+        $r = $this->one("SELECT on_account FROM bk_parties WHERE ext_id=?", [$partyExt]);
+        return $r ? (float)$r['on_account'] : 0.0;
+    }
+    public function partyOnAccountSet(string $partyExt, float $amount): void {
+        // A receipt can name a party the ERP has not pushed yet; hold the
+        // money against the ext_id regardless, so it is there when the party is.
+        if (!$this->one("SELECT id FROM bk_parties WHERE ext_id=?", [$partyExt]))
+            $this->pdo->prepare("INSERT INTO bk_parties (ext_id, created_at, updated_at) VALUES (?,?,?)")
+                      ->execute([$partyExt, date('c'), date('c')]);
+        $this->pdo->prepare("UPDATE bk_parties SET on_account=?, updated_at=? WHERE ext_id=?")
+                  ->execute([round($amount, 2), date('c'), $partyExt]);
     }
     private function one($sql, $a = []) { $s = $this->pdo->prepare($sql); $s->execute($a); $r = $s->fetch(PDO::FETCH_ASSOC); return $r ?: null; }
     private function all($sql, $a = []) { $s = $this->pdo->prepare($sql); $s->execute($a); return $s->fetchAll(PDO::FETCH_ASSOC) ?: []; }
@@ -324,7 +415,7 @@ final class Bkrecv_PdoStore implements Bkrecv_Store {
                 json_encode($d, JSON_UNESCAPED_UNICODE), date('c'), $id]);
     }
     public function invoiceGet(int $id): ?array { return $this->one("SELECT ext_id, total, paid, outstanding, irn, status FROM bk_documents WHERE id=?", [$id]); }
-    public function invoiceByExt(string $ext): ?array { return $this->one("SELECT id, irn, status, paid, outstanding FROM bk_documents WHERE kind='INVOICE' AND ext_id=?", [$ext]); }
+    public function invoiceByExt(string $ext): ?array { return $this->one("SELECT id, irn, status, paid, outstanding, party_ext FROM bk_documents WHERE kind='INVOICE' AND ext_id=?", [$ext]); }
     public function openInvoicesByParty(string $partyExt): array {
         return $this->all("SELECT id, outstanding FROM bk_documents WHERE kind='INVOICE' AND party_ext=? AND outstanding > 0 ORDER BY id", [$partyExt]);
     }

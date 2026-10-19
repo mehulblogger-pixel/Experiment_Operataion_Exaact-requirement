@@ -30,6 +30,19 @@
 // ============================================================================
 
 const LS_GRACE   = 14;
+// The most a single payment may extend a subscription. Months travel in the
+// payment's notes, typed by whoever creates the link in Razorpay; the webhook
+// cannot be forged, but a finger can slip, and before this cap a Rs 1 payment
+// whose notes said months=1200 was accepted and moved an expiry to the year
+// 2126. Five years permits any real sale and stops any plausible typo. Raise it
+// here if a longer term is ever actually sold.
+const LS_MAX_MONTHS = 60;
+
+// Failed admin sign-ins before the console pauses, and for how long. One
+// operator, one password: a short lock after a handful of misses costs that
+// operator seconds and costs a guesser the ability to try a dictionary.
+const LS_LOGIN_MAX_FAILS = 5;
+const LS_LOGIN_LOCK_SECS = 900;
 
 // ---- Where the private things live ------------------------------------------
 //  The signing key, the admin password hash and the database must sit somewhere
@@ -170,6 +183,20 @@ function ls_migrate($db) {
 
     $db->exec("CREATE INDEX IF NOT EXISTS idx_inst ON installs(install_id)");
     $db->exec("CREATE INDEX IF NOT EXISTS idx_led ON ledger(install_id, at)");
+    // One payment reference may move an expiry ONCE. api.php already checks the
+    // ledger before extending, but a check followed by a write is not atomic,
+    // and Razorpay retries: two deliveries of the same payment that overlap
+    // could both pass the check and hand out a free year. The database is the
+    // only thing that can refuse the second write, so it does. Partial, so
+    // MANUAL rows with a blank reference are untouched.
+    $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS uq_led_payref
+               ON ledger(reference) WHERE kind = 'PAYMENT' AND reference <> ''");
+}
+
+// True when a PDO exception is the UNIQUE index above refusing a duplicate.
+function ls_is_duplicate_payment(Throwable $e) {
+    return stripos($e->getMessage(), 'UNIQUE') !== false && stripos($e->getMessage(), 'uq_led_payref') !== false
+        || stripos($e->getMessage(), 'UNIQUE constraint failed: ledger.reference') !== false;
 }
 
 function ls_now() { return date('c'); }
@@ -253,17 +280,35 @@ function ls_extend($installId, $months, $kind, $amount = 0, $reference = '', $de
     if (!$row) return ['err' => 'No installation with that id.'];
     $months = (int)$months;
     if ($months <= 0) return ['err' => 'Months must be a positive number.'];
+    if ($months > LS_MAX_MONTHS)
+        return ['err' => 'Months must be ' . LS_MAX_MONTHS . ' or fewer for one payment — ' . $months
+                       . ' looks like a mistake. Nothing was changed.'];
 
     $was  = (string)$row['expires_on'];
     $from = ($was !== '' && strtotime($was) > time()) ? strtotime($was) : time();
     $new  = date('Y-m-d', strtotime('+' . $months . ' months', $from));
 
-    ls_db()->prepare("UPDATE installs SET expires_on = ?, status = 'ACTIVE' WHERE install_id = ?")
-           ->execute([$new, (string)$installId]);
-    ls_db()->prepare("INSERT INTO ledger (install_id, kind, amount, reference, months, was, now, detail, at)
+    // One transaction, and the LEDGER ROW IS WRITTEN FIRST. The ledger carries
+    // the UNIQUE guard against a replayed payment; if the expiry were moved
+    // before that row was refused, the refusal would be too late -- which is
+    // precisely what the first version of this guard did: the second delivery
+    // moved the expiry a further year and was then refused a ledger row, so the
+    // customer got the free year with no record of it. Found by re-running the
+    // audit probe against the fix, not by reading it.
+    $db = ls_db();
+    $db->beginTransaction();
+    try {
+        $db->prepare("INSERT INTO ledger (install_id, kind, amount, reference, months, was, now, detail, at)
                       VALUES (?,?,?,?,?,?,?,?,?)")
            ->execute([(string)$installId, $kind, (float)$amount, (string)$reference, $months,
                       $was, $new, (string)$detail, ls_now()]);
+        $db->prepare("UPDATE installs SET expires_on = ?, status = 'ACTIVE' WHERE install_id = ?")
+           ->execute([$new, (string)$installId]);
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
     return ['ok' => true, 'was' => $was, 'now' => $new, 'customer' => $row['customer_name']];
 }
 
@@ -316,8 +361,9 @@ function ls_state($row) {
 //
 //  JSON has a second benefit: if this file ever ends up somewhere web-reachable
 //  it is inert data rather than executable code.
-function ls_config() {
+function ls_config($reset = false) {
     static $c = null;
+    if ($reset) { $c = null; return []; }
     if ($c !== null) return $c;
     $f = ls_configfile();
     clearstatcache(true, $f);
@@ -343,15 +389,54 @@ function ls_config_save(array $c) {
     return true;
 }
 
+function ls_config_reset() { ls_config(true); }
 function ls_admin_hash()   { return (string)(ls_config()['admin_hash'] ?? ''); }
 function ls_webhook_key()  { return (string)(ls_config()['razorpay_secret'] ?? ''); }
 
+// The one place a session starts, so the cookie flags cannot be forgotten in
+// any of the places that used to start it by hand. HttpOnly keeps script away
+// from it, SameSite=Lax keeps another site's form from riding it (the console's
+// own sign-in form carries no token, and this is what makes that acceptable),
+// and Secure is set whenever the request itself arrived over TLS.
+function ls_session() {
+    if (session_status() !== PHP_SESSION_NONE) return;
+    session_name('MGHLIC');
+    session_set_cookie_params([
+        'httponly' => true, 'samesite' => 'Lax', 'path' => '/',
+        'secure'   => !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off',
+    ]);
+    session_start();
+}
+
 function ls_logged_in() {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_name('MGHLIC');
-        session_start();
-    }
+    ls_session();
     return !empty($_SESSION['ls_admin']);
+}
+
+// ---- Sign-in throttle -------------------------------------------------------
+// Kept in the same private config file as the password hash, so there is no
+// table to create and nothing a browser can reach. Global rather than per-IP:
+// one operator, and a guesser with many addresses is still one guesser.
+function ls_login_locked_for() {
+    $c = ls_config();
+    $until = (int)($c['login_lock_until'] ?? 0);
+    return $until > time() ? $until - time() : 0;
+}
+function ls_login_failed() {
+    $c = ls_config();
+    $n = (int)($c['login_fails'] ?? 0) + 1;
+    $c['login_fails'] = $n;
+    if ($n >= LS_LOGIN_MAX_FAILS) { $c['login_lock_until'] = time() + LS_LOGIN_LOCK_SECS; $c['login_fails'] = 0; }
+    ls_config_save($c);
+    ls_config_reset();
+}
+function ls_login_succeeded() {
+    $c = ls_config();
+    if (!empty($c['login_fails']) || !empty($c['login_lock_until'])) {
+        unset($c['login_fails'], $c['login_lock_until']);
+        ls_config_save($c);
+        ls_config_reset();
+    }
 }
 
 function ls_require_login() {
@@ -361,11 +446,11 @@ function ls_require_login() {
 function ls_h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 function ls_csrf() {
-    if (session_status() === PHP_SESSION_NONE) { session_name('MGHLIC'); session_start(); }
+    ls_session();
     if (empty($_SESSION['ls_csrf'])) $_SESSION['ls_csrf'] = bin2hex(random_bytes(16));
     return $_SESSION['ls_csrf'];
 }
 function ls_csrf_ok($t) {
-    if (session_status() === PHP_SESSION_NONE) { session_name('MGHLIC'); session_start(); }
+    ls_session();
     return !empty($_SESSION['ls_csrf']) && hash_equals($_SESSION['ls_csrf'], (string)$t);
 }

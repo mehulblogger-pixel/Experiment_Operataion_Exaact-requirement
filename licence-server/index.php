@@ -34,21 +34,28 @@ if ($p === 'setup') {
         }
     }
 }
-if ($p === 'setupdone') {
-    if (session_status() === PHP_SESSION_NONE) { session_name('MGHLIC'); session_start(); }
-}
+if ($p === 'setupdone') ls_session();
 
 // ---- Login -----------------------------------------------------------------
 if ($p === 'login' && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-    if (session_status() === PHP_SESSION_NONE) { session_name('MGHLIC'); session_start(); }
-    if (password_verify((string)($_POST['pw'] ?? ''), ls_admin_hash())) {
+    ls_session();
+    // A paused console answers the same way whether the password was right or
+    // wrong: a guesser must learn nothing from the pause, and the operator is
+    // told how long to wait rather than left retrying.
+    $wait = ls_login_locked_for();
+    if ($wait > 0) {
+        $msg = 'Too many wrong passwords. Try again in ' . (int)ceil($wait / 60) . ' minute' . ($wait > 60 ? 's' : '') . '.'; $bad = true;
+    } elseif (password_verify((string)($_POST['pw'] ?? ''), ls_admin_hash())) {
+        ls_login_succeeded();
         session_regenerate_id(true);
         $_SESSION['ls_admin'] = 1;
         header('Location: index.php'); exit;
+    } else {
+        ls_login_failed();
+        $msg = 'Wrong password.'; $bad = true;
     }
-    $msg = 'Wrong password.'; $bad = true;
 }
-if ($p === 'logout') { if (session_status() === PHP_SESSION_NONE) { session_name('MGHLIC'); session_start(); } session_destroy(); header('Location: index.php?p=login'); exit; }
+if ($p === 'logout') { ls_session(); session_destroy(); header('Location: index.php?p=login'); exit; }
 
 // Anything past here needs a login, except the two setup pages and login itself.
 if (!in_array($p, ['login', 'setup', 'setupdone'], true)) {

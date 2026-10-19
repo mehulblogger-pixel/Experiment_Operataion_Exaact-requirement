@@ -671,6 +671,97 @@ post to a business record or list another person's data.
 
 ---
 
+## GAP-028 — the Books receiver silently dropped money it could not apply
+
+**CONFIRMED BY EXECUTION · P1 · `mgh_books_receiver` · FIXED 19 Oct 2026**
+
+Books is the only ledger of paid/outstanding -- the ERP's own connector says
+*"the ERP never recomputes any of it"* -- so a figure Books drops is held by
+nobody. Driven through the real dispatcher (`evidence/books-receiver-money.php`):
+
+| Case | Before |
+|---|---|
+| Customer pays 15,000 against 10,000 owed | 10,000 applied, **5,000 vanished** |
+| Receipt of 8,000 lands before its 8,000 invoice | invoice reports **UNPAID, 8,000 outstanding** |
+| Credit note of 5,000 against 2,000 outstanding | 2,000 applied, **3,000 vanished** |
+
+The second is ordinary, not contrived: `books_bridge_drain()` continues past a
+failed push, so a transient Books error on the invoice lets the receipt behind
+it overtake.
+
+**Fixed:** money with nowhere to go is held **on account** for the party and
+pays the next invoice down; `status` reports the balance (additive key
+`on_account`, which the ERP ignores). The 13-method storage contract that a
+real Books adapter implements is untouched -- the capability is a separate
+optional interface, and a store without it gets the unapplied figure back in
+the reply rather than silence. Each import is now one transaction.
+
+**Owner decision needed (Q-H):** "on account, applied to the next invoice" is
+standard practice and the safe default. If MGH Books should instead refund, or
+hold for a human, say so and the rule changes in one function.
+
+---
+
+## GAP-029 — an edited receipt would leave the receipt and the invoice disagreeing
+
+**CONFIRMED BY EXECUTION · P3 · `mgh_books_receiver` · LATENT, recorded**
+
+Re-importing a receipt with a changed amount updates its header and leaves the
+money already applied untouched: the receipt says 7,000, the invoice shows 3,000
+paid. **Not reachable today** -- the only bridge trigger is
+`books_receipt_create`; there is no receipt-edit path -- but the outbox's
+hash-based re-queue is designed for exactly this, so the day an edit path
+appears, this fires. Recorded rather than fixed: reversing a partially applied
+receipt is a business rule (reverse newest-first? refund?) that needs an owner
+answer before it is written.
+
+---
+
+## GAP-025 — a replayed payment could extend a licence twice
+
+**CONFIRMED BY EXECUTION · P2 · `licence-server` · FIXED 19 Oct 2026**
+
+The webhook is well built (HMAC over the raw body, constant-time compare,
+verified before parsing). Behind it, the replay guard was a `SELECT COUNT` then
+an `INSERT` with nothing atomic between them and **no UNIQUE constraint** on the
+payment reference. Razorpay retries, so one payment arrives twice; two
+deliveries that overlap could both pass the count and hand out a free year.
+The probe showed the schema accepts the duplicate the guard exists to prevent.
+
+**Fixed:** a partial UNIQUE index on `ledger(reference)` for payments, the
+ledger row written **first**, and both statements in one transaction. The first
+version of this fix moved the expiry and *then* was refused the ledger row --
+a free year with no record, which is worse than no guard. Re-running the probe
+against the fix caught it (expiry 2028 with one ledger row). Now the expiry
+moves exactly once; `api.php` answers `duplicate: true` on the refusal.
+
+---
+
+## GAP-026 — a payment's term had no upper bound
+
+**CONFIRMED BY EXECUTION · P3 · `licence-server` · FIXED 19 Oct 2026**
+
+`months` is read from the payment's notes with no ceiling and no check against
+the amount: **Rs 1 with `notes.months=1200` moved an expiry to the year 2126.**
+The webhook is signed, so this is a control against a slipped finger in the
+Razorpay dashboard, not an attacker. **Fixed:** `LS_MAX_MONTHS = 60` -- any real
+sale fits, no plausible typo does. **Owner decision (Q-I):** is five years the
+right ceiling, and should the amount be checked against a price list?
+
+---
+
+## GAP-027 — unlimited password guesses at the console that mints every licence
+
+**CONFIRMED · P2 · `licence-server` · FIXED 19 Oct 2026**
+
+The admin sign-in had no throttle, and the session was started with PHP's
+default cookie flags in four separate places. **Fixed:** five misses pause
+sign-in for fifteen minutes (held in the same private config file as the
+password hash -- nothing new a browser can reach), and one `ls_session()` sets
+`HttpOnly`, `SameSite=Lax` and `Secure` for every start.
+
+---
+
 ## GAP-024 — two upload size failures gave two misleading messages
 
 **CONFIRMED BY EXECUTION · P2 · All three portals · FIXED 19 Oct 2026**
@@ -1008,7 +1099,9 @@ screen is changed.
 | **Q-E** | Today a coordinator can **record money received** from a customer. Should they, or should that be Accounts only? | GAP-010 · P0 |
 | **Q-F** | Today a coordinator and a branch manager can **start a draft invoice** for Accounts to issue. Is that the intended way of working? | GAP-010 · P0 |
 | **Q-B** | Who may raise a nonconformity — inspectors and coordinators, or managers only? | GAP-004 |
-| **Q-C** | Is `mgh-hire` live, a prototype, or dead? | GAP-007; also decides whether it is audited further |
+| **Q-C** | Is `mgh-hire` live, a prototype, or dead? **Evidence gathered:** zero references from the ERP or its docs; standalone by design (own login, own database, *"shares none of its data with any other system"*); last touched 2026-09-05. Nothing in the ERP depends on it. A grep-level pass found prepared statements throughout, hashed passwords, escaping and CSRF present -- and a **public** careers-page upload whose guard I could not find by grep (see `12-SIBLING-DEPLOYABLES.md`). | Decides whether a 2,555-line separate product gets a full pass |
+| **Q-H** | Money a customer pays that cannot be applied -- an overpayment, a receipt before its invoice, a credit note larger than its invoice -- is now held **on account** and pays the next invoice. Is that the rule MGH Books should follow, or should it refund / hold for a human? | GAP-028 · P1 |
+| **Q-I** | A single payment may now extend a licence by at most **60 months**. Right ceiling? And should the amount paid be checked against a price per month? | GAP-026 |
 | **Q-D** | Is a non-production workspace available on the live host? | Everything is currently "verified locally" |
 | **Q-B1** | Who may **raise** a nonconformity? Today nobody below Business Director can open the register, and an inspector cannot. *Recommend: inspectors and coordinators raise, quality closes.* | GAP-004 |
 | **Q-B2** | Should the five roles who see a corrective action also see the nonconformity behind it? *Recommend: yes, read-only.* | GAP-004 |

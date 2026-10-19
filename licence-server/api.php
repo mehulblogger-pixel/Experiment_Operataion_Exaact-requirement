@@ -111,11 +111,25 @@ if ($action === 'razorpay_webhook') {
     $seen->execute([$refId]);
     if ((int)$seen->fetchColumn() > 0) ls_out(200, ['ok' => true, 'duplicate' => true]);
 
-    $r = ls_extend($inst, $months, 'PAYMENT', $amount, $refId, $event);
+    // The COUNT above is the fast path. The database's UNIQUE index on the
+    // payment reference (lib.php, ls_migrate) is the real guard: if two
+    // deliveries of one payment overlap and both pass the COUNT, the second
+    // INSERT is refused here and reported as the duplicate it is, with the
+    // expiry moved exactly once.
+    try {
+        $r = ls_extend($inst, $months, 'PAYMENT', $amount, $refId, $event);
+    } catch (Throwable $e) {
+        if (ls_is_duplicate_payment($e)) ls_out(200, ['ok' => true, 'duplicate' => true]);
+        throw $e;
+    }
     if (!empty($r['err'])) {
-        ls_db()->prepare("INSERT INTO ledger (install_id, kind, amount, reference, detail, at)
-                          VALUES (?, 'PAYMENT', ?, ?, ?, ?)")
-               ->execute([$inst, $amount, $refId, 'Payment received but could not be applied: ' . $r['err'], ls_now()]);
+        try {
+            ls_db()->prepare("INSERT INTO ledger (install_id, kind, amount, reference, detail, at)
+                              VALUES (?, 'PAYMENT', ?, ?, ?, ?)")
+                   ->execute([$inst, $amount, $refId, 'Payment received but could not be applied: ' . $r['err'], ls_now()]);
+        } catch (Throwable $e) {
+            if (!ls_is_duplicate_payment($e)) throw $e;   // already on record from an earlier delivery
+        }
         ls_out(200, ['ok' => false, 'error' => $r['err']]);
     }
     ls_out(200, ['ok' => true, 'customer' => $r['customer'], 'was' => $r['was'], 'now' => $r['now']]);
