@@ -110,6 +110,7 @@ const TALLY_DEFAULTS = [
     'tally_igst_ledger'  => 'IGST',
     'tally_bank_ledger'  => 'Bank Account',
     'tally_tds_ledger'   => 'TDS Receivable',
+    'tally_roundoff_ledger' => 'Round Off',   // the paise shaved to print a whole-rupee total
     'tally_debtors_group'=> 'Sundry Debtors',
     'tally_voucher_type' => 'Sales',
     'tally_receipt_type' => 'Receipt',
@@ -274,6 +275,8 @@ function tally_rows_from_books($from, $to, $kind = 'SALES', $includeDone = false
                 'tax'             => (float)($r['cgst'] + $r['sgst'] + $r['igst']),
                 'total'           => (float)$r['total'],
                 'cgst'            => (float)$r['cgst'], 'sgst' => (float)$r['sgst'], 'igst' => (float)$r['igst'],
+                'round_off'       => (float)($r['round_off'] ?? 0),
+                'gst_pct'         => (float)$r['subtotal'] > 0 ? round(($r['cgst'] + $r['sgst'] + $r['igst']) / $r['subtotal'] * 100, 2) : 0,
                 'interstate'      => (int)$r['is_igst'] === 1,
                 'their_state'     => (string)$r['place_of_supply'],
                 'place_of_supply' => $r['place_of_supply'] !== '' ? (GST_STATE_CODES[$r['place_of_supply']] ?? '') : '',
@@ -514,6 +517,13 @@ function tally_sales_voucher(array $r, array $cfg) {
     if ($r['igst'] > 0) $x .= tally_entry($cfg['tally_igst_ledger'], false, $r['igst']);
     if ($r['cgst'] > 0) $x .= tally_entry($cfg['tally_cgst_ledger'], false, $r['cgst']);
     if ($r['sgst'] > 0) $x .= tally_entry($cfg['tally_sgst_ledger'], false, $r['sgst']);
+    // The printed invoice is rounded to the rupee; the party is debited with that
+    // whole rupee while sales + tax carry the paise. Without this line the two
+    // sides differ by the round-off and Tally refuses the voucher -- which, until
+    // 19 Oct 2026, it did for every invoice whose GST produced paise (GAP-044).
+    // A negative round-off (1180.47 printed as 1180) is a debit; positive a credit.
+    $ro = round((float)($r['round_off'] ?? 0), 2);
+    if (abs($ro) >= 0.005) $x .= tally_entry($cfg['tally_roundoff_ledger'], $ro < 0, abs($ro));
     $x .= "   </VOUCHER>\n  </TALLYMESSAGE>\n";
     return $x;
 }
@@ -626,18 +636,20 @@ function tally_csv_rows(array $rows, $kind = 'SALES') {
         return $csv;
     }
     if ($kind === 'RECEIPT') {
-        $csv = [['Date','Voucher','Party','GSTIN','Against invoice','Amount','Job']];
+        // The same voucher number the XML carries (a books receipt keeps its own
+        // number; only the legacy job-mirror row is prefixed), and the TDS line.
+        $csv = [['Date','Voucher','Party','GSTIN','Against invoice','Amount','TDS','Job']];
         foreach ($rows as $r)
-            $csv[] = [$r['payment_date'], 'RCPT-' . $r['job_code'], tally_party($r), $r['gstin'],
-                      $r['invoice_number'], tally_amt($r['receipt_amount']), $r['job_code']];
+            $csv[] = [$r['payment_date'], (($r['src'] ?? '') === 'RECEIPT' ? '' : 'RCPT-') . $r['job_code'], tally_party($r), $r['gstin'],
+                      $r['invoice_number'], tally_amt($r['receipt_amount']), tally_amt($r['tds'] ?? 0), $r['job_code']];
         return $csv;
     }
-    $csv = [['Invoice date','Invoice no','Party','GSTIN','Place of supply','Taxable','GST %','CGST','SGST','IGST','Total','Job','Office']];
+    $csv = [['Invoice date','Invoice no','Party','GSTIN','Place of supply','Taxable','GST %','CGST','SGST','IGST','Round off','Total','Job','Office']];
     foreach ($rows as $r)
         $csv[] = [$r['invoice_date'], $r['invoice_number'], tally_party($r), $r['gstin'],
-                  $r['place_of_supply'], tally_amt($r['taxable']), $r['gst_pct'],
+                  $r['place_of_supply'], tally_amt($r['taxable']), $r['gst_pct'] ?? '',
                   tally_amt($r['cgst']), tally_amt($r['sgst']), tally_amt($r['igst']),
-                  tally_amt($r['total']), $r['job_code'], $r['office_name']];
+                  tally_amt($r['round_off'] ?? 0), tally_amt($r['total']), $r['job_code'], $r['office_name']];
     return $csv;
 }
 

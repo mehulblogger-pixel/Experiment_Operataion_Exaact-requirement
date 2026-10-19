@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'ac707d5 · 2026-10-19 12:14 UTC · 687 files';
+$RELEASE = '3777e9b · 2026-10-19 12:54 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -241,7 +241,7 @@ $EXPECT  = [
     'lib/setup_cockpit.php' => ['s'=>31439,'h'=>'3bf43713e1b2b0e3'],
     'lib/stagegate.php' => ['s'=>22623,'h'=>'699772501f2dbdbb'],
     'lib/superadmin.php' => ['s'=>10675,'h'=>'995da0045cd4e7ee'],
-    'lib/tally.php' => ['s'=>43582,'h'=>'b555bf1d1298c5bb'],
+    'lib/tally.php' => ['s'=>44735,'h'=>'f910b38d13d7cee8'],
     'lib/tapi.php' => ['s'=>69455,'h'=>'a8d85d8e3a4bdd08'],
     'lib/tapi_dash.php' => ['s'=>19519,'h'=>'efd1e7a78a470736'],
     'lib/tapi_gov.php' => ['s'=>17290,'h'=>'111e443d157ce2ce'],
@@ -611,7 +611,7 @@ $EXPECT  = [
     'views/ops/subscription.php' => ['s'=>5599,'h'=>'d202fff8f46cefcd'],
     'views/ops/super_admin.php' => ['s'=>25600,'h'=>'f4d5a83d44fb7a8b'],
     'views/ops/system_status.php' => ['s'=>2399,'h'=>'90287c341b6166f4'],
-    'views/ops/tally_export.php' => ['s'=>12750,'h'=>'831011525527b02d'],
+    'views/ops/tally_export.php' => ['s'=>13104,'h'=>'4b8ef6be8b7b91b4'],
     'views/ops/tapi.php' => ['s'=>988,'h'=>'33442189ab50828c'],
     'views/ops/tapi_alerts.php' => ['s'=>3591,'h'=>'5c5b4b3a672220c0'],
     'views/ops/tapi_drill.php' => ['s'=>2439,'h'=>'b94ddc7da157384d'],

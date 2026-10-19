@@ -721,6 +721,64 @@ per-address limit is the conventional answer; recorded, not built.
 
 ---
 
+## GAP-044 — the Tally sales voucher did not balance for any invoice with a round-off
+
+**CONFIRMED BY EXECUTION · P1 · `tally_sales_voucher()` · FIXED 19 Oct 2026**
+
+An invoice is printed to the whole rupee; the engine records the paise it
+shaved as `round_off` (GAP-free, shown on the invoice and the print). The Tally
+sales voucher debited the party with the rounded total and credited sales and
+the tax ledgers with the paise -- and never wrote the round-off. For an invoice
+of 1,000.40 at 18% (1,180.47 printed as 1,180) the voucher's entries summed to
+**0.47, not 0**. Tally refuses an unbalanced voucher, so the accountant's import
+failed for every invoice whose GST produced paise -- most of them -- and the
+only way through was to re-key the round-off by hand in Tally.
+
+**Fixed:** the round-off is its own ledger entry (a debit when negative, a
+credit when positive), on a *Round-off ledger* the accountant can name on the
+Tally settings panel (default *Round Off*, Tally's own). A whole-rupee invoice
+carries no such line. Receipt and credit-note vouchers were checked the same
+way and balanced already. Evidence `evidence/tally-balance-probe.php`; guard
+rail `tests/test_tally_balance.php` (22) sums the entries of every voucher kind
+and fails on any non-zero.
+
+---
+
+## GAP-045 — the Tally CSVs did not say what the XML said
+
+**CONFIRMED BY EXECUTION · P3 · `tally_csv_rows()` · FIXED 19 Oct 2026**
+
+The CSV exists so the accountant can *look before importing*. The sales CSV's
+*GST %* column was empty for every books invoice (a PHP warning, *Undefined
+array key "gst_pct"*, on each row) and had no round-off column, so a row did
+not add up to its own total. The receipt CSV named the voucher
+`RCPT-RCP/2627/0001` while the XML sent `RCP/2627/0001`, and omitted the TDS
+line the voucher carries. **Fixed:** GST % derived from tax over taxable, a
+*Round off* column, the XML's voucher number, and a *TDS* column.
+
+---
+
+## Q-J — bank charges on a receipt: do they settle the invoice, or stay with the customer?
+
+**QUESTION FOR THE OWNER · recorded 19 Oct 2026 · impact P3**
+
+The receipt form asks for *Bank charges*. The figure is stored and then **read
+nowhere**: not by the allocation (only *Amount in the bank* and *TDS* can
+settle an invoice), not by the ledger, not by the Tally export. A customer who
+pays 10,000 of which the bank keeps 100: the books show 100 still owed, the
+reminder chases it, and the 100 reaches no expense ledger.
+
+Two conventions exist. (a) **The charge is ours**: the invoice is settled in
+full and 100 is booked to a *Bank Charges* expense -- the usual treatment for
+inward remittance fees, and what the TDS line already does for the customer's
+withholding. (b) **The charge is the customer's**: the invoice stays 100 short
+and is chased or written off. The field as built implies (a) and behaves as
+(b). Recommended: (a), built exactly as TDS is (a third allocation kind, a
+bank-charges ledger on the Tally receipt voucher). Not built: it changes what a
+receipt settles, which is a rule for the owner.
+
+---
+
 ## GAP-040 — one screen, two revenue sources: the revenue switch was only half wired
 
 **CONFIRMED BY EXECUTION · P1 · `job_money()`, `boss_profit()`, TAPI `revenue.invoiced` · FIXED 19 Oct 2026**

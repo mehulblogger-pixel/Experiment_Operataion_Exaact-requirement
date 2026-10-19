@@ -130,6 +130,8 @@
     <div><label>CGST ledger</label><input class="form-control" name="tally_cgst_ledger" value="<?= e($cfg['tally_cgst_ledger']) ?>"></div>
     <div><label>SGST ledger</label><input class="form-control" name="tally_sgst_ledger" value="<?= e($cfg['tally_sgst_ledger']) ?>"></div>
     <div><label>IGST ledger</label><input class="form-control" name="tally_igst_ledger" value="<?= e($cfg['tally_igst_ledger']) ?>"></div>
+    <div><label>Round-off ledger <span class="muted">(the paise shaved to print a whole rupee)</span></label><input class="form-control" name="tally_roundoff_ledger" value="<?= e($cfg['tally_roundoff_ledger']) ?>">
+      <span class="muted" style="font-size:12px">Without it a rounded invoice does not balance and Tally refuses the voucher.</span></div>
     <div><label>Debtors group <span class="muted">(where new party ledgers go)</span></label><input class="form-control" name="tally_debtors_group" value="<?= e($cfg['tally_debtors_group']) ?>"></div>
     <div><label>Sales voucher type</label><input class="form-control" name="tally_voucher_type" value="<?= e($cfg['tally_voucher_type']) ?>"></div>
     <div><label>Receipt voucher type</label><input class="form-control" name="tally_receipt_type" value="<?= e($cfg['tally_receipt_type']) ?>"></div>
