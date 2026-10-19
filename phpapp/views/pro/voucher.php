@@ -110,11 +110,11 @@
 <div class="card">
   <h2>Payment &amp; report release</h2>
   <?php if ($settled): ?>
-    <p style="margin:0">✓ Both sides confirmed — settled. The client can now download your inspection report.</p>
+    <p style="margin:0">✓ Both sides confirmed — settled. The client can now download your <?= e(Tl('report')) ?>.</p>
   <?php elseif ($proConfirmed): ?>
     <p style="margin:0">You confirmed receipt. Waiting for the client to confirm payment — the report releases to them once both sides confirm.</p>
   <?php else: ?>
-    <p class="muted" style="margin:0 0 10px;font-size:13px">Once the client has paid you, confirm it here. The client's inspection report is released to them only when <strong>both</strong> sides confirm payment.</p>
+    <p class="muted" style="margin:0 0 10px;font-size:13px">Once the client has paid you, confirm it here. The client's <?= e(Tl('report')) ?> is released to them only when <strong>both</strong> sides confirm payment.</p>
     <form method="post" action="/pro/voucher" style="margin:0">
       <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="confirm_received">
       <button class="btn" type="submit">I have received payment</button>
@@ -122,9 +122,9 @@
   <?php endif; ?>
 </div>
 
-<?php // Inspection report deliverable — the freelancer uploads it; the client gets it on settlement ?>
+<?php // The report deliverable — the freelancer uploads it; the client gets it on settlement ?>
 <div class="card">
-  <h2>Inspection report</h2>
+  <h2><?= e(T('report')) ?></h2>
   <?php if ($reports): ?>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
       <?php foreach ($reports as $r): ?>
@@ -136,7 +136,7 @@
     </div>
     <p class="muted" style="margin:0;font-size:13px"><?= $settled ? 'The client can now download this.' : 'Held from the client until payment is confirmed by both sides.' ?></p>
   <?php else: ?>
-    <p class="muted" style="margin:0 0 10px;font-size:13px">Upload the inspection report for the client. It stays locked to them until the payment is settled.</p>
+    <p class="muted" style="margin:0 0 10px;font-size:13px">Upload the <?= e(Tl('report')) ?> for the client. It stays locked to them until the payment is settled.</p>
     <form method="post" action="/pro/voucher" enctype="multipart/form-data">
       <input type="hidden" name="voucher_id" value="<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="report_upload">
       <label for="f-title">Title</label><input id="f-title" type="text" name="title" placeholder="e.g. RT film review report — Dahej FAT">

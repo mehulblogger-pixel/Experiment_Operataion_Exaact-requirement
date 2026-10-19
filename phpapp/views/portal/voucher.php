@@ -69,11 +69,11 @@ $canReview = $status === 'SUBMITTED';
 <div class="pcard" style="max-width:720px">
   <h3 class="ptitle" style="font-size:16px;margin:0 0 6px">Payment &amp; report</h3>
   <?php if ($settled): ?>
-    <p style="margin:0 0 10px">✓ Payment confirmed by both sides. Your inspection report is unlocked below.</p>
+    <p style="margin:0 0 10px">✓ Payment confirmed by both sides. Your <?= e(Tl('report')) ?> is unlocked below.</p>
   <?php elseif ($clientConfirmed): ?>
     <p style="margin:0 0 10px">You confirmed payment. The report unlocks once <?= e($v['subject_name'] ?: 'the professional') ?> also confirms they received it.</p>
   <?php else: ?>
-    <p class="plead" style="margin:0 0 12px">Once you have paid <?= e($v['subject_name'] ?: 'the professional') ?>, confirm it here. Your inspection report is released only when <strong>both</strong> sides confirm payment.</p>
+    <p class="plead" style="margin:0 0 12px">Once you have paid <?= e($v['subject_name'] ?: 'the professional') ?>, confirm it here. Your <?= e(Tl('report')) ?> is released only when <strong>both</strong> sides confirm payment.</p>
     <form method="post" action="/portal/voucher" style="margin:0">
       <input type="hidden" name="id" value="<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="confirm_paid">
       <button class="btn" type="submit">I have paid — <?= e($inr($money['client_payable'] ?? $v['grand_total'])) ?></button>

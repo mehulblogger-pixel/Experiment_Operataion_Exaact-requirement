@@ -396,6 +396,76 @@ rather than altered.
 
 ---
 
+### 2.7 Terminology, and colour contrast
+
+#### GAP-018 (P2) — customer-facing screens hardcoded words the tenant chooses · **FIXED**
+
+`lib/terms.php` exists so a tenant picks its own vocabulary, and the presets
+genuinely differ. Measured, not assumed:
+
+| Preset | `report` | `job` (plural) | `call` |
+|---|---|---|---|
+| general | Report | Jobs | Work Order |
+| **inspection** | **Inspection Report** | **Deputations** | **Inspection Call** |
+| manufacturing | Report | Operations | Production Order |
+| trading | Report | Consignments | Order |
+
+Four customer-facing screens hardcoded those nouns. A **trading** tenant's own
+client would have opened their portal and read a heading saying
+*"Inspection report"* and a column headed *"Visits"* — for what their business
+calls a consignment. On an outside-facing screen that is not a cosmetic slip;
+it tells the customer the software was built for somebody else.
+
+Fixed in `portal/voucher.php`, `pro/voucher.php` (the marketplace report
+deliverable, 7 places), `portal/call.php` and `portal/complaint_new.php`
+(3 places), all now via `T()` / `Tl()` / `TP()`.
+
+> **What was deliberately NOT changed.** The first scan counted **22** hardcoded
+> nouns. Reading all 22 in context cut it to 10. The rest are **trade names** in
+> the manpower marketplace — *"inspector, welder, NDT technician, site
+> engineer"*, *"e.g. CSWIP welding inspector"*, *"pressure vessel inspector"* —
+> and those are **occupations a client is hiring**, not the tenant's word for its
+> own people. Replacing them would have been wrong, and would have damaged
+> exactly the marketplace wording the owner described. The test asserts they
+> survived, so a later pass cannot "tidy" them away.
+
+---
+
+#### GAP-019 (P3) — the professional portal's header failed contrast by a hair · **FIXED**
+
+`tools/b1-contrast-check.js` has measured the staff application all along, but
+it signs in at `/login` as staff and can therefore never reach these three
+portals — so the portals had **never** been measured. The same algorithm now
+runs inside `tools/portal-mobile-a11y-check.js`.
+
+One real failure: **"Sign out" in the professional portal header at 4.33:1**,
+where WCAG 1.4.3 requires 4.5:1 for normal text.
+
+The cause was not the brand colour. The teal gives white text **4.94:1 — already
+compliant**; `opacity:.9` on the link pulled it down to 4.33. So the fix was to
+drop the fade and leave the palette exactly as designed.
+
+Everything else passes: lead and note text, empty states, tile labels, table
+headers, footers, nav links, form labels, flashes, chips and buttons, across all
+three portals.
+
+> **Method note — a 1.07:1 reading that was my probe's fault, not the
+> portal's.** The first contrast run reported the professional header at
+> **1.07:1**, which would be invisible text. That absurdity was the tell. The
+> header is painted with a `linear-gradient`, which lives in
+> `background-image`; the algorithm walked past it looking for a
+> `background-color` and landed on the near-white page background, so
+> white-on-teal measured as white-on-white. The probe now detects a gradient,
+> reads its colour stops and uses the **worst** one, so the answer is the least
+> favourable real pixel rather than an average. **`b1-contrast-check.js` shares
+> this blind spot** — it has not bitten there because the staff chrome uses flat
+> colours, but it is worth knowing before that changes.
+
+**Final measurement across all three portals at 390px: 273 passed, 0 failed,
+51 warnings.**
+
+---
+
 ## 3. Still to do on these portals
 
 This pass answered the two security questions. It did **not** do for the portals
@@ -403,17 +473,17 @@ what deliverables 04 and 05 did for the staff application:
 
 | Outstanding | Why it matters |
 |---|---|
-| Terminology against `lib/terms.php` | whether these screens use the canonical 33 terms or their own wording has not been checked |
-| Field-level **validation** messages | what each form says when the input is wrong, screen by screen |
-| Empty states on the 38 screens not walked | the 39 walked were reachable by the four seeded personas |
-| Colour contrast | `tools/b1-contrast-check.js` exists for the staff app and has not been pointed at the portals |
+| Field-level **validation** messages | what each form says when the input is wrong, screen by screen — the one substantial piece of §2 still unmeasured |
+| Empty states on the 38 screens not walked | the 39 walked were those the four seeded personas could reach |
 | The professional portal's **write** paths | isolation is proven on reads and on the one delete tested; the profile, CV, credentials and voucher-line writes are not each individually driven |
 | `/pro/tax-*` (4 routes) and `/pro/geo` | small lookup endpoints, read only for isolation so far |
+| The remaining 51 warnings | 24–40px tap targets (compliant) and 10.5px tile micro-labels — a type-scale decision under `docs/05-ui-ux-blueprint.md`, not an audit fix |
 
 Closed since the first pass: the vendor portal's four permissions (§2.4), the
 assistant on the vendor side (§2.4), the professional portal's isolation
-including all three file routes (§2.5), and phone-width layout, message delivery
-and field labelling across 39 screens (§2.6).
+including all three file routes (§2.5), phone-width layout, message delivery
+and field labelling across 39 screens (§2.6), and terminology and colour
+contrast (§2.7).
 
 **GAP-012 is therefore reduced, not closed.** The coverage hole is mapped and its
 two security defects are fixed; the quality audit of these 77 screens remains.
@@ -434,4 +504,4 @@ two security defects are fixed; the quality audit of these 77 screens remains.
 | `phpapp/tests/fixtures/vendor_routes_gated.tsv` | all 13 vendor routes and their gates |
 | `evidence/pro-flash-lost.php` | renders a real `/pro` screen with a message set and reports whether the professional sees it |
 | `phpapp/tools/portal-mobile-a11y-check.js` | 39 screens at 390px as four personas: overflow, tap targets (with the WCAG inline exemption), tiny text, unnamed fields, duplicate ids, missing alt, header-less tables |
-| `phpapp/tests/test_portal_flash_and_labels.php` | 34 assertions freezing all three fixes |
+| `phpapp/tests/test_portal_flash_and_labels.php` | 49 assertions freezing the message, label and terminology fixes — including that the marketplace trade names are left alone |

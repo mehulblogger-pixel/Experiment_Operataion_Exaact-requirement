@@ -34,7 +34,7 @@
 
   <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:4px">
     <div>
-      <label for="cjob" style="<?= $lbl ?>" for="cjob">Against which visit? <span style="opacity:.75">(if it applies)</span></label>
+      <label for="cjob" style="<?= $lbl ?>" for="cjob">Against which <?= e(Tl('job')) ?>? <span style="opacity:.75">(if it applies)</span></label>
       <select class="form-control" id="cjob" name="job_id">
         <option value="">— none in particular —</option>
         <?php foreach ($jobs as $j): ?>

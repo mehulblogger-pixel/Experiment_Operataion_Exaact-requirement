@@ -125,6 +125,53 @@ try {
     t_ok(strpos($roster, '<label for="f-manual_name"') !== false
          && strpos($roster, 'id="f-manual_name" class="form-control" name="manual_name"') !== false,
          'and f-manual_name points at the name field, not at the rating');
+    // ---- 6. the words a tenant chooses are not hardcoded ------------------
+    // lib/terms.php lets a tenant pick its own vocabulary, and the presets
+    // genuinely differ: report is "Inspection Report" under 'inspection' but
+    // plain "Report" under 'manufacturing' and 'trading', where job becomes
+    // "Operation" and "Consignment". A hardcoded noun on a CUSTOMER-FACING
+    // screen therefore shows a non-inspection tenant's own client the wrong
+    // word -- exactly what this file exists to prevent.
+    t_section('external portals — the tenant chooses the nouns');
+
+    t_eq(term_apply_pack('trading'), true, 'the trading preset applies');
+    t_eq(T('report'), 'Report', "under 'trading' a report is just a Report");
+    t_eq(TP('job'), 'Consignments', "...and a job is a Consignment");
+    t_eq(term_apply_pack('inspection'), true, 'the inspection preset applies');
+    t_eq(T('report'), 'Inspection Report', "under 'inspection' it is an Inspection Report");
+    t_eq(TP('job'), 'Deputations', '...and a job is a Deputation');
+
+    // The customer-facing screens that used to hardcode those two nouns.
+    foreach ([
+        'views/portal/voucher.php'      => ['report'],
+        'views/pro/voucher.php'         => ['report'],
+        'views/portal/call.php'         => ['job'],
+        'views/portal/complaint_new.php'=> ['job'],
+    ] as $v => $keys) {
+        $t = file_get_contents(__DIR__ . '/../' . $v);
+        // strip php blocks so a code COMMENT mentioning the word is not a hit
+        $prose = preg_replace('/<\?php.*?\?>/s', ' ', $t);
+        $prose = preg_replace('/<\?=.*?\?>/s', ' ', $prose);
+        if (in_array('report', $keys, true))
+            t_eq(preg_match('/\binspection reports?\b/i', $prose), 0,
+                 basename($v) . ' does not hardcode "inspection report" in prose');
+        if (in_array('job', $keys, true))
+            t_eq(preg_match('/\bvisits?\b/i', $prose), 0,
+                 basename($v) . ' does not hardcode "visit" where the tenant picks the word');
+        $used = false;
+        foreach ($keys as $k) if (strpos($t, "('" . $k . "')") !== false) $used = true;
+        t_ok($used, basename($v) . ' uses the term helper for ' . implode('/', $keys));
+    }
+
+    // The TRADE names in the marketplace are NOT this term and must be left
+    // alone: "inspector, welder, NDT technician" are occupations a client is
+    // hiring, not the tenant's word for its own people. Replacing them would
+    // have been wrong, so this asserts they survived.
+    $hire = file_get_contents(__DIR__ . '/../views/portal/hire.php');
+    t_ok(strpos($hire, 'inspector, welder, NDT technician, site engineer') !== false,
+         'the marketplace trade names are left as prose — they are occupations, not the term');
+
+    term_apply_pack('general');
 } finally {
     unset($_SESSION['portal_flash'], $_SESSION['pro_flash'], $_SESSION['vendor_flash']);
     if ($own && db()->inTransaction()) db()->rollBack();

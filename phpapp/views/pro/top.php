@@ -14,7 +14,10 @@ $me = $me ?? (function_exists('connect_pro_user') ? connect_pro_user() : null);
   .top{background:linear-gradient(135deg,var(--teal),var(--teal-d));color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
   /* 24px minimum hit area (WCAG 2.5.8) on the controls that stand alone --
      a prose link inside a sentence is exempt and is left as it is. */
-  .top a{color:#fff;text-decoration:none;font-size:14px;opacity:.9;
+  /* No opacity here. The teal itself gives white text 4.94:1, which clears
+     WCAG 1.4.3 -- but opacity:.9 pulled it down to 4.33:1 and failed. The brand
+     colour needed no change; only the fade had to go. */
+  .top a{color:#fff;text-decoration:none;font-size:14px;
          display:inline-flex;align-items:center;min-height:26px;padding:0 4px}
   .card p > a:only-child,.card > a:only-child,.wrap > p > a:only-child{
          display:inline-flex;align-items:center;min-height:26px}

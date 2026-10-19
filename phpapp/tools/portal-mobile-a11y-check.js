@@ -17,6 +17,11 @@
 //    4. unlabelled fields    -- a control with no accessible name at all
 //    5. images without alt
 //    6. data tables with no header row
+//    7. colour contrast -- the composited foreground against the first opaque
+//       ancestor background, as the compositor does it. The algorithm is the one
+//       tools/b1-contrast-check.js already uses for the staff app; that tool
+//       signs in at /login as staff and can never reach these three portals,
+//       which is why the portals had never been measured.
 //
 //  Reuses the personas and sign-in flow of tools/portal-crawl.js. Boot a
 //  DEMO-S01..S04 seeded throwaway server first, exactly as that tool documents:
@@ -133,6 +138,90 @@ const PROBE = () => {
   return out;
 };
 
+
+// Colour contrast, measured the way the compositor composites: the foreground
+// flattened over the first OPAQUE ancestor background, with opacity applied.
+// Algorithm reused from tools/b1-contrast-check.js so the two agree.
+const CONTRAST = () => {
+  const lin = v => (v /= 255) <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  const lum = c => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
+  const ratio = (a, b) => { const la = lum(a), lb = lum(b);
+    return Math.round(((Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)) * 100) / 100; };
+  const parse = s => { const m = (s || '').match(/[\d.]+/g); return m ? m.map(Number) : null; };
+  const over = (fg, bg) => { const a = fg.length > 3 ? fg[3] : 1;
+    return [0, 1, 2].map(i => Math.round(fg[i] * a + bg[i] * (1 - a))); };
+  // The first ancestor that actually PAINTS something behind the text.
+  //
+  // A background-color is not the only way to paint one: the professional
+  // portal's header is a linear-gradient, which lives in background-image.
+  // Reading backgroundColor alone walks straight past it and lands on the
+  // near-white page background, so white-on-teal measures 1.07:1 -- invisible
+  // text, which is absurd on its face and was the tell that the PROBE was
+  // wrong, not the portal. (tools/b1-contrast-check.js shares this blind spot;
+  // it has not bitten there because the staff chrome uses flat colours.)
+  // Where a gradient is found, its colour stops are read and the WORST of them
+  // is used, so the answer is the least favourable real pixel, not an average.
+  const bgOf = el => {
+    for (let n = el; n && n !== document.documentElement.parentNode; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      const img = cs.backgroundImage || '';
+      if (/gradient\(/.test(img)) {
+        const stops = (img.match(/rgba?\([^)]*\)/g) || []).map(parse)
+          .filter(c => c && (c.length < 4 || c[3] > 0.99)).map(c => [c[0], c[1], c[2]]);
+        if (stops.length) return { stops };
+      }
+      const c = parse(cs.backgroundColor);
+      if (c && (c.length < 4 || c[3] > 0.99)) return { stops: [[c[0], c[1], c[2]]] };
+    }
+    return { stops: [[255, 255, 255]] };
+  };
+  const vis = el => { const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+  const out = [];
+  const sample = (label, sel, limit) => {
+    for (const el of [...document.querySelectorAll(sel)].filter(vis).slice(0, limit || 6)) {
+      const cs = getComputedStyle(el);
+      const fg = parse(cs.color); if (!fg) continue;
+      const text = (el.textContent || '').trim();
+      if (!text) continue;
+      const { stops } = bgOf(el);
+      const op = parseFloat(cs.opacity || '1');
+      let worst = null;
+      for (const bg of stops) {
+        let eff = over(fg.length > 3 ? fg : [...fg, 1], bg);
+        if (op < 1) eff = over([...eff, op], bg);
+        const rr = ratio(eff, bg);
+        if (worst === null || rr < worst) worst = rr;
+      }
+      const size = parseFloat(cs.fontSize), weight = parseInt(cs.fontWeight) || 400;
+      // WCAG 1.4.3: large text is >=24px, or >=18.66px when bold.
+      const large = size >= 24 || (size >= 18.66 && weight >= 700);
+      out.push({ label, ratio: worst, size, large, stops: stops.length,
+                 need: large ? 3 : 4.5, text: text.slice(0, 30) });
+    }
+  };
+  // Client/vendor portal markup
+  sample('lead text', '.plead', 3);
+  sample('note text', '.pnote', 3);
+  sample('empty state', '.pempty', 2);
+  sample('tile label', '.ptile .l', 4);
+  sample('table header', '.ptable th', 5);
+  sample('footer', '.pfoot', 2);
+  sample('nav link', '.pnav a', 5);
+  sample('who/sign-out', '.phead .who, .phead a', 3);
+  sample('form label', '.pform label, label', 5);
+  sample('flash', '.pmsg', 2);
+  // Professional portal markup
+  sample('pro muted', '.muted', 5);
+  sample('pro h2 label', '.wrap h2', 3);
+  sample('pro nav link', '.nav a', 5);
+  sample('pro top bar', '.top a, .top .brand', 3);
+  sample('pro chip', '.chip', 4);
+  sample('pro button', '.btn', 3);
+  sample('pro flash', '.msg', 2);
+  return out;
+};
+
 const PERSONAS = [
   { who: 'Professional (phone-first by definition)', login: '/pro/login', user: 'ajay.s02@demo.test',
     routes: ['/pro', '/pro/jobs', '/pro/applications', '/pro/bookings', '/pro/vouchers',
@@ -195,6 +284,12 @@ const PERSONAS = [
            + (res.noalt.length ? ' — ' + res.noalt.length + ' without: ' + res.noalt.slice(0, 2).join(', ') : ''));
       ok(res.headless.length === 0, r + ' gives every data table a header row'
            + (res.headless.length ? ' — ' + res.headless.map(t => t.rows + ' rows, class="' + t.cls + '"').join('; ') : ''));
+
+      const cr = await pg.evaluate(CONTRAST);
+      const bad = cr.filter(c => c.ratio < c.need);
+      ok(bad.length === 0, r + ' meets WCAG 1.4.3 contrast'
+           + (bad.length ? ' — ' + bad.slice(0, 4).map(c => c.label + ' ' + c.ratio + ':1 (needs '
+               + c.need + ', ' + c.size + 'px) "' + c.text + '"').join('; ') : ''));
     }
     console.log('');
     await ctx.close();

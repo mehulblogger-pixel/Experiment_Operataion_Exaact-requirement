@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '6df601d · 2026-10-18 17:51 UTC · 686 files';
+$RELEASE = '2cb8c19 · 2026-10-19 01:00 UTC · 686 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2228,'h'=>'0813d712b25666dd'],
@@ -645,9 +645,9 @@ $EXPECT  = [
     'views/portal/assistant.php' => ['s'=>2284,'h'=>'59037917099f7b3f'],
     'views/portal/bench.php' => ['s'=>8930,'h'=>'5ab0dc18000198c2'],
     'views/portal/bottom.php' => ['s'=>260,'h'=>'38c0e9ceb9238454'],
-    'views/portal/call.php' => ['s'=>2348,'h'=>'e9bfa6995655492b'],
+    'views/portal/call.php' => ['s'=>2374,'h'=>'2c0976ee3765839a'],
     'views/portal/calls.php' => ['s'=>1504,'h'=>'5bd2edcba3454040'],
-    'views/portal/complaint_new.php' => ['s'=>3787,'h'=>'23c6f25388ff0087'],
+    'views/portal/complaint_new.php' => ['s'=>3801,'h'=>'8f86b9a4ab5aab24'],
     'views/portal/complaints.php' => ['s'=>1893,'h'=>'c898dd644d85604a'],
     'views/portal/dashboard.php' => ['s'=>5490,'h'=>'f5be16ee1e25206c'],
     'views/portal/deputations.php' => ['s'=>5877,'h'=>'d80f8cb2f7a73958'],
@@ -672,7 +672,7 @@ $EXPECT  = [
     'views/portal/talent.php' => ['s'=>10080,'h'=>'1dec998e9609120c'],
     'views/portal/team.php' => ['s'=>3405,'h'=>'bccdc3129af75ef9'],
     'views/portal/top.php' => ['s'=>6730,'h'=>'1a8983a7eb46a13c'],
-    'views/portal/voucher.php' => ['s'=>13247,'h'=>'2ac19207103afc87'],
+    'views/portal/voucher.php' => ['s'=>13257,'h'=>'e8f5eb765ecf01dc'],
     'views/pro/applications.php' => ['s'=>2208,'h'=>'7c4febd8703426aa'],
     'views/pro/bookings.php' => ['s'=>3693,'h'=>'f348f74b6510728f'],
     'views/pro/bottom.php' => ['s'=>22,'h'=>'c3d3f7a894cb6988'],
@@ -690,9 +690,9 @@ $EXPECT  = [
     'views/pro/register.php' => ['s'=>1020,'h'=>'e25cf621a69b4be5'],
     'views/pro/reputation.php' => ['s'=>4017,'h'=>'ade5a3fcade67256'],
     'views/pro/reset.php' => ['s'=>1350,'h'=>'943280f38cce9a67'],
-    'views/pro/top.php' => ['s'=>5457,'h'=>'b051a7d04c99ffd0'],
+    'views/pro/top.php' => ['s'=>5661,'h'=>'e083c17d96dcedfd'],
     'views/pro/verify.php' => ['s'=>5152,'h'=>'834ecb35a53d27cb'],
-    'views/pro/voucher.php' => ['s'=>17699,'h'=>'96ee3a3e9396382b'],
+    'views/pro/voucher.php' => ['s'=>17711,'h'=>'afd320df418120e1'],
     'views/pro/vouchers.php' => ['s'=>4684,'h'=>'1664b6935d7928d2'],
     'views/public/get_started.php' => ['s'=>8788,'h'=>'58316e2c3ca63fc1'],
     'views/reset_password.php' => ['s'=>3677,'h'=>'bbbee0a4f6e37827'],

@@ -12,13 +12,13 @@
     <tr><th>We received it</th><td><?= e(fdate($c['call_received_date'])) ?></td></tr>
     <tr><th>You need it by</th><td><?= e(fdate($c['inspection_required_date'])) ?></td></tr>
     <?php if (!empty($c['inspection_dates'])): ?>
-      <tr><th>Visit dates</th><td><?= e(implode(', ', array_map('fdate',
+      <tr><th><?= e(T('job')) ?> dates</th><td><?= e(implode(', ', array_map('fdate',
             array_filter(array_map('trim', explode(',', (string)$c['inspection_dates']))))) ) ?></td></tr>
     <?php endif; ?>
   </table></div>
 </div>
 
-<h3 class="ptitle" style="font-size:16px">Visits</h3>
+<h3 class="ptitle" style="font-size:16px"><?= e(TP('job')) ?></h3>
 <?php if (!$jobs): ?>
   <p class="pempty">No engineer assigned yet. Our coordinators are arranging it.</p>
 <?php else: ?>

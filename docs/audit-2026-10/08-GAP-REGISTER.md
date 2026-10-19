@@ -671,6 +671,51 @@ post to a business record or list another person's data.
 
 ---
 
+## GAP-019 — the professional portal's header failed colour contrast
+
+**CONFIRMED · P3 · Professional portal · FIXED 19 Oct 2026**
+
+`tools/b1-contrast-check.js` has measured the staff application all along, but it
+signs in as staff and can never reach the three portals, so they had never been
+measured. Running the same algorithm against them found one failure: **"Sign
+out" in the professional header at 4.33:1**, where WCAG 1.4.3 asks 4.5:1.
+
+Not the brand colour's fault -- the teal gives white text **4.94:1**, already
+compliant. `opacity:.9` pulled it to 4.33. **Fixed** by dropping the fade and
+leaving the palette untouched. Everything else in all three portals passes.
+
+See `11-EXTERNAL-PORTAL-AUDIT.md` §2.7 for the 1.07:1 reading my first run
+produced -- a gradient background the algorithm could not see -- and note that
+`b1-contrast-check.js` shares that blind spot.
+
+---
+
+## GAP-018 — customer-facing screens hardcoded the words a tenant chooses
+
+**CONFIRMED · P2 · Client and professional portals · FIXED 19 Oct 2026**
+
+`lib/terms.php` lets a tenant pick its vocabulary, and the presets differ:
+`report` is "Inspection Report" under **inspection** but plain "Report" under
+**manufacturing** and **trading**, where `job` becomes "Operation" and
+"Consignment".
+
+Four customer-facing screens hardcoded those nouns, so a **trading** tenant's
+own client would read a heading saying *"Inspection report"* and a column headed
+*"Visits"*. On an outside-facing screen that tells the customer the software was
+built for somebody else.
+
+**Fixed** in `portal/voucher.php`, `pro/voucher.php`, `portal/call.php` and
+`portal/complaint_new.php` -- 10 places, via `T()` / `Tl()` / `TP()`.
+
+**Deliberately not changed:** the first scan counted 22 hardcoded nouns; reading
+all 22 in context cut it to 10. The rest are **trade names** in the manpower
+marketplace -- *"inspector, welder, NDT technician, site engineer"* -- which are
+occupations a client is hiring, not the tenant's word for its own people.
+Replacing those would have been wrong and would have damaged the marketplace
+wording the owner described. A test asserts they survived.
+
+---
+
 ## GAP-017 — 113 fields had a label that was never attached to them
 
 **CONFIRMED BY EXECUTION · P2 · All three portals · FIXED 18 Oct 2026**
