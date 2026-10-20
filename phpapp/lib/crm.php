@@ -3572,15 +3572,50 @@ function crm_step_approvers_direct($step) {
         $u = ops_one("SELECT id, username, first_name, last_name, email, role FROM users WHERE id=?", [(int)$step['approver_user_id']]);
         return $u ? [$u] : [];
     }
+    $q = !empty($step['quote_id']) ? crm_quote_get((int)$step['quote_id']) : null;
     if (($step['approver_role'] ?? '') !== '') {
-        return ops_all("SELECT id, username, first_name, last_name, email, role FROM users WHERE role=? AND is_active=1 ORDER BY first_name, username", [$step['approver_role']]);
+        return crm_role_approvers_for([(string)$step['approver_role']], $q);
     }
     // A generic step is open to anyone who may approve quotes.
     $roles = [];
     foreach (ORG_ROLES as $rk => $rl) if (role_perms($rk) && in_array('crm.quote.approve', role_perms($rk), true)) $roles[] = $rk;
+    return $roles ? crm_role_approvers_for($roles, $q) : [];
+}
+
+//  AN APPROVAL BY ROLE GOES TO THE PEOPLE OVER THAT QUOTATION.
+//
+//  A level addressed to "Branch Manager" or "SBU Head" used to mean every one
+//  in the company: all of them were e-mailed, listed as "waiting on", and any of
+//  them could sign. In a company of several branches and business units (the
+//  owner's organisation chart, 20 Oct 2026: KAM → Branch Manager → SBU Head of
+//  the unit → Business Director → MD) the step belongs to the branch manager
+//  whose branches include the quotation's, and the head of ITS business unit.
+//  Data scope (Add a person → Data scope) is what says who covers what.
+//
+//  If nobody in the role covers it — a branch with no manager set up yet — the
+//  step falls back to everyone in the role rather than to nobody, so a
+//  quotation is never stuck. Set up Sales warns about such gaps.
+function crm_role_approvers_for(array $roles, $q) {
     if (!$roles) return [];
     $ph = implode(',', array_fill(0, count($roles), '?'));
-    return ops_all("SELECT id, username, first_name, last_name, email, role FROM users WHERE role IN ($ph) AND is_active=1 ORDER BY first_name, username", $roles);
+    $all = ops_all("SELECT id, username, first_name, last_name, email, role, is_superuser, home_office_id, scope_offices, scope_sbus, permissions
+                    FROM users WHERE role IN ($ph) AND is_active=1 ORDER BY first_name, username", $roles) ?: [];
+    if (!$q || !function_exists('user_scope_covers')) return $all;
+    $office = !empty($q['office_id']) ? (int)$q['office_id'] : null; $sbu = (string)($q['sbu'] ?? '');
+    $over = array_values(array_filter($all, fn($u) => user_scope_covers($u, $office, $sbu)));
+    return $over ?: $all;
+}
+// May this person sign a step addressed to their role (or a generic step)?
+// Only if they are among the people that step goes to (see above).
+function crm_role_step_covers_me($step, $q) {
+    if (!$q) return true;
+    $roles = ($step['approver_role'] ?? '') !== '' ? [(string)$step['approver_role']] : [];
+    if (!$roles) foreach (ORG_ROLES as $rk => $rl) if (role_perms($rk) && in_array('crm.quote.approve', role_perms($rk), true)) $roles[] = $rk;
+    $me = (int)(current_user()['id'] ?? 0);
+    foreach (crm_role_approvers_for($roles, $q) as $u) if ((int)$u['id'] === $me) return true;
+    // Someone who holds the approve right by a personal tick, outside the roles
+    // above, may still sign a generic step — when the quotation is within their scope.
+    return ($step['approver_role'] ?? '') === '' && function_exists('scope_allows') && scope_allows($q['office_id'] ?? null, $q['sbu'] ?? null);
 }
 // D-11a — escalation. A quotation whose current level has waited longer than the
 // company allows (Sales setup: quote_approval_escalate_days, 0 = never) is opened
@@ -3610,7 +3645,7 @@ function crm_escalate_quote_approvals($now = null) {
         if (!$up || (empty($up['approver_user_id']) && trim((string)$up['approver_role']) === '')) continue;
         db()->prepare("UPDATE quote_approvals SET escalated_at=?, escalate_role=?, escalate_user_id=? WHERE quote_id=? AND level=? AND status='PENDING'")
             ->execute([date('c', $now), (string)$up['approver_role'], ($up['approver_user_id'] ?? null) ?: null, $qid, $lvl]);
-        $who = crm_step_approvers(['approver_role' => (string)$up['approver_role'], 'approver_user_id' => $up['approver_user_id'] ?? null]);
+        $who = crm_step_approvers(['approver_role' => (string)$up['approver_role'], 'approver_user_id' => $up['approver_user_id'] ?? null, 'quote_id' => $qid]);
         crm_log_change($qid, 'Waited more than ' . $days . ' day(s) at level ' . $lvl . ' — opened to the level above ('
             . ($who ? implode(', ', array_map('crm_person_label', array_slice($who, 0, 3))) : (ORG_ROLES[$up['approver_role']] ?? $up['approver_role'])) . ').');
         foreach ($who as $ap) {
@@ -3731,7 +3766,9 @@ function crm_can_act_approval($step) {
     // crm.quote.approve permission. (That is exactly the branch-manager case: the
     // step is routed to BRANCH_MANAGER, so the branch manager can sign it.)
     $me = (int)($u['id'] ?? 0);
-    if (crm_step_is_mine($step, $me, user_role(), can('crm.quote.approve'))) return true;
+    $sq = $sq ?? crm_quote_get((int)($step['quote_id'] ?? 0));
+    if (crm_step_is_mine($step, $me, user_role(), can('crm.quote.approve'))
+        && (!empty($step['approver_user_id']) || crm_role_step_covers_me($step, $sq))) return true;
     // D-11a — someone covering for an approver who is away (a live delegation
     // for quotations, or for everything), within the branch the delegation names.
     $sq = $sq ?? crm_quote_get((int)($step['quote_id'] ?? 0));
@@ -3748,7 +3785,8 @@ function crm_can_act_approval($step) {
     // D-11a — a step that waited too long is open to the level above as well.
     if (trim((string)($step['escalated_at'] ?? '')) !== '') {
         if (!empty($step['escalate_user_id'])) return (int)$step['escalate_user_id'] === $me;
-        if (($step['escalate_role'] ?? '') !== '') return user_role() === $step['escalate_role'];
+        if (($step['escalate_role'] ?? '') !== '') return user_role() === $step['escalate_role']
+            && crm_role_step_covers_me(['approver_role' => $step['escalate_role']], $sq);
     }
     return false;
 }

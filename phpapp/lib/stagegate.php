@@ -374,6 +374,18 @@ function ops_approvals($route, $method) {
         'You cannot open the approvals queue.');
     gate_migrate();
 
+    //  A lead reassignment is decided here, not on the lead: the manager who
+    //  approves it — often the owner's Branch Manager — may hold no right to
+    //  open the lead register, and needs none to say yes or no to this.
+    if ($route === 'approval-lead-decide' && $method === 'POST' && function_exists('lead_reassign_decide')
+        && (!function_exists('licence_module_live') || licence_module_live('leads'))) {
+        $r = lead_reassign_decide((int)($_POST['req'] ?? 0), ($_POST['decision'] ?? '') === 'approve', (string)($_POST['note'] ?? ''));
+        flash(!empty($r['err']) ? $r['err'] : ($r['ok'] === 'approved' ? 'Approved — the lead now belongs to its new owner.' : 'Rejected — it stays with its owner.'),
+              !empty($r['err']) ? 'error' : 'success');
+        $back = (string)($_POST['back'] ?? '');
+        redirect(preg_match('#^/lead\?id=\d+$#', $back) ? $back : '/approvals');
+    }
+
     if ($route === 'approval-act' && $method === 'POST') {
         $r = gate_act((int)($_POST['id'] ?? 0), (string)($_POST['decision'] ?? ''), (string)($_POST['remarks'] ?? ''));
         if (!empty($r['err'])) flash($r['err'], 'error');

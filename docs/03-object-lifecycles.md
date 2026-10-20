@@ -226,7 +226,7 @@ enquiry). Reopening is the owner's rule D-22 (20 Oct 2026, "Yes").
 stateDiagram-v2
   [*] --> OPEN
   OPEN --> OPEN : move between open stages
-  OPEN --> LOST : move to a LOST stage — a reason is required
+  OPEN --> LOST : lead — the responsible person only, a listed reason AND remarks (owner, 20 Oct 2026)
   OPEN --> CONVERTED : lead — convert (a WON stage means convert)
   OPEN --> WON : deal — move to a WON stage
   LOST --> OPEN : reopen — a manager, with a reason, back to the stage it left (D-22)
@@ -238,6 +238,37 @@ stateDiagram-v2
 - **A lost lead is not converted** — it is reopened first (it used to convert straight from LOST).
 - A reopen is written in the record's history with who, the reason and why it had been closed,
   and adds a stage-history row; the lost reason is cleared so it no longer counts as lost.
+- **Marking a lead lost** (owner, 20 Oct 2026: *"the responsible person must mark as lost with a
+  valid reason and remarks"*): only the lead's owner (`lead_can_mark_lost()`; a lead nobody owns —
+  anyone who may edit leads; a master always), with a reason from the lost-reason list **and**
+  remarks, on the lead and in bulk alike (`lead_lost_problem()`). The bulk action used to fill in
+  "No response" with no remarks.
+
+### Lead reassignment request (`lead_reassign_requests.status`) — owner, 20 Oct 2026
+
+*"Reassigning shall be done only after manager approval."* Giving a lead that **already has an
+owner** to someone else is a request unless the person doing it is a manager over that lead.
+The lead keeps its owner until the request is approved. Allocating a lead **nobody owns** is not
+a reassignment and needs no approval.
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING : someone who is not a manager over the lead asks, with a reason
+  PENDING --> APPROVED : a manager over the lead approves — the lead changes hands
+  PENDING --> REJECTED : a manager rejects, with a reason — the lead stays
+  PENDING --> CANCELLED : the lead closed or changed hands meanwhile, or a manager reassigned it directly
+  APPROVED --> [*]
+  REJECTED --> [*]
+  CANCELLED --> [*]
+```
+
+- **A manager over the lead** (`lead_user_is_manager_for()`): the current owner's reporting
+  manager (Reports to), or someone with sales-manager authority (`mod.leads.edit` or
+  `crm.quote.approve`, as D-22) whose data scope covers the lead's branch and business unit;
+  a master always. Such a person reassigns directly, with a reason kept in the history.
+- The person who asked never decides it (unless a master). One request per lead at a time.
+- Decided from **Approvals** (`/approval-lead-decide`) — the approving manager needs no right to
+  open the lead register — or on the lead itself when they can open it.
 
 ## Customer trade block — the owner's rule D-12 (20 Oct 2026)
 

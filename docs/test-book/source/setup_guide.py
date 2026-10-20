@@ -73,15 +73,15 @@ USERS = [
          sees='Mumbai only',
          can='The same as Test Coord, for Mumbai. Used to prove the wall between branches in Operations.',
          cannot='See Ahmedabad work orders, jobs or customers.'),
-    dict(n=14, user='test.bdm', name='Test BDM', role='BUSINESS_DEV_MANAGER', home='Ahmedabad', team='OFFICE', reports='Test MktMgr', dept='Sales', scope='leave',
+    dict(n=14, user='test.bdm', name='Test BDM', role='BUSINESS_DEV_MANAGER', home='Ahmedabad', team='OFFICE', reports='Test BranchMgr', dept='Sales', scope='leave',
          sees='Ahmedabad only',
          can='Finds new customers: leads, deals, enquiries, quotations; sends quotations and records the customer\'s answer on its own quotations.',
          cannot='Approve quotations, register contracts, touch operations or users.'),
-    dict(n=15, user='test.kam', name='Test KAM', role='KEY_ACCOUNTS_MANAGER', home='Mumbai', team='OFFICE', reports='Test MktMgr', dept='Sales', scope='leave',
+    dict(n=15, user='test.kam', name='Test KAM', role='KEY_ACCOUNTS_MANAGER', home='Mumbai', team='OFFICE', reports='Test BranchMgr2', dept='Sales', scope='leave',
          sees='Mumbai only',
          can='Same rights as the BDM, for existing big customers. Sits in Mumbai so the Sales branch wall can be tested.',
          cannot='Same limits as the BDM; nothing of Ahmedabad.'),
-    dict(n=16, user='test.mktexec', name='Test MktExec', role='MARKETING_EXECUTIVE', home='Ahmedabad', team='OFFICE', reports='Test MktMgr', dept='Sales', scope='leave',
+    dict(n=16, user='test.mktexec', name='Test MktExec', role='MARKETING_EXECUTIVE', home='Ahmedabad', team='OFFICE', reports='Test BranchMgr', dept='Sales', scope='leave',
          sees='Ahmedabad only',
          can='Records leads and enquiries, prepares quotations, does follow-ups.',
          cannot='Approve or send a quotation, see Insights, money or operations.'),
@@ -189,4 +189,30 @@ def book_data(role_names, access):
                       'opens': sum(v == 'OPEN' for v in a.values()) if a else None, 'of': len(a) if a else None})
     return {'branches': BRANCHES, 'users': users, 'form': [{'tab': t, 'fields': [{'f': f, 'v': v} for f, v in fs]} for t, fs in FORM],
             'settings': SETTINGS, 'questions': [{'q': q, 'why': w} for q, w in QUESTIONS],
-            'watch': [{'who': w, 'what': x} for w, x in WATCH]}
+            'watch': [{'who': w, 'what': x} for w, x in WATCH],
+            'org': [{'post': a, 'role': b, 'scope': c, 'reports': d, 'note': e} for a, b, c, d, e in ORG_MAP],
+            'orgLevels': [{'lvl': a, 'who': b, 'band': c, 'note': d} for a, b, c, d in ORG_LEVELS]}
+
+
+# The owner's organisation chart (20 Oct 2026), mapped onto EXAACT. Role = what
+# they may do; Data scope = which branches / business units they see and approve
+# for; Reports to = the chain. Approval amounts are the owner's to give.
+ORG_MAP = [
+    ('Managing Director', 'Business Director', 'Every branch, every unit (leave Data scope empty)', '— top —', 'Designation "Managing Director". Named as the approver of the top level.'),
+    ('Business Director', 'Business Director', 'Every branch, every unit', 'Managing Director', ''),
+    ('SBU Head — Manufacturing, Safety, Infra, Oil & Gas, Mining, Power (one person each)', 'Business Unit Head', 'Business units: untick "Every business unit", tick only their own unit', 'Business Director', 'First rename the Business Unit master to your six units (Admin → Masters → Business Unit).'),
+    ('Branch Manager (over Ahmedabad, Baroda, Indore, Bhopal, Mumbai)', 'Branch Manager', 'Offices: tick those five branches', 'Business Director', 'One person can cover several branches — that is what the office ticks are for.'),
+    ('Operation Manager (each branch)', 'Operation Manager', 'Their branch (leave empty = home office)', 'Branch Manager', ''),
+    ('Assistant Manager — Operations / Projects', 'Asst. Manager', 'Their branch', 'Operation Manager', 'Designation tells the two apart.'),
+    ('Coordinator / Project Coordinator', 'Coordinator', 'Their branch', 'Their Assistant Manager', ''),
+    ('Key Accounts Manager (each branch)', 'Key Accounts Manager', 'Their branch', 'Branch Manager', 'Prepares and sends quotations; their quotations go to the Branch Manager first.'),
+    ('Assistant Manager — Sales', 'Business Development Manager', 'Their branch', 'Key Accounts Manager', 'Same rights as a KAM (prepare and send quotations). Designation "Asst. Manager — Sales".'),
+    ('Executive Sales', 'Marketing Executive', 'Their branch', 'Assistant Manager — Sales', 'Prepares quotations; cannot send or approve them.'),
+    ('Finance Manager / Asst. Manager — Finance / Executive Finance', 'Finance', 'Offices: tick their branch only (Finance otherwise sees every branch)', 'Branch Manager / Finance Manager', 'Designation tells the three apart.'),
+]
+ORG_LEVELS = [
+    ('Level 1', 'Branch Manager (role)', 'From ₹0, no upper limit', 'Every quotation — goes to the Branch Manager over its branch only.'),
+    ('Level 2', 'Business Unit Head (role)', 'From ₹ A (your figure), no upper limit', 'Goes to the SBU Head of the quotation\'s business unit only.'),
+    ('Level 3', 'Business Director (role, or the named person)', 'From ₹ B (your figure), no upper limit', ''),
+    ('Level 4', 'The Managing Director (one named person)', 'From ₹ C (your figure), no upper limit', 'Levels run in order: a ₹ C quotation goes Branch Manager → SBU Head → Business Director → MD.'),
+]

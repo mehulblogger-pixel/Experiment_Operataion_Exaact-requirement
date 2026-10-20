@@ -24,6 +24,29 @@
   <?php endif; ?>
 </div>
 
+<?php // ---- A reassignment waiting for a manager (owner, 20 Oct 2026) ------------
+      $rq = function_exists('lead_reassign_pending') ? lead_reassign_pending((int)$l['id']) : null;
+      if ($rq):
+        $rqTo = ops_one("SELECT * FROM users WHERE id=?", [(int)$rq['to_user_id']]);
+        $me = current_user();
+        $canDecide = lead_user_is_manager_for($l, $me) && ((int)$rq['requested_by_id'] !== (int)($me['id'] ?? 0) || is_master());
+        $mgrs = array_map('user_name', array_slice(lead_reassign_approvers($l, (int)$rq['requested_by_id']), 0, 4)); ?>
+  <div class="panel" role="status" style="margin-top:12px;border-left:4px solid var(--warn,#d97706)">
+    <b>Reassignment waiting for a manager.</b>
+    <?= e($rq['requested_by']) ?> asked to give this lead to <b><?= e($rqTo ? user_name($rqTo) : 'someone') ?></b> — “<?= e($rq['reason']) ?>”.
+    It stays with <?= e($l['owner_name'] ?: 'its owner') ?> until a manager decides<?= $mgrs ? ' (' . e(implode(', ', $mgrs)) . ')' : '' ?>.
+    <?php if ($canDecide): ?>
+      <form method="post" action="/approval-lead-decide" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px">
+        <input type="hidden" name="back" value="/lead?id=<?= (int)$l['id'] ?>"><input type="hidden" name="req" value="<?= (int)$rq['id'] ?>">
+        <div class="ff" style="margin:0;flex:1;min-width:200px"><label style="font-size:12px">Your note <span class="muted">(required to reject)</span></label>
+          <input class="form-control" name="note" maxlength="500"></div>
+        <button class="btn small" name="decision" value="approve">Approve</button>
+        <button class="btn small secondary" name="decision" value="reject">Reject</button>
+      </form>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
 <?php // ---- Where it is now, and the one next thing ------------------------- ?>
 <div class="nowband">
   <?php if ($converted): ?>
@@ -281,7 +304,9 @@
   <?php if ($lost): ?>
     <div class="form-sec"><h3 style="font-size:14px">It did not happen</h3>
       <p>Pick the closest reason — it is the only thing that makes a lost lead tell you anything later.</p></div>
-    <?php foreach ($lost as $s): ?>
+    <?php if (function_exists('lead_can_mark_lost') && !lead_can_mark_lost($l)): ?>
+      <p class="muted" style="font-size:13px">Only the person responsible for this lead — <b><?= e($l['owner_name'] ?: 'its owner') ?></b> — marks it lost.</p>
+    <?php else: foreach ($lost as $s): ?>
       <form method="post" action="/lead-move" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:8px">
         <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
         <input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
@@ -290,11 +315,11 @@
             <option value="">choose a reason…</option>
             <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
           </select></div>
-        <div class="ff" style="margin:0"><label style="font-size:12px">Anything more</label>
-          <input class="form-control" name="lost_note" placeholder="optional" style="max-width:200px"></div>
+        <div class="ff" style="margin:0;flex:1;min-width:200px"><label style="font-size:12px">Remarks — what happened</label>
+          <input class="form-control" name="lost_note" required maxlength="500" placeholder="required"></div>
         <button class="btn small secondary"><?= e($s['name']) ?></button>
       </form>
-    <?php endforeach; ?>
+    <?php endforeach; endif; ?>
   <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -343,6 +368,15 @@
           <?php if (trim((string)($l['owner_name'] ?? '')) !== '' && !(int)($l['owner_user_id'] ?? 0)): ?>
             <div class="ff-help">Held against the typed name “<?= e($l['owner_name']) ?>”, not linked to a login. Pick the person to make it a real allocation.</div>
           <?php endif; ?></div>
+        <?php if ((int)($l['owner_user_id'] ?? 0)): ?>
+        <div class="ff ff-wide" id="reassign_why" hidden><label>Why it is being reassigned <span class="muted">— <?= lead_user_is_manager_for($l, current_user()) ? 'kept in its history' : 'a manager approves it before it changes hands' ?></span></label>
+          <input class="form-control" name="reassign_reason" maxlength="500"></div>
+        <script>(function () {
+          var s = document.querySelector('select[name="owner_user_id"]'), w = document.getElementById('reassign_why');
+          if (!s || !w) return; var was = s.value;
+          s.addEventListener('change', function () { w.hidden = s.value === was; var i = w.querySelector('input'); if (i) i.required = !w.hidden; });
+        })();</script>
+        <?php endif; ?>
         <div class="ff"><label>Best reached by</label>
           <select class="form-control" name="pref_contact">
             <option value="">— not noted —</option>

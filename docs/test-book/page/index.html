@@ -425,10 +425,15 @@ function peopleHTML(){ const S = BOOK.setup;
   <h2 style="font-size:16px;margin-top:20px">5 · The 19 test people — create them top to bottom</h2>
   <p class="lede">Top to bottom, because "Reports to" can only pick someone who already exists.</p>
   <div class="steps"><table><thead><tr><th>#</th><th>Name · username</th><th>Role · home office · team</th><th>Reports to</th><th>Sees</th><th>Can</th><th>Cannot</th></tr></thead><tbody>${S.users.map(u => `<tr><td>${u.n}</td><td><b>${esc(u.name)}</b><br><code>${esc(u.user)}</code></td><td><b>${esc(u.roleName)}</b><br>${esc(u.home)} · ${esc(u.teamName)}${u.scope === 'sbu' ? '<br><i>Data scope: only "Industrial"</i>' : ''}${u.pay ? '<br><i>' + esc(u.pay) + '</i>' : ''}</td><td>${esc(u.reports)}</td><td>${esc(u.sees)}</td><td>${esc(u.can)}${opens(u)}</td><td>${esc(u.cannot)}</td></tr>`).join('')}</tbody></table></div>
-  <h2 style="font-size:16px;margin-top:20px">6 · Watch for these while testing</h2>
+  <h2 style="font-size:16px;margin-top:20px">6 · Your own organisation chart in EXAACT</h2>
+  <p class="lede">For setting up your real people later (not the test users). Role decides what each person may do; Data scope decides which branches and business units they see and approve for; Reports to builds the chain.</p>
+  <div class="steps"><table><thead><tr><th>Post on your chart</th><th>Role to pick</th><th>Data scope</th><th>Reports to</th><th>Note</th></tr></thead><tbody>${(S.org || []).map(o => `<tr><td><b>${esc(o.post)}</b></td><td>${esc(o.role)}</td><td>${esc(o.scope)}</td><td>${esc(o.reports)}</td><td>${esc(o.note)}</td></tr>`).join('')}</tbody></table></div>
+  <p class="lede" style="margin-top:10px">Quotation approval levels for that chart (Set up Sales → "Who approves, and up to what value"):</p>
+  <div class="steps"><table><thead><tr><th>Level</th><th>Approved by</th><th>Value</th><th>What happens</th></tr></thead><tbody>${(S.orgLevels || []).map(o => `<tr><td><b>${esc(o.lvl)}</b></td><td>${esc(o.who)}</td><td>${esc(o.band)}</td><td>${esc(o.note)}</td></tr>`).join('')}</tbody></table></div>
+  <h2 style="font-size:16px;margin-top:20px">7 · Watch for these while testing</h2>
   <p class="lede">Measured on the test copy, these disagree with the company's permission rules. They are not fixed yet. If you see them, mark that test Failed with a screenshot.</p>
   <div class="steps"><table><tbody>${S.watch.map(w => `<tr><td><b>${esc(w.who)}</b></td><td>${esc(w.what)}</td></tr>`).join('')}</tbody></table></div>
-  <h2 style="font-size:16px;margin-top:20px">7 · Company types</h2>
+  <h2 style="font-size:16px;margin-top:20px">8 · Company types</h2>
   <p class="lede">Run the Sales tests once for each type, on a test workspace (applying an industry changes the wording everyone sees).</p>
   <div class="steps"><table><thead><tr><th>Code</th><th>Company type</th><th>What is special</th><th>Industry to apply</th></tr></thead><tbody>${BOOK.companies.map(c => `<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.name)}</td><td>${esc(c.what)}</td><td>${esc(c.industry)}</td></tr>`).join('')}</tbody></table></div>`; }
 

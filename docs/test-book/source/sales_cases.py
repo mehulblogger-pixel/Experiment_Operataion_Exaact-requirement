@@ -79,6 +79,17 @@ C('SAL-005', 'Before you start', 'A level for one business unit applies to that 
    ('Sales → Approvals → "Approval rules" (page "Approval rules for deal stages") → "＋ New rule".', '"Applies to" is a fixed box reading "Deals (opportunities)" — not a drop-down — with the note: quotations are approved by value levels on Set up Sales; leads need no approval. Press Cancel.')],
   'owner SAL-002; crm_rule_is_unit(); stage_gates', live=False)
 
+C('SAL-006', 'Before you start', 'Approvals follow your organisation: the branch\'s manager, then the unit\'s SBU Head', 'access', ['rule', 'best'],
+  'several', 'In a company with several branches and business units, a quotation must wait for the Branch Manager over ITS branch and the SBU Head of ITS business unit — not every manager in the company.',
+  'SAL-003 levels, but Level 2 set to "Approved by: Business Unit Head". Test SBUHead\'s Data scope: only "Industrial". Test BranchMgr (Ahmedabad) and Test BranchMgr2 (Mumbai) exist.',
+  [('Set up Sales → read the level summary.', 'No warning, or a "⚠ No Branch Manager covers …" line naming each branch nobody manages yet. Fix those on the person\'s Data scope.'),
+   ('As Test BDM (Ahmedabad), make a ₹6,00,000 quotation, business unit Industrial, and submit it.', 'It waits for Level 1. The quotation names Test BranchMgr only — not Test BranchMgr2.'),
+   ('Sign in as Test BranchMgr2 → Approvals.', 'The quotation is NOT listed. Opening its address directly offers no Approve.'),
+   ('Sign in as Test BranchMgr → Approvals.', 'Section "Quotations" lists it. Open it and approve Level 1.'),
+   ('Now it waits for Level 2. Sign in as Test SBUHead → Approvals.', 'Listed (Industrial is their unit). Approve.'),
+   ('Repeat with a quotation in "Oil, Gas & Chemicals" (a unit nobody covers).', 'Level 2 falls back to every Business Unit Head, and Set up Sales showed a "⚠ No Business Unit Head covers the business unit Oil, Gas & Chemicals" line.')],
+  'crm_role_approvers_for(); docs/02 19h', live=False)
+
 C('SAL-004', 'Before you start', 'Company types to test — run the Sales tests once for each', 'scenario', ['best'],
   'MASTER_ADMIN', 'The same software behaves differently for a services company, a manpower supplier and a product company; each must be tried.',
   'A TEST workspace (not your live company), because applying an industry changes the wording everyone sees.',
@@ -129,13 +140,17 @@ C('SAL-012', 'Leads', 'Moving a lead through its stages', 'scenario', ['best'],
    ('Move to Proposal sent, then Negotiation.', 'Each move appears in History with who and when.')],
   'lead_move; lead_stage_history')
 
-C('SAL-013', 'Leads', 'Marking a lead lost needs a reason', 'scenario', ['worst', 'rule'],
-  'MARKETING_EXECUTIVE', 'A loss without a reason teaches the company nothing.',
-  'A lead at Negotiation.',
-  [('Actions tab → Lost box → leave "Why it was lost" on "choose a reason…" → press "Lost".', 'Refused: "Say why it was lost — the reason is what makes win/loss analysis possible."'),
-   ('Choose "Price too high / lost on price", Anything more "Competitor 20% cheaper" → "Lost".', 'The lead shows "Closed — this one did not happen." with your reason.'),
-   ('Left menu → Insights → Sales dashboard → "Why we lose".', 'The reason is counted.')],
-  'lead_move LOST')
+C('SAL-013', 'Leads', 'Only the responsible person marks a lead lost — with a reason AND remarks', 'scenario', ['worst', 'rule'],
+  'MARKETING_EXECUTIVE', 'Owner, 20 Oct 2026: "if lead is lost the responsible person must mark as lost with a valid reason and remarks." A loss without both teaches the company nothing.',
+  'A lead at Negotiation, "Handled by" Test MktExec.',
+  [('Sign in as Test BDM (not responsible for it) and open the lead → Actions tab.', 'Under "It did not happen": "Only the person responsible for this lead — Test MktExec — marks it lost." No Lost button.'),
+   ('Sign in as Test MktExec → Actions tab → "It did not happen". Leave "Why it was lost" on "choose a reason…", type remarks → press "Lost".', 'The browser asks you to choose a reason; nothing changes.'),
+   ('Choose "Price too high / lost on price", leave "Remarks — what happened" empty → "Lost".', 'The browser asks for the remarks; nothing changes.'),
+   ('Remarks "Competitor 20% cheaper" → "Lost".', 'The lead shows "Closed — this one did not happen." with your reason and remarks.'),
+   ('Lead register → List → tick two open leads of Test MktExec → "Mark lost" → choose a reason, leave "Remarks — required" empty → apply.', 'Refused: "Add your remarks — what happened, in a sentence. Both the reason and the remarks are required." Nothing is marked lost.'),
+   ('Same, with remarks "No budget this year".', 'Both are marked lost. A lead belonging to someone else in the same tick-list is left alone "(…not yours to mark lost)".'),
+   ('Left menu → Insights → Sales dashboard → "Why we lose".', 'The reasons are counted.')],
+  'owner 20 Oct 2026; lead_lost_problem(); lead_can_mark_lost()')
 
 C('SAL-014', 'Leads', 'Reopening a lost lead — only a manager, only with a reason', 'scenario', ['rule', 'worst'],
   'several', 'Customers come back; a reopened lead must keep its history and say who reopened it and why (owner\'s rule D-22).',
@@ -228,6 +243,21 @@ C('SAL-023', 'Leads', 'Ads Pro: imported leads never duplicate a lead already he
 # ════════════════════════════════════════════════════════════════════════════
 # S2 — Opportunities (deals)
 # ════════════════════════════════════════════════════════════════════════════
+C('SAL-024', 'Leads', 'Reassigning a lead waits for a manager\'s approval', 'scenario', ['rule', 'worst', 'best'],
+  'several', 'Owner, 20 Oct 2026: "Reassigning shall be done only after manager approval." A lead taken from someone without a manager agreeing is a lead the team fights over.',
+  'Start here → SET-06 done, with Test MktExec and Test BDM reporting to Test BranchMgr. A lead "Handled by" Test MktExec, Ahmedabad, still open.',
+  [('As Test MktExec, open the lead → Details → change "Handled by" to Test BDM.', 'A box appears: "Why it is being reassigned — a manager approves it before it changes hands".'),
+   ('Leave the reason empty → Save.', 'The browser asks for the reason.'),
+   ('Reason "BDM already handles this customer" → Save.', '"Saved. The reassignment has been sent to a manager for approval; it stays with its owner until then." The lead still shows Test MktExec, and a panel "Reassignment waiting for a manager" names who asked, to whom, the reason and the managers it waits for. No Approve button for you.'),
+   ('Change "Handled by" again to Test KAM with a reason → Save.', 'The owner is NOT changed: "A reassignment of this lead is already waiting for a manager…"'),
+   ('Sign in as Test BranchMgr → left menu → Approvals.', 'A section "Lead reassignments" with the lead, "From Test MktExec to Test BDM", who asked and the reason, a Note box, Approve and Reject.'),
+   ('Press Reject with the Note empty.', 'Refused: "Say why it is rejected — the person who asked reads this."'),
+   ('Type "Agreed — BDM owns the account" → Approve.', '"Approved — the lead now belongs to its new owner." Signed in as Test MktExec, the lead now shows Test BDM, and its activity says who approved it and why.'),
+   ('As Test MktMgr (a sales manager over Ahmedabad), change "Handled by" on another Test MktExec lead with a reason → Save.', 'It changes at once — no request — and the reason is in its history.'),
+   ('As Test MktExec, give a lead that has NO owner to Test BDM (register → tick it → "Allocate to…").', 'Allocated at once: a lead nobody owns needs no approval.'),
+   ('Edge: as Test MktExec, ask to reassign a lead, then (as its owner) mark it lost before the manager decides. As Test BranchMgr press Approve.', 'Refused: "The lead has changed since this was asked (closed, or given to someone else), so the request is closed." It disappears from Approvals.')],
+  'owner 20 Oct 2026; lead_change_owner(); lead_reassign_decide(); docs/03 lead reassignment request')
+
 C('SAL-030', 'Opportunities', 'Open a deal and move it to Won', 'scenario', ['best'],
   'BUSINESS_DEV_MANAGER', 'Deals carry the value and probability that make the forecast.',
   'Signed in as Test BDM. Customer TB Refinery Ltd exists.',

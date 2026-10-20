@@ -47,7 +47,7 @@ $pipe = (int) $lrow()['pipeline_id'];
 $open = pipeline_stages($pipe);
 $second = null; foreach ($open as $s) if ($s['kind'] === 'OPEN' && (int)$s['id'] !== (int)$lrow()['stage_id']) { $second = $s; break; }
 lead_move($lid, (int)$second['id']);
-lead_move($lid, (int)$kindStage($pipe, 'LOST')['id'], ['lost_reason' => 'PRICE', 'lost_note' => 'Too dear']);
+lead_move($lid, (int)$kindStage($pipe, 'LOST')['id'], ['lost_reason' => 'PRICE_HIGH', 'lost_note' => 'Too dear']);
 t_eq((string) $lrow()['status'], 'LOST', 'arranged: a lead lost from its second stage');
 $r = $drive($MM, 'lead-convert', 'POST', ['id' => $lid], ['id' => $lid]);
 t_eq((string) $lrow()['status'], 'LOST', 'a lost lead cannot be converted straight into a customer: ' . $said($r));

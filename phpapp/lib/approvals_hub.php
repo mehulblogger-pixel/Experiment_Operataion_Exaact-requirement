@@ -49,6 +49,31 @@ function approvals_hub_sections() {
             'items' => $items,
         ];
     }
+    //  Quotations at the level waiting on this person — the approval chain the
+    //  owner's organisation runs on (Branch Manager → SBU Head → Business
+    //  Director → MD). They were only findable inside Sales.
+    if (function_exists('crm_quote_ids_awaiting_me') && (!function_exists('licence_module_live') || licence_module_live('quotes'))) {
+        $items = [];
+        foreach (crm_quote_ids_awaiting_me() as $qid) if ($q = crm_quote_get((int)$qid)) $items[] = $q;
+        if ($items) $out[] = [
+            'key'   => 'quotes',
+            'title' => 'Quotations',
+            'sub'   => 'Quotations waiting at your approval level.',
+            'act'   => '/quotes',
+            'items' => $items,
+        ];
+    }
+    //  Lead reassignments waiting for a manager (owner, 20 Oct 2026).
+    if (function_exists('lead_reassign_waiting_on_me')) {
+        $items = lead_reassign_waiting_on_me();
+        if ($items) $out[] = [
+            'key'   => 'lead_reassign',
+            'title' => 'Lead reassignments',
+            'sub'   => 'Someone asked to give a lead to another person. It changes hands only when a manager approves.',
+            'act'   => '',   // decided right here; the approving manager may not open the lead register
+            'items' => $items,
+        ];
+    }
     if (function_exists('gate_can_view') && gate_can_view() && function_exists('gate_queue')) {
         $q = gate_queue('PENDING');
         if (!empty($q['act'])) $out[] = [
@@ -74,7 +99,11 @@ function approvals_hub_count() {
 //  recruitment approver who had no stage-gate rights, which is most of them.
 function approvals_hub_can_view() {
     if (function_exists('gate_can_view') && gate_can_view()) return true;
-    return approvals_hub_recruit_on();
+    if (approvals_hub_recruit_on()) return true;
+    //  Someone with a quotation or a lead reassignment waiting on them may open
+    //  it too — a Branch Manager approving quotations holds no stage-gate right.
+    if (function_exists('crm_quote_ids_awaiting_me') && crm_quote_ids_awaiting_me()) return true;
+    return function_exists('lead_reassign_waiting_on_me') && (bool) lead_reassign_waiting_on_me();
 }
 
 //  One row, however it arrived, so the screen can render both the same way.
@@ -89,6 +118,28 @@ function approvals_hub_row($sectionKey, array $r) {
             'when'  => (string)($r['sla_due'] ?? ''),
             'rule'  => (string)($r['rule_name'] ?? ''),
             'url'   => '/my-approvals',
+        ];
+    }
+    if ($sectionKey === 'quotes') {
+        return [
+            'what'  => (function_exists('quote_label') ? quote_label($r) : (string)($r['quote_no'] ?? 'Quotation')) . ' — ' . (string)($r['client_name'] ?? ''),
+            'kind'  => function_exists('fmoney') ? fmoney((float)($r['subtotal'] ?? 0)) . ' before tax' : '',
+            'who'   => (string)($r['created_by'] ?? ''),
+            'when'  => (string)substr((string)($r['submitted_at'] ?? ''), 0, 10),
+            'rule'  => '',
+            'url'   => '/quote?id=' . (int)$r['id'],
+        ];
+    }
+    if ($sectionKey === 'lead_reassign') {
+        $to = ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [(int)($r['to_user_id'] ?? 0)]);
+        return [
+            'what'  => (string)($r['ref'] ?? '') . ' — ' . (string)($r['company_name'] ?? ''),
+            'kind'  => 'From ' . ((string)($r['owner_name'] ?? '') ?: 'its owner') . ' to ' . ($to ? (trim(($to['first_name'] ?? '') . ' ' . ($to['last_name'] ?? '')) ?: $to['username']) : '—'),
+            'who'   => (string)($r['requested_by'] ?? ''),
+            'when'  => (string)substr((string)($r['created_at'] ?? ''), 0, 10),
+            'rule'  => (string)($r['reason'] ?? ''),
+            'url'   => '',
+            'req'   => (int)($r['id'] ?? 0),
         ];
     }
     return [

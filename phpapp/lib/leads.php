@@ -159,7 +159,15 @@ function leads_migrate() {
         ensure_column('leads', 'manpower_skills', "TEXT");                     // skills / qualifications sought
         ensure_column('leads', 'site_location',   "VARCHAR(300) DEFAULT ''");  // required for a man-month deputation
     }
+    // Owner, 20 Oct 2026: reassigning a lead needs a manager's approval. One row
+    // per request: PENDING → APPROVED | REJECTED | CANCELLED (docs/03).
+    $pdo->exec("CREATE TABLE IF NOT EXISTS lead_reassign_requests (
+        id $pk, lead_id INT, from_user_id INT NULL, to_user_id INT NULL,
+        reason VARCHAR(500) DEFAULT '', requested_by_id INT NULL, requested_by VARCHAR(150) DEFAULT '',
+        status VARCHAR(12) DEFAULT 'PENDING', decided_by VARCHAR(150) DEFAULT '', decided_at VARCHAR(30) DEFAULT '',
+        decision_note VARCHAR(500) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     if (function_exists('act_index')) {
+        act_index('lead_reassign_requests', 'idx_lrr_lead', '(lead_id, status)');
         act_index('leads', 'idx_lead_stage', '(stage_id, status)');
         act_index('leads', 'idx_lead_owner', '(owner_user_id, status)');
         act_index('lead_stage_history', 'idx_lsh_lead', '(lead_id)');
@@ -224,6 +232,144 @@ function lead_reopen($leadId, $reason) {
         act_log('LEAD', (int)$l['id'], 'SYSTEM', 'Lead ' . $l['ref'] . ' reopened by ' . user_name(current_user()) . ' — ' . $reason,
                 ['auto' => 1, 'partner_id' => $l['partner_id'], 'body' => 'It had been lost: ' . trim((string)$l['lost_reason'] . ' ' . (string)$l['lost_note'])]);
     return ['ok' => true, 'stage' => $to['name']];
+}
+
+// ---- Who marks a lead lost, and who may hand it to someone else --------------
+//  The owner, 20 Oct 2026: "if lead is lost the responsible person must mark as
+//  lost with a valid reason and remarks. Reassigning shall be done only after
+//  manager approval."
+//
+//  The responsible person is the lead's owner (the person it is allocated to).
+//  A lead nobody owns yet may be closed by anyone who may edit leads. A master
+//  may always act — the recovery when an owner has left.
+function lead_can_mark_lost($l) {
+    if (function_exists('is_master_of') && is_master_of(['leads'])) return true;
+    $owner = (int)($l['owner_user_id'] ?? 0);
+    if ($owner) return $owner === (int)(current_user()['id'] ?? 0);
+    return leads_can_edit();
+}
+// A valid reason is one on the lost-reason list; remarks are always required.
+function lead_lost_problem($l, $reason, $note) {
+    if (!lead_can_mark_lost($l)) return 'Only the person responsible for this lead (' . (trim((string)($l['owner_name'] ?? '')) ?: 'its owner')
+        . ') can mark it lost. Ask them, or have it reassigned to you first.';
+    $reasons = function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : QUOTE_LOST_REASONS;
+    if ((string)$reason === '' || !isset($reasons[(string)$reason])) return 'Pick why it was lost from the list — the reason is what makes win/loss analysis possible.';
+    if (trim((string)$note) === '') return 'Add your remarks — what happened, in a sentence. Both the reason and the remarks are required.';
+    return '';
+}
+
+// "A manager" for a reassignment: the current owner's reporting manager, or
+// someone with sales-manager authority (D-22: configures the pipelines or
+// approves quotations) whose branches and business units cover the lead. Never
+// the person who asked, unless they are themselves such a manager.
+function lead_user_is_manager_for($l, $u) {
+    if (!$u) return false;
+    if (!empty($u['is_superuser']) || strtoupper((string)($u['role'] ?? '')) === 'MASTER_ADMIN') return true;
+    $owner = (int)($l['owner_user_id'] ?? 0);
+    if ($owner && (int)ops_val("SELECT COALESCE(reports_to_id,0) FROM users WHERE id=?", [$owner]) === (int)$u['id']) return true;
+    $perms = function_exists('user_effective_perms') ? user_effective_perms($u) : [];
+    if (!in_array('mod.leads.edit', $perms, true) && !in_array('crm.quote.approve', $perms, true)) return false;
+    return !function_exists('user_scope_covers') || user_scope_covers($u, $l['office_id'] ?? null, (string)($l['sbu'] ?? ''));
+}
+function lead_reassign_approvers($l, $exceptId = 0) {
+    $out = [];
+    foreach (ops_all("SELECT * FROM users WHERE is_active=1 AND COALESCE(is_superuser,0)=0 AND role<>'MASTER_ADMIN'") ?: [] as $u)
+        if ((int)$u['id'] !== (int)$exceptId && lead_user_is_manager_for($l, $u)) $out[] = $u;
+    return $out;
+}
+function lead_reassign_pending($leadId) {
+    return leads_try(fn() => ops_one("SELECT * FROM lead_reassign_requests WHERE lead_id=? AND status='PENDING' ORDER BY id DESC LIMIT 1", [(int)$leadId]), null) ?: null;
+}
+
+// Change who a lead belongs to. Returns ['ok'=>'done'|'requested'] or ['err'=>…].
+//   - nobody owns it yet         → allocated at once (that is allocation, not reassignment)
+//   - the actor manages this lead → reassigned at once, with the reason in its history
+//   - anyone else                 → a request; the lead stays with its owner until a manager approves
+function lead_change_owner($leadId, $toUserId, $reason = '') {
+    $l = lead_row($leadId);
+    if (!$l) return ['err' => 'That lead no longer exists.'];
+    $to = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [(int)$toUserId]);
+    if (!$to) return ['err' => 'Choose an active person to give it to.'];
+    $from = (int)($l['owner_user_id'] ?? 0);
+    if ($from === (int)$to['id']) return ['ok' => 'same'];
+    $me = current_user(); $reason = trim((string)$reason);
+    $apply = function () use ($l, $to, $reason, $me, $from) {
+        db()->prepare("UPDATE leads SET owner_user_id=?, owner_name=?, updated_at=? WHERE id=?")
+            ->execute([(int)$to['id'], substr(user_name($to), 0, 150), date('c'), (int)$l['id']]);
+        if (function_exists('act_log'))
+            act_log('LEAD', (int)$l['id'], 'OWNER', ($from ? 'Reassigned from ' . ($l['owner_name'] ?: 'its owner') . ' to ' : 'Allocated to ') . user_name($to)
+                . ' by ' . user_name($me) . ($reason !== '' ? ' — ' . $reason : ''));
+    };
+    if (!$from) { $apply(); return ['ok' => 'done']; }
+    if ($l['status'] !== 'OPEN') return ['err' => 'This lead is ' . strtolower((string)$l['status']) . ' — a closed lead is not reassigned.'];
+    if ($reason === '') return ['err' => 'Say why it is being reassigned — the manager who approves it reads this.'];
+    if (lead_user_is_manager_for($l, $me)) {
+        $apply();
+        leads_try(fn() => db()->prepare("UPDATE lead_reassign_requests SET status='CANCELLED', decided_by=?, decided_at=?, decision_note=? WHERE lead_id=? AND status='PENDING'")
+            ->execute([user_name($me), date('c'), 'Reassigned directly by a manager', (int)$l['id']]), null);
+        return ['ok' => 'done'];
+    }
+    if (lead_reassign_pending((int)$l['id'])) return ['err' => 'A reassignment of this lead is already waiting for a manager. It can be changed after that is decided.'];
+    db()->prepare("INSERT INTO lead_reassign_requests (lead_id, from_user_id, to_user_id, reason, requested_by_id, requested_by, status, created_at)
+                   VALUES (?,?,?,?,?,?,'PENDING',?)")
+        ->execute([(int)$l['id'], $from, (int)$to['id'], substr($reason, 0, 500), (int)($me['id'] ?? 0), substr(user_name($me), 0, 150), date('c')]);
+    if (function_exists('act_log'))
+        act_log('LEAD', (int)$l['id'], 'OWNER', user_name($me) . ' asked to reassign it to ' . user_name($to) . ' — waiting for a manager — ' . $reason);
+    foreach (lead_reassign_approvers($l, (int)($me['id'] ?? 0)) as $ap) {
+        if (trim((string)($ap['email'] ?? '')) === '' || !function_exists('ops_mail')) continue;
+        ops_mail($ap['email'], 'Approve a lead reassignment: ' . $l['ref'],
+            "Hello,\n\n" . user_name($me) . " asks to reassign lead {$l['ref']} ({$l['company_name']}) from " . ($l['owner_name'] ?: 'its owner')
+            . ' to ' . user_name($to) . ".\nReason: $reason\n\nOpen the lead in " . (function_exists('app_name') ? app_name() : 'the application') . " to approve or reject it.\n",
+            '', 'LEAD_REASSIGN');
+    }
+    return ['ok' => 'requested'];
+}
+
+// A manager decides a waiting reassignment. Rejecting needs a reason.
+function lead_reassign_decide($reqId, $approve, $note = '') {
+    $r = leads_try(fn() => ops_one("SELECT * FROM lead_reassign_requests WHERE id=?", [(int)$reqId]), null);
+    if (!$r || $r['status'] !== 'PENDING') return ['err' => 'That request has already been decided.'];
+    $l = lead_row((int)$r['lead_id']); $me = current_user(); $note = trim((string)$note);
+    if (!$l) return ['err' => 'That lead no longer exists.'];
+    if (!lead_user_is_manager_for($l, $me)) return ['err' => 'Only a manager over this lead can decide its reassignment.'];
+    if ((int)$r['requested_by_id'] === (int)($me['id'] ?? 0) && !(function_exists('is_master') && is_master()))
+        return ['err' => 'You asked for this reassignment, so another manager decides it.'];
+    $close = function ($status, $why) use ($r, $me) {
+        db()->prepare("UPDATE lead_reassign_requests SET status=?, decided_by=?, decided_at=?, decision_note=? WHERE id=? AND status='PENDING'")
+            ->execute([$status, user_name($me), date('c'), substr($why, 0, 500), (int)$r['id']]);
+    };
+    if (!$approve) {
+        if ($note === '') return ['err' => 'Say why it is rejected — the person who asked reads this.'];
+        $close('REJECTED', $note);
+        if (function_exists('act_log')) act_log('LEAD', (int)$l['id'], 'OWNER', 'Reassignment rejected by ' . user_name($me) . ' — ' . $note);
+        return ['ok' => 'rejected'];
+    }
+    // The lead moved on while the request waited: nothing to approve any more.
+    if ($l['status'] !== 'OPEN' || (int)$l['owner_user_id'] !== (int)$r['from_user_id']) {
+        $close('CANCELLED', 'The lead had changed since it was asked');
+        return ['err' => 'The lead has changed since this was asked (closed, or given to someone else), so the request is closed.'];
+    }
+    $to = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [(int)$r['to_user_id']]);
+    if (!$to) { $close('CANCELLED', 'The person it was to go to is no longer active'); return ['err' => 'That person is no longer active, so the request is closed.']; }
+    db()->prepare("UPDATE leads SET owner_user_id=?, owner_name=?, updated_at=? WHERE id=?")
+        ->execute([(int)$to['id'], substr(user_name($to), 0, 150), date('c'), (int)$l['id']]);
+    $close('APPROVED', $note);
+    if (function_exists('act_log'))
+        act_log('LEAD', (int)$l['id'], 'OWNER', 'Reassigned from ' . ($l['owner_name'] ?: 'its owner') . ' to ' . user_name($to)
+            . ' — approved by ' . user_name($me) . ' (asked by ' . $r['requested_by'] . ': ' . $r['reason'] . ')' . ($note !== '' ? ' — ' . $note : ''));
+    return ['ok' => 'approved'];
+}
+// The requests waiting on the person signed in (for the Approvals inbox).
+function lead_reassign_waiting_on_me() {
+    $me = current_user(); if (!$me) return [];
+    $rows = leads_try(fn() => ops_all("SELECT r.*, l.ref, l.company_name, l.owner_name, l.office_id, l.sbu, l.owner_user_id, l.status lead_status
+                                       FROM lead_reassign_requests r JOIN leads l ON l.id=r.lead_id WHERE r.status='PENDING' ORDER BY r.id"), []) ?: [];
+    $out = [];
+    foreach ($rows as $r) {
+        if ((int)$r['requested_by_id'] === (int)$me['id'] && !(function_exists('is_master') && is_master())) continue;
+        if (lead_user_is_manager_for($r, $me)) $out[] = $r;
+    }
+    return $out;
 }
 
 // ---- Pipelines and stages --------------------------------------------------
@@ -637,7 +783,8 @@ function lead_move($leadId, $stageId, array $b = []) {
 
     if ($to['kind'] === 'LOST') {
         $reason = (string)($b['lost_reason'] ?? '');
-        if ($reason === '') return ['err' => 'Say why it was lost — the reason is what makes win/loss analysis possible.'];
+        $problem = lead_lost_problem($l, $reason, (string)($b['lost_note'] ?? ''));
+        if ($problem !== '') return ['err' => $problem];
         db()->prepare("UPDATE leads SET status='LOST', stage_id=?, lost_reason=?, lost_note=?,
                        stage_since=?, updated_at=? WHERE id=?")
             ->execute([(int)$to['id'], $reason, substr(trim((string)($b['lost_note'] ?? '')), 0, 500),
@@ -980,8 +1127,9 @@ function leads_bulk_eligible($action, $id) {
     if ($action === 'lost') {
         // Already closed one way or another — skip rather than overwrite a
         // conversion with a loss.
-        $st = (string)ops_val("SELECT status FROM leads WHERE id=?", [(int)$id]);
-        if ($st !== 'OPEN') return ['ok' => false, 'reason' => 'already closed'];
+        $l = lead_row((int)$id);
+        if (!$l || $l['status'] !== 'OPEN') return ['ok' => false, 'reason' => 'already closed'];
+        if (!lead_can_mark_lost($l)) return ['ok' => false, 'reason' => 'not yours — only the person responsible marks it lost'];
     }
     return ['ok' => true, 'reason' => ''];
 }
@@ -1014,42 +1162,44 @@ function leads_bulk($action, array $ids) {
     if (!$allowed) return 'None of those are yours to change.';
     $u = current_user();
     $now = date('c');
-    $n = 0;
+    $n = 0; $asked = 0; $skip = [];
     foreach ($allowed as $id) {
         // Allocating to a colleague, not only to yourself. "Assign to me" was
         // the ONLY way to give a lead an owner from the register, which is the
         // opposite of what a manager standing over a list of new enquiries
         // actually needs to do.
-        if ($action === 'assign') {
-            $to = (int)($_POST['assign_to'] ?? 0);
-            $ou = $to ? ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [$to]) : null;
-            if (!$ou) return 'Choose an active person to allocate these to.';
-            db()->prepare("UPDATE leads SET owner_user_id=?, owner_name=?, updated_at=? WHERE id=?")
-                ->execute([(int)$ou['id'], user_name($ou), $now, $id]);
-            if (function_exists('act_log')) act_log('LEAD', $id, 'OWNER', 'Allocated to ' . user_name($ou) . ' in a bulk update');
-            $n++;
+        // Allocating and taking go through the one owner-change rule: a lead
+        // nobody owns is allocated at once; one that has an owner is reassigned
+        // at once only by a manager over it, otherwise it is asked for.
+        if ($action === 'assign' || $action === 'mine') {
+            $to = $action === 'mine' ? (int)$u['id'] : (int)($_POST['assign_to'] ?? 0);
+            if (!$to) return 'Choose an active person to allocate these to.';
+            $r = lead_change_owner($id, $to, (string)($_POST[$action === 'mine' ? 'reassign_reason_mine' : 'reassign_reason'] ?? ''));
+            if (!empty($r['err'])) { $skip[] = $r['err']; continue; }
+            if (($r['ok'] ?? '') === 'requested') $asked++; elseif (($r['ok'] ?? '') === 'done') $n++;
             continue;
         }
-        if ($action === 'mine') {
-            // user_name() is what lead_create() writes, so a lead reassigned in
-            // bulk carries the same name as one created by hand.
-            db()->prepare("UPDATE leads SET owner_user_id=?, owner_name=?, updated_at=? WHERE id=?")
-               ->execute([(int)$u['id'], substr(user_name($u), 0, 150), $now, $id]);
-            $n++;
-        } elseif ($action === 'lost') {
+        if ($action === 'lost') {
             // Same eligibility the preview showed: skip a lead that is already
             // closed rather than overwrite a conversion with a loss.
             if (!leads_bulk_eligible('lost', $id)['ok']) continue;
-            db()->prepare("UPDATE leads SET status='LOST', lost_reason=?, updated_at=? WHERE id=?")
-               ->execute([(string)($_POST['lost_reason'] ?? 'NO_RESPONSE'), $now, $id]);
+            $problem = lead_lost_problem(lead_row($id), (string)($_POST['lost_reason'] ?? ''), (string)($_POST['lost_note'] ?? ''));
+            if ($problem !== '') return $problem;
+            db()->prepare("UPDATE leads SET status='LOST', lost_reason=?, lost_note=?, updated_at=? WHERE id=?")
+               ->execute([(string)$_POST['lost_reason'], substr(trim((string)$_POST['lost_note']), 0, 500), $now, $id]);
             if (function_exists('act_log')) act_log('LEAD', $id, 'STATUS', 'Marked lost in a bulk update');
             if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Marked lost in a bulk update');
             $n++;
         }
     }
+    if ($action === 'assign' || $action === 'mine') {
+        return $n . ' lead' . ($n === 1 ? '' : 's') . ' updated.'
+             . ($asked ? ' ' . $asked . ' sent to a manager for approval (they had an owner).' : '')
+             . ($skip ? ' ' . count($skip) . ' left alone: ' . implode(' ', array_unique($skip)) : '');
+    }
     $skipped = count($allowed) - $n;
     return $n . ' lead' . ($n === 1 ? '' : 's') . ' updated.'
-         . ($skipped > 0 ? ' ' . $skipped . ' left alone because ' . ($skipped === 1 ? 'it was' : 'they were') . ' already closed.' : '');
+         . ($skipped > 0 ? ' ' . $skipped . ' left alone (already closed, or not yours to mark lost).' : '');
 }
 
 // ---- Screens ----------------------------------------------------------------
@@ -1297,12 +1447,10 @@ function ops_leads($route, $method) {
         // which every "my leads" filter and every reminder reads — stayed empty.
         // A lead you cannot allocate is a lead nobody is accountable for.
         $ownerId = ($_POST['owner_user_id'] ?? '') !== '' ? (int)$_POST['owner_user_id'] : null;
-        $ownerNm = '';
-        if ($ownerId) {
-            $ou = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [$ownerId]);
-            if (!$ou) { flash('That person is not an active user.', 'error'); redirect('/lead?id=' . $id); }
-            $ownerNm = user_name($ou);
-        }
+        if ($ownerId && !ops_one("SELECT id FROM users WHERE id=? AND is_active=1", [$ownerId])) { flash('That person is not an active user.', 'error'); redirect('/lead?id=' . $id); }
+        // The details save keeps the CURRENT owner; a different one is handled below.
+        $cur = lead_row($id) ?: [];
+        $keepOwnerId = (int)($cur['owner_user_id'] ?? 0) ?: null; $ownerNm = (string)($cur['owner_name'] ?? '');
         $pref = isset(LEAD_PREF_CONTACT[$_POST['pref_contact'] ?? '']) ? (string)$_POST['pref_contact'] : '';
         // Field #7 — manpower deputation, same rule as create: a man-month needs the site.
         $dep = strtoupper(trim((string)($_POST['deputation_kind'] ?? '')));
@@ -1324,7 +1472,7 @@ function ops_leads($route, $method) {
                 substr(trim((string)($_POST['contact_phone'] ?? '')), 0, 60),
                 (string)($_POST['source'] ?? ''), (string)($_POST['requirement'] ?? ''),
                 (float)($_POST['value'] ?? 0), (string)($_POST['expected_close'] ?? ''),
-                $ownerId, substr($ownerNm, 0, 150),
+                $keepOwnerId, substr($ownerNm, 0, 150),
                 (string)($_POST['next_action_on'] ?? ''),
                 substr(trim((string)($_POST['next_action'] ?? '')), 0, 255),
                 $pref,
@@ -1332,7 +1480,15 @@ function ops_leads($route, $method) {
                 trim((string)($_POST['manpower_skills'] ?? '')), substr($site, 0, 300),
                 date('c'), $id]);
         if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Details edited');
-        flash('Saved.');
+        // Who it belongs to changes through the one rule (manager approval),
+        // never as a side effect of saving the other details.
+        $ownerMsg = '';
+        if ($ownerId && $ownerId !== (int)($cur['owner_user_id'] ?? 0)) {
+            $r = lead_change_owner($id, $ownerId, (string)($_POST['reassign_reason'] ?? ''));
+            $ownerMsg = !empty($r['err']) ? ' The owner was NOT changed: ' . $r['err']
+                      : (($r['ok'] ?? '') === 'requested' ? ' The reassignment has been sent to a manager for approval; it stays with its owner until then.' : '');
+        }
+        flash('Saved.' . $ownerMsg, strpos($ownerMsg, 'NOT') !== false ? 'warning' : 'success');
         redirect('/lead?id=' . $id);
     }
 

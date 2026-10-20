@@ -116,14 +116,22 @@
       foreach (($users ?? []) as $u)
           $bulkExtra .= '<option value="' . (int)$u['id'] . '">'
             . e(trim($u['first_name'] . ' ' . $u['last_name']) ?: $u['username']) . '</option>';
-      $bulkExtra .= '</select></span>';
+      $bulkExtra .= '</select>'
+        . '<label class="sr-only" for="lead-assign-why">Why (for leads that already have an owner)</label>'
+        . '<input class="form-control" id="lead-assign-why" name="reassign_reason" maxlength="500" placeholder="Why — needed if they already have an owner" style="min-width:14rem"></span>';
+      // Taking leads that belong to someone else is a reassignment too.
+      $bulkExtra .= '<span class="bulk-ctl" data-for="mine" hidden>'
+        . '<label class="sr-only" for="lead-mine-why">Why (for leads that already have an owner)</label>'
+        . '<input class="form-control" id="lead-mine-why" name="reassign_reason_mine" maxlength="500" placeholder="Why — needed if they already have an owner" style="min-width:14rem"></span>';
 
       $bulkExtra .= '<span class="bulk-ctl" data-for="lost" hidden>'
         . '<label class="sr-only" for="lead-lost-reason">Why they were lost</label>'
         . '<select class="form-control" id="lead-lost-reason" name="lost_reason" style="min-width:11rem">';
       foreach (($lostReasons ?: ['NO_RESPONSE' => 'No response']) as $k => $v)
           $bulkExtra .= '<option value="' . e($k) . '">' . e($v) . '</option>';
-      $bulkExtra .= '</select></span>';
+      $bulkExtra .= '</select>'
+        . '<label class="sr-only" for="lead-lost-note">Remarks</label>'
+        . '<input class="form-control" id="lead-lost-note" name="lost_note" maxlength="500" placeholder="Remarks — required" style="min-width:14rem"></span>';
   }
 ?>
 <div style="margin-top:16px">

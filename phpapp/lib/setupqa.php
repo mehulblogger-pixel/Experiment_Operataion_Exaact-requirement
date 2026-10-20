@@ -171,12 +171,11 @@ function setupqa_sales_gate_facts() {
 
 // Every other approval in Sales, with who gives it. These follow the company's
 // decided rules (docs/02-permission-matrix.md 19e, 19f; D-11 B) and have no
-// setting, so they are stated rather than asked. A lead needs no approval: it
-// ends by converting, which is its own act.
+// setting, so they are stated rather than asked.
 function setupqa_sales_other_approvals() {
     $q = function_exists('Tl') ? Tl('quote') : 'quotation';
     return [
-        'Leads: no approval. A lead ends by becoming a customer (convert) or being marked lost. A manager may reopen a lost lead, with a reason that is kept.',
+        'Leads: only the person responsible marks a lead lost, with a reason and remarks. Giving a lead that already has an owner to someone else waits for a manager\'s approval — the owner\'s reporting manager, or a sales manager over that branch. A manager may reopen a lost lead, with a reason that is kept.',
         'Deals (opportunities): only the stage rules above. A manager may reopen a closed deal, with a reason that is kept — unless it has already become an order or contract.',
         'Project costing (man-month work): approved by someone who may approve ' . (function_exists('Tlp') ? Tlp('quote') : 'quotations') . ' or a manager — never by the person who prepared it.',
         ucfirst($q) . 's: the levels above, in order — level 1 first, then level 2, and so on.',
@@ -220,5 +219,37 @@ function setupqa_sales_level_facts() {
         if ($max <= 0) $open = true; else $top = max($top, $max);
     }
     if (!$open) $out[] = 'Nothing above ' . $money($top) . ' is covered by a level — the first question below decides what happens to it.';
+    return array_merge($out, setupqa_sales_coverage_gaps($rows, $units));
+}
+
+// A level addressed to a role goes to the people in that role who cover the
+// quotation's branch and business unit (crm_role_approvers_for()). Where nobody
+// does, it falls back to everyone in the role — said here, so it can be fixed
+// on the person's Data scope before a quotation meets it.
+function setupqa_sales_coverage_gaps(array $rows, array $units) {
+    if (!function_exists('user_scope_covers')) return [];
+    $offices = function_exists('offices_list') ? (offices_list() ?: []) : [];
+    $out = []; $seen = [];
+    foreach ($rows as $r) {
+        $role = (string) ($r['approver_role'] ?? '');
+        if ($role === '' || $role === 'REPORTS_TO' || !empty($r['approver_user_id']) || isset($seen[$role])) continue;
+        $seen[$role] = true;
+        $people = ops_all("SELECT * FROM users WHERE role=? AND is_active=1", [$role]) ?: [];
+        $name = ORG_ROLES[$role] ?? $role;
+        if (!$people) { $out[] = '⚠ Nobody has the role ' . $name . ' yet, so level ' . (int) $r['level'] . ' cannot be signed by role.'; continue; }
+        $missOff = [];
+        foreach ($offices as $o) {
+            $covered = false; foreach ($people as $u) if (user_scope_covers($u, (int) $o['id'], '')) { $covered = true; break; }
+            if (!$covered) $missOff[] = $o['name'];
+        }
+        $missUnit = [];
+        foreach ($units as $code => $label) {
+            $covered = false; foreach ($people as $u) if (user_scope_covers($u, null, (string) $code)) { $covered = true; break; }
+            if (!$covered) $missUnit[] = $label;
+        }
+        if ($missOff) $out[] = '⚠ No ' . $name . ' covers ' . implode(', ', array_slice($missOff, 0, 8)) . (count($missOff) > 8 ? ' and ' . (count($missOff) - 8) . ' more' : '')
+                             . ' — a quotation from there goes to every ' . $name . '. Set it on that person\'s Data scope.';
+        if ($missUnit) $out[] = '⚠ No ' . $name . ' covers the business unit ' . implode(', ', $missUnit) . ' — such a quotation goes to every ' . $name . '.';
+    }
     return $out;
 }

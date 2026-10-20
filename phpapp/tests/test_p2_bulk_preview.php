@@ -48,7 +48,10 @@ try {
     t_ok($plan['skip'][0]['reason'] === 'already closed', 'the skip reason is surfaced');
 
     // Now actually run it — the count must match the preview exactly.
+    // Owner, 20 Oct 2026: a reason from the list AND remarks, in bulk too.
+    $_POST['lost_reason'] = array_key_first(lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS)); $_POST['lost_note'] = 'No budget this year';
     $msg = leads_bulk('lost', $ids);
+    unset($_POST['lost_reason'], $_POST['lost_note']);
     t_ok(strpos($msg, '3 leads updated') !== false, 'the executor marks exactly the 3 the preview promised');
     $stillOpen = (int)ops_val("SELECT COUNT(*) FROM leads WHERE id IN (" . implode(',', $ids) . ") AND status='OPEN'");
     t_eq($stillOpen, 0, 'no open lead is left behind');

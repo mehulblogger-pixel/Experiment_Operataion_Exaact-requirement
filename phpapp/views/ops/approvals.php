@@ -36,7 +36,7 @@ foreach ($sections as $sec):
     <div style="padding:12px 16px;background:var(--soft);border-bottom:1px solid var(--line);display:flex;gap:12px;flex-wrap:wrap;align-items:baseline">
       <b style="font-size:13.5px"><?= e($sec['title']) ?></b>
       <span class="muted" style="font-size:12.5px">— <?= count($sec['items']) ?></span>
-      <a class="btn small secondary" style="margin-left:auto" href="<?= e($sec['act']) ?>">Open <?= e(strtolower($sec['title'])) ?> →</a>
+      <?php if (($sec['act'] ?? '') !== ''): ?><a class="btn small secondary" style="margin-left:auto" href="<?= e($sec['act']) ?>">Open <?= e(strtolower($sec['title'])) ?> →</a><?php endif; ?>
       <div class="muted" style="font-size:12.5px;flex-basis:100%"><?= e($sec['sub']) ?></div>
     </div>
     <div class="dt-scroll">
@@ -44,7 +44,7 @@ foreach ($sections as $sec):
         <caption class="sr-only"><?= e($sec['title']) ?> waiting on you</caption>
         <thead><tr>
           <th scope="col">What</th><th scope="col">Kind</th>
-          <th scope="col">Raised by</th><th scope="col">Due</th><th scope="col"></th>
+          <th scope="col">Raised by</th><th scope="col">Date</th><th scope="col"></th>
         </tr></thead>
         <tbody>
         <?php foreach ($sec['items'] as $it): $row = approvals_hub_row($sec['key'], $it); ?>
@@ -53,7 +53,18 @@ foreach ($sections as $sec):
             <td><?= e($row['kind']) ?></td>
             <td><?= e($row['who']) ?></td>
             <td><?= e($row['when']) ?></td>
-            <td style="text-align:right"><a class="btn small" href="<?= e($row['url']) ?>">Decide</a></td>
+            <td style="text-align:right">
+              <?php if ($sec['key'] === 'lead_reassign'): ?>
+                <form method="post" action="/approval-lead-decide" style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+                  <input type="hidden" name="req" value="<?= (int)$row['req'] ?>">
+                  <label class="sr-only" for="lrn-<?= (int)$row['req'] ?>">Note</label>
+                  <input class="form-control" id="lrn-<?= (int)$row['req'] ?>" style="width:180px" name="note" placeholder="Note (required to reject)" maxlength="500">
+                  <button class="btn small" name="decision" value="approve">Approve</button>
+                  <button class="btn small secondary" name="decision" value="reject">Reject</button>
+                </form>
+              <?php else: ?>
+                <a class="btn small" href="<?= e($row['url']) ?>">Decide</a>
+              <?php endif; ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>

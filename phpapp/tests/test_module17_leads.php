@@ -64,8 +64,13 @@ try {
         $res2 = lead_move($ok, $lostStage, []);   // no lost_reason
         t_ok(trim((string)($res2['err'] ?? '')) !== '',
              'moving a lead to a LOST stage without a reason is refused');
-        $res3 = lead_move($ok, $lostStage, ['lost_reason' => 'NO_RESPONSE']);
-        t_ok(!empty($res3['ok']), 'a LOST move with a reason is accepted');
+        // Marking lost is the responsible person's act (owner, 20 Oct 2026); this
+        // lead has no owner, so it needs someone who may edit leads — an administrator.
+        if (function_exists('t_as_admin')) t_as_admin();
+        $res3a = lead_move($ok, $lostStage, ['lost_reason' => 'NO_RESPONSE']);
+        t_ok(!empty($res3a['err']), 'a LOST move with a reason but no remarks is refused (owner, 20 Oct 2026)');
+        $res3 = lead_move($ok, $lostStage, ['lost_reason' => 'NO_RESPONSE', 'lost_note' => 'No reply in four weeks']);
+        t_ok(!empty($res3['ok']), 'a LOST move with a reason and remarks is accepted');
     }
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();

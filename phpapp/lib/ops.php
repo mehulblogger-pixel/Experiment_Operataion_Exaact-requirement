@@ -4173,7 +4173,7 @@ function ops_dispatch($route, $method) {
         case $route === 'sso':
             return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.
-        case $route === 'approvals' || $route === 'approval-act':
+        case $route === 'approvals' || $route === 'approval-act' || $route === 'approval-lead-decide':
             return ops_approvals($route, $method);
         case strncmp($route, 'stage-gate', 10) === 0:
             return ops_stage_gates($route, $method);

@@ -34,7 +34,7 @@ $val = fn($k, $d = '') => htmlspecialchars((string)($r[$k] ?? $d), ENT_QUOTES);
                 //  and the note says where. ?>
           <input type="hidden" name="entity_kind" value="OPPORTUNITY">
           <div class="form-control" style="background:var(--field,#f8fafc)">Deals (opportunities)</div>
-          <div class="muted" style="font-size:12px;margin-top:3px">Quotations are approved by value levels, set on <a href="/sales-setup#levels">Set up Sales</a>. Leads need no approval — a lead ends by converting into a customer, which is its own act.</div>
+          <div class="muted" style="font-size:12px;margin-top:3px">Quotations are approved by value levels, set on <a href="/sales-setup#levels">Set up Sales</a>. Leads have their own rules: the person responsible marks a lead lost (reason and remarks), and reassigning it waits for a manager.</div>
         </div>
 
         <div>

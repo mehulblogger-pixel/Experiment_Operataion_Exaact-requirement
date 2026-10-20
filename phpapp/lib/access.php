@@ -1298,6 +1298,25 @@ function ua($fresh = false) {
     // what this same choke point grants (R3 — no drift between what is shown and
     // what is enforced).
     $perms = user_effective_perms($u);
+    $sc = user_scope_of($u);
+    return $a = [
+        'role' => $role, 'perms' => array_values($perms),
+        'offices' => $sc['offices'], 'sbus' => $sc['sbus'],
+        'self' => $role === 'INSPECTOR', 'home' => $u['home_office_id'] ?? null,
+        'master' => $role === 'MASTER_ADMIN',
+    ];
+}
+
+// Which branches and business units ANY person covers — the same answer ua()
+// gives for the person signed in, for anyone. Approvals need it: a quotation
+// waiting for "a Branch Manager" waits for the branch manager over THAT branch,
+// and "an SBU Head" for the head of THAT business unit, not every one in the
+// company (owner's organisation chart, 20 Oct 2026).
+function user_scope_of($u) {
+    $role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper($u['role'] ?? 'ADMIN');
+    if (function_exists('role_effective_key')) $role = role_effective_key($role);
+    if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
+    $def = role_defaults($role);
     // office scope
     $so = trim((string)($u['scope_offices'] ?? ''));
     if ($role === 'MASTER_ADMIN' || $def['offices'] === 'ALL' && $so === '') $offices = 'ALL';
@@ -1329,12 +1348,17 @@ function ua($fresh = false) {
     elseif ($ss === 'ALL') $sbus = 'ALL';
     elseif ($ss !== '') $sbus = array_filter(explode(',', $ss));
     else $sbus = 'ALL';
-    return $a = [
-        'role' => $role, 'perms' => array_values($perms),
-        'offices' => $offices, 'sbus' => $sbus,
-        'self' => $role === 'INSPECTOR', 'home' => $u['home_office_id'] ?? null,
-        'master' => $role === 'MASTER_ADMIN',
-    ];
+    return ['offices' => $offices, 'sbus' => $sbus];
+}
+
+// Does this person's scope cover a record in this branch and business unit?
+// A record with no branch, or no business unit, is not held back on that count.
+function user_scope_covers($u, $officeId, $sbu) {
+    if (!empty($u['is_superuser']) || strtoupper((string) ($u['role'] ?? '')) === 'MASTER_ADMIN') return true;
+    $sc = user_scope_of($u);
+    if ($officeId && $sc['offices'] !== 'ALL' && !in_array((int) $officeId, array_map('intval', (array) $sc['offices']), true)) return false;
+    if ((string) $sbu !== '' && $sc['sbus'] !== 'ALL' && !in_array((string) $sbu, array_map('strval', (array) $sc['sbus']), true)) return false;
+    return true;
 }
 // The single choke point. Every screen, every menu item and every module gate
 // in this app comes through here, which is why the module licence is applied
