@@ -175,6 +175,38 @@ writes one line in the quotation's history (who, what, why).
   duplicate customer or inquiry is created (both already exist by acceptance time). A lead already
   `CONVERTED`/`LOST` is left alone (idempotent), and the whole propagation is best-effort — it
   never blocks the acceptance it rides on.
+- **Approval steps sign in order** (owner's D-05, 20 Oct 2026): a level-2 step is refused while any
+  level-1 step is still pending. A step waiting longer than the days set in Set up Sales
+  (`quote_approval_escalate_days`) is opened to the next level's approvers as well (D-11a); a
+  delegate may sign for an approver who is away. Neither adds a status or a move.
+- **A man-month quotation stands on an approved costing** (owner's D-11 A, 20 Oct 2026): the moves
+  to PENDING_APPROVAL, APPROVED and SENT, and each approval signature, are refused while a quotation
+  with a man-month line has no linked project costing in APPROVED (any revision's link counts),
+  unless the company answers "the costing is optional" in Set up Sales (`quote_manmonth_costing`).
+  A save that changes such a quotation's prices away from its costing is allowed only to its creator
+  (or a master), with a note, written in its history. No status or move is added.
+
+## Project costing (`project_costings.status`)
+
+Statuses as they have always been in the code (`PC_STATUS`, `lib/projcosting.php`); the moves were
+unrestricted until 20 Oct 2026 and are now enforced by `pc_transition_problem()` (owner's D-11 B).
+
+```mermaid
+stateDiagram-v2
+  [*] --> DRAFT : created (author recorded by id)
+  DRAFT --> SUBMITTED : submit — at least one role
+  REJECTED --> SUBMITTED : submit again
+  SUBMITTED --> APPROVED : approve — never by its author
+  SUBMITTED --> REJECTED : send back — a reason is required
+  SUBMITTED --> DRAFT : reopen (withdraw)
+  APPROVED --> DRAFT : reopen — the approval is withdrawn
+  REJECTED --> DRAFT : reopen
+```
+
+- A quotation is drafted from a costing only when it is APPROVED; the quotation belongs to the person
+  who drafted it.
+- Reopening an APPROVED costing clears who approved it and when, and writes a line in its quotation's
+  history; that quotation cannot move forward again until the costing is approved again.
 
 ---
 

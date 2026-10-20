@@ -292,6 +292,13 @@ approval, which makes it a business control. *Document it — see
 `PC_STATUS` = DRAFT · SUBMITTED · APPROVED · REJECTED — so a costing is itself
 approved, giving the quote a defensible floor price.
 
+**Since 20 Oct 2026 (owner's D-11 A/B):** the moves are enforced — submit needs a
+role, approve only from Submitted and **never by the costing's author** (matched by
+user id, so a variant spelling of a name cannot get round it; older sheets fall
+back to the name), send back needs a reason, reopening an approved costing
+withdraws its approval. A quotation is drafted only from an approved costing, and a
+man-month quotation is submitted, approved or sent only on one.
+
 **Measured:** Finance can open it; Inspector is refused (302). It has **no
 module gate**, so its protection is whatever the handler applies — it was in the
 GAP-008 shortlist and came back read-only for a least-privileged role.

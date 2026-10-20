@@ -108,7 +108,9 @@ function pc_migrate() {
     // Additive columns for older installs.
     foreach ([['project_costings','requisition_id','INT NULL'],
               ['project_costings','load_on',"VARCHAR(8) DEFAULT 'COST'"],
-              ['project_costing_lines','oneoff',"DECIMAL(14,2) DEFAULT 0"]] as $c) {
+              ['project_costing_lines','oneoff',"DECIMAL(14,2) DEFAULT 0"],
+              // Who prepared it, by id — the owner's rule D-11 B: its author never approves it.
+              ['project_costings','created_by_user_id','INT NULL']] as $c) {
         if (function_exists('ensure_column')) ensure_column($c[0], $c[1], $c[2]);
     }
 }
@@ -150,6 +152,37 @@ function pc_can_approve() {
     if (!pc_modules_live()) return false;
     return (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master())
         || (function_exists('can') && can('crm.quote.approve'));
+}
+
+// D-11 B (the owner, 20 Oct 2026: "No") — the person who prepared a costing never
+// approves it, whatever their role. Older sheets carry only the author's name.
+function pc_is_author($h) {
+    $u = current_user(); $me = (int)($u['id'] ?? 0);
+    if (!empty($h['created_by_user_id'])) return $me > 0 && (int)$h['created_by_user_id'] === $me;
+    return $me > 0 && trim((string)($h['created_by'] ?? '')) !== '' && trim((string)$h['created_by']) === user_name($u);
+}
+// How a costing may move — `docs/03-object-lifecycles.md` §Project costing.
+// Returns '' when allowed, else the sentence that says why not.
+function pc_transition_problem($h, $route) {
+    $st = (string)($h['status'] ?? 'DRAFT');
+    switch ($route) {
+        case 'project-costing-submit':
+            if (!in_array($st, ['DRAFT', 'REJECTED'], true)) return 'Only a draft or a sent-back costing can be submitted.';
+            if (!pc_lines((int)$h['id'])) return 'Add at least one role before submitting.';
+            return '';
+        case 'project-costing-approve':
+            if ($st !== 'SUBMITTED') return 'Only a submitted costing can be approved — this one is ' . strtolower(PC_STATUS[$st] ?? $st) . '.';
+            if (pc_is_author($h)) return 'You prepared this costing, so someone else must approve it.';
+            return '';
+        case 'project-costing-reject':
+            if ($st !== 'SUBMITTED') return 'Only a submitted costing can be sent back.';
+            if (trim((string)($_POST['reject_note'] ?? '')) === '') return 'Say why it is being sent back, so its author knows what to change.';
+            return '';
+        case 'project-costing-reopen':
+            if ($st === 'DRAFT') return 'This costing is already a draft.';
+            return '';
+    }
+    return '';
 }
 
 // ---- Reads -----------------------------------------------------------------
@@ -315,12 +348,12 @@ function pc_make_quote($roll) {
         foreach ($lines as $ln) { $c = pc_line_calc($ln, $h); $sub += $c['revenue']; }
         $gstPct = 18; $gst = round($sub * $gstPct / 100, 2); $total = $sub + $gst;
         db()->prepare("INSERT INTO quotations (quote_no,rev,is_current,client_id,client_name,office_id,subject,site_location,
-                        currency,validity_days,subtotal,gst_pct,gst_amount,total_amount,status,created_by,created_at)
-                       VALUES (?,0,1,?,?,?,?,?, 'INR',30,?,?,?,?, 'DRAFT',?,?)")
+                        currency,validity_days,subtotal,gst_pct,gst_amount,total_amount,status,owner_id,created_by,created_at)
+                       VALUES (?,0,1,?,?,?,?,?, 'INR',30,?,?,?,?, 'DRAFT',?,?,?)")
             ->execute([$no, (int)$h['client_id'] ?: null,
                 (string)ops_val("SELECT COALESCE(display_name,legal_name) FROM business_partners WHERE id=?", [(int)$h['client_id']]),
                 (int)$h['office_id'] ?: null, (string)$h['title'], (string)$h['site'],
-                $sub, $gstPct, $gst, $total, user_name(current_user()), date('c')]);
+                $sub, $gstPct, $gst, $total, (int)(current_user()['id'] ?? 0) ?: null, user_name(current_user()), date('c')]);
         $qid = (int)db()->lastInsertId();
         $n = 0;
         foreach ($lines as $ln) {
@@ -409,14 +442,14 @@ function ops_projcosting($route, $method) {
         $code = ops_next_code('project_costings', 'code', 'PC');
         $pdo->prepare("INSERT INTO project_costings
             (code,title,client_id,office_id,site,basis,overhead_pct,insurance_pct,baddebt_pct,contingency_pct,negotiation_pct,
-             status,quote_id,opportunity_id,requisition_id,created_by,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?, 'DRAFT', ?,?,?,?,?)")
+             status,quote_id,opportunity_id,requisition_id,created_by,created_by_user_id,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?, 'DRAFT', ?,?,?,?,?,?)")
             ->execute([$code, trim((string)($_POST['title'] ?? 'Untitled costing')),
                 (int)($_POST['client_id'] ?? 0) ?: null, (int)($_POST['office_id'] ?? 0) ?: null,
                 trim((string)($_POST['site'] ?? '')), strtoupper((string)($_POST['basis'] ?? 'LONG')),
                 $d['overhead_pct'], $d['insurance_pct'], $d['baddebt_pct'], $d['contingency_pct'], $d['negotiation_pct'],
                 (int)($_POST['quote_id'] ?? 0) ?: null, (int)($_POST['opportunity_id'] ?? 0) ?: null,
-                (int)($_POST['requisition_id'] ?? 0) ?: null, user_name(current_user()), date('c')]);
+                (int)($_POST['requisition_id'] ?? 0) ?: null, user_name(current_user()), (int)(current_user()['id'] ?? 0) ?: null, date('c')]);
         $id = (int)$pdo->lastInsertId();
         flash("$code created — add the team roles and their cost heads.");
         redirect('/project-costing?id=' . $id);
@@ -487,6 +520,7 @@ function ops_projcosting($route, $method) {
     if (in_array($route, ['project-costing-submit', 'project-costing-approve', 'project-costing-reject', 'project-costing-reopen'], true) && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0); $h = pc_get($id);
         if (!$h) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
+        if (($why = pc_transition_problem($h, $route)) !== '') { flash($why, 'error'); redirect('/project-costing?id=' . $id); }
         if ($route === 'project-costing-submit') {
             ops_require(pc_can_edit(), 'You cannot submit this.');
             $pdo->prepare("UPDATE project_costings SET status='SUBMITTED', updated_at=? WHERE id=?")->execute([date('c'), $id]);
@@ -501,10 +535,12 @@ function ops_projcosting($route, $method) {
             $pdo->prepare("UPDATE project_costings SET status='REJECTED', reject_note=?, updated_at=? WHERE id=?")
                 ->execute([trim((string)($_POST['reject_note'] ?? '')), date('c'), $id]);
             flash('Sent back with comments.', 'warning');
-        } else { // reopen to draft
+        } else { // reopen to draft — an approval is for the figures approved, so it goes
             ops_require(pc_can_edit(), 'You cannot reopen this.');
-            $pdo->prepare("UPDATE project_costings SET status='DRAFT', updated_at=? WHERE id=?")->execute([date('c'), $id]);
-            flash('Reopened as draft.');
+            $pdo->prepare("UPDATE project_costings SET status='DRAFT', approved_by='', approved_at='', approval_ref='', updated_at=? WHERE id=?")->execute([date('c'), $id]);
+            if ($h['status'] === 'APPROVED' && !empty($h['quote_id']) && function_exists('crm_log_change'))
+                crm_log_change((int)$h['quote_id'], 'Costing ' . $h['code'] . ' was reopened by ' . user_name(current_user()) . ' — its approval was withdrawn.');
+            flash($h['status'] === 'APPROVED' ? 'Reopened as draft — its approval was withdrawn; submit it again when it is ready.' : 'Reopened as draft.');
         }
         redirect('/project-costing?id=' . $id);
     }
@@ -529,6 +565,12 @@ function ops_projcosting($route, $method) {
         $id = (int)($_POST['id'] ?? 0); $roll = pc_rollup($id);
         if (!$roll) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
         ops_require(function_exists('can') && can('mod.quotes.edit'), 'You cannot create a quotation.');
+        // D-11 (the owner, 20 Oct 2026) — a quotation is made only from an approved
+        // costing: approval is what makes its prices the company's prices.
+        if ((string)$roll['header']['status'] !== 'APPROVED') {
+            flash('Make the quotation once this costing is approved — submit it for approval first.', 'error');
+            redirect('/project-costing?id=' . $id);
+        }
         $r = pc_make_quote($roll);
         if (!empty($r['id'])) { flash('Quotation ' . $r['no'] . ' drafted from this costing — review and send.'); redirect('/quote?id=' . $r['id']); }
         flash($r['err'] ?? 'Could not create the quotation.', 'error'); redirect('/project-costing?id=' . $id);

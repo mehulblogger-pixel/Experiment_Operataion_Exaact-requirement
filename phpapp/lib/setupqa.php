@@ -99,6 +99,13 @@ function setupqa_sales_set() {
                         'options' => ['0' => 'Never — it waits for its own approver', '1' => 'After 1 day', '2' => 'After 2 days', '3' => 'After 3 days', '7' => 'After a week'],
                         'default' => '0',
                     ],
+                    [
+                        'key' => 'quote_manmonth_costing',
+                        'ask' => 'Must a man-month ' . $L . ' come from an approved project costing before it is submitted, approved or sent?',
+                        'why' => 'A man-month price carries salaries, allowances and overheads for months; the costing shows they are covered. Whoever made the ' . $L . ' can still change its prices afterwards, with a note saying why.',
+                        'options' => ['yes' => 'Yes — an approved costing first', 'no' => 'No — the costing is optional'],
+                        'default' => 'yes',
+                    ],
                 ],
                 'link' => ['/quote-approval-rules', 'Change who approves, and up to what value'],
                 'link2' => ['/quote-delegations', 'Set who covers for an approver who is away'],

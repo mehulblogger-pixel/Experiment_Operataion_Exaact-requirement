@@ -1258,6 +1258,76 @@ function crm_quote_ready_problem($q) {
     return $miss ? 'Before it can go further this ' . Tl('quote') . ' needs ' . implode(', ', $miss) . '. Edit it to add them.' : '';
 }
 
+// D-11 A (the owner, 20 Oct 2026: "Yes") — a man-month quotation goes forward
+// only from an approved project costing, unless the company says otherwise in
+// Set up Sales. Returns '' when it may, else the sentence saying what to do.
+function crm_quote_manmonth_needs_costing() {
+    return (string) setting_get('quote_manmonth_costing', 'yes') !== 'no';
+}
+// The costing a quotation was priced from. A revision is a new record, so the
+// costing linked to any revision of the same quotation counts.
+function crm_quote_costing($q) {
+    if (!$q || !function_exists('pc_migrate')) return null;
+    pc_migrate();
+    $base = (int)($q['parent_id'] ?? 0) ?: (int)$q['id'];
+    return ops_one("SELECT * FROM project_costings WHERE quote_id IN (SELECT id FROM quotations WHERE id=? OR parent_id=?) ORDER BY id DESC LIMIT 1",
+                   [$base, $base]) ?: null;
+}
+function crm_quote_costing_problem($q) {
+    if (!crm_quote_manmonth_needs_costing() || !function_exists('pc_for_quote')) return '';
+    if (!(int) ops_val("SELECT COUNT(*) FROM quote_lines WHERE quote_id=? AND unit='MANMONTH'", [(int)$q['id']])) return '';
+    $pc = crm_quote_costing($q);
+    if ($pc && (string)$pc['status'] === 'APPROVED') return '';
+    return 'A man-month ' . Tl('quote') . ' goes forward only from an approved project costing — '
+         . ($pc ? 'costing ' . $pc['code'] . ' is ' . strtolower(PC_STATUS[$pc['status']] ?? $pc['status']) . '; have it approved first.'
+                 : 'make one for it (Project costing), have it approved, and link it to this ' . Tl('quote') . '.');
+}
+// The priced lines of a quotation, as a comparable list: what is offered at
+// what price. Used to tell when a costing-based quotation's prices change.
+function crm_price_rows(array $rows) {
+    $out = [];
+    foreach ($rows as $r) $out[] = sprintf('%.2f|%s|%.2f', (float)$r[0], strtoupper(trim((string)$r[1])), (float)$r[2]);
+    sort($out);
+    return $out;
+}
+function crm_posted_price_rows(array $b) {
+    $rows = [];
+    $desc = (array)($b['l_desc'] ?? []); $svc = (array)($b['l_service'] ?? []);
+    foreach ($desc as $i => $d) {
+        if (trim((string)$d) === '' && trim((string)($svc[$i] ?? '')) === '') continue;   // blank rows are not saved
+        $rows[] = [$b['l_qty'][$i] ?? 0, $b['l_unit'][$i] ?? '', $b['l_rate'][$i] ?? 0];
+    }
+    return crm_price_rows($rows);
+}
+function crm_saved_price_rows($qid) {
+    return crm_price_rows(array_map(fn($l) => [$l['qty'], $l['unit'], $l['rate']],
+        ops_all("SELECT qty, unit, rate FROM quote_lines WHERE quote_id=?", [(int)$qid]) ?: []));
+}
+function crm_costing_price_rows(array $roll) {
+    $h = $roll['header']; $unit = pc_unit((string)$h['basis']); $rows = [];
+    foreach ($roll['lines'] as $ln) {
+        $c = pc_line_calc($ln, $h);
+        $rows[] = [$h['basis'] === 'FIXED' ? 1 : (float)$ln['boq_qty'], $unit, $c['proposed']];
+    }
+    return crm_price_rows($rows);
+}
+// D-11 A — "can also be edited by the creator with a note or remark, mandatory".
+// When a save would change a costing-based quotation's prices to something its
+// costing does not say, only the person who made the quotation may do it, and
+// only with a note saying why. Returns [problem, costing] — problem '' = may save.
+function crm_quote_costing_edit_problem($q, array $b) {
+    if (!$q || !($pc = crm_quote_costing($q))) return ['', null];
+    $posted = crm_posted_price_rows($b);
+    if ($posted === crm_saved_price_rows($q['id'])) return ['', null];            // prices not touched by this save
+    $roll = pc_rollup((int)$pc['id']);
+    if ($roll && $posted === crm_costing_price_rows($roll)) return ['', null];    // back in line with the costing
+    if (!crm_quote_is_mine($q) && !is_master_of('quotes'))
+        return ['This ' . Tl('quote') . ' was priced from costing ' . $pc['code'] . '. Only the person who made it can change its prices away from the costing. Nothing was saved.', $pc];
+    if (trim((string)($b['costing_note'] ?? '')) === '')
+        return ['This ' . Tl('quote') . ' was priced from costing ' . $pc['code'] . '. Say why its prices now differ, in "Why the prices differ from the costing" — the note is kept in its history. Nothing was saved.', $pc];
+    return ['', $pc];
+}
+
 // The one table of how a quotation may move — `docs/03-object-lifecycles.md`
 // in code. Returns '' when the move is allowed, otherwise the sentence that
 // tells the person why not and what to do instead. The buttons on the screen
@@ -1268,6 +1338,7 @@ function crm_quote_transition_problem($q, $to) {
     if (empty($q['is_current']))
         return 'This is an earlier revision (R' . sprintf('%02d', (int)$q['rev']) . ') — a later revision has replaced it, so nothing on it can move. Work on the current revision.';
     if (in_array($to, ['PENDING_APPROVAL', 'APPROVED', 'SENT'], true) && ($rp = crm_quote_ready_problem($q)) !== '') return $rp;
+    if (in_array($to, ['PENDING_APPROVAL', 'APPROVED', 'SENT'], true) && ($cp = crm_quote_costing_problem($q)) !== '') return $cp;
     // D-12 — nothing moves towards new business for a blocked customer. Marking
     // it lost is still allowed: that closes business, it does not open any.
     if ($to !== 'LOST' && !empty($q['client_id']) && function_exists('partner_trade_block')
@@ -1888,6 +1959,8 @@ function ops_crm_quotes($route, $method) {
             // D-12 — a blacklisted, inactive, on-hold or blocked customer gets no
             // quotation (new, or moved onto them by an edit).
             elseif ($cid && ($tb = partner_trade_block($cid)) !== '') $refused = $tb;
+            // D-11 A — prices changed away from the costing need the creator and a note.
+            if ($refused === null && $q) { [$cep, $costingOf] = crm_quote_costing_edit_problem($q, $b); if ($cep !== '') $refused = $cep; }
         }
         if ($method === 'POST' && $refused === null) {
             // §i — when a client is picked, the free-text name is ignored entirely.
@@ -1934,6 +2007,8 @@ function ops_crm_quotes($route, $method) {
                 } else {
                     crm_log_change($q['id'], 'Edited');
                 }
+                if (!empty($costingOf))
+                    crm_log_change($q['id'], 'Prices changed away from costing ' . $costingOf['code'] . ' — note: ' . trim((string)$b['costing_note']));
                 flash($voided
                     ? ucfirst(Tl('quote')) . ' saved. Because its commercial terms changed, the approval was cancelled — submit it for approval again.'
                     : ucfirst(Tl('quote')) . ' saved.', $voided ? 'warning' : 'success');
@@ -2478,6 +2553,8 @@ function ops_crm_quotes($route, $method) {
             flash('Level ' . $lowest . ' approves first — this ' . Tl('quote') . ' reaches level ' . (int)$step['level'] . ' when it has.', 'error');
             redirect('/quote?id=' . $q['id']);
         }
+        // D-11 A — its costing may have been reopened while it waited.
+        if (($_POST['decision'] ?? '') !== 'reject' && ($cp = crm_quote_costing_problem($q)) !== '') { flash($cp, 'error'); redirect('/quote?id=' . $q['id']); }
         // Pre-order control: when the checklist is on and every point is required,
         // an approval cannot be given until the review checklist is complete. Only
         // gates approval — a rejection is always allowed.

@@ -9,6 +9,8 @@ $sym = function_exists('cur_sym') ? cur_sym() : '₹';
 $locked = function_exists('pc_locked') && pc_locked($h);
 $canEdit = function_exists('pc_can_edit') && pc_can_edit() && !$locked;
 $canApprove = function_exists('pc_can_approve') && pc_can_approve();
+// D-11 B — its author never approves it, whatever their role.
+$isAuthor = function_exists('pc_is_author') && pc_is_author($h);
 $basis = (string)$h['basis'];
 $qtyLabel = $basis === 'DAILY' ? 'Man-days' : ($basis === 'FIXED' ? 'Units' : 'Man-months');
 $rateLabel = $basis === 'DAILY' ? '/man-day' : ($basis === 'FIXED' ? '/lump' : '/man-month');
@@ -220,16 +222,18 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <?php if (in_array($h['status'],['DRAFT','REJECTED'],true) && function_exists('pc_can_edit') && pc_can_edit() && !empty($lines)): ?>
         <form method="post" action="/project-costing-submit"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn primary">Submit for approval</button></form>
       <?php endif; ?>
-      <?php if ($h['status']==='SUBMITTED' && $canApprove): ?>
+      <?php if ($h['status']==='SUBMITTED' && $canApprove && $isAuthor): ?>
+        <span class="muted" style="font-size:12.5px">You prepared this costing, so someone else approves it.</span>
+      <?php elseif ($h['status']==='SUBMITTED' && $canApprove): ?>
         <form method="post" action="/project-costing-approve" style="display:flex;gap:6px;align-items:center"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><input class="form-control" name="approval_ref" placeholder="Approval ref (optional)" style="width:170px"><button class="btn primary">Approve</button></form>
-        <form method="post" action="/project-costing-reject" style="display:flex;gap:6px;align-items:center"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><input class="form-control" name="reject_note" placeholder="Reason" style="width:150px"><button class="btn btn-ghost">Send back</button></form>
+        <form method="post" action="/project-costing-reject" style="display:flex;gap:6px;align-items:center"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><input class="form-control" name="reject_note" placeholder="Reason (needed)" required style="width:150px"><button class="btn btn-ghost">Send back</button></form>
       <?php endif; ?>
-      <?php if (!in_array($h['status'],['DRAFT'],true) && function_exists('pc_can_edit') && pc_can_edit() && $h['status']!=='SUBMITTED'): ?>
+      <?php if (!in_array($h['status'],['DRAFT'],true) && function_exists('pc_can_edit') && pc_can_edit()): ?>
         <form method="post" action="/project-costing-reopen"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost">Reopen as draft</button></form>
       <?php endif; ?>
       <?php if ($h['status']==='DRAFT' && empty($lines)): ?><span class="muted" style="font-size:12.5px">Add at least one role before submitting.</span><?php endif; ?>
     </div>
-    <p class="sub" style="margin-top:6px">Draft → Submitted → Approved. Submitting locks the sheet; an approver approves or sends it back with a note. Approval is optional — you can keep it in Draft and still use the numbers.</p>
+    <p class="sub" style="margin-top:6px">Draft → Submitted → Approved. Submitting locks the sheet; someone other than its author approves it, or sends it back with a reason. A quotation is made only from an approved costing, and reopening an approved one withdraws its approval.</p>
   </div>
 </div>
 </div>

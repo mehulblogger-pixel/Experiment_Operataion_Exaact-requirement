@@ -67,7 +67,7 @@ scoping/atomicity/config integrity; **Low** = robustness/validation hardening.
 | GAP-APPR-001 / GAP-IMP-001 | **Major** | **No automatic no-self-approval** on report vetting/approval — same person can author and approve; SELF_REVIEW is only a manual threat | 07,25 |
 | GAP-CMP-001 | Major | Complaint decider-independence is **name-string** based (bypassable by a variant) — move to user-id | 22 |
 | GAP-AUD-001 | Major | Internal-audit auditor-independence is name-string based | 28 |
-| GAP-PC(approve) | Moderate | Confirm a project-costing creator cannot approve their own bid where independence is required | 20 |
+| GAP-PC(approve) | Moderate | Confirm a project-costing creator cannot approve their own bid where independence is required — **closed 20 Oct 2026** (owner's D-11 B): the author is refused by user id, `pc_is_author()`; guard `tests/test_sales_costing_rules.php` | 20 |
 
 ### Theme 5 — Evidence & tamper-evidence · **MAJOR**
 | ID | Sev | Finding | Module |

@@ -270,6 +270,14 @@
 </section>
 </div><!-- /.form-tabs -->
 
+<?php // D-11 A — a quotation priced from a costing says why, when its prices move away from it.
+  $fromCosting = ($isEdit && function_exists('crm_quote_costing')) ? crm_quote_costing($q) : null;
+  if ($fromCosting): ?>
+  <div class="panel" style="margin-top:16px">
+    <label for="costing_note"><b>Why the prices differ from the costing</b> <span class="muted">— needed only if you change a price, quantity or unit away from costing <?= e($fromCosting['code']) ?>; kept in this <?= e(Tl('quote')) ?>'s history</span></label>
+    <textarea class="form-control" id="costing_note" name="costing_note" rows="2" placeholder="For example: the customer asked for one fewer engineer; rate agreed with the branch manager"><?= e((string)($posted['costing_note'] ?? '')) ?></textarea>
+  </div>
+<?php endif; ?>
   <div class="fs-actions" style="margin-top:16px">
     <button class="btn" type="submit"><?= $isEdit ? 'Save ' . Tl('quote') : 'Create ' . Tl('quote') ?></button>
     <a class="btn secondary" href="<?= $isEdit ? '/quote?id=' . (int)$q['id'] : '/quotes' ?>">Cancel</a>

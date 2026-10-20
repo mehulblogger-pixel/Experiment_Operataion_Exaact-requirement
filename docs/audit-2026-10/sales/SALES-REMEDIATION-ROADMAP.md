@@ -186,8 +186,10 @@ sign-in).
 
 | 1.4, 3.x (D-11a) | **The approval engine:** levels sign in order (D-05); an approver who is away names a delegate on Sales → *Who covers for a quotation approver*, and a delegation for "everything" covers quotations too; a step waiting longer than the days the company sets in Set up Sales is opened to the next level up by the night job, once, written in the quotation's history and e-mailed; "waiting for me" counts delegated and escalated steps | the approval-engine commit | `test_sales_approval_engine.php` (22) |
 
+| 3.x (D-11 A/B) | **Costing before price:** a costing moves only Draft → Submitted → Approved or Sent back (with a reason), and its author never approves it; a quotation is made only from an approved costing; a man-month quotation is submitted, approved or sent only on an approved costing (a company may make it optional in Set up Sales); its creator may change its prices away from the costing with a note kept in its history; reopening an approved costing withdraws its approval and stops its quotation until approved again | the costing commit | `test_sales_costing_rules.php` (33) |
+
 **Stage 1 is complete.** The third round of answers (20 Oct) is being built in order:
-costing (D-11 A/B), checklist (D-10), enquiry branch, industry template, contract
+checklist (D-10), enquiry branch, industry template, contract
 amendment, reopening. **Still waiting on the owner:** D-09, D-13…D-17, D-19…D-21, D-24, D-26…D-28, D-30.
 
 ## 9. If only five things are done
