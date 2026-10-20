@@ -206,7 +206,7 @@ function opp_quotes($oppId) {
     // this makes the deal's quote list agree with it, so one definition of "which
     // quotes are on this deal" is used everywhere (list, delete-guard, order-of-record).
     return opp_try(fn() => ops_all(
-        "SELECT q.id, q.quote_no, q.rev, q.status, q.total_amount, q.is_current, q.created_at, q.contract_number
+        "SELECT q.id, q.quote_no, q.rev, q.status, q.subtotal, q.total_amount, q.is_current, q.created_at, q.contract_number
          FROM quotations q
          WHERE q.id IN (SELECT quotation_id FROM opportunity_quotes WHERE opportunity_id=?)
             OR q.lead_id = (SELECT lead_id FROM opportunities WHERE id=?)

@@ -20,6 +20,9 @@ FIN **Issue**.
 
 | Change | What it means in this area | Ref | How it was verified |
 |---|---|---|---|
+| **A job bills its own share of its work order (20 Oct)** | When a man-day work order is delivered as several jobs, each job's invoice line defaults to **its own man-days** — a 2-day job of a 3-day order is 2 × rate, not 3 × rate. An order delivered as one job is unchanged. An invoice refuses a job done for another customer | Sales audit SA-15, SA-36 | `test_sales_billing_defaults.php` |
+| **Billing events report what they were billed (20 Oct)** | Once an invoice is issued, each job's billing event records **its own line, before tax** — no longer the invoice's whole total with GST, which made every GST invoice look like a mismatch and two jobs on one invoice report twice its value | Sales audit SA-16 | same test |
+| **A blocked customer still gets invoices for work done (20 Oct)** | The owner's rule D-12 stops all *new* business for a blacklisted, inactive, on-hold or blocked customer; invoicing work already done, payment reminders and receipts carry on | D-12 | `test_sales_d12_blocked.php` |
 | **Credit notes are bounded cumulatively** | Notes against one invoice may not, together, exceed what it still owes. The old ceiling added earlier notes back, so an 11,800 invoice took four 5,900 notes | GAP-035 (P1) | Execution + test |
 | **Over-credited invoices are shown on screen** | **Money → Billing workspace → Invoices** shows a red panel and a *Credited beyond their value* filter; accounts also see it under *needs attention* on the home screen. Silent on a clean ledger | GAP-035 follow-up | Test |
 | Every figure off a form is validated | Negative rate, quantity, GST, receipt, TDS, bank charges; GST outside 0–100%; non-numbers — refused, naming the field | GAP-034 | Execution |

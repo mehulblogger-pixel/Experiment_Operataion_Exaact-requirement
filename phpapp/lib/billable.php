@@ -250,12 +250,30 @@ function billable_event_upsert($module, $kind, $sourceId, array $d) {
 // ---- Inline hook (P4b) — create the candidate the moment a job closes ------
 // The field map for a JOB_CLOSED event, read from the job + its call (same shape
 // the sync derives, so the hook and the sync produce identical rows).
+// The quantity, rate and value ONE job carries of its work order (Sales audit
+// SA-15). A work order billed by the man-day and delivered as several jobs is
+// billed job by job, each for its own man-days — never each for the whole order,
+// which billed a 2-day job of a 3-day order for 3. Any other basis, or an order
+// delivered as a single job, carries the order's own figures exactly as before.
+function job_billable_share(array $j) {
+    $qty = (float)($j['billable_qty'] ?? 0); $rate = (float)($j['billable_rate'] ?? 0); $val = (float)($j['billable_value'] ?? 0);
+    $basis = strtoupper(trim((string)($j['billable_basis'] ?? '')));
+    $jobs = !empty($j['call_id']) ? (int) ops_val("SELECT COUNT(*) FROM jobs WHERE call_id=?", [(int)$j['call_id']]) : 1;
+    if ($basis === 'MANDAY' && $jobs > 1 && $rate > 0 && function_exists('job_mandays')) {
+        $md = (float) job_mandays($j);
+        return ['qty' => $md, 'rate' => $rate, 'value' => round($md * $rate, 2), 'rule' => 'job.mandays × call.billable_rate'];
+    }
+    return ['qty' => $qty, 'rate' => $rate, 'value' => $val, 'rule' => 'call.billable_value'];
+}
 function billable_job_fields($jobId) {
-    $j = ops_one("SELECT j.id, j.executing_office_id, j.sbu, j.inspection_type, j.invoice_value,
-                         c.client_id, c.contract_number, c.billable_value, c.billable_rate, c.billable_qty
+    $j = ops_one("SELECT j.id, j.call_id, j.executing_office_id, j.sbu, j.inspection_type, j.invoice_value, j.mandays,
+                         j.inspection_start_date, j.inspection_end_date,
+                         c.client_id, c.contract_number, c.billable_value, c.billable_rate, c.billable_qty, c.billable_basis
                   FROM jobs j LEFT JOIN calls c ON c.id = j.call_id WHERE j.id=?", [(int)$jobId]);
     if (!$j) return null;
-    $amount = (float)($j['billable_value'] ?? 0);
+    $share = job_billable_share($j);
+    $j['billable_qty'] = $share['qty']; $j['billable_rate'] = $share['rate'];
+    $amount = (float)$share['value'];
     if ($amount <= 0 && (float)($j['invoice_value'] ?? 0) > 0) $amount = (float)$j['invoice_value'];
     return [
         'party_id'        => (int)($j['client_id'] ?? 0),
@@ -266,7 +284,7 @@ function billable_job_fields($jobId) {
         'qty'             => (float)($j['billable_qty'] ?? 0),
         'rate'            => (float)($j['billable_rate'] ?? 0),
         'amount'          => $amount,
-        'calc_rule'       => 'call.billable_value',
+        'calc_rule'       => $share['rule'],
     ];
 }
 
@@ -322,19 +340,11 @@ function billable_events_sync($limit = 500) {
 
     if (function_exists('books_billable_jobs')) {
         foreach (books_billable_jobs(0, $limit) as $j) {
-            $amount = (float)($j['billable_value'] ?? 0);
-            if ($amount <= 0 && (float)($j['invoice_value'] ?? 0) > 0) $amount = (float)$j['invoice_value'];
-            $id = billable_event_upsert('job', 'JOB_CLOSED', (int)$j['id'], [
-                'party_id'        => (int)($j['client_id'] ?? 0),
-                'contract_number' => (string)($j['contract_number'] ?? ''),
-                'office_id'       => (int)($j['executing_office_id'] ?? 0),
-                'sbu'             => (string)($j['sbu'] ?? ''),
-                'service_type'    => (string)($j['inspection_type'] ?? ''),
-                'qty'             => (float)($j['billable_qty'] ?? 0),
-                'rate'            => (float)($j['billable_rate'] ?? 0),
-                'amount'          => $amount,
-                'calc_rule'       => 'call.billable_value',
-            ]);
+            // The same field map the job-close hook uses, so the two can never
+            // derive different figures for the same job (one job's share of its
+            // order, SA-15).
+            $f = billable_job_fields((int)$j['id']);
+            $id = $f ? billable_event_upsert('job', 'JOB_CLOSED', (int)$j['id'], $f) : 0;
             if ($id) $created++;
         }
     }
@@ -369,8 +379,15 @@ function billable_events_sync($limit = 500) {
                 if ($st !== '' && $st !== 'DRAFT' && $st !== 'CANCELLED') { $issued = $iv; break; }
             }
             if ($issued) {
-                db()->prepare("UPDATE billable_events SET status='BILLED', invoice_id=?, amount=?, updated_at=? WHERE id=?")
-                    ->execute([(int)$issued['id'], (float)($issued['total'] ?? $e['amount']), date('c'), (int)$e['id']]);
+                // What THIS job was billed on that invoice — its own lines, before
+                // tax, like the amount it earned. The invoice's whole total (every
+                // line, plus GST) used to be written onto every event on it, so two
+                // jobs on one invoice reported twice its value (Sales audit SA-16).
+                $jobBilled = (float) ops_val("SELECT COALESCE(SUM(amount),0) FROM invoice_lines WHERE invoice_id=? AND job_id=?",
+                                             [(int)$issued['id'], (int)$e['source_id']]);
+                $billedNow = $jobBilled > 0 ? round($jobBilled, 2) : (float)$e['amount'];
+                db()->prepare("UPDATE billable_events SET status='BILLED', invoice_id=?, amount=?, billed_amount=?, updated_at=? WHERE id=?")
+                    ->execute([(int)$issued['id'], $billedNow, $billedNow, date('c'), (int)$e['id']]);
                 $billed++;
             }
         }

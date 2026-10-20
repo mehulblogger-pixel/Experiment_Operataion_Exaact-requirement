@@ -68,12 +68,17 @@ t_ok($r2['billed'] >= 1, 'sync reconciles the invoiced job to BILLED');
 $ev3 = ops_one("SELECT * FROM billable_events WHERE id=?", [(int)$ev['id']]);
 t_eq($ev3['status'], 'BILLED', 'the event is now BILLED');
 t_eq((int)$ev3['invoice_id'], $invId, 'the event links to the invoice that consumed it');
-t_eq((float)$ev3['amount'], 13000.0, 'the billed amount is taken from the invoice (books wins on money)');
+//  Books still wins on money — but the figure is what THIS job was billed on the
+//  invoice: its own line, before tax, like the 12,000 it earned. Until 20 Oct the
+//  invoice's whole total (13,000 here, with GST) was written onto every event on
+//  it, so every GST invoice showed as a mismatch and two jobs on one invoice
+//  reported twice its value (Sales audit SA-16).
+t_eq((float)$ev3['amount'], 12000.0, 'the billed amount is this job\'s own invoice line, before tax (books wins on money)');
 t_ok(!billable_set_status((int)$ev['id'], 'APPROVED'), 'a BILLED event is terminal');
 
 // ---- Rollup + list ---------------------------------------------------------
 $roll = billable_rollup();
-t_ok($roll['billed'] >= 1 && $roll['billed_amt'] >= 13000, 'the rollup counts the billed value');
+t_ok($roll['billed'] >= 1 && $roll['billed_amt'] >= 12000, 'the rollup counts the billed value');
 $rows = billable_list();
 t_ok((bool)array_filter($rows, fn($x) => (int)$x['id'] === (int)$ev['id']), 'the event appears on the board list');
 t_ok(isset($rows[0]['party_name']), 'the list resolves the client name');

@@ -635,9 +635,14 @@ function books_line_add($invoiceId, array $b) {
     // re-key them, which is where the two versions of a number come from.
     $callId = null;
     if ($job) {
-        $j = ops_one("SELECT j.*, c.id call_id, c.contract_number, c.billable_value, c.billable_rate, c.billable_qty, c.billable_basis
+        $j = ops_one("SELECT j.*, c.id call_id, c.client_id call_client_id, c.contract_number, c.billable_value, c.billable_rate, c.billable_qty, c.billable_basis
                       FROM jobs j LEFT JOIN calls c ON c.id = j.call_id WHERE j.id=?", [$job]);
         if (!$j) return 'That ' . Tl('job') . ' no longer exists.';
+        // A job is billed to the customer it was done for (Sales audit SA-36).
+        if (!empty($inv['partner_id']) && !empty($j['call_client_id']) && (int)$j['call_client_id'] !== (int)$inv['partner_id']) {
+            $for = (string) ops_val("SELECT COALESCE(NULLIF(display_name,''), legal_name) FROM business_partners WHERE id=?", [(int)$j['call_client_id']]);
+            return TH('job') . ' ' . $j['job_code'] . ' was done for ' . ($for ?: 'another ' . Tl('client')) . ' — it cannot go on this ' . Tl('client') . "'s invoice.";
+        }
         // §INV-2 — a job can be billed only once it is closed on its last day (a
         // multi-day job cannot close before then). A master or finance user may
         // override to raise the invoice mid-inspection.
@@ -659,7 +664,10 @@ function books_line_add($invoiceId, array $b) {
             if ($rate <= 0) $rate = (float)($j['billable_value'] ?? 0);
             $b['rate'] = $rate;
         }
-        if (($b['qty'] ?? '') === '')  $b['qty']  = ((float)($j['billable_qty'] ?? 0) > 0) ? (float)$j['billable_qty'] : 1.0;
+        // This job's own share of its work order (SA-15): by the man-day, its own
+        // man-days, never the whole order's.
+        $share = function_exists('job_billable_share') ? job_billable_share($j) : ['qty' => (float)($j['billable_qty'] ?? 0)];
+        if (($b['qty'] ?? '') === '')  $b['qty']  = ((float)$share['qty'] > 0) ? (float)$share['qty'] : 1.0;
     }
     // The figures, whether typed or taken off the job. A negative line is not a
     // discount here: lower the rate on a draft, or raise a credit note against an

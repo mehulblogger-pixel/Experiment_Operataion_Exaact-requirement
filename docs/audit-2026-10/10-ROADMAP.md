@@ -107,7 +107,7 @@ people rely on it.
 | 3.3 | **Competence enforcement:** when switched on, refuse the allocation and say why | T-15 | **Q-F6** |
 | 3.4 | **Pre-order checklist** with `require_all` must block quote approval; decide whether a recorded waiver is needed | T-16 | **S-F / E-8** |
 | 3.5 | **Answer Q-B1/Q-B2:** who may *raise* a nonconformity (today an inspector cannot), and should the five roles who see a corrective action see the finding behind it | — | **GAP-004** — **ANSWERED 19 Oct (Q-B1): coordinator level and above record; built** |
-| 3.7 | **Sales commercial controls** — the approval, acceptance and contract bypasses and the billing defaults found by the Sales audit. Its own staged plan: `sales/SALES-REMEDIATION-ROADMAP.md` | `sales/SALES-END-TO-END-TEST-MATRIX.md` | **GAP-050** — awaiting the owner's scope approval and decisions D-01…D-12 |
+| 3.7 | **Sales commercial controls** — the approval, acceptance and contract bypasses and the billing defaults found by the Sales audit. Its own staged plan: `sales/SALES-REMEDIATION-ROADMAP.md` | `sales/SALES-END-TO-END-TEST-MATRIX.md` | **GAP-050** — **Stage 1 built 20 Oct** after the owner's answers; Stage 2 next |
 | 3.6 | **Make `test_m7_*` and `test_m8_*` pass on their own.** They pass only after other tests have run, so they could stay green while the rule they guard breaks | the two files, run alone | **GAP-049 note** |
 
 ---
@@ -192,12 +192,12 @@ of work: highest consequence first, cheapest first where equal.
 | S-2 | **Impersonation ("Login as"):** every action taken while impersonating must name the real person; it must be logged and listed in the matrix | Today it is not established who is accountable for an impersonated change | 2.5 | T-9 | untested |
 | S-3 | **Delete cascade:** work order → job → report → billable event → voucher | A delete that orphans a voucher leaves money with no source | 2.3 | T-4 | untested |
 | S-4 | **Four forms create numbered empty records** (`/call-new`, `/candidate-new`, `/incident-new`, `/endorsement-new`) | Gaps and ghosts in a numbered register are what an assessor finds first | 2.1 | T-10 | confirmed, not fixed |
-| S-5 | **`/quote-new` with an empty submit** — creates a numbered DRAFT with no customer and ₹0 that can be taken to ACCEPTED | A quotation goes to a customer | 2.2 | T-11 | confirmed 19 Oct, not fixed (SA-26) |
+| S-5 | **`/quote-new` with an empty submit** — creates a numbered DRAFT with no customer and ₹0. Since 20 Oct it can no longer be sent unapproved or accepted by anyone but the person assigned; the empty save itself is Sales Stage 2.2 | A quotation goes to a customer | 2.2 | T-11 | partly fixed 20 Oct (SA-26) |
 | S-6 | **Merge:** reason required; nothing left pointing at the discarded record; say on the screen that it cannot be undone | One-way door with no record of why | 2.6 | T-6 | untested |
 | S-7 | **Changing the numbering scheme mid-year** — protect the existing series or refuse | Duplicate invoice or certificate numbers | 2.7 | T-18 | untested |
 | S-8 | **Staff sessions without a company stamp** are still accepted anywhere (kept deliberately: the overnight jobs act through them). A real sign-in always stamps, so only a session older than M13 could carry none | Low residual risk; closing it needs the overnight jobs to stamp first | — | `test_cross_company_session` | accepted for now, recorded |
-| S-10 | **A Branch Manager can approve another branch's quotation** — the quotation scope gate returns before it resolves an approval step to its quote | Branch segregation of commercial authority does not hold | Sales 1.1 | TM-A20 | confirmed, not fixed (GAP-050, SA-06) |
-| S-11 | **View is treated as decide on quotations** — anyone who can open a quote can mark it accepted, lost or back to draft, and the portal register stores any status | Read access changes the customer master, the pipeline and the accounting system | Sales 1.2, 1.5 | TM-Q20…Q33 | confirmed, not fixed (GAP-050, SA-03/04) |
+| S-10 | **A Branch Manager can approve another branch's quotation** — the quotation scope gate returns before it resolves an approval step to its quote | Branch segregation of commercial authority does not hold | Sales 1.1 | TM-A20 | **fixed 20 Oct** (GAP-050, SA-06) |
+| S-11 | **View is treated as decide on quotations** — anyone who can open a quote can mark it accepted, lost or back to draft, and the portal register stores any status | Read access changes the customer master, the pipeline and the accounting system | Sales 1.2, 1.5 | TM-Q20…Q33 | **fixed 20 Oct** — the person assigned records the customer's answer (GAP-050, SA-03/04) |
 | S-9 | **Two test files pass only in the full suite** (`test_m7_*`, `test_m8_*`) | A guard rail that only holds in company can hide a regression | 3.6 | run alone | recorded |
 
 **Done this month, for the record:** GAP-008 (ungated routes, none reachable),

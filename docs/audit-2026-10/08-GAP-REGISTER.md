@@ -730,7 +730,7 @@ per-address limit is the conventional answer; recorded, not built.
 
 ## GAP-050 — Sales: the approval and acceptance controls are enforced by hidden buttons, not by the server
 
-**CONFIRMED BY EXECUTION · P0 · Sales (quotations, approvals, contracts) · OPEN — investigation only, awaiting the owner's scope approval**
+**CONFIRMED BY EXECUTION · P0 · Sales (quotations, approvals, contracts) · FIXED 20 Oct 2026 after the owner's answers (D-01…D-12) — Sales roadmap Stage 1, §8a**
 
 The deep business-user audit of Sales (`sales/`, 19 Oct 2026; probes in
 `evidence/sales-audit/`) drove every Sales handler on throwaway databases as
@@ -754,9 +754,13 @@ with the invoice total (SA-16); blacklisted customers are never stopped
 (SA-17); customers duplicated at acceptance and on simultaneous conversion
 (SA-18). 54 findings in all, 197 test scenarios, 30 owner decisions.
 
-**Not fixed, by instruction:** the audit was investigation-only. The proposed
-corrections are `sales/SALES-REMEDIATION-ROADMAP.md` Stage 1; eight of them wait
-on owner decisions D-01, 02, 03, 04, 06, 07, 08, 12.
+**Fixed 20 Oct 2026**, once the owner answered D-01, 02, 03, 04, 06, 07, 08 and
+12: all seven P0 items and the six P1 items above, each driven through the real
+dispatcher as each role in a guard-rail test (`test_sales_owner_rules`,
+`test_sales_d01_leads`, `test_sales_d12_blocked`, `test_sales_billing_defaults`,
+`test_sales_setup_questions`). Approval now follows the company's own rules,
+answered on a new **Set up Sales** screen. What remains is Stage 2 onwards of
+`sales/SALES-REMEDIATION-ROADMAP.md`.
 
 ---
 

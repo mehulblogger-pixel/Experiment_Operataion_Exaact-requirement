@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '03d171a · 2026-10-20 01:30 UTC · 689 files';
+$RELEASE = '1e461f6 · 2026-10-20 01:47 UTC · 689 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -50,10 +50,10 @@ $EXPECT  = [
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
     'lib/audits.php' => ['s'=>41605,'h'=>'f362d70e80a1632d'],
     'lib/backup.php' => ['s'=>23534,'h'=>'f46dd929ef6ec98f'],
-    'lib/billable.php' => ['s'=>28937,'h'=>'912d22dd3639fc99'],
+    'lib/billable.php' => ['s'=>30388,'h'=>'915abaabd09e5c9a'],
     'lib/billing.php' => ['s'=>14639,'h'=>'f1395bd56bae517b'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
-    'lib/books.php' => ['s'=>69188,'h'=>'54ea4ad2906c0bb6'],
+    'lib/books.php' => ['s'=>70004,'h'=>'50ed5b2dc1b11f82'],
     'lib/booksbridge.php' => ['s'=>26219,'h'=>'b98194d999c7b90b'],
     'lib/booksui.php' => ['s'=>24743,'h'=>'167e036aaf00240e'],
     'lib/bulk.php' => ['s'=>2157,'h'=>'ca3be826f9a4414c'],
@@ -174,7 +174,7 @@ $EXPECT  = [
     'lib/nextaction.php' => ['s'=>15255,'h'=>'85f9797146341fa6'],
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
-    'lib/opportunities.php' => ['s'=>67020,'h'=>'5b78894c71d71c6c'],
+    'lib/opportunities.php' => ['s'=>67032,'h'=>'c1c0fe2ac50270ec'],
     'lib/ops.php' => ['s'=>724383,'h'=>'cedaa2afa54b4918'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
