@@ -85,8 +85,10 @@ t_ok(!crm_quote_matching_rules(crm_quote_get($under)), '90,000 before tax is und
 t_ok((bool) crm_quote_matching_rules(crm_quote_get($over)), '1,10,000 before tax falls in the one-lakh rule');
 
 // ---- D-03: a value no rule covers does what the company chose ---------------------
-t_eq(crm_quote_unmatched_policy(), 'any', 'with nothing chosen, an uncovered value keeps the behaviour it always had: any approver');
+t_eq(crm_quote_unmatched_policy(), 'top', 'with nothing chosen, an uncovered value goes to the highest level — the owner\'s answer to D-03 ("as you recommend")');
 t_ok(crm_quote_needs_approval(crm_quote_get($under)), '…so it still needs an approval');
+t_eq(array_map(fn($r) => $r['approver_role'], crm_quote_rule_steps(crm_quote_get($under))), ['MARKETING_MANAGER'],
+     '…and it goes to the approver of the highest level (here the only one) — not to anyone at all');
 setting_set('quote_unmatched_approval', 'none');
 t_ok(!crm_quote_needs_approval(crm_quote_get($under)), 'when the company says "no approval needed", an uncovered value needs none');
 t_ok(crm_quote_needs_approval(crm_quote_get($over)), '…but a value a rule covers still does');

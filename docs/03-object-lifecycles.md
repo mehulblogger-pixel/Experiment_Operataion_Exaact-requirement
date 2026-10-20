@@ -161,9 +161,9 @@ writes one line in the quotation's history (who, what, why).
   amount/BU, the direct `quote-status → APPROVED` path is routed through the chain
   (`crm_quote_needs_chain` / `crm_quote_chain_satisfied`); a master may override, logged as a
   bypass. When no rule matches, the company's own answer decides (owner's rule D-03,
-  setting `quote_unmatched_approval`): **any** approver (the default, and the behaviour
-  before 20 Oct), **none** needed (it may be sent straight from DRAFT), or the **highest
-  level's** approvers. Matching uses the value **before tax** (D-04).
+  setting `quote_unmatched_approval`): the **highest level's** approvers (the default,
+  the owner's answer of 20 Oct; with no levels at all, any approver), **any** approver
+  (the behaviour before 20 Oct), or **none** needed (it may be sent straight from DRAFT). Matching uses the value **before tax** (D-04).
 - **Closed unlock** — ACCEPTED/LOST are locked; a time-boxed unlock is granted by the master
   only in answer to a `quote_edit_requests` row (`crm.php:1007`, `quote_is_locked` 968-971).
 - **On acceptance the outcome propagates back up the funnel** (Field #8): the sync lands the

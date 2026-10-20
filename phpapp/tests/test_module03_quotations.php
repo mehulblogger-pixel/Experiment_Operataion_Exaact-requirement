@@ -74,8 +74,17 @@ try {
 
     // A quote below the threshold does not need the chain.
     $qSmall = $mkQuote('Q-SMALL', 'DRAFT', 30, '', ['total_amount'=>500, 'subtotal'=>500]);
+    //  What happens to a value no rule covers is the company's own answer (D-03).
+    //  The owner's default since 20 Oct is "the highest level"; "any approver" is
+    //  the behaviour before it.
+    $prevPolicy = setting_get('quote_unmatched_approval', '');
+    setting_set('quote_unmatched_approval', 'any');
     t_ok(crm_quote_needs_chain(ops_one("SELECT * FROM quotations WHERE id=?", [$qSmall])) === false,
-         'a quote below every rule threshold does not require the chain');
+         'with "any approver", a quote below every rule threshold does not require the chain');
+    setting_set('quote_unmatched_approval', 'top');
+    t_ok(crm_quote_needs_chain(ops_one("SELECT * FROM quotations WHERE id=?", [$qSmall])) === true,
+         'with "the highest level" (the default), it goes to the highest level\'s chain instead');
+    setting_set('quote_unmatched_approval', (string) $prevPolicy);
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }

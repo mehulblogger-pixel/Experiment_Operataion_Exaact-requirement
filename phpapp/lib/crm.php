@@ -1144,14 +1144,18 @@ function crm_quote_band_value($q) {
 }
 
 // D-03 — what the company said to do with a value no approval rule covers.
+// The owner's answer (20 Oct 2026): "as you recommend" — the approvers of the
+// highest level, so the quotations no level was written for get the most senior
+// eyes rather than anyone's. A company with no levels at all has no highest
+// level, and then anyone who may approve quotations approves it.
 const QUOTE_UNMATCHED_POLICIES = [
+    'top'  => 'It goes to the approvers of your highest level (recommended)',
     'any'  => 'Anyone who may approve quotations approves it',
     'none' => 'No approval is needed — it can be sent straight away',
-    'top'  => 'It goes to the approvers of the highest level',
 ];
 function crm_quote_unmatched_policy() {
-    $p = (string) setting_get('quote_unmatched_approval', 'any');
-    return isset(QUOTE_UNMATCHED_POLICIES[$p]) ? $p : 'any';
+    $p = (string) setting_get('quote_unmatched_approval', 'top');
+    return isset(QUOTE_UNMATCHED_POLICIES[$p]) ? $p : 'top';
 }
 
 // The active rules this quotation's business unit and before-tax value fall in.

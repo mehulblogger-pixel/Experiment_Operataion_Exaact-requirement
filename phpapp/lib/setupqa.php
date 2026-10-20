@@ -81,9 +81,9 @@ function setupqa_sales_set() {
                     [
                         'key' => 'quote_unmatched_approval',
                         'ask' => 'When a ' . $L . "'s value is not covered by any of your approval levels, what should happen?",
-                        'why' => 'For example, a value above your highest level, or between two levels, or when you have no levels at all. A one-person company usually needs no approval.',
+                        'why' => 'For example, a value above your highest level, or between two levels. With no levels at all there is no highest level, so anyone who may approve does it. A one-person company usually needs no approval.',
                         'options' => function_exists('crm_quote_unmatched_policy') ? QUOTE_UNMATCHED_POLICIES : ['any' => 'Anyone who may approve'],
-                        'default' => 'any',
+                        'default' => 'top',
                     ],
                     [
                         'key' => 'quote_self_approval',

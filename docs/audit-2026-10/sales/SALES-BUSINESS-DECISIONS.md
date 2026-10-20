@@ -22,7 +22,7 @@ the first remediation stage start (`SALES-REMEDIATION-ROADMAP.md` §2).
 |---|---|---|
 | ★ D-01 | "Sales executive, sales manager and anyone who is assigned to do the job." | The four sales roles (Business Development Manager, Key Accounts Manager, Marketing Manager, Marketing Executive) work leads, deals and pipelines; anyone else the company assigns the work to is given the same module on **Roles & access**. *Built 20 Oct* |
 | ★ D-02 | "It totally depends on the approval stages defined by the company during company setup or if company grows or changes its mind." | A quotation needs approval before sending **only where the company's approval rules call for it**. *Built 20 Oct* |
-| ★ D-03 | "Value approval can be set in the rules of approval." | What happens to a value no rule covers is itself a choice in the approval setup: any approver (unchanged default) · no approval needed · the highest level. *Built 20 Oct* |
+| ★ D-03 | "Value approval can be set in the rules of approval." · then "As you recommend." | What happens to a value no rule covers is itself a choice in Set up Sales: **the highest level (default)** · any approver · no approval needed. *Built 20 Oct* |
 | ★ D-04 | "Measured before tax." | Rule values are compared with the quotation's subtotal, after discount, before GST. *Built 20 Oct* |
 | ★ D-06 | "Approval may not be required … a single person company … if I am branch manager and instead of Sales executive I am preparing the quote then of course I can approve it but lower level cannot approve it. It again depends on approval rules." | A person who holds the approval authority for that level may approve their own quotation; a lower level never can (the step is not theirs). Each is recorded as a self-approval. A company with no rules and "no approval needed" approves nothing. *Built 20 Oct* |
 | ★ D-07 | "Any commercial or terms and conditions cancel an approval." | Any change to who it is for, what is offered where, price, quantities, units, tax, validity, payment terms, advance, report-release terms or the terms & conditions returns the quotation to DRAFT and removes its approval. *Built 20 Oct* |
@@ -30,9 +30,16 @@ the first remediation stage start (`SALES-REMEDIATION-ROADMAP.md` §2).
 | ★ D-12 | "Nothing only the payment reminder. They can be unblocked by person." | A blacklisted, inactive, on-hold or blocked customer gets **nothing new** — no enquiry, quotation, approval, sending, acceptance, contract, work order or job. What they already owe is still invoiced and reminded, and their payments received. A manager clears a hold under Client holds; someone who may edit the client record makes them Active again. *Built 20 Oct — invoicing work already done kept open, to be confirmed by the owner* |
 | new | "Every module shall have simple questions and answers for the user to set up all these things very easily." | A **setup in plain questions** for each module. *Built 20 Oct for Sales (`/sales-setup`), on a shared engine every other module will use* |
 
-**Still open:** D-05 (levels in order), D-09…D-11, D-13…D-30. D-18 (portal
-quotes) is handled for now by registering them only as *sent* or *lost* — a win
-is recorded on the quotation by the person assigned.
+**Confirmed by the owner, 20 Oct 2026 (second round):**
+
+| Question | The owner's answer | Effect |
+|---|---|---|
+| D-12 — should invoicing work already done be blocked for a blocked customer? | "No" | It stays open, with payment reminders and receipts — as built |
+| D-01 — is giving someone the Leads module on Roles & access enough for "anyone who is assigned"? | "Enough" | No per-record access is added — as built |
+| D-18 — must a quotation lodged on a customer's portal go through approval? | "No" | Registered as sent or lost, no approval; a win is recorded on it by the person assigned — as built. **D-18 answered** |
+| D-03 — the default for a value no level covers | "As you recommend" | The approvers of the **highest level** (option B) is now the default; with no levels at all, anyone who may approve. A company can choose otherwise in Set up Sales |
+
+**Still open:** D-05 (levels in order), D-09…D-11, D-13…D-17, D-19…D-30.
 ---
 
 ## A. Who does what
