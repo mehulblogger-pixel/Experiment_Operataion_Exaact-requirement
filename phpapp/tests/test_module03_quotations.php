@@ -35,7 +35,9 @@ try {
     $pdo = db();
     $mkQuote = function ($no, $status, $validity, $sentAt, $extra = []) use ($pdo) {
         $cols = array_merge(['quote_no'=>$no, 'rev'=>0, 'is_current'=>1, 'status'=>$status,
-            'validity_days'=>$validity, 'sent_at'=>$sentAt, 'total_amount'=>5000, 'sbu'=>'', 'created_at'=>date('c')], $extra);
+            'validity_days'=>$validity, 'sent_at'=>$sentAt, 'total_amount'=>5000, 'subtotal'=>5000, 'sbu'=>'', 'created_at'=>date('c')], $extra);
+        // An approval band is measured on the value BEFORE tax (owner's rule D-04,
+        // 20 Oct 2026), so a fixture carries its subtotal, as every real quote does.
         $ph = implode(',', array_fill(0, count($cols), '?'));
         $pdo->prepare("INSERT INTO quotations (" . implode(',', array_keys($cols)) . ") VALUES ($ph)")->execute(array_values($cols));
         return (int)$pdo->lastInsertId();
@@ -71,7 +73,7 @@ try {
     t_ok(crm_quote_chain_satisfied($qA) === false, 'a quote with no acted approvals has an unsatisfied chain');
 
     // A quote below the threshold does not need the chain.
-    $qSmall = $mkQuote('Q-SMALL', 'DRAFT', 30, '', ['total_amount'=>500]);
+    $qSmall = $mkQuote('Q-SMALL', 'DRAFT', 30, '', ['total_amount'=>500, 'subtotal'=>500]);
     t_ok(crm_quote_needs_chain(ops_one("SELECT * FROM quotations WHERE id=?", [$qSmall])) === false,
          'a quote below every rule threshold does not require the chain');
 } finally {

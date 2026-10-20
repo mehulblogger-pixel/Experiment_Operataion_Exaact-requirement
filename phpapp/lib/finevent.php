@@ -39,7 +39,11 @@ function financial_events(array $f = []) {
 
     // 1. Accepted quotations — a commitment won (not cash yet).
     [$qs, $qa] = _finevent_scope('office_id');
-    $qw = ["UPPER(COALESCE(status,''))='ACCEPTED'", $qs];
+    // One commitment per quotation: its latest ACCEPTED revision. A revision
+    // accepted again after an earlier one was accepted must not count the same
+    // deal twice (Sales audit SA-10).
+    $qw = ["UPPER(COALESCE(status,''))='ACCEPTED'", $qs,
+           "NOT EXISTS (SELECT 1 FROM quotations q2 WHERE q2.quote_no=quotations.quote_no AND q2.rev>quotations.rev AND UPPER(COALESCE(q2.status,''))='ACCEPTED')"];
     if ($pid) { $qw[] = 'client_id=' . $pid; }
     if ($cno !== '') { $qw[] = 'contract_number=' . db()->quote($cno); }
     foreach ($all("SELECT id, quote_no, client_name, total_amount, accepted_date, created_at, office_id, sbu FROM quotations WHERE " . implode(' AND ', $qw), $qa) as $r)

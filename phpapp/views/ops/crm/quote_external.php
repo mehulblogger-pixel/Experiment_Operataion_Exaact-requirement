@@ -17,10 +17,10 @@
     <div class="ff"><label>Submitted on</label><input class="form-control" type="date" name="submitted_on" value="<?= e(date('Y-m-d')) ?>"></div>
     <div class="ff"><label>Status</label>
       <select class="form-control" name="status">
-        <?php foreach (['SENT','ACCEPTED','LOST','REJECTED'] as $sk): ?>
+        <?php foreach (['SENT','LOST'] as $sk): ?>
           <option value="<?= e($sk) ?>" <?= $sk==='SENT'?'selected':'' ?>><?= e($statuses[$sk] ?? $sk) ?></option><?php endforeach; ?>
       </select>
-      <small class="muted">Marking it sent schedules the usual follow-ups.</small></div>
+      <small class="muted">Marking it sent schedules the usual follow-ups. When the <?= e(Tl('client')) ?> accepts, record it on the <?= e(Tl('quote')) ?> itself.</small></div>
   </div>
 
   <h3 class="tab-sub"><?= e(T('client')) ?> &amp; scope</h3>

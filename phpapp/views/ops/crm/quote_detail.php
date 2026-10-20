@@ -187,13 +187,23 @@
 </div>
 <?php endif; ?>
 
+<?php $needsApproval = $needsApproval ?? true; $canDecide = $canDecide ?? false; $assignedName = (string)($assignedName ?? ''); ?>
+<?php if (empty($q['is_current'])): ?>
+<div class="panel" role="status" style="border-left:4px solid var(--warn,#b7791f)">
+  <b>This is an earlier revision.</b> A later revision replaced it, so it is kept as a record and nothing on it can move.
+  <?php foreach (($revs ?? []) as $rv) if (!empty($rv['is_current'])): ?><a class="btn small" href="/quote?id=<?= (int)$rv['id'] ?>">Open the current revision →</a><?php endif; ?>
+</div>
+<?php else: ?>
 <!-- Status action bar -->
 <div class="panel" id="actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <span class="muted"><b>Actions</b> — move this <?= e(Tl('quote')) ?>:</span>
   <?php // A rejected quote is not an ending — it goes back round. It must offer
         // the same submit button a draft does, or the only way forward is to
         // raise a whole new revision for what may be a one-word correction. ?>
-  <?php if ($st==='DRAFT' || $st==='REJECTED'): ?>
+  <?php if (($st==='DRAFT' || $st==='REJECTED') && !$needsApproval): ?>
+    <?php if ($canSend): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php endif; ?>
+    <span class="muted" style="font-size:12.5px">No approval needed — your approval rules do not cover this value.</span>
+  <?php elseif ($st==='DRAFT' || $st==='REJECTED'): ?>
     <?= $act('PENDING_APPROVAL', $st==='REJECTED' ? '↻ Submit for approval again' : 'Submit for approval') ?>
     <?php if ($st==='REJECTED'): ?>
       <a class="btn small secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit first</a>
@@ -201,7 +211,8 @@
   <?php elseif ($st==='APPROVED'): ?>
     <?php if ($canSend): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php endif; ?>
   <?php elseif ($st==='SENT' || $st==='EXPIRED'): ?>
-    <?= $act('ACCEPTED', $st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?>
+    <?php if ($canDecide): ?><?= $act('ACCEPTED', $st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?>
+    <?php else: ?><span class="muted" style="font-size:12.5px"><?= e($assignedName !== '' ? $assignedName . ', who is assigned to this ' . Tl('quote') . ',' : 'The person assigned to this ' . Tl('quote')) ?> records the <?= e(Tl('client')) ?>'s answer.</span><?php endif; ?>
     <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a>
   <?php endif; ?>
   <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email'])): ?>
@@ -211,7 +222,7 @@
     <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>&amp;mode=mailto"
        title="Opens your default mail app — no attachment (browsers cannot attach files to a mailto link)">Compose without attachment</a>
   <?php endif; ?>
-  <?php if (in_array($st, ['DRAFT','REJECTED','PENDING_APPROVAL','APPROVED','SENT'], true)): ?>
+  <?php if ($canDecide && in_array($st, ['DRAFT','REJECTED','PENDING_APPROVAL','APPROVED','SENT','EXPIRED'], true)): ?>
     <button class="btn small danger" type="button" onclick="document.getElementById('lostbox').style.display='block'">Mark lost</button>
   <?php endif; ?>
   <?php // Revising is how a sent quotation is changed, so this is deliberately NOT
@@ -221,6 +232,7 @@
     <button class="btn small secondary" type="button" onclick="document.getElementById('revbox').style.display='block'" style="margin-left:auto">Revise (new rev)</button>
   <?php endif; ?>
 </div>
+<?php endif; // current revision ?>
 
 <?php // ---- Project costing linked to this quotation --------------------------
   if (!empty($costingCan)): $pcRow = $costing ?? null; $back = '/quote?id=' . (int)$q['id']; ?>

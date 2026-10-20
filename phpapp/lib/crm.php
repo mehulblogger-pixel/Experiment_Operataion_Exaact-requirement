@@ -1127,14 +1127,137 @@ function crm_expire_quotes($today = null) {
 // a multi-level chain is REQUIRED, and the one-click "set approved" short-cut
 // must route through it rather than skip it. Mirrors crm_build_approvals().
 function crm_quote_needs_chain($q) {
-    $amt = (float)($q['total_amount'] ?? 0); $sbu = (string)($q['sbu'] ?? '');
-    foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1") ?: [] as $r) {
+    return (bool) crm_quote_rule_steps($q);
+}
+
+// ---- The owner's rules for quotations (20 Oct 2026, Sales audit D-02…D-08) --
+//
+// Approval is whatever the company's own approval rules say — set up once, and
+// changed when the company grows. The code below never invents an approval the
+// rules did not ask for, and never lets one be skipped that they did.
+
+// D-04 — a rule's value band is measured BEFORE tax: the quotation's subtotal,
+// after any discount line. Tax is not margin, and a change of GST rate must
+// never move a quotation into a different approver's hands.
+function crm_quote_band_value($q) {
+    return (float)($q['subtotal'] ?? 0);
+}
+
+// D-03 — what the company said to do with a value no approval rule covers.
+const QUOTE_UNMATCHED_POLICIES = [
+    'any'  => 'Anyone who may approve quotations approves it',
+    'none' => 'No approval is needed — it can be sent straight away',
+    'top'  => 'It goes to the approvers of the highest level',
+];
+function crm_quote_unmatched_policy() {
+    $p = (string) setting_get('quote_unmatched_approval', 'any');
+    return isset(QUOTE_UNMATCHED_POLICIES[$p]) ? $p : 'any';
+}
+
+// The active rules this quotation's business unit and before-tax value fall in.
+function crm_quote_matching_rules($q) {
+    $amt = crm_quote_band_value($q); $sbu = (string)($q['sbu'] ?? '');
+    $out = [];
+    foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 ORDER BY level, id") ?: [] as $r) {
         if (($r['match_type'] ?? 'ANY') === 'Business Unit' && ($r['sbu'] ?? '') !== '' && $r['sbu'] !== $sbu) continue;
         if ($amt < (float)$r['min_amount']) continue;
         if ((float)$r['max_amount'] > 0 && $amt > (float)$r['max_amount']) continue;
-        return true;
+        $out[] = $r;
     }
-    return false;
+    return $out;
+}
+
+// The rules a quotation must pass: those its value falls in or, when none does
+// and the company chose "the highest level", the rules of that level. Empty
+// means no rule speaks for it — then crm_quote_unmatched_policy() decides.
+function crm_quote_rule_steps($q) {
+    $steps = crm_quote_matching_rules($q);
+    if ($steps || crm_quote_unmatched_policy() !== 'top') return $steps;
+    $top = (int) ops_val("SELECT MAX(level) FROM quote_approval_rules WHERE active=1");
+    return $top ? (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 AND level=? ORDER BY id", [$top]) ?: []) : [];
+}
+
+// D-02 — does this quotation need approving before it goes to the customer?
+// Only when a rule speaks for it, or the company asked for approval anyway.
+function crm_quote_needs_approval($q) {
+    return crm_quote_rule_steps($q) || crm_quote_unmatched_policy() !== 'none';
+}
+
+// D-08 — the person assigned to the quotation (its owner, else whoever raised
+// it) is the one who records the customer's answer.
+function crm_quote_is_mine($q) {
+    $u = current_user(); $me = (int)($u['id'] ?? 0);
+    return $me > 0 && (int)(crm_quote_owner_user_id($q) ?? 0) === $me;
+}
+function crm_quote_can_record_decision($q) {
+    return is_master_of('quotes') || crm_quote_is_mine($q);
+}
+// Who may work a quotation forward (submit it): the same people who may edit it.
+function crm_quote_can_work($q) {
+    return can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes') || crm_quote_is_mine($q);
+}
+
+// D-07 — any change to the commercial terms or the terms & conditions cancels
+// an approval. These are the parts of a quotation that are commercial: who it
+// is for, what is offered where, at what price, on what terms. The contact
+// person, the subject line, the letter and internal notes are not.
+const QUOTE_COMMERCIAL_FIELDS = ['client_id', 'client_name', 'sbu', 'currency', 'validity_days', 'payment_terms',
+    'advance_pct', 'advance_required', 'report_vs_payment', 'gst_pct', 'terms_conditions', 'inspection_types',
+    'product_category', 'site_location', 'location_type', 'vendor_id', 'subtotal', 'total_amount'];
+function crm_quote_commercial_print($qid) {
+    $q = ops_one("SELECT * FROM quotations WHERE id=?", [(int)$qid]); if (!$q) return '';
+    $h = [];
+    foreach (QUOTE_COMMERCIAL_FIELDS as $f) $h[$f] = trim((string)($q[$f] ?? ''));
+    foreach (['validity_days', 'advance_pct', 'gst_pct', 'subtotal', 'total_amount'] as $f) $h[$f] = round((float)$h[$f], 2);
+    $lines = array_map(fn($l) => [(string)$l['sbu'], (string)$l['service_type'], (string)$l['subtypes'], trim((string)$l['description']),
+        (string)$l['order_type'], round((float)$l['qty'], 2), (string)$l['unit'], round((float)$l['rate'], 2), round((float)$l['amount'], 2),
+        trim((string)$l['deliverables']), (int)$l['location_id']],
+        ops_all("SELECT * FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [(int)$qid]) ?: []);
+    $sites = array_map(fn($s) => [(string)$s['label'], (string)$s['location_type'], (string)$s['line1'], (string)$s['line2'],
+        (string)$s['city'], (string)$s['state'], (string)$s['pincode'], (string)$s['country'], (int)$s['vendor_id']],
+        ops_all("SELECT * FROM quote_locations WHERE quote_id=? ORDER BY sort_order, id", [(int)$qid]) ?: []);
+    return json_encode([$h, $lines, $sites]);
+}
+
+// The one table of how a quotation may move — `docs/03-object-lifecycles.md`
+// in code. Returns '' when the move is allowed, otherwise the sentence that
+// tells the person why not and what to do instead. The buttons on the screen
+// follow the same table; this is what holds when a button is not used.
+function crm_quote_transition_problem($q, $to) {
+    $from = (string)($q['status'] ?? '');
+    $L = Tl('quote');
+    if (empty($q['is_current']))
+        return 'This is an earlier revision (R' . sprintf('%02d', (int)$q['rev']) . ') — a later revision has replaced it, so nothing on it can move. Work on the current revision.';
+    switch ($to) {
+        case 'PENDING_APPROVAL':
+            if (!in_array($from, ['DRAFT', 'REJECTED'], true)) return 'Only a draft or a rejected ' . $L . ' can be submitted for approval.';
+            if (!crm_quote_can_work($q)) return 'You cannot submit this ' . $L . ' for approval.';
+            return '';
+        case 'APPROVED':
+            if (!in_array($from, ['DRAFT', 'REJECTED', 'PENDING_APPROVAL'], true)) return 'This ' . $L . ' is ' . strtolower($from) . ' — it cannot be approved now.';
+            return '';
+        case 'SENT':
+            if ($from === 'APPROVED') return '';
+            if (in_array($from, ['DRAFT', 'REJECTED'], true) && !crm_quote_needs_approval($q)) return '';
+            if (in_array($from, ['DRAFT', 'REJECTED', 'PENDING_APPROVAL'], true))
+                return 'This ' . $L . ' needs approval before it goes to the ' . Tl('client') . ' — your approval rules cover its value. Submit it for approval first.';
+            return 'This ' . $L . ' is ' . strtolower($from) . ' — it cannot be sent again. Raise a revision to send a new offer.';
+        case 'ACCEPTED':
+        case 'LOST':
+            if ($from === $to) return 'This ' . $L . ' is already marked ' . strtolower($to) . '.';
+            if ($from === 'ACCEPTED') return 'The ' . Tl('client') . ' has accepted this ' . $L . ', and that is final. A change after acceptance is a new revision.';
+            if ($from === 'LOST') return 'This ' . $L . ' is marked lost. If the ' . Tl('client') . ' comes back, raise a revision.';
+            if ($to === 'ACCEPTED' && !in_array($from, ['SENT', 'EXPIRED'], true))
+                return 'A ' . $L . ' can be accepted only once it has gone to the ' . Tl('client') . '.';
+            if (!crm_quote_can_record_decision($q)) {
+                $oid = crm_quote_owner_user_id($q);
+                $wu  = $oid ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$oid]) : null;
+                $who = $wu ? (trim(($wu['first_name'] ?? '') . ' ' . ($wu['last_name'] ?? '')) ?: (string)$wu['username']) : '';
+                return 'Only the person assigned to this ' . $L . ($who !== '' ? ' (' . $who . ')' : '') . ' can record the ' . Tl('client') . "'s answer.";
+            }
+            return '';
+    }
+    return 'That is not a step in a ' . $L . "'s life. A " . $L . ' is rejected by its approver, expires on its own when its validity ends, and goes back to draft when its commercial terms change.';
 }
 // The chain is satisfied only when steps exist and none is still pending — every
 // required approver has acted. An empty chain is NOT satisfied (nobody acted).
@@ -1408,11 +1531,15 @@ function ops_crm_inquiries($route, $method) {
 // exactly as confidential as the quote they hang off.
 function crm_quote_scope_gate($route) {
     $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+    // An approval names its STEP, not its quotation, so it is resolved before the
+    // "no object named" exit below — otherwise an approval posted without an id
+    // walked straight past the branch question (Sales audit SA-06).
+    if ($route === 'quote-approve') {
+        $id = (int)ops_val("SELECT quote_id FROM quote_approvals WHERE id=?", [(int)($_POST['step'] ?? $id)]);
+    }
     if ($id <= 0) return;                       // a list, a new form: no object named
     if ($route === 'quote-file' || $route === 'quote-file-delete') {
         $id = (int)ops_val("SELECT quote_id FROM quote_files WHERE id=?", [$id]);
-    } elseif ($route === 'quote-approve') {
-        $id = (int)ops_val("SELECT quote_id FROM quote_approvals WHERE id=?", [(int)($_POST['step'] ?? $id)]);
     }
     if ($id <= 0) return;
     $q = ops_one("SELECT office_id, sbu FROM quotations WHERE id=?", [$id]);
@@ -1504,6 +1631,33 @@ function ops_crm_quotes($route, $method) {
             // The same figure rules as a quotation written here, plus the total typed in.
             $qp = crm_quote_figures_problem($b) ?: figures_problem([[$b['total_amount'] ?? '', 'The quotation total', 0, null]]);
             if ($qp !== '') { flash($qp . ' Nothing was saved.', 'error'); redirect('/quote-external'); }
+            // What a portal registration may say about itself. It was lodged, so
+            // it is SENT; or the bid is already known to be lost. A win is recorded
+            // on the quotation afterwards by the person assigned, through the same
+            // acceptance every quotation goes through — never typed in here.
+            $extStatus = (string)($b['status'] ?? 'SENT');
+            if (!in_array($extStatus, ['SENT', 'LOST'], true)) {
+                flash('Register it as sent (or lost). Once it is on the register, the person assigned records the '
+                    . Tl('client') . "'s acceptance on it, so the order is set up the same way as every other. Nothing was saved.", 'error');
+                redirect('/quote-external');
+            }
+            if ($cid === null && trim((string)($b['client_name'] ?? '')) === '') { flash('Name the ' . Tl('client') . ' it was lodged with. Nothing was saved.', 'error'); redirect('/quote-external'); }
+            if (trim((string)($b['origin'] ?? '')) === '') { flash('Say where it was lodged — the portal or channel. Nothing was saved.', 'error'); redirect('/quote-external'); }
+            // The total must be the lines' total when lines are given, or the
+            // register and the order drawn down against it tell two stories.
+            $lineSum = 0.0; $hasLine = false;
+            foreach ((array)($b['l_desc'] ?? []) as $i => $d) {
+                $lq = (float)(($b['l_qty'] ?? [])[$i] ?? 0); $lr = (float)(($b['l_rate'] ?? [])[$i] ?? 0);
+                if (trim((string)$d) === '' && $lq == 0 && $lr == 0) continue;
+                $hasLine = true;
+                $lineSum += (float)((($b['l_amount'] ?? [])[$i] ?? 0) ?: ($lq * $lr));
+            }
+            $typed = (float)($b['total_amount'] ?? 0);
+            if ($hasLine && abs($lineSum - $typed) > 1) {
+                flash('The total (' . fmoney($typed) . ') does not match its lines (' . fmoney($lineSum) . '). Correct one of them. Nothing was saved.', 'error');
+                redirect('/quote-external');
+            }
+            if (!$hasLine && $typed <= 0) { flash('Enter the total that was quoted, or its lines. Nothing was saved.', 'error'); redirect('/quote-external'); }
             $no = trim($b['quote_no'] ?? '') ?: crm_next_quote_no();
             // §3 — an external quotation carries the number the client or the
             // portal gave it, so it is the one place a duplicate can be typed in.
@@ -1517,7 +1671,7 @@ function ops_crm_quotes($route, $method) {
                 'contact_name','contact_email','contact_mobile','sbu','office_id','subject','product_category',
                 'inspection_types','total_amount','subtotal','gst_pct','payment_terms','sent_at','owner_id','created_by','created_at'];
             $sub = (float)($b['total_amount'] ?? 0);
-            $vals = [$no, 0, 1, $b['status'] ?? 'SENT', $b['origin'] ?? 'CLIENT_PORTAL', trim($b['origin_portal'] ?? ''), trim($b['origin_ref'] ?? ''),
+            $vals = [$no, 0, 1, $extStatus, $b['origin'] ?? 'CLIENT_PORTAL', trim($b['origin_portal'] ?? ''), trim($b['origin_ref'] ?? ''),
                 $cid, $cid ? crm_client_name($cid) : trim($b['client_name'] ?? ''),
                 trim($b['contact_name'] ?? ''), trim($b['contact_email'] ?? ''), trim($b['contact_mobile'] ?? ''),
                 $b['sbu'] ?? '', ($b['office_id'] ?? '') !== '' ? (int)$b['office_id'] : null, trim($b['subject'] ?? ''),
@@ -1533,7 +1687,8 @@ function ops_crm_quotes($route, $method) {
             $nLines = crm_save_lines_from_post($id, $b);
             crm_log_change($id, 'Registered from ' . (lk_options_or('quote_origin', QUOTE_ORIGINS)[$b['origin'] ?? ''] ?? 'an external portal')
                 . ($nLines ? ' with ' . $nLines . ' line item(s)' : ''));
-            if (($b['status'] ?? '') === 'SENT') crm_schedule_followups($id);
+            if ($extStatus === 'SENT') crm_schedule_followups($id);
+            if ($extStatus === 'LOST') $pdo->prepare("UPDATE quotations SET lost_reason_other=? WHERE id=?")->execute(['Registered as lost from ' . trim((string)($b['origin_portal'] ?? '') ?: 'the portal'), $id]);
             flash("$no registered.");
             redirect('/quote?id=' . $id);
         }
@@ -1658,13 +1813,30 @@ function ops_crm_quotes($route, $method) {
                 'gst_pct' => (float)($b['gst_pct'] ?? 18),
             ];
             if ($q) {
+                $before = crm_quote_commercial_print($q['id']);
                 $set = implode(',', array_map(fn($k) => "$k=?", array_keys($hdr)));
                 $pdo->prepare("UPDATE quotations SET $set, updated_at=? WHERE id=?")->execute(array_merge(array_values($hdr), [date('c'), $q['id']]));
                 // Sites first — line items point at them by id.
                 crm_save_locations($q['id'], $b);
                 crm_save_lines($q['id'], $b); crm_quote_recalc($q['id']);
-                crm_log_change($q['id'], 'Edited');
-                flash(ucfirst(Tl('quote')) . ' saved.'); redirect('/quote?id=' . $q['id']);
+                // D-07 — any change to the commercial terms or the terms &
+                // conditions cancels an approval, given or in progress. What
+                // was approved is no longer what would be sent.
+                $voided = false;
+                if (in_array($q['status'], ['PENDING_APPROVAL', 'APPROVED'], true) && crm_quote_commercial_print($q['id']) !== $before) {
+                    $pdo->prepare("DELETE FROM quote_approvals WHERE quote_id=?")->execute([$q['id']]);
+                    $pdo->prepare("UPDATE quotations SET status='DRAFT', submitted_at='' WHERE id=?")->execute([$q['id']]);
+                    $now = crm_quote_get($q['id']);
+                    crm_log_change($q['id'], 'Edited — the commercial terms changed, so the ' . ($q['status'] === 'APPROVED' ? 'approval' : 'approval in progress')
+                        . ' was cancelled (total ' . fmoney($q['total_amount']) . ' → ' . fmoney($now['total_amount'] ?? 0) . ').');
+                    $voided = true;
+                } else {
+                    crm_log_change($q['id'], 'Edited');
+                }
+                flash($voided
+                    ? ucfirst(Tl('quote')) . ' saved. Because its commercial terms changed, the approval was cancelled — submit it for approval again.'
+                    : ucfirst(Tl('quote')) . ' saved.', $voided ? 'warning' : 'success');
+                redirect('/quote?id=' . $q['id']);
             } else {
                 $no = crm_next_quote_no();
                 $inqId = ($b['inquiry_id'] ?? '') !== '' ? (int)$b['inquiry_id'] : null;
@@ -1761,6 +1933,11 @@ function ops_crm_quotes($route, $method) {
             'approvals' => crm_approvals($q['id']),
             'lostReasons' => lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS),
             'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => can('crm.quote.send') || is_master(),
+            // The owner's rules (20 Oct): approval only where the rules call for it,
+            // and the customer's answer recorded by the person assigned.
+            'needsApproval' => crm_quote_needs_approval($q), 'canDecide' => crm_quote_can_record_decision($q),
+            'assignedName' => (function () use ($q) { $u = ($oid = crm_quote_owner_user_id($q)) ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$oid]) : null;
+                                return $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string)$u['username']) : ''; })(),
             'canEdit' => (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')) && !quote_is_locked($q),
             // Revising is the way FORWARD from a sent quotation, so it must not
             // be gated on the lock that sending puts in place — that would leave
@@ -1815,13 +1992,18 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote-status' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         $to = $_POST['to'] ?? '';
+        if (!isset(lk_options_or('quote_status', QUOTE_STATUS)[$to])) { flash('Unknown status.', 'error'); redirect('/quote?id=' . $q['id']); }
+        // The lifecycle, enforced here and not only by which buttons are drawn:
+        // a move the table does not allow is refused, with the reason.
+        if (($why = crm_quote_transition_problem($q, $to)) !== '') { flash($why, 'error'); redirect('/quote?id=' . $q['id']); }
         // Once it is with the customer the only honest moves are the customer's
         // own answer — accepted, or lost. Everything else needs a revision.
         if (quote_is_locked($q) && !in_array($to, ['ACCEPTED', 'LOST'], true)) {
             flash(quote_lock_reason($q), 'error');
             redirect('/quote?id=' . $q['id']);
         }
-        if (!isset(lk_options_or('quote_status', QUOTE_STATUS)[$to])) { flash('Unknown status.', 'error'); redirect('/quote?id=' . $q['id']); }
+        $me = user_name(current_user());
+        $self = crm_quote_is_mine($q) ? ' (self-approval: the person assigned to the ' . Tl('quote') . ')' : '';
         if ($to === 'APPROVED') {
             ops_require(can('crm.quote.approve') || is_master(), 'You cannot approve quotations.');
             // Segregation of duties: when the amount / business unit matches an
@@ -1844,6 +2026,16 @@ function ops_crm_quotes($route, $method) {
             }
         }
         if ($to === 'SENT') ops_require(can('crm.quote.send') || is_master(), 'You cannot send quotations.');
+        if ($to === 'PENDING_APPROVAL' && !crm_quote_needs_approval($q)) {
+            // No rule covers this value and the company said none is needed (D-03):
+            // there is nobody to wait for, so it is ready to send.
+            $pdo->prepare("DELETE FROM quote_approvals WHERE quote_id=?")->execute([$q['id']]);
+            $pdo->prepare("UPDATE quotations SET status='APPROVED', submitted_at=?, rejected_by='', rejected_at='', reject_remarks='' WHERE id=?")
+                ->execute([date('c'), $q['id']]);
+            crm_log_change($q['id'], 'Ready to send — no approval rule covers its value, and your approval setup says none is needed (' . $me . ').');
+            flash('No approval is needed for this ' . Tl('quote') . ' under your approval rules — it is ready to send.');
+            redirect('/quote?id=' . $q['id']);
+        }
         if ($to === 'PENDING_APPROVAL') {
             $n = crm_build_approvals($q);   // build the approval chain from the rules
             $pdo->prepare("UPDATE quotations SET status='PENDING_APPROVAL', submitted_at=?, rejected_by='', rejected_at='', reject_remarks='' WHERE id=?")
@@ -1861,8 +2053,12 @@ function ops_crm_quotes($route, $method) {
             flash('Submitted for approval — ' . $n . ' step(s). Now with ' . ($with ?: 'an approver') . '.');
             redirect('/quote?id=' . $q['id']);
         } elseif ($to === 'LOST') {
+            $lr = trim((string)($_POST['lost_reason'] ?? '')); $lro = trim((string)($_POST['lost_reason_other'] ?? ''));
+            if ($lr === '' && $lro === '') { flash('Say why it was lost — pick a reason, or write one.', 'error'); redirect('/quote?id=' . $q['id']); }
             $pdo->prepare("UPDATE quotations SET status='LOST', lost_reason=?, lost_reason_other=? WHERE id=?")
-                ->execute([$_POST['lost_reason'] ?? '', trim($_POST['lost_reason_other'] ?? ''), $q['id']]);
+                ->execute([$lr, $lro, $q['id']]);
+            crm_log_change($q['id'], 'Marked lost by ' . $me . ' — ' . (lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS)[$lr] ?? $lr)
+                . ($lro !== '' ? ' (' . $lro . ')' : '') . '.');
             $pdo->prepare("UPDATE quote_followups SET status='SKIPPED' WHERE quote_id=? AND status='PENDING'")->execute([$q['id']]);
             // SYNC — a lost quotation closes its deal too, carrying the reason, so
             // the pipeline does not keep counting a deal that is already gone.
@@ -1886,6 +2082,9 @@ function ops_crm_quotes($route, $method) {
         } elseif ($to === 'SENT') {
             [$sent, $msg] = crm_send_quote_email($q);
             $pdo->prepare("UPDATE quotations SET status='SENT', sent_at=? WHERE id=?")->execute([date('c'), $q['id']]);
+            crm_log_change($q['id'], 'Sent to the ' . Tl('client') . ' by ' . $me
+                . ($q['status'] !== 'APPROVED' ? ' — no approval was needed under your approval rules' : '')
+                . ($sent ? ' (e-mailed to ' . $q['contact_email'] . ').' : '.'));
             crm_schedule_followups($q['id']);
             // SYNC — sending the quotation nudges the deal to its "quotation sent"
             // step, but only FORWARD: a deal already further along is never dragged
@@ -1915,6 +2114,7 @@ function ops_crm_quotes($route, $method) {
             // record that — accepting is never blocked, but the trail says so.
             $expBefore = quote_validity($q);
             $pdo->prepare("UPDATE quotations SET status='ACCEPTED', accepted_date=? WHERE id=?")->execute([date('Y-m-d'), $q['id']]);
+            crm_log_change($q['id'], "The " . Tl('client') . "'s acceptance was recorded by " . $me . '.');
             if ($expBefore['expired'])
                 crm_log_change($q['id'], 'Accepted after validity had lapsed on ' . fdate($expBefore['expires_on']) . '.');
             $pdo->prepare("UPDATE quote_followups SET status='SKIPPED' WHERE quote_id=? AND status='PENDING'")->execute([$q['id']]);
@@ -2001,8 +2201,13 @@ function ops_crm_quotes($route, $method) {
             flash(quote_landed_text($q, $res)
                 . ($dealWon ? ' The deal is now won in the sales pipeline.' : ''), 'success');
             redirect('/quote?id=' . $q['id']);
+        } elseif ($to === 'APPROVED') {
+            $pdo->prepare("UPDATE quotations SET status='APPROVED' WHERE id=?")->execute([$q['id']]);
+            crm_log_change($q['id'], 'Approved directly by ' . $me . $self . '.');
         } else {
-            $pdo->prepare("UPDATE quotations SET status=? WHERE id=?")->execute([$to, $q['id']]);
+            // Unreachable while crm_quote_transition_problem() answers for every
+            // target; kept so a status added to the list later cannot slip past.
+            flash('That change is not allowed.', 'error'); redirect('/quote?id=' . $q['id']);
         }
         flash('Quotation moved to ' . (lk_options_or('quote_status', QUOTE_STATUS)[$to] ?? $to) . '.');
         redirect('/quote?id=' . $q['id']);
@@ -2132,6 +2337,13 @@ function ops_crm_quotes($route, $method) {
         if (!$step) { flash('Approval step not found.', 'error'); redirect('/quotes'); }
         $q = crm_quote_get($step['quote_id']); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(crm_can_act_approval($step), 'You are not an approver for this step.');
+        // A step can be signed only while its quotation is waiting for approval.
+        // Once a level has rejected it, or it has gone back to draft, or been
+        // sent, an old step left open must not move it again.
+        if (empty($q['is_current']) || ($q['status'] ?? '') !== 'PENDING_APPROVAL') {
+            flash('This ' . Tl('quote') . ' is no longer waiting for approval (' . strtolower((string)$q['status']) . ') — there is nothing to sign.', 'error');
+            redirect('/quote?id=' . $q['id']);
+        }
         // Pre-order control: when the checklist is on and every point is required,
         // an approval cannot be given until the review checklist is complete. Only
         // gates approval — a rejection is always allowed.
@@ -2162,7 +2374,8 @@ function ops_crm_quotes($route, $method) {
             $pending = (int)ops_val("SELECT COUNT(*) FROM quote_approvals WHERE quote_id=? AND status='PENDING'", [$q['id']]);
             if ($pending === 0) {
                 $pdo->prepare("UPDATE quotations SET status='APPROVED' WHERE id=?")->execute([$q['id']]);
-                crm_log_change($q['id'], 'Approved by ' . $me . ($remarks !== '' ? ' — ' . $remarks : ''));
+                crm_log_change($q['id'], 'Approved by ' . $me . (crm_quote_is_mine($q) ? ' (self-approval: the person assigned to the ' . Tl('quote') . ')' : '')
+                    . ($remarks !== '' ? ' — ' . $remarks : ''));
                 crm_notify_owner($q, 'approved', $remarks);
                 flash('All approvals complete — ' . Tl('quote') . ' approved and ready to send.');
             } else {
@@ -2211,6 +2424,14 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote-contract' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register the contract.');
+        // A contract is the customer's acceptance made formal — so it exists only
+        // for the current revision of an accepted quotation (Sales audit SA-09/10).
+        if (empty($q['is_current']) || ($q['status'] ?? '') !== 'ACCEPTED') {
+            flash(empty($q['is_current'])
+                ? 'This is an earlier revision — a later one replaced it. Register the contract on the current revision.'
+                : 'A contract can be registered only once the ' . Tl('client') . ' has accepted the ' . Tl('quote') . ' (it is ' . strtolower((string)$q['status']) . ').', 'error');
+            redirect('/quote?id=' . $q['id']);
+        }
         $cid = crm_register_client_for_quote($q);
         // Point 1/2 — nothing here is re-typed. The purchase order and the
         // quotation already carry the value, the dates, the subject and the
@@ -2966,19 +3187,22 @@ function preorder_checklist_progress($q) {
     return ['done' => $done, 'total' => count($items), 'complete' => $done >= count($items)];
 }
 // Build the approval steps for a quote from the active rules. A rule matches when
-// its Business Unit matches (or it is "any Business Unit") and the quote total falls in its amount band
-// (max 0 = no upper limit). If nothing matches, one generic step (any approver).
+// its Business Unit matches (or it is "any Business Unit") and the quote's value
+// BEFORE tax falls in its amount band (max 0 = no upper limit). If nothing
+// matches, the company's own answer to "what about a value no rule covers?"
+// decides: the highest level's approvers, or one generic step (any approver).
 function crm_build_approvals($q) {
     $pdo = db();
+    // A rejected chain is kept in the history, not erased: the next line records
+    // who rejected it and why before its steps are replaced.
+    $old = ops_all("SELECT level, status, acted_by, remarks FROM quote_approvals WHERE quote_id=? AND status='REJECTED'", [$q['id']]) ?: [];
+    foreach ($old as $o)
+        crm_log_change($q['id'], 'Earlier approval round: level ' . (int)$o['level'] . ' rejected by ' . ($o['acted_by'] ?: 'an approver')
+            . ($o['remarks'] !== '' ? ' — ' . $o['remarks'] : ''));
     $pdo->prepare("DELETE FROM quote_approvals WHERE quote_id=?")->execute([$q['id']]);
-    $amt = (float)$q['total_amount']; $sbu = $q['sbu'];
-    $steps = [];
-    foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 ORDER BY level, id") as $r) {
-        if (($r['match_type'] ?? 'ANY') === 'Business Unit' && ($r['sbu'] ?? '') !== '' && $r['sbu'] !== $sbu) continue;
-        if ($amt < (float)$r['min_amount']) continue;
-        if ((float)$r['max_amount'] > 0 && $amt > (float)$r['max_amount']) continue;
-        $steps[] = $r;
-    }
+    // The rules its before-tax value falls in (D-04), or the top level when the
+    // company chose that for an uncovered value (D-03).
+    $steps = crm_quote_rule_steps($q);
     if (!$steps) {
         $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,approver_user_id,status) VALUES (?,1,'',NULL,'PENDING')")->execute([$q['id']]);
         return 1;

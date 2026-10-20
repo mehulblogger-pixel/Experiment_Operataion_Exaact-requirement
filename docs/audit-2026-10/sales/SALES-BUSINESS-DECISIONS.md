@@ -15,6 +15,24 @@ Q-B1, Q-G and Q-K, an answer that changes who can do what is written into
 **The eight that block the P0 and P1 fixes** are marked ★. Answering just those lets
 the first remediation stage start (`SALES-REMEDIATION-ROADMAP.md` §2).
 
+
+## Answered by the owner — 20 Oct 2026
+
+| Id | The owner's answer (in their words) | How it is built |
+|---|---|---|
+| ★ D-01 | "Sales executive, sales manager and anyone who is assigned to do the job." | The four sales roles (Business Development Manager, Key Accounts Manager, Marketing Manager, Marketing Executive) work leads, deals and pipelines; anyone else the company assigns the work to is given the same module on **Roles & access**. *Build: stage 1.9* |
+| ★ D-02 | "It totally depends on the approval stages defined by the company during company setup or if company grows or changes its mind." | A quotation needs approval before sending **only where the company's approval rules call for it**. *Built 20 Oct* |
+| ★ D-03 | "Value approval can be set in the rules of approval." | What happens to a value no rule covers is itself a choice in the approval setup: any approver (unchanged default) · no approval needed · the highest level. *Built 20 Oct* |
+| ★ D-04 | "Measured before tax." | Rule values are compared with the quotation's subtotal, after discount, before GST. *Built 20 Oct* |
+| ★ D-06 | "Approval may not be required … a single person company … if I am branch manager and instead of Sales executive I am preparing the quote then of course I can approve it but lower level cannot approve it. It again depends on approval rules." | A person who holds the approval authority for that level may approve their own quotation; a lower level never can (the step is not theirs). Each is recorded as a self-approval. A company with no rules and "no approval needed" approves nothing. *Built 20 Oct* |
+| ★ D-07 | "Any commercial or terms and conditions cancel an approval." | Any change to who it is for, what is offered where, price, quantities, units, tax, validity, payment terms, advance, report-release terms or the terms & conditions returns the quotation to DRAFT and removes its approval. *Built 20 Oct* |
+| ★ D-08 | "Person who is assigned to do that work." | The quotation's owner (else whoever raised it), or a master, records accepted / lost. *Built 20 Oct* |
+| ★ D-12 | "Nothing only the payment reminder. They can be unblocked by person." | A blacklisted, inactive, on-hold or blocked customer gets **nothing new** — no enquiry, quotation, sending, acceptance, contract, work order, job or invoice — only payment reminders (and receipts of their payments). An authorised person unblocks them. *Build: stage 1.12* |
+| new | "Every module shall have simple questions and answers for the user to set up all these things very easily." | A **setup in plain questions** for each module, starting with Sales. *Build: Sales first; the same pattern for every module after* |
+
+**Still open:** D-05 (levels in order), D-09…D-11, D-13…D-30. D-18 (portal
+quotes) is handled for now by registering them only as *sent* or *lost* — a win
+is recorded on the quotation by the person assigned.
 ---
 
 ## A. Who does what

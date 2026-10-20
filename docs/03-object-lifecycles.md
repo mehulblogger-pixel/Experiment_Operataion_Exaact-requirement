@@ -119,23 +119,36 @@ them for the §14 register views. A sent quotation is **immutable** — the way 
 
 ```mermaid
 stateDiagram-v2
-  [*] --> DRAFT : quote-new / opp-create-quote · crm.quote.create/master (crm.php:1372)
-  DRAFT --> PENDING_APPROVAL : submit · builds the approval chain (crm.php:1550, crm_build_approvals 2588)
-  REJECTED --> PENDING_APPROVAL : re-submit after correction (crm.php:1550)
-  PENDING_APPROVAL --> APPROVED : final chain step acted · crm_can_act_approval (crm.php:1844-1845)
-  PENDING_APPROVAL --> REJECTED : approver rejects, reason required (crm.php:1830-1836)
-  DRAFT --> APPROVED : direct set · crm.quote.approve; if amount/BU matches a rule it is routed to the chain instead (crm.php:1548 guard, Module 03)
-  APPROVED --> PENDING_APPROVAL : retract before it leaves · quote_can_retract (crm.php:1858)
-  APPROVED --> SENT : send · crm.quote.send/master, emails + schedules follow-ups (crm.php:1589-1591)
-  SENT --> ACCEPTED : client accepts (staff-recorded) · lands client + wins deal + converts originating lead (crm.php:1616)
-  SENT --> LOST : client declines · reason captured, closes deal (crm.php:1566)
-  SENT --> EXPIRED : validity lapsed · crm_expire_quotes cron, no user (crm.php, Module 03)
-  EXPIRED --> ACCEPTED : accepted after expiry · recorded as accepted-after-expiry (crm.php:1616, Module 03)
-  SENT --> SENT : raise a revision (new rev, new DRAFT; this row stays, is_current moves)
-  EXPIRED --> EXPIRED : raise a revision to re-issue
-  ACCEPTED --> [*] : locked; Accounts registers the contract number separately
+  [*] --> DRAFT : quote-new / opp-create-quote · crm.quote.create/master
+  [*] --> SENT : quote-external — a portal-lodged quote is registered SENT (or LOST), never ACCEPTED/APPROVED (20 Oct)
+  DRAFT --> PENDING_APPROVAL : submit · the quote's editors or the person assigned · builds the chain from the rules
+  REJECTED --> PENDING_APPROVAL : re-submit after correction · the earlier rejection stays in the history
+  DRAFT --> APPROVED : submit when no approval is needed (D-03 "none") · or direct set by crm.quote.approve when no rule covers it
+  PENDING_APPROVAL --> APPROVED : final chain step signed · step's approver, in branch scope, only while PENDING_APPROVAL
+  PENDING_APPROVAL --> REJECTED : any level rejects, reason required · the chain ends there
+  APPROVED --> PENDING_APPROVAL : retract before it leaves · quote_can_retract
+  PENDING_APPROVAL --> DRAFT : a commercial or terms change on edit cancels the approval in progress (D-07)
+  APPROVED --> DRAFT : a commercial or terms change on edit cancels the approval (D-07)
+  APPROVED --> SENT : send · crm.quote.send/master
+  DRAFT --> SENT : send without approval — only when no rule covers its value and the company needs none (D-02/D-03)
+  SENT --> ACCEPTED : the person assigned records the customer's yes (D-08) · lands client + wins deal + converts lead
+  EXPIRED --> ACCEPTED : the same, after expiry · recorded as accepted-after-expiry
+  SENT --> LOST : the person assigned, reason required
+  DRAFT --> LOST : the person assigned, reason required (the deal died before it was sent)
+  SENT --> EXPIRED : validity lapsed · crm_expire_quotes cron, no user
+  SENT --> SENT : raise a revision (new rev, new DRAFT; this row is superseded and can no longer move)
+  ACCEPTED --> [*] : final — no route moves it; Accounts registers the contract on the current revision
   LOST --> [*]
 ```
+
+**Enforced at the server since 20 Oct 2026** (`crm_quote_transition_problem()`,
+`lib/crm.php`): any move not drawn above is refused with a sentence saying why —
+including DRAFT → ACCEPTED, ACCEPTED ↔ LOST, a typed EXPIRED / REJECTED / DRAFT,
+any move of a superseded revision, and any approval step signed after the
+quotation stopped waiting for approval. Before that date the diagram was
+documentation only; the Sales audit (SA-01…SA-06) drove each of those moves
+through the old code. Rule values are measured **before tax** (D-04). Every move
+writes one line in the quotation's history (who, what, why).
 
 - **Immutable once SENT / sent_at set** (`quote_is_locked` `crm.php:959-973`) — not even the
   master edits it; only a revision moves forward (`canRevise` bypasses the lock, `crm.php:1498`).
@@ -147,7 +160,10 @@ stateDiagram-v2
 - **Approval segregation** (Module 03): when an active `quote_approval_rules` row matches the
   amount/BU, the direct `quote-status → APPROVED` path is routed through the chain
   (`crm_quote_needs_chain` / `crm_quote_chain_satisfied`); a master may override, logged as a
-  bypass. When no rule matches, the direct set is unchanged.
+  bypass. When no rule matches, the company's own answer decides (owner's rule D-03,
+  setting `quote_unmatched_approval`): **any** approver (the default, and the behaviour
+  before 20 Oct), **none** needed (it may be sent straight from DRAFT), or the **highest
+  level's** approvers. Matching uses the value **before tax** (D-04).
 - **Closed unlock** — ACCEPTED/LOST are locked; a time-boxed unlock is granted by the master
   only in answer to a `quote_edit_requests` row (`crm.php:1007`, `quote_is_locked` 968-971).
 - **On acceptance the outcome propagates back up the funnel** (Field #8): the sync lands the
