@@ -192,6 +192,39 @@ function leads_try($fn, $fb = []) {
 
 function leads_can_view() { return can('mod.leads.view') || can('mod.inquiries.view') || is_master_of(['leads','inquiries']); }
 function leads_can_edit() { return can('mod.leads.edit') || can('mod.inquiries.edit') || is_master_of(['leads','inquiries']); }
+// D-22 (the owner, 20 Oct 2026: "Yes") — a manager may reopen a lost lead or a
+// closed deal, with a reason. "A manager" is someone who already holds sales-
+// manager authority: whoever configures the pipelines, or approves quotations.
+function leads_can_reopen() {
+    if (function_exists('licence_module_live') && !licence_module_live('leads')) return false;   // no Sales, no leads to reopen
+    return can('mod.leads.edit') || can('crm.quote.approve') || is_master_of(['leads']);
+}
+// The stage a record left when it was closed: the last move INTO a closed stage
+// came from it. Else the pipeline's first open stage.
+function closed_reopen_stage($histTable, $fk, $id, $pipelineId) {
+    $prev = (int) ops_val("SELECT h.from_stage_id FROM $histTable h JOIN pipeline_stages s ON s.id=h.to_stage_id
+                           WHERE h.$fk=? AND s.kind IN ('WON','LOST') ORDER BY h.id DESC LIMIT 1", [(int)$id]);
+    if ($prev && ($st = stage_row($prev)) && ($st['kind'] ?? '') === 'OPEN') return $st;
+    $first = (int) ops_val("SELECT id FROM pipeline_stages WHERE pipeline_id=? AND kind='OPEN' AND COALESCE(active,1)=1 ORDER BY seq, id LIMIT 1", [(int)$pipelineId]);
+    return $first ? stage_row($first) : null;
+}
+function lead_reopen($leadId, $reason) {
+    $l = lead_row($leadId);
+    if (!$l) return ['err' => 'That lead no longer exists.'];
+    if (!leads_can_reopen()) return ['err' => 'Only a manager can reopen a lost lead.'];
+    if ($l['status'] !== 'LOST') return ['err' => 'Only a lost lead can be reopened — this one is ' . strtolower((string)$l['status']) . '.'];
+    $reason = trim((string)$reason);
+    if ($reason === '') return ['err' => 'Say why the lead is being reopened — it is written in its history.'];
+    $to = closed_reopen_stage('lead_stage_history', 'lead_id', (int)$l['id'], (int)$l['pipeline_id']);
+    if (!$to) return ['err' => 'This lead\'s pipeline has no open stage to return it to.'];
+    db()->prepare("UPDATE leads SET status='OPEN', stage_id=?, stage_since=?, lost_reason='', lost_note='', updated_at=? WHERE id=?")
+        ->execute([(int)$to['id'], date('c'), date('c'), (int)$l['id']]);
+    lead_record_move($l, $to);
+    if (function_exists('act_log'))
+        act_log('LEAD', (int)$l['id'], 'SYSTEM', 'Lead ' . $l['ref'] . ' reopened by ' . user_name(current_user()) . ' — ' . $reason,
+                ['auto' => 1, 'partner_id' => $l['partner_id'], 'body' => 'It had been lost: ' . trim((string)$l['lost_reason'] . ' ' . (string)$l['lost_note'])]);
+    return ['ok' => true, 'stage' => $to['name']];
+}
 
 // ---- Pipelines and stages --------------------------------------------------
 function pipelines_all($kind = 'LEAD') {
@@ -648,6 +681,9 @@ function lead_convert($leadId, array $b = []) {
     $l = lead_row($leadId);
     if (!$l) return ['err' => 'That lead no longer exists.'];
     if ($l['status'] === 'CONVERTED') return ['err' => 'That lead has already been converted.'];
+    // A lost lead is closed: it is reopened, by a manager with a reason, before
+    // it can become a customer (D-22). It used to convert straight from lost.
+    if ($l['status'] === 'LOST') return ['err' => 'This lead is marked lost. A manager reopens it first, with a reason — then it can be converted.'];
 
     $pdo = db();
     // Claim the lead before creating anything. Two people pressing Convert at the
@@ -1226,6 +1262,13 @@ function ops_leads($route, $method) {
         }
         flash('Moved.');
         redirect('/lead?id=' . (int)($_POST['id'] ?? 0));
+    }
+
+    if ($route === 'lead-reopen' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $r = lead_reopen($id, (string)($_POST['reason'] ?? ''));
+        flash(!empty($r['err']) ? $r['err'] : 'Reopened — back at "' . $r['stage'] . '".', !empty($r['err']) ? 'error' : 'success');
+        redirect('/lead?id=' . $id);
     }
 
     if ($route === 'lead-convert') {

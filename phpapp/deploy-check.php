@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '4fddece · 2026-10-20 05:53 UTC · 689 files';
+$RELEASE = '3725c40 · 2026-10-20 06:30 UTC · 689 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -148,7 +148,7 @@ $EXPECT  = [
     'lib/install_mode.php' => ['s'=>4935,'h'=>'0c1d5ab96ff54b68'],
     'lib/invready.php' => ['s'=>6922,'h'=>'0f7637be388be1fc'],
     'lib/joblock.php' => ['s'=>13155,'h'=>'47c05d15e9e8e13b'],
-    'lib/leads.php' => ['s'=>76877,'h'=>'9ee33b119829d919'],
+    'lib/leads.php' => ['s'=>80093,'h'=>'85ab20cfa5bd1632'],
     'lib/licence.php' => ['s'=>31138,'h'=>'ae1f563479d4009c'],
     'lib/licenceissue.php' => ['s'=>33709,'h'=>'583595aeb2561596'],
     'lib/licencekey.php' => ['s'=>29242,'h'=>'c42b2078fe80352f'],
@@ -174,8 +174,8 @@ $EXPECT  = [
     'lib/nextaction.php' => ['s'=>15255,'h'=>'85f9797146341fa6'],
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
-    'lib/opportunities.php' => ['s'=>67032,'h'=>'c1c0fe2ac50270ec'],
-    'lib/ops.php' => ['s'=>724523,'h'=>'3506ec536ff270ca'],
+    'lib/opportunities.php' => ['s'=>69459,'h'=>'1fabb6c2818818ac'],
+    'lib/ops.php' => ['s'=>724576,'h'=>'f67159b1901e43e0'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -509,7 +509,7 @@ $EXPECT  = [
     'views/ops/job_form.php' => ['s'=>58267,'h'=>'fc27fcee363d06e0'],
     'views/ops/jobs.php' => ['s'=>7058,'h'=>'54c963c415ee7600'],
     'views/ops/lead_convert.php' => ['s'=>2983,'h'=>'36d24e0b5dfc08ab'],
-    'views/ops/lead_detail.php' => ['s'=>26592,'h'=>'250c21c11b287ae2'],
+    'views/ops/lead_detail.php' => ['s'=>27273,'h'=>'699c22e3ae394d59'],
     'views/ops/lead_form.php' => ['s'=>13316,'h'=>'4b62e8d6ec3009bd'],
     'views/ops/leads.php' => ['s'=>9683,'h'=>'92e376b49c03b080'],
     'views/ops/ledger.php' => ['s'=>4304,'h'=>'414f7ffeb7052c79'],
@@ -542,7 +542,7 @@ $EXPECT  = [
     'views/ops/office_finance.php' => ['s'=>10390,'h'=>'0c4ba07f736f995d'],
     'views/ops/operations_home.php' => ['s'=>16889,'h'=>'5e9df2e4207f6766'],
     'views/ops/opportunities.php' => ['s'=>6993,'h'=>'f6c105203b970888'],
-    'views/ops/opportunity_detail.php' => ['s'=>32883,'h'=>'d7a470b99774e730'],
+    'views/ops/opportunity_detail.php' => ['s'=>34405,'h'=>'269e269b4520d38b'],
     'views/ops/opportunity_form.php' => ['s'=>6508,'h'=>'cb05777e648dc213'],
     'views/ops/ops_desk.php' => ['s'=>5950,'h'=>'50cc74a4ae6338bb'],
     'views/ops/owner_home.php' => ['s'=>6289,'h'=>'b417b9c31ab009a5'],

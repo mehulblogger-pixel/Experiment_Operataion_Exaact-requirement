@@ -196,8 +196,9 @@ sign-in).
 
 | 3.x (D-25) | **Contract amendments:** a change to an open contract's value, dates or quantities is an amendment with a reason, endorsed by a manager and approved by someone else (the branch manager) before it applies, the old figures kept; a rejected one changes nothing; "Reopen" only on a closed or rejected contract (it wiped an open contract's signatures); a figure change before opening withdraws an endorsement given for the old figures | the amendment commit | `test_sales_contract_amendment.php` (21) |
 
-**Stage 1 is complete.** The third round of answers (20 Oct) is being built in order:
-reopening is the last. **Still waiting on the owner:** D-09, D-13…D-17, D-19…D-21, D-24, D-26…D-28, D-30.
+| 3.x (D-22) | **Reopening:** a manager reopens a lost lead or a won/lost deal with a reason, logged, back to the stage it left; a won deal already an order or contract is not reopened; a lost lead is no longer converted without reopening | the reopen commit | `test_sales_reopen.php` (15) |
+
+**Stage 1 is complete.** **The third round of answers (20 Oct) is built in full.** **Still waiting on the owner:** D-09, D-13…D-17, D-19…D-21, D-24, D-26…D-28, D-30.
 
 ## 9. If only five things are done
 

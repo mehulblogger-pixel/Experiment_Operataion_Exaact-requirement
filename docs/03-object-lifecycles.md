@@ -216,6 +216,29 @@ stateDiagram-v2
 
 ---
 
+## Lead (`leads.status`) and opportunity (`opportunities.status`) — closing and reopening
+
+The stages are configurable per pipeline; the **status** follows the kind of stage
+(`OPEN` · `WON` · `LOST`). Leads also have `CONVERTED` (a won lead becomes a customer and an
+enquiry). Reopening is the owner's rule D-22 (20 Oct 2026, "Yes").
+
+```mermaid
+stateDiagram-v2
+  [*] --> OPEN
+  OPEN --> OPEN : move between open stages
+  OPEN --> LOST : move to a LOST stage — a reason is required
+  OPEN --> CONVERTED : lead — convert (a WON stage means convert)
+  OPEN --> WON : deal — move to a WON stage
+  LOST --> OPEN : reopen — a manager, with a reason, back to the stage it left (D-22)
+  WON --> OPEN : deal reopen — a manager, with a reason, only while it is not yet an order or contract (D-22)
+  CONVERTED --> [*]
+```
+
+- **A manager** is `leads_can_reopen()`: `mod.leads.edit`, `crm.quote.approve`, or a master of leads.
+- **A lost lead is not converted** — it is reopened first (it used to convert straight from LOST).
+- A reopen is written in the record's history with who, the reason and why it had been closed,
+  and adds a stage-history row; the lost reason is cleared so it no longer counts as lost.
+
 ## Customer trade block — the owner's rule D-12 (20 Oct 2026)
 
 Not a lifecycle of its own: it reads the customer's two existing status fields and

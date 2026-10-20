@@ -193,3 +193,20 @@ Use a test quotation for a test customer; nothing below sends anything to a real
 | The person assigned | **Mark lost** without choosing a reason | Refused — it asks why it was lost |
 | A manager | **Client holds** → block the test customer → try a new enquiry, quotation or work order for them | Each is refused with one sentence saying why and where it is cleared. Clear the hold afterwards |
 | Finance | Invoice one job of a work order that was split into two jobs | The line suggests that job's own man-days, not the whole order's |
+
+### Sales — your third round of answers (check after the upload)
+
+| Who signs in | Do this | You should see |
+|---|---|---|
+| A level-2 approver | Try to approve a test quotation that level 1 has not yet approved | Refused: "Level 1 approves first" |
+| A Marketing Manager | **Sales → Set up Sales → Set who covers for an approver who is away**; name a colleague for a week | The colleague now sees that manager's quotations in "waiting for me" and can approve them |
+| A Marketing Manager | **Set up Sales** → "If a quotation waits too long…" → *After 3 days* | Saved; from the next night a quotation waiting more than 3 days is opened to the level above, and its history says so |
+| The person who prepared a project costing | Submit it, then try to approve it | No Approve button — "someone else approves it" |
+| A salesperson | Try to send a man-month quotation with no approved costing | Refused, naming what to do |
+| The creator of a quotation made from a costing | Change a rate and save without a note | Refused, and the form asks "Why the prices differ from the costing"; with a note it saves and the note is in its history |
+| Anyone | With the review checklist required, try to send or accept a quotation with a point unticked | Refused; an approver can **Waive** it with a reason, which then shows on the quotation |
+| A salesperson in one branch | **Sales → Enquiries** | Only their branch's enquiries, plus older ones marked "No branch — every branch sees it" |
+| A Business Director | **Your industry** → pick another template | Only **Add these pipelines** — wording and accreditation are not offered |
+| An administrator | **Your industry** → pick *Manufacturing* | A separate panel listing what would change (e.g. "ISO/IEC 17020 rules will be turned OFF") and a tick-box. **Do not confirm on the live system** unless you mean it |
+| Finance | On an open test contract, change the value | Saved as an *amendment* waiting for a manager and the branch manager; the contract keeps its old value until both sign |
+| A Marketing Manager | Open a lost test lead → **Reopen this lead** with a reason | It returns to the stage it was lost from; the reason is in its history |

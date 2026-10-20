@@ -62,9 +62,27 @@
     <?php elseif ($canOrder): ?>
       <p class="next">Next: <b>raise the order</b> so operations can start — the panel is just below.</p>
     <?php endif; ?>
+    <?php if (empty($o['call_id']) && empty($o['contract_id']) && trim((string)($o['sent_to_accounts_at'] ?? '')) === ''): ?>
+    <?php if (function_exists('leads_can_reopen') && leads_can_reopen()): ?>
+      <details style="margin-top:8px"><summary class="muted" style="font-size:12.5px;cursor:pointer">Reopen this deal</summary>
+        <form method="post" action="/opportunity-reopen" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <input class="form-control" name="reason" required maxlength="300" placeholder="Why — written in its history" style="flex:1;min-width:220px">
+          <button class="btn small secondary" type="submit">Reopen</button>
+        </form></details>
+    <?php endif; ?>
+    <?php endif; ?>
   <?php elseif ($o['status'] === 'LOST'): ?>
     <div class="step">Closed — this one did not happen.</div>
     <p class="next">Reason: <b><?= e($lostReasons[$o['lost_reason']] ?? $o['lost_reason']) ?></b><?= $o['lost_to'] ? ' — lost to ' . e($o['lost_to']) : '' ?><?= $o['lost_note'] ? '. ' . e($o['lost_note']) : '' ?>.</p>
+    <?php if (function_exists('leads_can_reopen') && leads_can_reopen()): ?>
+      <details style="margin-top:8px"><summary class="muted" style="font-size:12.5px;cursor:pointer">Reopen this deal</summary>
+        <form method="post" action="/opportunity-reopen" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <input class="form-control" name="reason" required maxlength="300" placeholder="Why — written in its history" style="flex:1;min-width:220px">
+          <button class="btn small secondary" type="submit">Reopen</button>
+        </form></details>
+    <?php endif; ?>
   <?php else: ?>
     <div class="step">This deal is at <b><?= e($curStageName ?: '—') ?></b>.<?php if ($stalled): ?> <span class="pill p-bad" style="font-size:11.5px"><?= (int)$days ?> days here — overdue</span><?php endif; ?></div>
     <p class="next"><?php if (trim((string)$o['next_action']) !== ''): ?>

@@ -443,6 +443,32 @@ function opp_move($oppId, $stageId, array $b = [], $bypassGate = false) {
     return ['ok' => true, 'status' => $status];
 }
 
+// D-22 — a manager reopens a won or lost deal, with a reason, back to the stage
+// it left. A won deal that has already become an order or a contract is not
+// reopened: that work is under way, and is changed where it is.
+function opp_reopen($oppId, $reason) {
+    opp_migrate();
+    $o = opp_row($oppId);
+    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (!leads_can_reopen()) return ['err' => 'Only a manager can reopen a closed deal.'];
+    if (!in_array((string)$o['status'], ['WON', 'LOST'], true)) return ['err' => 'This deal is still open.'];
+    if ($o['status'] === 'WON' && (trim((string)($o['sent_to_accounts_at'] ?? '')) !== '' || (int)($o['contract_id'] ?? 0) || (int)($o['call_id'] ?? 0)))
+        return ['err' => 'This deal has already become an order or a contract, so it is not reopened — change the order or contract instead.'];
+    $reason = trim((string)$reason);
+    if ($reason === '') return ['err' => 'Say why the deal is being reopened — it is written in its history.'];
+    $to = closed_reopen_stage('opportunity_stage_history', 'opportunity_id', (int)$o['id'], (int)$o['pipeline_id']);
+    if (!$to) return ['err' => 'This deal\'s pipeline has no open stage to return it to.'];
+    opp_record_move($o, $to);
+    db()->prepare("UPDATE opportunities SET status='OPEN', stage_id=?, probability=?, stage_since=?, lost_reason='', lost_note='', lost_to='',
+                   won_at='', won_by='', updated_at=? WHERE id=?")
+       ->execute([(int)$to['id'], (int)$to['probability'], date('c'), date('c'), (int)$o['id']]);
+    if (function_exists('act_log'))
+        act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM', 'Reopened by ' . user_name(current_user()) . ' — ' . $reason,
+                ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null,
+                 'body' => 'It had been ' . strtolower((string)$o['status']) . ($o['status'] === 'LOST' ? ': ' . trim((string)$o['lost_reason'] . ' ' . (string)$o['lost_note']) : ' by ' . (string)$o['won_by'])]);
+    return ['ok' => true, 'stage' => $to['name']];
+}
+
 function opp_update($oppId, array $b) {
     opp_migrate();
     $o = opp_row($oppId);
@@ -1020,6 +1046,13 @@ function ops_opportunities($route, $method) {
     if ($route === 'opportunity-edit' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
         if (($e = opp_update($id, $_POST)) !== '') flash($e, 'error'); else flash('Saved.');
+        redirect('/opportunity?id=' . $id);
+    }
+
+    if ($route === 'opportunity-reopen' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $r = opp_reopen($id, (string)($_POST['reason'] ?? ''));
+        flash(!empty($r['err']) ? $r['err'] : 'Reopened — back at "' . $r['stage'] . '".', !empty($r['err']) ? 'error' : 'success');
         redirect('/opportunity?id=' . $id);
     }
 
