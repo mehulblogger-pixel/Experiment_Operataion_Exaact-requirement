@@ -161,6 +161,27 @@ milestones; two industry templates side by side.
 
 ---
 
+## 8a. Built on 20 Oct 2026, after the owner's answers
+
+| Stage item | What was built | Commit | Guard rail |
+|---|---|---|---|
+| 1.1–1.7, 1.10, 1.11 | Quotations follow the company's own approval rules at the server: approval only where the rules call for it, values before tax, any commercial or terms change cancels an approval, the person assigned records the customer's answer, a rejection ends the chain, approval within the approver's branch, one transition table, contract only on the current accepted revision, portal quotes SENT/LOST only, one commitment per quotation, a history line per move | `078030b` | `test_sales_owner_rules.php` (58) |
+| 1.9 | The sales roles work leads and deals; Finance registers a contract for a deal won without a quotation; the Operation Manager endorses contract openings | `374f144` | `test_sales_d01_leads.php` (24) |
+| 1.12 | A blocked customer gets nothing new, only payment reminders | `03d171a` | `test_sales_d12_blocked.php` (21) |
+| new | **Setup in plain questions** — a shared engine (`lib/setupqa.php`) and its first set, **Set up Sales** (`/sales-setup`): what happens to a value no level covers, whether a preparer may approve their own quotation, and the contract-review checklist; the approval levels stated in sentences with what they leave uncovered | the setup commit | `test_sales_setup_questions.php` (18) |
+
+**Next on the same engine — one set per module, as the owner asked.** Each set is
+a list of questions bound to settings the module already reads; no module needs a
+new screen design. In order of how much setting-up each module needs today:
+Operations (work-order numbering, competence enforcement, hold points), Recruitment
+(approval matrix, offer approval, careers page), Money (tax, numbering, Tally
+ledgers, bank charges), Quality (accreditation pack, NCR closure), Reporting
+(report approval rules), Marketplace (plans, payment), Admin (company, offices,
+sign-in).
+
+**Still waiting on the owner:** Stage 1.8 needs no decision and is next; D-05,
+D-09…D-11, D-13…D-30 remain open.
+
 ## 9. If only five things are done
 
 1. **1.3 — an edit voids the approval.** The single most consequential gap, and

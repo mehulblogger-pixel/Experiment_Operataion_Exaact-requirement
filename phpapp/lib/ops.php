@@ -3309,7 +3309,7 @@ function ops_route_module_map() {
         'adspro-sync'=>'leads','adspro-backfill'=>'leads',
         'stage-gates'=>'leads','stage-gate-save'=>'leads','stage-gate-delete'=>'leads',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries','inquiry-delete'=>'inquiries',
-        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-add-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes','quote-preorder-save'=>'quotes','preorder-checklist'=>'quotes',
+        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-add-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes','quote-preorder-save'=>'quotes','preorder-checklist'=>'quotes','sales-setup'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs','schedule'=>'jobs',
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems','release-notes'=>'idems','document-ai-review'=>'idems','document-rn-flag'=>'idems','document-scope-from-qap'=>'idems','document-polish-text'=>'idems',
@@ -3661,6 +3661,8 @@ function ops_dispatch($route, $method) {
             ops_crm_templates($route, $method); return true;
         case $route === 'quote-approval-rules' || $route === 'quote-approval-rule-new' || $route === 'quote-approval-rule-edit' || $route === 'quote-approval-rule-delete':
             ops_crm_approval_rules($route, $method); return true;
+        case $route === 'sales-setup':
+            return ops_setup_questions('sales', $method);
         case $route === 'crm-reports':
             ops_crm_reports(); return true;
         case $route === 'requisitions' || $route === 'requisition-new' || $route === 'requisition-edit' || $route === 'requisition':

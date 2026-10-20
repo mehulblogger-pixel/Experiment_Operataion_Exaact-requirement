@@ -28,7 +28,7 @@ the first remediation stage start (`SALES-REMEDIATION-ROADMAP.md` §2).
 | ★ D-07 | "Any commercial or terms and conditions cancel an approval." | Any change to who it is for, what is offered where, price, quantities, units, tax, validity, payment terms, advance, report-release terms or the terms & conditions returns the quotation to DRAFT and removes its approval. *Built 20 Oct* |
 | ★ D-08 | "Person who is assigned to do that work." | The quotation's owner (else whoever raised it), or a master, records accepted / lost. *Built 20 Oct* |
 | ★ D-12 | "Nothing only the payment reminder. They can be unblocked by person." | A blacklisted, inactive, on-hold or blocked customer gets **nothing new** — no enquiry, quotation, approval, sending, acceptance, contract, work order or job. What they already owe is still invoiced and reminded, and their payments received. A manager clears a hold under Client holds; someone who may edit the client record makes them Active again. *Built 20 Oct — invoicing work already done kept open, to be confirmed by the owner* |
-| new | "Every module shall have simple questions and answers for the user to set up all these things very easily." | A **setup in plain questions** for each module, starting with Sales. *Build: Sales first; the same pattern for every module after* |
+| new | "Every module shall have simple questions and answers for the user to set up all these things very easily." | A **setup in plain questions** for each module. *Built 20 Oct for Sales (`/sales-setup`), on a shared engine every other module will use* |
 
 **Still open:** D-05 (levels in order), D-09…D-11, D-13…D-30. D-18 (portal
 quotes) is handled for now by registering them only as *sent* or *lost* — a win

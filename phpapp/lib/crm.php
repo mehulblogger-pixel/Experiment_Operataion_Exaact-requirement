@@ -1189,6 +1189,12 @@ function crm_quote_is_mine($q) {
     $u = current_user(); $me = (int)($u['id'] ?? 0);
     return $me > 0 && (int)(crm_quote_owner_user_id($q) ?? 0) === $me;
 }
+// D-06 — may the person who prepared a quotation approve it themselves when it is
+// within their own authority? The owner's answer is yes, and it is the default; a
+// company that wants a second pair of eyes says no in Sales setup.
+function crm_quote_self_approval_allowed() {
+    return (string) setting_get('quote_self_approval', 'yes') !== 'no';
+}
 function crm_quote_can_record_decision($q) {
     return is_master_of('quotes') || crm_quote_is_mine($q);
 }
@@ -1239,6 +1245,8 @@ function crm_quote_transition_problem($q, $to) {
             return '';
         case 'APPROVED':
             if (!in_array($from, ['DRAFT', 'REJECTED', 'PENDING_APPROVAL'], true)) return 'This ' . $L . ' is ' . strtolower($from) . ' — it cannot be approved now.';
+            if (!crm_quote_self_approval_allowed() && crm_quote_is_mine($q) && !is_master_of('quotes'))
+                return 'Your company asks that someone other than the person who prepared a ' . $L . ' approves it.';
             return '';
         case 'SENT':
             if ($from === 'APPROVED') return '';
@@ -3324,6 +3332,10 @@ function crm_notify_owner($q, $what, $remarks = '') {
 function crm_can_act_approval($step) {
     if (($step['status'] ?? '') !== 'PENDING') return false;
     if (is_master()) return true;
+    // The company's own answer (Sales setup): when it says someone else must
+    // always approve, the person who prepared the quotation cannot sign a step
+    // on it, even one addressed to their role (owner's rule D-06).
+    if (!crm_quote_self_approval_allowed() && ($sq = crm_quote_get((int)($step['quote_id'] ?? 0))) && crm_quote_is_mine($sq)) return false;
     $u = current_user();
     // Being named on the step IS the authority to act on it: the approval matrix
     // routed this quote here on purpose, so a person addressed by name — or by

@@ -94,6 +94,7 @@ function ops_area_def($area) {
             // always opens quotation templates and the Reporting tile always opens
             // report templates. One authoritative route, two unambiguous doors.
             $t(can('crm.template.manage') || is_master(), '📝', ucfirst(Tl('quote')) . ' templates', '/templates?kind=quote', 'Letter and covering-note templates for ' . Tlp('quote') . '.');
+            $t(is_master() || can('settings.manage') || can('crm.quote.approve'), '🧭', 'Set up Sales', '/sales-setup', 'A few plain questions: who approves ' . Tlp('quote') . ', and how requests are reviewed.');
             $t(is_master() || can('settings.manage') || can('crm.quote.approve'), '☑', 'Pre-order checklist', '/preorder-checklist', 'Enquiry / tender / contract review before a quote is approved.');
             $t(function_exists('pc_can') && pc_can(), '🧮', 'Project costing', '/project-costings', 'Team cost build-ups → man-month / man-day / lump rates and margin.');
             $t($fx('gate_can_view') && gate_can_view(), '🛂', 'Approvals', '/approvals', 'Deals held at a stage gate.',
