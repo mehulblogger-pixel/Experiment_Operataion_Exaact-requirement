@@ -135,6 +135,8 @@ function search_sources() {
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = search_sbu_clause('sbu');
+            [$ow, $oa] = scope_office_clause('office_id');   // an enquiry belongs to its branch
+            $sw = "($sw) AND ($ow)"; $sa = array_merge($sa, $oa);
             return array_map(fn($r) => [
                 'title'    => $r['inquiry_no'] . ' — ' . ($r['subject'] ?: 'no subject'),
                 'subtitle' => $r['client_name'] ?: '',

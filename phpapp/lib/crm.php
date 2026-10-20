@@ -280,6 +280,10 @@ function crm_migrate() {
         // The lead an inquiry was converted from, so its origin is a real link
         // (and shows on the register) rather than only a line of notes.
         ensure_column('crm_inquiries', 'lead_id', 'INT NULL');
+        // The branch an enquiry belongs to — the recorder's (owner, 20 Oct 2026).
+        // Blank on older rows and website imports: those stay visible to every
+        // branch, as an unassigned lead does, so nothing becomes invisible.
+        ensure_column('crm_inquiries', 'office_id', 'INT NULL');
         // Where the quote came from: our own, or a client / tender portal that we
         // still want in the register (§xv).
         ensure_column('quotations', 'origin', "VARCHAR(20) DEFAULT 'OWN'");
@@ -622,6 +626,18 @@ function crm_render_quote_playbook($q) {
     echo ob_get_clean();
 }
 function crm_inquiry_get($id) { return ops_one("SELECT * FROM crm_inquiries WHERE id=?", [(int)$id]); }
+// An enquiry belongs to the branch of the person who recorded it, and branch
+// scope applies to it as to a quotation; one with no branch is everyone's.
+function crm_inquiry_in_scope($inq) {
+    if (!$inq) return false;
+    if (function_exists('scope_office_allows') && !scope_office_allows($inq['office_id'] ?? null)) return false;
+    if (function_exists('scope_sbu_allows') && trim((string)($inq['sbu'] ?? '')) !== '' && !scope_sbu_allows($inq['sbu'])) return false;
+    return true;
+}
+function crm_inquiry_office_for_recorder() {
+    $u = function_exists('current_user') ? current_user() : null;
+    return (int)($u['home_office_id'] ?? 0) ?: null;
+}
 function crm_quote_get($id) { return ops_one("SELECT * FROM quotations WHERE id=?", [(int)$id]); }
 function crm_quote_lines($qid) { return ops_all("SELECT * FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [(int)$qid]); }
 function crm_client_name($cid) { return $cid ? (ops_val("SELECT COALESCE(NULLIF(display_name,''), legal_name) FROM business_partners WHERE id=?", [(int)$cid]) ?: '') : ''; }
@@ -1567,6 +1583,7 @@ function inquiries_due($today = null) {
         $ph = implode(',', array_fill(0, count($sb), '?')); $w[] = "(i.sbu IN ($ph) OR i.sbu='')";
         foreach ($sb as $s) $a[] = $s;
     }
+    if (function_exists('scope_office_clause')) { [$ow, $oa] = scope_office_clause('i.office_id'); $w[] = $ow; $a = array_merge($a, $oa); }
     $rows = ops_all("SELECT i.*, bp.display_name client_disp, u.first_name owner_first, u.last_name owner_last, u.username owner_username
                      FROM crm_inquiries i
                      LEFT JOIN business_partners bp ON bp.id=i.client_id
@@ -1599,14 +1616,16 @@ function ops_crm_inquiries($route, $method) {
         if ($q !== '') { $w[] = '(i.inquiry_no LIKE ? OR i.subject LIKE ? OR i.client_name LIKE ?)'; array_push($args, "%$q%", "%$q%", "%$q%"); }
         $sb = scope_sbus();
         if ($sb !== 'ALL' && is_array($sb) && $sb) { $ph = implode(',', array_fill(0, count($sb), '?')); $w[] = "(i.sbu IN ($ph) OR i.sbu='')"; foreach ($sb as $s) $args[] = $s; }
+        [$ow, $oa] = scope_office_clause('i.office_id'); $w[] = $ow; $args = array_merge($args, $oa);
         // Financial-year window (defaults to the current FY; "All years" removes it).
         $fy = fy_filter();
         if (!$fy['all']) { $w[] = 'i.created_at >= ?'; $args[] = $fy['from']; $w[] = 'i.created_at < ?'; $args[] = $fy['to_excl']; }
         // origin_ref = the lead this inquiry was converted from (if any), so the
         // register shows where it came from.
-        $rows = ops_all("SELECT i.*, bp.display_name client_disp, l.ref origin_ref,
+        $rows = ops_all("SELECT i.*, bp.display_name client_disp, l.ref origin_ref, o.name office_name,
                                 u.first_name owner_first, u.last_name owner_last, u.username owner_username
                          FROM crm_inquiries i
+                         LEFT JOIN offices o ON o.id=i.office_id
                          LEFT JOIN business_partners bp ON bp.id=i.client_id
                          LEFT JOIN leads l ON l.id=i.lead_id
                          LEFT JOIN users u ON u.id=i.assigned_to
@@ -1618,6 +1637,7 @@ function ops_crm_inquiries($route, $method) {
         ops_require(can('mod.inquiries.edit'), 'You cannot add or edit inquiries.');
         $inq = null;
         if ($route === 'inquiry-edit') { $inq = crm_inquiry_get((int)($_GET['id'] ?? 0)); if (!$inq) { http_response_code(404); view('notfound'); return; } }
+        if ($inq) ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
         if ($method === 'POST') {
             $b = $_POST;
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
@@ -1662,8 +1682,8 @@ function ops_crm_inquiries($route, $method) {
                 flash('Inquiry updated.'); redirect('/inquiries');
             } else {
                 $no = crm_next_inquiry_no();
-                $pdo->prepare("INSERT INTO crm_inquiries (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,subject,service_requirement,sbu,source,received_date,assigned_to,status,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                    ->execute(array_merge([$no], $vals, [user_name(current_user()), date('c')]));
+                $pdo->prepare("INSERT INTO crm_inquiries (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,subject,service_requirement,sbu,source,received_date,assigned_to,status,notes,created_by,created_at,office_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                    ->execute(array_merge([$no], $vals, [user_name(current_user()), date('c'), crm_inquiry_office_for_recorder()]));
                 // Ads Pro is told an enquiry exists so it can stop advertising to
                 // somebody who has already asked us for a price. Queued, not sent.
                 if (function_exists('ads_queue_inquiry')) ads_queue_inquiry((int)$pdo->lastInsertId(), 'Enquiry raised');
@@ -1684,6 +1704,7 @@ function ops_crm_inquiries($route, $method) {
         $id  = (int)($_POST['id'] ?? 0);
         $inq = $id ? crm_inquiry_get($id) : null;
         if (!$inq) { flash('That inquiry no longer exists.', 'error'); redirect('/inquiries'); }
+        ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
         $quotes = (int)ops_val("SELECT COUNT(*) FROM quotations WHERE inquiry_id=?", [$id]);
         if ($quotes) {
             flash('A ' . Tl('quote') . ' has been raised against ' . $inq['inquiry_no'] . ', so it is part of the record and cannot be deleted. Set its status to Dropped instead.', 'error');
@@ -2024,6 +2045,7 @@ function ops_crm_quotes($route, $method) {
             } else {
                 $no = crm_next_quote_no();
                 $inqId = ($b['inquiry_id'] ?? '') !== '' ? (int)$b['inquiry_id'] : null;
+                if ($inqId && !crm_inquiry_in_scope(crm_inquiry_get($inqId))) $inqId = null;
                 // The lead this was raised from, so it shows back on that lead.
                 $leadId = ($b['lead_id'] ?? '') !== '' ? (int)$b['lead_id'] : null;
                 $cols = array_merge(['quote_no', 'rev', 'is_current', 'inquiry_id', 'lead_id', 'status', 'owner_id', 'created_by', 'created_at'], array_keys($hdr));
@@ -2048,6 +2070,7 @@ function ops_crm_quotes($route, $method) {
         $posted = null; $pLines = null; $pLocs = null;
         if ($refused !== null) { flash($refused, 'error'); [$posted, $pLines, $pLocs] = crm_quote_posted_form($_POST); }
         $preInq = (!$q && ($_GET['inquiry'] ?? '') !== '') ? crm_inquiry_get((int)$_GET['inquiry']) : null;
+        if ($preInq && !crm_inquiry_in_scope($preInq)) $preInq = null;   // another branch's enquiry is not quoted from here
         // Quoting straight off a lead. The lead carries the company, the contact
         // and the requirement, so none of it is re-typed; if the lead is linked
         // to a customer on the master, that customer is pre-selected.

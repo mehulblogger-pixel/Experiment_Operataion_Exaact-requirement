@@ -724,14 +724,18 @@ function lead_convert($leadId, array $b = []) {
             : 'INQ-' . date('ym') . '-' . str_pad((string)((int)ops_val("SELECT COUNT(*) FROM crm_inquiries") + 1), 3, '0', STR_PAD_LEFT);
         $pdo->prepare("INSERT INTO crm_inquiries
             (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,subject,
-             service_requirement,sbu,source,received_date,assigned_to,status,notes,created_by,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'OPEN', ?,?,?)")
+             service_requirement,sbu,source,received_date,assigned_to,status,notes,created_by,created_at,office_id)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'OPEN', ?,?,?,?)")
             ->execute([$no, $partnerId, $l['company_name'], $l['contact_name'], $l['contact_email'],
                        $l['contact_phone'],
                        $subject,
                        (string)$l['requirement'], (string)$l['sbu'], (string)$l['source'],
-                       date('Y-m-d'), (string)$l['owner_name'],
-                       'Converted from lead ' . $l['ref'] . '.', user_name(current_user()), date('c')]);
+                       // assigned_to holds a person's id — it was given the owner's NAME,
+                       // so a converted enquiry showed nobody as its owner.
+                       date('Y-m-d'), (int)($l['owner_user_id'] ?? 0) ?: null,
+                       'Converted from lead ' . $l['ref'] . '.', user_name(current_user()), date('c'),
+                       // the lead's branch, else the branch of whoever converts it
+                       (int)($l['office_id'] ?? 0) ?: ((int)(current_user()['home_office_id'] ?? 0) ?: null)]);
         $inqId = (int)$pdo->lastInsertId();
         // Record the origin as a real link, not just the note above. Best-effort:
         // an older install without the column must still convert the lead.

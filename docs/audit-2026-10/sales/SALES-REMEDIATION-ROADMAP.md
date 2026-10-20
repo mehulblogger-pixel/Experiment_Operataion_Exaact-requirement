@@ -190,8 +190,10 @@ sign-in).
 
 | 3.x (D-10) | **Contract review that holds:** when every point is required, the checklist holds direct approval, every signature, sending and acceptance; each tick records who and when; a revision starts unticked and unwaived; someone who may approve waives it with a reason, shown on the quotation and in its history; Set up Sales says so in its question | the checklist commit | `test_sales_checklist_gates.php` (23) |
 
+| 3.x (enquiry branch) | **An enquiry belongs to its branch:** recorded with the recorder's branch (a converted lead's takes the lead's); register, due count, search, edit, delete and quote-from follow branch scope; no-branch enquiries stay visible to all. Also fixed: converting a lead wrote the owner's *name* into the enquiry's assignee (an id), so it showed nobody | the enquiry-branch commit | `test_sales_enquiry_branch.php` (15) |
+
 **Stage 1 is complete.** The third round of answers (20 Oct) is being built in order:
-enquiry branch, industry template, contract
+industry template, contract
 amendment, reopening. **Still waiting on the owner:** D-09, D-13…D-17, D-19…D-21, D-24, D-26…D-28, D-30.
 
 ## 9. If only five things are done

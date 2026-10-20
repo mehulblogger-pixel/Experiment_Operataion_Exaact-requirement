@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'ca7e542 · 2026-10-20 05:07 UTC · 689 files';
+$RELEASE = '193035b · 2026-10-20 05:25 UTC · 689 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -115,7 +115,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>285094,'h'=>'b157d836e3e2bca5'],
+    'lib/crm.php' => ['s'=>286871,'h'=>'8b6125640fa9a65a'],
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>24205,'h'=>'04ed75b284858be6'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -148,7 +148,7 @@ $EXPECT  = [
     'lib/install_mode.php' => ['s'=>4935,'h'=>'0c1d5ab96ff54b68'],
     'lib/invready.php' => ['s'=>6922,'h'=>'0f7637be388be1fc'],
     'lib/joblock.php' => ['s'=>13155,'h'=>'47c05d15e9e8e13b'],
-    'lib/leads.php' => ['s'=>76486,'h'=>'4ea182b3f99780af'],
+    'lib/leads.php' => ['s'=>76877,'h'=>'9ee33b119829d919'],
     'lib/licence.php' => ['s'=>31138,'h'=>'ae1f563479d4009c'],
     'lib/licenceissue.php' => ['s'=>33709,'h'=>'583595aeb2561596'],
     'lib/licencekey.php' => ['s'=>29242,'h'=>'c42b2078fe80352f'],
@@ -221,7 +221,7 @@ $EXPECT  = [
     'lib/satisfaction.php' => ['s'=>15957,'h'=>'14bfd7fb7267d70f'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
     'lib/schedule.php' => ['s'=>35990,'h'=>'81b963c982b619c8'],
-    'lib/search.php' => ['s'=>34331,'h'=>'3358f1a7be1c8b45'],
+    'lib/search.php' => ['s'=>34494,'h'=>'bd412c0715939eba'],
     'lib/security.php' => ['s'=>41757,'h'=>'ea7431cf49804da6'],
     'lib/seed_connect.php' => ['s'=>22943,'h'=>'06f835c70073b5b5'],
     'lib/seed_costing.php' => ['s'=>7626,'h'=>'d377be1adc35b4da'],
@@ -423,7 +423,7 @@ $EXPECT  = [
     'views/ops/crm/approval_rule_form.php' => ['s'=>3705,'h'=>'f65697a269bb5247'],
     'views/ops/crm/approval_rule_list.php' => ['s'=>3321,'h'=>'f61e360629f8f6c8'],
     'views/ops/crm/inquiry_form.php' => ['s'=>4541,'h'=>'bd15d063e6debfc5'],
-    'views/ops/crm/inquiry_list.php' => ['s'=>4641,'h'=>'5917461194b40e2e'],
+    'views/ops/crm/inquiry_list.php' => ['s'=>4792,'h'=>'365e128c3e1ccef2'],
     'views/ops/crm/quote_detail.php' => ['s'=>73255,'h'=>'1597151ed35535e7'],
     'views/ops/crm/quote_external.php' => ['s'=>8907,'h'=>'7aa7bd1259a0c79d'],
     'views/ops/crm/quote_form.php' => ['s'=>43623,'h'=>'b7756e7eae7cf4b2'],

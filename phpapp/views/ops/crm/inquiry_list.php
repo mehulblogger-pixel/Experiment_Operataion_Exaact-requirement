@@ -33,7 +33,8 @@ $dueCount = $dueCount ?? 0; $sla = $sla ?? 7; ?>
     <?php foreach ($rows as $r): ?>
     <tr>
       <td><b><?= e($r['inquiry_no']) ?></b>
-        <?php if (!empty($r['origin_ref'])): ?><div class="muted" style="font-size:12px">from lead <?= e($r['origin_ref']) ?></div><?php endif; ?></td>
+        <?php if (!empty($r['origin_ref'])): ?><div class="muted" style="font-size:12px">from lead <?= e($r['origin_ref']) ?></div><?php endif; ?>
+        <div class="muted" style="font-size:12px"><?= !empty($r['office_name']) ? e($r['office_name']) : 'No branch — every branch sees it' ?></div></td>
       <td><?= e($r['received_date'] ?: '—') ?></td>
       <td><?= e($r['client_disp'] ?: $r['client_name'] ?: '—') ?></td>
       <td><?= e($r['subject'] ?: '—') ?></td>
