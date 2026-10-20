@@ -72,6 +72,7 @@ t_ok((int) ops_val("SELECT COUNT(*) FROM activities WHERE subject LIKE 'Sales an
 $pdo->prepare("INSERT INTO quotations (quote_no, rev, is_current, status, client_name, office_id, subtotal, gst_pct, gst_amount, total_amount, owner_id, created_by, created_at)
                VALUES ('SQ-1',0,1,'DRAFT','x',?,50000,18,9000,59000,?,'sq_mm',?)")->execute([$off, $MM, date('c')]);
 $own = (int) $pdo->lastInsertId();
+$pdo->prepare("INSERT INTO quote_lines (quote_id, line_no, description, qty, unit, rate, amount) VALUES (?,1,'Inspection',1,'MANDAY',50000,50000)")->execute([$own]);
 setting_set('quote_unmatched_approval', 'any');
 $drive($MM, 'quote-status', 'POST', ['id' => $own], ['to' => 'PENDING_APPROVAL']);
 $step = ops_one("SELECT * FROM quote_approvals WHERE quote_id=?", [$own]);

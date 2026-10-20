@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'ef12835 · 2026-10-20 02:03 UTC · 689 files';
+$RELEASE = 'b56237c · 2026-10-20 02:40 UTC · 689 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -115,7 +115,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>258220,'h'=>'860d8ce83aeab9d6'],
+    'lib/crm.php' => ['s'=>264639,'h'=>'45d29f744808b4aa'],
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>24205,'h'=>'04ed75b284858be6'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -175,7 +175,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>67032,'h'=>'c1c0fe2ac50270ec'],
-    'lib/ops.php' => ['s'=>724383,'h'=>'cedaa2afa54b4918'],
+    'lib/ops.php' => ['s'=>724397,'h'=>'ebb4095a32a38483'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -426,7 +426,7 @@ $EXPECT  = [
     'views/ops/crm/inquiry_list.php' => ['s'=>4641,'h'=>'5917461194b40e2e'],
     'views/ops/crm/quote_detail.php' => ['s'=>70508,'h'=>'948bd4f5312ffcec'],
     'views/ops/crm/quote_external.php' => ['s'=>8907,'h'=>'7aa7bd1259a0c79d'],
-    'views/ops/crm/quote_form.php' => ['s'=>41812,'h'=>'381c2d3b1ed59ace'],
+    'views/ops/crm/quote_form.php' => ['s'=>42819,'h'=>'41a66ee8c50f02a2'],
     'views/ops/crm/quote_list.php' => ['s'=>8038,'h'=>'36be301c9d7ffe37'],
     'views/ops/crm/reports.php' => ['s'=>3263,'h'=>'f9d0840a7994e767'],
     'views/ops/crm/template_form.php' => ['s'=>3958,'h'=>'3671a20d6c01c474'],

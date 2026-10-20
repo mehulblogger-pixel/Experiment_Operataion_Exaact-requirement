@@ -180,6 +180,8 @@ ledgers, bank charges), Quality (accreditation pack, NCR closure), Reporting
 (report approval rules), Marketplace (plans, payment), Admin (company, offices,
 sign-in).
 
+| 2.2, 2.3 | An honest quotation form: a draft needs a customer and a subject; submitting, approving or sending needs at least one priced line with a unit on every line; a refused save redraws the form with everything typed; a double click saves once; the second of two editors is told instead of silently overwriting; a negative validity is refused; a line can only use this quotation's own sites, another quotation's site number is saved as a new site instead of deleting this one's, and a new quotation can pair a line with a site before it is ever saved | the form commit | `test_sales_quote_form.php` (21) |
+
 **Stage 1 is complete** except 1.4's "levels in order", which waits on D-05.
 **Still waiting on the owner:** D-05, D-09…D-11, D-13…D-30. Stage 2 (§3) is next.
 

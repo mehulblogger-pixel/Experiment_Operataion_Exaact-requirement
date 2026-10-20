@@ -20,6 +20,12 @@ the owner has not set, it names the decision (`D-nn`,
 `B/p4_output.txt`; `C/p2` means `C/p2_contract.php` and `C/p2.out`; `D/…` the
 named file in `D/`.
 
+**Re-runs after the fixes of 20 Oct 2026.** The *Today* column records the
+audit run of 19 Oct. Rows since turned to PASS by a guard-rail test are listed
+in `SALES-REMEDIATION-ROADMAP.md` §8a with the test that keeps them so; the
+Quotation, Approval, Contract, Billing, Customer-data, Permission and History
+sections are the ones most changed.
+
 **Never on the live site.** Every FAIL row below changes records in a way that
 cannot be cleanly undone (a customer created, a lead converted, a quote pushed to
 Books). Run them only on a copy.

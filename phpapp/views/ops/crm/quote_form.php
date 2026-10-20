@@ -2,8 +2,12 @@
   $isEdit = (bool)$q;
   $preLead = $preLead ?? null;
   $preClient = $preClient ?? null;   // Field #2 — pre-selected client (e.g. from the PO tab)
-  $inqId  = $q['inquiry_id'] ?? ($preInq['id'] ?? '');
-  $g = function($k, $d = '') use ($q, $preInq, $preLead, $preClient) {
+  // A save that was refused draws the form again from what was posted, so
+  // nothing typed is lost (Sales audit SA-26). It wins over the stored record.
+  $posted = $posted ?? null;
+  $inqId  = $posted['inquiry_id'] ?? ($q['inquiry_id'] ?? ($preInq['id'] ?? ''));
+  $g = function($k, $d = '') use ($q, $preInq, $preLead, $preClient, $posted) {
+    if ($posted && array_key_exists($k, $posted)) return $posted[$k];
     if ($q && isset($q[$k])) return $q[$k];
     if ($preInq && isset($preInq[$k])) return $preInq[$k];
     if ($preLead && isset($preLead[$k]) && $preLead[$k] !== '') return $preLead[$k];
@@ -14,8 +18,9 @@
   $locRows = $locations ?: [[]];
   $curTypes = array_filter(explode(',', (string)$g('inspection_types')));
   $curOffs  = array_filter(explode(',', (string)$g('exec_office_ids')));
-  $terms    = $isEdit ? (string)($q['terms_conditions'] ?? '') : '';
-  if (trim($terms) === '') $terms = $defaultTerms;
+  $terms    = $posted && array_key_exists('terms_conditions', $posted) ? (string)$posted['terms_conditions']
+            : ($isEdit ? (string)($q['terms_conditions'] ?? '') : '');
+  if (trim($terms) === '' && !$posted) $terms = $defaultTerms;
 ?>
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit — ' . e(quote_label($q)) : ucfirst(T_NEW('quote')) ?></h1>
@@ -26,6 +31,8 @@
 <form method="post" action="/<?= $isEdit ? 'quote-edit?id=' . (int)$q['id'] : 'quote-new' ?>" class="panel" id="qform">
   <?php if ($inqId !== ''): ?><input type="hidden" name="inquiry_id" value="<?= (int)$inqId ?>"><?php endif; ?>
   <?php if ($preLead): ?><input type="hidden" name="lead_id" value="<?= (int)$preLead['id'] ?>"><?php endif; ?>
+  <?php if (!$isEdit): ?><input type="hidden" name="form_once" value="<?= e((string)($posted['form_once'] ?? bin2hex(random_bytes(12)))) ?>"><?php endif; ?>
+  <?php if ($isEdit): ?><input type="hidden" name="row_version" value="<?= e((string)($posted['row_version'] ?? ($q['updated_at'] ?? ''))) ?>"><?php endif; ?>
 
 <div data-tabs data-tabs-key="quoteform" class="form-tabs">
 <section class="fs-pane" data-tab="<?= e(T('client')) ?> &amp; header">
@@ -235,7 +242,7 @@
           <?php // Office is set once for the whole quote (Executing offices tab), not
                 // per line — kept as a hidden value so existing quotes are preserved. ?>
           <input type="hidden" name="l_office[]" value="<?= e((string)($ln['office_id'] ?? '')) ?>"></td>
-      <td><select class="form-control l_loc" name="l_location[]" data-cur="<?= (int)($ln['location_id'] ?? 0) ?>"><option value="">— add a site above —</option></select></td>
+      <td><select class="form-control l_loc" name="l_location[]" data-cur="<?= e((string)($ln['location_id'] ?? '')) ?>"><option value="">— add a site above —</option></select></td>
       <td><select class="form-control" name="l_order[]"><?php foreach ($orderOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['order_type'] ?? 'LINE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
       <td><input class="form-control num l_qty" type="number" step="0.01" min="0" name="l_qty[]" value="<?= e($ln['qty'] ?? '') ?>"></td>
       <td><select class="form-control" name="l_unit[]"><?php foreach ($unitOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['unit'] ?? 'MANDAY')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
@@ -538,7 +545,10 @@
       var city= tr.querySelector('[name="loc_city[]"]').value;
       var l1  = tr.querySelector('[name="loc_line1[]"]').value;
       var text = (lab || l1 || ('Site ' + (i+1))) + (city ? ' — ' + city : '');
-      if (lab || l1 || city) opts.push({ id: id, text: text, idx: i });
+      // A site not saved yet has no number, so it is offered by its place on the
+      // form ("new:2"); the save turns that into the site it creates. A line can
+      // be paired with a new site before the quotation is ever saved.
+      if (lab || l1 || city) opts.push({ id: (id && id !== '0') ? id : ('new:' + i), text: text, idx: i });
     });
     tbody.querySelectorAll('.l_loc').forEach(function(s){
       var want = s.value || s.dataset.cur || '';

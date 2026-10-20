@@ -613,7 +613,7 @@ function hiring_admin_can() { return is_admin_level() || (function_exists('can')
 // is stamped on every save. (Second-plus-random granularity — unique per save.)
 function row_version_token() { return date('c') . '.' . bin2hex(random_bytes(2)); }
 function stale_edit_block($table, $id, $postedVersion) {
-    if (!in_array($table, ['calls', 'jobs'], true)) return '';   // allow-list — never interpolate arbitrary names
+    if (!in_array($table, ['calls', 'jobs', 'quotations'], true)) return '';   // allow-list — never interpolate arbitrary names
     if (function_exists('ensure_column')) ensure_column($table, 'updated_at', "VARCHAR(40) DEFAULT ''");
     $cur    = (string) ops_val("SELECT updated_at FROM $table WHERE id=?", [(int)$id]);
     $posted = trim((string)$postedVersion);

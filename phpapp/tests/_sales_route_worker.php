@@ -9,7 +9,7 @@
 //  reason tests/_b10_worker.php exists. It attaches to the SAME database as the
 //  parent (env) and never uses tests/bootstrap.php.
 //
-//    php tests/_sales_route_worker.php <uid> <route> <GET|POST> '<get json>' '<post json>' ['<needles json>']
+//    php tests/_sales_route_worker.php <uid> <route> <GET|POST> '<get json>' '<post json>' ['<needles json>'] ['<session json>']
 //
 //  Prints one JSON line: {"flash":[{text,tag}], "done":"redirect|return|threw", "error":...,
 //  "has":{needle:true|false}} — "has" says whether each needle appears in the page drawn.
@@ -34,6 +34,9 @@ $_POST = json_decode((string)($argv[5] ?? '{}'), true) ?: [];
 $_REQUEST = $_GET + $_POST;
 $_SERVER['REQUEST_METHOD'] = $method;
 $_SERVER['REQUEST_URI'] = '/' . $route . ($_GET ? '?' . http_build_query($_GET) : '');
+// Optional 7th argument: session values to start from — what an earlier request
+// in the same browser session left behind (e.g. a used one-time form key).
+foreach ((json_decode((string)($argv[7] ?? '{}'), true) ?: []) as $sk => $sv) $_SESSION[$sk] = $sv;
 $_SESSION['uid'] = $uid;
 current_user(true); if (function_exists('ua')) ua(true);
 

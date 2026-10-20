@@ -24,7 +24,7 @@ t_ok(strpos($crm, "(\$_GET['client'] ?? '') !== ''") !== false
      'quote-new?client=<id> pre-selects that client (validated as a real client)');
 t_ok(strpos($crm, "'preClient' => \$preClient") !== false, 'the prefill is passed to the quote form');
 $qf = file_get_contents(__DIR__ . '/../views/ops/crm/quote_form.php');
-t_ok(strpos($qf, '$preClient = $preClient ?? null') !== false && strpos($qf, 'use ($q, $preInq, $preLead, $preClient)') !== false,
+t_ok(strpos($qf, '$preClient = $preClient ?? null') !== false && strpos($qf, 'use ($q, $preInq, $preLead, $preClient') !== false,   // (… , $posted) since 20 Oct: a refused save redraws from what was posted
      'the quote form applies the client prefill');
 
 // The PO tab shows a guarded "+ New quotation" trigger that opens the quote form in-page,

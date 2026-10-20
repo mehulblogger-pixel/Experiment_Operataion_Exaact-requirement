@@ -622,7 +622,9 @@ function crm_quote_recalc($qid) {
     $sub = (float)ops_val("SELECT COALESCE(SUM(amount),0) FROM quote_lines WHERE quote_id=?", [(int)$qid]);
     $gst = round($sub * (float)$q['gst_pct'] / 100, 2);
     db()->prepare("UPDATE quotations SET subtotal=?, gst_amount=?, total_amount=?, updated_at=? WHERE id=?")
-        ->execute([$sub, $gst, $sub + $gst, date('c'), (int)$qid]);
+        // A fresh version on every save, so two people editing at once are told
+        // rather than the second silently overwriting the first (SA-26).
+        ->execute([$sub, $gst, $sub + $gst, function_exists('row_version_token') ? row_version_token() : date('c'), (int)$qid]);
 }
 // What would make a quotation's figures wrong, as a sentence, or ''. A line may
 // carry a NEGATIVE RATE -- that is how a discount line is written on this form, and
@@ -630,7 +632,9 @@ function crm_quote_recalc($qid) {
 // quotation as a whole may not total less than nothing. GST must be 0-100%.
 // (GAP-047.) Checked before anything is written, so a refused save changes nothing.
 function crm_quote_figures_problem(array $b) {
-    $f = [[$b['gst_pct'] ?? '', 'GST %', 0, 100], [$b['advance_pct'] ?? '', 'Advance %', 0, 100]];
+    $f = [[$b['gst_pct'] ?? '', 'GST %', 0, 100], [$b['advance_pct'] ?? '', 'Advance %', 0, 100],
+          // A negative validity never expires; ten years is more than any offer.
+          [$b['validity_days'] ?? '', 'Validity (days)', 0, 3650]];
     $desc = (array)($b['l_desc'] ?? []); $svc = (array)($b['l_service'] ?? []);
     $qty = (array)($b['l_qty'] ?? []); $rate = (array)($b['l_rate'] ?? []);
     $sum = 0.0; $n = 0;
@@ -662,14 +666,19 @@ function crm_save_lines($qid, $b) {
     // Word/PDF output and older reports still have something to print.
     $locs = crm_quote_locations((int)$qid);
     $byId = []; foreach ($locs as $L) $byId[(int)$L['id']] = $L;
+    $newMap = crm_quote_loc_map((int)$qid);
     $ins = db()->prepare("INSERT INTO quote_lines (quote_id,line_no,sbu,service_type,subtypes,description,location,location_type,order_type,qty,unit,rate,amount,deliverables,office_id,location_id,activity_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     $n = 0;
     foreach ($desc as $i => $d) {
         $d = trim((string)$d); $sv = trim((string)($svc[$i] ?? ''));
         if ($d === '' && $sv === '') continue;                         // skip blank rows
         $qv = (float)($qty[$i] ?? 0); $rv = (float)($rate[$i] ?? 0);
-        $locId = (int)($lid[$i] ?? 0) ?: null;
-        $L = $locId && isset($byId[$locId]) ? $byId[$locId] : null;
+        // A site not saved until this save is named by its form row; any other
+        // value must be one of this quotation's own sites, or the line has none.
+        $lraw = (string)($lid[$i] ?? '');
+        $locId = isset($newMap[$lraw]) ? (int)$newMap[$lraw] : ((int)$lraw ?: null);
+        if ($locId && !isset($byId[$locId])) $locId = null;
+        $L = $locId ? $byId[$locId] : null;
         $ins->execute([(int)$qid, $n++, $sbu[$i] ?? '', $sv, trim((string)($sub[$i] ?? '')), $d,
             $L ? quote_location_line($L) : '', $L ? $L['location_type'] : 'SITE',
             $ot[$i] ?? 'LINE', $qv, $unit[$i] ?? 'MANDAY', $rv, round($qv * $rv, 2), trim((string)($del[$i] ?? '')),
@@ -1229,6 +1238,21 @@ function crm_quote_commercial_print($qid) {
     return json_encode([$h, $lines, $sites]);
 }
 
+// What a quotation must carry before it can be submitted, approved or sent — an
+// approver cannot judge, and a customer cannot accept, an offer of nothing (Sales
+// audit SA-26). A draft needs only a customer and a subject; this is the next
+// level. Returns '' when ready, else one sentence naming everything missing.
+function crm_quote_ready_problem($q) {
+    $miss = [];
+    if (empty($q['client_id']) && trim((string)($q['client_name'] ?? '')) === '') $miss[] = 'the ' . Tl('client') . ' it is for';
+    $lines = ops_all("SELECT qty, unit, rate FROM quote_lines WHERE quote_id=?", [(int)$q['id']]) ?: [];
+    $priced = array_filter($lines, fn($l) => (float)$l['qty'] > 0 && abs((float)$l['rate']) > 0);
+    if (!$priced) $miss[] = 'at least one line with a quantity and a rate';
+    if (array_filter($lines, fn($l) => trim((string)$l['unit']) === '')) $miss[] = 'a unit on every line';
+    if ($priced && (float)($q['subtotal'] ?? 0) <= 0) $miss[] = 'a total above zero';
+    return $miss ? 'Before it can go further this ' . Tl('quote') . ' needs ' . implode(', ', $miss) . '. Edit it to add them.' : '';
+}
+
 // The one table of how a quotation may move — `docs/03-object-lifecycles.md`
 // in code. Returns '' when the move is allowed, otherwise the sentence that
 // tells the person why not and what to do instead. The buttons on the screen
@@ -1238,6 +1262,7 @@ function crm_quote_transition_problem($q, $to) {
     $L = Tl('quote');
     if (empty($q['is_current']))
         return 'This is an earlier revision (R' . sprintf('%02d', (int)$q['rev']) . ') — a later revision has replaced it, so nothing on it can move. Work on the current revision.';
+    if (in_array($to, ['PENDING_APPROVAL', 'APPROVED', 'SENT'], true) && ($rp = crm_quote_ready_problem($q)) !== '') return $rp;
     // D-12 — nothing moves towards new business for a blocked customer. Marking
     // it lost is still allowed: that closes business, it does not open any.
     if ($to !== 'LOST' && !empty($q['client_id']) && function_exists('partner_trade_block')
@@ -1325,6 +1350,40 @@ function quote_location_label($L) {
     $t = lk_options_or('site_location_type', SITE_LOCATION_TYPES)[$L['location_type'] ?? ''] ?? ($L['location_type'] ?? '');
     return trim(($L['label'] ?: $t) . ($L['city'] ? ' — ' . $L['city'] : ''));
 }
+// The posted-row → saved-site map from the last crm_save_locations() of a quote.
+function crm_quote_loc_map($qid, $set = null) {
+    static $maps = [];
+    if ($set !== null) $maps[(int)$qid] = $set;
+    return $maps[(int)$qid] ?? [];
+}
+// What a refused save posted, shaped as the form draws it: the header values,
+// the line rows and the site rows — so the person sees their own typing again.
+function crm_quote_posted_form(array $b) {
+    $posted = [];
+    foreach ($b as $k => $v) {
+        if (strncmp((string)$k, 'l_', 2) === 0 || strncmp((string)$k, 'loc_', 4) === 0 || $k === '_csrf') continue;
+        $posted[$k] = is_array($v) ? implode(',', array_map('strval', $v)) : (string)$v;
+    }
+    $col = fn($k, $i) => (string)(((array)($b[$k] ?? []))[$i] ?? '');
+    $lines = [];
+    foreach ((array)($b['l_desc'] ?? []) as $i => $d) {
+        if (trim((string)$d) === '' && trim($col('l_service', $i)) === '') continue;
+        $q = (float)$col('l_qty', $i); $r = (float)$col('l_rate', $i);
+        $lines[] = ['description' => (string)$d, 'service_type' => $col('l_service', $i), 'sbu' => $col('l_sbu', $i),
+            'order_type' => $col('l_order', $i), 'qty' => $col('l_qty', $i), 'unit' => $col('l_unit', $i), 'rate' => $col('l_rate', $i),
+            'amount' => round($q * $r, 2), 'subtypes' => $col('l_subtypes', $i), 'deliverables' => $col('l_deliv', $i),
+            'activity_id' => $col('l_activity', $i), 'office_id' => $col('l_office', $i), 'location_id' => $col('l_location', $i)];
+    }
+    $locs = [];
+    foreach ((array)($b['loc_line1'] ?? []) as $i => $l1) {
+        $row = ['id' => (int)$col('loc_id', $i), 'label' => $col('loc_label', $i), 'location_type' => $col('loc_type', $i) ?: 'SITE',
+            'line1' => (string)$l1, 'line2' => $col('loc_line2', $i), 'city' => $col('loc_city', $i), 'state' => $col('loc_state', $i),
+            'pincode' => $col('loc_pin', $i), 'country' => $col('loc_country', $i), 'contact_name' => $col('loc_contact', $i),
+            'contact_mobile' => $col('loc_mobile', $i), 'office_id' => $col('loc_office', $i), 'vendor_id' => $col('loc_vendor', $i)];
+        $locs[] = $row;   // every row, blank ones too: a line names a new site by its row number
+    }
+    return [$posted, $lines, $locs];
+}
 function crm_save_locations($qid, $b) {
     $qid = (int)$qid;
     $ids = (array)($b['loc_id'] ?? []); $lab = (array)($b['loc_label'] ?? []);
@@ -1334,6 +1393,12 @@ function crm_save_locations($qid, $b) {
     $off = (array)($b['loc_office'] ?? []);
     $ven = (array)($b['loc_vendor'] ?? []);   // the vendor whose site this is (optional)
     $keep = [];
+    // A site row may only update a site of THIS quotation. Another quotation's
+    // site number, or one that does not exist, is treated as a new site — it
+    // used to be "kept" without being written, which deleted this quotation's
+    // own site and dropped the edit (Sales audit SA-24).
+    $own = array_map('intval', array_column(ops_all("SELECT id FROM quote_locations WHERE quote_id=?", [$qid]) ?: [], 'id'));
+    $map = [];   // posted row → saved site id, so a line can name a site not saved yet ("new:<row>")
     $upd = db()->prepare("UPDATE quote_locations SET label=?,location_type=?,line1=?,line2=?,city=?,state=?,pincode=?,country=?,contact_name=?,contact_mobile=?,office_id=?,vendor_id=?,sort_order=? WHERE id=? AND quote_id=?");
     $ins = db()->prepare("INSERT INTO quote_locations (quote_id,label,location_type,line1,line2,city,state,pincode,country,contact_name,contact_mobile,office_id,vendor_id,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     $n = 0;
@@ -1348,9 +1413,11 @@ function crm_save_locations($qid, $b) {
             trim((string)($st[$i] ?? '')), trim((string)($pin[$i] ?? '')), trim((string)($ctry[$i] ?? '')) ?: 'India',
             trim((string)($cn[$i] ?? '')), trim((string)($cm[$i] ?? '')), (int)($off[$i] ?? 0) ?: null, $vid, $n++];
         $existing = (int)($ids[$i] ?? 0);
-        if ($existing) { $upd->execute(array_merge($args, [$existing, $qid])); $keep[] = $existing; }
+        if ($existing && in_array($existing, $own, true)) { $upd->execute(array_merge($args, [$existing, $qid])); $keep[] = $existing; }
         else { $ins->execute(array_merge([$qid], $args)); $keep[] = (int)db()->lastInsertId(); }
+        $map['new:' . $i] = end($keep);
     }
+    crm_quote_loc_map($qid, $map);
     // Anything the user removed from the form goes, and lines pointing at it are freed.
     $all = ops_all("SELECT id FROM quote_locations WHERE quote_id=?", [$qid]);
     foreach ($all as $r) {
@@ -1791,19 +1858,31 @@ function ops_crm_quotes($route, $method) {
                 redirect('/quote?id=' . $q['id']);
             }
         }
+        $refused = null;   // a refused save draws the form again from what was posted
         if ($method === 'POST') {
             $b = $_POST;
-            if (($qp = crm_quote_figures_problem($b)) !== '') {
-                flash($qp . ' Nothing was saved.', 'error');
-                redirect($q ? '/quote-edit?id=' . $q['id'] : '/quote-new');
+            // A double click, or the same form sent twice, saves once (SA-26): the
+            // form carries a one-time key, and a key already used opens the
+            // quotation it created instead of making a second one.
+            $once = trim((string)($b['form_once'] ?? ''));
+            if (!$q && $once !== '' && !empty($_SESSION['quote_form_once'][$once])) {
+                flash('That ' . Tl('quote') . ' was already saved — here it is.', 'warning');
+                redirect('/quote?id=' . (int)$_SESSION['quote_form_once'][$once]);
             }
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
+            if ($q && ($stale = stale_edit_block('quotations', $q['id'], $b['row_version'] ?? '')) !== '') $refused = $stale;
+            elseif (($qp = crm_quote_figures_problem($b)) !== '') $refused = $qp . ' Nothing was saved.';
+            // A draft needs only what makes it a draft of something: who it is for
+            // and what it is about. Everything else can wait for submission.
+            elseif ($cid === null && trim((string)($b['client_name'] ?? '')) === '')
+                $refused = 'Say who the ' . Tl('quote') . ' is for — pick the ' . Tl('client') . ', or type their name. Nothing was saved.';
+            elseif (trim((string)($b['subject'] ?? '')) === '')
+                $refused = 'Give the ' . Tl('quote') . ' a subject — what is being offered. Nothing was saved.';
             // D-12 — a blacklisted, inactive, on-hold or blocked customer gets no
             // quotation (new, or moved onto them by an edit).
-            if ($cid && ($tb = partner_trade_block($cid)) !== '') {
-                flash($tb, 'error');
-                redirect($q ? '/quote-edit?id=' . $q['id'] : '/quote-new');
-            }
+            elseif ($cid && ($tb = partner_trade_block($cid)) !== '') $refused = $tb;
+        }
+        if ($method === 'POST' && $refused === null) {
             // §i — when a client is picked, the free-text name is ignored entirely.
             $hdr = [
                 'client_id' => $cid, 'client_name' => $cid ? crm_client_name($cid) : trim($b['client_name'] ?? ''),
@@ -1862,6 +1941,7 @@ function ops_crm_quotes($route, $method) {
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
+                if ($once !== '') $_SESSION['quote_form_once'][$once] = (int)$id;
                 crm_save_locations($id, $b);
                 crm_save_lines($id, $b); crm_quote_recalc($id);
                 if ($inqId) $pdo->prepare("UPDATE crm_inquiries SET status='QUOTED' WHERE id=?")->execute([$inqId]);
@@ -1874,6 +1954,9 @@ function ops_crm_quotes($route, $method) {
                 flash("$no created."); redirect('/quote?id=' . $id);
             }
         }
+        // A refused save: say why, and draw the form again from what was posted.
+        $posted = null; $pLines = null; $pLocs = null;
+        if ($refused !== null) { flash($refused, 'error'); [$posted, $pLines, $pLocs] = crm_quote_posted_form($_POST); }
         $preInq = (!$q && ($_GET['inquiry'] ?? '') !== '') ? crm_inquiry_get((int)$_GET['inquiry']) : null;
         // Quoting straight off a lead. The lead carries the company, the contact
         // and the requirement, so none of it is re-typed; if the lead is linked
@@ -1902,8 +1985,8 @@ function ops_crm_quotes($route, $method) {
             if ($pc && ops_val("SELECT id FROM business_partners WHERE id=? AND is_client=1", [$pc]))
                 $preClient = ['client_id' => $pc];
         }
-        view('ops/crm/quote_form', ['q' => $q, 'lines' => $q ? crm_quote_lines($q['id']) : [], 'preInq' => $preInq, 'preLead' => $preLead, 'preClient' => $preClient,
-            'locations' => $q ? crm_quote_locations($q['id']) : [],
+        view('ops/crm/quote_form', ['q' => $q, 'lines' => $pLines ?? ($q ? crm_quote_lines($q['id']) : []), 'preInq' => $preInq, 'preLead' => $preLead, 'preClient' => $preClient,
+            'locations' => $pLocs ?? ($q ? crm_quote_locations($q['id']) : []), 'posted' => $posted,
             'clients' => clients_list(), 'vendors' => vendors_list(), 'offices' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
             'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES), 'unitOpts' => lk_options_or('charge_unit', CHARGE_UNITS),
             'orderOpts' => lk_options_or('order_type', ORDER_TYPES), 'locTypes' => lk_options_or('site_location_type', SITE_LOCATION_TYPES),
