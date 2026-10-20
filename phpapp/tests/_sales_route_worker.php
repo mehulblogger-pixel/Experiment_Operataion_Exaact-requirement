@@ -52,6 +52,10 @@ register_shutdown_function(function () use ($needles) {
                       'error' => $GLOBALS['__sales_worker_error'] ?? (($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) ? $err['message'] : null),
                       'has' => $has, 'len' => strlen($html)]) . "\n";
 });
+// A shared start line (env SALES_WORKER_START_AT, unix seconds with fraction):
+// several workers started together finish booting at different moments, so for a
+// true race each waits for the same instant before it dispatches.
+if (($at = (float) getenv('SALES_WORKER_START_AT')) > 0) { $w = $at - microtime(true); if ($w > 0 && $w < 30) usleep((int) ($w * 1e6)); }
 ob_start();
 try { ops_dispatch($route, $method); $GLOBALS['__sales_worker_done'] = 'return'; }
 catch (Throwable $e) { $GLOBALS['__sales_worker_done'] = 'threw'; $GLOBALS['__sales_worker_error'] = $e->getMessage(); }

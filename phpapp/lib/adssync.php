@@ -368,6 +368,11 @@ function ads_pull_update($link, $x) {
 function ads_make_lead($x, $ext) {
     $realCompany = trim((string)($x['company'] ?? ''));
     $company = $realCompany ?: trim((string)($x['name'] ?? '')) ?: 'Unnamed enquiry';
+    // Already here — typed by hand, or sent before under another id: link to it.
+    if (function_exists('ads_existing_lead') && ($dup = ads_existing_lead($x, $company))) {
+        ads_store_link('LEAD', $dup, $ext, $x, $realCompany === '');
+        return ['ok' => true, 'linked' => $dup];
+    }
     $res = ads_try(fn() => lead_create([
         'company_name'  => $company,
         'contact_name'  => (string)($x['name'] ?? ''),

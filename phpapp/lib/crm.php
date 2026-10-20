@@ -1539,6 +1539,15 @@ function ops_crm_inquiries($route, $method) {
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
             // D-12 — no new enquiry for a customer who is blocked.
             if ($cid && !$inq && ($tb = partner_trade_block($cid)) !== '') { flash($tb, 'error'); redirect('/inquiry-new'); }
+            // A typed name that looks like a customer already on file is said at
+            // once, so the enquiry can be pointed at them (SA-18). Never blocking:
+            // a name is evidence, not proof.
+            if (!$cid && trim((string)($b['client_name'] ?? '')) !== '' && function_exists('partner_find_or_problem')) {
+                $hit = partner_find_or_problem(trim((string)$b['client_name']), '', '', '', 0);
+                if (($hit['confidence'] ?? 'NONE') !== 'NONE')
+                    flash('A ' . Tl('client') . ' with a similar name is already on file: ' . ($hit['row']['legal_name'] ?? '') . ' (' . ($hit['row']['code'] ?? '')
+                        . '). If it is the same company, pick it on this ' . Tl('inquiry') . ' so its history stays in one place.', 'warning');
+            }
             $cname = $cid ? crm_client_name($cid) : trim($b['client_name'] ?? '');
             $vals = [$cid, $cname, trim($b['contact_name'] ?? ''), trim($b['contact_email'] ?? ''), trim($b['contact_mobile'] ?? ''),
                 trim($b['subject'] ?? ''), trim($b['service_requirement'] ?? ''), $b['sbu'] ?? '', $b['source'] ?? 'EMAIL',
@@ -2034,6 +2043,7 @@ function ops_crm_quotes($route, $method) {
             // The owner's rules (20 Oct): approval only where the rules call for it,
             // and the customer's answer recorded by the person assigned.
             'needsApproval' => crm_quote_needs_approval($q), 'canDecide' => crm_quote_can_record_decision($q),
+            'possibleCustomer' => in_array($q['status'], ['SENT', 'EXPIRED'], true) ? crm_quote_possible_customer($q) : null,
             'assignedName' => (function () use ($q) { $u = ($oid = crm_quote_owner_user_id($q)) ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$oid]) : null;
                                 return $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string)$u['username']) : ''; })(),
             'canEdit' => (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')) && !quote_is_locked($q),
@@ -2208,6 +2218,27 @@ function ops_crm_quotes($route, $method) {
             flash($sent ? ('Quotation e-mailed to ' . $q['contact_email'] . ' and marked sent — follow-ups scheduled.') : ('Marked sent and follow-ups scheduled; ' . $msg), $sent ? 'success' : 'warning');
             redirect('/quote?id=' . $q['id']);
         } elseif ($to === 'ACCEPTED') {
+            // Same company, or a different one? When the quotation names its
+            // customer only by a typed name that looks like one already on file,
+            // the person recording the acceptance says which — once — before a
+            // customer record is created or reused (SA-18).
+            if ($near = crm_quote_possible_customer($q)) {
+                $same = (int)($_POST['same_as'] ?? 0);
+                if ($same === (int)$near['id']) {
+                    $base = (int)(($q['parent_id'] ?? 0) ?: $q['id']);
+                    $pdo->prepare("UPDATE quotations SET client_id=? WHERE (id=? OR id=? OR parent_id=?) AND (client_id IS NULL OR client_id=0)")
+                        ->execute([$same, (int)$q['id'], $base, $base]);
+                    crm_log_change($q['id'], 'Confirmed by ' . $me . ' as the same company as ' . trim((string)($near['code'] ?? '') . ' ' . ($near['legal_name'] ?? '')) . ' already on file.');
+                    $q = crm_quote_get($q['id']);
+                    // Now that it names a customer, that customer's own block applies (D-12).
+                    if (($tb = partner_trade_block($same)) !== '') { flash($tb, 'error'); redirect('/quote?id=' . $q['id']); }
+                } elseif (($_POST['new_company'] ?? '') === '1') {
+                    crm_log_change($q['id'], 'Confirmed by ' . $me . ' as a different company from ' . trim((string)($near['code'] ?? '') . ' ' . ($near['legal_name'] ?? '')) . ', which has a similar name.');
+                } else {
+                    flash('Before recording the acceptance: is "' . $q['client_name'] . '" the same company as ' . ($near['legal_name'] ?? '') . ' (' . ($near['code'] ?? '') . '), already on file? Answer on the ' . Tl('quote') . '.', 'warning');
+                    redirect('/quote?id=' . $q['id'] . '#actions');
+                }
+            }
             // Honest audit: if the client accepted after the validity had lapsed,
             // record that — accepting is never blocked, but the trail says so.
             $expBefore = quote_validity($q);
@@ -3072,6 +3103,20 @@ function partner_carry_text($res) {
 
 // Ensure the quote's customer is a registered client; create one if only a name
 // was typed. Returns the business_partner id (or null if there is nothing to use).
+// A customer already on file that a quotation's TYPED name looks like — the case
+// where a person must say "same company" or "a different one" before acceptance
+// puts a customer on file (Sales audit SA-18). A name is evidence, not proof, so
+// it is never linked silently; an exact name, or a matching GSTIN / PAN, is linked
+// as before without asking. Returns the partner row, or null when there is
+// nothing to ask.
+function crm_quote_possible_customer($q) {
+    if (!empty($q['client_id'])) return null;
+    $name = trim((string)($q['client_name'] ?? '')); if ($name === '') return null;
+    if (ops_val("SELECT id FROM business_partners WHERE is_client=1 AND (legal_name=? OR display_name=?) LIMIT 1", [$name, $name])) return null;
+    if (!function_exists('partner_find_or_problem')) return null;
+    $hit = partner_find_or_problem($name, (string)($q['gstin'] ?? ''), (string)($q['pan'] ?? ''), '', 0);
+    return (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') ? $hit['row'] : null;
+}
 function crm_register_client_for_quote($q) {
     if (!empty($q['client_id'])) return (int)$q['client_id'];
     $name = trim($q['client_name'] ?? ''); if ($name === '') return null;

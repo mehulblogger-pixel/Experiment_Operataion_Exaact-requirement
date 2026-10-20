@@ -211,7 +211,13 @@
   <?php elseif ($st==='APPROVED'): ?>
     <?php if ($canSend): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php endif; ?>
   <?php elseif ($st==='SENT' || $st==='EXPIRED'): ?>
-    <?php if ($canDecide): ?><?= $act('ACCEPTED', $st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?>
+    <?php $pc = $possibleCustomer ?? null; if ($canDecide && $pc): ?>
+      <div role="group" aria-label="Same company?" style="flex-basis:100%;padding:10px 12px;border-left:4px solid var(--warn,#b7791f);background:var(--warn-bg,#fffbea);border-radius:8px">
+        <div style="margin-bottom:6px"><b>Before recording the acceptance:</b> is “<?= e($q['client_name']) ?>” the same company as <b><?= e($pc['legal_name'] ?? '') ?></b> (<?= e($pc['code'] ?? '') ?>), already on file?</div>
+        <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="display:inline"><input type="hidden" name="to" value="ACCEPTED"><input type="hidden" name="same_as" value="<?= (int)$pc['id'] ?>"><button class="btn small" type="submit">Yes — same company, mark accepted</button></form>
+        <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="display:inline"><input type="hidden" name="to" value="ACCEPTED"><input type="hidden" name="new_company" value="1"><button class="btn small secondary" type="submit">No — a different company, mark accepted</button></form>
+      </div>
+    <?php elseif ($canDecide): ?><?= $act('ACCEPTED', $st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?>
     <?php else: ?><span class="muted" style="font-size:12.5px"><?= e($assignedName !== '' ? $assignedName . ', who is assigned to this ' . Tl('quote') . ',' : 'The person assigned to this ' . Tl('quote')) ?> records the <?= e(Tl('client')) ?>'s answer.</span><?php endif; ?>
     <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a>
   <?php endif; ?>

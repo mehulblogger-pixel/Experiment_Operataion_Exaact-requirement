@@ -650,12 +650,26 @@ function lead_convert($leadId, array $b = []) {
     if ($l['status'] === 'CONVERTED') return ['err' => 'That lead has already been converted.'];
 
     $pdo = db();
+    // Claim the lead before creating anything. Two people pressing Convert at the
+    // same moment both read "not converted" above and each created a customer and
+    // an enquiry (Sales audit SA-18). The conversion stamp is set here, only if it
+    // is empty — or older than two minutes, so a conversion that died half-way
+    // never leaves the lead stuck — and only the request that set it carries on.
+    $claim = $pdo->prepare("UPDATE leads SET converted_at=? WHERE id=? AND status<>'CONVERTED'
+                            AND (COALESCE(converted_at,'')='' OR converted_at < ?)");
+    $claim->execute([date('c'), (int)$l['id'], date('c', time() - 120)]);
+    if ($claim->rowCount() !== 1) return ['err' => 'That lead is being converted, or has just been converted, by someone else.'];
+    // A refusal after the claim gives the lead back.
+    $release = function (array $r) use ($pdo, $l) {
+        $pdo->prepare("UPDATE leads SET converted_at='' WHERE id=? AND status<>'CONVERTED'")->execute([(int)$l['id']]);
+        return $r;
+    };
     $partnerId = (int)($b['partner_id'] ?? 0) ?: (int)($l['partner_id'] ?? 0);
 
     // Either attach to a customer somebody picked, or create one.
     if (!$partnerId) {
         $name = trim((string)($b['company_name'] ?? $l['company_name']));
-        if ($name === '') return ['err' => 'The customer needs a name.'];
+        if ($name === '') return $release(['err' => 'The customer needs a name.']);
         //  Phase 6 · Batch 3 (F5) — the same guard the rest of the application
         //  uses. Unlike the quotation path, a PERSON is standing here, so an
         //  authoritative identifier stops and names the record: they can point
@@ -665,7 +679,7 @@ function lead_convert($leadId, array $b = []) {
         $near = null;
         if (function_exists('partner_find_or_problem')) {
             $hit = partner_find_or_problem($name, (string)($b['gstin'] ?? ''), (string)($b['pan'] ?? ''), '', 0);
-            if (($hit['confidence'] ?? 'NONE') === 'EXACT') return ['err' => $hit['message']];
+            if (($hit['confidence'] ?? 'NONE') === 'EXACT') return $release(['err' => $hit['message']]);
             //  A name is evidence, not proof: allowed, and recorded.
             if (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') $near = $hit['row'];
         }
@@ -704,7 +718,10 @@ function lead_convert($leadId, array $b = []) {
 
     $inqId = null;
     try {
-        $no = 'INQ-' . date('ym') . '-' . str_pad((string)((int)ops_val("SELECT COUNT(*) FROM crm_inquiries") + 1), 3, '0', STR_PAD_LEFT);
+        // The same numbering every other enquiry takes. "Count the rows and add
+        // one" issued the same number twice and wrote a second number format.
+        $no = function_exists('crm_next_inquiry_no') ? crm_next_inquiry_no()
+            : 'INQ-' . date('ym') . '-' . str_pad((string)((int)ops_val("SELECT COUNT(*) FROM crm_inquiries") + 1), 3, '0', STR_PAD_LEFT);
         $pdo->prepare("INSERT INTO crm_inquiries
             (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,subject,
              service_requirement,sbu,source,received_date,assigned_to,status,notes,created_by,created_at)

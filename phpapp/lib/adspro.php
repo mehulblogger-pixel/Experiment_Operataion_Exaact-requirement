@@ -270,7 +270,10 @@ function ads_import_leads($limit = ADSPRO_MAX_PULL) {
         $company = trim((string)($x['company'] ?? '')) ?: trim((string)($x['name'] ?? '')) ?: 'Unnamed enquiry';
         $src = strtolower(trim((string)($x['source'] ?? '')));
 
-        $res = ads_try(fn() => lead_create([
+        // Somebody may already have typed this person in by hand, or Ads Pro may
+        // send them twice under different ids: link to that lead, do not add one.
+        $dupLead = ads_existing_lead($x, $company);
+        $res = $dupLead ? ['id' => $dupLead] : ads_try(fn() => lead_create([
             'company_name'  => $company,
             'contact_name'  => (string)($x['name'] ?? ''),
             'contact_email' => (string)($x['email'] ?? ''),
@@ -502,4 +505,20 @@ function ops_adspro($route, $method) {
         'envTok'    => getenv('ADSPRO_TOKEN') !== false && getenv('ADSPRO_TOKEN') !== '',
     ]);
     return true;
+}
+
+// An open lead that is already this person (Sales audit SA-18): the same e-mail
+// address, compared without capitals or spaces, or the same company already
+// being chased. Returns its id, or 0 when this really is someone new.
+function ads_existing_lead(array $x, $company = '') {
+    $email = strtolower(trim((string)($x['email'] ?? '')));
+    if ($email !== '') {
+        $id = (int) ads_try(fn() => ops_val("SELECT id FROM leads WHERE LOWER(TRIM(contact_email))=? AND status='OPEN' ORDER BY id LIMIT 1", [$email]), 0);
+        if ($id) return $id;
+    }
+    if (trim((string)$company) !== '' && function_exists('lead_possible_duplicate')) {
+        $d = lead_possible_duplicate((string)$company);
+        if ($d && ($d['kind'] ?? '') === 'lead') return (int)($d['row']['id'] ?? 0);
+    }
+    return 0;
 }

@@ -53,7 +53,7 @@ t_ok(lead_convert_on_quote_win($lid, 0, null) === false, 'no customer → no-op'
 $crm = file_get_contents(__DIR__ . '/../lib/crm.php');
 $acc = strpos($crm, "elseif (\$to === 'ACCEPTED')");
 t_ok($acc !== false, 'the ACCEPTED branch exists');
-$blk = substr($crm, $acc, 6000);
+$blk = substr($crm, $acc, 9000);   // widened 20 Oct: the branch now also asks "same company?" (SA-18) before landing the customer
 t_ok(strpos($blk, 'lead_convert_on_quote_win(') !== false
      && strpos($blk, "\$res['client_id']") !== false
      && strpos($blk, "\$q['lead_id']") !== false,

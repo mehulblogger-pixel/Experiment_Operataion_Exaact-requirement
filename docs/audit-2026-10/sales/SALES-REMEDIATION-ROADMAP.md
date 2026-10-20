@@ -182,6 +182,8 @@ sign-in).
 
 | 2.2, 2.3 | An honest quotation form: a draft needs a customer and a subject; submitting, approving or sending needs at least one priced line with a unit on every line; a refused save redraws the form with everything typed; a double click saves once; the second of two editors is told instead of silently overwriting; a negative validity is refused; a line can only use this quotation's own sites, another quotation's site number is saved as a new site instead of deleting this one's, and a new quotation can pair a line with a site before it is ever saved | the form commit | `test_sales_quote_form.php` (21) |
 
+| 2.1 | One customer, one record: accepting a quotation whose typed name looks like a customer on file asks once — *same company* or *a different one* — instead of silently creating a second (a name is evidence, not proof, so nothing is linked by name without a person); an enquiry typed for a near-match is saved with a warning naming the customer on file; a lead is claimed before it is converted, so simultaneous presses create one customer and one enquiry (proven: the old code made three of each); converted enquiries take the shared numbering; Ads Pro links an imported contact to an open lead with the same e-mail (ignoring capitals and spaces) or company | the duplicates commit | `test_sales_duplicates.php` (19) |
+
 **Stage 1 is complete** except 1.4's "levels in order", which waits on D-05.
 **Still waiting on the owner:** D-05, D-09…D-11, D-13…D-30. Stage 2 (§3) is next.
 
