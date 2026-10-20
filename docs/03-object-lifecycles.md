@@ -178,6 +178,23 @@ writes one line in the quotation's history (who, what, why).
 
 ---
 
+## Customer trade block — the owner's rule D-12 (20 Oct 2026)
+
+Not a lifecycle of its own: it reads the customer's two existing status fields and
+adds **no new status**. A customer whose `business_partners.status` is
+**BLACKLISTED, INACTIVE or ON_HOLD**, or whose `hold_status` is **HOLD or BLOCKED**,
+gets **nothing new** (`partner_trade_block()`, `lib/ops.php`): no enquiry, no
+quotation, no submission, approval, sending or acceptance of one, no contract, no
+work order (from the form or from a won deal), no job. A quotation may still be
+marked **lost**. Invoices for work already done, payment reminders and receipts
+are untouched — that is the "payment reminder" the owner kept. A person unblocks
+them: a manager clears the hold under **Client holds**; someone who may edit the
+client record sets the status back to Active. Before this rule, BLACKLISTED and
+INACTIVE stopped nothing, HOLD only warned, and BLOCKED stopped only a
+non-manager's quotation or work order.
+
+---
+
 ## Contract opening (`partner_contracts.open_status`)
 
 `CONTRACT_OPEN_STATES` (`contracts.php:462-467`) — **PENDING, OPEN, REJECTED, CLOSED**.

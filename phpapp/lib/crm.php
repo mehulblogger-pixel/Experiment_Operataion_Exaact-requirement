@@ -1228,6 +1228,10 @@ function crm_quote_transition_problem($q, $to) {
     $L = Tl('quote');
     if (empty($q['is_current']))
         return 'This is an earlier revision (R' . sprintf('%02d', (int)$q['rev']) . ') — a later revision has replaced it, so nothing on it can move. Work on the current revision.';
+    // D-12 — nothing moves towards new business for a blocked customer. Marking
+    // it lost is still allowed: that closes business, it does not open any.
+    if ($to !== 'LOST' && !empty($q['client_id']) && function_exists('partner_trade_block')
+        && ($tb = partner_trade_block((int)$q['client_id'])) !== '') return $tb;
     switch ($to) {
         case 'PENDING_APPROVAL':
             if (!in_array($from, ['DRAFT', 'REJECTED'], true)) return 'Only a draft or a rejected ' . $L . ' can be submitted for approval.';
@@ -1454,6 +1458,8 @@ function ops_crm_inquiries($route, $method) {
         if ($method === 'POST') {
             $b = $_POST;
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
+            // D-12 — no new enquiry for a customer who is blocked.
+            if ($cid && !$inq && ($tb = partner_trade_block($cid)) !== '') { flash($tb, 'error'); redirect('/inquiry-new'); }
             $cname = $cid ? crm_client_name($cid) : trim($b['client_name'] ?? '');
             $vals = [$cid, $cname, trim($b['contact_name'] ?? ''), trim($b['contact_email'] ?? ''), trim($b['contact_mobile'] ?? ''),
                 trim($b['subject'] ?? ''), trim($b['service_requirement'] ?? ''), $b['sbu'] ?? '', $b['source'] ?? 'EMAIL',
@@ -1642,6 +1648,7 @@ function ops_crm_quotes($route, $method) {
                 redirect('/quote-external');
             }
             if ($cid === null && trim((string)($b['client_name'] ?? '')) === '') { flash('Name the ' . Tl('client') . ' it was lodged with. Nothing was saved.', 'error'); redirect('/quote-external'); }
+            if ($cid && $extStatus === 'SENT' && ($tb = partner_trade_block($cid)) !== '') { flash($tb . ' Nothing was saved.', 'error'); redirect('/quote-external'); }
             if (trim((string)($b['origin'] ?? '')) === '') { flash('Say where it was lodged — the portal or channel. Nothing was saved.', 'error'); redirect('/quote-external'); }
             // The total must be the lines' total when lines are given, or the
             // register and the order drawn down against it tell two stories.
@@ -1779,15 +1786,11 @@ function ops_crm_quotes($route, $method) {
                 redirect($q ? '/quote-edit?id=' . $q['id'] : '/quote-new');
             }
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
-            // Pre-order control: a BLOCKED client stops a non-manager from quoting
-            // (a manager may proceed but is warned); HOLD always warns, never stops.
-            if ($cid && function_exists('partner_hold')) {
-                $ph = partner_hold($cid);
-                if ($ph && partner_hold_blocks($cid)) {
-                    flash('This ' . Tl('client') . ' is BLOCKED (' . $ph['reason'] . '). A ' . Tl('quote') . ' cannot be raised for them until a manager clears the block under Client holds.', 'error');
-                    redirect($q ? '/quote-edit?id=' . $q['id'] : '/quote-new');
-                }
-                if ($ph) flash('Note: this ' . Tl('client') . ' is ' . $ph['label'] . ' — ' . $ph['reason'], 'warning');
+            // D-12 — a blacklisted, inactive, on-hold or blocked customer gets no
+            // quotation (new, or moved onto them by an edit).
+            if ($cid && ($tb = partner_trade_block($cid)) !== '') {
+                flash($tb, 'error');
+                redirect($q ? '/quote-edit?id=' . $q['id'] : '/quote-new');
             }
             // §i — when a client is picked, the free-text name is ignored entirely.
             $hdr = [
@@ -2432,6 +2435,7 @@ function ops_crm_quotes($route, $method) {
                 : 'A contract can be registered only once the ' . Tl('client') . ' has accepted the ' . Tl('quote') . ' (it is ' . strtolower((string)$q['status']) . ').', 'error');
             redirect('/quote?id=' . $q['id']);
         }
+        if (!empty($q['client_id']) && ($tb = partner_trade_block((int)$q['client_id'])) !== '') { flash($tb, 'error'); redirect('/quote?id=' . $q['id']); }
         $cid = crm_register_client_for_quote($q);
         // Point 1/2 — nothing here is re-typed. The purchase order and the
         // quotation already carry the value, the dates, the subject and the

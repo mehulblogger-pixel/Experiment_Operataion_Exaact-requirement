@@ -756,8 +756,36 @@ function partner_hold_set($id, $status, $reason = '') {
     if (function_exists('act_log')) act_log('PARTNER', $id, 'HOLD', $status === '' ? 'Hold cleared' : ('Set ' . (PARTNER_HOLD_STATES[$status] ?? $status)), ['partner_id' => $id]);
     return true;
 }
+// The owner's rule, 2026-10-20 (Sales audit D-12): "Nothing, only the payment
+// reminder. They can be unblocked by a person." A customer who is blacklisted,
+// inactive, on hold or blocked gets NOTHING new — no enquiry, quotation,
+// approval, sending, acceptance, contract, work order or job — until an
+// authorised person unblocks them. What they already owe is still invoiced and
+// reminded, and their payments are still received: that is the payment
+// reminder, and refusing it would only stop the company being paid.
+// Returns '' when new business is open, else the sentence that says why not and
+// how to clear it. Reads BOTH status systems: the customer's own status and the
+// credit hold.
+const PARTNER_TRADE_BLOCK_STATUSES = ['BLACKLISTED', 'INACTIVE', 'ON_HOLD'];
+function partner_trade_block($id) {
+    $id = (int)$id; if (!$id) return '';
+    $p = ops_one("SELECT COALESCE(NULLIF(display_name,''), legal_name) nm, status, hold_status, hold_reason FROM business_partners WHERE id=?", [$id]);
+    if (!$p) return '';
+    $st = strtoupper(trim((string)($p['status'] ?? '')));
+    $hs = strtoupper(trim((string)($p['hold_status'] ?? '')));
+    $who = (string)($p['nm'] ?: ('This ' . Tl('client')));
+    if (in_array($st, PARTNER_TRADE_BLOCK_STATUSES, true))
+        return $who . ' is ' . strtolower(STATUSES[$st] ?? $st) . '. Nothing new can be raised for them — only payment reminders — '
+             . 'until someone allowed to edit the ' . Tl('client') . ' record makes them Active again.';
+    if ($hs === 'HOLD' || $hs === 'BLOCKED')
+        return $who . ' is ' . strtolower(PARTNER_HOLD_STATES[$hs] ?? $hs) . (trim((string)$p['hold_reason']) !== '' ? ' (' . trim((string)$p['hold_reason']) . ')' : '')
+             . '. Nothing new can be raised for them — only payment reminders — until a manager clears it under Client holds.';
+    return '';
+}
 // Whether a BLOCKED client should stop a non-manager from raising work. Managers
 // (coordinator level and up) may proceed past a block with the warning shown.
+// Superseded by partner_trade_block() on every door that raises new business
+// (owner's rule D-12); kept for any caller that only wants the old answer.
 function partner_hold_blocks($id) {
     $h = partner_hold($id);
     if (!$h || $h['status'] !== 'BLOCKED') return false;
@@ -5502,18 +5530,13 @@ function ops_calls($route, $method) {
                     }
                 }
             }
-            // Pre-order control: a BLOCKED client stops a non-manager from raising a
-            // call; a manager may proceed but is warned. HOLD always warns, never
-            // stops. Nothing changes when the client has no hold.
+            // The owner's rule D-12: a blacklisted, inactive, on-hold or blocked
+            // customer gets no new work order. Editing one already raised is not
+            // new business and is left alone.
             $holdCid = (int)($b['client_id'] ?? ($call['client_id'] ?? 0));
-            if ($holdCid && function_exists('partner_hold')) {
-                $ph = partner_hold($holdCid);
-                if ($ph && partner_hold_blocks($holdCid)) {
-                    view('ops/call_form', array_merge(call_form_vars($call, $b), ['errorFields' => ['client_id'], 'error' =>
-                        'This ' . Tl('client') . ' is BLOCKED (' . $ph['reason'] . '). Raising a ' . Tl('call') . ' for them is not allowed — a manager must clear the block under Client holds first.']));
-                    return;
-                }
-                if ($ph) flash('Note: this ' . Tl('client') . ' is ' . $ph['label'] . ' — ' . $ph['reason'], 'warning');
+            if ($holdCid && !$call && ($tb = partner_trade_block($holdCid)) !== '') {
+                view('ops/call_form', array_merge(call_form_vars($call, $b), ['errorFields' => ['client_id'], 'error' => $tb]));
+                return;
             }
             $execOffice = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : null;
             // Default the managing / contracting office when it is left blank. The
@@ -7914,6 +7937,8 @@ function ops_jobs($route, $method) {
                 flash('This ' . Tl('call') . ' is closed — it cannot be allocated again. Raise a new ' . Tl('call') . ' for further work.', 'warning');
                 redirect('/call?id=' . (int)$call['id']);
             }
+            // D-12 — no new job for a customer who is blocked.
+            if (($tb = partner_trade_block((int)($call['client_id'] ?? 0))) !== '') { flash($tb, 'error'); redirect('/call?id=' . (int)$call['id']); }
         }
         // Only the executing office allocates. A contracting-office coordinator can
         // open and read the call but not raise work on it — that is the executing

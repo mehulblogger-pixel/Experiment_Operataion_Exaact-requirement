@@ -667,6 +667,8 @@ function opp_raise_order($oppId, array $b = []) {
     $why = opp_order_block($o);
     if ($why === 'not-installed') return ['err' => 'Operations is not switched on for this installation.'];
     if ($why !== '') return ['err' => $why];
+    // D-12 — no new work order for a customer who is blocked.
+    if (!empty($o['partner_id']) && function_exists('partner_trade_block') && ($tb = partner_trade_block((int)$o['partner_id'])) !== '') return ['err' => $tb];
 
     $q = opp_order_quote((int)$o['id']);
     $pdo = db();
@@ -746,6 +748,8 @@ function opp_register_contract($oppId, array $b = []) {
     if (($o['status'] ?? '') !== 'WON') return ['err' => 'Only a won deal becomes a contract.'];
     if (empty($o['partner_id'])) return ['err' => 'Add the customer to the master first.'];
     if (!empty($o['contract_id'])) return ['err' => 'A contract has already been registered for this deal.'];
+    // D-12 — no contract for a customer who is blocked.
+    if (function_exists('partner_trade_block') && ($tb = partner_trade_block((int)$o['partner_id'])) !== '') return ['err' => $tb];
     $pdo = db();
     $cid = (int)$o['partner_id'];
     $branchId = (int)($b['branch_id'] ?? 0) ?: (($o['office_id'] ?? null) ?: null);

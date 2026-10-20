@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '078030b · 2026-10-20 01:02 UTC · 687 files';
+$RELEASE = '374f144 · 2026-10-20 01:15 UTC · 687 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -115,7 +115,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>256523,'h'=>'34e2bc8d267e80fc'],
+    'lib/crm.php' => ['s'=>256957,'h'=>'4092c5f3f56c674b'],
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>24205,'h'=>'04ed75b284858be6'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -174,8 +174,8 @@ $EXPECT  = [
     'lib/nextaction.php' => ['s'=>15255,'h'=>'85f9797146341fa6'],
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
-    'lib/opportunities.php' => ['s'=>66604,'h'=>'389f5a46c713f72e'],
-    'lib/ops.php' => ['s'=>722462,'h'=>'5cda67ec48a5ea78'],
+    'lib/opportunities.php' => ['s'=>67020,'h'=>'5b78894c71d71c6c'],
+    'lib/ops.php' => ['s'=>724262,'h'=>'3faa905a00ed30cc'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -375,7 +375,7 @@ $EXPECT  = [
     'views/ops/cform_records.php' => ['s'=>2901,'h'=>'ba11725333160623'],
     'views/ops/cforms_admin.php' => ['s'=>4492,'h'=>'4c0c8835df9e3286'],
     'views/ops/change_password.php' => ['s'=>819,'h'=>'07a7c01d844eed39'],
-    'views/ops/client_holds.php' => ['s'=>2760,'h'=>'f4a905d7edc11228'],
+    'views/ops/client_holds.php' => ['s'=>2903,'h'=>'5687a162f310c58e'],
     'views/ops/cockpit_forms.php' => ['s'=>1956,'h'=>'c70846e6e910e1ba'],
     'views/ops/cockpit_home.php' => ['s'=>6795,'h'=>'4f8fac9a8e081de4'],
     'views/ops/cockpit_modules.php' => ['s'=>5558,'h'=>'0dcd0925e264ba4b'],

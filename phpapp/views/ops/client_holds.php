@@ -1,6 +1,6 @@
 <?php // Put a client on hold / block, or clear it — a pre-order control. ?>
 <div class="master-head"><div><h1>Client holds &amp; blocks</h1>
-  <p class="sub" style="margin:2px 0 0">A pre-order control: put a client <b>on hold</b> (a warning shows when raising a quote or call) or <b>block</b> them (raising work is stopped for non-managers). Always with a reason.</p></div></div>
+  <p class="sub" style="margin:2px 0 0">Put a client <b>on hold</b> or <b>block</b> them, always with a reason. Either way <b>nothing new</b> is raised for them — no enquiry, <?= e(Tl('quote')) ?>, contract, <?= e(Tl('call')) ?> or <?= e(Tl('job')) ?> — while what they already owe is still invoiced and reminded. Clearing it here opens them for business again.</p></div></div>
 
 <form method="post" action="/client-holds" class="panel" style="max-width:720px">
   <h3 class="tab-sub" style="margin-top:0">Set or clear a hold</h3>
