@@ -49,7 +49,11 @@ $pc  = fn($id) => pc_get($id);
 $st  = fn($id) => (string) ops_val("SELECT status FROM quotations WHERE id=?", [$id]);
 
 // ---- D-11 B: the costing's own lifecycle -------------------------------------------------
-$drive($MM, 'project-costing-new', 'POST', [], ['title' => 'Site engineers', 'client_id' => $cli, 'office_id' => $off, 'basis' => 'LONG']);
+// A costing is tagged with the enquiry it prices (owner, 20 Oct 2026).
+$pdo->prepare("INSERT INTO crm_inquiries (inquiry_no, client_id, client_name, subject, status, office_id, created_at) VALUES ('PC-ENQ',?,?,?,'OPEN',?,?)")
+    ->execute([$cli, 'PC Client', 'Site engineers', $off, date('c')]);
+$enq = (int) $pdo->lastInsertId();
+$drive($MM, 'project-costing-new', 'POST', [], ['title' => 'Site engineers', 'client_id' => $cli, 'office_id' => $off, 'basis' => 'LONG', 'inquiry_id' => $enq]);
 $cid = (int) ops_val("SELECT MAX(id) FROM project_costings");
 t_eq((int) $pc($cid)['created_by_user_id'], $MM, 'a costing records who prepared it');
 $r = $drive($MM, 'project-costing-submit', 'POST', [], ['id' => $cid]);

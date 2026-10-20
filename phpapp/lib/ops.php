@@ -630,16 +630,22 @@ function touch_row_version($table, $id) {
 }
 
 function is_inspector() { return user_role() === 'INSPECTOR'; }
-// R7 — the field engineer for UI purposes: a plain INSPECTOR, a SR_INSPECTOR (a senior
-// inspector who also does field work), or any non-management login seated on an
-// inspector record. is_inspector() matches only the literal role, so a SR_INSPECTOR
-// used to miss My Jobs / site check-in / My Voucher entirely. Use THIS for the
-// phone-first field tools; keep is_inspector() for strict-role behaviour.
+// R7 — the field engineer for UI purposes: a plain INSPECTOR or a SR_INSPECTOR (a
+// senior inspector who also does field work). is_inspector() matches only the
+// literal role, so a SR_INSPECTOR used to miss My Jobs / site check-in / My Voucher
+// entirely. Use THIS for the phone-first field tools; keep is_inspector() for
+// strict-role behaviour.
+//
+// THE ROLE DECIDES, NOT THE TEAM RECORD (owner's screenshot, 20 Oct 2026). This
+// also answered yes for "any non-management login seated on an inspector record".
+// Since every login must now belong to a team member (Add a person → Team
+// member), that caught every desk role below coordinator level — a Business
+// Development Manager, Key Accounts Manager, Marketing Executive, Finance, Quality
+// Head — and replaced their whole menu with My jobs / My vouchers: no Sales, no
+// Money, nothing they were hired to do. A custom role built on Inspector still
+// counts (user_role() reads the role's base).
 function is_field_inspector() {
-    if (in_array(user_role(), ['INSPECTOR', 'SR_INSPECTOR'], true)) return true;
-    if (is_master() || is_coordinator_level()) return false;   // a manager keeps the desk UI
-    $u = current_user();
-    return $u && (int)($u['inspector_id'] ?? 0) > 0;
+    return in_array(user_role(), ['INSPECTOR', 'SR_INSPECTOR'], true);
 }
 
 // Which office actually executes a call (does the field work). Falls back to the

@@ -177,7 +177,7 @@ function setupqa_sales_other_approvals() {
     return [
         'Leads: only the person responsible marks a lead lost, with a reason and remarks. Giving a lead that already has an owner to someone else waits for a manager\'s approval — the owner\'s reporting manager, or a sales manager over that branch. A manager may reopen a lost lead, with a reason that is kept.',
         'Deals (opportunities): only the stage rules above. A manager may reopen a closed deal, with a reason that is kept — unless it has already become an order or contract.',
-        'Project costing (man-month work): approved by someone who may approve ' . (function_exists('Tlp') ? Tlp('quote') : 'quotations') . ' or a manager — never by the person who prepared it.',
+        'Project costing (man-month work): tagged with its enquiry or lead, and approved through the same levels as a ' . (function_exists('Tl') ? Tl('quote') : 'quotation') . ' of that value — never by the person who prepared it.',
         ucfirst($q) . 's: the levels above, in order — level 1 first, then level 2, and so on.',
         'Opening a contract, and any later change to its value, dates or quantities: two different people — endorsed by an Operation Manager, Business Unit Head, Business Director or a branch user-manager, then approved by a Branch Manager or Branch Application Manager.',
     ];

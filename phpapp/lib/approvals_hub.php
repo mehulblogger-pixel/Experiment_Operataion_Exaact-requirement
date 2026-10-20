@@ -63,6 +63,18 @@ function approvals_hub_sections() {
             'items' => $items,
         ];
     }
+    //  Project costings at the level waiting on this person — the same levels
+    //  as a quotation of that value (owner, 20 Oct 2026).
+    if (function_exists('pc_waiting_on_me')) {
+        $items = pc_waiting_on_me();
+        if ($items) $out[] = [
+            'key'   => 'costings',
+            'title' => 'Project costings',
+            'sub'   => 'Costings waiting at your approval level. A man-month quotation is made only from an approved costing.',
+            'act'   => '/project-costings',
+            'items' => $items,
+        ];
+    }
     //  Lead reassignments waiting for a manager (owner, 20 Oct 2026).
     if (function_exists('lead_reassign_waiting_on_me')) {
         $items = lead_reassign_waiting_on_me();
@@ -103,6 +115,7 @@ function approvals_hub_can_view() {
     //  Someone with a quotation or a lead reassignment waiting on them may open
     //  it too — a Branch Manager approving quotations holds no stage-gate right.
     if (function_exists('crm_quote_ids_awaiting_me') && crm_quote_ids_awaiting_me()) return true;
+    if (function_exists('pc_waiting_on_me') && pc_waiting_on_me()) return true;
     return function_exists('lead_reassign_waiting_on_me') && (bool) lead_reassign_waiting_on_me();
 }
 
@@ -128,6 +141,16 @@ function approvals_hub_row($sectionKey, array $r) {
             'when'  => (string)substr((string)($r['submitted_at'] ?? ''), 0, 10),
             'rule'  => '',
             'url'   => '/quote?id=' . (int)$r['id'],
+        ];
+    }
+    if ($sectionKey === 'costings') {
+        return [
+            'what'  => (string)($r['code'] ?? '') . ' — ' . (string)($r['title'] ?? ''),
+            'kind'  => function_exists('fmoney') ? fmoney((float)($r['exp_revenue'] ?? 0)) . ' before tax' : '',
+            'who'   => (string)($r['created_by'] ?? ''),
+            'when'  => (string)substr((string)($r['updated_at'] ?? ''), 0, 10),
+            'rule'  => '',
+            'url'   => '/project-costing?id=' . (int)$r['id'],
         ];
     }
     if ($sectionKey === 'lead_reassign') {

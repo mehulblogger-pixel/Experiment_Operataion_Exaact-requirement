@@ -377,25 +377,32 @@ C('SAL-045', 'Inquiries', 'Deleting an enquiry', 'access', ['rule', 'worst'],
 # ════════════════════════════════════════════════════════════════════════════
 # S4 — Project costing (the price behind a man-month or project quotation)
 # ════════════════════════════════════════════════════════════════════════════
-C('SAL-050', 'Project costing', 'Build a costing for a 12-month site deputation', 'scenario', ['best'],
-  'MARKETING_MANAGER', 'A man-month price carries salary, statutory, travel and overheads for months; the costing proves the margin.',
-  'Signed in as Test MktMgr. Customer TB Steel Works exists.',
-  [('Left menu → Sales → Project costing → "＋ New costing": Title "TB Steel — QA/QC deputation 12 months", Client TB Steel Works, Executing office Mumbai, Site "Tarapur works", Basis "Long — per man-month" → "Create costing".', 'Message "PC-… created — add the team roles and their cost heads." The costing shows status Draft.'),
+C('SAL-050', 'Project costing', 'Build a costing for a 12-month site deputation — started from its enquiry', 'scenario', ['best', 'rule'],
+  'BUSINESS_DEV_MANAGER', 'A man-month price carries salary, statutory, travel and overheads for months; the costing proves the margin. Owner, 20 Oct 2026: it is tagged with the enquiry or lead it prices.',
+  'Signed in as Test BDM. An open enquiry from TB Steel Works Pvt Ltd, Ahmedabad, business unit Industrial, subject "QA/QC deputation 12 months".',
+  [('Left menu → Sales → Project costing → "＋ New costing" → press "Create costing" without choosing anything under "For".', 'Refused: "Say which enquiry or lead this costing is for — pick one under "For"."'),
+   ('Open the enquiry (Sales → Inquiries → Edit) → press "＋ Project costing".', 'The Project costing page opens with "＋ New costing" open and the enquiry already chosen under "For — enquiry".'),
+   ('Leave Title, Client and Executing office empty, Basis "Long — per man-month" → "Create costing".', '"PC-… created". Under the title: "For: enquiry …" (a link) and the business unit Industrial. Client, office and title came from the enquiry.'),
+   ('Same from a lead: open an open lead → Quotes tab → "+ Project costing" → Create costing.', 'The costing says "For: lead <its reference> — <company>".'),
    ('"＋ Add a role": Role "QA/QC Engineer", Personnel / salary 60,000, Statutory 9,000, Transport / travel 4,000, Accommodation / rentals 8,000, Food / meal allowance 3,000, PPE / safety kit 500, Units (BOQ) 12, Target margin (%) 20 → "Add role".', 'The role row shows Direct/mo = ₹84,500, a Loaded/mo, a Rate/lump, Units 12, Revenue, Profit and Margin ≈ 20%.'),
    ('Add a second role "Welding Inspector" with Personnel 45,000, Units 12, Target margin 15.', 'Both roles listed; totals add up.'),
    ('"Loadings, basis & details": Overhead % 8, Insurance % 1, Bad debt % 1, Contingency % 2, Negotiation % 3 → "Save settings".', 'Rates rise with the loadings; Negotiation % lifts the proposed rate only.'),
    ('Press "🖨 Print / PDF".', 'A printable sheet opens with every role and head.')],
-  'pc_line_calc; lib/projcosting.php')
+  'owner 20 Oct 2026; pc_link_source(); pc_line_calc')
 
-C('SAL-051', 'Project costing', 'The person who prepared a costing can never approve it', 'scenario', ['rule'],
-  'several', 'Owner\'s rule D-11 B: "No" — maker and checker are different people.',
-  'The costing from SAL-050, prepared by Test MktMgr.',
-  [('As Test MktMgr: Approval → "Submit for approval".', 'Message "Costing submitted for approval." Status Submitted; the sheet is read-only.'),
-   ('Still as Test MktMgr, look at Approval.', 'No Approve button; it says "You prepared this costing, so someone else approves it."'),
-   ('As Test Director: "Send back" with the Reason empty.', 'Refused: "Say why it is being sent back, so its author knows what to change."'),
+C('SAL-051', 'Project costing', 'A costing is approved through the same levels as a quotation — never by its author', 'scenario', ['rule'],
+  'several', 'Owner, 20 Oct 2026: "approval level as of quotation shall be applicable." D-11 B: maker and checker are different people.',
+  'The costing from SAL-050 (prepared by Test BDM). The levels from SAL-003.',
+  [('As Test BDM: Approval → "Submit for approval".', '"Costing submitted for approval — N levels to pass, in order." The Approval panel lists each level, e.g. "Level 1 — Branch Manager (Test BranchMgr) · waiting" and, when its revenue is ₹5,00,000 or more, "Level 2 — Marketing Manager (Test MktMgr) · after the level before".'),
+   ('Still as Test BDM, look at Approval.', 'No Approve button; it says "You prepared this costing, so someone else approves it."'),
+   ('As Test MktMgr (level 2), open it before level 1 has signed and try to approve.', 'No Approve button (or refused: "This costing is waiting for someone else at its current approval level").'),
+   ('As Test BranchMgr2 (Mumbai) → Approvals.', 'The costing is NOT listed — it is an Ahmedabad costing.'),
+   ('As Test BranchMgr → Approvals → section "Project costings" → open it → "Send back" with the Reason empty.', 'Refused: "Say why it is being sent back, so its author knows what to change."'),
    ('Reason "Check accommodation rate" → Send back.', 'Status "Sent back" with the reason shown to the author.'),
-   ('As Test MktMgr: correct it, Submit again. As Test Director: "Approve" (Approval ref optional).', 'Status Approved, "Approved by Test Director".')],
-  'D-11 B; pc_transition_problem')
+   ('As Test BDM: correct it, Submit again. As Test BranchMgr: Approve.', '"Your level is signed — it now waits for level 2." (Or "Costing approved" when it has one level.)'),
+   ('As Test MktMgr: Approve.', 'Status Approved. Each level shows "✓ approved by …".'),
+   ('"Make a quotation" from it, then open the quotation.', 'The quotation carries the same enquiry and business unit.')],
+  'owner 20 Oct 2026; D-11 B; pc_build_approvals(); pc_can_act()')
 
 C('SAL-052', 'Project costing', 'A costing moves only in the allowed order', 'edge', ['edge', 'rule'],
   'several', 'A costing approved from Draft, or submitted with no roles, means nothing.',

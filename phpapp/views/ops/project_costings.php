@@ -12,12 +12,24 @@ $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=
 </div>
 
 <?php if ($canEdit): ?>
-<details class="panel" style="margin-bottom:14px"<?= empty($rows) ? ' open' : '' ?>>
+<?php $pre = $pre ?? ['inquiry_id' => 0, 'lead_id' => 0]; $inquiries = $inquiries ?? []; $leads = $leads ?? []; $sbuOpts = $sbuOpts ?? []; ?>
+<details class="panel" style="margin-bottom:14px"<?= (empty($rows) || $pre['inquiry_id'] || $pre['lead_id']) ? ' open' : '' ?>>
   <summary style="cursor:pointer;font-weight:600">＋ New costing</summary>
   <form method="post" action="/project-costing-new" style="margin-top:10px">
     <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
+    <?php // What the costing prices — owner, 20 Oct 2026. The enquiry or lead fills in
+          //  the customer, branch and business unit; pick one of the two. ?>
     <div class="form-grid">
-      <div class="ff ff-wide"><label>Title</label><input class="form-control" name="title" required placeholder="e.g. Mundra Solar — module &amp; cell manpower"></div>
+      <div class="ff"><label>For — enquiry</label><select class="form-control searchable" name="inquiry_id"><option value="">—</option>
+        <?php foreach ($inquiries as $i): ?><option value="<?= (int)$i['id'] ?>" <?= (int)$pre['inquiry_id'] === (int)$i['id'] ? 'selected' : '' ?>><?= $e(trim(($i['inquiry_no'] ?? '') . ' · ' . ($i['client_name'] ?? '') . ' · ' . ($i['subject'] ?? ''), ' ·')) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label>…or a lead</label><select class="form-control searchable" name="lead_id"><option value="">—</option>
+        <?php foreach ($leads as $l): ?><option value="<?= (int)$l['id'] ?>" <?= (int)$pre['lead_id'] === (int)$l['id'] ? 'selected' : '' ?>><?= $e(trim(($l['ref'] ?? '') . ' · ' . ($l['company_name'] ?? ''), ' ·')) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label>Business unit <span class="muted">— from the enquiry or lead if left blank</span></label><select class="form-control" name="sbu"><option value="">—</option>
+        <?php foreach ($sbuOpts as $k => $v): ?><option value="<?= $e($k) ?>"><?= $e($v) ?></option><?php endforeach; ?></select></div>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:4px 0 10px">Customer, office and title below fill themselves in from the enquiry or lead when you leave them empty. Approval follows the same levels as a quotation of this value — set on Set up Sales.</p>
+    <div class="form-grid">
+      <div class="ff ff-wide"><label>Title <span class="muted">— optional when an enquiry or lead is picked</span></label><input class="form-control" name="title" placeholder="e.g. Mundra Solar — module &amp; cell manpower"></div>
       <div class="ff"><label>Client</label><select class="form-control" name="client_id"><option value="">—</option>
         <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>"><?= $e($c['display_name'] ?? $c['legal_name'] ?? ('#'.$c['id'])) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Executing office</label><select class="form-control" name="office_id"><option value="">—</option>

@@ -8,7 +8,14 @@ $csrf = function_exists('csrf_token') ? csrf_token() : '';
 $sym = function_exists('cur_sym') ? cur_sym() : '₹';
 $locked = function_exists('pc_locked') && pc_locked($h);
 $canEdit = function_exists('pc_can_edit') && pc_can_edit() && !$locked;
-$canApprove = function_exists('pc_can_approve') && pc_can_approve();
+// Approving follows the quotation levels (owner, 20 Oct 2026): the person who
+// may sign is the one the CURRENT level waits for, not anyone who may approve.
+$canApprove = function_exists('pc_can_act') ? pc_can_act($h) : (function_exists('pc_can_approve') && pc_can_approve());
+$pcSteps = function_exists('pc_steps') ? pc_steps((int)$h['id']) : [];
+$pcLevel = function_exists('pc_current_level') ? pc_current_level((int)$h['id']) : 0;
+$sbuOpts = $sbuOpts ?? (function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : []);
+$forInq  = !empty($h['inquiry_id']) ? ops_one("SELECT id, inquiry_no, subject FROM crm_inquiries WHERE id=?", [(int)$h['inquiry_id']]) : null;
+$forLead = !empty($h['lead_id']) && function_exists('lead_row') ? lead_row((int)$h['lead_id']) : null;
 // D-11 B — its author never approves it, whatever their role.
 $isAuthor = function_exists('pc_is_author') && pc_is_author($h);
 $basis = (string)$h['basis'];
@@ -33,7 +40,9 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   .pc .num{text-align:right;font-variant-numeric:tabular-nums}
   .pc .hh input{width:100%;padding:6px 7px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;box-sizing:border-box}
   .pc .addrow td{background:var(--soft)} .pc .grp{font-weight:700;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
-  .pc .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+  /* Not .bar: app.css draws .bar as an 8px progress strip (overflow hidden), which
+     squeezed the Submit / Approve / Make-a-quotation buttons out of sight. */
+  .pc .pc-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
   .pc .lockmsg{background:var(--warn-soft,#fdf1e3);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:12.5px;margin:10px 0}
   @media(max-width:1000px){.pc .kpis{grid-template-columns:repeat(2,1fr)} .pc .wide-scroll{overflow-x:auto}}
 </style>
@@ -41,7 +50,13 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 <div class="pc">
 <div class="master-head">
   <div><h1 style="margin:0"><?= $e($h['title']) ?> <span class="pill <?= $stTone[$h['status']] ?? 'p-mut' ?>"><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></span></h1>
-    <p class="sub" style="margin:2px 0 0"><?= $e($h['code']) ?> · <?= $e(PC_BASES[$basis] ?? $basis) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?></p></div>
+    <p class="sub" style="margin:2px 0 0"><?= $e($h['code']) ?> · <?= $e(PC_BASES[$basis] ?? $basis) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?><?= !empty($h['sbu']) ? ' · ' . $e($sbuOpts[$h['sbu']] ?? $h['sbu']) : '' ?></p>
+    <p class="sub" style="margin:2px 0 0">For:
+      <?php if ($forInq): ?><a href="/inquiry-edit?id=<?= (int)$forInq['id'] ?>">enquiry <?= $e($forInq['inquiry_no']) ?></a><?php endif; ?>
+      <?php if ($forInq && $forLead): ?> · <?php endif; ?>
+      <?php if ($forLead): ?><a href="/lead?id=<?= (int)$forLead['id'] ?>">lead <?= $e($forLead['ref']) ?> — <?= $e($forLead['company_name']) ?></a><?php endif; ?>
+      <?php if (!$forInq && !$forLead): ?><span class="muted">no enquiry or lead tagged<?= !empty($h['opportunity_id']) ? ' (made from a deal)' : (!empty($h['quote_id']) ? ' (made for a quotation)' : '') ?></span><?php endif; ?>
+    </p></div>
   <div class="row-actions"><a class="btn secondary" href="/project-costing-print?id=<?= (int)$h['id'] ?>" target="_blank" rel="noopener">🖨 Print / PDF</a></div>
 </div>
 
@@ -117,7 +132,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   if (!empty($lines) && ($canQuote || $canHire)): ?>
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Use this costing</h3>
-  <div class="bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+  <div class="pc-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
     <?php if ($canQuote): ?>
       <?php if (!empty($h['quote_id'])): ?>
         <a class="btn secondary" href="/quote?id=<?= (int)$h['quote_id'] ?>">📝 View linked quotation</a>
@@ -192,6 +207,8 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <div class="ff"><label>Office</label><select class="form-control" name="office_id"><option value="">—</option>
           <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (int)$h['office_id']===(int)$o['id']?'selected':'' ?>><?= $e($o['name']) ?></option><?php endforeach; ?></select></div>
         <div class="ff"><label>Site</label><input class="form-control" name="site" value="<?= $e($h['site']) ?>"></div>
+        <div class="ff"><label>Business unit <span class="muted">— decides which SBU Head approves</span></label><select class="form-control" name="sbu"><option value="">—</option>
+          <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= $e($k) ?>" <?= (string)($h['sbu'] ?? '')===(string)$k?'selected':'' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
         <div class="ff"><label>Basis</label><select class="form-control" name="basis"><?php foreach (PC_BASES as $k=>$v): ?><option value="<?= $e($k) ?>" <?= $basis===$k?'selected':'' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
         <div class="ff"><label>Loadings applied on</label><select class="form-control" name="load_on"><option value="COST" <?= strtoupper((string)$h['load_on'])!=='RATE'?'selected':'' ?>>Direct cost (standard)</option><option value="RATE" <?= strtoupper((string)$h['load_on'])==='RATE'?'selected':'' ?>>Sell rate (Excel-style)</option></select></div>
         <div class="ff"><label>Overhead %</label><input class="form-control" type="number" step="0.01" name="overhead_pct" value="<?= $e($h['overhead_pct']) ?>"></div>
@@ -218,11 +235,11 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Approval</h3>
-    <div class="bar">
+    <div class="pc-actions">
       <?php if (in_array($h['status'],['DRAFT','REJECTED'],true) && function_exists('pc_can_edit') && pc_can_edit() && !empty($lines)): ?>
         <form method="post" action="/project-costing-submit"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn primary">Submit for approval</button></form>
       <?php endif; ?>
-      <?php if ($h['status']==='SUBMITTED' && $canApprove && $isAuthor): ?>
+      <?php if ($h['status']==='SUBMITTED' && $isAuthor): ?>
         <span class="muted" style="font-size:12.5px">You prepared this costing, so someone else approves it.</span>
       <?php elseif ($h['status']==='SUBMITTED' && $canApprove): ?>
         <form method="post" action="/project-costing-approve" style="display:flex;gap:6px;align-items:center"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><input class="form-control" name="approval_ref" placeholder="Approval ref (optional)" style="width:170px"><button class="btn primary">Approve</button></form>
@@ -233,7 +250,17 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <?php endif; ?>
       <?php if ($h['status']==='DRAFT' && empty($lines)): ?><span class="muted" style="font-size:12.5px">Add at least one role before submitting.</span><?php endif; ?>
     </div>
-    <p class="sub" style="margin-top:6px">Draft → Submitted → Approved. Submitting locks the sheet; someone other than its author approves it, or sends it back with a reason. A quotation is made only from an approved costing, and reopening an approved one withdraws its approval.</p>
+    <?php if ($pcSteps): ?>
+      <ol style="margin:10px 0 0;padding-left:20px;font-size:13px;line-height:1.6">
+        <?php foreach ($pcSteps as $s):
+          $who = function_exists('pc_step_people') ? array_map('user_name', array_slice(pc_step_people($s, $h), 0, 3)) : [];
+          $tag = $s['status'] === 'APPROVED' ? '✓ approved by ' . $s['acted_by'] : ($s['status'] === 'REJECTED' ? '↩ sent back by ' . $s['acted_by'] : ((int)$s['level'] === $pcLevel ? 'waiting' : 'after the level before'));
+          $name = !empty($s['approver_user_id']) ? '' : ((string)$s['approver_role'] !== '' ? (ORG_ROLES[$s['approver_role']] ?? $s['approver_role']) : 'anyone who may approve'); ?>
+          <li><b>Level <?= (int)$s['level'] ?></b> — <?= $e($name !== '' ? $name . ($who ? ' (' . implode(', ', $who) . ')' : '') : implode(', ', $who)) ?> · <span class="<?= $s['status']==='APPROVED' ? '' : 'muted' ?>"><?= $e($tag) ?></span></li>
+        <?php endforeach; ?>
+      </ol>
+    <?php endif; ?>
+    <p class="sub" style="margin-top:6px">Draft → Submitted → Approved. Submitting sets the approval levels the same way as a quotation of this value and business unit (Set up Sales), and locks the sheet. Levels sign in order; its author never signs. A quotation is made only from an approved costing, and reopening an approved one withdraws its approval.</p>
   </div>
 </div>
 </div>

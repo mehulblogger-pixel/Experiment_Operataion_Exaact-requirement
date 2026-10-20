@@ -199,18 +199,28 @@ unrestricted until 20 Oct 2026 and are now enforced by `pc_transition_problem()`
 
 ```mermaid
 stateDiagram-v2
-  [*] --> DRAFT : created (author recorded by id)
-  DRAFT --> SUBMITTED : submit — at least one role
-  REJECTED --> SUBMITTED : submit again
-  SUBMITTED --> APPROVED : approve — never by its author
+  [*] --> DRAFT : created — tagged with an enquiry, lead, deal, quotation or requisition (author recorded by id)
+  DRAFT --> SUBMITTED : submit — at least one role; builds its approval levels
+  REJECTED --> SUBMITTED : submit again — levels rebuilt
+  SUBMITTED --> SUBMITTED : a level signs — the next level now waits
+  SUBMITTED --> APPROVED : the last level signs — never its author
   SUBMITTED --> REJECTED : send back — a reason is required
   SUBMITTED --> DRAFT : reopen (withdraw)
   APPROVED --> DRAFT : reopen — the approval is withdrawn
   REJECTED --> DRAFT : reopen
 ```
 
+- **Tagged and levelled (owner, 20 Oct 2026):** *"tagged with that inquiry or lead … approval level as
+  of quotation shall be applicable."* A new costing must be tagged with what it prices — an enquiry or
+  a lead (which fill in customer, branch, business unit and title), or the deal, quotation or
+  recruitment requisition it was made from. Submitting writes one `project_costing_approvals` row per
+  level a **quotation** of the costing's sell value (before tax) and business unit would need — the
+  levels on Set up Sales, in order; each level goes to the people over the costing's branch and
+  business unit (`crm_role_approvers_for()`), never its author. With no levels set up: one step,
+  anyone who may approve. A costing submitted before this has no rows and is approved as before.
+  Sending back closes the round; reopening deletes it. No new status.
 - A quotation is drafted from a costing only when it is APPROVED; the quotation belongs to the person
-  who drafted it.
+  who drafted it and carries the costing's enquiry, lead and business unit.
 - Reopening an APPROVED costing clears who approved it and when, and writes a line in its quotation's
   history; that quotation cannot move forward again until the costing is approved again.
 

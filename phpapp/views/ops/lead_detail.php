@@ -204,6 +204,7 @@
     <h3 style="margin:0">Quotations <span class="muted" style="font-weight:400;font-size:13px">(<?= count($quotes) ?>)</span></h3>
     <?php if (!empty($canQuote) && $l['status'] !== 'LOST'): ?>
       <a class="btn small" href="/quote-new?lead=<?= (int)$l['id'] ?>">+ Make a quotation</a>
+      <?php if (function_exists('pc_can_edit') && pc_can_edit()): ?><a class="btn small secondary" href="/project-costings?lead_id=<?= (int)$l['id'] ?>">+ Project costing</a><?php endif; ?>
     <?php endif; ?>
   </div>
   <p class="muted" style="font-size:13px;margin:8px 0 0">The company, the contact and what they want come across — you will not type them again.</p>

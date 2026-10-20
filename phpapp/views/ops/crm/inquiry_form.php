@@ -2,7 +2,14 @@
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit inquiry — ' . e($inq['inquiry_no']) : 'New ' . Tl('client') . ' ' . Tl('inquiry') ?></h1>
     <p class="sub" style="margin:2px 0 0">Capture what the <?= e(Tl('client')) ?> asked for. You can raise a <?= e(Tl('quote')) ?> against it afterwards.</p></div>
-  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php // A man-month price is costed first (owner, 20 Oct 2026); the costing is
+          //  tagged with this enquiry and fills in its customer, branch and unit. ?>
+    <?php if ($isEdit && function_exists('pc_can_edit') && pc_can_edit()): ?>
+      <a class="btn secondary" href="/project-costings?inquiry_id=<?= (int)$inq['id'] ?>">＋ Project costing</a>
+    <?php endif; ?>
+    <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
+  </div>
 </div>
 
 <?php if (!empty($error)): ?><div class="msg msg-error" style="margin-bottom:12px"><?= e($error) ?></div><?php endif; ?>

@@ -94,6 +94,13 @@ function pc_migrate() {
             inclusions TEXT, exclusions TEXT, notes TEXT,
             exp_revenue DECIMAL(18,2) DEFAULT 0, exp_cost DECIMAL(18,2) DEFAULT 0, exp_profit DECIMAL(18,2) DEFAULT 0,
             created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
+        // One row per approval level the costing must pass (owner, 20 Oct 2026:
+        // "approval level as of quotation shall be applicable").
+        db()->exec("CREATE TABLE IF NOT EXISTS project_costing_approvals (
+            id $pk, costing_id INT NOT NULL, level INT DEFAULT 1,
+            approver_role VARCHAR(40) DEFAULT '', approver_user_id INT NULL,
+            status VARCHAR(12) DEFAULT 'PENDING', acted_by VARCHAR(150) DEFAULT '', acted_at VARCHAR(30) DEFAULT '',
+            remarks VARCHAR(400) DEFAULT '')");
         db()->exec("CREATE TABLE IF NOT EXISTS project_costing_lines (
             id $pk,
             costing_id INT NOT NULL, seq INT DEFAULT 0,
@@ -110,7 +117,12 @@ function pc_migrate() {
               ['project_costings','load_on',"VARCHAR(8) DEFAULT 'COST'"],
               ['project_costing_lines','oneoff',"DECIMAL(14,2) DEFAULT 0"],
               // Who prepared it, by id — the owner's rule D-11 B: its author never approves it.
-              ['project_costings','created_by_user_id','INT NULL']] as $c) {
+              ['project_costings','created_by_user_id','INT NULL'],
+              // Owner, 20 Oct 2026: a costing is tagged with the enquiry or lead it
+              // prices, and its business unit decides which SBU Head approves it.
+              ['project_costings','inquiry_id','INT NULL'],
+              ['project_costings','lead_id','INT NULL'],
+              ['project_costings','sbu',"VARCHAR(20) DEFAULT ''"]] as $c) {
         if (function_exists('ensure_column')) ensure_column($c[0], $c[1], $c[2]);
     }
 }
@@ -161,6 +173,115 @@ function pc_is_author($h) {
     if (!empty($h['created_by_user_id'])) return $me > 0 && (int)$h['created_by_user_id'] === $me;
     return $me > 0 && trim((string)($h['created_by'] ?? '')) !== '' && trim((string)$h['created_by']) === user_name($u);
 }
+// The enquiry or lead a costing is made for, and what it fills in. Branch scope
+// applies: you tag only an enquiry or lead you can see.
+function pc_link_source($inqId, $leadId) {
+    $out = [];
+    if ($inqId) {
+        $i = ops_one("SELECT * FROM crm_inquiries WHERE id=?", [(int)$inqId]);
+        if (!$i || (function_exists('crm_inquiry_in_scope') && !crm_inquiry_in_scope($i))) return ['err' => 'That enquiry is not one you can see.'];
+        $out = ['client_id' => (int)($i['client_id'] ?? 0), 'office_id' => (int)($i['office_id'] ?? 0), 'sbu' => (string)($i['sbu'] ?? ''),
+                'title' => trim((string)($i['subject'] ?? '')) ?: (string)($i['inquiry_no'] ?? ''), 'lead_id' => (int)($i['lead_id'] ?? 0)];
+    }
+    if ($leadId) {
+        $l = function_exists('lead_row') ? lead_row((int)$leadId) : null;
+        if (!$l || (function_exists('scope_office_allows') && !scope_office_allows($l['office_id'] ?? null))) return ['err' => 'That lead is not one you can see.'];
+        $out += ['client_id' => (int)($l['partner_id'] ?? 0), 'office_id' => (int)($l['office_id'] ?? 0), 'sbu' => (string)($l['sbu'] ?? ''),
+                 'title' => trim((string)$l['company_name'] . ((string)($l['requirement'] ?? '') !== '' ? ' — ' . mb_substr((string)$l['requirement'], 0, 80) : ''))];
+        $out['lead_id'] = (int)$leadId;
+    }
+    return $out;
+}
+
+// ---- Approval levels: the quotation levels, applied to the costing -----------
+//  The owner, 20 Oct 2026: "project costing is mandatory … approval level as of
+//  quotation shall be applicable." Submitting builds the same steps a quotation
+//  of the costing's sell value (before tax) and business unit would need — the
+//  levels on Set up Sales, in order, each going to the people over the
+//  costing's branch and business unit (crm_role_approvers_for). Its author never
+//  signs (D-11 B). With no levels set up, one step: anyone who may approve.
+function pc_value($h) {
+    $r = pc_rollup((int)$h['id']);
+    return $r ? (float)$r['totals']['revenue'] : (float)($h['exp_revenue'] ?? 0);
+}
+function pc_as_quote($h) {
+    return ['subtotal' => pc_value($h), 'sbu' => (string)($h['sbu'] ?? ''), 'office_id' => $h['office_id'] ?? null];
+}
+function pc_build_approvals($h) {
+    $pdo = db(); $id = (int)$h['id'];
+    $pdo->prepare("DELETE FROM project_costing_approvals WHERE costing_id=?")->execute([$id]);
+    $steps = function_exists('crm_quote_rule_steps') ? crm_quote_rule_steps(pc_as_quote($h)) : [];
+    $ins = $pdo->prepare("INSERT INTO project_costing_approvals (costing_id, level, approver_role, approver_user_id, status) VALUES (?,?,?,?,'PENDING')");
+    if (!$steps) { $ins->execute([$id, 1, '', null]); return 1; }
+    foreach ($steps as $s) {
+        $role = (string)($s['approver_role'] ?? ''); $uid = ($s['approver_user_id'] ?? null) ?: null;
+        if ($role === 'REPORTS_TO') {   // the author's reporting manager, N levels up
+            $uid = (!empty($h['created_by_user_id']) && function_exists('reporting_manager_at')) ? (reporting_manager_at((int)$h['created_by_user_id'], (int)$s['level']) ?: null) : null;
+            $role = '';
+        }
+        $ins->execute([$id, (int)$s['level'], $role, $uid]);
+    }
+    return count($steps);
+}
+function pc_steps($id) {
+    return ops_all("SELECT * FROM project_costing_approvals WHERE costing_id=? ORDER BY level, id", [(int)$id]) ?: [];
+}
+function pc_current_level($id) {
+    return (int)ops_val("SELECT MIN(level) FROM project_costing_approvals WHERE costing_id=? AND status='PENDING'", [(int)$id]);
+}
+// The people a step waits for (named person, the role over the costing, or anyone who may approve).
+function pc_step_people($step, $h) {
+    if (!empty($step['approver_user_id'])) {
+        $u = ops_one("SELECT id, username, first_name, last_name, email, role FROM users WHERE id=? AND is_active=1", [(int)$step['approver_user_id']]);
+        return $u ? [$u] : [];
+    }
+    $roles = [];
+    if (($step['approver_role'] ?? '') !== '') $roles = [(string)$step['approver_role']];
+    else foreach (ORG_ROLES as $rk => $rl) if (in_array('crm.quote.approve', role_perms($rk) ?: [], true) || in_array($rk, defined('MGMT_ROLES') ? MGMT_ROLES : [], true)) $roles[] = $rk;
+    $people = function_exists('crm_role_approvers_for') ? crm_role_approvers_for($roles, pc_as_quote($h)) : [];
+    $author = (int)($h['created_by_user_id'] ?? 0);
+    $out = array_values(array_filter($people, fn($u) => (int)$u['id'] !== $author));
+    //  The author is the only person holding this level (a Marketing Manager who
+    //  prepared it, at a "Marketing Manager" level): it may not wait forever on
+    //  someone who can never sign it — anyone else who may approve signs instead.
+    if (!$out && $roles && ($step['approver_role'] ?? '') !== '')
+        return pc_step_people(['approver_role' => '', 'approver_user_id' => null] + $step, $h);
+    return $out;
+}
+// May the person signed in sign the level this costing is waiting at?
+function pc_can_act($h) {
+    if ((string)($h['status'] ?? '') !== 'SUBMITTED' || pc_is_author($h)) return false;
+    $steps = pc_steps((int)$h['id']);
+    if (!$steps) return pc_can_approve();   // submitted before levels existed: the old rule
+    $lvl = pc_current_level((int)$h['id']); if (!$lvl) return false;
+    if (function_exists('is_master') && is_master()) return true;
+    $me = (int)(current_user()['id'] ?? 0);
+    foreach ($steps as $s) {
+        if ((int)$s['level'] !== $lvl || $s['status'] !== 'PENDING') continue;
+        foreach (pc_step_people($s, $h) as $u) if ((int)$u['id'] === $me) return true;
+    }
+    return false;
+}
+// Sign the current level. Returns 'APPROVED' when it was the last, else 'NEXT'.
+function pc_sign_level($h, $ref = '') {
+    $id = (int)$h['id']; $lvl = pc_current_level($id); $me = current_user();
+    if ($lvl) db()->prepare("UPDATE project_costing_approvals SET status='APPROVED', acted_by=?, acted_at=?, remarks=? WHERE costing_id=? AND level=? AND status='PENDING'")
+        ->execute([user_name($me), date('c'), substr(trim((string)$ref), 0, 400), $id, $lvl]);
+    if (pc_current_level($id)) return 'NEXT';
+    db()->prepare("UPDATE project_costings SET status='APPROVED', approved_by=?, approved_at=?, approval_ref=?, updated_at=? WHERE id=?")
+        ->execute([user_name($me), date('c'), trim((string)$ref), date('c'), $id]);
+    return 'APPROVED';
+}
+// Costings waiting at a level the person signed in may sign (for Approvals).
+function pc_waiting_on_me() {
+    if (!pc_modules_live()) return [];
+    pc_migrate();
+    $out = [];
+    foreach (ops_all("SELECT * FROM project_costings WHERE status='SUBMITTED' ORDER BY updated_at DESC LIMIT 300") ?: [] as $h)
+        if (pc_can_act($h)) $out[] = $h;
+    return $out;
+}
+
 // How a costing may move — `docs/03-object-lifecycles.md` §Project costing.
 // Returns '' when allowed, else the sentence that says why not.
 function pc_transition_problem($h, $route) {
@@ -173,9 +294,11 @@ function pc_transition_problem($h, $route) {
         case 'project-costing-approve':
             if ($st !== 'SUBMITTED') return 'Only a submitted costing can be approved — this one is ' . strtolower(PC_STATUS[$st] ?? $st) . '.';
             if (pc_is_author($h)) return 'You prepared this costing, so someone else must approve it.';
+            if (!pc_can_act($h)) return 'This costing is waiting for someone else at its current approval level.';
             return '';
         case 'project-costing-reject':
             if ($st !== 'SUBMITTED') return 'Only a submitted costing can be sent back.';
+            if (!pc_can_act($h)) return 'Only an approver at its current level can send it back.';
             if (trim((string)($_POST['reject_note'] ?? '')) === '') return 'Say why it is being sent back, so its author knows what to change.';
             return '';
         case 'project-costing-reopen':
@@ -364,6 +487,10 @@ function pc_make_quote($roll) {
                 ->execute([$qid, $n, $desc, ($h['basis'] === 'FIXED' ? 1 : (float)$ln['boq_qty']), $unit, $c['proposed'], $c['revenue']]);
         }
         db()->prepare("UPDATE project_costings SET quote_id=? WHERE id=?")->execute([$qid, (int)$h['id']]);
+        // The quotation belongs to the same enquiry, lead and business unit as
+        // the costing it was made from — and is worked by its preparer.
+        db()->prepare("UPDATE quotations SET inquiry_id=?, lead_id=?, sbu=? WHERE id=?")
+            ->execute([(int)($h['inquiry_id'] ?? 0) ?: null, (int)($h['lead_id'] ?? 0) ?: null, (string)($h['sbu'] ?? ''), $qid]);
         return ['id' => $qid, 'no' => $no];
     } catch (Throwable $e) { return ['err' => $e->getMessage()]; }
 }
@@ -439,18 +566,34 @@ function ops_projcosting($route, $method) {
     if ($route === 'project-costing-new' && $method === 'POST') {
         ops_require(pc_can_edit(), 'You cannot create a costing.');
         $d = pc_defaults();
+        //  What the costing prices (owner, 20 Oct 2026: "tagged with that inquiry
+        //  or lead"). An enquiry or lead fills in the customer, branch and
+        //  business unit; a costing made from a deal, a quotation or a
+        //  recruitment requisition is tagged by that instead. One is required —
+        //  a costing tagged to nothing is a sheet nobody can find again.
+        $inq = (int)($_POST['inquiry_id'] ?? 0); $lead = (int)($_POST['lead_id'] ?? 0);
+        $src = pc_link_source($inq, $lead);
+        if (!$inq && !$lead && !(int)($_POST['opportunity_id'] ?? 0) && !(int)($_POST['quote_id'] ?? 0) && !(int)($_POST['requisition_id'] ?? 0)) {
+            flash('Say which enquiry or lead this costing is for — pick one under "For".', 'error'); redirect('/project-costings');
+        }
+        if (!empty($src['err'])) { flash($src['err'], 'error'); redirect('/project-costings'); }
+        foreach (['client_id', 'office_id'] as $k) if (!(int)($_POST[$k] ?? 0) && !empty($src[$k])) $_POST[$k] = $src[$k];
+        if (trim((string)($_POST['title'] ?? '')) === '' && !empty($src['title'])) $_POST['title'] = $src['title'];
         $code = ops_next_code('project_costings', 'code', 'PC');
         $pdo->prepare("INSERT INTO project_costings
             (code,title,client_id,office_id,site,basis,overhead_pct,insurance_pct,baddebt_pct,contingency_pct,negotiation_pct,
              status,quote_id,opportunity_id,requisition_id,created_by,created_by_user_id,created_at)
             VALUES (?,?,?,?,?,?,?,?,?,?,?, 'DRAFT', ?,?,?,?,?,?)")
-            ->execute([$code, trim((string)($_POST['title'] ?? 'Untitled costing')),
+            ->execute([$code, trim((string)($_POST['title'] ?? '')) ?: 'Untitled costing',
                 (int)($_POST['client_id'] ?? 0) ?: null, (int)($_POST['office_id'] ?? 0) ?: null,
                 trim((string)($_POST['site'] ?? '')), strtoupper((string)($_POST['basis'] ?? 'LONG')),
                 $d['overhead_pct'], $d['insurance_pct'], $d['baddebt_pct'], $d['contingency_pct'], $d['negotiation_pct'],
                 (int)($_POST['quote_id'] ?? 0) ?: null, (int)($_POST['opportunity_id'] ?? 0) ?: null,
                 (int)($_POST['requisition_id'] ?? 0) ?: null, user_name(current_user()), (int)(current_user()['id'] ?? 0) ?: null, date('c')]);
         $id = (int)$pdo->lastInsertId();
+        $sbu = trim((string)($_POST['sbu'] ?? '')) ?: (string)($src['sbu'] ?? '');
+        $pdo->prepare("UPDATE project_costings SET inquiry_id=?, lead_id=?, sbu=? WHERE id=?")
+            ->execute([$inq ?: null, ($lead ?: (int)($src['lead_id'] ?? 0)) ?: null, substr($sbu, 0, 20), $id]);
         flash("$code created — add the team roles and their cost heads.");
         redirect('/project-costing?id=' . $id);
     }
@@ -462,7 +605,7 @@ function ops_projcosting($route, $method) {
         ops_require(pc_can_edit() && !pc_locked($h), 'This costing is locked.');
         $pdo->prepare("UPDATE project_costings SET title=?, client_id=?, office_id=?, site=?, basis=?, load_on=?,
             overhead_pct=?, insurance_pct=?, baddebt_pct=?, contingency_pct=?, negotiation_pct=?,
-            inclusions=?, exclusions=?, notes=?, updated_at=? WHERE id=?")
+            inclusions=?, exclusions=?, notes=?, sbu=?, updated_at=? WHERE id=?")
             ->execute([trim((string)($_POST['title'] ?? $h['title'])), (int)($_POST['client_id'] ?? 0) ?: null,
                 (int)($_POST['office_id'] ?? 0) ?: null, trim((string)($_POST['site'] ?? '')),
                 strtoupper((string)($_POST['basis'] ?? $h['basis'])),
@@ -471,7 +614,7 @@ function ops_projcosting($route, $method) {
                 (float)($_POST['baddebt_pct'] ?? 0), (float)($_POST['contingency_pct'] ?? 0),
                 (float)($_POST['negotiation_pct'] ?? 0),
                 trim((string)($_POST['inclusions'] ?? '')), trim((string)($_POST['exclusions'] ?? '')),
-                trim((string)($_POST['notes'] ?? '')), date('c'), $id]);
+                trim((string)($_POST['notes'] ?? '')), substr(trim((string)($_POST['sbu'] ?? ($h['sbu'] ?? ''))), 0, 20), date('c'), $id]);
         pc_restamp($id);
         flash('Costing saved.');
         redirect('/project-costing?id=' . $id);
@@ -523,20 +666,37 @@ function ops_projcosting($route, $method) {
         if (($why = pc_transition_problem($h, $route)) !== '') { flash($why, 'error'); redirect('/project-costing?id=' . $id); }
         if ($route === 'project-costing-submit') {
             ops_require(pc_can_edit(), 'You cannot submit this.');
+            pc_restamp($id);
             $pdo->prepare("UPDATE project_costings SET status='SUBMITTED', updated_at=? WHERE id=?")->execute([date('c'), $id]);
-            flash('Costing submitted for approval.');
+            $n = pc_build_approvals(pc_get($id));
+            // Tell the people the first level waits for.
+            $h2 = pc_get($id); $lvl = pc_current_level($id);
+            foreach (pc_steps($id) as $s) {
+                if ((int)$s['level'] !== $lvl) continue;
+                foreach (pc_step_people($s, $h2) as $ap) if (trim((string)($ap['email'] ?? '')) !== '' && function_exists('ops_mail'))
+                    ops_mail($ap['email'], 'Approval needed: costing ' . $h2['code'], "Hello,\n\nProject costing {$h2['code']} — {$h2['title']} is waiting for your approval (level $lvl).\nOpen it in " . (function_exists('app_name') ? app_name() : 'the application') . " to approve it or send it back with a reason.\n", '', 'COSTING_APPROVAL');
+            }
+            flash('Costing submitted for approval — ' . $n . ' level' . ($n === 1 ? '' : 's') . ' to pass, in order.');
         } elseif ($route === 'project-costing-approve') {
-            ops_require(pc_can_approve(), 'Only an approver can approve a costing.');
-            $pdo->prepare("UPDATE project_costings SET status='APPROVED', approved_by=?, approved_at=?, approval_ref=?, updated_at=? WHERE id=?")
-                ->execute([user_name(current_user()), date('c'), trim((string)($_POST['approval_ref'] ?? '')), date('c'), $id]);
-            flash('Costing approved.');
+            $r = pc_sign_level($h, (string)($_POST['approval_ref'] ?? ''));
+            if ($r === 'APPROVED') flash('Costing approved — a quotation can now be made from it.');
+            else {
+                $h2 = pc_get($id); $lvl = pc_current_level($id);
+                foreach (pc_steps($id) as $s) if ((int)$s['level'] === $lvl)
+                    foreach (pc_step_people($s, $h2) as $ap) if (trim((string)($ap['email'] ?? '')) !== '' && function_exists('ops_mail'))
+                        ops_mail($ap['email'], 'Approval needed: costing ' . $h2['code'], "Hello,\n\nProject costing {$h2['code']} — {$h2['title']} has passed the level below and is waiting for your approval (level $lvl).\n", '', 'COSTING_APPROVAL');
+                flash('Your level is signed — it now waits for level ' . $lvl . '.');
+            }
         } elseif ($route === 'project-costing-reject') {
-            ops_require(pc_can_approve(), 'Only an approver can send a costing back.');
+            $lvl = pc_current_level($id);
+            if ($lvl) $pdo->prepare("UPDATE project_costing_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE costing_id=? AND level=? AND status='PENDING'")
+                ->execute([user_name(current_user()), date('c'), substr(trim((string)($_POST['reject_note'] ?? '')), 0, 400), $id, $lvl]);
             $pdo->prepare("UPDATE project_costings SET status='REJECTED', reject_note=?, updated_at=? WHERE id=?")
                 ->execute([trim((string)($_POST['reject_note'] ?? '')), date('c'), $id]);
             flash('Sent back with comments.', 'warning');
         } else { // reopen to draft — an approval is for the figures approved, so it goes
             ops_require(pc_can_edit(), 'You cannot reopen this.');
+            $pdo->prepare("DELETE FROM project_costing_approvals WHERE costing_id=?")->execute([$id]);
             $pdo->prepare("UPDATE project_costings SET status='DRAFT', approved_by='', approved_at='', approval_ref='', updated_at=? WHERE id=?")->execute([date('c'), $id]);
             if ($h['status'] === 'APPROVED' && !empty($h['quote_id']) && function_exists('crm_log_change'))
                 crm_log_change((int)$h['quote_id'], 'Costing ' . $h['code'] . ' was reopened by ' . user_name(current_user()) . ' — its approval was withdrawn.');
@@ -611,8 +771,16 @@ function ops_projcosting($route, $method) {
     }
 
     // list
+    // The enquiries and leads a costing can be tagged with — open ones, in scope.
+    [$ow, $oa] = function_exists('scope_office_clause') ? scope_office_clause('i.office_id') : ['1=1', []];
+    $inqs = ops_all("SELECT i.id, i.inquiry_no, i.client_name, i.subject FROM crm_inquiries i
+                     WHERE COALESCE(i.status,'OPEN') <> 'DROPPED' AND $ow ORDER BY i.id DESC LIMIT 300", $oa) ?: [];
+    $leads = function_exists('leads_all') ? (leads_try(fn() => leads_all(['status' => 'OPEN'], ' LIMIT 300'), []) ?: []) : [];
     view('ops/project_costings', ['rows' => pc_all(),
         'clients' => function_exists('clients_list') ? clients_list() : [],
-        'offices' => function_exists('offices_list') ? offices_list() : []]);
+        'offices' => function_exists('offices_list') ? offices_list() : [],
+        'inquiries' => $inqs, 'leads' => $leads,
+        'sbuOpts' => function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : [],
+        'pre' => ['inquiry_id' => (int)($_GET['inquiry_id'] ?? 0), 'lead_id' => (int)($_GET['lead_id'] ?? 0)]]);
     return true;
 }
