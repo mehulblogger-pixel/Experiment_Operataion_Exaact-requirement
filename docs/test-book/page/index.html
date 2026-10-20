@@ -412,7 +412,7 @@ function peopleHTML(){ const S = BOOK.setup;
   const opens = u => u.opens == null ? '' : `<br><span class="muted" style="font-size:12px">opened ${u.opens} of ${u.of} screens on the test copy</span>`;
   return `<h1>Start here — users &amp; settings</h1>
   <p class="lede">Before any test: set the company up as below and create the 19 test people. Then tick off each step in <b>Start here → Set up for testing</b> (SET-01 … SET-12) so you know it is done.</p>
-  <div class="note"><b>The one rule about permissions:</b> do not tick anything on a test user's <b>Permissions</b> tab, and do not change <b>Admin → Roles &amp; permissions</b>. The role you pick gives each person exactly what the company's permission rules allow. The tests check those rules; one extra tick and the results no longer mean anything.</div>
+  <div class="note"><b>The one rule about permissions:</b> do not change any tick on a test user's <b>Permissions</b> tab, and do not change <b>Admin → Roles &amp; permissions</b>. Pick the <b>Role</b> and the ticks become exactly what that role gives — a green line says so. If an orange "own access" line or mark appears, press <b>Use the … role's access</b> (or, before the 20 Oct update is uploaded, tick <b>↺ Reset this login's access to its role default</b> and save). The tests check the role's rules; one extra tick and the results no longer mean anything.</div>
   <h2 style="font-size:16px;margin-top:20px">1 · Answer these two questions first</h2>
   <div class="steps"><table><tbody>${S.questions.map(q => `<tr><td><b>${esc(q.q)}</b></td><td>${esc(q.why)}</td></tr>`).join('')}</tbody></table></div>
   <h2 style="font-size:16px;margin-top:20px">2 · Company settings, in this order</h2>

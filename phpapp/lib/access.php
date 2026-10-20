@@ -1055,6 +1055,62 @@ function user_effective_perms($u) {
     return role_perms($role);
 }
 
+//  WHAT A ROLE GIVES, AND WHEN A PERSON FOLLOWS IT.
+//
+//  A person either FOLLOWS their role (no per-user set stored: they get the
+//  role's access as Roles & permissions defines it today, including anything
+//  added later) or has their OWN access (a stored set that replaces the role's).
+//
+//  The user form used to store whatever was ticked, every time. A new person's
+//  screen arrived pre-ticked with the Coordinator's access whatever role was
+//  picked, so a Marketing Executive saved untouched got a Coordinator's
+//  invoicing, vendors and credit figures — and lost "Create / edit quotations",
+//  which a Coordinator does not hold (owner's video SAL_002, 20 Oct 2026). An
+//  ordinary edit froze a person on a copy of their role, so a later change
+//  under Roles & permissions silently passed them by.
+//
+//  role_perm_set() is the one answer to "what does this role give", shared by
+//  the form (what it pre-ticks) and the save (what it compares against), so the
+//  two cannot drift. user_perms_to_store() decides what is stored: '' when the
+//  ticks are exactly the role's, so the person keeps following it.
+function role_perm_set($role) {
+    return perm_close_implications(array_values(array_unique(role_perms($role))));
+}
+
+// $chosen      what the editor ticked (already limited to $assignable)
+// $assignable  the permissions this editor can see and change
+// $existingCsv the person's stored set ('' = follows the role, or a new person)
+// Returns '' (follow the role) or the comma list to store.
+function user_perms_to_store(array $chosen, $role, array $assignable, $existingCsv = '') {
+    $chosen  = perm_close_implications(array_values(array_unique(array_filter($chosen))));
+    $roleSet = role_perm_set($role);
+    $inside  = function ($s) use ($assignable) { $x = array_values(array_unique(array_intersect($s, $assignable))); sort($x); return $x; };
+    $outside = function ($s) use ($assignable) { $x = array_values(array_unique(array_diff($s, $assignable))); sort($x); return $x; };
+    // What the person keeps beyond this editor's view (R3 — an editor never takes
+    // away what they cannot see): their own stored part if they have one, else
+    // the part their role gives them there today.
+    // Nothing ticked has always meant "the role's access" — an empty set cannot
+    // be stored (empty IS "follow the role"). The screen says so before saving;
+    // taking somebody's access away is Deactivate, not unticking every box.
+    if ($inside($chosen) === []) return '';
+    $existing = array_values(array_filter(explode(',', (string) $existingCsv)));
+    $keep = $existing ? $outside($existing) : $outside($roleSet);
+    if ($inside($chosen) === $inside($roleSet) && $keep === $outside($roleSet)) return '';
+    return implode(',', perm_close_implications(array_values(array_unique(array_merge($inside($chosen), $keep)))));
+}
+
+// True when a person has their OWN access that differs from what their role
+// gives — shown on the user register so an administrator can see who departs
+// from the permission matrix, and why the role's rules do not reach them.
+function user_has_own_access($u) {
+    if (!empty($u['is_superuser']) || trim((string) ($u['permissions'] ?? '')) === '') return false;
+    static $memo = [];
+    $role = strtoupper((string) ($u['role'] ?? ''));
+    if (!isset($memo[$role])) { $r = role_perm_set($role); sort($r); $memo[$role] = $r; }
+    $mine = perm_close_implications(user_effective_perms($u)); $mine = array_values(array_unique($mine)); sort($mine);
+    return $mine !== $memo[$role];
+}
+
 // Module 02 — a plain-English diff of two users' RESOLVED access, for the audit
 // trail. Returns [] when nothing that matters to authorization changed, so a save
 // that touched only a name or a phone number writes no access-audit entry.

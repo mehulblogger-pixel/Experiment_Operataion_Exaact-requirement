@@ -10104,22 +10104,12 @@ function ops_users($route, $method) {
             // everything) — assignable_permissions() is the SAME set the form renders.
             $assignable = array_keys(assignable_permissions($globalMgr));
             $chosen = array_intersect(array_filter((array)($b['permissions'] ?? [])), $assignable);
-            // R3 — never silently lock someone out: any permission the login already
-            // holds that this editor could NOT see (outside $assignable) is preserved,
-            // not dropped. Without this, a branch-level admin editing a user wiped
-            // every permission that was not on their limited screen.
-            if ($user && trim((string)($user['permissions'] ?? '')) !== '') {
-                $existing  = array_values(array_filter(explode(',', (string)$user['permissions'])));
-                $preserved = array_diff($existing, $assignable);
-                $chosen    = array_merge($chosen, $preserved);
-            }
-            //  R-20 — close the ticked set under the verb implications before it is
-            //  stored, exactly as the role editor does. Ticking Delete stores Edit
-            //  and View too: "may delete but may not see" is not a state any
-            //  screen should have to render, and a person who found that in their
-            //  own access would reasonably think the software was broken.
-            $chosen = perm_close_implications(array_values(array_unique($chosen)));
-            $perms = implode(',', $chosen);
+            //  Ticks that are exactly the role's are stored as '' — the person
+            //  follows their role, including later changes under Roles &
+            //  permissions. Anything else is their own access. R3 (what lies
+            //  outside this editor's view is kept, never dropped) and R-20 (the
+            //  set is closed under the verb implications) both live in the helper.
+            $perms = user_perms_to_store($chosen, $role, $assignable, $user['permissions'] ?? '');
             // "Reset access to the role default" — clears the per-user override so the
             // login tracks its ROLE's full default access (and any modules added
             // later) instead of a frozen ticked set. This is the recovery when an

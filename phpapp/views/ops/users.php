@@ -73,7 +73,13 @@
     <td><?= e($u['username']) ?></td>
     <td><?= e(trim(($u['first_name'] ?? '').' '.($u['last_name'] ?? '')) ?: '—') ?></td>
     <td><?= e($u['email'] ?: '—') ?></td>
-    <td><?= e(!empty($u['is_superuser']) ? 'Master Admin' : (function_exists('role_name') ? role_name($u['role'] ?? 'ADMIN') : (ORG_ROLES[strtoupper($u['role'] ?? 'ADMIN')] ?? $u['role']))) ?></td>
+    <td><?= e(!empty($u['is_superuser']) ? 'Master Admin' : (function_exists('role_name') ? role_name($u['role'] ?? 'ADMIN') : (ORG_ROLES[strtoupper($u['role'] ?? 'ADMIN')] ?? $u['role']))) ?>
+      <?php // Someone whose access is their own, not their role's: the role's rules
+            //  (and later changes to them) do not reach this person. Shown so it is
+            //  a choice somebody made, not something nobody noticed. ?>
+      <?php if (function_exists('user_has_own_access') && user_has_own_access($u)): ?>
+        <a class="pill p-warn" href="/user-edit?id=<?= (int)$u['id'] ?>" title="This person's permissions differ from their role's. Open them → Permissions to see how, or to put them back on the role.">own access</a>
+      <?php endif; ?></td>
     <?php //  WHICH BRANCH THIS PERSON BELONGS TO.
           //
           //  Not decoration. A role this workspace confines to its own branch,

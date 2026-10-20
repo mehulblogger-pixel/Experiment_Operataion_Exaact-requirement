@@ -45,6 +45,21 @@ sales roles BDM/KAM/MM/ME are in the CRM mini-matrix below.)
 Master (MA) bypasses every gate (`access.php:530`). "Edit" implies View. Per-user
 overrides and the Settings→Roles editor can change any of this at runtime.
 
+> **A person follows their role unless given their own access (fixed 2026-10-20,
+> owner's video SAL_002).** The "Add a person" screen used to arrive pre-ticked with
+> the **Coordinator's** access whatever role was chosen, and every save stored the
+> ticks as a frozen per-user set. A Marketing Executive saved untouched therefore held
+> a Coordinator's invoicing, vendors and credit figures — rights this matrix does not
+> give the role — and lacked *Create / edit quotations*, which it does. Now the ticks
+> are the chosen role's (`role_perm_set()`, Roles & permissions applied) and follow the
+> role when it is changed; a save whose ticks equal the role's stores nothing, so the
+> person keeps following the role, including later changes to it
+> (`user_perms_to_store()`). Only a deliberate difference is stored as the person's
+> **own access**; the screen says how it differs and offers one click back to the
+> role, and the user register marks such people "own access". Nothing ticked still
+> means "the role's access" (empty cannot be stored); removing access is Deactivate.
+> No right was added to any role. Guard rail `tests/test_user_perms_follow_role.php`.
+
 > **D-07 (decided, 2026-10-04) — what Finance reads.** Business UAT 1.5.4 reported a
 > Finance login opening on what looked like an operations menu. Measured: the engine
 > granted FINANCE view on jobs, calls, vouchers **and inspection reports**, while this

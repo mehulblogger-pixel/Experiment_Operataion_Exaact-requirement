@@ -16,7 +16,11 @@
   } elseif (trim((string)$permRaw) !== '') {
       $curPerms = explode(',', (string)$permRaw);
   } else {
-      $curPerms = $defaults['perms'] ?? [];
+      // A new person starts on their role's access: exactly what Roles &
+      // permissions gives the role picked below, and the ticks follow the role
+      // when it is changed. (It used to start from the role passed in — always
+      // the Coordinator's for a new person — whatever role was then chosen.)
+      $curPerms = function_exists('role_perm_set') ? role_perm_set($curRole) : ($defaults['perms'] ?? []);
   }
   $roleBase = $globalMgr ? (function_exists('roles_all') ? roles_all() : ORG_ROLES) : ['OPERATION_MANAGER'=>ORG_ROLES['OPERATION_MANAGER'],'ASST_MANAGER'=>ORG_ROLES['ASST_MANAGER'],'COORDINATOR'=>ORG_ROLES['COORDINATOR'],'INSPECTOR'=>ORG_ROLES['INSPECTOR']];
   // Only offer roles this company can actually use — a Recruitment company is not
@@ -417,13 +421,23 @@
     .perm-tip.show{display:block}
   </style>
   <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
-    <h3 class="tab-sub" style="margin:0">Permissions <span class="muted">— grouped like the menu; tap the ⓘ on any item to see what it grants and who needs it; leave all unticked to use the role's defaults</span></h3>
+    <h3 class="tab-sub" style="margin:0">Permissions <span class="muted">— ticked = what this person can do; grouped like the menu; tap the ⓘ on any item to see what it grants and who needs it</span></h3>
     <label class="chk" style="margin-left:auto;font-weight:600"><input type="checkbox" id="perm_all_toggle"> Select <b style="margin:0 3px">everything</b> (full access)</label>
   </div>
   <?php // A per-login permission set REPLACES the role's defaults — so a save that
         //  left a box unticked can narrow an admin. This clears the override and
         //  returns the login to its ROLE's full default access (and any modules
         //  added later). The one-click recovery when access was accidentally lost. ?>
+  <?php // Says, in words, whether this person follows their role or has their own
+        //  access, and offers the one-click way back. Kept current as ticks and the
+        //  role change (script below). The role sets come from role_perm_set(), the
+        //  same function the save compares against. ?>
+  <?php $rolePermSets = [];
+        if (function_exists('role_perm_set')) foreach (array_keys($roleList) as $rk) $rolePermSets[$rk] = array_values(role_perm_set($rk)); ?>
+  <script type="application/json" id="role_perm_sets"><?= json_encode($rolePermSets, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+  <div id="perm_status" class="note-inline" role="status" aria-live="polite"
+       data-existing="<?= !empty($user['id']) ? '1' : '0' ?>"
+       style="margin:10px 0 0;padding:8px 12px;border-radius:8px;border:1px solid var(--line,#e5e7eb);font-size:13px;display:none"></div>
   <?php if (!empty($globalMgr) && !empty($user['id'])): ?>
     <label class="chk" style="margin:6px 0 0;color:var(--accent,#234e70);font-weight:600">
       <input type="checkbox" name="reset_perms" value="1"> ↺ Reset this login's access to its <b><?= e(ORG_ROLES[$curRole] ?? $curRole) ?></b> role default
@@ -585,14 +599,78 @@
   if (master) master.addEventListener('change', function(){
     allBoxes.forEach(function(b){ b.checked = master.checked; });
     groups.forEach(syncGroup);
+    showStatus();
   });
   syncMaster();
+
+  // ---- Follow the role ----------------------------------------------------------
+  //  Ticks that equal the chosen role's set are saved as "follows the role". When
+  //  the role changes, a person who was following their role moves to the new
+  //  role's ticks; a person with their own access keeps theirs and is told how
+  //  they differ, with one button back to the role.
+  var setsEl = document.getElementById('role_perm_sets');
+  var sets = {}; try { sets = JSON.parse(setsEl ? setsEl.textContent : '{}') || {}; } catch (e) { sets = {}; }
+  var roleSel = document.getElementById('u_role');
+  var status = document.getElementById('perm_status');
+  function roleKey(){ return roleSel ? roleSel.value : ''; }
+  function roleLabel(){ var o = roleSel && roleSel.options[roleSel.selectedIndex]; return o ? o.text : 'this role'; }
+  function roleSet(k){ var s = sets[k]; if (!s) return null; var m = {}; s.forEach(function(p){ m[p] = 1; }); return m; }
+  function diff(k){
+    var s = roleSet(k); if (!s) return null;
+    var more = 0, fewer = 0;
+    allBoxes.forEach(function(b){ var inRole = !!s[b.value]; if (b.checked && !inRole) more++; if (!b.checked && inRole) fewer++; });
+    return {more: more, fewer: fewer};
+  }
+  function applyRole(k){
+    var s = roleSet(k); if (!s) return;
+    allBoxes.forEach(function(b){ b.checked = !!s[b.value]; });
+    groups.forEach(syncGroup); syncMaster(); showStatus();
+  }
+  function showStatus(){
+    if (!status) return;
+    var d = diff(roleKey());
+    if (!d) { status.style.display = 'none'; return; }
+    status.style.display = '';
+    status.textContent = '';
+    if (!allBoxes.some(function(b){ return b.checked; })) {
+      status.style.borderColor = 'var(--warn,#d97706)';
+      status.appendChild(document.createTextNode('Nothing is ticked, so on save they get the full ' + roleLabel() + ' role\'s access. To stop someone signing in, use Deactivate instead.'));
+      return;
+    }
+    if (!d.more && !d.fewer) {
+      status.style.borderColor = 'var(--ok,#16a34a)';
+      status.appendChild(document.createTextNode('✓ Exactly what the ' + roleLabel() + ' role gives. The person follows the role — a later change under Roles & permissions reaches them too. Change a tick only to make an exception for this one person.'));
+      return;
+    }
+    status.style.borderColor = 'var(--warn,#d97706)';
+    var parts = [];
+    if (d.more) parts.push(d.more + ' more');
+    if (d.fewer) parts.push(d.fewer + ' fewer');
+    status.appendChild(document.createTextNode('⚠ Their own access: ' + parts.join(' and ') + ' than the ' + roleLabel() + ' role gives. Changes to the role will not reach them. '));
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'btn secondary'; btn.style.marginLeft = '6px';
+    btn.textContent = 'Use the ' + roleLabel() + ' role\'s access';
+    btn.addEventListener('click', function(){ applyRole(roleKey()); });
+    status.appendChild(btn);
+  }
+  var lastRole = roleKey();
+  if (roleSel) roleSel.addEventListener('change', function(){
+    var was = diff(lastRole);
+    var following = was && !was.more && !was.fewer;
+    if (following && sets[roleKey()]) applyRole(roleKey()); else showStatus();
+    lastRole = roleKey();
+  });
+  allBoxes.forEach(function(b){ b.addEventListener('change', showStatus); });
+  groups.forEach(function(g){ var a = g.querySelector('.grp-all'); if (a) a.addEventListener('change', showStatus); });
+  showStatus();
 
   // R3 — a save that would take away a module the login CURRENTLY holds asks first.
   // Pre-ticking the effective set already means a no-op save preserves access; this
   // catches the deliberate untick, which is how access was lost before. Skipped when
   // "reset to role default" is on (that intentionally restores full role access).
-  if (allBoxes.length){
+  //  Only for someone who already exists: a new person holds nothing yet, so
+  //  there is nothing to take away (and the pre-ticks are only the role's).
+  if (allBoxes.length && status && status.getAttribute('data-existing') === '1'){
     var form = allBoxes[0].form;
     var heldModules = allBoxes.filter(function(b){ return b.checked && b.value.indexOf('mod.') === 0; })
                              .map(function(b){ return b.value; });

@@ -62,5 +62,7 @@ t_ok(strpos($form, 'assignable_permissions($globalMgr)') !== false, 'the form so
 t_ok(strpos($form, 'user_effective_perms($user)') !== false, 'the form pre-ticks the login\'s effective set');
 $ops = file_get_contents(__DIR__ . '/../lib/ops.php');
 t_ok(strpos($ops, 'assignable_permissions($globalMgr)') !== false, 'the save handler uses the same editable set');
-t_ok(strpos($ops, 'array_diff($existing, $assignable)') !== false, 'the save handler preserves unseen permissions');
+t_ok(strpos($ops, 'user_perms_to_store($chosen, $role, $assignable,') !== false, 'the save handler stores through the shared helper');
+$acc = file_get_contents(__DIR__ . '/../lib/access.php');
+t_ok(strpos($acc, '$keep = $existing ? $outside($existing) : $outside($roleSet);') !== false, 'the helper preserves unseen permissions');
 t_ok(strpos($form, 'will remove access to') !== false, 'a confirm warns before a save drops a held module');

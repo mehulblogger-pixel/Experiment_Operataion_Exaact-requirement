@@ -216,8 +216,8 @@ def setup_cases(g):
         if s['step'] == 'Test users':
             steps = [{'do': f"{u['n']}. Create {u['name']}: Username {u['user']} · Role {ROLE_NAMES[u['role']]} · Home office {u['home']} · Which team {g.TEAM[u['team']]} · Reports to {u['reports']} · Department {u['dept']}"
                             + (' · Data scope: untick "Every business unit", tick only "Industrial"' if u['scope'] == 'sbu' else ' · Data scope: tick nothing')
-                            + (f" · Position & pay: {u['pay']}" if u.get('pay') else '') + ' · Permissions: tick nothing. Press "Save user".',
-                      'expect': f"Saved and listed in the User register with role {ROLE_NAMES[u['role']]}. Signed in as them (private window) they reach their home screen and see {u['sees']}."}
+                            + (f" · Position & pay: {u['pay']}" if u.get('pay') else '') + ' · Permissions: change nothing — check the line "✓ Exactly what the … role gives". Press "Save user".',
+                      'expect': f"Saved and listed in the User register with role {ROLE_NAMES[u['role']]}, with NO orange \"own access\" mark. Signed in as them (private window) they reach their home screen and see {u['sees']}."}
                      for u in g.USERS]
             why = 'Every test in the book is done as one of these people. Wrong role or branch here = wrong results everywhere.'
         else:

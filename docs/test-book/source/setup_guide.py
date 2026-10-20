@@ -130,7 +130,8 @@ FORM = [
         ('"This person is field / production staff"', 'Tick for the three inspectors only.'),
     ]),
     ('Permissions', [
-        ('All the tick-boxes', 'Leave ALL unticked. The screen says: "leave all unticked to use the role\'s defaults". The tests check the role\'s defaults; one extra tick and the results no longer mean anything.'),
+        ('All the tick-boxes', 'Change NOTHING. Pick the Role first (tab "Who they are"); the ticks then show exactly what that role gives, and a green line reads "✓ Exactly what the … role gives". If instead you see "⚠ Their own access", press the button "Use the … role\'s access". (Before the 20 Oct update is uploaded the ticks are wrongly the Coordinator\'s: after "Save user", open the person again → Permissions → tick "↺ Reset this login\'s access to its … role default" → Save user.)'),
+        ('Check', 'In Admin → User register, no test user may carry the orange "own access" mark. It means their access is not their role\'s, and the tests would not mean anything for them.'),
     ]),
 ]
 
