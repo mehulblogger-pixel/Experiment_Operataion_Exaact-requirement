@@ -1,0 +1,1165 @@
+[
+ {
+  "id": "FLOW-01",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Main line: lead → deal → enquiry → quotation → approval → sent → accepted → contract (two signatures) → work order → job → inspection → report issued → billable event → invoice → payment → profit → Tally",
+  "kind": "flow",
+  "tags": [
+   "best",
+   "rule",
+   "gap"
+  ],
+  "persona": "several",
+  "why": "This is how the company earns money; one number typed at the start must arrive unchanged at the invoice and the profit line.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). A quote approval rule covers ₹1,00,000 with approver Marketing Manager (Admin → Approvals → Quote & report approvals). The client below must NOT exist yet. Write every code/number the screens give you into the tester's sheet.",
+  "steps": [
+   {
+    "do": "[Business Development Manager] Left menu → Sales → Leads → '+ New lead'. '…or type a new company / person's name' = ZZ FLOW1 Engineering Pvt Ltd; Contact name = Ravi Flow; E-mail = your e-mail; Telephone; Where they came from = Referral; The requirement = 'Stage inspection of 4 pressure vessels'; Value they are worth = 100000; Allocated to = admin — me (yourself); Branch = your branch. Press 'Create it'.",
+    "expect": "Lead page opens headed 'ZZ FLOW1 Engineering Pvt Ltd' with a lead code and status Open. Note the LEAD CODE."
+   },
+   {
+    "do": "[Business Development Manager] On the lead press 'Move to Qualified →'.",
+    "expect": "Stage shows Qualified; History tab records the move."
+   },
+   {
+    "do": "[Business Development Manager] Press 'Work this as a deal →'.",
+    "expect": "An opportunity page opens (status Open, value ₹1,00,000). Back on the lead, 'Open the deal →' now appears. Note the DEAL CODE."
+   },
+   {
+    "do": "[Business Development Manager] Sales → Inquiries → '+ New inquiry'. Client: '…or client name (if not yet registered)' = ZZ FLOW1 Engineering Pvt Ltd; Received date = today; Contact person = Ravi Flow; Business Unit = Industrial; Subject = 'ZZ FLOW1 stage inspection — 4 vessels'. 'Create inquiry'.",
+    "expect": "Inquiry register shows the new row, Status Open. Note the INQUIRY NO."
+   },
+   {
+    "do": "[Business Development Manager] Inquiry register → that row → 'Quote'.",
+    "expect": "'New quote' opens with client name and subject carried over (nothing retyped)."
+   },
+   {
+    "do": "[Business Development Manager] Business Unit (primary) = Industrial; tick 'Stage / In-process inspection'. '+ Add site': Name / label = Plant 1, Type = Manufacturer works, Address/City/State, Nearest Office = your office. '+ Add line': Business Unit Industrial, Activity, Service, Description = 'Stage inspection per vessel', Site = Plant 1, Order = Line-item order, Qty = 4, Unit = Per visit, Rate ₹ = 25000. Validity 30, GST % 18, Payment terms = Against invoice. 'Create quote'.",
+    "expect": "Quote page 'Q-… Draft'. Line Amount 1,00,000; total before tax ₹1,00,000. Note the QUOTE NO. Inquiry register now shows Status Quoted."
+   },
+   {
+    "do": "[Business Development Manager] Open the deal (DEAL CODE) → Quotes tab.",
+    "expect": "Expected: the quotation is listed under 'Quotations on this deal'. If it is not (a quote raised from the enquiry is not tied to the deal), record as a gap — the lead → deal → enquiry → quote chain is not one linked thread; move the deal by hand ('Move it' → Quotation sent (50%)) and continue."
+   },
+   {
+    "do": "[Business Development Manager] Quote → Actions → 'Submit for approval'.",
+    "expect": "Status Pending approval; 'Approval chain' table (Level · With whom · Status · Acted · Comment) shows Level 1 with the Marketing Manager. (If the screen says 'No approval needed — your approval rules do not cover this value.', the rule is missing — fix the rule first.)"
+   },
+   {
+    "do": "[Business Development Manager] Try to approve it yourself (no Approve button should be offered to you).",
+    "expect": "No 'Approve' for the preparer (BDM holds no approval right)."
+   },
+   {
+    "do": "[Marketing Manager] Sales → Quotes → open QUOTE NO (it waits for you to approve) → 'Approve'.",
+    "expect": "Status Approved; the chain row shows Approved by the Marketing Manager with the time."
+   },
+   {
+    "do": "[Business Development Manager] Quote → '✉ Send to client'. Then '⬇ PDF (for client)'.",
+    "expect": "Status Sent. 'Edit' is no longer offered (a sent quote is locked; 'Revise (new rev)' is). The PDF shows ZZ FLOW1 Engineering Pvt Ltd, 4 × ₹25,000 = ₹1,00,000 plus GST 18%."
+   },
+   {
+    "do": "[Business Development Manager] Quote → 'Mark accepted (won)'. If asked 'Before recording the acceptance: is … the same company as …?', press 'No — a different company, mark accepted'.",
+    "expect": "Status Accepted / closed-won. Directory → Client register now lists ZZ FLOW1 Engineering Pvt Ltd (Role Client). The deal shows Won; the lead shows Converted (if they were linked in step 7)."
+   },
+   {
+    "do": "[Finance] Sales → Quotes → QUOTE NO → section 'Won — client & contract registration (Accounts)' → '✓ Register the contract & request opening'.",
+    "expect": "A contract number is generated (value ₹1,00,000, dates and branch from the quote). Quote register 'Contract' column shows it. Note the CONTRACT NO. The opening is pending."
+   },
+   {
+    "do": "[Coordinator] Try Operations → '＋ New work order' for ZZ FLOW1 with CONTRACT NO before it is opened.",
+    "expect": "Expected: the contract is not yet open to operations (it waits for two signatures) — not offered or refused. If a work order can be raised against an unopened contract, record as a defect."
+   },
+   {
+    "do": "[Operation Manager] Open operations.mghaiapps.com/contract-openings ('Contract openings' — 'A manager endorses, then the branch manager approves…'). On CONTRACT NO press 'Endorse'.",
+    "expect": "The row shows endorsed by the Operation Manager; still waiting for approval."
+   },
+   {
+    "do": "[Operation Manager] Press 'Approve & open' on the same row.",
+    "expect": "Not offered or refused — the Operation Manager can endorse but not approve."
+   },
+   {
+    "do": "[Branch Manager] Contract openings → CONTRACT NO → 'Approve & open'.",
+    "expect": "Contract page reads 'Contract CONTRACT NO Open / in force', value ₹1,00,000, 'Quantity sold' 4 Per visit. (Endorser and approver are different people — two signatures.)"
+   },
+   {
+    "do": "[Coordinator] Operations → '＋ New work order'. Client = ZZ FLOW1 Engineering Pvt Ltd; 'Quote — what was sold' = QUOTE NO; 'Contract number — from the quote' fills with CONTRACT NO; line item = the stage inspection line; Vendor / manufacturer (site) as on the quote; Business Unit Industrial; Activity code; Service line = Inspection; Type of inspection = Stage / In-process inspection; inspection date; offices = your office. 'Save work order'.",
+    "expect": "Page 'Work order …' with Stage · Target · Actual · Status. Work order register row: Client ZZ FLOW1, Executing Office yours. Contract page 'Work orders raised under this contract' lists it. Note the WORK ORDER NO."
+   },
+   {
+    "do": "[Coordinator] Work order → 'Change status (only the valid next steps are listed)' → Accepted → 'Set'; then Ready for scheduling → 'Set'.",
+    "expect": "Only valid next steps offered; status moves; history kept."
+   },
+   {
+    "do": "[Coordinator] Work order → '+ Allocate another job' (or Operations home 'Allocate engineer'). Choose Executing office = your office, Engineer = the inspector of zz.ins, the date. Press 'Allocate & send email'.",
+    "expect": "Job page 'Job …'. Work order's 'Jobs allocated from this call' lists it with Expected credit. Operations → Scheduling board shows the inspector busy on that date. Note the JOB NO."
+   },
+   {
+    "do": "[Inspector, on phone] Sign in as zz.ins → My Jobs → 'To do' → the job → 'Open'.",
+    "expect": "Job details readable on the phone: client, site, contact, QAP documents."
+   },
+   {
+    "do": "[Inspector, on phone] On the job press '📑 New report'. Report type = IR — Inspection Report; Title = 'ZZ FLOW1 stage inspection'; Inspection date = the job date. 'Generate report'. Fill the report, then '✓ Submit for review'.",
+    "expect": "Report shows status Under review (or At vetting); an IRN has been generated. Note the IRN."
+   },
+   {
+    "do": "[Senior Inspector — the mapped approver] Reporting → Report register → IRN → '✓ Approve'.",
+    "expect": "Status Approved — 'Approved — ready to issue.'"
+   },
+   {
+    "do": "[Senior Inspector] Try 'Finalize & issue' on the same report.",
+    "expect": "Refused — the person who approved cannot issue (approver ≠ issuer)."
+   },
+   {
+    "do": "[Branch Manager] Reporting → Report register → IRN → 'Finalize & issue'.",
+    "expect": "Status Issued with 🔒; '📄 PDF' works; the client portal (if switched on) lists it under Reports."
+   },
+   {
+    "do": "[Inspector, on phone] My Jobs → the job → 'Close & record expenses': Report upload date = today, Travel (₹) 500, others 0. 'Close job & record expenses'.",
+    "expect": "Job leaves 'To do'. Job register shows the job Closed."
+   },
+   {
+    "do": "[Finance] Money → Billable events → '⟳ Sync from closed work'. Filter Status = Pending review.",
+    "expect": "A row for JOB NO: Client ZZ FLOW1, Contract CONTRACT NO, Service, Amount ₹25,000 (the quote's per-visit rate), Status Pending review. If the amount differs from the quote rate, screenshot it as a FAIL."
+   },
+   {
+    "do": "[Finance] Press 'Approve' on that row.",
+    "expect": "Status Approved to bill."
+   },
+   {
+    "do": "[Finance] Money → Billing workspace ('Work waiting to be billed'). Month = this month → Apply. Under ZZ FLOW1 → CONTRACT NO tick 'Include' for JOB NO → 'Draft invoice for the ticked work'.",
+    "expect": "An invoice in Draft opens for ZZ FLOW1 with one line ₹25,000 + GST 18% = ₹29,500, Contract number = CONTRACT NO. No invoice number yet ('Nothing is numbered until it is issued')."
+   },
+   {
+    "do": "[Coordinator] Open the draft invoice and look for 'Issue this invoice'.",
+    "expect": "Not available to the Coordinator — only Accounts issues."
+   },
+   {
+    "do": "[Finance] Press 'Issue this invoice' → confirm.",
+    "expect": "Invoice number from your branch's series (pattern as Admin → System settings → Document numbering 'Example'); status Issued; due date = invoice date + the client's credit days. Billable events row now Billed."
+   },
+   {
+    "do": "[Finance] Invoice page → 'Record money received'. Customer = ZZ FLOW1, Branch, How it came = Bank transfer, Amount in the bank = 29000, TDS the customer withheld = 500. 'Record it'.",
+    "expect": "Message asks which invoices it settles; press 'Match it' against the invoice."
+   },
+   {
+    "do": "[Finance] Money → Invoices and Money → Receivables ageing.",
+    "expect": "Invoice Settled ₹29,500 (29,000 + 500 TDS), Outstanding 0, status Paid. Ageing shows nothing owed by ZZ FLOW1."
+   },
+   {
+    "do": "[Finance] Money → Profit by work order → this month → Show. Find JOB NO.",
+    "expect": "Revenue ₹25,000; Expenses include ₹500 travel; Profit = Revenue − Total cost. Money → Contract number register shows CONTRACT NO with Jobs 1 and Invoicing done."
+   },
+   {
+    "do": "[Business Director] Insights → Management dashboard → this month → filter Client = ZZ FLOW1.",
+    "expect": "Inspections 1, Closed 1, Revenue ₹25,000 — same as Profit by work order."
+   },
+   {
+    "do": "[Finance] Money → Tally export. What = Sales vouchers (invoices raised), From/To covering today → 'Show'. Press '⬇ CSV (to look at first)'. Then What = Receipt vouchers → Show.",
+    "expect": "The invoice row shows party ZZ FLOW1, GSTIN/place of supply, Taxable 25,000, CGST+SGST (same state) or IGST (other state), Total 29,500; the receipt appears in Receipt vouchers with TDS 500. (Use '⬇ Tally XML (import this)' only when really handing over — it is recorded under 'Batches already handed over'.)"
+   },
+   {
+    "do": "[Master Admin] Admin → MGH Books.",
+    "expect": "If 'Books is connected' is off: EXAACT is the record (pass). If on: Integration health shows the invoice and receipt sent, and the invoice page shows Books' paid/outstanding."
+   }
+  ],
+  "ref": "03-WORKFLOW-CATALOGUE.md §2.1; 01-SALES.md S-1; 03-OPERATIONS.md S-1; 07-MONEY.md S-1; docs/03-object-lifecycles.md (Quotation, Contract opening, Inspection report, Billable event); 02-permission-matrix.md fn 6, 17, 18, 19"
+ },
+ {
+  "id": "FLOW-02",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Manpower supply: project costing → man-month quotation → accepted → requisition → candidate → joining → deployment → monthly attendance → billing",
+  "kind": "flow",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "several",
+  "why": "Technical staffing is billed by the man-month; the costed rate must be the quoted rate, the deployed person must be the hired one, and the billed days must be the approved days.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). A client ZZ FLOW2 Refinery Ltd (Directory, payment terms set). Sales → Set up Sales: 'Must a man-month quote come from an approved project costing…' = Yes (default).",
+  "steps": [
+   {
+    "do": "[Business Development Manager] Sales → Project costing → '＋ New costing'. Title = ZZ FLOW2 Hazira QA/QC deputation; Client = ZZ FLOW2 Refinery Ltd; Executing office = yours; Site = Hazira; Basis = Long — per man-month × BOQ. 'Create costing'.",
+    "expect": "Costing page '… Draft' with a PC code. Note the COSTING CODE."
+   },
+   {
+    "do": "[Business Development Manager] '＋ Add a role': Role = QA/QC Engineer; Personnel / salary 60000; Statutory 8000; Accommodation / rentals 10000; Food / meal allowance 6000; Units (BOQ) = 6; Target margin (%) = 20. 'Add role'.",
+    "expect": "Row shows Direct/mo, Loaded/mo, Rate/lump, Units 6, Revenue, Profit, Margin ≈ 20%. Note the RATE (per man-month) and REVENUE."
+   },
+   {
+    "do": "[Business Development Manager] Press 'Submit for approval'. Then try to approve it yourself.",
+    "expect": "Status Submitted. Your own approval is refused — the author never approves a costing."
+   },
+   {
+    "do": "[Marketing Manager] Open the costing → Approval → approve.",
+    "expect": "Status Approved, with who and when."
+   },
+   {
+    "do": "[Business Development Manager] Costing → '📝 Create quotation'.",
+    "expect": "A Draft quote for ZZ FLOW2 with a line Unit = Man-month, Qty = 6, Rate = the costing RATE; total = costing REVENUE. Note QUOTE NO."
+   },
+   {
+    "do": "[Marketing Manager] Edit the quote and change the rate (you are not its creator).",
+    "expect": "Expected: refused — only the quotation's creator (or a master of quotations) may move prices away from the costing, and then only with a note written in its history. If someone else can change it silently, record as a defect."
+   },
+   {
+    "do": "[Business Development Manager] Submit for approval → [Marketing Manager] Approve → [Business Development Manager] '✉ Send to client' → 'Mark accepted (won)'.",
+    "expect": "Status Accepted. Quote still shows Man-month × 6 at RATE."
+   },
+   {
+    "do": "[Finance] Quote → '✓ Register the contract & request opening'. [Operation Manager] Contract openings → 'Endorse'. [Branch Manager] 'Approve & open'.",
+    "expect": "Contract Open / in force; Quantity sold 6 Man-month; value = REVENUE. Note CONTRACT NO."
+   },
+   {
+    "do": "[Coordinator] Sales → Project costing → COSTING CODE → on the role press '→ Requirement'.",
+    "expect": "Message 'Recruitment Requisition REQ-… created from this role — set the headcount & duration.' The requisition page opens: status Open, client ZZ FLOW2, site Hazira. Note REQ NO."
+   },
+   {
+    "do": "[Coordinator] Requisition → Edit: headcount 1, duration per the contract. 'Add source': Source = Direct recruitment, How many people = 1. 'Add source'.",
+    "expect": "'Where these people come from' shows 1 promised to Direct recruitment."
+   },
+   {
+    "do": "[Coordinator] Recruitment → '＋ Add candidate'. Against requisition = REQ NO; First name = ZZ Flow2; Last name = Candidate; Client = ZZ FLOW2 Refinery Ltd; Experience 6. 'Add candidate'.",
+    "expect": "Candidate page 'ZZ Flow2 Candidate' stage CV received; requisition 'Candidates against this requisition (1)'."
+   },
+   {
+    "do": "[Coordinator] Candidate → 'Client submission & interview': CV submitted to client on = today; Client feedback = Shortlisted; Interview outcome = Selected. 'Save tracking'.",
+    "expect": "Candidate register tabs 'Submitted to client' / 'Shortlisted' count the candidate."
+   },
+   {
+    "do": "[Coordinator] Candidate → Offer: 'Draft offer' with Total CTC and Joining date.",
+    "expect": "Offer drafted (offer approval follows Recruitment approvals)."
+   },
+   {
+    "do": "[Coordinator] Candidate → 'Move this candidate' → New stage = Accepted (Hired); Which team do they join? = Field — goes to site; On whose roll? = On our roll. 'Update stage'.",
+    "expect": "Stage Accepted (Hired); the requisition's Placements shows 1 hired. The person now exists as a team member."
+   },
+   {
+    "do": "[Coordinator] Operations → Team member availability.",
+    "expect": "ZZ Flow2 Candidate is listed (Available) under the right office."
+   },
+   {
+    "do": "[Coordinator] Operations → '＋ New work order': Client ZZ FLOW2, Quote = QUOTE NO, contract CONTRACT NO, Service line = Project Deputation. Save. Then allocate: Engineer = ZZ Flow2 Candidate, shape = man-month basis, months 6. 'Allocate & send email'.",
+    "expect": "Job created; Operations → Deputation & site operations lists Person ZZ Flow2 Candidate, Client ZZ FLOW2, Site Hazira, Status Planned."
+   },
+   {
+    "do": "[Coordinator] Job → '👷 Deputation & site operations' → Set status = Mobilized → 'Update status'; then Active.",
+    "expect": "Status Active; Deputations register shows Active; 'Manpower plan & gap' Gap reduces by 1."
+   },
+   {
+    "do": "[Coordinator] Month end: Job → '➕ Submit an attendance period for client approval': Period from 1st, Period to last day, Basis = Man-month, Billable days = 26. 'Submit for approval'.",
+    "expect": "Row in 'Attendance approval & billing sign-off' with status Submitted."
+   },
+   {
+    "do": "[Client portal user, or Coordinator for the client] Approve the period (portal 'Deputations', or on the job set status Approved with Client rep name → 'Save').",
+    "expect": "Status Approved; row shows 'locked'."
+   },
+   {
+    "do": "[Finance] Money → Billable events → '⟳ Sync from closed work'.",
+    "expect": "A row for the approved deputation timesheet for ZZ FLOW2 / CONTRACT NO, Pending review, quantity 26 days (man-month basis)."
+   },
+   {
+    "do": "[Finance] 'Approve' the row. Then Money → Invoices → '+ New invoice': Customer ZZ FLOW2, Branch, Contract number = CONTRACT NO → 'Start the draft'; 'Add the line' for 1 man-month at RATE → 'Issue this invoice'.",
+    "expect": "Invoice issued for one man-month at the costing RATE."
+   },
+   {
+    "do": "[Finance] Billable events → that row → 'Mark billed' with invoice # = the new invoice number.",
+    "expect": "Status Billed with the invoice number (a non-job event needs the invoice number)."
+   },
+   {
+    "do": "[Finance] Money → Profit by work order (this month) and Recruitment home 'Manpower P&L'.",
+    "expect": "Revenue for the deputation equals RATE; cost shows the person's salary; margin close to the costed 20% (differences explained by actual days)."
+   },
+   {
+    "do": "[Business Development Manager] Try to submit a second man-month quote with no approved costing.",
+    "expect": "Refused while the man-month line has no approved project costing."
+   }
+  ],
+  "ref": "03-WORKFLOW-CATALOGUE.md §2.4; 04-RECRUITMENT.md S-2; 03-OPERATIONS.md S-5; docs/03-object-lifecycles.md (Project costing, Billable event TIMESHEET_APPROVED); 02-permission-matrix.md fn 19a (D-11)"
+ },
+ {
+  "id": "FLOW-03",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Quality loop: complaint → nonconformity → corrective action → closure → management review",
+  "kind": "flow",
+  "tags": [
+   "best",
+   "rule",
+   "gap"
+  ],
+  "persona": "several",
+  "why": "An assessor follows one complaint from arrival to the management review; every date, owner and decision must be on the record.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Also zz.qh (Quality Head). FLOW-01 done (JOB NO and IRN exist).",
+  "steps": [
+   {
+    "do": "[Coordinator] Left menu → Quality & Accreditation → Complaints & appeals → 'Record one'. What is it? = Complaint; Received on = today; How it reached us = E-mail; Who from = Client; Their name = Ravi Flow; Which client = ZZ FLOW1 Engineering Pvt Ltd; Which team member = the FLOW-01 inspector; Job number = JOB NO; Report number (IRN) = IRN; Subject = ZZ FLOW3 report issued late; What they told us = 'Report came 8 days after inspection'. 'Record it'.",
+    "expect": "Complaint page 'CMP-… — ZZ FLOW3 report issued late', tabs Overview · Handle · History. Register row with Received date. Note CMP NO."
+   },
+   {
+    "do": "[Coordinator] Handle → '1 · Acknowledge' → 'Record it'; '2 · Is it ours to answer?' → 'Save'; '3 · Investigate' → findings → 'Save findings'.",
+    "expect": "Each step dated in 'What happened, in order'; register shows the acknowledgement date within the 'Acknowledge within (days)' deadline."
+   },
+   {
+    "do": "[Coordinator] Quality → Nonconformity workspace → NCR register → '+ Raise a nonconformity'. What was wrong = ZZ FLOW3 report late; Where it came from = A complaint; Reference at the source = CMP NO; Major; Against a job = JOB NO; Owner = Quality Head; Due by blank. 'Raise it'.",
+    "expect": "NCR page 'NCR-… — ZZ FLOW3 report late', 'Major Open A complaint'; Due date = 14 days from today (blank = 14 days if major). Note NCR NO."
+   },
+   {
+    "do": "[Quality Head] NCR → '1 · What was done immediately' → text → 'Save'. '2 · What happened to the work that was already wrong' = Correct and re-issue the document → 'Record it'.",
+    "expect": "Both recorded with name and date."
+   },
+   {
+    "do": "[Quality Head] Try '4 · Close it' now.",
+    "expect": "Refused — 'Before this can be closed' lists the missing corrective action (a major one cannot be closed without one)."
+   },
+   {
+    "do": "[Quality Head] '3 · Does it need a corrective action?' → 'Open a corrective action from this'.",
+    "expect": "CAPA page 'CAPA-… — …' 'Major · raised today · A nonconformity'; 'Quality case — the full story (2 linked)'. Note CAPA NO."
+   },
+   {
+    "do": "[Quality Head] CAPA → '1 · Cause': Root cause, How it was worked out = Five whys, elsewhere = No — we looked… → 'Save'. '2 · Plan' → What will be done, Whose job, By when → 'Save plan'. '3 · It was done' → Carried out on = today → 'Record it'.",
+    "expect": "Each step recorded in 'What happened, in order'."
+   },
+   {
+    "do": "[Coordinator] Try '5 · Close' on the CAPA.",
+    "expect": "Not offered / refused (closing a corrective action needs capa.close — Quality or Technical Head)."
+   },
+   {
+    "do": "[Quality Head] '4 · Did it work?' = Yes — it worked → 'Record the check'. '5 · Close' → 'Close …'.",
+    "expect": "CAPA status Closed. (Choosing 'No — it did not' instead offers 'Close as ineffective and raise a further action'.)"
+   },
+   {
+    "do": "[Quality Head] NCR NO → '4 · Close it'.",
+    "expect": "NCR Closed with closure date; register Status Closed."
+   },
+   {
+    "do": "[Master Admin — not involved in the case] Complaint CMP NO → '4 · Decide' → 'Record the decision'. Check 'Who may not decide this'.",
+    "expect": "Decision recorded; the inspector and the recorder are listed as people who may not decide. Note: by default only administrators hold 'Decide complaints and appeals' — the Quality Head cannot decide. Record as a gap for the owner (who should decide complaints)."
+   },
+   {
+    "do": "[Coordinator] Complaint → '5 · Tell the complainant' → Save; '7 · Close' → Close.",
+    "expect": "State closed; register columns Outcome, Decided by, Told filled."
+   },
+   {
+    "do": "[Quality Head] Open Quality & Accreditation → Management review.",
+    "expect": "Expected for the owner's quality role: opens. Today the Quality Head holds no 'Internal audits & management review' right by default — if refused, record as a gap and continue as Master Admin."
+   },
+   {
+    "do": "[Master Admin] Management review → 'Hold a review': Held on = today, Period from = first of this month, to = today, Chaired by = Rahul Desai. 'Open it'.",
+    "expect": "Review page 'MR-… — management review' with 'The required inputs (§8.9.2 — all 15)'."
+   },
+   {
+    "do": "[Master Admin] Press 'Re-count from the system'.",
+    "expect": "The complaints, nonconformities and corrective-action inputs count CMP NO, NCR NO and CAPA NO."
+   },
+   {
+    "do": "[Master Admin] 'Record a decision': About = The management system and its processes; Whose job; By when; The decision = 'Report TAT alert at 5 days'. 'Record it'. Then 'Complete the review'.",
+    "expect": "Decision row in 'What came out of it'; review State completed; Management review list shows Decisions 1."
+   },
+   {
+    "do": "[Business Director] Insights → Analytics & performance → 'Quality' view, this month.",
+    "expect": "'Open nonconformities' does not include NCR NO; 'Average NCR closure time' includes it; 'CAPA effectiveness' counts CAPA NO as effective."
+   }
+  ],
+  "ref": "03-WORKFLOW-CATALOGUE.md §2.3; 05-QUALITY.md; 02-permission-matrix.md fn 20 and Quality roles; lib/access.php complaints.decide (no default holder)"
+ },
+ {
+  "id": "FLOW-04",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Marketplace: requirement → applications → award → engagement → voucher → invoice → payout",
+  "kind": "flow",
+  "tags": [
+   "best",
+   "rule",
+   "gap"
+  ],
+  "persona": "several",
+  "why": "The marketplace earns commission on the fee only; the professional's payout and the client's bill must come from one approved voucher.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Marketplace & Connect switched on. A verified test professional login (marketplace portal) available to the tester. Client ZZ FLOW1 exists.",
+  "steps": [
+   {
+    "do": "[Coordinator] Left menu → Marketplace → Requirements ('Manpower marketplace') → '➕ Post a requirement (full form)'. What do you need? = ZZ FLOW4 UT technician 10 days; Posted for = ZZ FLOW1 Engineering Pvt Ltd; Work type = Day rate; Discipline = NDT; Location = Vadodara; Positions = 1; Start/End dates; Rate from 3000, Rate to 4000. 'Post it — open for applications'.",
+    "expect": "'All requirements' shows a CX-REQ code with Status Open. Note REQ CODE."
+   },
+   {
+    "do": "[Professional] From the marketplace portal, open REQ CODE and apply with a day rate of 3500.",
+    "expect": "Applied."
+   },
+   {
+    "do": "[Coordinator] Requirement page → Applications (1).",
+    "expect": "The application shows status Applied with the rate."
+   },
+   {
+    "do": "[Coordinator] Press 'Start shortlisting', then 'Shortlist' on the application.",
+    "expect": "Requirement Shortlisting; application Shortlisted."
+   },
+   {
+    "do": "[Coordinator] '🤝 Award' on the application → confirm 'Award this requirement to …?'.",
+    "expect": "Requirement Awarded; application Accepted; panels 'Billing', 'Deployment', '📅 Booking / engagement', '🧾 Engagement vouchers' appear."
+   },
+   {
+    "do": "[Coordinator] Booking / engagement → Basis = Man-days; Rate ₹ = 3500; Per = day; Quantity = 10; Rate model = Fee only (expenses extra); Voucher cadence = Per deployment / month. 'Update booking'. Then 'Mark active'.",
+    "expect": "Engagement Active with 10 × ₹3,500."
+   },
+   {
+    "do": "[Coordinator] Billing → '💷 Send to billing'.",
+    "expect": "'This engagement is in the billing ledger — 1 × ₹3500 = ₹3,500' (positions × awarded rate) with 'Open the billable events board →'."
+   },
+   {
+    "do": "[Professional] In the portal raise a voucher on the booking: add 2 days and travel ₹800 (fee-only lets expenses be claimed), attach a receipt, submit. (Or [Coordinator] '+ Raise a voucher' → 'Add a day' ×2 → 'Submit for approval' for an on-roll/bench person.)",
+    "expect": "Engagement vouchers shows the voucher Submitted: Fee ₹7,000 · Exp ₹800 · Total ₹7,800."
+   },
+   {
+    "do": "[Coordinator] Press 'Send back' with a note, then (professional) correct and resubmit.",
+    "expect": "Status 'Sent back', then Submitted again."
+   },
+   {
+    "do": "[Coordinator] Press 'Approve'.",
+    "expect": "Voucher Approved; receipts frozen. A Draft tax invoice for the voucher appears in Money → Invoices for ZZ FLOW1 (fee and expense lines)."
+   },
+   {
+    "do": "[Finance] Money → Invoices → that Draft → check lines (Fee 7,000, Expenses 800) → 'Issue this invoice'.",
+    "expect": "Issued with a branch number."
+   },
+   {
+    "do": "[Finance] Money → Billable events.",
+    "expect": "The award event from step 7 (₹3,500) is listed too. If both the award event and the voucher invoice would bill the same work, record as a gap (possible double billing) and 'Dispute'/do not bill the award event."
+   },
+   {
+    "do": "[Coordinator] Engagement vouchers → 'Mark paid' (after the client has paid and the professional confirmed receipt).",
+    "expect": "Voucher Paid (settled)."
+   },
+   {
+    "do": "[Master Admin] Admin → Control panel → 'Marketplace escrow' (/marketplace-escrow).",
+    "expect": "The voucher's row shows Amount, Commission (on the fee only, default 5%, split half client / half professional) and 'To pro' = Total − the professional's half of commission. Release/Refund only if escrow is used."
+   },
+   {
+    "do": "[Coordinator] Requirement → Ratings → 5 stars, 'Would work again' → 'Save rating'. Then 'Close'.",
+    "expect": "Rating saved; requirement Closed."
+   }
+  ],
+  "ref": "02-MARKETPLACE.md S-1; docs/03-object-lifecycles.md (Connect Requirement, Application, Engagement, Engagement Voucher); lib/connect_bridge.php"
+ },
+ {
+  "id": "FLOW-05",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Sub-contracted inspection: agency allocation → sub-con cost → engineer's voucher → cost → margin",
+  "kind": "flow",
+  "tags": [
+   "best",
+   "gap"
+  ],
+  "persona": "several",
+  "why": "When a sub-contractor does the inspection, its cost must land on that job so the margin is real.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). A sub-contracting agency with a person in the master (e.g. 'Mohan Rao (SC-001)'). FLOW-01 contract open with visits left.",
+  "steps": [
+   {
+    "do": "[Coordinator] Operations → '＋ New work order' for ZZ FLOW1 against CONTRACT NO (next visit). Save.",
+    "expect": "WORK ORDER 2 created."
+   },
+   {
+    "do": "[Coordinator] Allocate: leave Engineer empty and press 'Allocate & send email'.",
+    "expect": "Refused: 'Choose an … / engineer, or a sub-contracting agency, before allocating.'"
+   },
+   {
+    "do": "[Coordinator] Choose 'Sub-contracting agency' = the agency — Mohan Rao; 'Sub-con cost (₹)' = 15000. 'Allocate & send email'.",
+    "expect": "Job page shows Sub-con = the agency; Money tab 'Sub-con cost' ₹15,000."
+   },
+   {
+    "do": "[Coordinator] After the visit: Job register → 'Close' → 'Close job JOB2': Report upload date, Travel 0. 'Close job & send closure email'.",
+    "expect": "Job Closed."
+   },
+   {
+    "do": "[Coordinator] Operations → Inspector vouchers → Open a voucher: Mohan Rao (SC-001), Month = this month → 'Open / create'. '↻ Pull working days from jobs'. 'Add expense': ₹1,200, What for = Hotel / Boarding & Lodging (out-station), Against a job = JOB2. 'Save details / upload' with the bill. 'Submit for approval'.",
+    "expect": "Voucher 'Statement of travelling expenses' status Submitted; total ₹1,200."
+   },
+   {
+    "do": "[Coordinator] (the submitter) Press 'Approve'.",
+    "expect": "Refused — the approver must be neither the claimant nor the submitter."
+   },
+   {
+    "do": "[Operation Manager] Open the voucher → 'Approve' → later 'Mark paid'.",
+    "expect": "Approved, then Paid."
+   },
+   {
+    "do": "[Finance] Money → Profit by work order → this month → JOB2.",
+    "expect": "Sub-con ₹15,000; Voucher ₹1,200; Profit = Revenue (₹25,000) − total cost. Write down PROFIT."
+   },
+   {
+    "do": "[Finance] Money → Reimbursable duplication.",
+    "expect": "JOB2 is not listed (the hotel is on the voucher only). If you also typed lodging on the job closure, it appears here — remove the duplicate on the wrong door."
+   },
+   {
+    "do": "[Branch Manager] Money → Month-end cost run → office, month → 'Show' → 'Calculate and store <month>'. Then Money → Cost reconciliation.",
+    "expect": "Cost reconciliation: 'Nothing to reconcile.' (legacy sub-con cost = ledger cost). If JOB2 is listed with a Δ, screenshot."
+   },
+   {
+    "do": "[Branch Manager] Money → Business Unit profit & loss → office, One month.",
+    "expect": "Sub-contractor column for Industrial includes ₹15,000."
+   },
+   {
+    "do": "[Business Director] Insights → Management dashboard → this month, Client = ZZ FLOW1.",
+    "expect": "Direct cost includes the sub-con cost; Margin falls accordingly; Profit equals Profit by work order."
+   },
+   {
+    "do": "[Finance] Look for a screen to record and pay the agency's own bill for ₹15,000.",
+    "expect": "Not supported today — the sub-con cost is a figure on the job; there is no payable/bill record for the agency. Record as a gap."
+   }
+  ],
+  "ref": "03-OPERATIONS.md S-1 step 4; 07-MONEY.md S-3; docs/03-object-lifecycles.md (Voucher R5); views/ops/job_form.php"
+ },
+ {
+  "id": "FLOW-06",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Client on hold / blocked — stops new business in Sales and Operations, keeps billing and collections in Money",
+  "kind": "flow",
+  "tags": [
+   "rule",
+   "worst",
+   "gap"
+  ],
+  "persona": "several",
+  "why": "Owner's rule D-12: a held customer gets nothing new, but what they owe is still invoiced, reminded and received.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Client ZZ FLOW1 with: a Draft quote, an Accepted quote not yet registered (or a second accepted quote), an open work order with no job, a closed job not yet invoiced, and an issued unpaid invoice.",
+  "steps": [
+   {
+    "do": "[Finance] Money → Receivables ageing (Due date).",
+    "expect": "ZZ FLOW1's unpaid invoice shown with days overdue."
+   },
+   {
+    "do": "[Branch Manager] Directory → Client holds: Client = ZZ FLOW1, Status = On hold, Reason = ZZ FLOW6 overdue 90 days. Save.",
+    "expect": "'Client set to On hold.'"
+   },
+   {
+    "do": "[Business Development Manager] Sales → Inquiries → '+ New inquiry' for ZZ FLOW1 → 'Create inquiry'.",
+    "expect": "Refused: 'ZZ FLOW1 Engineering Pvt Ltd is on hold (ZZ FLOW6 overdue 90 days). Nothing new can be raised for them — only payment reminders — until a manager clears it under Client holds.'"
+   },
+   {
+    "do": "[Business Development Manager] Sales → Quotes → '+ New quote' for ZZ FLOW1 → 'Create quote'.",
+    "expect": "Refused with the same sentence."
+   },
+   {
+    "do": "[Business Development Manager] Open the Draft quote → 'Submit for approval'.",
+    "expect": "Refused (no submission, approval, sending or acceptance for a held client)."
+   },
+   {
+    "do": "[Business Development Manager] Same Draft quote → 'Mark lost' with a reason → 'Confirm lost'.",
+    "expect": "Allowed — a quotation may still be marked lost."
+   },
+   {
+    "do": "[Finance] Accepted quote → '✓ Register the contract & request opening'.",
+    "expect": "Refused (no contract)."
+   },
+   {
+    "do": "[Coordinator] Operations → '＋ New work order' for ZZ FLOW1 → 'Save work order'.",
+    "expect": "Refused with the hold sentence."
+   },
+   {
+    "do": "[Coordinator] The open work order → '+ Allocate another job'.",
+    "expect": "Back on the work order with the hold sentence; no job created."
+   },
+   {
+    "do": "[Client portal user of ZZ FLOW1] Portal → 'Request an inspection' → 'Send it'. [Coordinator] Directory → Client portal → 'Accept & raise the call'.",
+    "expect": "Expected: no work order is created for the held client. If one is, record as a defect."
+   },
+   {
+    "do": "[Finance] Money → Billing workspace → the closed job → 'Draft invoice for the ticked work' → 'Issue this invoice'.",
+    "expect": "Allowed — work already done is still invoiced."
+   },
+   {
+    "do": "[Finance] Money → Money in → '+ Record money received' for ZZ FLOW1 → 'Record it' → 'Match it'.",
+    "expect": "Allowed; ageing reduces."
+   },
+   {
+    "do": "[Coordinator] Directory → Activity: record the chase (What kind = Telephone call, Customer ZZ FLOW1).",
+    "expect": "'Last anything' updates."
+   },
+   {
+    "do": "[Branch Manager] Client holds → Status = Blocked (same reason) → Save. Repeat step 3.",
+    "expect": "Refused: '… is blocked (…)…'. Blocked stops managers too (not only non-managers)."
+   },
+   {
+    "do": "[Branch Manager] Client holds → Status = Active (no hold) → Save. Repeat step 3.",
+    "expect": "'Hold cleared.' The inquiry is now created."
+   },
+   {
+    "do": "[Branch Manager] Directory → Client register → ZZ FLOW1 → Edit → Status = Inactive → Save. Repeat step 8.",
+    "expect": "Refused: '… is inactive. Nothing new can be raised for them — only payment reminders — until someone allowed to edit the client record makes them Active again.' Set back to Active."
+   }
+  ],
+  "ref": "docs/03-object-lifecycles.md 'Customer trade block — D-12'; 09-DIRECTORY.md S-3, D-F1; lib/ops.php partner_trade_block()"
+ },
+ {
+  "id": "FLOW-07",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Revising an accepted quotation — new revision, contract amendment with two signatures, and what happens downstream",
+  "kind": "flow",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "several",
+  "why": "Clients change scope after the order; the old revision, the contract, work already done and invoices must each stay correct.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). FLOW-01 completed (QUOTE NO Accepted Rev 00, CONTRACT NO open, one job invoiced).",
+  "steps": [
+   {
+    "do": "[Business Development Manager] Sales → Quotes → QUOTE NO → 'Revise (new rev)'. What changed? = 'ZZ client added 2 vessels'. 'Create revision'.",
+    "expect": "A new revision Rev 01 opens in Draft. 'Revision history' (Rev · Status · Total · When) shows Rev 00 Accepted ₹1,00,000 and Rev 01 Draft."
+   },
+   {
+    "do": "[Business Development Manager] Open Rev 00.",
+    "expect": "It shows 'Open the current revision →' and offers no status moves (a superseded revision cannot move)."
+   },
+   {
+    "do": "[Business Development Manager] Rev 01 → Edit → line Qty 6 → Save.",
+    "expect": "Total ₹1,50,000; history logs old and new totals."
+   },
+   {
+    "do": "[Business Development Manager] Submit for approval → [Marketing Manager] Approve → [Business Development Manager] Edit the rate on the Approved revision → Save.",
+    "expect": "The approval is cancelled: status back to Draft, approval steps removed, history shows old/new totals (a commercial change cancels approval)."
+   },
+   {
+    "do": "[Business Development Manager] Submit again → [Marketing Manager] Approve → '✉ Send to client' → 'Mark accepted (won)'.",
+    "expect": "Rev 01 Accepted."
+   },
+   {
+    "do": "[Opportunity] Sales → Opportunities → the deal.",
+    "expect": "Still ONE deal (value updated or as recorded) — quotations are counted per deal, not per revision."
+   },
+   {
+    "do": "[Finance] Open CONTRACT NO → '✎ Edit contract': Value = 150000, Qty = 6, 'Reason for the amendment' = Rev 01 accepted. 'Save changes'.",
+    "expect": "Not applied at once: an entry under 'Amendments' waits for signatures; the contract still shows ₹1,00,000 / 4."
+   },
+   {
+    "do": "[Operation Manager] Contract page → Amendments → 'Endorse'. [Operation Manager] try 'Approve amendment'.",
+    "expect": "Endorse recorded; Approve refused for the endorser/Operation Manager."
+   },
+   {
+    "do": "[Branch Manager] 'Approve amendment'.",
+    "expect": "Contract now ₹1,50,000, Quantity sold 6; the old figures stay on the amendment row."
+   },
+   {
+    "do": "[Coordinator] Operations → '＋ New work order' for ZZ FLOW1: 'Quote — what was sold'.",
+    "expect": "The current revision (Rev 01) is offered; the contract number is unchanged (CONTRACT NO)."
+   },
+   {
+    "do": "[Coordinator] Open the FLOW-01 work order and job.",
+    "expect": "Unchanged: same work order, job, IRN; contract page lists both work orders."
+   },
+   {
+    "do": "[Finance] Money → Invoices → the FLOW-01 invoice.",
+    "expect": "Unchanged (₹25,000 + GST) — invoices already issued are never re-priced."
+   },
+   {
+    "do": "[Finance] Money → Contract number register → CONTRACT NO.",
+    "expect": "Jobs and Invoicing done reflect both work orders as they are billed; Profit recalculates."
+   }
+  ],
+  "ref": "docs/03-object-lifecycles.md (Quotation revisions D-07, Contract amendment D-25); 01-SALES.md"
+ },
+ {
+  "id": "FLOW-08",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Month-end: office costs → month-end cost run → Business Unit P&L → close the month",
+  "kind": "flow",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "several",
+  "why": "A business unit's profit is only real once the office's own costs are spread onto it and the month is closed.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Last month has closed jobs in your office (e.g. FLOW-01/05). Do this for LAST month.",
+  "steps": [
+   {
+    "do": "[Branch Manager] Money → Office costs & overheads. Office = yours, Month = last month → 'Show'. Tab 'Actual costs, month by month'.",
+    "expect": "Heading 'Office costs & overheads'; section '<Month> — <Office>'; table Expense head · Amount (₹) · Spreads across Business Units by · Note."
+   },
+   {
+    "do": "[Branch Manager] Press 'Copy last month', adjust one amount (e.g. Rent), set each head's 'Spreads across Business Units by'. Press 'Save <Month YYYY>'.",
+    "expect": "Message 'Saved ₹X of …'. Note TOTAL OFFICE COST X."
+   },
+   {
+    "do": "[Branch Manager] Tab 'Business Units in this office'.",
+    "expect": "Units listed that will receive a share."
+   },
+   {
+    "do": "[Branch Manager] Money → Month-end cost run → Office, Month → 'Show'.",
+    "expect": "Roll-up per business unit, activity code and Contract Number; 'Overhead recovery — did this month's work cover the office overhead?'; 'Worth looking at before you close the month'. Nothing stored yet."
+   },
+   {
+    "do": "[Branch Manager] 'Calculate and store <Month>'.",
+    "expect": "'<Month> has been calculated but is not closed. The figures below are stored and can still be recalculated.'"
+   },
+   {
+    "do": "[Branch Manager] Press 'Business Unit P&L' (or Money → Business Unit profit & loss): Office, Show = One month, Month → 'Show'.",
+    "expect": "Heading 'Business Unit profit & loss — <Month>'. Table Business Unit · Revenue · Engineers · Other salary · Sub-contractor · Office costs · Total cost · Profit · Margin. The Office costs column totals X."
+   },
+   {
+    "do": "[Branch Manager] Press 'Management dashboard' from the P&L (same office and month).",
+    "expect": "Revenue per business unit equals the P&L Revenue; 'Branch costs allocated to each business unit' shows the same office costs and 'Profit after everything'."
+   },
+   {
+    "do": "[Branch Manager] Money → Profit by work order (same office, month).",
+    "expect": "Sum of Sub-con equals the P&L Sub-contractor total."
+   },
+   {
+    "do": "[Branch Manager] Money → Cost reconciliation and Revenue reconciliation.",
+    "expect": "Both 'Nothing to reconcile.' — otherwise screenshot."
+   },
+   {
+    "do": "[Branch Manager] Month-end cost run → 'Close the month' → confirm.",
+    "expect": "'<Month> is closed. Calculated by … and frozen, so nothing can change it now.'"
+   },
+   {
+    "do": "[Coordinator] Open an inspector voucher for that month and try to add an expense.",
+    "expect": "Locked — editing is frozen for a closed month."
+   },
+   {
+    "do": "[Branch Manager] Office costs & overheads for the closed month → change an amount → Save.",
+    "expect": "Expected: refused or it does not change the stored P&L until the month is reopened. Record which."
+   },
+   {
+    "do": "[Branch Manager] Month-end cost run → 'Reopen the month' → confirm; correct; 'Calculate and store'; 'Close the month' again.",
+    "expect": "Reopened, recalculated, closed; P&L shows the corrected figure."
+   },
+   {
+    "do": "[Business Director] Insights → Dashboards (same month).",
+    "expect": "'By business unit — credit vs distributed cost' Loaded cost reflects the distributed office costs."
+   }
+  ],
+  "ref": "07-MONEY.md S-2, S-3; views/ops/cost_run.php; 08-INSIGHTS.md S-2"
+ },
+ {
+  "id": "FLOW-09",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Cross-office job: contracting office invoices, executing office allocates and earns the credit",
+  "kind": "flow",
+  "tags": [
+   "rule",
+   "edge"
+  ],
+  "persona": "several",
+  "why": "ADR-005: the contracting office books client revenue; the executing office earns an inter-office credit — neither may claim the other's.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Plus zz.co.mum (Coordinator, Mumbai) and zz.bm.mum (Branch Manager, Mumbai), and a Mumbai inspector. Your main office is Ahmedabad.",
+  "steps": [
+   {
+    "do": "[Coordinator, Ahmedabad] Operations → '＋ New work order' for ZZ FLOW1 (contract from FLOW-01/07). Section '4. Which Offices, and the money between them': Executing office = Mumbai, credit to the executing office per man-day as agreed. 'Save work order'.",
+    "expect": "Work order register row: Executing Office Mumbai, 'Credit to give' filled. Note WO-X."
+   },
+   {
+    "do": "[Coordinator, Ahmedabad] WO-X → '+ Allocate another job'.",
+    "expect": "Refused: 'This work order is carried out by Mumbai. Only that office can allocate it — you can see it because your office contracts it and will invoice it.' (wording follows Terminology)"
+   },
+   {
+    "do": "[Coordinator, Mumbai] Operations → Work order register.",
+    "expect": "WO-X visible. Allocate the Mumbai inspector → 'Allocate & send email'."
+   },
+   {
+    "do": "[Inspector, Mumbai] Do the job and close it (My Jobs → 'Close & record expenses').",
+    "expect": "Job Closed."
+   },
+   {
+    "do": "[Finance] Billable events → Sync → Approve → Billing workspace → draft → New invoice Branch = Ahmedabad → 'Issue this invoice'.",
+    "expect": "Invoice number from the AHMEDABAD series."
+   },
+   {
+    "do": "[Branch Manager, Mumbai] Insights → Dashboards (this month).",
+    "expect": "'By business unit — credit vs distributed cost' Credit includes WO-X's credit; Mumbai sees no Ahmedabad client revenue."
+   },
+   {
+    "do": "[Branch Manager, Mumbai] Money → Invoice register → 'Inter-office settlement'.",
+    "expect": "Row Owing office Ahmedabad · Owed to Mumbai · Credit · Settled · Outstanding · Open jobs."
+   },
+   {
+    "do": "[Finance] Invoice register → the job → 'Confirm →' → job 'Invoice & payment / credit' → tick 'Credit received' → 'Save invoice / payment'.",
+    "expect": "Inter-office settlement: Settled up, Outstanding down by the credit."
+   },
+   {
+    "do": "[Business Director] Insights → Management dashboard (this month): 'By contracting office' and 'By executing office'.",
+    "expect": "Revenue of WO-X under Ahmedabad (contracting); Mumbai shows the job under executing office. Neither double-counts the client revenue."
+   },
+   {
+    "do": "[Branch Manager, Ahmedabad] Money → Profit by work order, Office = Ahmedabad; [Branch Manager, Mumbai] same with Mumbai.",
+    "expect": "Ahmedabad's revenue is the client invoice value; Mumbai's revenue is its inter-office credit."
+   }
+  ],
+  "ref": "02-permission-matrix.md fn 4 (ADR-005); 08-INSIGHTS.md E-4; lib/ops.php call_can_allocate()"
+ },
+ {
+  "id": "FLOW-10",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Report rejected by the client → nonconformity → re-issued revision → accepted",
+  "kind": "flow",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "several",
+  "why": "A rejected report is a quality event and a commercial one; the reissue must keep both versions on record.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Client portal user for ZZ FLOW1 with 'Accept or reject a report on the company's behalf'. An issued report (IRN) for ZZ FLOW1.",
+  "steps": [
+   {
+    "do": "[Coordinator] Quality → Client acceptance ('Client acceptance of reports').",
+    "expect": "IRN listed under 'Issued, no answer yet' with days Waiting."
+   },
+   {
+    "do": "[Client portal user] Portal → Reports → IRN → Your decision = Reject; 'If you are rejecting it, why?' = 'Heat number missing'. 'Record my decision'.",
+    "expect": "'Every decision on this report' shows the rejection with date."
+   },
+   {
+    "do": "[Coordinator] Client acceptance.",
+    "expect": "IRN no longer 'no answer yet'; shown as rejected by the client."
+   },
+   {
+    "do": "[Coordinator] Quality → NCR register → '+ Raise a nonconformity': Where it came from = Rejected by the client; Reference = IRN; Minor; Against a job = the job. 'Raise it'.",
+    "expect": "NCR … Minor Open (due in 30 days if blank)."
+   },
+   {
+    "do": "[Quality Head] NCR → disposition 'Correct and re-issue the document' → 'Record it'.",
+    "expect": "Recorded."
+   },
+   {
+    "do": "[Inspector] Report IRN → '♻️ Reissue as new revision'.",
+    "expect": "A new Draft revision opens; the issued one stays locked."
+   },
+   {
+    "do": "[Inspector] Correct the report → '✓ Submit for review'. [Senior Inspector] '✓ Approve'. [Branch Manager] 'Finalize & issue'.",
+    "expect": "New revision Issued; both versions in the Report register."
+   },
+   {
+    "do": "[Client portal user] Reports → new revision → Accept → 'Record my decision'.",
+    "expect": "Accepted."
+   },
+   {
+    "do": "[Quality Head] NCR → '4 · Close it'.",
+    "expect": "Closed."
+   },
+   {
+    "do": "[Business Director] Insights → Analytics & performance → KPI library 'Report revision rate' (this month).",
+    "expect": "Includes this reissue."
+   }
+  ],
+  "ref": "05-QUALITY.md; docs/03-object-lifecycles.md (Inspection report); views/portal/report_decide.php"
+ },
+ {
+  "id": "FLOW-11",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "In-house hiring: hiring request → approval → requisition → candidate stages → onboarding → availability → first job",
+  "kind": "flow",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "several",
+  "why": "A person can be sent to site only after an approved request, a hire and activation; the chain proves every hire was sanctioned.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Recruitment approvals: Self-approval OFF. An approver for hiring requests (per Recruitment approvals rules, e.g. Master Admin).",
+  "steps": [
+   {
+    "do": "[Branch Manager] Left menu → Recruitment → '＋ New hiring request'. Requested by; Job title = ZZ FLOW11 Welding Inspector; How many people? = 2; Branch; Work location; Needed by; Employment type; Priority; Minimum qualification = CSWIP 3.1. 'Create request'.",
+    "expect": "Request in Draft. Hiring requests register lists it."
+   },
+   {
+    "do": "[Branch Manager] 'Submit for approval'.",
+    "expect": "Submitted / Under review; appears in the approver's 'My approvals'."
+   },
+   {
+    "do": "[Branch Manager] Try 'Approve' on your own request.",
+    "expect": "Refused — self-approval is off."
+   },
+   {
+    "do": "[Approver] Open the request → 'Approve'.",
+    "expect": "Approved; 'Start recruiting' appears."
+   },
+   {
+    "do": "[Branch Manager] 'Start recruiting'.",
+    "expect": "A requisition opens (REQ …, Open). Note REQ NO."
+   },
+   {
+    "do": "[Coordinator] Recruitment → '＋ Add candidate': Against requisition = REQ NO; First name = ZZ Flow11; Last name = One. 'Add candidate'.",
+    "expect": "Candidate stage CV received; pipeline '1 Staff Requisition … 15 Onboarding'."
+   },
+   {
+    "do": "[Coordinator] Press 'Advance → Organogram Verification' and continue to '6. L1 Interview'. Schedule: Round L1, When, Mode Video, tick a panel member → 'Schedule'.",
+    "expect": "Interview listed; the panel member sees it in 'Interviews to attend'."
+   },
+   {
+    "do": "[Panel member] Record the outcome Selected.",
+    "expect": "Screen prompts the next stage."
+   },
+   {
+    "do": "[Coordinator] Salary structure → 'Save structure'; HR discussion → 'Save discussion' (Agreed); Offer → 'Draft offer'.",
+    "expect": "Offer drafted; offer approval per Recruitment approvals."
+   },
+   {
+    "do": "[Coordinator] 'Move this candidate' → New stage = Accepted (Hired); Which team = Field — goes to site; On whose roll = On our roll. 'Update stage'.",
+    "expect": "Requisition Placements: 1 hired of 2 (partially filled)."
+   },
+   {
+    "do": "[Branch Manager] Open the approved hiring request and change 'How many people?' to 3.",
+    "expect": "The button reads 'Propose this change' and needs 'Reason for the change'; the approver sees what changes · approved now · proposed. Approve or reject the change only."
+   },
+   {
+    "do": "[Coordinator] Operations → Team member availability.",
+    "expect": "ZZ Flow11 One listed as Available."
+   },
+   {
+    "do": "[Coordinator] Allocate a job (any open work order) to ZZ Flow11 One.",
+    "expect": "Job created; Scheduling board shows them; Recruitment home 'Requisition tracker' and 'People working per project' update."
+   }
+  ],
+  "ref": "04-RECRUITMENT.md S-1, S-3; docs/03-object-lifecycles.md (Hiring request, Candidate, Workforce activation Gate 5); 02-permission-matrix.md Gate 4"
+ },
+ {
+  "id": "FLOW-12",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Money in: payment terms from the client record → due date → part payment with TDS → credit note → ageing → Tally",
+  "kind": "flow",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "several",
+  "why": "Ageing from the due date, TDS and part payments are where receivables go wrong.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Client ZZ FLOW12 Ltd (Directory) with Payment terms = Against invoice, Credit days = 60. A closed job for it worth ₹1,00,000.",
+  "steps": [
+   {
+    "do": "[Finance] Billable events → approve → Billing workspace → draft → 'Issue this invoice'.",
+    "expect": "Invoice ₹1,18,000 (incl. 18% GST); due date = invoice date + 60 days."
+   },
+   {
+    "do": "[Finance] Money → Receivables ageing → 'Due date', then 'Invoice date'.",
+    "expect": "Due-date view: not overdue. Invoice-date view: ages from the invoice date."
+   },
+   {
+    "do": "[Coordinator] Money in → '+ Record money received' ₹50,000 → 'Record it' → 'Match it'.",
+    "expect": "Allowed (Coordinator may record receipts — owner accepted 18 Oct). Invoice Part paid; Outstanding ₹68,000."
+   },
+   {
+    "do": "[Coordinator] Try 'Issue this invoice' on another draft, 'Cancel this invoice', 'Raise the credit note'.",
+    "expect": "All refused — issuing, cancelling and credit notes are Accounts only."
+   },
+   {
+    "do": "[Finance] '+ Record money received': Amount in the bank = 66,000, TDS the customer withheld = 2,000 → 'Record it' → 'Match it'.",
+    "expect": "Invoice Paid; Settled ₹1,18,000."
+   },
+   {
+    "do": "[Finance] On the paid invoice try 'Cancel this invoice'.",
+    "expect": "Refused — a settled invoice is not cancelled (a GST series keeps its number); use 'Raise the credit note'."
+   },
+   {
+    "do": "[Finance] 'Raise the credit note' for ₹5,000 (client discount).",
+    "expect": "Credit note recorded; invoice shows the reduction; customer ledger shows it."
+   },
+   {
+    "do": "[Finance] '+ Record money received' ₹3,000 from ZZ FLOW12 with no open invoice → 'Record it' (do not match).",
+    "expect": "Money in → 'Not yet matched' lists it; 'Left to match' ₹3,000."
+   },
+   {
+    "do": "[Finance] Money → Tally export: What = Sales vouchers / Receipt vouchers / Credit notes → 'Show' each.",
+    "expect": "The invoice, both receipts (TDS 2,000 on the second) and the credit note appear with the right tax split."
+   },
+   {
+    "do": "[Business Director] Insights → Analytics & performance 'Invoiced value' for this month.",
+    "expect": "Unchanged by receipts (invoiced, not collected)."
+   },
+   {
+    "do": "[Finance] Directory → Client register → ZZ FLOW12 → '360' → Money section.",
+    "expect": "Outstanding equals Receivables ageing for the client (credit note and unmatched cash shown separately)."
+   }
+  ],
+  "ref": "07-MONEY.md S-1; 02-permission-matrix.md fn 17; 03-WORKFLOW-CATALOGUE.md §3"
+ },
+ {
+  "id": "FLOW-13",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Duplicate company merged — quotes, work orders, invoices and receipts follow the kept record",
+  "kind": "flow",
+  "tags": [
+   "edge",
+   "gap"
+  ],
+  "persona": "several",
+  "why": "A merge rewrites history across six areas; afterwards every record must point at one company and nothing may be lost.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Two TEST records for the same company: 'ZZ FLOW13 Pumps Pvt Ltd' (record A) and 'ZZ FLOW13 Pumps Private Limited' (record B, created via '+ Add new' on a form).",
+  "steps": [
+   {
+    "do": "[Business Development Manager] Quote for record A (Draft is enough). [Coordinator] Work order for record B; job closed. [Finance] Invoice for record B issued; receipt matched.",
+    "expect": "Each register shows A or B respectively. Note the counts."
+   },
+   {
+    "do": "[Branch Manager] Directory → Find duplicates.",
+    "expect": "The A/B pair is listed side by side (Record A · Record B)."
+   },
+   {
+    "do": "[Branch Manager] Keep which record? = A; Why = 'ZZ FLOW13 same GSTIN'. 'Merge them'.",
+    "expect": "'… merged into ZZ FLOW13 Pumps Pvt Ltd. N record(s) repointed. The old record is marked merged rather than deleted…' N ≥ 3."
+   },
+   {
+    "do": "[Finance] Money → Invoices and Money in.",
+    "expect": "B's invoice and receipt now show customer A; totals unchanged."
+   },
+   {
+    "do": "[Coordinator] Operations → Work order register and Job register.",
+    "expect": "B's work order and job now show client A."
+   },
+   {
+    "do": "[Finance] Directory → A → '360' and 'Ledger'.",
+    "expect": "Work and Money sections include the former B items; one ledger."
+   },
+   {
+    "do": "[Finance] Money → Receivables ageing.",
+    "expect": "One row for A (no separate B)."
+   },
+   {
+    "do": "[Business Director] Insights → Management dashboard 'By client'.",
+    "expect": "One row for A."
+   },
+   {
+    "do": "[Anyone] Search for 'ZZ FLOW13 Pumps Private Limited'.",
+    "expect": "Found, marked merged, pointing to A."
+   },
+   {
+    "do": "[Branch Manager] Try to undo the merge.",
+    "expect": "Not supported today — record as a gap (D-F3)."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §3 ('a change here is felt in every area'), E-4, D-F3; lib/dedupe.php"
+ },
+ {
+  "id": "FLOW-14",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Approval set-up drives quotation routing: bands, levels in order, delegation while away, escalation",
+  "kind": "flow",
+  "tags": [
+   "rule",
+   "edge"
+  ],
+  "persona": "several",
+  "why": "Admin's approval rules are only right if a real quotation goes to the right people in the right order.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Plus zz.mm2 (second Marketing Manager). Do at a quiet time; the test rules are removed at the end. Sales → Set up Sales: 'If a quote waits too long…' = After 1 day (note the current answer to restore it).",
+  "steps": [
+   {
+    "do": "[Master Admin] Sales → Quotes → 'Approval rules' → '+ Add rule': ZZ L1, Level 1, Active, Any business unit, Amount from 200000, up to 0 (no upper limit), Approver role = Marketing Manager. Add another: ZZ L2, Level 2, Active, from 200000, up to 0, '…or a specific person' = zz.mm2.",
+    "expect": "Both rules listed (Level · Rule · Applies to · From ₹ · Up to ₹ · Approver · Status)."
+   },
+   {
+    "do": "[Business Development Manager] New quote for ZZ FLOW1: one line ₹3,00,000 before tax → 'Create quote' → 'Submit for approval'.",
+    "expect": "Approval chain: Level 1 Marketing Manager, Level 2 zz.mm2, both pending. (A ₹1,90,000 quote would not match — values are measured before tax.)"
+   },
+   {
+    "do": "[zz.mm2] Try to approve Level 2 first.",
+    "expect": "Refused — levels sign in order."
+   },
+   {
+    "do": "[Marketing Manager] Sales → Quotes → 'Who covers for a quotation approver' (/quote-delegations): Who is away = zz.mm, Who acts for them = zz.mm2, From today, To tomorrow, Reason = ZZ leave. 'Add delegation'.",
+    "expect": "Row with State active."
+   },
+   {
+    "do": "[zz.mm2] Approve Level 1 (as delegate), then Level 2.",
+    "expect": "Level 1 recorded as signed by zz.mm2 for zz.mm; Level 2 signed; quote Approved. (If one person is not allowed to sign two levels of the same quotation, note the message — that is acceptable; then sign Level 2 with another approver.)"
+   },
+   {
+    "do": "[Business Development Manager] A second ₹3,00,000 quote → Submit. Wait one day without Level 1 signing. [zz.mm2] (Level 2 approver) open it.",
+    "expect": "After 1 day the Level 1 step is open to the next level's approvers: zz.mm2 can sign it."
+   },
+   {
+    "do": "[Business Development Manager] A third quote of ₹1,90,000 before tax (₹2,24,200 with GST) → 'Submit for approval'.",
+    "expect": "No ZZ rule matches (values are measured before tax); the company's answer for an uncovered value applies (default: the approvers of your highest level)."
+   },
+   {
+    "do": "[Marketing Manager] On the second ₹3,00,000 quote press 'Reject' at Level 1 without a reason, then with reason 'ZZ rate too low'.",
+    "expect": "Without a reason: refused. With a reason: status Rejected; the chain ends there (Level 2 not asked)."
+   },
+   {
+    "do": "[Business Development Manager] On the rejected quote: 'Edit first', correct the rate, then '↻ Submit for approval again'.",
+    "expect": "Chain rebuilt from scratch; the earlier rejection stays in the history."
+   },
+   {
+    "do": "[Business Development Manager] On the approved first quote: '✉ Send to client'.",
+    "expect": "Sent; History shows each approval with who signed and 'for zz.mm' where a delegate signed."
+   },
+   {
+    "do": "[Master Admin] Delete ZZ L1 and ZZ L2 ('✕'); end the delegation; restore Set up Sales.",
+    "expect": "Company rules back to how they were."
+   },
+   {
+    "do": "[Business Development Manager] Mark the remaining ZZ test quotes lost ('Mark lost', reason).",
+    "expect": "Test data closed off."
+   }
+  ],
+  "ref": "02-permission-matrix.md fn 19, 19a (D-05, D-11a); docs/03-object-lifecycles.md Quotation"
+ },
+ {
+  "id": "FLOW-15",
+  "area": "Across modules",
+  "module": "End-to-end",
+  "title": "Admin change ripples into every area: module switch, terminology, report format, working norms",
+  "kind": "flow",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "several",
+  "why": "Admin is the root of the dependency tree; each change must reach the other areas immediately and revert cleanly.",
+  "before": "Test logins (Admin → User register → + Add a person, all in one office, e.g. Ahmedabad): zz.bdm (Business Development Manager), zz.mm (Marketing Manager), zz.fin (Finance), zz.om (Operation Manager), zz.bm (Branch Manager), zz.co (Coordinator), zz.ins (Inspector, linked to a team member), zz.srins (Senior Inspector, set as the inspector's approver in Admin → Approvals → Approver mapping). Quiet time. Note current wording of 'Work order', the Inspection report format, and Inspector working norms.",
+  "steps": [
+   {
+    "do": "[Master Admin] Admin → Terminology / wording → Operations: Work order singular/plural = 'Call' / 'Calls' → 'Save terminology'.",
+    "expect": "Saved."
+   },
+   {
+    "do": "[Coordinator] Operations home, Work order register, a work order page, the New work order button.",
+    "expect": "All read 'Call(s)'. Stored records and numbers unchanged."
+   },
+   {
+    "do": "[Master Admin] Admin → Report formats by service: Inspection = Stage Inspection Report (SIR) → 'Save report formats'.",
+    "expect": "Saved."
+   },
+   {
+    "do": "[Coordinator] New work order with Service line Inspection → allocate.",
+    "expect": "Job's report format = SIR."
+   },
+   {
+    "do": "[Branch Manager] Working norms: Inspector, your office, 5 days, 40 hours → 'Save norm'.",
+    "expect": "Insights → Dashboards utilisation for the CURRENT month changes (and past months too — no effective date, D-F6)."
+   },
+   {
+    "do": "[Master Admin] Quality & Accreditation → SLA targets (or Operations home 'SLA targets'): Client = — all clients (default) —, Stage = Response, Target (days) = 1 → 'Save target'.",
+    "expect": "Row in Current targets (Client · Stage · Target (days) · Note)."
+   },
+   {
+    "do": "[Coordinator] Open a new work order → 'Timing & SLA' tab.",
+    "expect": "Stage · Target · Actual · Status shows Response target 1 day. (A stage with no target shows 'N/A'.)"
+   },
+   {
+    "do": "[Master Admin] Admin → Masters → dropdown list 'Product category' → '+ Add a value' ZZ TEST Category → 'Add value'.",
+    "expect": "Operations → ＋ New work order → 'Product category' offers ZZ TEST Category."
+   },
+   {
+    "do": "[Master Admin] Admin → Company profile → Brand / trading name + ' ZZ' → 'Save company profile'. Open a quote PDF and an invoice print.",
+    "expect": "Both show the new brand name. Revert afterwards."
+   },
+   {
+    "do": "[Master Admin] Revert all changes: terminology, report format, working norm ('Remove'), SLA target ('Remove'), ZZ TEST Category ('Delete'), brand name.",
+    "expect": "Everything back as it was; Dashboards figures back."
+   },
+   {
+    "do": "[Master Admin] Admin → Modules & features → a module the company does not use → 'Turn off this feature' → 'Turn it off & hide these'; then 'Add this to my workspace'.",
+    "expect": "Its area vanishes from every role's menu while off and returns with its records intact (ADM-004)."
+   }
+  ],
+  "ref": "10-ADMIN.md §3 (Admin configures everything); 09-DIRECTORY.md E-8"
+ }
+]

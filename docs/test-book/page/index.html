@@ -1,0 +1,415 @@
+<title>EXAACT Test Book</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a fixed left index of areas and modules beside one working column of tests; summary first, detail on demand. */
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --ink:#18212f; --muted:#5b6575; --line:#dfe3ea; --soft:#eef1f6;
+  --accent:#1d4ed8; --accent-ink:#ffffff; --accent-soft:#e6edfc;
+  --pass:#11795a; --pass-soft:#e2f4ec; --fail:#c0322b; --fail-soft:#fbe8e6; --block:#a35f00; --block-soft:#fbf0dd; --skip:#6b7280; --skip-soft:#eceef1;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141c; --panel:#161d28; --ink:#e6eaf0; --muted:#9aa4b2; --line:#283244; --soft:#1c2533;
+  --accent:#7ea2ff; --accent-ink:#0b1220; --accent-soft:#1d2a47;
+  --pass:#46c08f; --pass-soft:#12301f; --fail:#ff7b72; --fail-soft:#3a1715; --block:#e3a64a; --block-soft:#33260f; --skip:#9aa4b2; --skip-soft:#232c3a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f141c; --panel:#161d28; --ink:#e6eaf0; --muted:#9aa4b2; --line:#283244; --soft:#1c2533;
+  --accent:#7ea2ff; --accent-ink:#0b1220; --accent-soft:#1d2a47;
+  --pass:#46c08f; --pass-soft:#12301f; --fail:#ff7b72; --fail-soft:#3a1715; --block:#e3a64a; --block-soft:#33260f; --skip:#9aa4b2; --skip-soft:#232c3a; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:14.5px/1.5 var(--f-body);margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line);
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.brand{font-weight:700;font-size:16px;letter-spacing:.01em}
+.brand small{font-weight:500;color:var(--muted);margin-left:6px}
+.meter{flex:1;min-width:180px;display:flex;align-items:center;gap:10px}
+.bar{flex:1;height:8px;border-radius:99px;background:var(--soft);overflow:hidden;display:flex}
+.bar i{display:block;height:100%}
+.meter .n{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;white-space:nowrap}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:6px 12px;cursor:pointer;line-height:1.3}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible,.chip:focus-visible,.st button:focus-visible,.nav a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.wrap{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100% - 56px)}
+.nav{border-right:1px solid var(--line);background:var(--panel);padding:12px 0 40px;overflow:auto;max-height:calc(100vh - 56px);position:sticky;top:56px}
+.nav h4{margin:14px 16px 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.nav a{display:flex;justify-content:space-between;gap:8px;padding:5px 16px;text-decoration:none;color:var(--ink);font-size:13.5px}
+.nav a:hover{background:var(--soft)}
+.nav a.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav a .c{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px;white-space:nowrap}
+.nav a.mod{padding-left:28px;font-size:13px}
+.main{padding-block:16px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-width:0}
+h1{font-size:22px;margin:0 0 4px;text-wrap:balance}
+.lede{color:var(--muted);margin:0 0 14px;max-width:72ch}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+.filters select,.filters input{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:6px 8px;min-width:0}
+.filters input[type=search]{flex:1;min-width:160px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:3px 10px;font-size:12.5px;cursor:pointer}
+.chip.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.case{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin:0 0 8px}
+.case>header{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:10px 12px;cursor:pointer}
+.case .id{font-family:var(--f-mono);font-size:12px;color:var(--muted);padding-top:2px;white-space:nowrap}
+.case .tt{font-weight:600}
+.case .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;font-size:12px;color:var(--muted)}
+.tag{border:1px solid var(--line);border-radius:4px;padding:0 6px;font-size:11.5px;color:var(--muted)}
+.tag.gap{border-color:var(--block);color:var(--block)}
+.tag.live{border-color:var(--fail);color:var(--fail)}
+.pill{border-radius:99px;padding:2px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.s-pass{background:var(--pass-soft);color:var(--pass)} .s-fail{background:var(--fail-soft);color:var(--fail)}
+.s-block{background:var(--block-soft);color:var(--block)} .s-skip{background:var(--skip-soft);color:var(--skip)} .s-none{background:var(--soft);color:var(--muted)}
+.body{border-top:1px solid var(--line);padding:12px}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 12px;font-size:13.5px;margin-bottom:10px}
+.kv b{color:var(--muted);font-weight:500}
+.steps{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.n{font-variant-numeric:tabular-nums;color:var(--muted);width:32px}
+td.do{min-width:220px} td.ex{min-width:200px;color:var(--ink)}
+.st{display:flex;gap:4px}
+.st button{border:1px solid var(--line);background:var(--panel);border-radius:6px;width:30px;height:28px;cursor:pointer;font-weight:700;font-size:12px}
+.st button[data-v=p].on{background:var(--pass);color:#fff;border-color:var(--pass)}
+.st button[data-v=f].on{background:var(--fail);color:#fff;border-color:var(--fail)}
+.st button[data-v=b].on{background:var(--block);color:#fff;border-color:var(--block)}
+tr.f td{background:var(--fail-soft)} tr.p td.do{color:var(--muted)}
+.verdict{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.verdict button{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:6px 12px;cursor:pointer}
+.verdict button.on[data-v=pass]{background:var(--pass);color:#fff;border-color:var(--pass)}
+.verdict button.on[data-v=fail]{background:var(--fail);color:#fff;border-color:var(--fail)}
+.verdict button.on[data-v=block]{background:var(--block);color:#fff;border-color:var(--block)}
+.verdict button.on[data-v=skip]{background:var(--skip);color:#fff;border-color:var(--skip)}
+textarea{width:100%;min-height:76px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:8px}
+.shots{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.shot{position:relative;width:128px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--soft)}
+.shot img{display:block;width:100%;height:88px;object-fit:cover;cursor:zoom-in}
+.shot .fn{font-size:11px;padding:3px 6px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shot .x{position:absolute;top:4px;right:4px;border:0;border-radius:4px;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:11px;padding:2px 6px}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:12px;text-align:center;color:var(--muted);font-size:13px;margin-top:8px}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.hist{font-size:12.5px;color:var(--muted);margin-top:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-bottom:18px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;cursor:pointer}
+.tile h3{margin:0 0 6px;font-size:14.5px}
+.tile .bar{margin:8px 0 4px}
+.tile .n{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sum{display:flex;gap:14px;flex-wrap:wrap;margin:0 0 16px}
+.sum div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;min-width:120px}
+.sum b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.sum span{font-size:12px;color:var(--muted)}
+.note{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--r);padding:10px 14px;margin:0 0 14px;max-width:85ch}
+.note.warn{border-left-color:var(--block)}
+.prose{max-width:75ch} .prose li{margin:4px 0}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;cursor:zoom-out}
+.lightbox img{max-width:100%;max-height:100%;border-radius:6px}
+.toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--panel);border-radius:var(--r);padding:8px 14px;z-index:60;font-size:13.5px}
+.more{display:block;margin:10px auto}
+.navtoggle{display:none}
+@media (max-width:600px){.meter{order:3;flex-basis:100%}}
+@media (max-width:860px){
+  .wrap{grid-template-columns:1fr}
+  .nav{position:fixed;inset:56px auto 0 0;width:min(86vw,300px);z-index:20;transform:translateX(-102%);transition:transform .2s;max-height:none;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+  .nav.open{transform:none}
+  .navtoggle{display:inline-block}
+  .kv{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){.nav{transition:none}}
+</style>
+
+<div class="top">
+  <button class="btn navtoggle" id="navt" aria-label="Show the list of areas">☰</button>
+  <div class="brand">EXAACT Test Book <small id="ver"></small></div>
+  <div class="meter" title="Tests with a result, of all tests">
+    <div class="bar" id="topbar" aria-hidden="true"></div><span class="n" id="topn">Loading…</span>
+  </div>
+  <button class="btn" id="exportBtn">Download Excel</button>
+</div>
+<div class="wrap">
+  <nav class="nav" id="nav" aria-label="Areas and modules"></nav>
+  <main class="main" id="main"><p class="lede">Loading the tests…</p></main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ST = {pass:'Pass', fail:'Fail', block:'Blocked', skip:'Not applicable', none:'Not run'};
+const KINDS = {scenario:'Scenario', edge:'Edge case', access:'Who may', flow:'Flow', phone:'Phone', screen:'Screen check'};
+const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('tb:' + k) || 'null'); localStorage.setItem('tb:' + k, JSON.stringify(v)); } catch (e) { return null; } };
+
+let BOOK = null, CASES = [], BYID = {}, RESULTS = {}, db = null, assets = null, user = null, downloads = null, me = null, canWrite = true;
+let view = store('view') || {page:'overview'};
+let F = Object.assign({q:'', kind:'', tag:'', persona:'', company:'', status:'', liveOnly:false}, store('filters') || {});
+let open = new Set(); let shown = 60;
+
+function toast(t){ const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 2600); }
+function statusOf(id){ return (RESULTS[id] && RESULTS[id].status) || 'none'; }
+
+// ---- data ---------------------------------------------------------------------------
+async function boot(){
+  try { BOOK = await (await fetch('book.json')).json(); }
+  catch (e) { $('#main').innerHTML = '<p class="lede">The tests could not be loaded. Reload the page.</p>'; return; }
+  CASES = BOOK.cases; CASES.forEach(c => BYID[c.id] = c);
+  $('#ver').textContent = 'built ' + BOOK.version;
+  if (location.hash.length > 1 && BYID[location.hash.slice(1)]) { const c = BYID[location.hash.slice(1)]; view = {page:'module', area:c.area, module:c.module}; open.add(c.id); }
+  render();
+  // capabilities light up when they answer
+  const cl = window.claude;
+  if (!cl || !cl.use) { notice('Results are not being saved in this view (open it on claude.ai to save).'); return; }
+  [db, assets, user, downloads] = await Promise.all(['db','assets','user','downloads'].map(n => cl.use(n).catch(() => null)));
+  if (user) { me = await user.me(); const w = await user.can('data.write'); if (w === false) canWrite = false; }
+  if (!db) { notice('Results cannot be saved in this view — sign in on claude.ai to keep them.'); canWrite = false; render(); return; }
+  for (const a of BOOK.areas) subscribe(a);
+}
+function subscribe(area){
+  db.collection('results').where('area', '==', area).onSnapshot(snap => {
+    snap.docChanges().forEach(ch => { if (ch.type === 'removed') delete RESULTS[ch.doc.id]; else RESULTS[ch.doc.id] = ch.doc.data(); });
+    scheduleRender();
+  }, err => notice('Live results stopped (' + err.code + '). Reload the page.'));
+}
+let rt = 0; function scheduleRender(){ clearTimeout(rt); rt = setTimeout(() => render(true), 120); }
+let noticeText = ''; function notice(t){ noticeText = t; render(true); }
+
+// one write at a time per test
+const queues = {};
+function save(id, patch){
+  if (!db || !canWrite) { toast('Not saved — this view cannot save results.'); return; }
+  const c = BYID[id]; const cur = RESULTS[id] || {area:c.area, module:c.module, status:'none', steps:{}, note:'', shots:[], history:[]};
+  const next = Object.assign({}, cur, patch, {area:c.area, module:c.module, by: me && me.id || null, at: new Date().toISOString()});
+  if (patch.status && patch.status !== cur.status) next.history = [{s:patch.status, by: next.by, at: next.at}].concat(cur.history || []).slice(0, 20);
+  RESULTS[id] = next;
+  const q = queues[id] || Promise.resolve();
+  queues[id] = q.then(() => db.doc('results/' + id).set(next)).catch(e => {
+    if (e && e.code === 'invalid_argument') { canWrite = false; toast('You can read but not save results here. Ask the owner to make you a Contributor.'); }
+    else toast('Could not save (' + (e && e.code || 'error') + '). Try again.');
+  });
+}
+
+// ---- counts ---------------------------------------------------------------------------
+function counts(list){ const k = {pass:0, fail:0, block:0, skip:0, none:0}; list.forEach(c => k[statusOf(c.id)]++); return k; }
+function barHTML(k, total){ const w = s => (100 * k[s] / Math.max(1, total)).toFixed(2) + '%';
+  return `<i style="width:${w('pass')};background:var(--pass)"></i><i style="width:${w('fail')};background:var(--fail)"></i><i style="width:${w('block')};background:var(--block)"></i><i style="width:${w('skip')};background:var(--skip)"></i>`; }
+function modulesOf(area){ const m = new Map(); CASES.filter(c => c.area === area).forEach(c => m.set(c.module, (m.get(c.module) || 0) + 1)); return [...m.keys()]; }
+
+// ---- render ---------------------------------------------------------------------------
+function render(keepScroll){
+  if (!BOOK) return;
+  const all = counts(CASES), done = CASES.length - all.none;
+  $('#topbar').innerHTML = barHTML(all, CASES.length);
+  $('#topn').textContent = `${done} of ${CASES.length} tested · ${all.fail} failed · ${all.block} blocked`;
+  renderNav();
+  const y = window.scrollY;
+  // A redraw must never interrupt typing: keep the note being written, and where the cursor is.
+  const ae = document.activeElement; const typing = ae && ae.dataset && ae.dataset.note ? {id:ae.dataset.note, v:ae.value, s:ae.selectionStart, e:ae.selectionEnd} : null;
+  const m = $('#main');
+  if (view.page === 'overview') m.innerHTML = overviewHTML();
+  else if (view.page === 'defects') m.innerHTML = listPage('What failed or is blocked', 'Every test marked Fail or Blocked, with its notes and screenshots — this is what gets fixed first.', CASES.filter(c => ['fail','block'].includes(statusOf(c.id))), true);
+  else if (view.page === 'how') m.innerHTML = howHTML();
+  else if (view.page === 'people') m.innerHTML = peopleHTML();
+  else if (view.page === 'area') m.innerHTML = listPage(view.area, 'Every test in this area. Pick a module on the left to narrow it.', CASES.filter(c => c.area === view.area));
+  else m.innerHTML = listPage(view.module, view.area, CASES.filter(c => c.area === view.area && c.module === view.module));
+  if (noticeText) m.insertAdjacentHTML('afterbegin', `<div class="note warn">${esc(noticeText)}</div>`);
+  bindMain(); hydrateShots(); fillNames();
+  if (typing) { const t = document.getElementById('note-' + typing.id); if (t) { t.value = typing.v; t.focus(); t.setSelectionRange(typing.s, typing.e); } }
+  if (keepScroll) window.scrollTo(0, y);
+}
+function renderNav(){
+  const n = $('#nav'); const on = (p, a, md) => view.page === p && (a === undefined || view.area === a) && (md === undefined || view.module === md) ? 'on' : '';
+  const k = counts(CASES.filter(c => ['fail','block'].includes(statusOf(c.id))));
+  let h = `<a href="#" data-p="overview" class="${on('overview')}">Overview</a>
+    <a href="#" data-p="defects" class="${on('defects')}">What failed or is blocked <span class="c">${k.fail + k.block}</span></a>
+    <a href="#" data-p="how" class="${on('how')}">How to use this book</a>
+    <a href="#" data-p="people" class="${on('people')}">People, companies, test data</a>`;
+  for (const a of BOOK.areas) {
+    const list = CASES.filter(c => c.area === a), kk = counts(list);
+    h += `<h4>${esc(a)}</h4><a href="#" data-p="area" data-a="${esc(a)}" class="${on('area', a)}">All of ${esc(a)} <span class="c">${list.length - kk.none}/${list.length}</span></a>`;
+    if (view.area === a || a === 'Sales') for (const md of modulesOf(a)) {
+      const ml = list.filter(c => c.module === md), mk = counts(ml);
+      h += `<a href="#" class="mod ${on('module', a, md)}" data-p="module" data-a="${esc(a)}" data-m="${esc(md)}">${esc(md)} <span class="c">${ml.length - mk.none}/${ml.length}${mk.fail ? ' · ' + mk.fail + '✗' : ''}</span></a>`;
+    }
+  }
+  n.innerHTML = h;
+  n.querySelectorAll('a[data-p]').forEach(el => el.onclick = e => { e.preventDefault(); view = {page:el.dataset.p, area:el.dataset.a, module:el.dataset.m}; store('view', view); shown = 60; $('#nav').classList.remove('open'); render(); window.scrollTo(0, 0); });
+}
+function overviewHTML(){
+  const all = counts(CASES), steps = CASES.reduce((s, c) => s + c.steps.length, 0);
+  let h = `<h1>EXAACT Test Book</h1><p class="lede">${CASES.length.toLocaleString('en-IN')} tests and ${steps.toLocaleString('en-IN')} steps for ${esc(BOOK.site)}, built from the screens as they are on ${esc(BOOK.version)}. Every result, note and screenshot you add is kept here — for you, for anyone you share this with, and for Claude to read and fix.</p>
+  <div class="sum"><div><b>${CASES.length - all.none}</b><span>tested</span></div><div><b style="color:var(--pass)">${all.pass}</b><span>passed</span></div><div><b style="color:var(--fail)">${all.fail}</b><span>failed</span></div><div><b style="color:var(--block)">${all.block}</b><span>blocked</span></div><div><b>${all.none}</b><span>not run yet</span></div></div>
+  <div class="grid">`;
+  for (const a of BOOK.areas) { const list = CASES.filter(c => c.area === a), k = counts(list);
+    h += `<div class="tile" data-go-area="${esc(a)}" tabindex="0"><h3>${esc(a)}</h3><div class="bar">${barHTML(k, list.length)}</div><div class="n">${list.length - k.none} of ${list.length} tested${k.fail ? ' · <span style="color:var(--fail)">' + k.fail + ' failed</span>' : ''}${k.block ? ' · ' + k.block + ' blocked' : ''}</div></div>`; }
+  h += `</div><div class="note">Start with <b>How to use this book</b>, then <b>Sales → Before you start</b>. Tests marked <span class="tag live">test copy only</span> change company-wide settings: run them on a test workspace, never on your live company.</div>`;
+  return h;
+}
+function filtered(list){
+  const q = F.q.trim().toLowerCase();
+  return list.filter(c => (!F.kind || c.kind === F.kind) && (!F.tag || (c.tags || []).includes(F.tag)) && (!F.persona || c.persona === F.persona) &&
+    (!F.company || c.company === F.company || c.company === 'ANY') && (!F.status || statusOf(c.id) === F.status) && (!F.liveOnly || c.live !== false) &&
+    (!q || (c.id + ' ' + c.title + ' ' + c.why + ' ' + c.module + ' ' + c.steps.map(s => s.do + ' ' + s.expect).join(' ')).toLowerCase().includes(q)));
+}
+function listPage(title, sub, list, defects){
+  const fl = filtered(list); const kinds = [...new Set(list.map(c => c.kind))]; const tags = [...new Set(list.flatMap(c => c.tags || []))].filter(t => t !== 'screen');
+  const personas = [...new Set(list.map(c => c.persona))].sort();
+  let h = `<h1>${esc(title)}</h1><p class="lede">${esc(sub)} · ${fl.length} of ${list.length} tests shown.</p>
+  <div class="filters">
+    <input type="search" id="fq" placeholder="Find a test, a field, a message…" value="${esc(F.q)}" aria-label="Find">
+    <select id="fstatus" aria-label="Result"><option value="">Any result</option>${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${F.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+    <select id="fpersona" aria-label="Who"><option value="">Anyone</option>${personas.map(p => `<option value="${esc(p)}" ${F.persona === p ? 'selected' : ''}>${esc(roleName(p))}</option>`).join('')}</select>
+    <select id="fcompany" aria-label="Company type"><option value="">Any company type</option>${BOOK.companies.map(c => `<option value="${c.code}" ${F.company === c.code ? 'selected' : ''}>${c.code} — ${esc(c.name)}</option>`).join('')}</select>
+    <label class="chip ${F.liveOnly ? 'on' : ''}"><input type="checkbox" id="flive" ${F.liveOnly ? 'checked' : ''} hidden>Safe on live only</label>
+  </div>
+  <div class="filters">${kinds.map(k => `<button class="chip ${F.kind === k ? 'on' : ''}" data-kind="${k}">${KINDS[k] || k}</button>`).join('')}
+    <span style="width:1px;height:18px;background:var(--line)"></span>${tags.map(t => `<button class="chip ${F.tag === t ? 'on' : ''}" data-tag="${t}">${esc(t)}</button>`).join('')}</div>`;
+  if (!fl.length) h += `<div class="note">${defects ? 'Nothing has failed or been blocked yet. Tests you mark Fail or Blocked appear here with their notes and screenshots.' : 'No test matches these filters.'}</div>`;
+  fl.slice(0, shown).forEach(c => h += caseHTML(c));
+  if (fl.length > shown) h += `<button class="btn more" id="more">Show ${Math.min(60, fl.length - shown)} more (${fl.length - shown} left)</button>`;
+  return h;
+}
+function roleName(code){ const p = BOOK.personas.find(x => x.code === code); return p ? p.name : (code === 'several' ? 'Several people' : code.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, m => m.toUpperCase())); }
+function caseHTML(c){
+  const r = RESULTS[c.id] || {}; const s = statusOf(c.id); const isOpen = open.has(c.id);
+  const stepsDone = Object.keys(r.steps || {}).length; const shots = (r.shots || []).length;
+  let h = `<article class="case" id="c-${esc(c.id)}"><header data-toggle="${esc(c.id)}" role="button" tabindex="0" aria-expanded="${isOpen}">
+    <span class="id">${esc(c.id)}</span>
+    <div><div class="tt">${esc(c.title)}</div><div class="meta"><span class="tag">${esc(KINDS[c.kind] || c.kind)}</span>${(c.tags || []).filter(t => t !== 'screen').map(t => `<span class="tag ${t === 'gap' ? 'gap' : ''}">${esc(t)}</span>`).join('')}
+      ${c.live === false ? '<span class="tag live">test copy only</span>' : ''}<span>${esc(roleName(c.persona))}</span>${c.company && c.company !== 'ANY' ? `<span>Company ${esc(c.company)}</span>` : ''}
+      <span>${c.steps.length} steps${stepsDone ? ' · ' + stepsDone + ' marked' : ''}${shots ? ' · 📷 ' + shots : ''}</span></div></div>
+    <span class="pill s-${s}">${ST[s]}</span></header>`;
+  if (isOpen) {
+    h += `<div class="body"><div class="kv"><b>Module</b><span>${esc(c.area)} · ${esc(c.module)}</span><b>Why</b><span>${esc(c.why)}</span><b>Before</b><span>${esc(c.before)}</span>${c.ref ? `<b>Source</b><span style="color:var(--muted)">${esc(c.ref)}</span>` : ''}</div>
+      <div class="steps"><table><thead><tr><th>#</th><th>Do this</th><th>You should see</th><th>Result</th></tr></thead><tbody>`;
+    c.steps.forEach((st, i) => { const v = (r.steps || {})[i] || '';
+      h += `<tr class="${v}"><td class="n">${i + 1}</td><td class="do">${esc(st.do)}</td><td class="ex">${esc(st.expect)}</td><td><div class="st" data-case="${esc(c.id)}" data-i="${i}">${['p','f','b'].map(x => `<button data-v="${x}" class="${v === x ? 'on' : ''}" title="${{p:'Pass', f:'Fail', b:'Blocked'}[x]}" aria-label="Step ${i + 1} ${{p:'Pass', f:'Fail', b:'Blocked'}[x]}">${{p:'✓', f:'✗', b:'!'}[x]}</button>`).join('')}</div></td></tr>`; });
+    h += `</tbody></table></div>
+      <div class="verdict" data-case="${esc(c.id)}"><b style="margin-right:4px">This test:</b>${['pass','fail','block','skip','none'].map(v => `<button data-v="${v}" class="${s === v ? 'on' : ''}">${ST[v]}</button>`).join('')}</div>
+      <label for="note-${esc(c.id)}" style="font-size:13px;color:var(--muted)">What happened — the message you saw, the record number, what you expected instead</label>
+      <textarea id="note-${esc(c.id)}" data-note="${esc(c.id)}" ${canWrite ? '' : 'readonly'}>${esc(r.note || '')}</textarea>
+      <div class="shots" data-shots="${esc(c.id)}"></div>
+      ${assets && canWrite ? `<div class="drop" data-drop="${esc(c.id)}">Drop screenshots here, paste one (Ctrl+V) while this test is open, or <label style="color:var(--accent);cursor:pointer;text-decoration:underline">choose files<input type="file" accept="image/*,application/pdf" multiple hidden data-file="${esc(c.id)}"></label> — as many as you need.</div>` : `<div class="hist">Screenshots can be added by people who can edit this book.</div>`}
+      <div class="hist" data-hist="${esc(c.id)}">${histHTML(r)}</div></div>`;
+  }
+  return h + '</article>';
+}
+function histHTML(r){ if (!r || !r.history || !r.history.length) return ''; return 'History: ' + r.history.map(x => `<span data-uid="${esc(x.by || '')}">someone</span> → ${esc(ST[x.s] || x.s)} on ${esc(new Date(x.at).toLocaleString('en-IN'))}`).join(' · '); }
+async function fillNames(){
+  if (!user) return; const els = [...document.querySelectorAll('[data-uid]')].filter(e => e.dataset.uid); if (!els.length) return;
+  const ps = await user.profiles([...new Set(els.map(e => e.dataset.uid))]); els.forEach(e => e.textContent = (ps[e.dataset.uid] && ps[e.dataset.uid].name) || 'someone');
+}
+function hydrateShots(){
+  document.querySelectorAll('[data-shots]').forEach(box => {
+    const id = box.dataset.shots; const r = RESULTS[id] || {};
+    box.innerHTML = (r.shots || []).map((sh, i) => `<figure class="shot" style="margin:0">${/pdf/.test(sh.type || '') ? `<a href="/_blob/${esc(sh.id)}" target="_blank" rel="noopener" style="display:flex;height:88px;align-items:center;justify-content:center">PDF</a>` : `<img src="/_blob/${esc(sh.id)}" alt="${esc(sh.name || 'Screenshot')}" data-zoom="/_blob/${esc(sh.id)}" loading="lazy">`}<figcaption class="fn">${esc(sh.name || 'screenshot')}</figcaption>${assets && canWrite ? `<button class="x" data-rm="${esc(id)}" data-i="${i}" aria-label="Remove screenshot">✕</button>` : ''}</figure>`).join('');
+  });
+}
+function bindMain(){
+  const m = $('#main');
+  m.querySelectorAll('[data-go-area]').forEach(el => el.onclick = () => { view = {page:'area', area:el.dataset.goArea}; store('view', view); render(); window.scrollTo(0, 0); });
+  m.querySelectorAll('[data-toggle]').forEach(el => { const f = () => { const id = el.dataset.toggle; open.has(id) ? open.delete(id) : open.add(id); render(true); }; el.onclick = f; el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); f(); } }; });
+  m.querySelectorAll('.st button').forEach(b => b.onclick = () => { const p = b.parentElement; const id = p.dataset.case, i = p.dataset.i; const r = RESULTS[id] || {}; const steps = Object.assign({}, r.steps || {});
+    if (steps[i] === b.dataset.v) delete steps[i]; else steps[i] = b.dataset.v;
+    const patch = {steps}; const vals = Object.values(steps);
+    if (b.dataset.v === 'f' && steps[i] === 'f') patch.status = 'fail';
+    else if (vals.length === BYID[id].steps.length && vals.every(v => v === 'p') && statusOf(id) === 'none') patch.status = 'pass';
+    save(id, patch); render(true); });
+  m.querySelectorAll('.verdict button').forEach(b => b.onclick = () => { save(b.parentElement.dataset.case, {status:b.dataset.v}); render(true); });
+  const timers = {};
+  m.querySelectorAll('[data-note]').forEach(t => t.oninput = () => { const id = t.dataset.note; clearTimeout(timers[id]); timers[id] = setTimeout(() => save(id, {note:t.value}), 900); });
+  m.querySelectorAll('[data-file]').forEach(inp => inp.onchange = () => upload(inp.dataset.file, [...inp.files]));
+  m.querySelectorAll('[data-drop]').forEach(d => { d.ondragover = e => { e.preventDefault(); d.classList.add('over'); }; d.ondragleave = () => d.classList.remove('over');
+    d.ondrop = e => { e.preventDefault(); d.classList.remove('over'); upload(d.dataset.drop, [...e.dataTransfer.files]); }; });
+  m.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => removeShot(b.dataset.rm, +b.dataset.i, b));
+  m.querySelectorAll('[data-zoom]').forEach(img => img.onclick = () => { const lb = document.createElement('div'); lb.className = 'lightbox'; lb.innerHTML = `<img src="${esc(img.dataset.zoom)}" alt="">`; lb.onclick = () => lb.remove(); document.body.appendChild(lb); });
+  const fq = $('#fq'); if (fq) fq.oninput = () => { F.q = fq.value; store('filters', F); clearTimeout(timers.q); timers.q = setTimeout(() => { shown = 60; render(true); const n = $('#fq'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
+  [['#fstatus','status'],['#fpersona','persona'],['#fcompany','company']].forEach(([s, k]) => { const el = $(s); if (el) el.onchange = () => { F[k] = el.value; store('filters', F); shown = 60; render(true); }; });
+  const fl = $('#flive'); if (fl) fl.parentElement.onclick = e => { e.preventDefault(); F.liveOnly = !F.liveOnly; store('filters', F); render(true); };
+  m.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => { F.kind = F.kind === b.dataset.kind ? '' : b.dataset.kind; store('filters', F); shown = 60; render(true); });
+  m.querySelectorAll('[data-tag]').forEach(b => b.onclick = () => { F.tag = F.tag === b.dataset.tag ? '' : b.dataset.tag; store('filters', F); shown = 60; render(true); });
+  const mo = $('#more'); if (mo) mo.onclick = () => { shown += 60; render(true); };
+}
+
+// ---- screenshots ------------------------------------------------------------------------
+async function upload(id, files){
+  if (!assets) { toast('Screenshots cannot be added in this view.'); return; }
+  files = files.filter(f => /^image\/|application\/pdf/.test(f.type)); if (!files.length) { toast('Only pictures and PDFs can be attached.'); return; }
+  toast(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}…`);
+  const added = [];
+  for (const f of files) {
+    try { const res = await assets.upload(f, f.type ? undefined : {type:'image/png'}); added.push({id:res.id, name:f.name || 'pasted screenshot', type:res.contentType, at:new Date().toISOString(), by: me && me.id || null}); }
+    catch (e) { toast(e && e.code === 'too_large' ? `${f.name} is over 20 MB — make it smaller.` : `${f.name} could not be uploaded (${e && e.code || 'error'}).`); }
+  }
+  if (added.length) { const r = RESULTS[id] || {}; save(id, {shots:(r.shots || []).concat(added)}); render(true); toast(`${added.length} screenshot${added.length > 1 ? 's' : ''} added.`); }
+}
+let confirmRm = null;
+async function removeShot(id, i, btn){
+  if (confirmRm !== id + ':' + i) { confirmRm = id + ':' + i; btn.textContent = 'Remove?'; setTimeout(() => { if (confirmRm === id + ':' + i) { confirmRm = null; btn.textContent = '✕'; } }, 3000); return; }
+  confirmRm = null; const r = RESULTS[id] || {}; const shots = (r.shots || []).slice(); const [gone] = shots.splice(i, 1);
+  save(id, {shots}); render(true);
+  try { await assets.delete(gone.id); } catch (e) { /* the row no longer points at it; harmless if the delete failed */ }
+}
+document.addEventListener('paste', e => {
+  const files = [...(e.clipboardData && e.clipboardData.files || [])]; if (!files.length) return;
+  const target = [...open].pop(); if (!target) { toast('Open a test first, then paste the screenshot.'); return; }
+  e.preventDefault(); upload(target, files);
+});
+
+// ---- export to Excel -------------------------------------------------------------------------
+$('#exportBtn').onclick = async () => {
+  if (!window.XLSX) { toast('The Excel library did not load. Reload the page.'); return; }
+  const base = location.origin;
+  const names = {}; if (user) { const ids = [...new Set(Object.values(RESULTS).flatMap(r => [r.by].concat((r.history || []).map(h => h.by))).filter(Boolean))]; const ps = await user.profiles(ids); ids.forEach(i => names[i] = (ps[i] && ps[i].name) || ''); }
+  const tests = CASES.map(c => { const r = RESULTS[c.id] || {}; return {'Test': c.id, 'Area': c.area, 'Module': c.module, 'Title': c.title, 'Kind': KINDS[c.kind] || c.kind, 'Tags': (c.tags || []).join(', '),
+    'Who': roleName(c.persona), 'Company type': c.company, 'Test copy only': c.live === false ? 'yes' : '', 'Result': ST[statusOf(c.id)], 'Notes': r.note || '',
+    'Screenshots': (r.shots || []).map(s => base + '/_blob/' + s.id).join('\n'), 'Tested by': names[r.by] || '', 'When': r.at ? new Date(r.at).toLocaleString('en-IN') : '', 'Why': c.why, 'Before': c.before, 'Source': c.ref || ''}; });
+  const steps = []; CASES.forEach(c => { const r = RESULTS[c.id] || {}; c.steps.forEach((s, i) => steps.push({'Test': c.id, 'Area': c.area, 'Module': c.module, 'Step': i + 1, 'Do this': s.do, 'You should see': s.expect, 'Result': {p:'Pass', f:'Fail', b:'Blocked'}[(r.steps || {})[i]] || ''})); });
+  const summary = BOOK.areas.map(a => { const l = CASES.filter(c => c.area === a), k = counts(l); return {'Area': a, 'Tests': l.length, 'Passed': k.pass, 'Failed': k.fail, 'Blocked': k.block, 'Not applicable': k.skip, 'Not run': k.none}; });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), 'Summary');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tests), 'Tests');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(steps), 'Steps');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(BOOK.personas.map(p => ({'Role': p.name, 'What they do': p.does}))), 'People');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(BOOK.companies.map(c => ({'Code': c.code, 'Company type': c.name, 'What is special': c.what, 'Industry template': c.industry}))), 'Company types');
+  const buf = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  const name = 'EXAACT-Test-Book-' + new Date().toISOString().slice(0, 10) + '.xlsx';
+  if (!downloads) { toast('Downloading is not available in this view.'); return; }
+  try { await downloads.save({filename:name, data:buf}); toast('Saved ' + name); }
+  catch (e) { if (e && e.code !== 'declined') toast('Could not save the file (' + (e && e.code || 'error') + ').'); }
+};
+$('#navt').onclick = () => $('#nav').classList.toggle('open');
+
+// ---- static pages -----------------------------------------------------------------------------
+function howHTML(){ return `<h1>How to use this book</h1><div class="prose">
+  <ol>
+    <li><b>Work module by module.</b> Pick an area on the left, then a module. Start with <b>Sales → Before you start</b>: it creates the test users, customers and settings every later test needs.</li>
+    <li><b>Open a test</b> by clicking its title. Do each step on <a href="${esc(BOOK.site)}" target="_blank" rel="noopener">${esc(BOOK.site)}</a> exactly as written, in a second window or on your phone.</li>
+    <li><b>Mark each step</b> ✓ (as expected), ✗ (not as expected) or ! (could not do it). A ✗ marks the whole test Failed. When every step is ✓ the test marks itself Passed.</li>
+    <li><b>Say what happened</b> in the box: the exact message, the record number (e.g. Q-2607-001), and what you expected instead.</li>
+    <li><b>Add screenshots</b> — drop them on the box, paste with Ctrl+V while the test is open, or choose files. Add as many as you need; PDFs work too.</li>
+    <li><b>Everything saves by itself</b> and stays here. Close the page and come back next week: your results are where you left them. Nothing is lost when you stop half-way.</li>
+    <li><b>When you are done for the day</b>, open <b>What failed or is blocked</b>. Tell Claude "read the test book". Claude reads every failure, note and screenshot directly from here, so you never retype an error.</li>
+    <li><b>Download Excel</b> (top right) gives a copy with every test, step, result, note and screenshot link.</li>
+  </ol>
+  <h2 style="font-size:16px">What the labels mean</h2>
+  <ul>
+    <li><b>Scenario</b> — a real piece of work, best case first. <b>Edge case</b> — limits: empty, too long, negative, duplicates, two people at once. <b>Who may</b> — what each role may and may not do. <b>Flow</b> — work from start to end across people and modules. <b>Phone</b> — on a phone. <b>Screen check</b> — every tab, field and button on one screen.</li>
+    <li><b>best / worst / edge</b> — the kind of day being tested. <b>rule</b> — a rule you decided (D-01 … D-29). <b>gap</b> — the software does not do this today; the test records it.</li>
+    <li><span class="tag live">test copy only</span> — changes a company-wide setting (industry, approval answers, checklist). Run it on a test workspace, not your live company.</li>
+  </ul>
+  <h2 style="font-size:16px">Sharing it with your team</h2>
+  <p>Share this page and give each tester <b>Contributor</b> access so they can record results. To add screenshots a person needs <b>Editor</b> access. Each result records who marked it.</p></div>`; }
+function peopleHTML(){ return `<h1>People, companies, test data</h1><p class="lede">Create one test user for each role (Sales → Before you start, SAL-000). Run the Sales tests once for each company type on a test workspace.</p>
+  <div class="steps"><table><thead><tr><th>Role</th><th>What they do</th></tr></thead><tbody>${BOOK.personas.map(p => `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.does)}</td></tr>`).join('')}</tbody></table></div>
+  <h2 style="font-size:16px;margin-top:20px">Company types</h2>
+  <div class="steps"><table><thead><tr><th>Code</th><th>Company type</th><th>What is special</th><th>Industry template to apply</th></tr></thead><tbody>${BOOK.companies.map(c => `<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.name)}</td><td>${esc(c.what)}</td><td>${esc(c.industry)}</td></tr>`).join('')}</tbody></table></div>`; }
+
+boot();
+})();
+</script>

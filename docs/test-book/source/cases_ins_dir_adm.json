@@ -1,0 +1,4554 @@
+[
+ {
+  "id": "INS-001",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Director reads the month by business unit and the numbers match Profit by work order",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "A director must be able to trust the first screen they open on a Monday.",
+  "before": "A Business Director test login. At least one closed job with an invoice or expected credit in September 2026 (any job closed in the month you choose works — change the month to one that has work).",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Business Director. Left menu → Insights.",
+    "expect": "Screen headed 'Insights' with the line 'One home for every dashboard — role views, the sales view, the management overview and the live analytics hub.' Four tiles: Dashboards, Analytics & performance, Sales dashboard, Management dashboard. A 'Your next actions' section and a 'Command Centre →' button."
+   },
+   {
+    "do": "Click the 'Management dashboard' tile.",
+    "expect": "Heading 'Management dashboard'. Breadcrumb Home › Insights › Dashboards / reports. Filters: Financial year, Month, Business Unit, Activity code, Executing office, Contracting office, Team member, Client, with 'Apply' and 'Clear'."
+   },
+   {
+    "do": "Set Financial year = FY 2026-27, Month = September 2026, leave the rest on 'Every…'. Press 'Apply'.",
+    "expect": "The 'By business unit' table shows columns Business Unit · Inspections · Closed · Man-days · Revenue · Direct cost · Profit · Margin · Late · Avg delay. Further sections appear: By activity code, By Team member, By executing office, By contracting office, By Contract Number, By client, Month by month across FY 2026-27, How these are counted."
+   },
+   {
+    "do": "Write down the total Revenue, Profit and Man-days for September (the summary figures at the top of the screen, or the bottom/total of 'By business unit').",
+    "expect": "Three figures noted. Margin shows a percentage, or '—' for a unit with no revenue."
+   },
+   {
+    "do": "Left menu → Money → Profit by work order. Set Financial year = FY 2026-27, Month = September 2026, Office = All my offices, Team Member = Everyone, Business Unit = All. Press 'Show'.",
+    "expect": "Heading 'Profit by work order'. Table 'Every job, line by line' with columns Job · Client · Team Member · Office · Days · Revenue · Salary · Overhead · Expenses · Voucher · Sub-con · Other · Contingency · Total cost · Profit."
+   },
+   {
+    "do": "Add up (or read the total row of) the Revenue, Profit and Days columns.",
+    "expect": "Revenue and Profit equal the Management dashboard figures from step 4, and Days equals Man-days. Any difference is a FAIL — screenshot both screens."
+   },
+   {
+    "do": "Return to Management dashboard and press 'Clear'.",
+    "expect": "Filters return to the whole financial year and every business unit; nothing is deleted ('Clear' only resets the filters)."
+   }
+  ],
+  "ref": "docs/audit-2026-10/workflows/08-INSIGHTS.md §2.2, S-1; 07-DASHBOARD-AND-KPI-AUDIT.md §6, §10 (GAP-040/041)"
+ },
+ {
+  "id": "INS-002",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Board pack — every table downloads as a spreadsheet with the same numbers",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "The board pack is built from these downloads; a CSV that differs from the screen misleads the board.",
+  "before": "Business Director login. Same month as INS-001.",
+  "steps": [
+   {
+    "do": "Left menu → Insights → Management dashboard. Financial year FY 2026-27, Month September 2026, 'Apply'.",
+    "expect": "Tables shown as in INS-001."
+   },
+   {
+    "do": "Under 'By business unit' press '⬇ Download as CSV'.",
+    "expect": "A spreadsheet file downloads. Opened in Excel it has one row per business unit with Inspections, Closed, Open, Man-days, Revenue, Late, Avg delay and (for a director) Engineer time, Expenses, Sub-contractor, Total direct cost, Profit, Margin %."
+   },
+   {
+    "do": "Compare the Revenue and Profit columns of the file with the screen.",
+    "expect": "Same values, row for row."
+   },
+   {
+    "do": "Repeat '⬇ Download as CSV' under 'By client' and 'Month by month across FY 2026-27'.",
+    "expect": "Each downloads; values match the screen table it came from."
+   },
+   {
+    "do": "Left menu → Insights → Sales dashboard → press '⬇ Funnel CSV'.",
+    "expect": "A funnel spreadsheet downloads."
+   }
+  ],
+  "ref": "08-INSIGHTS.md S-3; views/ops/mis.php; lib/mis.php mis_export()"
+ },
+ {
+  "id": "INS-003",
+  "area": "Insights",
+  "module": "Dashboards",
+  "title": "Dashboards screen — inter-office view and drill-through to the registers",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "A number you cannot drill into is a number you cannot trust; the four register links are how a manager checks one.",
+  "before": "Branch Manager login with at least one closed job in the chosen month.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Branch Manager. Left menu → Insights → Dashboards.",
+    "expect": "Heading 'Dashboards', sub-line 'Live figures within your access…'. Filters FY, month, office, Business Unit, client, team member, activity, type; buttons Reset, Job register, Call register, Invoicing & payments, Profitability by Contract Number."
+   },
+   {
+    "do": "Choose FY 2026-27 and the month 'Sep'.",
+    "expect": "Sections include 'Your pending tasks', '🛠️ Operations', '💰 Financial', 'By business unit — credit vs distributed cost' (columns Business Unit · Credit · Loaded cost · Net), 'Expenses by heading', 'Credit received vs actual (reconciliation)', 'Inspector profitability', 'Man-days by business unit', 'Certificates expiring (≤90 days)', 'Inspectors by trade'."
+   },
+   {
+    "do": "Note the total of 'Man-days by business unit'. Open Left menu → Insights → Management dashboard with FY 2026-27 and September 2026 and compare its Man-days.",
+    "expect": "The two Man-days totals are equal (same jobs, same rule since 19 Oct). A difference is a FAIL."
+   },
+   {
+    "do": "Back on Dashboards, press 'Job register'.",
+    "expect": "A Job register spreadsheet downloads (the button exports the register)."
+   },
+   {
+    "do": "Press 'Reset'.",
+    "expect": "All filters go back to their defaults."
+   }
+  ],
+  "ref": "08-INSIGHTS.md §2.1; 07-DASHBOARD-AND-KPI-AUDIT.md §10 (GAP-042)"
+ },
+ {
+  "id": "INS-004",
+  "area": "Insights",
+  "module": "Sales dashboard",
+  "title": "Sales dashboard — period buttons and cross-check with Opportunities",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MARKETING_MANAGER",
+  "why": "Win rate and pipeline drive sales decisions; they must equal the deals actually recorded.",
+  "before": "Marketing Manager login. At least two opportunities, one Won and one Lost, closed in the last 90 days.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Marketing Manager. Left menu → Insights → Sales dashboard.",
+    "expect": "Heading 'Sales dashboard'. Sections: The funnel · From first contact to won · Deals that have stopped moving · Why we lose · Who is selling · Effort behind it. Buttons '⬇ Funnel CSV', 'Pipeline board', '30 days', '90 days', '6 months', '12 months', '2 years'."
+   },
+   {
+    "do": "Press '90 days'.",
+    "expect": "All sections redraw for the last 90 days."
+   },
+   {
+    "do": "In 'Who is selling' note, for one owner, the Open, Won and Lost counts.",
+    "expect": "Columns Owner · Open · Pipeline · Won · Lost."
+   },
+   {
+    "do": "Press 'Pipeline board' (opens Sales → Opportunities). Switch to 'List', filter to that owner and count Won and Lost deals closed in the last 90 days.",
+    "expect": "The Won and Lost counts equal the Sales dashboard counts."
+   },
+   {
+    "do": "Back on the Sales dashboard press '12 months' and read 'Why we lose'. Then open Sales → Opportunities and read 'Why deals were lost — last 12 months'.",
+    "expect": "Reason, Deals and Value agree between the two screens."
+   }
+  ],
+  "ref": "08-INSIGHTS.md §2.3; 07-DASHBOARD-AND-KPI-AUDIT.md §6 (Win rate)"
+ },
+ {
+  "id": "INS-005",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "Analytics hub — views, drill-down and KPI cross-checks against the registers",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The analytics cards feed the management review; each must equal the register behind it.",
+  "before": "Master Admin login. Some jobs closed and reports issued in the chosen month.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as Master Admin. Left menu → Insights → Analytics & performance.",
+    "expect": "Heading 'Analytics & performance'. Filters Period, From, To, Business unit, Compare (vs previous / Year on year / Month on month / Quarter on quarter / vs target) and 'Apply'. Buttons Executive, Operations, Quality, Service, Vendor, Client & portal, Scorecard, Review, Alerts, Periods, KPI library, Data quality."
+   },
+   {
+    "do": "Period = Monthly, From = 2026-09-01, To = 2026-09-30, Compare = vs previous. Press 'Apply'.",
+    "expect": "KPI cards redraw for September with a comparison to August."
+   },
+   {
+    "do": "Read the 'Reports issued' card. Then Left menu → Reporting → Report register; All statuses = Issued; count the rows dated in September 2026.",
+    "expect": "The count equals the 'Reports issued' card."
+   },
+   {
+    "do": "Read the 'Invoiced value' card. Compare with Management dashboard Revenue for September 2026 (INS-001).",
+    "expect": "Same value (one revenue rule since 19 Oct)."
+   },
+   {
+    "do": "Read the 'Open nonconformities' card. Then Left menu → Quality & Accreditation → Nonconformity workspace → NCR register; count rows not Closed.",
+    "expect": "Counts agree."
+   },
+   {
+    "do": "Click any KPI card's 'details →' link.",
+    "expect": "A 'Breakdown —' screen opens: 'Pick a slice to see the records behind it.'"
+   },
+   {
+    "do": "Press each view button in turn: Executive, Operations, Quality, Service, Vendor, Client & portal.",
+    "expect": "Each opens without an error page."
+   }
+  ],
+  "ref": "08-INSIGHTS.md §1.3; 07-DASHBOARD-AND-KPI-AUDIT.md §2, §10; lib/tapi_dash.php"
+ },
+ {
+  "id": "INS-006",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "KPI library — change a target, see it flow, then put it back",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A target changed by mistake moves every dashboard; changing and reverting must be clean.",
+  "before": "Master Admin login. Write down the current Target of 'Jobs closed' before starting.",
+  "steps": [
+   {
+    "do": "Insights → Analytics & performance → 'KPI library'.",
+    "expect": "Heading 'KPI library'. Table KPI · Category · Formula · Now · Target · Dir · Status, with an 'Edit' button per KPI and '+ New KPI'."
+   },
+   {
+    "do": "Press 'Edit' on 'Jobs closed'. Change 'Target (blank = informational)' to the old value + 1. Press 'Save'.",
+    "expect": "Message 'KPI \"Jobs closed\" saved.' The library shows the new Target."
+   },
+   {
+    "do": "Open Analytics & performance → Scorecard.",
+    "expect": "'Management scorecard' shows the KPI with its weight, value, score and contribution reflecting the new target."
+   },
+   {
+    "do": "Edit 'Jobs closed' again and put the original Target back. Save.",
+    "expect": "Message 'KPI \"Jobs closed\" saved.' Target column shows the original value; Scorecard is back to its earlier score."
+   }
+  ],
+  "ref": "08-INSIGHTS.md E-7; lib/tapi_dash.php analytics-kpi-edit"
+ },
+ {
+  "id": "INS-007",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "KPI library — refuses a bad formula and a missing key or name",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A broken formula must never be saved silently onto every dashboard.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "KPI library → '+ New KPI'. Key (stable id) = zz_test_bad, Name = ZZ TEST bad formula, Formula = jobs.closed ; drop. Press 'Save'.",
+    "expect": "Refused: 'That formula is not valid — it may reference an unknown metric or contain a disallowed character. Nothing was saved.' No new row in the KPI library."
+   },
+   {
+    "do": "'+ New KPI' again, leave Key and Name empty, press 'Save'.",
+    "expect": "The browser stops you ('Please fill in this field') — Key and Name are required."
+   }
+  ],
+  "ref": "lib/tapi_dash.php analytics-kpi-edit (tapi_formula_valid)"
+ },
+ {
+  "id": "INS-008",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "KPI library — special characters and very long names display correctly",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Names are typed by people; quotes, ampersands and long text must not break the page.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "KPI library → '+ New KPI'. Key = zz_test_chars, Name = ZZ TEST Margin % — Q&A <check> 'quoted' followed by about 200 more characters of text. Formula = jobs.closed (or pick any metric listed under the box). Status = INACTIVE. Save.",
+    "expect": "Message 'KPI \"…\" saved.' The row shows the name exactly as typed, including % & < > and quotes; the table layout is not broken."
+   },
+   {
+    "do": "Open Analytics & performance.",
+    "expect": "No card for the INACTIVE test KPI is shown; the page renders normally."
+   }
+  ],
+  "ref": "05-ui-ux-blueprint Zero Training UI; lib/tapi_dash.php"
+ },
+ {
+  "id": "INS-009",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "Alerts — add a silent alert rule",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Alerts e-mail management when a KPI breaches; the rule must save with what was typed.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Analytics & performance → 'Alerts'.",
+    "expect": "Heading 'Alerts' — 'Rule-based watches on any KPI. Breaches are e-mailed by the nightly job, once per rule per day.' Section 'New / edit a rule'."
+   },
+   {
+    "do": "Name = ZZ TEST alert, KPI = Open nonconformities, Condition = is above, Threshold = 1000, Severity = Info, Email to = (blank), Enabled = unticked. Press 'Save rule'.",
+    "expect": "The rule appears in the table Rule · KPI · Condition · Severity · Recipients · State, shown as not enabled."
+   },
+   {
+    "do": "Try 'Save rule' with Threshold empty.",
+    "expect": "The browser refuses — Threshold is required."
+   }
+  ],
+  "ref": "views/ops tapi alerts; screens_today analytics-alerts"
+ },
+ {
+  "id": "INS-010",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "Periods & snapshots — freeze last month, and a wrongly typed month",
+  "kind": "edge",
+  "tags": [
+   "best",
+   "worst",
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A finalised management report must be reproducible after live data moves on.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Analytics & performance → 'Periods'.",
+    "expect": "Heading 'Periods & snapshots'. Sections 'Snapshot a period' and 'Period status' (Period · Snapshots · Last taken · State · Change state)."
+   },
+   {
+    "do": "Month (YYYY-MM) = 2026-09. Press 'Take snapshot'.",
+    "expect": "Message 'Snapshot taken — N KPIs frozen for 2026-09.' The Period status table shows 2026-09 with a snapshot count and time."
+   },
+   {
+    "do": "On the 2026-09 row set 'Change state' = Under review and press 'Set'; then set it back to Open and press 'Set'.",
+    "expect": "A message 'Period 2026-09 set to …' naming the new state each time; the State column follows. Do NOT choose Final or Locked on live."
+   },
+   {
+    "do": "Month (YYYY-MM) = Sept. Press 'Take snapshot'.",
+    "expect": "Expected: a message saying the month must be YYYY-MM. Today the screen simply reloads with no message and nothing taken — if so, record as a gap (silent refusal)."
+   }
+  ],
+  "ref": "lib/tapi_dash.php analytics-snapshot"
+ },
+ {
+  "id": "INS-011",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "Scorecard, Management review and Data quality open and agree",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "The management review export is what goes to the board; it must match the KPI library.",
+  "before": "Business Director login.",
+  "steps": [
+   {
+    "do": "Analytics & performance → 'Review'.",
+    "expect": "Heading 'Management review' with sections Key performance indicators, Scorecard, Alerts firing, Data quality, and buttons Export XLSX, CSV, Print / PDF."
+   },
+   {
+    "do": "Compare three KPI values in the review with the 'Now' column of the KPI library for the same month.",
+    "expect": "Values agree."
+   },
+   {
+    "do": "Press 'Export XLSX'.",
+    "expect": "A spreadsheet downloads with the same KPI values."
+   },
+   {
+    "do": "Analytics & performance → 'Data quality' → 'Re-run checks'.",
+    "expect": "Table Check · Result · Detail refreshes."
+   },
+   {
+    "do": "Analytics & performance → 'Scorecard'.",
+    "expect": "'Management scorecard' — every category shows Weight, Value, Score and Contribution (no single opaque number)."
+   }
+  ],
+  "ref": "08-INSIGHTS.md; screens_today analytics-review / analytics-quality / analytics-scorecard"
+ },
+ {
+  "id": "INS-012",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Empty period — future year shows 'Nothing in this period.' and Margin '—'",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Zero must read as zero, not as an error or a misleading 0% margin.",
+  "before": "Business Director login.",
+  "steps": [
+   {
+    "do": "Insights → Management dashboard. Financial year = FY 2027-28, Month = Whole year. Apply.",
+    "expect": "Every table shows 'Nothing in this period.' No error page."
+   },
+   {
+    "do": "Insights → Analytics & performance. Period = Custom, From = 2027-04-01, To = 2027-04-30. Apply.",
+    "expect": "Cards show 0 or '—'; no error page; margin-type figures show '—' rather than 0% when there is no revenue."
+   },
+   {
+    "do": "Insights → Dashboards, choose FY 2027-28.",
+    "expect": "Tables show 'No data.' or empty rows; no error page."
+   }
+  ],
+  "ref": "08-INSIGHTS.md E-8; views/ops/mis.php; D7-1 (margin '—' when no revenue)"
+ },
+ {
+  "id": "INS-013",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Same month on three dashboards — period filters differ (I-F3)",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "gap"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Directors compare screens; a period that means different things on each screen causes wrong decisions.",
+  "before": "Business Director login.",
+  "steps": [
+   {
+    "do": "Management dashboard: Financial year FY 2026-27, Month September 2026. Note Inspections.",
+    "expect": "Number noted."
+   },
+   {
+    "do": "Dashboards: FY 2026-27, month Sep. Note the jobs figure under Operations / Inspector profitability (Jobs column total).",
+    "expect": "Same number of jobs as Management dashboard Inspections."
+   },
+   {
+    "do": "Sales dashboard: try to show September 2026 only.",
+    "expect": "Not supported today — the Sales dashboard offers only rolling periods (30 days, 90 days, 6 months, 12 months, 2 years). Record as a gap (I-F3)."
+   }
+  ],
+  "ref": "08-INSIGHTS.md E-6, I-F3"
+ },
+ {
+  "id": "INS-014",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Before trusting profit — the three reconciliation screens say 'Nothing to reconcile'",
+  "kind": "edge",
+  "tags": [
+   "rule",
+   "edge"
+  ],
+  "persona": "FINANCE",
+  "why": "Two sources for one number is a known condition; the reconciliations prove the dashboards agree with the ledger.",
+  "before": "Finance login.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as Finance. Left menu → Money → Revenue reconciliation.",
+    "expect": "Heading 'Revenue reconciliation', Tolerance ₹1. Expected on live: 'Nothing to reconcile.' If rows are listed (Jobs · Client · Legacy · Ledger net · Ledger gross · Δ (net) · Why), screenshot them — dashboards can disagree for those jobs."
+   },
+   {
+    "do": "Money → Cost reconciliation.",
+    "expect": "Expected: 'Nothing to reconcile.' Otherwise screenshot the rows (Legacy cost vs Ledger cost)."
+   },
+   {
+    "do": "Money → Reimbursable duplication.",
+    "expect": "Expected: '… Nothing to reconcile.' Otherwise the listed jobs have travel/lodging/food on both the job closure and the voucher (profit understated)."
+   },
+   {
+    "do": "Do not change the reader option on any of these screens.",
+    "expect": "No setting changed."
+   }
+  ],
+  "ref": "08-INSIGHTS.md E-5, S-1; 07-DASHBOARD-AND-KPI-AUDIT.md §9 step 4"
+ },
+ {
+  "id": "INS-015",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Phone width — dashboards usable on a 375 px phone",
+  "kind": "phone",
+  "tags": [
+   "phone"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Directors glance at figures on the phone; the page must not scroll sideways.",
+  "before": "Business Director login on a phone (or a desktop browser narrowed to phone width).",
+  "steps": [
+   {
+    "do": "On the phone open Left menu (☰) → Insights → Management dashboard.",
+    "expect": "Filters stack one under another; the page itself does not scroll sideways; wide tables scroll inside their own box."
+   },
+   {
+    "do": "Open Dashboards and Analytics & performance on the phone.",
+    "expect": "Same: readable, buttons tappable, no sideways page scroll."
+   },
+   {
+    "do": "Open Sales dashboard and press '90 days'.",
+    "expect": "Buttons fit or wrap; the funnel is readable."
+   }
+  ],
+  "ref": "CLAUDE.md (desk-first managers, still must work on phone); docs/05-ui-ux-blueprint.md"
+ },
+ {
+  "id": "INS-016",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "Two admins edit the same KPI at once — last save wins silently",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Silent overwrites of company targets go unnoticed until a review is wrong.",
+  "before": "Two Master Admin sessions (two browsers or a normal and a private window). Note the current Target of 'Reports issued'.",
+  "steps": [
+   {
+    "do": "Browser A: KPI library → Edit 'Reports issued'. Browser B: open the same edit screen.",
+    "expect": "Both show the same target."
+   },
+   {
+    "do": "A: set Target = old + 1 and Save. B (without reloading): set Target = old + 2 and Save.",
+    "expect": "Expected good behaviour: B is warned that someone else saved. Today no warning is expected — B's value simply replaces A's. If so, record as a gap (no protection outside work orders and jobs)."
+   },
+   {
+    "do": "Put the original Target back and Save.",
+    "expect": "Original value restored."
+   }
+  ],
+  "ref": "10-ADMIN.md E-17 (same concurrency rule); 03-OPERATIONS.md §4"
+ },
+ {
+  "id": "INS-017",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "A KPI target cannot be set per office or business unit (I-F1a)",
+  "kind": "edge",
+  "tags": [
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Branches of different sizes judged against one target is unfair.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "KPI library → Edit 'Jobs closed'. Look for a way to give Ahmedabad a different target from Mumbai.",
+    "expect": "Not supported today — the form has one Target and Warn threshold for the whole company; no office/business-unit/period target field. Record as a gap (I-F1a)."
+   }
+  ],
+  "ref": "08-INSIGHTS.md I-F1a, E-7"
+ },
+ {
+  "id": "INS-018",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "Recruitment figures are missing from the KPI library (I-F2)",
+  "kind": "edge",
+  "tags": [
+   "gap"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Time-to-hire and drop-off belong in the board pack.",
+  "before": "Business Director login.",
+  "steps": [
+   {
+    "do": "Insights → Analytics & performance → KPI library. Look for any hiring, candidate or requisition KPI.",
+    "expect": "Not supported today — the 14 KPIs are Jobs closed, Job closure rate, Reports issued, Report issue rate, Average report TAT, Open nonconformities, Average NCR closure time, Invoiced value, SLA compliance, Report revision rate, Release rate, CAPA effectiveness, Vendor re-assessments due, Active portal users. Record as a gap (I-F2): recruitment figures live only on Recruitment's own home."
+   }
+  ],
+  "ref": "08-INSIGHTS.md I-F2; 07-DASHBOARD-AND-KPI-AUDIT.md D7-4"
+ },
+ {
+  "id": "INS-019",
+  "area": "Insights",
+  "module": "Sales dashboard",
+  "title": "Two screens are both headed 'Sales dashboard' (I-F4)",
+  "kind": "edge",
+  "tags": [
+   "gap"
+  ],
+  "persona": "MARKETING_MANAGER",
+  "why": "Two screens with one name make people compare different things.",
+  "before": "Marketing Manager login.",
+  "steps": [
+   {
+    "do": "Insights → Sales dashboard. Note the heading and what it shows.",
+    "expect": "Heading 'Sales dashboard' — the period funnel."
+   },
+   {
+    "do": "Open operations.mghaiapps.com/crm-reports.",
+    "expect": "Also headed 'Sales dashboard' — a month-by-month table (Month · Raised · Won · Lost · Won value) with a Financial year filter. Neither screen has a Sales tile. Record as a gap (I-F4)."
+   }
+  ],
+  "ref": "08-INSIGHTS.md I-F4; 01-SALES.md S-F2"
+ },
+ {
+  "id": "INS-020",
+  "area": "Insights",
+  "module": "Insights home",
+  "title": "Inspector cannot open Insights",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "INSPECTOR",
+  "why": "Field staff see only their own figures, on their own phone screens.",
+  "before": "Inspector test login.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Inspector (phone).",
+    "expect": "Menu shows only the 'My work' group (My Jobs, reports, My Voucher). No Insights."
+   },
+   {
+    "do": "Type operations.mghaiapps.com/insights in the address bar.",
+    "expect": "Refused (403 'not allowed' page)."
+   },
+   {
+    "do": "Type /mis, then /reports, then /analytics.",
+    "expect": "Each is refused; no figure is shown."
+   }
+  ],
+  "ref": "08-INSIGHTS.md E-1; docs/02-permission-matrix.md Dashboards (INS = View(own)); evidence/role-access-matrix.md"
+ },
+ {
+  "id": "INS-021",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Finance sees the full money view",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "FINANCE",
+  "why": "Finance holds View(money) on dashboards including cost and profit.",
+  "before": "Finance test login.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as Finance. Left menu → Insights.",
+    "expect": "Insights opens with its four tiles."
+   },
+   {
+    "do": "Open Management dashboard, FY 2026-27.",
+    "expect": "Columns include Revenue, Direct cost, Profit and Margin (Finance holds the salary/cost right)."
+   },
+   {
+    "do": "Open Sales dashboard.",
+    "expect": "Opens (Finance can read sales reports)."
+   }
+  ],
+  "ref": "08-INSIGHTS.md E-2; 02-permission-matrix.md Dashboards FIN = View(money); lib/access.php FINANCE"
+ },
+ {
+  "id": "INS-022",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Coordinator sees operations and credit but no cost, salary or profit",
+  "kind": "access",
+  "tags": [
+   "rule",
+   "gap"
+  ],
+  "persona": "COORDINATOR",
+  "why": "A coordinator must never see salary or profit (docs/01-roles.md).",
+  "before": "Coordinator test login.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Coordinator. Left menu → Insights → Management dashboard.",
+    "expect": "Opens. Columns Inspections · Closed · Man-days · Revenue · Late · Avg delay. NO Direct cost, Profit or Margin column and no 'Branch costs allocated…' table."
+   },
+   {
+    "do": "Look at the Revenue column.",
+    "expect": "docs/01-roles.md says a coordinator must never see revenue; the code gives coordinators 'read-only revenue' by decision. If the Revenue column is visible, record it as a disagreement between the roles document and the screen for the owner to decide."
+   },
+   {
+    "do": "Insights → Dashboards. Read 'By business unit — credit vs distributed cost'.",
+    "expect": "Only Business Unit and Credit columns; no Loaded cost and no Net."
+   },
+   {
+    "do": "Insights → Sales dashboard.",
+    "expect": "Refused (coordinators have no sales-report access)."
+   }
+  ],
+  "ref": "08-INSIGHTS.md E-3; docs/01-roles.md COORDINATOR; lib/access.php COORDINATOR; views/ops/mis.php, reports.php"
+ },
+ {
+  "id": "INS-023",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Branch Manager and Operation Manager see only their own office",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Branch-scoped roles must not see other branches' figures (R-30).",
+  "before": "Branch Manager and Operation Manager logins, each with a home office (e.g. Ahmedabad); jobs exist in at least two offices.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Branch Manager. Insights → Management dashboard, whole FY 2026-27.",
+    "expect": "'By executing office' lists only the manager's own office (cross-office jobs show under the office rule)."
+   },
+   {
+    "do": "Compare total Inspections with what the Master Admin sees for that office only (Master Admin: Executing office = that office).",
+    "expect": "Equal."
+   },
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Operation Manager. Insights → Sales dashboard.",
+    "expect": "Refused (no sales-report access)."
+   },
+   {
+    "do": "Operation Manager: Insights → Management dashboard.",
+    "expect": "Opens; Revenue visible; no Direct cost / Profit / Margin (no salary right)."
+   }
+  ],
+  "ref": "02-permission-matrix.md R-30; evidence/role-access-matrix.md (/crm-dashboard OM 403)"
+ },
+ {
+  "id": "INS-024",
+  "area": "Insights",
+  "module": "Insights home",
+  "title": "Marketing Executive has no Insights",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "MARKETING_EXECUTIVE",
+  "why": "Junior sales do not see company dashboards (docs/01-roles.md).",
+  "before": "Marketing Executive test login.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Marketing Executive.",
+    "expect": "Left menu has Sales and Directory; no Insights."
+   },
+   {
+    "do": "Type /mis in the address bar.",
+    "expect": "Refused: 'You cannot see the management dashboard.'"
+   }
+  ],
+  "ref": "docs/01-roles.md MARKETING_EXECUTIVE; lib/mis.php ops_mis()"
+ },
+ {
+  "id": "INS-025",
+  "area": "Insights",
+  "module": "Analytics & performance",
+  "title": "Coordinator can change company KPI targets and periods — not in the permission matrix",
+  "kind": "access",
+  "tags": [
+   "rule",
+   "gap"
+  ],
+  "persona": "COORDINATOR",
+  "why": "The matrix gives a coordinator only View on dashboards; changing a company target is more than viewing.",
+  "before": "Coordinator test login. Note the current Target of 'Average report TAT'.",
+  "steps": [
+   {
+    "do": "As the Coordinator: Insights → Analytics & performance → KPI library → Edit 'Average report TAT'.",
+    "expect": "Expected per the matrix (Dashboards = View): no Edit button, or Save refused."
+   },
+   {
+    "do": "If the edit screen opens, change Target by 1 and press Save.",
+    "expect": "If 'KPI … saved.' appears, record as a gap: any role with a dashboard right can change KPI definitions and set period states. Immediately put the original Target back."
+   },
+   {
+    "do": "Periods: as the Coordinator, check whether 'Take snapshot' and 'Change state' are offered.",
+    "expect": "Same rule — if offered, record in the same gap (do not lock any period)."
+   }
+  ],
+  "ref": "docs/02-permission-matrix.md Dashboards (CO = View); lib/tapi_dash.php tapi_can()"
+ },
+ {
+  "id": "INS-026",
+  "area": "Insights",
+  "module": "Dashboards",
+  "title": "Cross-office job — revenue sits with the contracting office, credit with the executing office",
+  "kind": "edge",
+  "tags": [
+   "rule",
+   "edge"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Two branches must not both claim the same client revenue (ADR-005).",
+  "before": "A closed job whose work order was contracted by Office A but executed by Office B; Branch Manager logins for A and B.",
+  "steps": [
+   {
+    "do": "Master Admin: Management dashboard, the job's month. Read 'By contracting office' and 'By executing office'.",
+    "expect": "The job's Revenue is counted under Office A in 'By contracting office'; Office B appears under 'By executing office' for the same job."
+   },
+   {
+    "do": "Branch Manager of B: Insights → Dashboards, same month. Read 'By business unit — credit vs distributed cost'.",
+    "expect": "Office B's Credit includes the inter-office credit for that job."
+   },
+   {
+    "do": "Branch Manager of B: Money → Invoice register → 'Inter-office settlement'.",
+    "expect": "A row Owing office / Owed to between A and B shows the credit and what is outstanding."
+   }
+  ],
+  "ref": "08-INSIGHTS.md E-4; 02-permission-matrix.md fn 4 (ADR-005)"
+ },
+ {
+  "id": "INS-027",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Whole-year dashboard loads in reasonable time",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "With real volume a slow dashboard is not used.",
+  "before": "Business Director login; live data.",
+  "steps": [
+   {
+    "do": "Insights → Management dashboard, FY 2026-27, Month = Whole year, every filter 'Every…'. Press Apply and time it.",
+    "expect": "Page complete within about 5 seconds. Note the time; over 10 seconds is a FAIL (performance)."
+   },
+   {
+    "do": "Repeat for Dashboards and Analytics & performance (Period Yearly).",
+    "expect": "Same expectation."
+   }
+  ],
+  "ref": "08-INSIGHTS.md E-8 (not measured at volume); 09-UAT-PLAN.md remaining work"
+ },
+ {
+  "id": "INS-028",
+  "area": "Insights",
+  "module": "Insights home",
+  "title": "Insights home opens and its shortcuts lead to the right screens",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "The home is the director's and manager's front door to every dashboard.",
+  "before": "Branch Manager login.",
+  "steps": [
+   {
+    "do": "Left menu → Insights.",
+    "expect": "Heading 'Insights'; tiles Dashboards, Analytics & performance, Sales dashboard, Management dashboard; 'Your next actions'; 'Command Centre →'."
+   },
+   {
+    "do": "Click each tile and press Back.",
+    "expect": "Each opens the screen of that name (Dashboards, Analytics & performance, Sales dashboard, Management dashboard)."
+   },
+   {
+    "do": "Press 'Command Centre →'.",
+    "expect": "The Command Centre opens."
+   }
+  ],
+  "ref": "evidence/navigation-dump.json (Insights); screens_today insights"
+ },
+ {
+  "id": "INS-029",
+  "area": "Insights",
+  "module": "Insights home",
+  "title": "Signed-out and wrong-role visitors cannot reach Insights",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "SR_INSPECTOR",
+  "why": "Figures must never show to someone signed out or without a dashboard right.",
+  "before": "A Senior Inspector login; a signed-out browser.",
+  "steps": [
+   {
+    "do": "In a private window (not signed in) open operations.mghaiapps.com/insights.",
+    "expect": "Sent to the sign-in page; no figures."
+   },
+   {
+    "do": "Sign in as the Senior Inspector; type /insights and /mis.",
+    "expect": "Insights is not in the menu; /mis is refused ('You cannot see the management dashboard.')."
+   },
+   {
+    "do": "Sign out, press the browser Back button.",
+    "expect": "No dashboard data is shown again without signing in."
+   }
+  ],
+  "ref": "docs/01-roles.md SR_INSPECTOR; lib/mis.php"
+ },
+ {
+  "id": "INS-030",
+  "area": "Insights",
+  "module": "Dashboards",
+  "title": "Dashboards with a client that has no work, and contradictory filters",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Empty answers must read as empty, never as an error or someone else's numbers.",
+  "before": "Branch Manager login; a client with no jobs (e.g. ZZ TEST Fabricators).",
+  "steps": [
+   {
+    "do": "Dashboards: client = ZZ TEST Fabricators.",
+    "expect": "Tables empty or 'No data.'; no error."
+   },
+   {
+    "do": "Choose an office and a team member who works in another office.",
+    "expect": "Empty result; no error; no figures from other offices."
+   },
+   {
+    "do": "Press 'Reset'.",
+    "expect": "Normal figures return."
+   }
+  ],
+  "ref": "views/ops/reports.php ('No data.')"
+ },
+ {
+  "id": "INS-031",
+  "area": "Insights",
+  "module": "Dashboards",
+  "title": "Certificates expiring (≤90 days) agrees with the competence register",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "An expired certificate on site is an accreditation finding.",
+  "before": "A team member with a certificate expiring within 90 days (and one expiring in 91+ days, if possible).",
+  "steps": [
+   {
+    "do": "Dashboards → 'Certificates expiring (≤90 days)' (Inspector · Certificate · Valid to · Left).",
+    "expect": "The 90-day certificate is listed with days left; the 91+ day one is not."
+   },
+   {
+    "do": "Quality & Accreditation → Competence & authorisation for the same person.",
+    "expect": "Same certificate and Valid to date."
+   }
+  ],
+  "ref": "screens_today reports (sections)"
+ },
+ {
+  "id": "INS-032",
+  "area": "Insights",
+  "module": "Sales dashboard",
+  "title": "Sales dashboard with no deals in the period",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "MARKETING_MANAGER",
+  "why": "A quiet month must not show an error or stale figures.",
+  "before": "Marketing Manager login.",
+  "steps": [
+   {
+    "do": "Sales dashboard → '30 days' (in a period with no new deals, or on a quiet test workspace).",
+    "expect": "Sections show zero / empty tables; no error page."
+   },
+   {
+    "do": "Press '⬇ Funnel CSV'.",
+    "expect": "A file downloads (header row only if empty)."
+   }
+  ],
+  "ref": "screens_today crm-dashboard"
+ },
+ {
+  "id": "INS-033",
+  "area": "Insights",
+  "module": "Sales dashboard",
+  "title": "Long deal names, 2-year view and phone width",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "phone"
+  ],
+  "persona": "MARKETING_MANAGER",
+  "why": "Real deal names are long; the funnel must stay readable.",
+  "before": "An opportunity named with 150+ characters (e.g. 'ZZ TEST very long deal name …').",
+  "steps": [
+   {
+    "do": "Sales dashboard → '2 years'. Find the long deal in 'Deals that have stopped moving' (Deal · Stage · Owner · Days · Value) if it qualifies.",
+    "expect": "Name wraps or is shortened; columns stay aligned."
+   },
+   {
+    "do": "Open the same screen on a phone.",
+    "expect": "No sideways page scroll; tables scroll inside their own box."
+   },
+   {
+    "do": "A Coordinator types /crm-dashboard.",
+    "expect": "Refused (wrong person)."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md (/crm-dashboard CO 403)"
+ },
+ {
+  "id": "INS-034",
+  "area": "Insights",
+  "module": "Management dashboard",
+  "title": "Odd links — unknown export and unknown year",
+  "kind": "edge",
+  "tags": [
+   "worst"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Edited bookmarks must fail safely.",
+  "before": "Business Director login.",
+  "steps": [
+   {
+    "do": "Open operations.mghaiapps.com/mis?export=zzz.",
+    "expect": "Message 'Nothing to export.' and the dashboard shows; no file, no error page."
+   },
+   {
+    "do": "Open /mis?fy=1999-00.",
+    "expect": "The dashboard opens on a valid year or shows 'Nothing in this period.'; no error page."
+   }
+  ],
+  "ref": "lib/mis.php mis_export()"
+ },
+ {
+  "id": "DIR-001",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Add a new client with GSTIN, terms and site location",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "One company record is used by Sales, Operations, Reporting and Money; getting it right once saves every later step.",
+  "before": "Branch Manager login. A real-format test GSTIN, e.g. 24AAACZ9999Z1Z5 (any 15-character GSTIN not already on file).",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Branch Manager. Left menu → Directory.",
+    "expect": "Heading 'Directory' — 'The people and companies the work is done with — and the portals they sign in to.' Tabs Directory and Portals; tiles Activity, Client register, Vendor register, Client holds, Find duplicates, Asset issuance, Client portal, Vendor portal."
+   },
+   {
+    "do": "Click 'Client register'.",
+    "expect": "Heading 'Client register' with the record count; Status filter (Any status / Active / Inactive / On hold / Blacklisted / Prospect); buttons '+ Add Client', '⬆ Import from a spreadsheet', '⬇ Export', '🔍 Possible duplicates'; columns Code · Name · Roles · Industry · GSTIN · Status · Actions."
+   },
+   {
+    "do": "Press '+ Add Client'.",
+    "expect": "Heading 'New business partner' — 'Client Code is generated automatically. Enter GSTIN once — PAN & State fill in automatically.' Tabs Identity & roles, Tax & terms, Site & scope. 'Is a Client' is ticked."
+   },
+   {
+    "do": "Identity & roles: Legal name = ZZ TEST Fabricators Pvt Ltd; Primary contact = Ravi Test; Contact e-mail = your own e-mail; Contact mobile = 9800000000; Contracting office = your office; Client type = EPC Contractor; Industry = Oil & Gas; Status = Active.",
+    "expect": "Display name fills itself from the legal name and can be edited."
+   },
+   {
+    "do": "Tax & terms: GSTIN = the test GSTIN; Payment terms = Against invoice; Credit days = 30.",
+    "expect": "PAN and State are filled from the GSTIN after save (or as you type)."
+   },
+   {
+    "do": "Site & scope: in '📍 Site location' press 'Use this device's current location' (allow location), or type 23.0225 and 72.5714 with radius 150. Tick 'Inspection (third-party / TPI)'. Press 'Save'.",
+    "expect": "The client's page opens: heading = ZZ TEST Fabricators Pvt Ltd, sub-line '<code> · Client Active', tabs Overview · General · Registration · Addresses · Contacts · Purchase Orders · Contract Numbers · Jobs · Relationships · Notes · Timeline."
+   },
+   {
+    "do": "Go back to Directory → Client register and search 'ZZ TEST Fab'.",
+    "expect": "One row: an automatic Code, Roles = Client, Industry = Oil & Gas, GSTIN as typed (capitals), Status Active."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.3, S-1; index.php partner-new"
+ },
+ {
+  "id": "DIR-002",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Saving a partner with no role is refused in plain words",
+  "kind": "edge",
+  "tags": [
+   "worst"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "A company with no role cannot be used anywhere; the form must say exactly what is missing.",
+  "before": "Branch Manager login.",
+  "steps": [
+   {
+    "do": "Directory → Client register → '+ Add Client'. Legal name = ZZ TEST No Role. Untick 'Is a Client' (leave Vendor and Sub-contractor unticked). Save.",
+    "expect": "Refused, form kept: 'Select at least one role (Client / Vendor / Both).'"
+   },
+   {
+    "do": "Clear Legal name and press Save.",
+    "expect": "The browser stops you — Legal name is required."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-1; index.php:1338"
+ },
+ {
+  "id": "DIR-003",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "A client without payment terms, or with a short GSTIN, is refused",
+  "kind": "edge",
+  "tags": [
+   "worst"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Invoices carry the client's payment terms and GSTIN; missing or wrong values break billing later.",
+  "before": "Branch Manager login.",
+  "steps": [
+   {
+    "do": "'+ Add Client'. Legal name = ZZ TEST No Terms, Is a Client ticked, Payment terms = '— none —'. Save.",
+    "expect": "Refused: 'Payment terms are required for a client (used on their invoices). A vendor-only record does not need them.'"
+   },
+   {
+    "do": "Set Payment terms = Against invoice and GSTIN = 24ABC. Save.",
+    "expect": "Refused: 'GSTIN should be 15 characters, e.g. 24ADUPL3517E2ZJ.'"
+   },
+   {
+    "do": "Now untick Is a Client and tick Is a Vendor, clear GSTIN, Payment terms '— none —'. Save.",
+    "expect": "Saved — a vendor-only record needs no payment terms."
+   }
+  ],
+  "ref": "index.php:1333-1345 (partner-new validations)"
+ },
+ {
+  "id": "DIR-004",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Entering the same company twice is stopped",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Duplicate companies split history and invoices across two records.",
+  "before": "DIR-001 done (ZZ TEST Fabricators Pvt Ltd exists).",
+  "steps": [
+   {
+    "do": "'+ Add Client'. Legal name = ZZ TEST Fabricators Pvt Ltd (same as DIR-001), Payment terms = Against invoice. Save.",
+    "expect": "Refused: 'This company already exists as <code> — ZZ TEST Fabricators Pvt Ltd (matched by …). Open it from the Clients/Vendors list and tick the extra role instead of creating a duplicate.'"
+   },
+   {
+    "do": "Repeat with a different name but the same GSTIN as DIR-001.",
+    "expect": "Refused the same way, 'matched by' naming the GSTIN/PAN."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-3; index.php:1350-1353"
+ },
+ {
+  "id": "DIR-005",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "One company is both client and vendor",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "best"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "The company inspected for this month is the company inspected at next month — one record, several roles.",
+  "before": "DIR-001 done.",
+  "steps": [
+   {
+    "do": "Directory → Client register → row ZZ TEST Fabricators → 'Edit'. Tick 'Is a Vendor'. Save.",
+    "expect": "Saved; the page returns to the record."
+   },
+   {
+    "do": "Directory → Client register.",
+    "expect": "Roles column shows Client and Vendor."
+   },
+   {
+    "do": "Directory → Vendor register, search 'ZZ TEST Fab'.",
+    "expect": "The same company, same Code, appears in the Vendor register too."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-2, §2.2"
+ },
+ {
+  "id": "DIR-006",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Very long name and special characters display and search correctly",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Indian company names carry &, (P), quotes and long unit names; they must survive every screen and PDF.",
+  "before": "Branch Manager login.",
+  "steps": [
+   {
+    "do": "'+ Add Client'. Legal name = ZZ TEST Shree Ganesh & Sons (P) Ltd — 'Unit-2' <Baroda> followed by about 150 more characters. Payment terms = Against invoice. Save.",
+    "expect": "Saved; the heading shows the name exactly, with & ( ) ' < > intact; nothing breaks the layout."
+   },
+   {
+    "do": "Client register: search 'Ganesh'.",
+    "expect": "The record is found; the long name wraps or is shortened neatly in the table."
+   },
+   {
+    "do": "Sales → Inquiries → + New inquiry → open the client dropdown and type 'Ganesh'.",
+    "expect": "The client is offered with the same spelling."
+   }
+  ],
+  "ref": "05-ui-ux-blueprint; 09-DIRECTORY.md §2.3"
+ },
+ {
+  "id": "DIR-007",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Client with no site coordinates — geofence is off for that site",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "An inspector must not be blocked from checking in because a site was never located.",
+  "before": "A test client with no coordinates (e.g. ZZ TEST Shree Ganesh from DIR-006).",
+  "steps": [
+   {
+    "do": "Directory → Client register → row → '360'.",
+    "expect": "Customer 360 page opens with sections Group, Billing branch, Money, Work, Who to talk to, What has happened, and a collapsible '📍 Site location — for geofenced attendance not set'."
+   },
+   {
+    "do": "Open the '📍 Site location…' panel.",
+    "expect": "Fields Site location and Allowed distance m with '📍 Use my current location' and 'Save location'. Leave it empty."
+   },
+   {
+    "do": "(Optional, with a test job for this client) The inspector checks in on that job from any place.",
+    "expect": "Check-in is accepted — blank coordinates leave the geofence off for that site."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-10; lib/geofence.php header"
+ },
+ {
+  "id": "DIR-008",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Two people edit the same client at once — last save wins",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "gap"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Every area points at this record; a silent overwrite is the worst place for one.",
+  "before": "Two sessions able to edit clients (e.g. Branch Manager in two browsers). Test client ZZ TEST Fabricators.",
+  "steps": [
+   {
+    "do": "Browser A and B: open the client → 'Edit'.",
+    "expect": "Both show the same values."
+   },
+   {
+    "do": "A: change Credit days to 45, Save. B (without reloading): change Website to www.zztest.example, Save.",
+    "expect": "Expected good behaviour: B is warned that someone else saved. Today expected: B saves without warning and Credit days goes back to the value B loaded (30). If so, record as a gap (D-F2)."
+   },
+   {
+    "do": "Re-open the record.",
+    "expect": "Note which values survived (screenshot)."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-11, D-F2"
+ },
+ {
+  "id": "DIR-009",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Client of another office — basic details only, editing refused",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "COORDINATOR",
+  "why": "Having the right to edit clients is not the right to edit another office's client (ADR-005).",
+  "before": "A client owned by Office A (Contracting office A). A Coordinator of Office B.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as Office B's Coordinator. Directory → Client register → open the Office A client.",
+    "expect": "Basic identity is shown; contact details, commercial terms, contracts, purchase orders, registrations and notes are withheld."
+   },
+   {
+    "do": "Try 'Edit'.",
+    "expect": "Refused — changes can only be made from the owning office."
+   }
+  ],
+  "ref": "02-permission-matrix.md fn 5 (partner_view_level, partner_can_write)"
+ },
+ {
+  "id": "DIR-010",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Register controls — status filter, paging, export, 360",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Large registers need filtering and exports to be usable.",
+  "before": "Branch Manager login.",
+  "steps": [
+   {
+    "do": "Client register: Status = On hold, Search.",
+    "expect": "Only on-hold clients listed (may be none — then an empty table, no error)."
+   },
+   {
+    "do": "Status = Any status, Search, then press 'Next →'.",
+    "expect": "The next page of clients appears."
+   },
+   {
+    "do": "Press '⬇ Export'.",
+    "expect": "An Excel file downloads with the clients."
+   },
+   {
+    "do": "On any row press '360', then back and 'Open'.",
+    "expect": "'360' opens the customer 360 view; 'Open' opens the master record with its tabs."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.2; screens_today clients"
+ },
+ {
+  "id": "DIR-011",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Import from a spreadsheet — template, preview, apply",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Bulk onboarding must show what will happen before anything is saved.",
+  "before": "Branch Manager login. Excel on the computer.",
+  "steps": [
+   {
+    "do": "Client register → '⬆ Import from a spreadsheet'.",
+    "expect": "Heading 'Import clients & vendors' — 'Download the format, fill it in, upload it. You see exactly what will happen before anything is saved.' Steps 'Step 1 — get the format', 'Step 2 — upload it', 'What the columns mean' (Column · What to put in it)."
+   },
+   {
+    "do": "Press 'Empty format (Excel)'. Fill 3 rows: ZZ TEST Import One, ZZ TEST Import Two, ZZ TEST Import Three (with payment terms). Save.",
+    "expect": "Template downloaded and filled."
+   },
+   {
+    "do": "'If a row does not say what it is, treat it as' = Client. Choose the file. Press 'Read the file'.",
+    "expect": "A preview lists the 3 rows as to be created; nothing saved yet. Buttons 'Apply 3 row(s)' and 'Cancel and start again'."
+   },
+   {
+    "do": "Press 'Apply 3 row(s)'.",
+    "expect": "Message '3 created, 0 updated. … contact(s) and … address(es) added.' Client register shows the three."
+   },
+   {
+    "do": "Press 'Everything already on file (Excel)'.",
+    "expect": "A file with all clients/vendors downloads (for edit-and-re-import)."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.4, S-2; lib/partnerimport.php"
+ },
+ {
+  "id": "DIR-012",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Import an empty sheet",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "An empty or wrong file must be refused clearly, not half-imported.",
+  "before": "The empty Excel format, unfilled.",
+  "steps": [
+   {
+    "do": "Import clients & vendors → choose the unfilled template → 'Read the file'.",
+    "expect": "Refused: 'No companies were found in that file.'"
+   },
+   {
+    "do": "Press 'Read the file' with no file chosen.",
+    "expect": "The browser stops you — a file is required."
+   }
+  ],
+  "ref": "lib/partnerimport.php:402-410"
+ },
+ {
+  "id": "DIR-013",
+  "area": "Directory",
+  "module": "Find duplicates",
+  "title": "Merge two test duplicates, keeping the one with more history",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Duplicates are the commonest data failure; merging must say what happened and keep a trace.",
+  "before": "Two TEST records that are the same company, e.g. 'ZZ TEST Import One' and a new 'ZZ TEST Import One Pvt' (Payment terms set). Never merge real companies on live.",
+  "steps": [
+   {
+    "do": "Left menu → Directory → Find duplicates.",
+    "expect": "Heading 'Possible duplicates' — 'The same company entered twice, months apart, spelt differently. Nothing is merged automatically — read the pair, then decide.' One section per pair with Record A · Record B, 'Keep which record?' and 'Why are these the same company?'."
+   },
+   {
+    "do": "Find the ZZ TEST pair. Keep which record? = the one marked '(more history)'. Why = 'ZZ TEST — same company, typed twice'. Press 'Merge them'.",
+    "expect": "Message '<dropped> merged into <kept>. N record(s) repointed. The old record is marked merged rather than deleted, so anybody searching for it still finds where it went.' The kept record's page opens."
+   },
+   {
+    "do": "Find duplicates again.",
+    "expect": "The pair is gone."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.5, S-2; lib/dedupe.php"
+ },
+ {
+  "id": "DIR-014",
+  "area": "Directory",
+  "module": "Find duplicates",
+  "title": "A merge without a reason, and undoing a merge",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "gap"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "A merge rewrites history across six areas; it must be justified and ideally reversible.",
+  "before": "Another TEST duplicate pair (create two ZZ TEST records with near-identical names).",
+  "steps": [
+   {
+    "do": "Find duplicates → the ZZ TEST pair → leave 'Why are these the same company?' empty → 'Merge them'.",
+    "expect": "Expected good behaviour: refused until a reason is given. If it merges with no reason, record as a gap (D-F3)."
+   },
+   {
+    "do": "Look for any way to undo the merge (on the kept record or Find duplicates).",
+    "expect": "Not supported today — no un-merge control. Record as a gap (D-F3, E-4)."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-4, D-F3; lib/dedupe.php dd_merge (reason optional)"
+ },
+ {
+  "id": "DIR-015",
+  "area": "Directory",
+  "module": "Activity",
+  "title": "Record a WhatsApp contact and see 'Last anything' move",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "COORDINATOR",
+  "why": "'When did we last touch this customer, by any means' is the salesperson's first question.",
+  "before": "Coordinator login; client ZZ TEST Fabricators.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Coordinator. Left menu → Directory → Activity.",
+    "expect": "Heading 'Activity'. Type buttons Everything, Note, Telephone call, Meeting, Site visit, E-mail, WhatsApp, Task, Recorded by the system, … , Typed by a person, '⬇ CSV'. Sections 'Nothing has happened with these for 30 days (N)' and 'Record something that happened'."
+   },
+   {
+    "do": "Record something that happened: What kind = WhatsApp, Which way = They contacted us, Customer = ZZ TEST Fabricators, When = now, What happened = 'ZZ TEST asked for revised rate', Outcome = 'Will call back'. Press 'Record it'.",
+    "expect": "The entry appears at the top of the timeline (When · What happened · Customer · About · Who), marked as typed by a person."
+   },
+   {
+    "do": "Press 'WhatsApp'.",
+    "expect": "Only WhatsApp entries listed, including the new one."
+   },
+   {
+    "do": "Read the 'Customer · Last anything' table.",
+    "expect": "ZZ TEST Fabricators shows today. It no longer appears under 'Nothing has happened with these for 30 days'."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.6, S-3 step 6"
+ },
+ {
+  "id": "DIR-016",
+  "area": "Directory",
+  "module": "Activity",
+  "title": "Activity entry without 'What happened' is refused",
+  "kind": "edge",
+  "tags": [
+   "worst"
+  ],
+  "persona": "COORDINATOR",
+  "why": "An empty note is noise on the timeline.",
+  "before": "Coordinator login.",
+  "steps": [
+   {
+    "do": "Activity → Record something that happened → leave 'What happened *' empty → 'Record it'.",
+    "expect": "The browser stops you — the field is required."
+   }
+  ],
+  "ref": "screens_today activity-add (What happened * required)"
+ },
+ {
+  "id": "DIR-017",
+  "area": "Directory",
+  "module": "Client holds",
+  "title": "Put a client on hold, see enquiries refused, then clear it",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "A credit control that does not block is only a note (D-F1, owner's rule D-12).",
+  "before": "Test client ZZ TEST Fabricators with no hold.",
+  "steps": [
+   {
+    "do": "Left menu → Directory → Client holds.",
+    "expect": "Heading 'Client holds & blocks' — '…nothing new is raised for them — no enquiry, quote, contract, work order or job — while what they already owe is still invoiced and reminded…'. Section 'Set or clear a hold': Client *, Status (Active (no hold) / On hold / Blocked), Reason."
+   },
+   {
+    "do": "Client = ZZ TEST Fabricators, Status = On hold, Reason = 'ZZ TEST payments overdue 90 days'. Save.",
+    "expect": "Message 'Client set to On hold.' Table Client · Status · Reason shows the row."
+   },
+   {
+    "do": "Sales → Inquiries → + New inquiry. Client = ZZ TEST Fabricators, Contact person, Business Unit, Subject filled. 'Create inquiry'.",
+    "expect": "Refused: 'ZZ TEST Fabricators Pvt Ltd is on hold (ZZ TEST payments overdue 90 days). Nothing new can be raised for them — only payment reminders — until a manager clears it under Client holds.'"
+   },
+   {
+    "do": "Directory → Client holds. Client = ZZ TEST Fabricators, Status = Active (no hold). Save.",
+    "expect": "Message 'Hold cleared.' Row disappears from the table."
+   },
+   {
+    "do": "Repeat step 3.",
+    "expect": "Inquiry is created."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.7, S-3; docs/03-object-lifecycles.md 'Customer trade block — D-12'; lib/ops.php partner_trade_block()"
+ },
+ {
+  "id": "DIR-018",
+  "area": "Directory",
+  "module": "Client holds",
+  "title": "A hold without a reason is refused",
+  "kind": "edge",
+  "tags": [
+   "worst"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Whoever raises the next quote must see why the client is held.",
+  "before": "Branch Manager login.",
+  "steps": [
+   {
+    "do": "Client holds: Client = ZZ TEST Fabricators, Status = Blocked, Reason empty. Save.",
+    "expect": "Refused: 'A reason is required to put a client on hold or block them.' Nothing changes."
+   },
+   {
+    "do": "Leave Client on '— choose —' and Save.",
+    "expect": "The browser stops you — Client is required."
+   }
+  ],
+  "ref": "lib/ops.php ops_client_holds()"
+ },
+ {
+  "id": "DIR-019",
+  "area": "Directory",
+  "module": "Client holds",
+  "title": "A blacklisted client is blocked too",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Blacklisted and inactive clients must also get nothing new (D-12).",
+  "before": "Test client ZZ TEST Shree Ganesh.",
+  "steps": [
+   {
+    "do": "Open the client → Edit → Status = Blacklisted → Save.",
+    "expect": "Client register shows Status Blacklisted."
+   },
+   {
+    "do": "Sales → Quotes → + New quote, Client = that client; fill a line and 'Create quote'.",
+    "expect": "Refused: '<name> is blacklisted. Nothing new can be raised for them — only payment reminders — until someone allowed to edit the client record makes them Active again.'"
+   },
+   {
+    "do": "Set the client back to Active.",
+    "expect": "New business opens again."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-5; docs/03-object-lifecycles.md D-12"
+ },
+ {
+  "id": "DIR-020",
+  "area": "Directory",
+  "module": "Asset issuance",
+  "title": "Issue a stamp and a helmet, acknowledge, return",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "COORDINATOR",
+  "why": "Whoever holds the inspection stamp can endorse work in the company's name; it must be tracked by serial number.",
+  "before": "Coordinator login; a team member (e.g. Ravi Kumar).",
+  "steps": [
+   {
+    "do": "Left menu → Directory → Asset issuance.",
+    "expect": "Heading 'Asset issuance register'. Filters (team member, type, status) and section 'Issue assets'."
+   },
+   {
+    "do": "Issue to = Ravi Kumar; Issued on = today; row 1: Type = Hard stamp, Description = ZZ TEST stamp, Serial / stamp no. = HS-ZZ01, Qty 1, Condition New. Press '+ Add another asset'; row 2: Type = Safety helmet, Description = ZZ TEST helmet, Qty 1, Condition New. Press 'Issue them'.",
+    "expect": "Two rows in the register (Asset · Type · Held by · Issued · Acknowledged · Status) with Status Issued."
+   },
+   {
+    "do": "On the stamp row use 'Acknowledge' with 'signed by' = Ravi Kumar.",
+    "expect": "Acknowledged column shows the name/date."
+   },
+   {
+    "do": "On the helmet row use 'Return / write off' → Returned, condition Good → Save.",
+    "expect": "Status Returned; the stamp stays Issued."
+   },
+   {
+    "do": "Filter Any status = Issued.",
+    "expect": "Only the stamp is listed for Ravi Kumar."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.9, S-4; views/ops/asset_register.php"
+ },
+ {
+  "id": "DIR-021",
+  "area": "Directory",
+  "module": "Asset issuance",
+  "title": "A lost stamp — status Lost, but no downstream consequence",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "gap"
+  ],
+  "persona": "COORDINATOR",
+  "why": "A lost stamp must be invalidated and its later endorsements questioned.",
+  "before": "DIR-020 done (stamp HS-ZZ01 Issued).",
+  "steps": [
+   {
+    "do": "On the stamp row: 'Return / write off' → Lost, note 'ZZ TEST lost on site' → Save.",
+    "expect": "Status Lost."
+   },
+   {
+    "do": "Look for any warning on Reporting → Endorsement register or Quality → Incidents about stamp HS-ZZ01.",
+    "expect": "Not supported today — nothing invalidates the stamp or flags endorsements made with it. Record as a gap (D-F7)."
+   },
+   {
+    "do": "Try 'Issue them' with 'Issue to' left on '— choose —'.",
+    "expect": "The browser stops you — Issue to is required."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-9, D-F7"
+ },
+ {
+  "id": "DIR-022",
+  "area": "Directory",
+  "module": "Client portal",
+  "title": "Invite a client user, set what they can do, withdraw and restore",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Clients see their own reports and invoices; access must be by invitation and limited per person.",
+  "before": "Branch Manager login. The client portal is switched on (button 'Switch it off' visible). Use YOUR OWN e-mail address for the invitation.",
+  "steps": [
+   {
+    "do": "Left menu → Directory → Client portal.",
+    "expect": "Heading 'Client portal' — 'Who at your clients can sign in, and what they have asked us for.' Sections Invite somebody, Who can sign in (Client · Person · E-mail · State · What they can do · Last signed in), What clients have asked for."
+   },
+   {
+    "do": "Invite somebody: Client company = ZZ TEST Fabricators, Their name = ZZ Test Client, Their e-mail = your e-mail. 'Create the invitation'.",
+    "expect": "New row in Who can sign in, State invited; an invitation e-mail arrives."
+   },
+   {
+    "do": "Open the person's permissions. Press 'Quality / technical — accepts reports, sees no money', then 'Save'.",
+    "expect": "'What they can do' shows report viewing/accepting but no invoices."
+   },
+   {
+    "do": "Set 'Access ends on' to a date next month, Save.",
+    "expect": "Saved; the end date is shown."
+   },
+   {
+    "do": "Press 'Withdraw' on the row, then 'Restore'.",
+    "expect": "State changes to withdrawn and back; 'New link' sends a fresh invitation link."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.8; screens_today portal-users, portal-user-perms"
+ },
+ {
+  "id": "DIR-023",
+  "area": "Directory",
+  "module": "Client portal",
+  "title": "Invitation needs a valid e-mail; dormant users are visible",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "E-mail is the identity; dormant external logins are a security exposure.",
+  "before": "Branch Manager login.",
+  "steps": [
+   {
+    "do": "Invite somebody with Their e-mail empty, then with 'abc'.",
+    "expect": "The browser refuses both (required / not an e-mail)."
+   },
+   {
+    "do": "Read the 'Last signed in' column for all client users.",
+    "expect": "Each shows a date or 'never'; anyone not signed in for months can be withdrawn with 'Withdraw'."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-7"
+ },
+ {
+  "id": "DIR-024",
+  "area": "Directory",
+  "module": "Client portal",
+  "title": "A client's request becomes a work order",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "COORDINATOR",
+  "why": "A client asking through the portal must reach operations without retyping.",
+  "before": "A client portal login (DIR-022) with 'Ask for a new work order' allowed.",
+  "steps": [
+   {
+    "do": "Client user: sign in to the portal → 'Request an inspection'. What do you need? = ZZ TEST stage inspection, Detail, Where, Wanted by → 'Send it'.",
+    "expect": "Shown under 'What you have asked us'."
+   },
+   {
+    "do": "Coordinator: Directory → Client portal → 'What clients have asked for'.",
+    "expect": "Row Asked · Client · What for · Where · Wanted by · State · Answer them."
+   },
+   {
+    "do": "Answer them = 'ZZ TEST accepted'; press 'Accept & raise the call'.",
+    "expect": "A new work order is created for that client (Operations → Work order register) and the client sees the answer."
+   },
+   {
+    "do": "Repeat with another request and press 'Decline'.",
+    "expect": "State Declined; no work order created."
+   }
+  ],
+  "ref": "screens_today portal-users (portal-request buttons); views/portal/request.php"
+ },
+ {
+  "id": "DIR-025",
+  "area": "Directory",
+  "module": "Vendor portal",
+  "title": "Vendor portal — switch on, invite, share a report, switch back",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "A vendor sees only reports deliberately shared with them; the portal is off until switched on.",
+  "before": "Branch Manager login; an issued report against a vendor. Note whether the vendor portal is currently on or off.",
+  "steps": [
+   {
+    "do": "Left menu → Directory → Vendor portal.",
+    "expect": "Heading 'Vendor portal' — 'Who at your vendors can sign in, and which reports they may see.' Sections Invite somebody, Who can sign in, Reports you can share (Report · Title · Vendor · Finalized · Shared?)."
+   },
+   {
+    "do": "If off, press 'Switch it on'.",
+    "expect": "Button changes to 'Switch it off'."
+   },
+   {
+    "do": "Invite: Vendor company = a test vendor, Their e-mail = your own. 'Create the invitation'.",
+    "expect": "Row in Who can sign in."
+   },
+   {
+    "do": "On a report row press 'Share with vendor'.",
+    "expect": "Shared? = yes; the vendor login sees that report only."
+   },
+   {
+    "do": "If the portal was off at the start, press 'Switch it off'.",
+    "expect": "Setting back to how it was."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.8; screens_today vendor-users"
+ },
+ {
+  "id": "DIR-026",
+  "area": "Directory",
+  "module": "Vendor register",
+  "title": "Finance opens the client and vendor registers read-only",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "FINANCE",
+  "why": "Accounts needs GSTIN and terms but must not change master data (owner Q-G, Q-K).",
+  "before": "Finance login (after the 19 Oct update is live).",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as Finance. Left menu → Directory → Client register.",
+    "expect": "Opens (read only)."
+   },
+   {
+    "do": "Press '+ Add Client'.",
+    "expect": "Refused: 'You do not have permission to add client / vendor records.'"
+   },
+   {
+    "do": "Directory → Vendor register.",
+    "expect": "Opens (read only)."
+   },
+   {
+    "do": "Directory → Client holds; Directory → Find duplicates.",
+    "expect": "Both refused ('You cannot manage client holds.' / merge refused)."
+   }
+  ],
+  "ref": "09-DIRECTORY.md status 19 Oct, E-13; 02-permission-matrix.md fn 5a"
+ },
+ {
+  "id": "DIR-027",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Inspector cannot open the Directory",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "INSPECTOR",
+  "why": "Inspectors have no business-partner rights (matrix INS = —).",
+  "before": "Inspector login.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Inspector.",
+    "expect": "No Directory in the menu."
+   },
+   {
+    "do": "Type /directory, /clients, /partner-new, /asset-register in turn.",
+    "expect": "Each refused or redirected away; no client data shown."
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-12; evidence/role-access-matrix.md"
+ },
+ {
+  "id": "DIR-028",
+  "area": "Directory",
+  "module": "Find duplicates",
+  "title": "Coordinator: may add clients and holds, may not merge or import",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "COORDINATOR",
+  "why": "Coordinators onboard a party while raising a call, but merging rewrites history.",
+  "before": "Coordinator login.",
+  "steps": [
+   {
+    "do": "Directory → Client register → '+ Add Client'.",
+    "expect": "The form opens (coordinator intake allowed)."
+   },
+   {
+    "do": "Directory → Client holds.",
+    "expect": "Opens."
+   },
+   {
+    "do": "Directory → Find duplicates.",
+    "expect": "Refused: 'You cannot merge clients or vendors.'"
+   },
+   {
+    "do": "Client register → '⬆ Import from a spreadsheet'.",
+    "expect": "Refused."
+   }
+  ],
+  "ref": "lib/dedupe.php; lib/partnerimport.php; evidence/role-access-matrix.md (/duplicates, /partner-import CO 302)"
+ },
+ {
+  "id": "DIR-029",
+  "area": "Directory",
+  "module": "Client portal",
+  "title": "Business Director cannot manage portal users",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "The director views the business; portal logins are run by branch management.",
+  "before": "Business Director login.",
+  "steps": [
+   {
+    "do": "Directory → Client portal.",
+    "expect": "Redirected away with a message (no invitation form)."
+   },
+   {
+    "do": "Directory → Vendor portal.",
+    "expect": "Same."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md (/portal-users, /vendor-users BD 302)"
+ },
+ {
+  "id": "DIR-030",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Phone width — add a client from the site gate",
+  "kind": "phone",
+  "tags": [
+   "phone"
+  ],
+  "persona": "COORDINATOR",
+  "why": "A site address is best captured standing at the gate with the phone's GPS.",
+  "before": "Coordinator login on a phone; location permission allowed.",
+  "steps": [
+   {
+    "do": "Phone: ☰ → Directory → Client register.",
+    "expect": "Table scrolls inside its box; the page does not scroll sideways."
+   },
+   {
+    "do": "'+ Add Client' → fill Legal name ZZ TEST Phone Client, Payment terms → Site & scope tab → 'Use this device's current location'.",
+    "expect": "The phone asks for location; latitude and longitude fill in."
+   },
+   {
+    "do": "Save.",
+    "expect": "Saved; the record opens readable on the phone."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.3 (four location controls); CLAUDE.md phone-first rule"
+ },
+ {
+  "id": "DIR-031",
+  "area": "Directory",
+  "module": "Client register",
+  "title": "Customer 360 — group company and branch GSTIN",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Group companies and per-state GSTINs decide invoices' place of supply.",
+  "before": "Test client ZZ TEST Fabricators.",
+  "steps": [
+   {
+    "do": "Client register → ZZ TEST Fabricators → '360'.",
+    "expect": "Customer 360 with sections Group, Billing branch, Money, Work, 'Where we have let them down', 'Reports issued', Who to talk to, What has happened; buttons '➕ Raise inspection work order', 'Master record', 'Ledger', '⬇ Timeline CSV'."
+   },
+   {
+    "do": "Group: Parent company = ZZ TEST Shree Ganesh… → 'Save group'.",
+    "expect": "Saved; the master record shows it under 'Company hierarchy'."
+   },
+   {
+    "do": "Open '➕ Add a branch / GSTIN of this client for another office': Registered name = ZZ TEST Fabricators Mumbai, GSTIN = a 27… test GSTIN, Owned by office = Mumbai → 'Create branch company'.",
+    "expect": "A branch company is created and linked."
+   },
+   {
+    "do": "Compare the Money section with Money → Receivables ageing for this client.",
+    "expect": "Outstanding amounts agree."
+   }
+  ],
+  "ref": "screens_today customer"
+ },
+ {
+  "id": "DIR-032",
+  "area": "Directory",
+  "module": "Masters",
+  "title": "Working norms — set, see utilisation move, revert (no effective date)",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "gap"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Working norms are the denominator for utilisation; a change moves history.",
+  "before": "Branch Manager login. Note the current norms table.",
+  "steps": [
+   {
+    "do": "Open operations.mghaiapps.com/work-norms (breadcrumb Home › Directory › Masters).",
+    "expect": "Heading 'Working norms' — most-specific rule wins. Fields Designation (blank = office-wide default), Office (blank = all offices), Weekly working days (6 / 5.5 / 5), Weekly working hours; button 'Save norm'; table Designation · Office · Weekly days · Weekly hours."
+   },
+   {
+    "do": "Note utilisation for last month on Insights → Dashboards '📈 Utilization'. Save a norm: Designation = Inspector, Office = your office, 5 days, 40 hours.",
+    "expect": "Row added."
+   },
+   {
+    "do": "Re-open Dashboards for LAST month.",
+    "expect": "Utilisation for a past month changes. Not supported today: no 'effective from' date, so history moves. Record as a gap (D-F6)."
+   },
+   {
+    "do": "Press 'Remove' on the new row.",
+    "expect": "Row removed; last month's utilisation returns to the noted value."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.11, E-8, D-F6"
+ },
+ {
+  "id": "DIR-033",
+  "area": "Directory",
+  "module": "Activity",
+  "title": "Activity — special characters, phone entry, filters and empty lists",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst",
+   "phone"
+  ],
+  "persona": "COORDINATOR",
+  "why": "Notes are typed fast on a phone with emojis and symbols; the timeline must keep them intact.",
+  "before": "Coordinator login on a phone.",
+  "steps": [
+   {
+    "do": "Phone: ☰ → Directory → Activity → Record something that happened: What kind = Telephone call, Customer = ZZ TEST Fabricators, What happened = 'Rate ₹1,200/day & 10% GST — OK 👍 \"final\"'. 'Record it'.",
+    "expect": "Saved; text shown exactly; page fits the phone."
+   },
+   {
+    "do": "Press 'Task' when no tasks exist.",
+    "expect": "Empty list; no error."
+   },
+   {
+    "do": "Press 'Typed by a person', then 'Recorded by the system'.",
+    "expect": "The first shows the typed entry; the second does not."
+   },
+   {
+    "do": "Press '⬇ CSV' on the empty 'Task' filter.",
+    "expect": "A file downloads with only the header row."
+   }
+  ],
+  "ref": "screens_today activities"
+ },
+ {
+  "id": "DIR-034",
+  "area": "Directory",
+  "module": "Asset issuance",
+  "title": "The same stamp number issued twice, and phone acknowledgement",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst",
+   "phone",
+   "gap"
+  ],
+  "persona": "COORDINATOR",
+  "why": "A controlled stamp cannot be held by two people at once.",
+  "before": "Stamp HS-ZZ02 issued to Ravi Kumar (Status Issued).",
+  "steps": [
+   {
+    "do": "Issue assets: Issue to = another team member, Type = Hard stamp, Serial / stamp no. = HS-ZZ02. 'Issue them'.",
+    "expect": "Expected: refused or warned that HS-ZZ02 is already held. If two people now hold HS-ZZ02, record as a gap."
+   },
+   {
+    "do": "On a phone, acknowledge the first issue ('Acknowledge', signed by).",
+    "expect": "Works on the phone; no sideways page scroll."
+   },
+   {
+    "do": "Issue with Qty = 0.",
+    "expect": "Expected: refused. If saved, record as a defect."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.9 (stamp is a controlled item)"
+ },
+ {
+  "id": "DIR-035",
+  "area": "Directory",
+  "module": "Client holds",
+  "title": "Hold reason length limit, Blocked state and wrong person",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "The reason is shown to whoever raises the next quote; it must fit and be set only by managers.",
+  "before": "Branch Manager and Finance logins.",
+  "steps": [
+   {
+    "do": "Client holds: Client = ZZ TEST Fabricators, Status = Blocked, paste a 500-character reason.",
+    "expect": "The box stops at 400 characters."
+   },
+   {
+    "do": "Save; try Sales → Quotes → + New quote for that client.",
+    "expect": "Refused: '… is blocked (…). Nothing new can be raised for them — only payment reminders — until a manager clears it under Client holds.'"
+   },
+   {
+    "do": "Finance opens Directory → Client holds.",
+    "expect": "Refused: 'You cannot manage client holds.'"
+   },
+   {
+    "do": "Branch Manager clears the hold (Active (no hold), Save).",
+    "expect": "'Hold cleared.'"
+   }
+  ],
+  "ref": "screens_today client-holds (maxlength 400); lib/ops.php partner_trade_block(), ops_client_holds()"
+ },
+ {
+  "id": "DIR-036",
+  "area": "Directory",
+  "module": "Client portal",
+  "title": "Portal access end date, duplicate invitation, and a blocked client",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst",
+   "gap"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Access must end when it is meant to; one person must not get two logins.",
+  "before": "Client portal user from DIR-022 (your e-mail).",
+  "steps": [
+   {
+    "do": "Open the user's permissions → 'Access ends on' = yesterday → Save. Try to sign in to the portal as them.",
+    "expect": "Access refused — 'blank means never; access is revoked automatically' after the date. Clear the date afterwards."
+   },
+   {
+    "do": "Create the invitation again with the same e-mail for the same client.",
+    "expect": "Expected: told the person already exists (no second row). If a duplicate row appears, record as a defect."
+   },
+   {
+    "do": "Press 'Create the invitation' with Client company = 'Choose…'.",
+    "expect": "The browser refuses — client company is required."
+   }
+  ],
+  "ref": "screens_today portal-user-perms"
+ },
+ {
+  "id": "DIR-037",
+  "area": "Directory",
+  "module": "Find duplicates",
+  "title": "Duplicates screen with nothing to merge, and a client merged into a vendor",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Merging across roles must keep both roles; an empty screen must say so.",
+  "before": "A TEST client and a TEST vendor that are the same company.",
+  "steps": [
+   {
+    "do": "Find duplicates → the TEST client/vendor pair → keep the client record → reason → 'Merge them'.",
+    "expect": "Merged message; the kept record's Roles show Client and Vendor (check Client register). If the vendor role is lost, record as a defect."
+   },
+   {
+    "do": "Press the browser Back button and 'Merge them' again on the same (already merged) pair.",
+    "expect": "Refused: 'That record has already been merged into another one. …' (or the pair is no longer listed)."
+   },
+   {
+    "do": "When no pairs are left (test workspace), open Find duplicates.",
+    "expect": "An empty list, no error."
+   }
+  ],
+  "ref": "lib/dedupe.php dd_merge() messages"
+ },
+ {
+  "id": "DIR-038",
+  "area": "Directory",
+  "module": "Vendor register",
+  "title": "Add a vendor and a sub-contractor",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge",
+   "worst"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Vendors are inspected at; sub-contractors supply manpower — both are vendors in the register.",
+  "before": "Branch Manager login.",
+  "steps": [
+   {
+    "do": "Directory → Vendor register.",
+    "expect": "Heading 'Vendor register' — 'manufacturers, suppliers, plants and their contacts'; '+ Add Vendor', '⬆ Import from a spreadsheet', '⬇ Export', '🔍 Possible duplicates'; columns Code · Name · Roles · Industry · GSTIN · Status · Actions."
+   },
+   {
+    "do": "'+ Add Vendor': Legal name = ZZ TEST Castings, Is a Vendor ticked, Payment terms '— none —'. Save.",
+    "expect": "Saved (a vendor-only record needs no payment terms)."
+   },
+   {
+    "do": "'+ Add Vendor': Legal name = ZZ TEST Manpower Agency, tick only 'Is a Sub-contractor'. Save.",
+    "expect": "Saved; Roles show Vendor and Sub-contractor (a sub-contractor is forced to be a vendor)."
+   },
+   {
+    "do": "'+ Add Vendor' with GSTIN = 1234.",
+    "expect": "Refused: 'GSTIN should be 15 characters, e.g. 24ADUPL3517E2ZJ.'"
+   }
+  ],
+  "ref": "index.php partner-new (sub-contractor forces vendor role)"
+ },
+ {
+  "id": "DIR-039",
+  "area": "Directory",
+  "module": "Vendor portal",
+  "title": "Vendor sees only shared reports; invitation needs a vendor",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst",
+   "rule"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "A vendor must never see another vendor's or an unshared report.",
+  "before": "Vendor portal on; a vendor user (DIR-025); two issued reports for that vendor, one shared.",
+  "steps": [
+   {
+    "do": "Sign in as the vendor user.",
+    "expect": "Only the shared report is listed."
+   },
+   {
+    "do": "As manager, 'Create the invitation' with Vendor company = 'Choose…'.",
+    "expect": "The browser refuses — vendor company is required."
+   },
+   {
+    "do": "Withdraw the vendor user ('Withdraw'); try to sign in as them.",
+    "expect": "Refused."
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.8"
+ },
+ {
+  "id": "ADM-001",
+  "area": "Admin",
+  "module": "Company setup",
+  "title": "Admin home — eight sections and their tiles",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Every configuration starts here; each tile must lead where its name says.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as Master Admin. Left menu → Admin.",
+    "expect": "Heading 'Admin' — 'For administrators: masters, people, access, licensing and system configuration.' Tabs: Set up your workspace · Masters · People · Configuration · Approvals · Report configuration · Super admin · Connections."
+   },
+   {
+    "do": "Read each tab's tiles.",
+    "expect": "Set up your workspace: Company setup, Modules & features. Masters: Masters. People: User register, Organisation, Roles & permissions, Role workspaces, Single sign-on. Configuration: System settings, Backup & restore, AI settings, Terminology / wording, Form Designer, Build forms with AI, Service scope, Report formats by service, Company profile. Approvals: Approvals. Report configuration: Report templates, Report audit trail. Super admin: Control panel, Companies, Product package. Connections: Ads Pro connection, Licence, MGH Books."
+   },
+   {
+    "do": "Click each of the 26 tiles once and press Back.",
+    "expect": "Every tile opens a screen with a heading; none shows an error or a blank page."
+   }
+  ],
+  "ref": "evidence/navigation-dump.json (Admin); 10-ADMIN.md §2"
+ },
+ {
+  "id": "ADM-002",
+  "area": "Admin",
+  "module": "Company setup",
+  "title": "Set up your workspace — readiness, search, Fix and Do this",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A new customer is guided to the next action instead of hunting through 26 tiles.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Company setup.",
+    "expect": "Heading 'Set up your workspace' with a readiness ring (a %), the line 'This is a guide, not a gate…', a search box 'Search settings — e.g. candidate, dropdown, role…', sections 'Needs your attention' (each with 'Fix'), 'Configuration areas' (cards with Complete / Configured / In progress / Needs attention / Not started), 'Get started' (each undone item with 'Do this') and 'Quick actions'."
+   },
+   {
+    "do": "Search 'dropdown'.",
+    "expect": "Matching settings listed, each with 'Open'."
+   },
+   {
+    "do": "Search 'zzzz'.",
+    "expect": "'No settings matched “zzzz”.'"
+   },
+   {
+    "do": "Quick actions: press each of '+ Add a form field', '✨ Build forms with AI', '+ Add a dropdown value', '+ Add a user', '+ Add a branch', 'Configure features', 'Change wording' and come back.",
+    "expect": "They open the form designer forms list, Build forms from your process, Masters, User register, Organisation → Offices, Modules & features and Terminology."
+   },
+   {
+    "do": "Press one 'Fix' or 'Do this'.",
+    "expect": "Opens exactly the screen that resolves that item."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 'Set up your workspace'; views/ops/cockpit_home.php"
+ },
+ {
+  "id": "ADM-003",
+  "area": "Admin",
+  "module": "Modules & features",
+  "title": "Switchboard — turning a feature off asks first; 'Keep it on' changes nothing",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Switching off an area hides screens for the whole company; it must never happen by one stray click.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Modules & features.",
+    "expect": "Heading 'Modules & features'. One card per module with an On / Off / '🔒 Not in plan' pill; core modules read 'Always on — every workspace needs it.'"
+   },
+   {
+    "do": "On a module that is On and has listed features (e.g. Marketplace & Connect), press 'Turn off this feature'.",
+    "expect": "A red panel 'Turn off “<name>”?' lists 'These parts of your workspace will be hidden while it is off:' with buttons 'Turn it off & hide these' and 'Keep it on'."
+   },
+   {
+    "do": "Press 'Keep it on'.",
+    "expect": "Back on the list; the module still shows On; nothing changed in the left menu."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 Configuration (switchboard); lib/setup_cockpit.php cockpit_module_apply()"
+ },
+ {
+  "id": "ADM-004",
+  "area": "Admin",
+  "module": "Modules & features",
+  "title": "Switch an unused module off and back on — data comes back unchanged",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "If switching back on loses data, a company cannot safely try a module (E-8).",
+  "before": "Master Admin login, at a quiet time. Pick a module the company does NOT use today. Count its records first (e.g. number of rows in its main register).",
+  "steps": [
+   {
+    "do": "Modules & features → that module → 'Turn off this feature' → 'Turn it off & hide these'.",
+    "expect": "Message '<name> is now off.' The pill shows Off; its area/tiles disappear from the left menu."
+   },
+   {
+    "do": "Type the address of one of its screens.",
+    "expect": "Refused or hidden — the screen is not reachable while off."
+   },
+   {
+    "do": "Press 'Add this to my workspace' on the same card.",
+    "expect": "Message '<name> is now on.' Area back in the menu."
+   },
+   {
+    "do": "Count the records in its register again.",
+    "expect": "Same count as before — nothing lost."
+   }
+  ],
+  "ref": "10-ADMIN.md E-8; views/ops/cockpit_modules.php"
+ },
+ {
+  "id": "ADM-005",
+  "area": "Admin",
+  "module": "Modules & features",
+  "title": "Plan limit — a module outside the plan cannot be switched on",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A company can never use a module it has not paid for.",
+  "before": "A module showing '🔒 Not in plan' (if none, note 'all modules in plan' and pass).",
+  "steps": [
+   {
+    "do": "Modules & features → the locked module.",
+    "expect": "Text 'This feature isn’t part of your plan.' with either 'Upgrade to add it' or 'Contact us to add it to your plan.' No 'Add this to my workspace' button."
+   },
+   {
+    "do": "Admin → Licence → table Module · What it contains · State.",
+    "expect": "The same module is shown as not licensed."
+   }
+  ],
+  "ref": "lib/setup_cockpit.php (entitlement lock)"
+ },
+ {
+  "id": "ADM-006",
+  "area": "Admin",
+  "module": "Modules & features",
+  "title": "Only an administrator can open Company setup and Modules & features",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Settings belong to MA/AD only in the matrix.",
+  "before": "Business Director and Branch Manager logins.",
+  "steps": [
+   {
+    "do": "As Business Director open Admin → Company setup (or /workspace/setup), then /workspace/setup/modules.",
+    "expect": "Refused/redirected: 'Only a workspace administrator can configure the company.'"
+   },
+   {
+    "do": "As Branch Manager do the same.",
+    "expect": "Same refusal."
+   }
+  ],
+  "ref": "02-permission-matrix.md Settings (MA/AD only); lib/setup_cockpit.php ops_cockpit(); evidence/role-access-matrix.md"
+ },
+ {
+  "id": "ADM-007",
+  "area": "Admin",
+  "module": "Masters",
+  "title": "Masters — add a dropdown value, use it, remove it",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Every dropdown in the product comes from these lists; adding one value must reach the forms at once.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Masters.",
+    "expect": "Heading 'Masters' — 'The ready-made answers your forms offer…'. Sections '1 · Records you keep', '2 · Dropdown lists', '3 · Extra fields on a form'; tabs Offices / branches and Back-office staff."
+   },
+   {
+    "do": "Open the dropdown lists (the second Masters screen, '… lists, … values', grouped by module) → Directory group → 'Industry' → 'Edit values'.",
+    "expect": "Table Value · Code · Active · (Used by) · Actions, and 'Add a value' form."
+   },
+   {
+    "do": "Value * = ZZ TEST Industry → 'Add value'.",
+    "expect": "Row appears."
+   },
+   {
+    "do": "Directory → Client register → '+ Add Client' → Industry dropdown.",
+    "expect": "ZZ TEST Industry is offered."
+   },
+   {
+    "do": "Back on the Industry list press 'Delete' on ZZ TEST Industry.",
+    "expect": "Browser asks 'Remove this value?' → OK → 'Value removed.'"
+   }
+  ],
+  "ref": "09-DIRECTORY.md §2.10; 10-ADMIN.md A-F4; views/ops/lookup_values.php"
+ },
+ {
+  "id": "ADM-008",
+  "area": "Admin",
+  "module": "Masters",
+  "title": "Removing a value that records still use warns first (no retire option)",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Removing a value in use leaves raw codes on old records (E-6).",
+  "before": "Add value ZZ TEST Industry2 and set it on test client ZZ TEST Fabricators.",
+  "steps": [
+   {
+    "do": "Masters → Industry → 'Delete' on ZZ TEST Industry2.",
+    "expect": "Browser warns '1 record(s) still use this value — they will show a raw code if you remove it. Remove anyway?' Press CANCEL."
+   },
+   {
+    "do": "Look for a way to retire the value (stop offering it on new records, keep it on old ones).",
+    "expect": "If only Delete exists, record as a gap (E-6 — Marketplace taxonomy has 'Retire', masters do not)."
+   },
+   {
+    "do": "Change the client back to Oil & Gas, then delete ZZ TEST Industry2.",
+    "expect": "'Value removed.'"
+   }
+  ],
+  "ref": "09-DIRECTORY.md E-6; views/ops/lookup_values.php"
+ },
+ {
+  "id": "ADM-009",
+  "area": "Admin",
+  "module": "Masters",
+  "title": "Two screens both headed 'Masters' (A-F4)",
+  "kind": "edge",
+  "tags": [
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Which screen is the front door for dropdowns is not obvious.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Masters. Note the heading and contents.",
+    "expect": "Heading 'Masters' (records you keep, dropdown lists, extra fields)."
+   },
+   {
+    "do": "Open operations.mghaiapps.com/lookups.",
+    "expect": "Also headed 'Masters' ('Every dropdown in the app, grouped by module… N lists, N values'). Record as a gap (A-F4)."
+   }
+  ],
+  "ref": "10-ADMIN.md A-F4"
+ },
+ {
+  "id": "ADM-010",
+  "area": "Admin",
+  "module": "Masters",
+  "title": "Coordinator may view masters but not edit dropdown lists",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "COORDINATOR",
+  "why": "The matrix gives Lookups = — to CO.",
+  "before": "Coordinator login.",
+  "steps": [
+   {
+    "do": "As Coordinator: Admin → Masters.",
+    "expect": "Opens (view)."
+   },
+   {
+    "do": "Type /lookups.",
+    "expect": "Refused/redirected — no 'Edit values' or 'Create list'."
+   }
+  ],
+  "ref": "02-permission-matrix.md Lookups (CO —); evidence/role-access-matrix.md (/lookups CO 302)"
+ },
+ {
+  "id": "ADM-011",
+  "area": "Admin",
+  "module": "User register",
+  "title": "Add a person with a login (Coordinator, own office)",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Every login must belong to a real team member with the right role, office and scope.",
+  "before": "Master Admin login. A spare e-mail address.",
+  "steps": [
+   {
+    "do": "Admin → User register.",
+    "expect": "Heading 'Organisation & people' — 'N active login(s)…'. Tabs Chart · Offices · People · Excel upload · Gaps. Buttons '+ Add a person', 'Bulk (Excel)', 'Print'. Columns Username · Name · Email · Role · Office · Signature · Two-step · Last seen · Active · Actions."
+   },
+   {
+    "do": "'+ Add a person'.",
+    "expect": "Heading 'Add a person'; tabs Who they are · Organisation & people · Data scope · Position & pay · Permissions."
+   },
+   {
+    "do": "Who they are: Username = zz.coord1, Password = a strong password, tick 'They must choose their own at the next sign-in', First name ZZ, Last name Coordinator, Email = spare e-mail, Role = Coordinator, Home office = Ahmedabad (or yours). Team member = '➕ Add this person to the team (use the name above)'; Which team = 'Coordinator / office-based…'; Is active ticked.",
+    "expect": "Fields accept the values."
+   },
+   {
+    "do": "Data scope: tick only the home office and the business units they work in. Leave Permissions all unticked (role defaults). 'Save user'.",
+    "expect": "Message 'User created.' Row zz.coord1, Role Coordinator, Office Ahmedabad, Active."
+   },
+   {
+    "do": "Sign out; sign in as zz.coord1.",
+    "expect": "Asked to choose a new password; then the Coordinator menu: Operations, Recruitment, Quality, Reporting, Money (invoice tracker/billing), Insights, Directory, Admin (Masters, SLA targets). No Roles & permissions, no System settings."
+   }
+  ],
+  "ref": "10-ADMIN.md S-2; docs/01-roles.md COORDINATOR; lib/ops.php user save"
+ },
+ {
+  "id": "ADM-012",
+  "area": "Admin",
+  "module": "User register",
+  "title": "Add a person with nothing filled is refused in plain words",
+  "kind": "edge",
+  "tags": [
+   "worst"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A login without a team member breaks allocation and approvals.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "User register → '+ Add a person' → Username = zz.empty → Team member: leave '➕ Add this person…' with no first/last name → 'Save user'.",
+    "expect": "Refused: 'A login must belong to a team member. Pick the person from the team, or enter their name (first / last) so they are added to the team.'"
+   },
+   {
+    "do": "Leave Username empty and press 'Save user'.",
+    "expect": "The browser stops you — Username is required."
+   },
+   {
+    "do": "Create a user with no password.",
+    "expect": "'User created. No password was set, so use Edit to give them one — the account cannot be signed into until you do.'"
+   }
+  ],
+  "ref": "10-ADMIN.md E-4; lib/ops.php:10070, 10283"
+ },
+ {
+  "id": "ADM-013",
+  "area": "Admin",
+  "module": "User register",
+  "title": "Deactivate and reactivate a person — their history stays",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A person who left still authored reports and approvals; their records must keep pointing at them (E-5).",
+  "before": "zz.coord1 from ADM-011, who has recorded at least one activity (e.g. DIR-015 done as zz.coord1).",
+  "steps": [
+   {
+    "do": "User register → row zz.coord1 → 'Deactivate'.",
+    "expect": "Message 'zz.coord1 can no longer sign in. Everything they did stays exactly as it is. …' Active column shows inactive; a 'Reactivate' button appears."
+   },
+   {
+    "do": "Try signing in as zz.coord1.",
+    "expect": "Sign-in refused."
+   },
+   {
+    "do": "Directory → Activity: find their entry.",
+    "expect": "Still shown with their name."
+   },
+   {
+    "do": "Press 'Reactivate'.",
+    "expect": "'zz.coord1 can sign in again.'"
+   },
+   {
+    "do": "Try 'Deactivate' on your OWN account.",
+    "expect": "Refused: 'You cannot deactivate your own account — somebody else has to do it.'"
+   }
+  ],
+  "ref": "10-ADMIN.md E-5; lib/security.php ops_user_retire()"
+ },
+ {
+  "id": "ADM-014",
+  "area": "Admin",
+  "module": "User register",
+  "title": "A user with no home office sees no branch — and the admin is told",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "An empty home office used to grant ALL offices; it must now close (R-30, E-6).",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "'+ Add a person': Username zz.nooffice, password set, Role = Coordinator, Home office = '—', no office ticked in Data scope, Team member added by name. 'Save user'.",
+    "expect": "User created."
+   },
+   {
+    "do": "Sign in as zz.nooffice and open Operations → Work order register.",
+    "expect": "No work orders from any branch; a message says the account has no branch yet and what to ask for."
+   },
+   {
+    "do": "As Master Admin: User register → 'Gaps' tab (or the admin notice on the home screen).",
+    "expect": "A count of people with no branch, with a link to fix them; zz.nooffice is among them."
+   },
+   {
+    "do": "Deactivate zz.nooffice.",
+    "expect": "Cleaned up."
+   }
+  ],
+  "ref": "10-ADMIN.md E-6; 02-permission-matrix.md R-30"
+ },
+ {
+  "id": "ADM-015",
+  "area": "Admin",
+  "module": "User register",
+  "title": "Branch Manager manages only own-office people and limited roles",
+  "kind": "access",
+  "tags": [
+   "rule",
+   "gap"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Users = E(own office) for BM; they must not create Finance or Directors or touch other branches.",
+  "before": "Branch Manager login (home office A); a user in office B.",
+  "steps": [
+   {
+    "do": "As Branch Manager: Admin → User register.",
+    "expect": "Opens; only people of office A are manageable."
+   },
+   {
+    "do": "'+ Add a person' → open the Role list.",
+    "expect": "Expected: only Operation Manager, Asst. Manager, Coordinator and Inspector. If other roles (e.g. Finance, Master Admin) are offered, choose Finance, save a test user zz.bmtest, and check the saved Role: if it silently became Coordinator, record as a gap (silent downgrade)."
+   },
+   {
+    "do": "Home office field.",
+    "expect": "Fixed to office A (cannot pick another office)."
+   },
+   {
+    "do": "Open the office B user's 'Edit' (type /user-edit?id=<their id>) and press 'Save user'.",
+    "expect": "Refused: 'You can only manage users in your own office.'"
+   }
+  ],
+  "ref": "02-permission-matrix.md Users (BM E(own office)); lib/ops.php:10010-10020"
+ },
+ {
+  "id": "ADM-016",
+  "area": "Admin",
+  "module": "User register",
+  "title": "Business Director is redirected from Users, Roles and Settings (GAP-005)",
+  "kind": "access",
+  "tags": [
+   "rule",
+   "gap"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "The rule is right (matrix gives BD nothing on Users/Settings) but the refusal shape differs from a Branch Manager's.",
+  "before": "Business Director and Branch Manager logins.",
+  "steps": [
+   {
+    "do": "As BD: Admin → User register.",
+    "expect": "Redirected away with a message (not an error page)."
+   },
+   {
+    "do": "As BD: Admin → Roles & permissions; Admin → System settings.",
+    "expect": "Same redirect."
+   },
+   {
+    "do": "As BM: Admin → Roles & permissions; Admin → System settings.",
+    "expect": "A plain 'not allowed' (403) page. Two different refusal shapes for the same rule — record as GAP-005 (consistency)."
+   }
+  ],
+  "ref": "10-ADMIN.md §1, E-1, E-2; evidence/role-access-matrix.md"
+ },
+ {
+  "id": "ADM-017",
+  "area": "Admin",
+  "module": "User register",
+  "title": "Seat limit — the plan's seat count is respected",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A company must not run more active logins than it pays for.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Licence → 'This subscription': note licensed seats (full and field). Admin → User register: count Active logins.",
+    "expect": "Two numbers noted; active ≤ licensed."
+   },
+   {
+    "do": "Only if active = licensed: try '+ Add a person' for one more office user.",
+    "expect": "Refused: 'Your plan covers N full seats and M are already active. Deactivate a … user who has left, or ask MGH to add … seats.' (If below the limit, record 'not at limit — not tested'.)"
+   },
+   {
+    "do": "Edit an existing person's e-mail.",
+    "expect": "Allowed even at the limit — editing is never blocked."
+   }
+  ],
+  "ref": "lib/licencekey.php lk_seat_block(); lib/ops.php (seat check on new users only)"
+ },
+ {
+  "id": "ADM-018",
+  "area": "Admin",
+  "module": "Organisation",
+  "title": "Organisation chart — tabs, arrange, and duplicate heading (A-F1)",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The reporting tree drives approvals (N+1); it must be easy to build and read.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Organisation.",
+    "expect": "Heading 'Organisation & people' — 'One place for the reporting tree, the office structure, every person…'. Tabs Chart · Offices · People · Excel upload · Gaps; 'Start here — in this order'."
+   },
+   {
+    "do": "Chart tab: press 'Expand all', 'Collapse all', 'Fit to screen', '100%'.",
+    "expect": "The chart redraws each time."
+   },
+   {
+    "do": "If 'Arrange these N automatically' is shown, read the 'Person · Would report to' proposals (do not press on live unless the proposals are right).",
+    "expect": "Proposals listed with a live count."
+   },
+   {
+    "do": "Compare the heading with Admin → User register.",
+    "expect": "Both read 'Organisation & people'. Record as gap A-F1 (two different screens, one name)."
+   },
+   {
+    "do": "Offices tab.",
+    "expect": "18 offices listed with Deactivate/Reactivate per office."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 People, A-F1"
+ },
+ {
+  "id": "ADM-019",
+  "area": "Admin",
+  "module": "Roles & permissions",
+  "title": "Change one right for Coordinator, reload, then put it back",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "'May edit a job but never delete one' is the point of the six-verb model; a saved untick must stay unticked (R-20).",
+  "before": "Master Admin login. Note the Coordinator's current tick for Jobs → Delete.",
+  "steps": [
+   {
+    "do": "Admin → Roles & permissions.",
+    "expect": "Heading 'Roles & permissions' — 'Pick a role, apply the recommended set in one click, then fine-tune…'. A role picker (Business Director … Inspector), grid Module · View · Add · Edit · Archive · Delete · Approve, a 'Data & feature permissions' list, buttons '✨ Apply recommended set', 'Reset to default', 'Save access for Coordinator', 'Undo', 'Cancel changes'."
+   },
+   {
+    "do": "Pick Coordinator. Toggle Jobs → Delete. Press 'Save access for Coordinator'.",
+    "expect": "Saved message; the tick shows the new state."
+   },
+   {
+    "do": "Reload the page (F5).",
+    "expect": "The new state is still there (not reverted by itself)."
+   },
+   {
+    "do": "Toggle it back and save.",
+    "expect": "Back to the original."
+   },
+   {
+    "do": "Pick Finance.",
+    "expect": "The save button now reads 'Save access for Finance' (E-7)."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 /access, E-7; 02-permission-matrix.md R-20"
+ },
+ {
+  "id": "ADM-020",
+  "area": "Admin",
+  "module": "Roles & permissions",
+  "title": "Undo and Cancel changes discard unsaved ticks",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Permission editing is high stakes; unsaved mistakes must be easy to throw away.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Roles & permissions → Coordinator. Tick three boxes that are unticked.",
+    "expect": "Ticks shown."
+   },
+   {
+    "do": "Press 'Undo'.",
+    "expect": "The last tick reverts."
+   },
+   {
+    "do": "Press 'Cancel changes'.",
+    "expect": "Page reloads with the saved state; none of the three ticks remain."
+   },
+   {
+    "do": "Tick a stronger verb (e.g. Edit) on a module where View is unticked.",
+    "expect": "View is ticked automatically (a stronger verb includes the weaker)."
+   }
+  ],
+  "ref": "10-ADMIN.md E-7; 02-permission-matrix.md R-20 (PERM_VERB_IMPLIES)"
+ },
+ {
+  "id": "ADM-021",
+  "area": "Admin",
+  "module": "Roles & permissions",
+  "title": "Default rights match the permission matrix",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The grid must never grant what docs/02-permission-matrix.md does not list.",
+  "before": "Master Admin login. A copy of docs/02-permission-matrix.md.",
+  "steps": [
+   {
+    "do": "Roles & permissions → Coordinator → 'Data & feature permissions'.",
+    "expect": "'See the revenue figure on a work order / job', 'See salary / loaded cost', 'See profitability by contract number', 'Manage all users & access', 'Manage system settings', 'Manage master data' are unticked; 'See the inter-office credit figures' ticked."
+   },
+   {
+    "do": "Finance.",
+    "expect": "'Register client & contract (Accounts)' ticked; module grid shows Vendors and Clients View only (no Add/Edit)."
+   },
+   {
+    "do": "Quality Head.",
+    "expect": "'Close nonconformities…' and 'Close corrective actions…' ticked; no money, users or settings."
+   },
+   {
+    "do": "Branch Manager.",
+    "expect": "'Manage users in own office' ticked, 'Manage all users & access' unticked, 'Manage system settings' unticked."
+   },
+   {
+    "do": "Any difference from the matrix (and not a deliberate change by the owner).",
+    "expect": "Record as FAIL with a screenshot."
+   }
+  ],
+  "ref": "docs/02-permission-matrix.md tables and fn 14-20; docs/01-roles.md"
+ },
+ {
+  "id": "ADM-022",
+  "area": "Admin",
+  "module": "Roles & permissions",
+  "title": "Two admins edit the same role at once — last save wins",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Silent overwrite of permissions can grant or remove rights nobody chose (E-17).",
+  "before": "Two Master Admin sessions. Note the Coordinator grid.",
+  "steps": [
+   {
+    "do": "A and B: open Roles & permissions → Coordinator.",
+    "expect": "Same grid."
+   },
+   {
+    "do": "A: tick box X, Save. B (no reload): tick box Y, Save.",
+    "expect": "Expected good behaviour: B warned. Today expected: B's save replaces the whole grid — X is lost. If so record as a gap (E-17)."
+   },
+   {
+    "do": "Untick X and Y; save.",
+    "expect": "Grid back to original."
+   }
+  ],
+  "ref": "10-ADMIN.md E-17"
+ },
+ {
+  "id": "ADM-023",
+  "area": "Admin",
+  "module": "Roles & permissions",
+  "title": "Only the Master Admin edits role rights",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "The role-access editor is master-only (matrix fn 14).",
+  "before": "Branch Manager, Coordinator, Finance logins.",
+  "steps": [
+   {
+    "do": "Each of them types /access.",
+    "expect": "Refused (Branch Manager 403, Coordinator 403, Finance 403)."
+   },
+   {
+    "do": "None of them sees a 'Roles & permissions' tile under Admin.",
+    "expect": "Tile absent."
+   }
+  ],
+  "ref": "02-permission-matrix.md fn 14; evidence/role-access-matrix.md"
+ },
+ {
+  "id": "ADM-024",
+  "area": "Admin",
+  "module": "User register",
+  "title": "Per-person extra right on top of the role, then removed",
+  "kind": "scenario",
+  "tags": [
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Companies narrow or widen one person without changing the role for everyone.",
+  "before": "zz.coord1 exists.",
+  "steps": [
+   {
+    "do": "User register → zz.coord1 → 'Edit' → Permissions tab ('leave all unticked to use the role's defaults').",
+    "expect": "Grid shown, all unticked."
+   },
+   {
+    "do": "In the module grid tick 'CRM — Sales reports' → View only. 'Save user'.",
+    "expect": "'User saved.'"
+   },
+   {
+    "do": "Sign in as zz.coord1 and open Insights → Sales dashboard.",
+    "expect": "Now opens (a plain Coordinator is refused — see INS-022)."
+   },
+   {
+    "do": "Untick it again and save; sign in as zz.coord1 and try again.",
+    "expect": "Refused again — back to role defaults."
+   }
+  ],
+  "ref": "02-permission-matrix.md 'Per-user overrides'; screens_today user-edit"
+ },
+ {
+  "id": "ADM-025",
+  "area": "Admin",
+  "module": "Role workspaces",
+  "title": "Set where a role lands after sign-in, then revert",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "One product serves an inspector and an accountant by a different first screen — but never a screen they cannot open.",
+  "before": "Master Admin login; zz.coord1.",
+  "steps": [
+   {
+    "do": "Admin → Role workspaces.",
+    "expect": "Heading 'Role workspaces' — '…a role only ever sees screens it is already allowed to open.' Sections 'Workspace for <role>' and 'Quick-access launchpad'; 'Lands on after sign-in'; 'Save workspace'."
+   },
+   {
+    "do": "Choose the Coordinator workspace. Lands on after sign-in = 🗓️ Scheduling board; tick launchpad 📋 Work orders and 🗂️ Jobs. 'Save workspace'.",
+    "expect": "Saved."
+   },
+   {
+    "do": "Sign in as zz.coord1.",
+    "expect": "Lands on the Scheduling board; the launchpad shows the chosen tiles."
+   },
+   {
+    "do": "As Master Admin set Coordinator 'Lands on' to a screen coordinators cannot open (e.g. one from Admin like ⬇️ Export data if listed) and tick an Admin tile; save; sign in as zz.coord1.",
+    "expect": "Coordinator lands on an allowed screen (Dashboard) and the forbidden tile is not shown."
+   },
+   {
+    "do": "Set the Coordinator workspace back to 'Dashboard (default)' and untick the added tiles; save.",
+    "expect": "Reverted."
+   }
+  ],
+  "ref": "02-permission-matrix.md fn 14 (Role workspaces, is_master)"
+ },
+ {
+  "id": "ADM-026",
+  "area": "Admin",
+  "module": "Single sign-on",
+  "title": "Single sign-on screen shows its state and the handoff log",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Admins must see whether SSO is on and who tried to come in (A-F2 / E-14).",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Single sign-on.",
+    "expect": "Heading 'Single sign-on'. Either 'Switched off. Single sign-on does nothing at all until … is set…' (or '…secret is too short…') or 'Active. A signed handoff from a sibling application is accepted here, once, within five minutes…'."
+   },
+   {
+    "do": "Read 'What this system will and will not do' and 'The other applications'.",
+    "expect": "Five plain rules (verifies, never issues; will not create a user; will not waive the second factor; no token twice; deactivated stays locked)."
+   },
+   {
+    "do": "Read 'Every handoff attempted'.",
+    "expect": "Table When · Who · Result · From, or 'Nothing yet.' — the screen is not empty (A-F2 no longer applies)."
+   }
+  ],
+  "ref": "10-ADMIN.md A-F2, E-14; views/ops/sso.php"
+ },
+ {
+  "id": "ADM-027",
+  "area": "Admin",
+  "module": "System settings",
+  "title": "Change the theme preset, see it everywhere, then revert",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Branding is company-wide; a change and its revert must both take effect at once.",
+  "before": "Master Admin login. Note the current theme colours.",
+  "steps": [
+   {
+    "do": "Admin → System settings.",
+    "expect": "Heading 'System settings'. Tabs Branding & theme · Financial & norms · Display & terms · Numbering & reports · Security; sections incl. Modules, Branding, Theme builder."
+   },
+   {
+    "do": "Branding & theme: press preset 'Teal', then 'Save settings'.",
+    "expect": "Top bar and buttons turn teal on every screen."
+   },
+   {
+    "do": "Press the original preset (e.g. 'Corporate Blue') and 'Save settings'.",
+    "expect": "Original colours back."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 /settings"
+ },
+ {
+  "id": "ADM-028",
+  "area": "Admin",
+  "module": "System settings",
+  "title": "Document numbering — read the live Example; changing a series mid-year is untested",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A GST invoice series may not have gaps or jumps (A-F7, E-10).",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "System settings → 'Numbering & reports' tab → 'Document numbering'.",
+    "expect": "Table Document · Prefix · Separator · Digits · Financial year · Start from · Example."
+   },
+   {
+    "do": "For the invoice row compare Example with the newest issued invoice number in Money → Invoices.",
+    "expect": "Same pattern (prefix, branch, year, digits)."
+   },
+   {
+    "do": "Do NOT save any numbering change on live.",
+    "expect": "Not tested: what happens to an existing series when its rule changes mid-year. Record as a gap (A-F7) to test on a copy."
+   }
+  ],
+  "ref": "10-ADMIN.md E-10, A-F7"
+ },
+ {
+  "id": "ADM-029",
+  "area": "Admin",
+  "module": "System settings",
+  "title": "Security — two-step for money roles, and the governed-settings table",
+  "kind": "edge",
+  "tags": [
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Money roles need a second factor; field staff on patchy data should not (E-13).",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "System settings → Security tab.",
+    "expect": "Control '🔒 Require it for the money roles' present. (Press only if the owner has decided; it forces Finance users to set up two-step.)"
+   },
+   {
+    "do": "User register → 'Two-step' column.",
+    "expect": "Shows who has two-step on."
+   },
+   {
+    "do": "Read 'What these settings affect (24 governed settings)'.",
+    "expect": "Table Setting · What it is for · Affects · Applies · Now."
+   }
+  ],
+  "ref": "10-ADMIN.md E-13"
+ },
+ {
+  "id": "ADM-030",
+  "area": "Admin",
+  "module": "System settings",
+  "title": "Module switches in System settings agree with Modules & features",
+  "kind": "edge",
+  "tags": [
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Two switchboards must show the same truth (one engine).",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "System settings → 'Modules' (Save modules): note which areas are ticked.",
+    "expect": "Operations, Administration (always on), Sales & CRM, Inspection reporting, Money, People & hiring, Marketplace & Connect."
+   },
+   {
+    "do": "Admin → Modules & features.",
+    "expect": "Same On/Off state for each."
+   }
+  ],
+  "ref": "lib/setup_cockpit.php (delegates to licence_save — the one engine)"
+ },
+ {
+  "id": "ADM-031",
+  "area": "Admin",
+  "module": "System settings",
+  "title": "Demo-data and install buttons are present but must not be pressed on live",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "rule",
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Loading or removing demo data on live corrupts real work (E-15).",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "System settings → 'Demo / sample data' and scenario sections.",
+    "expect": "Buttons '🗑 Remove demo data', '↻ Reload DEMO-S01', 'Load DEMO-S02 scenario' … and 'Install mode … Apply' are present. Never press it on the live site."
+   },
+   {
+    "do": "Search the Client register for 'DEMO-S0'.",
+    "expect": "If demo companies exist on live, record as a gap (E-15: demo data left in a live workspace) for the owner to remove deliberately."
+   }
+  ],
+  "ref": "10-ADMIN.md E-15"
+ },
+ {
+  "id": "ADM-032",
+  "area": "Admin",
+  "module": "System settings",
+  "title": "Who can open System settings and Terminology",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Settings = E for MA/AD only.",
+  "before": "Branch Manager, Coordinator, Business Director logins.",
+  "steps": [
+   {
+    "do": "Branch Manager and Coordinator type /settings and /terminology.",
+    "expect": "403 refusal."
+   },
+   {
+    "do": "Business Director types /settings and /terminology.",
+    "expect": "Redirected away (see ADM-016)."
+   }
+  ],
+  "ref": "02-permission-matrix.md Settings; evidence/role-access-matrix.md"
+ },
+ {
+  "id": "ADM-033",
+  "area": "Admin",
+  "module": "Backup & restore",
+  "title": "Take a backup and download it (never restore on live)",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The customer can get their own data out without the vendor.",
+  "before": "Master Admin login. Never press Restore or Upload & restore on the live sRestore or Upload & restoree.",
+  "steps": [
+   {
+    "do": "Admin → Backup & restore.",
+    "expect": "Heading 'Backup & restore' — 'A complete, dated copy of this workspace's data…'. Button '💾 Back up now'; panel 'Saved backups' (When · Why · Records · Size · Actions)."
+   },
+   {
+    "do": "Press '💾 Back up now'.",
+    "expect": "Message 'Backup created — N records saved safely outside the app folder.' (or '… stored inside the app folder — set a safe backup location…'). New top row, Why = 'You clicked Back up now'."
+   },
+   {
+    "do": "Press '⬇️ Download' on that row.",
+    "expect": "A .json file downloads to your computer; keep it safe."
+   },
+   {
+    "do": "Read the older rows' 'Why'.",
+    "expect": "Daily rows read 'Automatic daily'."
+   }
+  ],
+  "ref": "10-ADMIN.md S-4; lib/backup.php ops_backup(); views/ops/backup.php"
+ },
+ {
+  "id": "ADM-034",
+  "area": "Admin",
+  "module": "Backup & restore",
+  "title": "Backup storage is safe (outside the app folder)",
+  "kind": "edge",
+  "tags": [
+   "rule",
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Backups inside the app folder are deleted by an update that replaces every file.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Backup & restore — read the coloured banner.",
+    "expect": "Green '🛡️ Your backups are stored safely outside the app folder.' = PASS. Amber 'Backups are currently kept inside the app folder.' = record as a gap for the server administrator."
+   },
+   {
+    "do": "If an amber 'This workspace stores its live data as a file inside the app folder.' appears.",
+    "expect": "Record as a gap (move live data to MySQL from Companies)."
+   }
+  ],
+  "ref": "views/ops/backup.php"
+ },
+ {
+  "id": "ADM-035",
+  "area": "Admin",
+  "module": "Backup & restore",
+  "title": "Restore asks for confirmation — press Cancel",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Restore is the most destructive act in the product; it must never happen on one click.",
+  "before": "Master Admin login. This test presses Cancel only.",
+  "steps": [
+   {
+    "do": "Backup & restore → any row → '↺ Restore'.",
+    "expect": "Browser asks 'Restore this workspace to how it was on <date>? Everything since then will be replaced. A safety copy of the current state is saved first, so this is reversible.' Press CANCEL."
+   },
+   {
+    "do": "Check the workspace.",
+    "expect": "Nothing changed; no 'Restored …' message."
+   },
+   {
+    "do": "Open '📤 Restore from a file on my computer'.",
+    "expect": "File chooser (.json / .json.gz), '↺ Upload & restore' and — for a master — 'Only for a backup from another workspace: type this workspace's name to confirm'. Do NOT upload on live. (Wrong-file and other-company refusals are proven on a copy — GAP-048, E-11.)"
+   }
+  ],
+  "ref": "10-ADMIN.md A-F3, E-11 (fixed GAP-048); views/ops/backup.php"
+ },
+ {
+  "id": "ADM-036",
+  "area": "Admin",
+  "module": "Backup & restore",
+  "title": "Only a workspace administrator can open backups",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Backup & restore = MA/AD only (matrix fn 16a).",
+  "before": "Business Director, Branch Manager, Finance logins.",
+  "steps": [
+   {
+    "do": "Each types /backup.",
+    "expect": "Refused: 'Only a workspace administrator can manage backups.' (or redirected); no backup list, no download."
+   }
+  ],
+  "ref": "02-permission-matrix.md Backup & restore, fn 16a"
+ },
+ {
+  "id": "ADM-037",
+  "area": "Admin",
+  "module": "AI settings",
+  "title": "AI providers — keys masked, models refreshed",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The AI helps only the form and document builders; keys must never be shown in full.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → AI settings.",
+    "expect": "Heading 'AI providers & models' — 'Keys are masked and never shown in full.' Sections OpenAI, Claude (Anthropic), Google Gemini, Perplexity, GitHub Copilot / Models; each with Enable, API key, '↻ Refresh models', model ticks; 'Save all providers'."
+   },
+   {
+    "do": "If a key is stored, look at the API key box.",
+    "expect": "Only a masked hint is shown."
+   },
+   {
+    "do": "Type an obviously wrong key into an unused provider and press its '↻ Refresh models' (do not Save).",
+    "expect": "An error is shown in plain words; no crash; the stored keys are unchanged."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 /ai-settings"
+ },
+ {
+  "id": "ADM-038",
+  "area": "Admin",
+  "module": "Build forms with AI",
+  "title": "Build forms from your process — needs AI on, and you approve before anything is added",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "AI suggestions must never change forms without review.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Build forms with AI.",
+    "expect": "Heading 'Build forms from your process'. If no AI key: 'Turn on AI first' with 'Open AI settings'."
+   },
+   {
+    "do": "With AI on: describe 'We hire NDT technicians; we need notice period and passport expiry' in 'Your recruitment process' → '✨ Generate suggestions'.",
+    "expect": "'Review the suggestions' lists proposed fields and dropdowns; nothing added yet."
+   },
+   {
+    "do": "Press 'Start over'.",
+    "expect": "Suggestions cleared; forms unchanged (check Form Designer)."
+   },
+   {
+    "do": "(Optional) tick one suggestion → 'Add selected to my forms'.",
+    "expect": "Only that field appears in Form Designer; delete it afterwards."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 /ai-forms; views/ops/ai_forms.php"
+ },
+ {
+  "id": "ADM-039",
+  "area": "Admin",
+  "module": "Terminology / wording",
+  "title": "Rename a business word everywhere, then put it back",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The company's own words ('Proposal', 'Indent') must appear on every screen; and must be revertible (E-9).",
+  "before": "Master Admin login. Write down the current Singular/Plural for 'Quote' before starting.",
+  "steps": [
+   {
+    "do": "Admin → Terminology / wording.",
+    "expect": "Heading 'Terminology' — 'Every screen in the app reads its wording from here…'. Sections Start from your trade, Parties, Sales, Operations, Reporting, Money, People, Recruitment, Reset; table Standard wording · Singular · Plural · What it means."
+   },
+   {
+    "do": "Sales: Quote → Singular = Proposal, Plural = Proposals. 'Save terminology'.",
+    "expect": "Saved."
+   },
+   {
+    "do": "Open Sales → Quotes register and a quote.",
+    "expect": "Headings/buttons read 'Proposal(s)'. Note whether an already-generated quote PDF still says 'Quotation' (stored text) — record what you see (E-9 untested)."
+   },
+   {
+    "do": "Type the original words back; 'Save terminology'.",
+    "expect": "Screens read as before. (Do not use 'Reset to standard wording' or 'Use this wording' on live — they replace ALL the company's words.)"
+   }
+  ],
+  "ref": "10-ADMIN.md §2 /terminology, E-9"
+ },
+ {
+  "id": "ADM-040",
+  "area": "Admin",
+  "module": "Terminology / wording",
+  "title": "Wording with special characters and a long word",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Labels must not break menus or buttons.",
+  "before": "Master Admin login; note the current 'Work order' wording.",
+  "steps": [
+   {
+    "do": "Operations: Work order singular = Work order / Call & Visit (Site), plural = Work orders / Calls & Visits (Sites). Save.",
+    "expect": "Menus, headings and buttons show the text exactly; buttons wrap rather than overflow; no layout break on phone width."
+   },
+   {
+    "do": "Revert to the original words; save.",
+    "expect": "Back to normal."
+   }
+  ],
+  "ref": "05-ui-ux-blueprint"
+ },
+ {
+  "id": "ADM-041",
+  "area": "Admin",
+  "module": "Form Designer",
+  "title": "Rename a standard field on the Leads form, then revert",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Admins tune forms without code; captured data must not change.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Form Designer.",
+    "expect": "Heading 'Form Designer' — 'Build your forms end to end… No coding, and it never changes data already captured.' Cards for forms (e.g. Work orders, Jobs, Leads, Opportunities, Invoices, Receipts, Complaints, Non-conformities, Corrective actions, Users…)."
+   },
+   {
+    "do": "Open 'Leads'.",
+    "expect": "'Standard fields' table Order · Field label (what staff see) · Type · Required · Hide, with ▲ ▼, and a note 'Why is there no Delete here?'. Some fields marked 'Essential'."
+   },
+   {
+    "do": "Rename 'Telephone' to 'ZZ Phone number'. 'Save standard fields'.",
+    "expect": "Saved."
+   },
+   {
+    "do": "Sales → Leads → + New lead.",
+    "expect": "The field reads 'ZZ Phone number'."
+   },
+   {
+    "do": "Rename back to 'Telephone' and save.",
+    "expect": "Back to normal."
+   }
+  ],
+  "ref": "Form Designer tile description; views/ops/form_designer.php"
+ },
+ {
+  "id": "ADM-042",
+  "area": "Admin",
+  "module": "Form Designer",
+  "title": "Add your own dropdown field, use it, delete it",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Companies capture their own details (e.g. referral code) without code.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Form Designer → Leads → '➕ Add a new field': Field name = ZZ Referral source, Type = dropdown, 'Options — one per line' = Partner / Event / Other, Where should it go? = At the end, under 'More details'. 'Add field'.",
+    "expect": "Field listed under 'Fields you added'."
+   },
+   {
+    "do": "Sales → + New lead.",
+    "expect": "ZZ Referral source dropdown offers Partner, Event, Other."
+   },
+   {
+    "do": "Form Designer → Leads → 'Fields you added' → 'Delete' on ZZ Referral source.",
+    "expect": "Removed; the New lead form no longer shows it."
+   }
+  ],
+  "ref": "views/ops/form_designer.php"
+ },
+ {
+  "id": "ADM-043",
+  "area": "Admin",
+  "module": "Form Designer",
+  "title": "Hide a field that has data — data is kept; Essential fields cannot be hidden",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Hiding must never lose captured data.",
+  "before": "A lead with a value in 'Expected to close'.",
+  "steps": [
+   {
+    "do": "Form Designer → Leads → tick 'Hide' for 'Expected to close' (if not Essential). Save standard fields.",
+    "expect": "The label reads 'Hidden'."
+   },
+   {
+    "do": "Open the existing lead.",
+    "expect": "The value is still kept (check after un-hiding)."
+   },
+   {
+    "do": "Un-hide and save. Re-open the lead.",
+    "expect": "Value shown unchanged."
+   },
+   {
+    "do": "Try to hide a field marked 'Essential'.",
+    "expect": "No Hide box — 'The form cannot save without this field, so it cannot be hidden'."
+   },
+   {
+    "do": "Phone width: open Form Designer → Leads.",
+    "expect": "Each row becomes a card with labels 'Required?' and 'Hide from the form?'."
+   }
+  ],
+  "ref": "views/ops/form_designer.php"
+ },
+ {
+  "id": "ADM-044",
+  "area": "Admin",
+  "module": "Form Designer",
+  "title": "Only an administrator designs forms",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Form design is settings.manage or master only.",
+  "before": "Branch Manager and Business Director logins.",
+  "steps": [
+   {
+    "do": "Each types /form-designer.",
+    "expect": "Refused: 'Only an administrator can design forms.' (or redirected)."
+   }
+  ],
+  "ref": "lib/formdesign.php fd_can()"
+ },
+ {
+  "id": "ADM-045",
+  "area": "Admin",
+  "module": "Service scope",
+  "title": "Services offered and an optional dependency",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Which services are sold drives work orders and report formats; a dependency forces the right order (E-16).",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Service scope.",
+    "expect": "Heading 'Service scope' — 'Every service runs on its own… none is a prerequisite for another…'. Sections '1 · Services offered on this installation', '2 · Client service scope', '3 · Optional dependencies'."
+   },
+   {
+    "do": "Section 2: Client = ZZ TEST Fabricators → 'Load'.",
+    "expect": "That client's in-scope services shown."
+   },
+   {
+    "do": "Section 3: Service = Release, Requires first = Inspection, Scope level = Client default, Effective from = today. 'Add dependency'.",
+    "expect": "Row in Service · Requires first · Condition · Approval · Scope."
+   },
+   {
+    "do": "Add a dependency where Service = Requires first (Inspection requires Inspection).",
+    "expect": "Expected: refused. If it saves, record as a defect."
+   },
+   {
+    "do": "Press 'Remove' on the test rows.",
+    "expect": "Removed."
+   }
+  ],
+  "ref": "10-ADMIN.md E-16; screens_today service-scope"
+ },
+ {
+  "id": "ADM-046",
+  "area": "Admin",
+  "module": "Report formats by service",
+  "title": "Report format per service line reaches a new work order",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Picking a service on a work order decides which report format the job gets.",
+  "before": "Master Admin login. Note the current format for 'Inspection'.",
+  "steps": [
+   {
+    "do": "Admin → Report formats by service.",
+    "expect": "Heading 'Report formats by service line'; table Service line · Primary report format · Also allocate (optional); 'Save report formats'."
+   },
+   {
+    "do": "Confirm Inspection's Primary report format (e.g. Inspection Report (IR)).",
+    "expect": "Shown."
+   },
+   {
+    "do": "Operations → ＋ New work order with Service line = Inspection; save; allocate a job.",
+    "expect": "The job's 'Reports & QA' tab shows the format from this table."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 /service-formats"
+ },
+ {
+  "id": "ADM-047",
+  "area": "Admin",
+  "module": "Company profile",
+  "title": "Company profile appears on quotations",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The legal identity is printed on every issued document.",
+  "before": "Master Admin login. Note current values.",
+  "steps": [
+   {
+    "do": "Admin → Company profile.",
+    "expect": "Heading 'Your company' — 'Enter your business once…'. Fields Legal name, Brand / trading name, Address, GSTIN (fills PAN & State), E-mail, Phone, Website, Footer line for PDFs, Report header colour, Logo; 'What does your company do?' ticks; 'Save company profile'."
+   },
+   {
+    "do": "Change only 'Footer line for PDFs' to add ' ZZ TEST'. Save.",
+    "expect": "Saved."
+   },
+   {
+    "do": "Sales → Quotes → open a quote → '⬇ PDF (for client)'.",
+    "expect": "The PDF footer shows the new line."
+   },
+   {
+    "do": "Remove ' ZZ TEST' and save.",
+    "expect": "Reverted."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 /company-profile"
+ },
+ {
+  "id": "ADM-048",
+  "area": "Admin",
+  "module": "Approvals",
+  "title": "Approvals hub lists every chain; inspector sees 'Nothing here is yours to change'",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "One way in to all approval configuration — without granting anything.",
+  "before": "Master Admin and Inspector logins.",
+  "steps": [
+   {
+    "do": "Admin → Approvals.",
+    "expect": "Heading 'Approvals' — 'Every approval chain in the business, in one place…'. Section 'How these fit together' with links to Recruitment approvals, Quote & report approvals, Approver mapping, Approval delegation, My approvals."
+   },
+   {
+    "do": "Open each link.",
+    "expect": "Each opens its own screen (Recruitment approvals, Quote & report approvals, Approver mapping, Approval delegation)."
+   },
+   {
+    "do": "Sign in at https://operations.mghaiapps.com as the Inspector; open /approvals-setup.",
+    "expect": "A read-only explainer headed 'Nothing here is yours to change'; no editable controls."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 Approvals, E-3; 02-permission-matrix.md 'one way in to approval configuration'"
+ },
+ {
+  "id": "ADM-049",
+  "area": "Admin",
+  "module": "Approvals",
+  "title": "Quote approval band — add an inactive test rule and remove it",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Quote approvals follow value bands measured before tax.",
+  "before": "Master Admin login. Note existing rules.",
+  "steps": [
+   {
+    "do": "Sales → Quotes → 'Approval rules', or open /quote-approval-rules.",
+    "expect": "Heading 'Quote & report approvals' — 'Who must approve a quote — by amount band and/or Business Unit…'. Table Level · Rule · Applies to · From ₹ · Up to ₹ · Approver · Status; '+ Add rule'."
+   },
+   {
+    "do": "'+ Add rule': Rule name = ZZ TEST band, Level 1, Active UNticked, Applies to = Any business unit, Amount from 0, up to 1, Approver role = Marketing Manager. 'Add rule'.",
+    "expect": "Row shown with Status inactive."
+   },
+   {
+    "do": "Press '✕' on ZZ TEST band.",
+    "expect": "Removed."
+   }
+  ],
+  "ref": "02-permission-matrix.md fn 19; screens_today quote-approval-rule-new"
+ },
+ {
+  "id": "ADM-050",
+  "area": "Admin",
+  "module": "Approvals",
+  "title": "Report approval rule with SLA, approver mapping and temporary cover",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A report cannot be submitted for an inspector with no approver; leave cover keeps reports moving.",
+  "before": "Master Admin login; a test inspector.",
+  "steps": [
+   {
+    "do": "Approvals → Quote & report approvals (report rules).",
+    "expect": "Form 'Add a rule': Rule name, Level, SLA hours (escalate after), Active, Report type, Office, Client, Business Unit, Who approves, Person, Role; table Level · Rule · Applies to · Approver · SLA · Status."
+   },
+   {
+    "do": "Add Rule name = ZZ TEST report rule, Level 1, SLA hours 24, Active unticked, Who approves = Inspector's mapped approver. 'Add rule'. Then '✕' to remove it.",
+    "expect": "Added then removed."
+   },
+   {
+    "do": "Approvals → Approver mapping.",
+    "expect": "Heading 'Approver mapping' — '…Reports can't be submitted for an inspector with no approver.' Table Inspector · Approver · Temp cover · From · To."
+   },
+   {
+    "do": "For the test inspector set Temp cover = another approver, From today, To tomorrow. 'Save'.",
+    "expect": "Saved; shown in the table. Clear it afterwards."
+   }
+  ],
+  "ref": "screens_today approval-rules, approver-map"
+ },
+ {
+  "id": "ADM-051",
+  "area": "Admin",
+  "module": "Approvals",
+  "title": "Approval delegation while somebody is away",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Approvals must not stall while an approver is on leave — and a delegate gets only the authority the absent person has.",
+  "before": "Master Admin login; two test users.",
+  "steps": [
+   {
+    "do": "Approvals → Approval delegation.",
+    "expect": "Heading 'Approval delegation' — '…for a stated period, and only for the authority they actually hold.' Fields Who is away *, Who acts for them *, Applies to, Branch, From, To, Reason; 'Add delegation'."
+   },
+   {
+    "do": "Who is away = user A, Who acts = user B, Applies to = Everything they approve, From today, To +3 days, Reason = ZZ TEST leave. 'Add delegation'.",
+    "expect": "Row with State active."
+   },
+   {
+    "do": "Try Who is away = Who acts for them = the same user.",
+    "expect": "Expected refusal; if saved, record as a defect."
+   },
+   {
+    "do": "Try To earlier than From.",
+    "expect": "Expected refusal; if saved, record as a defect."
+   }
+  ],
+  "ref": "screens_today approval-delegations"
+ },
+ {
+  "id": "ADM-052",
+  "area": "Admin",
+  "module": "Approvals",
+  "title": "Recruitment approval policy switches are visible and unchanged",
+  "kind": "scenario",
+  "tags": [
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Self-approval must stay off unless the owner decides otherwise (Gate 4).",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Approvals → Recruitment approvals.",
+    "expect": "Heading 'Recruitment approvals'. Sections 'Who may approve their own request — Self-approval is OFF' and 'When does a requirement change need its candidates re-checked? Redefined: ON'. Buttons '＋ New rule', 'Save policy', 'Save triggers'."
+   },
+   {
+    "do": "Do not change; confirm the states match the owner's decision.",
+    "expect": "Self-approval OFF; Redefined ON (defaults)."
+   }
+  ],
+  "ref": "02-permission-matrix.md Self-approval governance (Gate 4)"
+ },
+ {
+  "id": "ADM-053",
+  "area": "Admin",
+  "module": "Report templates",
+  "title": "Upload a Word report template, preview, approve",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Reports must come out in the client's approved format.",
+  "before": "A simple .docx with a {{token}} placeholder.",
+  "steps": [
+   {
+    "do": "Admin → Report templates.",
+    "expect": "Heading 'Document templates' — 'Upload a client's approved Word format and place {{tokens}}…'. Sections '🪄 Easiest — build a form from your plain Word file', 'Add a template', 'Token reference'; table Name · Report type · Client · Office · File · Status."
+   },
+   {
+    "do": "Add a template: Name = ZZ TEST template, Report type = IR — Inspection Report, Client = ZZ TEST Fabricators, Active, Word template (.docx) = the file, Is default unticked. 'Add template'.",
+    "expect": "Row appears awaiting approval."
+   },
+   {
+    "do": "Press '👁 Preview'.",
+    "expect": "A preview of the format with tokens filled."
+   },
+   {
+    "do": "Press '✓ Approve' (or '✕ Send back').",
+    "expect": "Status changes."
+   },
+   {
+    "do": "Try 'Add template' with a .pdf instead of .docx.",
+    "expect": "Expected: refused with a plain message. If a PDF is accepted as a Word template, record as a defect."
+   }
+  ],
+  "ref": "screens_today templates"
+ },
+ {
+  "id": "ADM-054",
+  "area": "Admin",
+  "module": "Report audit trail",
+  "title": "Audit trail filters, export, and no delete",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "BRANCH_MANAGER",
+  "why": "Accreditation needs who changed what, when, with the role held at the time.",
+  "before": "Branch Manager login; at least one report action done today.",
+  "steps": [
+   {
+    "do": "Admin → Report audit trail.",
+    "expect": "Heading 'Audit trail' — 'Every critical action across all branches. Records are never deleted…'. Sections Recent controlled changes, Compliance checks, Activity by action (30 days), Most active users (30 days), Audit log; table When · IRN / ref · Action · By · Role · Detail · IP."
+   },
+   {
+    "do": "Filter: From = today, High-risk only unticked → 'Filter'.",
+    "expect": "Today's actions listed with the role held at the time and the IP."
+   },
+   {
+    "do": "'⭳ Export CSV'.",
+    "expect": "File downloads with the same rows."
+   },
+   {
+    "do": "Press 'Clear'.",
+    "expect": "Only the filter resets; no delete control anywhere on the screen."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 Report configuration"
+ },
+ {
+  "id": "ADM-055",
+  "area": "Admin",
+  "module": "Report audit trail",
+  "title": "Who can read the audit trail",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "OPERATION_MANAGER",
+  "why": "idems.audit.view is held by BD, SBU, BM, BAM, QH, TH — not by OM, CO, FIN.",
+  "before": "Operation Manager, Coordinator, Finance, Quality Head logins.",
+  "steps": [
+   {
+    "do": "Operation Manager and Coordinator type /audit-log.",
+    "expect": "Redirected away."
+   },
+   {
+    "do": "Finance types /audit-log.",
+    "expect": "Refused (403)."
+   },
+   {
+    "do": "Quality Head types /audit-log.",
+    "expect": "Opens."
+   }
+  ],
+  "ref": "docs/01-roles.md; evidence/role-access-matrix.md (/audit-log)"
+ },
+ {
+  "id": "ADM-056",
+  "area": "Admin",
+  "module": "Control panel",
+  "title": "Control panel — seat classes match the user register",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "What the installation would bill must equal the people really active.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Control panel.",
+    "expect": "Heading 'Super Admin — Control Panel'. Sections Licence, seats & modules · Subscription & workspaces · Marketplace plans & limits · Marketplace escrow · Compliance rules & fees · Financial control · Feature gates · Plans & packaging · Seat classes & monthly cost · What this installation would bill · Who is in each class · System & data. Buttons 'Turn OFF', '＋ Load demo data', 'Remove demo data'. Never press it on the live site."
+   },
+   {
+    "do": "'Seat classes & monthly cost' (Seat class · Seats · Billable · Price / mo · Subtotal) and 'Who is in each class' (Role · Class · Active).",
+    "expect": "Total Active across classes equals the Active logins in the User register."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 Super admin"
+ },
+ {
+  "id": "ADM-057",
+  "area": "Admin",
+  "module": "Companies",
+  "title": "Companies console — 'log in as' must be logged (A-F5)",
+  "kind": "edge",
+  "tags": [
+   "gap",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "For an accredited customer, 'who could have changed this record' must include support staff logging in as a user.",
+  "before": "Master Admin (super-admin) login.",
+  "steps": [
+   {
+    "do": "Admin → Companies.",
+    "expect": "Heading 'Companies'; collapsibles '＋ Add a company' (Company name *, Workspace key, Owner name, Owner email *, Temporary password, Plan, storage choice, 'Create company') and '💳 Pricing — what each module & seat costs' ('Save prices'). Do not create a company on live unless intended."
+   },
+   {
+    "do": "Look for 'log in as' on a company row and for any statement of who sees that it happened.",
+    "expect": "Not documented today: whether impersonation is logged, visible to the customer, and whose name the audit trail records. Record as a gap (A-F5). Do not use it on a customer workspace for this test."
+   }
+  ],
+  "ref": "10-ADMIN.md A-F5, E-12"
+ },
+ {
+  "id": "ADM-058",
+  "area": "Admin",
+  "module": "Product package",
+  "title": "Product package shows which EXAACT is in use (do not apply on live)",
+  "kind": "scenario",
+  "tags": [
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Applying a pack switches whole bundles on/off.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Product package.",
+    "expect": "Heading 'Product package' — 'Pick which EXAACT this installation is…'. Sections EXAACT TPIA, EXAACT Technical Staffing, EXAACT Recruitment, EXAACT Recruitment — In-house HR, EXAACT Enterprise (one marked 'In use'). Buttons 'Set up now', 'Apply EXAACT …'. Never press it on the live site."
+   },
+   {
+    "do": "Compare the pack 'In use' with Admin → Licence modules.",
+    "expect": "The licensed modules match that pack."
+   }
+  ],
+  "ref": "10-ADMIN.md A-F8"
+ },
+ {
+  "id": "ADM-059",
+  "area": "Admin",
+  "module": "Ads Pro connection",
+  "title": "Ads Pro — test the connection and read the outbox",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "worst"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Advertising return can be measured only if leads and money travel both ways.",
+  "before": "Master Admin login. Current Ads Pro values noted.",
+  "steps": [
+   {
+    "do": "Admin → Ads Pro connection.",
+    "expect": "Heading 'Ads Pro connection'. Sections The connection (Ads Pro address, Workspace id, API token, 'Tell Ads Pro when money is actually received'), What has come across, What travels, and which way; buttons Save, Test the connection, Bring leads across, Refresh 90 days of spend, ⇄ Sync now, both ways, Queue every lead…, Queue every enquiry…; outbox Waiting to go · Sent · Failed · Not sent."
+   },
+   {
+    "do": "Press 'Test the connection'.",
+    "expect": "A plain message: connected, or why not (if not configured, says so)."
+   },
+   {
+    "do": "Press 'Failed'.",
+    "expect": "Lists failed items (or none)."
+   }
+  ],
+  "ref": "01-SALES.md S-4; screens_today adspro"
+ },
+ {
+  "id": "ADM-060",
+  "area": "Admin",
+  "module": "Licence",
+  "title": "Licence — state, modules, and a wrong key",
+  "kind": "edge",
+  "tags": [
+   "best",
+   "worst"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The licence decides what the company may use and until when.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → Licence.",
+    "expect": "Heading 'Licence' — 'What this installation is entitled to, and until when.' Sections Renewal, The key, This subscription; table Module · What it contains · State; 'Licence console →'."
+   },
+   {
+    "do": "'Paste the licence key MGH sent you' = ZZ-NOT-A-KEY → 'Apply the key'.",
+    "expect": "Expected: refused in plain words; licence state and modules unchanged. If the state changes, record as a defect and re-apply the real key."
+   },
+   {
+    "do": "Do not touch 'Provider key'.",
+    "expect": "Unchanged."
+   }
+  ],
+  "ref": "10-ADMIN.md §2 Connections; screens_today licence"
+ },
+ {
+  "id": "ADM-061",
+  "area": "Admin",
+  "module": "MGH Books",
+  "title": "MGH Books — off by default, dry run before going live",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "When Books is connected it owns paid, outstanding and IRN; switching it on by accident changes the money truth.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Admin → MGH Books.",
+    "expect": "Heading '📗 MGH Books connection' — 'Connect Books as your finance system of record. Off by default…'. Fields 'Books is connected…', 'Books API address…', 'API token', 'Books web address…', 'Dry run — queue and mark items delivered without contacting Books…'; 'Save connection'."
+   },
+   {
+    "do": "Record whether 'Books is connected' is ticked.",
+    "expect": "Matches the owner's decision (off unless decided)."
+   },
+   {
+    "do": "Open /integrations ('Integration health').",
+    "expect": "Every connection with its last sync and state, read-only."
+   }
+  ],
+  "ref": "10-ADMIN.md S-3; 02-MODULE-DEPENDENCY-MAP.md §1"
+ },
+ {
+  "id": "ADM-062",
+  "area": "Admin",
+  "module": "Company setup",
+  "title": "Inspector and Finance cannot open Admin",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "INSPECTOR",
+  "why": "Admin is for administrators.",
+  "before": "Inspector and Finance logins.",
+  "steps": [
+   {
+    "do": "Inspector types /admin.",
+    "expect": "Refused (403)."
+   },
+   {
+    "do": "Finance: no Admin in the left menu; types /admin.",
+    "expect": "Refused (403)."
+   }
+  ],
+  "ref": "10-ADMIN.md header; evidence/role-access-matrix.md"
+ },
+ {
+  "id": "ADM-063",
+  "area": "Admin",
+  "module": "User register",
+  "title": "One test login per role — each sees the menu the roles document promises",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "several",
+  "why": "Users per role is the backbone of every other test; each role's menu must match docs/01-roles.md.",
+  "before": "Master Admin creates (User register → + Add a person) one test login per role, all in one office, e.g. zz.bd, zz.sbu, zz.bm, zz.bam, zz.om, zz.am, zz.co, zz.bdm, zz.kam, zz.mm, zz.me, zz.fin, zz.qh, zz.th, zz.srins, zz.ins.",
+  "steps": [
+   {
+    "do": "Sign in as MASTER_ADMIN.",
+    "expect": "Every area, including Admin → Super admin."
+   },
+   {
+    "do": "BUSINESS_DIRECTOR.",
+    "expect": "Every area, view-only; Admin without System settings / Users editing (redirected)."
+   },
+   {
+    "do": "SBU_HEAD.",
+    "expect": "Sales, Operations, Recruitment, Quality, Reporting, Money, Insights, Directory, Admin (Masters). No Users."
+   },
+   {
+    "do": "BRANCH_MANAGER.",
+    "expect": "All areas; Admin shows Masters and User register; no System settings."
+   },
+   {
+    "do": "BRANCH_APP_MANAGER.",
+    "expect": "Operations (view), Money (overheads), Insights, Directory (client holds), Admin (Masters, Users, report-configuration tiles). No Reporting area."
+   },
+   {
+    "do": "OPERATION_MANAGER.",
+    "expect": "Operations, Recruitment, Quality (complaints / corrective actions), Reporting, Money (profitability), Insights, Directory, Admin (Masters). No Sales."
+   },
+   {
+    "do": "ASST_MANAGER.",
+    "expect": "Operations, Quality, Reporting, Insights, Directory. No Money, Recruitment or Sales."
+   },
+   {
+    "do": "COORDINATOR.",
+    "expect": "Operations, Recruitment, Quality, Reporting, Money (invoice tracker / billing), Insights, Directory, Admin (Masters, SLA targets)."
+   },
+   {
+    "do": "BUSINESS_DEV_MANAGER and KEY_ACCOUNTS_MANAGER.",
+    "expect": "Sales, Insights, Directory (clients). Nothing operational."
+   },
+   {
+    "do": "MARKETING_MANAGER.",
+    "expect": "Sales (incl. Pre-order checklist), Money (profitability), Insights, Directory, Admin (Document templates)."
+   },
+   {
+    "do": "MARKETING_EXECUTIVE.",
+    "expect": "Sales and Directory (clients) only; no Insights."
+   },
+   {
+    "do": "FINANCE.",
+    "expect": "Sales (quotes view), Operations (view), Reporting, Money, Insights; since 19 Oct Directory (clients and vendors, read only). No Admin."
+   },
+   {
+    "do": "QUALITY_HEAD and TECHNICAL_HEAD.",
+    "expect": "Quality & Accreditation, Operations and Reporting read-only, Insights. No money, users, settings."
+   },
+   {
+    "do": "SR_INSPECTOR.",
+    "expect": "Reporting only (plus Dashboard/Search) — not the inspector 'My work' menu (flagged in roles doc)."
+   },
+   {
+    "do": "INSPECTOR (phone).",
+    "expect": "Only 'My work': My Jobs, My Reports / New report / Endorsements, My Voucher. No area rail."
+   },
+   {
+    "do": "Any role whose menu differs from the above.",
+    "expect": "Record as FAIL with a screenshot of the menu."
+   }
+  ],
+  "ref": "docs/01-roles.md (each role's 'Sees'); docs/02-permission-matrix.md"
+ },
+ {
+  "id": "ADM-064",
+  "area": "Admin",
+  "module": "Company setup",
+  "title": "Phone width — Company setup and Modules & features",
+  "kind": "phone",
+  "tags": [
+   "phone"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "An owner may configure from a phone; cards must stack and buttons stay tappable.",
+  "before": "Master Admin on a phone.",
+  "steps": [
+   {
+    "do": "☰ → Admin → Company setup.",
+    "expect": "Cards stack in one column; search box and buttons fit; no sideways page scroll."
+   },
+   {
+    "do": "Admin → Modules & features → press 'Turn off this feature' on any module → 'Keep it on'.",
+    "expect": "Confirm panel readable; buttons tappable; nothing changed."
+   },
+   {
+    "do": "Admin → Roles & permissions on the phone.",
+    "expect": "The grid scrolls inside its own box; the save button is reachable."
+   }
+  ],
+  "ref": "views/ops/cockpit_home.php (@media 520px); CLAUDE.md"
+ },
+ {
+  "id": "ADM-065",
+  "area": "Admin",
+  "module": "AI settings",
+  "title": "AI settings — refresh with no key, and who can open it",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A missing key must give a plain message; only administrators manage provider keys.",
+  "before": "Master Admin, Branch Manager, Business Director logins.",
+  "steps": [
+   {
+    "do": "Master Admin: AI settings → a provider with an empty key → '↻ Refresh models'.",
+    "expect": "A plain message that a key is needed; no crash; other providers unchanged."
+   },
+   {
+    "do": "Branch Manager types /ai-settings.",
+    "expect": "Refused (403)."
+   },
+   {
+    "do": "Business Director types /ai-settings.",
+    "expect": "Redirected away."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md (/ai-settings)"
+ },
+ {
+  "id": "ADM-066",
+  "area": "Admin",
+  "module": "Ads Pro connection",
+  "title": "Ads Pro — wrong address, and who can open it",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A failed connection must say why; leads data belongs to sales management.",
+  "before": "Master Admin, Branch Manager logins. Note current settings first; this test does not Save.",
+  "steps": [
+   {
+    "do": "Master Admin: type Ads Pro address = https://zz-not-real.example (do not Save) → 'Test the connection'.",
+    "expect": "If the test uses the typed value: a plain failure message. If it uses the saved value, it reports the saved connection — note which. Reload the page to discard the typing."
+   },
+   {
+    "do": "Branch Manager types /adspro.",
+    "expect": "Refused (403)."
+   },
+   {
+    "do": "Business Director opens Admin → Ads Pro connection.",
+    "expect": "Opens (BD holds lead view rights)."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md (/adspro)"
+ },
+ {
+  "id": "ADM-067",
+  "area": "Admin",
+  "module": "Build forms with AI",
+  "title": "Who can use Build forms with AI — a coordinator must not change forms",
+  "kind": "access",
+  "tags": [
+   "rule",
+   "gap"
+  ],
+  "persona": "COORDINATOR",
+  "why": "Form design is administrators only; the AI helper must not be a side door.",
+  "before": "Coordinator, Inspector, Finance logins.",
+  "steps": [
+   {
+    "do": "Inspector and Finance type /ai-forms.",
+    "expect": "Redirected away."
+   },
+   {
+    "do": "Coordinator opens /ai-forms.",
+    "expect": "Opens today (measured). Expected: the Coordinator may read but 'Add selected to my forms' is refused."
+   },
+   {
+    "do": "If AI is on: Coordinator generates suggestions and presses 'Add selected to my forms'.",
+    "expect": "If any field is added to a form, record as a gap (form design is settings.manage only) and delete the field in Form Designer."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md (/ai-forms CO open); lib/formdesign.php fd_can()"
+ },
+ {
+  "id": "ADM-068",
+  "area": "Admin",
+  "module": "Control panel",
+  "title": "Super-admin screens are refused to everyone else",
+  "kind": "access",
+  "tags": [
+   "rule",
+   "worst"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "The platform's licence, tenants and demo tools are not company business.",
+  "before": "Business Director, Branch Manager logins.",
+  "steps": [
+   {
+    "do": "Each types /super-admin, /companies, /product-package, /tenants, /issue-licence.",
+    "expect": "Each redirected away; no control panel, company list or licence console shown."
+   },
+   {
+    "do": "Each checks Admin → Super admin tab.",
+    "expect": "Tab or its tiles absent."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md; 10-ADMIN.md A-F6"
+ },
+ {
+  "id": "ADM-069",
+  "area": "Admin",
+  "module": "Company profile",
+  "title": "Company profile — wrong GSTIN, oversized logo, wrong person",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge",
+   "gap"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The identity printed on invoices must be valid.",
+  "before": "Master Admin, Business Director logins. Note current values; do not save the bad values.",
+  "steps": [
+   {
+    "do": "Company profile → GSTIN = 24ABC → 'Save company profile'.",
+    "expect": "Expected: refused in plain words, PAN/State not filled. If saved, restore the real GSTIN and record as a defect."
+   },
+   {
+    "do": "Logo: choose an image over 5 MB → save.",
+    "expect": "Expected: refused with a plain message; the old logo stays."
+   },
+   {
+    "do": "Business Director types /company-profile.",
+    "expect": "Redirected away."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md (/company-profile)"
+ },
+ {
+  "id": "ADM-070",
+  "area": "Admin",
+  "module": "Licence",
+  "title": "Licence, MGH Books and Single sign-on refused to non-administrators",
+  "kind": "access",
+  "tags": [
+   "rule"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Connections change money and identity; only administrators may open them.",
+  "before": "Business Director, Branch Manager, Coordinator logins.",
+  "steps": [
+   {
+    "do": "Each types /licence, /books-bridge, /sso.",
+    "expect": "Each redirected away."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md (/licence, /books-bridge, /sso)"
+ },
+ {
+  "id": "ADM-071",
+  "area": "Admin",
+  "module": "Organisation",
+  "title": "Organisation chart — wrong person and an empty Gaps tab",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst"
+  ],
+  "persona": "OPERATION_MANAGER",
+  "why": "Only user managers see the whole organisation.",
+  "before": "Operation Manager, Coordinator, Branch Manager logins.",
+  "steps": [
+   {
+    "do": "Operation Manager and Coordinator type /hierarchy.",
+    "expect": "Refused (403)."
+   },
+   {
+    "do": "Branch Manager opens Admin → Organisation.",
+    "expect": "Opens (own office)."
+   },
+   {
+    "do": "Master Admin opens the 'Gaps' tab after every person has a branch and a manager.",
+    "expect": "Nothing listed, no error."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md (/hierarchy)"
+ },
+ {
+  "id": "ADM-072",
+  "area": "Admin",
+  "module": "Report formats by service",
+  "title": "Report formats — a service line with no format, and wrong person",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A job without a report format cannot be reported on correctly.",
+  "before": "Master Admin, Branch Manager, Business Director logins.",
+  "steps": [
+   {
+    "do": "Note the format of 'Vendor Audit'. Set it to '— none —', 'Save report formats'.",
+    "expect": "Saved."
+   },
+   {
+    "do": "Operations → ＋ New work order with Service line = Vendor Audit; allocate a job.",
+    "expect": "The job has no automatic report format (a format can still be picked on the work order or job). Put the original format back and save."
+   },
+   {
+    "do": "Branch Manager types /service-formats; Business Director types it.",
+    "expect": "Branch Manager refused (403); Business Director redirected."
+   }
+  ],
+  "ref": "screens_today service-formats; evidence/role-access-matrix.md"
+ },
+ {
+  "id": "ADM-073",
+  "area": "Admin",
+  "module": "Report templates",
+  "title": "Report templates — no file, wrong person",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A template without a Word file cannot produce a report.",
+  "before": "Master Admin, Business Director logins.",
+  "steps": [
+   {
+    "do": "Add a template with Name = ZZ TEST empty and no Word file → 'Add template'.",
+    "expect": "Expected: refused or saved as a template without a file that cannot be made default; record which."
+   },
+   {
+    "do": "Business Director types /templates?kind=report.",
+    "expect": "Redirected away."
+   }
+  ],
+  "ref": "evidence/role-access-matrix.md (/templates)"
+ },
+ {
+  "id": "ADM-074",
+  "area": "Admin",
+  "module": "Role workspaces",
+  "title": "Role workspaces and Single sign-on — master only",
+  "kind": "access",
+  "tags": [
+   "rule",
+   "worst"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Landing pages for every role are a master's decision (matrix fn 14).",
+  "before": "Business Director, Branch Manager logins.",
+  "steps": [
+   {
+    "do": "Each types /role-workspaces.",
+    "expect": "Redirected away."
+   },
+   {
+    "do": "Master Admin: Role workspaces → choose a launchpad tile, then press browser Back without saving.",
+    "expect": "Nothing saved (sign in as that role to confirm)."
+   }
+  ],
+  "ref": "02-permission-matrix.md fn 14; evidence/role-access-matrix.md"
+ },
+ {
+  "id": "ADM-075",
+  "area": "Admin",
+  "module": "Service scope",
+  "title": "Business Director can open Service scope — can they change it?",
+  "kind": "access",
+  "tags": [
+   "rule",
+   "gap"
+  ],
+  "persona": "BUSINESS_DIRECTOR",
+  "why": "Settings are MA/AD only in the matrix; the director should only read.",
+  "before": "Business Director login. Note the 'Services offered' ticks first.",
+  "steps": [
+   {
+    "do": "BD: Admin → Service scope.",
+    "expect": "Opens today (measured)."
+   },
+   {
+    "do": "Untick nothing; press 'Save services offered'.",
+    "expect": "Expected: refused (Settings = — for BD). If 'saved' appears, record as a gap (a director can change services offered) — check nothing changed."
+   },
+   {
+    "do": "Branch Manager types /service-scope.",
+    "expect": "Refused (403)."
+   }
+  ],
+  "ref": "02-permission-matrix.md Settings; evidence/role-access-matrix.md (/service-scope BD open, BM 403)"
+ },
+ {
+  "id": "ADM-076",
+  "area": "Admin",
+  "module": "Single sign-on",
+  "title": "Single sign-on — a person with no account here is turned away",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "SSO must never create a login with permissions nobody chose.",
+  "before": "Only if SSO shows 'Active.' — a sibling-app user whose e-mail has no account in EXAACT.",
+  "steps": [
+   {
+    "do": "That person follows the link from the sibling application.",
+    "expect": "Turned away in plain words; no account created."
+   },
+   {
+    "do": "Admin → Single sign-on → 'Every handoff attempted'.",
+    "expect": "A row with Result 'No account here'."
+   },
+   {
+    "do": "A deactivated EXAACT user tries the same.",
+    "expect": "Turned away; Result 'Account switched off'. (If SSO is 'Switched off.', record 'not applicable'.)"
+   }
+  ],
+  "ref": "views/ops/sso.php"
+ },
+ {
+  "id": "ADM-077",
+  "area": "Admin",
+  "module": "Product package",
+  "title": "Product package — 'In use' agrees with Modules & features; wrong person",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "The pack in use must match what the company sees.",
+  "before": "Master Admin and Branch Manager logins.",
+  "steps": [
+   {
+    "do": "Product package: note which pack is 'In use' and its listed bundles.",
+    "expect": "One pack marked."
+   },
+   {
+    "do": "Modules & features: compare On modules.",
+    "expect": "Match the pack's bundles (plus any single-module tweaks made on Licence)."
+   },
+   {
+    "do": "Branch Manager types /product-package.",
+    "expect": "Redirected away."
+   }
+  ],
+  "ref": "screens_today product-package"
+ },
+ {
+  "id": "ADM-078",
+  "area": "Admin",
+  "module": "MGH Books",
+  "title": "MGH Books — saving with 'connected' ticked but no address",
+  "kind": "edge",
+  "tags": [
+   "worst",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Half-configured Books must not break invoicing.",
+  "before": "Only if Books is NOT connected on live today. Note current values.",
+  "steps": [
+   {
+    "do": "MGH Books: tick 'Books is connected', leave the API address empty, tick 'Dry run'. 'Save connection'.",
+    "expect": "Expected: refused (address needed), or saved but invoicing keeps working in dry run. Record which."
+   },
+   {
+    "do": "If it saved: Money → Invoices still opens and '+ New invoice' works.",
+    "expect": "Invoicing unaffected."
+   },
+   {
+    "do": "Untick 'Books is connected' and save.",
+    "expect": "Back to off."
+   }
+  ],
+  "ref": "10-ADMIN.md S-3"
+ },
+ {
+  "id": "ADM-079",
+  "area": "Admin",
+  "module": "Control panel",
+  "title": "Control panel figures add up — data at a glance and what would be billed",
+  "kind": "edge",
+  "tags": [
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "Billing figures must stay sensible.",
+  "before": "Master Admin login.",
+  "steps": [
+   {
+    "do": "Control panel → 'Data at a glance'.",
+    "expect": "Counts of records; compare clients count with Client register record count (… records)."
+   },
+   {
+    "do": "'What this installation would bill'.",
+    "expect": "A total equal to the sum of Subtotals in 'Seat classes & monthly cost'."
+   }
+  ],
+  "ref": "screens_today super-admin"
+ },
+ {
+  "id": "ADM-080",
+  "area": "Admin",
+  "module": "Companies",
+  "title": "Companies — create-company form refuses missing owner e-mail",
+  "kind": "edge",
+  "tags": [
+   "worst"
+  ],
+  "persona": "MASTER_ADMIN",
+  "why": "A company without an owner login cannot be used.",
+  "before": "Master Admin (super-admin). This test does not create a company.",
+  "steps": [
+   {
+    "do": "Companies → '＋ Add a company' → Company name = ZZ TEST Co, Owner email empty → 'Create company'.",
+    "expect": "The browser refuses — Owner email * is required. Nothing created."
+   },
+   {
+    "do": "Owner email = 'abc'.",
+    "expect": "The browser refuses — not an e-mail address."
+   }
+  ],
+  "ref": "screens_today companies"
+ }
+]
