@@ -6,7 +6,7 @@
 <?php if ($current): ?>
   <div class="msg msg-info" style="margin-top:14px">
     Currently set to <b><?= e($templates[$current]['label'] ?? $current) ?></b><?= $appliedAt ? ', applied ' . e(fdate(substr($appliedAt,0,10))) : '' ?>.
-    Applying another one <b>creates</b> new pipelines and makes them the default — nothing already in flight is moved or lost.
+    Adding another template's pipelines <b>creates</b> new pipelines and makes them the default — nothing already in flight is moved or lost, and your wording and accreditation rules are not touched.
   </div>
 <?php endif; ?>
 
@@ -70,9 +70,31 @@
       </p>
     <?php endif; ?>
     <button class="btn" onclick="return confirm('Create the <?= e($preview['label']) ?> pipelines and make them the default?')">
-      Use <?= e($preview['label']) ?>
+      Add these pipelines
     </button>
-    <span class="muted" style="font-size:12.5px;margin-left:10px">Creates; never edits or deletes.</span>
+    <span class="muted" style="font-size:12.5px;margin-left:10px">Creates; never edits or deletes. Your wording and accreditation rules stay as they are.</span>
   </form>
 </div>
+
+<?php if (!empty($canCompany)): $chg = $companyChanges ?? []; ?>
+<div class="panel" style="margin-top:16px">
+  <h3 style="margin-top:0">Make this our company's industry</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">This sets the words everyone in the company sees and which accreditation rules run. It creates no pipeline.</p>
+  <?php if ($chg): ?>
+    <ul style="margin:0 0 10px 18px;font-size:13.5px">
+      <?php foreach ($chg as $line): ?><li><?= e($line) ?></li><?php endforeach; ?>
+    </ul>
+    <form method="post" action="/industry-apply">
+      <input type="hidden" name="key" value="<?= e($showKey) ?>"><input type="hidden" name="do" value="company">
+      <label class="chk" style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:10px">
+        <input type="checkbox" name="confirm" value="1" required style="margin-top:2px">
+        <span>I understand the changes listed above.</span>
+      </label>
+      <button class="btn secondary" type="submit">Make <?= e($preview['label']) ?> our industry</button>
+    </form>
+  <?php else: ?>
+    <p style="margin:0;font-size:13px">✓ Your company already uses this industry's wording and accreditation rules — nothing would change.</p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 <?php endif; ?>

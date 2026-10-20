@@ -192,8 +192,10 @@ sign-in).
 
 | 3.x (enquiry branch) | **An enquiry belongs to its branch:** recorded with the recorder's branch (a converted lead's takes the lead's); register, due count, search, edit, delete and quote-from follow branch scope; no-branch enquiries stay visible to all. Also fixed: converting a lead wrote the owner's *name* into the enquiry's assignee (an id), so it showed nobody | the enquiry-branch commit | `test_sales_enquiry_branch.php` (15) |
 
+| 3.x (D-29) | **An industry template only adds pipelines:** the company's wording and accreditation rules are set separately, by an administrator, after a confirmation that lists each change; other packs a company has on are left alone; the first-time setup still does both | the industry commit | `test_sales_industry_split.php` (13) |
+
 **Stage 1 is complete.** The third round of answers (20 Oct) is being built in order:
-industry template, contract
+contract
 amendment, reopening. **Still waiting on the owner:** D-09, D-13…D-17, D-19…D-21, D-24, D-26…D-28, D-30.
 
 ## 9. If only five things are done

@@ -463,6 +463,13 @@ const INDUSTRY_TEMPLATES = [
 ];
 
 function industry_can() { return can('settings.manage') || can('mod.settings.view') || is_master_of('settings'); }
+// D-29 (the owner, 20 Oct 2026: "Yes") — adding a template's pipelines is the
+// day-to-day act above; setting the COMPANY's industry — the wording everyone
+// sees and the accreditation rules — is an administrator's alone.
+function industry_can_company() {
+    if (function_exists('licence_enabled') && !licence_enabled('sales') && !licence_enabled('operations')) return false;
+    return can('settings.manage') || is_master_of('settings');
+}
 
 function industry_current() { return (string)setting_get('industry_template', ''); }
 
@@ -505,9 +512,18 @@ function industry_make_pipeline($name, $entityKind, array $stages, $makeDefault 
     return $pid;
 }
 
-// Apply a template. Creates; never edits or deletes. An existing pipeline keeps
-// its deals and simply stops being the default.
+// The first-time setup: an administrator setting the company up does both —
+// the pipelines, and the company's wording and accreditation.
 function industry_apply($key) {
+    $r = industry_apply_pipelines($key);
+    if (!empty($r['err'])) return $r;
+    return array_merge($r, industry_set_company($key));
+}
+
+// Add a template's pipelines and list values. Creates; never edits or deletes.
+// An existing pipeline keeps its deals and simply stops being the default. It
+// changes neither the wording nor the accreditation rules (D-29).
+function industry_apply_pipelines($key) {
     $t = INDUSTRY_TEMPLATES[$key] ?? null;
     if (!$t) return ['err' => 'That is not one of the industry templates.'];
     if (function_exists('leads_migrate')) leads_migrate();
@@ -535,26 +551,55 @@ function industry_apply($key) {
         $added += industry_seed_list('quote_lost_reason', 'Lost reason', $t['lost']);
     }
 
-    // The same choice also decides the WORDING and which specialist rules run —
-    // so "choose your industry" is one act, not three. Apply the matching
-    // vocabulary pack, and switch the inspection accreditation pack on only when
-    // the industry actually is inspection. Both are no-ops if their libraries
-    // are not loaded, so this stays safe in a cut-down build.
+    if (function_exists('act_log'))
+        act_log('', 0, 'SYSTEM', 'Industry template pipelines added: ' . $t['label'], ['auto' => 1]);
+    return ['ok' => true, 'pipelines' => $made, 'list_values' => $added, 'label' => $t['label']];
+}
+
+// Which accreditation pack (if any) an industry carries. Only inspection and
+// laboratory do; every other trade has none.
+function industry_accr_pack($key) { return ['inspection' => 'inspection', 'labs' => 'labs'][$key] ?? ''; }
+const INDUSTRY_ACCR_LABELS = ['inspection' => 'inspection (ISO/IEC 17020)', 'labs' => 'laboratory (ISO/IEC 17025)'];
+
+// What making $key the company's industry would change, in sentences — shown
+// before the administrator confirms, so nothing changes by surprise.
+function industry_company_changes($key) {
+    $out = [];
+    $termKey = INDUSTRY_TERM_MAP[$key] ?? 'general';
+    $curTerm = (string) setting_get('terms_pack', '');
+    $lbl = fn($k) => defined('TERM_PACKS') ? (TERM_PACKS[$k]['label'] ?? $k) : $k;
+    if ($curTerm !== $termKey)
+        $out[] = 'The wording everyone sees changes to "' . $lbl($termKey) . '"' . ($curTerm !== '' ? ' (now "' . $lbl($curTerm) . '")' : '') . '.';
+    $on = function_exists('packs_enabled') ? packs_enabled(true) : [];
+    $want = industry_accr_pack($key);
+    foreach (INDUSTRY_ACCR_LABELS as $p => $pl) {
+        $isOn = in_array($p, $on, true);
+        if ($isOn && $p !== $want) $out[] = 'The ' . $pl . ' accreditation rules will be turned OFF.';
+        if (!$isOn && $p === $want) $out[] = 'The ' . $pl . ' accreditation rules will be turned ON.';
+    }
+    return $out;
+}
+
+// Set the company's industry: its wording, and which accreditation rules run.
+// An administrator's act (industry_can_company()); creates no pipeline.
+function industry_set_company($key) {
+    $t = INDUSTRY_TEMPLATES[$key] ?? null;
+    if (!$t) return ['err' => 'That is not one of the industry templates.'];
     $termKey = INDUSTRY_TERM_MAP[$key] ?? 'general';
     $wording = function_exists('term_apply_pack') ? (bool) term_apply_pack($termKey) : false;
-    // Which accreditation pack (if any) this industry turns on. Only inspection
-    // and laboratory carry one; every other trade turns them all off.
-    $packMap = ['inspection' => 'inspection', 'labs' => 'labs'];
-    $accrPack = $packMap[$key] ?? '';
-    if (function_exists('packs_save')) packs_save($accrPack);
-
+    // Only the accreditation packs follow the industry; any other pack the
+    // company has switched on is left as it is.
+    $accrPack = industry_accr_pack($key);
+    if (function_exists('packs_save')) {
+        $keep = array_values(array_diff(function_exists('packs_enabled') ? packs_enabled(true) : [], array_keys(INDUSTRY_ACCR_LABELS)));
+        packs_save(implode(',', array_filter(array_merge($keep, [$accrPack]))));
+    }
     setting_set('industry_template', $key);
     setting_set('industry_applied_at', date('c'));
     if (function_exists('act_log'))
-        act_log('', 0, 'SYSTEM', 'Industry template applied: ' . $t['label'], ['auto' => 1]);
-    return ['ok' => true, 'pipelines' => $made, 'list_values' => $added, 'label' => $t['label'],
-            'wording' => $wording, 'inspection_pack' => ($key === 'inspection'),
-            'accreditation_pack' => $accrPack];
+        act_log('', 0, 'SYSTEM', 'Company industry set to ' . $t['label'] . ' — wording and accreditation rules', ['auto' => 1]);
+    return ['ok' => true, 'label' => $t['label'], 'wording' => $wording,
+            'inspection_pack' => ($key === 'inspection'), 'accreditation_pack' => $accrPack];
 }
 
 // Which vocabulary pack (terms.php TERM_PACKS) each industry template lines up
@@ -608,17 +653,25 @@ function ops_industry($route, $method) {
 
     if ($route === 'industry-apply' && $method === 'POST') {
         $key = preg_replace('/[^a-z]/', '', (string)($_POST['key'] ?? ''));
-        $r = industry_apply($key);
+        // The company's industry — wording and accreditation: an administrator,
+        // and only once they have confirmed the changes they were shown.
+        if (($_POST['do'] ?? '') === 'company') {
+            ops_require(industry_can_company(), 'Only an administrator can change the company\'s wording and accreditation rules.');
+            if (empty($_POST['confirm'])) { flash('Tick the confirmation first — it lists what will change.', 'error'); redirect('/industry?show=' . $key); }
+            $r = industry_set_company($key);
+            if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/industry'); }
+            flash('Your company\'s industry is now ' . $r['label'] . '. '
+                . ($r['accreditation_pack'] !== '' ? 'The ' . INDUSTRY_ACCR_LABELS[$r['accreditation_pack']] . ' accreditation rules are ON.' : 'No accreditation rules are on.'));
+            redirect('/industry?show=' . $key);
+        }
+        // Adding a template's pipelines changes nothing else.
+        $r = industry_apply_pipelines($key);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/industry'); }
-            $n = 2 + count($r['pipelines']['alt'] ?? []);
-        flash($r['label'] . ' applied. ' . $n . ' pipelines created — a main funnel (now the default), '
+        $n = 2 + count($r['pipelines']['alt'] ?? []);
+        flash($r['label'] . ' pipelines added. ' . $n . ' pipelines created — a main funnel (now the default), '
             . 'an alternate funnel and a lead pipeline'
             . ($r['list_values'] ? ', with ' . $r['list_values'] . ' list values added' : '')
-            . (!empty($r['wording']) ? '; the wording is set to match' : '')
-            . (!empty($r['accreditation_pack'])
-                ? '; the ' . ($r['accreditation_pack'] === 'labs' ? 'laboratory (ISO/IEC 17025)' : 'inspection (ISO/IEC 17020)') . ' accreditation rules are ON'
-                : '; the accreditation registers are OFF')
-            . '. Anything already in flight keeps the pipeline it was on.');
+            . '. Your wording and accreditation rules are unchanged. Anything already in flight keeps the pipeline it was on.');
         redirect('/opportunities');
     }
 
@@ -628,6 +681,8 @@ function ops_industry($route, $method) {
         'appliedAt' => (string)setting_get('industry_applied_at', ''),
         'preview'   => industry_preview((string)($_GET['show'] ?? '') ?: (industry_current() ?: 'generic')),
         'showKey'   => (string)($_GET['show'] ?? '') ?: (industry_current() ?: 'generic'),
+        'canCompany'=> industry_can_company(),
+        'companyChanges' => industry_company_changes((string)($_GET['show'] ?? '') ?: (industry_current() ?: 'generic')),
     ]);
     return true;
 }
