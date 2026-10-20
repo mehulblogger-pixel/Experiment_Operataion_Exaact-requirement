@@ -17,14 +17,19 @@ def C(id, module, title, kind, tags, persona, why, before, steps, ref='', compan
 # ════════════════════════════════════════════════════════════════════════════
 # S0 — Before you start: the test company, its people and its answers
 # ════════════════════════════════════════════════════════════════════════════
-C('SAL-000', 'Before you start', 'Create one test user for every Sales role, and one for each role that touches Sales', 'scenario', ['best'],
-  'MASTER_ADMIN', 'Every rule below depends on who is signed in; without a user per role half the tests cannot be run.',
-  'You are signed in as the Master Admin. Two branches exist (e.g. Ahmedabad and Mumbai).',
-  [('Left menu → Admin → User register → + Add user. Create "Test MktExec" with role Marketing Executive, home branch Ahmedabad.', 'The user is saved and listed with role Marketing Executive and branch Ahmedabad.'),
-   ('Repeat for: Test BDM (Business Development Manager, Ahmedabad), Test KAM (Key Accounts Manager, Mumbai), Test MktMgr (Marketing Manager, Ahmedabad), Test BranchMgr (Branch Manager, Ahmedabad), Test BranchMgr2 (Branch Manager, Mumbai), Test OpsMgr (Operation Manager, Ahmedabad), Test Finance (Finance), Test Director (Business Director), Test Coord (Coordinator, Ahmedabad), Test Inspector (Inspector, Ahmedabad).', 'Eleven test users are listed, each with the right role and branch.'),
-   ('Give every test user an e-mail address you can read (e.g. yourname+bdm@gmail.com).', 'Approval and escalation e-mails can reach you during the tests.'),
-   ('Sign in once as each test user in a private browser window, then sign out.', 'Each one reaches their home screen. Nobody sees an error.')],
-  'docs/01-roles.md; docs/02-permission-matrix.md')
+C('SAL-000', 'Before you start', 'Check that each Sales test user sees exactly what their role allows', 'access', ['best', 'rule'],
+  'MASTER_ADMIN', 'Every Sales rule depends on who is signed in. If a person\'s role, branch or ticks are wrong, every later result is wrong.',
+  'Start here → SET-06 is done: the 19 test users exist, with NO extra permission ticks and nothing ticked on Data scope (except Test SBUHead).',
+  [('Admin → User register. Find the Sales people: Test MktExec, Test BDM, Test KAM, Test MktMgr, Test BranchMgr, Test BranchMgr2, Test Finance, Test Director.', 'Each is listed with the role and home office from the Start here table (KAM and BranchMgr2 in Mumbai, the rest in Ahmedabad).'),
+   ('Open Test BDM → Permissions tab.', 'Every tick-box is empty — the role\'s defaults apply. If anything is ticked, untick it and save before testing.'),
+   ('Sign in as Test MktExec (private window). Look at the left menu.', 'Sales and Directory are there. Insights, Money and Operations are NOT.'),
+   ('Sign in as Test BDM. Left menu.', 'Sales, Insights and Directory. No Operations, no Money.'),
+   ('Sign in as Test MktMgr. Left menu, then Sales home.', 'Sales, Money (profitability), Insights, Directory, Admin (document templates). Sales home shows the "Set up Sales" tile.'),
+   ('Sign in as Test BranchMgr. Sales → Quotes.', 'Only Ahmedabad quotations. Nothing from Mumbai.'),
+   ('Sign in as Test KAM. Sales → Quotes and Directory → Client register.', 'Only Mumbai records.'),
+   ('Sign in as Test Finance. Left menu.', 'Sales (quotations read only), Operations (read only), Reporting, Money, Insights. No Admin.'),
+   ('Sign in as Test Director. Left menu.', 'Every area; System settings are not offered.')],
+  'docs/01-roles.md; docs/02-permission-matrix.md; setup_guide.py')
 
 C('SAL-001', 'Before you start', 'Test customers that cover every kind of buyer', 'scenario', ['best'],
   'MASTER_ADMIN', 'Different buyers trigger different rules (blocked, on hold, group companies, near-duplicate names).',
@@ -48,18 +53,18 @@ C('SAL-002', 'Before you start', 'Answer "Set up Sales" — record your company\
 
 C('SAL-003', 'Before you start', 'Set approval levels that match a real company', 'scenario', ['best', 'rule'],
   'MARKETING_MANAGER', 'Approval routing is the heart of the Sales controls; every approval test uses these three levels.',
-  'Signed in as Test MktMgr (or Master Admin).',
+  'Signed in as Test MktMgr (or Master Admin). Start here → SET-07 describes the same three levels.',
   [('Left menu → Sales → Quotes → "Approval rules".', 'Page "Quote & report approvals" with a table Level / Rule / Applies to / From ₹ / Up to ₹ / Approver / Status.'),
    ('"+ Add rule": Level 1, any Business Unit, From ₹0 Up to ₹5,00,000, Approver role Branch Manager. Save.', 'Row appears as Level 1.'),
    ('Add Level 2: From ₹5,00,000 Up to ₹25,00,000, Approver role Marketing Manager.', 'Row appears as Level 2.'),
-   ('Add Level 3: From ₹25,00,000, Up to blank (no upper limit), Approver role Business Director.', 'Row appears as Level 3.'),
+   ('Add Level 3: From ₹25,00,000, Up to 0 (the form says "0 = no upper limit"), Approver role Business Director.', 'Row appears as Level 3.'),
    ('Go back to Set up Sales → "Already set by your company\'s rules".', 'The three levels are described in sentences, e.g. "₹0 – ₹5,00,000: a Branch Manager approves".')],
   'D-02, D-04, D-05; quote_approval_rules', live=False)
 
 C('SAL-004', 'Before you start', 'Company types to test — run the Sales tests once for each', 'scenario', ['best'],
   'MASTER_ADMIN', 'The same software behaves differently for a services company, a manpower supplier and a product company; each must be tried.',
   'A TEST workspace (not your live company), because applying an industry changes the wording everyone sees.',
-  [('Profile A — Third-party inspection agency (services by man-day). Left menu → Admin → Your industry → "Inspection, testing & certification" → Make it the company\'s industry (tick "I understand the changes listed above.").', 'Wording and ISO/IEC 17020 rules match an inspection body.'),
+  [('Profile A — Third-party inspection agency (services by man-day). Left menu → Admin → Settings → Your industry → "Inspection, testing & certification" → Make it the company\'s industry (tick "I understand the changes listed above.").', 'Wording and ISO/IEC 17020 rules match an inspection body.'),
    ('Profile B — Testing laboratory: "Testing & calibration laboratory".', 'The ISO/IEC 17025 laboratory rules are switched on, inspection rules off; the panel listed both changes before you confirmed.'),
    ('Profile C — Manpower supply / deputation: "Recruitment & staffing". Quote by Man-month.', 'Man-month quotations need an approved project costing (if your Set up Sales answer says so).'),
    ('Profile D — Manufacturer selling products: "Manufacturing & engineering". Try to quote 50 cabinets.', 'Quote line units offered are Man-day, Man-month, Per visit, Audit day, Per lot / lump sum, Per document, Per km, Other — there is no "Nos / pieces / kg" and no HSN code. Record as a GAP for product companies unless your administrator adds a unit in Masters.'),
@@ -928,7 +933,7 @@ C('SAL-172', 'Quote templates', 'Quotation and e-mail templates', 'scenario', ['
 C('SAL-173', 'Industry', 'Applying an industry template only adds pipelines; wording and accreditation are an administrator\'s', 'scenario', ['rule'],
   'several', 'Owner\'s answer D-29: a funnel test must never re-word the application or switch ISO/IEC 17020 off.',
   'Test workspace on Inspection. Test Director and Master Admin.',
-  [('As Test Director: Left menu → Admin → Your industry → pick "Manufacturing & engineering".', 'Only "Add these pipelines" is offered; no "Make this our company\'s industry" panel.'),
+  [('As Test Director: Left menu → Admin → Settings → Your industry → pick "Manufacturing & engineering".', 'Only "Add these pipelines" is offered; no "Make this our company\'s industry" panel.'),
    ('"Add these pipelines".', 'Message "… pipelines added. 3 pipelines created … Your wording and accreditation rules are unchanged." The inspection words and ISO/IEC 17020 rules are still in place.'),
    ('As Master Admin pick "Manufacturing & engineering".', 'A separate panel "Make this our company\'s industry" lists each change, e.g. "The inspection (ISO/IEC 17020) accreditation rules will be turned OFF." and a tick-box "I understand the changes listed above."'),
    ('Press "Make … our industry" without ticking.', 'Refused: "Tick the confirmation first — it lists what will change."'),

@@ -228,7 +228,7 @@ function renderNav(){
   let h = `<a href="#" data-p="overview" class="${on('overview')}">Overview</a>
     <a href="#" data-p="defects" class="${on('defects')}">What failed or is blocked <span class="c">${k.fail + k.block}</span></a>
     <a href="#" data-p="how" class="${on('how')}">How to use this book</a>
-    <a href="#" data-p="people" class="${on('people')}">People, companies, test data</a>`;
+    <a href="#" data-p="people" class="${on('people')}"><b>Start here — users &amp; settings</b></a>`;
   for (const a of BOOK.areas) {
     const list = CASES.filter(c => c.area === a), kk = counts(list);
     h += `<h4>${esc(a)}</h4><a href="#" data-p="area" data-a="${esc(a)}" class="${on('area', a)}">All of ${esc(a)} <span class="c">${list.length - kk.none}/${list.length}</span></a>`;
@@ -247,7 +247,7 @@ function overviewHTML(){
   <div class="grid">`;
   for (const a of BOOK.areas) { const list = CASES.filter(c => c.area === a), k = counts(list);
     h += `<div class="tile" data-go-area="${esc(a)}" tabindex="0"><h3>${esc(a)}</h3><div class="bar">${barHTML(k, list.length)}</div><div class="n">${list.length - k.none} of ${list.length} tested${k.fail ? ' · <span style="color:var(--fail)">' + k.fail + ' failed</span>' : ''}${k.block ? ' · ' + k.block + ' blocked' : ''}</div></div>`; }
-  h += `</div><div class="note">Start with <b>How to use this book</b>, then <b>Sales → Before you start</b>. Tests marked <span class="tag live">test copy only</span> change company-wide settings: run them on a test workspace, never on your live company.</div>`;
+  h += `</div><div class="note">Start with <b>Start here — users &amp; settings</b> (left menu): it says which test users to create, what each may do, and which company settings to use. Then <b>How to use this book</b>. Tests marked <span class="tag live">test copy only</span> change company-wide settings: run them on a test workspace, never on your live company.</div>`;
   return h;
 }
 function filtered(list){
@@ -375,7 +375,9 @@ $('#exportBtn').onclick = async () => {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), 'Summary');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(tests), 'Tests');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(steps), 'Steps');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(BOOK.personas.map(p => ({'Role': p.name, 'What they do': p.does}))), 'People');
+  const S = BOOK.setup;
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(S.users.map(u => ({'#': u.n, 'Name': u.name, 'Username': u.user, 'Role': u.roleName, 'Home office': u.home, 'Which team': u.teamName, 'Reports to': u.reports, 'Department': u.dept, 'Data scope': u.scope === 'sbu' ? 'Untick "Every business unit"; tick only Industrial' : 'Tick nothing', 'Position & pay': u.pay || '', 'Sees': u.sees, 'Can': u.can, 'Cannot': u.cannot}))), 'Test users');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(S.settings.map((s, i) => ({'Step': 'SET-' + String(i + 1).padStart(2, '0'), 'What': s.step, 'Where': s.where, 'Enter / check': s.what, 'Safe on the live company': s.live ? 'yes' : 'NO — test workspace'}))), 'Company settings');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(BOOK.companies.map(c => ({'Code': c.code, 'Company type': c.name, 'What is special': c.what, 'Industry template': c.industry}))), 'Company types');
   const buf = XLSX.write(wb, {bookType:'xlsx', type:'array'});
   const name = 'EXAACT-Test-Book-' + new Date().toISOString().slice(0, 10) + '.xlsx';
@@ -388,7 +390,7 @@ $('#navt').onclick = () => $('#nav').classList.toggle('open');
 // ---- static pages -----------------------------------------------------------------------------
 function howHTML(){ return `<h1>How to use this book</h1><div class="prose">
   <ol>
-    <li><b>Work module by module.</b> Pick an area on the left, then a module. Start with <b>Sales → Before you start</b>: it creates the test users, customers and settings every later test needs.</li>
+    <li><b>Work module by module.</b> Pick an area on the left, then a module. Start with <b>Start here — users &amp; settings</b>, then tick off <b>Start here → Set up for testing</b> (SET-01 … SET-12): the test users, customers and settings every later test needs.</li>
     <li><b>Open a test</b> by clicking its title. Do each step on <a href="${esc(BOOK.site)}" target="_blank" rel="noopener">${esc(BOOK.site)}</a> exactly as written, in a second window or on your phone.</li>
     <li><b>Mark each step</b> ✓ (as expected), ✗ (not as expected) or ! (could not do it). A ✗ marks the whole test Failed. When every step is ✓ the test marks itself Passed.</li>
     <li><b>Say what happened</b> in the box: the exact message, the record number (e.g. Q-2607-001), and what you expected instead.</li>
@@ -405,10 +407,30 @@ function howHTML(){ return `<h1>How to use this book</h1><div class="prose">
   </ul>
   <h2 style="font-size:16px">Sharing it with your team</h2>
   <p>Share this page and give each tester <b>Contributor</b> access so they can record results. To add screenshots a person needs <b>Editor</b> access. Each result records who marked it.</p></div>`; }
-function peopleHTML(){ return `<h1>People, companies, test data</h1><p class="lede">Create one test user for each role (Sales → Before you start, SAL-000). Run the Sales tests once for each company type on a test workspace.</p>
-  <div class="steps"><table><thead><tr><th>Role</th><th>What they do</th></tr></thead><tbody>${BOOK.personas.map(p => `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.does)}</td></tr>`).join('')}</tbody></table></div>
-  <h2 style="font-size:16px;margin-top:20px">Company types</h2>
-  <div class="steps"><table><thead><tr><th>Code</th><th>Company type</th><th>What is special</th><th>Industry template to apply</th></tr></thead><tbody>${BOOK.companies.map(c => `<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.name)}</td><td>${esc(c.what)}</td><td>${esc(c.industry)}</td></tr>`).join('')}</tbody></table></div>`; }
+function peopleHTML(){ const S = BOOK.setup;
+  const live = s => s.live ? '<span class="tag">safe on live</span>' : '<span class="tag live">test copy only</span>';
+  const opens = u => u.opens == null ? '' : `<br><span class="muted" style="font-size:12px">opened ${u.opens} of ${u.of} screens on the test copy</span>`;
+  return `<h1>Start here — users &amp; settings</h1>
+  <p class="lede">Before any test: set the company up as below and create the 19 test people. Then tick off each step in <b>Start here → Set up for testing</b> (SET-01 … SET-12) so you know it is done.</p>
+  <div class="note"><b>The one rule about permissions:</b> do not tick anything on a test user's <b>Permissions</b> tab, and do not change <b>Admin → Roles &amp; permissions</b>. The role you pick gives each person exactly what the company's permission rules allow. The tests check those rules; one extra tick and the results no longer mean anything.</div>
+  <h2 style="font-size:16px;margin-top:20px">1 · Answer these two questions first</h2>
+  <div class="steps"><table><tbody>${S.questions.map(q => `<tr><td><b>${esc(q.q)}</b></td><td>${esc(q.why)}</td></tr>`).join('')}</tbody></table></div>
+  <h2 style="font-size:16px;margin-top:20px">2 · Company settings, in this order</h2>
+  <div class="steps"><table><thead><tr><th>#</th><th>What</th><th>Where (left menu)</th><th>What to enter or check</th></tr></thead><tbody>${S.settings.map((s, i) => `<tr><td>SET-${String(i + 1).padStart(2, '0')}</td><td><b>${esc(s.step)}</b><br>${live(s)}</td><td>${esc(s.where)}</td><td>${esc(s.what)}</td></tr>`).join('')}</tbody></table></div>
+  <h2 style="font-size:16px;margin-top:20px">3 · Two branches</h2>
+  <div class="steps"><table><tbody>${S.branches.map(b => `<tr><td><b>${esc(b.name)}</b></td><td>${esc(b.why)}</td></tr>`).join('')}</tbody></table></div>
+  <h2 style="font-size:16px;margin-top:20px">4 · How to fill "Add a person" — tab by tab</h2>
+  <p class="lede">Admin → User register → <b>+ Add a person</b>. Same for all 19; only the values in the table in step 5 change.</p>
+  ${S.form.map(f => `<div class="steps"><table><thead><tr><th colspan="2">Tab: ${esc(f.tab)}</th></tr></thead><tbody>${f.fields.map(x => `<tr><td style="width:32%"><b>${esc(x.f)}</b></td><td>${esc(x.v)}</td></tr>`).join('')}</tbody></table></div>`).join('')}
+  <h2 style="font-size:16px;margin-top:20px">5 · The 19 test people — create them top to bottom</h2>
+  <p class="lede">Top to bottom, because "Reports to" can only pick someone who already exists.</p>
+  <div class="steps"><table><thead><tr><th>#</th><th>Name · username</th><th>Role · home office · team</th><th>Reports to</th><th>Sees</th><th>Can</th><th>Cannot</th></tr></thead><tbody>${S.users.map(u => `<tr><td>${u.n}</td><td><b>${esc(u.name)}</b><br><code>${esc(u.user)}</code></td><td><b>${esc(u.roleName)}</b><br>${esc(u.home)} · ${esc(u.teamName)}${u.scope === 'sbu' ? '<br><i>Data scope: only "Industrial"</i>' : ''}${u.pay ? '<br><i>' + esc(u.pay) + '</i>' : ''}</td><td>${esc(u.reports)}</td><td>${esc(u.sees)}</td><td>${esc(u.can)}${opens(u)}</td><td>${esc(u.cannot)}</td></tr>`).join('')}</tbody></table></div>
+  <h2 style="font-size:16px;margin-top:20px">6 · Watch for these while testing</h2>
+  <p class="lede">Measured on the test copy, these disagree with the company's permission rules. They are not fixed yet. If you see them, mark that test Failed with a screenshot.</p>
+  <div class="steps"><table><tbody>${S.watch.map(w => `<tr><td><b>${esc(w.who)}</b></td><td>${esc(w.what)}</td></tr>`).join('')}</tbody></table></div>
+  <h2 style="font-size:16px;margin-top:20px">7 · Company types</h2>
+  <p class="lede">Run the Sales tests once for each type, on a test workspace (applying an industry changes the wording everyone sees).</p>
+  <div class="steps"><table><thead><tr><th>Code</th><th>Company type</th><th>What is special</th><th>Industry to apply</th></tr></thead><tbody>${BOOK.companies.map(c => `<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.name)}</td><td>${esc(c.what)}</td><td>${esc(c.industry)}</td></tr>`).join('')}</tbody></table></div>`; }
 
 boot();
 })();

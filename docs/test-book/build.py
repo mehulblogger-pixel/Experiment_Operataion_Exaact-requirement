@@ -11,7 +11,7 @@ from collections import OrderedDict, Counter
 
 SP = os.path.dirname(os.path.abspath(__file__))
 EV = '/home/user/Experiment_Operataion_Exaact-requirement/docs/audit-2026-10/evidence'
-AREAS = ['Sales', 'Operations', 'Recruitment', 'Marketplace', 'Quality & Accreditation', 'Reporting', 'Money', 'Insights',
+AREAS = ['Start here', 'Sales', 'Operations', 'Recruitment', 'Marketplace', 'Quality & Accreditation', 'Reporting', 'Money', 'Insights',
          'Directory', 'Admin', 'Across modules', 'Your own pages']
 ROLE_NAMES = {
     'MASTER_ADMIN': 'Master Admin', 'BUSINESS_DIRECTOR': 'Business Director', 'SBU_HEAD': 'Business Unit Head',
@@ -203,11 +203,38 @@ def screen_case(route, d, nav, access, seq):
             'steps': steps, 'ref': f'measured screen /{d["path"]}', 'live': True, 'route': route}
 
 
+def load_setup():
+    spec = importlib.util.spec_from_file_location('setup_guide', os.path.join(SP, 'setup_guide.py'))
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    return m
+
+
+def setup_cases(g):
+    """One tick-off test per set-up step, so the tester can record what was done."""
+    out = []
+    for i, s in enumerate(g.SETTINGS, 1):
+        if s['step'] == 'Test users':
+            steps = [{'do': f"{u['n']}. Create {u['name']}: Username {u['user']} · Role {ROLE_NAMES[u['role']]} · Home office {u['home']} · Which team {g.TEAM[u['team']]} · Reports to {u['reports']} · Department {u['dept']}"
+                            + (' · Data scope: untick "Every business unit", tick only "Industrial"' if u['scope'] == 'sbu' else ' · Data scope: tick nothing')
+                            + (f" · Position & pay: {u['pay']}" if u.get('pay') else '') + ' · Permissions: tick nothing. Press "Save user".',
+                      'expect': f"Saved and listed in the User register with role {ROLE_NAMES[u['role']]}. Signed in as them (private window) they reach their home screen and see {u['sees']}."}
+                     for u in g.USERS]
+            why = 'Every test in the book is done as one of these people. Wrong role or branch here = wrong results everywhere.'
+        else:
+            steps = [{'do': f"{s['where']}: {s['what']}", 'expect': 'Saved without an error; reopening the screen shows what you entered.' if s['step'] != 'Company details' else 'Every field holds your real company details.'}]
+            why = 'Later tests assume this is in place.'
+        out.append({'id': f'SET-{i:02d}', 'area': 'Start here', 'module': 'Set up for testing', 'title': s['step'], 'kind': 'scenario', 'tags': ['best'],
+                    'persona': 'MARKETING_MANAGER' if 'Set up Sales' in s['where'] else 'MASTER_ADMIN', 'company': 'ANY', 'why': why,
+                    'before': 'Read "Start here — users & settings" (left menu, top) first.', 'steps': steps, 'ref': 'setup_guide.py', 'live': s['live']})
+    return out
+
+
 def main():
     screens = json.load(open(os.path.join(SP, 'screens_today.json')))
     access = json.load(open(os.path.join(SP, 'access_today.json'))) if os.path.exists(os.path.join(SP, 'access_today.json')) else {}
     nav = nav_index()
-    cases = list(load_sales())
+    guide = load_setup()
+    cases = setup_cases(guide) + list(load_sales())
     only = os.environ.get('TB_FILES')   # e.g. "cases_ops_rec_mkt.json" — publish only finished parts
     for fp in sorted(glob.glob(os.path.join(SP, 'cases_*.json'))):
         if only and os.path.basename(fp) not in only.split(','): continue
@@ -248,6 +275,7 @@ def main():
         areas=areas,
         personas=[{'code': c, 'name': ROLE_NAMES[c], 'does': d} for c, d in PERSONAS],
         companies=[{'code': c, 'name': n, 'what': w, 'industry': i} for c, n, w, i in COMPANIES],
+        setup=guide.book_data(ROLE_NAMES, access),
         cases=cases)
     out = os.path.join(SP, 'site', 'book.json')
     os.makedirs(os.path.dirname(out), exist_ok=True)
