@@ -92,6 +92,39 @@
   <?php endif; ?>
 </div>
 
+<?php // ---- D-25 — amendments: two signatures, the old figures kept ------------
+  $amendments = $amendments ?? [];
+  if ($amendments): ?>
+<div class="panel" id="amendments" style="margin-top:0">
+  <h3 class="tab-sub" style="margin-top:0">Amendments</h3>
+  <?php foreach ($amendments as $am): $pend = $am['status'] === 'PENDING'; ?>
+    <div style="padding:8px 0;border-top:1px solid var(--line)">
+      <span class="pill <?= $pend ? 'p-warn' : ($am['status'] === 'APPROVED' ? 'p-ok' : 'p-bad') ?>"><?= e(['PENDING' => 'Waiting for signatures', 'APPROVED' => 'Approved', 'REJECTED' => 'Rejected'][$am['status']] ?? $am['status']) ?></span>
+      <b style="margin-left:6px"><?= e(contract_amendment_summary($am)) ?></b>
+      <div class="muted" style="font-size:12.5px;margin-top:3px">
+        Asked by <?= e($am['requested_by']) ?> on <?= e(fdate($am['requested_at'])) ?> — <?= e($am['reason']) ?>
+        <?= trim((string)$am['endorsed_at']) !== '' ? ' · endorsed by ' . e($am['endorsed_by']) . ' on ' . e(fdate($am['endorsed_at'])) : '' ?>
+        <?= trim((string)$am['decided_at']) !== '' ? ' · ' . strtolower(e($am['status'])) . ' by ' . e($am['decided_by']) . ' on ' . e(fdate($am['decided_at'])) . ($am['decision_note'] !== '' ? ' — ' . e($am['decision_note']) : '') : '' ?>
+      </div>
+      <?php if ($pend): $endorsed = trim((string)$am['endorsed_at']) !== ''; ?>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <?php if (!$endorsed && !empty($canEndorse)): ?>
+            <form method="post" action="/contract-open"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="do" value="amend-endorse"><button class="btn small">Endorse</button></form>
+          <?php endif; ?>
+          <?php if (($endorsed || is_master()) && !empty($canApprove)): ?>
+            <form method="post" action="/contract-open"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="do" value="amend-approve"><button class="btn small">Approve amendment</button></form>
+          <?php endif; ?>
+          <?php if (!empty($canEndorse) || !empty($canApprove)): ?>
+            <form method="post" action="/contract-open" style="display:flex;gap:6px"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="do" value="amend-reject">
+              <input class="form-control" name="note" required placeholder="Why it is rejected" style="width:200px"><button class="btn small secondary">Reject</button></form>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <?php // ---- Field #3 — Edit / Delete this contract ------------------------ ?>
 <?php if (!empty($canEditContract)): ?>
 <details class="panel" style="margin-top:0">
@@ -121,6 +154,11 @@
         </tbody></table>
       <button type="button" class="btn small secondary cl-add" data-cl-rows="edit">+ Add line</button>
     </div>
+    <?php if ($os === 'OPEN'): ?>
+    <div class="ff ff-wide"><label for="amend_reason">Reason for the amendment <span class="muted">— needed only if you change the value, dates or quantities</span></label>
+      <input class="form-control" id="amend_reason" name="amend_reason" maxlength="400" placeholder="For example: customer extended the work by three months, PO amendment 2">
+      <small class="muted">This contract is open, so new figures need a manager's endorsement and the branch manager's approval, as the opening did. Until then it keeps its current figures.</small></div>
+    <?php endif; ?>
     <button class="btn small" type="submit">Save changes</button>
   </form>
   <?php // ---- Point 1 — correct a contract number that was typed wrongly ------

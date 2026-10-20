@@ -65,6 +65,17 @@ function contracts_migrate() {
     ensure_column('partner_registrations', 'file_data',   'MEDIUMTEXT');
     ensure_column('partner_registrations', 'uploaded_by', "VARCHAR(150) DEFAULT ''");
     ensure_column('partner_registrations', 'uploaded_at', "VARCHAR(30) DEFAULT ''");
+    // D-25 (the owner, 20 Oct 2026: "Yes") — a change to the value, dates or
+    // quantities of an OPEN contract is an amendment: it takes the same two
+    // signatures as the opening, and the values it replaces are kept here.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS contract_amendments (
+        id $pk, contract_id INT, status VARCHAR(16) DEFAULT 'PENDING',
+        old_values MEDIUMTEXT, new_values MEDIUMTEXT, reason VARCHAR(400) DEFAULT '',
+        requested_by VARCHAR(150) DEFAULT '', requested_by_id INT NULL, requested_at VARCHAR(30) DEFAULT '',
+        endorsed_by VARCHAR(150) DEFAULT '', endorsed_by_id INT NULL, endorsed_at VARCHAR(30) DEFAULT '',
+        decided_by VARCHAR(150) DEFAULT '', decided_by_id INT NULL, decided_at VARCHAR(30) DEFAULT '',
+        decision_note VARCHAR(400) DEFAULT '')");
+    if (function_exists('act_index')) act_index('contract_amendments', 'idx_camd_contract', '(contract_id)');
     // Field #3 — "Quantity sold" as a LIST of line items (man-days / man-months /
     // other), like a PO's lines, instead of one number. The contract's qty_total is
     // kept as the SUM of these, so every existing quantity gate keeps working unchanged.
@@ -201,6 +212,38 @@ function contract_lines_from_post(array $b) {
         $out[] = ['description' => (string)$d, 'quantity' => (float)($qty[$i] ?? 0), 'unit' => (string)($unit[$i] ?? 'MANDAY')];
     return $out;
 }
+// The commercial part of a contract — what an amendment changes: its value,
+// its dates and its quantity lines. Title, business unit and notes are not.
+function contract_commercial($c, array $lines) {
+    $ls = [];
+    foreach ($lines as $ln) {
+        $d = trim((string)($ln['description'] ?? '')); $q = round((float)($ln['quantity'] ?? 0), 2);
+        if ($d === '' && $q <= 0) continue;
+        $ls[] = ['description' => $d, 'quantity' => $q, 'unit' => trim((string)($ln['unit'] ?? '')) ?: 'MANDAY'];
+    }
+    return ['value' => ($c['value'] ?? null) === null || $c['value'] === '' ? null : round((float)$c['value'], 2),
+            'start_date' => (string)($c['start_date'] ?? ''), 'end_date' => (string)($c['end_date'] ?? ''), 'lines' => $ls];
+}
+function contract_pending_amendment($contractId) {
+    return ops_one("SELECT * FROM contract_amendments WHERE contract_id=? AND status='PENDING' ORDER BY id DESC LIMIT 1", [(int)$contractId]) ?: null;
+}
+function contract_amendments($contractId) {
+    return ops_all("SELECT * FROM contract_amendments WHERE contract_id=? ORDER BY id DESC", [(int)$contractId]) ?: [];
+}
+// One line saying what an amendment changes, old → new.
+function contract_amendment_summary($am) {
+    $o = json_decode((string)$am['old_values'], true) ?: []; $n = json_decode((string)$am['new_values'], true) ?: [];
+    $out = [];
+    if (($o['value'] ?? null) != ($n['value'] ?? null)) $out[] = 'value ' . fmoney($o['value'] ?? 0) . ' → ' . fmoney($n['value'] ?? 0);
+    if (($o['start_date'] ?? '') !== ($n['start_date'] ?? '')) $out[] = 'start ' . (fdate($o['start_date'] ?? '') ) . ' → ' . fdate($n['start_date'] ?? '');
+    if (($o['end_date'] ?? '') !== ($n['end_date'] ?? '')) $out[] = 'end ' . fdate($o['end_date'] ?? '') . ' → ' . fdate($n['end_date'] ?? '');
+    if (($o['lines'] ?? []) != ($n['lines'] ?? [])) {
+        $sum = fn($ls) => array_sum(array_map(fn($l) => (float)$l['quantity'], $ls ?: []));
+        $out[] = 'quantities ' . rtrim(rtrim(number_format($sum($o['lines'] ?? []), 2, '.', ''), '0'), '.') . ' → ' . rtrim(rtrim(number_format($sum($n['lines'] ?? []), 2, '.', ''), '0'), '.');
+    }
+    return $out ? implode('; ', $out) : 'no commercial change';
+}
+
 // A contract's quantity lines seeded from a quotation's countable line items.
 function contract_lines_from_quote($quoteId) {
     $rows = ops_all("SELECT description, service_type, location, unit, qty FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [(int)$quoteId]) ?: [];
@@ -867,11 +910,55 @@ function ops_contract_open($route, $method) {
     // Re-open a closed / auto-closed contract → back to the PENDING approval path.
     if ($do === 'reopen') {
         ops_require(can('crm.contract.register') || is_master(), 'You cannot re-open a contract.');
+        // Only a closed or rejected contract re-opens: "re-opening" an open one
+        // wiped both of its signatures (SA-19). A change to an open one is an amendment.
+        if (!in_array($status, ['CLOSED', 'REJECTED'], true)) {
+            flash('Only a closed or rejected contract can be re-opened. To change an open contract, edit it — a change to its figures becomes an amendment.', 'error');
+            redirect($back);
+        }
         $pdo->prepare("UPDATE partner_contracts SET open_status='PENDING', is_active=1, auto_closed=0, closed_at='', close_reason='', mgr_endorsed_by='', mgr_endorsed_by_id=NULL, mgr_endorsed_at='', bm_approved_by='', bm_approved_by_id=NULL, bm_approved_at='', requested_by=?, requested_by_id=?, requested_at=? WHERE id=?")
             ->execute([$me, $meId, date('c'), (int)$c['id']]);
         if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' re-opening requested by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. Pending manager & branch-manager approval.');
         flash('Re-opening requested — pending manager & branch-manager approval.');
         redirect($back);
+    }
+    // D-25 — an amendment takes the same two signatures as the opening: a manager
+    // endorses, then someone else — the branch manager — approves; only then do
+    // the new figures replace the old, which stay on the amendment.
+    if (in_array($do, ['amend-endorse', 'amend-approve', 'amend-reject'], true)) {
+        $am = contract_pending_amendment((int)$c['id']);
+        if (!$am) { flash('There is no amendment waiting on this contract.', 'warning'); redirect('/contract?id=' . (int)$c['id']); }
+        $to = '/contract?id=' . (int)$c['id'];
+        if ($do === 'amend-endorse') {
+            ops_require(can_endorse_contract_open(), 'Only a manager can endorse an amendment.');
+            if (trim((string)$am['endorsed_at']) !== '') { flash('Already endorsed.', 'warning'); redirect($to); }
+            db()->prepare("UPDATE contract_amendments SET endorsed_by=?, endorsed_by_id=?, endorsed_at=? WHERE id=?")->execute([$me, $meId, date('c'), (int)$am['id']]);
+            if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment endorsed by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. Awaiting branch-manager approval.');
+            flash('Amendment endorsed — it is now with the branch manager.'); redirect($to);
+        }
+        if ($do === 'amend-approve') {
+            ops_require(can_approve_contract_open(), 'Only the branch manager can approve an amendment.');
+            if (trim((string)$am['endorsed_at']) === '' && !is_master()) { flash('It needs a manager to endorse it first.', 'error'); redirect($to); }
+            if (!is_master() && (int)$am['endorsed_by_id'] === $meId && $meId !== 0) { flash('The approval must come from someone other than the endorser.', 'error'); redirect($to); }
+            $n = json_decode((string)$am['new_values'], true) ?: [];
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare("UPDATE partner_contracts SET value=?, start_date=?, end_date=? WHERE id=?")
+                    ->execute([$n['value'] ?? null, (string)($n['start_date'] ?? ''), (string)($n['end_date'] ?? ''), (int)$c['id']]);
+                contract_replace_lines((int)$c['id'], $n['lines'] ?? []);
+                $pdo->prepare("UPDATE contract_amendments SET status='APPROVED', decided_by=?, decided_by_id=?, decided_at=?, decision_note=? WHERE id=?")
+                    ->execute([$me, $meId, date('c'), mb_substr($note, 0, 400), (int)$am['id']]);
+                $pdo->commit();
+            } catch (Throwable $e) { $pdo->rollBack(); flash('The amendment could not be applied: ' . $e->getMessage(), 'error'); redirect($to); }
+            if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment APPROVED by ' . $me . ' — ' . contract_amendment_summary($am) . '.');
+            flash('Amendment approved — the contract now carries the new figures; the old ones are kept on the amendment.'); redirect($to);
+        }
+        ops_require(can_endorse_contract_open() || can_approve_contract_open(), 'You cannot decide this amendment.');
+        if ($note === '') { flash('Say why the amendment is rejected.', 'error'); redirect($to); }
+        db()->prepare("UPDATE contract_amendments SET status='REJECTED', decided_by=?, decided_by_id=?, decided_at=?, decision_note=? WHERE id=?")
+            ->execute([$me, $meId, date('c'), mb_substr($note, 0, 400), (int)$am['id']]);
+        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment REJECTED by ' . $me . ' — ' . $note . '.');
+        flash('Amendment rejected — the contract keeps its current figures.', 'warning'); redirect($to);
     }
     redirect($back);
 }
@@ -1036,6 +1123,9 @@ function ops_contract_360() {
         'jobs' => $jobs, 'reports' => $reports, 'money' => $money,
         // Field #3 — the contract's quantity line items, and whether this user may edit/delete it.
         'lines' => contract_lines($id),
+        // D-25 — an amendment waiting for its signatures, and those already decided.
+        'amendments' => contract_amendments($id),
+        'canEndorse' => can_endorse_contract_open(), 'canApprove' => can_approve_contract_open(),
         'canEditContract' => can('crm.contract.register') || is_master(),
         // Point 1 — what a correction to the number would carry with it, counted
         // BEFORE the button exists, so nobody discovers afterwards that they just
@@ -1060,18 +1150,60 @@ function ops_contract_edit($method) {
     if (!$c) { flash('That contract no longer exists.', 'error'); redirect('/'); }
     $b = $_POST;
     $value = ($b['value'] ?? '') !== '' ? (float)$b['value'] : null;
-    db()->prepare("UPDATE partner_contracts SET title=?, sbu=?, value=?, start_date=?, end_date=?, notes=? WHERE id=?")
-        ->execute([substr(trim((string)($b['title'] ?? '')), 0, 200), (string)($b['sbu'] ?? ''), $value,
-                   (string)($b['start_date'] ?? ''), (string)($b['end_date'] ?? ''),
+    $curLines = contract_lines($id);
+    // A save that carries no quantity lines at all leaves the lines as they are.
+    $postedLines = array_key_exists('cl_desc', $b) ? contract_lines_from_post($b)
+        : array_map(fn($l) => ['description' => $l['description'], 'quantity' => (float)$l['quantity'], 'unit' => $l['unit']], $curLines);
+    // D-25 — compare what is commercial before deciding how the save is applied.
+    $before = contract_commercial($c, $curLines);
+    $after  = contract_commercial(['value' => $value, 'start_date' => (string)($b['start_date'] ?? ''), 'end_date' => (string)($b['end_date'] ?? '')], $postedLines);
+    $commercialChanged = $before != $after;
+    $os = strtoupper((string)($c['open_status'] ?? 'OPEN'));
+    // The parts that are not commercial are saved at once, whatever its state.
+    db()->prepare("UPDATE partner_contracts SET title=?, sbu=?, notes=? WHERE id=?")
+        ->execute([substr(trim((string)($b['title'] ?? '')), 0, 200), (string)($b['sbu'] ?? ''),
                    substr(trim((string)($b['notes'] ?? '')), 0, 255), $id]);
+    $qid = function_exists('contract_quote_id') ? contract_quote_id($c) : 0;
+    if ($commercialChanged && $os === 'OPEN') {
+        // An open contract carries two signatures for the figures it was opened
+        // on; new figures need the same two, and the old stay in force until then.
+        if (contract_pending_amendment($id)) {
+            flash('An amendment to this contract is already waiting for its signatures — decide it first. The title and notes were saved.', 'error');
+            redirect('/contract?id=' . $id);
+        }
+        $reason = trim((string)($b['amend_reason'] ?? ''));
+        if ($reason === '') {
+            flash('Changing the value, dates or quantities of an open contract is an amendment — say why, in "Reason for the amendment". The title and notes were saved; the figures were not.', 'error');
+            redirect('/contract?id=' . $id);
+        }
+        $u = current_user();
+        db()->prepare("INSERT INTO contract_amendments (contract_id,status,old_values,new_values,reason,requested_by,requested_by_id,requested_at)
+                       VALUES (?, 'PENDING', ?,?,?,?,?,?)")
+            ->execute([$id, json_encode($before), json_encode($after), mb_substr($reason, 0, 400), user_name($u), (int)($u['id'] ?? 0) ?: null, date('c')]);
+        $am = contract_pending_amendment($id);
+        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment requested by ' . user_name($u) . ' — ' . contract_amendment_summary($am) . ' — ' . $reason . '. Pending manager & branch-manager approval.');
+        if (function_exists('act_log')) act_log('PARTNER', (int)$c['partner_id'], 'SYSTEM', 'Contract ' . ($c['contract_number'] ?? '') . ' amendment requested');
+        flash('Amendment requested — ' . contract_amendment_summary($am) . '. It needs a manager\'s endorsement and the branch manager\'s approval, as the opening did; until then the contract keeps its current figures.', 'warning');
+        redirect('/contract?id=' . $id);
+    }
+    db()->prepare("UPDATE partner_contracts SET value=?, start_date=?, end_date=? WHERE id=?")
+        ->execute([$value, (string)($b['start_date'] ?? ''), (string)($b['end_date'] ?? ''), $id]);
     // Quantity line items — replace with what was submitted; if none but a single
     // quantity was typed, keep that as the untracked total (backward compatible).
-    $kept = contract_replace_lines($id, contract_lines_from_post($b));
+    $kept = contract_replace_lines($id, $postedLines);
     if ($kept === 0 && ($b['qty_total'] ?? '') !== '')
         db()->prepare("UPDATE partner_contracts SET qty_total=? WHERE id=?")->execute([(float)$b['qty_total'], $id]);
+    // A contract still awaiting its signatures: an endorsement given for other
+    // figures no longer stands.
+    $unendorsed = false;
+    if ($commercialChanged && $os === 'PENDING' && trim((string)$c['mgr_endorsed_at']) !== '') {
+        db()->prepare("UPDATE partner_contracts SET mgr_endorsed_by='', mgr_endorsed_by_id=NULL, mgr_endorsed_at='' WHERE id=?")->execute([$id]);
+        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' figures changed before approval — the endorsement by ' . $c['mgr_endorsed_by'] . ' was withdrawn.');
+        $unendorsed = true;
+    }
     if (function_exists('act_log')) act_log('PARTNER', (int)$c['partner_id'], 'SYSTEM',
         'Contract ' . ($c['contract_number'] ?? '') . ' edited');
-    flash('Contract updated.');
+    flash($unendorsed ? 'Contract updated. Its figures changed, so it needs a manager\'s endorsement again.' : 'Contract updated.', $unendorsed ? 'warning' : 'success');
     redirect('/contract?id=' . $id);
 }
 

@@ -257,7 +257,29 @@ stateDiagram-v2
 - `can_approve_contract_open()` (`contracts.php:478-481`): master, or BRANCH_MANAGER /
   BRANCH_APP_MANAGER.
 - Each action guards `status==='PENDING'` (endorse 645, approve 662, reject 681); reopen is
-  the deliberate from-closed/rejected path.
+  the deliberate from-closed/rejected path — **enforced since 20 Oct 2026**: a reopen of an OPEN
+  or PENDING contract is refused (it used to wipe both signatures of an open contract, SA-19).
+- A change to the value, dates or quantity lines of a PENDING contract that is already endorsed
+  withdraws the endorsement (it was given for other figures).
+
+### Contract amendment (`contract_amendments.status`) — the owner's D-25, 20 Oct 2026
+
+A change to the value, dates or quantity lines of an **OPEN** contract does not apply at once:
+it is recorded as an amendment, with its reason and the old and new figures, and takes the same
+two signatures as the opening. Title, business unit and notes are saved directly.
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING : contract-edit on an OPEN contract with commercial changes + a reason · crm.contract.register/master
+  PENDING --> PENDING : endorse · can_endorse_contract_open
+  PENDING --> APPROVED : approve · can_approve_contract_open, endorsed first, approver ≠ endorser (unless master) — the new figures replace the old, in one transaction
+  PENDING --> REJECTED : reject, with a reason · endorse OR approve rights — the contract keeps its figures
+  APPROVED --> [*]
+  REJECTED --> [*]
+```
+
+- One amendment waits at a time; the old figures stay on the amendment row for good.
+- The contract's own `open_status` does not change — no status is added to it.
 
 ---
 
