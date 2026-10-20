@@ -57,8 +57,11 @@ t_ok(!empty(opp_register_contract($oid3, ['contract_number' => 'VSF-2026-01'])['
 
 // --- wiring ------------------------------------------------------------------
 $ops = file_get_contents(__DIR__ . '/../lib/ops.php');
-t_ok(strpos($ops, "'opportunity-send-to-accounts'=>'leads','opportunity-contract'=>'leads'") !== false,
-    'the two new routes are mapped through the module gate');
+//  2026-10-20 (Sales audit SA-11, owner rule D-01): the contract door moved from
+//  the Leads module to Quotes, because Finance — the only role that registers a
+//  contract — reads quotes and not leads. Its handler still asks crm.contract.register.
+t_ok(strpos($ops, "'opportunity-send-to-accounts'=>'leads','opportunity-contract'=>'quotes'") !== false,
+    'the two new routes are mapped through the module gate (the contract door behind Quotes, where Finance can reach it)');
 $view = file_get_contents(__DIR__ . '/../views/ops/opportunity_detail.php');
 t_ok(strpos($view, '/opportunity-send-to-accounts') !== false && strpos($view, 'Send to Accounts to register the contract') !== false,
     'the won deal offers "Send to Accounts to register the contract"');

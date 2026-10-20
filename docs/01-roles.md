@@ -90,7 +90,7 @@ role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 - **Must never:** see revenue/salary/profit (has `data.credit` only), approve their own reports, manage users or settings.
 
 ## BUSINESS_DEV_MANAGER — "Business Development Manager"
-- **Key:** `BUSINESS_DEV_MANAGER` · `dash.operations, dash.financial, data.credit, crm.quote.create, crm.quote.send, crm.followup.manage`; offices `OWN`, sbus `ALL` (`access.php:456-457`, shared with KAM); edits inquiries/quotes/crm_orders, views crm_reports/clients/reports (`:348-350`).
+- **Key:** `BUSINESS_DEV_MANAGER` · `dash.operations, dash.financial, data.credit, crm.quote.create, crm.quote.send, crm.followup.manage`; offices `OWN`, sbus `ALL` (`access.php:456-457`, shared with KAM); edits inquiries/quotes/crm_orders, views crm_reports/clients/reports (`:348-350`). **Since 20 Oct 2026 (owner's rule D-01):** also opens and adds **leads and deals** (`mod.leads.view/add`, shared by all four sales roles — matrix fn. 19b), and records the customer's answer on **the quotations assigned to them** (fn. 19).
 - **Who:** front-line sales — chases leads, builds and sends quotations, follows up.
 - **Context:** desk/mobile; sales-flavoured dashboard (`dashboard.php:63`).
 - **Sees:** Sales, Insights, Directory (clients). Nothing operational, no money beyond credit.

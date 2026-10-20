@@ -36,6 +36,13 @@ const MGMT_ROLES = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANC
 const ACCESS_NCR_RECORDERS = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','BRANCH_APP_MANAGER','OPERATION_MANAGER','ASST_MANAGER','COORDINATOR'];
 // Marketing & Sales roles (CRM funnel owners)
 const SALES_ROLES = ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'];
+// The owner's rule, 2026-10-20 (Sales audit D-01): "Sales executive, sales
+// manager and anyone who is assigned to do the job" work leads and deals. The
+// sales roles get the Leads module by default; anyone else the company assigns
+// the work to is given it on Roles & access. View + Add only: editing a lead or a
+// deal already rides on the Enquiries edit right these roles hold, deleting stays
+// with management, and configuring the pipelines stays company setup.
+const ACCESS_LEAD_WORKERS = SALES_ROLES;
 
 // Which module a role belongs to — used to hide roles a company can't use.
 // Only module-specific roles are listed; management/admin/coordinator roles are
@@ -898,6 +905,7 @@ function module_defaults($role) {
     $out = [];
     foreach ($view as $k) $out[] = "mod.$k.view";
     if ($ncrRecord) { $out[] = 'mod.ncr.view'; $out[] = perm_verb_key('ncr', 'add'); }
+    if (in_array($role, ACCESS_LEAD_WORKERS, true) && !in_array('leads', $edit, true)) { $out[] = 'mod.leads.view'; $out[] = perm_verb_key('leads', 'add'); }
     //  R-20 — the old edit tick meant "add / edit", so a role that had it must
     //  now receive BOTH Add and Edit, or every role quietly loses the ability to
     //  create records. And on the four modules where the edit tick also carried
@@ -1184,6 +1192,7 @@ function access_owner_grants() {
         'Q-B1-2026-10-19' => ['perms' => ['mod.ncr.view', 'mod.ncr.add'], 'roles' => ACCESS_NCR_RECORDERS],
         'Q-G-2026-10-19'  => ['perms' => ['mod.vendors.view'],            'roles' => ['FINANCE']],
         'Q-K-2026-10-19'  => ['perms' => ['mod.clients.view'],            'roles' => ['FINANCE']],
+        'D-01-2026-10-20' => ['perms' => ['mod.leads.view', 'mod.leads.add'], 'roles' => ACCESS_LEAD_WORKERS],
     ];
 }
 function access_apply_owner_grants($force = false) {

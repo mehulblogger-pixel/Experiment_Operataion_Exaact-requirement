@@ -53,7 +53,7 @@ try {
     db()->prepare("INSERT INTO users (username,first_name,email,role,is_superuser,is_active,permissions) VALUES ('t.or.custom','Custom','custom.or@t.test','OPERATION_MANAGER',0,1,'mod.jobs.view,mod.calls.view')")->execute();
     $cu = (int)db()->lastInsertId();
     $done = access_apply_owner_grants(true);
-    t_eq($done, ['Q-B1-2026-10-19', 'Q-G-2026-10-19', 'Q-K-2026-10-19'], 'all three rules are applied to the saved access');
+    t_eq(array_slice($done, 0, 3), ['Q-B1-2026-10-19', 'Q-G-2026-10-19', 'Q-K-2026-10-19'], 'all three rules are applied to the saved access (later owner rules follow them)');
     $st = json_decode(setting_get('role_access', ''), true);
     t_ok(in_array('mod.ncr.add', $st['COORDINATOR'], true), 'the saved Coordinator grid now records nonconformities');
     t_ok(in_array('mod.vendors.view', $st['FINANCE'], true) && in_array('mod.clients.view', $st['FINANCE'], true), 'the saved Finance grid now reads vendors and clients');

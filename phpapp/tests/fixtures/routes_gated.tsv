@@ -78,7 +78,8 @@ complaints	complaints	map
 confidentiality	confidentiality	map
 connect-capabilities	settings	map
 contract-no-check	clients	map
-contract-open	quotes	map
+# 2026-10-20: contract-open moved quotes -> calls (Sales audit SA-20, owner rule D-01); matrix fn. 19b.
+contract-open	calls	map
 contract-override	calls	map
 contract-overrides	calls	map
 cost-run	overheads	map
