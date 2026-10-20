@@ -26,7 +26,7 @@
     <tr>
       <td class="num"><b><?= (int)$r['level'] ?></b></td>
       <td><?= e($r['name'] ?: '—') ?></td>
-      <td><?= $r['match_type']==='SBU' && $r['sbu'] ? e(T('sbu')).': '.e(lk_options_or('sbu',OPS_SBUS)[$r['sbu']] ?? $r['sbu']) : 'Any '.e(Tl('sbu')) ?></td>
+      <td><?= crm_rule_is_unit($r) ? e(T('sbu')).': '.e(lk_options_or('sbu',OPS_SBUS)[$r['sbu']] ?? $r['sbu']) : 'Any '.e(Tl('sbu')) ?></td>
       <td class="num"><?= number_format((float)$r['min_amount'],0) ?></td>
       <td class="num"><?= (float)$r['max_amount']>0 ? number_format((float)$r['max_amount'],0) : '—' ?></td>
       <td><?= $r['approver_user_id'] ? e($nm) : ($r['approver_role'] ? e(ORG_ROLES[$r['approver_role']] ?? $r['approver_role']) : '<span class="muted">any approver</span>') ?></td>

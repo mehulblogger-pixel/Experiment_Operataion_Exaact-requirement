@@ -20,6 +20,7 @@ $n = 0;
           <?php foreach ($sec['facts'] as $f): ?><li><?= e($f) ?></li><?php endforeach; ?>
         </ul>
       <?php endif; ?>
+      <?php if (($sec['editor'] ?? '') === 'quote_levels') { $mode = 'rows'; include __DIR__ . '/crm/approval_levels_inline.php'; } ?>
       <?php foreach ($sec['questions'] as $q): $cur = setupqa_value($q); ?>
         <fieldset style="border:0;padding:0;margin:14px 0 0">
           <legend style="font-weight:600;font-size:15px;margin-bottom:4px"><?= e($q['ask']) ?></legend>
@@ -44,3 +45,5 @@ $n = 0;
     <a class="btn secondary" href="<?= e($set['home'] ?? '/') ?>">Back to <?= e($set['title']) ?></a>
   </div>
 </form>
+<?php //  The level cards' own forms — outside the answers form (see the partial).
+      foreach ($set['sections'] as $sec) if (($sec['editor'] ?? '') === 'quote_levels') { $mode = 'forms'; include __DIR__ . '/crm/approval_levels_inline.php'; } ?>

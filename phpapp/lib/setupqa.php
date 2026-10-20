@@ -107,8 +107,23 @@ function setupqa_sales_set() {
                         'default' => 'yes',
                     ],
                 ],
-                'link' => ['/quote-approval-rules', 'Change who approves, and up to what value'],
+                //  The levels themselves are edited right here (owner, SAL-002:
+                //  "in Sales setup we must have option to set the applicable rules
+                //  from that screen directly"), not on a screen two clicks away.
+                'editor' => 'quote_levels',
                 'link2' => ['/quote-delegations', 'Set who covers for an approver who is away'],
+            ],
+            [
+                'title' => 'Approving a deal as it moves stage',
+                'facts' => setupqa_sales_gate_facts(),
+                'questions' => [],
+                'link' => ['/stage-gates', 'Add or change the rules for deal stages'],
+            ],
+            [
+                'title' => 'Other approvals in Sales',
+                'facts' => setupqa_sales_other_approvals(),
+                'questions' => [],
+                'link' => null,
             ],
             [
                 'title' => 'Reviewing the request before it is approved (contract review)',
@@ -146,6 +161,40 @@ function setupqa_sales_set() {
     ];
 }
 
+// Deal-stage rules in sentences (lib/stagegate.php explains each one).
+function setupqa_sales_gate_facts() {
+    if (!function_exists('gate_rules')) return [];
+    $rows = array_values(array_filter(gate_rules(), fn($r) => (int)($r['active'] ?? 1) === 1));
+    if (!$rows) return ['There are no rules for deal stages, so a deal (opportunity) moves to any stage — won, lost or open — without anyone having to agree first.'];
+    return array_map('gate_explain', $rows);
+}
+
+// Every other approval in Sales, with who gives it. These follow the company's
+// decided rules (docs/02-permission-matrix.md 19e, 19f; D-11 B) and have no
+// setting, so they are stated rather than asked. A lead needs no approval: it
+// ends by converting, which is its own act.
+function setupqa_sales_other_approvals() {
+    $q = function_exists('Tl') ? Tl('quote') : 'quotation';
+    return [
+        'Leads: no approval. A lead ends by becoming a customer (convert) or being marked lost. A manager may reopen a lost lead, with a reason that is kept.',
+        'Deals (opportunities): only the stage rules above. A manager may reopen a closed deal, with a reason that is kept — unless it has already become an order or contract.',
+        'Project costing (man-month work): approved by someone who may approve ' . (function_exists('Tlp') ? Tlp('quote') : 'quotations') . ' or a manager — never by the person who prepared it.',
+        ucfirst($q) . 's: the levels above, in order — level 1 first, then level 2, and so on.',
+        'Opening a contract, and any later change to its value, dates or quantities: two different people — endorsed by an Operation Manager, Business Unit Head, Business Director or a branch user-manager, then approved by a Branch Manager or Branch Application Manager.',
+    ];
+}
+
+// What the in-place level editor on Set up Sales needs. Editing needs the same
+// right the rule screen has always asked for (ops_crm_approval_rules()).
+function setupqa_quote_levels_data() {
+    $can = function_exists('can') && (can('crm.quote.approve') || (function_exists('is_master') && is_master()));
+    $rows = function_exists('ops_all') ? (ops_all("SELECT * FROM quote_approval_rules ORDER BY level, min_amount, id") ?: []) : [];
+    $roles = ORG_ROLES; unset($roles['INSPECTOR']);
+    return ['can' => $can, 'rows' => $rows, 'roles' => $roles,
+            'users' => $can ? (ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username") ?: []) : [],
+            'sbuOpts' => function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : []];
+}
+
 // The approval levels as they stand, in sentences, and what happens to a value
 // none of them covers — the coverage check the rule screen never showed.
 function setupqa_sales_level_facts() {
@@ -160,12 +209,13 @@ function setupqa_sales_level_facts() {
         return $role !== '' ? (ORG_ROLES[$role] ?? $role) : 'anyone who may approve';
     };
     if (!$rows) return ['You have no approval levels yet, so every ' . (function_exists('Tl') ? Tl('quote') : 'quotation') . ' is treated as "not covered" — the first question below decides what happens.'];
+    $units = function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : [];
     $out = []; $top = 0.0; $open = false;
     foreach ($rows as $r) {
         $min = (float) $r['min_amount']; $max = (float) $r['max_amount'];
         $range = $max > 0 ? ('from ' . $money($min) . ' to ' . $money($max)) : ('from ' . $money($min) . ' upward');
         $out[] = 'Level ' . (int) $r['level'] . ' — ' . $range . ' before tax'
-               . (($r['match_type'] ?? '') === 'Business Unit' && ($r['sbu'] ?? '') !== '' ? ' (' . $r['sbu'] . ' only)' : '')
+               . (crm_rule_is_unit($r) ? ' (' . ($units[$r['sbu']] ?? $r['sbu']) . ' only)' : '')
                . ': ' . $who($r) . '.';
         if ($max <= 0) $open = true; else $top = max($top, $max);
     }

@@ -28,10 +28,13 @@ $val = fn($k, $d = '') => htmlspecialchars((string)($r[$k] ?? $d), ENT_QUOTES);
 
         <div>
           <label class="form-label">Applies to</label>
-          <select class="form-control" name="entity_kind">
-            <option value="OPPORTUNITY" <?= ($r['entity_kind'] ?? 'OPPORTUNITY') === 'OPPORTUNITY' ? 'selected' : '' ?>>Opportunities</option>
-          </select>
-          <div class="muted" style="font-size:12px;margin-top:3px">Leads win by converting into a customer, which is already its own act — gating them would gate the conversion, not the stage.</div>
+          <?php //  A drop-down with one choice reads as "the others are missing"
+                //  (owner, SAL-002: "what about lead, quotation etc."). These rules
+                //  are for deals; the other Sales approvals live where they belong,
+                //  and the note says where. ?>
+          <input type="hidden" name="entity_kind" value="OPPORTUNITY">
+          <div class="form-control" style="background:var(--field,#f8fafc)">Deals (opportunities)</div>
+          <div class="muted" style="font-size:12px;margin-top:3px">Quotations are approved by value levels, set on <a href="/sales-setup#levels">Set up Sales</a>. Leads need no approval — a lead ends by converting into a customer, which is its own act.</div>
         </div>
 
         <div>

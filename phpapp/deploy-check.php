@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'c6b3f7f · 2026-10-20 08:57 UTC · 689 files';
+$RELEASE = '2aa3089 · 2026-10-20 10:11 UTC · 690 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -115,7 +115,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>286871,'h'=>'8b6125640fa9a65a'],
+    'lib/crm.php' => ['s'=>289124,'h'=>'76f741b55e034e23'],
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>24205,'h'=>'04ed75b284858be6'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -239,8 +239,8 @@ $EXPECT  = [
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
     'lib/setup.php' => ['s'=>22705,'h'=>'43cbca244da74864'],
     'lib/setup_cockpit.php' => ['s'=>31439,'h'=>'3bf43713e1b2b0e3'],
-    'lib/setupqa.php' => ['s'=>10918,'h'=>'1f257271cc81c87a'],
-    'lib/stagegate.php' => ['s'=>22623,'h'=>'699772501f2dbdbb'],
+    'lib/setupqa.php' => ['s'=>14256,'h'=>'97e6cc964b57b627'],
+    'lib/stagegate.php' => ['s'=>22685,'h'=>'5c3020f4818dbcda'],
     'lib/superadmin.php' => ['s'=>10675,'h'=>'995da0045cd4e7ee'],
     'lib/tally.php' => ['s'=>44735,'h'=>'f910b38d13d7cee8'],
     'lib/tapi.php' => ['s'=>69455,'h'=>'a8d85d8e3a4bdd08'],
@@ -420,8 +420,9 @@ $EXPECT  = [
     'views/ops/contract_overrides.php' => ['s'=>8886,'h'=>'e22fdf59af73f743'],
     'views/ops/cost_reconciliation.php' => ['s'=>5547,'h'=>'3c2d6f2dcd59c0a8'],
     'views/ops/cost_run.php' => ['s'=>11344,'h'=>'5bb43d8aae74a6b9'],
-    'views/ops/crm/approval_rule_form.php' => ['s'=>3705,'h'=>'f65697a269bb5247'],
-    'views/ops/crm/approval_rule_list.php' => ['s'=>3321,'h'=>'f61e360629f8f6c8'],
+    'views/ops/crm/approval_levels_inline.php' => ['s'=>6864,'h'=>'2cd70a87bd0a7be1'],
+    'views/ops/crm/approval_rule_form.php' => ['s'=>3668,'h'=>'0dc628db27deb0a7'],
+    'views/ops/crm/approval_rule_list.php' => ['s'=>3304,'h'=>'da79bb76a5dfb4a3'],
     'views/ops/crm/inquiry_form.php' => ['s'=>4541,'h'=>'bd15d063e6debfc5'],
     'views/ops/crm/inquiry_list.php' => ['s'=>4792,'h'=>'365e128c3e1ccef2'],
     'views/ops/crm/quote_detail.php' => ['s'=>73255,'h'=>'1597151ed35535e7'],
@@ -605,11 +606,11 @@ $EXPECT  = [
     'views/ops/service_scope.php' => ['s'=>8596,'h'=>'580a7c044d31aa3c'],
     'views/ops/settings.php' => ['s'=>72365,'h'=>'2eff5891b467e9be'],
     'views/ops/setup.php' => ['s'=>4915,'h'=>'3d515f379722674c'],
-    'views/ops/setup_questions.php' => ['s'=>2469,'h'=>'c9b1ce59ae6d6a8d'],
+    'views/ops/setup_questions.php' => ['s'=>2854,'h'=>'a6feb3e000f62701'],
     'views/ops/site_docs.php' => ['s'=>4927,'h'=>'f03c1d9c89e53436'],
     'views/ops/sla_targets.php' => ['s'=>2640,'h'=>'e78061dbc1d27d5e'],
     'views/ops/sso.php' => ['s'=>5411,'h'=>'7e627345af817c60'],
-    'views/ops/stage_gates.php' => ['s'=>10292,'h'=>'a42b4e0087a241e4'],
+    'views/ops/stage_gates.php' => ['s'=>10605,'h'=>'4993b160a0cc3f65'],
     'views/ops/subscription.php' => ['s'=>5599,'h'=>'d202fff8f46cefcd'],
     'views/ops/super_admin.php' => ['s'=>25600,'h'=>'f4d5a83d44fb7a8b'],
     'views/ops/system_status.php' => ['s'=>2399,'h'=>'90287c341b6166f4'],

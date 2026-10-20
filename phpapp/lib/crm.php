@@ -1193,12 +1193,22 @@ function crm_quote_unmatched_policy() {
     return isset(QUOTE_UNMATCHED_POLICIES[$p]) ? $p : 'top';
 }
 
+// Does this approval level apply to ONE business unit only? The form has always
+// posted 'SBU' while the save and this check compared against 'Business Unit'
+// (a wording change applied to code), so every "a specific business unit"
+// level was stored as "any" and applied to every quotation. 'SBU' is the stored
+// value; the other spellings are read so a row written either way still counts.
+function crm_rule_is_unit($r) {
+    $mt = strtoupper(trim((string) ($r['match_type'] ?? '')));
+    return in_array($mt, ['SBU', 'BUSINESS UNIT', 'BUSINESS U'], true) && trim((string) ($r['sbu'] ?? '')) !== '';
+}
+
 // The active rules this quotation's business unit and before-tax value fall in.
 function crm_quote_matching_rules($q) {
     $amt = crm_quote_band_value($q); $sbu = (string)($q['sbu'] ?? '');
     $out = [];
     foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 ORDER BY level, id") ?: [] as $r) {
-        if (($r['match_type'] ?? 'ANY') === 'Business Unit' && ($r['sbu'] ?? '') !== '' && $r['sbu'] !== $sbu) continue;
+        if (crm_rule_is_unit($r) && $r['sbu'] !== $sbu) continue;
         if ($amt < (float)$r['min_amount']) continue;
         if ((float)$r['max_amount'] > 0 && $amt > (float)$r['max_amount']) continue;
         $out[] = $r;
@@ -3895,18 +3905,39 @@ function ops_crm_approval_rules($route, $method) {
         $rows = ops_all("SELECT r.*, u.username, u.first_name, u.last_name FROM quote_approval_rules r LEFT JOIN users u ON u.id=r.approver_user_id ORDER BY r.level, r.id");
         view('ops/crm/approval_rule_list', ['rows' => $rows]); return;
     }
+    // Set up Sales edits the levels in place, so a change made there returns
+    // there. Only that one address is honoured — never a free-form redirect.
+    $back = (($_GET['back'] ?? $_POST['back'] ?? '') === 'sales-setup') ? '/sales-setup#levels' : '/quote-approval-rules';
     if ($route === 'quote-approval-rule-delete' && $method === 'POST') {
         $pdo->prepare("DELETE FROM quote_approval_rules WHERE id=?")->execute([(int)($_GET['id'] ?? 0)]);
-        flash('Approval rule deleted.'); redirect('/quote-approval-rules');
+        flash('Approval level removed.'); redirect($back);
     }
     if ($route === 'quote-approval-rule-new' || $route === 'quote-approval-rule-edit') {
         $r = null;
         if ($route === 'quote-approval-rule-edit') { $r = ops_one("SELECT * FROM quote_approval_rules WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$r) { http_response_code(404); view('notfound'); return; } }
         if ($method === 'POST') {
             $b = $_POST;
-            $mt = ($b['match_type'] ?? 'ANY') === 'Business Unit' ? 'Business Unit' : 'ANY';
-            $vals = [trim($b['name'] ?? ''), $mt, $mt === 'Business Unit' ? ($b['sbu'] ?? '') : '', (float)($b['min_amount'] ?? 0), (float)($b['max_amount'] ?? 0),
-                max(1, (int)($b['level'] ?? 1)), $b['approver_role'] ?? '', ($b['approver_user_id'] ?? '') !== '' ? (int)$b['approver_user_id'] : null, !empty($b['active']) ? 1 : 0];
+            $mt = in_array($b['match_type'] ?? 'ANY', ['SBU', 'Business Unit'], true) && trim((string)($b['sbu'] ?? '')) !== '' ? 'SBU' : 'ANY';
+            $min = (float)($b['min_amount'] ?? 0); $max = (float)($b['max_amount'] ?? 0); $lvl = max(1, (int)($b['level'] ?? 1));
+            $role = (string)($b['approver_role'] ?? '');
+            if ($role !== '' && $role !== 'REPORTS_TO' && !isset(ORG_ROLES[$role])) $role = '';
+            $uid = ($b['approver_user_id'] ?? '') !== '' ? (int)$b['approver_user_id'] : null;
+            //  Refused, not stored: a band that ends where it starts covers nothing.
+            $problem = $min < 0 || $max < 0 ? 'Values cannot be negative.'
+                     : ($max > 0 && $max <= $min ? 'The "up to" value must be above the "from" value (or 0 for no upper limit).' : '');
+            if ($problem !== '') { flash($problem, 'error'); redirect($back === '/quote-approval-rules' ? '/' . $route . ($r ? '?id=' . (int)$r['id'] : '') : $back); }
+            //  A name is what appears on a quotation waiting for this level; when
+            //  none is typed (Set up Sales asks only for the facts) it is written
+            //  from them, e.g. "Level 2 — Marketing Manager".
+            $name = trim((string)($b['name'] ?? ''));
+            if ($name === '') {
+                $pu = $uid ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$uid]) : null;
+                $who = $pu ? (trim(($pu['first_name'] ?? '') . ' ' . ($pu['last_name'] ?? '')) ?: (string)$pu['username'])
+                     : ($role === 'REPORTS_TO' ? 'Reporting manager' : ($role !== '' ? ORG_ROLES[$role] : 'Any approver'));
+                $name = 'Level ' . $lvl . ' — ' . $who;
+            }
+            $vals = [$name, $mt, $mt === 'SBU' ? (string)$b['sbu'] : '', $min, $max,
+                $lvl, $role, $uid, !empty($b['active']) ? 1 : 0];
             if ($r) {
                 $pdo->prepare("UPDATE quote_approval_rules SET name=?,match_type=?,sbu=?,min_amount=?,max_amount=?,level=?,approver_role=?,approver_user_id=?,active=? WHERE id=?")
                     ->execute(array_merge($vals, [$r['id']]));
@@ -3916,7 +3947,7 @@ function ops_crm_approval_rules($route, $method) {
                     ->execute(array_merge($vals, [date('c')]));
                 flash('Approval rule added.');
             }
-            redirect('/quote-approval-rules');
+            redirect($back);
         }
         view('ops/crm/approval_rule_form', ['r' => $r, 'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'roles' => ORG_ROLES,
             'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]); return;

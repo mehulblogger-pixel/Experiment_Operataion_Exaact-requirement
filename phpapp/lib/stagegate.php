@@ -318,12 +318,12 @@ function gate_explain($r) {
         : 'into any ' . strtolower((string)$r['stage_kind']) . ' stage';
     $who = !empty($r['approver_user_id'])
         ? (trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? '')) ?: (string)$r['username'])
-        : (trim((string)$r['approver_role']) !== '' ? 'anyone with the role ' . $r['approver_role']
+        : (trim((string)$r['approver_role']) !== '' ? 'a ' . (ORG_ROLES[$r['approver_role']] ?? $r['approver_role'])
                                                     : 'anyone who may approve quotations');
     $plural = ['OPPORTUNITY' => 'Opportunities', 'LEAD' => 'Leads'][$r['entity_kind']] ?? (GATE_KINDS[$r['entity_kind']] ?? $r['entity_kind']);
     return $plural . ' ' . $band
          . (trim((string)$r['sbu']) !== '' ? ' in ' . $r['sbu'] : '')
-         . ((int)$r['pipeline_id'] > 0 ? ' on the ' . ($r['pipeline_name'] ?: 'chosen') . ' pipeline' : '')
+         . ((int)$r['pipeline_id'] > 0 ? ' on the ' . preg_replace('/\s+pipeline$/i', '', (string)($r['pipeline_name'] ?: 'chosen')) . ' pipeline' : '')
          . ' moving ' . $where . ' need ' . $who . ' to agree first.';
 }
 
