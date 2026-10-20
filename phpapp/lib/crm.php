@@ -317,6 +317,11 @@ function crm_migrate() {
         // Pre-order review checklist ticks for this quotation (JSON: item=>1). Only
         // used when the configurable pre-order checklist is switched on.
         ensure_column('quotations', 'preorder_checklist', 'MEDIUMTEXT');
+        // D-11a — escalation: when a step has waited longer than the company
+        // allows, the next level up may sign it too (recorded on the step).
+        ensure_column('quote_approvals', 'escalated_at', "VARCHAR(30) DEFAULT ''");
+        ensure_column('quote_approvals', 'escalate_role', "VARCHAR(40) DEFAULT ''");
+        ensure_column('quote_approvals', 'escalate_user_id', 'INT NULL');
         // Per-line: which office executes, which site, and the activity under the Business Unit.
         ensure_column('quote_lines', 'office_id', 'INT NULL');
         ensure_column('quote_lines', 'location_id', 'INT NULL');
@@ -1647,25 +1652,18 @@ function ops_crm_quotes($route, $method) {
     $pdo = db();
     if ($route === 'quotes') {
         // "Awaiting my approval" — the exact set the dashboard's "quotes to
-        // approve" counts. Routed to me (by name, role, or a generic step I may
-        // sign); NO office/FY scope, because the routing is the authority — so
-        // the list can never disagree with the dashboard count.
+        // approve" counts: routed to me (by name, role, a generic step I may
+        // sign, a delegation or an escalation) and inside my branch, because the
+        // approval itself is refused outside it (SA-06). One function feeds both,
+        // so the list can never disagree with the dashboard count.
         if (($_GET['mine'] ?? '') === 'approve') {
-            $u = current_user(); $me = (int)($u['id'] ?? 0); $role = (string)user_role();
-            $canApprove = can('crm.quote.approve') || is_master();
-            $rows = ops_all(
+            $ids = crm_quote_ids_awaiting_me();
+            $rows = $ids ? ops_all(
                 "SELECT q.*, bp.display_name client_disp, o.name office_name
                  FROM quotations q
                  LEFT JOIN business_partners bp ON bp.id=q.client_id
                  LEFT JOIN offices o ON o.id=q.office_id
-                 JOIN quote_approvals a ON a.quote_id=q.id AND a.status='PENDING'
-                      AND a.level=(SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=q.id AND a2.status='PENDING')
-                 WHERE q.is_current=1 AND q.status='PENDING_APPROVAL'
-                   AND ( a.approver_user_id=?
-                         OR (a.approver_role=? AND (a.approver_user_id IS NULL OR a.approver_user_id=0))
-                         OR ((a.approver_role='' OR a.approver_role IS NULL)
-                             AND (a.approver_user_id IS NULL OR a.approver_user_id=0) AND ?) )
-                 GROUP BY q.id ORDER BY q.id DESC", [$me, $role, $canApprove ? 1 : 0]);
+                 WHERE q.id IN (" . implode(',', array_map('intval', $ids)) . ") ORDER BY q.id DESC") : [];
             view('ops/crm/quote_list', ['rows' => $rows, 'view' => 'pending', 'q' => '',
                 'counts' => ['open' => 0, 'pending' => count($rows), 'closed' => 0, 'lost' => 0],
                 'fy' => current_fy(), 'mineApprove' => true]);
@@ -2471,6 +2469,13 @@ function ops_crm_quotes($route, $method) {
         // sent, an old step left open must not move it again.
         if (empty($q['is_current']) || ($q['status'] ?? '') !== 'PENDING_APPROVAL') {
             flash('This ' . Tl('quote') . ' is no longer waiting for approval (' . strtolower((string)$q['status']) . ') — there is nothing to sign.', 'error');
+            redirect('/quote?id=' . $q['id']);
+        }
+        // D-05 — levels sign in order. Approvers at the same level may sign in
+        // any order; a higher level waits until every lower level has signed.
+        $lowest = (int) ops_val("SELECT MIN(level) FROM quote_approvals WHERE quote_id=? AND status='PENDING'", [$q['id']]);
+        if (($_POST['decision'] ?? '') !== 'reject' && (int)$step['level'] > $lowest) {
+            flash('Level ' . $lowest . ' approves first — this ' . Tl('quote') . ' reaches level ' . (int)$step['level'] . ' when it has.', 'error');
             redirect('/quote?id=' . $q['id']);
         }
         // Pre-order control: when the checklist is on and every point is required,
@@ -3384,7 +3389,24 @@ function crm_quote_owner_user_id($q) {
 // ---- Who is it sitting with? (§xii) ----------------------------------------
 // Turn an approval step into the actual people who can act on it, so the quote
 // screen can say "waiting on <name>" instead of "pending".
+// The people a step waits for, plus anyone currently covering for them (a live
+// quotation delegation) — so the person who can act is the person who is told.
 function crm_step_approvers($step) {
+    $direct = crm_step_approvers_direct($step);
+    if (!function_exists('appr_delegates_of') || !$direct) return $direct;
+    $seen = []; foreach ($direct as $u) $seen[(int)$u['id']] = true;
+    $q = !empty($step['quote_id']) ? crm_quote_get((int)$step['quote_id']) : null;
+    $office = $q && !empty($q['office_id']) ? (int)$q['office_id'] : null;
+    foreach ($direct as $u) {
+        foreach (appr_delegates_of((int)$u['id'], 'QUOTE', $office) as $did) {
+            if (isset($seen[(int)$did])) continue;
+            $d = ops_one("SELECT id, username, first_name, last_name, email, role FROM users WHERE id=? AND is_active=1", [(int)$did]);
+            if ($d) { $direct[] = $d; $seen[(int)$did] = true; }
+        }
+    }
+    return $direct;
+}
+function crm_step_approvers_direct($step) {
     if (!empty($step['approver_user_id'])) {
         $u = ops_one("SELECT id, username, first_name, last_name, email, role FROM users WHERE id=?", [(int)$step['approver_user_id']]);
         return $u ? [$u] : [];
@@ -3398,6 +3420,78 @@ function crm_step_approvers($step) {
     if (!$roles) return [];
     $ph = implode(',', array_fill(0, count($roles), '?'));
     return ops_all("SELECT id, username, first_name, last_name, email, role FROM users WHERE role IN ($ph) AND is_active=1 ORDER BY first_name, username", $roles);
+}
+// D-11a — escalation. A quotation whose current level has waited longer than the
+// company allows (Sales setup: quote_approval_escalate_days, 0 = never) is opened
+// to the level above: the next level in its own chain or, at the top of its
+// chain, the next level in the rules. The original approver can still sign; the
+// level above now can too, and is told. Nobody above → nothing changes.
+// Returns how many quotations were escalated. Run nightly from cron.php.
+function crm_escalate_quote_approvals($now = null) {
+    $days = (int) setting_get('quote_approval_escalate_days', '0');
+    if ($days <= 0) return 0;
+    $now = $now ?? time(); $n = 0;
+    $rows = ops_all("SELECT a.* FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id
+                     WHERE a.status='PENDING' AND COALESCE(a.escalated_at,'')='' AND q.is_current=1 AND q.status='PENDING_APPROVAL'
+                       AND a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=a.quote_id AND a2.status='PENDING')
+                     ORDER BY a.quote_id, a.id") ?: [];
+    $done = [];
+    foreach ($rows as $st) {
+        $qid = (int)$st['quote_id']; $lvl = (int)$st['level'];
+        if (isset($done[$qid . ':' . $lvl])) continue;
+        $q = crm_quote_get($qid); if (!$q) continue;
+        // When this level started waiting: the last signature below it, else submission.
+        $since = (string) ops_val("SELECT MAX(acted_at) FROM quote_approvals WHERE quote_id=? AND level<? AND status='APPROVED'", [$qid, $lvl]);
+        if ($since === '') $since = (string)($q['submitted_at'] ?? '');
+        if ($since === '' || strtotime($since) > $now - $days * 86400) continue;
+        $up = ops_one("SELECT approver_role, approver_user_id FROM quote_approvals WHERE quote_id=? AND level>? ORDER BY level, id LIMIT 1", [$qid, $lvl])
+           ?: ops_one("SELECT approver_role, approver_user_id FROM quote_approval_rules WHERE active=1 AND level>? AND approver_role<>'REPORTS_TO' ORDER BY level, id LIMIT 1", [$lvl]);
+        if (!$up || (empty($up['approver_user_id']) && trim((string)$up['approver_role']) === '')) continue;
+        db()->prepare("UPDATE quote_approvals SET escalated_at=?, escalate_role=?, escalate_user_id=? WHERE quote_id=? AND level=? AND status='PENDING'")
+            ->execute([date('c', $now), (string)$up['approver_role'], ($up['approver_user_id'] ?? null) ?: null, $qid, $lvl]);
+        $who = crm_step_approvers(['approver_role' => (string)$up['approver_role'], 'approver_user_id' => $up['approver_user_id'] ?? null]);
+        crm_log_change($qid, 'Waited more than ' . $days . ' day(s) at level ' . $lvl . ' — opened to the level above ('
+            . ($who ? implode(', ', array_map('crm_person_label', array_slice($who, 0, 3))) : (ORG_ROLES[$up['approver_role']] ?? $up['approver_role'])) . ').');
+        foreach ($who as $ap) {
+            if (trim((string)($ap['email'] ?? '')) === '') continue;
+            ops_mail($ap['email'], 'Waiting too long — approval needed: ' . quote_label($q),
+                "Hello,\n\n" . quote_label($q) . " ({$q['client_name']}) has waited more than $days day(s) for approval at level $lvl.\n"
+                . "It is now open to you as well. Open it in " . app_name() . " to approve or reject it with a comment.\n", '', 'QUOTE_APPROVAL');
+        }
+        $done[$qid . ':' . $lvl] = true; $n++;
+    }
+    return $n;
+}
+// Who may set up quotation delegations: the same people who manage the
+// quotation approval rules (no new permission).
+function crm_quote_delegation_can() {
+    // Quotations are a Sales screen: a company without Sales has none to cover.
+    if (function_exists('licence_module_live') && !licence_module_live('quotes')) return false;
+    return is_master_of('quotes') || can('settings.manage') || can('crm.quote.approve');
+}
+function ops_quote_delegations($method) {
+    ops_require(crm_quote_delegation_can(), 'Only someone who manages the quotation approval rules can set up who covers for an approver.');
+    if (function_exists('appr_migrate')) appr_migrate();
+    if ($method === 'POST') {
+        $do = (string)($_POST['do'] ?? '');
+        if ($do === 'save') {
+            [$ok, $msg] = appr_delegation_save(0, ['entity' => 'QUOTE'] + $_POST);
+            flash($msg, $ok ? 'success' : 'error');
+        } elseif ($do === 'revoke') {
+            [$ok, $msg] = appr_delegation_revoke((int)($_POST['id'] ?? 0));
+            flash($msg, $ok ? 'success' : 'error');
+        }
+        redirect('/quote-delegations');
+    }
+    view('ops/approval_delegations', [
+        'rows'       => array_values(array_filter(appr_delegations(false), fn($d) => strtoupper((string)$d['entity']) === 'QUOTE')),
+        'people'     => ops_all("SELECT id, first_name, last_name, username FROM users WHERE COALESCE(is_active,1)=1 ORDER BY first_name, last_name, username"),
+        'offices'    => function_exists('offices_list') ? offices_list() : [],
+        'entities'   => ['QUOTE' => 'Quotations'],
+        'onlyEntity' => 'QUOTE',
+        'title'      => 'Who covers for a quotation approver',
+    ]);
+    return true;
 }
 function crm_person_label($u) {
     $nm = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: ($u['username'] ?? '');
@@ -3429,23 +3523,24 @@ function crm_quotes_awaiting_me() {
     if (!$u) return 0;
     $me   = (int)($u['id'] ?? 0);
     $role = function_exists('user_role') ? (string)user_role() : (string)($u['role'] ?? '');
-    $canApprove = (function_exists('can') && can('crm.quote.approve')) || (function_exists('is_master') && is_master());
-    try {
-        // NO office scope here: a quote routed to this person for approval must
-        // reach them even if it belongs to another office. The routing IS the
-        // authority — office scope would strand the very approval assigned to them
-        // (e.g. a quote with no office, or another branch's, waiting on this BM).
-        $sql = "SELECT COUNT(DISTINCT q.id)
-                FROM quotations q
-                JOIN quote_approvals a ON a.quote_id=q.id AND a.status='PENDING'
-                     AND a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=q.id AND a2.status='PENDING')
-                WHERE q.is_current=1 AND q.status='PENDING_APPROVAL'
-                  AND ( a.approver_user_id = ?
-                        OR (a.approver_role = ? AND (a.approver_user_id IS NULL OR a.approver_user_id=0))
-                        OR ((a.approver_role='' OR a.approver_role IS NULL)
-                            AND (a.approver_user_id IS NULL OR a.approver_user_id=0) AND ?) )";
-        return (int) ops_val($sql, [$me, $role, $canApprove ? 1 : 0]);
-    } catch (Throwable $e) { return 0; }
+    try { return count(crm_quote_ids_awaiting_me()); } catch (Throwable $e) { return 0; }
+}
+// The quotations whose CURRENT step (the lowest still-pending level) the signed-in
+// person may sign now — by name, by role, as a delegate, or by escalation —
+// within their branch scope. One answer for the home count and the list, so the
+// two can never disagree (Sales audit SA-25), asked through the same
+// crm_can_act_approval() that the approve button itself asks.
+function crm_quote_ids_awaiting_me() {
+    $ids = [];
+    $rows = ops_all("SELECT a.*, q.office_id q_office, q.sbu q_sbu FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id
+                     WHERE a.status='PENDING' AND q.is_current=1 AND q.status='PENDING_APPROVAL'
+                       AND a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=a.quote_id AND a2.status='PENDING')") ?: [];
+    foreach ($rows as $st) {
+        if (isset($ids[(int)$st['quote_id']])) continue;
+        if (function_exists('scope_allows') && !is_master() && !scope_allows($st['q_office'] ?? null, $st['q_sbu'] ?? null)) continue;
+        if (crm_can_act_approval($st)) $ids[(int)$st['quote_id']] = true;
+    }
+    return array_keys($ids);
 }
 // Tell the sales owner what the approver decided.
 function crm_notify_owner($q, $what, $remarks = '') {
@@ -3474,10 +3569,34 @@ function crm_can_act_approval($step) {
     // their role — may approve it even if their role does not carry the blanket
     // crm.quote.approve permission. (That is exactly the branch-manager case: the
     // step is routed to BRANCH_MANAGER, so the branch manager can sign it.)
-    if (!empty($step['approver_user_id'])) return (int)$step['approver_user_id'] === (int)($u['id'] ?? 0);
-    if (($step['approver_role'] ?? '') !== '') return user_role() === $step['approver_role'];
-    // A generic "any approver" step is open to anyone who holds the permission.
-    return can('crm.quote.approve');
+    $me = (int)($u['id'] ?? 0);
+    if (crm_step_is_mine($step, $me, user_role(), can('crm.quote.approve'))) return true;
+    // D-11a — someone covering for an approver who is away (a live delegation
+    // for quotations, or for everything), within the branch the delegation names.
+    $sq = $sq ?? crm_quote_get((int)($step['quote_id'] ?? 0));
+    $office = $sq && !empty($sq['office_id']) ? (int)$sq['office_id'] : null;
+    if (function_exists('appr_delegators_for')) {
+        foreach (appr_delegators_for($me, 'QUOTE', $office) as $dl) {
+            $du = ops_one("SELECT id, role FROM users WHERE id=? AND is_active=1", [(int)$dl]);
+            if (!$du) continue;
+            $dRole = (string)$du['role'];
+            $dCan = in_array('crm.quote.approve', role_perms($dRole) ?: [], true);
+            if (crm_step_is_mine($step, (int)$du['id'], $dRole, $dCan)) return true;
+        }
+    }
+    // D-11a — a step that waited too long is open to the level above as well.
+    if (trim((string)($step['escalated_at'] ?? '')) !== '') {
+        if (!empty($step['escalate_user_id'])) return (int)$step['escalate_user_id'] === $me;
+        if (($step['escalate_role'] ?? '') !== '') return user_role() === $step['escalate_role'];
+    }
+    return false;
+}
+// Is this step addressed to that person — by name, by their role, or as a
+// generic step they may sign because they hold the approve right?
+function crm_step_is_mine($step, $uid, $role, $holdsApprove) {
+    if (!empty($step['approver_user_id'])) return (int)$step['approver_user_id'] === (int)$uid;
+    if (($step['approver_role'] ?? '') !== '') return (string)$role === (string)$step['approver_role'];
+    return (bool)$holdsApprove;
 }
 // Can the current user act on any still-pending approval step of this quote? True
 // for the routed approver — used so they can also tick the pre-order checklist

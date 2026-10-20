@@ -26,7 +26,7 @@ $state = function ($r) use ($today) {
 };
 ?>
 <div class="master-head">
-  <div><h1>Approval delegation</h1>
+  <div><h1><?= $e($title ?? 'Approval delegation') ?></h1>
     <p class="sub" style="margin:2px 0 0">While somebody is away, another person may approve in their place — for a stated period, and only for the authority they actually hold.</p></div>
 <?php // UAT 1.7.3 — the four approval screens share one tab strip, so they read
       //  as one workbench instead of four destinations in three areas.
@@ -78,11 +78,15 @@ $state = function ($r) use ($today) {
           <option value="">—</option>
           <?php foreach ($people as $u): ?><option value="<?= (int) $u['id'] ?>"><?= $who($u) ?></option><?php endforeach; ?>
         </select></div>
+      <?php if (!empty($onlyEntity)): ?>
+      <div class="ff"><label>Applies to</label><input type="hidden" name="entity" value="<?= $e($onlyEntity) ?>"><div style="padding:8px 0"><?= $e($entities[$onlyEntity] ?? $onlyEntity) ?></div></div>
+      <?php else: ?>
       <div class="ff"><label>Applies to</label>
         <select class="form-control" name="entity">
           <option value="">Everything they approve</option>
           <?php foreach ($entities as $k => $v): ?><option value="<?= $e($k) ?>"><?= $e($v) ?></option><?php endforeach; ?>
         </select></div>
+      <?php endif; ?>
       <div class="ff"><label>Branch</label>
         <select class="form-control" name="office_id">
           <option value="0">Any branch they cover</option>

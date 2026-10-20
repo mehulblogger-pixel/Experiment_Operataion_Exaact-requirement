@@ -24,11 +24,11 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '26038a5 · 2026-10-20 02:56 UTC · 689 files';
+$RELEASE = '011f941 · 2026-10-20 04:24 UTC · 689 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
-    'cron.php' => ['s'=>23812,'h'=>'9a49ea3b6161e98c'],
+    'cron.php' => ['s'=>24146,'h'=>'e9c56d809345c3cb'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>123794,'h'=>'c0273435e0c54b45'],
@@ -115,7 +115,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>268451,'h'=>'935c9a5b7765529d'],
+    'lib/crm.php' => ['s'=>276252,'h'=>'73ce995db759df8e'],
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>24205,'h'=>'04ed75b284858be6'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -175,7 +175,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>3867,'h'=>'c9f9c319c1f15cd3'],
     'lib/opportunities.php' => ['s'=>67032,'h'=>'c1c0fe2ac50270ec'],
-    'lib/ops.php' => ['s'=>724397,'h'=>'ebb4095a32a38483'],
+    'lib/ops.php' => ['s'=>724523,'h'=>'3506ec536ff270ca'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -196,7 +196,7 @@ $EXPECT  = [
     'lib/rating.php' => ['s'=>7766,'h'=>'f5bbd79552189e10'],
     'lib/receivables.php' => ['s'=>13029,'h'=>'bfbc04eeaf0fb181'],
     'lib/recruit.php' => ['s'=>140121,'h'=>'2f028091332609a7'],
-    'lib/recruit_approval.php' => ['s'=>175044,'h'=>'fd58571c0596c63d'],
+    'lib/recruit_approval.php' => ['s'=>175814,'h'=>'3232813e8041d4e1'],
     'lib/recruit_assign.php' => ['s'=>40788,'h'=>'bcdcf294d7fa64a5'],
     'lib/recruit_cc.php' => ['s'=>34246,'h'=>'80729bc2ce7f76bd'],
     'lib/recruit_exec.php' => ['s'=>24603,'h'=>'0546b6c003d3493c'],
@@ -239,7 +239,7 @@ $EXPECT  = [
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
     'lib/setup.php' => ['s'=>22705,'h'=>'43cbca244da74864'],
     'lib/setup_cockpit.php' => ['s'=>31439,'h'=>'3bf43713e1b2b0e3'],
-    'lib/setupqa.php' => ['s'=>9331,'h'=>'dd64d7082e02293c'],
+    'lib/setupqa.php' => ['s'=>10054,'h'=>'a0adde2c9c55680e'],
     'lib/stagegate.php' => ['s'=>22623,'h'=>'699772501f2dbdbb'],
     'lib/superadmin.php' => ['s'=>10675,'h'=>'995da0045cd4e7ee'],
     'lib/tally.php' => ['s'=>44735,'h'=>'f910b38d13d7cee8'],
@@ -338,7 +338,7 @@ $EXPECT  = [
     'views/ops/ai_forms.php' => ['s'=>6653,'h'=>'f278678379d12723'],
     'views/ops/ai_settings.php' => ['s'=>3916,'h'=>'ac3a734628f292f8'],
     'views/ops/ai_topup_pay.php' => ['s'=>2408,'h'=>'a6c85b5a75f2bc3e'],
-    'views/ops/approval_delegations.php' => ['s'=>6387,'h'=>'bb1582de6ea989e2'],
+    'views/ops/approval_delegations.php' => ['s'=>6695,'h'=>'4aa3dcfd5a6f250b'],
     'views/ops/approval_rules.php' => ['s'=>26294,'h'=>'d7e79c8f723188c9'],
     'views/ops/approvals.php' => ['s'=>9059,'h'=>'10797e07fd17f681'],
     'views/ops/approvals_setup.php' => ['s'=>3905,'h'=>'87bc1b9015e1f58b'],
@@ -605,7 +605,7 @@ $EXPECT  = [
     'views/ops/service_scope.php' => ['s'=>8596,'h'=>'580a7c044d31aa3c'],
     'views/ops/settings.php' => ['s'=>72365,'h'=>'2eff5891b467e9be'],
     'views/ops/setup.php' => ['s'=>4915,'h'=>'3d515f379722674c'],
-    'views/ops/setup_questions.php' => ['s'=>2443,'h'=>'00b1a97d2052ae03'],
+    'views/ops/setup_questions.php' => ['s'=>2469,'h'=>'c9b1ce59ae6d6a8d'],
     'views/ops/site_docs.php' => ['s'=>4927,'h'=>'f03c1d9c89e53436'],
     'views/ops/sla_targets.php' => ['s'=>2640,'h'=>'e78061dbc1d27d5e'],
     'views/ops/sso.php' => ['s'=>5411,'h'=>'7e627345af817c60'],

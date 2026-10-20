@@ -92,8 +92,16 @@ function setupqa_sales_set() {
                         'options' => ['yes' => 'Yes — when it is within their own authority', 'no' => 'No — someone else must always approve it'],
                         'default' => 'yes',
                     ],
+                    [
+                        'key' => 'quote_approval_escalate_days',
+                        'ask' => 'If a ' . $L . ' waits too long at one approval level, when should the level above be able to approve it too?',
+                        'why' => 'The person it is waiting for can still approve it; the level above is told and can step in. Checked every night.',
+                        'options' => ['0' => 'Never — it waits for its own approver', '1' => 'After 1 day', '2' => 'After 2 days', '3' => 'After 3 days', '7' => 'After a week'],
+                        'default' => '0',
+                    ],
                 ],
                 'link' => ['/quote-approval-rules', 'Change who approves, and up to what value'],
+                'link2' => ['/quote-delegations', 'Set who covers for an approver who is away'],
             ],
             [
                 'title' => 'Reviewing the request before it is approved (contract review)',

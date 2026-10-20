@@ -184,8 +184,11 @@ sign-in).
 
 | 2.1 | One customer, one record: accepting a quotation whose typed name looks like a customer on file asks once — *same company* or *a different one* — instead of silently creating a second (a name is evidence, not proof, so nothing is linked by name without a person); an enquiry typed for a near-match is saved with a warning naming the customer on file; a lead is claimed before it is converted, so simultaneous presses create one customer and one enquiry (proven: the old code made three of each); converted enquiries take the shared numbering; Ads Pro links an imported contact to an open lead with the same e-mail (ignoring capitals and spaces) or company | the duplicates commit | `test_sales_duplicates.php` (19) |
 
-**Stage 1 is complete** except 1.4's "levels in order", which waits on D-05.
-**Still waiting on the owner:** D-05, D-09…D-11, D-13…D-30. Stage 2 (§3) is next.
+| 1.4, 3.x (D-11a) | **The approval engine:** levels sign in order (D-05); an approver who is away names a delegate on Sales → *Who covers for a quotation approver*, and a delegation for "everything" covers quotations too; a step waiting longer than the days the company sets in Set up Sales is opened to the next level up by the night job, once, written in the quotation's history and e-mailed; "waiting for me" counts delegated and escalated steps | the approval-engine commit | `test_sales_approval_engine.php` (22) |
+
+**Stage 1 is complete.** The third round of answers (20 Oct) is being built in order:
+costing (D-11 A/B), checklist (D-10), enquiry branch, industry template, contract
+amendment, reopening. **Still waiting on the owner:** D-09, D-13…D-17, D-19…D-21, D-24, D-26…D-28, D-30.
 
 ## 9. If only five things are done
 

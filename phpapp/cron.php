@@ -127,6 +127,12 @@ if ($m8('quotes', 'Sales & CRM') && function_exists('crm_expire_quotes')) {
     $exq = crm_expire_quotes();
     echo "Quotations expired: $exq\n";
 }
+// D-11a — a quotation that has waited longer than the company allows at one
+// approval level is opened to the level above (Sales → Set up Sales).
+if ($m8('quotes', 'Sales & CRM') && function_exists('crm_escalate_quote_approvals')) {
+    $esc = crm_escalate_quote_approvals();
+    echo "Quotation approvals escalated: $esc\n";
+}
 
 // Module 09 — chase overdue invoices. Ageing was view-only; this follows up the
 // money, marking each so a daily run does not re-nag the same invoice.

@@ -34,8 +34,8 @@ $n = 0;
           </div>
         </fieldset>
       <?php endforeach; ?>
-      <?php if (!empty($sec['link'])): ?>
-        <p style="margin:12px 0 0"><a href="<?= e($sec['link'][0]) ?>"><?= e($sec['link'][1]) ?> →</a></p>
+      <?php foreach (['link', 'link2'] as $lk) if (!empty($sec[$lk])): ?>
+        <p style="margin:12px 0 0"><a href="<?= e($sec[$lk][0]) ?>"><?= e($sec[$lk][1]) ?> →</a></p>
       <?php endif; ?>
     </section>
   <?php endforeach; ?>

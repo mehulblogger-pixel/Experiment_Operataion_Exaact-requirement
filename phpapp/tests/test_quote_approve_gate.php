@@ -8,7 +8,11 @@ t_section('quote approval: assignment is the authority');
 
 $pdo = db();
 // A user whose role does not carry the blanket approve permission.
-$pdo->prepare("INSERT INTO users (username,first_name,role,is_active) VALUES ('qa_bm','Meena','BRANCH_MANAGER',1)")->execute();
+$pdo->prepare("INSERT INTO offices (name,is_active) VALUES ('QAG Branch',1)")->execute();
+$qagOff = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO offices (name,is_active) VALUES ('QAG Elsewhere',1)")->execute();
+$qagOther = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO users (username,first_name,role,is_active,home_office_id) VALUES ('qa_bm','Meena','BRANCH_MANAGER',1,?)")->execute([$qagOff]);
 $uid = (int)$pdo->lastInsertId();
 $_SESSION['uid'] = $uid;
 current_user(true); ua(true);
@@ -38,13 +42,18 @@ t_ok(crm_can_act_approval($pending(['approver_user_id'=>$uid, 'status'=>'APPROVE
 // The routed approver can act on the quote as a whole (so they may also save the
 // pre-order checklist that gates their own approval — the bug that bounced the
 // branch manager to the dashboard). Guards crm_can_act_on_quote().
-$pdo->prepare("INSERT INTO quotations (quote_no,rev,is_current,status,created_at) VALUES ('QAG-1',0,1,'PENDING_APPROVAL',?)")->execute([date('c')]);
+$pdo->prepare("INSERT INTO quotations (quote_no,rev,is_current,status,office_id,created_at) VALUES ('QAG-1',0,1,'PENDING_APPROVAL',?,?)")->execute([$qagOff, date('c')]);
 $qid = (int)$pdo->lastInsertId();
 $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,status) VALUES (?,1,'BRANCH_MANAGER','PENDING')")->execute([$qid]);
 t_ok(crm_can_act_on_quote($qid) === true, 'the routed branch-manager approver can act on the quote (checklist save allowed)');
-// The quote has NO office, yet it is routed to the branch manager — it must still
-// reach their "quotes to approve" pending list (routing overrides office scope).
-t_ok(crm_quotes_awaiting_me() >= 1, 'a routed quote reaches the approver even with no office / out of their scope');
+// Routed to the branch manager's role, in their branch — it reaches their
+// "quotes to approve" list without the blanket approve permission.
+t_ok(in_array($qid, crm_quote_ids_awaiting_me(), true), 'a routed quote in the approver\'s branch reaches their list without the blanket permission');
+// Outside their branch it does not: since the Sales audit (SA-06) the approval
+// itself is refused outside the approver's branch, so listing it would be a dead end.
+$pdo->prepare("UPDATE quotations SET office_id=? WHERE id=?")->execute([$qagOther, $qid]);
+t_ok(!in_array($qid, crm_quote_ids_awaiting_me(), true), 'a quote in another branch is not listed — the approver could not open or sign it');
+$pdo->prepare("UPDATE quotations SET office_id=? WHERE id=?")->execute([$qagOff, $qid]);
 $pdo->prepare("UPDATE quote_approvals SET approver_role='FINANCE' WHERE quote_id=?")->execute([$qid]);
 t_ok(crm_can_act_on_quote($qid) === false, 'someone not on the pending step cannot act on the quote');
 

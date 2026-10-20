@@ -39,7 +39,21 @@ the first remediation stage start (`SALES-REMEDIATION-ROADMAP.md` §2).
 | D-18 — must a quotation lodged on a customer's portal go through approval? | "No" | Registered as sent or lost, no approval; a win is recorded on it by the person assigned — as built. **D-18 answered** |
 | D-03 — the default for a value no level covers | "As you recommend" | The approvers of the **highest level** (option B) is now the default; with no levels at all, anyone who may approve. A company can choose otherwise in Set up Sales |
 
-**Still open:** D-05 (levels in order), D-09…D-11, D-13…D-17, D-19…D-30.
+**Answered by the owner, 20 Oct 2026 (third round):**
+
+| Question | The owner's answer | Effect |
+|---|---|---|
+| D-05 — must levels approve in order? | "Yes" | Level 2 cannot sign until every level-1 step has signed; steps at the same level sign in any order; a rejection at any level still ends the chain. *Built 20 Oct* |
+| D-11 A — may a man-month quotation be made only from an approved costing? | "Yes but can also be edited by creator with note or remark to be mentioned mandatory" | Read as: a man-month quotation goes forward only from an APPROVED costing; its creator may still change it away from the costing, but only with a written note, kept in the quotation's history. *To be built next — the owner is asked to say if this reading is wrong* |
+| D-11 B / D-23 — may a costing's author approve it? | "No" | The author of a costing can never approve it, whatever their role. *To be built next* |
+| D-11a — delegation covers quotations, and a step waiting too long escalates? | "Yes to both" | A quotation approver can name someone to approve for them while away (Sales → **Who covers for a quotation approver**), and a delegation for "everything they approve" covers quotations too. Set up Sales asks *after how many days* a waiting step is opened to the next level up (never · 1 · 2 · 3 · 7 days); the night job does it once, writes it in the quotation's history and e-mails the new approvers. *Built 20 Oct* |
+| D-10 — the checklist gates send and accept, and a waiver needs a reason and the approver? | "Yes to both" | *To be built* |
+| Enquiry branch — an enquiry belongs to the branch of the person who recorded it? | "Yes" | *To be built* |
+| D-29 — applying an industry template only adds pipelines; wording and accreditation are administrator-only? | "Yes" | *To be built* |
+| D-25 — a commercial change to an open contract needs two signatures and keeps the old values? | "Yes" | *To be built* |
+| D-22 — a manager may reopen a lost lead or a closed deal, with a reason? | "Yes" | *To be built; the new transitions are written into `docs/03-object-lifecycles.md` in the same commit* |
+
+**Still open:** D-09, D-13…D-17, D-19…D-21, D-24, D-26…D-28, D-30.
 ---
 
 ## A. Who does what
