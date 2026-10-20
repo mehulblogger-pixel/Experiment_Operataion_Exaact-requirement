@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '9e092db · 2026-10-20 04:52 UTC · 689 files';
+$RELEASE = 'ca7e542 · 2026-10-20 05:07 UTC · 689 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -115,7 +115,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>281285,'h'=>'398f6e65bee471ec'],
+    'lib/crm.php' => ['s'=>285094,'h'=>'b157d836e3e2bca5'],
     'lib/crmdash.php' => ['s'=>14139,'h'=>'01c4f1181a8fcf4d'],
     'lib/customer360.php' => ['s'=>24205,'h'=>'04ed75b284858be6'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -239,7 +239,7 @@ $EXPECT  = [
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
     'lib/setup.php' => ['s'=>22705,'h'=>'43cbca244da74864'],
     'lib/setup_cockpit.php' => ['s'=>31439,'h'=>'3bf43713e1b2b0e3'],
-    'lib/setupqa.php' => ['s'=>10710,'h'=>'c0972f4c6e2ec60f'],
+    'lib/setupqa.php' => ['s'=>10918,'h'=>'1f257271cc81c87a'],
     'lib/stagegate.php' => ['s'=>22623,'h'=>'699772501f2dbdbb'],
     'lib/superadmin.php' => ['s'=>10675,'h'=>'995da0045cd4e7ee'],
     'lib/tally.php' => ['s'=>44735,'h'=>'f910b38d13d7cee8'],
@@ -424,7 +424,7 @@ $EXPECT  = [
     'views/ops/crm/approval_rule_list.php' => ['s'=>3321,'h'=>'f61e360629f8f6c8'],
     'views/ops/crm/inquiry_form.php' => ['s'=>4541,'h'=>'bd15d063e6debfc5'],
     'views/ops/crm/inquiry_list.php' => ['s'=>4641,'h'=>'5917461194b40e2e'],
-    'views/ops/crm/quote_detail.php' => ['s'=>71622,'h'=>'fd13f8f456c99c43'],
+    'views/ops/crm/quote_detail.php' => ['s'=>73255,'h'=>'1597151ed35535e7'],
     'views/ops/crm/quote_external.php' => ['s'=>8907,'h'=>'7aa7bd1259a0c79d'],
     'views/ops/crm/quote_form.php' => ['s'=>43623,'h'=>'b7756e7eae7cf4b2'],
     'views/ops/crm/quote_list.php' => ['s'=>8038,'h'=>'36be301c9d7ffe37'],

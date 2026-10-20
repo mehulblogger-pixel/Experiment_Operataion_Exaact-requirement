@@ -317,6 +317,11 @@ function crm_migrate() {
         // Pre-order review checklist ticks for this quotation (JSON: item=>1). Only
         // used when the configurable pre-order checklist is switched on.
         ensure_column('quotations', 'preorder_checklist', 'MEDIUMTEXT');
+        // D-10 — a checklist that cannot be completed is waived, with a reason, by
+        // someone who may approve; the waiver shows on the quotation.
+        ensure_column('quotations', 'preorder_waiver', "VARCHAR(400) DEFAULT ''");
+        ensure_column('quotations', 'preorder_waived_by', "VARCHAR(150) DEFAULT ''");
+        ensure_column('quotations', 'preorder_waived_at', "VARCHAR(40) DEFAULT ''");
         // D-11a — escalation: when a step has waited longer than the company
         // allows, the next level up may sign it too (recorded on the step).
         ensure_column('quote_approvals', 'escalated_at', "VARCHAR(30) DEFAULT ''");
@@ -1350,10 +1355,12 @@ function crm_quote_transition_problem($q, $to) {
             return '';
         case 'APPROVED':
             if (!in_array($from, ['DRAFT', 'REJECTED', 'PENDING_APPROVAL'], true)) return 'This ' . $L . ' is ' . strtolower($from) . ' — it cannot be approved now.';
+            if (($cl = crm_quote_checklist_problem($q)) !== '') return $cl;
             if (!crm_quote_self_approval_allowed() && crm_quote_is_mine($q) && !is_master_of('quotes'))
                 return 'Your company asks that someone other than the person who prepared a ' . $L . ' approves it.';
             return '';
         case 'SENT':
+            if (($cl = crm_quote_checklist_problem($q)) !== '') return $cl;
             if ($from === 'APPROVED') return '';
             if (in_array($from, ['DRAFT', 'REJECTED'], true) && !crm_quote_needs_approval($q)) return '';
             if (in_array($from, ['DRAFT', 'REJECTED', 'PENDING_APPROVAL'], true))
@@ -1372,6 +1379,7 @@ function crm_quote_transition_problem($q, $to) {
                 $who = $wu ? (trim(($wu['first_name'] ?? '') . ' ' . ($wu['last_name'] ?? '')) ?: (string)$wu['username']) : '';
                 return 'Only the person assigned to this ' . $L . ($who !== '' ? ' (' . $who . ')' : '') . ' can record the ' . Tl('client') . "'s answer.";
             }
+            if ($to === 'ACCEPTED' && ($cl = crm_quote_checklist_problem($q)) !== '') return $cl;
             return '';
     }
     return 'That is not a step in a ' . $L . "'s life. A " . $L . ' is rejected by its approver, expires on its own when its validity ends, and goes back to draft when its commercial terms change.';
@@ -2107,6 +2115,7 @@ function ops_crm_quotes($route, $method) {
             'q' => $q, 'lines' => crm_quote_lines($q['id']),
             'preorderOn' => preorder_checklist_enabled(), 'preorderItems' => preorder_checklist_items(),
             'preorderState' => preorder_checklist_state($q), 'preorderRequireAll' => preorder_checklist_require_all(),
+            'preorderCanWaive' => crm_quote_checklist_can_waive($q),
             'revs' => ops_all("SELECT id, rev, status, total_amount, is_current, created_at FROM quotations WHERE quote_no=? ORDER BY rev", [$q['quote_no']]),
             'hist' => ops_all("SELECT * FROM quote_revisions WHERE quote_id=? ORDER BY rev DESC, id DESC", [$base]),
             'followups' => ops_all("SELECT * FROM quote_followups WHERE quote_id=? ORDER BY due_date", [$q['id']]),
@@ -2444,6 +2453,8 @@ function ops_crm_quotes($route, $method) {
                  'lost_reason','lost_reason_other',
                  'rejected_by','rejected_at','reject_remarks',  // this attempt's history
                  'locked','unlocked_until',
+                 // D-10 — a revision is reviewed afresh: it starts unticked and unwaived.
+                 'preorder_checklist','preorder_waiver','preorder_waived_by','preorder_waived_at',
                  'created_by','created_at','updated_at'];
         $carryCols = array_values(array_diff(array_keys($src), $skip));
         $cols = array_merge(['quote_no','rev','parent_id','is_current','status','created_by','created_at','updated_at'], $carryCols);
@@ -2528,9 +2539,34 @@ function ops_crm_quotes($route, $method) {
         // and bounces to the dashboard, so the checklist can never be completed.
         ops_require(crm_can_act_on_quote((int)$q['id']) || can('crm.quote.create') || can('mod.quotes.edit') || can('crm.quote.approve') || is_master(),
             'You cannot update this ' . Tl('quote') . '.');
-        $ticked = (array)($_POST['pc'] ?? []); $vc = [];
-        foreach (preorder_checklist_items() as $it) { $k = preorder_item_key($it); if (!empty($ticked[$k])) $vc[$k] = 1; }
+        if (empty($q['is_current']) || in_array((string)$q['status'], ['ACCEPTED', 'LOST', 'EXPIRED'], true)) {
+            flash('This ' . Tl('quote') . ' is ' . (empty($q['is_current']) ? 'an earlier revision' : strtolower((string)$q['status'])) . ' — its checklist can no longer change.', 'error');
+            redirect('/quote?id=' . $q['id']);
+        }
+        // D-10 — waive: only someone who may approve it, and only with a reason.
+        if (($_POST['do'] ?? '') === 'waive') {
+            $why = trim((string)($_POST['waiver_reason'] ?? ''));
+            if (!crm_quote_checklist_can_waive($q)) { flash('Only someone who may approve this ' . Tl('quote') . ' can waive its checklist.', 'error'); redirect('/quote?id=' . $q['id']); }
+            if ($why === '') { flash('Say why the checklist is being waived — the reason is shown on the ' . Tl('quote') . '.', 'error'); redirect('/quote?id=' . $q['id']); }
+            $me = user_name(current_user());
+            $pdo->prepare("UPDATE quotations SET preorder_waiver=?, preorder_waived_by=?, preorder_waived_at=? WHERE id=?")
+                ->execute([mb_substr($why, 0, 400), $me, date('c'), $q['id']]);
+            crm_log_change($q['id'], 'Review checklist waived by ' . $me . ' — ' . $why);
+            flash('Checklist waived. The reason and your name are shown on the ' . Tl('quote') . '.', 'warning');
+            redirect('/quote?id=' . $q['id']);
+        }
+        // Each tick keeps who ticked it and when; a point already ticked keeps its
+        // first tick, and unticking removes it.
+        $ticked = (array)($_POST['pc'] ?? []); $vc = []; $was = preorder_checklist_state($q);
+        $me = user_name(current_user());
+        foreach (preorder_checklist_items() as $it) {
+            $k = preorder_item_key($it);
+            if (empty($ticked[$k])) continue;
+            $vc[$k] = is_array($was[$k] ?? null) ? $was[$k] : ['by' => $me, 'at' => date('c')];
+        }
         $pdo->prepare("UPDATE quotations SET preorder_checklist=? WHERE id=?")->execute([json_encode($vc), $q['id']]);
+        $pg = preorder_checklist_progress(['preorder_checklist' => json_encode($vc)]);
+        crm_log_change($q['id'], 'Review checklist: ' . $pg['done'] . ' of ' . $pg['total'] . ' points ticked');
         flash('Pre-order checklist saved.');
         redirect('/quote?id=' . $q['id']);
     }
@@ -2558,12 +2594,9 @@ function ops_crm_quotes($route, $method) {
         // Pre-order control: when the checklist is on and every point is required,
         // an approval cannot be given until the review checklist is complete. Only
         // gates approval — a rejection is always allowed.
-        if (($_POST['decision'] ?? '') !== 'reject' && preorder_checklist_enabled() && preorder_checklist_require_all()) {
-            $pg = preorder_checklist_progress($q);
-            if (!$pg['complete']) {
-                flash('Complete the pre-order review checklist before approving (' . $pg['done'] . '/' . $pg['total'] . ' done).', 'error');
-                redirect('/quote?id=' . $q['id']);
-            }
+        if (($_POST['decision'] ?? '') !== 'reject' && ($cl = crm_quote_checklist_problem($q)) !== '') {
+            flash($cl, 'error');
+            redirect('/quote?id=' . $q['id']);
         }
         $remarks = trim($_POST['remarks'] ?? '');
         $me = user_name(current_user());
@@ -3405,6 +3438,24 @@ function preorder_item_key($item) { return 'c' . substr(md5(trim((string)$item))
 function preorder_checklist_state($q) {
     $j = json_decode((string)($q['preorder_checklist'] ?? ''), true);
     return is_array($j) ? $j : [];
+}
+// D-10 (the owner, 20 Oct 2026: "Yes to both") — when every point is required,
+// the checklist holds approval, sending and the customer's acceptance, unless
+// someone who may approve has waived it with a reason. Returns '' when clear.
+function crm_quote_checklist_problem($q) {
+    if (!preorder_checklist_enabled() || !preorder_checklist_require_all()) return '';
+    if (trim((string)($q['preorder_waiver'] ?? '')) !== '') return '';
+    $pg = preorder_checklist_progress($q);
+    if ($pg['complete']) return '';
+    return 'The review checklist on this ' . Tl('quote') . ' is not complete (' . $pg['done'] . '/' . $pg['total']
+         . ' ticked). Tick every point first — or someone who may approve can waive it, with a reason.';
+}
+// Who may waive it: someone who may approve this quotation — never its own
+// preparer when the company asks for a second pair of eyes (D-06).
+function crm_quote_checklist_can_waive($q) {
+    if (is_master_of('quotes')) return true;
+    if (!can('crm.quote.approve') && !crm_can_act_on_quote((int)$q['id'])) return false;
+    return !(crm_quote_is_mine($q) && !crm_quote_self_approval_allowed());
 }
 // How many of the configured points are ticked on this quotation.
 function preorder_checklist_progress($q) {

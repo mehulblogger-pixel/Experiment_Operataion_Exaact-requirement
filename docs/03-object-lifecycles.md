@@ -185,6 +185,12 @@ writes one line in the quotation's history (who, what, why).
   unless the company answers "the costing is optional" in Set up Sales (`quote_manmonth_costing`).
   A save that changes such a quotation's prices away from its costing is allowed only to its creator
   (or a master), with a note, written in its history. No status or move is added.
+- **The contract-review checklist holds the moves towards the customer** (owner's D-10, 20 Oct
+  2026): when the company requires every point (`preorder_checklist_require`), the moves to APPROVED,
+  SENT and ACCEPTED, and every approval signature, are refused until every point is ticked or the
+  checklist is waived. Submitting for approval is not held — the approver reviews it. A revision
+  starts unticked and unwaived; an accepted, lost or expired quotation's checklist no longer changes.
+  No status or move is added.
 
 ## Project costing (`project_costings.status`)
 

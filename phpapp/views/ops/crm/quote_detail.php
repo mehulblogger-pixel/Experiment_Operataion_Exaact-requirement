@@ -274,25 +274,42 @@
   // ---- Pre-order review checklist (configurable, on/off) ----
   $preorderOn = $preorderOn ?? false; $preorderItems = $preorderItems ?? [];
   $preorderState = $preorderState ?? []; $preorderRequireAll = $preorderRequireAll ?? false;
+  $preorderCanWaive = $preorderCanWaive ?? false;
   if ($preorderOn && $preorderItems):
     $pcDone = 0; foreach ($preorderItems as $it) if (!empty($preorderState[preorder_item_key($it)])) $pcDone++;
     $pcAll = $pcDone >= count($preorderItems);
+    $pcWaived = trim((string)($q['preorder_waiver'] ?? '')) !== '';
+    $pcOpen = !empty($q['is_current']) && !in_array((string)$q['status'], ['ACCEPTED', 'LOST', 'EXPIRED'], true);
 ?>
-<div class="panel" id="preorder" style="border:1px solid <?= $pcAll ? 'var(--ok)' : 'var(--warn,#c90)' ?>">
+<div class="panel" id="preorder" style="border:1px solid <?= ($pcAll || $pcWaived) ? 'var(--ok)' : 'var(--warn,#c90)' ?>">
   <div class="ctitle" style="margin-top:0"><h3>Pre-order review</h3>
-    <span class="pill <?= $pcAll ? 'p-ok' : 'p-warn' ?>"><?= (int)$pcDone ?>/<?= count($preorderItems) ?> done</span></div>
-  <p class="muted" style="margin:0 0 8px;font-size:12px">Enquiry / tender / contract review before this <?= e(Tl('quote')) ?> is approved.<?= $preorderRequireAll ? ' <b>All points must be ticked to approve.</b>' : '' ?></p>
+    <span class="pill <?= ($pcAll || $pcWaived) ? 'p-ok' : 'p-warn' ?>"><?= $pcWaived && !$pcAll ? 'Waived' : (int)$pcDone . '/' . count($preorderItems) . ' done' ?></span></div>
+  <p class="muted" style="margin:0 0 8px;font-size:12px">Enquiry / tender / contract review for this <?= e(Tl('quote')) ?>.<?= $preorderRequireAll ? ' <b>Every point must be ticked — or the checklist waived — before it is approved, sent, or accepted.</b>' : '' ?></p>
+  <?php if ($pcWaived): ?>
+    <p style="margin:0 0 8px;font-size:13px">⚠ <b>Waived</b> by <?= e($q['preorder_waived_by']) ?> on <?= e(fdate($q['preorder_waived_at'])) ?> — <?= e($q['preorder_waiver']) ?></p>
+  <?php endif; ?>
   <form method="post" action="/quote-preorder-save">
     <input type="hidden" name="id" value="<?= (int)$q['id'] ?>">
-    <?php foreach ($preorderItems as $it): $k = preorder_item_key($it); ?>
+    <?php foreach ($preorderItems as $it): $k = preorder_item_key($it); $tk = $preorderState[$k] ?? null; ?>
       <label class="chk" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;font-size:13px">
-        <input type="checkbox" name="pc[<?= e($k) ?>]" value="1" <?= !empty($preorderState[$k]) ? 'checked' : '' ?> style="margin-top:2px">
-        <span><?= e($it) ?></span>
+        <input type="checkbox" name="pc[<?= e($k) ?>]" value="1" <?= !empty($tk) ? 'checked' : '' ?> <?= $pcOpen ? '' : 'disabled' ?> style="margin-top:2px">
+        <span><?= e($it) ?><?php if (is_array($tk)): ?> <span class="muted" style="font-size:11.5px">— <?= e($tk['by'] ?? '') ?>, <?= e(fdate($tk['at'] ?? '')) ?></span><?php endif; ?></span>
       </label>
     <?php endforeach; ?>
+    <?php if ($pcOpen): ?>
     <div style="margin-top:8px"><button class="btn small" type="submit">Save checklist</button>
       <?php if (is_master() || can('settings.manage')): ?><a class="muted" style="font-size:11.5px;margin-left:8px" href="/preorder-checklist">Edit the checklist →</a><?php endif; ?></div>
+    <?php endif; ?>
   </form>
+  <?php if ($preorderRequireAll && !$pcAll && !$pcWaived && $pcOpen && $preorderCanWaive): ?>
+  <details style="margin-top:10px"><summary class="muted" style="font-size:12.5px;cursor:pointer">A point cannot be confirmed? Waive the checklist</summary>
+    <form method="post" action="/quote-preorder-save" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
+      <input type="hidden" name="id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="do" value="waive">
+      <input class="form-control" name="waiver_reason" required maxlength="400" placeholder="Why — shown on the <?= e(Tl('quote')) ?> with your name" style="flex:1;min-width:220px">
+      <button class="btn small secondary" type="submit">Waive</button>
+    </form>
+  </details>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 

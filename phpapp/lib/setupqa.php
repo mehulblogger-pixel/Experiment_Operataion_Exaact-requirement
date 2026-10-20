@@ -123,9 +123,9 @@ function setupqa_sales_set() {
                     ],
                     [
                         'key' => 'preorder_checklist_require',
-                        'ask' => 'If the checklist is shown, must every point be ticked before the ' . $L . ' can be approved?',
-                        'why' => 'A reminder lets the approver go ahead; a requirement stops approval until every point is confirmed.',
-                        'options' => ['1' => 'Yes — every point must be ticked first', '0' => 'No — it is a reminder only'],
+                        'ask' => 'If the checklist is shown, must every point be ticked before the ' . $L . ' can be approved, sent or accepted?',
+                        'why' => 'A reminder lets people go ahead; a requirement holds approval, sending and the customer\'s acceptance until every point is confirmed. A point that cannot be confirmed can be waived, with a reason, by someone who may approve — the reason and their name show on the ' . $L . '.',
+                        'options' => ['1' => 'Yes — every point must be ticked (or waived) first', '0' => 'No — it is a reminder only'],
                         'default' => '0',
                     ],
                 ],

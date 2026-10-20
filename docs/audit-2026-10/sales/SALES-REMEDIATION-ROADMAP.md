@@ -188,8 +188,10 @@ sign-in).
 
 | 3.x (D-11 A/B) | **Costing before price:** a costing moves only Draft → Submitted → Approved or Sent back (with a reason), and its author never approves it; a quotation is made only from an approved costing; a man-month quotation is submitted, approved or sent only on an approved costing (a company may make it optional in Set up Sales); its creator may change its prices away from the costing with a note kept in its history; reopening an approved costing withdraws its approval and stops its quotation until approved again | the costing commit | `test_sales_costing_rules.php` (33) |
 
+| 3.x (D-10) | **Contract review that holds:** when every point is required, the checklist holds direct approval, every signature, sending and acceptance; each tick records who and when; a revision starts unticked and unwaived; someone who may approve waives it with a reason, shown on the quotation and in its history; Set up Sales says so in its question | the checklist commit | `test_sales_checklist_gates.php` (23) |
+
 **Stage 1 is complete.** The third round of answers (20 Oct) is being built in order:
-checklist (D-10), enquiry branch, industry template, contract
+enquiry branch, industry template, contract
 amendment, reopening. **Still waiting on the owner:** D-09, D-13…D-17, D-19…D-21, D-24, D-26…D-28, D-30.
 
 ## 9. If only five things are done
