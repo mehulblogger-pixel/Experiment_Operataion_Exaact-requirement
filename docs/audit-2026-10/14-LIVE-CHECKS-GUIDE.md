@@ -178,3 +178,18 @@ normally possible on your existing plan.
 | An engineer | On the claim sheet, enter a negative number of hours | Refused with *"Hours cannot be negative"* |
 | Finance | **Directory → Client register** | The list opens, read only; there is no way to add a client |
 | A client on a paid plan (client portal) | **Plans** → look under a cheaper plan | It says the change starts when the paid period ends and nothing is charged now |
+
+### Sales — the rules you set on 20 Oct (check after the upload)
+
+Use a test quotation for a test customer; nothing below sends anything to a real customer unless you press **Send**.
+
+| Who signs in | Do this | You should see |
+|---|---|---|
+| A Marketing Manager | **Sales → Set up Sales** | A few plain questions: what happens to a value no approval level covers, whether a person may approve their own quotation, and the review checklist — with your approval levels written out in sentences |
+| A Sales Executive | **Sales → Leads**, then **Opportunities** | Both open (they were refused before) |
+| A salesperson | A draft quotation whose value your approval rules cover | **Submit for approval** — and no **Send** button until it is approved |
+| The same salesperson | **Edit** an approved quotation and change a rate | It goes back to **Draft**, with a message that the approval was cancelled |
+| Finance | Open a sent quotation someone else is assigned to | No **Mark accepted** button; a line saying who records the customer's answer |
+| The person assigned | **Mark lost** without choosing a reason | Refused — it asks why it was lost |
+| A manager | **Client holds** → block the test customer → try a new enquiry, quotation or work order for them | Each is refused with one sentence saying why and where it is cleared. Clear the hold afterwards |
+| Finance | Invoice one job of a work order that was split into two jobs | The line suggests that job's own man-days, not the whole order's |
