@@ -12,7 +12,7 @@ $canEdit = function_exists('pc_can_edit') && pc_can_edit() && !$locked;
 // may sign is the one the CURRENT level waits for, not anyone who may approve.
 $canApprove = function_exists('pc_can_act') ? pc_can_act($h) : (function_exists('pc_can_approve') && pc_can_approve());
 $pcSteps = function_exists('pc_steps') ? pc_steps((int)$h['id']) : [];
-$pcLevel = function_exists('pc_current_level') ? pc_current_level((int)$h['id']) : 0;
+$pcOpen = function_exists('pc_open_levels') ? pc_open_levels((int)$h['id']) : [];
 $sbuOpts = $sbuOpts ?? (function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : []);
 $forInq  = !empty($h['inquiry_id']) ? ops_one("SELECT id, inquiry_no, subject FROM crm_inquiries WHERE id=?", [(int)$h['inquiry_id']]) : null;
 $forLead = !empty($h['lead_id']) && function_exists('lead_row') ? lead_row((int)$h['lead_id']) : null;
@@ -254,13 +254,13 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <ol style="margin:10px 0 0;padding-left:20px;font-size:13px;line-height:1.6">
         <?php foreach ($pcSteps as $s):
           $who = function_exists('pc_step_people') ? array_map('user_name', array_slice(pc_step_people($s, $h), 0, 3)) : [];
-          $tag = $s['status'] === 'APPROVED' ? '✓ approved by ' . $s['acted_by'] : ($s['status'] === 'REJECTED' ? '↩ sent back by ' . $s['acted_by'] : ((int)$s['level'] === $pcLevel ? 'waiting' : 'after the level before'));
+          $tag = $s['status'] === 'APPROVED' ? '✓ approved by ' . $s['acted_by'] : ($s['status'] === 'REJECTED' ? '↩ sent back by ' . $s['acted_by'] : (in_array((int)$s['level'], $pcOpen, true) ? 'waiting' : 'after the level before'));
           $name = !empty($s['approver_user_id']) ? '' : ((string)$s['approver_role'] !== '' ? (ORG_ROLES[$s['approver_role']] ?? $s['approver_role']) : 'anyone who may approve'); ?>
           <li><b>Level <?= (int)$s['level'] ?></b> — <?= $e($name !== '' ? $name . ($who ? ' (' . implode(', ', $who) . ')' : '') : implode(', ', $who)) ?> · <span class="<?= $s['status']==='APPROVED' ? '' : 'muted' ?>"><?= $e($tag) ?></span></li>
         <?php endforeach; ?>
       </ol>
     <?php endif; ?>
-    <p class="sub" style="margin-top:6px">Draft → Submitted → Approved. Submitting sets the approval levels the same way as a quotation of this value and business unit (Set up Sales), and locks the sheet. Levels sign in order; its author never signs. A quotation is made only from an approved costing, and reopening an approved one withdraws its approval.</p>
+    <p class="sub" style="margin-top:6px">Draft → Submitted → Approved. Submitting sets the approval levels the same way as a quotation of this value and business unit (Set up Sales), and locks the sheet. Levels sign <?= function_exists('crm_approval_mode') && crm_approval_mode() === 'together' ? 'all at the same time' : 'in order' ?>; its author never signs. A quotation is made only from an approved costing, and reopening an approved one withdraws its approval.</p>
   </div>
 </div>
 </div>

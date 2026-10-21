@@ -248,23 +248,35 @@ function pc_step_people($step, $h) {
         return pc_step_people(['approver_role' => '', 'approver_user_id' => null] + $step, $h);
     return $out;
 }
-// May the person signed in sign the level this costing is waiting at?
+// The levels that may sign now: the lowest waiting one, or — when the company
+// chose that all levels sign at the same time (Set up Sales) — every waiting one.
+function pc_open_levels($id) {
+    if (function_exists('crm_approval_mode') && crm_approval_mode() === 'together')
+        return array_map('intval', array_column(ops_all("SELECT DISTINCT level FROM project_costing_approvals WHERE costing_id=? AND status='PENDING' ORDER BY level", [(int)$id]) ?: [], 'level'));
+    $l = pc_current_level($id);
+    return $l ? [$l] : [];
+}
+// The lowest open level the person signed in may sign (0 = none).
+function pc_my_level($h) {
+    if ((string)($h['status'] ?? '') !== 'SUBMITTED' || pc_is_author($h)) return 0;
+    $open = pc_open_levels((int)$h['id']); if (!$open) return 0;
+    if (function_exists('is_master') && is_master()) return $open[0];
+    $me = (int)(current_user()['id'] ?? 0);
+    foreach ($open as $lvl) foreach (pc_steps((int)$h['id']) as $s) {
+        if ((int)$s['level'] !== $lvl || $s['status'] !== 'PENDING') continue;
+        foreach (pc_step_people($s, $h) as $u) if ((int)$u['id'] === $me) return $lvl;
+    }
+    return 0;
+}
+// May the person signed in sign this costing now?
 function pc_can_act($h) {
     if ((string)($h['status'] ?? '') !== 'SUBMITTED' || pc_is_author($h)) return false;
-    $steps = pc_steps((int)$h['id']);
-    if (!$steps) return pc_can_approve();   // submitted before levels existed: the old rule
-    $lvl = pc_current_level((int)$h['id']); if (!$lvl) return false;
-    if (function_exists('is_master') && is_master()) return true;
-    $me = (int)(current_user()['id'] ?? 0);
-    foreach ($steps as $s) {
-        if ((int)$s['level'] !== $lvl || $s['status'] !== 'PENDING') continue;
-        foreach (pc_step_people($s, $h) as $u) if ((int)$u['id'] === $me) return true;
-    }
-    return false;
+    if (!pc_steps((int)$h['id'])) return pc_can_approve();   // submitted before levels existed: the old rule
+    return pc_my_level($h) > 0;
 }
-// Sign the current level. Returns 'APPROVED' when it was the last, else 'NEXT'.
+// Sign the level that is mine. Returns 'APPROVED' when nothing is left, else 'NEXT'.
 function pc_sign_level($h, $ref = '') {
-    $id = (int)$h['id']; $lvl = pc_current_level($id); $me = current_user();
+    $id = (int)$h['id']; $lvl = pc_my_level($h) ?: pc_current_level($id); $me = current_user();
     if ($lvl) db()->prepare("UPDATE project_costing_approvals SET status='APPROVED', acted_by=?, acted_at=?, remarks=? WHERE costing_id=? AND level=? AND status='PENDING'")
         ->execute([user_name($me), date('c'), substr(trim((string)$ref), 0, 400), $id, $lvl]);
     if (pc_current_level($id)) return 'NEXT';
@@ -670,17 +682,20 @@ function ops_projcosting($route, $method) {
             $pdo->prepare("UPDATE project_costings SET status='SUBMITTED', updated_at=? WHERE id=?")->execute([date('c'), $id]);
             $n = pc_build_approvals(pc_get($id));
             // Tell the people the first level waits for.
-            $h2 = pc_get($id); $lvl = pc_current_level($id);
+            $h2 = pc_get($id); $open = pc_open_levels($id);
             foreach (pc_steps($id) as $s) {
-                if ((int)$s['level'] !== $lvl) continue;
+                if (!in_array((int)$s['level'], $open, true)) continue;
                 foreach (pc_step_people($s, $h2) as $ap) if (trim((string)($ap['email'] ?? '')) !== '' && function_exists('ops_mail'))
-                    ops_mail($ap['email'], 'Approval needed: costing ' . $h2['code'], "Hello,\n\nProject costing {$h2['code']} — {$h2['title']} is waiting for your approval (level $lvl).\nOpen it in " . (function_exists('app_name') ? app_name() : 'the application') . " to approve it or send it back with a reason.\n", '', 'COSTING_APPROVAL');
+                    ops_mail($ap['email'], 'Approval needed: costing ' . $h2['code'], "Hello,\n\nProject costing {$h2['code']} — {$h2['title']} is waiting for your approval (level {$s['level']}).\nOpen it in " . (function_exists('app_name') ? app_name() : 'the application') . " to approve it or send it back with a reason.\n", '', 'COSTING_APPROVAL');
             }
-            flash('Costing submitted for approval — ' . $n . ' level' . ($n === 1 ? '' : 's') . ' to pass, in order.');
+            $together = function_exists('crm_approval_mode') && crm_approval_mode() === 'together';
+            flash('Costing submitted for approval — ' . $n . ' level' . ($n === 1 ? '' : 's') . ' to pass' . ($n > 1 ? ($together ? ', all at the same time.' : ', in order.') : '.'));
         } elseif ($route === 'project-costing-approve') {
             $r = pc_sign_level($h, (string)($_POST['approval_ref'] ?? ''));
             if ($r === 'APPROVED') flash('Costing approved — a quotation can now be made from it.');
-            else {
+            elseif (function_exists('crm_approval_mode') && crm_approval_mode() === 'together') {
+                flash('Your level is signed — still waiting for level ' . implode(', ', pc_open_levels($id)) . '.');
+            } else {
                 $h2 = pc_get($id); $lvl = pc_current_level($id);
                 foreach (pc_steps($id) as $s) if ((int)$s['level'] === $lvl)
                     foreach (pc_step_people($s, $h2) as $ap) if (trim((string)($ap['email'] ?? '')) !== '' && function_exists('ops_mail'))
@@ -688,7 +703,7 @@ function ops_projcosting($route, $method) {
                 flash('Your level is signed — it now waits for level ' . $lvl . '.');
             }
         } elseif ($route === 'project-costing-reject') {
-            $lvl = pc_current_level($id);
+            $lvl = pc_my_level($h) ?: pc_current_level($id);
             if ($lvl) $pdo->prepare("UPDATE project_costing_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE costing_id=? AND level=? AND status='PENDING'")
                 ->execute([user_name(current_user()), date('c'), substr(trim((string)($_POST['reject_note'] ?? '')), 0, 400), $id, $lvl]);
             $pdo->prepare("UPDATE project_costings SET status='REJECTED', reject_note=?, updated_at=? WHERE id=?")

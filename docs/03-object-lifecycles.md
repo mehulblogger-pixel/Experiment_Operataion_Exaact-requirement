@@ -179,6 +179,17 @@ writes one line in the quotation's history (who, what, why).
   level-1 step is still pending. A step waiting longer than the days set in Set up Sales
   (`quote_approval_escalate_days`) is opened to the next level's approvers as well (D-11a); a
   delegate may sign for an approver who is away. Neither adds a status or a move.
+  **Owner, 21 Oct 2026 — "simultaneous approval":** Set up Sales asks *"When a quotation needs more
+  than one level, how do the levels approve?"* (`quote_approval_mode`: one after another — default ·
+  all at the same time). At the same time, every level is asked at once and may sign in any order;
+  the quotation is APPROVED when all have signed; escalation does not apply (all are asked), and
+  taking one approval back does not reset the others. Project costings follow the same answer.
+- **When no approval is needed** (owner, 21 Oct 2026): a quotation goes DRAFT → APPROVED on submit,
+  with the reason in its history, when the company has **no approval levels at all** (*"no approval
+  chain → top management is not required"* — it used to wait for "anyone who may approve"), or when
+  it was **made from an approved project costing at that costing's prices** (*"skip the second
+  approval"* — the levels already signed the costing; a changed price is approved again), or when no
+  level covers its value and Set up Sales says none is needed (D-03). `crm_quote_needs_approval()`.
 - **A man-month quotation stands on an approved costing** (owner's D-11 A, 20 Oct 2026): the moves
   to PENDING_APPROVAL, APPROVED and SENT, and each approval signature, are refused while a quotation
   with a man-month line has no linked project costing in APPROVED (any revision's link counts),

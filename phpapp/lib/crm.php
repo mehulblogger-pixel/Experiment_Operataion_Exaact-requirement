@@ -1162,7 +1162,7 @@ function crm_expire_quotes($today = null) {
 // a multi-level chain is REQUIRED, and the one-click "set approved" short-cut
 // must route through it rather than skip it. Mirrors crm_build_approvals().
 function crm_quote_needs_chain($q) {
-    return (bool) crm_quote_rule_steps($q);
+    return crm_quote_needs_approval($q) && (bool) crm_quote_rule_steps($q);
 }
 
 // ---- The owner's rules for quotations (20 Oct 2026, Sales audit D-02…D-08) --
@@ -1228,8 +1228,43 @@ function crm_quote_rule_steps($q) {
 
 // D-02 — does this quotation need approving before it goes to the customer?
 // Only when a rule speaks for it, or the company asked for approval anyway.
+//
+// The owner, 21 Oct 2026:
+//  - "If there is no approval chain then top management is not required to
+//    review or approve quotation." A company with no approval levels at all
+//    needs no approval — it used to wait for "anyone who may approve".
+//  - "Yes skip the second approval." A quotation made from an approved
+//    project costing, at the costing's prices, was approved with the costing
+//    by the same levels; it is not approved a second time. A changed price
+//    (allowed to its creator, with a note — D-11 A) is approved again.
+function crm_quote_has_levels() {
+    return (int) ops_val("SELECT COUNT(*) FROM quote_approval_rules WHERE active=1") > 0;
+}
+function crm_quote_from_approved_costing($q) {
+    if (empty($q['id']) || !function_exists('pc_rollup')) return false;
+    $pc = crm_quote_costing($q);
+    if (!$pc || (string)$pc['status'] !== 'APPROVED') return false;
+    $roll = pc_rollup((int)$pc['id']);
+    return $roll && $roll['lines'] && crm_saved_price_rows((int)$q['id']) === crm_costing_price_rows($roll);
+}
 function crm_quote_needs_approval($q) {
+    if (!crm_quote_has_levels()) return false;
+    if (crm_quote_from_approved_costing($q)) return false;
     return crm_quote_rule_steps($q) || crm_quote_unmatched_policy() !== 'none';
+}
+// Why a quotation needs no approval — said on the quotation and in its history.
+function crm_quote_no_approval_reason($q) {
+    if (!crm_quote_has_levels()) return 'your company has no approval levels';
+    if (crm_quote_from_approved_costing($q)) return 'it is at the prices of its approved project costing, which the approval levels already signed';
+    return 'no approval rule covers its value, and your approval setup says none is needed';
+}
+
+// Owner, 21 Oct 2026: "setting in sales setup wherein simultaneous approval
+// are required." 'order' (default, D-05): level 1 first, then level 2 …;
+// 'together': every level is asked at once and the quotation (or costing) is
+// approved when all have signed.
+function crm_approval_mode() {
+    return (string) setting_get('quote_approval_mode', 'order') === 'together' ? 'together' : 'order';
 }
 
 // D-08 — the person assigned to the quotation (its owner, else whoever raised
@@ -2255,8 +2290,9 @@ function ops_crm_quotes($route, $method) {
             $pdo->prepare("DELETE FROM quote_approvals WHERE quote_id=?")->execute([$q['id']]);
             $pdo->prepare("UPDATE quotations SET status='APPROVED', submitted_at=?, rejected_by='', rejected_at='', reject_remarks='' WHERE id=?")
                 ->execute([date('c'), $q['id']]);
-            crm_log_change($q['id'], 'Ready to send — no approval rule covers its value, and your approval setup says none is needed (' . $me . ').');
-            flash('No approval is needed for this ' . Tl('quote') . ' under your approval rules — it is ready to send.');
+            $why = crm_quote_no_approval_reason($q);
+            crm_log_change($q['id'], 'Ready to send — no approval needed: ' . $why . ' (' . $me . ').');
+            flash('No approval is needed for this ' . Tl('quote') . ' — ' . $why . '. It is ready to send.');
             redirect('/quote?id=' . $q['id']);
         }
         if ($to === 'PENDING_APPROVAL') {
@@ -2266,8 +2302,12 @@ function ops_crm_quotes($route, $method) {
             crm_log_change($q['id'], 'Submitted for approval');
             // §xii — say who it is now sitting with, and tell them.
             $with = crm_pending_with($q['id']);
-            $step = crm_pending_step($q['id']);
-            foreach (crm_step_approvers($step ?: []) as $ap) {
+            $askNow = crm_approval_mode() === 'together'
+                ? (ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [$q['id']]) ?: [])
+                : array_filter([crm_pending_step($q['id'])]);
+            $told = [];
+            foreach (array_merge(...array_map('crm_step_approvers', $askNow ?: [[]])) as $ap) {
+                if (isset($told[(int)$ap['id']])) continue; $told[(int)$ap['id']] = true;
                 if (trim((string)($ap['email'] ?? '')) === '') continue;
                 ops_mail($ap['email'], 'Approval needed: ' . quote_label($q),
                     "Hello,\n\n" . quote_label($q) . " ({$q['client_name']}, " . fmoney($q['total_amount']) . ") is waiting for your approval.\n\n"
@@ -2616,9 +2656,10 @@ function ops_crm_quotes($route, $method) {
             redirect('/quote?id=' . $q['id']);
         }
         // D-05 — levels sign in order. Approvers at the same level may sign in
-        // any order; a higher level waits until every lower level has signed.
+        // any order; a higher level waits until every lower level has signed —
+        // unless the company chose that all levels sign at the same time.
         $lowest = (int) ops_val("SELECT MIN(level) FROM quote_approvals WHERE quote_id=? AND status='PENDING'", [$q['id']]);
-        if (($_POST['decision'] ?? '') !== 'reject' && (int)$step['level'] > $lowest) {
+        if (crm_approval_mode() === 'order' && ($_POST['decision'] ?? '') !== 'reject' && (int)$step['level'] > $lowest) {
             flash('Level ' . $lowest . ' approves first — this ' . Tl('quote') . ' reaches level ' . (int)$step['level'] . ' when it has.', 'error');
             redirect('/quote?id=' . $q['id']);
         }
@@ -2681,7 +2722,8 @@ function ops_crm_quotes($route, $method) {
             ->execute([$why, $step['id']]);
         // Any level approved AFTER this one is void too — an approval given on
         // the strength of a withdrawn one cannot stand on its own.
-        $after = ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='APPROVED' AND level > ?",
+        // Signed at the same time (Set up Sales), a later level did not rely on this one.
+        $after = crm_approval_mode() === 'together' ? [] : ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='APPROVED' AND level > ?",
                          [$q['id'], (int)$step['level']]);
         foreach ($after as $a)
             $pdo->prepare("UPDATE quote_approvals SET status='PENDING', acted_by='', acted_at='', remarks=? WHERE id=?")
@@ -3626,6 +3668,7 @@ function crm_role_step_covers_me($step, $q) {
 function crm_escalate_quote_approvals($now = null) {
     $days = (int) setting_get('quote_approval_escalate_days', '0');
     if ($days <= 0) return 0;
+    if (crm_approval_mode() === 'together') return 0;   // every level is already asked
     $now = $now ?? time(); $n = 0;
     $rows = ops_all("SELECT a.* FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id
                      WHERE a.status='PENDING' AND COALESCE(a.escalated_at,'')='' AND q.is_current=1 AND q.status='PENDING_APPROVAL'
@@ -3696,6 +3739,14 @@ function crm_person_label($u) {
 }
 // The lowest still-pending level, and who it is with — as a readable phrase.
 function crm_pending_with($qid) {
+    if (crm_approval_mode() === 'together') {
+        $all = ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [(int)$qid]) ?: [];
+        if (count($all) > 1) {
+            $parts = [];
+            foreach ($all as $s) { $p = array_map('crm_person_label', array_slice(crm_step_approvers($s), 0, 2)); $parts[] = 'level ' . (int)$s['level'] . ': ' . ($p ? implode(', ', $p) : 'any approver'); }
+            return implode('; ', $parts) . ' (all at the same time)';
+        }
+    }
     $step = ops_one("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$qid]);
     if (!$step) return '';
     $people = crm_step_approvers($step);
@@ -3730,7 +3781,7 @@ function crm_quote_ids_awaiting_me() {
     $ids = [];
     $rows = ops_all("SELECT a.*, q.office_id q_office, q.sbu q_sbu FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id
                      WHERE a.status='PENDING' AND q.is_current=1 AND q.status='PENDING_APPROVAL'
-                       AND a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=a.quote_id AND a2.status='PENDING')") ?: [];
+                       AND (? = 'together' OR a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=a.quote_id AND a2.status='PENDING'))", [crm_approval_mode()]) ?: [];
     foreach ($rows as $st) {
         if (isset($ids[(int)$st['quote_id']])) continue;
         if (function_exists('scope_allows') && !is_master() && !scope_allows($st['q_office'] ?? null, $st['q_sbu'] ?? null)) continue;

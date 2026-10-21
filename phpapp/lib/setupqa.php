@@ -81,7 +81,7 @@ function setupqa_sales_set() {
                     [
                         'key' => 'quote_unmatched_approval',
                         'ask' => 'When a ' . $L . "'s value is not covered by any of your approval levels, what should happen?",
-                        'why' => 'For example, a value above your highest level, or between two levels. With no levels at all there is no highest level, so anyone who may approve does it. A one-person company usually needs no approval.',
+                        'why' => 'For example, a value above your highest level, or between two levels. With no levels at all, no approval is needed (your rule, 21 Oct 2026). A one-person company usually needs no approval.',
                         'options' => function_exists('crm_quote_unmatched_policy') ? QUOTE_UNMATCHED_POLICIES : ['any' => 'Anyone who may approve'],
                         'default' => 'top',
                     ],
@@ -93,9 +93,19 @@ function setupqa_sales_set() {
                         'default' => 'yes',
                     ],
                     [
+                        //  Owner, 21 Oct 2026: "setting in sales setup wherein
+                        //  simultaneous approval are required." Applies to
+                        //  quotations and project costings alike.
+                        'key' => 'quote_approval_mode',
+                        'ask' => 'When a ' . $L . ' needs more than one level, how do the levels approve?',
+                        'why' => 'One after another: level 1 first, and level 2 is asked only when level 1 has signed. At the same time: every level is asked at once, and it is approved when all have signed. Project costings follow the same answer.',
+                        'options' => ['order' => 'One after another — level 1 first', 'together' => 'All at the same time — every level is asked at once'],
+                        'default' => 'order',
+                    ],
+                    [
                         'key' => 'quote_approval_escalate_days',
                         'ask' => 'If a ' . $L . ' waits too long at one approval level, when should the level above be able to approve it too?',
-                        'why' => 'The person it is waiting for can still approve it; the level above is told and can step in. Checked every night.',
+                        'why' => 'The person it is waiting for can still approve it; the level above is told and can step in. Checked every night. (Not used when all levels approve at the same time — they are all asked already.)',
                         'options' => ['0' => 'Never — it waits for its own approver', '1' => 'After 1 day', '2' => 'After 2 days', '3' => 'After 3 days', '7' => 'After a week'],
                         'default' => '0',
                     ],
@@ -178,7 +188,8 @@ function setupqa_sales_other_approvals() {
         'Leads: only the person responsible marks a lead lost, with a reason and remarks. Giving a lead that already has an owner to someone else waits for a manager\'s approval — the owner\'s reporting manager, or a sales manager over that branch. A manager may reopen a lost lead, with a reason that is kept.',
         'Deals (opportunities): only the stage rules above. A manager may reopen a closed deal, with a reason that is kept — unless it has already become an order or contract.',
         'Project costing (man-month work): tagged with its enquiry or lead, and approved through the same levels as a ' . (function_exists('Tl') ? Tl('quote') : 'quotation') . ' of that value — never by the person who prepared it.',
-        ucfirst($q) . 's: the levels above, in order — level 1 first, then level 2, and so on.',
+        ucfirst($q) . 's: the levels above' . (function_exists('crm_approval_mode') && crm_approval_mode() === 'together' ? ', all at the same time.' : ', in order — level 1 first, then level 2, and so on.')
+            . ' A ' . $q . ' made from an approved project costing, at the costing\'s prices, is not approved a second time. With no levels at all, no approval is needed.',
         'Opening a contract, and any later change to its value, dates or quantities: two different people — endorsed by an Operation Manager, Business Unit Head, Business Director or a branch user-manager, then approved by a Branch Manager or Branch Application Manager.',
     ];
 }

@@ -75,6 +75,9 @@ $r = $drive($MM, 'quote-status', 'POST', ['id' => $q2], ['to' => 'APPROVED']);
 t_eq($st($q2), 'DRAFT', 'approving directly (no chain) is held while the checklist is incomplete — the gap: only a chain step was held');
 t_ok(strpos($said($r), 'review checklist') !== false, '…held by the checklist itself: ' . $said($r));
 setting_set('quote_unmatched_approval', 'any');
+// An approval chain needs at least one level (owner, 21 Oct 2026: with no levels
+// at all, no approval is needed) — one level, any approver, every value.
+$pdo->prepare("INSERT INTO quote_approval_rules (name,match_type,sbu,min_amount,max_amount,level,approver_role,active,created_at) VALUES ('CK any','ANY','',0,0,1,'',1,?)")->execute([date('c')]);
 // ---- a chain-step signature is held, as before -------------------------------------------------
 $drive($BDM, 'quote-status', 'POST', ['id' => $q2], ['to' => 'PENDING_APPROVAL']);
 t_eq($st($q2), 'PENDING_APPROVAL', 'submitting for approval is allowed — the approver reviews the checklist');
@@ -121,6 +124,7 @@ t_eq((string) ops_val("SELECT preorder_waiver FROM quotations WHERE id=?", [$rev
 // ---- as a reminder only, nothing is held -----------------------------------------------------------
 setting_set('preorder_checklist_require', '0');
 setting_set('quote_unmatched_approval', 'none');
+$pdo->exec("DELETE FROM quote_approval_rules WHERE name='CK any'");
 $q4 = $quote();
 $drive($BDM, 'quote-status', 'POST', ['id' => $q4], ['to' => 'SENT']);
 t_eq($st($q4), 'SENT', 'control: when the company answers "a reminder only", nothing is held');
