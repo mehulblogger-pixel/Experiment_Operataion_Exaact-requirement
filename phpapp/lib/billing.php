@@ -74,6 +74,9 @@ function rzp_create_order($paise, $receipt, array $notes = []) {
     $c = billing_config();
     if (!$c['enabled']) return ['ok' => false, 'error' => 'Payment is not set up yet — add your Razorpay keys first.'];
     if ((int) $paise <= 0) return ['ok' => false, 'error' => 'The price per user is not set, so there is nothing to charge.'];
+    // A test copy never takes real money: only Razorpay TEST keys work on it.
+    if (function_exists('app_is_test_copy') && app_is_test_copy() && strncmp((string) $c['key_id'], 'rzp_test_', 9) !== 0)
+        return ['ok' => false, 'error' => 'This is a test copy, so it only takes payment with Razorpay TEST keys (rzp_test_…). Put your test keys in Billing on this copy — no real money can move here.'];
     $payload = json_encode(['amount' => (int) $paise, 'currency' => $c['currency'],
                             'receipt' => substr((string) $receipt, 0, 40), 'notes' => $notes, 'payment_capture' => 1]);
     $r = rzp_http('POST', 'https://api.razorpay.com/v1/orders', $payload, $c['key_id'], $c['key_secret']);

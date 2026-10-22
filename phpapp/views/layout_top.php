@@ -61,7 +61,7 @@
 </script>
 </head><body class="<?= $u ? 'app' : '' ?><?= $isInsp ? ' inspector' : '' ?>">
 <?php if (function_exists('app_is_test_copy') && app_is_test_copy()): ?>
-<div role="status" style="background:#7c2d12;color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:600;position:sticky;top:0;z-index:1000">TEST COPY — not the live system. No e-mail is sent from here.</div>
+<div role="status" style="background:#7c2d12;color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:600;position:sticky;top:0;z-index:1000">TEST COPY — not the live system. <?= !empty($GLOBALS['APP_TEST_MAIL_TO']) ? 'E-mail goes only to the testers\' own addresses.' : 'No e-mail is sent from here.' ?> Payments: Razorpay test keys only.</div>
 <?php endif; ?>
 <?php if ($u): ?>
 <div class="shell">

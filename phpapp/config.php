@@ -52,6 +52,13 @@ if (is_file($localFile)) {
         // A TEST COPY of a live site (same data, its own database): 'test_copy' => true
         // stops every e-mail and marks every page, so a test can never reach a customer.
         if (!empty($local['test_copy'])) $GLOBALS['APP_TEST_COPY'] = true;
+        // On a test copy, e-mail may still reach the testers' OWN addresses
+        // (and only those): a list like ['you@yourco.com', '*@yourco.com'].
+        if (!empty($local['test_mail_to'])) $GLOBALS['APP_TEST_MAIL_TO'] = (array) $local['test_mail_to'];
+        // Where the protected data folder is (platform e-mail settings, invoice
+        // numbers, GST register, backups, company files). Normally beside the app
+        // folder; a second install on the same hosting account must have its own.
+        if (!empty($local['data_dir'])) $GLOBALS['APP_DATA_DIR'] = (string) $local['data_dir'];
         if (!empty($local['saas_db_admin']) && is_array($local['saas_db_admin'])) {
             $GLOBALS['SAAS_DB_ADMIN'] = $local['saas_db_admin'];
         }

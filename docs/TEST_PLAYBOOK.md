@@ -1,5 +1,10 @@
 # Exaact — Test Playbook (exhaustive edition)
 
+> **Superseded (22 Oct 2026).** Testing now runs from the **EXAACT Test Book** (1,403 tests,
+> results kept in the book) — start with `docs/testing-start-guide.md`. This older list is kept
+> for reference only; some figures in it are out of date (e.g. TC-B3: there are no built-in
+> seat prices any more — every price is set on Plans, pricing & usage).
+
 A module-by-module acceptance protocol for the whole application: every module and
 sub-module with its happy path, its **expected figures**, and the boundary/negative
 cases that must fail gracefully. Tick each `[ ]` as you go.

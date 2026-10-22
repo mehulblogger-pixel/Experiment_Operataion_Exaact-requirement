@@ -4,6 +4,11 @@ Plain steps to make self sign-up, e-mail and payments work on
 **operations.mghaiapps.com**. Do them in this order. The **Platform setup** page
 ticks each one green as it is done.
 
+## Before all this: test on a test copy
+Run the test book on a separate **test copy** first (`docs/testing-start-guide.md`). It shows a
+red banner, e-mails only your testers, takes only Razorpay test payments, and keeps its own data
+folder, so nothing done there can reach the live site or a customer.
+
 ## 0. Upload the latest code
 Upload the latest version of the app to the server first (as usual).
 

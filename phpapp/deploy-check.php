@@ -24,10 +24,10 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'facd279 · 2026-10-22 12:46 UTC · 701 files';
+$RELEASE = '0a99b95 · 2026-10-22 13:55 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
-    'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
+    'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
     'cron.php' => ['s'=>25218,'h'=>'d31a80db09206902'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
@@ -51,7 +51,7 @@ $EXPECT  = [
     'lib/audits.php' => ['s'=>41605,'h'=>'f362d70e80a1632d'],
     'lib/backup.php' => ['s'=>23534,'h'=>'f46dd929ef6ec98f'],
     'lib/billable.php' => ['s'=>30388,'h'=>'915abaabd09e5c9a'],
-    'lib/billing.php' => ['s'=>16540,'h'=>'6a7145d5fba1da6c'],
+    'lib/billing.php' => ['s'=>16950,'h'=>'29743662b6e17cdb'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
     'lib/books.php' => ['s'=>70004,'h'=>'50ed5b2dc1b11f82'],
     'lib/booksbridge.php' => ['s'=>26219,'h'=>'b98194d999c7b90b'],
@@ -176,7 +176,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>69459,'h'=>'1fabb6c2818818ac'],
-    'lib/ops.php' => ['s'=>725903,'h'=>'a729257297268efc'],
+    'lib/ops.php' => ['s'=>727019,'h'=>'1067ecbbcc690b47'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -251,7 +251,7 @@ $EXPECT  = [
     'lib/tapi_gov.php' => ['s'=>17290,'h'=>'111e443d157ce2ce'],
     'lib/tapi_score.php' => ['s'=>14322,'h'=>'e2256ab85fab255c'],
     'lib/tasks.php' => ['s'=>11239,'h'=>'82c11af4ebccd03c'],
-    'lib/tenant_migrate.php' => ['s'=>19927,'h'=>'0b63124682d54a07'],
+    'lib/tenant_migrate.php' => ['s'=>20675,'h'=>'3a8be680c3200403'],
     'lib/tenant_signup.php' => ['s'=>14646,'h'=>'dbc3ba0b5299482a'],
     'lib/tenants.php' => ['s'=>23111,'h'=>'f5c5ac268cf7acec'],
     'lib/terms.php' => ['s'=>28589,'h'=>'6aa8716a9d4cae12'],
@@ -316,7 +316,7 @@ $EXPECT  = [
     'views/layout_bottom.php' => ['s'=>880,'h'=>'e6b33e19b84eb59f'],
     'views/layout_embed_bottom.php' => ['s'=>65,'h'=>'63f4c118c80caf4b'],
     'views/layout_embed_top.php' => ['s'=>730,'h'=>'b20991bedef34be0'],
-    'views/layout_top.php' => ['s'=>37614,'h'=>'4413d272ef8dd3e9'],
+    'views/layout_top.php' => ['s'=>37750,'h'=>'178d8d9a836b6a60'],
     'views/list.php' => ['s'=>3275,'h'=>'b234af3a9590aae2'],
     'views/login.php' => ['s'=>602,'h'=>'ff266c37dfd19bb0'],
     'views/login_page.php' => ['s'=>11061,'h'=>'c158fc00ceb6d078'],

@@ -389,6 +389,15 @@ $('#navt').onclick = () => $('#nav').classList.toggle('open');
 
 // ---- static pages -----------------------------------------------------------------------------
 function howHTML(){ return `<h1>How to use this book</h1><div class="prose">
+  <div class="note"><b>Test on the TEST COPY — never on the live site.</b> Use <a href="${esc(BOOK.site)}" target="_blank" rel="noopener">${esc(BOOK.site)}</a>: it shows a red "TEST COPY" banner, sends e-mail only to the testers' own addresses, and takes Razorpay test payments only. Where a test says operations.mghaiapps.com, use the test copy's address instead. Use made-up names, never real customers'.</div>
+  <h2 style="font-size:16px">The order to test in</h2>
+  <ol>
+    <li><b>Wave 1</b> — Start here (SET-01 … SET-12, the 19 test users) and New company. <i>Platform owner.</i></li>
+    <li><b>Wave 2</b> — Sales, Operations, Money. <b>Wave 3</b> — Recruitment, Reporting, Quality &amp; Accreditation. <b>Wave 4</b> — Marketplace, Directory, Insights, Admin, Your own pages.</li>
+    <li><b>Wave 5</b> — Across modules (start-to-end flows) and every <b>phone</b> test, on a real phone.</li>
+    <li>Inside an area: <b>Scenario</b> first, then <b>Who may</b>, <b>Edge case</b>, <b>Screen check</b>. Short on time? Filter on <b>best</b> and <b>rule</b> first.</li>
+  </ol>
+  <h2 style="font-size:16px">Doing a test</h2>
   <ol>
     <li><b>Work module by module.</b> Pick an area on the left, then a module. Start with <b>Start here — users &amp; settings</b>, then tick off <b>Start here → Set up for testing</b> (SET-01 … SET-12): the test users, customers and settings every later test needs.</li>
     <li><b>Testing as a brand-new company?</b> Open <b>New company</b> (left menu) instead: it walks from applying for a workspace, through the platform owner creating it, first sign-in and setup, to buying one, several or all modules and setting each one up — plus the marketplace professional and the company posting a requirement. Use separate test companies whose names start with "TB", and remove them afterwards (ONB-012).</li>

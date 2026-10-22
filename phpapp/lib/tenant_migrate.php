@@ -45,8 +45,17 @@ function tenant_safe_data_dir() {
         if (!is_file($ht)) @file_put_contents($ht, "Options -Indexes\nRequire all denied\nOrder deny,allow\nDeny from all\n");
         return true;
     };
-    $above = dirname(dirname(__DIR__)) . '/exaact_data';   // sibling of the app folder → above web root
+    // Chosen in config.local.php ('data_dir') — used as given, or not at all.
+    $own = (string) ($GLOBALS['APP_DATA_DIR'] ?? '');
+    if ($own !== '') return $mk($own) ? [rtrim($own, '/'), true] : [dirname(__DIR__) . '/data', false];
+    // A TEST COPY never shares the live site's folder, even when both sit in the
+    // same hosting account (their app folders then have the same parent): it
+    // keeps its own "exaact_data_test", so a test can never take a live invoice
+    // number, change the live platform e-mail, or touch a live company's files.
+    $test = !empty($GLOBALS['APP_TEST_COPY']) || (string) getenv('OPS_TEST_COPY') === '1';
+    $above = dirname(dirname(__DIR__)) . ($test ? '/exaact_data_test' : '/exaact_data');   // sibling of the app folder → above web root
     if ($mk($above)) return [$above, true];
+    if ($test) return [dirname(__DIR__) . '/data_test', false];
     $inApp = dirname(__DIR__) . '/data';                    // fallback, inside the app folder (backups still protect it)
     if ($mk($inApp)) return [$inApp, false];
     return [dirname(__DIR__), false];                       // last resort: the app folder root (legacy)

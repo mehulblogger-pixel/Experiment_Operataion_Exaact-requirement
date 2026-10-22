@@ -26,6 +26,14 @@ return [
     //  and shows a banner on every page. Never set it on the live site.
     // ---------------------------------------------------------------------
     // 'test_copy' => true,
+    //
+    //  On a test copy, e-mail may still go to the TESTERS' OWN addresses (and to
+    //  nobody else), so sign-up codes and reminders can be checked in an inbox:
+    // 'test_mail_to' => ['you@yourcompany.com', '*@yourcompany.com'],
+    //
+    //  Where this install keeps its protected data folder. Leave it out normally.
+    //  A test copy uses its own folder (exaact_data_test) automatically.
+    // 'data_dir' => '/home/YOUR_USER/exaact_data_test',
     'admin' => [
         'user' => 'admin',            // your admin login name (usually 'admin')
         'pass' => 'admin12345',       // <-- change to your chosen admin password

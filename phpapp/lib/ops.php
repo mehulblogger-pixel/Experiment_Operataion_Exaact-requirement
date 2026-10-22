@@ -2602,12 +2602,31 @@ function smtp_send($cfg, $to, $subject, $body, $cc = '', $attachments = []) {
 // Is this a test copy of a live site (config.local.php 'test_copy' => true, or
 // OPS_TEST_COPY=1)? A copy holds real customers' addresses, so it must never mail one.
 function app_is_test_copy() { return !empty($GLOBALS['APP_TEST_COPY']) || (string)getenv('OPS_TEST_COPY') === '1'; }
+// On a test copy: may this message go out? Only when EVERY recipient (to and
+// cc) is on the testers' own list (config.local.php 'test_mail_to'), so a test
+// can check a sign-up code or a reminder in a tester's inbox but never reach a
+// customer. A pattern may use * (e.g. *@yourco.com).
+function app_test_mail_allowed($to, $cc = '') {
+    $list = array_filter(array_map(fn($x) => strtolower(trim((string) $x)), (array) ($GLOBALS['APP_TEST_MAIL_TO'] ?? [])));
+    if (!$list) return false;
+    $rcpt = array_filter(array_map(fn($x) => strtolower(trim($x)), preg_split('/[,;]+/', (string) $to . ',' . (string) $cc)));
+    if (!$rcpt) return false;
+    foreach ($rcpt as $r) {
+        $hit = false;
+        foreach ($list as $pat) if (fnmatch($pat, $r)) { $hit = true; break; }
+        if (!$hit) return false;
+    }
+    return true;
+}
 
 function ops_mail($to, $subject, $body, $cc = '', $kind = '', $attachments = []) {
     $ok = 0; $err = '';
-    if ($to && app_is_test_copy()) {
-        $err = 'not sent: this is a test copy (config.local.php test_copy)';
+    $testCopy = $to && app_is_test_copy();
+    if ($testCopy && !app_test_mail_allowed($to, $cc)) {
+        $err = 'not sent: this is a test copy (config.local.php test_copy)'
+             . (!empty($GLOBALS['APP_TEST_MAIL_TO']) ? ' and the address is not on its test_mail_to list' : '');
     } elseif ($to) {
+        if ($testCopy) $subject = '[TEST COPY] ' . $subject;   // a tester's own inbox, marked as such
         $smtp = smtp_config($kind);
         if ($smtp) {
             try { smtp_send($smtp, $to, $subject, $body, $cc, $attachments); $ok = 1; }
