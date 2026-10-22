@@ -1,6 +1,6 @@
 import json, re, sys, glob, html, os
 APP='/home/user/Experiment_Operataion_Exaact-requirement/phpapp'
-corpus=[open('screens_today.json').read()]
+corpus=[open('screens_today.json').read()]+[open(f).read() for f in ['onb_screens.json', 'measured/onboarding_screens.json'] if os.path.exists(f)]
 for p in glob.glob(APP+'/lib/*.php')+glob.glob(APP+'/views/**/*.php',recursive=True)+glob.glob(APP+'/*.php'):
     try: corpus.append(open(p,errors='replace').read())
     except: pass

@@ -1,0 +1,2452 @@
+{
+ "/login": {
+  "path": "/login",
+  "final": "/login",
+  "h1": [],
+  "h2": [
+   "Sign in to continue"
+  ],
+  "labels": [
+   "Username",
+   "Password Forgot password?"
+  ],
+  "buttons": [
+   "SHOW",
+   "Sign in →"
+  ],
+  "links": [
+   [
+    "Forgot password?",
+    "/forgot"
+   ],
+   [
+    "Go to the marketplace →",
+    "/connect"
+   ],
+   [
+    "Start here →",
+    "/get-started"
+   ]
+  ]
+ },
+ "/get-started": {
+  "path": "/get-started",
+  "final": "/get-started",
+  "h1": [
+   "Run your inspection company on Inspection Ops"
+  ],
+  "h2": [],
+  "labels": [
+   "Company name",
+   "Your name",
+   "Work e-mail — we'll send your workspace details here",
+   "Phone — optional",
+   "Preferred workspace name — optional, letters & numbers",
+   "Anything we should know? — optional"
+  ],
+  "buttons": [
+   "Request my workspace →"
+  ],
+  "links": [
+   [
+    "Inspection Ops",
+    "/"
+   ],
+   [
+    "Staff sign in",
+    "/login"
+   ],
+   [
+    "Staff sign in",
+    "/login"
+   ]
+  ]
+ },
+ "/connect": {
+  "path": "/connect",
+  "final": "/connect",
+  "h1": [],
+  "h2": [
+   "I need to hire",
+   "I’m a professional",
+   "I’m an agency",
+   "Welcome back",
+   "Get your own operations workspace"
+  ],
+  "labels": [],
+  "buttons": [],
+  "links": [
+   [
+    "Create a company account →",
+    "/join?type=COMPANY"
+   ],
+   [
+    "Create a professional profile →",
+    "/pro/register"
+   ],
+   [
+    "Create an agency account →",
+    "/join?type=MANPOWER_AGENCY"
+   ],
+   [
+    "Sign in as a professional",
+    "/pro/login"
+   ],
+   [
+    "Sign in as a company or agency",
+    "/portal/login"
+   ],
+   [
+    "Start your workspace →",
+    "/get-started"
+   ],
+   [
+    "Staff sign-in",
+    "/login"
+   ]
+  ]
+ },
+ "/join?type=COMPANY": {
+  "path": "/join?type=COMPANY",
+  "final": "/join?type=COMPANY",
+  "h1": [
+   "Set up your organisation"
+  ],
+  "h2": [],
+  "labels": [
+   "Your organisation's name",
+   "What does your organisation do?",
+   "Third-Party Inspection Agency",
+   "Testing, Inspection & Certification",
+   "Vendor Inspection",
+   "Shop Inspection",
+   "Resident Inspection",
+   "Site Inspection",
+   "Expediting",
+   "Vendor Surveillance",
+   "QA/QC Services",
+   "NDT Services",
+   "Technical Manpower Supply",
+   "Contract Staffing",
+   "Project Staffing",
+   "Shutdown Staffing",
+   "Turnaround Staffing",
+   "Freelance Resource Supply",
+   "Freelance Inspector Supply",
+   "Technical Specialist Supply",
+   "Technical Recruitment",
+   "Permanent Placement",
+   "Executive Search",
+   "Contract Recruitment",
+   "Project Management",
+   "Project Engineering",
+   "Commissioning Support",
+   "Construction Support",
+   "Technical Consultancy",
+   "Set me up automatically — based on what I ticked above (recommended)",
+   "TPIA / inspection body Operations Admin Reporting Money Marketplace",
+   "Manpower / staffing agency Operations Admin Reporting Money People/Hiring Marketplace",
+   "Recruitment agency Admin Sales/CRM Money People/Hiring Marketplace",
+   "Enterprise (everything) Operations Admin Sales/CRM Reporting Money People/Hiring Marketplace",
+   "Company / client (hire only) Marketplace",
+   "Your name",
+   "Work e-mail",
+   "Mobile",
+   "Choose a password"
+  ],
+  "buttons": [
+   "Create my account →"
+  ],
+  "links": [
+   [
+    "List yourself here →",
+    "/pro/register"
+   ],
+   [
+    "All options",
+    "/connect"
+   ]
+  ]
+ },
+ "/join?type=MANPOWER_AGENCY": {
+  "path": "/join?type=MANPOWER_AGENCY",
+  "final": "/join?type=MANPOWER_AGENCY",
+  "h1": [
+   "Set up your organisation"
+  ],
+  "h2": [],
+  "labels": [
+   "Your organisation's name",
+   "What does your organisation do?",
+   "Third-Party Inspection Agency",
+   "Testing, Inspection & Certification",
+   "Vendor Inspection",
+   "Shop Inspection",
+   "Resident Inspection",
+   "Site Inspection",
+   "Expediting",
+   "Vendor Surveillance",
+   "QA/QC Services",
+   "NDT Services",
+   "Technical Manpower Supply",
+   "Contract Staffing",
+   "Project Staffing",
+   "Shutdown Staffing",
+   "Turnaround Staffing",
+   "Freelance Resource Supply",
+   "Freelance Inspector Supply",
+   "Technical Specialist Supply",
+   "Technical Recruitment",
+   "Permanent Placement",
+   "Executive Search",
+   "Contract Recruitment",
+   "Project Management",
+   "Project Engineering",
+   "Commissioning Support",
+   "Construction Support",
+   "Technical Consultancy",
+   "Set me up automatically — based on what I ticked above (recommended)",
+   "TPIA / inspection body Operations Admin Reporting Money Marketplace",
+   "Manpower / staffing agency Operations Admin Reporting Money People/Hiring Marketplace",
+   "Recruitment agency Admin Sales/CRM Money People/Hiring Marketplace",
+   "Enterprise (everything) Operations Admin Sales/CRM Reporting Money People/Hiring Marketplace",
+   "Company / client (hire only) Marketplace",
+   "Your name",
+   "Work e-mail",
+   "Mobile",
+   "Choose a password"
+  ],
+  "buttons": [
+   "Create my account →"
+  ],
+  "links": [
+   [
+    "List yourself here →",
+    "/pro/register"
+   ],
+   [
+    "All options",
+    "/connect"
+   ]
+  ]
+ },
+ "/pro/register": {
+  "path": "/pro/register",
+  "final": "/pro/register",
+  "h1": [
+   "List yourself for work"
+  ],
+  "h2": [],
+  "labels": [
+   "Your name",
+   "E-mail",
+   "Mobile",
+   "Password (8+ characters)"
+  ],
+  "buttons": [
+   "Create my profile"
+  ],
+  "links": [
+   [
+    "Sign in",
+    "/pro/login"
+   ],
+   [
+    "Sign in →",
+    "/pro/login"
+   ],
+   [
+    "See all options →",
+    "/connect"
+   ]
+  ]
+ },
+ "/pro/login": {
+  "path": "/pro/login",
+  "final": "/pro/login",
+  "h1": [
+   "Welcome back"
+  ],
+  "h2": [],
+  "labels": [
+   "E-mail",
+   "Password"
+  ],
+  "buttons": [
+   "Sign in"
+  ],
+  "links": [
+   [
+    "Sign in",
+    "/pro/login"
+   ],
+   [
+    "Forgot your password?",
+    "/pro/forgot"
+   ],
+   [
+    "Create your professional profile →",
+    "/pro/register"
+   ],
+   [
+    "Sign in here →",
+    "/portal/login"
+   ],
+   [
+    "All options",
+    "/connect"
+   ]
+  ]
+ },
+ "/portal/login": {
+  "path": "/portal/login",
+  "final": "/portal/login",
+  "h1": [
+   "Inspection Ops · Client portal"
+  ],
+  "h2": [
+   "Sign in"
+  ],
+  "labels": [
+   "E-mail address",
+   "Password"
+  ],
+  "buttons": [
+   "Sign in"
+  ],
+  "links": [
+   [
+    "create an account →",
+    "/join"
+   ],
+   [
+    "list themselves →",
+    "/pro/register"
+   ],
+   [
+    "Sign in here →",
+    "/pro/login"
+   ],
+   [
+    "All options",
+    "/connect"
+   ],
+   [
+    "check the code on it",
+    "/verify"
+   ],
+   [
+    "Verify a report",
+    "/verify"
+   ],
+   [
+    "Complaints and appeals",
+    "/complaints-policy"
+   ]
+  ]
+ },
+ "/forgot": {
+  "path": "/forgot",
+  "final": "/forgot",
+  "h1": [],
+  "h2": [
+   "Reset your password"
+  ],
+  "labels": [
+   "Your e-mail address"
+  ],
+  "buttons": [
+   "Send reset link →"
+  ],
+  "links": [
+   [
+    "← Back to sign in",
+    "/login"
+   ]
+  ]
+ },
+ "/workspace/setup": {
+  "path": "/workspace/setup",
+  "final": "/workspace/setup",
+  "h1": [
+   "Set up your workspace"
+  ],
+  "h2": [
+   "Company profile",
+   "Features · 7 on",
+   "Forms",
+   "Dropdown lists",
+   "People & access · 32 people",
+   "Offices · 18 set up",
+   "Wording · default",
+   "Branding & theme · default"
+  ],
+  "labels": [],
+  "buttons": [
+   "Search"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Admin",
+    "/admin"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Fix",
+    "/company-profile"
+   ],
+   [
+    "🏢 Not started Company profile Your company name, details and what you do.",
+    "/company-profile"
+   ],
+   [
+    "🧩 Complete Features · 7 on Which parts of the software your workspace uses.",
+    "/workspace/setup/modules"
+   ],
+   [
+    "📝 Configured Forms The fields on your Requisitions & Candidates & Sample & Client satisfaction & Test method & Risk / opportunity & Decision rule & Controlled document & Work Orders & Jobs & Team Members & Instruments & Complaints & Security incidents & Non-conformities & Corrective actions & Internal audits & Leads & Opportunities & Invoices & Receipts & Users forms.",
+    "/workspace/setup/forms"
+   ],
+   [
+    "📋 Configured Dropdown lists The options behind your form dropdowns.",
+    "/masters"
+   ],
+   [
+    "👥 Complete People & access · 32 people Who can sign in and what they can do.",
+    "/users"
+   ],
+   [
+    "🏬 Complete Offices · 18 set up Your offices and who works where — add a branch and assign people to it.",
+    "/hierarchy?tab=offices"
+   ],
+   [
+    "🔤 Complete Wording · default Rename things to match how your business speaks.",
+    "/terminology"
+   ],
+   [
+    "Do this",
+    "/company-profile"
+   ],
+   [
+    "+ Add a form field",
+    "/workspace/setup/forms"
+   ],
+   [
+    "✨ Build forms with AI",
+    "/ai-forms"
+   ],
+   [
+    "+ Add a dropdown value",
+    "/masters"
+   ],
+   [
+    "+ Add a user",
+    "/users"
+   ],
+   [
+    "+ Add a branch",
+    "/hierarchy?tab=offices"
+   ],
+   [
+    "Configure features",
+    "/workspace/setup/modules"
+   ],
+   [
+    "Change wording",
+    "/terminology"
+   ]
+  ]
+ },
+ "/workspace/setup/modules": {
+  "path": "/workspace/setup/modules",
+  "final": "/workspace/setup/modules",
+  "h1": [
+   "Modules & features"
+  ],
+  "h2": [
+   "Operations",
+   "Administration",
+   "Sales & CRM",
+   "Inspection reporting",
+   "Money",
+   "People & hiring",
+   "Marketplace & Connect"
+  ],
+  "labels": [],
+  "buttons": [
+   "Turn off this feature",
+   "Turn off this feature",
+   "Turn off this feature",
+   "Turn off this feature",
+   "Turn off this feature",
+   "Turn off this feature"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Admin",
+    "/admin"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ]
+  ]
+ },
+ "/company-profile": {
+  "path": "/company-profile",
+  "final": "/company-profile",
+  "h1": [
+   "Your company"
+  ],
+  "h2": [
+   "What does your company do?"
+  ],
+  "labels": [
+   "Legal name — as registered",
+   "Brand / trading name — the name on invoices and documents",
+   "Address",
+   "GSTIN — fills PAN & State automatically",
+   "PAN — from GSTIN",
+   "State — from GSTIN",
+   "E-mail",
+   "Phone",
+   "Website",
+   "Footer line for PDFs — optional, e.g. CIN / bank / tagline",
+   "Report header colour — your brand colour",
+   "Logo — shown on quotations and reports",
+   "Third-Party Inspection Agency",
+   "Testing, Inspection & Certification",
+   "Vendor Inspection",
+   "Shop Inspection",
+   "Resident Inspection",
+   "Site Inspection",
+   "Expediting",
+   "Vendor Surveillance",
+   "QA/QC Services",
+   "NDT Services",
+   "Technical Manpower Supply",
+   "Contract Staffing",
+   "Project Staffing",
+   "Shutdown Staffing",
+   "Turnaround Staffing",
+   "Freelance Resource Supply",
+   "Freelance Inspector Supply",
+   "Technical Specialist Supply",
+   "Technical Recruitment",
+   "Permanent Placement",
+   "Executive Search",
+   "Contract Recruitment",
+   "Project Management",
+   "Project Engineering",
+   "Commissioning Support",
+   "Construction Support",
+   "Technical Consultancy"
+  ],
+  "buttons": [
+   "Save company profile"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Admin",
+    "/admin"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Settings › Branding",
+    "/settings"
+   ]
+  ]
+ },
+ "/companies": {
+  "path": "/companies",
+  "final": "/companies",
+  "h1": [
+   "Companies"
+  ],
+  "h2": [],
+  "labels": [
+   "Company name *",
+   "Workspace key (optional — made from the name)",
+   "Owner name",
+   "Owner email * (their login)",
+   "Temporary password (blank = auto)",
+   "Plan",
+   "Where this company's data is stored",
+   "Set it up for me — nothing to do A private data file, kept outside the app folder . Re-uploading the app cannot reach it. Ready in one click.",
+   "Use a MySQL database — strongest, about 2 minutes A real database, exactly like the Books app uses. Make one in your hosting panel first, then paste its details here.",
+   "MySQL host",
+   "MySQL database name",
+   "MySQL user",
+   "MySQL password"
+  ],
+  "buttons": [
+   "Create company",
+   "Save prices"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Home",
+    "/"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "‹ Control panel",
+    "/super-admin"
+   ],
+   [
+    "Cloud workspaces",
+    "/tenants"
+   ]
+  ]
+ },
+ "/tenants": {
+  "path": "/tenants",
+  "final": "/tenants",
+  "h1": [
+   "Cloud workspaces"
+  ],
+  "h2": [
+   "Switch cloud mode on"
+  ],
+  "labels": [
+   "Base domain"
+  ],
+  "buttons": [
+   "Switch cloud mode on"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Home",
+    "/"
+   ],
+   [
+    "Home",
+    "/"
+   ]
+  ]
+ },
+ "/subscription": {
+  "path": "/subscription",
+  "final": "/subscription",
+  "h1": [
+   "Your subscription"
+  ],
+  "h2": [
+   "What your plan includes today",
+   "Payment history"
+  ],
+  "labels": [],
+  "buttons": [],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Home",
+    "/"
+   ],
+   [
+    "Home",
+    "/"
+   ]
+  ]
+ },
+ "/licence": {
+  "path": "/licence",
+  "final": "/licence",
+  "h1": [
+   "Licence"
+  ],
+  "h2": [
+   "Renewal",
+   "The key",
+   "This subscription"
+  ],
+  "labels": [
+   "Paste the licence key MGH sent you"
+  ],
+  "buttons": [
+   "Apply the key",
+   "Save provider key"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Admin",
+    "/admin"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Licence console →",
+    "/issue-licence"
+   ],
+   [
+    "Modules & features",
+    "/workspace/setup/modules"
+   ]
+  ]
+ },
+ "/inspectors": {
+  "path": "/inspectors",
+  "code": 404
+ },
+ "/overheads": {
+  "path": "/overheads",
+  "code": 404
+ },
+ "/welcome": {
+  "path": "/welcome",
+  "final": "/welcome",
+  "h1": [
+   "✅ You're all set up!"
+  ],
+  "h2": [
+   "Getting started"
+  ],
+  "labels": [],
+  "buttons": [],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Home",
+    "/"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Go to home →",
+    "/"
+   ],
+   [
+    "✓ Invite your team Add colleagues so they can log in and help run the work.",
+    "/users"
+   ],
+   [
+    "✓ Post your first requirement Tell the marketplace who you need — qualified people can apply.",
+    "/connect-requirements"
+   ],
+   [
+    "✓ Build your bench Add people you already work with, or search the shared pool.",
+    "/connect-bench"
+   ]
+  ]
+ },
+ "/setup": {
+  "path": "/setup",
+  "final": "/setup",
+  "h1": [
+   "Welcome — let’s set up your system"
+  ],
+  "h2": [
+   "1 · Your admin password",
+   "2 · What does your company do?",
+   "3 · Money & calendar",
+   "4 · Data-protection contact"
+  ],
+  "labels": [
+   "New password — leave blank to keep the current one",
+   "Company / brand name",
+   "Your industry",
+   "Financial year starts in",
+   "Currency symbol",
+   "Date format",
+   "Grievance officer — name",
+   "Their e-mail"
+  ],
+  "buttons": [
+   "Finish setup →"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Home",
+    "/"
+   ],
+   [
+    "Home",
+    "/"
+   ]
+  ]
+ },
+ "/portal-users": {
+  "path": "/portal-users",
+  "final": "/portal-users",
+  "h1": [
+   "Client portal"
+  ],
+  "h2": [
+   "Invite somebody",
+   "Who can sign in",
+   "What clients have asked for"
+  ],
+  "labels": [
+   "Client company + Add new",
+   "Pick a saved contact (optional)",
+   "Their name",
+   "Their e-mail"
+  ],
+  "buttons": [
+   "Switch it off",
+   "Create the invitation",
+   "Withdraw",
+   "New link",
+   "Restore",
+   "New link",
+   "Withdraw",
+   "New link",
+   "Withdraw",
+   "New link",
+   "Raise the call now",
+   "Accept & raise the call",
+   "Just acknowledge",
+   "Decline"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Directory",
+    "/directory"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Directory",
+    "/directory"
+   ],
+   [
+    "Change",
+    "/portal-user-perms?id=1"
+   ],
+   [
+    "Change",
+    "/portal-user-perms?id=4"
+   ],
+   [
+    "Change",
+    "/portal-user-perms?id=2"
+   ],
+   [
+    "Change",
+    "/portal-user-perms?id=3"
+   ]
+  ]
+ },
+ "/connect-verify": {
+  "path": "/connect-verify",
+  "final": "/connect-verify",
+  "h1": [
+   "Verification desk"
+  ],
+  "h2": [
+   "Awaiting your decision 0"
+  ],
+  "labels": [],
+  "buttons": [],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Marketplace",
+    "/marketplace"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Marketplace",
+    "/marketplace"
+   ]
+  ]
+ },
+ "/marketplace-plans": {
+  "path": "/marketplace-plans",
+  "final": "/marketplace-plans",
+  "h1": [
+   "Marketplace plans & limits",
+   "Credit packs"
+  ],
+  "h2": [
+   "Global settings",
+   "🏢 Client plans",
+   "🧑‍🔧 Professional plans",
+   "Add a plan",
+   "🎟️ Packs on sale",
+   "Add a credit pack",
+   "🏷️ Coupons",
+   "Renewal grace",
+   "Add a coupon"
+  ],
+  "labels": [
+   "Marketplace add-on (Connect) — is the Connect marketplace available on this install? This install is Cloud platform (hosted, shared marketplace) . On the hosted cloud this is normally on — it is the public marketplace face.",
+   "Charge for the marketplace — enforce subscriptions & limits. OFF — the marketplace is open & free for everyone right now. Turn this on when you launch paid access.",
+   "Annual = how many months?",
+   "Freelancers free until",
+   "Currency symbol",
+   "Who is it for?",
+   "Plan name *",
+   "Price / month (₹)",
+   "Price / year (₹)",
+   "Job posts / month",
+   "Contact unlocks / month",
+   "On-platform reports / month",
+   "Applications / month (pro)",
+   "Featured / top-rank slots",
+   "Sort order",
+   "Active?",
+   "Shown to customers",
+   "Who is it for?",
+   "Pack name *",
+   "Tops up which limit? *",
+   "Credits added *",
+   "Price (₹)",
+   "Sort order",
+   "Active?",
+   "On sale",
+   "Grace days after expiry",
+   "Code *",
+   "Label",
+   "Type",
+   "Value",
+   "Who for?",
+   "Valid from",
+   "Valid until",
+   "Max uses (0 = unlimited)",
+   "Active"
+  ],
+  "buttons": [
+   "Save settings",
+   "＋ Set free-until to 6 months from today",
+   "×",
+   "×",
+   "×",
+   "×",
+   "×",
+   "×",
+   "Add plan",
+   "×",
+   "×",
+   "×",
+   "×",
+   "Add pack",
+   "Save",
+   "Add coupon"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Home",
+    "/"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "← Super Admin",
+    "/super-admin"
+   ],
+   [
+    "Enter the payment keys",
+    "/billing"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit=1"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit=2"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit=3"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit=4"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit=5"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit=6"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit_pack=1"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit_pack=2"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit_pack=3"
+   ],
+   [
+    "Edit",
+    "/marketplace-plans?edit_pack=4"
+   ]
+  ]
+ },
+ "/product-package": {
+  "path": "/product-package",
+  "final": "/product-package",
+  "h1": [
+   "Product package"
+  ],
+  "h2": [
+   "🎯 Set up as a Recruitment-only company",
+   "EXAACT TPIA",
+   "EXAACT Technical Staffing",
+   "EXAACT Recruitment",
+   "EXAACT Recruitment — In-house HR",
+   "EXAACT Enterprise Current"
+  ],
+  "labels": [],
+  "buttons": [
+   "Set up now",
+   "Apply EXAACT TPIA",
+   "Apply EXAACT Technical Staffing",
+   "Apply EXAACT Recruitment",
+   "Apply EXAACT Recruitment — In-house HR",
+   "In use"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Admin",
+    "/admin"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Licence",
+    "/licence"
+   ],
+   [
+    "← Control panel",
+    "/super-admin"
+   ]
+  ]
+ },
+ "/irn-rules": {
+  "path": "/irn-rules",
+  "final": "/irn-rules",
+  "h1": [
+   "IRN numbering rules"
+  ],
+  "h2": [
+   "Per-office numbering patterns (optional)"
+  ],
+  "labels": [
+   "IRN format — must contain {SERIAL}",
+   "Company code",
+   "Serial width (digits)"
+  ],
+  "buttons": [
+   "Save numbering rules",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save",
+   "Save"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Reports (IDEMS)",
+    "/documents"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Reporting",
+    "/reporting"
+   ],
+   [
+    "Reports (IDEMS)",
+    "/documents"
+   ]
+  ]
+ },
+ "/report-types": {
+  "path": "/report-types",
+  "final": "/report-types",
+  "h1": [
+   "Report types"
+  ],
+  "h2": [
+   "Add a report type",
+   "⭐ Ready-made inspection report",
+   "🔧 Repair split table rows",
+   "🧹 Tidy the catalogue"
+  ],
+  "labels": [
+   "Code *",
+   "Name *",
+   "Category",
+   "Active",
+   "Format No.",
+   "Document No.",
+   "Revision"
+  ],
+  "buttons": [
+   "Add type",
+   "Set up the ready inspection report",
+   "Repair split table rows",
+   "Hide 27 empty types",
+   "Show all 1 hidden type again",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate",
+   "Deactivate"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Reports (IDEMS)",
+    "/documents"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Reporting",
+    "/reporting"
+   ],
+   [
+    "Reports (IDEMS)",
+    "/documents"
+   ],
+   [
+    "☑ Vetting checklist",
+    "/vetting-checklist"
+   ],
+   [
+    "Design form",
+    "/report-builder?type=1"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=1"
+   ],
+   [
+    "Design form",
+    "/report-builder?type=2"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=2"
+   ],
+   [
+    "Design form",
+    "/report-builder?type=3"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=3"
+   ],
+   [
+    "Edit form",
+    "/report-builder?type=4"
+   ],
+   [
+    "Preview",
+    "/report-type-preview?type=4"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=4"
+   ],
+   [
+    "Design form",
+    "/report-builder?type=5"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=5"
+   ],
+   [
+    "Design form",
+    "/report-builder?type=6"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=6"
+   ],
+   [
+    "Edit form",
+    "/report-builder?type=7"
+   ],
+   [
+    "Preview",
+    "/report-type-preview?type=7"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=7"
+   ],
+   [
+    "Design form",
+    "/report-builder?type=8"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=8"
+   ],
+   [
+    "Design form",
+    "/report-builder?type=9"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=9"
+   ],
+   [
+    "Design form",
+    "/report-builder?type=10"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=10"
+   ],
+   [
+    "Design form",
+    "/report-builder?type=11"
+   ],
+   [
+    "Edit",
+    "/report-type-edit?id=11"
+   ]
+  ]
+ },
+ "/service-scope": {
+  "path": "/service-scope",
+  "final": "/service-scope",
+  "h1": [
+   "Service scope"
+  ],
+  "h2": [
+   "1 · Services offered on this installation",
+   "2 · Client service scope",
+   "3 · Optional dependencies"
+  ],
+  "labels": [
+   "Client — choose a client — 2MM BETON A A Vasani Polypipe Llp AGGARWAL BATH CONCEPTS AGP City Gas Private Limited ALK INFRA AMAN MACHINE TOOLS PRIVATE LIMITED AMBICA TRADING AMPLUS SUN BEAT PRIVATE LIMITED AMPO VALVES INDIA PRIVATE LIMITED ANANTA PROCON ARHAM RENEWTECH INDIA PRIVATE LIMITED ARVIND ENGINEERING LIMITED Acme Air Equipments Company Private Limited Acme Solar Holding Private Limited Acmefil Engineering Systems Private Limited Adaptive Engineering Private Limited Aditya Birla Aditya Birla Renewables Limited Aditya Sales Corporation Aeon Software Private Limited Aeron Composite Limited Afrzen Private Limited Agro Pulping Machinery Private Limited Aia Engineering Limited Aira 4 Matic Global Valve Automation Private Limited Airox Nigen Equipments Private Limited Alpha Devraj Renewable Energy Llp Amplus KN One Power Private Limited Angelique International Limited Antelopus Selan Energy Limited Apollo Screens Private Limited Aqua Machineries Private Limited Arcelor Mittal Nippon Steel India Limited Arcons Infrastructures & Constructions Private Limited Argo Solar Private Limited Artson Engineering Limited Arvensis Energy Private Limited Arvinox Stainless LLP Avolate Technologies Axis Solutions Private Limited Azure Power India Privte Limited Bayer Vapi Private Limited Beijing Henson Engineering Technology Company Limited Bentlay Fittings Limited Biyani Alloys Private Limited Boundless Environment Resource Solutions Brevitee International Brothers Plast Tech Private Limited Burckhardt Compression India Private Limited CECO ENVIRONMENTAL SOLUTIONS INDIA PRIVATE LIMITED CHIRIPAL PLOYFLIMS LIMITED CIVET PROJECTS PRIVATE LIMITED CMR Infrastructure Private Limited COHIZON LIFE SCIENCES LIMITED Cair Euromatic Automation Private Limited Capital Innotech Private Limited Cargil India Private Limited Chamunda EletroMech Solution Chamunda Plastic Private Limited Chennai Metropolitan Water Supply And Sewerage Board Chief Engineer Megalift Bhubhaneshwa Cimcon Software India Private Limited CleanMax Enviro Energy Solutions Limited Clout Hitech Innovation Private Limited Continual Renewable Energy Private LImited Covestro Ctci D P World Limited DEMO-S01 Power Projects DIPIETRO INDIA Private Limited Darling Muesco India Private Limited Darshinal Electromation Private Limted Deem Roll Tech Limited Deep Seals India Limited Detox Green Energy Private Limited Detox Group Of Companies Digital Engineering Projects Private Limited Dineshchandra R Agrawal Infracon Private Limited Divine Tubes Private Limited Duker Solutions Gmbh ERABLUE TECHNOLOGY Private Limited Eagle Infra Pravite Limited Earth Water Pipe Fittings Private Limited Eco Protection Engineers Private Limited Ecoren Energy India Private Ltd EdgeCli1 EdgeCli2 EdgeCli3 EdgeCli4 EdgeCli5 EdgeCli6 EdgeCli7 EdgeCli8 EdgeCli9 EdgeCli10 Eiffil Water Infra Private Limited Electrotherm India Limited Energy Emission India Private Limited Enerparc Energy Private Limited Enviro infra Engineers Limited Envision Energy India Private Limited Epp Composites Private Limited Essens Renewable Private Limited Euro Global Gas Cylinders Llp Evercrest Projects Private Limited Everest Kanto Cylinder Limited Everest Multitech Evren Energy Private Limited Exxonmobil Global Services Company G M Engineering Private Limited GA INFRA PRIVATE LIMITED GSJ ENVO LIMITED GYSCOAL Enterprise Gangotri Submersible Pump Gayatri Private Limited Gimex India Projects And Enigneering Private Limited Girnar Energy Girnar Heavy Engineering Ltd Girnar Heavy Engineering Ltd (Energy Products & Systems) Gokul Poly Valves Private Limited Goodluck Metallics Private Limited Gratik Tubes Private Limited Greenleaf Envirotech Limited Growmech Industries Private Limited Gujarat Alkalies And Chemicals Limited Gujarat Fluorochemicals Limited Gujarat Industries Power Company Limited Gvpr Engineers Limited HD Fire Protect Limited Havells India Limited Hero Future Energies Hexa Climate Solutions Private Limited Hindustan Zinc Limited Hitech Flow Solutions Limited Hnb Engineers Private Limited ITT SpA Indian Oil Corporation Limited Indo Asia Copper Limited Insolare energy limited Inspiron Engineering Private Limited International Refreshments India Private Limited Ion Exchange India Limited Ion Exchange Projects And Engineering Limited Isgec Heavy Engineering Limited Itt Engineering India Private Limited J K Lakshmi Cement Limited J P Polyplast Private Limited J V Hussein Atieh and Sons Company and Passavant Energy and Environment JK Fluid Controls Jainson Cables India Private Limited Jainsons Japs Projects Jasco Pump Private Limited Jeet Pumps Private Limited Jindal Saw Limited Jindal Steel and Power Jio Bp Mobility Limited Jnk India Limited Juniper Green Energy Private Limited Jwil Infra Limited KARELIYA STEEL INDUSTRIES KBH ENERGY AND INFRA SERVICES KRR Engineer Priavte limited Kalpa Power Private Limited Kamath Transformers Privete Limited Kamlesh Kumar Singh Engineers Private Limited Ketan Engineering Works Khilari Infrastructure Private Limited Kilburn Engineering Limited Kirloskar Brothers Limited Kirloskar Ebara Pumps Limited L & T Energy Hydrocarbon L & T Engineering and Construction Company L C Infra Projects Private Limited LAXMI ORGANIC INDUSTRIES Limited LCC Engineering Private Limited Laxmi Civil Engineering Services Private Limited Linde India Limited Lohum Materials Private Limited Lubi Industries Llp M G Worldwide Private Limited M/s. Texmaco West Rail Limited M/s. Ultratech cement limited_Aditya Birla MURER SANFIELD PRIVATE LIMITED Macons Socage Platforms Private Limited Mahanagar Gas Limited Maharashtra Jeevan Pradhikaran Mahdi and Mohammad Mechanical and Engineering Equipment Trading L.L.C Mangukiya Brothers Project Private Limited Manikaran Renewables Limited Maxim Tubes Company Private Limited Mbh Pumps Gujarat Private Limited Mbm Tubes Private Limited Mc Dermott Megha Engineering And Infrastructures Limited Miraj Pipes And Fittings Private Limited Modern Engineering Company Mounting Renewable Power Limited Mundra Petrochemical Limited N & T ENGITECH Prative Limited Narmada Industries Ltd Narmada Narmada Infrastructure Ltd Narmada OSBL Project I Engineering India Pvt Ltd National Small Industries Corporation Navitas Planet Private Limited Nayara Energy Limited Ncc Limited Nidhi Engineering Industries Nrpulse Nuclear Power Corporation Of India Limited Nutral Powertech OEC Group One Box Warehouse Private Limited Onnyx Electronisys Private Limited Orbit Engineers Limited Liability Partnership Oriano Clean Energy Private Limited Orkan Enenrgy Privte Limited Oswal Energies Limited Oswal Industries Limited Oyak Sentetik Karbon Urunleri Sanayi Ve Ticaret A.S. P Prabhudas Engineering Private Limited PRAMUKH AGRO EXPORT Palava Induslogic 4 Private Limited Paramount Limited Patels Airtemp India Limited Pearls Salt Works Private Limited Pietro Fiorentini Db India Private Limited Praj Industries Limited Pratik Corporation Precision Infratech Private Limited Pride LED Primier Energies Prozeal Green Energy Limited R K M Powergen Private Limited RHN IMPEX RYSA Infratech Limited Rainson Pipe Industries Private Limited Rajasthan Urban Drinking Water Sewerage and Infrastructure Corporation Limited Rajasthan Urban Infrastructure Development Project Rajendra Engineering Works Rajsha Chemicals Private Limited Rama Cylinders Private Limited Ramalingam Construction company Limited Rashmi Metaliks Limited Ratnamani Metal And Tube Limited - C S Division Renew Power Private Limited Rhythm Automation Control Private Limited S A Infracom SAMRAT CONSTRUCTIONS SAP Control Systems & Engineers Private Limited SKN Gas SOPAN PROCESS TECHNOLOGIES Private Limited STILONN VALVES AND CONTROLS PRIVATE LIMITED SV Power link Private Limited Safex Industries Limited Sagoma Impex Private Limited Sahaj Constructions Private Limited Saisanket Industries Private Limited Sany Saravana Engineering and Infratech Private Limited Sarju Impex Limited Sattva Engineering Construction Limite Sauni Yojana Project Sealmech Valves Serentica Renewables India 3 Private Limited Sevitsil Solution in Silicone Shah Bhogilal Jethalal And Bros Shree Cement Limited Shri Navkar Metals Limited Shri Ram Construction Company Shyam Enterprise Silox India Private Limited Silver Bay Marine Gear Private Limited Sima Labs Simon India Limited Singhal Industries Private Limited Sintex Advance Plastic Limited Solarworld Energy Solutions Limited Solid Blue Infra Solidus Techno Power Private Limited Sopan O And M Company Private Limited Sophisticated Industrial Materials Analytic Labs Private Limited South East Construction Company Private Limited Sprng Energy Private Limited Sprng Vayu Vidyut Private Limited Subway Network for Trading and Services Sun Pharmaceutical Industries Limited Sun Trading Co Surya Roshni Limited Suryavan Energy Solutions Ltd (Khavda IV-A Transmission) Suryavan Green Energy Ltd Suryavan Infra India Ltd Suryavan Ports Suryavan Water Ltd TECHNOCRAFT CONSTRUCTION PVT. LTD. - EMS LTD. Taurant Projects Limited Tawi Engineering India Private Limited Technimont Private Limited The Wesman Engineering Company Private Limited Torrent Power Limited Training Udhna Project Ultratech Cement Limited Unifrax India Limited Unipro Techno Infrastructure Private Li mited Univeral Cranes and Lifts Universal Piping Systems Unnati Pump Enterprise Unnati Pump Private Limited Usha Compressor Private Limited VERKORA PRIVATE LIMITED VEXL Environ Projects Private Limited VOLTAGESHIFT ENGINEERING SOLUTIONS LLP Vapco Engineers Private Limited Vasani Polymers Private limited Vijay Kumar Mishra Construction Private Limited Vindhya Power Ltd Vindhya Projects Ltd Vishvaraj Environment Private Limited Volcur Electrix Private Limited WALTER TOSTO WTB S.R.L WEFS TECHWORKS LLP Waaree Renewable Technologies Limited Weg Industries India Private Limited Welspun Corporation Limited Welspun DI Welspun Enterprise Limited Welspun Speciality Solution Limited Weltreat Systems Private Limited Wide Space Technosolution Private Limited Wpil Limited YASHO INDUSTRIES YUKON INDUSTRIES Yaha Water Systems Private Limited Ycube Engineered Solutions Private Limited",
+   "Service Inspection Expediting Vendor Assessment Vendor Audit Release Project Deputation Nonconformity & CAPA",
+   "Requires first Inspection Expediting Vendor Assessment Vendor Audit Release Project Deputation Nonconformity & CAPA",
+   "Condition (optional)",
+   "Scope level All clients (global) Assignment PO / Package Project Contract Client default",
+   "Scope record ID",
+   "Effective from",
+   "Requires approval"
+  ],
+  "buttons": [
+   "Save services offered",
+   "Load",
+   "Remove",
+   "Remove",
+   "Add dependency"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Settings",
+    "/settings"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Settings",
+    "/settings"
+   ]
+  ]
+ },
+ "/service-formats": {
+  "path": "/service-formats",
+  "final": "/service-formats",
+  "h1": [
+   "Report formats by service line"
+  ],
+  "h2": [],
+  "labels": [],
+  "buttons": [
+   "Save report formats"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Settings",
+    "/settings"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Settings",
+    "/settings"
+   ],
+   [
+    "Back to service scope",
+    "/service-scope"
+   ]
+  ]
+ },
+ "/sla-targets": {
+  "path": "/sla-targets",
+  "final": "/sla-targets",
+  "h1": [
+   "SLA targets"
+  ],
+  "h2": [
+   "Add / update a target",
+   "Current targets"
+  ],
+  "labels": [
+   "Client",
+   "Stage",
+   "Target (days)",
+   "Note"
+  ],
+  "buttons": [
+   "Save target",
+   "Remove",
+   "Remove",
+   "Remove",
+   "Remove",
+   "Remove"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Settings",
+    "/settings"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Quality & Accreditation",
+    "/quality"
+   ],
+   [
+    "Settings",
+    "/settings"
+   ]
+  ]
+ },
+ "/recruitment": {
+  "path": "/recruitment",
+  "final": "/recruitment",
+  "h1": [
+   "Recruitment & Workforce"
+  ],
+  "h2": [
+   "What needs doing",
+   "Today",
+   "Risks",
+   "Opportunities",
+   "The recruitment pipeline",
+   "Longest-waiting candidates",
+   "Biggest open demand",
+   "Ownership, deployment & the requisition tracker",
+   "Requisition tracker",
+   "People working per project",
+   "Hiring demand & pipeline volume",
+   "Manpower P&L",
+   "Analysis",
+   "Conversion, speed & cost"
+  ],
+  "labels": [
+   "Financial year",
+   "Month (CV shared)",
+   "Department",
+   "Source type",
+   "Hiring manager / recruiter"
+  ],
+  "buttons": [],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Home",
+    "/"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "hiring request",
+    "/hiring-requests"
+   ],
+   [
+    "＋ New hiring request",
+    "/hiring-request"
+   ],
+   [
+    "＋ Add candidate",
+    "/candidate-new"
+   ],
+   [
+    "Requisitions",
+    "/requisitions"
+   ],
+   [
+    "Hiring requests",
+    "/hiring-requests"
+   ],
+   [
+    "Candidates",
+    "/candidates"
+   ],
+   [
+    "🧮 Project costing",
+    "/project-costings"
+   ],
+   [
+    "⚙️ Setup ▾",
+    "/recruit-pipelines"
+   ],
+   [
+    "🏛️ Departments & designations",
+    "/departments"
+   ],
+   [
+    "🏷️ Positions — roles & headcount",
+    "/positions"
+   ],
+   [
+    "🗂️ Org chart",
+    "/positions-org"
+   ],
+   [
+    "⬆️ Import organogram (Excel / PPT / image)",
+    "/positions-import"
+   ],
+   [
+    "⇥ Hiring workflows — pipeline & stages",
+    "/recruit-pipelines"
+   ],
+   [
+    "₹ Compensation setup",
+    "/comp-setup"
+   ],
+   [
+    "📄 Document templates",
+    "/doc-templates"
+   ],
+   [
+    "🧷 Approval rules",
+    "/recruit-approvals"
+   ],
+   [
+    "🌐 Careers page",
+    "/careers-admin"
+   ],
+   [
+    "⬇️ Export ▾",
+    "/recruit-export?dataset=candidates&fy=2026-27"
+   ],
+   [
+    "Candidates",
+    "/recruit-export?dataset=candidates&fy=2026-27"
+   ],
+   [
+    "Requisitions",
+    "/recruit-export?dataset=requisitions&fy=2026-27"
+   ],
+   [
+    "Offers",
+    "/recruit-export?dataset=offers&fy=2026-27"
+   ],
+   [
+    "Funnel & KPI summary",
+    "/recruit-export?dataset=funnel&fy=2026-27"
+   ],
+   [
+    "REQ-2607-09 · Inspector × 5 Mumbai · Suryavan Mundra — commissioning sourcing ›",
+    "/requisition?id=7"
+   ],
+   [
+    "REQ-2607-08 · HSE_OFFICER × 3 Ahmedabad · Narmada Jamnagar — expansion sourcing ›",
+    "/requisition?id=6"
+   ],
+   [
+    "REQ-2607-07 · NDT_TECHNICIAN × 4 Pune · Dahej Petrochem — new unit 1 of 4 ›",
+    "/requisition?id=5"
+   ],
+   [
+    "REQ-2607-06 · QAQC_ENGINEER × 4 Mumbai · GHE Refinery — turnaround 1 of 4 ›",
+    "/requisition?id=4"
+   ],
+   [
+    "REQ-2607-05 · WELDING_INSPECTOR × 6 Ahmedabad · Suryavan Ports — jetty fabrication 1 of 6 ›",
+    "/requisition?id=3"
+   ]
+  ]
+ },
+ "/recruit-pipelines": {
+  "path": "/recruit-pipelines",
+  "final": "/recruit-pipelines",
+  "h1": [
+   "Hiring workflows"
+  ],
+  "h2": [
+   "Workflows",
+   "Corporate Recruitment Workflow",
+   "Stages"
+  ],
+  "labels": [
+   "Workflow name",
+   "Code",
+   "Description",
+   "Company",
+   "Business unit",
+   "Department",
+   "Position",
+   "Employment type",
+   "Grade",
+   "Location",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "mandatory",
+   "Order",
+   "Name",
+   "Type",
+   "Stage key",
+   "Responsible role",
+   "SLA days (0 = none)"
+  ],
+  "buttons": [
+   "＋ New workflow",
+   "Save workflow",
+   "Save",
+   "✕",
+   "Save",
+   "✕",
+   "Save",
+   "✕",
+   "Save",
+   "✕",
+   "Save",
+   "✕",
+   "Save",
+   "✕",
+   "Save",
+   "✕",
+   "Save",
+   "✕",
+   "Save",
+   "✕"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Recruitment",
+    "/recruitment"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Recruitment",
+    "/recruitment"
+   ],
+   [
+    "Corporate Recruitment Workflow Default All requisitions (default match)",
+    "/recruit-pipelines?id=1"
+   ],
+   [
+    "Simple Recruitment All requisitions (default match)",
+    "/recruit-pipelines?id=2"
+   ],
+   [
+    "Executive Recruitment All requisitions (default match)",
+    "/recruit-pipelines?id=3"
+   ]
+  ]
+ },
+ "/recruit-approvals": {
+  "path": "/recruit-approvals",
+  "final": "/recruit-approvals",
+  "h1": [
+   "Recruitment approvals"
+  ],
+  "h2": [
+   "Who may approve their own request Self-approval is OFF",
+   "When does a requirement change need its candidates re-checked? Redefined: ON"
+  ],
+  "labels": [
+   "Allow anyone to approve their own request — off by default. Switching this on removes the separation for everybody, not just administrators.",
+   "Allow a superuser to approve their own request — for a workspace where one person legitimately does both. Every time it is used it is recorded in the audit trail as a self-approval exception. An ordinary administrator does not get this; only a superuser.",
+   "Also raise a review when the requirement is redefined — on by default. A change that is not a higher bar but makes the people in the process the wrong people: the role became Electrician where it said Welder, the branch moved from Mumbai to Dubai, or the department, grade, team, trade or skill changed. Switch it off only if this organisation re-labels roles without changing what it actually wants."
+  ],
+  "buttons": [
+   "＋ New rule",
+   "Save policy",
+   "Save triggers"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Recruitment",
+    "/recruitment"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Recruitment",
+    "/recruitment"
+   ],
+   [
+    "Quote & report approvals",
+    "/approval-rules"
+   ],
+   [
+    "All approvals",
+    "/approvals-setup"
+   ],
+   [
+    "🧷 Recruitment",
+    "/recruit-approvals"
+   ],
+   [
+    "🔀 Quotes & reports",
+    "/approval-rules"
+   ],
+   [
+    "👤 Report approver map",
+    "/approver-map"
+   ],
+   [
+    "🤝 Delegation",
+    "/approval-delegations"
+   ]
+  ]
+ },
+ "/crm-templates": {
+  "path": "/crm-templates",
+  "final": "/crm-templates",
+  "h1": [
+   "Document templates"
+  ],
+  "h2": [
+   "Letterhead for client PDF — per company",
+   "Signature for client PDFs"
+  ],
+  "labels": [
+   "Company logo (PNG / JPG)",
+   "Company name",
+   "Contact line (phone · email · web · GSTIN)",
+   "Address (one line each)",
+   "Footer note (optional)",
+   "Signature image (PNG / JPG)",
+   "Signatory name",
+   "Designation"
+  ],
+  "buttons": [
+   "Save letterhead",
+   "Save signature",
+   "✕",
+   "✕",
+   "✕"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← CRM — Sales reports",
+    "/crm-dashboard"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Sales",
+    "/sales"
+   ],
+   [
+    "CRM — Sales reports",
+    "/crm-dashboard"
+   ],
+   [
+    "+ Add template",
+    "/crm-template-new"
+   ],
+   [
+    "Report formats",
+    "/templates?kind=report"
+   ],
+   [
+    "Quote & e-mail",
+    "/templates?kind=quote"
+   ],
+   [
+    "Edit",
+    "/crm-template-edit?id=1"
+   ],
+   [
+    "Edit",
+    "/crm-template-edit?id=3"
+   ],
+   [
+    "Edit",
+    "/crm-template-edit?id=2"
+   ]
+  ]
+ },
+ "/pipelines": {
+  "path": "/pipelines",
+  "final": "/pipelines",
+  "h1": [
+   "Pipelines & funnels"
+  ],
+  "h2": [
+   "Create one"
+  ],
+  "labels": [
+   "Name *",
+   "What is it for",
+   "Start from",
+   "Make it the default for new work"
+  ],
+  "buttons": [
+   "Create it"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Leads & pipeline",
+    "/leads"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Sales",
+    "/sales"
+   ],
+   [
+    "Leads & pipeline",
+    "/leads"
+   ],
+   [
+    "Start from an industry template",
+    "/industry"
+   ],
+   [
+    "Opportunity pipeline",
+    "/pipeline?id=2"
+   ],
+   [
+    "Edit stages",
+    "/pipeline?id=2"
+   ],
+   [
+    "Sales pipeline",
+    "/pipeline?id=1"
+   ],
+   [
+    "Edit stages",
+    "/pipeline?id=1"
+   ]
+  ]
+ },
+ "/tally": {
+  "path": "/tally",
+  "final": "/tally",
+  "h1": [
+   "Tally export"
+  ],
+  "h2": [
+   "Download the batch",
+   "Invoices in this window (1)",
+   "Batches already handed over"
+  ],
+  "labels": [
+   "What",
+   "Invoice from",
+   "to",
+   "Show what has already gone",
+   "Also create the party ledgers (tick for a fresh Tally company; on an established one Tally will report the names it already has)",
+   "Tally company name (optional)",
+   "Our state (place of supply we sell from)",
+   "Sales ledger",
+   "Bank / cash ledger (receipts)",
+   "TDS ledger (tax the customer withheld)",
+   "CGST ledger",
+   "SGST ledger",
+   "IGST ledger",
+   "Round-off ledger (the paise shaved to print a whole rupee)",
+   "Debtors group (where new party ledgers go)",
+   "Sales voucher type",
+   "Receipt voucher type",
+   "Credit note voucher type",
+   "Default GST % (used when the quotation does not say)",
+   "The invoice amount recorded here is…",
+   "SAC code (for your reference)"
+  ],
+  "buttons": [
+   "Show",
+   "⬇ Tally XML (import this)",
+   "⬇ CSV (to look at first)",
+   "Save",
+   "Undo",
+   "Undo"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Invoicing",
+    "/invoicing"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Money",
+    "/money"
+   ],
+   [
+    "Invoicing",
+    "/invoicing"
+   ],
+   [
+    "⧗ To bill",
+    "/to-bill"
+   ],
+   [
+    "🧾 Invoices",
+    "/invoices"
+   ],
+   [
+    "💰 Money in",
+    "/receipts"
+   ],
+   [
+    "⏳ Ageing",
+    "/receivables"
+   ],
+   [
+    "📤 Export",
+    "/tally"
+   ]
+  ]
+ },
+ "/billing": {
+  "path": "/billing",
+  "final": "/billing",
+  "h1": [
+   "Users & billing"
+  ],
+  "h2": [
+   "Payments"
+  ],
+  "labels": [
+   "Currency",
+   "Full seat / month (office & management users)",
+   "Full seat / year",
+   "Field seat / month (inspector & site roles)",
+   "Portal seat / month (client / vendor logins)",
+   "Free portal seats (included, never billed)",
+   "Razorpay Key Id",
+   "Razorpay Key Secret"
+  ],
+  "buttons": [
+   "Save pricing & keys"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Admin",
+    "/admin"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Licence details",
+    "/licence"
+   ]
+  ]
+ },
+ "/terminology": {
+  "path": "/terminology",
+  "final": "/terminology",
+  "h1": [
+   "Terminology"
+  ],
+  "h2": [
+   "Start from your trade",
+   "Parties",
+   "Sales",
+   "Operations",
+   "Reporting",
+   "Money",
+   "People",
+   "Recruitment",
+   "Reset"
+  ],
+  "labels": [],
+  "buttons": [
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Use this wording",
+   "Save terminology",
+   "Reset to standard wording"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Settings",
+    "/settings"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Settings",
+    "/settings"
+   ],
+   [
+    "Back to settings",
+    "/settings"
+   ]
+  ]
+ },
+ "/settings": {
+  "path": "/settings",
+  "final": "/settings",
+  "h1": [
+   "System settings"
+  ],
+  "h2": [
+   "Modules",
+   "Branding",
+   "Theme builder",
+   "Financial & operations",
+   "Working norms & limits",
+   "Display",
+   "Default terms & conditions",
+   "Document numbering",
+   "Reporting controls",
+   "Hiring Requests & approval",
+   "Security",
+   "Compliance",
+   "Email — automatic sending (SMTP)",
+   "What these settings affect (24 governed settings)"
+  ],
+  "labels": [
+   "Operations Work orders, jobs, scheduling, availability",
+   "Administration always on Masters, users, offices, settings, parties",
+   "Sales & CRM Leads, pipelines, enquiries, quotations, approvals, activity, sales dashboards",
+   "Inspection reporting The report engine, formats, endorsements, evidence",
+   "Money Invoicing, profitability, credits and the cost run",
+   "People & hiring Requisitions, candidates, placement",
+   "Marketplace & Connect The shared professional marketplace: requirements, sourcing, matching, bench, engagement, ratings and settlement",
+   "Application name — shown in the header",
+   "Logo (PNG/JPG/SVG, ≤600 KB)",
+   "No logo uploaded yet.",
+   "Built-in themes",
+   "① Primary (top bar, buttons)",
+   "② Accent (charts, highlights)",
+   "③ Page background",
+   "④ Panels / cards",
+   "Font colour",
+   "Base font size",
+   "Live preview",
+   "Financial year starts in",
+   "Current financial year — what every register opens on",
+   "On-time TAT threshold (days)",
+   "Annual revenue target (₹) — shows on the leadership dashboard",
+   "Report-overdue escalation (days) — then e-mail the reporting manager",
+   "What a man-month means — company default",
+   "Minimum working days in a man-month",
+   "Contract expiry warning (days) — how far ahead to start warning",
+   "Maximum hours a person may log in one day",
+   "Default weekly working days",
+   "Hours on a half day",
+   "Days to close a job after the inspection ends",
+   "Lock jobs that are not closed in time",
+   "Employee code prefix (own staff)",
+   "Currency symbol",
+   "Date format",
+   "Wording used across the app",
+   "in number",
+   "in number",
+   "in number",
+   "in number",
+   "in number"
+  ],
+  "buttons": [
+   "Save modules",
+   "Corporate Blue",
+   "Corporate Orange",
+   "Forest Green",
+   "Royal Purple",
+   "Teal",
+   "Crimson",
+   "Midnight (dark)",
+   "🔒 Require it for the money roles",
+   "Clear all",
+   "✉️ Save & send test email",
+   "Save settings",
+   "Save",
+   "🗑 Remove demo data",
+   "↻ Reload DEMO-S01",
+   "🗑 Remove DEMO-S01",
+   "Load DEMO-S02 scenario",
+   "Load DEMO-S03 client foundation",
+   "Apply",
+   "Load DEMO-S04 marketplace lifecycle"
+  ],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Admin",
+    "/admin"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Server check & version 2026.10.1 →",
+    "/preflight"
+   ],
+   [
+    "see who changed what →",
+    "/audit-log?action=SETTING_CHANGED"
+   ],
+   [
+    "Notification log",
+    "/notifications"
+   ],
+   [
+    "Integration health",
+    "/integrations"
+   ],
+   [
+    "System status",
+    "/system-status"
+   ],
+   [
+    "Your company",
+    "/company-profile"
+   ],
+   [
+    "Working norms",
+    "/work-norms"
+   ],
+   [
+    "Open terminology",
+    "/terminology"
+   ],
+   [
+    "Reports → IRN numbering rules",
+    "/irn-rules"
+   ],
+   [
+    "Where we stand",
+    "/compliance"
+   ],
+   [
+    "🛠️ Super Admin Cloud workspaces, licences & signing ›",
+    "/vendor"
+   ],
+   [
+    "📊 Plans, pricing & usage What each workspace uses ›",
+    "/pricing-usage"
+   ],
+   [
+    "🧩 Custom forms Build a new register — no coding ›",
+    "/cforms"
+   ],
+   [
+    "🏢 Your company Legal name, address, GSTIN & logo ›",
+    "/company-profile"
+   ],
+   [
+    "🧭 Your industry Now: Not set ›",
+    "/industry"
+   ],
+   [
+    "💳 Users & billing Set price & keys to switch on ›",
+    "/billing"
+   ],
+   [
+    "🔐 Roles & access Who can view or edit what ›",
+    "/access"
+   ],
+   [
+    "🔤 Terminology Rename the words the app uses ›",
+    "/terminology"
+   ],
+   [
+    "🤖 AI providers & models API keys & model selection ›",
+    "/ai-settings"
+   ],
+   [
+    "💾 Backup & restore Download a safe copy & restore anytime ›",
+    "/backup"
+   ],
+   [
+    "🧹 Clear records Empty record groups to start clean ›",
+    "/reset-data"
+   ],
+   [
+    "☁️ Cloud workspaces Run many businesses on one copy ›",
+    "/tenants"
+   ]
+  ]
+ },
+ "/workspace/setup/forms": {
+  "path": "/workspace/setup/forms",
+  "final": "/workspace/setup/forms",
+  "h1": [
+   "Forms"
+  ],
+  "h2": [
+   "Requisitions",
+   "Candidates",
+   "Sample",
+   "Client satisfaction",
+   "Test method",
+   "Risk / opportunity",
+   "Decision rule",
+   "Controlled document",
+   "Work Orders",
+   "Jobs",
+   "Team Members",
+   "Instruments",
+   "Complaints",
+   "Security incidents"
+  ],
+  "labels": [],
+  "buttons": [],
+  "links": [
+   [
+    "Set their home office",
+    "/users"
+   ],
+   [
+    "← Admin",
+    "/admin"
+   ],
+   [
+    "Home",
+    "/"
+   ],
+   [
+    "Admin",
+    "/admin"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=requisition"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=candidate"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=sample"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=satisfaction"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=method"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=risk"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=decision_rule"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=controlled_doc"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=call"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=job"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=inspector"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=equipment"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=complaint"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=incident"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=ncr"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=capa"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=audit"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=lead"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=opportunity"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=invoice"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=receipt"
+   ],
+   [
+    "Configure",
+    "/form-designer?form=user"
+   ],
+   [
+    "Custom forms",
+    "/cforms"
+   ],
+   [
+    "Dropdown lists",
+    "/masters"
+   ]
+  ]
+ }
+}

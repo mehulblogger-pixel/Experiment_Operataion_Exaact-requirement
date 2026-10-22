@@ -11,7 +11,7 @@ from collections import OrderedDict, Counter
 
 SP = os.path.dirname(os.path.abspath(__file__))
 EV = '/home/user/Experiment_Operataion_Exaact-requirement/docs/audit-2026-10/evidence'
-AREAS = ['Start here', 'Sales', 'Operations', 'Recruitment', 'Marketplace', 'Quality & Accreditation', 'Reporting', 'Money', 'Insights',
+AREAS = ['Start here', 'New company', 'Sales', 'Operations', 'Recruitment', 'Marketplace', 'Quality & Accreditation', 'Reporting', 'Money', 'Insights',
          'Directory', 'Admin', 'Across modules', 'Your own pages']
 ROLE_NAMES = {
     'MASTER_ADMIN': 'Master Admin', 'BUSINESS_DIRECTOR': 'Business Director', 'SBU_HEAD': 'Business Unit Head',
@@ -19,7 +19,8 @@ ROLE_NAMES = {
     'ASST_MANAGER': 'Asst. Manager', 'COORDINATOR': 'Coordinator', 'BUSINESS_DEV_MANAGER': 'Business Development Manager',
     'KEY_ACCOUNTS_MANAGER': 'Key Accounts Manager', 'MARKETING_MANAGER': 'Marketing Manager', 'MARKETING_EXECUTIVE': 'Marketing Executive',
     'FINANCE': 'Finance', 'QUALITY_HEAD': 'Quality Head', 'TECHNICAL_HEAD': 'Technical Head', 'SR_INSPECTOR': 'Senior Inspector',
-    'INSPECTOR': 'Inspector', 'ADMIN': 'Admin (legacy)', 'several': 'Several people',
+    'INSPECTOR': 'Inspector', 'NEWCOMER': 'A new company (not signed in)', 'PLATFORM_OWNER': 'Platform owner (Super Admin)',
+    'PROFESSIONAL': 'Marketplace professional', 'CLIENT_USER': 'Marketplace company / agency', 'ADMIN': 'Admin (legacy)', 'several': 'Several people',
 }
 
 PERSONAS = [
@@ -40,6 +41,10 @@ PERSONAS = [
     ('TECHNICAL_HEAD', 'Owns methods, competence, technical review of reports. Desk.'),
     ('SR_INSPECTOR', 'Does inspections and reviews juniors\' reports. Phone first, in the field.'),
     ('INSPECTOR', 'Does inspections, fills reports and vouchers. Phone first, in the field.'),
+    ('NEWCOMER', 'Someone from a company that does not use the system yet, visiting the site. Signed out.'),
+    ('PLATFORM_OWNER', 'Runs the platform itself (the control site): approves and creates companies, sells plans, modules and seats.'),
+    ('PROFESSIONAL', 'An inspector or engineer who lists themselves on the marketplace for work. Phone first.'),
+    ('CLIENT_USER', 'A company or agency that signs in to the marketplace to post requirements or offer its people.'),
 ]
 COMPANIES = [
     ('A', 'Third-party inspection agency', 'Services by man-day; ISO/IEC 17020; multi-branch.', 'Inspection, testing & certification'),
@@ -271,7 +276,7 @@ def main():
         if c['area'] not in AREAS: c['area'] = 'Admin' if c['area'] == 'Settings' else c['area']
     areas = [a for a in AREAS if any(c['area'] == a for c in cases)] + sorted({c['area'] for c in cases} - set(AREAS))
     book = OrderedDict(
-        title='EXAACT Test Book', version='2026-10-20', site='https://operations.mghaiapps.com',
+        title='EXAACT Test Book', version='2026-10-22', site='https://operations.mghaiapps.com',
         areas=areas,
         personas=[{'code': c, 'name': ROLE_NAMES[c], 'does': d} for c, d in PERSONAS],
         companies=[{'code': c, 'name': n, 'what': w, 'industry': i} for c, n, w, i in COMPANIES],
