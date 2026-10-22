@@ -60,6 +60,7 @@ $me = $me ?? (function_exists('connect_pro_user') ? connect_pro_user() : null);
   <?php $mUn = (function_exists('connect_msg_pro_unread') && $me) ? connect_msg_pro_unread((int)$me['id']) : 0; ?>
   <a class="<?= $here==='pro/messages'?'on':'' ?>" href="/pro/messages">Messages<?= $mUn > 0 ? ' (' . (int)$mUn . ')' : '' ?></a>
   <a class="<?= $here==='pro/verify'?'on':'' ?>" href="/pro/verify">Get verified</a>
+  <a class="<?= $here==='pro/plans'?'on':'' ?>" href="/pro/plans">Plan &amp; credits</a>
 </div>
 <?php endif; ?>
 <div class="wrap">

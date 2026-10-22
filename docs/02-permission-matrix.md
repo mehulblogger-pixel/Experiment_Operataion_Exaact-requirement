@@ -1116,3 +1116,34 @@ Workforce activation   =   the joining screen only
                        ≠   approval authority (Gate 4)
                        ≠   hiring.review.clear (Gate 3)
 ```
+
+## Self-serve companies — sign up, trial, plan, view-only, clean-up (owner, 22 Oct 2026) — no new permission
+
+The owner's decisions: a company may sign itself up, try the **full application for
+30 days** (no card), choose and pay for its own modules and logins, and becomes
+**view-only** — never locked out — when its trial or paid period ends. A free-trial
+company nobody signs in to is e-mailed every **15 days** and deleted after **90 days**.
+Built in `lib/selfserve.php`. **No permission was added**; each action reuses an
+existing gate.
+
+| Action | Who | Gate |
+|---|---|---|
+| Sign up at `/start` (company name, name, e-mail, mobile, password, an e-mail code) | anybody, while the platform owner has switched self sign-up on | public, in front of `require_login()`; form token, robot trap, 5 sign-ups an hour per connection, 5 tries per code, code valid 30 minutes |
+| Switch self sign-up on/off; set trial days, trial storage, trial logins, warning interval, deletion days, automatic deletion | the platform owner | the Companies console — `superadmin_can()` (unchanged) |
+| Set module and login prices, Razorpay keys | the platform owner, on the control install **only** | `billing-config` now also refuses inside any company workspace (`current_tenant() !== ''`). Before 22 Oct a company's own Master Admin could change the prices and keys its own purchases used |
+| Choose, change or renew the company's plan and pay | the company's owner / administrators | `billing_can_manage()` = Master Admin or `settings.manage` (unchanged gate of `/subscription`) |
+| Read everything, print, export while view-only | every user of the company, as their role already allows | unchanged — only *saving* is refused (`saas_blocks_write()`), except paying, signing out, changing one's own password / second factor / signature |
+| See when every company was last used, its trial and paid dates, warnings sent, deletion date, and the list of deleted companies | the platform owner | the Companies console |
+
+A payment is applied from the order **recorded on the server** when the payment
+window was opened (`saas_orders`), once; the browser can no longer say what was
+bought (before 22 Oct, `/subscription-verify` and `/billing-verify` applied the
+modules and seats posted back by the page). The platform owner's "Log in as" never
+counts as the company using its workspace. Companies created by hand on the console
+are not self-serve and none of the trial, view-only or deletion rules apply to them.
+
+A marketplace company or agency that joined through `/join` may sign in at
+`/portal/login` while the marketplace is on, even when staff have the client portal
+switched off (it used to be told "sign in now" and then shown "Not found"); clients
+*invited* by staff still need the client portal on. Both kinds can now reset a
+forgotten password themselves (`/portal/forgot`, a one-hour, single-use link).

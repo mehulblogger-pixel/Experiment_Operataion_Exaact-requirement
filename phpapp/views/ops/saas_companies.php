@@ -17,6 +17,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
   table.sc{width:100%;border-collapse:collapse;min-width:760px}
   table.sc th,table.sc td{padding:10px 12px;border-bottom:1px solid var(--line,#eef1f5);text-align:left;font-size:13px;vertical-align:middle}
   table.sc th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted,#656e7a)}
+  .sc-meta{font-size:11.5px;color:var(--muted,#656e7a);line-height:1.35}
   .sc-co{font-weight:600} .sc-key{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted,#656e7a)}
   .pill{display:inline-block;padding:1px 9px;border-radius:20px;font-size:11px;font-weight:700}
   .pill.on{background:#ecfdf5;color:#047857}.pill.off{background:#fee2e2;color:#dc2626}
@@ -120,15 +121,24 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
   <h2><?= count($companies) ?> compan<?= count($companies) === 1 ? 'y' : 'ies' ?></h2>
   <div class="sc-scroll">
   <table class="sc">
-    <tr><th>Company</th><th>Plan</th><th>Seats</th><th>Modules</th><th>Status</th><th></th></tr>
+    <tr><th>Company</th><th>Plan</th><th>Seats</th><th>Modules</th><th>Last used</th><th>Status</th><th></th></tr>
     <?php foreach ($companies as $c): $k = $e($c['tenant_key']);
       $active = ($c['status'] ?? 'active') !== 'suspended' && ($c['route_status'] ?? '') !== 'suspended'; ?>
     <tr>
       <td><div class="sc-co"><?= $e($c['company'] ?: $c['tenant_key']) ?></div>
           <div class="sc-key"><?= $k ?><?= $base_domain ? ' · ' . $e($c['owner_email'] ?? '') : '' ?></div></td>
-      <td><?= $e($plans[$c['plan']]['label'] ?? $c['plan']) ?></td>
-      <td><b><?= (int) $c['seat_limit'] ?></b> <span class="sc-key">(<?= (int) $c['base_logins'] ?> + <?= (int) ($c['extra_user_seats'] ?? 0) ?>)</span></td>
+      <td><?= $c['plan'] === 'TRIAL' ? 'Free trial' : ($c['plan'] === 'CUSTOM' ? 'Own choice' : $e($plans[$c['plan']]['label'] ?? $c['plan'])) ?>
+        <?php if (!empty($c['self'])): ?><div class="sc-meta">signed itself up</div>
+          <?php if (($c['paid_until'] ?? '') !== ''): ?><div class="sc-meta">paid until <?= $e(fdate($c['paid_until'])) ?></div>
+          <?php elseif (($c['trial_until'] ?? '') !== ''): ?><div class="sc-meta">trial <?= ($c['trial_until'] >= date('Y-m-d')) ? 'until' : 'ended' ?> <?= $e(fdate($c['trial_until'])) ?></div><?php endif; ?>
+        <?php endif; ?></td>
+      <td><?php if ((int) $c['seat_limit'] === 0): ?><b>no limit</b>
+          <?php elseif ($c['plan'] === 'CUSTOM'): ?><b><?= (int) $c['seat_limit'] ?></b> <span class="sc-meta">bought</span>
+          <?php else: ?><b><?= (int) $c['seat_limit'] ?></b> <span class="sc-key">(<?= (int) $c['base_logins'] ?> + <?= (int) ($c['extra_user_seats'] ?? 0) ?>)</span><?php endif; ?></td>
       <td><?php foreach ($c['mods_list'] as $m): ?><span class="pill mod"><?= $e($modLabel($m)) ?></span><?php endforeach; ?></td>
+      <td><?php $la = (string) ($c['last_active_at'] ?? '') ?: (string) ($c['last_login_at'] ?? ''); ?>
+        <?= $la !== '' ? $e(fdate(substr($la, 0, 10))) . '<div class="sc-meta">' . (int) $c['idle_days'] . ' day' . ((int) $c['idle_days'] === 1 ? '' : 's') . ' ago</div>' : '<span class="sc-meta">' . (!empty($c['self']) ? 'not yet' : '—') . '</span>' ?>
+        <?php if (!empty($c['delete_on'])): ?><div class="sc-meta" style="color:#b45309">deleted <?= $e(fdate($c['delete_on'])) ?> if unused<?= (int) ($c['inactive_notices'] ?? 0) ? ' · ' . (int) $c['inactive_notices'] . ' warning' . ((int) $c['inactive_notices'] === 1 ? '' : 's') . ' sent' : '' ?></div><?php endif; ?></td>
       <td><?= $active ? '<span class="pill on">Active</span>' : '<span class="pill off">Suspended</span>' ?></td>
       <td><div class="sc-actions">
         <a class="btn xs ghost" href="/companies?key=<?= $k ?>">Manage</a>
@@ -266,6 +276,38 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
   })();
   </script>
 </div>
+<?php endif; ?>
+
+<?php // ---- Self-serve sign-up (super-admin): the owner's rules of 22 Oct 2026 -------
+  $ssc = $ss_cfg ?? null; if ($ssc): $raw = fn($k) => (string) setting_get($k, ''); ?>
+<details class="sc-card" style="padding:0" <?= empty($ss_on) ? '' : 'open' ?>>
+  <summary style="cursor:pointer;padding:13px 16px;font-size:14px;font-weight:600;background:var(--soft,#f6f8fb);border-bottom:1px solid var(--line,#e5e7eb)">🚀 Self sign-up &amp; free trial — <?= !empty($ss_on) ? 'ON' : 'OFF' ?></summary>
+  <form method="post" style="padding:16px">
+    <input type="hidden" name="do" value="selfserve_save">
+    <?php if (empty($ss_ready)): ?><div class="msg msg-warning">Cloud mode is not switched on yet (Admin → Super Admin → Cloud workspaces → Base domain). Until it is, the sign-up page stays closed.</div><?php endif; ?>
+    <label style="display:flex;gap:9px;align-items:flex-start;margin-bottom:12px;font-size:13.5px"><input type="checkbox" name="ss_on" value="1" <?= !empty($ss_on) ? 'checked' : '' ?> style="margin-top:2px">
+      <span><b>Companies can sign themselves up</b> at <code>/start</code>: they confirm their e-mail with a code and go straight into their own workspace on a free trial of every module. (Off = they apply at <code>/get-started</code> and you approve.)</span></label>
+    <div class="sc-edit" style="padding:0;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+      <div class="ff"><label>Free trial (days)</label><input type="number" name="ss_trial_days" min="1" value="<?= $e($raw('saas_trial_days')) ?>" placeholder="<?= (int) SELFSERVE_TRIAL_DAYS_DEFAULT ?>"></div>
+      <div class="ff"><label>Trial storage limit (MB)</label><input type="number" name="ss_storage_mb" min="0" value="<?= $e($raw('saas_trial_storage_mb')) ?>" placeholder="not set — no limit"></div>
+      <div class="ff"><label>Logins during the trial</label><input type="number" name="ss_trial_seats" min="0" value="<?= $e($raw('saas_trial_seats')) ?>" placeholder="not set — no limit"></div>
+      <div class="ff"><label>Warn unused trials every (days)</label><input type="number" name="ss_notice_days" min="1" value="<?= $e($raw('saas_inactive_notice_days')) ?>" placeholder="<?= (int) SELFSERVE_NOTICE_DAYS_DEFAULT ?>"></div>
+      <div class="ff"><label>Delete unused trials after (days)</label><input type="number" name="ss_delete_days" min="1" value="<?= $e($raw('saas_inactive_delete_days')) ?>" placeholder="<?= (int) SELFSERVE_DELETE_DAYS_DEFAULT ?>"></div>
+    </div>
+    <label style="display:flex;gap:9px;align-items:flex-start;margin:12px 0;font-size:13.5px"><input type="checkbox" name="ss_autodelete" value="1" <?= $ssc['auto_delete'] ? 'checked' : '' ?> style="margin-top:2px">
+      <span><b>Delete unused free trials automatically.</b> Only companies that signed themselves up and never paid. Each gets an e-mail every <?= (int) $ssc['notice_days'] ?> days of no use; it is deleted after <?= (int) $ssc['delete_days'] ?> days, and never sooner than <?= (int) $ssc['notice_days'] ?> days after its first warning. A company that has ever paid is never deleted — it becomes view-only.</span></label>
+    <div class="sc-actions"><button class="btn">Save</button></div>
+    <div class="sc-note">After the trial a company becomes view-only until it chooses a plan: it can open, print and export everything, but not save. Prices come from the panel below, and payment from your Razorpay keys (Billing).</div>
+  </form>
+  <form method="post" style="padding:0 16px 16px"><input type="hidden" name="do" value="selfserve_sync"><button class="btn ghost xs">Check when every company was last used</button>
+    <span class="sc-key">Refreshes "last used" and plan dates. Sends nothing, deletes nothing. It also runs every night.</span></form>
+  <?php if (!empty($ss_deleted)): ?>
+  <div class="sc-scroll" style="padding:0 16px 16px"><table class="sc" style="min-width:520px">
+    <tr><th>Deleted</th><th>Company</th><th>Owner</th><th>Why</th></tr>
+    <?php foreach ($ss_deleted as $d): ?><tr><td><?= $e(fdate(substr((string) $d['deleted_at'], 0, 10))) ?></td><td><?= $e($d['company']) ?></td><td class="sc-key"><?= $e($d['owner_email']) ?></td><td><?= $e($d['reason']) ?></td></tr><?php endforeach; ?>
+  </table></div>
+  <?php endif; ?>
+</details>
 <?php endif; ?>
 
 <?php // ---- Pricing panel (super-admin): the price book ---------------------------

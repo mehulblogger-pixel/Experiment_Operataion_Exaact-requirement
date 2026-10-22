@@ -77,7 +77,7 @@ $v = function($k) use ($p) { return e((string)($p[$k] ?? '')); };
       <p>Thanks. Our team will review your details and set up your workspace. You'll hear from us at the e-mail you gave, usually within one working day.</p>
       <ol class="steps">
         <li><span class="n">1</span><div><b>We review</b> your company details.</div></li>
-        <li><span class="n">2</span><div><b>We create your workspace</b> — your own private web address and admin login.</div></li>
+        <li><span class="n">2</span><div><b>We create your workspace</b> and e-mail you how to sign in.</div></li>
         <li><span class="n">3</span><div><b>You sign in</b> and add your team. That's it.</div></li>
       </ol>
       <p class="note"><a href="/">← Back to home</a></p>
@@ -92,6 +92,8 @@ $v = function($k) use ($p) { return e((string)($p[$k] ?? '')); };
   <?php else: ?>
     <?php if ($err !== ''): ?><div class="banner err"><?= e($err) ?></div><?php endif; ?>
     <form method="post" action="/get-started" autocomplete="on">
+      <input type="hidden" name="_csrf" value="<?= e((string)($GLOBALS['__ws_csrf'] ?? '')) ?>">
+      <div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
       <div class="fld">
         <label for="company">Company name</label>
         <input id="company" name="company" required value="<?= $v('company') ?>" placeholder="e.g. Acme Inspection Services">

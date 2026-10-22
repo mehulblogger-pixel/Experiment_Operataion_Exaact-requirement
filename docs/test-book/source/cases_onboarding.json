@@ -33,7 +33,7 @@
   "id": "ONB-001",
   "area": "New company",
   "module": "1 · A company applies",
-  "title": "Online registration is a switch the platform owner turns on",
+  "title": "Applying (and waiting for approval) is a switch the platform owner turns on",
   "kind": "scenario",
   "tags": [
    "rule"
@@ -58,6 +58,10 @@
    {
     "do": "Turn it OFF again and open /get-started signed out.",
     "expect": "\"We set up workspaces personally… Online self-registration isn't open just yet.\" — no form. Turn it back ON for the next tests."
+   },
+   {
+    "do": "Note: when SELF sign-up is on (ONB-006), /get-started forwards to /start instead — the company creates its own workspace without waiting.",
+    "expect": "Opening /get-started lands on \"Start your free trial\"."
    }
   ],
   "ref": "lib/tenants.php; views/ops/tenants.php",
@@ -67,16 +71,15 @@
   "id": "ONB-002",
   "area": "New company",
   "module": "1 · A company applies",
-  "title": "A new company fills \"Start your workspace\" — best case",
+  "title": "A new company applies and waits for approval — best case",
   "kind": "scenario",
   "tags": [
-   "best",
-   "gap"
+   "best"
   ],
   "persona": "NEWCOMER",
   "company": "ANY",
-  "why": "This is the very first thing a new customer does. Measured 22 Oct: the code sends NO e-mail on request or on approval, although the screen promises one — expect step 3 to fail.",
-  "before": "ONB-001: online registration ON. Signed out, private window.",
+  "why": "The route for companies you want to approve yourself (self sign-up OFF).",
+  "before": "ONB-001: online registration ON; self sign-up OFF (ONB-006). Signed out, private window.",
   "steps": [
    {
     "do": "Open /get-started (or \"Start here →\" on the sign-in page).",
@@ -84,11 +87,11 @@
    },
    {
     "do": "Company name \"TB Test Inspections\", Your name \"Test Owner\", Work e-mail (one you can read), Phone, Preferred workspace name \"tbtest\", note \"Testing onboarding\" → \"Request my workspace →\".",
-    "expect": "A ✅ and \"Request received\" with three numbered next steps, and that you will hear at the e-mail you gave, usually within one working day."
+    "expect": "A ✅ and \"Request received\" with three numbered steps (\"We review\", \"We create your workspace and e-mail you how to sign in\", \"You sign in\"), and that you will hear at the e-mail you gave, usually within one working day."
    },
    {
     "do": "Check that e-mail inbox.",
-    "expect": "An acknowledgement e-mail arrives."
+    "expect": "An e-mail \"We have your request for a … workspace\" arrives (fixed 22 Oct — it used to send nothing)."
    }
   ],
   "ref": "views/public/get_started.php; lib/tenant_signup.php",
@@ -102,12 +105,11 @@
   "kind": "edge",
   "tags": [
    "edge",
-   "worst",
-   "gap"
+   "worst"
   ],
   "persona": "NEWCOMER",
   "company": "ANY",
-  "why": "A public form gets every kind of mistake. Measured 22 Oct: the public form has no rate limit and no form token — repeated automatic submissions are not slowed down.",
+  "why": "A public form gets every kind of mistake.",
   "before": "Online registration ON. Signed out.",
   "steps": [
    {
@@ -131,12 +133,156 @@
     "expect": "Saved or refused with a sentence — never an error page."
    },
    {
-    "do": "Press \"Request my workspace →\" 20 times quickly with different e-mails.",
-    "expect": "Each is accepted or politely refused; the site keeps working."
+    "do": "Send 6 requests within an hour from the same computer, each with a different e-mail.",
+    "expect": "The 6th: \"Too many requests from this connection. Please try again in an hour.\" (fixed 22 Oct — there was no limit)."
+   },
+   {
+    "do": "Leave the page open for a long time (or sign out in another tab), then press the button.",
+    "expect": "\"Your page had been open too long. Please press the button again.\" — nothing typed is lost."
    }
   ],
   "ref": "lib/tenant_signup.php",
   "live": true
+ },
+ {
+  "id": "ONB-004",
+  "area": "New company",
+  "module": "1 · A company applies",
+  "title": "A company signs itself up and starts a 30-day free trial — best case",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "NEWCOMER",
+  "company": "ANY",
+  "why": "The owner's decision of 22 Oct: a company can start on its own, try every module for 30 days without a card, and buy when ready.",
+  "before": "ONB-006: self sign-up ON. Signed out, private window. Use an e-mail you can read.",
+  "steps": [
+   {
+    "do": "Open /start (or \"Start your free trial →\" on the sign-in page, or \"Start your free trial →\" on the marketplace front page).",
+    "expect": "Heading \"Start your free trial\", ribbon \"◆ 30 days free · no card needed\". Fields: Company name, Your name, \"Work e-mail — this is how you sign in\", \"Mobile — optional\", \"Choose a password — at least … characters\", and a tick \"I agree: the trial is free for 30 days…\". Button \"Start my free trial →\"."
+   },
+   {
+    "do": "Fill with test data (\"TB Selfserve Co\"), tick the agreement → \"Start my free trial →\".",
+    "expect": "\"We have sent a 6-digit code to <e-mail>.\" and a box \"Enter the 6-digit code from your e-mail\"."
+   },
+   {
+    "do": "Open the e-mail \"… — your sign-up code ……\" and type the code → \"Create my workspace →\".",
+    "expect": "You are inside your own new workspace at once — no waiting, no second password change. \"Welcome! Your workspace is ready and your free trial has started.\" and \"Free trial — 30 days left (until <date>).\""
+   },
+   {
+    "do": "The setup wizard \"Welcome — let’s set up your system\".",
+    "expect": "It does NOT ask for a password again (you just chose one): it starts at \"1 · What does your company do?\". Finish it → the setup page."
+   },
+   {
+    "do": "Look at the left menu.",
+    "expect": "Every module is there during the trial."
+   },
+   {
+    "do": "Check your inbox.",
+    "expect": "An e-mail \"Your … workspace is ready\" with the sign-in address, your username, the trial end date, what happens after the trial, and the 90-day rule."
+   },
+   {
+    "do": "Sign out, then sign in at the product address with your e-mail and password.",
+    "expect": "Straight into your workspace."
+   }
+  ],
+  "ref": "lib/selfserve.php; views/public/start.php",
+  "live": true
+ },
+ {
+  "id": "ONB-005",
+  "area": "New company",
+  "module": "1 · A company applies",
+  "title": "Self sign-up — the worst cases",
+  "kind": "edge",
+  "tags": [
+   "edge",
+   "worst"
+  ],
+  "persona": "NEWCOMER",
+  "company": "ANY",
+  "why": "A public form gets mistakes, repeats and robots.",
+  "before": "ONB-006: self sign-up ON. Signed out.",
+  "steps": [
+   {
+    "do": "Empty company name / empty name / e-mail \"abc\" → Start.",
+    "expect": "\"Please enter your company name.\" / \"Please enter your name.\" / \"Enter a valid work e-mail address.\""
+   },
+   {
+    "do": "Password \"12345678\".",
+    "expect": "Refused with a sentence saying why."
+   },
+   {
+    "do": "Leave the agreement unticked.",
+    "expect": "\"Please tick that you agree to the trial terms.\""
+   },
+   {
+    "do": "Use an e-mail that already has a workspace (ONB-004).",
+    "expect": "\"That e-mail already has a workspace — sign in instead, or use \"Forgot password?\".\""
+   },
+   {
+    "do": "On the code screen type a wrong code.",
+    "expect": "\"That code is not right. 4 tries left.\" After 5 wrong codes: \"Too many wrong codes. Press \"Send a new code\".\""
+   },
+   {
+    "do": "Press \"Send a new code\".",
+    "expect": "\"A new code has been sent to <e-mail>.\" The old code no longer works."
+   },
+   {
+    "do": "Wait more than 30 minutes, then type the code.",
+    "expect": "\"That code has run out. Press \"Send a new code\".\""
+   },
+   {
+    "do": "Press \"Create my workspace →\" twice quickly.",
+    "expect": "Only ONE company is created."
+   },
+   {
+    "do": "Start 6 sign-ups within an hour from the same computer.",
+    "expect": "The 6th: \"Too many sign-ups from this connection. Please try again in an hour.\""
+   }
+  ],
+  "ref": "lib/selfserve.php",
+  "live": true
+ },
+ {
+  "id": "ONB-006",
+  "area": "New company",
+  "module": "1 · A company applies",
+  "title": "The platform owner switches self sign-up on and sets the trial rules",
+  "kind": "scenario",
+  "tags": [
+   "rule"
+  ],
+  "persona": "PLATFORM_OWNER",
+  "company": "ANY",
+  "why": "Self sign-up is the platform owner's choice; the numbers are theirs to set.",
+  "before": "Signed in as the control site's Master Admin; cloud mode on (ONB-001 step 1).",
+  "steps": [
+   {
+    "do": "Super Admin → \"Companies\" → panel \"🚀 Self sign-up & free trial\".",
+    "expect": "Tick \"Companies can sign themselves up\", boxes \"Free trial (days)\" (30), \"Trial storage limit (MB)\" (not set — no limit), \"Logins during the trial\" (not set — no limit), \"Warn unused trials every (days)\" (15), \"Delete unused trials after (days)\" (90), tick \"Delete unused free trials automatically\", \"Save\"."
+   },
+   {
+    "do": "Tick \"Companies can sign themselves up\" → Save.",
+    "expect": "\"Self-serve sign-up settings saved.\" The panel title reads \"— ON\". /get-started now forwards to /start."
+   },
+   {
+    "do": "Set \"Delete unused trials after\" to 10 (less than the 15-day warning) → Save.",
+    "expect": "\"Saved — but deletion comes before the first warning with these numbers…\" Put it back to 90."
+   },
+   {
+    "do": "Set a storage limit and a number of trial logins (your numbers) → Save.",
+    "expect": "Saved; new trial companies get them."
+   },
+   {
+    "do": "Untick \"Companies can sign themselves up\" → Save.",
+    "expect": "/start forwards to /get-started again (apply and wait for approval)."
+   }
+  ],
+  "ref": "lib/selfserve.php; views/ops/saas_companies.php",
+  "live": false
  },
  {
   "id": "ONB-010",
@@ -146,12 +292,11 @@
   "kind": "scenario",
   "tags": [
    "best",
-   "rule",
-   "gap"
+   "rule"
   ],
   "persona": "PLATFORM_OWNER",
   "company": "ANY",
-  "why": "A request becomes a company only when the platform owner approves it. Measured 22 Oct: approving here creates NO owner login and sends no e-mail — the new workspace's only login is \"admin\" with the server's default password, which you would have to hand over yourself. The \"Companies\" screen (ONB-011) does create the owner properly. Expect step 5 to fail.",
+  "why": "A request becomes a company only when the platform owner approves it.",
   "before": "ONB-002 request exists. Signed in as the control site's Master Admin.",
   "steps": [
    {
@@ -164,15 +309,19 @@
    },
    {
     "do": "Set it back to \"tbtest\" → Approve → confirm \"Approve \"TB Test Inspections\" and create this workspace?\".",
-    "expect": "Either \"Workspace \"tbtest\" created. Their address: https://tbtest.…/ — they finish their own first-time setup there.\" (hosting panel connected), or a message telling you to create the database and sub-domain in the hosting panel, then \"Mark set up\"."
+    "expect": "\"Workspace for “TB Test Inspections” created on a 30-day free trial. Its owner signs in with <e-mail> (temporary password: …). These details have been e-mailed to them.\" — nothing left to finish by hand."
    },
    {
-    "do": "Open the new address.",
-    "expect": "The new company's own sign-in page."
+    "do": "The applicant checks their inbox.",
+    "expect": "An e-mail \"Your … workspace is ready\" with the sign-in address, their username (their e-mail) and a temporary password."
    },
    {
-    "do": "How does the owner of TB Test Inspections learn their sign-in?",
-    "expect": "They receive an e-mail with their address, their username (their e-mail) and a way to set their password."
+    "do": "The applicant signs in at the product address with that e-mail and temporary password.",
+    "expect": "Asked to choose their own password, then the setup wizard; a \"Free trial — 30 days left\" line on every screen. (Fixed 22 Oct — approval used to create no login and send nothing.)"
+   },
+   {
+    "do": "Super Admin → Companies.",
+    "expect": "TB Test Inspections is listed: Plan \"Free trial\", \"signed itself up\", trial until a date 30 days ahead."
    }
   ],
   "ref": "lib/tenant_signup.php; views/ops/tenants.php",
@@ -185,12 +334,11 @@
   "title": "Creating a company directly — \"Companies\" (with its plan)",
   "kind": "scenario",
   "tags": [
-   "best",
-   "gap"
+   "best"
   ],
   "persona": "PLATFORM_OWNER",
   "company": "ANY",
-  "why": "The complete way to create a company today: it creates the owner's login, the plan and the seat limit together. Measured 22 Oct: no e-mail is sent — the platform owner must pass the temporary password on by hand. Expect step 6 to fail.",
+  "why": "The complete way to create a company today: it creates the owner's login, the plan and the seat limit together.",
   "before": "Signed in as the control site's Master Admin.",
   "steps": [
    {
@@ -214,8 +362,12 @@
     "expect": "\"A company name and a valid owner email are required.\""
    },
    {
-    "do": "Write down the temporary password shown and pass it to the owner.",
-    "expect": "The owner also receives it (or a set-your-password link) by e-mail."
+    "do": "Read the message after \"Create company\".",
+    "expect": "\"…These sign-in details have been e-mailed to the owner.\" — or, where e-mail is not set up: \"E-mail is not set up, so please pass these details on yourself.\""
+   },
+   {
+    "do": "The owner checks their inbox.",
+    "expect": "An e-mail \"Your … workspace is ready\" with the address, username and temporary password; they must choose their own password at first sign-in."
    }
   ],
   "ref": "lib/saas_tenants.php; views/ops/saas_companies.php",
@@ -339,12 +491,11 @@
   "title": "The setup cockpit — every card, in order",
   "kind": "scenario",
   "tags": [
-   "best",
-   "gap"
+   "best"
   ],
   "persona": "MASTER_ADMIN",
   "company": "ANY",
-  "why": "One page tells a new company what is left to do; every card must lead somewhere real. Measured 22 Oct: every \"Do this\" in the checklist links to the home page (the code reads the wrong field), and \"Add your people\" points to /inspectors, which does not exist. Expect step 7 to fail.",
+  "why": "One page tells a new company what is left to do; every card must lead somewhere real.",
   "before": "ONB-020 done. Signed in as the owner.",
   "steps": [
    {
@@ -372,8 +523,12 @@
     "expect": "Settings opens on branding (logo, colour)."
    },
    {
-    "do": "Section \"Getting started\" (checklist) → press each \"Do this\".",
-    "expect": "Each opens the right screen (Invite your team → people; Add your people → team; first job / first requirement → that screen)."
+    "do": "Section \"Get started\" (checklist) → press each \"Do this\".",
+    "expect": "\"Tell us what your company does\" → Company profile; \"Invite your team\" → User register; \"Add your people\" → \"Team member register\"; \"Raise your first work order\" → New work order; \"Post your first requirement\" and \"Build your bench\" (only with the Marketplace) → those screens. Never the home page (fixed 22 Oct)."
+   },
+   {
+    "do": "Switch Operations off (Admin → Modules & features) and look at the checklist again.",
+    "expect": "\"Add your people\" and \"Raise your first work order\" are no longer offered; switch Operations back on."
    },
    {
     "do": "\"Setup health\" lines (e.g. \"You are the only user…\") → \"Fix\".",
@@ -390,17 +545,16 @@
   "title": "The dashboard \"Finish setting up\" list agrees with what was done",
   "kind": "edge",
   "tags": [
-   "edge",
-   "gap"
+   "edge"
   ],
   "persona": "MASTER_ADMIN",
   "company": "ANY",
-  "why": "Two checklists must not disagree about the same work. Measured 22 Oct: the setup wizard stores the name in a different setting from the one the dashboard checks — \"Say who you are\" stays unticked until Company profile is saved.",
+  "why": "Two checklists must not disagree about the same work.",
   "before": "ONB-020: setup wizard finished with a company name.",
   "steps": [
    {
     "do": "Open the Dashboard.",
-    "expect": "A panel \"Finish setting up …\" with its steps; \"Say who you are\" (the company name) is ticked, because you gave the name in the setup wizard."
+    "expect": "A panel \"Finish setting up …\" with its steps; \"Say who you are\" (the company name) is ticked, because you gave the name in the setup wizard (fixed 22 Oct). Its button opens Company profile."
    },
    {
     "do": "Compare with the cockpit (ONB-030).",
@@ -693,6 +847,192 @@
   "live": true
  },
  {
+  "id": "ONB-047",
+  "area": "New company",
+  "module": "5 · Buying modules",
+  "title": "A trial company chooses its own modules and pays online",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "company": "ANY",
+  "why": "The owner's decision: a company buys the modules it wants itself and pays directly.",
+  "before": "ONB-004 company, on its trial. The platform owner has set prices and Razorpay keys (TEST keys on a test copy).",
+  "steps": [
+   {
+    "do": "Admin → \"Your subscription\" (/subscription) — or \"Choose your plan →\" on the trial line at the top of any screen.",
+    "expect": "Cards \"Your workspace: Free trial\", \"Until\", \"Days left\". \"You are trying every module free until … Choose the modules you want to keep below — you pay only for those.\" Panel \"Choose your plan\"."
+   },
+   {
+    "do": "Tick nothing → \"Choose this plan & pay →\".",
+    "expect": "\"Pick at least one module.\" Nothing charged."
+   },
+   {
+    "do": "Tick Operations and Sales & CRM, \"How many people will sign in?\" 3, \"Pay\" Monthly.",
+    "expect": "The \"Plan price\" updates as you tick (each module's price + 3 × the price per login)."
+   },
+   {
+    "do": "\"Choose this plan & pay →\" → pay in the Razorpay window with a TEST card / UPI.",
+    "expect": "\"Payment received. Your plan is active until <date one month ahead>.\""
+   },
+   {
+    "do": "Look at the left menu and the subscription page.",
+    "expect": "Only Operations and Sales (plus Administration) remain; the other modules are switched off. Their records are kept."
+   },
+   {
+    "do": "Add a 4th person.",
+    "expect": "\"This company is on 3 seats and all 3 are in use…\" — buy more logins on the same page."
+   },
+   {
+    "do": "Super Admin → Companies (the next day, or after \"Check when every company was last used\").",
+    "expect": "The company shows Plan \"Own choice\", its paid-until date, and \"3 bought\" logins."
+   }
+  ],
+  "ref": "lib/selfserve.php; views/ops/_subscription_plan.php",
+  "live": false
+ },
+ {
+  "id": "ONB-048",
+  "area": "New company",
+  "module": "5 · Buying modules",
+  "title": "When the trial ends without a plan: view-only, never locked out",
+  "kind": "scenario",
+  "tags": [
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "company": "ANY",
+  "why": "The owner's rule: \"lock out with notice to upgrade plan but they shall be able to access the data with view only permission\".",
+  "before": "A trial company whose trial has ended (on a test copy a developer can move the date; otherwise wait for the trial to end).",
+  "steps": [
+   {
+    "do": "Sign in as the owner.",
+    "expect": "Every screen says: \"Your free trial ended on <date>. Your workspace is view-only — everything can be opened and exported, but nothing new can be saved.\" with \"Choose your plan →\"."
+   },
+   {
+    "do": "Open any register, record, report PDF; export to Excel.",
+    "expect": "Everything opens and exports."
+   },
+   {
+    "do": "Try to save anything (a new lead, a company profile change).",
+    "expect": "\"Your free trial has ended, so your workspace is view-only: everything can be opened, printed and exported, but nothing new can be saved. Choose a plan to carry on.\" — taken to Your subscription. Nothing saved."
+   },
+   {
+    "do": "Sign in as a colleague who is not an administrator and try to save.",
+    "expect": "The same refusal, ending \"Ask your workspace owner to choose a plan.\" They stay on their screen."
+   },
+   {
+    "do": "The owner chooses a plan and pays (ONB-047).",
+    "expect": "Saving works again at once."
+   }
+  ],
+  "ref": "lib/selfserve.php; index.php",
+  "live": false
+ },
+ {
+  "id": "ONB-049",
+  "area": "New company",
+  "module": "5 · Buying modules",
+  "title": "Changing plan later — upgrade, renew, downgrade",
+  "kind": "edge",
+  "tags": [
+   "rule",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "company": "ANY",
+  "why": "The owner's rule of 19 Oct (Q-L): upgrade now with credit, renew and downgrade at the end of the period.",
+  "before": "A company with a paid plan running (ONB-047).",
+  "steps": [
+   {
+    "do": "Your subscription → tick one more module → \"Change or renew →\".",
+    "expect": "An UPGRADE: it starts today; the unused days of the current plan are taken off the price; the new period runs one month from today."
+   },
+   {
+    "do": "Choose exactly the same modules and logins again.",
+    "expect": "A RENEWAL: paid now, it starts the day after the current period ends; nothing is lost."
+   },
+   {
+    "do": "Untick a module (a smaller plan).",
+    "expect": "\"Your smaller plan starts on <date>, when the current one ends. Nothing is charged now.\" The page shows \"Booked: from <date> your plan becomes …\". Everything stays switched on until then."
+   },
+   {
+    "do": "On that date (or after), open Your subscription.",
+    "expect": "The smaller selection is offered to be paid."
+   }
+  ],
+  "ref": "lib/selfserve.php",
+  "live": false
+ },
+ {
+  "id": "ONB-050",
+  "area": "New company",
+  "module": "5 · Buying modules",
+  "title": "Trial storage limit",
+  "kind": "edge",
+  "tags": [
+   "rule",
+   "edge"
+  ],
+  "persona": "MASTER_ADMIN",
+  "company": "ANY",
+  "why": "The owner's rule: the trial has a limit on storage. The number is the platform owner's (ONB-006).",
+  "before": "The platform owner has set \"Trial storage limit (MB)\" to a small number on a test copy, BEFORE the company signed up.",
+  "steps": [
+   {
+    "do": "Your subscription during the trial.",
+    "expect": "A card \"Trial storage used: … of … MB\"."
+   },
+   {
+    "do": "Keep attaching files until the limit is reached, then attach one more.",
+    "expect": "\"Your free-trial storage is full, so this file was not added. Choose a plan to add more files — nothing else you typed has been lost.\""
+   },
+   {
+    "do": "Save a record without a file.",
+    "expect": "Saved — only new files are refused."
+   },
+   {
+    "do": "Choose a plan (ONB-047) and attach a file.",
+    "expect": "Accepted — the limit is for the trial only."
+   }
+  ],
+  "ref": "lib/selfserve.php",
+  "live": false
+ },
+ {
+  "id": "ONB-051",
+  "area": "New company",
+  "module": "5 · Buying modules",
+  "title": "A company cannot set its own prices or fake a payment",
+  "kind": "access",
+  "tags": [
+   "worst",
+   "rule"
+  ],
+  "persona": "MASTER_ADMIN",
+  "company": "ANY",
+  "why": "Two holes closed on 22 Oct: a company's own administrator could change the prices and payment keys its purchases used; and the page told the server what had been bought.",
+  "before": "Signed in as a company's Master Admin (not the platform owner).",
+  "steps": [
+   {
+    "do": "Admin → Billing → change the price per user or the Razorpay keys → Save.",
+    "expect": "\"Prices and payment keys are set by your provider, not inside your workspace.\" Nothing saved."
+   },
+   {
+    "do": "(Tester with browser tools) open the payment page, change the hidden module list, then pay.",
+    "expect": "Exactly what was priced is applied — the server uses its own record of the order."
+   },
+   {
+    "do": "Press the browser's Back after paying and submit the payment confirmation again.",
+    "expect": "\"That payment has already been applied, or its order is not known here. Nothing was changed twice.\""
+   }
+  ],
+  "ref": "lib/billing.php; lib/saas_tenants.php; lib/selfserve.php",
+  "live": false
+ },
+ {
   "id": "MOD-ADM",
   "area": "New company",
   "module": "6 · Setting up each module",
@@ -791,17 +1131,20 @@
   "title": "Operations — what to set up after buying it",
   "kind": "scenario",
   "tags": [
-   "best",
-   "gap"
+   "best"
   ],
   "persona": "BRANCH_MANAGER",
   "company": "ANY",
-  "why": "Work orders, jobs, the team and their availability. Measured 22 Oct: there is no separate team-member register (/inspectors does not exist) — team members are only added through Add a person. Expect step 6 to fail; note what you find.",
+  "why": "Work orders, jobs, the team and their availability.",
   "before": "Operations bought. MOD-ADM done.",
   "steps": [
    {
-    "do": "Team: Admin → User register → + Add a person → \"Which team\": Field team member for inspectors (their own logins).",
-    "expect": "They appear on Operations → Team member availability."
+    "do": "Team: Admin → Masters → Inspectors (\"Team member register\") → \"+ Add team member\" for each inspector / technician.",
+    "expect": "They are listed in the Team member register and appear on Operations → Team member availability."
+   },
+   {
+    "do": "Those who need a login: Admin → User register → + Add a person → link to the team member.",
+    "expect": "They sign in and see their own jobs."
    },
    {
     "do": "Admin → Service scope: \"1 · Services offered on this installation\" → tick what you do → \"Save services offered\".",
@@ -820,8 +1163,8 @@
     "expect": "A work order is raised; allocate a job to a field team member."
    },
    {
-    "do": "Look for one place that lists the team (team member register).",
-    "expect": "A team register exists, reachable from the menu."
+    "do": "Setup page → \"Add your people\" → \"Do this\".",
+    "expect": "Opens the \"Team member register\" (it used to point at an address that does not exist — fixed 22 Oct)."
    }
   ],
   "ref": "views/ops/call_form.php; service-scope; sla-targets",
@@ -1071,25 +1414,36 @@
   "title": "A company that needs people creates an account and posts a requirement",
   "kind": "scenario",
   "tags": [
-   "best",
-   "gap"
+   "best"
   ],
   "persona": "CLIENT_USER",
   "company": "ANY",
-  "why": "The buyer side of the marketplace. Measured 22 Oct: if staff have not switched the client portal on, the account is created and the e-mail says \"sign in now\", but /portal/login shows \"Not found\". Also: no GSTIN/PAN boxes on the form, and the portal has no \"forgot password\" although the e-mail mentions one.",
-  "before": "Signed out. Marketplace on. Client portal switched ON by staff (MOD-MKT step 2).",
+  "why": "The buyer side of the marketplace.",
+  "before": "Signed out. Marketplace on (the client portal does NOT need to be switched on for marketplace accounts).",
   "steps": [
    {
     "do": "/connect → \"Create a company account →\".",
-    "expect": "Heading \"Set up your organisation\": 1 \"Your organisation's name\"; 2 \"What does your organisation do?\" (ticks in four groups: Inspection & Technical Services, Resource Supply, Recruitment, Project Services) and \"Set me up automatically — based on what I ticked above (recommended)\"; 3 Your name, Work e-mail, Mobile, \"Choose a password\". Button \"Create my account →\"."
+    "expect": "Heading \"Set up your organisation\": 1 \"Your organisation's name\", GSTIN (optional), PAN (optional, filled from the GSTIN if you give one); 2 \"What does your organisation do?\" (ticks in four groups: Inspection & Technical Services, Resource Supply, Recruitment, Project Services) and \"Set me up automatically — based on what I ticked above (recommended)\"; 3 Your name, Work e-mail, Mobile, \"Choose a password\". Button \"Create my account →\"."
    },
    {
     "do": "Fill with test data, tick \"Third-Party Inspection Agency\" → Create my account.",
     "expect": "\"Thanks — we have your details. We have sent the next step to <e-mail>\" and \"Sign in →\". An e-mail \"Your <app name> account is ready\"."
    },
    {
-    "do": "Sign in → /portal/login.",
-    "expect": "The client portal; with no inspection work on file it opens on hiring."
+    "do": "Type a wrong GSTIN (\"24ABCDE1234F1Z\") and try again.",
+    "expect": "\"That GSTIN does not look right — it is 15 characters, e.g. 24ABCDE1234F1Z5. Leave it empty if you do not have one.\""
+   },
+   {
+    "do": "Sign in → /portal/login (even with the client portal switched off by staff).",
+    "expect": "The sign-in page opens and you get in; with no inspection work on file it opens on hiring. (Fixed 22 Oct — it said \"Not found\".)"
+   },
+   {
+    "do": "Sign out → \"Forgot your password?\" → your e-mail → \"Send me a link\".",
+    "expect": "\"If that e-mail address has an account here, we have sent it a link…\". The e-mail \"… — choose a new password\" has a link that works once, for one hour."
+   },
+   {
+    "do": "Open the link → \"Choose a new password\" → type it twice → \"Save and sign in\".",
+    "expect": "Signed in with the new password. Opening the same link again: \"This link is not valid — it may already have been used.\""
    },
    {
     "do": "Post a requirement (\"What do you need? *\", Discipline, Sector, Where, Positions, Start, Rate up to, Details, rate model, GST %, TDS %) → post.",
@@ -1110,12 +1464,11 @@
   "title": "Duplicates and agencies",
   "kind": "edge",
   "tags": [
-   "edge",
-   "gap"
+   "edge"
   ],
   "persona": "CLIENT_USER",
   "company": "ANY",
-  "why": "The same company must not end up twice; an agency gets its bench. Measured 22 Oct: the Plans pages (/portal/plans, /pro/plans) are not in any menu — reachable only by typing the address. Expect step 4 to fail.",
+  "why": "The same company must not end up twice; an agency gets its bench.",
   "before": "CLI-001 done.",
   "steps": [
    {
@@ -1131,12 +1484,93 @@
     "expect": "The agency signs in and has \"My bench\" to list its people."
    },
    {
-    "do": "Look for the client plans page (subscribe, credits, coupons) from the portal menu.",
-    "expect": "Reachable from the menu."
+    "do": "Portal menu → \"Plan & credits\"; and as a professional, menu → \"Plan & credits\".",
+    "expect": "Both open the plan page (subscription, credits, coupons). (Fixed 22 Oct — they were in no menu.)"
+   },
+   {
+    "do": "As a client that STAFF invited (not self-joined), with the client portal switched OFF, try to sign in.",
+    "expect": "\"The client portal is switched off at the moment. Ask your contact at … about access.\" — staff decide for their invited clients."
    }
   ],
   "ref": "lib/connect_org.php; lib/portal.php",
   "live": true
+ },
+ {
+  "id": "ONB-070",
+  "area": "New company",
+  "module": "10 · Unused trials",
+  "title": "Super Admin sees when every company was last used",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "PLATFORM_OWNER",
+  "company": "ANY",
+  "why": "The owner: \"Our superadmin panel must show when last data was accessed.\"",
+  "before": "Some companies exist; at least one self sign-up company.",
+  "steps": [
+   {
+    "do": "Super Admin → Companies → \"Check when every company was last used\".",
+    "expect": "\"Checked N companies for when they were last used. Nothing was e-mailed or deleted.\""
+   },
+   {
+    "do": "Read the column \"Last used\".",
+    "expect": "For each company: the date and \"N days ago\". A self sign-up company also shows \"signed itself up\", its trial or paid-until date, and — if it has never paid — \"deleted <date> if unused\" and how many warnings were sent."
+   },
+   {
+    "do": "Use \"Log in as ›\" on a company, then check again.",
+    "expect": "Your own visit as platform owner does NOT count as the company using it."
+   },
+   {
+    "do": "Sign in as a real user of that company, then check again.",
+    "expect": "\"Last used\" moves to today."
+   }
+  ],
+  "ref": "lib/selfserve.php; views/ops/saas_companies.php",
+  "live": true
+ },
+ {
+  "id": "ONB-071",
+  "area": "New company",
+  "module": "10 · Unused trials",
+  "title": "A free trial nobody uses is warned every 15 days and deleted after 90",
+  "kind": "scenario",
+  "tags": [
+   "rule"
+  ],
+  "persona": "PLATFORM_OWNER",
+  "company": "ANY",
+  "why": "The owner: \"if any company with free trial does not access its login for 90 days the data shall be deleted and email notification for every 15 days shall be provided\".",
+  "before": "A self sign-up company that has never paid. Runs from the nightly job; proven by the automated test tests/test_selfserve.php (dates moved forward). To see it live, leave a test company unused.",
+  "steps": [
+   {
+    "do": "After 15 days with nobody signing in: the owner's inbox.",
+    "expect": "An e-mail \"Your trial workspace <company> will be deleted on <date>\" — nobody has signed in for 15 days; sign in to keep it, or choose a plan to keep it for good."
+   },
+   {
+    "do": "Day 30, 45, 60, 75.",
+    "expect": "One more warning each time; Companies shows the count."
+   },
+   {
+    "do": "Someone signs in on day 40.",
+    "expect": "The warnings start over from that day."
+   },
+   {
+    "do": "Day 90 with nobody signing in.",
+    "expect": "The company and its data are deleted; the owner gets \"Your trial workspace <company> has been deleted\"; Companies lists it under deleted companies with the reason."
+   },
+   {
+    "do": "A company that has EVER paid, unused for 120 days.",
+    "expect": "Never warned, never deleted — it is view-only once its plan ends."
+   },
+   {
+    "do": "Super Admin unticks \"Delete unused free trials automatically\".",
+    "expect": "Nothing is deleted while it is off."
+   }
+  ],
+  "ref": "lib/selfserve.php; cron.php",
+  "live": false
  },
  {
   "id": "ONB-060",

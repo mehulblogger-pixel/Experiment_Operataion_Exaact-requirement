@@ -228,7 +228,7 @@ function setup_journey() {
         ['title' => 'Say who you are',
          'why'   => 'Your company name goes on every document, e-mail and report. Nothing else can be printed convincingly until it is right.',
          'done'  => $v('company_name') !== '', 'state' => $v('company_name') ?: 'not set yet',
-         'href'  => '/settings', 'cta' => 'Open Settings'],
+         'href'  => '/company-profile', 'cta' => 'Open company profile'],
 
         ['title' => 'Set your currency and financial year',
          'why'   => 'These decide how every figure is printed and which year it falls in. Changing them later moves figures between years.',
@@ -355,6 +355,10 @@ function ops_setup($route, $method) {
         // 2. Company name (branding).
         $app = trim((string)($_POST['app_name'] ?? ''));
         if ($app !== '') setting_set('app_name', substr($app, 0, 120));
+        // The same name is the company's name on documents, until the company
+        // profile says otherwise — so the dashboard's "Say who you are" is not
+        // left unticked after the owner has just said it.
+        if ($app !== '' && trim((string) setting_get('company_name', '')) === '') setting_set('company_name', substr($app, 0, 120));
         // 3. Industry — sets the wording everywhere, and switches the inspection
         //    accreditation pack ON only when the industry really is inspection.
         $ind = (string)($_POST['industry'] ?? '');

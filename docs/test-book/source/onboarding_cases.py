@@ -32,23 +32,23 @@ C('ONB-000', '0 · The three front doors', 'Where a newcomer can start — the t
 # ════════════════════════════════════════════════════════════════════════════
 # 1 — A company applies for its own workspace
 # ════════════════════════════════════════════════════════════════════════════
-C('ONB-001', '1 · A company applies', 'Online registration is a switch the platform owner turns on', 'scenario', ['rule'],
+C('ONB-001', '1 · A company applies', 'Applying (and waiting for approval) is a switch the platform owner turns on', 'scenario', ['rule'],
   'PLATFORM_OWNER', 'Companies can apply only while the platform owner allows it; it is OFF on a new installation.',
   'Signed in as the Master Admin of the CONTROL site (the platform owner).',
   [('Left menu → Admin → Super Admin → "Cloud workspaces" (or /tenants).', 'Heading "Cloud workspaces". If cloud mode is not on yet: "Switch cloud mode on" with a "Base domain" box — set it first (e.g. operations.mghaiapps.com).'),
    ('Panel "Workspace requests" → press "Online registration: OFF — turn on".', 'Message "Online workspace registration is ON — companies can now apply at /get-started." The button now reads "Online registration: ON — turn off".'),
    ('Signed out, open /login.', 'The line "Run an inspection company and want your own workspace? Start here →" now shows.'),
-   ('Turn it OFF again and open /get-started signed out.', '"We set up workspaces personally… Online self-registration isn\'t open just yet." — no form. Turn it back ON for the next tests.')],
+   ('Turn it OFF again and open /get-started signed out.', '"We set up workspaces personally… Online self-registration isn\'t open just yet." — no form. Turn it back ON for the next tests.'),
+   ('Note: when SELF sign-up is on (ONB-006), /get-started forwards to /start instead — the company creates its own workspace without waiting.', 'Opening /get-started lands on "Start your free trial".')],
   'lib/tenants.php; views/ops/tenants.php', live=False)
 
-C('ONB-002', '1 · A company applies', 'A new company fills "Start your workspace" — best case', 'scenario', ['best'],
-  'NEWCOMER', 'This is the very first thing a new customer does.',
-  'ONB-001: online registration ON. Signed out, private window.',
+C('ONB-002', '1 · A company applies', 'A new company applies and waits for approval — best case', 'scenario', ['best'],
+  'NEWCOMER', 'The route for companies you want to approve yourself (self sign-up OFF).',
+  'ONB-001: online registration ON; self sign-up OFF (ONB-006). Signed out, private window.',
   [('Open /get-started (or "Start here →" on the sign-in page).', 'Heading "Run your inspection company on Inspection Ops", ribbon "◆ Free during launch". Fields: Company name, Your name, "Work e-mail — we\'ll send your workspace details here", "Phone — optional", "Preferred workspace name — optional, letters & numbers" (with the domain shown after it), "Anything we should know? — optional". Button "Request my workspace →".'),
-   ('Company name "TB Test Inspections", Your name "Test Owner", Work e-mail (one you can read), Phone, Preferred workspace name "tbtest", note "Testing onboarding" → "Request my workspace →".', 'A ✅ and "Request received" with three numbered next steps, and that you will hear at the e-mail you gave, usually within one working day.'),
-   ('Check that e-mail inbox.', 'An acknowledgement e-mail arrives.')],
+   ('Company name "TB Test Inspections", Your name "Test Owner", Work e-mail (one you can read), Phone, Preferred workspace name "tbtest", note "Testing onboarding" → "Request my workspace →".', 'A ✅ and "Request received" with three numbered steps ("We review", "We create your workspace and e-mail you how to sign in", "You sign in"), and that you will hear at the e-mail you gave, usually within one working day.'),
+   ('Check that e-mail inbox.', 'An e-mail "We have your request for a … workspace" arrives (fixed 22 Oct — it used to send nothing).')],
   'views/public/get_started.php; lib/tenant_signup.php', )
-CASES[-1]['tags'].append('gap'); CASES[-1]['why'] += ' Measured 22 Oct: the code sends NO e-mail on request or on approval, although the screen promises one — expect step 3 to fail.'
 
 C('ONB-003', '1 · A company applies', 'Applying with bad or repeated details', 'edge', ['edge', 'worst'],
   'NEWCOMER', 'A public form gets every kind of mistake.',
@@ -58,9 +58,45 @@ C('ONB-003', '1 · A company applies', 'Applying with bad or repeated details', 
    ('Preferred workspace name "TB Test!!" (symbols).', 'Refused by the box (letters, numbers and hyphens only) — or, if it gets through, the name is made from the company name instead.'),
    ('Submit a second request with the SAME e-mail as ONB-002.', '"We already have a request in progress for that e-mail — we will be in touch shortly." Nothing new is created.'),
    ('Company name of 300 characters; note of 5,000 characters.', 'Saved or refused with a sentence — never an error page.'),
-   ('Press "Request my workspace →" 20 times quickly with different e-mails.', 'Each is accepted or politely refused; the site keeps working.')],
+   ('Send 6 requests within an hour from the same computer, each with a different e-mail.', 'The 6th: "Too many requests from this connection. Please try again in an hour." (fixed 22 Oct — there was no limit).'),
+   ('Leave the page open for a long time (or sign out in another tab), then press the button.', '"Your page had been open too long. Please press the button again." — nothing typed is lost.')],
   'lib/tenant_signup.php')
-CASES[-1]['tags'].append('gap'); CASES[-1]['why'] += ' Measured 22 Oct: the public form has no rate limit and no form token — repeated automatic submissions are not slowed down.'
+
+C('ONB-004', '1 · A company applies', 'A company signs itself up and starts a 30-day free trial — best case', 'scenario', ['best', 'rule'],
+  'NEWCOMER', 'The owner\'s decision of 22 Oct: a company can start on its own, try every module for 30 days without a card, and buy when ready.',
+  'ONB-006: self sign-up ON. Signed out, private window. Use an e-mail you can read.',
+  [('Open /start (or "Start your free trial →" on the sign-in page, or "Start your free trial →" on the marketplace front page).', 'Heading "Start your free trial", ribbon "◆ 30 days free · no card needed". Fields: Company name, Your name, "Work e-mail — this is how you sign in", "Mobile — optional", "Choose a password — at least … characters", and a tick "I agree: the trial is free for 30 days…". Button "Start my free trial →".'),
+   ('Fill with test data ("TB Selfserve Co"), tick the agreement → "Start my free trial →".', '"We have sent a 6-digit code to <e-mail>." and a box "Enter the 6-digit code from your e-mail".'),
+   ('Open the e-mail "… — your sign-up code ……" and type the code → "Create my workspace →".', 'You are inside your own new workspace at once — no waiting, no second password change. "Welcome! Your workspace is ready and your free trial has started." and "Free trial — 30 days left (until <date>)."'),
+   ('The setup wizard "Welcome — let’s set up your system".', 'It does NOT ask for a password again (you just chose one): it starts at "1 · What does your company do?". Finish it → the setup page.'),
+   ('Look at the left menu.', 'Every module is there during the trial.'),
+   ('Check your inbox.', 'An e-mail "Your … workspace is ready" with the sign-in address, your username, the trial end date, what happens after the trial, and the 90-day rule.'),
+   ('Sign out, then sign in at the product address with your e-mail and password.', 'Straight into your workspace.')],
+  'lib/selfserve.php; views/public/start.php')
+
+C('ONB-005', '1 · A company applies', 'Self sign-up — the worst cases', 'edge', ['edge', 'worst'],
+  'NEWCOMER', 'A public form gets mistakes, repeats and robots.',
+  'ONB-006: self sign-up ON. Signed out.',
+  [('Empty company name / empty name / e-mail "abc" → Start.', '"Please enter your company name." / "Please enter your name." / "Enter a valid work e-mail address."'),
+   ('Password "12345678".', 'Refused with a sentence saying why.'),
+   ('Leave the agreement unticked.', '"Please tick that you agree to the trial terms."'),
+   ('Use an e-mail that already has a workspace (ONB-004).', '"That e-mail already has a workspace — sign in instead, or use "Forgot password?"."'),
+   ('On the code screen type a wrong code.', '"That code is not right. 4 tries left." After 5 wrong codes: "Too many wrong codes. Press "Send a new code"."'),
+   ('Press "Send a new code".', '"A new code has been sent to <e-mail>." The old code no longer works.'),
+   ('Wait more than 30 minutes, then type the code.', '"That code has run out. Press "Send a new code"."'),
+   ('Press "Create my workspace →" twice quickly.', 'Only ONE company is created.'),
+   ('Start 6 sign-ups within an hour from the same computer.', 'The 6th: "Too many sign-ups from this connection. Please try again in an hour."')],
+  'lib/selfserve.php')
+
+C('ONB-006', '1 · A company applies', 'The platform owner switches self sign-up on and sets the trial rules', 'scenario', ['rule'],
+  'PLATFORM_OWNER', 'Self sign-up is the platform owner\'s choice; the numbers are theirs to set.',
+  'Signed in as the control site\'s Master Admin; cloud mode on (ONB-001 step 1).',
+  [('Super Admin → "Companies" → panel "🚀 Self sign-up & free trial".', 'Tick "Companies can sign themselves up", boxes "Free trial (days)" (30), "Trial storage limit (MB)" (not set — no limit), "Logins during the trial" (not set — no limit), "Warn unused trials every (days)" (15), "Delete unused trials after (days)" (90), tick "Delete unused free trials automatically", "Save".'),
+   ('Tick "Companies can sign themselves up" → Save.', '"Self-serve sign-up settings saved." The panel title reads "— ON". /get-started now forwards to /start.'),
+   ('Set "Delete unused trials after" to 10 (less than the 15-day warning) → Save.', '"Saved — but deletion comes before the first warning with these numbers…" Put it back to 90.'),
+   ('Set a storage limit and a number of trial logins (your numbers) → Save.', 'Saved; new trial companies get them.'),
+   ('Untick "Companies can sign themselves up" → Save.', '/start forwards to /get-started again (apply and wait for approval).')],
+  'lib/selfserve.php; views/ops/saas_companies.php', live=False)
 
 # ════════════════════════════════════════════════════════════════════════════
 # 2 — The platform owner approves / creates the company
@@ -70,11 +106,11 @@ C('ONB-010', '2 · The platform owner creates it', 'Approving a workspace reques
   'ONB-002 request exists. Signed in as the control site\'s Master Admin.',
   [('Super Admin → "Cloud workspaces" → panel "Workspace requests".', 'A "1 new" pill. The row shows TB Test Inspections, the e-mail, phone, note and an editable workspace name "tbtest", with "Approve" and "Decline".'),
    ('Change the workspace name to one already in use → Approve.', '"A workspace named "…" already exists — type a different name…" Nothing is created.'),
-   ('Set it back to "tbtest" → Approve → confirm "Approve "TB Test Inspections" and create this workspace?".', 'Either "Workspace "tbtest" created. Their address: https://tbtest.…/ — they finish their own first-time setup there." (hosting panel connected), or a message telling you to create the database and sub-domain in the hosting panel, then "Mark set up".'),
-   ('Open the new address.', 'The new company\'s own sign-in page.'),
-   ('How does the owner of TB Test Inspections learn their sign-in?', 'They receive an e-mail with their address, their username (their e-mail) and a way to set their password.')],
+   ('Set it back to "tbtest" → Approve → confirm "Approve "TB Test Inspections" and create this workspace?".', '"Workspace for “TB Test Inspections” created on a 30-day free trial. Its owner signs in with <e-mail> (temporary password: …). These details have been e-mailed to them." — nothing left to finish by hand.'),
+   ('The applicant checks their inbox.', 'An e-mail "Your … workspace is ready" with the sign-in address, their username (their e-mail) and a temporary password.'),
+   ('The applicant signs in at the product address with that e-mail and temporary password.', 'Asked to choose their own password, then the setup wizard; a "Free trial — 30 days left" line on every screen. (Fixed 22 Oct — approval used to create no login and send nothing.)'),
+   ('Super Admin → Companies.', 'TB Test Inspections is listed: Plan "Free trial", "signed itself up", trial until a date 30 days ahead.')],
   'lib/tenant_signup.php; views/ops/tenants.php')
-CASES[-1]['tags'].append('gap'); CASES[-1]['why'] += ' Measured 22 Oct: approving here creates NO owner login and sends no e-mail — the new workspace\'s only login is "admin" with the server\'s default password, which you would have to hand over yourself. The "Companies" screen (ONB-011) does create the owner properly. Expect step 5 to fail.'
 
 C('ONB-011', '2 · The platform owner creates it', 'Creating a company directly — "Companies" (with its plan)', 'scenario', ['best'],
   'PLATFORM_OWNER', 'The complete way to create a company today: it creates the owner\'s login, the plan and the seat limit together.',
@@ -84,9 +120,9 @@ C('ONB-011', '2 · The platform owner creates it', 'Creating a company directly 
    ('Edge: create another company with the SAME owner e-mail.', '"That owner email already belongs to a company."'),
    ('Edge: Workspace key "TB Owner!" (capitals, symbols).', '"The workspace key must be lowercase letters, digits or hyphens."'),
    ('Edge: leave Owner email empty.', '"A company name and a valid owner email are required."'),
-   ('Write down the temporary password shown and pass it to the owner.', 'The owner also receives it (or a set-your-password link) by e-mail.')],
+   ('Read the message after "Create company".', '"…These sign-in details have been e-mailed to the owner." — or, where e-mail is not set up: "E-mail is not set up, so please pass these details on yourself."'),
+   ('The owner checks their inbox.', 'An e-mail "Your … workspace is ready" with the address, username and temporary password; they must choose their own password at first sign-in.')],
   'lib/saas_tenants.php; views/ops/saas_companies.php')
-CASES[-1]['tags'].append('gap'); CASES[-1]['why'] += ' Measured 22 Oct: no e-mail is sent — the platform owner must pass the temporary password on by hand. Expect step 6 to fail.'
 
 C('ONB-012', '2 · The platform owner creates it', 'Declining a request, and cleaning up test companies', 'edge', ['edge'],
   'PLATFORM_OWNER', 'A request that is not genuine is declined; test companies are removed after testing.',
@@ -132,18 +168,17 @@ C('ONB-030', '4 · Setting up the company', 'The setup cockpit — every card, i
    ('Card "Dropdown lists" → "+ Add a dropdown value".', 'The Masters page, grouped by area (Recruitment & people, Directory, Sales & CRM, Operations, Inspection reporting, Money & billing). Add one value.'),
    ('Card "Wording" → "Change wording".', '"Terminology" with "Start from your trade" and a "Use this wording" per area.'),
    ('Card "Branding & theme".', 'Settings opens on branding (logo, colour).'),
-   ('Section "Getting started" (checklist) → press each "Do this".', 'Each opens the right screen (Invite your team → people; Add your people → team; first job / first requirement → that screen).'),
+   ('Section "Get started" (checklist) → press each "Do this".', '"Tell us what your company does" → Company profile; "Invite your team" → User register; "Add your people" → "Team member register"; "Raise your first work order" → New work order; "Post your first requirement" and "Build your bench" (only with the Marketplace) → those screens. Never the home page (fixed 22 Oct).'),
+   ('Switch Operations off (Admin → Modules & features) and look at the checklist again.', '"Add your people" and "Raise your first work order" are no longer offered; switch Operations back on.'),
    ('"Setup health" lines (e.g. "You are the only user…") → "Fix".', 'Each opens the screen that fixes it.')],
   'lib/setup_cockpit.php; views/ops/cockpit_home.php')
-CASES[-1]['tags'].append('gap'); CASES[-1]['why'] += ' Measured 22 Oct: every "Do this" in the checklist links to the home page (the code reads the wrong field), and "Add your people" points to /inspectors, which does not exist. Expect step 7 to fail.'
 
 C('ONB-031', '4 · Setting up the company', 'The dashboard "Finish setting up" list agrees with what was done', 'edge', ['edge'],
   'MASTER_ADMIN', 'Two checklists must not disagree about the same work.',
   'ONB-020: setup wizard finished with a company name.',
-  [('Open the Dashboard.', 'A panel "Finish setting up …" with its steps; "Say who you are" (the company name) is ticked, because you gave the name in the setup wizard.'),
+  [('Open the Dashboard.', 'A panel "Finish setting up …" with its steps; "Say who you are" (the company name) is ticked, because you gave the name in the setup wizard (fixed 22 Oct). Its button opens Company profile.'),
    ('Compare with the cockpit (ONB-030).', 'The same things are shown as done in both places.')],
   'lib/setup.php')
-CASES[-1]['tags'].append('gap'); CASES[-1]['why'] += ' Measured 22 Oct: the setup wizard stores the name in a different setting from the one the dashboard checks — "Say who you are" stays unticked until Company profile is saved.'
 
 C('ONB-032', '4 · Setting up the company', 'Adding the company\'s people — and the seat limit', 'scenario', ['best', 'edge'],
   'MASTER_ADMIN', 'A plan includes a number of logins; the next one must be refused politely, not crash.',
@@ -224,6 +259,54 @@ C('ONB-046', '5 · Buying modules', 'The company\'s own subscription page', 'sce
    ('Look for a way to buy another module or more seats.', 'Offered — or, while online payment is not switched on: "Online payment is not switched on for your workspace yet."')],
   'lib/saas_tenants.php')
 
+C('ONB-047', '5 · Buying modules', 'A trial company chooses its own modules and pays online', 'scenario', ['best', 'rule'],
+  'MASTER_ADMIN', 'The owner\'s decision: a company buys the modules it wants itself and pays directly.',
+  'ONB-004 company, on its trial. The platform owner has set prices and Razorpay keys (TEST keys on a test copy).',
+  [('Admin → "Your subscription" (/subscription) — or "Choose your plan →" on the trial line at the top of any screen.', 'Cards "Your workspace: Free trial", "Until", "Days left". "You are trying every module free until … Choose the modules you want to keep below — you pay only for those." Panel "Choose your plan".'),
+   ('Tick nothing → "Choose this plan & pay →".', '"Pick at least one module." Nothing charged.'),
+   ('Tick Operations and Sales & CRM, "How many people will sign in?" 3, "Pay" Monthly.', 'The "Plan price" updates as you tick (each module\'s price + 3 × the price per login).'),
+   ('"Choose this plan & pay →" → pay in the Razorpay window with a TEST card / UPI.', '"Payment received. Your plan is active until <date one month ahead>."'),
+   ('Look at the left menu and the subscription page.', 'Only Operations and Sales (plus Administration) remain; the other modules are switched off. Their records are kept.'),
+   ('Add a 4th person.', '"This company is on 3 seats and all 3 are in use…" — buy more logins on the same page.'),
+   ('Super Admin → Companies (the next day, or after "Check when every company was last used").', 'The company shows Plan "Own choice", its paid-until date, and "3 bought" logins.')],
+  'lib/selfserve.php; views/ops/_subscription_plan.php', live=False)
+
+C('ONB-048', '5 · Buying modules', 'When the trial ends without a plan: view-only, never locked out', 'scenario', ['rule'],
+  'MASTER_ADMIN', 'The owner\'s rule: "lock out with notice to upgrade plan but they shall be able to access the data with view only permission".',
+  'A trial company whose trial has ended (on a test copy a developer can move the date; otherwise wait for the trial to end).',
+  [('Sign in as the owner.', 'Every screen says: "Your free trial ended on <date>. Your workspace is view-only — everything can be opened and exported, but nothing new can be saved." with "Choose your plan →".'),
+   ('Open any register, record, report PDF; export to Excel.', 'Everything opens and exports.'),
+   ('Try to save anything (a new lead, a company profile change).', '"Your free trial has ended, so your workspace is view-only: everything can be opened, printed and exported, but nothing new can be saved. Choose a plan to carry on." — taken to Your subscription. Nothing saved.'),
+   ('Sign in as a colleague who is not an administrator and try to save.', 'The same refusal, ending "Ask your workspace owner to choose a plan." They stay on their screen.'),
+   ('The owner chooses a plan and pays (ONB-047).', 'Saving works again at once.')],
+  'lib/selfserve.php; index.php', live=False)
+
+C('ONB-049', '5 · Buying modules', 'Changing plan later — upgrade, renew, downgrade', 'edge', ['rule', 'edge'],
+  'MASTER_ADMIN', 'The owner\'s rule of 19 Oct (Q-L): upgrade now with credit, renew and downgrade at the end of the period.',
+  'A company with a paid plan running (ONB-047).',
+  [('Your subscription → tick one more module → "Change or renew →".', 'An UPGRADE: it starts today; the unused days of the current plan are taken off the price; the new period runs one month from today.'),
+   ('Choose exactly the same modules and logins again.', 'A RENEWAL: paid now, it starts the day after the current period ends; nothing is lost.'),
+   ('Untick a module (a smaller plan).', '"Your smaller plan starts on <date>, when the current one ends. Nothing is charged now." The page shows "Booked: from <date> your plan becomes …". Everything stays switched on until then.'),
+   ('On that date (or after), open Your subscription.', 'The smaller selection is offered to be paid.')],
+  'lib/selfserve.php', live=False)
+
+C('ONB-050', '5 · Buying modules', 'Trial storage limit', 'edge', ['rule', 'edge'],
+  'MASTER_ADMIN', 'The owner\'s rule: the trial has a limit on storage. The number is the platform owner\'s (ONB-006).',
+  'The platform owner has set "Trial storage limit (MB)" to a small number on a test copy, BEFORE the company signed up.',
+  [('Your subscription during the trial.', 'A card "Trial storage used: … of … MB".'),
+   ('Keep attaching files until the limit is reached, then attach one more.', '"Your free-trial storage is full, so this file was not added. Choose a plan to add more files — nothing else you typed has been lost."'),
+   ('Save a record without a file.', 'Saved — only new files are refused.'),
+   ('Choose a plan (ONB-047) and attach a file.', 'Accepted — the limit is for the trial only.')],
+  'lib/selfserve.php', live=False)
+
+C('ONB-051', '5 · Buying modules', 'A company cannot set its own prices or fake a payment', 'access', ['worst', 'rule'],
+  'MASTER_ADMIN', 'Two holes closed on 22 Oct: a company\'s own administrator could change the prices and payment keys its purchases used; and the page told the server what had been bought.',
+  'Signed in as a company\'s Master Admin (not the platform owner).',
+  [('Admin → Billing → change the price per user or the Razorpay keys → Save.', '"Prices and payment keys are set by your provider, not inside your workspace." Nothing saved.'),
+   ('(Tester with browser tools) open the payment page, change the hidden module list, then pay.', 'Exactly what was priced is applied — the server uses its own record of the order.'),
+   ('Press the browser\'s Back after paying and submit the payment confirmation again.', '"That payment has already been applied, or its order is not known here. Nothing was changed twice."')],
+  'lib/billing.php; lib/saas_tenants.php; lib/selfserve.php', live=False)
+
 # ════════════════════════════════════════════════════════════════════════════
 # 6 — Setting up each module after buying it
 # ════════════════════════════════════════════════════════════════════════════
@@ -254,14 +337,14 @@ C('MOD-SAL', '6 · Setting up each module', 'Sales & CRM — what to set up afte
 C('MOD-OPS', '6 · Setting up each module', 'Operations — what to set up after buying it', 'scenario', ['best'],
   'BRANCH_MANAGER', 'Work orders, jobs, the team and their availability.',
   'Operations bought. MOD-ADM done.',
-  [('Team: Admin → User register → + Add a person → "Which team": Field team member for inspectors (their own logins).', 'They appear on Operations → Team member availability.'),
+  [('Team: Admin → Masters → Inspectors ("Team member register") → "+ Add team member" for each inspector / technician.', 'They are listed in the Team member register and appear on Operations → Team member availability.'),
+   ('Those who need a login: Admin → User register → + Add a person → link to the team member.', 'They sign in and see their own jobs.'),
    ('Admin → Service scope: "1 · Services offered on this installation" → tick what you do → "Save services offered".', 'Saved.'),
    ('Operations → SLA targets: Client, Stage, Target (days) → "Save target".', 'Listed under "Current targets".'),
    ('Masters → Operations lists (26): check work-order types, inspection types.', 'Your values present.'),
    ('Operations → New work order: tabs Client & quote · What\'s inspected · When · Offices & money · Purchase order · Reporting → save.', 'A work order is raised; allocate a job to a field team member.'),
-   ('Look for one place that lists the team (team member register).', 'A team register exists, reachable from the menu.')],
+   ('Setup page → "Add your people" → "Do this".', 'Opens the "Team member register" (it used to point at an address that does not exist — fixed 22 Oct).')],
   'views/ops/call_form.php; service-scope; sla-targets')
-CASES[-1]['tags'].append('gap'); CASES[-1]['why'] += ' Measured 22 Oct: there is no separate team-member register (/inspectors does not exist) — team members are only added through Add a person. Expect step 6 to fail; note what you find.'
 
 C('MOD-REP', '6 · Setting up each module', 'Inspection reporting — what to set up after buying it', 'scenario', ['best'],
   'BRANCH_APP_MANAGER', 'Report types, numbering, formats and signatures must exist before the first report.',
@@ -333,14 +416,16 @@ C('PRO-002', '7 · A professional joins', 'Professional sign-up — the worst ca
 # ════════════════════════════════════════════════════════════════════════════
 C('CLI-001', '8 · A company posts a requirement', 'A company that needs people creates an account and posts a requirement', 'scenario', ['best'],
   'CLIENT_USER', 'The buyer side of the marketplace.',
-  'Signed out. Marketplace on. Client portal switched ON by staff (MOD-MKT step 2).',
-  [('/connect → "Create a company account →".', 'Heading "Set up your organisation": 1 "Your organisation\'s name"; 2 "What does your organisation do?" (ticks in four groups: Inspection & Technical Services, Resource Supply, Recruitment, Project Services) and "Set me up automatically — based on what I ticked above (recommended)"; 3 Your name, Work e-mail, Mobile, "Choose a password". Button "Create my account →".'),
+  'Signed out. Marketplace on (the client portal does NOT need to be switched on for marketplace accounts).',
+  [('/connect → "Create a company account →".', 'Heading "Set up your organisation": 1 "Your organisation\'s name", GSTIN (optional), PAN (optional, filled from the GSTIN if you give one); 2 "What does your organisation do?" (ticks in four groups: Inspection & Technical Services, Resource Supply, Recruitment, Project Services) and "Set me up automatically — based on what I ticked above (recommended)"; 3 Your name, Work e-mail, Mobile, "Choose a password". Button "Create my account →".'),
    ('Fill with test data, tick "Third-Party Inspection Agency" → Create my account.', '"Thanks — we have your details. We have sent the next step to <e-mail>" and "Sign in →". An e-mail "Your <app name> account is ready".'),
-   ('Sign in → /portal/login.', 'The client portal; with no inspection work on file it opens on hiring.'),
+   ('Type a wrong GSTIN ("24ABCDE1234F1Z") and try again.', '"That GSTIN does not look right — it is 15 characters, e.g. 24ABCDE1234F1Z5. Leave it empty if you do not have one."'),
+   ('Sign in → /portal/login (even with the client portal switched off by staff).', 'The sign-in page opens and you get in; with no inspection work on file it opens on hiring. (Fixed 22 Oct — it said "Not found".)'),
+   ('Sign out → "Forgot your password?" → your e-mail → "Send me a link".', '"If that e-mail address has an account here, we have sent it a link…". The e-mail "… — choose a new password" has a link that works once, for one hour.'),
+   ('Open the link → "Choose a new password" → type it twice → "Save and sign in".', 'Signed in with the new password. Opening the same link again: "This link is not valid — it may already have been used."'),
    ('Post a requirement ("What do you need? *", Discipline, Sector, Where, Positions, Start, Rate up to, Details, rate model, GST %, TDS %) → post.', '"Your requirement is posted and open for applications." Professionals (PRO-001) see it under Open jobs.'),
    ('Empty title → post.', '"Give the requirement a one-line title… Nothing was posted."')],
   'lib/connect_org.php; lib/portal.php')
-CASES[-1]['tags'].append('gap'); CASES[-1]['why'] += ' Measured 22 Oct: if staff have not switched the client portal on, the account is created and the e-mail says "sign in now", but /portal/login shows "Not found". Also: no GSTIN/PAN boxes on the form, and the portal has no "forgot password" although the e-mail mentions one.'
 
 C('CLI-002', '8 · A company posts a requirement', 'Duplicates and agencies', 'edge', ['edge'],
   'CLIENT_USER', 'The same company must not end up twice; an agency gets its bench.',
@@ -348,9 +433,32 @@ C('CLI-002', '8 · A company posts a requirement', 'Duplicates and agencies', 'e
   [('Create an account again with the same e-mail.', 'The screen shows the same neutral "we have sent the next step"; the e-mail says an account already exists. Nothing new is created.'),
    ('Same organisation name, new e-mail.', 'Nothing created; an access request waits for staff (Access requests); the e-mail says so.'),
    ('/connect → "Create an agency account →" and finish.', 'The agency signs in and has "My bench" to list its people.'),
-   ('Look for the client plans page (subscribe, credits, coupons) from the portal menu.', 'Reachable from the menu.')],
+   ('Portal menu → "Plan & credits"; and as a professional, menu → "Plan & credits".', 'Both open the plan page (subscription, credits, coupons). (Fixed 22 Oct — they were in no menu.)'),
+   ('As a client that STAFF invited (not self-joined), with the client portal switched OFF, try to sign in.', '"The client portal is switched off at the moment. Ask your contact at … about access." — staff decide for their invited clients.')],
   'lib/connect_org.php; lib/portal.php')
-CASES[-1]['tags'].append('gap'); CASES[-1]['why'] += ' Measured 22 Oct: the Plans pages (/portal/plans, /pro/plans) are not in any menu — reachable only by typing the address. Expect step 4 to fail.'
+
+# ════════════════════════════════════════════════════════════════════════════
+# 10 — Unused free trials (the owner's 90-day rule)
+# ════════════════════════════════════════════════════════════════════════════
+C('ONB-070', '10 · Unused trials', 'Super Admin sees when every company was last used', 'scenario', ['best', 'rule'],
+  'PLATFORM_OWNER', 'The owner: "Our superadmin panel must show when last data was accessed."',
+  'Some companies exist; at least one self sign-up company.',
+  [('Super Admin → Companies → "Check when every company was last used".', '"Checked N companies for when they were last used. Nothing was e-mailed or deleted."'),
+   ('Read the column "Last used".', 'For each company: the date and "N days ago". A self sign-up company also shows "signed itself up", its trial or paid-until date, and — if it has never paid — "deleted <date> if unused" and how many warnings were sent.'),
+   ('Use "Log in as ›" on a company, then check again.', 'Your own visit as platform owner does NOT count as the company using it.'),
+   ('Sign in as a real user of that company, then check again.', '"Last used" moves to today.')],
+  'lib/selfserve.php; views/ops/saas_companies.php')
+
+C('ONB-071', '10 · Unused trials', 'A free trial nobody uses is warned every 15 days and deleted after 90', 'scenario', ['rule'],
+  'PLATFORM_OWNER', 'The owner: "if any company with free trial does not access its login for 90 days the data shall be deleted and email notification for every 15 days shall be provided".',
+  'A self sign-up company that has never paid. Runs from the nightly job; proven by the automated test tests/test_selfserve.php (dates moved forward). To see it live, leave a test company unused.',
+  [('After 15 days with nobody signing in: the owner\'s inbox.', 'An e-mail "Your trial workspace <company> will be deleted on <date>" — nobody has signed in for 15 days; sign in to keep it, or choose a plan to keep it for good.'),
+   ('Day 30, 45, 60, 75.', 'One more warning each time; Companies shows the count.'),
+   ('Someone signs in on day 40.', 'The warnings start over from that day.'),
+   ('Day 90 with nobody signing in.', 'The company and its data are deleted; the owner gets "Your trial workspace <company> has been deleted"; Companies lists it under deleted companies with the reason.'),
+   ('A company that has EVER paid, unused for 120 days.', 'Never warned, never deleted — it is view-only once its plan ends.'),
+   ('Super Admin unticks "Delete unused free trials automatically".', 'Nothing is deleted while it is off.')],
+  'lib/selfserve.php; cron.php', live=False)
 
 # ════════════════════════════════════════════════════════════════════════════
 # 9 — Self-hosted install (licence)

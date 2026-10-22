@@ -27,6 +27,7 @@ portal/dep-approve	deputation.approve
 portal/dep-gate	deputation
 portal/deputations	deputation
 portal/find	market.post
+portal/forgot	
 portal/hire	market.post
 portal/hire-req	market.post
 portal/hiring	market.post
@@ -44,6 +45,7 @@ portal/report-file	market.vouchers
 portal/reports	reports
 portal/reputation	
 portal/request	request
+portal/reset	
 portal/roster	market.post
 portal/talent	market.post
 portal/team	

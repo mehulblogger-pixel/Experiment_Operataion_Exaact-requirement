@@ -436,6 +436,19 @@ if ($m8('hiring', 'People & hiring') && function_exists('appr_tick')) {
     catch (Throwable $e) { echo "Approval tick: failed — " . $e->getMessage() . "\n"; }
 }
 
+// Self-serve companies (lib/selfserve.php) — only on the platform owner's own
+// install: record when every company was last used, keep each self-serve
+// company's prices and payment keys current, warn unused free trials every N
+// days and delete them after the owner's limit. Never touches a company that has
+// ever paid.
+if (function_exists('selfserve_sweep') && (!function_exists('current_tenant') || current_tenant() === '')) {
+    try {
+        $ss = selfserve_sweep();
+        if ($ss['checked']) echo "Companies checked: {$ss['checked']}, inactivity warnings sent: {$ss['notices']}, unused trials deleted: {$ss['deleted']}\n";
+        foreach ($ss['lines'] as $ln) echo "  " . $ln . "\n";
+    } catch (Throwable $e) { echo "Self-serve companies: failed — " . $e->getMessage() . "\n"; }
+}
+
 // What this workspace is not subscribed to, named once rather than silently
 // missing. The operator reads this output; it says which product is not enabled
 // and nothing about how that is decided.

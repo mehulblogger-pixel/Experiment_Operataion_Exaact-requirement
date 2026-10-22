@@ -47,6 +47,8 @@ function tenant_signup_migrate($pdo = null) {
         created_at     VARCHAR(40)  NOT NULL DEFAULT ''
     )");
     } catch (Throwable $e) { /* never block the rest of the boot chain */ }
+    // Where a request came from, so one connection cannot flood the inbox.
+    if (function_exists('ensure_column')) { try { ensure_column('tenant_requests', 'ip', "VARCHAR(60) DEFAULT ''"); } catch (Throwable $e) {} }
 }
 
 /** The public page is OFF by default — the operator turns it on from the
@@ -90,12 +92,25 @@ function tenant_signup_submit(array $in) {
     // Don't take a second live request for the same e-mail while one is open.
     $dupe = (int)ops_val("SELECT COUNT(*) FROM tenant_requests WHERE LOWER(email)=? AND status IN ('PENDING','APPROVED')", [$email]);
     if ($dupe > 0) return [false, 'We already have a request in progress for that e-mail — we will be in touch shortly.', 0];
+    // One connection may not flood the inbox (a technical limit, not a business rule).
+    $ip = function_exists('client_ip') ? client_ip() : (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $recent = (int)ops_val("SELECT COUNT(*) FROM tenant_requests WHERE ip=? AND created_at>=?", [$ip, date('c', time() - 3600)]);
+    if ($recent >= 5) return [false, 'Too many requests from this connection. Please try again in an hour.', 0];
 
-    db()->prepare("INSERT INTO tenant_requests (company,contact_name,email,phone,sub,note,status,created_at)
-                   VALUES (?,?,?,?,?,?, 'PENDING', ?)")
+    db()->prepare("INSERT INTO tenant_requests (company,contact_name,email,phone,sub,note,status,ip,created_at)
+                   VALUES (?,?,?,?,?,?, 'PENDING', ?, ?)")
         ->execute([mb_substr($company,0,150), mb_substr($person,0,120), mb_substr($email,0,160),
-                   mb_substr($phone,0,40), mb_substr($sub,0,48), mb_substr($note,0,500), date('c')]);
-    return [true, 'Thanks — your request has been received. We will review it and set up your workspace shortly.', (int)db()->lastInsertId()];
+                   mb_substr($phone,0,40), mb_substr($sub,0,48), mb_substr($note,0,500), $ip, date('c')]);
+    $id = (int)db()->lastInsertId();
+    // The page promises an e-mail; this is it.
+    if (function_exists('ops_mail')) {
+        $app = function_exists('app_name') ? app_name() : 'Operations';
+        ops_mail($email, 'We have your request for a ' . $app . ' workspace',
+            "Hello " . ($person ?: 'there') . ",\n\nThank you — we have your request for a " . $app . " workspace for " . $company . ".\n"
+            . "We review every request personally, usually within one working day, and will e-mail you here with your sign-in details.\n",
+            '', 'tenant_request_ack');
+    }
+    return [true, 'Thanks — your request has been received. We will review it and set up your workspace shortly.', $id];
 }
 
 function tenant_request_get($id) {
@@ -144,24 +159,41 @@ function tenant_request_approve($id, $subOverride = '') {
     if (isset($reg['tenants'][$sub]))
         return [false, 'A workspace named “' . $sub . '” already exists — type a different name in the box and approve again (e.g. ' . $sub . '-2 or ' . $sub . '-<city>).'];
 
-    // Automatic path — cPanel makes the database (and maybe the subdomain).
+    if (function_exists('saas_login_lookup') && saas_login_lookup((string)$r['email']) !== '')
+        return [false, 'That e-mail already has a workspace — the owner can simply sign in.'];
+
+    // Where its data lives: cPanel makes a database when it is connected;
+    // otherwise storage is chosen automatically, so there is no hand-finishing.
+    $db = null; $note = '';
     if (function_exists('cpanel_configured') && cpanel_configured()) {
         $prov = cpanel_provision_workspace($sub);
         if (empty($prov['ok']))
             return [false, 'cPanel could not create the workspace: ' . implode(' ', $prov['errors'] ?? [])];
-        $err = tenant_add($sub, $r['company'], $prov['db']);
-        if ($err !== '') return [false, $err];
+        $db = $prov['db'];
         $note = !empty($prov['errors']) ? ' (' . implode(' ', $prov['errors']) . ')' : '';
-        tenant_request_mark($id, 'PROVISIONED', $sub, 'Auto-provisioned via cPanel' . $note);
-        return [true, 'Workspace “' . $sub . '” created. Their address: https://' . $sub . '.' . tenant_base_domain()
-            . '/ — they finish their own first-time setup there.' . $note];
     }
+    if (!function_exists('saas_company_create')) return [false, 'The company builder is not available on this build.'];
 
-    // Assisted path — approve now, finish provisioning by hand.
-    tenant_request_mark($id, 'APPROVED', $sub,
-        'Approved — create the database + subdomain in cPanel, then add “' . $sub . '” on the Workspaces panel.');
-    return [true, 'Approved. Now create the database + subdomain in cPanel, then add the workspace “' . $sub
-        . '” on the Workspaces panel below to finish. (Once its database is registered, mark this request as set up.)'];
+    // The same company a self sign-up gets — owner login, free trial of every
+    // module, the same rules after the trial — only with the platform owner's
+    // approval in between (lib/selfserve.php).
+    $cfg   = function_exists('selfserve_cfg') ? selfserve_cfg() : ['trial_days' => 30, 'storage_mb' => 0, 'trial_seats' => 0];
+    $until = date('Y-m-d', strtotime('+' . (int)$cfg['trial_days'] . ' days'));
+    $res = saas_company_create([
+        'company' => (string)$r['company'], 'key' => $sub, 'owner_name' => (string)$r['contact_name'],
+        'owner_email' => (string)$r['email'], 'owner_phone' => (string)$r['phone'], 'owner_pass' => '',
+        'plan' => 'TRIAL', 'modules' => array_merge(['admin'], function_exists('selfserve_all_modules') ? selfserve_all_modules() : []),
+        'source' => 'self', 'trial_until' => $until, 'db' => $db,
+        'pending_extra' => ['billing_mode' => 'self', 'trial_until' => $until, 'storage_mb' => (int)$cfg['storage_mb'],
+                            'seat_limit' => (int)$cfg['trial_seats']],
+    ]);
+    if (!$res['ok']) return [false, $res['error']];
+    tenant_request_mark($id, 'PROVISIONED', $res['key'], 'Approved — workspace and owner login created' . $note);
+    $mailed = function_exists('saas_mail_new_owner')
+        ? saas_mail_new_owner((string)$r['email'], (string)$r['contact_name'], (string)$r['company'], $res['temp_pass']) : 0;
+    return [true, 'Workspace for “' . $r['company'] . '” created on a ' . (int)$cfg['trial_days'] . '-day free trial. '
+        . 'Its owner signs in with ' . $r['email'] . ' (temporary password: ' . $res['temp_pass'] . ').'
+        . ($mailed ? ' These details have been e-mailed to them.' : ' E-mail is not set up, so please pass these details on yourself.') . $note];
 }
 
 /** Mark an APPROVED request as PROVISIONED once its workspace has been added
@@ -192,12 +224,22 @@ function tenant_signup_route($method) {
         if (function_exists('current_user') && !current_user()) redirect('/login');
         http_response_code(404); echo 'Not available.'; exit;
     }
+    // Self-serve sign-up switched on: companies create their own workspace at
+    // /start instead of applying and waiting (lib/selfserve.php).
+    if (function_exists('selfserve_enabled') && selfserve_enabled() && function_exists('selfserve_ready') && selfserve_ready()) redirect('/start');
     tenant_signup_migrate();
     $done = false; $err = ''; $open = tenant_signup_enabled();
     if ($method === 'POST' && $open) {
-        [$ok, $msg] = tenant_signup_submit($_POST);
-        if ($ok) $done = true; else $err = $msg;
+        if (trim((string)($_POST['website'] ?? '')) !== '') {
+            $done = true;                       // a robot filled the hidden field: same reply, nothing stored
+        } elseif (function_exists('csrf_ok') && !csrf_ok($_POST['_csrf'] ?? '')) {
+            $err = 'Your page had been open too long. Please press the button again.';
+        } else {
+            [$ok, $msg] = tenant_signup_submit($_POST);
+            if ($ok) $done = true; else $err = $msg;
+        }
     }
+    $GLOBALS['__ws_csrf'] = function_exists('csrf_token') ? csrf_token() : '';
     $GLOBALS['__ws_done'] = $done;
     $GLOBALS['__ws_err']  = $err;
     $GLOBALS['__ws_open'] = $open;

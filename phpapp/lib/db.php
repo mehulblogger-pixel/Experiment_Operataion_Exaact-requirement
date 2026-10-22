@@ -835,6 +835,7 @@ function run_schema($withSeeds = true) {
     // SaaS control plane — the cross-company directory used by single-URL login
     // and the super-admin console. Additive; empty on a single-company install.
     if (function_exists('saas_tenants_migrate')) saas_tenants_migrate();
+    if (function_exists('selfserve_migrate')) selfserve_migrate();      // self-serve trial facts, sign-up codes, orders, deletions log
     //  Batch 3 · Q26 — the queue a public sign-up lands in when the organisation
     //  is already ours. Built here rather than on first use, so a workspace that
     //  has never had such a sign-up still has somewhere to put the first one.

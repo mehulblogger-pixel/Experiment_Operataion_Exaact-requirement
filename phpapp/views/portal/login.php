@@ -21,6 +21,7 @@
   <input class="form-control" id="ppass" name="password" type="password" autocomplete="current-password" required>
   <button class="btn" type="submit" style="margin-top:20px;width:100%">Sign in</button>
 </form>
+<p class="pnote" style="max-width:430px;margin:12px auto 0;text-align:center"><a href="/portal/forgot">Forgot your password?</a></p>
 
 <p class="pnote" style="max-width:430px;margin:22px auto 0;text-align:center">
   <strong>New here?</strong> A company or agency can <a href="/join">create an account →</a>.

@@ -531,6 +531,13 @@
       <div class="msg msg-warning">Your role requires two-step sign-in and it is not set up yet.
         <a href="/two-factor"><strong>Set it up now</strong></a> — it takes about a minute and needs only your phone.</div>
 <?php endif; ?>
+<?php // A company that signed itself up: its trial days, or that it is now
+      // view-only, said on every screen with the one way to fix it. ?>
+<?php if (function_exists('saas_access_banner') && ($__sb = saas_access_banner())): ?>
+      <div class="msg msg-<?= e($__sb['tone']) ?>"><?= e($__sb['text']) ?>
+        <?php if ($__sb['link'] !== '' && $cur !== 'subscription'): ?> <a href="<?= e($__sb['link']) ?>"><strong><?= e($__sb['cta']) ?> →</strong></a><?php endif; ?>
+        <?php if ($__sb['note'] !== ''): ?> <?= e($__sb['note']) ?><?php endif; ?></div>
+<?php endif; ?>
 <?php
   //  ---- NOBODY IS LEFT STARING AT AN EMPTY SCREEN -------------------------
   //

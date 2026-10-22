@@ -62,6 +62,8 @@ function portal_migrate() {
     ensure_column('client_users', 'perms', "VARCHAR(400) DEFAULT ''");
     ensure_column('client_users', 'site_ids', "VARCHAR(400) DEFAULT ''");
     ensure_column('client_users', 'role_preset', "VARCHAR(30) DEFAULT ''");
+    ensure_column('client_users', 'reset_hash', "VARCHAR(64) DEFAULT ''");      // forgotten password: hash of the link's token
+    ensure_column('client_users', 'reset_expires', "VARCHAR(30) DEFAULT ''");
     // What they asked for. Kept apart from the inspection-call register until a
     // coordinator accepts it — a client cannot create work in our system, only
     // ask for it.
@@ -136,6 +138,20 @@ function portal_try($fn, $fallback = []) {
 }
 
 function portal_enabled() { return setting_get('portal_enabled', '0') === '1'; }
+
+// The sign-in door. Open when staff have switched the client portal on — or
+// when the marketplace is on, because a company or agency that joined the
+// marketplace itself signs in here. Without this, /join created the account,
+// e-mailed "sign in now", and the sign-in page said "Not found".
+function portal_door_open() {
+    return portal_enabled() || (function_exists('install_marketplace_enabled') && install_marketplace_enabled());
+}
+// Who may come through it: everybody while the portal is on; while it is off,
+// only the accounts that joined through the marketplace themselves (a client the
+// staff invited stays out, as the staff intended by switching the portal off).
+function portal_account_allowed(array $u) {
+    return portal_enabled() || (string) ($u['created_by'] ?? '') === 'self-service';
+}
 
 // ============================================================================
 //  Identity — its own session key, never current_user()
@@ -223,10 +239,11 @@ function portal_off() {
 }
 
 function portal_require() {
-    if (!portal_enabled()) portal_off();
+    if (!portal_door_open()) portal_off();
     if (!portal_user()) redirect('/portal/login');
     // A client who has not set their own password does nothing else first.
     $u = portal_user();
+    if (!portal_account_allowed((array) $u)) { unset($_SESSION['cuid']); portal_off(); }
     if (!empty($u['must_change']) && strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/portal/password') === false)
         redirect('/portal/password');
 }
@@ -286,6 +303,8 @@ function portal_login($email, $password) {
     // Auto-revoke: an expired account cannot sign in, with no cron.
     if (trim((string)($u['access_expires'] ?? '')) !== '' && (string)$u['access_expires'] < date('Y-m-d'))
         return 'Your access has expired. Ask your contact at ' . app_name() . ' to renew it.';
+    if (!portal_account_allowed($u))
+        return 'The client portal is switched off at the moment. Ask your contact at ' . app_name() . ' about access.';
     portal_start_session((int)$u['id']);
     if (function_exists('login_clear')) login_clear('portal:' . $email);
     try { db()->prepare("UPDATE client_users SET last_login_at=?, last_login_ip=? WHERE id=?")
@@ -725,6 +744,53 @@ function portal_base_url() {
 // so the page can say so on the way IN. An invitation that has already been
 // used, or has expired, used to show a perfectly good form that only refused
 // once somebody had chosen a password and typed it twice.
+// ---- Forgotten password ------------------------------------------------------
+// Only a hash of the link's token is stored, so a copy of the database cannot be
+// used to take over an account.
+function portal_reset_request($email) {
+    $email = email_key($email);
+    if ($email === '') return;
+    $u = portal_try(fn() => ops_one("SELECT * FROM client_users WHERE LOWER(TRIM(email))=? AND is_active=1", [$email]), null);
+    if (!$u || !portal_account_allowed($u)) return;
+    $token = bin2hex(random_bytes(24));
+    try {
+        db()->prepare("UPDATE client_users SET reset_hash=?, reset_expires=? WHERE id=?")
+            ->execute([hash('sha256', $token), date('c', time() + 3600), (int) $u['id']]);
+    } catch (Throwable $e) { return; }
+    $link = (function_exists('portal_base_url') ? portal_base_url() : '') . '/portal/reset?t=' . $token;
+    if (function_exists('ops_mail'))
+        ops_mail((string) $u['email'], app_name() . ' — choose a new password',
+            "Hello " . ((string) $u['name'] ?: 'there') . ",\n\nSomeone asked to reset the password for this e-mail address.\n"
+            . "To choose a new password, open this link within one hour:\n\n" . $link . "\n\n"
+            . "If it was not you, ignore this e-mail — your password has not changed.\n", '', 'portal_reset');
+    portal_log('RESET_REQUESTED', (string) $u['email']);
+}
+function portal_reset_user($token) {
+    $token = trim((string) $token);
+    if ($token === '') return null;
+    return portal_try(fn() => ops_one("SELECT * FROM client_users WHERE reset_hash=? AND reset_hash<>'' AND is_active=1",
+        [hash('sha256', $token)]), null);
+}
+function portal_reset_problem($token) {
+    $u = portal_reset_user($token);
+    if (!$u) return 'This link is not valid — it may already have been used. Ask for a new one below.';
+    if ((string) $u['reset_expires'] < date('c')) return 'This link has expired. Ask for a new one below.';
+    return '';
+}
+function portal_reset_finish($token, $password, $confirm) {
+    $why = portal_reset_problem($token);
+    if ($why !== '') return $why;
+    $u = portal_reset_user($token);
+    if ((string) $password !== (string) $confirm) return 'The two passwords do not match.';
+    $why = function_exists('password_problem_text') ? password_problem_text((string) $password, (string) $u['email'], (string) $u['name']) : '';
+    if ($why !== '') return $why;
+    db()->prepare("UPDATE client_users SET password_hash=?, must_change=0, reset_hash='', reset_expires='' WHERE id=?")
+        ->execute([password_hash((string) $password, PASSWORD_DEFAULT), (int) $u['id']]);
+    portal_start_session((int) $u['id']);
+    portal_log('PASSWORD_RESET', (string) $u['email']);
+    return '';
+}
+
 function portal_invite_problem($token) {
     $token = trim((string)$token);
     $u = $token === '' ? null : portal_try(fn() => ops_one(
@@ -823,7 +889,7 @@ function portal_route($route, $method) {
 
     // Everything before the gate: the pages somebody who is NOT signed in needs.
     if ($route === 'portal/login') {
-        if (!portal_enabled()) portal_off();
+        if (!portal_door_open()) portal_off();
         if (portal_user()) redirect('/portal');
         $err = '';
         if ($method === 'POST') {
@@ -833,8 +899,38 @@ function portal_route($route, $method) {
         portal_view('login', ['err' => $err], false);
         exit;
     }
+    // Forgotten password: a one-hour link to choose a new one. The reply is the
+    // same whether or not the address is registered.
+    if ($route === 'portal/forgot') {
+        if (!portal_door_open()) portal_off();
+        $sent = false; $err = '';
+        if ($method === 'POST') {
+            $ipKey = 'portal-forgot:' . (function_exists('client_ip') ? client_ip() : '');
+            $wait = function_exists('login_locked_for') ? login_locked_for($ipKey) : 0;
+            if ($wait > 0) $err = 'Too many requests. Try again in ' . $wait . ' minute(s).';
+            else {
+                if (function_exists('login_fail')) login_fail($ipKey);   // counts requests, not just failures
+                portal_reset_request((string) ($_POST['email'] ?? ''));
+                $sent = true;
+            }
+        }
+        portal_view('forgot', ['sent' => $sent, 'err' => $err], false);
+        exit;
+    }
+    if ($route === 'portal/reset') {
+        if (!portal_door_open()) portal_off();
+        $token = (string)($_GET['t'] ?? $_POST['t'] ?? '');
+        $err = portal_reset_problem($token);
+        $dead = $err !== '';
+        if (!$dead && $method === 'POST') {
+            $err = portal_reset_finish($token, $_POST['password'] ?? '', $_POST['confirm'] ?? '');
+            if ($err === '') redirect('/portal');
+        }
+        portal_view('reset', ['err' => $err, 'token' => $token, 'dead' => $dead], false);
+        exit;
+    }
     if ($route === 'portal/accept') {
-        if (!portal_enabled()) portal_off();
+        if (!portal_door_open()) portal_off();
         $token = (string)($_GET['t'] ?? $_POST['t'] ?? '');
         // Checked on the way in as well as on the way out, so a used or expired
         // link says so straight away rather than after somebody has chosen a

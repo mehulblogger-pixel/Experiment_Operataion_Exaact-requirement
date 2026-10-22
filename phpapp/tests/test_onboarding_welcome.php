@@ -13,16 +13,33 @@ try {
     // shape: every step carries a label, why, url, icon and a done flag
     install_mode_set('cloud');
     $steps = onboarding_steps();
-    t_ok(count($steps) === 3, 'there are three getting-started steps');
+    t_ok(count($steps) >= 3, 'there are getting-started steps');
     foreach ($steps as $s) t_ok(isset($s['label'], $s['why'], $s['url'], $s['icon']) && array_key_exists('done', $s), 'each step is fully described: ' . $s['key']);
 
-    // cloud wording leans on the marketplace; licence leans on your own people
-    $cloudLabels = implode(' | ', array_column($steps, 'label'));
-    t_ok(strpos($cloudLabels, 'Post your first requirement') !== false, 'cloud step: post to the marketplace');
+    // 22 Oct 2026 — the steps follow the modules THIS company has, not the install
+    // mode: an operations company is asked to add its people and raise a work
+    // order; one with the marketplace to post a requirement and build a bench.
+    $labels = implode(' | ', array_column($steps, 'label'));
+    t_ok(strpos($labels, 'Add your people') !== false && strpos($labels, 'Raise your first work order') !== false,
+        'with Operations on: add your people + raise a work order');
+    t_ok(strpos($labels, 'Post your first requirement') !== false, 'with the marketplace on: post a requirement');
+    $byKey = array_column($steps, 'url', 'key');
+    t_eq($byKey['people'] ?? '', '/m/inspectors', '"Add your people" opens the real team register (it used to point at /inspectors, which does not exist)');
+    t_eq($byKey['call'] ?? '', '/call-new', '"Raise your first work order" opens the new work order screen');
     install_mode_set('licence');
-    $licLabels = implode(' | ', array_column(onboarding_steps(), 'label'));
-    t_ok(strpos($licLabels, 'Add your people') !== false && strpos($licLabels, 'Create your first job') !== false, 'licence steps: add your own people + create a job');
+    t_eq(count(onboarding_steps()), count($steps), 'the install mode no longer changes the steps');
     install_mode_set('cloud');
+    $offBefore = (string) setting_get('modules_off', '');
+    setting_set('modules_off', trim($offBefore . ',operations', ','));
+    if (function_exists('licence_disabled')) licence_disabled(true);
+    $noOps = implode(' | ', array_column(onboarding_steps(), 'label'));
+    t_ok(strpos($noOps, 'Add your people') === false && strpos($noOps, 'work order') === false, 'without Operations, no Operations steps are offered');
+    setting_set('modules_off', $offBefore);
+    if (function_exists('licence_disabled')) licence_disabled(true);
+    // The setup page's checklist uses the same links (it used to read the wrong field and send every "Do this" home).
+    $ck = function_exists('cockpit_checklist') ? cockpit_checklist() : [];
+    $fixes = array_column($ck, 'fix');
+    t_ok(in_array('/users', $fixes, true) && in_array('/m/inspectors', $fixes, true), 'the setup page\'s "Do this" buttons open the right screens, not the home page');
 
     // done-state reflects real data: post a requirement → that step flips to done
     $before = onboarding_has_requirement();

@@ -278,6 +278,7 @@ try {
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/owner_home.php';   // calm owner landing (modules + marketplace switches)
     require __DIR__ . '/lib/saas_tenants.php';    // SaaS control plane — cross-company directory for single-URL login + console (additive)
+    require __DIR__ . '/lib/selfserve.php';       // Self-serve companies: sign up, 30-day trial, choose a plan & pay, view-only after, inactivity clean-up
     require __DIR__ . '/lib/tenant_migrate.php';  // Move a file-backed (SQLite) workspace's data into MySQL — upload-proof storage
     require __DIR__ . '/lib/backup.php';          // Per-workspace Backup & Restore — snapshots stored above the web root (upload-proof)
     require __DIR__ . '/lib/pwreset.php';         // Self-service forgot / reset password (e-mail one-time link)
@@ -1059,6 +1060,13 @@ if ($route === 'join' && function_exists('connect_org_join_route')) {
 // OPERATIONS workspace (not a marketplace account). Lands as PENDING for the
 // Super-Admin to approve, then the workspace is provisioned. Public, in front of
 // require_login(); off by default until the operator turns signup on. Always exits.
+// Self-serve: a company signs itself up, proves its e-mail with a code and is
+// straight into its own workspace on a free trial (lib/selfserve.php). When the
+// platform owner has not switched it on, /start falls back to /get-started.
+if ($route === 'start' && function_exists('selfserve_route')) {
+    selfserve_route($method);
+    exit;
+}
 if ($route === 'get-started' && function_exists('tenant_signup_route')) {
     tenant_signup_route($method);
     exit;
@@ -1139,6 +1147,8 @@ if ($expired !== '') {
     redirect('/login');
 }
 session_touch();
+// "Last used", for the platform owner's inactivity rule (lib/selfserve.php).
+if (function_exists('saas_touch_activity')) saas_touch_activity();
 
 // Somebody still on the password they were handed, or on one that has aged out
 // of the company's own rule, is sent to change it and can go nowhere else. The
@@ -1166,6 +1176,26 @@ if ($method === 'POST' && function_exists('lk_blocks_write') && lk_blocks_write(
         . ' The system is read-only: everything can be opened, printed and exported, but nothing new can be saved. '
         . 'Paste a current licence key on the Licence screen to carry on.', 'error');
     redirect('/licence');
+}
+
+// The same rule for a company that signed itself up (lib/selfserve.php): when
+// its free trial or paid period has ended it is VIEW-ONLY — every screen,
+// export and PDF still opens; only saving is refused, with the way to fix it.
+if ($method === 'POST' && function_exists('saas_blocks_write') && saas_blocks_write($route)) {
+    $st = saas_access_state();
+    $admin = function_exists('billing_can_manage') && billing_can_manage();
+    flash((($st['was'] ?? '') === 'paid' ? 'Your plan has ended' : 'Your free trial has ended')
+        . ', so your workspace is view-only: everything can be opened, printed and exported, but nothing new can be saved. '
+        . ($admin ? 'Choose a plan to carry on.' : 'Ask your workspace owner to choose a plan.'), 'error');
+    redirect($admin ? '/subscription' : '/');
+}
+// A trial company at its storage limit: new files are refused; everything else
+// (and everything already stored) works as normal.
+if ($method === 'POST' && function_exists('saas_storage_full') && saas_request_has_files() && saas_storage_full()) {
+    if (function_exists('form_stash')) form_stash($route, $_POST);
+    flash('Your free-trial storage is full, so this file was not added. Choose a plan to add more files — '
+        . 'nothing else you typed has been lost.', 'error');
+    redirect('/' . $route);
 }
 
 // Refuse any state-changing request that did not come from one of our own

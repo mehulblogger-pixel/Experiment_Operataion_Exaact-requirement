@@ -66,6 +66,15 @@ function tenant_registry_write(array $reg) {
         return 'Could not write tenants.php — the app folder is not writable by the web server. '
              . 'Create it by hand in cPanel → File Manager instead (see tenants.sample.php).';
     @chmod(tenant_registry_file(), 0600);
+    // tenants.php is read with `require`, and PHP's code cache (opcache, on by
+    // default on most hosting) keeps serving the copy it compiled for up to
+    // revalidate_freq seconds — and for ever within the same second, because it
+    // compares file times to the second. A write followed by a read in the same
+    // request (add a company, then stash its owner's first sign-in) used to read
+    // the OLD registry, find no such company, and silently drop the owner's
+    // details. Throw the cached copy away on every write.
+    if (function_exists('opcache_invalidate')) @opcache_invalidate(tenant_registry_file(), true);
+    clearstatcache(true, tenant_registry_file());
     return '';
 }
 

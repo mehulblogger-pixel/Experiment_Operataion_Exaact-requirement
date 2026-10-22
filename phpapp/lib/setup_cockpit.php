@@ -412,7 +412,7 @@ function cockpit_checklist() {
         try {
             foreach (onboarding_steps() as $s) {
                 $items[] = ['done' => !empty($s['done']),
-                    'label' => (string) ($s['label'] ?? ''), 'fix' => (string) ($s['where'] ?? '/')];
+                    'label' => (string) ($s['label'] ?? ''), 'fix' => (string) ($s['url'] ?? ($s['where'] ?? '/'))];
             }
         } catch (Throwable $e) {}
     }

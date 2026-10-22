@@ -1116,16 +1116,61 @@ ever **adds** a workspace (its own subdomain + database), never changes or delet
 
 > **PENDING → APPROVED → PROVISIONED**, plus **REJECTED** as an off-ramp.
 
-- `PENDING → APPROVED` — Super-Admin approves; if the cPanel API is **not** set up,
-  the workspace is created by hand and the request waits at APPROVED until marked set up.
-- `PENDING → PROVISIONED` — approve with the cPanel API configured provisions the
-  database (+ subdomain) at once via `cpanel_provision_workspace()` + `tenant_add()`.
+- `PENDING → PROVISIONED` — **since 22 Oct 2026 every approval goes straight here.**
+  Approving builds the company with `saas_company_create()` (the same builder the
+  console and self sign-up use): its database (cPanel when connected, otherwise chosen
+  automatically), **its owner's login** (the applicant's e-mail, a temporary password
+  e-mailed to them, changed at first sign-in) and the same 30-day free trial as a self
+  sign-up. Before, approval created no owner login and sent nothing.
+- `PENDING → APPROVED` — no longer produced; kept so requests approved before
+  22 Oct can still be finished by hand.
 - `APPROVED → PROVISIONED` — operator finishes the manual two-click setup and marks it.
 - `PENDING → REJECTED` — Super-Admin declines. Terminal.
 - Terminal: `PROVISIONED` (workspace exists), `REJECTED`.
 
 Approve/decline reuse **`can_manage_tenants()`** — Master Admin, on the base/control
 domain only (a workspace can never reach the fleet). **No new permission.** Each
-provisioned workspace is a full independent install: its own subdomain
-(`<name>.<base-domain>`), its own database, its own `admin`, its own licence and data —
-its people sign in at **their own subdomain's `/login`**, never at the marketplace door.
+provisioned workspace has its own database and data, and its owner as its first
+administrator; since 22 Oct 2026 its people sign in at the one product address with
+their e-mail (the same as console-created companies), never at the marketplace door.
+
+## Self-serve company — what it may do today (owner, 22 Oct 2026)
+
+Computed on every request from the company's own settings (`saas_access_state()`,
+`lib/selfserve.php`); applies **only** to companies that signed themselves up (or
+whose request was approved after 22 Oct). A company created by hand on the
+Companies console is not affected.
+
+> **TRIAL → PAID** · **TRIAL → VIEW-ONLY** · **PAID → VIEW-ONLY** · **VIEW-ONLY → PAID** · **TRIAL / VIEW-ONLY (never paid) → DELETED**
+
+- `TRIAL` — every module, for the trial days the platform owner set (30 by default).
+  New files are refused once the trial storage limit (if one is set) is reached.
+- `PAID` — exactly the modules and logins bought, until the paid-until date.
+  Plan changes follow the owner's Q-L rule: an **upgrade** starts today with credit
+  for the unused days; a **renewal** starts the day after the current period ends; a
+  **downgrade** is booked for that day and nothing is charged now.
+- `VIEW-ONLY` — the trial or paid period has ended. Everything opens, prints and
+  exports; nothing new can be saved except paying for a plan. Never locked out.
+- `DELETED` — only a company that has **never paid**, after no one has signed in for
+  the deletion days (90 by default), with an e-mail warning every 15 days and at
+  least one warning a full interval old. Recorded in `saas_deletions`. A company that
+  has ever paid is never deleted automatically.
+
+### Sign-up code (`selfserve_signups.status`)
+
+> **CODE_SENT → CREATING → DONE**, plus **DUPLICATE**
+
+- `CODE_SENT` — details given, a 6-digit code e-mailed (stored as a hash; valid 30
+  minutes, 5 tries, "send a new code" resets both).
+- `CREATING` — the right code was entered; claimed so a double press builds one company.
+- `DONE` — the company exists; the password and code hashes are erased.
+- `DUPLICATE` — the e-mail gained a workspace meanwhile; nothing created.
+
+### Plan payment (`saas_orders.status`)
+
+> **CREATED → PAID**
+
+- `CREATED` — the price was worked out and the payment window opened; what was
+  ordered is recorded here.
+- `PAID` — Razorpay's signature checked; exactly the recorded order applied, once. A
+  repeated callback finds no CREATED order and changes nothing.

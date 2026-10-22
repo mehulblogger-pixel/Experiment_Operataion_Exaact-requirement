@@ -186,6 +186,11 @@ function ops_billing($route, $method) {
 
     if ($route === 'billing-config' && $method === 'POST') {
         ops_require(is_master(), 'Only the Master Admin can change the price and payment keys.');
+        // Inside a company workspace on the platform, prices and payment keys
+        // belong to the platform owner. A company setting its own price could
+        // otherwise buy its plan for ₹1, or send its payment anywhere.
+        ops_require(!function_exists('current_tenant') || current_tenant() === '',
+            'Prices and payment keys are set by your provider, not inside your workspace.');
         setting_set('billing_currency', strtoupper(substr(trim((string) ($_POST['currency'] ?? 'INR')), 0, 5)) ?: 'INR');
         setting_set('billing_price_user_month', (string) max(0, (int) ($_POST['price_month'] ?? 0)));
         setting_set('billing_price_user_year', (string) max(0, (int) ($_POST['price_year'] ?? 0)));
@@ -211,6 +216,9 @@ function ops_billing($route, $method) {
         $ord = rzp_create_order($a['paise'], 'seats-' . $a['seats'] . '-' . date('ymdHis'),
             ['seats' => $a['seats'], 'period' => $a['period']]);
         if (empty($ord['ok'])) { flash('Could not start the payment: ' . $ord['error'], 'error'); redirect('/billing'); }
+        // What was priced is recorded here; the verification applies this record,
+        // never the seat count the browser posts back.
+        if (function_exists('saas_order_create')) saas_order_create((string) $ord['id'], 'seats', [], $a['seats'], $a['period'], (int) $a['major']);
         view('ops/billing_pay', ['amt' => $a, 'order' => $ord, 'cfg' => billing_config()]);
         return;
     }
@@ -225,6 +233,15 @@ function ops_billing($route, $method) {
         if (!rzp_verify_signature($orderId, $paymentId, $sig)) {
             flash('That payment could not be verified. If money was taken, it will be refunded automatically — nothing was activated.', 'error');
             redirect('/billing');
+        }
+        if (function_exists('saas_order_claim')) {
+            $o = saas_order_claim($orderId, $paymentId);
+            if (!$o) {
+                flash('That payment has already been applied, or its order is not known here. Nothing was changed twice. '
+                    . 'If you believe something is missing, contact support with payment reference ' . $paymentId . '.', 'warning');
+                redirect('/billing');
+            }
+            $seats = (int) $o['seats']; $period = (string) $o['period'];
         }
         $r = billing_apply($seats, $period, $paymentId, $orderId);
         flash('Payment received. Your plan now covers ' . $r['seats'] . ' '

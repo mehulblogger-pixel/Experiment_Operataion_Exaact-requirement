@@ -24,6 +24,11 @@
 // same idea as Books' plans.max_users. Kept beside superadmin_tiers()'s module
 // map; a plan not listed falls back to a safe minimum.
 function saas_plan_logins($plan) {
+    // A self-serve trial: the number the platform owner set (0 = no limit yet).
+    if (strtoupper((string) $plan) === 'TRIAL') return function_exists('selfserve_cfg') ? (int) selfserve_cfg()['trial_seats'] : 0;
+    // A self-serve company that has chosen its own plan: its logins are exactly
+    // the ones it bought (held as extra_user_seats), so the plan adds none.
+    if (strtoupper((string) $plan) === 'CUSTOM') return 0;
     $map = ['STARTER' => 2, 'RECRUITMENT' => 3, 'PRO' => 5, 'ENTERPRISE' => 9];
     return $map[strtoupper((string) $plan)] ?? 2;
 }
@@ -119,7 +124,9 @@ function saas_tenant_upsert($key, array $data) {
     if (!$pdo) return false;
     $key = strtolower(trim((string) $key));
     if ($key === '') return false;
-    $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules', 'route_json', 'pending_json', 'provisioned_at'];
+    $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules', 'route_json', 'pending_json', 'provisioned_at',
+             // self-serve facts (lib/selfserve.php)
+             'source', 'trial_until', 'paid_until', 'last_active_at', 'inactive_notices', 'last_notice_at', 'owner_phone', 'created_at', 'last_login_at'];
     $existing = saas_tenant_get($key);
     try {
         if ($existing) {
@@ -142,6 +149,10 @@ function saas_tenant_upsert($key, array $data) {
                 VALUES (?,?,?,?,?,?,?,?,?,?)")
                 ->execute([$key, $row['company'], $row['owner_name'], $row['owner_email'], $row['plan'],
                     $row['plan_expiry'], $row['status'], (int) $row['extra_user_seats'], $row['enabled_modules'], date('c')]);
+            // Anything beyond the basic columns is written by the update path.
+            $rest = array_diff_key(array_intersect_key($data, array_flip($cols)),
+                array_flip(['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules']));
+            if ($rest) return saas_tenant_upsert($key, $rest);
         }
         return true;
     } catch (Throwable $e) { return false; }
@@ -385,6 +396,15 @@ function saas_console_companies() {
         $r['mods_list']     = saas_tenant_modules($k);
         $r['seat_limit']    = saas_tenant_seat_limit($k);
         $r['base_logins']   = saas_plan_logins($r['plan'] ?? '');
+        // Self-serve companies: when last used, and when the inactivity rule
+        // would delete them (never-paid trials only — lib/selfserve.php).
+        $r['self'] = ($r['source'] ?? '') === 'self';
+        $r['idle_days'] = function_exists('selfserve_idle_days') && (($r['last_active_at'] ?? '') !== '' || $r['self']) ? selfserve_idle_days($r) : 0;
+        $r['delete_on'] = '';
+        if ($r['self'] && function_exists('selfserve_never_paid') && selfserve_never_paid($r) && function_exists('selfserve_cfg')) {
+            $cfg = selfserve_cfg();
+            $r['delete_on'] = date('Y-m-d', strtotime('+' . max(0, $cfg['delete_days'] - $r['idle_days']) . ' days'));
+        }
     }
     unset($r);
     return $rows;
@@ -1042,6 +1062,7 @@ function saas_tenant_apply_bootstrap($key = '') {
         // 1) A friendly company name (the owner confirms/edits it in onboarding).
         $company = (string) ($p['app_name'] ?? '');
         if ($company !== '') setting_set('app_name', substr($company, 0, 120));
+        if ($company !== '' && trim((string) setting_get('company_name', '')) === '') setting_set('company_name', substr($company, 0, 120));
         // 2) Force the owner through first-login onboarding (password + profile).
         setting_set('saas_onboarding_pending', '1');
         // 3) The owner becomes this workspace's admin — their email + temp password.
@@ -1050,8 +1071,12 @@ function saas_tenant_apply_bootstrap($key = '') {
         [$fn, $ln] = array_pad(explode(' ', $name, 2), 2, '');
         $hash  = (string) ($p['pass_hash'] ?? '');
         if ($hash === '') $hash = password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
-        $pdo->prepare("UPDATE users SET email=?, first_name=?, last_name=?, password_hash=?, must_change_pwd=1, pwd_changed_at=? WHERE is_superuser=1")
-            ->execute([$email, $fn, $ln, $hash, date('c')]);
+        // A self-serve owner chose their own password on the sign-up page, so
+        // they are not made to change it again; a console-created owner was
+        // handed a temporary one and must.
+        $mustChange = empty($p['own_password']) ? 1 : 0;
+        $pdo->prepare("UPDATE users SET email=?, first_name=?, last_name=?, password_hash=?, must_change_pwd=?, pwd_changed_at=? WHERE is_superuser=1")
+            ->execute([$email, $fn, $ln, $hash, $mustChange, date('c')]);
         // 4) Stop the config-admin sync from reverting that password on later boots.
         try {
             $cfg = require dirname(__DIR__) . '/config.php';
@@ -1066,7 +1091,25 @@ function saas_tenant_apply_bootstrap($key = '') {
         // 6) Best-effort finishing touches — each guarded so a failure can never
         //    un-provision the workspace. Turn on exactly the plan's modules, set
         //    the seat cap, and install the letter templates.
-        try { if (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules((string) ($p['plan'] ?? 'RECRUITMENT')); } catch (Throwable $e) {}
+        try {
+            if (!empty($p['modules']) && is_array($p['modules']) && function_exists('saas_apply_modules_list')) {
+                // An explicit module list (a self-serve trial gets every module):
+                // switch exactly these on and make them the entitlement ceiling.
+                saas_apply_modules_list($p['modules']);
+                $ent = array_values(array_filter(array_map('strtolower', $p['modules']),
+                    fn($k) => defined('PRODUCT_MODULES') && isset(PRODUCT_MODULES[$k]) && empty(PRODUCT_MODULES[$k][3])));
+                setting_set('saas_entitled_modules', implode(',', $ent));
+                if (function_exists('licence_disabled')) licence_disabled(true);
+            } elseif (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules((string) ($p['plan'] ?? 'RECRUITMENT'));
+        } catch (Throwable $e) {}
+        // A company that signed itself up: its trial and storage limit (lib/selfserve.php).
+        try {
+            if (($p['billing_mode'] ?? '') === 'self') {
+                setting_set('saas_billing_mode', 'self');
+                setting_set('saas_trial_until', (string) ($p['trial_until'] ?? ''));
+                setting_set('saas_storage_limit_mb', (string) max(0, (int) ($p['storage_mb'] ?? 0)));
+            }
+        } catch (Throwable $e) {}
         try { setting_set('saas_seat_limit', (string) max(0, (int) ($p['seat_limit'] ?? 0))); } catch (Throwable $e) {}
         try { if (function_exists('doc_tpl_migrate')) doc_tpl_migrate(); } catch (Throwable $e) {}
         return true;
@@ -1121,7 +1164,6 @@ function ops_saas_admin($route, $method) {
         // a clean request do it.
         if ($do === 'company_add') {
             $company = trim((string) ($_POST['company'] ?? ''));
-            $nkey    = saas_slug($_POST['new_key'] ?? '') ?: saas_slug($company);
             $oname   = trim((string) ($_POST['owner_name'] ?? ''));
             $oemail  = strtolower(trim((string) ($_POST['owner_email'] ?? '')));
             $opass   = (string) ($_POST['owner_pass'] ?? '');
@@ -1131,72 +1173,26 @@ function ops_saas_admin($route, $method) {
             // option on the form.
             $dbkind  = (string) ($_POST['db_kind'] ?? 'auto');
 
-            if ($company === '' || $oemail === '' || !filter_var($oemail, FILTER_VALIDATE_EMAIL)) {
-                flash('A company name and a valid owner email are required.', 'error'); redirect('/companies');
-            }
-            if ($nkey === '' || (function_exists('tenant_valid_sub') && !tenant_valid_sub($nkey))) {
-                flash('The workspace key must be lowercase letters, digits or hyphens.', 'error'); redirect('/companies');
-            }
-            $reg = function_exists('tenant_registry') ? tenant_registry() : ['tenants' => []];
-            if (saas_tenant_get($nkey) || isset($reg['tenants'][$nkey])) {
-                flash('That workspace key is already taken — pick another.', 'error'); redirect('/companies');
-            }
-            if (saas_login_lookup($oemail) !== '') {
-                flash('That owner email already belongs to a company.', 'error'); redirect('/companies');
-            }
-            if ($opass === '') $opass = bin2hex(random_bytes(4));   // a temp password to hand over
-
-            // Treat it as "bring your own MySQL" only when a database name was
-            // actually filled in (the Advanced box); otherwise it is automatic —
-            // so an empty Advanced box never blocks creation.
+            // Advanced: the operator pastes a MySQL database they created. Only
+            // when a database name was actually filled in — an empty Advanced box
+            // never blocks creation. Otherwise storage is chosen automatically.
+            $db = null;
             if ($dbkind === 'mysql' && trim((string) ($_POST['db_name'] ?? '')) !== '') {
-                // Advanced: the operator pastes a MySQL database they created.
                 $db = ['host' => trim((string) ($_POST['db_host'] ?? 'localhost')), 'name' => trim((string) ($_POST['db_name'] ?? '')),
                        'user' => trim((string) ($_POST['db_user'] ?? '')), 'pass' => (string) ($_POST['db_pass'] ?? '')];
-                if ($db['name'] === '' || $db['user'] === '') { flash('A MySQL database name and user are required.', 'error'); redirect('/companies'); }
-            } else {
-                // Automatic (the default): a real MySQL database when the server can
-                // make one itself; otherwise a data file placed ABOVE the web root,
-                // so an upload into the app folder can never delete it. Either way
-                // the operator ticks nothing.
-                [$db] = function_exists('tenant_auto_storage')
-                    ? tenant_auto_storage($nkey)
-                    : [['sqlite' => (function_exists('tenant_default_sqlite_path') ? tenant_default_sqlite_path($nkey)[0] : dirname(__DIR__) . '/tenant-' . $nkey . '.sqlite')]];
+                if ($db['user'] === '') { flash('A MySQL database name and user are required.', 'error'); redirect('/companies'); }
             }
-            $err = function_exists('tenant_add') ? tenant_add($nkey, $company, $db) : 'Cloud mode is not enabled.';
-            if ($err !== '') { flash($err, 'error'); redirect('/companies'); }
-
-            saas_tenant_upsert($nkey, ['company' => $company, 'owner_name' => $oname, 'owner_email' => $oemail, 'plan' => $plan, 'status' => 'active']);
-            // Remember WHERE this company's database lives, in the control DB, so
-            // the routing file can rebuild itself from the database if an upload
-            // ever wipes it (durable routing — the DB is the source of truth).
-            saas_tenant_upsert($nkey, ['route_json' => json_encode($db)]);
-            saas_tenant_set_plan($nkey, $plan);
-            saas_login_index_set($oemail, $nkey);
-
-            // Stash the owner's details on the workspace's registry entry. The
-            // workspace builds its OWN database and applies these the first time
-            // it is opened — a clean request pointed only at its own store (see
-            // saas_tenant_apply_bootstrap / saas_tenant_ensure_ready). This needs
-            // no exec() and so works on managed hosting (cPanel/mPanel), where
-            // exec() is disabled and the old separate-process provisioner did
-            // nothing. "Log in as" and the owner's first sign-in both trigger it
-            // on demand, so the company is ready the moment anyone opens it.
-            $pending = [
-                'owner_email' => $oemail,
-                'owner_name'  => $oname,
-                'pass_hash'   => password_hash($opass, PASSWORD_DEFAULT),
-                'plan'        => $plan,
-                'seat_limit'  => (int) saas_tenant_seat_limit($nkey),
-                'app_name'    => $company,
-            ];
-            if (function_exists('tenant_pending_set')) tenant_pending_set($nkey, $pending);
-            // Also keep the owner details in the control database, so the routing
-            // file can restore them if an upload wipes it (durable owner login).
-            saas_tenant_upsert($nkey, ['pending_json' => json_encode($pending)]);
+            // One builder for every company, console or self-serve (lib/selfserve.php).
+            $res = saas_company_create(['company' => $company, 'key' => (string) ($_POST['new_key'] ?? ''),
+                'owner_name' => $oname, 'owner_email' => $oemail, 'owner_pass' => $opass, 'plan' => $plan,
+                'db' => $db, 'source' => 'console']);
+            if (!$res['ok']) { flash($res['error'], 'error'); redirect('/companies'); }
+            $shown = $res['temp_pass'] !== '' ? $res['temp_pass'] : $opass;
+            $mailed = function_exists('saas_mail_new_owner') ? saas_mail_new_owner($oemail, $oname, $company, $shown) : 0;
             flash('Company “' . $company . '” is ready. Its owner signs in at the one product URL with '
-                . $oemail . ' (temporary password: ' . $opass . '). On first sign-in they set their own '
-                . 'password and complete their company onboarding (business profile, financial year, '
+                . $oemail . ' (temporary password: ' . $shown . '). '
+                . ($mailed ? 'These sign-in details have been e-mailed to the owner. ' : 'E-mail is not set up, so please pass these details on yourself. ')
+                . 'On first sign-in they set their own password and complete their company onboarding (business profile, financial year, '
                 . 'currency). Their workspace is a separate database — no other company can see its data.');
             redirect('/companies');
         }
@@ -1247,6 +1243,29 @@ function ops_saas_admin($route, $method) {
                 : '. (Saved here; it will apply to their workspace on the next sync — automatic pushing is off on this server.)'),
                 $ok ? 'success' : 'warning');
         };
+        // ---- Self-serve sign-up: the platform owner's switches (lib/selfserve.php)
+        if ($do === 'selfserve_save') {
+            $num = function ($k, $min) { $v = trim((string) ($_POST[$k] ?? '')); return $v === '' ? '' : (string) max($min, (int) $v); };
+            setting_set('selfserve_signup_enabled', !empty($_POST['ss_on']) ? '1' : '0');
+            setting_set('saas_trial_days', $num('ss_trial_days', 1));
+            setting_set('saas_trial_storage_mb', $num('ss_storage_mb', 0));
+            setting_set('saas_trial_seats', $num('ss_trial_seats', 0));
+            setting_set('saas_inactive_notice_days', $num('ss_notice_days', 1));
+            setting_set('saas_inactive_delete_days', $num('ss_delete_days', 1));
+            setting_set('saas_autodelete_enabled', !empty($_POST['ss_autodelete']) ? '1' : '0');
+            $c = selfserve_cfg();
+            if ($c['delete_days'] <= $c['notice_days'])
+                flash('Saved — but deletion comes before the first warning with these numbers. Make the deletion days larger than the warning interval.', 'warning');
+            else flash('Self-serve sign-up settings saved.' . (!selfserve_ready() ? ' Note: cloud mode is not switched on yet (Cloud workspaces), so the sign-up page stays closed.' : ''));
+            redirect('/companies');
+        }
+        if ($do === 'selfserve_sync') {
+            // Refresh "last used", trial and payment facts now, without sending
+            // any e-mail and without deleting anything.
+            $r = selfserve_sweep(['dry' => true]);
+            flash('Checked ' . $r['checked'] . ' compan' . ($r['checked'] === 1 ? 'y' : 'ies') . ' for when they were last used. Nothing was e-mailed or deleted.');
+            redirect('/companies');
+        }
         if ($do === 'price_save') {
             $g = fn($k) => max(0, (int) ($_POST[$k] ?? 0));
             if (defined('PRODUCT_MODULES')) foreach (PRODUCT_MODULES as $mk => $mm) {
@@ -1367,6 +1386,10 @@ function ops_saas_admin($route, $method) {
         'quote'     => $selRow ? saas_company_quote(saas_tenant_modules($sel), saas_tenant_seat_limit($sel), 'month') : null,
         'base_domain' => function_exists('tenant_base_domain') ? tenant_base_domain() : '',
         'can_autocreate' => saas_can_autocreate_db(),
+        'ss_cfg'    => function_exists('selfserve_cfg') ? selfserve_cfg() : null,
+        'ss_on'     => function_exists('selfserve_enabled') && selfserve_enabled(),
+        'ss_ready'  => function_exists('selfserve_ready') && selfserve_ready(),
+        'ss_deleted' => function_exists('selfserve_deletions') ? selfserve_deletions(20) : [],
     ]);
     return true;
 }
@@ -1379,45 +1402,88 @@ function ops_saas_admin($route, $method) {
 function ops_saas_subscription($route, $method) {
     ops_require(function_exists('billing_can_manage') ? billing_can_manage() : (function_exists('is_master') && is_master()),
         'You cannot manage the subscription.');
-    // Meaningful only for a metered (cloud) company — one with a seat cap set.
-    $metered = function_exists('setting_get') && (int) setting_get('saas_seat_limit', 0) > 0;
+    // Meaningful only for a metered (cloud) company — one with a seat cap set —
+    // or a company that signed itself up (lib/selfserve.php).
+    $self = function_exists('saas_is_selfserve') && saas_is_selfserve();
+    $metered = $self || (function_exists('setting_get') && (int) setting_get('saas_seat_limit', 0) > 0);
 
-    // Step 1 → price the à-la-carte selection and open the payment window.
-    if ($route === 'subscription-order' && $method === 'POST') {
+    // Open the payment window for an order whose content is recorded HERE, on
+    // the server. The verification applies that record — never what the
+    // browser sends back — so a page edited in the browser cannot buy more
+    // than was priced.
+    $pay = function ($kind, array $mods, $seats, $period, $total, array $quote = []) {
         if (!function_exists('billing_configured') || !billing_configured()) {
             flash('Online payment is not switched on for your workspace yet. Please contact your provider.', 'error'); redirect('/subscription');
         }
+        $ord = rzp_create_order((int) round($total * 100), 'sub-' . date('ymdHis'),
+            ['kind' => $kind, 'modules' => implode(',', $mods), 'seats' => $seats, 'period' => $period]);
+        if (empty($ord['ok'])) { flash('Could not start the payment: ' . $ord['error'], 'error'); redirect('/subscription'); }
+        saas_order_create((string) ($ord['id'] ?? ''), $kind, $mods, $seats, $period, (int) $total, $quote);
+        view('ops/billing_pay', [
+            'amt' => ['seats' => $seats, 'period' => $period, 'currency' => saas_price_book()['currency'], 'total' => $total, 'major' => $total],
+            'order' => $ord, 'cfg' => billing_config(),
+            'verify_action' => '/subscription-verify', 'back' => '/subscription',
+            'extra' => [],
+        ]);
+        return true;
+    };
+
+    // Step 1 → price the selection and open the payment window.
+    if ($route === 'subscription-order' && $method === 'POST') {
+        $period = ($_POST['period'] ?? 'month') === 'year' ? 'year' : 'month';
+        if ($self && ($_POST['do'] ?? '') === 'plan') {
+            // A self-serve company choosing (or changing, or renewing) its plan.
+            $q = saas_plan_change_quote((array) ($_POST['mods'] ?? []), (int) ($_POST['seats'] ?? 0), $period);
+            if (empty($q['ok'])) { flash($q['msg'], 'error'); redirect('/subscription'); }
+            if ($q['type'] === 'DOWNGRADE') {
+                saas_plan_change_apply($q);
+                flash($q['msg'], 'success'); redirect('/subscription');
+            }
+            if ((int) $q['price'] <= 0) {
+                saas_plan_change_apply($q);
+                flash('Done — the unused value of your current plan covers this change. Your plan now runs until '
+                    . (function_exists('fdate') ? fdate($q['expires']) : $q['expires']) . '.', 'success');
+                redirect('/subscription');
+            }
+            return $pay('plan', $q['mods'], $q['seats'], $period, (int) $q['price'], $q);
+        }
+        // A self-serve company buys through the plan chooser only: the older
+        // "add a module" path extends the whole plan by a full period for the
+        // price of the module alone, which the plan rules above exist to prevent.
+        if ($self) { flash('Choose your plan on this page — tick the modules and people you want.', 'error'); redirect('/subscription'); }
         $mods   = array_values(array_intersect(saas_addable_modules(), array_map('strtolower', (array) ($_POST['add_mods'] ?? []))));
         $seats  = max(0, (int) ($_POST['add_seats'] ?? 0));
-        $period = ($_POST['period'] ?? 'month') === 'year' ? 'year' : 'month';
         if (!$mods && $seats <= 0) { flash('Pick at least one module or some seats to add.', 'error'); redirect('/subscription'); }
         $q = saas_company_quote($mods, $seats, $period);
         if ((int) $q['total'] <= 0) { flash('That selection has no price set yet — please contact your provider.', 'error'); redirect('/subscription'); }
-        $ord = rzp_create_order((int) round($q['total'] * 100), 'sub-' . date('ymdHis'),
-            ['modules' => implode(',', $mods), 'seats' => $seats, 'period' => $period]);
-        if (empty($ord['ok'])) { flash('Could not start the payment: ' . $ord['error'], 'error'); redirect('/subscription'); }
-        view('ops/billing_pay', [
-            'amt' => ['seats' => $seats, 'period' => $period, 'currency' => $q['currency'], 'total' => $q['total']],
-            'order' => $ord, 'cfg' => billing_config(),
-            'verify_action' => '/subscription-verify', 'back' => '/subscription',
-            'extra' => ['add_mods' => implode(',', $mods)],
-        ]);
-        return true;
+        return $pay('add', $mods, $seats, $period, (int) $q['total']);
     }
 
-    // Step 2 → Razorpay called back. Verify, then unlock exactly what was bought.
+    // Step 2 → Razorpay called back. Verify, then apply exactly the recorded order, once.
     if ($route === 'subscription-verify' && $method === 'POST') {
         $orderId   = (string) ($_POST['razorpay_order_id'] ?? '');
         $paymentId = (string) ($_POST['razorpay_payment_id'] ?? '');
         $sig       = (string) ($_POST['razorpay_signature'] ?? '');
-        $seats     = max(0, (int) ($_POST['seats'] ?? 0));
-        $period    = ($_POST['period'] ?? 'month') === 'year' ? 'year' : 'month';
-        $mods      = array_values(array_filter(array_map('trim', explode(',', (string) ($_POST['add_mods'] ?? '')))));
         if (!rzp_verify_signature($orderId, $paymentId, $sig)) {
             flash('That payment could not be verified. If money was taken it is refunded automatically — nothing was changed.', 'error');
             redirect('/subscription');
         }
-        $r = saas_selfservice_apply($mods, $seats, $period, $paymentId, $orderId);
+        $o = saas_order_claim($orderId, $paymentId);
+        if (!$o) {
+            flash('That payment has already been applied, or its order is not known here. Nothing was changed twice. '
+                . 'If you believe something is missing, contact your provider with payment reference ' . $paymentId . '.', 'warning');
+            redirect('/subscription');
+        }
+        if ($o['kind'] === 'plan') {
+            $q = json_decode((string) $o['quote_json'], true);
+            $q = saas_plan_change_apply(is_array($q) ? $q : [], $paymentId, $orderId);
+            flash('Payment received. ' . ($q['type'] === 'RENEW'
+                ? 'Your plan is renewed and now runs until ' . (function_exists('fdate') ? fdate($q['expires']) : $q['expires']) . '.'
+                : 'Your plan is active until ' . (function_exists('fdate') ? fdate($q['expires']) : $q['expires']) . '.'), 'success');
+            redirect('/subscription');
+        }
+        $mods = array_values(array_filter(array_map('trim', explode(',', (string) $o['modules']))));
+        $r = saas_selfservice_apply($mods, (int) $o['seats'], (string) $o['period'], $paymentId, $orderId);
         $bits = [];
         if ($r['added'])        $bits[] = count($r['added']) . ' module' . (count($r['added']) === 1 ? '' : 's');
         if ($r['seat_add'] > 0) $bits[] = $r['seat_add'] . ' seat' . ($r['seat_add'] === 1 ? '' : 's');
@@ -1431,6 +1497,12 @@ function ops_saas_subscription($route, $method) {
         'pb'      => saas_price_book(),
         'cfg'     => billing_config(),
         'metered' => $metered,
+        'self'    => $self,
+        'access'  => $self ? saas_access_state() : null,
+        'current' => $self ? saas_plan_current() : null,
+        'next'    => $self ? saas_plan_next() : null,
+        'offer'   => $self ? json_decode((string) setting_get('saas_offer_plan', ''), true) : null,
+        'storage' => $self ? ['used' => saas_storage_used_bytes(), 'limit' => saas_storage_limit_bytes()] : null,
         'modules' => defined('PRODUCT_MODULES') ? PRODUCT_MODULES : [],
         'history' => function_exists('billing_history') ? billing_history() : [],
     ]);

@@ -26,7 +26,10 @@ if (!$mktFirst) {
     if (pcan('request'))   $links['portal/request']    = 'Request an inspection';
 }
 if (function_exists('portal_agency_org') && portal_agency_org()) $links['portal/bench'] = 'My bench';
-if (pcan('complaint') && !$mktFirst) $links['portal/complaints'] = 'Complaints &amp; appeals';
+// The marketplace plan (subscription, credits, payments) — it existed but no
+// menu led to it, so nobody could find it without typing its address.
+if ($canHire || $isAgency) $links['portal/plans'] = 'Plan & credits';
+if (pcan('complaint') && !$mktFirst) $links['portal/complaints'] = 'Complaints & appeals';
 if (function_exists('cvp_notify_count')) {
     $__cn = cvp_notify_count('CLIENT', portal_partner_id());
     $links['portal/alerts'] = 'Alerts' . ($__cn ? ' (' . $__cn . ')' : '');

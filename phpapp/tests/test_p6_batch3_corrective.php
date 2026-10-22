@@ -347,7 +347,9 @@ t_ok($ceNullHit && (int)$ceNullHit['row']['id'] === $ceNull,
 // =============================================================================
 t_section('P6-B3C · CF — merge safety and survivor resolution (R4 · §12)');
 // =============================================================================
-$cfGst = '24MRG00001M1Z9';
+//  A correctly formed GSTIN (15 characters): since 22 Oct 2026 the public sign-up
+//  in CF13 refuses a malformed one, which the 14-character value used here was.
+$cfGst = '24MRGAA0001M1Z9';
 $cfKeep = $ccPartner('Kingsley Marine Services Pvt Ltd', ['gstin' => $cfGst]);
 $cfDrop = $ccPartner('Kingsley Marine Services Private Limited', ['gstin' => $cfGst]);
 $cfFindings = fn() => count(array_filter(identity_state_findings(),

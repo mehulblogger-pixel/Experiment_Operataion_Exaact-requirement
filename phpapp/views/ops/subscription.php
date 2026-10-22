@@ -4,6 +4,7 @@
 // company's OWN workspace. Uses the app's standard panel / kpi / msg styles.
 $sub = $sub ?? []; $pb = $pb ?? []; $cfg = $cfg ?? []; $modules = $modules ?? []; $history = $history ?? [];
 $metered = !empty($metered);
+$self = !empty($self); $access = $access ?? null; $current = $current ?? null; $next = $next ?? null; $offer = $offer ?? null; $storage = $storage ?? null;
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 $cur = $pb['currency'] ?? ($cfg['currency'] ?? 'INR');
 $sym = $cur === 'INR' ? '₹' : ($cur . ' ');
@@ -17,6 +18,33 @@ $fmt = fn($n) => $sym . number_format((int) $n);
     <p class="sub" style="margin:2px 0 0">See what your plan includes, and add exactly the modules or seats you need — you pay only for what you use.</p></div>
 </div>
 
+<?php if ($self && $access): $st = $access['mode']; ?>
+  <div class="kpi-row" style="margin-top:14px">
+    <div class="kpi <?= $st === 'locked' ? 'tone-bad' : ($st === 'trial' ? '' : 'tone-ok') ?>"><span class="k-lab">Your workspace</span>
+      <span class="k-val" style="font-size:18px"><?= $st === 'trial' ? 'Free trial' : ($st === 'paid' ? 'Plan active' : 'View-only') ?></span></div>
+    <div class="kpi"><span class="k-lab"><?= $st === 'locked' ? 'Ended on' : 'Until' ?></span>
+      <span class="k-val" style="font-size:18px"><?= $access['until'] !== '' ? $e(fdate($access['until'])) : '—' ?></span></div>
+    <?php if ($st !== 'locked'): ?><div class="kpi"><span class="k-lab">Days left</span><span class="k-val"><?= (int) $access['days_left'] ?></span></div><?php endif; ?>
+    <?php if ($storage && $storage['limit'] > 0): $pct = min(100, (int) round(100 * $storage['used'] / max(1, $storage['limit']))); ?>
+      <div class="kpi <?= $pct >= 100 ? 'tone-bad' : '' ?>"><span class="k-lab">Trial storage used</span>
+        <span class="k-val" style="font-size:18px"><?= round($storage['used'] / 1048576, 1) ?> of <?= round($storage['limit'] / 1048576) ?> MB</span></div>
+    <?php endif; ?>
+  </div>
+  <?php if ($st === 'locked'): ?>
+    <div class="msg msg-error" style="margin-top:8px">Your <?= ($access['was'] ?? '') === 'paid' ? 'plan' : 'free trial' ?> has ended, so your workspace is view-only.
+      Everything you recorded is safe and can be opened, printed and exported. Choose a plan below to carry on saving new work.</div>
+  <?php elseif ($st === 'trial'): ?>
+    <div class="msg msg-info" style="margin-top:8px">You are trying every module free until <?= $e(fdate($access['until'])) ?>.
+      Choose the modules you want to keep below — you pay only for those.</div>
+  <?php endif; ?>
+  <?php if ($next): ?>
+    <div class="msg msg-info" style="margin-top:8px">Booked: from <?= $e(fdate($next['starts'])) ?> your plan becomes
+      <?= $e(implode(', ', array_map($modLabel, (array) $next['mods']))) ?> for <?= (int) $next['seats'] ?> <?= (int) $next['seats'] === 1 ? 'person' : 'people' ?>
+      (<?= !empty($next['paid']) ? 'already paid' : 'to be paid then' ?>).</div>
+  <?php endif; ?>
+<?php endif; ?>
+
+<?php if (!$self): ?>
 <div class="kpi-row" style="margin-top:14px">
   <div class="kpi"><span class="k-lab">People active now</span><span class="k-val"><?= (int) ($sub['seats_used'] ?? 0) ?></span></div>
   <div class="kpi <?= ($sub['seat_limit'] ?? 0) ? 'tone-ok' : '' ?>"><span class="k-lab">Seats in your plan</span>
@@ -24,6 +52,7 @@ $fmt = fn($n) => $sym . number_format((int) $n);
   <div class="kpi"><span class="k-lab">Active until</span>
     <span class="k-val" style="font-size:18px"><?= !empty($sub['paid_until']) ? $e(fdate($sub['paid_until'])) : '—' ?></span></div>
 </div>
+<?php endif; ?>
 <?php if (($sub['seat_limit'] ?? 0) && ($sub['seats_used'] ?? 0) > $sub['seat_limit']): ?>
   <div class="msg msg-warning" style="margin-top:8px"><?= (int) $sub['seats_used'] ?> people are active but your plan covers <?= (int) $sub['seat_limit'] ?> seats. Add seats below, or deactivate people who have left.</div>
 <?php endif; ?>
@@ -40,7 +69,17 @@ $fmt = fn($n) => $sym . number_format((int) $n);
   <?php endif; ?>
 </div>
 
-<?php if (!$metered): ?>
+<?php if ($self): ?>
+  <?php if (!$payOn): ?>
+    <div class="msg" style="margin-top:14px">Online payment is not switched on for your workspace yet. To choose a plan, please contact your provider.</div>
+  <?php else: ?>
+  <div class="panel" style="margin-top:14px">
+    <h2 style="margin:0 0 4px;font-size:15px"><?= ($access['mode'] ?? '') === 'paid' ? 'Change or renew your plan' : 'Choose your plan' ?></h2>
+    <p class="sub" style="margin:0 0 12px">You pay securely online and the plan starts the moment the payment clears.</p>
+    <?php include __DIR__ . '/_subscription_plan.php'; ?>
+  </div>
+  <?php endif; ?>
+<?php elseif (!$metered): ?>
   <div class="msg" style="margin-top:14px">This workspace is managed directly by your provider, so there is nothing to buy here. Contact your provider to change your plan.</div>
 <?php elseif (!$payOn): ?>
   <div class="msg" style="margin-top:14px">Online payment is not switched on for your workspace yet. To add modules or seats, please contact your provider.</div>
