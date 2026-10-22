@@ -72,6 +72,7 @@ function selfserve_migrate() {
             'storage_used'     => "VARCHAR(20) DEFAULT ''",   // bytes, as last read by the nightly run
             'storage_limit'    => "VARCHAR(20) DEFAULT ''",   // bytes (0 = no limit)
             'storage_notice'   => "INT DEFAULT 0",            // highest warning level e-mailed (80/95/100)
+            'converted_at'     => "VARCHAR(30) DEFAULT ''",   // the day its free trial became a paid plan
         ] as $col => $def) {
             try { ensure_column('saas_tenants', $col, $def); } catch (Throwable $e) {}
         }
@@ -762,6 +763,12 @@ function saas_plan_switch_to(array $mods, $seats, $packs = 0) {
 // for the end of the running period (applied by saas_apply_due_change()).
 function saas_plan_change_apply(array $q, $paymentId = '', $orderId = '') {
     $note = implode(',', $q['mods']);
+    // The first plan ever paid for turns the free trial into a paid company —
+    // recorded once, shown to the customer and on the platform owner's console.
+    if ($q['type'] === 'NEW' && (string) setting_get('saas_converted_at', '') === '' && (string) setting_get('billing_paid_until', '') === '') {
+        setting_set('saas_converted_at', date('c'));
+        $q['converted'] = true;
+    }
     if ($q['type'] === 'NEW' || $q['type'] === 'UPGRADE') {
         saas_plan_switch_to($q['mods'], $q['seats'], (int) ($q['packs'] ?? 0));
         setting_set('saas_paid_period', $q['period']);
@@ -855,6 +862,7 @@ function selfserve_read_tenant($key, array $sell = null, array $storage = null) 
                 $row['trial_until'] = (string) setting_get('saas_trial_until', '');
                 $row['modules']     = function_exists('saas_current_modules') ? saas_current_modules() : [];
                 $row['seat_limit']  = (int) setting_get('saas_seat_limit', 0);
+                $row['converted_at'] = (string) setting_get('saas_converted_at', '');
                 if ($sell) foreach ($sell as $sk => $sv) { try { setting_set($sk, $sv); } catch (Throwable $e) {} }
                 if ($storage) foreach ($storage as $sk => $sv) { try { setting_set($sk, $sv); } catch (Throwable $e) {} }
                 $row['storage_used']  = saas_storage_used_bytes(true);
@@ -942,6 +950,7 @@ function selfserve_sweep(array $opts = []) {
                 $upd['inactive_notices'] = 0; $upd['last_notice_at'] = '';
             }
         }
+        if ((string) ($facts['converted_at'] ?? '') !== '') $upd['converted_at'] = (string) $facts['converted_at'];
         if ($facts['paid_until'] !== '') {
             $upd['plan'] = 'CUSTOM';                                   // logins = exactly those bought
             $upd['extra_user_seats'] = (int) $facts['seat_limit'];

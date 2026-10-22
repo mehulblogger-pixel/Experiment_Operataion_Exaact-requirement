@@ -129,6 +129,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
           <div class="sc-key"><?= $k ?><?= $base_domain ? ' · ' . $e($c['owner_email'] ?? '') : '' ?></div></td>
       <td><?= $c['plan'] === 'TRIAL' ? 'Free trial' : ($c['plan'] === 'CUSTOM' ? 'Own choice' : $e($plans[$c['plan']]['label'] ?? $c['plan'])) ?>
         <?php if (!empty($c['self'])): ?><div class="sc-meta">signed itself up</div>
+          <?php if (($c['converted_at'] ?? '') !== ''): ?><div class="sc-meta" style="color:#047857">converted from free trial <?= $e(fdate(substr($c['converted_at'], 0, 10))) ?></div><?php endif; ?>
           <?php if (($c['paid_until'] ?? '') !== ''): ?><div class="sc-meta">paid until <?= $e(fdate($c['paid_until'])) ?></div>
           <?php elseif (($c['trial_until'] ?? '') !== ''): ?><div class="sc-meta">trial <?= ($c['trial_until'] >= date('Y-m-d')) ? 'until' : 'ended' ?> <?= $e(fdate($c['trial_until'])) ?></div><?php endif; ?>
         <?php endif; ?></td>

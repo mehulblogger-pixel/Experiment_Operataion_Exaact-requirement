@@ -1368,6 +1368,14 @@
    {
     "do": "Verification desk (/connect-verify): professionals waiting for ID / credential checks.",
     "expect": "The queue with \"✓ Verify\" / \"✕ Reject\"."
+   },
+   {
+    "do": "Platform owner: make a coupon (e.g. 30%). As a client with online payment on: Plan & credits → choose a priced plan, enter the coupon → pay.",
+    "expect": "The Razorpay amount is the price LESS the coupon; the plan page shows the discount. (Fixed 22 Oct — the coupon used to be ignored when paying online.)"
+   },
+   {
+    "do": "Platform owner: switch the marketplace add-on OFF, then open /pro/register signed out.",
+    "expect": "Not available — the professional sign-up closes with the company / agency sign-up (fixed 22 Oct)."
    }
   ],
   "ref": "marketplace-plans; connect-verify; portal-users",

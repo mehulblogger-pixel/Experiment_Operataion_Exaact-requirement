@@ -396,7 +396,9 @@ C('MOD-MKT', '6 · Setting up each module', 'Marketplace & Connect — what to s
   [('Platform owner: Marketplace plans & limits → "Global settings": Marketplace add-on, "Charge for the marketplace" (OFF = free during launch), plans for clients and professionals, credit packs, coupons → Save settings.', 'Saved.'),
    ('Company: Directory → Client portal → switch the portal on.', 'Client and agency accounts can sign in at /portal/login (see CLI-001).'),
    ('Company: Marketplace → Manpower marketplace: post a requirement; Agency bench; Talent search.', 'Each works.'),
-   ('Verification desk (/connect-verify): professionals waiting for ID / credential checks.', 'The queue with "✓ Verify" / "✕ Reject".')],
+   ('Verification desk (/connect-verify): professionals waiting for ID / credential checks.', 'The queue with "✓ Verify" / "✕ Reject".'),
+   ('Platform owner: make a coupon (e.g. 30%). As a client with online payment on: Plan & credits → choose a priced plan, enter the coupon → pay.', 'The Razorpay amount is the price LESS the coupon; the plan page shows the discount. (Fixed 22 Oct — the coupon used to be ignored when paying online.)'),
+   ('Platform owner: switch the marketplace add-on OFF, then open /pro/register signed out.', 'Not available — the professional sign-up closes with the company / agency sign-up (fixed 22 Oct).')],
   'marketplace-plans; connect-verify; portal-users')
 
 # ════════════════════════════════════════════════════════════════════════════

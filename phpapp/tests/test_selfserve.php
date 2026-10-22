@@ -149,6 +149,7 @@ $o = saas_order_claim('order_' . getmypid(), 'pay_1');
 t_ok($o && $o['kind'] === 'plan', 'a recorded order is claimed once for its payment');
 t_eq(saas_order_claim('order_' . getmypid(), 'pay_1'), null, 'a replayed payment callback applies nothing a second time');
 $applied = saas_plan_change_apply(json_decode($o['quote_json'], true), 'pay_1', 'order_' . getmypid());
+t_ok(!empty($applied['converted']) && (string) setting_get('saas_converted_at', '') !== '', 'the first paid plan turns the free trial into a paid company (recorded once)');
 $st = saas_access_state();
 t_eq($st['mode'], 'paid', 'after paying, the workspace is on its paid plan');
 sort($mods);

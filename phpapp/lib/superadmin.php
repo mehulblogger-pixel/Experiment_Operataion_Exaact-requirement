@@ -199,7 +199,7 @@ function superadmin_data() {
 }
 
 function ops_super_admin($method) {
-    ops_require(superadmin_can(), 'Only the Master Admin can open the control panel.');
+    ops_require(superadmin_can(), 'Only the platform owner (Super Admin), on the main site, can open the control panel — a company\'s own administrators never can.');
     view('ops/super_admin', ['d' => superadmin_data()]);
     return true;
 }

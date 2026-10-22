@@ -1161,3 +1161,11 @@ A marketplace company or agency that joined through `/join` may sign in at
 switched off (it used to be told "sign in now" and then shown "Not found"); clients
 *invited* by staff still need the client portal on. Both kinds can now reset a
 forgotten password themselves (`/portal/forgot`, a one-hour, single-use link).
+
+**Marketplace sign-ups follow one switch (22 Oct 2026).** A professional may
+register at `/pro/register` only while the marketplace is available on the install
+(`install_marketplace_enabled()` — the add-on AND the kill-switch), exactly like a
+company or agency at `/join`. Before, the professional sign-up asked only the
+kill-switch. **Coupons with online payment:** a valid coupon is taken off the
+amount charged by Razorpay, recorded on the order, and counted as used only when
+the payment is confirmed (it used to be ignored whenever online payment was on).

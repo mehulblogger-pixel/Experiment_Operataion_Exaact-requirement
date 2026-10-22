@@ -127,7 +127,7 @@ function saas_tenant_upsert($key, array $data) {
     $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules', 'route_json', 'pending_json', 'provisioned_at',
              // self-serve facts (lib/selfserve.php)
              'source', 'trial_until', 'paid_until', 'last_active_at', 'inactive_notices', 'last_notice_at', 'owner_phone', 'created_at', 'last_login_at',
-             'storage_extra_gb', 'storage_used', 'storage_limit', 'storage_notice'];
+             'storage_extra_gb', 'storage_used', 'storage_limit', 'storage_notice', 'converted_at'];
     $existing = saas_tenant_get($key);
     try {
         if ($existing) {
@@ -1512,7 +1512,7 @@ function ops_saas_subscription($route, $method) {
         if ($o['kind'] === 'plan') {
             $q = json_decode((string) $o['quote_json'], true);
             $q = saas_plan_change_apply(is_array($q) ? $q : [], $paymentId, $orderId);
-            flash('Payment received. ' . ($q['type'] === 'RENEW'
+            flash('Payment received. ' . (!empty($q['converted']) ? 'Your free trial is now a paid plan. ' : '') . ($q['type'] === 'RENEW'
                 ? 'Your plan is renewed and now runs until ' . (function_exists('fdate') ? fdate($q['expires']) : $q['expires']) . '.'
                 : 'Your plan is active until ' . (function_exists('fdate') ? fdate($q['expires']) : $q['expires']) . '.'), 'success');
             redirect('/subscription');

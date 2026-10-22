@@ -155,8 +155,12 @@ function connect_pro_reset_complete($token, $pw, $pw2) {
     return '';
 }
 
-/** The pro-portal is part of Connect: it follows the same on/off switch. */
+/** The pro-portal is part of the marketplace: it follows the same switch as the
+ *  company / agency sign-up (/join) — the add-on AND the kill-switch. It used to
+ *  ask only the kill-switch, so professionals could still register on an install
+ *  whose marketplace add-on was off. */
 function connect_pro_portal_on() {
+    if (function_exists('install_marketplace_enabled')) return install_marketplace_enabled();
     return (function_exists('connect_enabled') ? connect_enabled() : true);
 }
 
@@ -826,7 +830,7 @@ function connect_pro_route($route, $method) {
                 $coupon  = (string)($_POST['coupon'] ?? '');
                 // Slice 6 — collect payment first when Razorpay is configured and there is a
                 // price; otherwise (no keys, or a free/promo price) activate immediately.
-                $start = function_exists('mkt_pay_start') ? mkt_pay_start('PRO', $meId, $purpose, $refId, $period, $who) : ['mode' => 'free'];
+                $start = function_exists('mkt_pay_start') ? mkt_pay_start('PRO', $meId, $purpose, $refId, $period, $who, $coupon) : ['mode' => 'free'];
                 if (($start['mode'] ?? '') === 'pay')   redirect('/pro/pay?o=' . (int)$start['row_id']);
                 if (($start['mode'] ?? '') === 'error') { connect_pro_flash_set($start['msg'], 'err'); redirect('/pro/plans'); }
                 if ($pack && function_exists('mkt_credit_buy'))     { [$bok, $bmsg] = mkt_credit_buy('PRO', $meId, $refId, $who); connect_pro_flash_set($bmsg, $bok ? 'ok' : 'err'); }

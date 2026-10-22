@@ -36,6 +36,8 @@ function mkt_pay_migrate() {
     // The upgrade credit fixed when the payment started, so what is applied on
     // confirmation is exactly what the customer was shown and paid for.
     if (function_exists('ensure_column')) ensure_column('mkt_orders', 'proration_credit', 'REAL DEFAULT 0');
+    // The coupon the buyer gave when the payment started (counted as used only when paid).
+    if (function_exists('ensure_column')) ensure_column('mkt_orders', 'coupon_code', "VARCHAR(40) DEFAULT ''");
     if (function_exists('act_index')) act_index('mkt_orders', 'ix_mord_who', '(subscriber_kind, subscriber_id, status)');
 }
 
@@ -77,7 +79,7 @@ function mkt_pay_price($purpose, $refId, $period = 'MONTH') {
  *   ['mode'=>'pay','row_id'=>N] → a Razorpay order is waiting — send to the checkout page
  *   ['mode'=>'error','msg'=>…] → could not create the order
  */
-function mkt_pay_start($kind, $subId, $purpose, $refId, $period = 'MONTH', $by = '') {
+function mkt_pay_start($kind, $subId, $purpose, $refId, $period = 'MONTH', $by = '', $coupon = '') {
     mkt_pay_migrate();
     $kind = _mkt_pay_kind($kind); $subId = (int)$subId;
     $purpose = strtoupper($purpose) === 'PACK' ? 'PACK' : 'SUB';
@@ -91,7 +93,18 @@ function mkt_pay_start($kind, $subId, $purpose, $refId, $period = 'MONTH', $by =
         if (empty($q['ok'])) return ['mode' => 'error', 'msg' => $q['msg']];
         if ($q['type'] === 'DOWNGRADE') return ['mode' => 'scheduled', 'msg' => $q['msg']];
         $amount = (float)$q['price']; $credit = (float)$q['credit'];
-    }
+        // A coupon takes its discount off the list price exactly as the plan record
+        // will (mkt_plan_change_apply), so what is charged is what is recorded. It
+        // used to be ignored whenever online payment was on.
+        $c = trim((string)$coupon) !== '' && function_exists('mkt_coupon_valid') ? mkt_coupon_valid($coupon, $kind) : null;
+        if ($c) {
+            $list = (float)($q['list'] ?? $amount);
+            $disc = strtoupper((string)$c['kind']) === 'FIXED' ? (float)$c['value'] : round($list * (float)$c['value'] / 100, 2);
+            $disc = min(max(0.0, $disc), $list);
+            $amount = max(0.0, round($list - $disc - $credit, 2));
+            $coupon = strtoupper(trim((string)$coupon));
+        } else { $coupon = ''; }
+    } else { $coupon = ''; }
     if ($amount <= 0) return ['mode' => 'free'];
     if (!mkt_pay_configured()) return ['mode' => 'error', 'msg' => mkt_pay_unconfigured_msg()];
 
@@ -101,9 +114,9 @@ function mkt_pay_start($kind, $subId, $purpose, $refId, $period = 'MONTH', $by =
     $ord = rzp_create_order($paise, $receipt, ['kind' => $kind, 'purpose' => $purpose, 'ref' => (string)$refId]);
     if (empty($ord['ok'])) return ['mode' => 'error', 'msg' => $ord['error'] ?? 'Could not start the payment.'];
 
-    db()->prepare("INSERT INTO mkt_orders (subscriber_kind,subscriber_id,purpose,ref_id,period,amount,currency,order_id,status,created_by,created_at,proration_credit)
-                   VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?, ?, ?)")
-        ->execute([$kind, $subId, $purpose, (int)$refId, $period, $amount, (string)$cfg['currency'], (string)$ord['id'], (string)$by, date('c'), round($credit, 2)]);
+    db()->prepare("INSERT INTO mkt_orders (subscriber_kind,subscriber_id,purpose,ref_id,period,amount,currency,order_id,status,created_by,created_at,proration_credit,coupon_code)
+                   VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?, ?, ?, ?)")
+        ->execute([$kind, $subId, $purpose, (int)$refId, $period, $amount, (string)$cfg['currency'], (string)$ord['id'], (string)$by, date('c'), round($credit, 2), $coupon]);
     return ['mode' => 'pay', 'row_id' => (int)db()->lastInsertId()];
 }
 
@@ -153,7 +166,7 @@ function mkt_pay_verify($orderId, $paymentId, $signature) {
         return [true, 'Payment received. ' . $msg];
     }
     [$ok, $msg] = function_exists('mkt_plan_change_apply')
-        ? mkt_plan_change_apply($kind, $subId, (int)$row['ref_id'], (string)$row['period'], $by, '', (float)($row['proration_credit'] ?? 0))
+        ? mkt_plan_change_apply($kind, $subId, (int)$row['ref_id'], (string)$row['period'], $by, (string)($row['coupon_code'] ?? ''), (float)($row['proration_credit'] ?? 0))
         : (function_exists('mkt_subscribe') ? mkt_subscribe($kind, $subId, (int)$row['ref_id'], (string)$row['period'], $by) : [true, 'Subscribed.']);
     return [true, 'Payment received. ' . $msg];
 }
