@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '64b10b0 · 2026-10-22 11:46 UTC · 701 files';
+$RELEASE = 'facd279 · 2026-10-22 12:46 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>2648,'h'=>'5374a8f8ccb4fdd4'],
@@ -63,7 +63,7 @@ $EXPECT  = [
     'lib/capa.php' => ['s'=>34318,'h'=>'cf9edf290b106bfd'],
     'lib/careers.php' => ['s'=>22969,'h'=>'70a9ec1b3acf87e3'],
     'lib/chain.php' => ['s'=>27590,'h'=>'38344fcbe18d90b5'],
-    'lib/commercial.php' => ['s'=>24343,'h'=>'07bab08c6e90e758'],
+    'lib/commercial.php' => ['s'=>25768,'h'=>'3dc1ba6d98aa0290'],
     'lib/comp_config.php' => ['s'=>15360,'h'=>'5864ccfc2501116d'],
     'lib/company.php' => ['s'=>7536,'h'=>'cf72adf65cfa6d50'],
     'lib/competence.php' => ['s'=>54296,'h'=>'0761c88493b8c827'],
@@ -190,7 +190,7 @@ $EXPECT  = [
     'lib/portal.php' => ['s'=>123446,'h'=>'bdb7a9fc58350701'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
-    'lib/pricing_admin.php' => ['s'=>14010,'h'=>'ca287d3e610ba5b0'],
+    'lib/pricing_admin.php' => ['s'=>14720,'h'=>'37b9122bf07e32de'],
     'lib/projcosting.php' => ['s'=>50957,'h'=>'924e2c01451770f7'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
     'lib/qr.php' => ['s'=>17936,'h'=>'4d50b69b53bfa5e2'],
@@ -565,7 +565,7 @@ $EXPECT  = [
     'views/ops/positions_org.php' => ['s'=>4761,'h'=>'f2346193aac18b77'],
     'views/ops/preflight.php' => ['s'=>2844,'h'=>'b076eae0d7c568c2'],
     'views/ops/preorder_checklist.php' => ['s'=>1902,'h'=>'71d84531e6250a45'],
-    'views/ops/pricing_usage.php' => ['s'=>13569,'h'=>'5048c7f8af65a09d'],
+    'views/ops/pricing_usage.php' => ['s'=>14786,'h'=>'4539aef10b1c0068'],
     'views/ops/privacy.php' => ['s'=>1458,'h'=>'cc20feb046ed0b1a'],
     'views/ops/product_package.php' => ['s'=>4732,'h'=>'a87a7a169d94fe14'],
     'views/ops/profitability_detail.php' => ['s'=>10185,'h'=>'f49f71530b916b7e'],
@@ -619,7 +619,7 @@ $EXPECT  = [
     'views/ops/sso.php' => ['s'=>5411,'h'=>'7e627345af817c60'],
     'views/ops/stage_gates.php' => ['s'=>10644,'h'=>'da76be3329606d2a'],
     'views/ops/subscription.php' => ['s'=>11729,'h'=>'e2ae42b345190335'],
-    'views/ops/subscription_invoice.php' => ['s'=>5728,'h'=>'bac73d302c4e0734'],
+    'views/ops/subscription_invoice.php' => ['s'=>6967,'h'=>'39607f380196f537'],
     'views/ops/super_admin.php' => ['s'=>25600,'h'=>'f4d5a83d44fb7a8b'],
     'views/ops/system_status.php' => ['s'=>2399,'h'=>'90287c341b6166f4'],
     'views/ops/tally_export.php' => ['s'=>13104,'h'=>'4b8ef6be8b7b91b4'],

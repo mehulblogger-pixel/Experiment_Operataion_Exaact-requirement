@@ -37,7 +37,7 @@ $yr = fn($v) => (int) $v > 0 ? e($sym . number_format((int) $v)) : '<span class=
 </div>
 <?php endif; ?>
 
-<form method="post" action="/pricing-usage" class="settings-form" id="pu-form">
+<form method="post" action="/pricing-usage" class="settings-form" id="pu-form" enctype="multipart/form-data">
   <div class="panel" style="max-width:860px;margin-top:14px">
     <h3 class="tab-sub" style="margin-top:0">Prices <span class="muted" style="font-weight:400;font-size:12.5px">— a company pays each module it picks (once per company) plus each login</span></h3>
     <div class="tbl-scroll" style="overflow-x:auto">
@@ -88,6 +88,14 @@ $yr = fn($v) => (int) $v > 0 ? e($sym . number_format((int) $v)) : '<span class=
       <div class="ff"><label>Invoice number prefix</label>
         <input class="form-control" name="plat_invoice_prefix" value="<?= e($raw['plat_invoice_prefix'] ?? '') ?>" placeholder="EX" maxlength="6" style="text-transform:uppercase">
         <div class="pu-hint">Invoices read like EX/2026-27/0001, one series for all companies, restarting each 1 April.</div></div>
+      <div class="ff ff-wide"><label>Logo on invoices</label>
+        <?php $lg = function_exists('commercial_logo_data_uri') ? commercial_logo_data_uri() : ''; ?>
+        <?php if ($lg !== ''): ?><div style="display:flex;gap:12px;align-items:center;margin-bottom:6px"><img src="<?= e($lg) ?>" alt="Current invoice logo" style="max-height:48px;max-width:180px;border:1px solid var(--line,#e5e7eb);border-radius:6px;padding:4px;background:#fff">
+          <label style="font-weight:400;font-size:12.5px;display:flex;gap:6px;align-items:center"><input type="checkbox" name="inv_logo_clear" value="1"> Remove it</label></div><?php endif; ?>
+        <input class="form-control" type="file" name="inv_logo" accept="image/png,image/jpeg,image/webp,image/gif">
+        <?php if ($lg === '' && (string) setting_get('quote_lh_logo', '') !== ''): ?>
+          <label style="font-weight:400;font-size:12.5px;display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" name="inv_logo_profile" value="1"> Use the logo from your Company profile</label><?php endif; ?>
+        <div class="pu-hint">PNG or JPG, up to 2 MB. Printed at the top of every invoice and receipt.</div></div>
       <div class="ff ff-wide"><label>Your registered address</label><?= $box('plat_address', 'plat_address', $raw['plat_address'] ?? '', 'maxlength="400"') ?></div>
     </div>
     <p class="pu-note" style="margin-top:8px">Same state as the customer's GSTIN → CGST + SGST; another state → IGST. Customers without a GSTIN are taxed at your state's rate.

@@ -120,9 +120,25 @@ try {
     $inv = commercial_register_get($o['invoice_no']);
     ob_start(); include dirname(__DIR__) . '/views/ops/subscription_invoice.php'; $html = ob_get_clean();
     t_ok($inv && $inv['buyer']['gstin'] === $MH && $inv['company_key'] === (string) current_tenant(), 'the invoice is in the platform\'s GST register, with the buyer\'s GSTIN');
-    foreach (['Tax invoice', $o['invoice_no'], $PLAT, $MH, 'Maharashtra (27)', '997331', 'IGST @ 18%', '₹2,358', 'reverse charge: No'] as $needle)
+    foreach (['Tax invoice', $o['invoice_no'], $PLAT, $MH, 'Maharashtra (27)', '997331', 'IGST @ 18%', '₹2,358', 'reverse charge: No',
+              'Two Thousand Three Hundred Fifty Eight Rupees Only', 'Paid in full via <b>Razorpay</b>', 'pay_cm_', '✓ PAID'] as $needle)
         t_ok(strpos($html, (string) $needle) !== false, 'the tax invoice shows "' . $needle . '"');
     t_eq(saas_order_claim($oid, 'pay_again'), null, 'a replayed payment changes nothing and takes no second number');
+
+    // ---- The logo on the invoice --------------------------------------------------------
+    $logoFile = commercial_logo_file(); $logoBak = is_file($logoFile) ? file_get_contents($logoFile) : null;
+    t_ok(strpos($html, 'class="logo"') === ($logoBak === null ? false : strpos($html, 'class="logo"')), 'with no logo uploaded, the invoice simply has none');
+    t_ok(commercial_logo_save('not an image') !== '', 'a file that is not an image is refused in plain words');
+    if (function_exists('imagecreatetruecolor')) {
+        $im = imagecreatetruecolor(400, 120); imagefill($im, 0, 0, imagecolorallocate($im, 30, 64, 175));
+        ob_start(); imagepng($im); $png = ob_get_clean();
+        t_eq(commercial_logo_save($png), '', 'a PNG logo is accepted (kept as a small JPEG)');
+        t_ok(strpos(commercial_logo_data_uri(), 'data:image/jpeg;base64,') === 0, 'and is ready to print on every invoice');
+        ob_start(); include dirname(__DIR__) . '/views/ops/subscription_invoice.php'; $html2 = ob_get_clean();
+        t_ok(strpos($html2, '<img class="logo" src="data:image/jpeg;base64,') !== false, 'the invoice now shows the logo at the top');
+    }
+    if ($logoBak !== null) file_put_contents($logoFile, $logoBak); else @unlink($logoFile);
+    t_ok(strlen((string) commercial_logo_save(str_repeat('x', 2 * 1048576 + 1))) > 0, 'a logo over 2 MB is refused');
 
     // ---- Bill to: what the customer types at checkout --------------------------------
     $bt = commercial_billto_clean(['name' => 'Buyer Co', 'gstin' => substr($MH, 0, 14) . 'X', 'state' => '24']);

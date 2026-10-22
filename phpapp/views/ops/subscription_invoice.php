@@ -4,7 +4,8 @@
 // Payment history) and to the platform owner (GST invoices) from the SAME
 // record — commercial_invoice_row(), or the register's latest line for the
 // number, which carries any correction. Never recomputed from today's prices.
-// Data: $inv.
+// The platform's logo is printed on top, the total in words, and how it was
+// paid (Razorpay, with the payment reference). Data: $inv.
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 $inv = is_array($inv ?? null) ? $inv : [];
 $money = fn($n) => '₹' . number_format((int) $n);
@@ -15,6 +16,9 @@ $pct = fn($r) => rtrim(rtrim(number_format((float) $r, 2), '0'), '.') . '%';
 $lines = (array) ($inv['lines'] ?? []); $credit = (int) ($inv['credit'] ?? 0);
 $date = (string) ($inv['date'] ?? '');
 $amend = (array) ($inv['amendments'] ?? []);
+$logo = function_exists('commercial_logo_data_uri') ? commercial_logo_data_uri() : '';
+$words = function_exists('amount_in_words_inr') ? amount_in_words_inr((int) ($inv['total'] ?? 0)) : '';
+$fd = fn($d) => function_exists('fdate') ? fdate($d) : $d;
 ?><!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= $isTax ? 'Tax invoice ' . $e($inv['invoice_no']) : 'Payment receipt' ?></title>
@@ -29,17 +33,22 @@ $amend = (array) ($inv['amendments'] ?? []);
   th{font-size:11px;text-transform:uppercase;color:#6b7280}
   .r{text-align:right}.tot td{font-weight:700;border-top:2px solid #111827}
   .bar{max-width:780px;margin:0 auto 10px;display:flex;justify-content:flex-end}
+  .logo{max-height:56px;max-width:220px;display:block;margin-bottom:14px}
+  .paid{display:inline-block;border:2px solid #15803d;color:#15803d;border-radius:8px;padding:3px 12px;font-weight:800;letter-spacing:.08em;font-size:13px;margin-bottom:6px}
+  .words td{font-size:13px;color:#374151;border-bottom:0;padding-top:4px}
+  .paybox{margin-top:14px;padding:10px 12px;border:1px solid #d1fae5;background:#f0fdf4;border-radius:8px;font-size:13px}
   .bar button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid #d1d5db;background:#fff;cursor:pointer}
   @media (max-width:600px){.two{grid-template-columns:1fr}.doc{padding:18px}}
   @media print{body{background:#fff;padding:0}.doc{border:0}.bar{display:none}}
 </style></head><body>
 <div class="bar"><button type="button" onclick="window.print()">Print / save as PDF</button></div>
 <div class="doc">
+  <?php if ($logo !== ''): ?><img class="logo" src="<?= $e($logo) ?>" alt="<?= $e($sup['name'] ?? 'Logo') ?>"><?php endif; ?>
   <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
     <div><h1><?= $isTax ? 'Tax invoice' : 'Payment receipt' ?></h1>
       <div class="muted"><?= $isTax ? 'Invoice no. <b>' . $e($inv['invoice_no']) . '</b> · ' : '' ?>Date <?= $e(function_exists('fdate') ? fdate($date) : $date) ?></div>
       <?php if ($amend): $last = end($amend); ?><div class="muted">Revised <?= $e(function_exists('fdate') ? fdate(substr((string) $last['at'], 0, 10)) : substr((string) $last['at'], 0, 10)) ?> — billing details corrected</div><?php endif; ?></div>
-    <div class="muted" style="text-align:right">Payment reference<br><b><?= $e($inv['payment_id'] ?? '') ?></b></div>
+    <div style="text-align:right"><span class="paid">✓ PAID</span><div class="muted">via Razorpay</div></div>
   </div>
 
   <div class="two">
@@ -70,8 +79,10 @@ $amend = (array) ($inv['amendments'] ?? []);
       <?php endif; ?>
     <?php endif; ?>
     <tr class="tot"><td colspan="<?= $isTax ? 2 : 1 ?>">Total paid</td><td class="r"><?= $money($inv['total'] ?? 0) ?></td></tr>
+    <?php if ($words !== ''): ?><tr class="words"><td colspan="<?= $isTax ? 3 : 2 ?>">Amount in words: <b><?= $e($words) ?></b></td></tr><?php endif; ?>
   </table>
 
+  <div class="paybox">Paid in full via <b>Razorpay</b> on <?= $e($fd($date)) ?> · Payment reference <b><?= $e($inv['payment_id'] ?? '') ?></b></div>
   <p class="muted" style="margin-top:16px"><?= $isTax ? 'Tax payable on reverse charge: No. ' : '' ?>This is a computer-generated <?= $isTax ? 'invoice' : 'receipt' ?> and needs no signature.</p>
   <?php if ($isTax && empty($buy['gstin'])): ?><p class="muted">Need your GSTIN on this invoice? Ask your provider — it can be corrected.</p><?php endif; ?>
 </div>

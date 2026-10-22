@@ -383,3 +383,25 @@ function ops_gst_invoices($method) {
     view('ops/gst_invoices', ['rows' => $rows, 'month' => $month, 'months' => $months, 'sel' => $no !== '' ? commercial_register_get($no) : null]);
     return true;
 }
+
+// ---- The logo printed on the platform's invoices ----------------------------------
+// One file in the protected data folder, so every company's invoice (rendered
+// inside that company's workspace) shows the PLATFORM's logo, not the company's.
+function commercial_logo_file() {
+    $dir = function_exists('tenant_safe_data_dir') ? (string) tenant_safe_data_dir()[0] : sys_get_temp_dir();
+    return rtrim($dir, '/') . '/platform-invoice-logo.jpg';
+}
+// Save an uploaded image (any common format) as a resized JPEG. '' or the reason.
+function commercial_logo_save($raw) {
+    if (strlen((string) $raw) > 2 * 1048576) return 'The logo is larger than 2 MB — please use a smaller image.';
+    [$jpg, $err] = function_exists('image_to_jpeg') ? image_to_jpeg((string) $raw, 600, 90) : ['', 'images cannot be read on this server'];
+    if ($err !== '' || $jpg === '') return 'That file could not be read as an image (' . ($err ?: 'unknown format') . '). Use a PNG or JPG.';
+    if (@file_put_contents(commercial_logo_file(), $jpg) === false) return 'The logo could not be saved on the server.';
+    @chmod(commercial_logo_file(), 0640);
+    return '';
+}
+// The logo as a data: URI for the invoice page, or '' when none is set.
+function commercial_logo_data_uri() {
+    $f = commercial_logo_file();
+    return is_file($f) && filesize($f) > 0 ? 'data:image/jpeg;base64,' . base64_encode((string) file_get_contents($f)) : '';
+}

@@ -273,6 +273,10 @@
     "expect": "\"Invoice … corrected. The customer sees the corrected invoice from their Payment history; include it as an amendment in your next GST return.\" The list shows \"corrected\"; the invoice shows \"Revised\" and the GSTIN; the amount is unchanged."
    },
    {
+    "do": "Pricing → GST → \"Logo on invoices\": upload a PNG → \"Save prices\". Open any invoice.",
+    "expect": "Your logo at the top, \"✓ PAID · via Razorpay\", \"Amount in words: … Rupees Only\" under the total, and \"Paid in full via Razorpay on <date> · Payment reference pay_…\"."
+   },
+   {
     "do": "Try saving the correction with no reason.",
     "expect": "Refused — a reason is required and is kept with the invoice (\"Earlier corrections\")."
    },

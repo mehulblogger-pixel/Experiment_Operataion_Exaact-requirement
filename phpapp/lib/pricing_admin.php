@@ -162,6 +162,15 @@ function ops_pricing_usage($method) {
         $map = pricing_settings_map($_POST);
         $why = pricing_settings_check($map);
         if ($why !== '') { flash($why, 'error'); redirect('/pricing-usage'); }
+        // The logo on the platform's invoices (lib/commercial.php).
+        if (!empty($_FILES['inv_logo']['tmp_name']) && (int) ($_FILES['inv_logo']['error'] ?? 1) === 0) {
+            $lerr = commercial_logo_save(file_get_contents($_FILES['inv_logo']['tmp_name']));
+            if ($lerr !== '') { flash('Invoice logo: ' . $lerr . ' Nothing was saved.', 'error'); redirect('/pricing-usage#gst'); }
+        } elseif (!empty($_POST['inv_logo_profile']) && (string) setting_get('quote_lh_logo', '') !== '') {
+            commercial_logo_save(base64_decode((string) setting_get('quote_lh_logo', '')));
+        } elseif (!empty($_POST['inv_logo_clear'])) {
+            @unlink(commercial_logo_file());
+        }
         // Always save on the control install (the master price list + AI defaults).
         foreach ($map as $k => $v) { try { setting_set($k, $v); } catch (Throwable $e) {} }
         if ($action === 'apply_all') {

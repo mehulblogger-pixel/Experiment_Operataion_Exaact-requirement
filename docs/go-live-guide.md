@@ -71,6 +71,9 @@ the empty boxes; check them, then press **Save**.
   rate (18%) and SAC code (997331; confirm with your accountant), and choose whether prices are
   before GST or include it. From then on the customer sees the GST before paying, pays the total,
   and gets a **tax invoice** (EX/2026-27/0001 …) under Subscription → Payment history.
+- **Invoice logo:** Plans, pricing & usage → GST → **Logo on invoices**. Upload a PNG or JPG, or tick
+  "Use the logo from your Company profile". Every invoice and receipt also shows "✓ PAID via
+  Razorpay", the total in words and the Razorpay payment reference.
 - **Customer's GSTIN:** at checkout the customer sees **Bill to** (name, GSTIN, state, address) and
   can enter their GSTIN. A mistyped GSTIN is refused before payment. If a customer paid without it
   and asks later, go to Owner home → **GST invoices** → **Correct**, enter the GSTIN and a reason.
