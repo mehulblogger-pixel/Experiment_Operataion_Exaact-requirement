@@ -121,7 +121,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
   <h2><?= count($companies) ?> compan<?= count($companies) === 1 ? 'y' : 'ies' ?></h2>
   <div class="sc-scroll">
   <table class="sc">
-    <tr><th>Company</th><th>Plan</th><th>Seats</th><th>Modules</th><th>Last used</th><th>Status</th><th></th></tr>
+    <tr><th>Company</th><th>Plan</th><th>Seats</th><th>Modules</th><th>Storage</th><th>Last used</th><th>Status</th><th></th></tr>
     <?php foreach ($companies as $c): $k = $e($c['tenant_key']);
       $active = ($c['status'] ?? 'active') !== 'suspended' && ($c['route_status'] ?? '') !== 'suspended'; ?>
     <tr>
@@ -136,6 +136,11 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
           <?php elseif ($c['plan'] === 'CUSTOM'): ?><b><?= (int) $c['seat_limit'] ?></b> <span class="sc-meta">bought</span>
           <?php else: ?><b><?= (int) $c['seat_limit'] ?></b> <span class="sc-key">(<?= (int) $c['base_logins'] ?> + <?= (int) ($c['extra_user_seats'] ?? 0) ?>)</span><?php endif; ?></td>
       <td><?php foreach ($c['mods_list'] as $m): ?><span class="pill mod"><?= $e($modLabel($m)) ?></span><?php endforeach; ?></td>
+      <td><?php $su = (string) ($c['storage_used'] ?? ''); $sl = (int) ($c['storage_limit'] ?? 0); ?>
+        <?php if ($su === ''): ?><span class="sc-meta">not read yet</span>
+        <?php else: $sp = $sl > 0 ? (int) floor(100 * (int) $su / $sl) : null; ?>
+          <?= $e(saas_bytes_label((int) $su)) ?><div class="sc-meta" style="<?= $sp !== null && $sp >= 95 ? 'color:#b91c1c' : ($sp !== null && $sp >= 80 ? 'color:#b45309' : '') ?>"><?= $sp !== null ? $sp . '% of ' . $e(saas_bytes_label($sl)) : 'no limit' ?></div>
+        <?php endif; ?></td>
       <td><?php $la = (string) ($c['last_active_at'] ?? '') ?: (string) ($c['last_login_at'] ?? ''); ?>
         <?= $la !== '' ? $e(fdate(substr($la, 0, 10))) . '<div class="sc-meta">' . (int) $c['idle_days'] . ' day' . ((int) $c['idle_days'] === 1 ? '' : 's') . ' ago</div>' : '<span class="sc-meta">' . (!empty($c['self']) ? 'not yet' : '—') . '</span>' ?>
         <?php if (!empty($c['delete_on'])): ?><div class="sc-meta" style="color:#b45309">deleted <?= $e(fdate($c['delete_on'])) ?> if unused<?= (int) ($c['inactive_notices'] ?? 0) ? ' · ' . (int) $c['inactive_notices'] . ' warning' . ((int) $c['inactive_notices'] === 1 ? '' : 's') . ' sent' : '' ?></div><?php endif; ?></td>
@@ -176,6 +181,16 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
         <input type="number" name="extra_user_seats" min="0" value="<?= (int) ($sel['extra_user_seats'] ?? 0) ?>">
         <div class="sc-note">Total logins allowed = plan base (<?= (int) saas_plan_logins($sel['plan'] ?? '') ?>) + purchased. Enforcement at sign-in lands in Increment 4.</div></div>
       <div class="ff" style="justify-content:flex-end"><div><button class="btn">Save seats</button></div></div>
+    </div>
+  </form>
+
+  <form method="post">
+    <input type="hidden" name="do" value="company_storage"><input type="hidden" name="key" value="<?= $sk ?>">
+    <div class="sc-edit" style="border-bottom:1px solid var(--line,#eef1f5)">
+      <div class="ff"><label>Extra storage granted (GB)</label>
+        <input type="number" name="storage_extra_gb" min="0" step="0.5" value="<?= $e($sel['storage_extra_gb'] ?? '') ?>" placeholder="none">
+        <div class="sc-note">Added on top of what its plan gives (the Storage allowance panel below) and any packs it bought — for a special arrangement with this company.</div></div>
+      <div class="ff" style="justify-content:flex-end"><div><button class="btn">Save storage</button></div></div>
     </div>
   </form>
 
@@ -307,6 +322,25 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     <?php foreach ($ss_deleted as $d): ?><tr><td><?= $e(fdate(substr((string) $d['deleted_at'], 0, 10))) ?></td><td><?= $e($d['company']) ?></td><td class="sc-key"><?= $e($d['owner_email']) ?></td><td><?= $e($d['reason']) ?></td></tr><?php endforeach; ?>
   </table></div>
   <?php endif; ?>
+</details>
+<?php endif; ?>
+
+<?php // ---- Storage allowance (super-admin) — owner, 22 Oct 2026 --------------------
+  if ($ssc): $raw2 = fn($k) => (string) setting_get($k, ''); ?>
+<details class="sc-card" style="padding:0">
+  <summary style="cursor:pointer;padding:13px 16px;font-size:14px;font-weight:600;background:var(--soft,#f6f8fb);border-bottom:1px solid var(--line,#e5e7eb)">💾 Storage allowance — how much each company may store</summary>
+  <form method="post" style="padding:16px">
+    <input type="hidden" name="do" value="storage_save">
+    <p class="sc-note" style="margin-top:0">A company on a plan may store: <b>base</b> + <b>GB per login</b> × its logins + the <b>extra packs</b> it buys + any extra you grant it (Manage). Leave everything empty for no limit. At the limit only NEW FILES are refused — records still save and nothing is ever deleted. Owners are e-mailed at 80%, 95% and 100%. (Free trials use the trial storage limit above.)</p>
+    <div class="sc-edit" style="padding:0;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+      <div class="ff"><label>Base storage per company (GB)</label><input type="number" min="0" step="0.5" name="st_base_gb" value="<?= $e($raw2('saas_storage_gb_base')) ?>" placeholder="not set"></div>
+      <div class="ff"><label>Storage per login (GB)</label><input type="number" min="0" step="0.5" name="st_login_gb" value="<?= $e($raw2('saas_storage_gb_per_login')) ?>" placeholder="not set"></div>
+      <div class="ff"><label>Extra storage pack size (GB)</label><input type="number" min="0" step="0.5" name="st_pack_gb" value="<?= $e($raw2('saas_storage_pack_gb')) ?>" placeholder="not offered"></div>
+      <div class="ff"><label>Pack price per month</label><input type="number" min="0" name="st_pack_month" value="<?= $e($raw2('saas_storage_pack_price_month')) ?>" placeholder="not offered"></div>
+      <div class="ff"><label>Pack price per year</label><input type="number" min="0" name="st_pack_year" value="<?= $e($raw2('saas_storage_pack_price_year')) ?>" placeholder="not offered"></div>
+    </div>
+    <div class="sc-actions" style="margin-top:12px"><button class="btn">Save and apply to every company</button></div>
+  </form>
 </details>
 <?php endif; ?>
 

@@ -68,6 +68,10 @@ function selfserve_migrate() {
             'inactive_notices' => "INT DEFAULT 0",
             'last_notice_at'   => "VARCHAR(30) DEFAULT ''",
             'owner_phone'      => "VARCHAR(40) DEFAULT ''",
+            'storage_extra_gb' => "VARCHAR(20) DEFAULT ''",   // extra GB the platform owner granted
+            'storage_used'     => "VARCHAR(20) DEFAULT ''",   // bytes, as last read by the nightly run
+            'storage_limit'    => "VARCHAR(20) DEFAULT ''",   // bytes (0 = no limit)
+            'storage_notice'   => "INT DEFAULT 0",            // highest warning level e-mailed (80/95/100)
         ] as $col => $def) {
             try { ensure_column('saas_tenants', $col, $def); } catch (Throwable $e) {}
         }
@@ -196,6 +200,10 @@ function saas_company_create(array $o) {
         'app_name'    => $company,
     ];
     if ($mods !== null) $pending['modules'] = $mods;
+    // The platform owner's storage allowance, so the company has it from its
+    // first minute rather than from the next nightly run. (Numbers only — no
+    // secret ever goes into the first-boot record.)
+    if (function_exists('selfserve_storage_settings')) $pending['storage'] = selfserve_storage_settings();
     foreach ((array) ($o['pending_extra'] ?? []) as $k => $v) $pending[$k] = $v;
     saas_tenant_upsert($nkey, ['pending_json' => json_encode($pending)]);
     // The owner's first sign-in lives on the routing entry; without it the
@@ -474,16 +482,91 @@ function saas_storage_used_bytes($fresh = false) {
     try { setting_set('saas_storage_cache', time() . '|' . $n); } catch (Throwable $e) {}
     return $n;
 }
-function saas_storage_limit_bytes() {
-    $mb = (int) setting_get('saas_storage_limit_mb', 0);
-    return $mb > 0 ? $mb * 1048576 : 0;
+// ---------------------------------------------------------------------------
+//  STORAGE ALLOWANCE — every hosted company (owner, 22 Oct 2026: "integrate
+//  storage usage and limits on the paid users also")
+//
+//  Trial:  the trial limit (MB) the platform owner set.
+//  Otherwise, an allowance in GB made of four parts, each the platform owner's
+//  number (blank = 0):
+//      base GB for any company on a plan
+//    + GB per login the company has
+//    + extra storage packs the company bought × the pack size
+//    + extra GB the platform owner granted this company (a negotiated deal)
+//  When all of it adds up to 0 the platform owner has not set storage at all,
+//  and there is no limit — nothing is invented.
+//
+//  At the limit, NEW FILES are refused; every record still saves, every file
+//  already stored stays, nothing is ever deleted for being over.
+//  A self-hosted (licence) install is never limited by any of this.
+// ---------------------------------------------------------------------------
+const STORAGE_WARN_LEVELS = [80, 95, 100];   // % at which the owner is told (technical, not a price)
+
+function saas_storage_cfg() {
+    $n = fn($k) => max(0, (float) setting_get($k, '0'));
+    return ['base_gb' => $n('saas_storage_gb_base'), 'per_login_gb' => $n('saas_storage_gb_per_login'),
+            'pack_gb' => $n('saas_storage_pack_gb'), 'packs' => (int) $n('saas_storage_packs'),
+            'extra_gb' => $n('saas_storage_extra_gb')];
 }
-// True when a trial company is at its storage limit — new files are refused.
+function saas_storage_limit_bytes() {
+    if (!function_exists('current_tenant') || current_tenant() === '') return 0;   // control / self-hosted: never limited
+    $st = saas_access_state();
+    if ($st['mode'] === 'trial') {
+        $mb = (int) setting_get('saas_storage_limit_mb', 0);
+        return $mb > 0 ? $mb * 1048576 : 0;
+    }
+    $c = saas_storage_cfg();
+    $logins = max(0, (int) setting_get('saas_seat_limit', 0));
+    $gb = $c['base_gb'] + $c['per_login_gb'] * $logins + $c['pack_gb'] * $c['packs'] + $c['extra_gb'];
+    return $gb > 0 ? (int) round($gb * 1073741824) : 0;
+}
+// Percent used, or null when there is no limit.
+function saas_storage_pct() {
+    $lim = saas_storage_limit_bytes();
+    return $lim > 0 ? (int) floor(100 * saas_storage_used_bytes() / $lim) : null;
+}
+// True when the company is at its storage allowance — new files are refused.
 function saas_storage_full() {
-    if (saas_access_state()['mode'] !== 'trial') return false;
     $lim = saas_storage_limit_bytes();
     return $lim > 0 && saas_storage_used_bytes() >= $lim;
 }
+// Where the space goes, largest first: [label => bytes]. Files are kept inside
+// the company's own database, so this reads the size of the columns that hold
+// them; "Records and everything else" is the rest of the database.
+const STORAGE_AREAS = [    // every table that holds files, by area (read from the schema, 22 Oct 2026)
+    'Inspection reports & photos' => [['report_files', 'data'], ['report_docs', 'data'], ['endorsement_files', 'data'],
+                                      ['job_qaps', 'data'], ['report_templates', 'file_data']],
+    'Field visits & vouchers'     => [['site_visits', 'photo_data'], ['vouchers', 'supporting_file'], ['voucher_entries', 'receipt_data'],
+                                      ['job_bills', 'file_data']],
+    'Sales documents'             => [['lead_files', 'file_data'], ['quote_files', 'file_data'], ['crm_templates', 'file_data'],
+                                      ['partner_registrations', 'file_data'], ['client_ndas', 'file_data']],
+    'Quality & equipment records' => [['equipment_calibrations', 'file_data'], ['controlled_docs', 'file_data'], ['methods', 'file_data'],
+                                      ['confidentiality_undertakings', 'file_data']],
+    'People documents'            => [['person_documents', 'file_data'], ['candidate_docs', 'file_data'], ['inspector_certs', 'file_data'],
+                                      ['asset_issues', 'ack_file_data']],
+    'Marketplace files'           => [['cx_pro_files', 'file_data'], ['cx_engagement_reports', 'file_data'], ['cx_engagement_voucher_files', 'file_data']],
+];
+function saas_storage_breakdown() {
+    $total = saas_storage_used_bytes();
+    $out = []; $files = 0;
+    foreach (STORAGE_AREAS as $label => $cols) {
+        $n = 0;
+        foreach ($cols as [$t, $c]) {
+            try { $n += (int) ops_val("SELECT COALESCE(SUM(LENGTH($c)),0) FROM $t"); } catch (Throwable $e) {}
+        }
+        if ($n > 0) { $out[$label] = $n; $files += $n; }
+    }
+    arsort($out);
+    $out['Records and everything else'] = max(0, $total - $files);
+    return $out;
+}
+function saas_bytes_label($n) {
+    $n = (float) $n;
+    if ($n >= 1073741824) return round($n / 1073741824, 2) . ' GB';
+    if ($n >= 1048576)    return round($n / 1048576, 1) . ' MB';
+    return max(0, (int) round($n / 1024)) . ' KB';
+}
+
 function saas_request_has_files() {
     foreach ((array) ($_FILES ?? []) as $f) {
         $sizes = (array) ($f['size'] ?? []);
@@ -522,7 +605,6 @@ function saas_access_banner() {
         $out = ['tone' => $d <= 7 ? 'warning' : 'info',
             'text' => 'Free trial — ' . ($d === 0 ? 'last day today' : $d . ' day' . ($d === 1 ? '' : 's') . ' left') . ' (until ' . $date . ').',
             'link' => $admin ? '/subscription' : '', 'cta' => $admin ? 'Choose your plan' : '', 'note' => ''];
-        if (saas_storage_full()) $out['text'] .= ' Your trial storage is full, so new files cannot be added.';
         return $out;
     }
     // Paid: only nag in the last 7 days, and only the people who can renew.
@@ -531,6 +613,26 @@ function saas_access_banner() {
                 'link' => '/subscription', 'cta' => 'Renew', 'note' => ''];
     }
     return null;
+}
+
+// The storage line, for every hosted company with an allowance: from 80% for
+// the people who can buy more, and at 100% for everyone (their uploads stop).
+function saas_storage_banner() {
+    if (saas_access_state()['mode'] === 'locked') return null;      // the view-only line already says it all
+    $pct = saas_storage_pct();
+    if ($pct === null || $pct < STORAGE_WARN_LEVELS[0]) return null;
+    $admin = function_exists('billing_can_manage') && billing_can_manage();
+    $self  = saas_is_selfserve();
+    $used  = saas_bytes_label(saas_storage_used_bytes()) . ' of ' . saas_bytes_label(saas_storage_limit_bytes());
+    if ($pct >= 100) {
+        return ['tone' => 'error', 'text' => 'Storage is full (' . $used . '), so new files cannot be added. Everything already stored is safe, and records without files still save.',
+            'link' => $admin ? '/subscription' : '', 'cta' => $admin ? ($self ? 'Add storage' : 'See storage') : '',
+            'note' => $admin ? ($self ? '' : 'Ask your provider for more storage.') : 'Ask your workspace owner to add storage.'];
+    }
+    if (!$admin) return null;
+    return ['tone' => $pct >= STORAGE_WARN_LEVELS[1] ? 'warning' : 'info',
+        'text' => 'Storage ' . $pct . '% used (' . $used . ').', 'link' => '/subscription',
+        'cta' => $self ? 'Add storage' : 'See storage', 'note' => $self ? '' : 'Ask your provider for more storage.'];
 }
 
 // ---------------------------------------------------------------------------
@@ -575,6 +677,7 @@ function saas_plan_current() {
     return [
         'mods'   => array_values(array_intersect(selfserve_all_modules(), function_exists('saas_paid_modules') ? saas_paid_modules() : [])),
         'seats'  => (int) setting_get('saas_seat_limit', 0),
+        'packs'  => (int) setting_get('saas_storage_packs', 0),
         'period' => (string) setting_get('saas_paid_period', '') ?: 'month',
         'from'   => (string) setting_get('saas_paid_from', ''),
         'until'  => (string) setting_get('billing_paid_until', ''),
@@ -584,26 +687,28 @@ function saas_plan_next() {
     $n = json_decode((string) setting_get('saas_next_plan', ''), true);
     return is_array($n) ? $n : null;
 }
-function saas_monthly_value(array $mods, $seats, $period) {
-    $q = saas_company_quote($mods, $seats, $period);
+function saas_monthly_value(array $mods, $seats, $period, $packs = 0) {
+    $q = saas_company_quote($mods, $seats, $period, $packs);
     return $period === 'year' ? $q['total'] / 12 : (float) $q['total'];
 }
-function saas_same_selection(array $a, $seatsA, array $b, $seatsB) {
+function saas_same_selection(array $a, $seatsA, array $b, $seatsB, $packsA = 0, $packsB = 0) {
     sort($a); sort($b);
-    return $a === $b && (int) $seatsA === (int) $seatsB;
+    return $a === $b && (int) $seatsA === (int) $seatsB && (int) $packsA === (int) $packsB;
 }
 
 // What choosing this would do, before anything is charged or written.
-function saas_plan_change_quote(array $mods, $seats, $period, $today = null) {
+function saas_plan_change_quote(array $mods, $seats, $period, $today = null, $packs = 0) {
     $today  = $today ?: date('Y-m-d');
     $period = $period === 'year' ? 'year' : 'month';
     $mods   = array_values(array_intersect(selfserve_all_modules(), array_map('strtolower', $mods)));
     sort($mods);
     $seats  = max(1, (int) $seats);
-    $q      = saas_company_quote($mods, $seats, $period);
+    $packs  = max(0, (int) $packs);
+    $q      = saas_company_quote($mods, $seats, $period, $packs);
+    $packs  = (int) $q['packs'];
     $list   = (int) $q['total'];
     $end    = fn($from) => date('Y-m-d', strtotime($from . ($period === 'year' ? ' +1 year' : ' +1 month')));
-    $out = ['ok' => true, 'msg' => '', 'mods' => $mods, 'seats' => $seats, 'period' => $period, 'list' => $list,
+    $out = ['ok' => true, 'msg' => '', 'mods' => $mods, 'seats' => $seats, 'packs' => $packs, 'period' => $period, 'list' => $list,
             'price' => $list, 'credit' => 0, 'starts' => $today, 'expires' => $end($today), 'extra_days' => 0, 'type' => 'NEW'];
     if (!$mods) return ['ok' => false, 'msg' => 'Pick at least one module.'] + $out;
     if ($list <= 0) return ['ok' => false, 'msg' => 'That selection has no price set yet — please contact your provider.'] + $out;
@@ -613,17 +718,17 @@ function saas_plan_change_quote(array $mods, $seats, $period, $today = null) {
     if (!$running) return $out;   // NEW
 
     $next = saas_plan_next();
-    $isCurrent = saas_same_selection($mods, $seats, $cur['mods'], $cur['seats']) && $period === $cur['period'];
-    $isNext = $next && saas_same_selection($mods, $seats, (array) $next['mods'], (int) $next['seats']) && $period === ($next['period'] ?? '');
+    $isCurrent = saas_same_selection($mods, $seats, $cur['mods'], $cur['seats'], $packs, $cur['packs']) && $period === $cur['period'];
+    $isNext = $next && saas_same_selection($mods, $seats, (array) $next['mods'], (int) $next['seats'], $packs, (int) ($next['packs'] ?? 0)) && $period === ($next['period'] ?? '');
     $starts = date('Y-m-d', strtotime($cur['until'] . ' +1 day'));
     if ($isCurrent || $isNext) {
         return ['type' => 'RENEW', 'starts' => $starts, 'expires' => $end($starts)] + $out;
     }
-    $newVal = saas_monthly_value($mods, $seats, $period);
-    $curVal = saas_monthly_value($cur['mods'], $cur['seats'], $cur['period']);
+    $newVal = saas_monthly_value($mods, $seats, $period, $packs);
+    $curVal = saas_monthly_value($cur['mods'], $cur['seats'], $cur['period'], $cur['packs']);
     if ($newVal > $curVal + 0.005) {
         // Unused value of what is running now, at its list price.
-        $worth = (int) saas_company_quote($cur['mods'], $cur['seats'], $cur['period'])['total'];
+        $worth = (int) saas_company_quote($cur['mods'], $cur['seats'], $cur['period'], $cur['packs'])['total'];
         $from  = $cur['from'] !== '' ? $cur['from'] : date('Y-m-d', strtotime($cur['until'] . ($cur['period'] === 'year' ? ' -1 year' : ' -1 month')));
         $total = max(1, (strtotime($cur['until']) - strtotime($from)) / 86400);
         $left  = max(0, (strtotime($cur['until']) - strtotime($today)) / 86400);
@@ -643,7 +748,8 @@ function saas_plan_change_quote(array $mods, $seats, $period, $today = null) {
 }
 
 // Switch exactly these modules and logins on now.
-function saas_plan_switch_to(array $mods, $seats) {
+function saas_plan_switch_to(array $mods, $seats, $packs = 0) {
+    setting_set('saas_storage_packs', (string) max(0, (int) $packs));
     setting_set('saas_paid_modules', implode(',', $mods));
     saas_apply_modules_list($mods);
     setting_set('saas_entitled_modules', implode(',', $mods));
@@ -657,7 +763,7 @@ function saas_plan_switch_to(array $mods, $seats) {
 function saas_plan_change_apply(array $q, $paymentId = '', $orderId = '') {
     $note = implode(',', $q['mods']);
     if ($q['type'] === 'NEW' || $q['type'] === 'UPGRADE') {
-        saas_plan_switch_to($q['mods'], $q['seats']);
+        saas_plan_switch_to($q['mods'], $q['seats'], (int) ($q['packs'] ?? 0));
         setting_set('saas_paid_period', $q['period']);
         setting_set('saas_paid_from', $q['starts']);
         setting_set('billing_paid_until', $q['expires']);
@@ -666,11 +772,11 @@ function saas_plan_change_apply(array $q, $paymentId = '', $orderId = '') {
         // Paid now: the running period is extended, and the selection (if it
         // differs) takes over the day the old period ends.
         setting_set('billing_paid_until', $q['expires']);
-        setting_set('saas_next_plan', json_encode(['mods' => $q['mods'], 'seats' => $q['seats'], 'period' => $q['period'],
-            'starts' => $q['starts'], 'paid' => true]));
+        setting_set('saas_next_plan', json_encode(['mods' => $q['mods'], 'seats' => $q['seats'], 'packs' => (int) ($q['packs'] ?? 0),
+            'period' => $q['period'], 'starts' => $q['starts'], 'paid' => true]));
     } else {   // DOWNGRADE — booked, unpaid
-        setting_set('saas_next_plan', json_encode(['mods' => $q['mods'], 'seats' => $q['seats'], 'period' => $q['period'],
-            'starts' => $q['starts'], 'paid' => false]));
+        setting_set('saas_next_plan', json_encode(['mods' => $q['mods'], 'seats' => $q['seats'], 'packs' => (int) ($q['packs'] ?? 0),
+            'period' => $q['period'], 'starts' => $q['starts'], 'paid' => false]));
         return $q;
     }
     if (function_exists('billing_record_line'))
@@ -685,7 +791,7 @@ function saas_apply_due_change($today = null) {
     if (!$n || (string) ($n['starts'] ?? '9999') > $today) return false;
     setting_set('saas_next_plan', '');
     if (!empty($n['paid'])) {
-        saas_plan_switch_to((array) $n['mods'], (int) $n['seats']);
+        saas_plan_switch_to((array) $n['mods'], (int) $n['seats'], (int) ($n['packs'] ?? 0));
         setting_set('saas_paid_period', (string) $n['period']);
         setting_set('saas_paid_from', (string) $n['starts']);
     }
@@ -704,7 +810,8 @@ function saas_apply_due_change($today = null) {
 // copied into each self-serve company (at creation and every night), so a
 // company never sets its own price.
 function selfserve_sell_settings() {
-    $keys = ['billing_currency', 'billing_price_user_month', 'billing_price_user_year', 'rzp_key_id', 'rzp_key_secret'];
+    $keys = ['billing_currency', 'billing_price_user_month', 'billing_price_user_year', 'rzp_key_id', 'rzp_key_secret',
+             'saas_storage_pack_price_month', 'saas_storage_pack_price_year'];
     if (defined('PRODUCT_MODULES')) foreach (PRODUCT_MODULES as $k => $m) {
         if (!empty($m[3])) continue;
         $keys[] = 'saas_price_mod_' . $k . '_month'; $keys[] = 'saas_price_mod_' . $k . '_year';
@@ -714,10 +821,20 @@ function selfserve_sell_settings() {
     return $out;
 }
 
+// The platform owner's storage allowance numbers, copied into EVERY hosted
+// company each night (and when changed on the console) so each company can
+// work out its own allowance without reaching back to the control database.
+function selfserve_storage_settings() {
+    $out = [];
+    foreach (['saas_storage_gb_base', 'saas_storage_gb_per_login', 'saas_storage_pack_gb'] as $k) $out[$k] = (string) setting_get($k, '');
+    return $out;
+}
+
 // Read the facts that live inside one company. Never throws; ['ok'=>false]
 // when the company could not be opened (it is then left completely alone).
-function selfserve_read_tenant($key, array $sell = null) {
-    $row = ['ok' => false, 'last_seen' => '', 'paid_until' => '', 'trial_until' => '', 'modules' => [], 'seat_limit' => 0];
+function selfserve_read_tenant($key, array $sell = null, array $storage = null) {
+    $row = ['ok' => false, 'last_seen' => '', 'paid_until' => '', 'trial_until' => '', 'modules' => [], 'seat_limit' => 0,
+            'storage_used' => null, 'storage_limit' => null];
     if (!function_exists('saas_enter_tenant')) return $row;
     // A file-backed company whose file does not exist yet has never been opened:
     // nothing to read, and connecting would create an empty file.
@@ -739,6 +856,9 @@ function selfserve_read_tenant($key, array $sell = null) {
                 $row['modules']     = function_exists('saas_current_modules') ? saas_current_modules() : [];
                 $row['seat_limit']  = (int) setting_get('saas_seat_limit', 0);
                 if ($sell) foreach ($sell as $sk => $sv) { try { setting_set($sk, $sv); } catch (Throwable $e) {} }
+                if ($storage) foreach ($storage as $sk => $sv) { try { setting_set($sk, $sv); } catch (Throwable $e) {} }
+                $row['storage_used']  = saas_storage_used_bytes(true);
+                $row['storage_limit'] = saas_storage_limit_bytes();
                 $row['ok'] = true;
             }
         }
@@ -778,6 +898,7 @@ function selfserve_sweep(array $opts = []) {
     selfserve_migrate();
     $cfg = selfserve_cfg();
     $sell = selfserve_sell_settings();
+    $storeSet = selfserve_storage_settings();
     try { $rows = ops_all("SELECT * FROM saas_tenants ORDER BY tenant_key"); }
     catch (Throwable $e) { return $out; }
     foreach ((array) $rows as $t) {
@@ -785,8 +906,26 @@ function selfserve_sweep(array $opts = []) {
         $isSelf = ($t['source'] ?? '') === 'self';
         if (strtolower((string) ($t['status'] ?? 'active')) === 'suspended') continue;
         $out['checked']++;
-        $facts = $read($key, $isSelf ? $sell : null);
+        $facts = $read($key, $isSelf ? $sell : null, $storeSet + ['saas_storage_extra_gb' => (string) ($t['storage_extra_gb'] ?? '')]);
         if (empty($facts['ok'])) { $out['lines'][] = $key . ': could not be opened — left alone'; continue; }
+        // Storage, for every company: record it for the console, and tell the
+        // owner once as each warning level is crossed.
+        if (($facts['storage_used'] ?? null) !== null) {
+            $used = (int) $facts['storage_used']; $lim = (int) $facts['storage_limit'];
+            $sUpd = ['storage_used' => (string) $used, 'storage_limit' => (string) $lim];
+            $pct = $lim > 0 ? (int) floor(100 * $used / $lim) : 0;
+            $level = 0; foreach (STORAGE_WARN_LEVELS as $lv) if ($pct >= $lv) $level = $lv;
+            $told = (int) ($t['storage_notice'] ?? 0);
+            if ($level < STORAGE_WARN_LEVELS[0]) $sUpd['storage_notice'] = 0;         // back under: a later rise is told again
+            elseif ($level > $told && !$dry) {
+                $subj = $level >= 100 ? 'Storage is full for ' . $t['company'] : 'Storage ' . $pct . '% used for ' . $t['company'];
+                if ($mail((string) $t['owner_email'], $subj, selfserve_storage_body($t, $used, $lim, $pct, $isSelf))) {
+                    $sUpd['storage_notice'] = $level;
+                    $out['lines'][] = $key . ': storage ' . $pct . '% — owner told';
+                }
+            }
+            saas_tenant_upsert($key, $sUpd);
+        }
         if (!$isSelf) {
             // A company the platform owner manages: only "last used" is recorded.
             if ((string) $facts['last_seen'] !== '' && (string) $facts['last_seen'] > (string) ($t['last_active_at'] ?? ''))
@@ -849,6 +988,16 @@ function selfserve_sweep(array $opts = []) {
         }
     }
     return $out;
+}
+
+function selfserve_storage_body(array $t, $used, $lim, $pct, $self) {
+    $app = function_exists('app_name') ? app_name() : 'Operations';
+    $u = saas_bytes_label($used) . ' of ' . saas_bytes_label($lim);
+    return "Hello " . (($t['owner_name'] ?? '') ?: 'there') . ",\n\n"
+         . ($pct >= 100
+            ? "Your " . $app . " workspace \"" . $t['company'] . "\" has used all its storage (" . $u . "). New files (photos, reports, documents) cannot be added until more storage is added. Everything already stored is safe, and records without files still save.\n"
+            : "Your " . $app . " workspace \"" . $t['company'] . "\" has used " . $pct . "% of its storage (" . $u . ").\n")
+         . ($self ? "Add storage under Admin → Your subscription.\n" : "Contact your provider to add storage.\n");
 }
 
 function selfserve_notice_body(array $t, $idle, $deleteOn, $deleted) {

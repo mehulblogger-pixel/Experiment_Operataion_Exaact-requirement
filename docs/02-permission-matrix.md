@@ -1134,6 +1134,20 @@ existing gate.
 | Choose, change or renew the company's plan and pay | the company's owner / administrators | `billing_can_manage()` = Master Admin or `settings.manage` (unchanged gate of `/subscription`) |
 | Read everything, print, export while view-only | every user of the company, as their role already allows | unchanged — only *saving* is refused (`saas_blocks_write()`), except paying, signing out, changing one's own password / second factor / signature |
 | See when every company was last used, its trial and paid dates, warnings sent, deletion date, and the list of deleted companies | the platform owner | the Companies console |
+| Set the storage allowance (base GB per company, GB per login, extra pack size and price) | the platform owner | the Companies console — "Storage allowance" panel; applied to every hosted company at once and every night |
+| Grant one company extra storage (a special arrangement) | the platform owner | the Companies console — Manage → "Extra storage granted (GB)" |
+| Buy extra storage packs | a self-serve company's owner / administrators | `billing_can_manage()` — part of "Choose / change your plan", same Q-L rules |
+| See the company's storage used, allowance and what uses the space | the company's owner / administrators | `/subscription` (`billing_can_manage()`); every user sees the line at 100% |
+
+**Storage allowance (owner, 22 Oct 2026 — "storage usage and limits on the paid users also").**
+Every company hosted on the platform — free trial, self-serve paid, or created by
+hand on the console — has an allowance once the platform owner has set one:
+base GB + GB per login × its logins + bought packs × pack size + any extra GB
+granted. Nothing set means no limit; no number is built in. At the allowance only
+**new files** are refused (`saas_storage_full()` in `index.php`); records still
+save, nothing stored is touched or deleted, and the company is not made view-only.
+Owners are e-mailed once as 80 %, 95 % and 100 % are crossed (nightly run). A
+self-hosted licence install is never limited by this.
 
 A payment is applied from the order **recorded on the server** when the payment
 window was opened (`saas_orders`), once; the browser can no longer say what was

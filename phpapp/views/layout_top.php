@@ -533,11 +533,12 @@
 <?php endif; ?>
 <?php // A company that signed itself up: its trial days, or that it is now
       // view-only, said on every screen with the one way to fix it. ?>
-<?php if (function_exists('saas_access_banner') && ($__sb = saas_access_banner())): ?>
+<?php foreach (array_filter([function_exists('saas_access_banner') ? saas_access_banner() : null,
+                              function_exists('saas_storage_banner') ? saas_storage_banner() : null]) as $__sb): ?>
       <div class="msg msg-<?= e($__sb['tone']) ?>"><?= e($__sb['text']) ?>
         <?php if ($__sb['link'] !== '' && $cur !== 'subscription'): ?> <a href="<?= e($__sb['link']) ?>"><strong><?= e($__sb['cta']) ?> →</strong></a><?php endif; ?>
         <?php if ($__sb['note'] !== ''): ?> <?= e($__sb['note']) ?><?php endif; ?></div>
-<?php endif; ?>
+<?php endforeach; ?>
 <?php
   //  ---- NOBODY IS LEFT STARING AT AN EMPTY SCREEN -------------------------
   //

@@ -1189,12 +1189,15 @@ if ($method === 'POST' && function_exists('saas_blocks_write') && saas_blocks_wr
         . ($admin ? 'Choose a plan to carry on.' : 'Ask your workspace owner to choose a plan.'), 'error');
     redirect($admin ? '/subscription' : '/');
 }
-// A trial company at its storage limit: new files are refused; everything else
-// (and everything already stored) works as normal.
+// A hosted company at its storage allowance (trial or paid): new files are
+// refused; everything else, and everything already stored, works as normal.
 if ($method === 'POST' && function_exists('saas_storage_full') && saas_request_has_files() && saas_storage_full()) {
     if (function_exists('form_stash')) form_stash($route, $_POST);
-    flash('Your free-trial storage is full, so this file was not added. Choose a plan to add more files — '
-        . 'nothing else you typed has been lost.', 'error');
+    $__trial = saas_access_state()['mode'] === 'trial';
+    $__self  = saas_is_selfserve();
+    flash(($__trial ? 'Your free-trial storage is full' : 'Your storage is full') . ', so this file was not added. '
+        . ($__self ? ($__trial ? 'Choose a plan' : 'Add storage on Your subscription') : 'Ask your workspace owner to add storage')
+        . ' to add more files — nothing else you typed has been lost.', 'error');
     redirect('/' . $route);
 }
 

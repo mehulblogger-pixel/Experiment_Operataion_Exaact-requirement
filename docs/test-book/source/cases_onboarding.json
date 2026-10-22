@@ -995,10 +995,61 @@
    },
    {
     "do": "Choose a plan (ONB-047) and attach a file.",
-    "expect": "Accepted — the limit is for the trial only."
+    "expect": "Accepted — the trial limit no longer applies; the paid allowance does (ONB-052)."
    }
   ],
   "ref": "lib/selfserve.php",
+  "live": false
+ },
+ {
+  "id": "ONB-052",
+  "area": "New company",
+  "module": "5 · Buying modules",
+  "title": "Storage allowance for paid companies — usage, warnings, full, extra storage",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "PLATFORM_OWNER",
+  "company": "ANY",
+  "why": "The owner (22 Oct): \"integrate storage usage and limits on the paid users also\" — inspections can be about 100 MB of photos each.",
+  "before": "Signed in as the control site's Master Admin. A company on a plan (console-created or self-serve and paid). TEST companies only.",
+  "steps": [
+   {
+    "do": "Super Admin → Companies → \"💾 Storage allowance\": Base storage per company (GB), Storage per login (GB), Extra storage pack size (GB), Pack price per month / per year → \"Save and apply to every company\".",
+    "expect": "\"Storage allowance saved and applied to N companies.\" (Use your own numbers.)"
+   },
+   {
+    "do": "Companies list → column \"Storage\".",
+    "expect": "Each company: space used and \"…% of … GB\" — or \"no limit\" where nothing is set."
+   },
+   {
+    "do": "As that company's owner: Admin → Your subscription → panel \"Storage\".",
+    "expect": "A bar \"… of … GB used\" with the %, \"Your allowance: … GB with your plan + … GB × N logins …\", and \"What is using the space\" by area (Inspection reports & photos, Sales documents, …, Records and everything else)."
+   },
+   {
+    "do": "Upload a 4 MB camera photo on a report, then look again.",
+    "expect": "Only a few hundred KB more is used — photos are made smaller automatically on upload."
+   },
+   {
+    "do": "(Test copy) give the company a tiny allowance so it is over 80%, then run \"Check when every company was last used\" and the nightly job.",
+    "expect": "Admins see \"Storage …% used (… of …)\" on every screen; the owner is e-mailed once at 80%, once at 95%, once at 100%."
+   },
+   {
+    "do": "At 100%: attach a file to anything.",
+    "expect": "\"Your storage is full, so this file was not added…\" — everything else typed is kept. Saving a record WITHOUT a file still works; every stored file still opens."
+   },
+   {
+    "do": "Self-serve company: Your subscription → \"Extra storage — packs of … GB\" → 1 → pay.",
+    "expect": "The allowance grows by one pack at once; uploads work again. (Fewer packs later = a downgrade at the end of the period.)"
+   },
+   {
+    "do": "Console company: Super Admin → Manage → \"Extra storage granted (GB)\" → Save storage.",
+    "expect": "\"Extra storage for … saved and applied to their workspace.\" The allowance grows."
+   }
+  ],
+  "ref": "lib/selfserve.php; views/ops/subscription.php; views/ops/saas_companies.php",
   "live": false
  },
  {

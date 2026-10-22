@@ -126,7 +126,8 @@ function saas_tenant_upsert($key, array $data) {
     if ($key === '') return false;
     $cols = ['company', 'owner_name', 'owner_email', 'plan', 'plan_expiry', 'status', 'extra_user_seats', 'enabled_modules', 'route_json', 'pending_json', 'provisioned_at',
              // self-serve facts (lib/selfserve.php)
-             'source', 'trial_until', 'paid_until', 'last_active_at', 'inactive_notices', 'last_notice_at', 'owner_phone', 'created_at', 'last_login_at'];
+             'source', 'trial_until', 'paid_until', 'last_active_at', 'inactive_notices', 'last_notice_at', 'owner_phone', 'created_at', 'last_login_at',
+             'storage_extra_gb', 'storage_used', 'storage_limit', 'storage_notice'];
     $existing = saas_tenant_get($key);
     try {
         if ($existing) {
@@ -540,14 +541,18 @@ function saas_price_book() {
             $mods[$k] = ['label' => $m[0] ?? $k, 'month' => $mm, 'year' => $my];
         }
     }
+    // Extra storage, sold in packs (lib/selfserve.php). Offered only once the
+    // platform owner has set a pack size AND a price — no default is invented.
+    $packGb = max(0, (float) $get('saas_storage_pack_gb', 0));
     return ['seat' => ['month' => $seatM, 'year' => $seatY], 'modules' => $mods,
+            'storage_pack' => ['gb' => $packGb, 'month' => $get('saas_storage_pack_price_month', 0), 'year' => $get('saas_storage_pack_price_year', 0)],
             'currency' => (string) ($bill['currency'] ?? 'INR')];
 }
 
 // Quote a company configuration: chosen modules + seats, monthly or yearly.
 // Returns line items and a total, so the console and (later) a customer checkout
 // can price exactly what was picked.
-function saas_company_quote(array $mods, $seats, $period = 'month') {
+function saas_company_quote(array $mods, $seats, $period = 'month', $packs = 0) {
     $period = $period === 'year' ? 'year' : 'month';
     $pb = saas_price_book();
     $mods = array_map('strtolower', $mods);
@@ -559,7 +564,13 @@ function saas_company_quote(array $mods, $seats, $period = 'month') {
     $seatAmt = $seats * $pb['seat'][$period];
     $lines[] = ['label' => $seats . ' seat' . ($seats === 1 ? '' : 's'), 'amount' => $seatAmt];
     $total += $seatAmt;
-    return ['period' => $period, 'currency' => $pb['currency'], 'lines' => $lines, 'total' => $total, 'seats' => $seats];
+    $packs = max(0, (int) $packs);
+    if ($packs > 0 && (float) $pb['storage_pack']['gb'] > 0 && (int) $pb['storage_pack'][$period] > 0) {
+        $amt = $packs * (int) $pb['storage_pack'][$period];
+        $lines[] = ['label' => $packs . ' × ' . rtrim(rtrim(number_format((float) $pb['storage_pack']['gb'], 2), '0'), '.') . ' GB extra storage', 'amount' => $amt];
+        $total += $amt;
+    }
+    return ['period' => $period, 'currency' => $pb['currency'], 'lines' => $lines, 'total' => $total, 'seats' => $seats, 'packs' => $packs];
 }
 
 // ---------------------------------------------------------------------------
@@ -1102,6 +1113,9 @@ function saas_tenant_apply_bootstrap($key = '') {
                 if (function_exists('licence_disabled')) licence_disabled(true);
             } elseif (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules((string) ($p['plan'] ?? 'RECRUITMENT'));
         } catch (Throwable $e) {}
+        // The storage allowance numbers in force when the company was created.
+        try { foreach ((array) ($p['storage'] ?? []) as $sk => $sv)
+                  if (strncmp((string) $sk, 'saas_storage_', 13) === 0) setting_set((string) $sk, (string) $sv); } catch (Throwable $e) {}
         // A company that signed itself up: its trial and storage limit (lib/selfserve.php).
         try {
             if (($p['billing_mode'] ?? '') === 'self') {
@@ -1258,6 +1272,27 @@ function ops_saas_admin($route, $method) {
                 flash('Saved — but deletion comes before the first warning with these numbers. Make the deletion days larger than the warning interval.', 'warning');
             else flash('Self-serve sign-up settings saved.' . (!selfserve_ready() ? ' Note: cloud mode is not switched on yet (Cloud workspaces), so the sign-up page stays closed.' : ''));
             redirect('/companies');
+        }
+        // ---- Storage allowance (lib/selfserve.php): the platform owner's numbers
+        if ($do === 'storage_save') {
+            $num = function ($k) { $v = trim((string) ($_POST[$k] ?? '')); return $v === '' ? '' : (string) max(0, round((float) $v, 2)); };
+            setting_set('saas_storage_gb_base', $num('st_base_gb'));
+            setting_set('saas_storage_gb_per_login', $num('st_login_gb'));
+            setting_set('saas_storage_pack_gb', $num('st_pack_gb'));
+            setting_set('saas_storage_pack_price_month', $num('st_pack_month'));
+            setting_set('saas_storage_pack_price_year', $num('st_pack_year'));
+            // Apply to every company now (sends nothing, deletes nothing) rather than waiting for tonight.
+            $r = selfserve_sweep(['dry' => true]);
+            flash('Storage allowance saved and applied to ' . $r['checked'] . ' compan' . ($r['checked'] === 1 ? 'y' : 'ies') . '.');
+            redirect('/companies');
+        }
+        if ($do === 'company_storage' && $key !== '') {
+            $gb = trim((string) ($_POST['storage_extra_gb'] ?? ''));
+            $gb = $gb === '' ? '' : (string) max(0, round((float) $gb, 2));
+            saas_tenant_upsert($key, ['storage_extra_gb' => $gb]);
+            $ok = function_exists('pricing_push_to_tenant') && pricing_push_to_tenant($key, ['saas_storage_extra_gb' => $gb]);
+            flash('Extra storage for ' . $key . ' saved' . ($ok ? ' and applied to their workspace.' : '; it applies tonight.'), $ok ? 'success' : 'warning');
+            redirect($back);
         }
         if ($do === 'selfserve_sync') {
             // Refresh "last used", trial and payment facts now, without sending
@@ -1433,7 +1468,7 @@ function ops_saas_subscription($route, $method) {
         $period = ($_POST['period'] ?? 'month') === 'year' ? 'year' : 'month';
         if ($self && ($_POST['do'] ?? '') === 'plan') {
             // A self-serve company choosing (or changing, or renewing) its plan.
-            $q = saas_plan_change_quote((array) ($_POST['mods'] ?? []), (int) ($_POST['seats'] ?? 0), $period);
+            $q = saas_plan_change_quote((array) ($_POST['mods'] ?? []), (int) ($_POST['seats'] ?? 0), $period, null, (int) ($_POST['packs'] ?? 0));
             if (empty($q['ok'])) { flash($q['msg'], 'error'); redirect('/subscription'); }
             if ($q['type'] === 'DOWNGRADE') {
                 saas_plan_change_apply($q);
@@ -1502,7 +1537,11 @@ function ops_saas_subscription($route, $method) {
         'current' => $self ? saas_plan_current() : null,
         'next'    => $self ? saas_plan_next() : null,
         'offer'   => $self ? json_decode((string) setting_get('saas_offer_plan', ''), true) : null,
-        'storage' => $self ? ['used' => saas_storage_used_bytes(), 'limit' => saas_storage_limit_bytes()] : null,
+        // Storage, for every hosted company (lib/selfserve.php).
+        'storage' => (function_exists('current_tenant') && current_tenant() !== '' && function_exists('saas_storage_breakdown'))
+            ? ['used' => saas_storage_used_bytes(true), 'limit' => saas_storage_limit_bytes(), 'breakdown' => saas_storage_breakdown(),
+               'cfg' => saas_storage_cfg(), 'logins' => (int) setting_get('saas_seat_limit', 0),
+               'trial' => saas_access_state()['mode'] === 'trial'] : null,
         'modules' => defined('PRODUCT_MODULES') ? PRODUCT_MODULES : [],
         'history' => function_exists('billing_history') ? billing_history() : [],
     ]);

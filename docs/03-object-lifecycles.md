@@ -1145,6 +1145,9 @@ Companies console is not affected.
 
 - `TRIAL` — every module, for the trial days the platform owner set (30 by default).
   New files are refused once the trial storage limit (if one is set) is reached.
+  *Storage is not a status:* in any state, a company at its storage allowance
+  (trial MB, or the paid allowance in GB) cannot add new files and can do
+  everything else; freeing space or adding storage lifts it at once.
 - `PAID` — exactly the modules and logins bought, until the paid-until date.
   Plan changes follow the owner's Q-L rule: an **upgrade** starts today with credit
   for the unused days; a **renewal** starts the day after the current period ends; a

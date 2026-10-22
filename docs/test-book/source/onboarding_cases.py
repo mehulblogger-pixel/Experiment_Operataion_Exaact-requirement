@@ -296,8 +296,21 @@ C('ONB-050', '5 · Buying modules', 'Trial storage limit', 'edge', ['rule', 'edg
   [('Your subscription during the trial.', 'A card "Trial storage used: … of … MB".'),
    ('Keep attaching files until the limit is reached, then attach one more.', '"Your free-trial storage is full, so this file was not added. Choose a plan to add more files — nothing else you typed has been lost."'),
    ('Save a record without a file.', 'Saved — only new files are refused.'),
-   ('Choose a plan (ONB-047) and attach a file.', 'Accepted — the limit is for the trial only.')],
+   ('Choose a plan (ONB-047) and attach a file.', 'Accepted — the trial limit no longer applies; the paid allowance does (ONB-052).')],
   'lib/selfserve.php', live=False)
+
+C('ONB-052', '5 · Buying modules', 'Storage allowance for paid companies — usage, warnings, full, extra storage', 'scenario', ['best', 'rule'],
+  'PLATFORM_OWNER', 'The owner (22 Oct): "integrate storage usage and limits on the paid users also" — inspections can be about 100 MB of photos each.',
+  'Signed in as the control site\'s Master Admin. A company on a plan (console-created or self-serve and paid). TEST companies only.',
+  [('Super Admin → Companies → "💾 Storage allowance": Base storage per company (GB), Storage per login (GB), Extra storage pack size (GB), Pack price per month / per year → "Save and apply to every company".', '"Storage allowance saved and applied to N companies." (Use your own numbers.)'),
+   ('Companies list → column "Storage".', 'Each company: space used and "…% of … GB" — or "no limit" where nothing is set.'),
+   ('As that company\'s owner: Admin → Your subscription → panel "Storage".', 'A bar "… of … GB used" with the %, "Your allowance: … GB with your plan + … GB × N logins …", and "What is using the space" by area (Inspection reports & photos, Sales documents, …, Records and everything else).'),
+   ('Upload a 4 MB camera photo on a report, then look again.', 'Only a few hundred KB more is used — photos are made smaller automatically on upload.'),
+   ('(Test copy) give the company a tiny allowance so it is over 80%, then run "Check when every company was last used" and the nightly job.', 'Admins see "Storage …% used (… of …)" on every screen; the owner is e-mailed once at 80%, once at 95%, once at 100%.'),
+   ('At 100%: attach a file to anything.', '"Your storage is full, so this file was not added…" — everything else typed is kept. Saving a record WITHOUT a file still works; every stored file still opens.'),
+   ('Self-serve company: Your subscription → "Extra storage — packs of … GB" → 1 → pay.', 'The allowance grows by one pack at once; uploads work again. (Fewer packs later = a downgrade at the end of the period.)'),
+   ('Console company: Super Admin → Manage → "Extra storage granted (GB)" → Save storage.', '"Extra storage for … saved and applied to their workspace." The allowance grows.')],
+  'lib/selfserve.php; views/ops/subscription.php; views/ops/saas_companies.php', live=False)
 
 C('ONB-051', '5 · Buying modules', 'A company cannot set its own prices or fake a payment', 'access', ['worst', 'rule'],
   'MASTER_ADMIN', 'Two holes closed on 22 Oct: a company\'s own administrator could change the prices and payment keys its purchases used; and the page told the server what had been bought.',

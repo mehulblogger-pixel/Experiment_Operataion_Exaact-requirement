@@ -25,10 +25,6 @@ $fmt = fn($n) => $sym . number_format((int) $n);
     <div class="kpi"><span class="k-lab"><?= $st === 'locked' ? 'Ended on' : 'Until' ?></span>
       <span class="k-val" style="font-size:18px"><?= $access['until'] !== '' ? $e(fdate($access['until'])) : '—' ?></span></div>
     <?php if ($st !== 'locked'): ?><div class="kpi"><span class="k-lab">Days left</span><span class="k-val"><?= (int) $access['days_left'] ?></span></div><?php endif; ?>
-    <?php if ($storage && $storage['limit'] > 0): $pct = min(100, (int) round(100 * $storage['used'] / max(1, $storage['limit']))); ?>
-      <div class="kpi <?= $pct >= 100 ? 'tone-bad' : '' ?>"><span class="k-lab">Trial storage used</span>
-        <span class="k-val" style="font-size:18px"><?= round($storage['used'] / 1048576, 1) ?> of <?= round($storage['limit'] / 1048576) ?> MB</span></div>
-    <?php endif; ?>
   </div>
   <?php if ($st === 'locked'): ?>
     <div class="msg msg-error" style="margin-top:8px">Your <?= ($access['was'] ?? '') === 'paid' ? 'plan' : 'free trial' ?> has ended, so your workspace is view-only.
@@ -95,6 +91,41 @@ $fmt = fn($n) => $sym . number_format((int) $n);
     <h2 style="margin:0 0 4px;font-size:15px">Add modules or seats</h2>
     <p class="sub" style="margin:0 0 10px">Tick what you want and set how many seats to add. The price updates live; you pay securely online and it activates the moment the payment clears.</p>
     <?php include __DIR__ . '/_subscription_builder.php'; ?>
+  </div>
+<?php endif; ?>
+
+<?php if ($storage): $lim = (int) $storage['limit']; $usedB = (int) $storage['used'];
+      $pct = $lim > 0 ? min(100, (int) floor(100 * $usedB / $lim)) : null; $sc = $storage['cfg']; ?>
+  <div class="panel" style="margin-top:14px">
+    <h2 style="margin:0 0 6px;font-size:15px">Storage</h2>
+    <?php if ($pct !== null): ?>
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:14px;margin-bottom:6px">
+        <span><b><?= $e(saas_bytes_label($usedB)) ?></b> of <?= $e(saas_bytes_label($lim)) ?> used</span><span class="sub"><?= (int) $pct ?>%</span></div>
+      <div role="progressbar" aria-valuenow="<?= (int) $pct ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Storage used"
+           style="height:10px;border-radius:999px;background:var(--soft,#eef2f7);overflow:hidden">
+        <div style="height:100%;width:<?= (int) $pct ?>%;background:<?= $pct >= 95 ? 'var(--bad,#dc2626)' : ($pct >= 80 ? 'var(--warn,#d97706)' : 'var(--ok,#16a34a)') ?>"></div></div>
+      <?php if ($pct >= 100): ?><div class="msg msg-error" style="margin-top:10px">Storage is full: new files cannot be added. Everything already stored is safe, and records without files still save.</div><?php endif; ?>
+      <p class="sub" style="margin:8px 0 0;font-size:12.5px">
+        <?php if (!empty($storage['trial'])): ?>Your free trial includes <?= $e(saas_bytes_label($lim)) ?>.
+        <?php else: $parts = [];
+          if ($sc['base_gb'] > 0) $parts[] = $sc['base_gb'] . ' GB with your plan';
+          if ($sc['per_login_gb'] > 0) $parts[] = $sc['per_login_gb'] . ' GB × ' . (int) $storage['logins'] . ' logins';
+          if ($sc['packs'] > 0 && $sc['pack_gb'] > 0) $parts[] = (int) $sc['packs'] . ' extra pack' . ($sc['packs'] === 1 ? '' : 's') . ' × ' . $sc['pack_gb'] . ' GB';
+          if ($sc['extra_gb'] > 0) $parts[] = $sc['extra_gb'] . ' GB added by your provider'; ?>
+          Your allowance: <?= $e(implode(' + ', $parts)) ?>.
+        <?php endif; ?></p>
+    <?php else: ?>
+      <p style="margin:0 0 4px;font-size:14px"><b><?= $e(saas_bytes_label($usedB)) ?></b> used — no storage limit is set for your workspace.</p>
+    <?php endif; ?>
+    <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600">What is using the space</summary>
+      <table class="tbl" style="width:100%;border-collapse:collapse;margin-top:6px">
+        <?php foreach ($storage['breakdown'] as $lab => $n): ?>
+          <tr style="border-top:1px solid var(--line,#eef1f5)"><td style="padding:6px 8px;font-size:13px"><?= $e($lab) ?></td>
+            <td style="padding:6px 8px;font-size:13px;text-align:right"><?= $e(saas_bytes_label($n)) ?></td></tr>
+        <?php endforeach; ?>
+      </table>
+      <p class="sub" style="margin:6px 0 0;font-size:12px">Photos are made smaller automatically when they are uploaded. Files are never deleted for being over the allowance.</p>
+    </details>
   </div>
 <?php endif; ?>
 

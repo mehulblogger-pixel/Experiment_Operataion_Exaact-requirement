@@ -32,6 +32,13 @@ $period = $mode === 'paid' ? (string) ($current['period'] ?? 'month') : (is_arra
     <div><label for="pl-seats" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">2 · How many people will sign in?</label>
       <input type="number" name="seats" id="pl-seats" min="1" value="<?= (int) $seats ?>" style="width:120px;padding:9px 10px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:15px">
       <span class="sub" style="font-size:12px;margin-left:6px"><?= $e($sym . number_format($seatM)) ?>/month each · <?= (int) ($sub['seats_used'] ?? 0) ?> active today</span></div>
+    <?php $pk = $pb['storage_pack'] ?? ['gb' => 0, 'month' => 0, 'year' => 0];
+          if ((float) $pk['gb'] > 0 && (int) $pk['month'] > 0):
+            $prePacks = $mode === 'paid' ? (int) ($current['packs'] ?? 0) : (is_array($offer) ? (int) ($offer['packs'] ?? 0) : 0); ?>
+    <div><label for="pl-packs" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">Extra storage — packs of <?= $e(rtrim(rtrim(number_format((float) $pk['gb'], 2), '0'), '.')) ?> GB</label>
+      <input type="number" name="packs" id="pl-packs" min="0" value="<?= (int) $prePacks ?>" data-m="<?= (int) $pk['month'] ?>" data-y="<?= (int) $pk['year'] ?>" style="width:120px;padding:9px 10px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:15px">
+      <span class="sub" style="font-size:12px;margin-left:6px"><?= $e($sym . number_format((int) $pk['month'])) ?>/month each</span></div>
+    <?php endif; ?>
     <div><label for="pl-period" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">3 · Pay</label>
       <select name="period" id="pl-period" style="padding:9px 10px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:15px">
         <option value="month" <?= $period === 'month' ? 'selected' : '' ?>>Monthly</option>
@@ -64,6 +71,8 @@ $period = $mode === 'paid' ? (string) ($current['period'] ?? 'month') : (is_arra
     form.querySelectorAll('input.pl-mod:checked').forEach(function(c){ total += parseInt(year ? c.dataset.y : c.dataset.m, 10) || 0; });
     var seats = Math.max(1, parseInt(document.getElementById('pl-seats').value, 10) || 1);
     total += seats * (year ? SEAT_Y : SEAT_M);
+    var pk = document.getElementById('pl-packs');
+    if (pk) total += Math.max(0, parseInt(pk.value, 10) || 0) * (parseInt(year ? pk.dataset.y : pk.dataset.m, 10) || 0);
     document.getElementById('pl-total').textContent = money(total);
     document.getElementById('pl-period-lab').textContent = year ? '/ year' : '/ month';
   }
