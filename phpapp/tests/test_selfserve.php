@@ -35,8 +35,14 @@ t_eq($cfg['delete_days'], 90, 'unused trials are deleted after 90 days by defaul
 t_eq($cfg['storage_mb'], 0, 'no storage number is invented — 0 (no limit) until the platform owner sets one');
 t_ok(selfserve_ready(), 'self-serve is ready when cloud mode has a base domain');
 
-$codeFor = function ($email) {
-    $r = ops_one("SELECT body FROM email_log WHERE to_addr=? AND kind='selfserve_code' ORDER BY id DESC LIMIT 1", [$email]);
+$__mails = [];
+$GLOBALS['__mail_capture'] = function ($to, $subject, $body, $kind) use (&$__mails) { $__mails[] = compact('to', 'subject', 'body', 'kind'); };
+$lastMail = function ($to, $kind) use (&$__mails) {
+    foreach (array_reverse($__mails) as $m) if ($m['to'] === $to && $m['kind'] === $kind) return $m;
+    return null;
+};
+$codeFor = function ($email) use ($lastMail) {
+    $r = $lastMail($email, 'selfserve_code');
     return ($r && preg_match('/^\s+(\d{6})\s*$/m', (string) $r['body'], $m)) ? $m[1] : '';
 };
 $_SERVER['REMOTE_ADDR'] = '203.0.113.' . (getmypid() % 200);
@@ -87,7 +93,9 @@ t_eq($t['trial_until'] ?? '', date('Y-m-d', strtotime('+30 days')), 'its trial e
 t_eq(saas_login_lookup($good['email']), $key, 'the owner can sign in with their e-mail at the one product address');
 $done = ops_one("SELECT status, pass_hash, code_hash FROM selfserve_signups WHERE id=?", [$sid]);
 t_ok($done['status'] === 'DONE' && $done['pass_hash'] === '' && $done['code_hash'] === '', 'the finished sign-up keeps no password or code');
-$welcome = ops_one("SELECT body FROM email_log WHERE to_addr=? AND kind='selfserve_welcome' ORDER BY id DESC LIMIT 1", [$good['email']]);
+$welcome = $lastMail($good['email'], 'selfserve_welcome');
+t_ok(strpos((string) ops_val("SELECT body FROM email_log WHERE to_addr=? AND kind='selfserve_code' ORDER BY id DESC LIMIT 1", [$good['email']]), 'not kept') !== false,
+    'the sign-up code is never kept in the e-mail log');
 t_ok($welcome && strpos($welcome['body'], 'view-only') !== false && strpos($welcome['body'], '90 days') !== false,
     'a welcome e-mail explains the trial, view-only after it, and the 90-day rule');
 
@@ -262,6 +270,7 @@ saas_company_purge($res['key'], 'test clean-up');
 saas_tenant_delete($k3);
 db()->prepare("DELETE FROM saas_logins WHERE email='taken@selfserve.test'")->execute();
 setting_set('selfserve_signup_enabled', '0');
+unset($GLOBALS['__mail_capture']);
 if ($prevSess === null) { unset($_SESSION['saas_tenant']); } else { $_SESSION['saas_tenant'] = $prevSess; }
 if (function_exists('db_reset')) db_reset();
 if ($hadReg && $regBak !== null) { file_put_contents($regFile, $regBak); } else { @unlink($regFile); }

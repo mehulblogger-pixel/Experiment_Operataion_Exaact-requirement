@@ -50,6 +50,10 @@ $app = function_exists('app_name') ? app_name() : 'your platform';
 </div>
 
 <div class="oh-actions">
+  <a class="oh-card" href="/platform-setup">
+    <span class="oh-ic">🚦</span>
+    <span><h3>Platform setup</h3><p>Your e-mail, payment keys and the go-live checklist — what is ready and what is still to do.</p></span>
+  </a>
   <a class="oh-card" href="/companies">
     <span class="oh-ic">🏢</span>
     <span><h3>Companies</h3><p>Add a client, set their plan, seats and modules, suspend or log in as them.</p></span>

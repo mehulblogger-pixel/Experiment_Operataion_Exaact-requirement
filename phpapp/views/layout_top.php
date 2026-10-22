@@ -86,6 +86,7 @@
       <a class="s-item<?= $navOn(['']) ?>" href="/"><span class="s-ic">🏠</span><span>Dashboard</span></a>
       <?php if (function_exists('superadmin_can') && superadmin_can()): // platform owner only — never inside a company workspace ?>
       <a class="s-item<?= $navOn(['owner']) ?>" href="/owner"><span class="s-ic">🧭</span><span>Owner home</span></a>
+      <a class="s-item<?= $navOn(['platform-setup']) ?>" href="/platform-setup"><span class="s-ic">🚦</span><span>Platform setup</span></a>
       <?php endif; ?>
       <?php // Also in the top bar, but a destination in the menu is how people
             // discover that searching records is a thing at all. ?>

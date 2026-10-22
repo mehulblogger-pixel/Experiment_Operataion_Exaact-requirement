@@ -2536,9 +2536,12 @@ function job_voucher_total($jobId) {
 
 // ---- Email (real send when configured, always logged) ----------------------
 // SMTP settings (e.g. Office 365) come from Settings, or env overrides. Null = not configured.
-function smtp_config() {
+function smtp_config($kind = '') {
     $host = getenv('OPS_SMTP_HOST') ?: setting_get('smtp_host', '');
-    if (!$host) return null;
+    // Nothing set for this server or this company: send through the platform
+    // owner's e-mail (lib/platform_mail.php), choosing the account & password
+    // sender or the general one by the kind of message.
+    if (!$host) return function_exists('platform_mail_sender') ? platform_mail_sender($kind) : null;
     return [
         'host' => $host,
         'port' => (int)(getenv('OPS_SMTP_PORT') ?: (setting_get('smtp_port', '') ?: 587)),
@@ -2572,7 +2575,10 @@ function smtp_send($cfg, $to, $subject, $body, $cc = '', $attachments = []) {
     foreach (array_filter(array_map('trim', array_merge(explode(',', $to), explode(',', $cc)))) as $rcpt)
         $need($say('RCPT TO:<' . $rcpt . '>'), '250');
     $need($say('DATA'), '354');
-    $hdrTop = 'From: ' . app_name() . ' <' . $cfg['from'] . ">\r\nTo: $to\r\n" . ($cc ? "Cc: $cc\r\n" : '') . 'Subject: ' . $subject . "\r\nMIME-Version: 1.0\r\n";
+    $fromName = trim(str_replace(["\r", "\n", '"'], '', (string) (($cfg['from_name'] ?? '') !== '' ? $cfg['from_name'] : app_name())));
+    $hdrTop = 'From: "' . $fromName . '" <' . $cfg['from'] . ">\r\nTo: $to\r\n" . ($cc ? "Cc: $cc\r\n" : '')
+            . (!empty($cfg['reply_to']) ? 'Reply-To: ' . $cfg['reply_to'] . "\r\n" : '')
+            . 'Date: ' . date('r') . "\r\n" . 'Subject: ' . $subject . "\r\nMIME-Version: 1.0\r\n";
     if ($attachments) {
         $bnd = 'b_' . bin2hex(random_bytes(10));
         $headers = $hdrTop . "Content-Type: multipart/mixed; boundary=\"$bnd\"\r\n\r\n";
@@ -2602,7 +2608,7 @@ function ops_mail($to, $subject, $body, $cc = '', $kind = '', $attachments = [])
     if ($to && app_is_test_copy()) {
         $err = 'not sent: this is a test copy (config.local.php test_copy)';
     } elseif ($to) {
-        $smtp = smtp_config();
+        $smtp = smtp_config($kind);
         if ($smtp) {
             try { smtp_send($smtp, $to, $subject, $body, $cc, $attachments); $ok = 1; }
             catch (Throwable $e) { $err = 'SMTP: ' . $e->getMessage(); }
@@ -2615,8 +2621,15 @@ function ops_mail($to, $subject, $body, $cc = '', $kind = '', $attachments = [])
             $err = 'mail disabled (configure Office 365 SMTP in Settings, or set OPS_MAIL_ENABLED=1)';
         }
     } else { $err = 'no recipient'; }
+    // Tests read what would have been sent here (the same pattern as Razorpay's
+    // __rzp_transport); nothing in the application sets it.
+    if (!empty($GLOBALS['__mail_capture']) && is_callable($GLOBALS['__mail_capture'])) ($GLOBALS['__mail_capture'])($to, $subject, $body, $kind);
+    // Sign-up codes, temporary passwords and reset links are never kept in the
+    // log: anybody with the database, or a backup of it, could use them.
+    $logBody = (function_exists('platform_mail_sender') && defined('PLATFORM_ACCOUNT_KINDS') && in_array($kind, PLATFORM_ACCOUNT_KINDS, true))
+        ? '[not kept — this e-mail carried sign-in details]' : $body;
     db()->prepare("INSERT INTO email_log (to_addr,cc_addr,subject,body,kind,sent_ok,error,created_at) VALUES (?,?,?,?,?,?,?,?)")
-        ->execute([$to, $cc, $subject, $body, $kind, $ok, $err, date('c')]);
+        ->execute([$to, $cc, $subject, $logBody, $kind, $ok, $err, date('c')]);
     return $ok;
 }
 function coordinator_emails() {
@@ -4006,6 +4019,8 @@ function ops_dispatch($route, $method) {
             return ops_marketplace_toggle($method);
         case $route === 'super-admin' || $route === 'control-panel':
             return ops_super_admin($method);
+        case $route === 'platform-setup':   // Super-Admin: platform e-mail, payment check, go-live checklist
+            return ops_platform_setup($method);
         case $route === 'companies':   // Super-Admin: cross-company console (add/plan/seats/modules/suspend/login-as)
             return ops_saas_admin($route, $method);
         case $route === 'subscription' || $route === 'subscription-order' || $route === 'subscription-verify':

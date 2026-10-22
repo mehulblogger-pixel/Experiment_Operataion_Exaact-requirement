@@ -38,8 +38,13 @@ $em = 'gap+' . getmypid() . '@portal.test';
 db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,perms,created_by,created_at) VALUES (?,?,?,?,1,0,'','self-service',?)")
     ->execute([$pid, $em, 'Gap Person', password_hash('Old-Pass-123!', PASSWORD_DEFAULT), date('c')]);
 $cu = (int) db()->lastInsertId();
+$__cap = [];
+$GLOBALS['__mail_capture'] = function ($to, $subject, $body, $kind) use (&$__cap) { if ($kind === 'portal_reset') $__cap[] = ['to' => $to, 'body' => $body]; };
 portal_reset_request($em);
-$mail = ops_one("SELECT body FROM email_log WHERE to_addr=? AND kind='portal_reset' ORDER BY id DESC LIMIT 1", [$em]);
+unset($GLOBALS['__mail_capture']);
+$mail = $__cap ? end($__cap) : null;
+t_ok(strpos((string) ops_val("SELECT body FROM email_log WHERE to_addr=? AND kind='portal_reset' ORDER BY id DESC LIMIT 1", [$em]), '/portal/reset') === false,
+    'the reset link is never kept in the e-mail log');
 t_ok($mail && preg_match('#/portal/reset\?t=([a-f0-9]{48})#', (string) $mail['body'], $m), 'forgot password e-mails a one-hour link');
 $token = $m[1] ?? '';
 $row = ops_one("SELECT reset_hash FROM client_users WHERE id=?", [$cu]);

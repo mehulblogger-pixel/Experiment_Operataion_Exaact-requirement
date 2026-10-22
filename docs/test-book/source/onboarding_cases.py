@@ -21,6 +21,36 @@ def C(id, module, title, kind, tags, persona, why, before, steps, ref='', live=T
 # ════════════════════════════════════════════════════════════════════════════
 # 0 — The map
 # ════════════════════════════════════════════════════════════════════════════
+C('PLT-001', '0 · Platform setup (do this first)', 'The go-live checklist', 'scenario', ['best', 'rule'],
+  'PLATFORM_OWNER', 'One page says what must work before companies sign up and pay, and what is still to do.',
+  'Signed in at the main site (operations.mghaiapps.com/login) with the platform owner\'s Master Admin account.',
+  [('Left menu → "Platform setup" (or Owner home → "Platform setup").', 'Heading "Platform setup", "… of 11 ready", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your own prices, storage allowance, trial storage and logins, nightly job, self sign-up.'),
+   ('Each line not yet done.', 'Says exactly where to fix it, with "Open →".'),
+   ('Sign in as a company\'s own Master Admin and type /platform-setup.', '"Only the platform owner (Super Admin), on the main site, can open Platform setup." — and it is not in their menu.')],
+  'lib/platform_mail.php; views/ops/platform_setup.php')
+
+C('PLT-002', '0 · Platform setup (do this first)', 'Platform e-mail — general sender and a separate account & password sender', 'scenario', ['best', 'rule'],
+  'PLATFORM_OWNER', 'The owner (22 Oct): e-mails sent automatically from our own address, with password e-mails from a different one.',
+  'Your mail provider\'s details (Microsoft 365: smtp.office365.com, port 587, mailbox address and password; the account address set up as a mailbox or as a "send as" alias).',
+  [('Platform setup → "Platform e-mail": Mail server, Port; 1 · General e-mails: Sender name, From address, Mailbox login, Mailbox password; 2 · Account & password e-mails: the same → "Save platform e-mail".', '"Platform e-mail saved. Now send a test e-mail from each sender."'),
+   ('"Send a test e-mail" — General sender, to your own address.', '"Sent" (or "Failed" with the reason in plain words). The e-mail arrives FROM the general address.'),
+   ('"Send a test e-mail" — Account & password sender.', 'Arrives FROM the account address.'),
+   ('Sign up a test company (ONB-004).', 'The sign-up code and welcome come from the ACCOUNT address; later trial / storage notices from the GENERAL address.'),
+   ('Inside a company with no e-mail of its own, send something (e.g. a quotation e-mail).', 'It arrives as "<Company> (via <your sender name>)"; pressing Reply writes to the company\'s own e-mail.'),
+   ('A wrong password → test again.', '"The mail server refused the mailbox login or password…" — in plain words, with the detail after it.'),
+   ('Open "Recent e-mails from the main site".', 'Who, subject, Sent / Not sent with the reason. No sign-up code, password or reset link is ever shown or kept.')],
+  'lib/platform_mail.php; lib/ops.php smtp_config', live=False)
+
+C('PLT-003', '0 · Platform setup (do this first)', 'Payment keys check (Razorpay)', 'scenario', ['best'],
+  'PLATFORM_OWNER', 'Before any company pays, the keys must be proven to work — without moving money.',
+  'Razorpay TEST keys from the Razorpay Dashboard → Account & Settings → API Keys.',
+  [('Super Admin → Advanced settings → Billing: paste Key ID and Key Secret → save.', 'Saved.'),
+   ('Platform setup → "Check payment keys".', '"Razorpay accepted the keys — TEST keys: no real money moves." The checklist line turns green.'),
+   ('Change one character of the secret, check again.', '"Razorpay refused the keys (wrong Key ID or Key Secret)."'),
+   ('With TEST keys, buy a plan as a test company (ONB-047) using Razorpay\'s test card.', 'The plan activates; no real money moves.'),
+   ('When ready: replace with LIVE keys (rzp_live_…), check again.', '"… LIVE keys: real payments." The "LIVE keys" line turns green.')],
+  'lib/platform_mail.php platform_payment_check', live=False)
+
 C('ONB-000', '0 · The three front doors', 'Where a newcomer can start — the three front doors', 'scenario', ['best'],
   'NEWCOMER', 'A newcomer is one of three people: a company that wants its own workspace, a professional who wants work, or a company/agency that wants people. Each has its own door.',
   'Signed OUT. A private browser window.',
@@ -67,7 +97,7 @@ C('ONB-004', '1 · A company applies', 'A company signs itself up and starts a 3
   'ONB-006: self sign-up ON. Signed out, private window. Use an e-mail you can read.',
   [('Open /start (or "Start your free trial →" on the sign-in page, or "Start your free trial →" on the marketplace front page).', 'Heading "Start your free trial", ribbon "◆ 30 days free · no card needed". Fields: Company name, Your name, "Work e-mail — this is how you sign in", "Mobile — optional", "Choose a password — at least … characters", and a tick "I agree: the trial is free for 30 days…". Button "Start my free trial →".'),
    ('Fill with test data ("TB Selfserve Co"), tick the agreement → "Start my free trial →".', '"We have sent a 6-digit code to <e-mail>." and a box "Enter the 6-digit code from your e-mail".'),
-   ('Open the e-mail "… — your sign-up code ……" and type the code → "Create my workspace →".', 'You are inside your own new workspace at once — no waiting, no second password change. "Welcome! Your workspace is ready and your free trial has started." and "Free trial — 30 days left (until <date>)."'),
+   ('Open the e-mail "… — your sign-up code" (from your account & password sender, PLT-002) and type the code → "Create my workspace →".', 'You are inside your own new workspace at once — no waiting, no second password change. "Welcome! Your workspace is ready and your free trial has started." and "Free trial — 30 days left (until <date>)."'),
    ('The setup wizard "Welcome — let’s set up your system".', 'It does NOT ask for a password again (you just chose one): it starts at "1 · What does your company do?". Finish it → the setup page.'),
    ('Look at the left menu.', 'Every module is there during the trial.'),
    ('Check your inbox.', 'An e-mail "Your … workspace is ready" with the sign-in address, your username, the trial end date, what happens after the trial, and the 90-day rule.'),
@@ -453,9 +483,9 @@ C('CLI-002', '8 · A company posts a requirement', 'Duplicates and agencies', 'e
   'lib/connect_org.php; lib/portal.php')
 
 # ════════════════════════════════════════════════════════════════════════════
-# 10 — Unused free trials (the owner's 90-day rule)
+# 9 — Unused free trials (the owner's 90-day rule)
 # ════════════════════════════════════════════════════════════════════════════
-C('ONB-070', '10 · Unused trials', 'Super Admin sees when every company was last used', 'scenario', ['best', 'rule'],
+C('ONB-070', '9 · Unused trials', 'Super Admin sees when every company was last used', 'scenario', ['best', 'rule'],
   'PLATFORM_OWNER', 'The owner: "Our superadmin panel must show when last data was accessed."',
   'Some companies exist; at least one self sign-up company.',
   [('Super Admin → Companies → "Check when every company was last used".', '"Checked N companies for when they were last used. Nothing was e-mailed or deleted."'),
@@ -464,7 +494,7 @@ C('ONB-070', '10 · Unused trials', 'Super Admin sees when every company was las
    ('Sign in as a real user of that company, then check again.', '"Last used" moves to today.')],
   'lib/selfserve.php; views/ops/saas_companies.php')
 
-C('ONB-071', '10 · Unused trials', 'A free trial nobody uses is warned every 15 days and deleted after 90', 'scenario', ['rule'],
+C('ONB-071', '9 · Unused trials', 'A free trial nobody uses is warned every 15 days and deleted after 90', 'scenario', ['rule'],
   'PLATFORM_OWNER', 'The owner: "if any company with free trial does not access its login for 90 days the data shall be deleted and email notification for every 15 days shall be provided".',
   'A self sign-up company that has never paid. Runs from the nightly job; proven by the automated test tests/test_selfserve.php (dates moved forward). To see it live, leave a test company unused.',
   [('After 15 days with nobody signing in: the owner\'s inbox.', 'An e-mail "Your trial workspace <company> will be deleted on <date>" — nobody has signed in for 15 days; sign in to keep it, or choose a plan to keep it for good.'),
@@ -476,9 +506,9 @@ C('ONB-071', '10 · Unused trials', 'A free trial nobody uses is warned every 15
   'lib/selfserve.php; cron.php', live=False)
 
 # ════════════════════════════════════════════════════════════════════════════
-# 9 — Self-hosted install (licence)
+# 10 — Self-hosted install (licence)
 # ════════════════════════════════════════════════════════════════════════════
-C('ONB-060', '9 · Self-hosted install', 'A customer installs EXAACT on their own server', 'scenario', ['best'],
+C('ONB-060', '10 · Self-hosted install', 'A customer installs EXAACT on their own server', 'scenario', ['best'],
   'MASTER_ADMIN', 'The other way to buy: a licence for one company\'s own server.',
   'A fresh self-hosted TEST install (never production).',
   [('Open the new install.', '"Software Licence Agreement": full name, designation, organisation, work e-mail, three ticks → "Accept and continue installation". Missing fields: "Please fill your name, designation and organisation."'),

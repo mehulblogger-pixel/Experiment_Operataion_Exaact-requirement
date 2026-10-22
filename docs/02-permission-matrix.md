@@ -1169,3 +1169,13 @@ company or agency at `/join`. Before, the professional sign-up asked only the
 kill-switch. **Coupons with online payment:** a valid coupon is taken off the
 amount charged by Razorpay, recorded on the order, and counted as used only when
 the payment is confirmed (it used to be ignored whenever online payment was on).
+
+**Platform setup (owner, 22 Oct 2026) — `/platform-setup`, platform owner only** (`superadmin_can()`: Master
+Admin on the main site; a company's administrators are refused and never see it). It holds the
+**platform e-mail** every hosted company uses when it has not set up its own (a general sender and a
+separate **account & password** sender for sign-up codes, temporary passwords and reset links), the
+**payment keys check** (asks Razorpay to confirm the keys; creates nothing, moves no money), the
+**go-live checklist**, and the main site's recent e-mails. The platform mailbox password is kept in
+the protected data folder above the web root, never in a company database, so no company can read
+it. Sign-up codes, temporary passwords and reset links are never kept in any e-mail log. No new
+permission — it reuses the Super Admin gate.

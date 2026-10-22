@@ -272,7 +272,7 @@ function selfserve_mail_code($email, $name, $code) {
     $body = "Hello " . ($name ?: 'there') . ",\n\n"
           . "Your code to finish creating your " . $app . " workspace is:\n\n    " . $code . "\n\n"
           . "It works for " . SELFSERVE_CODE_TTL_MIN . " minutes. If you did not ask for this, ignore this e-mail — nothing has been created.\n";
-    return function_exists('ops_mail') ? ops_mail($email, $app . ' — your sign-up code ' . $code, $body, '', 'selfserve_code') : 0;
+    return function_exists('ops_mail') ? ops_mail($email, $app . ' — your sign-up code', $body, '', 'selfserve_code') : 0;
 }
 
 // A new code for the same sign-up (the first one did not arrive, or ran out).

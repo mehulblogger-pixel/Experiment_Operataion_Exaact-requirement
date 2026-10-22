@@ -449,6 +449,10 @@ if (function_exists('selfserve_sweep') && (!function_exists('current_tenant') ||
     } catch (Throwable $e) { echo "Self-serve companies: failed — " . $e->getMessage() . "\n"; }
 }
 
+// When this nightly job last ran — the Platform setup checklist shows it, so a
+// missing scheduled task is noticed instead of silently doing nothing.
+if (function_exists('setting_set')) { try { setting_set('cron_last_run', date('c')); } catch (Throwable $e) {} }
+
 // What this workspace is not subscribed to, named once rather than silently
 // missing. The operator reads this output; it says which product is not enabled
 // and nothing about how that is decided.

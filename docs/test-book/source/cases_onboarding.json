@@ -1,5 +1,121 @@
 [
  {
+  "id": "PLT-001",
+  "area": "New company",
+  "module": "0 · Platform setup (do this first)",
+  "title": "The go-live checklist",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "PLATFORM_OWNER",
+  "company": "ANY",
+  "why": "One page says what must work before companies sign up and pay, and what is still to do.",
+  "before": "Signed in at the main site (operations.mghaiapps.com/login) with the platform owner's Master Admin account.",
+  "steps": [
+   {
+    "do": "Left menu → \"Platform setup\" (or Owner home → \"Platform setup\").",
+    "expect": "Heading \"Platform setup\", \"… of 11 ready\", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your own prices, storage allowance, trial storage and logins, nightly job, self sign-up."
+   },
+   {
+    "do": "Each line not yet done.",
+    "expect": "Says exactly where to fix it, with \"Open →\"."
+   },
+   {
+    "do": "Sign in as a company's own Master Admin and type /platform-setup.",
+    "expect": "\"Only the platform owner (Super Admin), on the main site, can open Platform setup.\" — and it is not in their menu."
+   }
+  ],
+  "ref": "lib/platform_mail.php; views/ops/platform_setup.php",
+  "live": true
+ },
+ {
+  "id": "PLT-002",
+  "area": "New company",
+  "module": "0 · Platform setup (do this first)",
+  "title": "Platform e-mail — general sender and a separate account & password sender",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule"
+  ],
+  "persona": "PLATFORM_OWNER",
+  "company": "ANY",
+  "why": "The owner (22 Oct): e-mails sent automatically from our own address, with password e-mails from a different one.",
+  "before": "Your mail provider's details (Microsoft 365: smtp.office365.com, port 587, mailbox address and password; the account address set up as a mailbox or as a \"send as\" alias).",
+  "steps": [
+   {
+    "do": "Platform setup → \"Platform e-mail\": Mail server, Port; 1 · General e-mails: Sender name, From address, Mailbox login, Mailbox password; 2 · Account & password e-mails: the same → \"Save platform e-mail\".",
+    "expect": "\"Platform e-mail saved. Now send a test e-mail from each sender.\""
+   },
+   {
+    "do": "\"Send a test e-mail\" — General sender, to your own address.",
+    "expect": "\"Sent\" (or \"Failed\" with the reason in plain words). The e-mail arrives FROM the general address."
+   },
+   {
+    "do": "\"Send a test e-mail\" — Account & password sender.",
+    "expect": "Arrives FROM the account address."
+   },
+   {
+    "do": "Sign up a test company (ONB-004).",
+    "expect": "The sign-up code and welcome come from the ACCOUNT address; later trial / storage notices from the GENERAL address."
+   },
+   {
+    "do": "Inside a company with no e-mail of its own, send something (e.g. a quotation e-mail).",
+    "expect": "It arrives as \"<Company> (via <your sender name>)\"; pressing Reply writes to the company's own e-mail."
+   },
+   {
+    "do": "A wrong password → test again.",
+    "expect": "\"The mail server refused the mailbox login or password…\" — in plain words, with the detail after it."
+   },
+   {
+    "do": "Open \"Recent e-mails from the main site\".",
+    "expect": "Who, subject, Sent / Not sent with the reason. No sign-up code, password or reset link is ever shown or kept."
+   }
+  ],
+  "ref": "lib/platform_mail.php; lib/ops.php smtp_config",
+  "live": false
+ },
+ {
+  "id": "PLT-003",
+  "area": "New company",
+  "module": "0 · Platform setup (do this first)",
+  "title": "Payment keys check (Razorpay)",
+  "kind": "scenario",
+  "tags": [
+   "best"
+  ],
+  "persona": "PLATFORM_OWNER",
+  "company": "ANY",
+  "why": "Before any company pays, the keys must be proven to work — without moving money.",
+  "before": "Razorpay TEST keys from the Razorpay Dashboard → Account & Settings → API Keys.",
+  "steps": [
+   {
+    "do": "Super Admin → Advanced settings → Billing: paste Key ID and Key Secret → save.",
+    "expect": "Saved."
+   },
+   {
+    "do": "Platform setup → \"Check payment keys\".",
+    "expect": "\"Razorpay accepted the keys — TEST keys: no real money moves.\" The checklist line turns green."
+   },
+   {
+    "do": "Change one character of the secret, check again.",
+    "expect": "\"Razorpay refused the keys (wrong Key ID or Key Secret).\""
+   },
+   {
+    "do": "With TEST keys, buy a plan as a test company (ONB-047) using Razorpay's test card.",
+    "expect": "The plan activates; no real money moves."
+   },
+   {
+    "do": "When ready: replace with LIVE keys (rzp_live_…), check again.",
+    "expect": "\"… LIVE keys: real payments.\" The \"LIVE keys\" line turns green."
+   }
+  ],
+  "ref": "lib/platform_mail.php platform_payment_check",
+  "live": false
+ },
+ {
   "id": "ONB-000",
   "area": "New company",
   "module": "0 · The three front doors",
@@ -168,7 +284,7 @@
     "expect": "\"We have sent a 6-digit code to <e-mail>.\" and a box \"Enter the 6-digit code from your e-mail\"."
    },
    {
-    "do": "Open the e-mail \"… — your sign-up code ……\" and type the code → \"Create my workspace →\".",
+    "do": "Open the e-mail \"… — your sign-up code\" (from your account & password sender, PLT-002) and type the code → \"Create my workspace →\".",
     "expect": "You are inside your own new workspace at once — no waiting, no second password change. \"Welcome! Your workspace is ready and your free trial has started.\" and \"Free trial — 30 days left (until <date>).\""
    },
    {
@@ -1557,7 +1673,7 @@
  {
   "id": "ONB-070",
   "area": "New company",
-  "module": "10 · Unused trials",
+  "module": "9 · Unused trials",
   "title": "Super Admin sees when every company was last used",
   "kind": "scenario",
   "tags": [
@@ -1592,7 +1708,7 @@
  {
   "id": "ONB-071",
   "area": "New company",
-  "module": "10 · Unused trials",
+  "module": "9 · Unused trials",
   "title": "A free trial nobody uses is warned every 15 days and deleted after 90",
   "kind": "scenario",
   "tags": [
@@ -1634,7 +1750,7 @@
  {
   "id": "ONB-060",
   "area": "New company",
-  "module": "9 · Self-hosted install",
+  "module": "10 · Self-hosted install",
   "title": "A customer installs EXAACT on their own server",
   "kind": "scenario",
   "tags": [

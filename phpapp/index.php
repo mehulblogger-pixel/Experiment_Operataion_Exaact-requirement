@@ -278,6 +278,7 @@ try {
     require __DIR__ . '/lib/superadmin.php';
     require __DIR__ . '/lib/owner_home.php';   // calm owner landing (modules + marketplace switches)
     require __DIR__ . '/lib/saas_tenants.php';    // SaaS control plane — cross-company directory for single-URL login + console (additive)
+    require __DIR__ . '/lib/platform_mail.php';   // Platform setup: the platform's own e-mail (accounts + general senders), payment check, go-live checklist
     require __DIR__ . '/lib/selfserve.php';       // Self-serve companies: sign up, 30-day trial, choose a plan & pay, view-only after, inactivity clean-up
     require __DIR__ . '/lib/tenant_migrate.php';  // Move a file-backed (SQLite) workspace's data into MySQL — upload-proof storage
     require __DIR__ . '/lib/backup.php';          // Per-workspace Backup & Restore — snapshots stored above the web root (upload-proof)
