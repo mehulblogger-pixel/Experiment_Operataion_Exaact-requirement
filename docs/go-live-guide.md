@@ -53,16 +53,28 @@ are never kept.
 4. Buy a plan as a test company with Razorpay's test card — no real money moves.
 5. When ready for real customers, repeat with **Live** keys (`rzp_live_…`) and check again.
 
-## 5. Your numbers (prices, storage, trial)
-Left menu → **Owner home → Companies** (or Platform setup → Open →):
+## 5. Your numbers (prices, GST, storage, trial)
+Nothing is for sale until you set your prices. The app has no built-in price, and a box left
+blank means "not for sale". Every box shows a suggested starting value from market research and
+the reason for it (see `docs/pricing-research.md`). "Fill in the suggested values" puts them into
+the empty boxes; check them, then press **Save**.
 
-- **💳 Pricing** — price of each module and of each login, per month and per year.
-  Until you save these, customers see built-in placeholder prices.
-- **💾 Storage allowance** — base GB per company, GB per login, extra pack size and price.
-- **🚀 Self sign-up & free trial** — trial days (30), trial storage (MB), trial logins,
-  warning interval (15 days), deletion after (90 days).
+- **Owner home → Pricing** (or Platform setup → Open →) opens **Plans, pricing & usage**. It holds:
+  - the price of each module (per company) and of each login, per month;
+  - yearly prices, either typed in or left blank to use the **yearly discount**;
+  - **GST**;
+  - the AI top-up price;
+  - the logins included in each console plan.
 
-Each panel has a Save button; storage changes apply to every company at once.
+  Press **Save & push to all workspaces** to update existing companies at once.
+- **GST:** switch it on only once you are GST-registered. Enter your GSTIN, legal name, address,
+  rate (18%) and SAC code (997331; confirm with your accountant), and choose whether prices are
+  before GST or include it. From then on the customer sees the GST before paying, pays the total,
+  and gets a **tax invoice** (EX/2026-27/0001 …) under Subscription → Payment history.
+- **Companies → 💾 Storage allowance:** base GB per company, GB per login, and the extra pack's
+  size and price.
+- **Companies → 🚀 Self sign-up & free trial:** trial days (30), trial storage (MB), trial logins,
+  the warning interval (15 days), and deletion after 90 days.
 
 ## 6. The nightly job
 In the hosting panel (cPanel → **Cron Jobs**) add once a day, e.g. 02:30:

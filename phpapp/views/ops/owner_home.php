@@ -62,9 +62,9 @@ $app = function_exists('app_name') ? app_name() : 'your platform';
     <span class="oh-ic">👥</span>
     <span><h3>Users &amp; seats</h3><p>Add your own people, set their roles, and manage how many seats you use.</p></span>
   </a>
-  <a class="oh-card" href="/companies?panel=pricing">
+  <a class="oh-card" href="/pricing-usage">
     <span class="oh-ic">💰</span>
-    <span><h3>Pricing</h3><p>Set the price of each module and each seat — what your clients are billed.</p></span>
+    <span><h3>Pricing</h3><p>Set the price of each module and each login, yearly discount and GST — what your clients are billed.</p></span>
   </a>
   <a class="oh-card" href="/super-admin">
     <span class="oh-ic">⚙️</span>

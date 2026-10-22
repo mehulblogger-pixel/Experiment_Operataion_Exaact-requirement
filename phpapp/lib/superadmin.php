@@ -242,15 +242,15 @@ function superadmin_field_roles() {
 
 // The seat-class catalogue: label, price (major units / month) and a one-line
 // pitch. FULL tracks the live billing price; FIELD/PORTAL are their own keys.
+// Every price is the platform owner's saved setting (lib/commercial.php);
+// 0 = not set yet — never an invented figure.
 function superadmin_seat_classes() {
     $bill = function_exists('billing_config') ? billing_config() : [];
-    $full = (int) ($bill['price_month'] ?? 0);
-    if ($full <= 0) $full = (int) setting_get('billing_price_user_month', 0);
-    if ($full <= 0) $full = 1799;                       // Professional default, so the panel is never blank
-    $field  = (int) setting_get('billing_price_field_month', 0);  if ($field  <= 0) $field  = 499;
-    $portal = (int) setting_get('billing_price_portal_month', 99); // recommended token price above the free bundle
-    if ($portal < 0) $portal = 0;                                  // a vendor may set 0 to keep portal free
-    $freeBundle = (int) setting_get('billing_portal_free', 10);   if ($freeBundle < 0) $freeBundle = 0;
+    $full = max(0, (int) ($bill['price_month'] ?? 0));
+    if ($full <= 0) $full = max(0, (int) setting_get('billing_price_user_month', 0));
+    $field  = max(0, (int) setting_get('billing_price_field_month', 0));
+    $portal = max(0, (int) setting_get('billing_price_portal_month', 0));
+    $freeBundle = max(0, (int) setting_get('billing_portal_free', 0));
 
     return [
         'FULL'  => ['label' => 'Full seat', 'price' => $full, 'free' => 0,

@@ -78,22 +78,17 @@
 <details class="panel" <?= $canBuy ? '' : 'open' ?> style="margin-top:16px">
   <summary style="cursor:pointer;font-weight:600">Pricing &amp; payment keys
     <?= !empty($cfg['enabled']) ? '<span class="pill p-ok">Razorpay connected</span>' : '<span class="pill p-mut">not connected</span>' ?></summary>
-  <p class="sub" style="margin:10px 0">Set what a seat costs, and paste your Razorpay <strong>Key Id</strong> and <strong>Key Secret</strong>
+  <p class="sub" style="margin:10px 0">Paste your Razorpay <strong>Key Id</strong> and <strong>Key Secret</strong>
     (Razorpay Dashboard → Settings → API Keys). The secret is stored here only and shown masked.</p>
   <form method="post" action="/billing-config" class="settings-form">
     <div class="form-grid">
-      <div class="ff"><label>Currency</label><input class="form-control" name="currency" value="<?= e($cur) ?>" maxlength="5"></div>
-      <div class="ff"><label>Full seat / month <span class="muted">(office &amp; management users)</span></label><input class="form-control" type="number" min="0" name="price_month" value="<?= $pm ?>"></div>
-      <div class="ff"><label>Full seat / year</label><input class="form-control" type="number" min="0" name="price_year" value="<?= $py ?>"></div>
-      <div class="ff"><label>Field seat / month <span class="muted">(inspector &amp; site roles)</span></label><input class="form-control" type="number" min="0" name="price_field_month" value="<?= (int) setting_get('billing_price_field_month', 499) ?>"></div>
-      <div class="ff"><label>Portal seat / month <span class="muted">(client / vendor logins)</span></label><input class="form-control" type="number" min="0" name="price_portal_month" value="<?= (int) setting_get('billing_price_portal_month', 99) ?>"></div>
-      <div class="ff"><label>Free portal seats <span class="muted">(included, never billed)</span></label><input class="form-control" type="number" min="0" name="portal_free" value="<?= (int) setting_get('billing_portal_free', 10) ?>"></div>
+      <div class="ff ff-wide"><label>Prices</label><div class="sub" style="font-size:13px">Set on <a href="/pricing-usage">Plans, pricing &amp; usage</a> — every module, login, yearly discount and GST in one place.</div></div>
       <div class="ff"><label>Razorpay Key Id</label><input class="form-control" name="rzp_key_id" value="<?= e($cfg['key_id'] ?? '') ?>" placeholder="rzp_live_… or rzp_test_…" autocomplete="off"></div>
       <div class="ff ff-wide"><label>Razorpay Key Secret</label><input class="form-control" type="password" name="rzp_key_secret" autocomplete="new-password" placeholder="<?= !empty($cfg['key_secret']) ? '•••••••• (leave blank to keep)' : 'paste the secret' ?>"></div>
     </div>
-    <button class="btn" type="submit" style="margin-top:10px">Save pricing &amp; keys</button>
+    <button class="btn" type="submit" style="margin-top:10px">Save payment keys</button>
   </form>
-  <p class="muted" style="margin-top:10px;font-size:12.5px">Leave a period's price at 0 to hide it. Use <code>rzp_test_</code> keys to try the flow without real money.</p>
+  <p class="muted" style="margin-top:10px;font-size:12.5px">Use <code>rzp_test_</code> keys to try the flow without real money.</p>
 </details>
 <?php endif; ?>
 

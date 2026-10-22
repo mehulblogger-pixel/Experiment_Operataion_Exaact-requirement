@@ -269,7 +269,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     </div>
     <div id="scq-lines" style="margin:8px 0 6px;font-size:13px"></div>
     <div id="scq-total" style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:20px"></div>
-    <div class="sc-note">Seats counted = plan base (<?= (int) $base ?>) + purchased (the box above). Set per-module prices in <b>Pricing</b> below. A customer pays this via your existing Razorpay checkout.</div>
+    <div class="sc-note">Seats counted = plan base (<?= (int) $base ?>) + purchased (the box above). Prices are set on <a href="/pricing-usage">Plans, pricing &amp; usage</a>; "not set" items are not for sale. A customer pays this via your Razorpay checkout.</div>
   </div>
   <script>
   (function(){
@@ -281,8 +281,8 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
       var extra=parseInt((document.querySelector('input[name=extra_user_seats]')||{}).value||'0',10)||0;
       var seats=Math.max(0,BASE+extra), lines=[], total=0;
       Object.keys(PB.modules).forEach(function(k){ if(mods.indexOf(k)>=0){ var a=PB.modules[k][per]; total+=a; lines.push([PB.modules[k].label, a]); } });
-      var sa=seats*PB.seat[per]; total+=sa; lines.push([seats+' seat'+(seats===1?'':'s'), sa]);
-      document.getElementById('scq-lines').innerHTML=lines.map(function(l){return '<div style="display:flex;justify-content:space-between"><span>'+l[0]+'</span><span>'+money(l[1])+'</span></div>';}).join('');
+      var sa=seats*PB.seat[per]; total+=sa; lines.push([seats+' seat'+(seats===1?'':'s'), PB.seat[per] > 0 ? sa : 0]);
+      document.getElementById('scq-lines').innerHTML=lines.map(function(l){return '<div style="display:flex;justify-content:space-between"><span>'+l[0]+'</span><span>'+(l[1] > 0 ? money(l[1]) : 'not set')+'</span></div>';}).join('');
       document.getElementById('scq-total').textContent=money(total)+' / '+(per==='year'?'year':'month');
     }
     document.getElementById('scq-period').addEventListener('change',calc);
@@ -304,15 +304,15 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     <label style="display:flex;gap:9px;align-items:flex-start;margin-bottom:12px;font-size:13.5px"><input type="checkbox" name="ss_on" value="1" <?= !empty($ss_on) ? 'checked' : '' ?> style="margin-top:2px">
       <span><b>Companies can sign themselves up</b> at <code>/start</code>: they confirm their e-mail with a code and go straight into their own workspace on a free trial of every module. (Off = they apply at <code>/get-started</code> and you approve.)</span></label>
     <div class="sc-edit" style="padding:0;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
-      <div class="ff"><label>Free trial (days)</label><input type="number" name="ss_trial_days" min="1" value="<?= $e($raw('saas_trial_days')) ?>" placeholder="<?= (int) SELFSERVE_TRIAL_DAYS_DEFAULT ?>"></div>
-      <div class="ff"><label>Trial storage limit (MB)</label><input type="number" name="ss_storage_mb" min="0" value="<?= $e($raw('saas_trial_storage_mb')) ?>" placeholder="not set — no limit"></div>
-      <div class="ff"><label>Logins during the trial</label><input type="number" name="ss_trial_seats" min="0" value="<?= $e($raw('saas_trial_seats')) ?>" placeholder="not set — no limit"></div>
-      <div class="ff"><label>Warn unused trials every (days)</label><input type="number" name="ss_notice_days" min="1" value="<?= $e($raw('saas_inactive_notice_days')) ?>" placeholder="<?= (int) SELFSERVE_NOTICE_DAYS_DEFAULT ?>"></div>
-      <div class="ff"><label>Delete unused trials after (days)</label><input type="number" name="ss_delete_days" min="1" value="<?= $e($raw('saas_inactive_delete_days')) ?>" placeholder="<?= (int) SELFSERVE_DELETE_DAYS_DEFAULT ?>"></div>
+      <div class="ff"><label>Free trial (days)</label><input type="number" name="ss_trial_days"<?= commercial_suggest_attr('saas_trial_days') ?> min="1" value="<?= $e($raw('saas_trial_days')) ?>" placeholder="<?= (int) SELFSERVE_TRIAL_DAYS_DEFAULT ?>"><?= commercial_hint('saas_trial_days') ?></div>
+      <div class="ff"><label>Trial storage limit (MB)</label><input type="number" name="ss_storage_mb"<?= commercial_suggest_attr('saas_trial_storage_mb') ?> min="0" value="<?= $e($raw('saas_trial_storage_mb')) ?>" placeholder="not set — no limit"><?= commercial_hint('saas_trial_storage_mb') ?></div>
+      <div class="ff"><label>Logins during the trial</label><input type="number" name="ss_trial_seats"<?= commercial_suggest_attr('saas_trial_seats') ?> min="0" value="<?= $e($raw('saas_trial_seats')) ?>" placeholder="not set — no limit"><?= commercial_hint('saas_trial_seats') ?></div>
+      <div class="ff"><label>Warn unused trials every (days)</label><input type="number" name="ss_notice_days"<?= commercial_suggest_attr('saas_inactive_notice_days') ?> min="1" value="<?= $e($raw('saas_inactive_notice_days')) ?>" placeholder="<?= (int) SELFSERVE_NOTICE_DAYS_DEFAULT ?>"><?= commercial_hint('saas_inactive_notice_days') ?></div>
+      <div class="ff"><label>Delete unused trials after (days)</label><input type="number" name="ss_delete_days"<?= commercial_suggest_attr('saas_inactive_delete_days') ?> min="1" value="<?= $e($raw('saas_inactive_delete_days')) ?>" placeholder="<?= (int) SELFSERVE_DELETE_DAYS_DEFAULT ?>"><?= commercial_hint('saas_inactive_delete_days') ?></div>
     </div>
     <label style="display:flex;gap:9px;align-items:flex-start;margin:12px 0;font-size:13.5px"><input type="checkbox" name="ss_autodelete" value="1" <?= $ssc['auto_delete'] ? 'checked' : '' ?> style="margin-top:2px">
       <span><b>Delete unused free trials automatically.</b> Only companies that signed themselves up and never paid. Each gets an e-mail every <?= (int) $ssc['notice_days'] ?> days of no use; it is deleted after <?= (int) $ssc['delete_days'] ?> days, and never sooner than <?= (int) $ssc['notice_days'] ?> days after its first warning. A company that has ever paid is never deleted — it becomes view-only.</span></label>
-    <div class="sc-actions"><button class="btn">Save</button></div>
+    <div class="sc-actions"><button class="btn">Save</button> <button type="button" class="btn ghost cm-fill">Fill in the suggested values</button></div>
     <div class="sc-note">After the trial a company becomes view-only until it chooses a plan: it can open, print and export everything, but not save. Prices come from the panel below, and payment from your Razorpay keys (Billing).</div>
   </form>
   <form method="post" style="padding:0 16px 16px"><input type="hidden" name="do" value="selfserve_sync"><button class="btn ghost xs">Check when every company was last used</button>
@@ -334,35 +334,23 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     <input type="hidden" name="do" value="storage_save">
     <p class="sc-note" style="margin-top:0">A company on a plan may store: <b>base</b> + <b>GB per login</b> × its logins + the <b>extra packs</b> it buys + any extra you grant it (Manage). Leave everything empty for no limit. At the limit only NEW FILES are refused — records still save and nothing is ever deleted. Owners are e-mailed at 80%, 95% and 100%. (Free trials use the trial storage limit above.)</p>
     <div class="sc-edit" style="padding:0;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
-      <div class="ff"><label>Base storage per company (GB)</label><input type="number" min="0" step="0.5" name="st_base_gb" value="<?= $e($raw2('saas_storage_gb_base')) ?>" placeholder="not set"></div>
-      <div class="ff"><label>Storage per login (GB)</label><input type="number" min="0" step="0.5" name="st_login_gb" value="<?= $e($raw2('saas_storage_gb_per_login')) ?>" placeholder="not set"></div>
-      <div class="ff"><label>Extra storage pack size (GB)</label><input type="number" min="0" step="0.5" name="st_pack_gb" value="<?= $e($raw2('saas_storage_pack_gb')) ?>" placeholder="not offered"></div>
-      <div class="ff"><label>Pack price per month</label><input type="number" min="0" name="st_pack_month" value="<?= $e($raw2('saas_storage_pack_price_month')) ?>" placeholder="not offered"></div>
-      <div class="ff"><label>Pack price per year</label><input type="number" min="0" name="st_pack_year" value="<?= $e($raw2('saas_storage_pack_price_year')) ?>" placeholder="not offered"></div>
+      <div class="ff"><label>Base storage per company (GB)</label><input type="number" min="0" step="0.5" name="st_base_gb"<?= commercial_suggest_attr('saas_storage_gb_base') ?> value="<?= $e($raw2('saas_storage_gb_base')) ?>" placeholder="not set"><?= commercial_hint('saas_storage_gb_base') ?></div>
+      <div class="ff"><label>Storage per login (GB)</label><input type="number" min="0" step="0.5" name="st_login_gb"<?= commercial_suggest_attr('saas_storage_gb_per_login') ?> value="<?= $e($raw2('saas_storage_gb_per_login')) ?>" placeholder="not set"><?= commercial_hint('saas_storage_gb_per_login') ?></div>
+      <div class="ff"><label>Extra storage pack size (GB)</label><input type="number" min="0" step="0.5" name="st_pack_gb"<?= commercial_suggest_attr('saas_storage_pack_gb') ?> value="<?= $e($raw2('saas_storage_pack_gb')) ?>" placeholder="not offered"><?= commercial_hint('saas_storage_pack_gb') ?></div>
+      <div class="ff"><label>Pack price per month</label><input type="number" min="0" name="st_pack_month"<?= commercial_suggest_attr('saas_storage_pack_price_month') ?> value="<?= $e($raw2('saas_storage_pack_price_month')) ?>" placeholder="not offered"><?= commercial_hint('saas_storage_pack_price_month') ?></div>
+      <div class="ff"><label>Pack price per year</label><input type="number" min="0" name="st_pack_year"<?= commercial_suggest_attr('saas_storage_pack_price_year') ?> value="<?= $e($raw2('saas_storage_pack_price_year')) ?>" placeholder="not offered"><?= commercial_hint('saas_storage_pack_price_year') ?></div>
     </div>
-    <div class="sc-actions" style="margin-top:12px"><button class="btn">Save and apply to every company</button></div>
+    <div class="sc-actions" style="margin-top:12px"><button class="btn">Save and apply to every company</button> <button type="button" class="btn ghost cm-fill">Fill in the suggested values</button></div>
   </form>
 </details>
 <?php endif; ?>
 
-<?php // ---- Pricing panel (super-admin): the price book ---------------------------
-  $pb = $price_book ?? saas_price_book(); $cur = ($pb['currency'] === 'INR') ? '₹' : ($e($pb['currency']) . ' '); ?>
-<details class="sc-card" style="padding:0">
-  <summary style="cursor:pointer;padding:13px 16px;font-size:14px;font-weight:600;background:var(--soft,#f6f8fb);border-bottom:1px solid var(--line,#e5e7eb)">💳 Pricing — what each module &amp; seat costs</summary>
-  <form method="post" style="padding:16px">
-    <input type="hidden" name="do" value="price_save">
-    <div class="sc-scroll"><table class="sc" style="min-width:520px">
-      <tr><th>Item</th><th>Per month (<?= $cur ?>)</th><th>Per year (<?= $cur ?>)</th></tr>
-      <tr><td class="sc-co">Each seat (user)</td>
-        <td><input type="number" name="seat_month" min="0" value="<?= (int) $pb['seat']['month'] ?>" style="width:110px;padding:6px 8px;border:1px solid var(--line,#d7dde5);border-radius:7px"></td>
-        <td><input type="number" name="seat_year" min="0" value="<?= (int) $pb['seat']['year'] ?>" style="width:110px;padding:6px 8px;border:1px solid var(--line,#d7dde5);border-radius:7px"></td></tr>
-      <?php foreach ($pb['modules'] as $mk => $m): ?>
-      <tr><td class="sc-co"><?= $e($m['label']) ?> <span class="sc-key">module</span></td>
-        <td><input type="number" name="price_<?= $e($mk) ?>_month" min="0" value="<?= (int) $m['month'] ?>" style="width:110px;padding:6px 8px;border:1px solid var(--line,#d7dde5);border-radius:7px"></td>
-        <td><input type="number" name="price_<?= $e($mk) ?>_year" min="0" value="<?= (int) $m['year'] ?>" style="width:110px;padding:6px 8px;border:1px solid var(--line,#d7dde5);border-radius:7px"></td></tr>
-      <?php endforeach; ?>
-    </table></div>
-    <div class="sc-note">Administration is always included and never priced. These prices drive the live quote on each company's Manage panel.</div>
-    <button class="btn">Save prices</button>
-  </form>
-</details>
+<?php // Prices live in ONE place: Plans, pricing & usage (lib/commercial.php). ?>
+<a class="sc-card" href="/pricing-usage" style="display:block;padding:13px 16px;font-size:14px;font-weight:600;text-decoration:none;color:inherit">💳 Pricing &amp; GST — what each module and login costs →
+  <span class="sc-key" style="display:block;font-weight:400">Set on Plans, pricing &amp; usage, with suggested values from market research.</span></a>
+<script>
+document.querySelectorAll('.cm-fill').forEach(function(b){ b.addEventListener('click', function(){
+  var n = 0; b.closest('form').querySelectorAll('[data-suggest]').forEach(function(el){
+    if (el.value === '') { el.value = el.dataset.suggest; el.style.background = '#fffbe6'; n++; } });
+  b.textContent = n ? n + ' filled — check, then Save' : 'Nothing empty to fill'; }); });
+</script>

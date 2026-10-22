@@ -146,6 +146,7 @@ t_ok(!saas_storage_full(), 'with no limit set, storage is never full');
 
 // ---- Choosing a plan (owner's Q-L rule) --------------------------------------------
 foreach ($sell as $sk => $sv) setting_set($sk, $sv);   // the platform owner's prices
+t_set_prices();                                          // (the app has none built in)
 $mods = array_slice(selfserve_all_modules(), 0, 2);
 $q = saas_plan_change_quote([], 2, 'month');
 t_ok(!$q['ok'], 'a plan with no module is refused');

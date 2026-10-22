@@ -24,7 +24,7 @@ def C(id, module, title, kind, tags, persona, why, before, steps, ref='', live=T
 C('PLT-001', '0 · Platform setup (do this first)', 'The go-live checklist', 'scenario', ['best', 'rule'],
   'PLATFORM_OWNER', 'One page says what must work before companies sign up and pay, and what is still to do.',
   'Signed in at the main site (operations.mghaiapps.com/login) with the platform owner\'s Master Admin account.',
-  [('Left menu → "Platform setup" (or Owner home → "Platform setup").', 'Heading "Platform setup", "… of 12 ready", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your own prices, storage allowance, trial storage and logins, nightly job, Super Admin on its own address, self sign-up.'),
+  [('Left menu → "Platform setup" (or Owner home → "Platform setup").', 'Heading "Platform setup", "… of 13 ready", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your prices, GST decided, storage allowance, trial storage and logins, nightly job, Super Admin on its own address, self sign-up.'),
    ('Each line not yet done.', 'Says exactly where to fix it, with "Open →".'),
    ('Sign in as a company\'s own Master Admin and type /platform-setup.', '"Only the platform owner (Super Admin), on the main site, can open Platform setup." — and it is not in their menu.')],
   'lib/platform_mail.php; views/ops/platform_setup.php')
@@ -65,6 +65,20 @@ C('PLT-004', '0 · Platform setup (do this first)', 'Super Admin on its own addr
    ('Emergency: cPanel → File Manager → in exaact_data create an empty file "superadmin-unlock"; open /platform-setup on the main address.', 'It opens on the main address again; the Super Admin page warns that the emergency unlock is on. Delete the file → locked again.'),
    ('Try to create a company called "Admin" (or with the workspace name "admin").', 'Its workspace gets another name (admin-2), or "That workspace key is already taken — pick another."')],
   'lib/superadmin.php superadmin_address_gate; lib/platform_mail.php; views/ops/platform_setup.php; index.php login')
+
+C('PLT-005', '0 · Platform setup (do this first)', 'Your prices and GST — nothing built in, suggestions shown', 'scenario', ['best', 'rule', 'edge'],
+  'PLATFORM_OWNER', 'The owner (22 Oct): "research this number and let me know or keep it open to configure in admin panel, don\'t hardcode it".',
+  'Signed in as the platform owner. No prices saved yet.',
+  [('Owner home → "Pricing" (opens Plans, pricing & usage).', 'Every price box is empty ("not set"). Under each: "Suggested: …" and the reason (evidence or judgement). A banner: "… numbers still to decide".'),
+   ('As a company on its free trial, open Subscription.', '"Plans are not on sale yet — prices are still being set." Nothing can be bought at an invented price.'),
+   ('Back on Pricing: "Fill in the suggested values".', '"… boxes filled — check them, then press Save". Only empty boxes are filled, highlighted; nothing is saved yet.'),
+   ('Leave the yearly boxes blank, Yearly discount 20 → "Save prices".', '"Pricing saved." The "Yearly price charged" column shows ₹9,590 for a ₹999 module and ₹4,790 for a ₹499 login.'),
+   ('Tick "Charge GST …" with only a GSTIN and rate → Save.', '"To charge GST, fill in your legal name, your registered address, the SAC code first. Nothing was saved."'),
+   ('Fill GSTIN, legal name, address, 18, 997331, "before GST" → Save & push to all workspaces.', 'Saved. Platform setup: "Your prices are set" and "GST decided" turn green.'),
+   ('As a company with a GSTIN in another state, choose a plan → pay.', 'Before paying: Price, IGST 18%, Total to pay. With a GSTIN in your own state (or none): CGST 9% + SGST 9%.'),
+   ('After paying (test keys): Subscription → Payment history → the invoice number.', 'A tax invoice EX/2026-27/0001: your GSTIN and the buyer\'s, place of supply, SAC 997331, taxable value, the tax, "Total paid", "Tax payable on reverse charge: No". "Print / save as PDF".'),
+   ('Companies → 💾 Storage allowance and 🚀 Self sign-up.', 'The same "Suggested: … · why" under each box (10 GB, 2 GB per login, 50 GB pack at ₹399; 30 days, 10 logins, 2048 MB) and "Fill in the suggested values".')],
+  'lib/commercial.php; lib/pricing_admin.php; views/ops/pricing_usage.php; views/ops/subscription_invoice.php; docs/pricing-research.md', live=False)
 
 C('ONB-000', '0 · The three front doors', 'Where a newcomer can start — the three front doors', 'scenario', ['best'],
   'NEWCOMER', 'A newcomer is one of three people: a company that wants its own workspace, a professional who wants work, or a company/agency that wants people. Each has its own door.',

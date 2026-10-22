@@ -1199,3 +1199,20 @@ named `superadmin-unlock` in the protected data folder, or the server setting
 `admin`, `www`, `mail`, `webmail`, `cpanel`, `whm`, `api`, `app`, `ftp`, `start`, `login`). No new
 permission — it narrows the existing Super Admin gate (`superadmin_can()`, `can_manage_tenants()`,
 the payment-keys save) to one address.
+
+**No built-in prices; GST and tax invoices (owner, 22 Oct 2026: "keep it open to configure in
+admin panel, don't hardcode it")** — every commercial number is a setting the platform owner saves
+(`lib/commercial.php`). Prices, the yearly discount, GST, the AI top-up and seat costs are on
+**Plans, pricing & usage** (`/pricing-usage`); storage and trial are under **Companies**. That
+screen is now the only place prices are edited: the Companies 💳 panel and the Billing form no
+longer edit them, and Billing keeps only the payment keys. An unset price means the item is not
+for sale, and a customer is told "Not for sale yet".
+
+When GST is switched on (it needs the platform's GSTIN, legal name, address, rate and SAC):
+- it is added to, or included in, the amount charged, split by place of supply;
+- each payment gets a GST tax invoice from one platform-wide series per financial year;
+- the invoice is visible at `/subscription-invoice`, to the same people who manage the company's
+  subscription (`billing_can_manage()`).
+
+No new permission — the existing Super Admin gate (`superadmin_can()`) and subscription gate are
+reused.

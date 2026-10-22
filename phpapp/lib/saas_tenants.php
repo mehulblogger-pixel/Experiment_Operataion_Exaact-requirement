@@ -29,8 +29,16 @@ function saas_plan_logins($plan) {
     // A self-serve company that has chosen its own plan: its logins are exactly
     // the ones it bought (held as extra_user_seats), so the plan adds none.
     if (strtoupper((string) $plan) === 'CUSTOM') return 0;
-    $map = ['STARTER' => 2, 'RECRUITMENT' => 3, 'PRO' => 5, 'ENTERPRISE' => 9];
-    return $map[strtoupper((string) $plan)] ?? 2;
+    // A console plan: the platform owner's number (Plans, pricing & usage).
+    // Until one is saved, the number these plans have always had stays in
+    // force, so no existing company's login limit changes underneath it.
+    $saved = function_exists('setting_get') ? trim((string) setting_get('saas_plan_logins_' . strtoupper((string) $plan), '')) : '';
+    if ($saved !== '') return max(0, (int) $saved);
+    return saas_plan_logins_in_force()[strtoupper((string) $plan)] ?? 2;
+}
+// The logins each console plan has included since it was introduced.
+function saas_plan_logins_in_force() {
+    return ['STARTER' => 2, 'RECRUITMENT' => 3, 'PRO' => 5, 'ENTERPRISE' => 9];
 }
 
 // The modules a plan grants, reused from the existing tier catalogue so the two
@@ -515,37 +523,28 @@ function saas_apply_modules_list(array $mods) {
 
 // Sensible default monthly prices (major currency units) per module, used until
 // a super-admin sets their own on the Pricing panel.
-function saas_price_defaults() {
-    return ['operations' => 1500, 'sales' => 1200, 'reporting' => 1400, 'money' => 900, 'hr' => 1000];
-}
-
-// The price book: per-seat price (reuses the existing Billing per-seat price) and
-// a per-module price, monthly and yearly, plus the currency. Settings override
-// the defaults, so it is fully configurable without code.
+// The price book: per-login price and a per-module price, monthly and yearly,
+// plus the currency. Every figure is the platform owner's saved setting
+// (lib/commercial.php) — there is no built-in price. 0 = not set = not for sale.
 function saas_price_book() {
-    $get = function ($k, $d) {
-        if (!function_exists('setting_get')) return (int) $d;
-        $v = setting_get($k, '');
-        return $v === '' ? (int) $d : (int) $v;
-    };
-    $bill  = function_exists('billing_config') ? billing_config() : [];
-    $seatM = (int) ($bill['price_month'] ?? 0) ?: $get('billing_price_user_month', 1799);
-    $seatY = (int) ($bill['price_year'] ?? 0)  ?: $get('billing_price_user_year', $seatM * 10);
-    $defM  = saas_price_defaults();
-    $mods  = [];
+    $p  = fn($k) => function_exists('commercial_price') ? (int) commercial_price($k) : max(0, (int) setting_get($k, 0));
+    $py = fn($m, $y) => function_exists('commercial_yearly') ? (int) commercial_yearly($m, $y) : max(0, (int) setting_get($y, 0));
+    $bill = function_exists('billing_config') ? billing_config() : [];
+    $mods = [];
     if (defined('PRODUCT_MODULES')) {
         foreach (PRODUCT_MODULES as $k => $m) {
             if (!empty($m[3])) continue;   // core (admin) is included, never priced
-            $mm = $get('saas_price_mod_' . $k . '_month', $defM[$k] ?? 1000);
-            $my = $get('saas_price_mod_' . $k . '_year', $mm * 10);
-            $mods[$k] = ['label' => $m[0] ?? $k, 'month' => $mm, 'year' => $my];
+            $mods[$k] = ['label' => $m[0] ?? $k, 'month' => $p('saas_price_mod_' . $k . '_month'),
+                         'year' => $py('saas_price_mod_' . $k . '_month', 'saas_price_mod_' . $k . '_year')];
         }
     }
     // Extra storage, sold in packs (lib/selfserve.php). Offered only once the
-    // platform owner has set a pack size AND a price — no default is invented.
-    $packGb = max(0, (float) $get('saas_storage_pack_gb', 0));
-    return ['seat' => ['month' => $seatM, 'year' => $seatY], 'modules' => $mods,
-            'storage_pack' => ['gb' => $packGb, 'month' => $get('saas_storage_pack_price_month', 0), 'year' => $get('saas_storage_pack_price_year', 0)],
+    // platform owner has set a pack size AND a price.
+    $packGb = max(0, (float) setting_get('saas_storage_pack_gb', 0));
+    return ['seat' => ['month' => $p('billing_price_user_month'), 'year' => $py('billing_price_user_month', 'billing_price_user_year')],
+            'modules' => $mods,
+            'storage_pack' => ['gb' => $packGb, 'month' => $p('saas_storage_pack_price_month'),
+                               'year' => $py('saas_storage_pack_price_month', 'saas_storage_pack_price_year')],
             'currency' => (string) ($bill['currency'] ?? 'INR')];
 }
 
@@ -557,20 +556,31 @@ function saas_company_quote(array $mods, $seats, $period = 'month', $packs = 0) 
     $pb = saas_price_book();
     $mods = array_map('strtolower', $mods);
     $lines = []; $total = 0;
+    $missing = [];   // chosen but not priced for this period — never sold at 0
     foreach ($pb['modules'] as $k => $m) {
-        if (in_array($k, $mods, true)) { $lines[] = ['label' => $m['label'], 'amount' => $m[$period]]; $total += $m[$period]; }
+        if (!in_array($k, $mods, true)) continue;
+        if ((int) $m[$period] <= 0) { $missing[] = $m['label']; continue; }
+        $lines[] = ['label' => $m['label'], 'amount' => $m[$period]]; $total += $m[$period];
     }
     $seats = max(0, (int) $seats);
+    if ($seats > 0 && (int) $pb['seat'][$period] <= 0) $missing[] = 'logins';
     $seatAmt = $seats * $pb['seat'][$period];
     $lines[] = ['label' => $seats . ' seat' . ($seats === 1 ? '' : 's'), 'amount' => $seatAmt];
     $total += $seatAmt;
     $packs = max(0, (int) $packs);
-    if ($packs > 0 && (float) $pb['storage_pack']['gb'] > 0 && (int) $pb['storage_pack'][$period] > 0) {
+    if ($packs > 0 && !((float) $pb['storage_pack']['gb'] > 0 && (int) $pb['storage_pack'][$period] > 0)) { $missing[] = 'extra storage'; $packs = 0; }
+    if ($packs > 0) {
         $amt = $packs * (int) $pb['storage_pack'][$period];
         $lines[] = ['label' => $packs . ' × ' . rtrim(rtrim(number_format((float) $pb['storage_pack']['gb'], 2), '0'), '.') . ' GB extra storage', 'amount' => $amt];
         $total += $amt;
     }
-    return ['period' => $period, 'currency' => $pb['currency'], 'lines' => $lines, 'total' => $total, 'seats' => $seats, 'packs' => $packs];
+    return ['period' => $period, 'currency' => $pb['currency'], 'lines' => $lines, 'total' => $total, 'seats' => $seats, 'packs' => $packs,
+            'missing' => $missing];
+}
+// The plain-language refusal for a selection that includes something unpriced.
+function saas_quote_missing_msg(array $missing, $period) {
+    return 'Not for sale yet: ' . implode(', ', $missing) . ($period === 'year' ? ' (paid yearly)' : '')
+        . ' — the price has not been set. Please contact your provider' . ($period === 'year' ? ', or choose monthly' : '') . '.';
 }
 
 // ---------------------------------------------------------------------------
@@ -1301,18 +1311,6 @@ function ops_saas_admin($route, $method) {
             flash('Checked ' . $r['checked'] . ' compan' . ($r['checked'] === 1 ? 'y' : 'ies') . ' for when they were last used. Nothing was e-mailed or deleted.');
             redirect('/companies');
         }
-        if ($do === 'price_save') {
-            $g = fn($k) => max(0, (int) ($_POST[$k] ?? 0));
-            if (defined('PRODUCT_MODULES')) foreach (PRODUCT_MODULES as $mk => $mm) {
-                if (!empty($mm[3])) continue;   // core module, never priced
-                setting_set('saas_price_mod_' . $mk . '_month', (string) $g('price_' . $mk . '_month'));
-                setting_set('saas_price_mod_' . $mk . '_year',  (string) $g('price_' . $mk . '_year'));
-            }
-            if (isset($_POST['seat_month'])) setting_set('billing_price_user_month', (string) $g('seat_month'));
-            if (isset($_POST['seat_year']))  setting_set('billing_price_user_year',  (string) $g('seat_year'));
-            flash('Price book saved.');
-            redirect('/companies');
-        }
         if ($do === 'company_plan' && $key !== '') {
             saas_tenant_set_plan($key, (string) ($_POST['plan'] ?? ''), trim((string) ($_POST['plan_expiry'] ?? '')) ?: null);
             $pushed($key, 'Plan');
@@ -1450,12 +1448,20 @@ function ops_saas_subscription($route, $method) {
         if (!function_exists('billing_configured') || !billing_configured()) {
             flash('Online payment is not switched on for your workspace yet. Please contact your provider.', 'error'); redirect('/subscription');
         }
-        $ord = rzp_create_order((int) round($total * 100), 'sub-' . date('ymdHis'),
+        // GST (lib/commercial.php): added to the price, or included in it, as
+        // the platform owner set it; nothing when GST is off.
+        $buyer = function_exists('saas_invoice_buyer') ? saas_invoice_buyer() : ['name' => '', 'address' => '', 'gstin' => ''];
+        $tax = function_exists('commercial_tax') ? commercial_tax((int) $total, $buyer['gstin']) : ['on' => false, 'gross' => (int) $total];
+        $charge = (int) $tax['gross'];
+        $ord = rzp_create_order($charge * 100, 'sub-' . date('ymdHis'),
             ['kind' => $kind, 'modules' => implode(',', $mods), 'seats' => $seats, 'period' => $period]);
         if (empty($ord['ok'])) { flash('Could not start the payment: ' . $ord['error'], 'error'); redirect('/subscription'); }
-        saas_order_create((string) ($ord['id'] ?? ''), $kind, $mods, $seats, $period, (int) $total, $quote);
+        saas_order_create((string) ($ord['id'] ?? ''), $kind, $mods, $seats, $period, $charge, $quote,
+            $tax + ['buyer' => $buyer, 'supplier' => function_exists('commercial_gst_cfg') ? commercial_gst_cfg() : [], 'lines' => saas_company_quote($mods, $seats, $period, (int) ($quote['packs'] ?? 0))['lines'],
+                    'credit' => (int) ($quote['credit'] ?? 0), 'price' => (int) $total]);
         view('ops/billing_pay', [
-            'amt' => ['seats' => $seats, 'period' => $period, 'currency' => saas_price_book()['currency'], 'total' => $total, 'major' => $total],
+            'amt' => ['seats' => $seats, 'period' => $period, 'currency' => saas_price_book()['currency'], 'total' => $charge, 'major' => $charge,
+                      'tax' => $tax],
             'order' => $ord, 'cfg' => billing_config(),
             'verify_action' => '/subscription-verify', 'back' => '/subscription',
             'extra' => [],
@@ -1490,8 +1496,19 @@ function ops_saas_subscription($route, $method) {
         $seats  = max(0, (int) ($_POST['add_seats'] ?? 0));
         if (!$mods && $seats <= 0) { flash('Pick at least one module or some seats to add.', 'error'); redirect('/subscription'); }
         $q = saas_company_quote($mods, $seats, $period);
+        if (!empty($q['missing'])) { flash(saas_quote_missing_msg($q['missing'], $period), 'error'); redirect('/subscription'); }
         if ((int) $q['total'] <= 0) { flash('That selection has no price set yet — please contact your provider.', 'error'); redirect('/subscription'); }
         return $pay('add', $mods, $seats, $period, (int) $q['total']);
+    }
+
+    // A tax invoice (GST on) or payment receipt for one of this company's own payments.
+    if ($route === 'subscription-invoice') {
+        $o = null;
+        try { $o = ops_one("SELECT * FROM saas_orders WHERE order_id=? AND status='PAID'", [(string) ($_GET['o'] ?? '')]); } catch (Throwable $e) {}
+        ops_require((bool) $o, 'That payment is not known here.');
+        $t = json_decode((string) ($o['tax_json'] ?? ''), true);
+        require __DIR__ . '/../views/ops/subscription_invoice.php';
+        exit;
     }
 
     // Step 2 → Razorpay called back. Verify, then apply exactly the recorded order, once.
@@ -1544,6 +1561,10 @@ function ops_saas_subscription($route, $method) {
                'trial' => saas_access_state()['mode'] === 'trial'] : null,
         'modules' => defined('PRODUCT_MODULES') ? PRODUCT_MODULES : [],
         'history' => function_exists('billing_history') ? billing_history() : [],
+        'invoices' => (function () {
+            try { $r = ops_all("SELECT order_id, invoice_no FROM saas_orders WHERE status='PAID'"); } catch (Throwable $e) { $r = []; }
+            $m = []; foreach ((array) $r as $x) $m[(string) $x['order_id']] = (string) $x['invoice_no']; return $m;
+        })(),
     ]);
     return true;
 }

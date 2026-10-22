@@ -16,7 +16,7 @@
   "steps": [
    {
     "do": "Left menu → \"Platform setup\" (or Owner home → \"Platform setup\").",
-    "expect": "Heading \"Platform setup\", \"… of 12 ready\", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your own prices, storage allowance, trial storage and logins, nightly job, Super Admin on its own address, self sign-up."
+    "expect": "Heading \"Platform setup\", \"… of 13 ready\", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your prices, GST decided, storage allowance, trial storage and logins, nightly job, Super Admin on its own address, self sign-up."
    },
    {
     "do": "Each line not yet done.",
@@ -174,6 +174,62 @@
   ],
   "ref": "lib/superadmin.php superadmin_address_gate; lib/platform_mail.php; views/ops/platform_setup.php; index.php login",
   "live": true
+ },
+ {
+  "id": "PLT-005",
+  "area": "New company",
+  "module": "0 · Platform setup (do this first)",
+  "title": "Your prices and GST — nothing built in, suggestions shown",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule",
+   "edge"
+  ],
+  "persona": "PLATFORM_OWNER",
+  "company": "ANY",
+  "why": "The owner (22 Oct): \"research this number and let me know or keep it open to configure in admin panel, don't hardcode it\".",
+  "before": "Signed in as the platform owner. No prices saved yet.",
+  "steps": [
+   {
+    "do": "Owner home → \"Pricing\" (opens Plans, pricing & usage).",
+    "expect": "Every price box is empty (\"not set\"). Under each: \"Suggested: …\" and the reason (evidence or judgement). A banner: \"… numbers still to decide\"."
+   },
+   {
+    "do": "As a company on its free trial, open Subscription.",
+    "expect": "\"Plans are not on sale yet — prices are still being set.\" Nothing can be bought at an invented price."
+   },
+   {
+    "do": "Back on Pricing: \"Fill in the suggested values\".",
+    "expect": "\"… boxes filled — check them, then press Save\". Only empty boxes are filled, highlighted; nothing is saved yet."
+   },
+   {
+    "do": "Leave the yearly boxes blank, Yearly discount 20 → \"Save prices\".",
+    "expect": "\"Pricing saved.\" The \"Yearly price charged\" column shows ₹9,590 for a ₹999 module and ₹4,790 for a ₹499 login."
+   },
+   {
+    "do": "Tick \"Charge GST …\" with only a GSTIN and rate → Save.",
+    "expect": "\"To charge GST, fill in your legal name, your registered address, the SAC code first. Nothing was saved.\""
+   },
+   {
+    "do": "Fill GSTIN, legal name, address, 18, 997331, \"before GST\" → Save & push to all workspaces.",
+    "expect": "Saved. Platform setup: \"Your prices are set\" and \"GST decided\" turn green."
+   },
+   {
+    "do": "As a company with a GSTIN in another state, choose a plan → pay.",
+    "expect": "Before paying: Price, IGST 18%, Total to pay. With a GSTIN in your own state (or none): CGST 9% + SGST 9%."
+   },
+   {
+    "do": "After paying (test keys): Subscription → Payment history → the invoice number.",
+    "expect": "A tax invoice EX/2026-27/0001: your GSTIN and the buyer's, place of supply, SAC 997331, taxable value, the tax, \"Total paid\", \"Tax payable on reverse charge: No\". \"Print / save as PDF\"."
+   },
+   {
+    "do": "Companies → 💾 Storage allowance and 🚀 Self sign-up.",
+    "expect": "The same \"Suggested: … · why\" under each box (10 GB, 2 GB per login, 50 GB pack at ₹399; 30 days, 10 logins, 2048 MB) and \"Fill in the suggested values\"."
+   }
+  ],
+  "ref": "lib/commercial.php; lib/pricing_admin.php; views/ops/pricing_usage.php; views/ops/subscription_invoice.php; docs/pricing-research.md",
+  "live": false
  },
  {
   "id": "ONB-000",

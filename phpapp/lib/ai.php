@@ -113,9 +113,10 @@ function ai_pool_over()      { return ai_usage_month() >= ai_effective_cap(); }
 // and what it costs. Both are set by the super admin (settings), with sensible
 // defaults, and are pushed to a workspace like the other pricing.
 const AI_DEFAULT_PACK_SIZE = 100;
-const AI_DEFAULT_PACK_PRICE = 199;   // major currency units (₹)
 function ai_pack_size()  { $v = function_exists('setting_get') ? (int) setting_get('ai_pack_size', 0)  : 0; return $v > 0 ? $v : AI_DEFAULT_PACK_SIZE; }
-function ai_pack_price() { $v = function_exists('setting_get') ? (int) setting_get('ai_pack_price', 0) : 0; return $v > 0 ? $v : AI_DEFAULT_PACK_PRICE; }
+// The top-up price is the platform owner's (Plans, pricing & usage). There is no
+// built-in price: 0 = not set, and top-ups are simply not sold until it is.
+function ai_pack_price() { $v = function_exists('setting_get') ? (int) setting_get('ai_pack_price', 0) : 0; return max(0, $v); }
 
 // Whether AI is usable at all here — an own key, or the platform pool. (When the
 // pool is configured but this month's cap is spent, AI is still "available"; the

@@ -4023,7 +4023,7 @@ function ops_dispatch($route, $method) {
             return ops_platform_setup($method);
         case $route === 'companies':   // Super-Admin: cross-company console (add/plan/seats/modules/suspend/login-as)
             return ops_saas_admin($route, $method);
-        case $route === 'subscription' || $route === 'subscription-order' || $route === 'subscription-verify':
+        case $route === 'subscription' || $route === 'subscription-order' || $route === 'subscription-verify' || $route === 'subscription-invoice':
             return ops_saas_subscription($route, $method);   // a company's own self-service plan / à-la-carte buy
         case $route === 'pricing-usage':                     // Super-Admin: module/seat prices, AI allowance & top-up, per-workspace usage
             return ops_pricing_usage($method);

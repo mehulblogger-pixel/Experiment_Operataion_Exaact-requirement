@@ -34,7 +34,7 @@ $savePS = (string) setting_get('ai_pack_size', '');
 $savePP = (string) setting_get('ai_pack_price', '');
 setting_set('ai_pack_size', ''); setting_set('ai_pack_price', '');
 t_eq(ai_pack_size(), AI_DEFAULT_PACK_SIZE, 'the pack size falls back to the default');
-t_ok(ai_pack_price() === AI_DEFAULT_PACK_PRICE, 'the pack price falls back to the default');
+t_eq(ai_pack_price(), 0, 'an unset pack price is 0 — top-ups are not sold at an invented price');
 setting_set('ai_pack_size', '250'); setting_set('ai_pack_price', '399');
 t_eq(ai_pack_size(), 250, 'a configured pack size wins');
 t_eq(ai_pack_price(), 399, 'a configured pack price wins');

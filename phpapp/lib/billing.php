@@ -25,7 +25,8 @@ function billing_config() {
     return [
         'currency'    => (string) (setting_get('billing_currency', '') ?: 'INR'),
         'price_month' => (int) setting_get('billing_price_user_month', 0),   // major units (e.g. rupees)
-        'price_year'  => (int) setting_get('billing_price_user_year', 0),
+        'price_year'  => function_exists('commercial_yearly')            // its own yearly price, else monthly less the yearly discount
+                           ? (int) commercial_yearly('billing_price_user_month', 'billing_price_user_year') : (int) setting_get('billing_price_user_year', 0),
         'key_id'      => $kid,
         'key_secret'  => $sec,
         'enabled'     => $kid !== '' && $sec !== '',
@@ -164,8 +165,11 @@ function billing_record_line($seats, $period, $modulesCsv, $paymentId, $orderId,
         billing_migrate();
         if (function_exists('ensure_column')) ensure_column('billing_orders', 'note', "VARCHAR(200) DEFAULT ''");
         $mods = array_values(array_filter(array_map('trim', explode(',', (string) $modulesCsv))));
+        // What was actually charged (after any credit, with any GST), from the
+        // server-held order; the list price only when there is no such order.
         $amount = 0;
-        if (function_exists('saas_company_quote')) { $q = saas_company_quote($mods, (int) $seats, $period); $amount = (int) $q['total']; }
+        try { $amount = (int) (ops_val("SELECT amount FROM saas_orders WHERE order_id=? AND status='PAID'", [(string) $orderId]) ?: 0); } catch (Throwable $e) {}
+        if ($amount <= 0 && function_exists('saas_company_quote')) { $q = saas_company_quote($mods, (int) $seats, $period); $amount = (int) $q['total']; }
         $note = $mods ? ('modules: ' . implode(', ', $mods)) : 'seats only';
         db()->prepare("INSERT INTO billing_orders (seats,period,amount,currency,order_id,payment_id,paid_until,by_user,created_at,note)
                        VALUES (?,?,?,?,?,?,?,?,?,?)")
@@ -193,19 +197,20 @@ function ops_billing($route, $method) {
             'Prices and payment keys are set by your provider, not inside your workspace.');
         ops_require(!function_exists('superadmin_host_ok') || superadmin_host_ok(),
             'Super Admin is locked to its own address — change the price and payment keys there.');
-        setting_set('billing_currency', strtoupper(substr(trim((string) ($_POST['currency'] ?? 'INR')), 0, 5)) ?: 'INR');
-        setting_set('billing_price_user_month', (string) max(0, (int) ($_POST['price_month'] ?? 0)));
-        setting_set('billing_price_user_year', (string) max(0, (int) ($_POST['price_year'] ?? 0)));
-        // Field-seat and portal pricing were only defaults in code (₹499 / ₹99,
-        // 10 free) with no way to change them — the Super Admin screen even
-        // pointed here to set them. Now they actually save.
-        setting_set('billing_price_field_month', (string) max(0, (int) ($_POST['price_field_month'] ?? 0)));
-        setting_set('billing_price_portal_month', (string) max(0, (int) ($_POST['price_portal_month'] ?? 0)));
-        setting_set('billing_portal_free', (string) max(0, (int) ($_POST['portal_free'] ?? 0)));
+        // Prices are set on Plans, pricing & usage (lib/commercial.php); this
+        // form keeps the payment keys. A price posted here by an older page is
+        // still honoured, so nothing it sends is silently lost.
+        foreach (['currency' => 'billing_currency', 'price_month' => 'billing_price_user_month', 'price_year' => 'billing_price_user_year',
+                  'price_field_month' => 'billing_price_field_month', 'price_portal_month' => 'billing_price_portal_month',
+                  'portal_free' => 'billing_portal_free'] as $f => $k) {
+            if (!array_key_exists($f, $_POST)) continue;
+            $v = trim((string) $_POST[$f]);
+            setting_set($k, $f === 'currency' ? (strtoupper(substr($v, 0, 5)) ?: 'INR') : ($v === '' ? '' : (string) max(0, (int) $v)));
+        }
         setting_set('rzp_key_id', trim((string) ($_POST['rzp_key_id'] ?? '')));
         if (trim((string) ($_POST['rzp_key_secret'] ?? '')) !== '')      // blank = keep existing
             setting_set('rzp_key_secret', trim((string) $_POST['rzp_key_secret']));
-        flash('Billing settings saved.');
+        flash('Payment keys saved.');
         redirect('/billing');
     }
 

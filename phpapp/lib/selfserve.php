@@ -105,6 +105,10 @@ function selfserve_migrate() {
             quote_json TEXT,
             created_by INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '', paid_at VARCHAR(30) DEFAULT '')");
     } catch (Throwable $e) { /* never block the boot chain */ }
+    // GST on the order (lib/commercial.php) and the platform's tax-invoice number.
+    if (function_exists('ensure_column')) foreach (['tax_json' => 'TEXT', 'invoice_no' => "VARCHAR(30) DEFAULT ''", 'invoiced_at' => "VARCHAR(30) DEFAULT ''"] as $col => $def) {
+        try { ensure_column('saas_orders', $col, $def); } catch (Throwable $e) {}
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -643,12 +647,14 @@ function saas_storage_banner() {
 
 // Record an order before the payment window opens; the verification applies
 // exactly this row, once.
-function saas_order_create($orderId, $kind, array $mods, $seats, $period, $amount, array $quote = []) {
+// $amount is what is charged (GST included when GST is on); $tax is the
+// breakdown from commercial_tax() plus the buyer's details for the invoice.
+function saas_order_create($orderId, $kind, array $mods, $seats, $period, $amount, array $quote = [], array $tax = []) {
     selfserve_migrate();
-    db()->prepare("INSERT INTO saas_orders (order_id,kind,modules,seats,period,amount,status,quote_json,created_by,created_at)
-                   VALUES (?,?,?,?,?,?,'CREATED',?,?,?)")
+    db()->prepare("INSERT INTO saas_orders (order_id,kind,modules,seats,period,amount,status,quote_json,tax_json,created_by,created_at)
+                   VALUES (?,?,?,?,?,?,'CREATED',?,?,?,?)")
         ->execute([(string) $orderId, (string) $kind, implode(',', $mods), (int) $seats, $period === 'year' ? 'year' : 'month',
-                   (int) $amount, $quote ? json_encode($quote) : '', (int) (current_user()['id'] ?? 0), date('c')]);
+                   (int) $amount, $quote ? json_encode($quote) : '', $tax ? json_encode($tax) : '', (int) (current_user()['id'] ?? 0), date('c')]);
 }
 // Claim a CREATED order for a verified payment. Returns the row or null (unknown
 // order, or already applied — a replayed callback changes nothing).
@@ -657,7 +663,19 @@ function saas_order_claim($orderId, $paymentId) {
     $st = db()->prepare("UPDATE saas_orders SET status='PAID', payment_id=?, paid_at=? WHERE order_id=? AND status='CREATED'");
     $st->execute([(string) $paymentId, date('c'), (string) $orderId]);
     if ($st->rowCount() !== 1) return null;
+    // A payment that carried GST gets the platform's next tax-invoice number.
+    $tax = json_decode((string) (ops_val("SELECT tax_json FROM saas_orders WHERE order_id=?", [(string) $orderId]) ?: ''), true);
+    if (is_array($tax) && !empty($tax['on']) && function_exists('commercial_next_invoice_no')) {
+        $no = commercial_next_invoice_no();
+        if ($no !== '') db()->prepare("UPDATE saas_orders SET invoice_no=?, invoiced_at=? WHERE order_id=?")->execute([$no, date('Y-m-d'), (string) $orderId]);
+    }
     return ops_one("SELECT * FROM saas_orders WHERE order_id=?", [(string) $orderId]) ?: null;
+}
+// The buyer, as the invoice names them: this company's own profile.
+function saas_invoice_buyer() {
+    $g = fn($k) => function_exists('setting_get') ? trim((string) setting_get($k, '')) : '';
+    return ['name' => $g('company_name') ?: (function_exists('current_tenant') ? (string) current_tenant() : ''),
+            'address' => $g('company_address'), 'gstin' => function_exists('clean_gstin') ? clean_gstin($g('company_gstin')) : $g('company_gstin')];
 }
 
 // ---------------------------------------------------------------------------
@@ -713,6 +731,7 @@ function saas_plan_change_quote(array $mods, $seats, $period, $today = null, $pa
     $out = ['ok' => true, 'msg' => '', 'mods' => $mods, 'seats' => $seats, 'packs' => $packs, 'period' => $period, 'list' => $list,
             'price' => $list, 'credit' => 0, 'starts' => $today, 'expires' => $end($today), 'extra_days' => 0, 'type' => 'NEW'];
     if (!$mods) return ['ok' => false, 'msg' => 'Pick at least one module.'] + $out;
+    if (!empty($q['missing'])) return ['ok' => false, 'msg' => saas_quote_missing_msg($q['missing'], $period)] + $out;
     if ($list <= 0) return ['ok' => false, 'msg' => 'That selection has no price set yet — please contact your provider.'] + $out;
 
     $cur = saas_plan_current();
@@ -824,6 +843,7 @@ function selfserve_sell_settings() {
         if (!empty($m[3])) continue;
         $keys[] = 'saas_price_mod_' . $k . '_month'; $keys[] = 'saas_price_mod_' . $k . '_year';
     }
+    if (function_exists('commercial_push_keys')) $keys = array_values(array_unique(array_merge($keys, commercial_push_keys())));
     $out = [];
     foreach ($keys as $k) $out[$k] = (string) setting_get($k, '');
     return $out;

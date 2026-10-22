@@ -11,6 +11,19 @@
   <p class="sub" style="margin:2px 0 0"><?= (int)$amt['seats'] ?> <?= (int)$amt['seats']===1?'person':'people' ?>,
     <?= e($amt['period']==='year'?'annual':'monthly') ?> — <strong><?= e($sym . number_format((int)$amt['major'])) ?></strong>.</p></div></div>
 
+<?php $tx = $amt['tax'] ?? null; if (is_array($tx) && !empty($tx['on'])): ?>
+<div class="panel" style="max-width:520px">
+  <table style="width:100%;font-size:14px;border-collapse:collapse">
+    <tr><td style="padding:4px 0">Price<?= $tx['mode'] === 'inclusive' ? ' (taxable value)' : '' ?></td><td style="text-align:right"><?= e($sym . number_format((int) $tx['net'])) ?></td></tr>
+    <?php if ((int) $tx['igst'] > 0): ?><tr><td style="padding:4px 0">IGST <?= e(rtrim(rtrim(number_format((float) $tx['rate'], 2), '0'), '.')) ?>%</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['igst'])) ?></td></tr>
+    <?php else: $half = rtrim(rtrim(number_format((float) $tx['rate'] / 2, 2), '0'), '.'); ?>
+      <tr><td style="padding:4px 0">CGST <?= e($half) ?>%</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['cgst'])) ?></td></tr>
+      <tr><td style="padding:4px 0">SGST <?= e($half) ?>%</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['sgst'])) ?></td></tr><?php endif; ?>
+    <tr style="font-weight:700;border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">Total to pay</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['gross'])) ?></td></tr>
+  </table>
+  <p class="muted" style="font-size:12px;margin:6px 0 0">A GST tax invoice is issued as soon as the payment is confirmed<?= $tx['buyer_gstin'] !== '' ? ', to GSTIN ' . e($tx['buyer_gstin']) : ' — add your GSTIN under Company profile first if you claim input tax credit' ?>.</p>
+</div>
+<?php endif; ?>
 <div class="panel" style="max-width:520px;text-align:center">
   <p class="sub">The secure Razorpay window should open automatically. If it does not, use the button below.</p>
   <button class="btn" id="paybtn" type="button">Pay <?= e($sym . number_format($amtMajor)) ?></button>

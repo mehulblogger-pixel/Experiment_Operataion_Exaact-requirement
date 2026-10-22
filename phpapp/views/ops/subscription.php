@@ -2,7 +2,7 @@
 // A company's own self-service subscription — review the plan, and buy extra
 // modules / seats à la carte with a live quote, paying online. Runs inside the
 // company's OWN workspace. Uses the app's standard panel / kpi / msg styles.
-$sub = $sub ?? []; $pb = $pb ?? []; $cfg = $cfg ?? []; $modules = $modules ?? []; $history = $history ?? [];
+$sub = $sub ?? []; $pb = $pb ?? []; $cfg = $cfg ?? []; $modules = $modules ?? []; $history = $history ?? []; $invoices = $invoices ?? [];
 $metered = !empty($metered);
 $self = !empty($self); $access = $access ?? null; $current = $current ?? null; $next = $next ?? null; $offer = $offer ?? null; $storage = $storage ?? null;
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
@@ -138,6 +138,7 @@ $fmt = fn($n) => $sym . number_format((int) $n);
         <th style="text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted,#6b7280);padding:6px 8px">What</th>
         <th style="text-align:right;font-size:11px;text-transform:uppercase;color:var(--muted,#6b7280);padding:6px 8px">Amount</th>
         <th style="text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted,#6b7280);padding:6px 8px">Active until</th>
+        <th style="text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted,#6b7280);padding:6px 8px">Invoice</th>
       </tr></thead>
       <tbody>
       <?php foreach ($history as $h): ?>
@@ -146,6 +147,8 @@ $fmt = fn($n) => $sym . number_format((int) $n);
           <td style="padding:7px 8px;font-size:13px"><?= $e($h['note'] ?? (((int) ($h['seats'] ?? 0)) . ' seats')) ?></td>
           <td style="padding:7px 8px;font-size:13px;text-align:right"><?= $e($fmt($h['amount'] ?? 0)) ?></td>
           <td style="padding:7px 8px;font-size:13px"><?= $e(!empty($h['paid_until']) ? (function_exists('fdate') ? fdate($h['paid_until']) : $h['paid_until']) : '—') ?></td>
+          <td style="padding:7px 8px;font-size:13px"><?php $oid = (string) ($h['order_id'] ?? ''); if ($oid !== '' && array_key_exists($oid, $invoices)): ?>
+            <a href="/subscription-invoice?o=<?= $e(rawurlencode($oid)) ?>" target="_blank" rel="noopener"><?= $e($invoices[$oid] !== '' ? $invoices[$oid] : 'Receipt') ?></a><?php else: ?>—<?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>

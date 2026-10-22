@@ -72,6 +72,7 @@ $bd = saas_storage_breakdown();
 t_ok(($bd['Sales documents'] ?? 0) >= 300000, 'a sales attachment is counted under "Sales documents"');
 
 // Extra storage packs in the plan (self-serve company buying its plan).
+t_set_prices();
 setting_set('saas_storage_pack_price_month', '500'); setting_set('saas_storage_pack_price_year', '5000');
 setting_set('saas_storage_pack_gb', '5');
 $mods = array_slice(selfserve_all_modules(), 0, 1);

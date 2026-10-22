@@ -11,9 +11,11 @@ $preAdd = strtolower(trim((string) ($_GET['add'] ?? '')));
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-bottom:12px">
     <?php foreach ($addable as $k): $m = $pb['modules'][$k] ?? ['month' => 0, 'year' => 0]; ?>
       <label style="display:flex;gap:9px;align-items:flex-start;border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:10px 12px;cursor:pointer">
-        <input type="checkbox" name="add_mods[]" value="<?= $e($k) ?>" class="sub-mod" data-m="<?= (int) $m['month'] ?>" data-y="<?= (int) $m['year'] ?>" <?= $k === $preAdd ? 'checked' : '' ?> style="margin-top:2px">
+        <input type="checkbox" name="add_mods[]" value="<?= $e($k) ?>" class="sub-mod" <?= (int) $m['month'] > 0 ? '' : 'disabled' ?> data-m="<?= (int) $m['month'] ?>" data-y="<?= (int) $m['year'] ?>" <?= $k === $preAdd ? 'checked' : '' ?> style="margin-top:2px">
         <span><span style="font-weight:600"><?= $e($modLabel($k)) ?></span><br>
-          <span class="sub" style="font-size:12px"><?= $e($sym . number_format((int) $m['month'])) ?>/mo · <?= $e($sym . number_format((int) $m['year'])) ?>/yr</span></span>
+          <span class="sub" style="font-size:12px"><?= (int) $m['month'] > 0
+            ? $e($sym . number_format((int) $m['month'])) . '/mo' . ((int) $m['year'] > 0 ? ' · ' . $e($sym . number_format((int) $m['year'])) . '/yr' : '')
+            : 'Not for sale yet' ?></span></span>
       </label>
     <?php endforeach; ?>
   </div>
@@ -26,7 +28,7 @@ $preAdd = strtolower(trim((string) ($_GET['add'] ?? '')));
     <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px">Billing period</label>
       <select name="period" id="sub-period" style="padding:7px 9px;border:1px solid var(--line,#e5e7eb);border-radius:8px">
         <option value="month">Monthly</option>
-        <option value="year">Yearly</option>
+        <?php if ($seatY > 0): ?><option value="year">Yearly</option><?php endif; ?>
       </select></div>
   </div>
 

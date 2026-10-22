@@ -179,3 +179,17 @@ function t_move_stage($candId, $to, $decidedAt = null) {
 function t_class($candId) {
     return (string) reqf_classify(ops_one("SELECT * FROM candidates WHERE id=?", [(int) $candId]));
 }
+
+// ============================================================================
+//  Prices for a test. The app has no built-in prices (lib/commercial.php): a
+//  test that buys something saves its own, here, in whatever database is live.
+// ============================================================================
+function t_set_prices($moduleMonth = 1000, $seatMonth = 500) {
+    if (defined('PRODUCT_MODULES')) foreach (PRODUCT_MODULES as $k => $m) {
+        if (!empty($m[3])) continue;
+        setting_set('saas_price_mod_' . $k . '_month', (string) $moduleMonth);
+        setting_set('saas_price_mod_' . $k . '_year', (string) ($moduleMonth * 10));
+    }
+    setting_set('billing_price_user_month', (string) $seatMonth);
+    setting_set('billing_price_user_year', (string) ($seatMonth * 10));
+}

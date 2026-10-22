@@ -1177,3 +1177,6 @@ Companies console is not affected.
   ordered is recorded here.
 - `PAID` — Razorpay's signature checked; exactly the recorded order applied, once. A
   repeated callback finds no CREATED order and changes nothing.
+- No new status. The order also records the GST charged with it, and, when GST was
+  charged, the moment it becomes `PAID` it takes the next platform tax-invoice number
+  (`invoice_no`, one series per financial year). A replayed callback takes no second number.

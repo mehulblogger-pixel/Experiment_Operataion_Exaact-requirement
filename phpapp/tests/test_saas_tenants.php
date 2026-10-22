@@ -155,6 +155,9 @@ setting_set('saas_seat_limit', $origLimit);   // MUST restore — a stray limit 
 // À-la-carte pricing (plan builder).
 t_section('SaaS control plane — à-la-carte pricing');
 t_ok(function_exists('saas_price_book') && function_exists('saas_company_quote'), 'the price book and quote helpers exist');
+$keepPrices = []; foreach (['billing_price_user_month', 'billing_price_user_year', 'saas_price_mod_operations_month', 'saas_price_mod_operations_year',
+    'saas_price_mod_sales_month', 'saas_price_mod_sales_year', 'saas_price_mod_hr_month', 'saas_price_mod_hr_year'] as $k) $keepPrices[$k] = (string) setting_get($k, '');
+t_set_prices();
 $pb = saas_price_book();
 t_ok(isset($pb['seat']['month']) && isset($pb['modules']['operations']), 'the price book has a seat price and per-module prices');
 t_ok(!isset($pb['modules']['admin']), 'the core Administration module is never priced');
@@ -166,6 +169,7 @@ $qy = saas_company_quote(['hr'], 1, 'year');
 t_eq($qy['total'], $pb['modules']['hr']['year'] + $pb['seat']['year'], 'a yearly quote uses the yearly prices');
 $qEmpty = saas_company_quote([], 0, 'month');
 t_eq($qEmpty['total'], 0, 'no modules and no seats costs nothing');
+foreach ($keepPrices as $k => $v) setting_set($k, $v);
 
 // Custom (à-la-carte) module apply — the push path respects the exact set bought.
 t_ok(function_exists('saas_apply_modules_list'), 'the custom-modules apply helper exists');
