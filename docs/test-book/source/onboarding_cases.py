@@ -80,6 +80,19 @@ C('PLT-005', '0 · Platform setup (do this first)', 'Your prices and GST — not
    ('Companies → 💾 Storage allowance and 🚀 Self sign-up.', 'The same "Suggested: … · why" under each box (10 GB, 2 GB per login, 50 GB pack at ₹399; 30 days, 10 logins, 2048 MB) and "Fill in the suggested values".')],
   'lib/commercial.php; lib/pricing_admin.php; views/ops/pricing_usage.php; views/ops/subscription_invoice.php; docs/pricing-research.md', live=False)
 
+C('PLT-006', '0 · Platform setup (do this first)', 'A customer wants its GSTIN on the bill', 'scenario', ['best', 'rule', 'edge', 'worst'],
+  'COMPANY_OWNER', 'The owner (22 Oct): "Suppose if customer wants bill with his gst number then??"',
+  'GST switched on (PLT-005). A company on its trial or plan, signed in as its owner.',
+  [('Subscription → tick modules → open "Bill to".', '"Registered business name", "GSTIN — to claim input tax credit", "State — taken from the GSTIN when given", "Billing address", "Save these to our company profile for next time" — filled in from the company profile.'),
+   ('Type a GSTIN with one character wrong → pay.', '"GSTIN: That GSTIN has a typing mistake (its last character does not match the rest) — please copy it again from the GST certificate. Nothing was charged." What you typed is still there.'),
+   ('Type the correct GSTIN of another state (e.g. Maharashtra) → pay.', 'Before paying: "Invoice to <name> · GSTIN … · place of supply Maharashtra" and IGST 18%. Your company profile now holds that GSTIN, its state and PAN.'),
+   ('Pay (test keys) → Payment history → the invoice number.', 'The tax invoice shows your GSTIN under "Bill to" and "Place of supply: Maharashtra (27)".'),
+   ('As the platform owner: Owner home → "GST invoices".', 'This month\'s invoices with totals (taxable value, IGST, CGST + SGST) and "Download for the accountant (CSV)" — B2B for GSTIN buyers, B2C otherwise.'),
+   ('A customer paid WITHOUT its GSTIN and now asks for it: GST invoices → "Correct" → enter the GSTIN and "Why is it being corrected?" → "Save the correction".', '"Invoice … corrected. The customer sees the corrected invoice from their Payment history; include it as an amendment in your next GST return." The list shows "corrected"; the invoice shows "Revised" and the GSTIN; the amount is unchanged.'),
+   ('Try saving the correction with no reason.', 'Refused — a reason is required and is kept with the invoice ("Earlier corrections").'),
+   ('Pricing → GST → SAC code "99731" → Save.', '"A SAC code is six digits beginning with 99 (for software services usually 997331) — "99731" cannot go on a tax invoice."')],
+  'views/ops/_billto.php; lib/commercial.php (commercial_gstin_problem, commercial_register_*, ops_gst_invoices); views/ops/gst_invoices.php', live=False)
+
 C('ONB-000', '0 · The three front doors', 'Where a newcomer can start — the three front doors', 'scenario', ['best'],
   'NEWCOMER', 'A newcomer is one of three people: a company that wants its own workspace, a professional who wants work, or a company/agency that wants people. Each has its own door.',
   'Signed OUT. A private browser window.',

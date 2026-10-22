@@ -1450,8 +1450,8 @@ function ops_saas_subscription($route, $method) {
         }
         // GST (lib/commercial.php): added to the price, or included in it, as
         // the platform owner set it; nothing when GST is off.
-        $buyer = function_exists('saas_invoice_buyer') ? saas_invoice_buyer() : ['name' => '', 'address' => '', 'gstin' => ''];
-        $tax = function_exists('commercial_tax') ? commercial_tax((int) $total, $buyer['gstin']) : ['on' => false, 'gross' => (int) $total];
+        $buyer = function_exists('saas_billto_from_post') ? saas_billto_from_post() : ['name' => '', 'address' => '', 'gstin' => '', 'state' => ''];
+        $tax = function_exists('commercial_tax') ? commercial_tax((int) $total, $buyer['gstin'], $buyer['state'] ?? '') : ['on' => false, 'gross' => (int) $total];
         $charge = (int) $tax['gross'];
         $ord = rzp_create_order($charge * 100, 'sub-' . date('ymdHis'),
             ['kind' => $kind, 'modules' => implode(',', $mods), 'seats' => $seats, 'period' => $period]);
@@ -1461,7 +1461,7 @@ function ops_saas_subscription($route, $method) {
                     'credit' => (int) ($quote['credit'] ?? 0), 'price' => (int) $total]);
         view('ops/billing_pay', [
             'amt' => ['seats' => $seats, 'period' => $period, 'currency' => saas_price_book()['currency'], 'total' => $charge, 'major' => $charge,
-                      'tax' => $tax],
+                      'tax' => $tax, 'buyer' => $buyer],
             'order' => $ord, 'cfg' => billing_config(),
             'verify_action' => '/subscription-verify', 'back' => '/subscription',
             'extra' => [],
@@ -1507,6 +1507,8 @@ function ops_saas_subscription($route, $method) {
         try { $o = ops_one("SELECT * FROM saas_orders WHERE order_id=? AND status='PAID'", [(string) ($_GET['o'] ?? '')]); } catch (Throwable $e) {}
         ops_require((bool) $o, 'That payment is not known here.');
         $t = json_decode((string) ($o['tax_json'] ?? ''), true);
+        $inv = ((string) $o['invoice_no'] !== '' && function_exists('commercial_register_get')) ? commercial_register_get($o['invoice_no']) : null;
+        if (!$inv) $inv = commercial_invoice_row($o, is_array($t) ? $t : [], function_exists('current_tenant') ? (string) current_tenant() : '');
         require __DIR__ . '/../views/ops/subscription_invoice.php';
         exit;
     }

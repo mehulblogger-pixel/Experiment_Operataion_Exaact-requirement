@@ -21,7 +21,10 @@
       <tr><td style="padding:4px 0">SGST <?= e($half) ?>%</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['sgst'])) ?></td></tr><?php endif; ?>
     <tr style="font-weight:700;border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">Total to pay</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['gross'])) ?></td></tr>
   </table>
-  <p class="muted" style="font-size:12px;margin:6px 0 0">A GST tax invoice is issued as soon as the payment is confirmed<?= $tx['buyer_gstin'] !== '' ? ', to GSTIN ' . e($tx['buyer_gstin']) : ' — add your GSTIN under Company profile first if you claim input tax credit' ?>.</p>
+  <?php $bt = (array) ($amt['buyer'] ?? []); ?>
+  <p style="font-size:13px;margin:10px 0 0">Invoice to <b><?= e($bt['name'] ?? '') ?></b> · <?= $tx['buyer_gstin'] !== '' ? 'GSTIN <b>' . e($tx['buyer_gstin']) . '</b>' : 'not GST-registered' ?>
+    · place of supply <?= e(defined('GST_STATES') ? (GST_STATES[$tx['pos']] ?? $tx['pos']) : $tx['pos']) ?></p>
+  <p class="muted" style="font-size:12px;margin:4px 0 0">The GST tax invoice is issued the moment the payment is confirmed. Wrong details? Press Cancel and change "Bill to".</p>
 </div>
 <?php endif; ?>
 <div class="panel" style="max-width:520px;text-align:center">

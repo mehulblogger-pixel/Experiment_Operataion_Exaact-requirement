@@ -71,6 +71,11 @@ the empty boxes; check them, then press **Save**.
   rate (18%) and SAC code (997331; confirm with your accountant), and choose whether prices are
   before GST or include it. From then on the customer sees the GST before paying, pays the total,
   and gets a **tax invoice** (EX/2026-27/0001 …) under Subscription → Payment history.
+- **Customer's GSTIN:** at checkout the customer sees **Bill to** (name, GSTIN, state, address) and
+  can enter their GSTIN. A mistyped GSTIN is refused before payment. If a customer paid without it
+  and asks later, go to Owner home → **GST invoices** → **Correct**, enter the GSTIN and a reason.
+- **Each month:** Owner home → **GST invoices** → choose the month → **Download for the
+  accountant (CSV)**.
 - **Companies → 💾 Storage allowance:** base GB per company, GB per login, and the extra pack's
   size and price.
 - **Companies → 🚀 Self sign-up & free trial:** trial days (30), trial storage (MB), trial logins,

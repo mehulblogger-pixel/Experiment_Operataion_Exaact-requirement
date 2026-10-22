@@ -88,7 +88,7 @@ function superadmin_host_ok() {
 }
 // The platform-owner screens, so an old link on the main address is sent on.
 const SUPERADMIN_ROUTES = ['owner', 'platform-setup', 'companies', 'tenants', 'super-admin', 'control-panel',
-                           'pricing-usage', 'marketplace-plans', 'marketplace-toggle', 'product-package', 'feature-gates'];
+                           'pricing-usage', 'marketplace-plans', 'marketplace-toggle', 'product-package', 'feature-gates', 'gst-invoices'];
 // The address every company uses (for "sign in over there" messages).
 function superadmin_main_address() {
     $base = function_exists('tenant_registry') ? strtolower((string) (tenant_registry()['base_domain'] ?? '')) : '';

@@ -89,10 +89,10 @@ function pricing_settings_map(array $in) {
 // What is wrong with a map before it is saved: '' or a plain-language reason.
 function pricing_settings_check(array $map) {
     $gstin = (string) ($map['plat_gstin'] ?? '');
-    if ($gstin !== '' && !preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', $gstin))
-        return 'That GSTIN does not look right — it is 15 characters, like 24ABCDE1234F1Z5.';
-    if ($gstin !== '' && defined('GST_STATES') && !isset(GST_STATES[substr($gstin, 0, 2)]))
-        return 'The GSTIN\'s first two digits are not an Indian state code.';
+    if ($gstin !== '' && ($why = commercial_gstin_problem($gstin)) !== '') return 'Your GSTIN: ' . $why;
+    $sac = trim((string) ($map['plat_gst_sac'] ?? ''));
+    if ($sac !== '' && !commercial_sac_ok($sac))
+        return 'A SAC code is six digits beginning with 99 (for software services usually 997331) — "' . $sac . '" cannot go on a tax invoice.';
     if (($map['plat_gst_enabled'] ?? '') === '1') {
         $miss = [];
         foreach (['plat_gstin' => 'your GSTIN', 'plat_gst_rate' => 'the GST rate', 'plat_legal_name' => 'your legal name',

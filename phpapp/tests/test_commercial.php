@@ -8,13 +8,17 @@
 
 t_section('Commercial numbers — nothing built in, suggestions, GST, tax invoice');
 
+$gst = fn($first14) => $first14 . commercial_gstin_check_char($first14);   // a GSTIN with a correct check character
+$PLAT = $gst('24AAACE1234F1Z'); $MH = $gst('27AAAAA0000A1Z'); $GJ = $gst('24AAAAA0000A1Z');
 $keys = array_keys(commercial_catalogue());
 $keep = [];
-foreach (array_merge($keys, ['billing_currency', 'plat_invoice_prefix', 'company_gstin', 'company_name', 'company_address']) as $k) $keep[$k] = (string) setting_get($k, '');
+foreach (array_merge($keys, ['billing_currency', 'plat_invoice_prefix', 'company_gstin', 'company_name', 'company_address', 'company_legal_name', 'company_state', 'company_pan']) as $k) $keep[$k] = (string) setting_get($k, '');
 foreach ($keys as $k) setting_set($k, '');
 $seriesFile = rtrim((string) tenant_safe_data_dir()[0], '/') . '/invoice-series.json';
 $seriesBak = is_file($seriesFile) ? file_get_contents($seriesFile) : null;
 @unlink($seriesFile);
+$regFile = commercial_register_file(); $regBak = is_file($regFile) ? file_get_contents($regFile) : null;
+@unlink($regFile);
 
 try {
     // ---- Nothing built in ---------------------------------------------------------
@@ -58,26 +62,30 @@ try {
     t_ok(!$q['missing'] && $q['total'] === 999 + 2 * 499, 'a priced selection quotes in full');
 
     // ---- The pricing form: blank stays blank, GST checked before saving -------------
-    $map = pricing_settings_map(['currency' => 'inr', 'seat_month' => '', 'mod_' . $mk . '_month' => '1200', 'plat_gstin' => ' 24abcde1234f1z5 ', '_has_plat_gst_enabled' => '1']);
+    $map = pricing_settings_map(['currency' => 'inr', 'seat_month' => '', 'mod_' . $mk . '_month' => '1200', 'plat_gstin' => ' ' . strtolower($PLAT) . ' ', '_has_plat_gst_enabled' => '1']);
     t_eq($map['billing_price_user_month'], '', 'a price box left blank is saved blank (= not set), never 0 or a default');
     t_eq($map['saas_price_mod_' . $mk . '_month'], '1200', 'a typed price is saved');
-    t_eq($map['plat_gstin'], '24ABCDE1234F1Z5', 'a GSTIN is cleaned and upper-cased');
+    t_eq($map['plat_gstin'], $PLAT, 'a GSTIN is cleaned and upper-cased');
+    t_eq(commercial_gstin_problem('27AAPFU0939F1ZV'), '', 'a published sample GSTIN passes the check-character test');
+    t_ok(strpos(commercial_gstin_problem('27AAPFU0939F1ZW'), 'typing mistake') !== false, 'one wrong character is caught as a typing mistake');
+    t_ok(!commercial_sac_ok('99731') && commercial_sac_ok('997331'), 'a SAC must be six digits beginning 99: "99731" is refused, 997331 accepted');
+    t_ok(strpos(pricing_settings_check(['plat_gst_sac' => '99731']), 'six digits') !== false, 'the Pricing screen refuses a 5-digit SAC in plain words');
     t_eq($map['plat_gst_enabled'], '', 'an unticked "Charge GST" saves off');
     t_ok(pricing_settings_check(['plat_gstin' => '24ABC']) !== '', 'a malformed GSTIN is refused in plain words');
     t_ok(pricing_settings_check(['plat_gstin' => '99ABCDE1234F1Z5']) !== '', 'a GSTIN with no Indian state code is refused');
-    $why = pricing_settings_check(['plat_gst_enabled' => '1', 'plat_gstin' => '24ABCDE1234F1Z5', 'plat_gst_rate' => '18']);
+    $why = pricing_settings_check(['plat_gst_enabled' => '1', 'plat_gstin' => $PLAT, 'plat_gst_rate' => '18']);
     t_ok(strpos($why, 'legal name') !== false && strpos($why, 'address') !== false, 'GST cannot be switched on without the legal name, address and SAC');
 
     // ---- GST arithmetic ---------------------------------------------------------------
     t_ok(!commercial_tax(1000)['on'] && commercial_tax(1000)['gross'] === 1000, 'GST off: the price is what is charged');
     foreach (['plat_gst_enabled' => '1', 'plat_gst_rate' => '18', 'plat_gst_mode' => 'exclusive', 'plat_gst_sac' => '997331',
-              'plat_gstin' => '24ABCDE1234F1Z5', 'plat_legal_name' => 'EXAACT Test Pvt Ltd', 'plat_address' => 'Ahmedabad'] as $k => $v) setting_set($k, $v);
+              'plat_gstin' => $PLAT, 'plat_legal_name' => 'EXAACT Test Pvt Ltd', 'plat_address' => 'Ahmedabad'] as $k => $v) setting_set($k, $v);
     $t = commercial_tax(1000);
     t_ok($t['on'] && $t['tax'] === 180 && $t['gross'] === 1180 && $t['cgst'] === 90 && $t['sgst'] === 90 && $t['igst'] === 0,
         'GST before-tax prices, buyer without GSTIN: ₹1,000 + CGST ₹90 + SGST ₹90 = ₹1,180');
-    $t = commercial_tax(1000, '27AAAAA0000A1Z5');
+    $t = commercial_tax(1000, $MH);
     t_ok($t['igst'] === 180 && $t['cgst'] === 0 && $t['pos'] === '27', 'a buyer registered in another state (Maharashtra) pays IGST ₹180');
-    $t = commercial_tax(1000, '24AAAAA0000A1Z5');
+    $t = commercial_tax(1000, $GJ);
     t_ok($t['cgst'] === 90 && $t['sgst'] === 90, 'a buyer in the same state pays CGST + SGST');
     t_eq(commercial_tax(999)['tax'], 180, 'tax is rounded to the rupee (₹179.82 → ₹180)');
     setting_set('plat_gst_mode', 'inclusive');
@@ -86,7 +94,7 @@ try {
     setting_set('plat_gst_mode', 'exclusive');
     setting_set('plat_gstin', '');
     t_ok(!commercial_tax(1000)['on'], 'without the platform\'s GSTIN no GST is charged, even if switched on');
-    setting_set('plat_gstin', '24ABCDE1234F1Z5');
+    setting_set('plat_gstin', $PLAT);
 
     // ---- Invoice numbers: one series, consecutive, per financial year -----------------
     t_eq(commercial_fy('2026-10-22'), '2026-27', 'October 2026 is in financial year 2026-27');
@@ -99,9 +107,9 @@ try {
 
     // ---- A paid order carries its GST and gets a tax invoice ---------------------------
     selfserve_migrate();
-    setting_set('company_name', 'Buyer Co'); setting_set('company_address', 'Pune'); setting_set('company_gstin', '27AAAAA0000A1Z5');
+    setting_set('company_name', 'Buyer Co'); setting_set('company_address', 'Pune'); setting_set('company_gstin', $MH);
     $buyer = saas_invoice_buyer();
-    t_eq($buyer['gstin'], '27AAAAA0000A1Z5', 'the buyer on the invoice is the company\'s own profile, with its GSTIN');
+    t_eq($buyer['gstin'], $MH, 'the buyer on the invoice is the company\'s own profile, with its GSTIN');
     $tax = commercial_tax(1998, $buyer['gstin']);
     $oid = 'order_cm_' . getmypid();
     saas_order_create($oid, 'plan', [$mk], 2, 'month', $tax['gross'], [],
@@ -109,11 +117,40 @@ try {
     $o = saas_order_claim($oid, 'pay_cm_' . getmypid());
     t_ok($o && (int) $o['amount'] === 2358, 'the order records what is charged: ₹1,998 + 18% = ₹2,358');
     t_ok($o && preg_match('#^EX/\d{4}-\d{2}/\d{4}$#', (string) $o['invoice_no']), 'a paid order with GST gets the next tax-invoice number (' . ($o['invoice_no'] ?? '') . ')');
-    $t = json_decode((string) $o['tax_json'], true);
+    $inv = commercial_register_get($o['invoice_no']);
     ob_start(); include dirname(__DIR__) . '/views/ops/subscription_invoice.php'; $html = ob_get_clean();
-    foreach (['Tax invoice', $o['invoice_no'], '24ABCDE1234F1Z5', '27AAAAA0000A1Z5', 'Maharashtra (27)', '997331', 'IGST @ 18%', '₹2,358', 'reverse charge: No'] as $needle)
+    t_ok($inv && $inv['buyer']['gstin'] === $MH && $inv['company_key'] === (string) current_tenant(), 'the invoice is in the platform\'s GST register, with the buyer\'s GSTIN');
+    foreach (['Tax invoice', $o['invoice_no'], $PLAT, $MH, 'Maharashtra (27)', '997331', 'IGST @ 18%', '₹2,358', 'reverse charge: No'] as $needle)
         t_ok(strpos($html, (string) $needle) !== false, 'the tax invoice shows "' . $needle . '"');
     t_eq(saas_order_claim($oid, 'pay_again'), null, 'a replayed payment changes nothing and takes no second number');
+
+    // ---- Bill to: what the customer types at checkout --------------------------------
+    $bt = commercial_billto_clean(['name' => 'Buyer Co', 'gstin' => substr($MH, 0, 14) . 'X', 'state' => '24']);
+    t_ok(strpos($bt['error'], 'typing mistake') !== false, 'a mistyped customer GSTIN is refused before anything is charged');
+    $bt = commercial_billto_clean(['name' => 'Buyer Co', 'gstin' => strtolower($MH), 'state' => '24', 'address' => 'Pune']);
+    t_ok($bt['error'] === '' && $bt['buyer']['gstin'] === $MH && $bt['buyer']['state'] === '27', 'a valid GSTIN is accepted, and its state (27) wins over the state picked');
+    t_ok(commercial_billto_clean(['name' => '', 'gstin' => ''])['error'] !== '', 'a name to bill is required');
+    $bt = commercial_billto_clean(['name' => 'Small Shop', 'gstin' => '', 'state' => 'Karnataka']);
+    t_ok($bt['error'] === '' && $bt['buyer']['state'] === '29', 'no GSTIN is fine; the state can be given by name');
+    t_ok(commercial_tax(1000, '', '29')['igst'] === 180, 'an unregistered buyer in another state pays IGST (place of supply = its state)');
+    t_ok(commercial_tax(1000, '', '')['cgst'] === 90, 'with no GSTIN and no state, the platform\'s own state is used (CGST + SGST)');
+    $_POST = ['billto_name' => 'Buyer Co Pvt Ltd', 'billto_gstin' => $GJ, 'billto_state' => '', 'billto_address' => 'Ahmedabad', 'billto_save' => '1'];
+    $buyer = saas_billto_from_post(); $_POST = [];
+    t_ok($buyer['gstin'] === $GJ && $buyer['state'] === '24', 'checkout reads the "Bill to" the customer typed');
+    t_ok(setting_get('company_gstin', '') === $GJ && setting_get('company_legal_name', '') === 'Buyer Co Pvt Ltd' && setting_get('company_state', '') === 'Gujarat',
+        '"Save to our company profile" fills it in for next time (GSTIN, name, state)');
+
+    // ---- A customer who paid without its GSTIN, then asks for it on the bill ----------
+    t_ok(commercial_register_amend($o['invoice_no'], ['name' => 'Buyer Co', 'gstin' => $GJ], '', 'owner') !== '', 'a correction needs a reason');
+    $err = commercial_register_amend($o['invoice_no'], ['name' => 'Buyer Co Pvt Ltd', 'gstin' => $GJ, 'address' => 'Ahmedabad'], 'customer sent its GSTIN after paying', 'owner');
+    $inv = commercial_register_get($o['invoice_no']);
+    t_ok($err === '' && $inv['buyer']['gstin'] === $GJ, 'the owner corrects the buyer on an issued invoice');
+    t_ok($inv['total'] === 2358 && $inv['tax'] === 360 && $inv['cgst'] === 180 && $inv['sgst'] === 180 && $inv['igst'] === 0,
+        'the amount and tax stay as charged; the split follows the new place of supply (Gujarat → CGST + SGST)');
+    t_ok(count($inv['amendments']) === 1 && $inv['amendments'][0]['was']['gstin'] === $MH && $inv['pos'] === '24', 'what it was, who, when and why are kept with the invoice');
+    ob_start(); include dirname(__DIR__) . '/views/ops/subscription_invoice.php'; $html = ob_get_clean();
+    t_ok(strpos($html, $GJ) !== false && strpos($html, 'Revised') !== false && strpos($html, 'CGST @ 9%') !== false, 'the invoice now shows the GSTIN, "Revised", and CGST + SGST');
+    t_ok(commercial_register_amend('EX/1999-00/9999', ['name' => 'x'], 'y', 'owner') !== '', 'an unknown invoice number cannot be corrected');
 
     // ---- What every company receives -------------------------------------------------
     $push = selfserve_sell_settings();
@@ -129,4 +166,5 @@ try {
 } finally {
     foreach ($keep as $k => $v) setting_set($k, $v);
     if ($seriesBak !== null) file_put_contents($seriesFile, $seriesBak); else @unlink($seriesFile);
+    if ($regBak !== null) file_put_contents($regFile, $regBak); else @unlink($regFile);
 }

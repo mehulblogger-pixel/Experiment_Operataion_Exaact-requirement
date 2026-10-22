@@ -232,6 +232,59 @@
   "live": false
  },
  {
+  "id": "PLT-006",
+  "area": "New company",
+  "module": "0 · Platform setup (do this first)",
+  "title": "A customer wants its GSTIN on the bill",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule",
+   "edge",
+   "worst"
+  ],
+  "persona": "COMPANY_OWNER",
+  "company": "ANY",
+  "why": "The owner (22 Oct): \"Suppose if customer wants bill with his gst number then??\"",
+  "before": "GST switched on (PLT-005). A company on its trial or plan, signed in as its owner.",
+  "steps": [
+   {
+    "do": "Subscription → tick modules → open \"Bill to\".",
+    "expect": "\"Registered business name\", \"GSTIN — to claim input tax credit\", \"State — taken from the GSTIN when given\", \"Billing address\", \"Save these to our company profile for next time\" — filled in from the company profile."
+   },
+   {
+    "do": "Type a GSTIN with one character wrong → pay.",
+    "expect": "\"GSTIN: That GSTIN has a typing mistake (its last character does not match the rest) — please copy it again from the GST certificate. Nothing was charged.\" What you typed is still there."
+   },
+   {
+    "do": "Type the correct GSTIN of another state (e.g. Maharashtra) → pay.",
+    "expect": "Before paying: \"Invoice to <name> · GSTIN … · place of supply Maharashtra\" and IGST 18%. Your company profile now holds that GSTIN, its state and PAN."
+   },
+   {
+    "do": "Pay (test keys) → Payment history → the invoice number.",
+    "expect": "The tax invoice shows your GSTIN under \"Bill to\" and \"Place of supply: Maharashtra (27)\"."
+   },
+   {
+    "do": "As the platform owner: Owner home → \"GST invoices\".",
+    "expect": "This month's invoices with totals (taxable value, IGST, CGST + SGST) and \"Download for the accountant (CSV)\" — B2B for GSTIN buyers, B2C otherwise."
+   },
+   {
+    "do": "A customer paid WITHOUT its GSTIN and now asks for it: GST invoices → \"Correct\" → enter the GSTIN and \"Why is it being corrected?\" → \"Save the correction\".",
+    "expect": "\"Invoice … corrected. The customer sees the corrected invoice from their Payment history; include it as an amendment in your next GST return.\" The list shows \"corrected\"; the invoice shows \"Revised\" and the GSTIN; the amount is unchanged."
+   },
+   {
+    "do": "Try saving the correction with no reason.",
+    "expect": "Refused — a reason is required and is kept with the invoice (\"Earlier corrections\")."
+   },
+   {
+    "do": "Pricing → GST → SAC code \"99731\" → Save.",
+    "expect": "\"A SAC code is six digits beginning with 99 (for software services usually 997331) — \"99731\" cannot go on a tax invoice.\""
+   }
+  ],
+  "ref": "views/ops/_billto.php; lib/commercial.php (commercial_gstin_problem, commercial_register_*, ops_gst_invoices); views/ops/gst_invoices.php",
+  "live": false
+ },
+ {
   "id": "ONB-000",
   "area": "New company",
   "module": "0 · The three front doors",

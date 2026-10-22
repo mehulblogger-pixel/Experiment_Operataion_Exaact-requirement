@@ -4021,6 +4021,8 @@ function ops_dispatch($route, $method) {
             return ops_super_admin($method);
         case $route === 'platform-setup':   // Super-Admin: platform e-mail, payment check, go-live checklist
             return ops_platform_setup($method);
+        case $route === 'gst-invoices':     // Super-Admin: every GST tax invoice issued, CSV for the return, buyer corrections
+            return ops_gst_invoices($method);
         case $route === 'companies':   // Super-Admin: cross-company console (add/plan/seats/modules/suspend/login-as)
             return ops_saas_admin($route, $method);
         case $route === 'subscription' || $route === 'subscription-order' || $route === 'subscription-verify' || $route === 'subscription-invoice':

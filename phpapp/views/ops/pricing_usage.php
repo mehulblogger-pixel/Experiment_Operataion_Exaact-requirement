@@ -91,7 +91,8 @@ $yr = fn($v) => (int) $v > 0 ? e($sym . number_format((int) $v)) : '<span class=
       <div class="ff ff-wide"><label>Your registered address</label><?= $box('plat_address', 'plat_address', $raw['plat_address'] ?? '', 'maxlength="400"') ?></div>
     </div>
     <p class="pu-note" style="margin-top:8px">Same state as the customer's GSTIN → CGST + SGST; another state → IGST. Customers without a GSTIN are taxed at your state's rate.
-      Tax is rounded to the rupee. E-invoicing (IRN) becomes compulsory only if your yearly turnover passes ₹5 crore.</p>
+      Tax is rounded to the rupee. E-invoicing (IRN) becomes compulsory only if your yearly turnover passes ₹5 crore.
+      Every invoice issued is listed under <a href="/gst-invoices">GST invoices</a> — with a monthly download for your accountant.</p>
   </div>
 
   <div class="panel" style="max-width:860px;margin-top:14px">

@@ -32,6 +32,7 @@ $preAdd = strtolower(trim((string) ($_GET['add'] ?? '')));
       </select></div>
   </div>
 
+  <?php include __DIR__ . '/_billto.php'; ?>
   <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--soft,#f6f8fb);border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:12px 14px">
     <div><span class="sub" style="font-size:12px">Total to pay now</span><br>
       <span id="sub-total" style="font-size:22px;font-weight:700"><?= $e($sym) ?>0</span>

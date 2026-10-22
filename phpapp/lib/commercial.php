@@ -112,28 +112,71 @@ function commercial_gst_cfg() {
         'address' => (string) commercial_val('plat_address'),
     ];
 }
-// Tax on an amount. $buyerGstin decides the place of supply: the buyer's state
-// when registered (s.12(2) IGST Act), else the platform's own state.
+// Tax on an amount. Place of supply (s.12(2) IGST Act): the buyer's state —
+// from its GSTIN when registered, else the state it gave for its address —
+// and only when neither is known, the platform's own state.
 // Returns net (taxable value), tax, gross (what is charged), and the split.
-function commercial_tax($amount, $buyerGstin = '') {
+function commercial_tax($amount, $buyerGstin = '', $buyerState = '') {
     $amount = max(0, (int) $amount);
     $g = commercial_gst_cfg();
     $out = ['on' => $g['on'], 'rate' => $g['rate'], 'mode' => $g['mode'], 'net' => $amount, 'tax' => 0, 'gross' => $amount,
             'cgst' => 0, 'sgst' => 0, 'igst' => 0, 'pos' => '', 'buyer_gstin' => ''];
     if (!$g['on'] || $amount <= 0) return $out;
     $b = function_exists('clean_gstin') ? clean_gstin((string) $buyerGstin) : strtoupper(trim((string) $buyerGstin));
-    $b = preg_match('/^[0-9]{2}[A-Z0-9]{13}$/', $b) ? $b : '';
-    $pos = $b !== '' ? substr($b, 0, 2) : $g['state'];
+    $b = commercial_gstin_problem($b) === '' ? $b : '';
+    $st = commercial_state_code($buyerState);
+    $pos = $b !== '' ? substr($b, 0, 2) : ($st !== '' ? $st : $g['state']);
     if ($g['mode'] === 'inclusive') {
         $net = (int) round($amount / (1 + $g['rate'] / 100));
         $tax = $amount - $net; $gross = $amount;
     } else {
         $net = $amount; $tax = (int) round($amount * $g['rate'] / 100); $gross = $amount + $tax;
     }
-    $out = array_merge($out, ['net' => $net, 'tax' => $tax, 'gross' => $gross, 'pos' => $pos, 'buyer_gstin' => $b]);
-    if ($pos === $g['state']) { $out['cgst'] = intdiv($tax, 2); $out['sgst'] = $tax - $out['cgst']; }
-    else $out['igst'] = $tax;
-    return $out;
+    $out = array_merge($out, ['net' => $net, 'tax' => $tax, 'gross' => $gross, 'buyer_gstin' => $b]);
+    return commercial_tax_split($out, $pos);
+}
+// Split a tax amount by place of supply: same state as the platform → CGST +
+// SGST; any other → IGST. Used again when an invoice's buyer is corrected.
+function commercial_tax_split(array $t, $pos) {
+    $home = commercial_gst_cfg()['state'];
+    $t['pos'] = (string) $pos;
+    $t['cgst'] = $t['sgst'] = $t['igst'] = 0;
+    if ($t['pos'] === $home) { $t['cgst'] = intdiv((int) $t['tax'], 2); $t['sgst'] = (int) $t['tax'] - $t['cgst']; }
+    else $t['igst'] = (int) $t['tax'];
+    return $t;
+}
+
+// ---- Checking what is typed ------------------------------------------------------
+// A GSTIN: 2-digit state code, PAN, entity number, 'Z', and a check character
+// computed from the first 14 (the GSTN algorithm), so a mistyped character is
+// caught before it reaches a tax invoice. '' = fine, else the reason.
+function commercial_gstin_problem($g) {
+    $g = function_exists('clean_gstin') ? clean_gstin((string) $g) : strtoupper(trim((string) $g));
+    if (!preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', $g))
+        return 'A GSTIN is 15 characters, like 24AAACE1234F1Z5 — please check it.';
+    if (defined('GST_STATES') && !isset(GST_STATES[substr($g, 0, 2)]))
+        return 'The GSTIN\'s first two digits are not an Indian state code.';
+    if (commercial_gstin_check_char(substr($g, 0, 14)) !== $g[14])
+        return 'That GSTIN has a typing mistake (its last character does not match the rest) — please copy it again from the GST certificate.';
+    return '';
+}
+function commercial_gstin_check_char($first14) {
+    $cs = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'; $sum = 0;
+    for ($i = 0; $i < 14; $i++) {
+        $p = strpos($cs, $first14[$i]) * (($i % 2) ? 2 : 1);
+        $sum += intdiv($p, 36) + $p % 36;
+    }
+    return $cs[(36 - $sum % 36) % 36];
+}
+// SAC codes are six digits beginning 99 (e.g. 997331).
+function commercial_sac_ok($sac) { return (bool) preg_match('/^99[0-9]{4}$/', trim((string) $sac)); }
+// A state as its two-digit GST code, from a code or a state name ('' if unknown).
+function commercial_state_code($s) {
+    $s = trim((string) $s);
+    if ($s === '' || !defined('GST_STATES')) return '';
+    if (isset(GST_STATES[$s])) return $s;
+    foreach (GST_STATES as $code => $name) if (strcasecmp($name, $s) === 0) return (string) $code;
+    return '';
 }
 
 // The settings each hosted company needs a copy of to price and tax its own
@@ -200,4 +243,143 @@ function commercial_next_invoice_no($date = null) {
     @chmod($f, 0600);
     $prefix = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) (commercial_val('plat_invoice_prefix') ?? 'EX'))) ?: 'EX';
     return $prefix . '/' . $fy . '/' . str_pad((string) $n, 4, '0', STR_PAD_LEFT);   // ≤ 16 characters, as Rule 46 requires
+}
+
+// ---- The platform's GST invoice register ------------------------------------------
+// One register across every company, for the platform owner's GST return: each
+// tax invoice is written here when it is issued, in the protected data folder
+// (a company's payment lands in the company's own database, which the owner's
+// screens should not have to open one by one). Append-only: a correction to an
+// invoice's buyer is a new line for the same number, with what changed, when,
+// by whom and why — the last line for a number is the invoice as it stands.
+function commercial_register_file() {
+    $dir = function_exists('tenant_safe_data_dir') ? (string) tenant_safe_data_dir()[0] : sys_get_temp_dir();
+    return rtrim($dir, '/') . '/gst-invoice-register.jsonl';
+}
+function commercial_register_add(array $row) {
+    $f = commercial_register_file();
+    $h = @fopen($f, 'a');
+    if (!$h) return false;
+    try { flock($h, LOCK_EX); fwrite($h, json_encode($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n"); fflush($h); flock($h, LOCK_UN); }
+    finally { fclose($h); }
+    @chmod($f, 0600);
+    return true;
+}
+// Every invoice as it stands now, newest first.
+function commercial_register_all() {
+    $f = commercial_register_file();
+    if (!is_file($f)) return [];
+    $by = [];
+    foreach (file($f, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+        $r = json_decode($line, true);
+        if (is_array($r) && !empty($r['invoice_no'])) $by[$r['invoice_no']] = $r;
+    }
+    uasort($by, fn($a, $b) => strcmp((string) $b['date'] . $b['invoice_no'], (string) $a['date'] . $a['invoice_no']));
+    return $by;
+}
+function commercial_register_get($no) { return commercial_register_all()[(string) $no] ?? null; }
+
+// The invoice row for a paid order (built from what the order recorded).
+function commercial_invoice_row(array $o, array $t, $companyKey = '') {
+    $buyer = (array) ($t['buyer'] ?? []);
+    return [
+        'invoice_no' => (string) $o['invoice_no'], 'date' => (string) ($o['invoiced_at'] ?: substr((string) $o['paid_at'], 0, 10)),
+        'company_key' => (string) $companyKey, 'order_id' => (string) $o['order_id'], 'payment_id' => (string) $o['payment_id'],
+        'period' => (string) $o['period'], 'lines' => array_values((array) ($t['lines'] ?? [])), 'credit' => (int) ($t['credit'] ?? 0),
+        'rate' => (float) ($t['rate'] ?? 0), 'mode' => (string) ($t['mode'] ?? 'exclusive'), 'net' => (int) ($t['net'] ?? 0), 'tax' => (int) ($t['tax'] ?? 0),
+        'cgst' => (int) ($t['cgst'] ?? 0), 'sgst' => (int) ($t['sgst'] ?? 0), 'igst' => (int) ($t['igst'] ?? 0),
+        'total' => (int) $o['amount'], 'pos' => (string) ($t['pos'] ?? ''),
+        'buyer' => ['name' => (string) ($buyer['name'] ?? ''), 'gstin' => (string) ($buyer['gstin'] ?? ''),
+                    'address' => (string) ($buyer['address'] ?? ''), 'state' => (string) ($buyer['state'] ?? '')],
+        'supplier' => (array) ($t['supplier'] ?? []), 'sac' => (string) (($t['supplier'] ?? [])['sac'] ?? ''),
+        'amendments' => [],
+    ];
+}
+
+// Correct an issued invoice's buyer (name, GSTIN, state, address) — e.g. a
+// customer who paid without its GSTIN and now needs it on the bill. The amount
+// and tax stay exactly as charged; only the split follows the new place of
+// supply. Returns '' or the reason it was refused.
+function commercial_register_amend($no, array $buyer, $reason, $by) {
+    $r = commercial_register_get($no);
+    if (!$r) return 'That invoice is not in the register.';
+    $reason = trim((string) $reason);
+    if ($reason === '') return 'Say why the invoice is being corrected (it is kept with the invoice).';
+    $b = commercial_billto_clean($buyer);
+    if ($b['error'] !== '') return $b['error'];
+    $old = $r['buyer'];
+    $new = $b['buyer'];
+    if ($old == $new) return 'Nothing was changed.';
+    $pos = $new['gstin'] !== '' ? substr($new['gstin'], 0, 2) : ($new['state'] !== '' ? $new['state'] : (string) ($r['supplier']['state'] ?? ''));
+    $split = commercial_tax_split(['tax' => (int) $r['tax']], $pos);
+    $r['amendments'][] = ['at' => date('c'), 'by' => (string) $by, 'reason' => mb_substr($reason, 0, 300), 'was' => $old, 'pos_was' => $r['pos']];
+    $r['buyer'] = $new;
+    foreach (['pos', 'cgst', 'sgst', 'igst'] as $k) $r[$k] = $split[$k];
+    commercial_register_add($r);
+    return '';
+}
+
+// The "Bill to" a company types at checkout, checked. GSTIN optional; when
+// given it must be a real one, and its state wins over the state chosen.
+// Returns ['buyer' => [name, gstin, address, state(code)], 'error' => ''].
+function commercial_billto_clean(array $in) {
+    $name  = mb_substr(trim((string) ($in['name'] ?? '')), 0, 200);
+    $gstin = function_exists('clean_gstin') ? clean_gstin((string) ($in['gstin'] ?? '')) : strtoupper(trim((string) ($in['gstin'] ?? '')));
+    $addr  = mb_substr(trim((string) ($in['address'] ?? '')), 0, 500);
+    $state = commercial_state_code((string) ($in['state'] ?? ''));
+    $out = ['buyer' => ['name' => $name, 'gstin' => $gstin, 'address' => $addr, 'state' => $state], 'error' => ''];
+    if ($name === '') { $out['error'] = 'Enter the name to bill (your registered business name).'; return $out; }
+    if ($gstin !== '') {
+        $why = commercial_gstin_problem($gstin);
+        if ($why !== '') { $out['error'] = 'GSTIN: ' . $why; return $out; }
+        $out['buyer']['state'] = substr($gstin, 0, 2);
+    }
+    return $out;
+}
+
+// ---- The screen: /gst-invoices (platform owner) -------------------------------------
+// Every tax invoice the platform has issued, by month, with totals and a CSV for
+// the accountant (GSTR-1: B2B lines carry the buyer's GSTIN; B2C lines do not),
+// one invoice opened for printing, and a buyer correction with its reason.
+function ops_gst_invoices($method) {
+    ops_require(function_exists('superadmin_can') && superadmin_can(), 'Only the platform owner (Super Admin) can see the GST invoice register.');
+    $no = trim((string) ($_GET['no'] ?? $_POST['no'] ?? ''));
+    if ($method === 'POST' && ($_POST['do'] ?? '') === 'amend') {
+        $u = function_exists('current_user') ? current_user() : [];
+        $err = commercial_register_amend($no, ['name' => $_POST['name'] ?? '', 'gstin' => $_POST['gstin'] ?? '',
+            'state' => $_POST['state'] ?? '', 'address' => $_POST['address'] ?? ''], $_POST['reason'] ?? '',
+            function_exists('user_name') ? user_name($u) : 'platform owner');
+        if ($err === '' && function_exists('idems_log')) idems_log('user', $u['id'] ?? null, 'GST_INVOICE_CORRECTED', ['field' => $no]);
+        flash($err === '' ? 'Invoice ' . $no . ' corrected. The customer sees the corrected invoice from their Payment history; include it as an amendment in your next GST return.' : $err,
+              $err === '' ? 'success' : 'error');
+        redirect('/gst-invoices?no=' . rawurlencode($no));
+    }
+    if ($no !== '' && isset($_GET['print'])) {
+        $inv = commercial_register_get($no);
+        ops_require((bool) $inv, 'That invoice is not in the register.');
+        require __DIR__ . '/../views/ops/subscription_invoice.php';
+        exit;
+    }
+    $month = preg_match('/^\d{4}-\d{2}$/', (string) ($_GET['m'] ?? '')) ? (string) $_GET['m'] : date('Y-m');
+    $all = commercial_register_all();
+    $rows = array_values(array_filter($all, fn($r) => substr((string) $r['date'], 0, 7) === $month));
+    if (isset($_GET['csv'])) {
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="gst-invoices-' . $month . '.csv"');
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['Invoice no', 'Date', 'Type', 'Buyer GSTIN', 'Buyer name', 'Place of supply', 'SAC', 'Taxable value', 'Rate %',
+                       'IGST', 'CGST', 'SGST', 'Invoice total', 'Workspace', 'Payment ref', 'Corrected']);
+        foreach ($rows as $r) {
+            $pos = (string) $r['pos'];
+            fputcsv($out, [$r['invoice_no'], $r['date'], $r['buyer']['gstin'] !== '' ? 'B2B' : 'B2C', $r['buyer']['gstin'], $r['buyer']['name'],
+                $pos . (defined('GST_STATES') && isset(GST_STATES[$pos]) ? '-' . GST_STATES[$pos] : ''), $r['sac'], $r['net'], $r['rate'],
+                $r['igst'], $r['cgst'], $r['sgst'], $r['total'], $r['company_key'], $r['payment_id'], $r['amendments'] ? 'yes' : '']);
+        }
+        fclose($out);
+        exit;
+    }
+    $months = array_values(array_unique(array_merge([date('Y-m')], array_map(fn($r) => substr((string) $r['date'], 0, 7), $all))));
+    rsort($months);
+    view('ops/gst_invoices', ['rows' => $rows, 'month' => $month, 'months' => $months, 'sel' => $no !== '' ? commercial_register_get($no) : null]);
+    return true;
 }

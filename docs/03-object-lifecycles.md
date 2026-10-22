@@ -1180,3 +1180,7 @@ Companies console is not affected.
 - No new status. The order also records the GST charged with it, and, when GST was
   charged, the moment it becomes `PAID` it takes the next platform tax-invoice number
   (`invoice_no`, one series per financial year). A replayed callback takes no second number.
+- **GST invoice register.** The tax invoice is also written to the platform's GST invoice register
+  (append-only). A **correction** to the buyer is a new entry for the same number that keeps what it
+  replaced; the latest entry is the invoice as it stands. There is no new status, and an invoice
+  is never deleted or renumbered.

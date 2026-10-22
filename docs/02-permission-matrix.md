@@ -1216,3 +1216,25 @@ When GST is switched on (it needs the platform's GSTIN, legal name, address, rat
 
 No new permission — the existing Super Admin gate (`superadmin_can()`) and subscription gate are
 reused.
+
+**Customer's GSTIN on the bill; GST invoice register (owner, 22 Oct 2026: "if customer wants bill
+with his gst number then??")**
+
+- **Bill to at checkout.** Checkout has a **Bill to** section: registered name, GSTIN, state and
+  billing address. It is filled from the company profile and can be changed.
+  - The GSTIN is checked for format, state code and its check character.
+  - The buyer's state sets the place of supply, so the tax is IGST or CGST + SGST.
+  - "Save to our company profile" writes those details back to the profile. Only people who
+    manage the subscription can do this (`billing_can_manage()` = Master Admin or
+    `settings.manage`), which are the same people who may edit the company profile.
+- **GST invoices register** (`/gst-invoices`, platform owner only, `superadmin_can()`).
+  - It lists every tax invoice issued to every company, for the GST return.
+  - It shows monthly totals and offers a CSV download for the accountant (B2B / B2C, place of
+    supply, IGST / CGST / SGST).
+  - The owner can **correct the buyer** on an issued invoice, for example to add a GSTIN given
+    after payment. The amount and tax never change; only the IGST / CGST + SGST split follows the
+    new place of supply. The old details, who made the change, when and why are kept with the
+    invoice. The company sees the corrected invoice.
+- **SAC check.** The SAC must be six digits beginning 99 (e.g. 997331).
+
+No new permission.

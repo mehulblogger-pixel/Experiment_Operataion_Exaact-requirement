@@ -144,6 +144,8 @@ function nav_screen_label($route) {
         //  "Recruitment cc" for one headed "Recruitment Command Centre".
         'billing'               => 'Users & billing',
         'recruitment-cc'        => 'Command centre',
+        'gst-invoices'          => 'GST invoices',
+        'pricing-usage'         => 'Plans, pricing & usage',
     ];
     if (isset($override[$route])) return $override[$route];
     if (strncmp($route, 'm/', 2) === 0) $route = substr($route, 2);

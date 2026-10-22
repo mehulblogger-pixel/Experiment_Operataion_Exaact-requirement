@@ -667,15 +667,50 @@ function saas_order_claim($orderId, $paymentId) {
     $tax = json_decode((string) (ops_val("SELECT tax_json FROM saas_orders WHERE order_id=?", [(string) $orderId]) ?: ''), true);
     if (is_array($tax) && !empty($tax['on']) && function_exists('commercial_next_invoice_no')) {
         $no = commercial_next_invoice_no();
-        if ($no !== '') db()->prepare("UPDATE saas_orders SET invoice_no=?, invoiced_at=? WHERE order_id=?")->execute([$no, date('Y-m-d'), (string) $orderId]);
+        if ($no !== '') {
+            db()->prepare("UPDATE saas_orders SET invoice_no=?, invoiced_at=? WHERE order_id=?")->execute([$no, date('Y-m-d'), (string) $orderId]);
+            // …and into the platform owner's register, for the GST return.
+            $o = ops_one("SELECT * FROM saas_orders WHERE order_id=?", [(string) $orderId]);
+            if ($o && function_exists('commercial_register_add'))
+                commercial_register_add(commercial_invoice_row($o, $tax, function_exists('current_tenant') ? (string) current_tenant() : ''));
+        }
     }
     return ops_one("SELECT * FROM saas_orders WHERE order_id=?", [(string) $orderId]) ?: null;
 }
 // The buyer, as the invoice names them: this company's own profile.
 function saas_invoice_buyer() {
     $g = fn($k) => function_exists('setting_get') ? trim((string) setting_get($k, '')) : '';
-    return ['name' => $g('company_name') ?: (function_exists('current_tenant') ? (string) current_tenant() : ''),
-            'address' => $g('company_address'), 'gstin' => function_exists('clean_gstin') ? clean_gstin($g('company_gstin')) : $g('company_gstin')];
+    $gstin = function_exists('clean_gstin') ? clean_gstin($g('company_gstin')) : $g('company_gstin');
+    $state = function_exists('commercial_state_code') ? commercial_state_code($g('company_state')) : '';
+    if ($gstin !== '' && preg_match('/^[0-9]{2}/', $gstin)) $state = substr($gstin, 0, 2);
+    return ['name' => $g('company_legal_name') ?: ($g('company_name') ?: (function_exists('current_tenant') ? (string) current_tenant() : '')),
+            'address' => $g('company_address'), 'gstin' => $gstin, 'state' => $state];
+}
+// The "Bill to" typed at checkout (views/ops/_billto.php), checked; saved back
+// to the company profile when asked, so it is filled in next time. Returns the
+// buyer, or redirects back with the reason (and what was typed kept).
+function saas_billto_from_post() {
+    if (!isset($_POST['billto_name'])) return saas_invoice_buyer();   // an older form: the profile, as before
+    $in = ['name' => $_POST['billto_name'] ?? '', 'gstin' => $_POST['billto_gstin'] ?? '',
+           'state' => $_POST['billto_state'] ?? '', 'address' => $_POST['billto_address'] ?? ''];
+    $b = commercial_billto_clean($in);
+    if ($b['error'] !== '') {
+        $_SESSION['billto_draft'] = $in;
+        flash($b['error'] . ' Nothing was charged.', 'error');
+        redirect('/subscription');
+    }
+    unset($_SESSION['billto_draft']);
+    $buyer = $b['buyer'];
+    if (!empty($_POST['billto_save'])) {
+        setting_set('company_legal_name', $buyer['name']);
+        setting_set('company_address', $buyer['address']);
+        if ($buyer['gstin'] !== '') {
+            setting_set('company_gstin', $buyer['gstin']);
+            if (function_exists('pan_from_gstin')) setting_set('company_pan', pan_from_gstin($buyer['gstin']));
+        }
+        if ($buyer['state'] !== '' && defined('GST_STATES')) setting_set('company_state', GST_STATES[$buyer['state']] ?? '');
+    }
+    return $buyer;
 }
 
 // ---------------------------------------------------------------------------

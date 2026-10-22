@@ -66,6 +66,10 @@ $app = function_exists('app_name') ? app_name() : 'your platform';
     <span class="oh-ic">💰</span>
     <span><h3>Pricing</h3><p>Set the price of each module and each login, yearly discount and GST — what your clients are billed.</p></span>
   </a>
+  <a class="oh-card" href="/gst-invoices">
+    <span class="oh-ic">🧾</span>
+    <span><h3>GST invoices</h3><p>Every tax invoice issued to your customers, a monthly download for your accountant, and corrections.</p></span>
+  </a>
   <a class="oh-card" href="/super-admin">
     <span class="oh-ic">⚙️</span>
     <span><h3>Advanced settings</h3><p>Licence, billing, escrow, compliance, seat costing — the full engine room.</p></span>

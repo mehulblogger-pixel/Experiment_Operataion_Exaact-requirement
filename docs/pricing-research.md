@@ -39,7 +39,7 @@ The app does both:
 | Extra storage per paid login | 2 GB | **J.** About a tenth of Google Workspace's 30 GB per user. |
 | Extra storage pack | 50 GB for ₹399 a month (about ₹8 per GB) | **J.** This sits between Zoho Meeting (about ₹6 per GB) and Zoho CRM ($4 per 5 GB). |
 | GST | 18%, with prices shown before GST | **E.** SaaS is taxed at 18%, unchanged by the Sept 2025 reform. Indian B2B SaaS quotes prices as "+18% GST". |
-| SAC code | 997331 | **Disputed.** Some sources give 998315, so confirm with your chartered accountant. |
+| SAC code | 997331 | **Disputed.** Some sources give 998315, so confirm with your chartered accountant. A SAC code is always six digits beginning 99; the app refuses anything else, such as "99731". |
 | Delete an unused, never-paid trial | 90 days | This is the owner's decision. For comparison, Freshdesk deletes after 14 days and Zoho after 120–180 days. |
 | AI top-up price, field/portal seat price | No suggestion | No market figure was found, so this is your decision. Left blank, these are not sold. |
 
