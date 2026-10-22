@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '0a99b95 · 2026-10-22 13:55 UTC · 701 files';
+$RELEASE = '5e516f4 · 2026-10-22 14:21 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -176,7 +176,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>69459,'h'=>'1fabb6c2818818ac'],
-    'lib/ops.php' => ['s'=>727019,'h'=>'1067ecbbcc690b47'],
+    'lib/ops.php' => ['s'=>727777,'h'=>'4b3becdb36c1ca2a'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -186,7 +186,7 @@ $EXPECT  = [
     'lib/pdf.php' => ['s'=>26663,'h'=>'356a367da31c40a6'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
-    'lib/platform_mail.php' => ['s'=>18886,'h'=>'014b26a17cd0a539'],
+    'lib/platform_mail.php' => ['s'=>19525,'h'=>'ea7b3c1974df8c8c'],
     'lib/portal.php' => ['s'=>123446,'h'=>'bdb7a9fc58350701'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
@@ -557,7 +557,7 @@ $EXPECT  = [
     'views/ops/person_erase.php' => ['s'=>2748,'h'=>'790e73d880be6d75'],
     'views/ops/pipeline_edit.php' => ['s'=>7169,'h'=>'d72f4149566ccc5e'],
     'views/ops/pipelines.php' => ['s'=>4360,'h'=>'d3909c30e881c937'],
-    'views/ops/platform_setup.php' => ['s'=>13144,'h'=>'1be1e8fe5955b8e2'],
+    'views/ops/platform_setup.php' => ['s'=>14219,'h'=>'41ebb6e614cbd24e'],
     'views/ops/portal_user_perms.php' => ['s'=>4461,'h'=>'7e54018feb626c27'],
     'views/ops/portal_users.php' => ['s'=>12861,'h'=>'cc442582bbfe4415'],
     'views/ops/positions.php' => ['s'=>6531,'h'=>'a2b8b745a2be0986'],

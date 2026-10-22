@@ -144,6 +144,21 @@ $adm = (array) ($adm ?? []); $ah = (string) ($adm['host'] ?? '');
   </div>
 </div>
 
+<?php if (function_exists('app_is_test_copy') && app_is_test_copy()): $redir = (string) setting_get('test_mail_redirect', ''); ?>
+<form class="ps-card" method="post" id="testmail">
+  <input type="hidden" name="do" value="test_redirect">
+  <h2>Test copy — where its e-mails go</h2>
+  <div class="ps-body">
+    <p class="ps-note" style="margin-top:0">This is a test copy, so it never e-mails anyone else. Put your own inbox here and <b>every</b> e-mail it sends — sign-up codes,
+      passwords, approvals, reminders — arrives there instead, with the person it was meant for in the subject: <i>[TEST COPY → test.bdm@example.test] …</i>.
+      It still needs the platform e-mail above to be filled in.</p>
+    <div class="ps-row" style="margin-top:0"><label for="ps-redir" style="font-weight:600;font-size:13px">Send every e-mail from this test copy to</label>
+      <input id="ps-redir" name="test_mail_redirect" type="email" value="<?= $e($redir) ?>" placeholder="your.name@gmail.com">
+      <button class="btn">Save</button></div>
+  </div>
+</form>
+<?php endif; ?>
+
 <details class="ps-card">
   <summary style="cursor:pointer;padding:13px 16px;font-size:15px;font-weight:700;background:var(--soft,#f6f8fb)">Recent e-mails from the main site (last <?= count($log) ?>) — <?= count(array_filter($log, fn($l) => (int) $l['sent_ok'])) ?> sent, <?= count(array_filter($log, fn($l) => !(int) $l['sent_ok'])) ?> not sent</summary>
   <div style="overflow-x:auto">

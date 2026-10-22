@@ -241,6 +241,13 @@ function ops_platform_setup($method) {
             flash($err === '' ? ($do === 'admin_lock' ? 'Locked. Super Admin now opens only at https://' . superadmin_host() . '.' : 'Unlocked. Super Admin opens on the main address again.') : $err, $err === '' ? 'success' : 'error');
             redirect('/platform-setup#admin');
         }
+        if ($do === 'test_redirect' && function_exists('app_is_test_copy') && app_is_test_copy()) {
+            $a = strtolower(trim((string) ($_POST['test_mail_redirect'] ?? '')));
+            if ($a !== '' && !filter_var($a, FILTER_VALIDATE_EMAIL)) { flash('That is not an e-mail address.', 'error'); redirect('/platform-setup#testmail'); }
+            setting_set('test_mail_redirect', $a);
+            flash($a !== '' ? 'Every e-mail from this test copy now goes to ' . $a . ' (the subject says who it was meant for).' : 'Test e-mails are no longer redirected.', 'success');
+            redirect('/platform-setup#testmail');
+        }
         if ($do === 'pay_check') {
             $r = platform_payment_check();
             platform_mail_note('payment', $r);

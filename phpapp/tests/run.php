@@ -1,4 +1,7 @@
 <?php
+// Command line only. Opened from a browser this would boot the app and run the
+// whole suite on the web server — refuse before anything else happens.
+if (PHP_SAPI !== 'cli') { http_response_code(403); exit('Forbidden'); }
 // Test runner. Boots the app once against a throwaway database, then runs every
 // tests/test_*.php file and prints a pass/fail summary. Exit code is non-zero on
 // any failure, so CI (or a quick manual run) can trust it.

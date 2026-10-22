@@ -1,4 +1,7 @@
 <?php
+// Command line only. Opened from a browser this would boot the app and run the
+// whole suite on the web server — refuse before anything else happens.
+if (PHP_SAPI !== 'cli') { http_response_code(403); exit('Forbidden'); }
 // ============================================================================
 //  Test bootstrap — boot the REAL application against a throwaway database.
 //

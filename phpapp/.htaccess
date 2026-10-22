@@ -52,7 +52,7 @@ Options -Indexes
 # but if the rewrite is ever switched off this is what stops the source being
 # read line by line — including whatever a future version keeps in it.
 <IfModule mod_rewrite.c>
-    RewriteRule ^(lib|views|tools|docs)/ - [F]
+    RewriteRule ^(lib|views|tools|docs|tests)/ - [F]
 </IfModule>
 
 # Do not advertise the PHP version in every response.

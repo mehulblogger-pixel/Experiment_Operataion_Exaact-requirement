@@ -18,7 +18,25 @@ made-up data. On a copy marked as a test copy:
 - **It keeps its own data folder** (`exaact_data_test`), so it can never take a live invoice
   number or touch the live platform e-mail, backups or company files.
 
-## Step 1 — Build the test copy (once, about 30 minutes, in cPanel)
+## Step 1 — Put the test copy on your server
+
+**Easiest: use the ready-made test copy** (`exaact-test-copy.zip`, about 15 minutes). It is
+already set up and "Start here" is done:
+- the made-up company "TB Inspection Services (TEST)";
+- the 19 test people (one per role) and the 8 test customers;
+- approval levels, Set up Sales answers and the pre-order checklist;
+- prices, GST (with a made-up GSTIN), the free trial and storage, and self sign-up switched on.
+
+It has its own database inside it, so there is no database to create. Follow its
+`README-FIRST.txt`:
+1. Upload it to your cPanel home folder (not public_html) and extract it.
+2. Create the address `test.operations.mghaiapps.com` with the document root `exaact_test/app`.
+3. Sign in.
+4. On Platform setup: enter your own e-mail, the mailbox details and your Razorpay TEST keys.
+
+How it was built: `docs/test-book/test-copy/`.
+
+**Or build one by hand** (about 30 minutes plus "Start here"):
 
 1. **Create the address.** cPanel → **Domains** (or **Subdomains**) → create
    `test.operations.mghaiapps.com` with its **own new folder**, e.g. `/home/USER/exaact_test/app`.
@@ -48,7 +66,7 @@ made-up data. On a copy marked as a test copy:
 
 Wherever a test says `operations.mghaiapps.com`, use `test.operations.mghaiapps.com`.
 
-## Step 2 — Prepare (half a day): "Start here" in the test book
+## Step 2 — Prepare: "Start here" in the test book (already done in the ready-made copy; just check it)
 
 1. Open the test book → **Start here — users & settings** and follow it top to bottom. It covers
    company details, two branches (Ahmedabad and Mumbai), business units and the **19 test users**,

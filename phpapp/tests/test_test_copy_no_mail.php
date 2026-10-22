@@ -38,6 +38,19 @@ try {
     unset($GLOBALS['__mail_capture']);
     if ($prevList === null) unset($GLOBALS['APP_TEST_MAIL_TO']); else $GLOBALS['APP_TEST_MAIL_TO'] = $prevList;
 
+    // One inbox for everything (Platform setup on a test copy): no settings file to edit.
+    $keepR = (string) setting_get('test_mail_redirect', '');
+    setting_set('test_mail_redirect', 'tester@mytest.example');
+    t_eq(app_test_mail_redirect(), 'tester@mytest.example', 'a test copy can send every e-mail to one tester inbox');
+    ops_mail('customer@example.com', 'Your sign-up code', 'body', 'boss@example.com', 'TEST');
+    $log = ops_one("SELECT to_addr, subject FROM email_log ORDER BY id DESC LIMIT 1");
+    t_ok($log && $log['to_addr'] === 'tester@mytest.example' && strpos((string) $log['subject'], '[TEST COPY → customer@example.com] ') === 0,
+        'it goes to the tester, never the customer, and says who it was meant for');
+    unset($GLOBALS['APP_TEST_COPY']);
+    t_eq(app_test_mail_redirect(), '', 'on a live site the setting does nothing');
+    $GLOBALS['APP_TEST_COPY'] = true;
+    setting_set('test_mail_redirect', $keepR);
+
     // Its own data folder: never the live site's invoice numbers, platform e-mail, backups or company files.
     $prevDir = $GLOBALS['APP_DATA_DIR'] ?? null; unset($GLOBALS['APP_DATA_DIR']);
     [$d] = tenant_safe_data_dir();

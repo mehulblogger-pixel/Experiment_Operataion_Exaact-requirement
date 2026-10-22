@@ -2619,9 +2619,24 @@ function app_test_mail_allowed($to, $cc = '') {
     return true;
 }
 
+// On a test copy: one inbox that receives EVERY e-mail the copy sends, set on
+// Platform setup ("Send every e-mail from this test copy to"), so a tester who
+// does not edit settings files still sees each sign-up code and reminder.
+function app_test_mail_redirect() {
+    if (!app_is_test_copy() || !function_exists('setting_get')) return '';
+    $a = strtolower(trim((string) setting_get('test_mail_redirect', '')));
+    return filter_var($a, FILTER_VALIDATE_EMAIL) ? $a : '';
+}
+
 function ops_mail($to, $subject, $body, $cc = '', $kind = '', $attachments = []) {
     $ok = 0; $err = '';
     $testCopy = $to && app_is_test_copy();
+    if ($testCopy && ($redir = app_test_mail_redirect()) !== '') {
+        // Delivered to the tester's inbox instead, saying who it was meant for.
+        $subject = '[TEST COPY → ' . $to . '] ' . $subject;
+        $to = $redir; $cc = '';
+        $testCopy = false;
+    }
     if ($testCopy && !app_test_mail_allowed($to, $cc)) {
         $err = 'not sent: this is a test copy (config.local.php test_copy)'
              . (!empty($GLOBALS['APP_TEST_MAIL_TO']) ? ' and the address is not on its test_mail_to list' : '');
