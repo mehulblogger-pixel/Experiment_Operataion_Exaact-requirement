@@ -24,7 +24,7 @@ def C(id, module, title, kind, tags, persona, why, before, steps, ref='', live=T
 C('PLT-001', '0 · Platform setup (do this first)', 'The go-live checklist', 'scenario', ['best', 'rule'],
   'PLATFORM_OWNER', 'One page says what must work before companies sign up and pay, and what is still to do.',
   'Signed in at the main site (operations.mghaiapps.com/login) with the platform owner\'s Master Admin account.',
-  [('Left menu → "Platform setup" (or Owner home → "Platform setup").', 'Heading "Platform setup", "… of 11 ready", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your own prices, storage allowance, trial storage and logins, nightly job, self sign-up.'),
+  [('Left menu → "Platform setup" (or Owner home → "Platform setup").', 'Heading "Platform setup", "… of 12 ready", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your own prices, storage allowance, trial storage and logins, nightly job, Super Admin on its own address, self sign-up.'),
    ('Each line not yet done.', 'Says exactly where to fix it, with "Open →".'),
    ('Sign in as a company\'s own Master Admin and type /platform-setup.', '"Only the platform owner (Super Admin), on the main site, can open Platform setup." — and it is not in their menu.')],
   'lib/platform_mail.php; views/ops/platform_setup.php')
@@ -50,6 +50,21 @@ C('PLT-003', '0 · Platform setup (do this first)', 'Payment keys check (Razorpa
    ('With TEST keys, buy a plan as a test company (ONB-047) using Razorpay\'s test card.', 'The plan activates; no real money moves.'),
    ('When ready: replace with LIVE keys (rzp_live_…), check again.', '"… LIVE keys: real payments." The "LIVE keys" line turns green.')],
   'lib/platform_mail.php platform_payment_check', live=False)
+
+C('PLT-004', '0 · Platform setup (do this first)', 'Super Admin on its own address, with its own sign-in', 'scenario', ['best', 'rule', 'edge'],
+  'PLATFORM_OWNER', 'The owner (22 Oct): "Super admin shall have complete different login" — companies never reach the platform-owner screens, and the owner signs in somewhere else.',
+  'Signed in at the main site as the platform owner. Access to cPanel.',
+  [('Platform setup → "Super Admin address" → type admin.operations.mghaiapps.com → "Save address".', '"Super Admin address saved. Next: create it in your hosting, then open it and lock Super Admin there." Three numbered steps appear.'),
+   ('Still on the main address, look at "Lock Super Admin to this address".', 'Greyed out, with "Available when this page is opened at https://admin.operations.mghaiapps.com — so you never lock yourself out of an address that does not work yet."'),
+   ('"Create it in cPanel for me" (or cPanel → Domains → create it with the same folder as the main site). Wait for the certificate.', 'https://admin.operations.mghaiapps.com/login opens the sign-in page.'),
+   ('At the new address, before signing in, open /connect or /start.', 'Sent to the sign-in page — nothing public is served there.'),
+   ('At the new address sign in with a company account or a member of staff.', '"This address is only for the platform owner (Super Admin). Company users sign in at https://operations.mghaiapps.com/login."'),
+   ('At the new address sign in as the platform owner.', 'You land on Owner home.'),
+   ('Platform setup → "Lock Super Admin to this address".', '"Locked. Super Admin now opens only at https://admin.operations.mghaiapps.com." The panel shows "Locked".'),
+   ('In the OTHER browser tab (main address, still signed in) open /platform-setup or /companies.', 'Sent on to the same screen at https://admin.operations.mghaiapps.com (where you sign in separately). The menu shows "Super Admin ↗" instead of Owner home / Platform setup.'),
+   ('Emergency: cPanel → File Manager → in exaact_data create an empty file "superadmin-unlock"; open /platform-setup on the main address.', 'It opens on the main address again; the Super Admin page warns that the emergency unlock is on. Delete the file → locked again.'),
+   ('Try to create a company called "Admin" (or with the workspace name "admin").', 'Its workspace gets another name (admin-2), or "That workspace key is already taken — pick another."')],
+  'lib/superadmin.php superadmin_address_gate; lib/platform_mail.php; views/ops/platform_setup.php; index.php login')
 
 C('ONB-000', '0 · The three front doors', 'Where a newcomer can start — the three front doors', 'scenario', ['best'],
   'NEWCOMER', 'A newcomer is one of three people: a company that wants its own workspace, a professional who wants work, or a company/agency that wants people. Each has its own door.',

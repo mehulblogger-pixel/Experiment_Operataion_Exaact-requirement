@@ -1,11 +1,12 @@
 <?php
 // Platform setup — the platform owner's go-live checklist, the platform e-mail
 // (general + account & password senders), the payment keys check and the
-// recent e-mails. Data: $mail, $items, $log, $pay, $me, $enc.
+// recent e-mails, and Super Admin's own address. Data: $mail, $items, $log, $pay, $me, $enc, $adm.
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 $done = count(array_filter($items, fn($i) => !empty($i['ok']))); $all = count($items);
 $ch = (array) ($mail['checks'] ?? []);
 $g = $mail['general']; $a = $mail['accounts'];
+$adm = (array) ($adm ?? []); $ah = (string) ($adm['host'] ?? '');
 ?>
 <style>
   .ps-wrap{max-width:980px}
@@ -103,6 +104,43 @@ $g = $mail['general']; $a = $mail['accounts'];
       <?php $pc = $ch['payment'] ?? null; if ($pc): ?><span class="<?= !empty($pc['ok']) ? 'ps-ok' : 'ps-bad' ?>"><?= !empty($pc['ok']) ? 'Working' : 'Not working' ?></span>
         <span class="ps-note" style="margin:0"><?= $e(substr((string) $pc['at'], 0, 16) . ' — ' . $pc['msg']) ?></span><?php endif; ?></form>
     <p class="ps-note">The check only asks Razorpay to confirm the keys; it creates nothing and moves no money.</p>
+  </div>
+</div>
+
+<div class="ps-card" id="admin">
+  <h2>Super Admin address — a separate sign-in for the platform owner</h2>
+  <div class="ps-body">
+    <?php if (!empty($adm['locked'])): ?>
+      <p style="margin:0 0 6px;font-size:14px"><span class="ps-ok">Locked</span> — Super Admin opens only at <b>https://<?= $e($ah) ?></b>.
+        On the main address it is not shown, and at this address only platform-owner accounts can sign in.</p>
+      <?php if (!empty($adm['override'])): ?><p class="ps-bad" style="font-size:13px">The emergency unlock is switched on on the server, so the lock is not enforced right now. Delete the file <code><?= $e($adm['unlock_file']) ?></code> to enforce it again.</p><?php endif; ?>
+      <form method="post" class="ps-row"><input type="hidden" name="do" value="admin_unlock"><button class="btn ghost" onclick="return confirm('Unlock? Super Admin will open on the main address again.')">Unlock</button></form>
+    <?php else: ?>
+      <p class="ps-note" style="margin-top:0">Give Super Admin its own web address, for example <b><?= $e($adm['suggest'] ?: 'admin.your-domain') ?></b>. Companies never use it, your browser keeps a separate sign-in there,
+        and once locked the Super Admin screens open nowhere else.</p>
+      <form method="post" class="ps-row"><input type="hidden" name="do" value="admin_host">
+        <label for="ps-ah" style="font-weight:600;font-size:13px">Address</label>
+        <input id="ps-ah" name="admin_host" value="<?= $e($ah) ?>" placeholder="<?= $e($adm['suggest'] ?: 'admin.your-domain') ?>">
+        <button class="btn">Save address</button></form>
+      <?php if ($ah !== ''): ?>
+        <ol style="margin:14px 0 0;padding-left:20px;font-size:13.5px;line-height:1.7">
+          <li><b>Create the address in your hosting.</b>
+            <?php if (!empty($adm['cpanel'])): ?>
+              <form method="post" style="display:inline"><input type="hidden" name="do" value="admin_cpanel"><button class="btn ghost" style="padding:3px 10px;font-size:12.5px">Create it in cPanel for me</button></form>
+              — or by hand:<?php endif; ?>
+            cPanel → <b>Domains</b> (or <b>Subdomains</b>) → create <b><?= $e($ah) ?></b> with the <b>same folder</b> as the main site. cPanel adds the free security certificate (AutoSSL) within about an hour.</li>
+          <li><b>Open <a href="https://<?= $e($ah) ?>/platform-setup#admin" target="_blank" rel="noopener">https://<?= $e($ah) ?></a></b> and sign in with this same platform-owner account.</li>
+          <li><b>Press "Lock Super Admin to this address"</b> on this page there.</li>
+        </ol>
+        <form method="post" class="ps-row"><input type="hidden" name="do" value="admin_lock">
+          <button class="btn"<?= empty($adm['here']) ? ' disabled aria-disabled="true"' : '' ?>>Lock Super Admin to this address</button>
+          <?php if (empty($adm['here'])): ?><span class="ps-note" style="margin:0">Available when this page is opened at https://<?= $e($ah) ?> — so you never lock yourself out of an address that does not work yet.</span><?php endif; ?></form>
+      <?php endif; ?>
+    <?php endif; ?>
+    <?php if ($ah !== ''): ?>
+      <p class="ps-note">Locked out (the address stopped working)? In cPanel → File Manager create an empty file named <code>superadmin-unlock</code> in the folder <code><?= $e(dirname((string) ($adm['unlock_file'] ?? ''))) ?></code>.
+        Super Admin then opens on the main address again until you delete that file.</p>
+    <?php endif; ?>
   </div>
 </div>
 

@@ -1179,3 +1179,23 @@ separate **account & password** sender for sign-up codes, temporary passwords an
 the protected data folder above the web root, never in a company database, so no company can read
 it. Sign-up codes, temporary passwords and reset links are never kept in any e-mail log. No new
 permission — it reuses the Super Admin gate.
+
+**Super Admin's own address (owner, 22 Oct 2026: "Super admin shall have complete different
+login")** — Platform setup → *Super Admin address*. The platform owner saves an address such as
+`admin.operations.mghaiapps.com` (it is added to the main site's own addresses in the workspace
+registry, so it opens the platform's own site and never a company), creates it in the hosting, opens
+it, signs in there and presses **Lock**. The lock can only be switched on *from* that address. Once
+locked:
+
+| | Main address (every company) | Super Admin address |
+|---|---|---|
+| Super Admin screens (Owner home, Platform setup, Companies, Cloud workspaces, Control panel, Pricing, Marketplace plans/switch, Feature gates, product package, payment keys) | refused; an old link is sent on to the Super Admin address (menu shows "Super Admin ↗") | platform owner only |
+| Who can sign in | everyone, as before | only the platform owner's Master Admin account(s) on the main site; company e-mails are never routed into a company here; any other account is told where to sign in |
+| Public pages (sign-up, marketplace, portals, verify…) | as before | not served — only the sign-in page |
+
+The browser keeps a separate sign-in per address. Emergency unlock without the app: an empty file
+named `superadmin-unlock` in the protected data folder, or the server setting
+`OPS_SUPERADMIN_ANY_HOST=1`. Company workspace names can never take the address's name (nor
+`admin`, `www`, `mail`, `webmail`, `cpanel`, `whm`, `api`, `app`, `ftp`, `start`, `login`). No new
+permission — it narrows the existing Super Admin gate (`superadmin_can()`, `can_manage_tenants()`,
+the payment-keys save) to one address.

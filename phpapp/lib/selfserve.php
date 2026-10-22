@@ -152,7 +152,8 @@ function saas_company_create(array $o) {
         return ['ok' => false, 'error' => 'A company name and a valid owner email are required.'];
 
     $reg = function_exists('tenant_registry') ? tenant_registry() : ['tenants' => []];
-    $taken = function ($k) use ($reg) { return saas_tenant_get($k) || isset($reg['tenants'][$k]); };
+    $reserved = function_exists('platform_reserved_keys') ? platform_reserved_keys() : [];
+    $taken = function ($k) use ($reg, $reserved) { return in_array($k, $reserved, true) || saas_tenant_get($k) || isset($reg['tenants'][$k]); };
     $nkey = saas_slug($o['key'] ?? '');
     if ($nkey !== '') {
         if (function_exists('tenant_valid_sub') && !tenant_valid_sub($nkey))

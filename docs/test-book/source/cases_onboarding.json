@@ -16,7 +16,7 @@
   "steps": [
    {
     "do": "Left menu → \"Platform setup\" (or Owner home → \"Platform setup\").",
-    "expect": "Heading \"Platform setup\", \"… of 11 ready\", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your own prices, storage allowance, trial storage and logins, nightly job, self sign-up."
+    "expect": "Heading \"Platform setup\", \"… of 12 ready\", and the Go-live checklist: cloud mode, e-mail, test e-mail, account & password sender, Razorpay keys, LIVE keys, your own prices, storage allowance, trial storage and logins, nightly job, Super Admin on its own address, self sign-up."
    },
    {
     "do": "Each line not yet done.",
@@ -114,6 +114,66 @@
   ],
   "ref": "lib/platform_mail.php platform_payment_check",
   "live": false
+ },
+ {
+  "id": "PLT-004",
+  "area": "New company",
+  "module": "0 · Platform setup (do this first)",
+  "title": "Super Admin on its own address, with its own sign-in",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule",
+   "edge"
+  ],
+  "persona": "PLATFORM_OWNER",
+  "company": "ANY",
+  "why": "The owner (22 Oct): \"Super admin shall have complete different login\" — companies never reach the platform-owner screens, and the owner signs in somewhere else.",
+  "before": "Signed in at the main site as the platform owner. Access to cPanel.",
+  "steps": [
+   {
+    "do": "Platform setup → \"Super Admin address\" → type admin.operations.mghaiapps.com → \"Save address\".",
+    "expect": "\"Super Admin address saved. Next: create it in your hosting, then open it and lock Super Admin there.\" Three numbered steps appear."
+   },
+   {
+    "do": "Still on the main address, look at \"Lock Super Admin to this address\".",
+    "expect": "Greyed out, with \"Available when this page is opened at https://admin.operations.mghaiapps.com — so you never lock yourself out of an address that does not work yet.\""
+   },
+   {
+    "do": "\"Create it in cPanel for me\" (or cPanel → Domains → create it with the same folder as the main site). Wait for the certificate.",
+    "expect": "https://admin.operations.mghaiapps.com/login opens the sign-in page."
+   },
+   {
+    "do": "At the new address, before signing in, open /connect or /start.",
+    "expect": "Sent to the sign-in page — nothing public is served there."
+   },
+   {
+    "do": "At the new address sign in with a company account or a member of staff.",
+    "expect": "\"This address is only for the platform owner (Super Admin). Company users sign in at https://operations.mghaiapps.com/login.\""
+   },
+   {
+    "do": "At the new address sign in as the platform owner.",
+    "expect": "You land on Owner home."
+   },
+   {
+    "do": "Platform setup → \"Lock Super Admin to this address\".",
+    "expect": "\"Locked. Super Admin now opens only at https://admin.operations.mghaiapps.com.\" The panel shows \"Locked\"."
+   },
+   {
+    "do": "In the OTHER browser tab (main address, still signed in) open /platform-setup or /companies.",
+    "expect": "Sent on to the same screen at https://admin.operations.mghaiapps.com (where you sign in separately). The menu shows \"Super Admin ↗\" instead of Owner home / Platform setup."
+   },
+   {
+    "do": "Emergency: cPanel → File Manager → in exaact_data create an empty file \"superadmin-unlock\"; open /platform-setup on the main address.",
+    "expect": "It opens on the main address again; the Super Admin page warns that the emergency unlock is on. Delete the file → locked again."
+   },
+   {
+    "do": "Try to create a company called \"Admin\" (or with the workspace name \"admin\").",
+    "expect": "Its workspace gets another name (admin-2), or \"That workspace key is already taken — pick another.\""
+   }
+  ],
+  "ref": "lib/superadmin.php superadmin_address_gate; lib/platform_mail.php; views/ops/platform_setup.php; index.php login",
+  "live": true
  },
  {
   "id": "ONB-000",

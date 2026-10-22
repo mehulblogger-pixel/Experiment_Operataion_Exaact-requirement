@@ -828,6 +828,10 @@ if ($route === 'sw.js' || $route === 'manifest.php' || strpos($route, 'assets/')
     http_response_code(404); exit;
 }
 
+// Super Admin's own address (lib/superadmin.php): only the platform owner's
+// sign-in exists there, and once locked the Super Admin screens open nowhere else.
+if (function_exists('superadmin_address_gate')) superadmin_address_gate($route);
+
 // --- Public routes ---
 // $stage is 'password' for the ordinary form and 'code' once the password has
 // been accepted and a second factor is still owed.
@@ -886,7 +890,9 @@ if ($route === 'login') {
         // skips all of this and behaves exactly as before.
         $loginId = trim((string)($_POST['username'] ?? ''));
         if (function_exists('saas_leave_tenant')) saas_leave_tenant();
-        if ($loginId !== '' && strpos($loginId, '@') !== false && function_exists('saas_login_lookup')) {
+        // On the Super Admin address nobody is routed into a company.
+        $onAdminHost = function_exists('on_superadmin_host') && on_superadmin_host();
+        if (!$onAdminHost && $loginId !== '' && strpos($loginId, '@') !== false && function_exists('saas_login_lookup')) {
             $tk = saas_login_lookup($loginId);
             // Not in the directory yet? Ask the companies themselves, once, and
             // remember the answer. Only the company OWNER is ever written to the
@@ -922,6 +928,10 @@ if ($route === 'login') {
         $u = $q->fetch();
         if ($u && $u['is_active'] && login_allowed($u['username'])
             && password_verify($_POST['password'] ?? '', $u['password_hash'])) {
+            if ($onAdminHost && user_role($u) !== 'MASTER_ADMIN') {
+                if (function_exists('idems_log')) idems_log('user', $u['id'], 'LOGIN_FAILED', ['field'=>'not the platform owner — Super Admin address']);
+                return render_login(superadmin_wrong_door_msg());
+            }
             if (twofa_on($u)) {
                 // Nothing is signed in yet. The session only remembers who is
                 // half-way through, and for how long.

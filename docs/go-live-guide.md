@@ -13,6 +13,8 @@ Upload the latest version of the app to the server first (as usual).
   account — not any company's account).
 - In the left menu you will see **Owner home** and **Platform setup**. A company's
   own administrators never see these and are refused if they type the address.
+- Once step 7 is done, sign in at the Super Admin address instead
+  (e.g. **https://admin.operations.mghaiapps.com/login**).
 
 ## 2. Open Platform setup
 Left menu → **Platform setup**. The **Go-live checklist** at the top shows what is
@@ -70,7 +72,26 @@ In the hosting panel (cPanel → **Cron Jobs**) add once a day, e.g. 02:30:
 (the exact path is shown on the checklist). It sends warnings, records last use and
 storage, and removes unused free trials. The checklist shows when it last ran.
 
-## 7. Switch on self sign-up — last
+## 7. Super Admin on its own address
+So that Super Admin has a completely separate sign-in, away from the address companies use:
+
+1. **Platform setup → Super Admin address** → type e.g. `admin.operations.mghaiapps.com` → **Save address**.
+2. Create the address in your hosting: press **Create it in cPanel for me** (shown when cPanel is
+   connected), or by hand in cPanel → **Domains** (or **Subdomains**) → create
+   `admin.operations.mghaiapps.com` with the **same folder** as the main site. cPanel adds the free
+   security certificate (AutoSSL) within about an hour.
+3. Open **https://admin.operations.mghaiapps.com/login** and sign in with the platform-owner account.
+4. **Platform setup → Lock Super Admin to this address.** (The button only works on the new address,
+   so you can never lock yourself out of an address that does not open yet.)
+
+From then on: Super Admin opens only at the new address; on the main address the menu shows
+**Super Admin ↗**; at the new address only the platform owner can sign in.
+
+**If the new address ever stops working:** cPanel → File Manager → in the folder `exaact_data`
+(next to the app folder) create an empty file named `superadmin-unlock`. Super Admin opens on the main
+address again until you delete that file.
+
+## 8. Switch on self sign-up — last
 When every other line is green: Companies → **🚀 Self sign-up & free trial** → tick
 **Companies can sign themselves up** → Save. Then try it yourself in a private window
 at **/start** with an e-mail you can read.

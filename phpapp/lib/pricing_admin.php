@@ -113,7 +113,7 @@ function pricing_tenant_keys() {
 
 // ---- The screen ------------------------------------------------------------
 function ops_pricing_usage($method) {
-    ops_require(function_exists('is_master') && is_master() && (!function_exists('current_tenant') || current_tenant() === ''),
+    ops_require(function_exists('superadmin_can') ? superadmin_can() : (function_exists('is_master') && is_master() && (!function_exists('current_tenant') || current_tenant() === '')),
         'Only the platform owner (Super Admin) can manage pricing.');
 
     if ($method === 'POST') {

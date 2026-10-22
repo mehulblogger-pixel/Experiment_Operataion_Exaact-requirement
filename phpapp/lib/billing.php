@@ -191,6 +191,8 @@ function ops_billing($route, $method) {
         // otherwise buy its plan for ₹1, or send its payment anywhere.
         ops_require(!function_exists('current_tenant') || current_tenant() === '',
             'Prices and payment keys are set by your provider, not inside your workspace.');
+        ops_require(!function_exists('superadmin_host_ok') || superadmin_host_ok(),
+            'Super Admin is locked to its own address — change the price and payment keys there.');
         setting_set('billing_currency', strtoupper(substr(trim((string) ($_POST['currency'] ?? 'INR')), 0, 5)) ?: 'INR');
         setting_set('billing_price_user_month', (string) max(0, (int) ($_POST['price_month'] ?? 0)));
         setting_set('billing_price_user_year', (string) max(0, (int) ($_POST['price_year'] ?? 0)));

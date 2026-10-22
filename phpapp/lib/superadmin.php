@@ -16,7 +16,178 @@
 // or reach the platform tools, so this is false inside any company workspace.
 function superadmin_can() {
     return function_exists('is_master') && is_master()
-        && (!function_exists('current_tenant') || current_tenant() === '');
+        && (!function_exists('current_tenant') || current_tenant() === '')
+        && superadmin_host_ok();
+}
+
+// ---------------------------------------------------------------------------
+//  ITS OWN ADDRESS (owner, 22 Oct 2026: "Super admin shall have complete
+//  different login"). The platform owner may give Super Admin its own web
+//  address (e.g. admin.operations.mghaiapps.com) and LOCK it there:
+//    • Super Admin screens then open only at that address — never on the
+//      address every company uses;
+//    • at that address only platform-owner (Master Admin) accounts can sign
+//      in, and company e-mails are never routed into their workspaces there;
+//    • browsers keep a separate sign-in per address, so the two never mix.
+//  The lock can only be switched on FROM the new address (which proves it
+//  works), and can be undone without the app: an empty file named
+//  "superadmin-unlock" in the protected data folder, or the server setting
+//  OPS_SUPERADMIN_ANY_HOST=1.
+// ---------------------------------------------------------------------------
+function request_host() {
+    return strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
+}
+// Where the address and the lock are kept. In cloud mode: the workspace
+// registry (tenants.php), so they read the same whichever database the request
+// is standing in. On a single-company install: the main site's settings.
+function superadmin_cfg_store() {
+    return function_exists('tenant_registry_file') && is_file(tenant_registry_file()) ? 'registry' : 'settings';
+}
+function superadmin_cfg() {
+    if (superadmin_cfg_store() === 'registry') {
+        $r = tenant_registry();
+        return ['host' => strtolower(trim((string) ($r['superadmin_host'] ?? ''))), 'locked' => !empty($r['superadmin_locked'])];
+    }
+    if (!function_exists('setting_get') || (function_exists('current_tenant') && current_tenant() !== '')) return ['host' => '', 'locked' => false];
+    return ['host' => strtolower(trim((string) setting_get('superadmin_host', ''))), 'locked' => (string) setting_get('superadmin_host_locked', '') === '1'];
+}
+function superadmin_cfg_write($host, $locked, $oldHost = null) {
+    if (superadmin_cfg_store() === 'registry') {
+        $reg = tenant_registry();
+        // The address opens the platform's own site, never a company: it is
+        // listed among the main site's own addresses.
+        $old = strtolower((string) ($oldHost ?? ($reg['superadmin_host'] ?? '')));
+        $al = array_values(array_filter(array_map('strtolower', (array) ($reg['aliases'] ?? [])), fn($a) => $a !== $old || $a === $host));
+        if ($host !== '' && !in_array($host, $al, true)) $al[] = $host;
+        $reg['aliases'] = $al;
+        $reg['superadmin_host'] = $host;
+        $reg['superadmin_locked'] = $host !== '' && $locked;
+        return tenant_registry_write($reg);
+    }
+    setting_set('superadmin_host', $host);
+    setting_set('superadmin_host_locked', $host !== '' && $locked ? '1' : '');
+    return '';
+}
+function superadmin_host() { return superadmin_cfg()['host']; }
+function superadmin_locked() { $c = superadmin_cfg(); return $c['host'] !== '' && $c['locked']; }
+function superadmin_unlock_override() {
+    if ((string) getenv('OPS_SUPERADMIN_ANY_HOST') === '1') return true;
+    $dir = function_exists('tenant_safe_data_dir') ? (string) tenant_safe_data_dir()[0] : '';
+    return $dir !== '' && is_file(rtrim($dir, '/') . '/superadmin-unlock');
+}
+// Is THIS request on the Super Admin address?
+function on_superadmin_host() {
+    $h = superadmin_host();
+    return $h !== '' && request_host() === $h;
+}
+// May Super Admin be used from where this request came in?
+function superadmin_host_ok() {
+    if (request_host() === '') return true;                       // the nightly job and tests: no web address
+    if (!superadmin_locked() || superadmin_unlock_override()) return true;
+    return on_superadmin_host();
+}
+// The platform-owner screens, so an old link on the main address is sent on.
+const SUPERADMIN_ROUTES = ['owner', 'platform-setup', 'companies', 'tenants', 'super-admin', 'control-panel',
+                           'pricing-usage', 'marketplace-plans', 'marketplace-toggle', 'product-package', 'feature-gates'];
+// The address every company uses (for "sign in over there" messages).
+function superadmin_main_address() {
+    $base = function_exists('tenant_registry') ? strtolower((string) (tenant_registry()['base_domain'] ?? '')) : '';
+    return $base !== '' ? 'https://' . $base : '';
+}
+// Runs on every request, before any page. Does nothing until an address is saved.
+//  • ON the Super Admin address: only the platform owner's own sign-in exists —
+//    no public pages, no company sessions, no company accounts.
+//  • On the main address, once LOCKED: a Super Admin screen is sent on to the
+//    Super Admin address (where the owner signs in separately).
+function superadmin_address_gate($route) {
+    $host = superadmin_host();
+    if ($host === '' || request_host() === '') return;
+    $u = function_exists('current_user') ? current_user() : null;
+    if (on_superadmin_host()) {
+        $inCompany = function_exists('current_tenant') && current_tenant() !== '';
+        $signedInHere = (string) ($_SESSION['login_host'] ?? '') === $host;
+        if ($u && ($inCompany || !$signedInHere || user_role($u) !== 'MASTER_ADMIN')) {
+            $_SESSION = [];
+            if (session_status() === PHP_SESSION_ACTIVE) session_regenerate_id(true);
+            $_SESSION['sso_msg'] = $signedInHere || $inCompany || user_role($u) !== 'MASTER_ADMIN'
+                ? superadmin_wrong_door_msg() : 'Please sign in again at this address.';
+            redirect('/login');
+        }
+        if (!$u && !in_array($route, ['login', 'logout', 'forgot', 'reset'], true)) redirect('/login');
+        if ($u && $route === '') redirect('/owner');
+        return;
+    }
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && superadmin_locked() && !superadmin_unlock_override()
+        && in_array($route, SUPERADMIN_ROUTES, true) && $u
+        && (!function_exists('current_tenant') || current_tenant() === '') && user_role($u) === 'MASTER_ADMIN') {
+        $qs = (string) ($_SERVER['QUERY_STRING'] ?? '');
+        redirect('https://' . $host . '/' . $route . ($qs !== '' ? '?' . $qs : ''));
+    }
+}
+function superadmin_wrong_door_msg() {
+    $main = superadmin_main_address();
+    return 'This address is only for the platform owner (Super Admin). '
+        . ($main !== '' ? 'Company users sign in at ' . $main . '/login' : 'Company users sign in at the main address') . '.';
+}
+
+// ---- Setting the address up (Platform setup → Super Admin address) -----------------
+function superadmin_host_suggest() {
+    $b = function_exists('tenant_registry') ? strtolower((string) (tenant_registry()['base_domain'] ?? '')) : '';
+    return $b !== '' ? 'admin.' . $b : '';
+}
+// Save (or clear, with '') the Super Admin address. Returns '' or the reason it was refused.
+function superadmin_host_save($host) {
+    $host = strtolower(trim((string) $host));
+    $host = preg_replace('#^https?://#', '', $host);
+    $host = rtrim(explode('/', $host)[0], '.');
+    if (superadmin_locked()) return 'Unlock Super Admin first — then the address can be changed.';
+    if ($host !== '' && !preg_match('/^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $host))
+        return 'That is not a web address. Type it like admin.operations.mghaiapps.com — no https://, no slash.';
+    $reg = function_exists('tenant_registry') ? tenant_registry() : ['base_domain' => '', 'aliases' => [], 'tenants' => []];
+    $base = strtolower((string) ($reg['base_domain'] ?? ''));
+    if ($host !== '' && ($host === $base || $host === 'www.' . $base))
+        return 'That is the address every company uses. Super Admin needs a different one, such as admin.' . ($base ?: 'your-domain') . '.';
+    if ($host !== '' && $base !== '' && substr($host, -strlen('.' . $base)) === '.' . $base) {
+        $label = substr($host, 0, -strlen('.' . $base));
+        if (isset($reg['tenants'][$label]) || (function_exists('saas_tenant_get') && saas_tenant_get($label)))
+            return 'A company already uses the name "' . $label . '". Choose another, such as admin.' . $base . '.';
+    }
+    return superadmin_cfg_write($host, false, superadmin_host());
+}
+// Ask cPanel to create the address, pointing at the same app folder.
+function superadmin_host_cpanel() {
+    $host = superadmin_host();
+    if ($host === '') return ['ok' => false, 'msg' => 'Save the address first.'];
+    if (!function_exists('cpanel_configured') || !cpanel_configured())
+        return ['ok' => false, 'msg' => 'cPanel is not connected. Create the address by hand: cPanel → Domains (or Subdomains).'];
+    $c = cpanel_config();
+    $p = explode('.', $host, 2);
+    $root = $c['base_domain'] !== '' && substr($host, -strlen('.' . $c['base_domain'])) === '.' . $c['base_domain'] ? $c['base_domain'] : ($p[1] ?? '');
+    $label = substr($host, 0, -strlen('.' . $root));
+    if ($label === '' || $c['docroot'] === '')
+        return ['ok' => false, 'msg' => 'The cPanel settings have no document root yet. Create the address by hand: cPanel → Domains (or Subdomains), with the same folder as the main site.'];
+    $r = cpanel_api('SubDomain', 'addsubdomain', ['domain' => $label, 'rootdomain' => $root, 'dir' => $c['docroot']]);
+    return $r['ok']
+        ? ['ok' => true, 'msg' => $host . ' was created. The free security certificate (AutoSSL) can take up to an hour; then open https://' . $host . '/login.']
+        : ['ok' => false, 'msg' => 'cPanel did not create it (' . (implode(' ', (array) $r['errors']) ?: 'refused') . '). Create it by hand: cPanel → Domains (or Subdomains).'];
+}
+// Lock or unlock. Locking only works FROM the new address: that proves it
+// opens, has its certificate, and that the owner can sign in there.
+function superadmin_lock_set($on) {
+    if (!$on) return superadmin_cfg_write(superadmin_host(), false);
+    if (superadmin_host() === '') return 'Save the Super Admin address first.';
+    if (!on_superadmin_host())
+        return 'Open https://' . superadmin_host() . '/platform-setup, sign in there, and lock it from that page. '
+             . 'This makes sure the address works before the main address stops showing Super Admin.';
+    return superadmin_cfg_write(superadmin_host(), true);
+}
+
+// Workspace names no company may take (they are addresses of the platform itself).
+function platform_reserved_keys() {
+    $r = ['admin', 'www', 'mail', 'webmail', 'cpanel', 'whm', 'api', 'app', 'ftp', 'start', 'login'];
+    $h = superadmin_host();
+    if ($h !== '') $r[] = explode('.', $h)[0];
+    return array_values(array_unique($r));
 }
 
 // Recommended plan packaging: which PRODUCT_MODULES each tier grants when a

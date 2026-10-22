@@ -337,6 +337,9 @@ function complete_login($u) {
     $_SESSION['uid'] = $u['id'];
     if (function_exists('auth_bind_workspace')) auth_bind_workspace();   // M13 — this identity belongs to THIS workspace
     $_SESSION['started_at'] = time();
+    // The address signed in at: a sign-in on the main address is never honoured
+    // on the Super Admin address, even if its cookie is carried across.
+    $_SESSION['login_host'] = function_exists('request_host') ? request_host() : '';
     session_touch();
     try { db()->prepare("UPDATE users SET last_login_at=?, last_login_ip=? WHERE id=?")
               ->execute([date('c'), client_ip(), $u['id']]); } catch (Throwable $e) {}

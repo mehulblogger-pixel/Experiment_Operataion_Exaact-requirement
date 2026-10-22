@@ -178,6 +178,8 @@ function platform_checklist() {
          'how' => 'Companies → 🚀 Self sign-up & free trial.', 'link' => '/companies'],
         ['key' => 'cron', 'label' => 'The nightly job is running', 'ok' => $cron !== '' && strtotime($cron) > time() - 2 * 86400,
          'how' => $cron !== '' ? 'Last run ' . substr($cron, 0, 16) . '.' : 'Not run yet. In your hosting panel (cPanel → Cron Jobs) add, once a day: php ' . dirname(__DIR__) . '/cron.php', 'link' => ''],
+        ['key' => 'admin', 'label' => 'Super Admin has its own address, and is locked to it', 'ok' => function_exists('superadmin_locked') && superadmin_locked(),
+         'how' => function_exists('superadmin_host') && superadmin_host() !== '' ? 'Address: ' . superadmin_host() . '. Open it, sign in, and press "Lock Super Admin to this address".' : 'Below, under "Super Admin address".', 'link' => '#admin'],
         ['key' => 'signup', 'label' => 'Self sign-up is switched on', 'ok' => function_exists('selfserve_enabled') && selfserve_enabled(),
          'how' => 'Companies → 🚀 Self sign-up & free trial → tick "Companies can sign themselves up". Do this last, when everything above is green.', 'link' => '/companies'],
     ];
@@ -220,6 +222,23 @@ function ops_platform_setup($method) {
             flash('Test e-mail ' . $msg . '.', $ok ? 'success' : 'error');
             redirect('/platform-setup#mail');
         }
+        if ($do === 'admin_host') {
+            $err = superadmin_host_save($_POST['admin_host'] ?? '');
+            flash($err === '' ? (superadmin_host() !== '' ? 'Super Admin address saved. Next: create it in your hosting, then open it and lock Super Admin there.' : 'Super Admin address removed.') : $err, $err === '' ? 'success' : 'error');
+            redirect('/platform-setup#admin');
+        }
+        if ($do === 'admin_cpanel') {
+            $r = superadmin_host_cpanel();
+            flash($r['msg'], $r['ok'] ? 'success' : 'error');
+            redirect('/platform-setup#admin');
+        }
+        if ($do === 'admin_lock' || $do === 'admin_unlock') {
+            $err = superadmin_lock_set($do === 'admin_lock');
+            if ($err === '' && function_exists('idems_log'))
+                idems_log('user', current_user()['id'] ?? null, $do === 'admin_lock' ? 'SUPERADMIN_LOCKED' : 'SUPERADMIN_UNLOCKED', ['field' => superadmin_host()]);
+            flash($err === '' ? ($do === 'admin_lock' ? 'Locked. Super Admin now opens only at https://' . superadmin_host() . '.' : 'Unlocked. Super Admin opens on the main address again.') : $err, $err === '' ? 'success' : 'error');
+            redirect('/platform-setup#admin');
+        }
         if ($do === 'pay_check') {
             $r = platform_payment_check();
             platform_mail_note('payment', $r);
@@ -233,6 +252,9 @@ function ops_platform_setup($method) {
         'mail' => platform_mail_get(), 'items' => platform_checklist(), 'log' => platform_mail_log(20),
         'pay' => function_exists('billing_config') ? billing_config() : [], 'me' => (string) ($u['email'] ?? ''),
         'enc' => function_exists('app_enc_available') && app_enc_available(),
+        'adm' => ['host' => superadmin_host(), 'suggest' => superadmin_host_suggest(), 'locked' => superadmin_locked(),
+                  'here' => on_superadmin_host(), 'override' => superadmin_unlock_override(), 'cpanel' => function_exists('cpanel_configured') && cpanel_configured(),
+                  'unlock_file' => rtrim((string) (function_exists('tenant_safe_data_dir') ? tenant_safe_data_dir()[0] : ''), '/') . '/superadmin-unlock'],
     ]);
     return true;
 }

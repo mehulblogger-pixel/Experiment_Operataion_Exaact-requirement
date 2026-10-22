@@ -38,7 +38,8 @@ function tenant_base_domain() {
 // able to reach the other workspaces. Works before cloud is switched on too, so
 // it can be switched on from here.
 function can_manage_tenants() {
-    return function_exists('is_master') && is_master() && current_tenant() === '';
+    return function_exists('is_master') && is_master() && current_tenant() === ''
+        && (!function_exists('superadmin_host_ok') || superadmin_host_ok());
 }
 
 function tenant_registry_file() { return __DIR__ . '/../tenants.php'; }
