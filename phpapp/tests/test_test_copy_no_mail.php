@@ -61,6 +61,18 @@ try {
     if ($prevDir === null) unset($GLOBALS['APP_DATA_DIR']); else $GLOBALS['APP_DATA_DIR'] = $prevDir;
     if (basename($d) === 'exaact_data_test') { @unlink($d . '/.htaccess'); @rmdir($d); }
 
+    // …and its own backups folder, never the live site's.
+    $keepBd = (string) setting_get('backup_dir', ''); setting_set('backup_dir', '');
+    unset($GLOBALS['APP_DATA_DIR']);
+    [$bd] = backup_root();
+    t_ok(basename($bd) === 'exaact_backups_test' || $bd === '', 'a test copy keeps its own backups folder (exaact_backups_test), never the live "exaact_backups"');
+    if (basename($bd) === 'exaact_backups_test') { @unlink($bd . '/.htaccess'); @rmdir($bd); }
+    $GLOBALS['APP_DATA_DIR'] = sys_get_temp_dir() . '/exaact_tcb_' . getmypid();
+    t_eq(backup_root()[0], $GLOBALS['APP_DATA_DIR'] . '/backups', "with config.local.php 'data_dir', backups go inside that folder");
+    @unlink($GLOBALS['APP_DATA_DIR'] . '/backups/.htaccess'); @rmdir($GLOBALS['APP_DATA_DIR'] . '/backups'); @rmdir($GLOBALS['APP_DATA_DIR']);
+    if ($prevDir === null) unset($GLOBALS['APP_DATA_DIR']); else $GLOBALS['APP_DATA_DIR'] = $prevDir;
+    setting_set('backup_dir', $keepBd);
+
     // No real money on a test copy.
     $kid = (string) setting_get('rzp_key_id', ''); $ks = (string) setting_get('rzp_key_secret', '');
     setting_set('rzp_key_id', 'rzp_live_XXXXXXXX'); setting_set('rzp_key_secret', 'x');

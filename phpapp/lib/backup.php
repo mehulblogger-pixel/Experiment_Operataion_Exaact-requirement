@@ -58,7 +58,13 @@ function backup_root() {
     $set = function_exists('setting_get') ? trim((string) setting_get('backup_dir', '')) : '';
     if ($set !== '' && $tryMake($set)) return [$set, true];
 
-    $aboveRoot = dirname(dirname(__DIR__)) . '/exaact_backups';   // sibling of the app folder → above web root
+    // A data folder chosen in config.local.php keeps its backups inside it, and
+    // a TEST COPY never writes into the live site's backups folder — even when
+    // its app folder sits beside the live one (same parent folder).
+    $own = (string) ($GLOBALS['APP_DATA_DIR'] ?? '');
+    if ($own !== '') return $tryMake(rtrim($own, '/') . '/backups') ? [rtrim($own, '/') . '/backups', true] : ['', false];
+    $test = !empty($GLOBALS['APP_TEST_COPY']) || (string) getenv('OPS_TEST_COPY') === '1';
+    $aboveRoot = dirname(dirname(__DIR__)) . ($test ? '/exaact_backups_test' : '/exaact_backups');   // sibling of the app folder → above web root
     if ($tryMake($aboveRoot)) return [$aboveRoot, true];
 
     $inApp = dirname(__DIR__) . '/data-backups';                  // fallback, inside the app folder

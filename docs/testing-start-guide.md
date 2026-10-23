@@ -27,6 +27,10 @@ already set up and "Start here" is done:
 - approval levels, Set up Sales answers and the pre-order checklist;
 - prices, GST (with a made-up GSTIN), the free trial and storage, and self sign-up switched on.
 
+On the MilesWeb panel, Document Root is typed relative to the sub-domain's own
+folder and without a slash at the start: upload and extract the zip inside the
+`test.operations.mghaiapps.com` folder, then set Document Root to `exaact_test/app`.
+
 It has its own database inside it, so there is no database to create. Follow its
 `README-FIRST.txt`:
 1. Upload it to your cPanel home folder (not public_html) and extract it.
