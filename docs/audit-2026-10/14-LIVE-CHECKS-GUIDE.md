@@ -133,7 +133,7 @@ normally possible on your existing plan.
 
 **What I need from you (or your hosting provider):**
 
-1. **A sub-address**, for example `test.operations.mghaiapps.com`.
+1. **A sub-address**, for example `opstest.mghaiapps.com`.
    cPanel → **Domains** (or **Subdomains**) → create it. cPanel creates an
    empty folder for it.
 2. **A second, empty database** and a user for it.

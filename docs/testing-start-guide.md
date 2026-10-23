@@ -27,14 +27,19 @@ already set up and "Start here" is done:
 - approval levels, Set up Sales answers and the pre-order checklist;
 - prices, GST (with a made-up GSTIN), the free trial and storage, and self sign-up switched on.
 
+Use an ordinary sub-domain such as `opstest.mghaiapps.com`, not one nested under
+`operations.` (e.g. `test.operations.mghaiapps.com`): the hosting creates the DNS record
+and SSL certificate only for one-level sub-domains, so a nested one does not open
+("DNS address could not be found").
+
 On the MilesWeb panel, Document Root is typed relative to the sub-domain's own
 folder and without a slash at the start: upload and extract the zip inside the
-`test.operations.mghaiapps.com` folder, then set Document Root to `exaact_test/app`.
+`opstest.mghaiapps.com` folder, then set Document Root to `exaact_test/app`.
 
 It has its own database inside it, so there is no database to create. Follow its
 `README-FIRST.txt`:
 1. Upload it to your cPanel home folder (not public_html) and extract it.
-2. Create the address `test.operations.mghaiapps.com` with the document root `exaact_test/app`.
+2. Create the address `opstest.mghaiapps.com` with the document root `exaact_test/app`.
 3. Sign in.
 4. On Platform setup: enter your own e-mail, the mailbox details and your Razorpay TEST keys.
 
@@ -43,7 +48,7 @@ How it was built: `docs/test-book/test-copy/`.
 **Or build one by hand** (about 30 minutes plus "Start here"):
 
 1. **Create the address.** cPanel → **Domains** (or **Subdomains**) → create
-   `test.operations.mghaiapps.com` with its **own new folder**, e.g. `/home/USER/exaact_test/app`.
+   `opstest.mghaiapps.com` with its **own new folder**, e.g. `/home/USER/exaact_test/app`.
    Do not use the live site's folder.
 2. **Create an empty database.** cPanel → **MySQL Databases** → create a new database and a user,
    and give the user all privileges on it.
@@ -59,16 +64,16 @@ How it was built: `docs/test-book/test-copy/`.
    ];
    ```
 
-5. **Check it.** Open **https://test.operations.mghaiapps.com/login** and sign in as `admin`. The
+5. **Check it.** Open **https://opstest.mghaiapps.com/login** and sign in as `admin`. The
    red TEST COPY banner must show on every page.
 6. **Set up payments and e-mail.**
    - Platform setup → paste Razorpay **TEST** keys (`rzp_test_…`) under Billing.
    - Fill in the platform e-mail.
    - Use **Send a test e-mail** to one of your own addresses.
 7. **Only if you will test "New company"** (sign-up, trials, plans, GST invoices): go to Super Admin
-   → **Cloud workspaces** → set the base domain to `test.operations.mghaiapps.com`.
+   → **Cloud workspaces** → set the base domain to `opstest.mghaiapps.com`.
 
-Wherever a test says `operations.mghaiapps.com`, use `test.operations.mghaiapps.com`.
+Wherever a test says `operations.mghaiapps.com`, use `opstest.mghaiapps.com`.
 
 ## Step 2 — Prepare: "Start here" in the test book (already done in the ready-made copy; just check it)
 

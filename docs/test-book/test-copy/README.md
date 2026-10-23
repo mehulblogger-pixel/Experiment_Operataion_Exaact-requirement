@@ -11,7 +11,7 @@ what a person would produce, with no data written behind the app's back.
    - `'test_copy' => true`
    - `'data_dir'` pointing at `exaact_test/exaact_data_test`
    - an admin password of your choosing
-3. Add `tenants.php` with `'base_domain' => 'test.operations.mghaiapps.com'`.
+3. Add `tenants.php` with `'base_domain' => 'opstest.mghaiapps.com'`.
 4. Start it with `php -S 127.0.0.1:8899 tools/smoke-router.php` from `exaact_test/app`.
 5. Accept the licence agreement once, so the build can continue. Then delete
    `exaact_data_test/licence-agreement.json`, because the build's own acceptance is not

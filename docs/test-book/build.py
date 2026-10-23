@@ -276,7 +276,7 @@ def main():
         if c['area'] not in AREAS: c['area'] = 'Admin' if c['area'] == 'Settings' else c['area']
     areas = [a for a in AREAS if any(c['area'] == a for c in cases)] + sorted({c['area'] for c in cases} - set(AREAS))
     book = OrderedDict(
-        title='EXAACT Test Book', version='2026-10-22', site='https://test.operations.mghaiapps.com',
+        title='EXAACT Test Book', version='2026-10-22', site='https://opstest.mghaiapps.com',
         areas=areas,
         personas=[{'code': c, 'name': ROLE_NAMES[c], 'does': d} for c, d in PERSONAS],
         companies=[{'code': c, 'name': n, 'what': w, 'industry': i} for c, n, w, i in COMPANIES],
