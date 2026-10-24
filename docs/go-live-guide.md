@@ -123,3 +123,25 @@ address again until you delete that file.
 When every other line is green: Companies → **🚀 Self sign-up & free trial** → tick
 **Companies can sign themselves up** → Save. Then try it yourself in a private window
 at **/start** with an e-mail you can read.
+
+## Updating the live site after testing
+
+Test every change on the test copy (opstest.mghaiapps.com) first. When testing is complete,
+ask Claude to **"prepare the live update"**: it builds one update zip from the final code.
+The zip is the same for both sites and never contains `config.local.php`, `tenants.php`, the
+`tests/` folder or any data — so the live site stays live and the test copy stays a test copy.
+**Never copy files from the opstest folder to the live folder.**
+
+1. **Back up live.** mPanel → **Backups** → full backup. Also on operations.mghaiapps.com:
+   Admin → **Backup & restore** → **Take a backup now**.
+2. **Find the live app folder.** mPanel → **Domains** → operations.mghaiapps.com → its
+   **Document Root** (the folder holding `index.php` and `config.local.php`).
+3. **Upload and extract.** mPanel → **File Manager** → that folder → upload the zip →
+   right-click → **Extract** → overwrite. Delete the zip afterwards.
+4. **Leave alone:** `config.local.php`, `tenants.php`, and the `exaact_data` and
+   `exaact_backups` folders next to the app folder.
+5. **Check the upload landed.** Sign in as admin → open `/deploy-check.php` → every file matches.
+6. **Check it is live:** no red TEST COPY bar; Platform setup → send a test e-mail; Payment
+   (Razorpay) → **live** keys (`rzp_live_…`) → Check payment keys; one small real payment,
+   then refund it in Razorpay.
+7. **Something wrong?** Restore the backup from step 1.
