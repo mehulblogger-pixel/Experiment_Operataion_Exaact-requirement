@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'e5bddc6 · 2026-10-24 05:54 UTC · 701 files';
+$RELEASE = 'eb6c62a · 2026-10-24 07:58 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
     'cron.php' => ['s'=>25218,'h'=>'d31a80db09206902'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>127095,'h'=>'715bae88143d8689'],
+    'index.php' => ['s'=>127725,'h'=>'0dcd87744a7defdc'],
     'lib/access.php' => ['s'=>127367,'h'=>'029aa66145b542f4'],
     'lib/access_state.php' => ['s'=>10512,'h'=>'25d820df4d27fbd9'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],

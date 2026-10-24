@@ -22,9 +22,6 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: same-origin');
 if ($httpsNow) header('Strict-Transport-Security: max-age=15552000');
-// Nothing on any screen needs a camera beyond the evidence capture, and nothing
-// needs a microphone, a payment sheet or the accelerometer at all.
-header('Permissions-Policy: geolocation=(self), camera=(self), microphone=(), payment=(), usb=(), interest-cohort=()');
 // A content policy is the net under the escaping in the views: if a script ever
 // did get onto a page, this is what stops it fetching from or reporting to
 // anywhere else. 'unsafe-inline' is stated honestly — the screens carry inline
@@ -33,7 +30,13 @@ header('Permissions-Policy: geolocation=(self), camera=(self), microphone=(), pa
 // Razorpay's checkout runs from its own domain in an iframe, so the payment
 // page (and only that page) has to be allowed to load and talk to it. Every
 // other page keeps the tight policy.
-$onPay = (bool)preg_match('#^/(billing-order|buy|portal/pay|pro/pay)(\?|$)#', (string)($_SERVER['REQUEST_URI'] ?? ''));
+// EVERY page that opens the Razorpay window is listed here — a page missing
+// from this list gets "Could not open the payment window" because the browser
+// blocks Razorpay's script (the company plan checkout, subscription-order, was
+// missing until 24 Oct 2026). tests/test_pay_pages_csp.php checks the list.
+$payRoutes = ['billing-order', 'subscription-order', 'ai-topup-order', 'buy', 'portal/pay', 'pro/pay'];
+$reqPath = trim((string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH), '/');
+$onPay = in_array($reqPath, $payRoutes, true);
 $rzpScript = $onPay ? ' https://checkout.razorpay.com' : '';
 $rzpFrame  = $onPay ? ' https://api.razorpay.com https://checkout.razorpay.com' : '';
 $rzpConn   = $onPay ? ' https://api.razorpay.com https://lumberjack.razorpay.com' : '';
@@ -50,6 +53,11 @@ $csp = "default-src 'self'; "
      . "frame-src 'self'" . $rzpFrame . "; "
      . "frame-ancestors 'self'";
 header('Content-Security-Policy: ' . $csp);
+// Nothing on any screen needs a camera beyond the evidence capture, nor a
+// microphone or the accelerometer. Razorpay's window may use the browser's
+// payment sheet (UPI apps, saved cards) — allowed on the payment pages only.
+header('Permissions-Policy: geolocation=(self), camera=(self), microphone=(), '
+     . ($onPay ? 'payment=(self "https://checkout.razorpay.com" "https://api.razorpay.com")' : 'payment=()') . ', usb=(), interest-cohort=()');
 
 // --- Readable error page instead of a blank 500 (so problems are diagnosable) ---
 //
