@@ -2627,6 +2627,18 @@ function app_test_mail_redirect() {
     $a = strtolower(trim((string) setting_get('test_mail_redirect', '')));
     return filter_var($a, FILTER_VALIDATE_EMAIL) ? $a : '';
 }
+// Where a message to $to really lands: the one test inbox when set, else $to.
+// Screens that report "sent to …" use this, so they never name an address
+// that did not receive it.
+function app_test_mail_lands($to) {
+    $r = app_test_mail_redirect();
+    return $r !== '' ? $r . ' (meant for ' . $to . ')' : (string) $to;
+}
+// The e-mail part of the red TEST COPY bar, saying what actually happens.
+function app_test_mail_banner() {
+    if (($r = app_test_mail_redirect()) !== '') return 'Every e-mail goes only to ' . $r . '.';
+    return !empty($GLOBALS['APP_TEST_MAIL_TO']) ? 'E-mail goes only to the testers\' own addresses.' : 'No e-mail is sent from here.';
+}
 
 function ops_mail($to, $subject, $body, $cc = '', $kind = '', $attachments = []) {
     $ok = 0; $err = '';
@@ -10488,7 +10500,7 @@ function ops_settings($method) {
             } else {
                 $app = function_exists('app_name') ? app_name() : 'Your workspace';
                 $ok = ops_mail($to, $app . ' — test email', "This is a test email from " . $app . ".\n\nIf you are reading this, automatic email is working — password-reset links and reminders will be delivered.\n\n— " . $app, '', 'smtp_test');
-                if ($ok) flash('Test email sent to ' . $to . '. Check the inbox (and spam). If it arrived, email is working.');
+                if ($ok) flash('Test email sent to ' . app_test_mail_lands($to) . '. Check the inbox (and spam). If it arrived, email is working.');
                 else {
                     $last = ops_one("SELECT error FROM email_log WHERE kind='smtp_test' ORDER BY id DESC LIMIT 1");
                     flash('The test email could not be sent. ' . (($last && $last['error']) ? 'Reason: ' . $last['error'] : 'Check the host, port, username and password.'), 'error');

@@ -219,7 +219,7 @@ function ops_platform_setup($method) {
                 "This is a test from " . $app . ".\n\nIf you are reading it, the " . ($which === 'accounts' ? 'account & password' : 'general')
                 . " sender works. Check which address it came from.\n", '', $kind);
             $last = ops_one("SELECT error FROM email_log WHERE kind=? ORDER BY id DESC LIMIT 1", [$kind]);
-            $msg = $ok ? 'sent to ' . $to . ' — check the inbox (and spam) to confirm it arrived' : ('failed: ' . platform_mail_explain((string) ($last['error'] ?? 'unknown reason')));
+            $msg = $ok ? 'sent to ' . app_test_mail_lands($to) . ' — check the inbox (and spam) to confirm it arrived' : ('failed: ' . platform_mail_explain((string) ($last['error'] ?? 'unknown reason')));
             platform_mail_note('mail_' . $which, ['ok' => (bool) $ok, 'msg' => $msg]);
             flash('Test e-mail ' . $msg . '.', $ok ? 'success' : 'error');
             redirect('/platform-setup#mail');

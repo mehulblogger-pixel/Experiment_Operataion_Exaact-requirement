@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'd8b79a9 · 2026-10-24 04:09 UTC · 701 files';
+$RELEASE = '6cee759 · 2026-10-24 05:02 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -176,7 +176,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>69459,'h'=>'1fabb6c2818818ac'],
-    'lib/ops.php' => ['s'=>727777,'h'=>'4b3becdb36c1ca2a'],
+    'lib/ops.php' => ['s'=>728468,'h'=>'506e9cf6ea242b22'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -186,7 +186,7 @@ $EXPECT  = [
     'lib/pdf.php' => ['s'=>26663,'h'=>'356a367da31c40a6'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
-    'lib/platform_mail.php' => ['s'=>19525,'h'=>'ea7b3c1974df8c8c'],
+    'lib/platform_mail.php' => ['s'=>19546,'h'=>'f3beb082146742af'],
     'lib/portal.php' => ['s'=>123446,'h'=>'bdb7a9fc58350701'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
@@ -316,7 +316,7 @@ $EXPECT  = [
     'views/layout_bottom.php' => ['s'=>880,'h'=>'e6b33e19b84eb59f'],
     'views/layout_embed_bottom.php' => ['s'=>65,'h'=>'63f4c118c80caf4b'],
     'views/layout_embed_top.php' => ['s'=>730,'h'=>'b20991bedef34be0'],
-    'views/layout_top.php' => ['s'=>37750,'h'=>'178d8d9a836b6a60'],
+    'views/layout_top.php' => ['s'=>37653,'h'=>'42f1a4e46c060106'],
     'views/list.php' => ['s'=>3275,'h'=>'b234af3a9590aae2'],
     'views/login.php' => ['s'=>602,'h'=>'ff266c37dfd19bb0'],
     'views/login_page.php' => ['s'=>11120,'h'=>'dfb93b51519c9759'],
