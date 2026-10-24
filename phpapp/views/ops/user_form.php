@@ -47,7 +47,7 @@
 <section class="fs-pane" data-tab="Who they are">
   <h3 class="tab-sub" style="margin-top:0">Who they are</h3>
   <div class="form-grid">
-    <div class="ff"><label>Username *</label><input class="form-control" name="username" required value="<?= e($user['username'] ?? '') ?>"></div>
+    <div class="ff"><label>Username *</label><input class="form-control" name="username" autocapitalize="none" autocorrect="off" spellcheck="false" required value="<?= e($user['username'] ?? '') ?>"></div>
     <div class="ff"><label>Password <?= $user ? '(blank = keep)' : '' ?></label>
       <input class="form-control" type="text" name="password" placeholder="<?= $user ? '••••••' : 'set a password' ?>">
       <span class="muted" style="font-size:11.5px">At least <?= (int)pwd_min_len() ?> characters, with a letter and a number, and not their own name.</span></div>

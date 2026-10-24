@@ -115,7 +115,7 @@
       <form method="post" action="/login">
         <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
         <div class="fld"><label for="u">Username</label>
-          <div class="wrap"><input id="u" name="username" type="text" autocomplete="username" autofocus required placeholder="e.g. m.prajapati"></div></div>
+          <div class="wrap"><input id="u" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" autofocus required placeholder="e.g. m.prajapati"></div></div>
         <div class="fld"><label for="p" style="display:flex;justify-content:space-between;align-items:center">Password
           <a href="/forgot" style="font-weight:600;color:var(--brand);text-transform:none;letter-spacing:0;font-size:12px">Forgot password?</a></label>
           <div class="wrap"><input id="p" name="password" type="password" autocomplete="current-password" required placeholder="••••••••">
