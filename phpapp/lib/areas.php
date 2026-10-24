@@ -384,6 +384,7 @@ function ops_area_def($area) {
             $sec('Super admin');
             $t($fx('superadmin_can') && superadmin_can(), '🛰️', 'Control panel', '/super-admin', 'Licence, seats, modules, subscription, tenants and system tools in one place.');
             $t($fx('superadmin_can') && superadmin_can(), '🏢', 'Companies', '/companies', 'Every company on the platform — plan, seats, modules, suspend and log in as. (Super-Admin.)');
+            $t($fx('can_manage_tenants') && can_manage_tenants(), '🌐', 'Cloud workspaces & requests', '/tenants', 'Base address, workspace requests and the "Online registration" switch.');
             // Revamp P6 — pick which EXAACT this install is (TPIA / Staffing / Recruitment / Enterprise).
             $t($fx('product_package_can') && product_package_can(), '📦', 'Product package', '/product-package', 'TPIA, Staffing, Recruitment or Enterprise — set the pack & bundles in one click.');
 

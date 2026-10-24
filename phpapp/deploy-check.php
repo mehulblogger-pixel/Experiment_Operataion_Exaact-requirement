@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '398c1f0 · 2026-10-24 08:56 UTC · 701 files';
+$RELEASE = 'a93c4c0a · 2026-10-24 17:05 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -44,7 +44,7 @@ $EXPECT  = [
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
     'lib/approvals_hub.php' => ['s'=>8916,'h'=>'920310fe3ad7ba19'],
     'lib/approvals_setup.php' => ['s'=>6622,'h'=>'8b679264ad47f3de'],
-    'lib/areas.php' => ['s'=>42987,'h'=>'4f251fc6d8079755'],
+    'lib/areas.php' => ['s'=>43179,'h'=>'7b0dc058ed79a3dd'],
     'lib/assets.php' => ['s'=>14415,'h'=>'019c1f61103da27d'],
     'lib/attend.php' => ['s'=>13919,'h'=>'695a4eae1fd9e2a9'],
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
@@ -552,7 +552,7 @@ $EXPECT  = [
     'views/ops/opportunity_detail.php' => ['s'=>34405,'h'=>'269e269b4520d38b'],
     'views/ops/opportunity_form.php' => ['s'=>6508,'h'=>'cb05777e648dc213'],
     'views/ops/ops_desk.php' => ['s'=>5950,'h'=>'50cc74a4ae6338bb'],
-    'views/ops/owner_home.php' => ['s'=>6767,'h'=>'4cd2fd6185d0229a'],
+    'views/ops/owner_home.php' => ['s'=>7162,'h'=>'92ce62ea31d0a041'],
     'views/ops/partner_import.php' => ['s'=>6405,'h'=>'dd873e0e376783b1'],
     'views/ops/person_erase.php' => ['s'=>2748,'h'=>'790e73d880be6d75'],
     'views/ops/pipeline_edit.php' => ['s'=>7169,'h'=>'d72f4149566ccc5e'],

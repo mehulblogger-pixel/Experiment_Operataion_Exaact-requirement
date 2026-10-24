@@ -15,6 +15,10 @@ CHANGE = {  # (test id, step number) -> new fields
                       'expect': '"Payment keys saved. Press \'Check payment keys\' to confirm them."'},
     ('PLT-004', 9):  {'do': 'Emergency: mPanel → File Manager → in the data folder (test copy: exaact_test/exaact_data_test; live site: exaact_data) create an empty file "superadmin-unlock"; open /platform-setup on the main address.'},
     ('PLT-005', 2):  {'do': 'BEFORE saving any price (step 4): as a company on its free trial, open Subscription.'},
+    # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
+    ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
+    ('ONB-010', 1):  {'do': 'Owner home → "Cloud workspaces & requests" → panel "Workspace requests".'},
+    ('ONB-012', 1):  {'do': 'Owner home → "Cloud workspaces & requests" → the request → "Decline".'},
     # The escalating chain (owner's decision, 24 Oct 2026): a quotation is signed by the
     # level its value falls in AND every level below it; a shared boundary is the lower level's.
     ('SAL-003', 4):  {'expect': 'Card "Level 2"; summary line "Level 2 — above ₹5,00,000 to ₹25,00,000 before tax: Marketing Manager."'},

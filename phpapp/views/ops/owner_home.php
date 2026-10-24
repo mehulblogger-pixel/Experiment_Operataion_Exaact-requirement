@@ -58,6 +58,12 @@ $app = function_exists('app_name') ? app_name() : 'your platform';
     <span class="oh-ic">🏢</span>
     <span><h3>Companies</h3><p>Add a client, set their plan, seats and modules, suspend or log in as them.</p></span>
   </a>
+  <?php // Was reachable only by a small link inside Advanced settings (owner, test book
+        // ONB-001: "guide where exactly to find this switch"). ?>
+  <a class="oh-card" href="/tenants">
+    <span class="oh-ic">🌐</span>
+    <span><h3>Cloud workspaces &amp; requests</h3><p>Your base address, companies' requests for a workspace, and the "Online registration" switch.</p></span>
+  </a>
   <a class="oh-card" href="/users">
     <span class="oh-ic">👥</span>
     <span><h3>Users &amp; seats</h3><p>Add your own people, set their roles, and manage how many seats you use.</p></span>
