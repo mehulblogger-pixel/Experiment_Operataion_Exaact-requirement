@@ -6,6 +6,9 @@
   $pm = (int)($cfg['price_month'] ?? 0); $py = (int)($cfg['price_year'] ?? 0);
   $canBuy = $selfManaged && !empty($cfg['enabled']) && ($pm > 0 || $py > 0);
   $master = function_exists('is_master') && is_master();
+  // The price and payment keys are the platform owner's. A company's own
+  // Master Admin (inside its workspace) never sees that box, nor the platform's Key ID.
+  $ownsKeys = function_exists('billing_keys_refusal') ? billing_keys_refusal() === '' : $master;
   $licSeats = (int)($lic['seats'] ?? 0);
 ?>
 <div class="master-head">
@@ -68,13 +71,13 @@
     document.getElementById('totnote').textContent='('+s+' × '+SYM+u.toLocaleString()+' / '+(p==='year'?'year':'month')+')';}
   calc();
 </script>
-<?php elseif ($master): ?>
+<?php elseif ($ownsKeys): ?>
   <div class="msg msg-info" style="margin-top:14px">Set your price per user and your Razorpay keys below to switch on self-service payment.</div>
 <?php else: ?>
-  <div class="msg msg-info" style="margin-top:14px">Online payment is not switched on yet. Ask the Master Admin to set it up.</div>
+  <div class="msg msg-info" style="margin-top:14px">Online payment is not switched on yet. <?= function_exists('current_tenant') && current_tenant() !== '' ? 'Your provider switches it on.' : 'Ask the Master Admin to set it up.' ?></div>
 <?php endif; ?>
 
-<?php if ($master && $selfManaged): ?>
+<?php if ($ownsKeys && $selfManaged): ?>
 <details class="panel" <?= $canBuy ? '' : 'open' ?> style="margin-top:16px">
   <summary style="cursor:pointer;font-weight:600">Pricing &amp; payment keys
     <?= !empty($cfg['enabled']) ? '<span class="pill p-ok">Razorpay connected</span>' : '<span class="pill p-mut">not connected</span>' ?></summary>

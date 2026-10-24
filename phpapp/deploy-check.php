@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '201ecbd · 2026-10-24 05:36 UTC · 701 files';
+$RELEASE = 'e5bddc6 · 2026-10-24 05:54 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -357,7 +357,7 @@ $EXPECT  = [
     'views/ops/availability.php' => ['s'=>17528,'h'=>'37e0f573cb2082d9'],
     'views/ops/backup.php' => ['s'=>5717,'h'=>'c25db9a0eab5b54d'],
     'views/ops/billable_events.php' => ['s'=>8005,'h'=>'8bced33ab4bff106'],
-    'views/ops/billing.php' => ['s'=>7617,'h'=>'f8e62fe9ca120b0e'],
+    'views/ops/billing.php' => ['s'=>7987,'h'=>'2b3fb9a5b8d4236c'],
     'views/ops/billing_pay.php' => ['s'=>5115,'h'=>'35b6b05a14f07371'],
     'views/ops/books_bridge.php' => ['s'=>6061,'h'=>'9d89c6e1a4160652'],
     'views/ops/call_detail.php' => ['s'=>28235,'h'=>'0e139ddb0e2b7556'],
