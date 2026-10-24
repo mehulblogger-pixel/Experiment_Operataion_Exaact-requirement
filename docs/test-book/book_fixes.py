@@ -37,6 +37,10 @@ CHANGE = {  # (test id, step number) -> new fields
     ('SAL-071', 4):  {'do': 'A ₹40,00,000 quotation (inside Level 3, which has no upper limit).',
                       'expect': 'Level 1 → Level 2 → Level 3 (Branch Manager, Marketing Manager, Business Director), in that order.'},
 }
+BEFORE = {  # test id -> the "Before" line
+    'ONB-002': 'Self sign-up OFF and applications ON. After the 24 Oct update: Owner home → Cloud workspaces & requests → choose "Companies apply at /get-started, and you approve each one here" → Save. Before it: Companies → 🚀 Self sign-up & free trial → untick "Companies can sign themselves up" → Save, then Cloud workspaces → "Online registration: OFF — turn on". Signed out, private window.',
+    'ONB-003': 'Same as ONB-002: the APPLICATION form (/get-started), which has the "Preferred workspace name" box. While self sign-up is on, /get-started jumps to the free-trial form (/start), which has no workspace-name box — its name is made from the company name. Signed out.',
+}
 ADD = {  # test id -> steps appended at the end
     'SAL-003': [
         {'do': 'Edge: in the dashed card type Level 4, From 30000, Up to 100000 (inside Level 1). Add this level.',
@@ -66,6 +70,8 @@ ADD = {  # test id -> steps appended at the end
 
 def apply(book):
     by_id = {c['id']: c for c in book['cases']}
+    for tid, text in BEFORE.items():
+        if tid in by_id: by_id[tid]['before'] = text
     for (tid, n), fields in CHANGE.items():
         c = by_id.get(tid)
         if c and 1 <= n <= len(c['steps']): c['steps'][n - 1].update(fields)
