@@ -1203,27 +1203,94 @@ function crm_rule_is_unit($r) {
     return in_array($mt, ['SBU', 'BUSINESS UNIT', 'BUSINESS U'], true) && trim((string) ($r['sbu'] ?? '')) !== '';
 }
 
-// The active rules this quotation's business unit and before-tax value fall in.
-function crm_quote_matching_rules($q) {
-    $amt = crm_quote_band_value($q); $sbu = (string)($q['sbu'] ?? '');
+// The active levels that speak for this quotation's business unit: the
+// company-wide ones and its own unit's.
+function crm_quote_applicable_rules($q) {
+    $sbu = (string)($q['sbu'] ?? '');
     $out = [];
-    foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 ORDER BY level, id") ?: [] as $r) {
+    foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 ORDER BY level, min_amount, id") ?: [] as $r) {
         if (crm_rule_is_unit($r) && $r['sbu'] !== $sbu) continue;
-        if ($amt < (float)$r['min_amount']) continue;
-        if ((float)$r['max_amount'] > 0 && $amt > (float)$r['max_amount']) continue;
         $out[] = $r;
     }
     return $out;
 }
+// Does this level's range hold the value? A range includes its "up to"; where
+// the next level starts exactly there, the shared value belongs to the lower
+// level only — so a ₹5,00,000 quote is not in both "0 to 5,00,000" and
+// "5,00,000 to 25,00,000".
+function crm_rule_covers(array $r, $amt, array $applicable) {
+    $min = (float)$r['min_amount']; $max = (float)$r['max_amount'];
+    if ($amt < $min || ($max > 0 && $amt > $max)) return false;
+    if ($amt == $min && $min > 0)
+        foreach ($applicable as $o)
+            if ((int)$o['id'] !== (int)$r['id'] && (float)$o['max_amount'] == $min) return false;
+    return true;
+}
+// The levels whose range this quotation's before-tax value falls in.
+function crm_quote_matching_rules($q) {
+    $amt = crm_quote_band_value($q);
+    $app = crm_quote_applicable_rules($q);
+    return array_values(array_filter($app, fn($r) => crm_rule_covers($r, $amt, $app)));
+}
 
-// The rules a quotation must pass: those its value falls in or, when none does
-// and the company chose "the highest level", the rules of that level. Empty
-// means no rule speaks for it — then crm_quote_unmatched_policy() decides.
+// THE ESCALATING CHAIN — the owner's decision, 24 Oct 2026 (test book SAL-003):
+// a quotation goes UP the levels. It is approved by the level its value falls
+// in AND by every level below it, in order: with Branch Manager to ₹5,00,000,
+// Marketing Manager to ₹25,00,000 and Business Director above, a ₹30,00,000
+// quotation is signed Branch Manager → Marketing Manager → Business Director,
+// and a ₹2,00,000 one by the Branch Manager alone. (Levels may not overlap —
+// crm_approval_band_problem() refuses that at the save.)
+//
+// When no level holds the value and the company chose "the highest level"
+// (crm_quote_unmatched_policy()), the highest level's approvers sign, with
+// every level below it that the value has passed. Empty means no rule speaks
+// for it — then crm_quote_unmatched_policy() decides.
 function crm_quote_rule_steps($q) {
-    $steps = crm_quote_matching_rules($q);
-    if ($steps || crm_quote_unmatched_policy() !== 'top') return $steps;
-    $top = (int) ops_val("SELECT MAX(level) FROM quote_approval_rules WHERE active=1");
-    return $top ? (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 AND level=? ORDER BY id", [$top]) ?: []) : [];
+    $amt  = crm_quote_band_value($q);
+    $app  = crm_quote_applicable_rules($q);
+    $tops = array_values(array_filter($app, fn($r) => crm_rule_covers($r, $amt, $app)));
+    if (!$tops) {
+        if (crm_quote_unmatched_policy() !== 'top') return [];
+        $top = (int) ops_val("SELECT MAX(level) FROM quote_approval_rules WHERE active=1");
+        $tops = $top ? (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 AND level=? ORDER BY id", [$top]) ?: []) : [];
+        if (!$tops) return [];
+    }
+    $ceiling = max(array_map(fn($r) => (int)$r['level'], $tops));
+    $steps = [];
+    foreach ($tops as $r) $steps[(int)$r['id']] = $r;
+    foreach ($app as $r)                                    // the rungs below, that the value has passed
+        if ((int)$r['level'] < $ceiling && (float)$r['min_amount'] <= $amt) $steps[(int)$r['id']] = $r;
+    uasort($steps, fn($a, $b) => [(int)$a['level'], (float)$a['min_amount'], (int)$a['id']] <=> [(int)$b['level'], (float)$b['min_amount'], (int)$b['id']]);
+    return array_values($steps);
+}
+
+// '' when this level can be saved, else the sentence that says why not. Two
+// levels of the SAME scope (both company-wide, or both for the same business
+// unit) may not overlap, and a higher range needs a higher level number —
+// otherwise "up the chain" has no meaning (owner, test book SAL-003: "0 to
+// 50,000 then 30,000 to 1,00,000 — it accepts. No refusal"). A level for ONE
+// business unit may sit over company-wide levels: it adds a signatory for
+// that unit (test book SAL-005, "Industrial only: Business Unit Head").
+function crm_approval_band_problem(array $cand, $excludeId = 0) {
+    if (empty($cand['active'])) return '';                  // a level not in use cannot clash
+    $money = fn($n) => function_exists('fmoney') ? fmoney($n) : number_format((float)$n);
+    $range = fn($r) => (float)$r['max_amount'] > 0 ? $money($r['min_amount']) . ' to ' . $money($r['max_amount']) : $money($r['min_amount']) . ' upward';
+    $inf = fn($r) => (float)$r['max_amount'] > 0 ? (float)$r['max_amount'] : INF;
+    $cUnit = crm_rule_is_unit($cand);
+    foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 AND id<>? ORDER BY level, min_amount", [(int)$excludeId]) ?: [] as $o) {
+        $oUnit = crm_rule_is_unit($o);
+        if ($cUnit !== $oUnit) continue;                                                  // a unit's own level adds a signatory
+        if ($cUnit && (string)$o['sbu'] !== (string)$cand['sbu']) continue;               // two different units never meet
+        $where = $cUnit ? ' for the same business unit' : '';
+        if ((float)$cand['min_amount'] < $inf($o) && (float)$o['min_amount'] < $inf($cand))
+            return 'Level ' . (int)$o['level'] . ' already covers ' . $range($o) . $where . '. Levels may not overlap — a quotation moves up through them in order. '
+                 . ((float)$o['max_amount'] > 0 && (float)$cand['min_amount'] >= (float)$o['min_amount'] ? 'Start this level at ' . $money($o['max_amount']) . ', or change level ' . (int)$o['level'] . ' first.' : 'Change the values so the ranges follow one another.');
+        $higher = (float)$cand['min_amount'] > (float)$o['min_amount'];
+        if ($higher ? (int)$cand['level'] <= (int)$o['level'] : (int)$cand['level'] >= (int)$o['level'])
+            return 'A higher value needs a higher level number: level ' . (int)$o['level'] . ' covers ' . $range($o) . $where
+                 . ', so this range must be level ' . ($higher ? ((int)$o['level'] + 1) . ' or above' : ((int)$o['level'] - 1) . ' or below') . '.';
+    }
+    return '';
 }
 
 // D-02 — does this quotation need approving before it goes to the customer?
@@ -4014,6 +4081,8 @@ function ops_crm_approval_rules($route, $method) {
             //  Refused, not stored: a band that ends where it starts covers nothing.
             $problem = $min < 0 || $max < 0 ? 'Values cannot be negative.'
                      : ($max > 0 && $max <= $min ? 'The "up to" value must be above the "from" value (or 0 for no upper limit).' : '');
+            if ($problem === '') $problem = crm_approval_band_problem(['level' => $lvl, 'min_amount' => $min, 'max_amount' => $max,
+                'match_type' => $mt, 'sbu' => $mt === 'SBU' ? (string)$b['sbu'] : '', 'active' => !empty($b['active']) ? 1 : 0], $r ? (int)$r['id'] : 0);
             if ($problem !== '') { flash($problem, 'error'); redirect($back === '/quote-approval-rules' ? '/' . $route . ($r ? '?id=' . (int)$r['id'] : '') : $back); }
             //  A name is what appears on a quotation waiting for this level; when
             //  none is typed (Set up Sales asks only for the facts) it is written

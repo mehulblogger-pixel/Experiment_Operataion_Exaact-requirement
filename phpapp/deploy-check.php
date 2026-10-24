@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'd163da3 · 2026-10-24 08:45 UTC · 701 files';
+$RELEASE = '398c1f0 · 2026-10-24 08:56 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -116,7 +116,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>294922,'h'=>'3ef59a49b5996900'],
+    'lib/crm.php' => ['s'=>299889,'h'=>'f541b6495f080497'],
     'lib/crmdash.php' => ['s'=>14427,'h'=>'f124694bf443bc02'],
     'lib/customer360.php' => ['s'=>24402,'h'=>'f1d98328a475561b'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -242,7 +242,7 @@ $EXPECT  = [
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
     'lib/setup.php' => ['s'=>23072,'h'=>'7af387096568ab14'],
     'lib/setup_cockpit.php' => ['s'=>31454,'h'=>'0367929928139113'],
-    'lib/setupqa.php' => ['s'=>17728,'h'=>'06885b91b2f56e0b'],
+    'lib/setupqa.php' => ['s'=>18966,'h'=>'a6785961911ec434'],
     'lib/stagegate.php' => ['s'=>23612,'h'=>'47e075112915aafc'],
     'lib/superadmin.php' => ['s'=>22099,'h'=>'f3e910a1caa81d54'],
     'lib/tally.php' => ['s'=>44735,'h'=>'f910b38d13d7cee8'],

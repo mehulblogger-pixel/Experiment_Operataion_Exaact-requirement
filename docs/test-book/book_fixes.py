@@ -15,8 +15,24 @@ CHANGE = {  # (test id, step number) -> new fields
                       'expect': '"Payment keys saved. Press \'Check payment keys\' to confirm them."'},
     ('PLT-004', 9):  {'do': 'Emergency: mPanel → File Manager → in the data folder (test copy: exaact_test/exaact_data_test; live site: exaact_data) create an empty file "superadmin-unlock"; open /platform-setup on the main address.'},
     ('PLT-005', 2):  {'do': 'BEFORE saving any price (step 4): as a company on its free trial, open Subscription.'},
+    # The escalating chain (owner's decision, 24 Oct 2026): a quotation is signed by the
+    # level its value falls in AND every level below it; a shared boundary is the lower level's.
+    ('SAL-003', 4):  {'expect': 'Card "Level 2"; summary line "Level 2 — above ₹5,00,000 to ₹25,00,000 before tax: Marketing Manager."'},
+    ('SAL-003', 5):  {'expect': 'Card "Level 3"; summary says "above ₹25,00,000". The line "Nothing above … is covered" disappears, and a line reads "A quote goes up the levels: it is signed by the level its value falls in and by every level below it, in order."'},
+    ('SAL-071', 2):  {'expect': 'Level 1 only — ₹5,00,000 is the top of Level 1 ("up to"); Level 2 starts above it.'},
+    ('SAL-071', 3):  {'expect': 'Level 1, then Level 2 — it has gone up past Level 1.'},
+    ('SAL-071', 4):  {'do': 'A ₹40,00,000 quotation (inside Level 3, which has no upper limit).',
+                      'expect': 'Level 1 → Level 2 → Level 3 (Branch Manager, Marketing Manager, Business Director), in that order.'},
 }
 ADD = {  # test id -> steps appended at the end
+    'SAL-003': [
+        {'do': 'Edge: in the dashed card type Level 4, From 30000, Up to 100000 (inside Level 1). Add this level.',
+         'expect': 'Refused: "Level 1 already covers ₹0 to ₹5,00,000. Levels may not overlap — a quotation moves up through them in order…". No card is added.'},
+        {'do': 'Edge: type Level 1, From 3000000, Up to 0 (a higher range with a lower level number). Add this level.',
+         'expect': 'Refused: "A higher value needs a higher level number…". No card is added.'},
+        {'do': 'As Test BDM make three quotations — ₹2,00,000, ₹10,00,000 and ₹30,00,000 before tax — and submit each for approval. Open each one\'s approval steps.',
+         'expect': '₹2,00,000: Level 1 only. ₹10,00,000: Level 1, then Level 2. ₹30,00,000: Level 1 → Level 2 → Level 3 (one after another, or all at once if Set up Sales says so).'},
+    ],
     'SAL-000': [
         {'do': 'As admin: open Test MktExec → Permissions → untick "Sales reports" (View) → Save user. Then sign in as Test MktExec.',
          'expect': 'Insights is gone from the menu and /crm-dashboard is refused. Open the person again as admin: the tick is still off (it no longer comes back by itself).'},

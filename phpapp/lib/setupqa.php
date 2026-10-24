@@ -223,13 +223,27 @@ function setupqa_sales_level_facts() {
     $out = []; $top = 0.0; $open = false;
     foreach ($rows as $r) {
         $min = (float) $r['min_amount']; $max = (float) $r['max_amount'];
-        $range = $max > 0 ? ('from ' . $money($min) . ' to ' . $money($max)) : ('from ' . $money($min) . ' upward');
+        //  A value on a shared boundary belongs to the lower level (crm_rule_covers()),
+        //  so a level that starts where another ends is "above" that value.
+        $above = false;
+        foreach ($rows as $o) if ((int) $o['id'] !== (int) $r['id'] && $min > 0 && (float) $o['max_amount'] == $min
+                                  && crm_rule_is_unit($o) === crm_rule_is_unit($r) && (!crm_rule_is_unit($r) || $o['sbu'] === $r['sbu'])) $above = true;
+        $from  = ($above ? 'above ' : 'from ') . $money($min);
+        $range = $max > 0 ? ($from . ' to ' . $money($max)) : ($from . ($above ? '' : ' upward'));
         $out[] = 'Level ' . (int) $r['level'] . ' — ' . $range . ' before tax'
                . (crm_rule_is_unit($r) ? ' (' . ($units[$r['sbu']] ?? $r['sbu']) . ' only)' : '')
                . ': ' . $who($r) . '.';
         if ($max <= 0) $open = true; else $top = max($top, $max);
     }
     if (!$open) $out[] = 'Nothing above ' . $money($top) . ' is covered by a level — the first question below decides what happens to it.';
+    if (count($rows) > 1)
+        $out[] = 'A ' . (function_exists('Tl') ? Tl('quote') : 'quotation') . ' goes up the levels: it is signed by the level its value falls in and by every level below it, in order.';
+    // Levels saved before overlaps were refused (24 Oct 2026) are named, so they can be put right.
+    if (function_exists('crm_approval_band_problem'))
+        foreach ($rows as $r) {
+            $why = crm_approval_band_problem($r, (int) $r['id']);
+            if ($why !== '') { $out[] = '⚠ Level ' . (int) $r['level'] . ' (' . ((float) $r['max_amount'] > 0 ? 'from ' . $money($r['min_amount']) . ' to ' . $money($r['max_amount']) : 'from ' . $money($r['min_amount']) . ' upward') . '): ' . $why; break; }
+        }
     return array_merge($out, setupqa_sales_coverage_gaps($rows, $units));
 }
 

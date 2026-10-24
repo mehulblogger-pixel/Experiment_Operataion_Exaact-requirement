@@ -175,6 +175,14 @@ writes one line in the quotation's history (who, what, why).
   duplicate customer or inquiry is created (both already exist by acceptance time). A lead already
   `CONVERTED`/`LOST` is left alone (idempotent), and the whole propagation is best-effort — it
   never blocks the acceptance it rides on.
+- **Which levels a quotation needs — the escalating chain** (owner's decision, 24 Oct 2026, test
+  book SAL-003): a quotation is signed by the approval level its before-tax value falls in **and by
+  every level below it**, in order (Branch Manager to ₹5,00,000, Marketing Manager to ₹25,00,000,
+  Business Director above: a ₹30,00,000 quotation is signed by all three, a ₹2,00,000 one by the
+  Branch Manager alone). A value on a shared boundary belongs to the lower level only. Levels that
+  could apply to the same quotation may not overlap, and a higher range needs a higher level number
+  — both refused at the save, in plain words (`crm_approval_band_problem()`). Project costings follow
+  the same chain. No status or move is added; the steps are the same approval steps as before.
 - **Approval steps sign in order** (owner's D-05, 20 Oct 2026): a level-2 step is refused while any
   level-1 step is still pending. A step waiting longer than the days set in Set up Sales
   (`quote_approval_escalate_days`) is opened to the next level's approvers as well (D-11a); a
