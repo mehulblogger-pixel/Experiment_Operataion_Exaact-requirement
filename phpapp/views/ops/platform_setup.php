@@ -98,8 +98,16 @@ $adm = (array) ($adm ?? []); $ah = (string) ($adm['host'] ?? '');
   <div class="ps-body">
     <p style="margin:0 0 6px;font-size:14px">Keys saved: <b><?= !empty($pay['enabled']) ? 'yes' : 'no' ?></b>
       <?php if (!empty($pay['key_id'])): ?> · Key ID <code><?= $e(substr((string) $pay['key_id'], 0, 13)) ?>…</code><?php endif; ?></p>
-    <p class="ps-note" style="margin-top:0">Your keys come from the Razorpay Dashboard → Account &amp; Settings → API Keys. Enter them under <a href="/billing">Billing</a>.
-      Start with TEST keys (rzp_test_…): payments are pretend, so you can try the whole purchase with Razorpay's test cards. Switch to LIVE keys (rzp_live_…) to take real money.</p>
+    <p class="ps-note" style="margin-top:0">Your keys come from the Razorpay Dashboard → Account &amp; Settings → API Keys.
+      Start with TEST keys (rzp_test_…): payments are pretend, so you can try the whole purchase with Razorpay's test cards. Switch to LIVE keys (rzp_live_…) to take real money.
+      Every company pays you through these keys — no company needs its own.</p>
+    <form method="post" style="margin:0 0 10px"><input type="hidden" name="do" value="pay_keys">
+      <div class="ps-grid">
+        <div><label for="ps-kid">Razorpay Key ID</label><input id="ps-kid" name="rzp_key_id" value="<?= $e($pay['key_id'] ?? '') ?>" placeholder="rzp_test_…" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+        <div><label for="ps-ksec">Razorpay Key Secret</label><input id="ps-ksec" name="rzp_key_secret" type="password" autocomplete="new-password" placeholder="<?= !empty($pay['key_secret']) ? 'saved — leave blank to keep' : 'paste the secret' ?>"></div>
+      </div>
+      <div class="ps-row"><button class="btn">Save payment keys</button></div>
+    </form>
     <form method="post" class="ps-row"><input type="hidden" name="do" value="pay_check"><button class="btn ghost">Check payment keys</button>
       <?php $pc = $ch['payment'] ?? null; if ($pc): ?><span class="<?= !empty($pc['ok']) ? 'ps-ok' : 'ps-bad' ?>"><?= !empty($pc['ok']) ? 'Working' : 'Not working' ?></span>
         <span class="ps-note" style="margin:0"><?= $e(substr((string) $pc['at'], 0, 16) . ' — ' . $pc['msg']) ?></span><?php endif; ?></form>

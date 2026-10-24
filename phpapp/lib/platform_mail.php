@@ -139,7 +139,7 @@ function platform_mail_sender($kind = '') {
 // and creates nothing. Returns ['ok'=>bool,'mode'=>'test'|'live'|'','msg'=>...].
 function platform_payment_check() {
     $c = function_exists('billing_config') ? billing_config() : ['enabled' => false];
-    if (empty($c['enabled'])) return ['ok' => false, 'mode' => '', 'msg' => 'No Razorpay keys are saved yet (Super Admin → Advanced settings → Billing).'];
+    if (empty($c['enabled'])) return ['ok' => false, 'mode' => '', 'msg' => 'No Razorpay keys are saved yet — enter them above, under "Payment (Razorpay)".'];
     $mode = strncmp((string) $c['key_id'], 'rzp_live_', 9) === 0 ? 'live' : (strncmp((string) $c['key_id'], 'rzp_test_', 9) === 0 ? 'test' : '');
     $r = rzp_http('GET', 'https://api.razorpay.com/v1/orders?count=1', '', $c['key_id'], $c['key_secret']);
     if (!empty($r['ok'])) return ['ok' => true, 'mode' => $mode, 'msg' => 'Razorpay accepted the keys' . ($mode === 'test' ? ' — TEST keys: no real money moves.' : ($mode === 'live' ? ' — LIVE keys: real payments.' : '.'))];
@@ -247,6 +247,19 @@ function ops_platform_setup($method) {
             setting_set('test_mail_redirect', $a);
             flash($a !== '' ? 'Every e-mail from this test copy now goes to ' . $a . ' (the subject says who it was meant for).' : 'Test e-mails are no longer redirected.', 'success');
             redirect('/platform-setup#testmail');
+        }
+        if ($do === 'pay_keys' && function_exists('billing_keys_refusal')) {
+            $why = billing_keys_refusal();
+            $kid = trim((string) ($_POST['rzp_key_id'] ?? ''));
+            if ($why === '' && $kid !== '' && !preg_match('/^rzp_(test|live)_[A-Za-z0-9]+$/', $kid))
+                $why = 'The Key ID starts with rzp_test_ or rzp_live_ — copy it again from Razorpay.';
+            if ($why !== '') { flash($why, 'error'); redirect('/platform-setup#pay'); }
+            billing_keys_store($kid, $_POST['rzp_key_secret'] ?? '');
+            $live = strncmp($kid, 'rzp_live_', 9) === 0;
+            flash('Payment keys saved' . ($live && function_exists('app_is_test_copy') && app_is_test_copy()
+                ? ' — but these are LIVE keys, and a test copy refuses to take payments with them. Use TEST keys (rzp_test_…).'
+                : '. Press "Check payment keys" to confirm them.'), $live && function_exists('app_is_test_copy') && app_is_test_copy() ? 'error' : 'success');
+            redirect('/platform-setup#pay');
         }
         if ($do === 'pay_check') {
             $r = platform_payment_check();

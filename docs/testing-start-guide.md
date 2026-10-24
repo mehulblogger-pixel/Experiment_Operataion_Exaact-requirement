@@ -67,7 +67,7 @@ How it was built: `docs/test-book/test-copy/`.
 5. **Check it.** Open **https://opstest.mghaiapps.com/login** and sign in as `admin`. The
    red TEST COPY banner must show on every page.
 6. **Set up payments and e-mail.**
-   - Platform setup → paste Razorpay **TEST** keys (`rzp_test_…`) under Billing.
+   - Platform setup → **Payment (Razorpay)** → paste Razorpay **TEST** keys (`rzp_test_…`) → **Save payment keys**.
    - Fill in the platform e-mail.
    - Use **Send a test e-mail** to one of your own addresses.
 7. **Only if you will test "New company"** (sign-up, trials, plans, GST invoices): go to Super Admin

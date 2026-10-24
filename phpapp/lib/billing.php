@@ -33,6 +33,22 @@ function billing_config() {
     ];
 }
 function billing_configured() { return billing_config()['enabled']; }
+
+// Who may change the platform's payment keys, and from where ('' = allowed).
+// Used by Users & billing and by Platform setup, so both refuse the same way.
+function billing_keys_refusal() {
+    if (!function_exists('is_master') || !is_master()) return 'Only the Master Admin can change the price and payment keys.';
+    // Inside a company workspace on the platform, prices and payment keys
+    // belong to the platform owner. A company setting its own price could
+    // otherwise buy its plan for ₹1, or send its payment anywhere.
+    if (function_exists('current_tenant') && current_tenant() !== '') return 'Prices and payment keys are set by your provider, not inside your workspace.';
+    if (function_exists('superadmin_host_ok') && !superadmin_host_ok()) return 'Super Admin is locked to its own address — change the price and payment keys there.';
+    return '';
+}
+function billing_keys_store($keyId, $secret) {
+    setting_set('rzp_key_id', trim((string) $keyId));
+    if (trim((string) $secret) !== '') setting_set('rzp_key_secret', trim((string) $secret));   // blank = keep existing
+}
 function billing_can_manage() { return function_exists('is_master') && (is_master() || can('settings.manage')); }
 
 // Amount for N seats over a period. Razorpay works in the smallest currency unit
@@ -192,14 +208,8 @@ function ops_billing($route, $method) {
     ops_require(billing_can_manage(), 'You cannot manage billing.');
 
     if ($route === 'billing-config' && $method === 'POST') {
-        ops_require(is_master(), 'Only the Master Admin can change the price and payment keys.');
-        // Inside a company workspace on the platform, prices and payment keys
-        // belong to the platform owner. A company setting its own price could
-        // otherwise buy its plan for ₹1, or send its payment anywhere.
-        ops_require(!function_exists('current_tenant') || current_tenant() === '',
-            'Prices and payment keys are set by your provider, not inside your workspace.');
-        ops_require(!function_exists('superadmin_host_ok') || superadmin_host_ok(),
-            'Super Admin is locked to its own address — change the price and payment keys there.');
+        $why = billing_keys_refusal();
+        ops_require($why === '', $why);
         // Prices are set on Plans, pricing & usage (lib/commercial.php); this
         // form keeps the payment keys. A price posted here by an older page is
         // still honoured, so nothing it sends is silently lost.
@@ -210,9 +220,7 @@ function ops_billing($route, $method) {
             $v = trim((string) $_POST[$f]);
             setting_set($k, $f === 'currency' ? (strtoupper(substr($v, 0, 5)) ?: 'INR') : ($v === '' ? '' : (string) max(0, (int) $v)));
         }
-        setting_set('rzp_key_id', trim((string) ($_POST['rzp_key_id'] ?? '')));
-        if (trim((string) ($_POST['rzp_key_secret'] ?? '')) !== '')      // blank = keep existing
-            setting_set('rzp_key_secret', trim((string) $_POST['rzp_key_secret']));
+        billing_keys_store($_POST['rzp_key_id'] ?? '', $_POST['rzp_key_secret'] ?? '');
         flash('Payment keys saved.');
         redirect('/billing');
     }

@@ -53,7 +53,7 @@ are never kept.
 
 ## 4. Payment (Razorpay)
 1. Razorpay Dashboard → Account & Settings → **API Keys** → generate **Test** keys.
-2. Super Admin → Advanced settings → **Billing** → paste Key ID and Key Secret → save.
+2. Super Admin → **Platform setup** → **Payment (Razorpay)** → paste Key ID and Key Secret → **Save payment keys**.
 3. Platform setup → **Check payment keys** → "Razorpay accepted the keys — TEST keys".
 4. Buy a plan as a test company with Razorpay's test card — no real money moves.
 5. When ready for real customers, repeat with **Live** keys (`rzp_live_…`) and check again.
