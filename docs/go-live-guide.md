@@ -19,7 +19,7 @@ Upload the latest version of the app to the server first (as usual).
 - In the left menu you will see **Owner home** and **Platform setup**. A company's
   own administrators never see these and are refused if they type the address.
 - Once step 7 is done, sign in at the Super Admin address instead
-  (e.g. **https://admin.operations.mghaiapps.com/login**).
+  (e.g. **https://operations-admin.mghaiapps.com/login**).
 
 ## 2. Open Platform setup
 Left menu → **Platform setup**. The **Go-live checklist** at the top shows what is
@@ -100,12 +100,15 @@ storage, and removes unused free trials. The checklist shows when it last ran.
 ## 7. Super Admin on its own address
 So that Super Admin has a completely separate sign-in, away from the address companies use:
 
-1. **Platform setup → Super Admin address** → type e.g. `admin.operations.mghaiapps.com` → **Save address**.
+1. **Platform setup → Super Admin address** → type e.g. `operations-admin.mghaiapps.com` → **Save address**.
+   Use a **one-level** address (only one word before `mghaiapps.com`). A nested one such as
+   `admin.operations.mghaiapps.com` never opens on MilesWeb: the panel creates its DNS record and
+   certificate only for one-level sub-domains. The box suggests a suitable address.
 2. Create the address in your hosting: press **Create it in cPanel for me** (shown when cPanel is
    connected), or by hand in cPanel → **Domains** (or **Subdomains**) → create
-   `admin.operations.mghaiapps.com` with the **same folder** as the main site. cPanel adds the free
+   `operations-admin.mghaiapps.com` with the **same folder** as the main site. cPanel adds the free
    security certificate (AutoSSL) within about an hour.
-3. Open **https://admin.operations.mghaiapps.com/login** and sign in with the platform-owner account.
+3. Open **https://operations-admin.mghaiapps.com/login** and sign in with the platform-owner account.
 4. **Platform setup → Lock Super Admin to this address.** (The button only works on the new address,
    so you can never lock yourself out of an address that does not open yet.)
 

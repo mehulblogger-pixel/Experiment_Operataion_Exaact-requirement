@@ -23,7 +23,7 @@ function superadmin_can() {
 // ---------------------------------------------------------------------------
 //  ITS OWN ADDRESS (owner, 22 Oct 2026: "Super admin shall have complete
 //  different login"). The platform owner may give Super Admin its own web
-//  address (e.g. admin.operations.mghaiapps.com) and LOCK it there:
+//  address (e.g. operations-admin.mghaiapps.com) and LOCK it there:
 //    • Super Admin screens then open only at that address — never on the
 //      address every company uses;
 //    • at that address only platform-owner (Master Admin) accounts can sign
@@ -131,9 +131,19 @@ function superadmin_wrong_door_msg() {
 }
 
 // ---- Setting the address up (Platform setup → Super Admin address) -----------------
+// When the main address is itself a sub-domain (operations.mghaiapps.com), the
+// suggestion is a sibling one level deep (operations-admin.mghaiapps.com), not
+// admin.operations.mghaiapps.com: many hosting panels (MilesWeb's among them)
+// create the DNS record and certificate only for one-level sub-domains, so a
+// nested address never opens.
 function superadmin_host_suggest() {
     $b = function_exists('tenant_registry') ? strtolower((string) (tenant_registry()['base_domain'] ?? '')) : '';
-    return $b !== '' ? 'admin.' . $b : '';
+    if ($b === '') return '';
+    $parts = explode('.', $b);
+    $tail2 = implode('.', array_slice($parts, -2));
+    $twoLevel = in_array($tail2, ['co.in', 'net.in', 'org.in', 'firm.in', 'gen.in', 'ind.in', 'co.uk', 'org.uk', 'com.au', 'co.nz', 'com.sg'], true);
+    $isSub = count($parts) > ($twoLevel ? 3 : 2);
+    return $isSub ? $parts[0] . '-admin.' . implode('.', array_slice($parts, 1)) : 'admin.' . $b;
 }
 // Save (or clear, with '') the Super Admin address. Returns '' or the reason it was refused.
 function superadmin_host_save($host) {
@@ -142,15 +152,15 @@ function superadmin_host_save($host) {
     $host = rtrim(explode('/', $host)[0], '.');
     if (superadmin_locked()) return 'Unlock Super Admin first — then the address can be changed.';
     if ($host !== '' && !preg_match('/^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $host))
-        return 'That is not a web address. Type it like admin.operations.mghaiapps.com — no https://, no slash.';
+        return 'That is not a web address. Type it like ' . (superadmin_host_suggest() ?: 'admin.your-domain.com') . ' — no https://, no slash.';
     $reg = function_exists('tenant_registry') ? tenant_registry() : ['base_domain' => '', 'aliases' => [], 'tenants' => []];
     $base = strtolower((string) ($reg['base_domain'] ?? ''));
     if ($host !== '' && ($host === $base || $host === 'www.' . $base))
-        return 'That is the address every company uses. Super Admin needs a different one, such as admin.' . ($base ?: 'your-domain') . '.';
+        return 'That is the address every company uses. Super Admin needs a different one, such as ' . (superadmin_host_suggest() ?: 'admin.your-domain.com') . '.';
     if ($host !== '' && $base !== '' && substr($host, -strlen('.' . $base)) === '.' . $base) {
         $label = substr($host, 0, -strlen('.' . $base));
         if (isset($reg['tenants'][$label]) || (function_exists('saas_tenant_get') && saas_tenant_get($label)))
-            return 'A company already uses the name "' . $label . '". Choose another, such as admin.' . $base . '.';
+            return 'A company already uses the name "' . $label . '". Choose another, such as ' . (superadmin_host_suggest() ?: 'admin.' . $base) . '.';
     }
     return superadmin_cfg_write($host, false, superadmin_host());
 }

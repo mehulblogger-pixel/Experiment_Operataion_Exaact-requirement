@@ -1182,7 +1182,7 @@ permission — it reuses the Super Admin gate.
 
 **Super Admin's own address (owner, 22 Oct 2026: "Super admin shall have complete different
 login")** — Platform setup → *Super Admin address*. The platform owner saves an address such as
-`admin.operations.mghaiapps.com` (it is added to the main site's own addresses in the workspace
+`operations-admin.mghaiapps.com` (it is added to the main site's own addresses in the workspace
 registry, so it opens the platform's own site and never a company), creates it in the hosting, opens
 it, signs in there and presses **Lock**. The lock can only be switched on *from* that address. Once
 locked:

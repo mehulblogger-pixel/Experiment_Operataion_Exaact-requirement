@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '8267f81 · 2026-10-24 05:34 UTC · 701 files';
+$RELEASE = '201ecbd · 2026-10-24 05:36 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -244,7 +244,7 @@ $EXPECT  = [
     'lib/setup_cockpit.php' => ['s'=>31454,'h'=>'0367929928139113'],
     'lib/setupqa.php' => ['s'=>17728,'h'=>'06885b91b2f56e0b'],
     'lib/stagegate.php' => ['s'=>23612,'h'=>'47e075112915aafc'],
-    'lib/superadmin.php' => ['s'=>21291,'h'=>'248c7eb4cee89045'],
+    'lib/superadmin.php' => ['s'=>22099,'h'=>'f3e910a1caa81d54'],
     'lib/tally.php' => ['s'=>44735,'h'=>'f910b38d13d7cee8'],
     'lib/tapi.php' => ['s'=>69455,'h'=>'a8d85d8e3a4bdd08'],
     'lib/tapi_dash.php' => ['s'=>19519,'h'=>'efd1e7a78a470736'],

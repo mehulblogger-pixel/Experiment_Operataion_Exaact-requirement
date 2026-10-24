@@ -72,7 +72,7 @@ file_put_contents($regFile, "<?php return " . var_export(['base_domain' => 'ops.
 if (function_exists('opcache_invalidate')) @opcache_invalidate($regFile, true);
 try {
     t_eq(superadmin_cfg_store(), 'registry', 'in cloud mode the address lives in the workspace registry (read the same in every database)');
-    t_eq(superadmin_host_suggest(), 'admin.ops.example.test', 'the suggested address is admin.<main address>');
+    t_eq(superadmin_host_suggest(), 'ops-admin.example.test', 'the main address is a sub-domain, so the suggestion is a one-level sibling (ops-admin.…), not admin.ops.… which many hosts never create');
     t_ok(superadmin_host_save('ops.example.test') !== '', 'the address every company uses cannot be the Super Admin address');
     t_eq(superadmin_host_save('admin.ops.example.test'), '', 'admin.ops.example.test is saved');
     $reg = tenant_registry();
