@@ -76,15 +76,19 @@
 <div class="panel">
   <div class="ctitle" style="margin-top:0"><h3>Workspace requests
       <?php if ($pending): ?><span class="pill p-warn"><?= count($pending) ?> new</span><?php else: ?><span class="muted">(<?= count($requests) ?>)</span><?php endif; ?></h3>
-    <form method="post" action="/workspace-signup-toggle" style="margin:0">
-      <input type="hidden" name="on" value="<?= $signupOn ? '0' : '1' ?>">
-      <button class="btn small <?= $signupOn ? 'secondary' : '' ?>" type="submit">
-        <?= $signupOn ? 'Online registration: ON — turn off' : 'Online registration: OFF — turn on' ?></button>
-    </form>
   </div>
-  <p class="sub" style="margin:0 0 10px">When online registration is on, a new inspection company can apply for its own
-    workspace at <code>/get-started</code>. Each request waits here for you to approve; approving creates the workspace
-    (automatically if the cPanel API is set up, otherwise you finish it with the two steps below).</p>
+  <?php $mode = function_exists('workspace_entry_mode') ? workspace_entry_mode() : ($signupOn ? 'apply' : 'closed'); ?>
+  <form method="post" action="/workspace-signup-toggle" style="margin:0 0 12px;padding:12px 14px;border:1px solid var(--line,#e5e7eb);border-radius:10px;background:var(--soft,#f8fafc)">
+    <div style="font-weight:600;margin-bottom:6px">How does a new company get a workspace?</div>
+    <?php foreach ((defined('WORKSPACE_ENTRY_MODES') ? WORKSPACE_ENTRY_MODES : []) as $k => $lab): ?>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:13.5px"><input type="radio" name="mode" value="<?= e($k) ?>" <?= $mode === $k ? 'checked' : '' ?> style="margin-top:3px"> <span><?= e($lab) ?></span></label>
+    <?php endforeach; ?>
+    <button class="btn small" type="submit" style="margin-top:6px">Save</button>
+    <span class="muted" style="font-size:12.5px;margin-left:8px">Now: <b><?= e((defined('WORKSPACE_ENTRY_MODES') ? WORKSPACE_ENTRY_MODES : [])[$mode] ?? $mode) ?></b>.
+      <?= $mode === 'instant' ? 'The free-trial length and limits are under Companies → 🚀 Self sign-up &amp; free trial.' : '' ?></span>
+  </form>
+  <p class="sub" style="margin:0 0 10px">With "apply", each request waits here for you to approve; approving creates the
+    workspace (automatically if the cPanel API is set up, otherwise you finish it with the two steps below).</p>
   <table class="dt">
     <thead><tr><th>Company</th><th>Contact</th><th>Wants</th><th>State</th><th></th></tr></thead>
     <tbody>

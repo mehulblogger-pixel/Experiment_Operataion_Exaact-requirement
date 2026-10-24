@@ -17,6 +17,15 @@ CHANGE = {  # (test id, step number) -> new fields
     ('PLT-005', 2):  {'do': 'BEFORE saving any price (step 4): as a company on its free trial, open Subscription.'},
     # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
     ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
+    # One choice instead of two switches (owner: "switch is off but still I can generate the account from /start").
+    ('ONB-001', 2):  {'do': 'Panel "Workspace requests" → "How does a new company get a workspace?" → choose "Companies apply at /get-started, and you approve each one here" → Save.',
+                      'expect': '"New companies: Companies apply at /get-started, and you approve each one here." The line "Now: …" shows that choice.'},
+    ('ONB-001', 4):  {'do': 'Choose "Only you add companies" → Save. Signed out, open /get-started, then /start.',
+                      'expect': 'Both closed: "We set up workspaces personally… Online self-registration isn\'t open just yet." — no form on either (before the 24 Oct update /start stayed open; that was the bug). Choose "Companies apply…" again for the next tests.'},
+    ('ONB-001', 5):  {'do': 'Choose "Companies sign themselves up at /start" → Save. Signed out, open /get-started.',
+                      'expect': 'It lands on "Start your free trial" — the company creates its own workspace without waiting.'},
+    ('ONB-006', 2):  {'do': 'Choose "Companies sign themselves up at /start" on Cloud workspaces (or tick "Companies can sign themselves up" here) → Save.'},
+    ('ONB-006', 5):  {'expect': 'Self sign-up is off. The note beside the tick says what happens instead: /start goes to the application form if applications are on, or is closed if you chose "Only you add companies" on Cloud workspaces.'},
     ('ONB-010', 1):  {'do': 'Owner home → "Cloud workspaces & requests" → panel "Workspace requests".'},
     ('ONB-012', 1):  {'do': 'Owner home → "Cloud workspaces & requests" → the request → "Decline".'},
     # The escalating chain (owner's decision, 24 Oct 2026): a quotation is signed by the

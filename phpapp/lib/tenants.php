@@ -339,6 +339,11 @@ function ops_tenants($route, $method) {
 
     // --- Public workspace-signup inbox (a new company applied for itself) ---
     if ($route === 'workspace-signup-toggle' && $method === 'POST') {
+        $mode = (string) ($_POST['mode'] ?? '');
+        if ($mode !== '' && function_exists('workspace_entry_set') && workspace_entry_set($mode)) {
+            flash('New companies: ' . WORKSPACE_ENTRY_MODES[$mode] . '.');
+            redirect('/tenants');
+        }
         if (function_exists('tenant_signup_set_enabled'))
             tenant_signup_set_enabled(!empty($_POST['on']));
         flash(!empty($_POST['on'])

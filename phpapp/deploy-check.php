@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'a93c4c0a · 2026-10-24 17:05 UTC · 701 files';
+$RELEASE = '222ed9f7 · 2026-10-24 17:19 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -252,8 +252,8 @@ $EXPECT  = [
     'lib/tapi_score.php' => ['s'=>14322,'h'=>'e2256ab85fab255c'],
     'lib/tasks.php' => ['s'=>11239,'h'=>'82c11af4ebccd03c'],
     'lib/tenant_migrate.php' => ['s'=>20675,'h'=>'3a8be680c3200403'],
-    'lib/tenant_signup.php' => ['s'=>14646,'h'=>'dbc3ba0b5299482a'],
-    'lib/tenants.php' => ['s'=>23111,'h'=>'f5c5ac268cf7acec'],
+    'lib/tenant_signup.php' => ['s'=>15976,'h'=>'8466996f3fff1e7e'],
+    'lib/tenants.php' => ['s'=>23379,'h'=>'8bb1d9d0ef7cc82e'],
     'lib/terms.php' => ['s'=>28589,'h'=>'6aa8716a9d4cae12'],
     'lib/timesheet.php' => ['s'=>9615,'h'=>'0850f4b87638e4a5'],
     'lib/tmplpreview.php' => ['s'=>3520,'h'=>'770170cf566d21da'],
@@ -599,7 +599,7 @@ $EXPECT  = [
     'views/ops/risk_form.php' => ['s'=>3356,'h'=>'f43057f55e88ff02'],
     'views/ops/risks_list.php' => ['s'=>2204,'h'=>'93906156b7d808ab'],
     'views/ops/role_workspaces.php' => ['s'=>4048,'h'=>'66938f5a5139889f'],
-    'views/ops/saas_companies.php' => ['s'=>33922,'h'=>'af74ef8ac94a9104'],
+    'views/ops/saas_companies.php' => ['s'=>34132,'h'=>'803d374b3a4f253b'],
     'views/ops/sample_detail.php' => ['s'=>4311,'h'=>'4529a1888c336f30'],
     'views/ops/sample_form.php' => ['s'=>4129,'h'=>'dfabaedae75c6f9f'],
     'views/ops/samples_list.php' => ['s'=>2173,'h'=>'18bdce8f8a7621a9'],
@@ -633,7 +633,7 @@ $EXPECT  = [
     'views/ops/tapi_scorecard.php' => ['s'=>2166,'h'=>'c547d85711e404f9'],
     'views/ops/tapi_snapshot.php' => ['s'=>2775,'h'=>'74aad9f368ad107f'],
     'views/ops/tasks.php' => ['s'=>4329,'h'=>'0c2ffedf67f10633'],
-    'views/ops/tenants.php' => ['s'=>19930,'h'=>'3a967825bf495de8'],
+    'views/ops/tenants.php' => ['s'=>20635,'h'=>'4b19e396151d1479'],
     'views/ops/terminology.php' => ['s'=>4401,'h'=>'984504c0b825174e'],
     'views/ops/timesheet.php' => ['s'=>5962,'h'=>'bef076d2397f0133'],
     'views/ops/to_bill.php' => ['s'=>7030,'h'=>'c2399620b3458380'],

@@ -120,9 +120,11 @@ From then on: Super Admin opens only at the new address; on the main address the
 address again until you delete that file.
 
 ## 8. Switch on self sign-up — last
-When every other line is green: Companies → **🚀 Self sign-up & free trial** → tick
-**Companies can sign themselves up** → Save. Then try it yourself in a private window
-at **/start** with an e-mail you can read.
+When every other line is green: Owner home → **Cloud workspaces & requests** → "How does a
+new company get a workspace?" → choose **Companies sign themselves up at /start** → Save. (The
+other two choices: only you add companies, or companies apply and you approve each one.) The
+trial length and limits are under Companies → **🚀 Self sign-up & free trial**. Then try it
+yourself in a private window at **/start** with an e-mail you can read.
 
 ## Updating the live site after testing
 

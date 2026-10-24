@@ -60,6 +60,30 @@ function tenant_signup_set_enabled($on) {
     if (function_exists('setting_set')) setting_set('workspace_signup_enabled', $on ? '1' : '0');
 }
 
+// HOW A NEW COMPANY GETS A WORKSPACE — one answer, not two switches.
+//
+// Two settings decide it: self sign-up (selfserve_signup_enabled, /start) and
+// online registration (workspace_signup_enabled, /get-started). Shown as two
+// switches on two screens, "Online registration: OFF" still let anyone open a
+// workspace at /start, because self sign-up was on (owner, test book ONB-001:
+// "the switch is off but still I can generate the account from /start").
+// So the owner now makes ONE choice; both settings follow it.
+const WORKSPACE_ENTRY_MODES = [
+    'closed'  => 'Only you add companies (Companies → ＋ Add a company)',
+    'apply'   => 'Companies apply at /get-started, and you approve each one here',
+    'instant' => 'Companies sign themselves up at /start — straight in, on a free trial',
+];
+function workspace_entry_mode() {
+    if (function_exists('selfserve_enabled') && selfserve_enabled()) return 'instant';
+    return tenant_signup_enabled() ? 'apply' : 'closed';
+}
+function workspace_entry_set($mode) {
+    if (!isset(WORKSPACE_ENTRY_MODES[$mode]) || !function_exists('setting_set')) return false;
+    setting_set('selfserve_signup_enabled', $mode === 'instant' ? '1' : '0');
+    tenant_signup_set_enabled($mode !== 'closed');   // with instant on, /get-started forwards to /start
+    return true;
+}
+
 /** The states a request moves through. */
 function tenant_request_statuses() {
     return ['PENDING' => 'Pending review', 'APPROVED' => 'Approved — awaiting setup',
