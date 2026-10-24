@@ -282,6 +282,8 @@ def main():
         companies=[{'code': c, 'name': n, 'what': w, 'industry': i} for c, n, w, i in COMPANIES],
         setup=guide.book_data(ROLE_NAMES, access),
         cases=cases)
+    from addresses import to_test_copy
+    book = to_test_copy(book)          # every address is the test copy's
     out = os.path.join(SP, 'site', 'book.json')
     os.makedirs(os.path.dirname(out), exist_ok=True)
     json.dump(book, open(out, 'w'), ensure_ascii=False, separators=(',', ':'))

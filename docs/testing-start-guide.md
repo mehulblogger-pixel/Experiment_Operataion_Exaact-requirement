@@ -73,7 +73,7 @@ How it was built: `docs/test-book/test-copy/`.
 7. **Only if you will test "New company"** (sign-up, trials, plans, GST invoices): go to Super Admin
    → **Cloud workspaces** → set the base domain to `opstest.mghaiapps.com`.
 
-Wherever a test says `operations.mghaiapps.com`, use `opstest.mghaiapps.com`.
+Every address in the test book is the test copy's (`opstest.mghaiapps.com`).
 
 ## Step 2 — Prepare: "Start here" in the test book (already done in the ready-made copy; just check it)
 
