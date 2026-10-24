@@ -441,6 +441,11 @@ function login_fail($username) {
     if ($username === '') return 0;
     login_attempts_migrate();
     $r = login_row($username);
+    // Already resting: a try during the lock is refused but does not restart
+    // it. Otherwise every attempt pushed the end back another 15 minutes and
+    // a person who kept trying (even with the right password) never got in.
+    $left = login_locked_for($username);
+    if ($left > 0) return $left;
     try {
         if (!$r) db()->prepare("INSERT INTO login_attempts (username,tries,last_at) VALUES (?,1,?)")
                      ->execute([$username, date('c')]);
