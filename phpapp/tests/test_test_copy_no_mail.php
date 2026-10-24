@@ -59,7 +59,7 @@ try {
     t_eq(tenant_safe_data_dir()[0], $GLOBALS['APP_DATA_DIR'], "config.local.php 'data_dir' chooses the folder exactly");
     @unlink($GLOBALS['APP_DATA_DIR'] . '/.htaccess'); @rmdir($GLOBALS['APP_DATA_DIR']);
     if ($prevDir === null) unset($GLOBALS['APP_DATA_DIR']); else $GLOBALS['APP_DATA_DIR'] = $prevDir;
-    if (basename($d) === 'exaact_data_test') { @unlink($d . '/.htaccess'); @rmdir($d); }
+    if (basename($d) === 'exaact_data_test') { @unlink($d . '/.htaccess'); @unlink($d . '/platform-mail.php'); @rmdir($d); }
 
     // …and its own backups folder, never the live site's.
     $keepBd = (string) setting_get('backup_dir', ''); setting_set('backup_dir', '');

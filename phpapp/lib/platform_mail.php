@@ -85,6 +85,15 @@ function platform_mail_note($key, array $v) {
     return platform_mail_write($d);
 }
 
+// The test copy's one inbox, kept in the platform file so every company
+// workspace on the copy reads the same answer (lib/ops.php app_test_mail_redirect()).
+function platform_mail_set_test_redirect($addr) {
+    $d = platform_mail_get();
+    if ((string) ($d['test_redirect'] ?? '') === (string) $addr) return '';
+    $d['test_redirect'] = (string) $addr;
+    return platform_mail_write($d);
+}
+
 // A mail server's error, in words the platform owner can act on; the original
 // is kept after it for whoever helps them.
 function platform_mail_explain($err) {
@@ -245,6 +254,7 @@ function ops_platform_setup($method) {
             $a = strtolower(trim((string) ($_POST['test_mail_redirect'] ?? '')));
             if ($a !== '' && !filter_var($a, FILTER_VALIDATE_EMAIL)) { flash('That is not an e-mail address.', 'error'); redirect('/platform-setup#testmail'); }
             setting_set('test_mail_redirect', $a);
+            platform_mail_set_test_redirect($a);   // read by every company workspace too
             flash($a !== '' ? 'Every e-mail from this test copy now goes to ' . $a . ' (the subject says who it was meant for).' : 'Test e-mails are no longer redirected.', 'success');
             redirect('/platform-setup#testmail');
         }

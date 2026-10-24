@@ -2670,10 +2670,27 @@ function app_test_mail_allowed($to, $cc = '') {
 // On a test copy: one inbox that receives EVERY e-mail the copy sends, set on
 // Platform setup ("Send every e-mail from this test copy to"), so a tester who
 // does not edit settings files still sees each sign-up code and reminder.
+//
+// It is kept in the PLATFORM file (beside the platform e-mail), not only in the
+// main site's settings: an e-mail sent from inside a company — a password reset,
+// a quotation, a reminder — runs in that company's own database, which never
+// held the setting, so the test copy BLOCKED it instead of redirecting it
+// (owner, 24 Oct 2026: "password reset for workspace does not send the reset
+// link"). A value saved before this lived only in the main site's settings; the
+// main site copies it across the first time it reads it.
 function app_test_mail_redirect() {
-    if (!app_is_test_copy() || !function_exists('setting_get')) return '';
-    $a = strtolower(trim((string) setting_get('test_mail_redirect', '')));
-    return filter_var($a, FILTER_VALIDATE_EMAIL) ? $a : '';
+    if (!app_is_test_copy()) return '';
+    $ok = fn($a) => filter_var($a, FILTER_VALIDATE_EMAIL) ? $a : '';
+    // On the main site its own setting decides (Platform setup saves it there);
+    // it is mirrored to the platform file so that e-mail sent from INSIDE a
+    // company workspace (own database, no such setting) reaches the same inbox.
+    $onMain = !function_exists('current_tenant') || current_tenant() === '';
+    if ($onMain) {
+        $mine = function_exists('setting_get') ? $ok(strtolower(trim((string) setting_get('test_mail_redirect', '')))) : '';
+        if (function_exists('platform_mail_set_test_redirect')) platform_mail_set_test_redirect($mine);
+        return $mine;
+    }
+    return function_exists('platform_mail_get') ? $ok(strtolower(trim((string) (platform_mail_get()['test_redirect'] ?? '')))) : '';
 }
 // Where a message to $to really lands: the one test inbox when set, else $to.
 // Screens that report "sent to …" use this, so they never name an address
