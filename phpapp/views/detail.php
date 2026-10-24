@@ -38,7 +38,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
 <?php endif; ?>
 <div class="master-head">
   <div><h1><?= e(partner_name($p)) ?></h1>
-    <p class="sub"><?= e($p['code']) ?> · <?= e(roles_label($p)) ?> <span class="badge <?= $badge ?>"><?= e(lk_options_or('partner_status', STATUSES)[$p['status']] ?? $p['status']) ?></span></p></div>
+    <p class="sub"><?= e($p['code']) ?> · <?= e(roles_label($p)) ?> <span class="badge <?= $badge ?>"><?= e(lk_options_or('partner_status', STATUSES)[$p['status']] ?? $p['status']) ?></span><?php if (trim((string)($p['status_reason'] ?? '')) !== '' && $p['status'] !== 'ACTIVE'): ?> <span class="muted">— <?= e($p['status_reason']) ?></span><?php endif; ?></p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <?php // The assembled view. This screen is the master RECORD; that one is
           // what somebody needs before they ring them. ?>

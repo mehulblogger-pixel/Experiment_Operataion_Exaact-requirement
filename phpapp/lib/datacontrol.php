@@ -280,7 +280,7 @@ function integrity_checks() {
         $stale = 0;
         foreach (ops_all("SELECT id, permissions FROM users WHERE COALESCE(permissions,'')<>''") as $u)
             foreach (array_filter(explode(',', (string)$u['permissions'])) as $p)
-                if (!in_array(trim($p), $valid, true)) { $stale++; break; }
+                if (($p = trim($p)) !== '' && $p[0] !== '@' && !in_array($p, $valid, true)) { $stale++; break; }   // '@…' = bookkeeping stamps, not rights
         $out[] = ['key' => 'perm_stale', 'ok' => $stale === 0, 'found' => $stale, 'skipped' => false,
                   'what' => 'No account carries a permission that no longer exists',
                   'why'  => 'A permission left over from an old version is a right nobody reviewed.'];

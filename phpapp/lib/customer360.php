@@ -173,7 +173,9 @@ function c360_sites($pid) {
 // Returns latest + average score over recent surveys, or null (card is skipped).
 function c360_satisfaction($pid) {
     if (!function_exists('sat_enabled') || !sat_enabled()) return null;
-    if (function_exists('sat_can_view') && !sat_can_view()) return null;
+    // Read-only on a client the viewer may already open: the account's own team sees
+    // how satisfied this client is, without the Quality register opening to them.
+    if (function_exists('sat_can_view') && !sat_can_view() && !can('mod.clients.view')) return null;
     $rows = c360_rows("SELECT score, recommend, received_on FROM satisfaction_surveys
                        WHERE client_id=? AND score IS NOT NULL ORDER BY received_on DESC, id DESC LIMIT 12", [(int)$pid]);
     if (!$rows) return null;

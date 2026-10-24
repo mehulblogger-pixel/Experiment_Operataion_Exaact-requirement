@@ -28,8 +28,12 @@ function disclosure_migrate() {
 }
 
 function disclosure_can_view() {
+    // Confidentiality / data control — or the operations people who send
+    // reports (client register, held by management or someone who works on
+    // jobs — works_operations()). Client register alone (Sales) does
+    // not open it (owner, test book SAL-000).
     return is_master() || (function_exists('can') && (can('mod.confidentiality.view') || can('mod.datacontrol.view')
-        || can('mod.clients.view')));
+        || (can('mod.clients.view') && works_operations())));
 }
 function disclosure_can_manage() {
     return is_master() || (function_exists('can') && (can('mod.confidentiality.view') || can('mod.datacontrol.view')));

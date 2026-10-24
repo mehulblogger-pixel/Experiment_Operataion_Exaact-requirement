@@ -708,7 +708,12 @@ function perm_legacy_right_grants() {
     return [
         'ops.call.delete'   => ['calls' => ['delete']],             // call-delete
         'ops.job.close'     => ['jobs'  => ['archive', 'delete']],  // job-close, bill-delete
-        'finance.reconcile' => ['jobs'  => ['delete']],             // expense-delete
+        // finance.reconcile used to carry Delete on Jobs here, for expense-delete.
+        // Delete implies Edit, so Finance passed every "may edit jobs" check
+        // (bills, job site, hold points) against the matrix's Jobs = View. The
+        // expense-delete handler admits finance.reconcile itself, and the route
+        // is no longer verb-gated (perm_route_verb), so nothing is lost (owner,
+        // test book SAL-000, 24 Oct 2026).
         'idems.finalize'    => ['idems' => ['delete']],             // document/endorsement-delete
         'capa.close'        => ['capa'  => ['archive']],            // capa-close
     ];
@@ -974,13 +979,44 @@ function modules_at_last_save() {
     return array_values(array_filter(array_map('trim', explode(',', $raw))));
 }
 
+//  THE PERSON'S OWN SET REMEMBERS WHICH MODULES EXISTED WHEN IT WAS SAVED.
+//
+//  modules_at_last_save() is stamped only when Roles & access is saved. An
+//  install that never saved it (the owner's live site, and every test copy)
+//  answered null, so every module on NEW_MODULES — Enquiries, Quotes, Orders,
+//  Sales reports, Reports, Complaints … — counted as "new" for every person,
+//  and the role's default ticks came back on every read. Unticking anything
+//  in those modules never stuck (owner, test book SAL-000: "if we add any
+//  other permission or delete any permission it still … remains default").
+//
+//  So a per-user set now carries its own '@mods=a|b|c' stamp, written by
+//  user_perms_to_store(). A set saved by the verb-era editor ('@verbs2') but
+//  before this stamp was saved after every NEW_MODULES entry existed, so none
+//  of those is new for it either.
+const PERM_MODS_TAG = '@mods=';
+function perm_mods_stamp(array $perms) {
+    $perms = array_values(array_filter($perms, fn($p) => strncmp((string) $p, PERM_MODS_TAG, strlen(PERM_MODS_TAG)) !== 0));
+    $perms[] = PERM_MODS_TAG . implode('|', array_keys(ACCESS_MODULES));
+    return $perms;
+}
+function perm_mods_known(array $perms) {
+    foreach ($perms as $p)
+        if (strncmp((string) $p, PERM_MODS_TAG, strlen(PERM_MODS_TAG)) === 0)
+            return array_values(array_filter(explode('|', substr((string) $p, strlen(PERM_MODS_TAG)))));
+    return null;
+}
+function perm_strip_bookkeeping(array $perms) {
+    return array_values(array_filter($perms, fn($p) => strncmp((string) $p, PERM_MODS_TAG, strlen(PERM_MODS_TAG)) !== 0));
+}
+
 function merge_new_module_defaults($perms, $role) {
-    $known = modules_at_last_save();
+    $known = perm_mods_known($perms) ?? modules_at_last_save();
+    $legacyNew = ($known === null && in_array(PERM_VOCAB_TAG, $perms, true)) ? [] : NEW_MODULES;
     foreach (module_defaults($role) as $dp) {
         // R-20 — must accept every verb, or a module added later would grant
         // only view/edit and silently withhold Add, Archive and Delete.
         if (!preg_match('/^mod\.(\w+)\.(view|add|edit|archive|delete|approve)$/', $dp, $m)) continue;
-        $isNew = $known === null ? in_array($m[1], NEW_MODULES, true) : !in_array($m[1], $known, true);
+        $isNew = $known === null ? in_array($m[1], $legacyNew, true) : !in_array($m[1], $known, true);
         if ($isNew && !in_array($dp, $perms, true)) $perms[] = $dp;
     }
     return array_values(array_unique($perms));
@@ -1050,7 +1086,7 @@ function user_effective_perms($u) {
         //  which meant add AND edit, and on four modules carried a destructive
         //  act as well. Upgrading it here is what keeps that person able to do
         //  on Monday exactly what they did on Friday.
-        return perm_upgrade_verbs(array_values(array_unique($perms)));
+        return perm_strip_bookkeeping(perm_upgrade_verbs(array_values(array_unique($perms))));
     }
     return role_perms($role);
 }
@@ -1096,7 +1132,8 @@ function user_perms_to_store(array $chosen, $role, array $assignable, $existingC
     $existing = array_values(array_filter(explode(',', (string) $existingCsv)));
     $keep = $existing ? $outside($existing) : $outside($roleSet);
     if ($inside($chosen) === $inside($roleSet) && $keep === $outside($roleSet)) return '';
-    return implode(',', perm_close_implications(array_values(array_unique(array_merge($inside($chosen), $keep)))));
+    $keep = perm_strip_bookkeeping($keep);   // re-stamped below, never carried twice
+    return implode(',', perm_mods_stamp(perm_close_implications(array_values(array_unique(array_merge($inside($chosen), $keep))))));
 }
 
 // True when a person has their OWN access that differs from what their role

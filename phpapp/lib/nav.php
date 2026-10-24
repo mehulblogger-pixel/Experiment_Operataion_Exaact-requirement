@@ -354,10 +354,34 @@ function nav_arrival_step($route, array $trail, $area) {
     return ['label' => $label, 'url' => '/' . $came];
 }
 
+//  ONE RECORD SCREEN, TWO REGISTERS. The client/vendor page (/partner) is the
+//  same screen whether it was opened from the client register or the vendor
+//  register, so no fixed place in the menu is right for it, and it showed
+//  "Home › Partner" with Back going Home (owner, test book SAL-001). Its
+//  handler says which register THIS record belongs under; the trail then
+//  reads Home › Directory › Client register › TB Refinery Ltd.
+//  $via is an optional step between the register and this screen — the record
+//  itself, when this screen is one of its sub-screens (its Edit form).
+function nav_under($route, $under = null, ?array $via = null, $wantVia = false) {
+    static $map = [];
+    $route = trim((string) $route, '/');
+    if ($under !== null) $map[$route] = ['under' => trim((string) $under, '/'), 'via' => $via];
+    return $wantVia ? ($map[$route]['via'] ?? null) : ($map[$route]['under'] ?? null);
+}
+
 function nav_trail($route, $leaf = null) {
     $route = trim((string)$route, '/');
     $trail = [['label' => 'Home', 'url' => '/']];
     if ($route === '') return $trail;
+    if (($under = nav_under($route)) !== null && $under !== $route) {
+        //  The register's own trail, then this record (or this screen) below it.
+        $trail = nav_trail($under);
+        $trail[count($trail) - 1]['url'] = '/' . $under;
+        $via = nav_under($route, null, null, true);
+        if (is_array($via) && ($via['label'] ?? '') !== '') $trail[] = ['label' => (string) $via['label'], 'url' => (string) ($via['url'] ?? '')];
+        $trail[] = ['label' => ($leaf !== null && trim((string) $leaf) !== '') ? (string) $leaf : nav_screen_label($route), 'url' => null];
+        return $trail;
+    }
 
     $mod  = nav_module_of($route);
     //  THE MENU DECIDES WHERE A SCREEN LIVES. The permission grouping only

@@ -378,6 +378,9 @@ function ops_migrate() {
     // reads `status` is affected. Empty = ordinary (no hold).
     ensure_column('business_partners', 'hold_status', "VARCHAR(20) DEFAULT ''");
     ensure_column('business_partners', 'hold_reason', "VARCHAR(400) DEFAULT ''");
+    // Why the record's own status is not Active (On hold, Blacklisted, Inactive…)
+    // — asked whenever that status is chosen (owner, test book SAL-001).
+    ensure_column('business_partners', 'status_reason', "VARCHAR(400) DEFAULT ''");
     //  R4 — where a retired record went. Set only by the merge, which is the one
     //  action that retires a record. Before this the merge wrote a sentence into
     //  the description ("Merged into ACME-01 — Acme Ltd") and nothing could read
@@ -601,6 +604,13 @@ function user_role($u = null) {
 function role_label($u = null) { $roles = defined('ORG_ROLES') ? ORG_ROLES : []; return $roles[user_role($u)] ?? 'User'; }
 function is_master() { return ua()['master']; }
 function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
+// Management, or someone who WORKS on jobs (edit). Opens the operational
+// Quality screens (customer satisfaction, disclosure consent, site entry
+// papers) that used to open for anyone who could view the client register —
+// so a Sales login (client register only) or Finance (reads jobs to bill
+// them) no longer gets a Quality menu (owner, test book SAL-000; the matrix
+// gives the Sales roles the CRM modules only, and Finance per D-07).
+function works_operations() { return is_admin_level() || (function_exists('can') && can('mod.jobs.edit')); }
 function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
 // May the current user CONFIGURE the recruitment module? A full administrator
 // always can; so can any role granted the module-scoped `hiring.admin` permission
@@ -773,15 +783,27 @@ function partner_hold_set($id, $status, $reason = '') {
 // how to clear it. Reads BOTH status systems: the customer's own status and the
 // credit hold.
 const PARTNER_TRADE_BLOCK_STATUSES = ['BLACKLISTED', 'INACTIVE', 'ON_HOLD'];
+// Every status but Active and Prospect needs its reason — including a status
+// the company added to its own list (e.g. "Rejected").
+function partner_status_needs_reason($status) {
+    return !in_array(strtoupper(trim((string) $status)), ['', 'ACTIVE', 'PROSPECT'], true);
+}
+// '' when fine, else the sentence that says what is missing.
+function partner_status_reason_problem($status, $reason) {
+    if (!partner_status_needs_reason($status) || trim((string) $reason) !== '') return '';
+    $lab = (function_exists('lk_options_or') ? lk_options_or('partner_status', STATUSES) : STATUSES)[strtoupper((string) $status)] ?? $status;
+    return 'Please give the reason for marking it "' . $lab . '" — it is shown to everyone who opens the record.';
+}
 function partner_trade_block($id) {
     $id = (int)$id; if (!$id) return '';
-    $p = ops_one("SELECT COALESCE(NULLIF(display_name,''), legal_name) nm, status, hold_status, hold_reason FROM business_partners WHERE id=?", [$id]);
+    try { $p = ops_one("SELECT COALESCE(NULLIF(display_name,''), legal_name) nm, status, status_reason, hold_status, hold_reason FROM business_partners WHERE id=?", [$id]); }
+    catch (Throwable $e) { $p = ops_one("SELECT COALESCE(NULLIF(display_name,''), legal_name) nm, status, hold_status, hold_reason FROM business_partners WHERE id=?", [$id]); }
     if (!$p) return '';
     $st = strtoupper(trim((string)($p['status'] ?? '')));
     $hs = strtoupper(trim((string)($p['hold_status'] ?? '')));
     $who = (string)($p['nm'] ?: ('This ' . Tl('client')));
     if (in_array($st, PARTNER_TRADE_BLOCK_STATUSES, true))
-        return $who . ' is ' . strtolower(STATUSES[$st] ?? $st) . '. Nothing new can be raised for them — only payment reminders — '
+        return $who . ' is ' . strtolower(STATUSES[$st] ?? $st) . (trim((string)($p['status_reason'] ?? '')) !== '' ? ' (' . trim((string)$p['status_reason']) . ')' : '') . '. Nothing new can be raised for them — only payment reminders — '
              . 'until someone allowed to edit the ' . Tl('client') . ' record makes them Active again.';
     if ($hs === 'HOLD' || $hs === 'BLOCKED')
         return $who . ' is ' . strtolower(PARTNER_HOLD_STATES[$hs] ?? $hs) . (trim((string)$p['hold_reason']) !== '' ? ' (' . trim((string)$p['hold_reason']) . ')' : '')
@@ -1158,6 +1180,32 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
             $nameHit = dup_hit($r, 'name', 'POSSIBLE');
     }
     return $nameHit;
+}
+
+// Another company's contact with the same mobile or e-mail (owner, test book
+// SAL-001: "there is no option to cross check the contact person, mobile,
+// email … duplicacy and flag it"). A FLAG, not a refusal: one consultant or
+// agent can genuinely act for two clients, so the person saving decides.
+// Mobiles compare on their last 10 digits, so +91 98250 12345 = 9825012345.
+function partner_contact_clash($mobile, $email, $excludePartnerId) {
+    $tail = fn($n) => substr(preg_replace('/\D+/', '', (string) $n), -10);
+    $digits = $tail($mobile); $mail = strtolower(trim((string) $email));
+    if (strlen($digits) < 10 && $mail === '') return [];
+    $out = [];
+    $rows = ops_all("SELECT c.name, c.email, c.mobile, c.phone, p.id AS pid, p.code, p.legal_name
+                       FROM partner_contacts c JOIN business_partners p ON p.id = c.partner_id
+                      WHERE c.partner_id <> ?", [(int) $excludePartnerId]) ?: [];
+    foreach ($rows as $r) {
+        $by = (strlen($digits) === 10 && ($tail($r['mobile'] ?? '') === $digits || $tail($r['phone'] ?? '') === $digits)) ? 'mobile'
+            : (($mail !== '' && strtolower(trim((string) ($r['email'] ?? ''))) === $mail) ? 'e-mail' : '');
+        if ($by !== '') $out[(int) $r['pid']] = $r['code'] . ' — ' . $r['legal_name'] . ' (' . $r['name'] . ', same ' . $by . ')';
+    }
+    return array_values($out);
+}
+function partner_contact_clash_msg(array $hits) {
+    if (!$hits) return '';
+    return 'Please check: this contact is also listed for ' . implode('; ', array_slice($hits, 0, 3))
+         . (count($hits) > 3 ? ' and ' . (count($hits) - 3) . ' more' : '') . '.';
 }
 
 /**
@@ -3268,7 +3316,6 @@ function perm_route_verb($route) {
         'call-delete'        => 'delete',
         'document-delete'    => 'delete',
         'endorsement-delete' => 'delete',
-        'expense-delete'     => 'delete',
         'audit-close'        => 'archive',
         'capa-close'         => 'archive',
         'job-close'          => 'archive',

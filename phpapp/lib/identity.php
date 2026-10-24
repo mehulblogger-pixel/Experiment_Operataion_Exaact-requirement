@@ -801,12 +801,18 @@ function sitedoc_expiring($days = 45, $today = null) {
 }
 
 // ---- The requirements register ---------------------------------------------
+function sitedocs_can_view() {
+    return can('mod.identity.view') || iddoc_can_view() || (can('mod.clients.view') && works_operations())
+        || is_master_of(['identity','clients']);
+}
 function ops_sitedocs($route, $method) {
-    ops_require(iddoc_can_view() || can('mod.clients.view') || is_master_of(['identity','clients']),
-                'You cannot open the site-document requirements.');
+    // Site entry papers are arranged by operations: identity, or the client
+    // register held by management or someone who works on jobs (works_operations()). Client register alone (Sales) does not open
+    // them (owner, test book SAL-000).
+    ops_require(sitedocs_can_view(), 'You cannot open the site-document requirements.');
     sitedoc_migrate();
 
-    $canEdit = iddoc_can_manage() || can('mod.clients.edit') || is_master_of(['identity','clients']);
+    $canEdit = iddoc_can_manage() || (can('mod.clients.edit') && works_operations()) || is_master_of(['identity','clients']);
 
     if ($route === 'site-docs-add' || $route === 'site-docs-delete') {
         ops_require($canEdit, 'You cannot change what a site requires.');

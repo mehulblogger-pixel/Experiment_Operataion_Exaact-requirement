@@ -1370,6 +1370,7 @@ if ($route === 'clients' || $route === 'vendors') {
 }
 
 if ($route === 'partner-new') {
+    if (function_exists('nav_under')) nav_under('partner-new', (($_GET['role'] ?? $_POST['is_vendor'] ?? '') === 'is_vendor' || (!empty($_POST['is_vendor']) && empty($_POST['is_client']))) ? 'vendors' : 'clients');
     // R1 — client/vendor create runs before the module gate, so guard it here.
     // Editing commercial master data needs the clients/vendors edit right; a
     // coordinator may also onboard a party while raising a call (intake).
@@ -1382,7 +1383,9 @@ if ($route === 'partner-new') {
     $picker = !empty($_POST['picker']) || !empty($_GET['picker']);
     if ($method === 'POST') {
         $b = $_POST;
-        $formVars = ['partner' => null, 'defaultRole' => 'is_client', 'offices' => offices_list(), 'picker' => $picker];
+        // A refused save re-shows the form WITH what was typed ('old'), never empty.
+        $formVars = ['partner' => null, 'defaultRole' => !empty($b['is_vendor']) && empty($b['is_client']) ? 'is_vendor' : 'is_client',
+                     'offices' => offices_list(), 'picker' => $picker, 'old' => $_POST];
         if (!empty($b['gstin']) && !is_valid_gstin($b['gstin'])) {
             return view('form', $formVars + ['error' => 'GSTIN should be 15 characters, e.g. 24ADUPL3517E2ZJ.']);
         }
@@ -1397,6 +1400,8 @@ if ($route === 'partner-new') {
         if (!empty($b['is_client']) && trim((string)($b['payment_terms'] ?? '')) === '') {
             return view('form', $formVars + ['error' => 'Payment terms are required for a ' . Tl('client') . ' (used on their invoices). A vendor-only record does not need them.']);
         }
+        if (($why = partner_status_reason_problem($b['status'] ?? 'ACTIVE', $b['status_reason'] ?? '')) !== '')
+            return view('form', $formVars + ['error' => $why]);
         $gstin = clean_gstin($b['gstin'] ?? '');
         $pan = $gstin ? pan_from_gstin($gstin) : '';
         $state = $gstin ? state_from_gstin($gstin) : '';
@@ -1412,6 +1417,8 @@ if ($route === 'partner-new') {
         $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,is_subcontractor,client_type,industry,ownership_type,status,gstin,pan,cin,tan,msme_udyam,state,website,description,payment_terms,credit_days,home_branch_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
         $ins->execute([$code, $b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $b['payment_terms'] ?? '', (int)($b['credit_days'] ?? 0), $branchId, date('c')]);
         $id = $pdo->lastInsertId();
+        $pdo->prepare("UPDATE business_partners SET status_reason=? WHERE id=?")
+            ->execute([partner_status_needs_reason($b['status'] ?? 'ACTIVE') ? substr(trim((string)($b['status_reason'] ?? '')), 0, 400) : '', $id]);
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $id]);
         // What a man-month means for this client, when their contract differs
@@ -1426,10 +1433,12 @@ if ($route === 'partner-new') {
         // was added against — so the person we already know lands on the client
         // master, not re-keyed later. Only when a name was actually provided.
         $pcName = trim((string)($b['contact_name'] ?? ''));
+        $clash = [];
         if ($pcName !== '') {
             $pcMobile = trim((string)($b['contact_mobile'] ?? '')) ?: trim((string)($b['contact_phone'] ?? ''));
             $pdo->prepare("INSERT INTO partner_contacts (partner_id,name,email,mobile,is_primary) VALUES (?,?,?,?,1)")
                 ->execute([$id, substr($pcName, 0, 150), substr(trim((string)($b['contact_email'] ?? '')), 0, 200), substr($pcMobile, 0, 40)]);
+            $clash = function_exists('partner_contact_clash') ? partner_contact_clash($pcMobile, $b['contact_email'] ?? '', (int) $id) : [];
         }
         // Whatever sales already knew about this company: the inspections they
         // asked for, the person they were talking to, and the inquiries and
@@ -1460,6 +1469,7 @@ if ($route === 'partner-new') {
             exit;
         }
         flash("$code created." . ($note !== '' ? ' ' . $note : ''));
+        if (!empty($clash)) flash(partner_contact_clash_msg($clash), 'warning');
         redirect("/partner?id=$id" . ($note !== '' ? '&tab=contacts' : ''));
     }
     return view('form', ['partner' => null, 'defaultRole' => $_GET['role'] ?? 'is_client', 'error' => null, 'offices' => offices_list(), 'pcfvals' => [], 'picker' => $picker]);
@@ -1472,6 +1482,8 @@ if ($route === 'partner-edit') {
         'You do not have permission to edit ' . Tl('client') . ' / ' . Tl('vendor') . ' records.');
     $p = find_partner((int)($_GET['id'] ?? 0));
     if (!$p) { http_response_code(404); return view('notfound'); }
+    if (function_exists('nav_under')) nav_under('partner-edit', !empty($p['is_client']) || empty($p['is_vendor']) ? 'clients' : 'vendors',
+        ['label' => partner_name($p), 'url' => '/partner?id=' . (int) $p['id']]);
     // The office boundary. Having the right to edit clients is not the same as
     // having the right to edit THIS client: a Mumbai coordinator reaching an
     // Ahmedabad record through search could rename it and rewrite its credit
@@ -1488,15 +1500,22 @@ if ($route === 'partner-edit') {
         $gstin = clean_gstin($b['gstin'] ?? '');
         $pan = $gstin ? pan_from_gstin($gstin) : $p['pan'];
         $state = $gstin ? state_from_gstin($gstin) : $p['state'];
+        if (($why = partner_status_reason_problem($b['status'] ?? 'ACTIVE', $b['status_reason'] ?? '')) !== '')
+            return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'offices' => offices_list(), 'old' => $_POST, 'error' => $why]);
         $dup = find_duplicate_partner($b['legal_name'] ?? '', $gstin, $pan ?: ($p['pan'] ?? ''), $b['tan'] ?? '', $p['id']);
         if ($dup) {
-            return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'offices' => offices_list(),
+            return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'offices' => offices_list(), 'old' => $_POST,
                 'error' => "Another company already uses these details: {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by {$dup['by']})."]);
         }
         $pdo->prepare("UPDATE business_partners SET legal_name=?,display_name=?,is_client=?,is_vendor=?,is_subcontractor=?,client_type=?,industry=?,ownership_type=?,status=?,gstin=?,pan=?,cin=?,tan=?,msme_udyam=?,state=?,website=?,description=?,payment_terms=?,credit_days=? WHERE id=?")
             ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $b['payment_terms'] ?? '', (int)($b['credit_days'] ?? 0), $p['id']]);
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $p['id']]);
+        $newSt = strtoupper((string)($b['status'] ?? 'ACTIVE'));
+        $newWhy = partner_status_needs_reason($newSt) ? substr(trim((string)($b['status_reason'] ?? '')), 0, 400) : '';
+        $pdo->prepare("UPDATE business_partners SET status_reason=? WHERE id=?")->execute([$newWhy, $p['id']]);
+        if (($newSt !== strtoupper((string)($p['status'] ?? '')) || $newWhy !== (string)($p['status_reason'] ?? '')) && function_exists('act_log'))
+            act_log('PARTNER', $p['id'], 'STATUS', 'Status ' . (STATUSES[$newSt] ?? $newSt) . ($newWhy !== '' ? ' — ' . $newWhy : ''), ['partner_id' => $p['id']]);
         // What a man-month means for this client, when their contract differs
         // from the company default. Blank falls back, which is the common case.
         $mmB = (string)($b['manmonth_basis'] ?? '');
@@ -1505,10 +1524,25 @@ if ($route === 'partner-edit') {
             ->execute([$mmB, (int)($b['manmonth_min_days'] ?? 0), $p['id']]);
         partner_save_geofence($pdo, $p['id'], $b);
         custom_save('partner', $p['id'], $b);
-        flash('Updated.');
+        // The owning office can move (owner, SAL-001: "what if that customer
+        // affiliates with other offices?") — by an administrator only, since it
+        // moves the record out of one office's view and into another's. The code
+        // stays: it is already printed on quotations and invoices.
+        $moved = '';
+        if (array_key_exists('home_branch_id', $b) && (is_master() || (function_exists('is_admin_level') && is_admin_level()))) {
+            $newOff = $b['home_branch_id'] !== '' ? (int) $b['home_branch_id'] : null;
+            if ((string) ($newOff ?? '') !== (string) ($p['home_branch_id'] ?? '')) {
+                $pdo->prepare("UPDATE business_partners SET home_branch_id=? WHERE id=?")->execute([$newOff, $p['id']]);
+                $offName = fn($id) => $id ? (string) (ops_val("SELECT name FROM offices WHERE id=?", [(int) $id]) ?: '#' . (int) $id) : 'no office';
+                $moved = ' Moved from ' . $offName($p['home_branch_id'] ?? null) . ' to ' . $offName($newOff) . '; the code ' . $p['code'] . ' is kept.';
+                if (function_exists('idems_log')) idems_log('partner', $p['id'], 'PARTNER_OFFICE_MOVED', ['field' => trim($moved)]);
+            }
+        }
+        flash('Updated.' . $moved);
         redirect("/partner?id={$p['id']}");
     }
-    return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'error' => null, 'offices' => offices_list(), 'pcfvals' => custom_values_map('partner', $p['id'])]);
+    return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'error' => null, 'offices' => offices_list(), 'pcfvals' => custom_values_map('partner', $p['id']),
+        'nav_leaf' => 'Edit']);
 }
 
 if ($route === 'partner-add' && $method === 'POST') {
@@ -1695,6 +1729,10 @@ if ($route === 'partner-add' && $method === 'POST') {
             }
         }
         flash($kind === 'contract' ? 'Contract registered — it is awaiting endorsement, then approval, before it goes live.' : 'Added.');
+        if ($kind === 'contact' && function_exists('partner_contact_clash')) {
+            $clash = partner_contact_clash(trim((string) ($b['mobile'] ?? '')) !== '' ? $b['mobile'] : ($b['phone'] ?? ''), $b['email'] ?? '', (int) $p['id']);
+            if ($clash) flash(partner_contact_clash_msg($clash), 'warning');
+        }
         redirect("/partner?id={$p['id']}&tab=$tab");
     }
     redirect("/partner?id={$p['id']}");
@@ -1763,7 +1801,9 @@ if ($route === 'partner') {
     }
     $subs = $pdo->prepare("SELECT * FROM business_partners WHERE parent_id = ?"); $subs->execute([$p['id']]);
     $parent = $p['parent_id'] ? find_partner($p['parent_id']) : null;
-    return view('detail', [
+    // The register this record sits under, for the trail and Back (owner, SAL-001).
+    if (function_exists('nav_under')) nav_under('partner', !empty($p['is_client']) || empty($p['is_vendor']) ? 'clients' : 'vendors');
+    return view('detail', ['nav_leaf' => partner_name($p),
         'viewLevel' => $viewLevel,
         'viewNote'  => $pFull ? '' : (function_exists('partner_write_denied_msg') ? partner_write_denied_msg($p) : ''),
         'p' => $p, 'tab' => $_GET['tab'] ?? 'overview', 'parent' => $parent,

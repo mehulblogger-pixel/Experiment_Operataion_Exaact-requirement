@@ -180,6 +180,11 @@ $BASELINE = [
     'retention_can_view', 'risk_can_manage', 'risk_can_view', 'sample_can_manage',
     'sample_can_view', 'sat_can_manage', 'sat_can_view', 'sched_board_can',
     'svc_can_manage', 'tapi_can', 'tosrm_can_edit', 'tosrm_ops_desk_can',
+    // 24 Oct 2026 — sitedocs_can_view() is the site-docs route's own inline gate
+    // lifted into a function (docs/02 19l), so the menu tile and the route ask
+    // one question. Same answer for a master as before (is_master_of(['identity',
+    // 'clients']), clients being core), and the tile still needs Operations licensed.
+    'sitedocs_can_view',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,

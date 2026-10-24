@@ -284,6 +284,8 @@ def main():
         cases=cases)
     from addresses import to_test_copy
     book = to_test_copy(book)          # every address is the test copy's
+    from book_fixes import apply as owner_fixes
+    book = owner_fixes(book)           # corrections from the owner's test runs
     out = os.path.join(SP, 'site', 'book.json')
     os.makedirs(os.path.dirname(out), exist_ok=True)
     json.dump(book, open(out, 'w'), ensure_ascii=False, separators=(',', ':'))

@@ -1,4 +1,14 @@
-<?php $p = $partner; $picker = $picker ?? false; ?>
+<?php $p = $partner; $picker = $picker ?? false;
+  // What the boxes show: the record being edited, overlaid with what was just
+  // typed when a save was refused — a refusal must never wipe the form (owner,
+  // test book SAL-001: "all details vanish and we need to input all again").
+  $old  = is_array($old ?? null) ? $old : [];
+  $d    = array_merge(is_array($p) ? $p : [], $old);
+  $redo = $p || $old;
+  // A ticked box is posted, an unticked one is not — so after a refusal the
+  // typed form decides, otherwise the saved record does.
+  $tick = fn($k) => $old ? !empty($old[$k]) : !empty($p[$k] ?? 0);
+  $canMoveOffice = is_master() || (function_exists('is_admin_level') && is_admin_level()); ?>
 <h1><?= $p ? 'Edit ' . e(partner_name($p)) : 'New business partner' ?></h1>
 <p class="sub">Client Code is generated automatically. Enter GSTIN once — PAN &amp; State fill in automatically.<?php if ($picker): ?> <span class="muted">Save and this window closes, selecting the new record on the form you came from.</span><?php endif; ?></p>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
@@ -12,31 +22,41 @@
     <?php // A client added from a lead / inquiry / quote arrives with the company
           // name it was typed against, so it is not re-keyed (Salesforce-style
           // carry-over). Only used when creating; an existing record wins. ?>
-    <div class="ff"><label>Legal name *</label><input class="form-control" name="legal_name" required value="<?= e(($p['legal_name'] ?? '') ?: (string)($_GET['prefill'] ?? '')) ?>"></div>
-    <div class="ff"><label>Display name <span class="muted">(auto from legal, editable)</span></label><input class="form-control" name="display_name" value="<?= e($p['display_name'] ?? '') ?>"></div>
+    <div class="ff"><label>Legal name *</label><input class="form-control" name="legal_name" required value="<?= e(($d['legal_name'] ?? '') ?: (string)($_GET['prefill'] ?? '')) ?>"></div>
+    <div class="ff"><label>Display name <span class="muted">(auto from legal, editable)</span></label><input class="form-control" name="display_name" value="<?= e($d['display_name'] ?? '') ?>"></div>
     <?php // Primary contact — captured at creation (and carried from the lead /
           // inquiry / quote this client was added from) so it lands on the client
           // master straight away. More contacts are added on the client's Contacts
           // tab afterwards. Only offered while creating a new record. ?>
     <?php if (!$p): ?>
     <div class="ff"><label>Primary contact <span class="muted">— optional; more can be added later</span></label>
-      <input class="form-control" name="contact_name" value="<?= e((string)($_GET['contact_name'] ?? '')) ?>" placeholder="Contact person"></div>
-    <div class="ff"><label>Contact e-mail</label><input class="form-control" type="email" name="contact_email" value="<?= e((string)($_GET['contact_email'] ?? '')) ?>" placeholder="name@company.com"></div>
-    <div class="ff"><label>Contact mobile</label><input class="form-control" name="contact_mobile" value="<?= e((string)($_GET['contact_mobile'] ?? '')) ?>" placeholder="Phone / mobile"></div>
+      <input class="form-control" name="contact_name" value="<?= e((string)($old['contact_name'] ?? $_GET['contact_name'] ?? '')) ?>" placeholder="Contact person"></div>
+    <div class="ff"><label>Contact e-mail</label><input class="form-control" type="email" name="contact_email" value="<?= e((string)($old['contact_email'] ?? $_GET['contact_email'] ?? '')) ?>" placeholder="name@company.com"></div>
+    <div class="ff"><label>Contact mobile</label><input class="form-control" name="contact_mobile" value="<?= e((string)($old['contact_mobile'] ?? $_GET['contact_mobile'] ?? '')) ?>" placeholder="Phone / mobile"></div>
     <?php endif; ?>
     <?php if (!$p): $branchWord = ($defaultRole === 'is_vendor') ? 'Executing' : 'Contracting'; ?>
     <div class="ff"><label><span id="branch_word"><?= $branchWord ?></span> office <span class="muted">(drives the code)</span></label>
       <select class="form-control searchable" name="home_branch_id">
-        <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= $o['code']==='AHM'?'selected':'' ?>><?= e($o['name']) ?> (<?= e($o['code']) ?>)</option><?php endforeach; ?>
+        <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (isset($old['home_branch_id']) ? (string) $old['home_branch_id'] === (string) $o['id'] : $o['code']==='AHM') ? 'selected' : '' ?>><?= e($o['name']) ?> (<?= e($o['code']) ?>)</option><?php endforeach; ?>
       </select><small class="muted">Code will look like <strong>AHM-<?= substr(date('Y'),2,2) ?>-NAME-00001</strong>.</small></div>
     <?php else: ?>
     <div class="ff"><label>Code</label><input class="form-control readonly-field" value="<?= e($p['code']) ?>" readonly></div>
+    <?php $curOff = (string) ($d['home_branch_id'] ?? ''); ?>
+    <div class="ff"><label>Contracting / executing office</label>
+      <?php if ($canMoveOffice): ?>
+      <select class="form-control searchable" name="home_branch_id">
+        <option value="">— no office (every office sees it) —</option>
+        <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (string)$o['id'] === $curOff ? 'selected' : '' ?>><?= e($o['name']) ?> (<?= e($o['code']) ?>)</option><?php endforeach; ?>
+      </select><small class="muted">Moving it to another office keeps the code — the code is already printed on quotations and invoices.</small>
+      <?php else: $offName = '—'; foreach (($offices ?? []) as $o) if ((string)$o['id'] === $curOff) $offName = $o['name'] . ' (' . $o['code'] . ')'; ?>
+      <input class="form-control readonly-field" value="<?= e($offName) ?>" readonly><small class="muted">Only an administrator can move a <?= e(Tl('client')) ?> to another office.</small>
+      <?php endif; ?></div>
     <?php endif; ?>
     <div class="ff ff-wide"><label>Roles</label>
       <div class="checkgrid" style="grid-template-columns:repeat(3,minmax(150px,1fr));">
-        <label class="chk"><input type="checkbox" id="is_client" name="is_client" <?= ($p ? $p['is_client'] : ($defaultRole==='is_client')) ? 'checked' : '' ?>> Is a Client</label>
-        <label class="chk"><input type="checkbox" id="is_vendor" name="is_vendor" <?= ($p ? $p['is_vendor'] : ($defaultRole==='is_vendor')) ? 'checked' : '' ?>> Is a Vendor</label>
-        <label class="chk"><input type="checkbox" id="is_subcon" name="is_subcontractor" <?= ($p && $p['is_subcontractor']) ? 'checked' : '' ?>> Is a Sub-contractor</label>
+        <label class="chk"><input type="checkbox" id="is_client" name="is_client" <?= ($redo ? $tick('is_client') : ($defaultRole==='is_client')) ? 'checked' : '' ?>> Is a Client</label>
+        <label class="chk"><input type="checkbox" id="is_vendor" name="is_vendor" <?= ($redo ? $tick('is_vendor') : ($defaultRole==='is_vendor')) ? 'checked' : '' ?>> Is a Vendor</label>
+        <label class="chk"><input type="checkbox" id="is_subcon" name="is_subcontractor" <?= $tick('is_subcontractor') ? 'checked' : '' ?>> Is a Sub-contractor</label>
       </div>
       <small class="muted">Tick both Client and Vendor for a company that is both. A Sub-contractor (manpower supplier) is automatically also a Vendor.</small></div>
     <?php // The office and the "type" mean different things by role: a client is
@@ -63,12 +83,19 @@
       if (document.readyState !== 'loading') wire();
       else document.addEventListener('DOMContentLoaded', wire);
     })();</script>
-    <div class="ff"><label><span id="ptype_word"><?= ($p ? ($p['is_vendor'] && !$p['is_client']) : ($defaultRole === 'is_vendor')) ? 'Vendor' : (($p && $p['is_client'] && $p['is_vendor']) ? 'Partner' : 'Client') ?></span> type</label><select class="form-control searchable" name="client_type"><option value="">—</option><?php foreach (lk_options_or('client_type', CLIENT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($p && $p['client_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?><option value="__new__">➕ Other (add new)…</option></select>
+    <div class="ff"><label><span id="ptype_word"><?= ($p ? ($p['is_vendor'] && !$p['is_client']) : ($defaultRole === 'is_vendor')) ? 'Vendor' : (($p && $p['is_client'] && $p['is_vendor']) ? 'Partner' : 'Client') ?></span> type</label><select class="form-control searchable" name="client_type"><option value="">—</option><?php foreach (lk_options_or('client_type', CLIENT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($d['client_type'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?><option value="__new__">➕ Other (add new)…</option></select>
       <input class="form-control" name="client_type_new" placeholder="New client type" style="display:none;margin-top:6px" data-newfor="client_type"></div>
-    <div class="ff"><label>Industry</label><select class="form-control searchable" name="industry"><option value="">—</option><?php foreach (lk_options_or('industry', INDUSTRIES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($p && $p['industry']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?><option value="__new__">➕ Other (add new)…</option></select>
+    <div class="ff"><label>Industry</label><select class="form-control searchable" name="industry"><option value="">—</option><?php foreach (lk_options_or('industry', INDUSTRIES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($d['industry'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?><option value="__new__">➕ Other (add new)…</option></select>
       <input class="form-control" name="industry_new" placeholder="New industry" style="display:none;margin-top:6px" data-newfor="industry"></div>
-    <div class="ff"><label>Ownership type</label><select class="form-control" name="ownership_type"><option value="">—</option><?php foreach (lk_options_or('ownership', OWNERSHIP) as $k=>$v): ?><option value="<?= $k ?>" <?= ($p && $p['ownership_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Status</label><select class="form-control" name="status"><?php foreach (lk_options_or('partner_status', STATUSES) as $k=>$v): ?><option value="<?= $k ?>" <?= (($p['status'] ?? 'ACTIVE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Ownership type</label><select class="form-control" name="ownership_type"><option value="">—</option><?php foreach (lk_options_or('ownership', OWNERSHIP) as $k=>$v): ?><option value="<?= $k ?>" <?= (($d['ownership_type'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Status</label><select class="form-control" name="status"><?php foreach (lk_options_or('partner_status', STATUSES) as $k=>$v): ?><option value="<?= $k ?>" <?= (($d['status'] ?? 'ACTIVE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <?php $needWhy = function_exists('partner_status_needs_reason') && partner_status_needs_reason($d['status'] ?? 'ACTIVE'); ?>
+    <div class="ff" id="status_reason_box" style="<?= $needWhy ? '' : 'display:none' ?>"><label>Reason <span style="color:var(--bad)">*</span> <span class="muted">— why it is not Active</span></label>
+      <input class="form-control" name="status_reason" maxlength="400" value="<?= e($d['status_reason'] ?? '') ?>" placeholder="e.g. Unpaid for 180 days / failed vendor audit / closed down"></div>
+    <script>(function(){ var s=document.querySelector('select[name="status"]'), b=document.getElementById('status_reason_box');
+      if(!s||!b) return; var i=b.querySelector('input');
+      function sync(){ var need = ['','ACTIVE','PROSPECT'].indexOf(s.value) < 0; b.style.display = need ? '' : 'none'; if(i) i.required = need; }
+      s.addEventListener('change', sync); sync(); })();</script>
   </div>
 </section>
 <section class="fs-pane" data-tab="Tax &amp; terms">
@@ -83,13 +110,13 @@
       <div class="msg msg-info" style="margin:0">Commercial &amp; billing details (GSTIN, PAN, payment terms…) are <b>not needed for a vendor</b> — a vendor is a site you inspect at, not a party you invoice. Tick <b>Is a Client</b> above if you also bill them, and these fields appear.</div>
     </div>
     <div id="commercialFields" style="display:contents">
-    <div class="ff"><label>GSTIN</label><input class="form-control" name="gstin" value="<?= e($p['gstin'] ?? '') ?>" placeholder="e.g. 24ADUPL3517E2ZJ"></div>
-    <div class="ff"><label>PAN (auto from GSTIN)</label><input class="form-control readonly-field" id="pan_display" value="<?= e($p['pan'] ?? '') ?>" readonly></div>
-    <div class="ff"><label>State (auto from GSTIN)</label><input class="form-control readonly-field" id="state_display" value="<?= e($p['state'] ?? '') ?>" readonly></div>
-    <div class="ff"><label>CIN</label><input class="form-control" name="cin" value="<?= e($p['cin'] ?? '') ?>"></div>
-    <div class="ff"><label>TAN</label><input class="form-control" name="tan" value="<?= e($p['tan'] ?? '') ?>"></div>
-    <div class="ff"><label>MSME / Udyam</label><input class="form-control" name="msme_udyam" value="<?= e($p['msme_udyam'] ?? '') ?>"></div>
-    <div class="ff"><label>Website</label><input class="form-control" name="website" value="<?= e($p['website'] ?? '') ?>"></div>
+    <div class="ff"><label>GSTIN</label><input class="form-control" name="gstin" value="<?= e($d['gstin'] ?? '') ?>" placeholder="e.g. 24ADUPL3517E2ZJ"></div>
+    <div class="ff"><label>PAN (auto from GSTIN)</label><input class="form-control readonly-field" id="pan_display" value="<?= e($d['pan'] ?? '') ?>" readonly></div>
+    <div class="ff"><label>State (auto from GSTIN)</label><input class="form-control readonly-field" id="state_display" value="<?= e($d['state'] ?? '') ?>" readonly></div>
+    <div class="ff"><label>CIN</label><input class="form-control" name="cin" value="<?= e($d['cin'] ?? '') ?>"></div>
+    <div class="ff"><label>TAN</label><input class="form-control" name="tan" value="<?= e($d['tan'] ?? '') ?>"></div>
+    <div class="ff"><label>MSME / Udyam</label><input class="form-control" name="msme_udyam" value="<?= e($d['msme_udyam'] ?? '') ?>"></div>
+    <div class="ff"><label>Website</label><input class="form-control" name="website" value="<?= e($d['website'] ?? '') ?>"></div>
     <?php // Agreed once here, then carried onto every invoice for this customer.
           // Before this existed the invoice form asked for both on every single
           // bill, which is how one customer ends up on 30 days in March and 45
@@ -99,7 +126,7 @@
           // and a blank "— none —" so it is optional. Add new terms under Masters. ?>
     <div class="ff"><label>Payment terms <span id="pt_req" style="color:var(--bad);display:none">*</span><span class="muted">— carried onto their invoices</span></label>
       <?php $ptOpts = function_exists('lk_options_or') ? lk_options_or('payment_term', defined('PAYMENT_TERMS') ? PAYMENT_TERMS : []) : [];
-            $ptCur = (string)($p['payment_terms'] ?? ''); ?>
+            $ptCur = (string)($d['payment_terms'] ?? ''); ?>
       <select class="form-control searchable" name="payment_terms" id="pt_select">
         <option value="">— none —</option>
         <?php $ptSeen = false; foreach ($ptOpts as $k => $lab): $val = (string)$lab; if ($val === $ptCur) $ptSeen = true; ?>
@@ -131,10 +158,10 @@
       cl.addEventListener('change', sync); sync();
     })();</script>
     <div class="ff"><label>Credit days <span class="muted">— sets the due date on their invoices</span></label>
-      <input class="form-control" type="number" min="0" name="credit_days" value="<?= e((string)($p['credit_days'] ?? '')) ?>"
+      <input class="form-control" type="number" min="0" name="credit_days" value="<?= e((string)($d['credit_days'] ?? '')) ?>"
              placeholder="e.g. 45"></div>
     </div><!-- /#commercialFields -->
-    <div class="ff ff-wide"><label>Description</label><input class="form-control" name="description" value="<?= e($p['description'] ?? '') ?>"></div>
+    <div class="ff ff-wide"><label>Description</label><input class="form-control" name="description" value="<?= e($d['description'] ?? '') ?>"></div>
 
     <?php // Site location for geofenced attendance — so an inspection engineer's
           // punch-in can be checked against the real site and a spoofed / fake-GPS
@@ -148,9 +175,9 @@
     <div class="ff ff-wide">
       <label>📍 Site location <span class="muted">— for geofenced attendance; stops an inspector punching in on a fake GPS. Leave blank to switch it off.</span></label>
       <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px">
-        <div><span class="lab">Latitude</span><input class="form-control" type="number" step="any" id="site_lat" name="site_lat" placeholder="e.g. 23.0225" value="<?= e((string)($p['site_lat'] ?? '')) ?>"></div>
-        <div><span class="lab">Longitude</span><input class="form-control" type="number" step="any" id="site_lon" name="site_lon" placeholder="e.g. 72.5714" value="<?= e((string)($p['site_lon'] ?? '')) ?>"></div>
-        <div><span class="lab">Allowed radius (metres)</span><input class="form-control" type="number" min="0" id="geofence_m" name="geofence_m" placeholder="e.g. 150" value="<?= e((string)($p['geofence_m'] ?? '') ?: '') ?>"></div>
+        <div><span class="lab">Latitude</span><input class="form-control" type="number" step="any" id="site_lat" name="site_lat" placeholder="e.g. 23.0225" value="<?= e((string)($d['site_lat'] ?? '')) ?>"></div>
+        <div><span class="lab">Longitude</span><input class="form-control" type="number" step="any" id="site_lon" name="site_lon" placeholder="e.g. 72.5714" value="<?= e((string)($d['site_lon'] ?? '')) ?>"></div>
+        <div><span class="lab">Allowed radius (metres)</span><input class="form-control" type="number" min="0" id="geofence_m" name="geofence_m" placeholder="e.g. 150" value="<?= e((string)($d['geofence_m'] ?? '') ?: '') ?>"></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
         <button type="button" class="btn secondary" id="geo_here">Use this device's current location</button>
@@ -268,7 +295,7 @@
     })();
     </script>
 
-    <?php $selInsp = ($p && !empty($p['inspection_types'])) ? explode(',', $p['inspection_types']) : []; ?>
+    <?php $selInsp = $old ? array_values(array_map('strval', (array) ($old['inspection_types'] ?? []))) : (($p && !empty($p['inspection_types'])) ? explode(',', $p['inspection_types']) : []); ?>
     <div class="ff ff-wide"><label>Types of inspection this client needs <span class="muted">— carried into new calls</span></label>
       <div class="checkgrid">
         <?php foreach (lk_options_or('inspection_type', INSPECTION_TYPES) as $k=>$v): ?>
@@ -283,7 +310,7 @@
     <div class="ff"><label>What a man-month means for this <?= e(Tl('client')) ?></label>
       <select class="form-control" name="manmonth_basis">
         <option value="">— the company default —</option>
-        <?php $mmb = (string)($p['manmonth_basis'] ?? '');
+        <?php $mmb = (string)($d['manmonth_basis'] ?? '');
               foreach (MANMONTH_BASES as $k => $v): ?>
           <option value="<?= e($k) ?>" <?= $mmb === $k ? 'selected' : '' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
@@ -291,7 +318,7 @@
       <small class="muted">Only matters for monthly <?= e(Tlp('job')) ?>. The default is under <a href="/settings">Settings</a>.</small></div>
     <div class="ff"><label>Minimum working days in their man-month</label>
       <input class="form-control" type="number" min="1" max="31" name="manmonth_min_days"
-             value="<?= e((($p['manmonth_min_days'] ?? 0) ?: '')) ?>" placeholder="e.g. 26">
+             value="<?= e((($d['manmonth_min_days'] ?? 0) ?: '')) ?>" placeholder="e.g. 26">
       <small class="muted">Below this the month is claimable pro-rata; above it, it is still one man-month.</small></div>
     <?php if (function_exists('render_custom_fields')) render_custom_fields('partner', $pcfvals ?? []); ?>
   </div>

@@ -174,7 +174,7 @@ function ops_area_def($area) {
             $t($inspPack && can('mod.audits.view'), '🏛', 'Management review', '/management-reviews', 'Management review records.');
             $t(can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity']), '🔒', 'Confidentiality', '/confidentiality', 'Undertakings, NDAs and breaches.',
                 $num(fn() => $fx('conf_open_breach_count') ? conf_open_breach_count() : 0), 'red');
-            $t($fx('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients'])), '🛂', 'Site entry documents', '/site-docs', 'Papers needed for site access.');
+            $t($fx('sitedocs_can_view') && licence_enabled('operations') && sitedocs_can_view(), '🛂', 'Site entry documents', '/site-docs', 'Papers needed for site access.');
             $t(can('mod.identity.view') && $fx('iddoc_can_view') && iddoc_can_view(), '🪪', 'Identity documents', '/identity', 'ID that gates site access.');
             // R11 — SLA / turnaround targets moved here from Admin. It is a
             // service-delivery setting, not core administration, so surfacing it here

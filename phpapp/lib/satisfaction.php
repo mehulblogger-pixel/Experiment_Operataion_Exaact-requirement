@@ -76,12 +76,18 @@ function sat_followup_threshold() {
 
 function sat_can_view() {
     if (!sat_enabled()) return false;
-    return is_master() || (function_exists('can') && (can('mod.clients.view')
-        || can('mod.complaints.view') || can('mod.jobs.view')));
+    // A Quality register: Complaints, or clients / jobs held by management or by
+    // someone who works on jobs (works_operations()). The client register alone
+    // (the Sales roles), or reading jobs only to bill them (Finance), does not — the matrix gives the
+    // Sales roles the CRM modules only (owner, test book SAL-000). A client's
+    // own satisfaction still shows on its Customer 360 (customer360.php).
+    return is_master() || (function_exists('can') && (can('mod.complaints.view')
+        || ((can('mod.clients.view') || can('mod.jobs.view')) && works_operations())));
 }
 function sat_can_manage() {
     if (!sat_enabled()) return false;
-    return is_master() || (function_exists('can') && (can('mod.clients.view') || can('mod.complaints.view')));
+    return is_master() || (function_exists('can') && (can('mod.complaints.view')
+        || (can('mod.clients.view') && works_operations())));
 }
 
 function sat_aspects() {

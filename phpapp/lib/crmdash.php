@@ -34,9 +34,13 @@
 //  Everything is scoped and licence-aware, like every other register.
 // ============================================================================
 
+// The "Sales reports" tick (mod.crm_reports.view) — and only it. It used to
+// open for anyone who could see leads or quotes too, so unticking Sales
+// reports changed nothing (owner, test book SAL-000: "if we delete any
+// permission it still remains"). Every role whose defaults hold leads or
+// quotes also holds Sales reports, so no role loses it by default.
 function crmdash_can() {
-    return can('mod.crm_reports.view') || can('mod.leads.view') || can('mod.quotes.view')
-        || is_master_of(['crm_reports', 'leads', 'quotes']);
+    return can('mod.crm_reports.view') || is_master_of(['crm_reports']);
 }
 
 function crmdash_try($fn, $fb = null) { try { return $fn(); } catch (Throwable $e) { return $fb; } }

@@ -45,11 +45,10 @@ $ENFORCED = [
     'endorsement-delete' => ['idems', 'delete', fn($r, $p) => in_array('idems.finalize', $p, true)],
     // lib/ops.php  job-close  ops_require(... can('ops.job.close') ...)
     'job-close'          => ['jobs', 'archive', fn($r, $p) => in_array('ops.job.close', $p, true)],
-    // lib/ops.php  expense-delete
-    //   == is_coordinator_level() || can('finance.reconcile') || is_master()
-    'expense-delete'     => ['jobs', 'delete', fn($r, $p) => in_array($r, MGMT_ROLES, true)
-                                 || in_array($r, ['ASST_MANAGER','COORDINATOR'], true)
-                                 || in_array('finance.reconcile', $p, true)],
+    // expense-delete is NOT verb-gated any more (24 Oct 2026, docs/02 19l): its
+    // authority admits accounts (finance.reconcile), which no per-module verb can
+    // express without handing Finance Delete — and so Edit — on every job. Its
+    // handler guard is the whole rule: is_coordinator_level() || can('finance.reconcile') || is_master().
 ];
 
 t_section('Every enforced route: nobody who can act today is locked out');
