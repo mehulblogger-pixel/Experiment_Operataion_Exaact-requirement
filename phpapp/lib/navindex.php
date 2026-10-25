@@ -191,6 +191,11 @@ function ops_nav_index($fresh = false) {
     // ---- The seven flat areas, flattened from their gated tile lists --------
     if ($fx('ops_area_def')) {
         foreach (['sales', 'marketplace', 'quality', 'reporting', 'money', 'insights', 'directory', 'admin'] as $area) {
+            // The same question the left rail asks before it shows an area: is
+            // it switched on for this company, and does it hold anything for this
+            // person? Without it the palette offered every area of a module the
+            // company had not bought (owner, test book ONB-041).
+            if ($fx('ops_area_has') && !ops_area_has($area)) continue;
             $def = ops_area_def($area);
             if (!$def) continue;
             $add($def['title'], '/' . $area, $def['title'], $def['icon'] ?: '📂', $def['sub'] ?? '');

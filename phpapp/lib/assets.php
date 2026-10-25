@@ -40,8 +40,11 @@ const ASSET_STATUS = [
 const ASSET_CONDITIONS = ['NEW' => 'New', 'GOOD' => 'Good', 'USED' => 'Used', 'DAMAGED' => 'Damaged'];
 
 function asset_types()      { return lk_options_or('asset_type', ASSET_TYPES); }
-function asset_can_view()   { return is_coordinator_level() || is_master(); }
-function asset_can_manage() { return is_coordinator_level() || is_master(); }
+// Gear issued to field engineers is part of Operations: a company that has not
+// bought Operations has no engineers to issue it to (owner, test book ONB-041).
+function asset_ops_on()     { return !function_exists('licence_enabled') || licence_enabled('operations'); }
+function asset_can_view()   { return asset_ops_on() && (is_coordinator_level() || is_master()); }
+function asset_can_manage() { return asset_ops_on() && (is_coordinator_level() || is_master()); }
 
 function assets_migrate() {
     static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();

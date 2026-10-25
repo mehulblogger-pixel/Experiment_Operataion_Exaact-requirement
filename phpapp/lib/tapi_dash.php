@@ -163,6 +163,9 @@ function tapi_data_quality() {
 //  Route handler — gated so a user only reaches analytics they may see.
 // ============================================================================
 function tapi_can() {
+    // Its KPIs are operations, utilisation, people and money figures; with
+    // neither Operations nor Money bought there is nothing to show (ONB-041).
+    if (function_exists('licence_enabled') && !licence_enabled('operations') && !licence_enabled('money')) return false;
     return (function_exists('is_master') && is_master())
         || (function_exists('can') && (can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people')));
 }

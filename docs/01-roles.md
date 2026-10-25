@@ -14,6 +14,24 @@ Landing is always `/` → `views/dashboard.php`; the dashboard changes *emphasis
 role (inspector branch `dashboard.php:23-43`; `$moneyFirst` for FINANCE `:65`;
 `$schedFirst` for COORDINATOR/ASST_MANAGER `:66`) but there is **no per-role redirect**.
 
+**Which roles a company is offered** (`ROLE_MODULE`, `roles_for_licence()` in
+`lib/access.php`). When a company adds a person, a role is offered only if the
+company has one of its modules switched on. This only decides which roles appear
+in the list; it grants and removes no rights.
+
+| Role | Offered when this module is on |
+| --- | --- |
+| Business Development Manager, Key Accounts Manager, Marketing Manager, Marketing Executive | Sales |
+| Finance | Money |
+| Inspector, Senior Inspector, Asst. Manager, Quality Head, Technical Head | Operations |
+| Operation Manager, Coordinator | Operations or People & hiring |
+| Master Admin, Business Director, Business Unit Head, Branch Manager, Branch Application Manager | Always (they run the whole business) |
+
+A person who already holds a role keeps it when their record is edited, even if
+the module is later switched off. A new person starts as Coordinator or, if the
+company has no use for one, as Marketing Executive, Inspector or Finance —
+whichever is offered first (owner, test book ONB-041, 25 Oct 2026).
+
 ---
 
 ## MASTER_ADMIN — "Master Admin"

@@ -17,8 +17,10 @@ t_ok(!isset($r['INSPECTOR']) && !isset($r['SR_INSPECTOR']), 'Inspector roles are
 t_ok(!isset($r['BUSINESS_DEV_MANAGER']) && !isset($r['MARKETING_MANAGER']) && !isset($r['KEY_ACCOUNTS_MANAGER']),
     'Sales / Marketing roles are hidden when Sales is off');
 t_ok(!isset($r['FINANCE']), 'the Finance role is hidden when Money is off');
-t_ok(isset($r['MASTER_ADMIN']) && isset($r['COORDINATOR']) && isset($r['ASST_MANAGER']),
-    'core management + coordinator roles always remain');
+t_ok(isset($r['MASTER_ADMIN']) && isset($r['COORDINATOR']) && isset($r['OPERATION_MANAGER']),
+    'core management + the roles that run recruitment (Coordinator, Operation Manager) remain');
+// docs/01-roles.md: the Asst. Manager has no Recruitment — an Operations role (ONB-041).
+t_ok(!isset($r['ASST_MANAGER']), 'the Asst. Manager (an Operations role) is hidden when Operations is off');
 
 // Editing an existing Inspector must still show Inspector as the current role.
 $rk = roles_for_licence(null, 'INSPECTOR');

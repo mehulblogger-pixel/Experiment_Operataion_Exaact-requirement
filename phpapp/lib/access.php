@@ -47,11 +47,20 @@ const ACCESS_LEAD_WORKERS = SALES_ROLES;
 // Which module a role belongs to — used to hide roles a company can't use.
 // Only module-specific roles are listed; management/admin/coordinator roles are
 // generic org roles and always available.
+// A role is offered when ANY of its modules is on. Roles that span the whole
+// business (Business Director, Business Unit Head, Branch Manager, Branch
+// Application Manager, Master Admin) have no entry and are always offered.
+// The operations line and the quality heads were missing, so a company that
+// bought Sales alone was still asked to choose a Coordinator or an Operation
+// Manager (owner, test book ONB-041). docs/01-roles.md says what each one sees.
 const ROLE_MODULE = [
     'BUSINESS_DEV_MANAGER' => 'sales', 'KEY_ACCOUNTS_MANAGER' => 'sales',
     'MARKETING_MANAGER' => 'sales', 'MARKETING_EXECUTIVE' => 'sales',
     'FINANCE' => 'money',
     'SR_INSPECTOR' => 'operations', 'INSPECTOR' => 'operations',
+    'OPERATION_MANAGER' => ['operations', 'hr'], 'COORDINATOR' => ['operations', 'hr'],
+    'ASST_MANAGER' => 'operations',
+    'QUALITY_HEAD' => 'operations', 'TECHNICAL_HEAD' => 'operations',
 ];
 
 // The roles worth OFFERING on this installation: hide any role whose owning
@@ -68,12 +77,21 @@ function roles_for_licence($roles = null, $keep = '') {
     if (!function_exists('licence_enabled')) return $roles;
     $out = [];
     foreach ($roles as $k => $v) {
-        $mod = ROLE_MODULE[$k] ?? null;
-        if ($mod !== null && !licence_enabled($mod) && $k !== $keep) continue;
+        $mods = (array) (ROLE_MODULE[$k] ?? []);
+        if ($mods && $k !== $keep && !array_filter($mods, 'licence_enabled')) continue;
         $out[$k] = $v;
     }
     if ($keep !== '' && !isset($out[$keep]) && isset($all[$keep])) $out[$keep] = $all[$keep];
     return $out;
+}
+
+// The role a NEW person starts on: the everyday role of a module this company
+// has, never a senior one picked just because it is first on the list.
+function role_default_for_licence(array $offered) {
+    foreach (['COORDINATOR', 'MARKETING_EXECUTIVE', 'INSPECTOR', 'FINANCE'] as $k)
+        if (isset($offered[$k])) return $k;
+    foreach ($offered as $k => $v) if ($k !== 'MASTER_ADMIN') return $k;
+    return 'COORDINATOR';
 }
 
 // ---- Custom (company-defined) roles ---------------------------------------

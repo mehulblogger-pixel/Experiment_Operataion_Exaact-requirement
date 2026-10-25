@@ -1,5 +1,12 @@
 <?php
   $curRole = $user ? (!empty($user['is_superuser'])?'MASTER_ADMIN':strtoupper($user['role'] ?? 'COORDINATOR')) : 'COORDINATOR';
+  $roleBase = $globalMgr ? (function_exists('roles_all') ? roles_all() : ORG_ROLES) : ['OPERATION_MANAGER'=>ORG_ROLES['OPERATION_MANAGER'],'ASST_MANAGER'=>ORG_ROLES['ASST_MANAGER'],'COORDINATOR'=>ORG_ROLES['COORDINATOR'],'INSPECTOR'=>ORG_ROLES['INSPECTOR']];
+  // A new person (no role chosen yet) starts on a role this company can use —
+  // not a Coordinator in a company that bought Sales alone (ONB-041).
+  if (!$user && empty($user['role']) && function_exists('roles_for_licence') && function_exists('role_default_for_licence')) {
+      $offeredNew = roles_for_licence($roleBase);
+      if ($offeredNew && !isset($offeredNew[$curRole])) $curRole = role_default_for_licence($offeredNew);
+  }
   // Comma-separated when it comes from the database, already a list when a
   // refused save hands back what was typed. Accept either rather than trusting
   // the caller — getting this wrong takes the whole screen down.
@@ -22,7 +29,6 @@
       // the Coordinator's for a new person — whatever role was then chosen.)
       $curPerms = function_exists('role_perm_set') ? role_perm_set($curRole) : ($defaults['perms'] ?? []);
   }
-  $roleBase = $globalMgr ? (function_exists('roles_all') ? roles_all() : ORG_ROLES) : ['OPERATION_MANAGER'=>ORG_ROLES['OPERATION_MANAGER'],'ASST_MANAGER'=>ORG_ROLES['ASST_MANAGER'],'COORDINATOR'=>ORG_ROLES['COORDINATOR'],'INSPECTOR'=>ORG_ROLES['INSPECTOR']];
   // Only offer roles this company can actually use — a Recruitment company is not
   // shown Inspector / Marketing / Finance roles (their modules are off). The
   // person's current role is always kept, so editing a user never loses it.

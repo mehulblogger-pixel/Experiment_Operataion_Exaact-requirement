@@ -23,6 +23,8 @@ CHANGE = {  # (test id, step number) -> new fields
     ('ONB-030', 6):  {'expect': 'Settings opens on "Branding & theme". If you added a logo on Your company, it already shows under "Current logo" with "Your company logo, from Your company … Nothing to do here." The upload box is only for a different header logo.'},
     # Owner, 25 Oct: a module not bought has no switch at all — only an upgrade.
     ('ONB-041', 4):  {'expect': 'Sales & CRM and Administration are on. Every other module shows "🔒 Not in plan" with "This feature isn\u2019t part of your plan." and an "Upgrade to add it" button — there is no switch to turn it on.'},
+    # Owner, 25 Oct: the role list offered Coordinator, Inspector… to a Sales-only company.
+    ('ONB-041', 5):  {'expect': 'Role list: Master Admin, Business Director, Business Unit Head, Branch Manager, Branch Application Manager, Business Development Manager, Key Accounts Manager, Marketing Manager, Marketing Executive, Admin (legacy) (and any role the company named itself). It starts on Marketing Executive. NO Coordinator, Asst. Manager, Operation Manager, Inspector, Senior Inspector, Quality Head, Technical Head or Finance. Permissions tab: no Operations/Money ticks.'},
     # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
     ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
     # One choice instead of two switches (owner: "switch is off but still I can generate the account from /start").
@@ -50,6 +52,10 @@ BEFORE = {  # test id -> the "Before" line
     'ONB-003': 'Same as ONB-002: the APPLICATION form (/get-started), which has the "Preferred workspace name" box. While self sign-up is on, /get-started jumps to the free-trial form (/start), which has no workspace-name box — its name is made from the company name. Signed out.',
 }
 ADD = {  # test id -> steps appended at the end
+    'ONB-041': [
+        {'do': 'Press the 🧭 "Go to…" button at the top (or Ctrl/⌘-K) and scroll the whole list; then type "quality", "invoice" and "asset".',
+         'expect': 'The list holds only Home, Me, Sales, Insights, Directory and Admin screens — the same areas as the left menu. Typing finds nothing from Quality & Accreditation, Reporting, Money, Operations, Recruitment, Marketplace, Asset issuance or Analytics & performance.'},
+    ],
     'SAL-003': [
         {'do': 'Edge: in the dashed card type Level 4, From 30000, Up to 100000 (inside Level 1). Add this level.',
          'expect': 'Refused: "Level 1 already covers ₹0 to ₹5,00,000. Levels may not overlap — a quotation moves up through them in order…". No card is added.'},
