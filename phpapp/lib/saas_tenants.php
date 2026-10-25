@@ -1278,9 +1278,12 @@ function ops_saas_admin($route, $method) {
             setting_set('saas_inactive_delete_days', $num('ss_delete_days', 1));
             setting_set('saas_autodelete_enabled', !empty($_POST['ss_autodelete']) ? '1' : '0');
             $c = selfserve_cfg();
-            if ($c['delete_days'] <= $c['notice_days'])
-                flash('Saved — but deletion comes before the first warning with these numbers. Make the deletion days larger than the warning interval.', 'warning');
-            else flash('Self-serve sign-up settings saved.' . (!selfserve_ready() ? ' Note: cloud mode is not switched on yet (Cloud workspaces), so the sign-up page stays closed.' : ''));
+            // Say the numbers that were actually stored, so a box left blank
+            // (= the built-in default) is never a surprise.
+            $nums = 'warn every ' . $c['notice_days'] . ' days, delete after ' . $c['delete_days'] . ' days';
+            if (($why = selfserve_days_problem($c)) !== '')
+                flash('Saved (' . $nums . ') — but ' . $why, 'warning');
+            else flash('Self-serve sign-up settings saved (' . $nums . ').' . (!selfserve_ready() ? ' Note: cloud mode is not switched on yet (Cloud workspaces), so the sign-up page stays closed.' : ''));
             redirect('/companies');
         }
         // ---- Storage allowance (lib/selfserve.php): the platform owner's numbers

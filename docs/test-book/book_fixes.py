@@ -15,6 +15,10 @@ CHANGE = {  # (test id, step number) -> new fields
                       'expect': '"Payment keys saved. Press \'Check payment keys\' to confirm them."'},
     ('PLT-004', 9):  {'do': 'Emergency: mPanel → File Manager → in the data folder (test copy: exaact_test/exaact_data_test; live site: exaact_data) create an empty file "superadmin-unlock"; open /platform-setup on the main address.'},
     ('PLT-005', 2):  {'do': 'BEFORE saving any price (step 4): as a company on its free trial, open Subscription.'},
+    # Owner, 25 Oct: the welcome screen showed no password section (correct — the password was just set).
+    ('ONB-020', 4):  {'expect': 'Next: "Welcome — let\u2019s set up your system" (sections 1 What does your company do? · 2 Money & calendar · 3 Data-protection contact). It does NOT ask for the password again — you set it a moment ago.'},
+    # Owner, 25 Oct: the warning was easy to miss; it now names the numbers and stays on the panel.
+    ('ONB-006', 3):  {'expect': 'Amber message "Saved (warn every 15 days, delete after 10 days) — but deletion comes before the first warning with these numbers…", and the same warning stays at the top of the panel. Put it back to 90 → "Self-serve sign-up settings saved (warn every 15 days, delete after 90 days)." and the panel warning disappears.'},
     # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
     ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
     # One choice instead of two switches (owner: "switch is off but still I can generate the account from /start").

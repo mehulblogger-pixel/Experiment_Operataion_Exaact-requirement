@@ -7,9 +7,13 @@
   $curFy = (int)(function_exists('fy_start_month') ? fy_start_month() : 4);
   $curInd = function_exists('industry_current') ? (string)industry_current() : '';
   $industries = defined('INDUSTRY_TEMPLATES') ? INDUSTRY_TEMPLATES : [];
-  // A company that signed itself up chose its owner's password a minute ago —
-  // asking again would only be a step to skip.
-  $askPw = !(function_exists('saas_is_selfserve') && saas_is_selfserve());
+  // Only a self-installed copy, whose administrator may still be on the password
+  // from config.php, is asked here. Every company workspace has already settled
+  // its owner's password: a self sign-up chose it on the sign-up page, and a
+  // company added by the platform owner was made to change the temporary one
+  // at first sign-in, a moment before this screen — asking again is a step to skip.
+  $inWorkspace = function_exists('current_tenant') && current_tenant() !== '';
+  $askPw = !$inWorkspace && !(function_exists('saas_is_selfserve') && saas_is_selfserve());
   $sec = 0;
 ?>
 <div class="master-head">

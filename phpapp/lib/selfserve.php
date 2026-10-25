@@ -128,6 +128,13 @@ function selfserve_cfg() {
         'auto_delete'  => (string) $g('saas_autodelete_enabled', '1') === '1',
     ];
 }
+// The deletion days must be larger than the warning interval, or an unused
+// trial could be deleted before its first warning e-mail. '' when fine.
+function selfserve_days_problem(?array $c = null) {
+    $c = $c ?: selfserve_cfg();
+    if ((int) $c['delete_days'] > (int) $c['notice_days']) return '';
+    return 'deletion comes before the first warning with these numbers. Make the deletion days larger than the warning interval.';
+}
 // Self-serve needs the one-URL cloud set-up to exist (a base domain on the
 // routing registry), because that is where a new company's database is routed.
 function selfserve_ready() {

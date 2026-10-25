@@ -300,6 +300,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
   <summary style="cursor:pointer;padding:13px 16px;font-size:14px;font-weight:600;background:var(--soft,#f6f8fb);border-bottom:1px solid var(--line,#e5e7eb)">🚀 Self sign-up &amp; free trial — <?= !empty($ss_on) ? 'ON' : 'OFF' ?></summary>
   <form method="post" style="padding:16px">
     <input type="hidden" name="do" value="selfserve_save">
+    <?php if (($ssWhy = selfserve_days_problem($ssc)) !== ''): ?><div class="msg msg-warning">With the numbers saved now (warn every <?= (int) $ssc['notice_days'] ?> days, delete after <?= (int) $ssc['delete_days'] ?> days), <?= $e($ssWhy) ?></div><?php endif; ?>
     <?php if (empty($ss_ready)): ?><div class="msg msg-warning">Cloud mode is not switched on yet (Admin → Super Admin → Cloud workspaces → Base domain). Until it is, the sign-up page stays closed.</div><?php endif; ?>
     <label style="display:flex;gap:9px;align-items:flex-start;margin-bottom:12px;font-size:13.5px"><input type="checkbox" name="ss_on" value="1" <?= !empty($ss_on) ? 'checked' : '' ?> style="margin-top:2px">
       <span><b>Companies can sign themselves up</b> at <code>/start</code>: they confirm their e-mail with a code and go straight into their own workspace on a free trial of every module.
