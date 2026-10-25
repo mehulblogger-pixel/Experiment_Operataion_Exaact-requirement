@@ -71,12 +71,17 @@
         company name<?= $ckName !== '' ? ' — currently <strong>' . e($ckName) . '</strong>' : '' ?>.
         This is not the name on your invoices and letters: that is
         <a href="/company-profile">Your company</a>.</small></div>
-    <div class="ff"><label>Logo (PNG/JPG/SVG, ≤600 KB)</label><input class="form-control" type="file" name="logo" accept="image/*"></div>
+    <?php $ownLogo = setting_get('logo_data','') !== ''; $coLogo = !$ownLogo && logo_src() !== ''; ?>
+    <div class="ff"><label><?= $coLogo ? 'A different logo for the header <span class="muted">— optional</span>' : 'Logo (PNG/JPG/SVG, ≤600 KB)' ?></label><input class="form-control" type="file" name="logo" accept="image/*">
+      <?php if ($coLogo): ?><small class="muted">Only if the header should show something other than your company logo.</small><?php endif; ?></div>
     <div class="ff">
-      <?php if (setting_get('logo_data','')): ?>
+      <?php if ($ownLogo): ?>
         <label>Current logo</label><div style="background:var(--brand);padding:8px;border-radius:8px;display:inline-block"><?= logo_html() ?></div>
-        <label class="chk" style="margin-top:6px"><input type="checkbox" name="clear_logo" value="1"> Remove logo</label>
-      <?php else: ?><label class="muted">No logo uploaded yet.</label><?php endif; ?>
+        <label class="chk" style="margin-top:6px"><input type="checkbox" name="clear_logo" value="1"> Remove logo<?= setting_get('quote_lh_logo','') !== '' ? ' (the header then uses your company logo)' : '' ?></label>
+      <?php elseif ($coLogo): ?>
+        <label>Current logo</label><div style="background:var(--brand);padding:8px;border-radius:8px;display:inline-block"><?= logo_html() ?></div>
+        <small class="muted" style="display:block;margin-top:6px">Your company logo, from <a href="/company-profile">Your company</a> — the one on your quotations and reports. Nothing to do here.</small>
+      <?php else: ?><label class="muted">No logo yet. Add it on <a href="/company-profile">Your company</a> to use it on documents and here, or upload one just for the header.</label><?php endif; ?>
     </div>
   </div>
 

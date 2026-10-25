@@ -1874,8 +1874,17 @@ function theme_style_tag() {
         . ".topbar .brand,.topbar .user{color:$navtext}.topbar nav a{color:$navlink}.topbar nav a:hover{color:$navtext}"
         . "</style>";
 }
-function logo_html() {
+// The header logo: Branding's own upload, else the company logo from Your
+// company (stored for documents as bare base64 JPEG). One upload is enough —
+// a logo given during company set-up must not be asked for again here.
+function logo_src() {
     $d = trim((string) setting_get('logo_data', ''));
+    if ($d !== '') return $d;
+    $c = preg_replace('~\s+~', '', (string) setting_get('quote_lh_logo', ''));
+    return ($c !== '' && preg_match('~^[A-Za-z0-9+/=]+$~', $c)) ? 'data:image/jpeg;base64,' . $c : '';
+}
+function logo_html() {
+    $d = logo_src();
     //  Only emit an <img> for something that can actually BE an image source.
     //  This used to trust the setting blindly, so a corrupt or truncated value —
     //  found in the wild as 5,000 letter A's — became src="AAAA…" on EVERY page:

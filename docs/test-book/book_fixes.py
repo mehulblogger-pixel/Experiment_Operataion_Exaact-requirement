@@ -19,6 +19,10 @@ CHANGE = {  # (test id, step number) -> new fields
     ('ONB-020', 4):  {'expect': 'Next: "Welcome — let\u2019s set up your system" (sections 1 What does your company do? · 2 Money & calendar · 3 Data-protection contact). It does NOT ask for the password again — you set it a moment ago.'},
     # Owner, 25 Oct: the warning was easy to miss; it now names the numbers and stays on the panel.
     ('ONB-006', 3):  {'expect': 'Amber message "Saved (warn every 15 days, delete after 10 days) — but deletion comes before the first warning with these numbers…", and the same warning stays at the top of the panel. Put it back to 90 → "Self-serve sign-up settings saved (warn every 15 days, delete after 90 days)." and the panel warning disappears.'},
+    # Owner, 25 Oct: the logo given on Your company is now also the header logo.
+    ('ONB-030', 6):  {'expect': 'Settings opens on "Branding & theme". If you added a logo on Your company, it already shows under "Current logo" with "Your company logo, from Your company … Nothing to do here." The upload box is only for a different header logo.'},
+    # Owner, 25 Oct: a module not bought has no switch at all — only an upgrade.
+    ('ONB-041', 4):  {'expect': 'Sales & CRM and Administration are on. Every other module shows "🔒 Not in plan" with "This feature isn\u2019t part of your plan." and an "Upgrade to add it" button — there is no switch to turn it on.'},
     # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
     ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
     # One choice instead of two switches (owner: "switch is off but still I can generate the account from /start").

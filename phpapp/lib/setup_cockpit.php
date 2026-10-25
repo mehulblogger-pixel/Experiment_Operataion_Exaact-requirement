@@ -343,7 +343,7 @@ function cockpit_sections() {
     //    setup place instead of only from a separate Settings screen. Deep-links
     //    straight to the Branding tab.
     $hasLogo = false;
-    if (function_exists('setting_get')) { try { $hasLogo = trim((string) setting_get('logo_data', '')) !== '' || trim((string) setting_get('app_name', '')) !== ''; } catch (Throwable $e) {} }
+    if (function_exists('setting_get')) { try { $hasLogo = (function_exists('logo_src') ? logo_src() !== '' : trim((string) setting_get('logo_data', '')) !== '') || trim((string) setting_get('app_name', '')) !== ''; } catch (Throwable $e) {} }
     $secs['appearance'] = [
         'key' => 'appearance', 'icon' => '🎨', 'label' => 'Branding & theme',
         'desc' => 'Your logo, colours and app name.',

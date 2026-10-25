@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '0e339c59 · 2026-10-25 03:38 UTC · 701 files';
+$RELEASE = 'e0ba22b5 · 2026-10-25 13:10 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -32,7 +32,7 @@ $EXPECT  = [
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>131718,'h'=>'8dba7c4bd7d1873e'],
-    'lib/access.php' => ['s'=>129609,'h'=>'190920e79a32e35e'],
+    'lib/access.php' => ['s'=>130093,'h'=>'85d983d4302ad496'],
     'lib/access_state.php' => ['s'=>10512,'h'=>'25d820df4d27fbd9'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
     'lib/adspro.php' => ['s'=>28665,'h'=>'3a35e9b834372419'],
@@ -241,7 +241,7 @@ $EXPECT  = [
     'lib/settingmeta.php' => ['s'=>12701,'h'=>'092392a858cc10d8'],
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
     'lib/setup.php' => ['s'=>23072,'h'=>'7af387096568ab14'],
-    'lib/setup_cockpit.php' => ['s'=>31454,'h'=>'0367929928139113'],
+    'lib/setup_cockpit.php' => ['s'=>31506,'h'=>'3a3770c84a89f262'],
     'lib/setupqa.php' => ['s'=>18966,'h'=>'a6785961911ec434'],
     'lib/stagegate.php' => ['s'=>23612,'h'=>'47e075112915aafc'],
     'lib/superadmin.php' => ['s'=>22099,'h'=>'f3e910a1caa81d54'],
@@ -611,7 +611,7 @@ $EXPECT  = [
     'views/ops/search.php' => ['s'=>5732,'h'=>'18f633a71a6d1d13'],
     'views/ops/service_formats.php' => ['s'=>2923,'h'=>'0da7c4881ffb154c'],
     'views/ops/service_scope.php' => ['s'=>8596,'h'=>'580a7c044d31aa3c'],
-    'views/ops/settings.php' => ['s'=>72365,'h'=>'2eff5891b467e9be'],
+    'views/ops/settings.php' => ['s'=>73282,'h'=>'03b075282b56e2d4'],
     'views/ops/setup.php' => ['s'=>5595,'h'=>'e4bcbe1609aa72c5'],
     'views/ops/setup_questions.php' => ['s'=>2854,'h'=>'a6feb3e000f62701'],
     'views/ops/site_docs.php' => ['s'=>4927,'h'=>'f03c1d9c89e53436'],
