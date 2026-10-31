@@ -134,7 +134,9 @@ function access_state_for($accessModule, $why = null) {
             break;
         case 'TENANT_DISABLED':
             $msg = $label . ' has been switched off for this workspace.';
-            $act = $canBuy ? ['label' => 'Review your subscription', 'route' => '/subscription']
+            //  Bought, only switched off — the switch is on Modules & features,
+            //  not on the subscription page (nothing needs buying).
+            $act = $canBuy ? ['label' => 'Switch it on in Modules & features', 'route' => '/workspace/setup/modules']
                            : ['label' => null, 'route' => null];
             $hint = $canBuy ? 'You can switch it back on — the work already recorded in it is untouched.'
                             : 'Your workspace administrator can switch it back on. Nothing recorded in it has been lost.';

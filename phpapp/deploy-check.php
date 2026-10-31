@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'ef15438e · 2026-10-31 06:56 UTC · 701 files';
+$RELEASE = '61389d2f · 2026-10-31 06:59 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -33,7 +33,7 @@ $EXPECT  = [
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
     'index.php' => ['s'=>131718,'h'=>'8dba7c4bd7d1873e'],
     'lib/access.php' => ['s'=>131202,'h'=>'359ad3b528a4471c'],
-    'lib/access_state.php' => ['s'=>10512,'h'=>'25d820df4d27fbd9'],
+    'lib/access_state.php' => ['s'=>10685,'h'=>'4c7da7d6d793745e'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
     'lib/adspro.php' => ['s'=>28665,'h'=>'3a35e9b834372419'],
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],

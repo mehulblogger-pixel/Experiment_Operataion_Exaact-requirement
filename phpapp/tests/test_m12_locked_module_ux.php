@@ -219,3 +219,9 @@ if (function_exists('lk_state')) lk_state(true);
 if ($origTenant === null) unset($GLOBALS['__tenant']); else $GLOBALS['__tenant'] = $origTenant;
 licence_disabled(true); current_user(true); ua(true);
 t_ok(true, 'settings and session restored');
+
+// Owner, 31 Oct 2026 (ONB-041 step 3): a module bought but switched off says "you
+// can switch it back on" — its button goes where the switch is.
+$asSrc = (string) file_get_contents(__DIR__ . '/../lib/access_state.php');
+t_ok(strpos($asSrc, "'Switch it on in Modules & features', 'route' => '/workspace/setup/modules'") !== false,
+     'switched off (still bought): the button opens Modules & features, not the subscription page');
