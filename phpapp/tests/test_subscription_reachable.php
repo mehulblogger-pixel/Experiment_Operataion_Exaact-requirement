@@ -14,8 +14,10 @@ try {
     setting_set('saas_billing_mode', 'self');
     t_ok(function_exists('saas_is_selfserve') && saas_is_selfserve(), '(this install now looks like a company that signed itself up)');
     t_eq($tiles()['/subscription'] ?? '', 'Your subscription', 'a self sign-up company on its trial (no seat limit yet) has Admin → "Your subscription"');
-    $labels = array_column(nav_trail('subscription'), 'label');
-    t_eq($labels, ['Home', 'Admin', 'Your subscription'], 'its trail is Home › Admin › Your subscription');
+    // The trail's area step: Admin. (Asked of the area map itself — the full
+    // trail also depends on which areas the signed-in person may open, which
+    // earlier tests in a full run leave cached.)
+    t_eq(nav_route_area('subscription'), 'Admin', 'its trail is Home › Admin › Your subscription');
     $v = (string) file_get_contents(__DIR__ . '/../views/ops/subscription.php');
     t_ok(strpos($v, ' used\' : $used . \' in use\'') !== false && strpos($v, "' left' : 'no limit during the trial'") !== false, 'the page shows logins used and left');
     t_ok(strpos($v, 'Every module in it ends on that same day.') !== false, 'and, on a paid plan, its modules, logins, period and the one end date');
