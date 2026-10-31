@@ -31,7 +31,7 @@ $yr = fn($v) => (int) $v > 0 ? e($sym . number_format((int) $v)) : '<span class=
 
 <?php if ($unset): ?>
 <div class="panel" style="max-width:860px;margin-top:14px;border-left:4px solid var(--warn,#b45309)">
-  <b><?= count($unset) ?> number<?= count($unset) === 1 ? '' : 's' ?> still to decide</b> <span class="pu-note">(storage and trial ones are under Companies → 💾 Storage allowance and 🚀 Self sign-up).</span><br>
+  <b><?= count($unset) ?> number<?= count($unset) === 1 ? '' : 's' ?> still to decide</b> <span class="pu-note">(storage sizes and trial ones are under Companies → 💾 Storage allowance and 🚀 Self sign-up).</span><br>
   <span class="pu-note">Each box shows a suggested starting value from market research (22 Oct 2026) and the reason. "Fill in the suggested values" puts them in the empty boxes only — nothing is saved until you press Save.</span>
   <div style="margin-top:8px"><button type="button" class="btn ghost" id="pu-fill">Fill in the suggested values</button></div>
 </div>
@@ -57,6 +57,16 @@ $yr = fn($v) => (int) $v > 0 ? e($sym . number_format((int) $v)) : '<span class=
         <td><input class="form-control" type="number" min="0" name="seat_year" value="<?= e($p['seat_year'] ?? '') ?>" placeholder="discount" style="width:130px"></td>
         <td><?= $yr($pb['seat']['year'] ?? 0) ?></td>
       </tr>
+      <?php // Every price in one place (owner, test book PLT-005: "GB pack price is
+            // under Companies … that should be under Pricing"). The pack SIZE stays
+            // with the storage rules on Companies. ?>
+      <?php $pkGb = (float) setting_get('saas_storage_pack_gb', 0); ?>
+      <tr>
+        <td><b>Extra storage pack</b><div class="pu-hint"><?= $pkGb > 0 ? e(rtrim(rtrim(number_format($pkGb, 2), '0'), '.')) . ' GB each — optional, a company buys only if it needs more' : 'pack size not set (Companies → 💾 Storage allowance)' ?></div></td>
+        <td><?= $box('pack_month', 'saas_storage_pack_price_month', $raw['saas_storage_pack_price_month'] ?? '', 'type="number" min="0"') ?></td>
+        <td><input class="form-control" type="number" min="0" name="saas_storage_pack_price_year" value="<?= e($raw['saas_storage_pack_price_year'] ?? '') ?>" placeholder="discount" style="width:130px"></td>
+        <td><?= $yr($pb['storage_pack']['year'] ?? 0) ?></td>
+      </tr>
     </table>
     </div>
     <div class="form-grid" style="margin-top:12px">
@@ -65,7 +75,7 @@ $yr = fn($v) => (int) $v > 0 ? e($sym . number_format((int) $v)) : '<span class=
       <div class="ff"><label>Currency</label>
         <input class="form-control" name="currency" value="<?= e($p['currency'] ?? 'INR') ?>" maxlength="3" style="text-transform:uppercase"></div>
     </div>
-    <p class="pu-note" style="margin-top:8px">Blank yearly price and no discount = yearly is not offered. Extra storage packs are priced under Companies → 💾 Storage allowance.</p>
+    <p class="pu-note" style="margin-top:8px">Blank yearly price and no discount = yearly is not offered. How big a pack is, and how much storage each company gets, are under Companies → 💾 Storage allowance.</p>
   </div>
 
   <div class="panel" style="max-width:860px;margin-top:14px" id="gst">

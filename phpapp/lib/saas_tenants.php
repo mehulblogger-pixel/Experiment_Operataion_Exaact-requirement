@@ -1303,8 +1303,10 @@ function ops_saas_admin($route, $method) {
             setting_set('saas_storage_gb_base', $num('st_base_gb'));
             setting_set('saas_storage_gb_per_login', $num('st_login_gb'));
             setting_set('saas_storage_pack_gb', $num('st_pack_gb'));
-            setting_set('saas_storage_pack_price_month', $num('st_pack_month'));
-            setting_set('saas_storage_pack_price_year', $num('st_pack_year'));
+            // The pack PRICE is set on Pricing now (owner, PLT-005); only kept here
+            // if an older form still sends it, so saving this panel never wipes it.
+            if (array_key_exists('st_pack_month', $_POST)) setting_set('saas_storage_pack_price_month', $num('st_pack_month'));
+            if (array_key_exists('st_pack_year', $_POST))  setting_set('saas_storage_pack_price_year', $num('st_pack_year'));
             // Apply to every company now (sends nothing, deletes nothing) rather than waiting for tonight.
             $r = selfserve_sweep(['dry' => true]);
             flash('Storage allowance saved and applied to ' . $r['checked'] . ' compan' . ($r['checked'] === 1 ? 'y' : 'ies') . '.');

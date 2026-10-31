@@ -378,8 +378,8 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
       <div class="ff"><label>Base storage per company (GB)</label><input type="number" min="0" step="0.5" name="st_base_gb"<?= commercial_suggest_attr('saas_storage_gb_base') ?> value="<?= $e($raw2('saas_storage_gb_base')) ?>" placeholder="not set"><?= commercial_hint('saas_storage_gb_base') ?></div>
       <div class="ff"><label>Storage per login (GB)</label><input type="number" min="0" step="0.5" name="st_login_gb"<?= commercial_suggest_attr('saas_storage_gb_per_login') ?> value="<?= $e($raw2('saas_storage_gb_per_login')) ?>" placeholder="not set"><?= commercial_hint('saas_storage_gb_per_login') ?></div>
       <div class="ff"><label>Extra storage pack size (GB)</label><input type="number" min="0" step="0.5" name="st_pack_gb"<?= commercial_suggest_attr('saas_storage_pack_gb') ?> value="<?= $e($raw2('saas_storage_pack_gb')) ?>" placeholder="not offered"><?= commercial_hint('saas_storage_pack_gb') ?></div>
-      <div class="ff"><label>Pack price per month</label><input type="number" min="0" name="st_pack_month"<?= commercial_suggest_attr('saas_storage_pack_price_month') ?> value="<?= $e($raw2('saas_storage_pack_price_month')) ?>" placeholder="not offered"><?= commercial_hint('saas_storage_pack_price_month') ?></div>
-      <div class="ff"><label>Pack price per year</label><input type="number" min="0" name="st_pack_year"<?= commercial_suggest_attr('saas_storage_pack_price_year') ?> value="<?= $e($raw2('saas_storage_pack_price_year')) ?>" placeholder="not offered"><?= commercial_hint('saas_storage_pack_price_year') ?></div>
+      <?php $pkM = (int) $raw2('saas_storage_pack_price_month'); ?>
+      <div class="ff"><label>Pack price</label><div style="padding:9px 0;font-size:14px"><?= $pkM > 0 ? '₹' . number_format($pkM) . ' a month' : 'not set' ?> — <a href="/pricing-usage">set on Pricing</a>, with every other price.</div></div>
     </div>
     <div class="sc-actions" style="margin-top:12px"><button class="btn">Save and apply to every company</button> <button type="button" class="btn ghost cm-fill">Fill in the suggested values</button></div>
   </form>

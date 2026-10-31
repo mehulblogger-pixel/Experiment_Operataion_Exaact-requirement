@@ -49,7 +49,9 @@ function pricing_settings() {
 function pricing_field_keys() {
     return ['saas_yearly_discount_pct' => 'pct', 'billing_price_field_month' => 'money', 'billing_price_portal_month' => 'money',
             'billing_portal_free' => 'int', 'plat_gst_enabled' => 'bool', 'plat_gst_rate' => 'pct', 'plat_gst_mode' => 'mode',
-            'plat_gst_sac' => 'text', 'plat_legal_name' => 'text', 'plat_gstin' => 'gstin', 'plat_address' => 'text', 'plat_invoice_prefix' => 'text'];
+            'plat_gst_sac' => 'text', 'plat_legal_name' => 'text', 'plat_gstin' => 'gstin', 'plat_address' => 'text', 'plat_invoice_prefix' => 'text',
+            // Every price on one screen (owner, PLT-005): the extra storage pack.
+            'saas_storage_pack_price_month' => 'money', 'saas_storage_pack_price_year' => 'money'];
 }
 
 // Flatten the pricing form into [setting => value]. A field left blank is saved
@@ -69,6 +71,7 @@ function pricing_settings_map(array $in) {
     }
     foreach ((function_exists('superadmin_tiers') ? array_keys(superadmin_tiers()) : []) as $plan)
         if (array_key_exists('plan_logins_' . $plan, $in)) $out['saas_plan_logins_' . $plan] = $money($in['plan_logins_' . $plan]);
+    if (array_key_exists('pack_month', $in)) $out['saas_storage_pack_price_month'] = $money($in['pack_month']);
     if (array_key_exists('ai_cap', $in))        $out['ai_monthly_cap'] = (string) max(1, (int) $in['ai_cap']);
     if (array_key_exists('ai_pack_size', $in))  $out['ai_pack_size']   = (string) max(1, (int) $in['ai_pack_size']);
     if (array_key_exists('ai_pack_price', $in)) $out['ai_pack_price']  = $money($in['ai_pack_price']);

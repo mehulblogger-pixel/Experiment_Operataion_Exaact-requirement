@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'a14dca81 · 2026-10-31 07:02 UTC · 701 files';
+$RELEASE = 'd57eb559 · 2026-10-31 07:05 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -190,7 +190,7 @@ $EXPECT  = [
     'lib/portal.php' => ['s'=>123446,'h'=>'bdb7a9fc58350701'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
-    'lib/pricing_admin.php' => ['s'=>14720,'h'=>'37b9122bf07e32de'],
+    'lib/pricing_admin.php' => ['s'=>15014,'h'=>'83ca1c6ec4438370'],
     'lib/projcosting.php' => ['s'=>53244,'h'=>'72292230c3a8de3d'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
     'lib/qr.php' => ['s'=>17936,'h'=>'4d50b69b53bfa5e2'],
@@ -218,7 +218,7 @@ $EXPECT  = [
     'lib/risks.php' => ['s'=>10571,'h'=>'83a96e16878654a2'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>98898,'h'=>'225b12797bf9903c'],
+    'lib/saas_tenants.php' => ['s'=>99162,'h'=>'e0f5d892ca43aad2'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
@@ -565,7 +565,7 @@ $EXPECT  = [
     'views/ops/positions_org.php' => ['s'=>4761,'h'=>'f2346193aac18b77'],
     'views/ops/preflight.php' => ['s'=>2844,'h'=>'b076eae0d7c568c2'],
     'views/ops/preorder_checklist.php' => ['s'=>1902,'h'=>'71d84531e6250a45'],
-    'views/ops/pricing_usage.php' => ['s'=>14786,'h'=>'4539aef10b1c0068'],
+    'views/ops/pricing_usage.php' => ['s'=>15825,'h'=>'b33f2042f8b9d2b0'],
     'views/ops/privacy.php' => ['s'=>1458,'h'=>'cc20feb046ed0b1a'],
     'views/ops/product_package.php' => ['s'=>4732,'h'=>'a87a7a169d94fe14'],
     'views/ops/profitability_detail.php' => ['s'=>10185,'h'=>'f49f71530b916b7e'],
@@ -599,7 +599,7 @@ $EXPECT  = [
     'views/ops/risk_form.php' => ['s'=>3356,'h'=>'f43057f55e88ff02'],
     'views/ops/risks_list.php' => ['s'=>2204,'h'=>'93906156b7d808ab'],
     'views/ops/role_workspaces.php' => ['s'=>4048,'h'=>'66938f5a5139889f'],
-    'views/ops/saas_companies.php' => ['s'=>38071,'h'=>'4998829a46231e56'],
+    'views/ops/saas_companies.php' => ['s'=>37757,'h'=>'9702f7608a5191dc'],
     'views/ops/sample_detail.php' => ['s'=>4311,'h'=>'4529a1888c336f30'],
     'views/ops/sample_form.php' => ['s'=>4129,'h'=>'dfabaedae75c6f9f'],
     'views/ops/samples_list.php' => ['s'=>2173,'h'=>'18bdce8f8a7621a9'],
