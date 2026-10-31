@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '24322684 · 2026-10-31 06:40 UTC · 701 files';
+$RELEASE = '670e3455 · 2026-10-31 06:42 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -168,7 +168,7 @@ $EXPECT  = [
     'lib/mkt_plans.php' => ['s'=>10874,'h'=>'c47b9e64a348f146'],
     'lib/mkt_rules.php' => ['s'=>12129,'h'=>'f541702a11884133'],
     'lib/mkt_subs.php' => ['s'=>10951,'h'=>'4e6d28aa7ffc7f07'],
-    'lib/nav.php' => ['s'=>29283,'h'=>'38944f5074e14c6a'],
+    'lib/nav.php' => ['s'=>29886,'h'=>'6ff129634d8cf152'],
     'lib/navindex.php' => ['s'=>15556,'h'=>'be00130955977f8d'],
     'lib/ncdca.php' => ['s'=>44960,'h'=>'d64c2c2e6eddc5e1'],
     'lib/ncr.php' => ['s'=>34655,'h'=>'237efa97105bfe03'],
@@ -254,7 +254,7 @@ $EXPECT  = [
     'lib/tenant_migrate.php' => ['s'=>20675,'h'=>'3a8be680c3200403'],
     'lib/tenant_signup.php' => ['s'=>15976,'h'=>'8466996f3fff1e7e'],
     'lib/tenants.php' => ['s'=>23379,'h'=>'8bb1d9d0ef7cc82e'],
-    'lib/terms.php' => ['s'=>28589,'h'=>'6aa8716a9d4cae12'],
+    'lib/terms.php' => ['s'=>29013,'h'=>'ea265ce51729491b'],
     'lib/timesheet.php' => ['s'=>9615,'h'=>'0850f4b87638e4a5'],
     'lib/tmplpreview.php' => ['s'=>3520,'h'=>'770170cf566d21da'],
     'lib/tosrm.php' => ['s'=>175958,'h'=>'97546ac06cc88324'],

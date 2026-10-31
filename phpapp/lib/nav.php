@@ -376,6 +376,15 @@ function nav_trail($route, $leaf = null) {
     $route = trim((string)$route, '/');
     $trail = [['label' => 'Home', 'url' => '/']];
     if ($route === '') return $trail;
+    //  One address, two screens: the report templates are Admin's (Report
+    //  configuration), the quote templates Sales'. The trail follows the one shown.
+    if ($route === 'templates' && function_exists('templates_kind')) {
+        $rep = templates_kind() === 'report';
+        $ar = $rep ? 'admin' : 'sales';
+        if (!function_exists('ops_area_has') || ops_area_has($ar)) $trail[] = ['label' => $rep ? 'Admin' : 'Sales', 'url' => '/' . $ar];
+        $trail[] = ['label' => $rep ? T('report') . ' templates' : ucfirst(Tl('quote')) . ' templates', 'url' => null];
+        return $trail;
+    }
     if (($under = nav_under($route)) !== null && $under !== $route) {
         //  The register's own trail, then this record (or this screen) below it.
         $trail = nav_trail($under);

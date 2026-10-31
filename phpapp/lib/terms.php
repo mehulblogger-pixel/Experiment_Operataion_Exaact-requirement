@@ -505,12 +505,21 @@ function template_tabs($active) {
     if (can('mod.quotes.view')) $t['/templates?kind=quote']  = T('quote') . ' & e-mail';
     return count($t) > 1 ? module_tabs($t, $active) : '';
 }
-function ops_templates($method) {
-    ops_require(!function_exists('licence_enabled') || licence_enabled('sales') || licence_enabled('reporting') || licence_enabled('operations'),
-        'Document templates apply to the Sales and Reporting modules, which are not part of your plan.');
+// Which of the two template screens /templates is showing — also read by the
+// breadcrumb, so the trail says "Admin › Report templates" for the report tile
+// and "Sales › Quote templates" for the quote tile (owner, test book MOD-SAL:
+// "when clicked on report templates the bread crumbs becomes Home › Sales ›
+// Quote templates").
+function templates_kind() {
     $kind = ($_GET['kind'] ?? '') === 'quote' ? 'quote' : 'report';
     if ($kind === 'report' && !can('mod.idems.view') && can('mod.quotes.view')) $kind = 'quote';
     if ($kind === 'quote' && !can('mod.quotes.view') && can('mod.idems.view')) $kind = 'report';
+    return $kind;
+}
+function ops_templates($method) {
+    ops_require(!function_exists('licence_enabled') || licence_enabled('sales') || licence_enabled('reporting') || licence_enabled('operations'),
+        'Document templates apply to the Sales and Reporting modules, which are not part of your plan.');
+    $kind = templates_kind();
     if ($kind === 'quote') { ops_crm_templates('crm-templates', $method); return true; }
     return ops_idems_templates('report-templates', $method);
 }
