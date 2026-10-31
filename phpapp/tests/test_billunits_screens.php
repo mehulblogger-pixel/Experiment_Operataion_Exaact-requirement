@@ -6,6 +6,13 @@ t_section('the billing screens show earned / due / billed, and only the right co
 
 $pdo = db();
 billunit_migrate();
+
+// Leave the shared test database as found: the invoices (and their numbers),
+// lines and billing records this file creates are removed at the end, so a later
+// file that types an invoice number by hand never collides with ours.
+$__bu_inv0 = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM invoices");
+$__bu_ev0  = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM billable_events");
+$__bu_bb0  = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM billable_bills");
 $pdo->prepare("INSERT INTO business_partners (legal_name,display_name,is_client,status,state,gstin) VALUES ('Screen Co','Screen Co',1,'ACTIVE','Gujarat','24AAAAA0000A1Z5')")->execute();
 $pid = (int)$pdo->lastInsertId();
 $pdo->prepare("INSERT INTO offices (name,is_active) VALUES ('Screen HQ',1)")->execute();
@@ -66,3 +73,9 @@ t_ok(strpos($h, 'Add a charge') === false && strpos($h, 'Release ticked for bill
 $as('INSPECTOR');
 t_ok(!billunit_can_set_job_terms() && !billunit_can_end_early() && !billunit_can_adjust(), 'an inspector cannot change terms, end early or add charges');
 unset($_SESSION['uid']); current_user(true); ua(true);
+
+// ---- cleanup (see the top of the file) ----
+db()->prepare("DELETE FROM invoice_lines WHERE invoice_id > ?")->execute([$__bu_inv0]);
+db()->prepare("DELETE FROM invoices WHERE id > ?")->execute([$__bu_inv0]);
+db()->prepare("DELETE FROM billable_bills WHERE id > ?")->execute([$__bu_bb0]);
+db()->prepare("DELETE FROM billable_events WHERE id > ?")->execute([$__bu_ev0]);

@@ -5,6 +5,13 @@ t_section('man-days and man-months are counted, and billed when the contract say
 
 $pdo = db();
 billunit_migrate();
+
+// Leave the shared test database as found: the invoices (and their numbers),
+// lines and billing records this file creates are removed at the end, so a later
+// file that types an invoice number by hand never collides with ours.
+$__bu_inv0 = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM invoices");
+$__bu_ev0  = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM billable_events");
+$__bu_bb0  = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM billable_bills");
 $_SESSION['uid'] = 1; current_user(true); ua(true);
 $pdo->prepare("INSERT INTO business_partners (legal_name,display_name,is_client,status,state,gstin) VALUES ('Trig Co','Trig Co',1,'ACTIVE','Gujarat','24AAAAA0000A1Z5')")->execute();
 $pid = (int)$pdo->lastInsertId();
@@ -132,3 +139,9 @@ $pdo->prepare("UPDATE jobs SET inspection_start_date=?, inspection_end_date=? WH
 if (function_exists('job_visits_sync')) job_visits_sync($j);
 t_eq((int)ops_val("SELECT COUNT(*) FROM job_visits WHERE job_id=? AND status='DONE'", [$j]), 5, 'rescheduling keeps the five worked days (they are billable evidence)');
 unset($_SESSION['uid']); current_user(true); ua(true);
+
+// ---- cleanup (see the top of the file) ----
+db()->prepare("DELETE FROM invoice_lines WHERE invoice_id > ?")->execute([$__bu_inv0]);
+db()->prepare("DELETE FROM invoices WHERE id > ?")->execute([$__bu_inv0]);
+db()->prepare("DELETE FROM billable_bills WHERE id > ?")->execute([$__bu_bb0]);
+db()->prepare("DELETE FROM billable_events WHERE id > ?")->execute([$__bu_ev0]);

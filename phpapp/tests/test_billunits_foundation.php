@@ -8,6 +8,13 @@ t_section('billing units: exactly once, reversible, never lost');
 
 $pdo = db();
 billunit_migrate();
+
+// Leave the shared test database as found: the invoices (and their numbers),
+// lines and billing records this file creates are removed at the end, so a later
+// file that types an invoice number by hand never collides with ours.
+$__bu_inv0 = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM invoices");
+$__bu_ev0  = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM billable_events");
+$__bu_bb0  = (int)ops_val("SELECT COALESCE(MAX(id),0) FROM billable_bills");
 $_SESSION['uid'] = 1; current_user(true); ua(true);
 $pdo->prepare("INSERT INTO business_partners (legal_name,display_name,is_client,status,state,gstin) VALUES ('Unit Co','Unit Co',1,'ACTIVE','Gujarat','24AAAAA0000A1Z5')")->execute();
 $pid = (int)$pdo->lastInsertId();
@@ -83,3 +90,9 @@ t_eq(ops_val("SELECT status FROM billable_events WHERE id=?", [$ev]), 'BILLED', 
 books_cancel($i4, 'duplicate');
 t_eq(ops_val("SELECT status FROM billable_events WHERE id=?", [$ev]), 'APPROVED', 'cancelling that invoice releases the job back to be billed');
 unset($_SESSION['uid']); current_user(true); ua(true);
+
+// ---- cleanup (see the top of the file) ----
+db()->prepare("DELETE FROM invoice_lines WHERE invoice_id > ?")->execute([$__bu_inv0]);
+db()->prepare("DELETE FROM invoices WHERE id > ?")->execute([$__bu_inv0]);
+db()->prepare("DELETE FROM billable_bills WHERE id > ?")->execute([$__bu_bb0]);
+db()->prepare("DELETE FROM billable_events WHERE id > ?")->execute([$__bu_ev0]);
