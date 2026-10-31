@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '002e67b1 · 2026-10-31 06:25 UTC · 701 files';
+$RELEASE = '3f2166bc · 2026-10-31 06:27 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -218,7 +218,7 @@ $EXPECT  = [
     'lib/risks.php' => ['s'=>10571,'h'=>'83a96e16878654a2'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>97554,'h'=>'d6c9d1897f6f9955'],
+    'lib/saas_tenants.php' => ['s'=>98190,'h'=>'5f2afdaf82ef93f6'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
@@ -236,7 +236,7 @@ $EXPECT  = [
     'lib/seed_scenario_s04.php' => ['s'=>15797,'h'=>'afbaeeaef614756d'],
     'lib/seed_scenario_s05.php' => ['s'=>10982,'h'=>'77ae3daf8c427816'],
     'lib/seed_scenario_s06.php' => ['s'=>13472,'h'=>'7e7c02ab15233f58'],
-    'lib/selfserve.php' => ['s'=>71702,'h'=>'f5e26750e8b9c825'],
+    'lib/selfserve.php' => ['s'=>71995,'h'=>'853a63dd092ce1dd'],
     'lib/services.php' => ['s'=>28431,'h'=>'6fc99ee80df3ff34'],
     'lib/settingmeta.php' => ['s'=>12701,'h'=>'092392a858cc10d8'],
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
@@ -599,7 +599,7 @@ $EXPECT  = [
     'views/ops/risk_form.php' => ['s'=>3356,'h'=>'f43057f55e88ff02'],
     'views/ops/risks_list.php' => ['s'=>2204,'h'=>'93906156b7d808ab'],
     'views/ops/role_workspaces.php' => ['s'=>4048,'h'=>'66938f5a5139889f'],
-    'views/ops/saas_companies.php' => ['s'=>35691,'h'=>'108ffc25c3257d7c'],
+    'views/ops/saas_companies.php' => ['s'=>36076,'h'=>'d786b424fb8aca1f'],
     'views/ops/sample_detail.php' => ['s'=>4311,'h'=>'4529a1888c336f30'],
     'views/ops/sample_form.php' => ['s'=>4129,'h'=>'dfabaedae75c6f9f'],
     'views/ops/samples_list.php' => ['s'=>2173,'h'=>'18bdce8f8a7621a9'],

@@ -169,7 +169,11 @@ function saas_company_create(array $o) {
     if ($nkey !== '') {
         if (function_exists('tenant_valid_sub') && !tenant_valid_sub($nkey))
             return ['ok' => false, 'error' => 'The workspace key must be lowercase letters, digits or hyphens.'];
-        if ($taken($nkey)) return ['ok' => false, 'error' => 'That workspace key is already taken — pick another.'];
+        if ($taken($nkey)) {
+            // Say which name is free instead of leaving the person to guess.
+            $free = ''; for ($i = 2; $i < 100; $i++) if (!$taken($nkey . '-' . $i)) { $free = $nkey . '-' . $i; break; }
+            return ['ok' => false, 'error' => 'That workspace key is already taken — pick another.' . ($free !== '' ? ' "' . $free . '" is free.' : ''), 'field' => 'key'];
+        }
     } else {
         // Made from the company name; a clash gets a number, never an error —
         // a person signing up should not have to invent a technical name.

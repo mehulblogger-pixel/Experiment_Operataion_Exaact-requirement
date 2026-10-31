@@ -45,13 +45,14 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
   <summary style="cursor:pointer;padding:13px 16px;font-size:14px;font-weight:600;background:var(--soft,#f6f8fb);border-bottom:1px solid var(--line,#e5e7eb)">＋ Add a company</summary>
   <form method="post" style="padding:16px">
     <input type="hidden" name="do" value="company_add">
+    <?php $dr = (array) ($_SESSION['company_add_draft'] ?? []); unset($_SESSION['company_add_draft']); $dv = fn($f, $d = '') => $e($dr[$f] ?? $d); ?>
     <div class="sc-edit" style="padding:0">
-      <div class="ff"><label>Company name *</label><input name="company" required placeholder="Asme Pharmaceutical Private Limited"></div>
-      <div class="ff"><label>Workspace key <span class="sc-key">(optional — made from the name)</span></label><input name="new_key" placeholder="asme"></div>
-      <div class="ff"><label>Owner name</label><input name="owner_name" placeholder="Asme Admin"></div>
-      <div class="ff"><label>Owner email * <span class="sc-key">(their login)</span></label><input type="email" name="owner_email" required placeholder="admin@asmehr.com"></div>
+      <div class="ff"><label>Company name *</label><input name="company" required value="<?= $dv('company') ?>" placeholder="Asme Pharmaceutical Private Limited"></div>
+      <div class="ff"><label>Workspace key <span class="sc-key">(optional — made from the name)</span></label><input name="new_key" value="<?= $dv('new_key') ?>" placeholder="asme"<?= ($dr['_field'] ?? '') === 'key' ? ' autofocus style="border-color:#dc2626"' : '' ?>></div>
+      <div class="ff"><label>Owner name</label><input name="owner_name" value="<?= $dv('owner_name') ?>" placeholder="Asme Admin"></div>
+      <div class="ff"><label>Owner email * <span class="sc-key">(their login)</span></label><input type="email" name="owner_email" required value="<?= $dv('owner_email') ?>" placeholder="admin@asmehr.com"></div>
       <div class="ff"><label>Temporary password <span class="sc-key">(blank = auto)</span></label><input name="owner_pass" placeholder="leave blank to auto-generate"></div>
-      <div class="ff"><label>Plan</label><select name="new_plan"><?php foreach ($plans as $pk => $p): ?><option value="<?= $e($pk) ?>" <?= $pk === 'RECRUITMENT' ? 'selected' : '' ?>><?= $e($p['label']) ?> — <?= implode(', ', array_map($modLabel, $p['mods'])) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label>Plan</label><select name="new_plan"><?php foreach ($plans as $pk => $p): ?><option value="<?= $e($pk) ?>" <?= $pk === ($dr['new_plan'] ?? 'RECRUITMENT') ? 'selected' : '' ?>><?= $e($p['label']) ?> — <?= implode(', ', array_map($modLabel, $p['mods'])) ?></option><?php endforeach; ?></select></div>
     </div>
     <div style="margin-top:12px;border-top:1px dashed var(--line,#e5e7eb);padding-top:12px">
       <!-- WHERE THIS COMPANY'S DATA LIVES.

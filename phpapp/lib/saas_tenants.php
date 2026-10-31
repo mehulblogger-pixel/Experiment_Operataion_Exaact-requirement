@@ -1196,6 +1196,14 @@ function ops_saas_admin($route, $method) {
             // 'mysql' (paste your own database) stays available as an advanced
             // option on the form.
             $dbkind  = (string) ($_POST['db_kind'] ?? 'auto');
+            // A refused add keeps what was typed (owner, test book PLT-004: "this
+            // error vanished the entry filled up"). Never the password.
+            $keepDraft = function ($field = '') {
+                $d = ['_field' => (string) $field];
+                foreach (['company', 'new_key', 'owner_name', 'owner_email', 'new_plan', 'db_host', 'db_name', 'db_user'] as $f)
+                    $d[$f] = mb_substr(trim((string) ($_POST[$f] ?? '')), 0, 200);
+                $_SESSION['company_add_draft'] = $d;
+            };
 
             // Advanced: the operator pastes a MySQL database they created. Only
             // when a database name was actually filled in — an empty Advanced box
@@ -1204,13 +1212,14 @@ function ops_saas_admin($route, $method) {
             if ($dbkind === 'mysql' && trim((string) ($_POST['db_name'] ?? '')) !== '') {
                 $db = ['host' => trim((string) ($_POST['db_host'] ?? 'localhost')), 'name' => trim((string) ($_POST['db_name'] ?? '')),
                        'user' => trim((string) ($_POST['db_user'] ?? '')), 'pass' => (string) ($_POST['db_pass'] ?? '')];
-                if ($db['user'] === '') { flash('A MySQL database name and user are required.', 'error'); redirect('/companies'); }
+                if ($db['user'] === '') { $keepDraft(); flash('A MySQL database name and user are required.', 'error'); redirect('/companies'); }
             }
             // One builder for every company, console or self-serve (lib/selfserve.php).
             $res = saas_company_create(['company' => $company, 'key' => (string) ($_POST['new_key'] ?? ''),
                 'owner_name' => $oname, 'owner_email' => $oemail, 'owner_pass' => $opass, 'plan' => $plan,
                 'db' => $db, 'source' => 'console']);
-            if (!$res['ok']) { flash($res['error'], 'error'); redirect('/companies'); }
+            if (!$res['ok']) { $keepDraft($res['field'] ?? ''); flash($res['error'], 'error'); redirect('/companies'); }
+            unset($_SESSION['company_add_draft']);
             $shown = $res['temp_pass'] !== '' ? $res['temp_pass'] : $opass;
             $mailed = function_exists('saas_mail_new_owner') ? saas_mail_new_owner($oemail, $oname, $company, $shown) : 0;
             flash('Company “' . $company . '” is ready. Its owner signs in at the one product URL with '

@@ -28,6 +28,8 @@ CHANGE = {  # (test id, step number) -> new fields
     # Owner, 31 Oct (ONB-051/049): the payment page now explains the amount before paying.
     ('ONB-049', 1):  {'expect': 'A page "Complete your payment" with a box "Adding to your plan": each module and the logins with their price, "Full price of this plan", "Less: unused part of your current plan − ₹…", and "To pay now". The sentence above says the whole plan — old and new modules — runs from today until one end date. Razorpay opens only when you press Pay.'},
     ('ONB-049', 2):  {'expect': 'A box "Renewing your plan in advance": "Your plan already runs until <date>. This payment adds the next year/month: from <date> until <date>." Nothing changes before then.'},
+    # Owner, 31 Oct (PLT-004): a refused Add company kept nothing.
+    ('PLT-004', 10): {'expect': 'Workspace key "admin": refused with "That workspace key is already taken — pick another. "admin-2" is free." Everything you typed (name, owner, e-mail, plan) is still in the form and the key box is outlined in red. With the key box left empty, the company simply gets the name admin-2.'},
     # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
     ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
     # One choice instead of two switches (owner: "switch is off but still I can generate the account from /start").
