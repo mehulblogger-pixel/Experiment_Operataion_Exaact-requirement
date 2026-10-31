@@ -8425,7 +8425,11 @@ function ops_jobs($route, $method) {
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
         if (!function_exists('books_invoice_create')) { flash('The Money module is not enabled on this installation.', 'error'); redirect('/job?id=' . $job['id']); }
-        if (empty($job['closed_flag'])) { flash('Close the ' . Tl('job') . ' before raising its invoice.', 'error'); redirect('/job?id=' . $job['id']); }
+        // A job billed by its man-days / man-month periods is billed whenever units
+        // are DUE under its contract (month end, report issue, closure …) — not only
+        // after closure — and may be billed many times, once per unit.
+        $byUnits = function_exists('billunit_job') && ($bj = billunit_job((int)$job['id'])) && billunit_basis($bj) !== '' && !billunit_job_billed_whole((int)$job['id']);
+        if (!$byUnits && empty($job['closed_flag'])) { flash('Close the ' . Tl('job') . ' before raising its invoice.', 'error'); redirect('/job?id=' . $job['id']); }
         // §33 — when the installation runs a strict invoice gate, a failing readiness
         // check (report not issued, release not accepted, …) blocks billing. Advisory
         // by default: with the gate off this is a no-op and the readiness panel just informs.
@@ -8437,6 +8441,15 @@ function ops_jobs($route, $method) {
         $existingInv = (int)(function_exists('books_try')
             ? books_try(fn() => ops_val("SELECT i.id FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id WHERE l.job_id=? AND i.status<>'CANCELLED' ORDER BY i.id DESC LIMIT 1", [(int)$job['id']]), 0)
             : 0);
+        if ($byUnits) {
+            // Unit-billed: reuse a DRAFT that already holds this job's units, else raise a new invoice.
+            $existingInv = (int)books_try(fn() => ops_val("SELECT i.id FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id WHERE l.job_id=? AND i.status='DRAFT' ORDER BY i.id DESC LIMIT 1", [(int)$job['id']]), 0);
+            if ($existingInv) {
+                $r = billunit_add_job_units($existingInv, (int)$job['id']);
+                flash($r['added'] ? $r['added'] . ' more due unit(s) added to the draft invoice already open for this ' . Tl('job') . '.' : 'The draft invoice for this ' . Tl('job') . ' is open — ' . $r['err'], $r['added'] ? 'success' : 'info');
+                redirect('/invoice?id=' . $existingInv);
+            }
+        }
         if ($existingInv) {
             flash('This ' . Tl('job') . ' is already billed on invoice #' . $existingInv . ' — opened it here. Add a line or raise a credit note to bill anything more.', 'info');
             redirect('/invoice?id=' . $existingInv);
@@ -8453,8 +8466,12 @@ function ops_jobs($route, $method) {
         ]);
         if (!empty($inv['err'])) { flash($inv['err'], 'error'); redirect('/job?id=' . $job['id']); }
         $invId = (int)$inv['id'];
-        $addErr = books_line_add($invId, ['job_id' => $job['id']]);   // amount auto-derived from the quote/call
-        if ($addErr !== '') flash($addErr, 'warning');
+        $addErr = books_line_add($invId, ['job_id' => $job['id']]);   // amount auto-derived from the quote/call (unit-billed: its due units)
+        if ($addErr !== '') {
+            // Nothing could go on it: drop the empty draft rather than leave a blank invoice behind.
+            if ($byUnits && !books_lines($invId)) { books_try(fn() => db()->prepare("DELETE FROM invoices WHERE id=? AND status='DRAFT'")->execute([$invId]), null); flash($addErr, 'warning'); redirect('/job?id=' . $job['id']); }
+            flash($addErr, 'warning');
+        }
         flash('Draft invoice raised from ' . TH('job') . ' ' . $job['job_code'] . ' — the amount is filled from the ' . Tl('quote') . '. Review the line and issue it.');
         redirect('/invoice?id=' . $invId);
     }
@@ -8632,6 +8649,7 @@ function ops_jobs($route, $method) {
         if (!$job) { http_response_code(404); view('notfound'); return; }
         if (!empty($job['closed_flag'])) { flash('This ' . Tl('job') . ' is already closed.', 'warning'); redirect('/job?id=' . $job['id'] . '#visits'); }
         $err = function_exists('job_visit_close') ? job_visit_close($job['id'], $_POST['date'] ?? '', $_POST['report_link'] ?? '', 0) : 'Per-day close is unavailable.';
+        if ($err === '' && function_exists('billunit_on_job_changed')) billunit_on_job_changed((int)$job['id']);   // the closed day is an earned man-day
         flash($err !== '' ? $err : ('Visit of ' . fdate($_POST['date'] ?? '') . ' closed.'), $err !== '' ? 'error' : 'success');
         redirect('/job?id=' . $job['id'] . '#visits');
     }

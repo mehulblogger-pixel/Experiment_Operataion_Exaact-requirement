@@ -643,6 +643,13 @@ function books_line_add($invoiceId, array $b) {
             $for = (string) ops_val("SELECT COALESCE(NULLIF(display_name,''), legal_name) FROM business_partners WHERE id=?", [(int)$j['call_client_id']]);
             return TH('job') . ' ' . $j['job_code'] . ' was done for ' . ($for ?: 'another ' . Tl('client')) . ' — it cannot go on this ' . Tl('client') . "'s invoice.";
         }
+        // A job billed by its man-days / man-month periods goes on the invoice as its
+        // DUE units, one line each (lib/billunits.php) — so no day or month can ever
+        // be billed twice, and an open job can be billed for what is already due.
+        if (function_exists('billunit_job') && ($bj = billunit_job($job)) && billunit_basis($bj) !== '' && !billunit_job_billed_whole($job, (int)$invoiceId)) {
+            $r = billunit_add_job_units((int)$invoiceId, $job);
+            return $r['err'];
+        }
         // §INV-2 — a job can be billed only once it is closed on its last day (a
         // multi-day job cannot close before then). A master or finance user may
         // override to raise the invoice mid-inspection.
@@ -651,11 +658,6 @@ function books_line_add($invoiceId, array $b) {
             return TH('job') . ' ' . $j['job_code'] . ' is not closed yet — bill it once the inspection is completed on its last day. '
                  . '(A finance user or admin can override to bill in between.)';
         }
-        // A job billed by its man-days / man-month periods is billed unit by unit
-        // (lib/billunits.php), so no unit can be billed twice; a whole-job line
-        // beside those units would bill the same days again.
-        if (function_exists('billunit_job_has_units') && billunit_job_has_units($job))
-            return TH('job') . ' ' . $j['job_code'] . ' is billed by its man-days / man-month periods — add its due units instead (Money → Billable events, or "Raise invoice" on the ' . Tl('job') . ').';
         if (books_job_invoiced($job, (int)$invoiceId)) return TH('job') . ' ' . $j['job_code'] . ' is already on another invoice.';
         $callId = $j['call_id'] ? (int)$j['call_id'] : null;
         if ($desc === '') $desc = 'Inspection services — ' . $j['job_code'];

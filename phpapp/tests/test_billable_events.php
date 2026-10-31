@@ -28,7 +28,7 @@ $pdo->prepare("INSERT INTO business_partners (legal_name, display_name, is_clien
 $cid = (int)$pdo->lastInsertId();
 $pdo->prepare("INSERT INTO calls (client_id, contract_number, call_code, inspection_type, billable_value, billable_rate, billable_qty, billable_basis, sbu, created_at)
                VALUES (?,?,?,?,?,?,?,?,'',?)")
-    ->execute([$cid, 'CON-1', 'C-BE-1', 'INSPECTION', 12000, 2000, 6, 'MANDAY', date('c')]);
+    ->execute([$cid, 'CON-1', 'C-BE-1', 'INSPECTION', 12000, 2000, 6, 'LUMP', date('c')]);   // a lump-sum order keeps the one-event-per-closed-job path (man-day orders bill by their units)
 $callId = (int)$pdo->lastInsertId();
 $pdo->prepare("INSERT INTO jobs (call_id, job_code, inspection_type, closed_flag, closed_at, executing_office_id, sbu, created_at)
                VALUES (?,?,?,?,?,?,'',?)")

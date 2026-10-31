@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '8d6e81e1 · 2026-10-31 12:30 UTC · 702 files';
+$RELEASE = 'ac460fb5 · 2026-10-31 12:45 UTC · 702 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -50,11 +50,11 @@ $EXPECT  = [
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
     'lib/audits.php' => ['s'=>41605,'h'=>'f362d70e80a1632d'],
     'lib/backup.php' => ['s'=>24069,'h'=>'55dc55fb9bd907ad'],
-    'lib/billable.php' => ['s'=>30758,'h'=>'606c1053f97b6432'],
+    'lib/billable.php' => ['s'=>31639,'h'=>'de1f0b05f0744d9c'],
     'lib/billing.php' => ['s'=>17267,'h'=>'9a996e5971e3994c'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
-    'lib/billunits.php' => ['s'=>20505,'h'=>'681d409675e9e866'],
-    'lib/books.php' => ['s'=>72162,'h'=>'5c0dcec8e569dc98'],
+    'lib/billunits.php' => ['s'=>40035,'h'=>'73db0b434621f530'],
+    'lib/books.php' => ['s'=>72163,'h'=>'32e036eaddd6b34d'],
     'lib/booksbridge.php' => ['s'=>26219,'h'=>'b98194d999c7b90b'],
     'lib/booksui.php' => ['s'=>24743,'h'=>'167e036aaf00240e'],
     'lib/bulk.php' => ['s'=>2157,'h'=>'ca3be826f9a4414c'],
@@ -140,7 +140,7 @@ $EXPECT  = [
     'lib/helpers.php' => ['s'=>28344,'h'=>'cc8dd4f170d5e1b1'],
     'lib/hiringreq.php' => ['s'=>129366,'h'=>'b5896066637f54e9'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
-    'lib/idems.php' => ['s'=>793479,'h'=>'a2253ab93eb5c853'],
+    'lib/idems.php' => ['s'=>793648,'h'=>'5d90d13146279159'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
     'lib/identity.php' => ['s'=>45233,'h'=>'4267d813af8001e8'],
     'lib/impartiality.php' => ['s'=>18224,'h'=>'70a0c7b051724178'],
@@ -177,7 +177,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>69459,'h'=>'1fabb6c2818818ac'],
-    'lib/ops.php' => ['s'=>733104,'h'=>'53ff6ff7a32d8a92'],
+    'lib/ops.php' => ['s'=>734860,'h'=>'956289055b717277'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -223,7 +223,7 @@ $EXPECT  = [
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
-    'lib/schedule.php' => ['s'=>35990,'h'=>'81b963c982b619c8'],
+    'lib/schedule.php' => ['s'=>36311,'h'=>'64d1e1ca133835ae'],
     'lib/search.php' => ['s'=>34494,'h'=>'bd412c0715939eba'],
     'lib/security.php' => ['s'=>41996,'h'=>'ece794937be3f12b'],
     'lib/seed_connect.php' => ['s'=>22943,'h'=>'06f835c70073b5b5'],

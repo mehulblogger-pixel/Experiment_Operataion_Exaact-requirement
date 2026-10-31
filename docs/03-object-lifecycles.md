@@ -488,6 +488,33 @@ stateDiagram-v2
 - **Reconciliation is immediate:** issuing an invoice marks its units and any
   `JOB_CLOSED` events on it BILLED at once (`billunit_after_invoice_change()` from
   `books_issue`), not on the next manual sync.
+- **How units are counted (stage 2, `billunit_generate_for_job()`).** Only for work
+  orders whose `calls.billable_basis` is MANDAY or MANMONTH (lump sum and others keep
+  the one `JOB_CLOSED` event per closed job). *Man-day:* one unit per visit day closed
+  with its report (`job_visits` DONE — the existing §WO-8 per-day control); a job with
+  no day-by-day plan earns one unit carrying its man-days when it is closed.
+  *Man-month:* one unit per calendar month of the deployment (start/end dates, or the
+  billing stop date), earned once the month is over or the deployment ends inside it;
+  a part month is pro-rated by the existing man-month rule (`manmonth_rule()`:
+  CALENDAR = days ÷ days in month, MIN_DAYS = working days ÷ agreed minimum, capped
+  at 1). Rate = the work order's `billable_rate`. A job billed as a whole before units
+  existed gets none. Worked, closed visit days are no longer deleted when the
+  schedule moves (`job_visits_sync`).
+- **When a unit is due (stage 3, `billunit_refresh_due_job()`).** Closure **always**
+  makes every earned, unbilled unit due ("final billing"), and so does a billing stop
+  date (termination / early end). Optional triggers, chosen on the contract
+  (`partner_contracts.billing_triggers`), the work order (`calls.…`) or the job
+  (`jobs.…`), most specific wins: PERIOD (monthly / fortnightly / weekly cut-off,
+  `billing_period`), MM_PERIOD (each man-month period), FIR / RN (issue of the Final
+  Inspection Report / Release Note makes the days up to it due), MANUAL (finance's
+  "Bill now", reason required). Default: MM_PERIOD for a man-month deployment, none
+  (closure) for man-day work — the business's practice before the engine. A unit is
+  due at the earliest applicable trigger and is still billed once; a due date never
+  moves later.
+- **Raising the invoice.** "Raise invoice" on a job (`job-bill`) and adding a job to
+  an invoice (`books_line_add`) put the job's **due, unbilled units** on it, one line
+  each; an open job can be billed for what is already due. Nothing due → the draft is
+  not left behind and the user is told what is waiting and why.
 - **Job invoice columns** (`jobs.invoice_amount` …) are now recomputed from every
   issued, not-cancelled invoice of the job (`books_job_remirror()`), so a job billed
   month by month shows the sum — a single-invoice job reads exactly as before.

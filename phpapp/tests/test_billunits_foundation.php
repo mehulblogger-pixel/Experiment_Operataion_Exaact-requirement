@@ -36,7 +36,10 @@ billunit_mark_due($u1, $today, 'test'); billunit_mark_due($u2, $today, 'test');
 t_eq(billunit_line_add($i1, $u1), '', 'a due unit goes on the invoice');
 t_ok(strpos(billunit_line_add($newInv(), $u1), 'already on another invoice') !== false, 'the same unit cannot go on a second invoice');
 // A whole-job line beside units is refused.
-t_ok(strpos(books_line_add($newInv(), ['job_id' => $jobId]), 'billed by its man-days') !== false, 'the job cannot also be billed as a whole — and is told how it is billed');
+// "Raise invoice from the job" bills its DUE units that are on no invoice — here only the next day.
+$i2 = $newInv();
+t_eq(books_line_add($i2, ['job_id' => $jobId]), '', 'billing the job adds its due units, never a whole-job line');
+t_eq(array_map('intval', array_column(ops_all("SELECT billable_event_id FROM invoice_lines WHERE invoice_id=?", [$i2]), 'billable_event_id')), [$u2], 'only the day not already invoiced goes on');
 
 // Issue → BILLED at once (no manual sync).
 t_eq(books_issue($i1), '', 'the invoice is issued');
@@ -46,8 +49,7 @@ t_eq((int)$e1['invoice_id'], $i1, 'and it points at the invoice that billed it')
 $job = ops_one("SELECT invoice_amount, invoice_raised FROM jobs WHERE id=?", [$jobId]);
 t_eq((float)$job['invoice_amount'], 11800.0, 'the job shows the billed amount (10,000 + 18% GST)');
 
-// A second invoice for the next day: the job's figures ADD UP, not overwrite.
-$i2 = $newInv(); t_eq(billunit_line_add($i2, $u2), '', 'the next day goes on a second invoice');
+// The second invoice is issued: the job's figures ADD UP, not overwrite.
 books_issue($i2);
 t_eq((float)ops_val("SELECT invoice_amount FROM jobs WHERE id=?", [$jobId]), 23600.0, 'two invoices for one job sum on the job (October is not lost when November is billed)');
 

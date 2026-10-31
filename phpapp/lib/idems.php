@@ -4986,6 +4986,8 @@ function ops_idems_documents($route, $method) {
         // an issued report is the best source of "how we actually word things"
         if (function_exists('learn_from_report')) { try { learn_from_report(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {} }
         idems_log('report_doc', $doc['id'], 'FINALIZE', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'ISSUED']);
+        // A Final Inspection Report / Release Note may be a billing trigger.
+        if (function_exists('billunit_on_report_issued')) billunit_on_report_issued($doc);
         if (!idems_sod_issue_on() && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0)))
             idems_log('report_doc', $doc['id'], 'SAME_PERSON_ISSUE', ['irn'=>$doc['irn'], 'field'=>'segregation', 'reason'=>'Approved and issued by the same person (the approver ≠ issuer rule is switched off).']);
         // P2 — tell the client it is ready. A report they can see on the portal

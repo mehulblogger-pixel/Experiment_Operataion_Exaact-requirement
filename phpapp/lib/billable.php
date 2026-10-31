@@ -301,6 +301,12 @@ function billable_on_job_closed($jobId) {
     try {
         billable_migrate();
         $jobId = (int)$jobId; if (!$jobId) return 0;
+        // Billed by its man-days / man-month periods: closure makes every earned,
+        // unbilled unit due (final billing) instead of adding one whole-job event.
+        if (function_exists('billunit_job') && ($bj = billunit_job($jobId)) && billunit_basis($bj) !== '' && !billunit_job_billed_whole($jobId)) {
+            billunit_on_job_changed($jobId);
+            return 0;
+        }
         // Nothing to queue if it is already invoiced.
         if (function_exists('books_job_invoiced') && books_job_invoiced($jobId)) return 0;
         $f = billable_job_fields($jobId);
@@ -350,6 +356,8 @@ function billable_events_sync($limit = 500) {
             // The same field map the job-close hook uses, so the two can never
             // derive different figures for the same job (one job's share of its
             // order, SA-15).
+            // Unit-billed jobs are counted by their units below, never also as a whole.
+            if (function_exists('billunit_job') && ($bj = billunit_job((int)$j['id'])) && billunit_basis($bj) !== '' && !billunit_job_billed_whole((int)$j['id'])) continue;
             $f = billable_job_fields((int)$j['id']);
             $id = $f ? billable_event_upsert('job', 'JOB_CLOSED', (int)$j['id'], $f) : 0;
             if ($id) $created++;
@@ -399,6 +407,8 @@ function billable_events_sync($limit = 500) {
             }
         }
     }
+    // Man-day / man-month units: anything newly earned, and when it falls due.
+    if (function_exists('billunit_generate_all')) { try { billunit_generate_all(); $billed += billunit_reconcile_all(); } catch (Throwable $e) {} }
     return ['created' => $created, 'billed' => $billed];
 }
 

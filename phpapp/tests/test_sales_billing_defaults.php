@@ -30,12 +30,14 @@ $job = function ($code, $days) use ($pdo, $call, $off) {
     return (int) $pdo->lastInsertId();
 };
 $j2 = $job('BD-JOB-2D', 2); $j1 = $job('BD-JOB-1D', 1);
-// Closing a job queues its billing event, before anyone invoices it.
+// Closing a job queues its billing, before anyone invoices it. A man-day order is
+// billed by its man-days (universal billing engine, 31 Oct 2026): each job's own
+// man-days are its own billing unit — never the whole order's.
 billable_events_sync();
-$e2 = (int) ops_val("SELECT id FROM billable_events WHERE source_module='job' AND source_id=?", [$j2]);
-$e1 = (int) ops_val("SELECT id FROM billable_events WHERE source_module='job' AND source_id=?", [$j1]);
-t_ok($e2 > 0 && $e1 > 0, 'arranged: each closed job has a billing event');
-t_eq((float) ops_val("SELECT amount FROM billable_events WHERE id=?", [$e2]), 19000.0, 'the 2-day job\'s event is queued at its own share, 19,000');
+$e2 = (int) ops_val("SELECT id FROM billable_events WHERE source_module='unit' AND job_id=?", [$j2]);
+$e1 = (int) ops_val("SELECT id FROM billable_events WHERE source_module='unit' AND job_id=?", [$j1]);
+t_ok($e2 > 0 && $e1 > 0, 'arranged: each closed job has its man-days queued for billing');
+t_eq((float) ops_val("SELECT amount FROM billable_events WHERE id=?", [$e2]), 19000.0, 'the 2-day job is queued at its own man-days, 2 × 9,500 = 19,000');
 
 // ---- SA-15: a job's own share ------------------------------------------------------
 $f2 = billable_job_fields($j2);
@@ -67,6 +69,7 @@ $pdo->prepare("UPDATE invoices SET status='ISSUED', total=? WHERE id=?")->execut
 billable_events_sync();
 $amt = fn($id) => (float) ops_val("SELECT amount FROM billable_events WHERE id=?", [$id]);
 t_eq([$amt($e2), $amt($e1)], [19000.0, 9500.0], 'after the invoice is issued each event holds its own line, before tax — not the invoice\'s 33,630 each');
+t_eq([(float) ops_val("SELECT billed_amount FROM billable_events WHERE id=?", [$e2]), (string) ops_val("SELECT status FROM billable_events WHERE id=?", [$e2])], [19000.0, 'BILLED'], 'and the 2-day job\'s man-days read BILLED for exactly their own line');
 t_eq(round($amt($e2) + $amt($e1), 2), 28500.0, '…so together they equal what the invoice billed for them, before tax');
 t_ok(!array_filter(billable_mismatch(), fn($m) => in_array((int) $m['id'], [$e1, $e2], true)),
      'and neither shows as a false mismatch against what it earned');

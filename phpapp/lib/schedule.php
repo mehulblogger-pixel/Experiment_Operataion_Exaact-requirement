@@ -591,8 +591,11 @@ function job_visits_sync($jobId, $defaultInspectorId = null, $perDate = []) {
         if (isset($have[$d])) { $upd->execute([$who ?: null, $have[$d]['id']]); $keep[] = (int)$have[$d]['id']; }
         else { $ins->execute([$jobId, $d, $who ?: null, 'PLANNED']); $keep[] = (int)db()->lastInsertId(); }
     }
-    // Dates that are no longer part of the engagement stop being visits.
-    $gone = array_diff(array_map(function ($v) { return (int)$v['id']; }, array_values($have)), $keep);
+    // Dates that are no longer part of the engagement stop being visits — unless
+    // the day was already worked and closed with its report: that is an earned,
+    // billable man-day and evidence, and moving the schedule must not erase it.
+    $done = array_map(function ($v) { return (int)$v['id']; }, array_filter(array_values($have), fn($v) => ($v['status'] ?? '') === 'DONE'));
+    $gone = array_diff(array_map(function ($v) { return (int)$v['id']; }, array_values($have)), $keep, $done);
     foreach ($gone as $id) db()->prepare("DELETE FROM job_visits WHERE id=?")->execute([$id]);
     return ops_all("SELECT * FROM job_visits WHERE job_id=? ORDER BY visit_date", [$jobId]);
 }
