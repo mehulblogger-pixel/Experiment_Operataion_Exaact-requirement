@@ -645,6 +645,8 @@ const BILLUNIT_STOP_KINDS = [
 
 // May this person end a job's billing early? The same right that closes a job.
 function billunit_can_end_early() {
+    // A billing act: only where Money is bought (M10 entitlement), then the job-close right.
+    if (function_exists('billable_money_live') && !billable_money_live()) return false;
     return is_master() || (function_exists('can') && can('ops.job.close'));
 }
 // May this person add a charge (termination / notice / demobilisation)? Money —
@@ -756,4 +758,170 @@ function billunit_reconciliation($jobId) {
     foreach (['mandays','months','earned','billed','due','not_due','disputed','adjust','cancelled'] as $k) $out[$k] = round($out[$k], 4);
     $out['outstanding'] = round($out['earned'] - $out['billed'], 2);
     return $out;
+}
+
+// ===========================================================================
+//  Stage 5 — routes
+// ===========================================================================
+// Who may raise an invoice — exactly the job-bill gate.
+function billunit_can_invoice() {
+    if (function_exists('billable_money_live') && !billable_money_live()) return false;
+    return (function_exists('can') && (can('finance.reconcile') || can('mod.invoicing.view'))) || (function_exists('is_master_of') && is_master_of(['invoicing', 'reconcile']));
+}
+// Who may set a job's billing terms — whoever may edit the job.
+function billunit_can_set_job_terms() {
+    // Exactly the job-edit gate (job-new / job-edit: is_coordinator_level()),
+    // and only where Money is bought — billing terms mean nothing without it.
+    if (function_exists('billable_money_live') && !billable_money_live()) return false;
+    return is_master() || (function_exists('is_coordinator_level') && is_coordinator_level());
+}
+// Who may set a contract's billing terms — whoever registers contracts.
+function billunit_can_set_contract_terms() {
+    if (function_exists('billable_money_live') && !billable_money_live()) return false;
+    return is_master() || (function_exists('can') && can('crm.contract.register'));
+}
+// Read triggers / period from a form.
+function billunit_terms_from_post() {
+    $t = [];
+    foreach ((array)($_POST['triggers'] ?? []) as $x) { $x = strtoupper((string)$x); if (isset(BILLUNIT_TRIGGERS[$x])) $t[] = $x; }
+    $p = strtoupper((string)($_POST['billing_period'] ?? ''));
+    return [implode(',', array_unique($t)), isset(BILLUNIT_PERIODS[$p]) ? $p : ''];
+}
+
+function ops_billunits($route, $method) {
+    billunit_migrate();
+    if ($method !== 'POST') redirect('/billable-events');
+    // ---- Raise one invoice from chosen due units (the board) ----
+    if ($route === 'billable-invoice') {
+        ops_require(billunit_can_invoice(), 'You cannot raise invoices.');
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['ids'] ?? [])))));
+        if (!$ids) { flash('Tick the units to bill first.', 'error'); redirect('/billable-events#due'); }
+        $rows = ops_all("SELECT * FROM billable_events WHERE source_module='unit' AND id IN (" . implode(',', $ids) . ")") ?: [];
+        $parties = array_unique(array_map(fn($r) => (int)$r['party_id'], $rows));
+        if (count($parties) !== 1 || !reset($parties)) { flash('One invoice is for one ' . Tl('client') . ' — tick units of a single ' . Tl('client') . '.', 'error'); redirect('/billable-events#due'); }
+        $first = $rows[0];
+        $job = (int)$first['job_id'] ? ops_one("SELECT * FROM jobs WHERE id=?", [(int)$first['job_id']]) : null;
+        $call = $job && $job['call_id'] ? ops_one("SELECT * FROM calls WHERE id=?", [(int)$job['call_id']]) : null;
+        $inv = books_invoice_create([
+            'partner_id' => (int)$first['party_id'],
+            'office_id' => ($job && function_exists('invoice_office_for') ? invoice_office_for($job, $call ?: []) : 0) ?: ((int)$first['office_id'] ?: null),
+            'contract_number' => count(array_unique(array_column($rows, 'contract_number'))) === 1 ? (string)$first['contract_number'] : '',
+            'po_number' => (string)($call['po_number'] ?? ''),
+        ]);
+        if (!empty($inv['err'])) { flash($inv['err'], 'error'); redirect('/billable-events#due'); }
+        $added = 0; $why = [];
+        foreach ($rows as $r) { $e = billunit_line_add((int)$inv['id'], (int)$r['id']); if ($e === '') $added++; else $why[] = $e; }
+        if (!$added) {
+            books_try(fn() => db()->prepare("DELETE FROM invoices WHERE id=? AND status='DRAFT'")->execute([(int)$inv['id']]), null);
+            flash('Nothing could be billed: ' . implode(' ', array_slice($why, 0, 3)), 'error'); redirect('/billable-events#due');
+        }
+        flash($added . ' unit(s) put on a draft invoice — review it and issue.' . ($why ? ' Skipped: ' . implode(' ', array_slice($why, 0, 3)) : ''), $why ? 'warning' : 'success');
+        redirect('/invoice?id=' . (int)$inv['id']);
+    }
+    // ---- A job's billing: terms, early end, charges, release, suspension ----
+    if ($route === 'job-billing') {
+        $jobId = (int)($_POST['job_id'] ?? 0);
+        $job = billunit_job($jobId);
+        if (!$job) { http_response_code(404); view('notfound'); return true; }
+        $back = '/job?id=' . $jobId . '#billing';
+        $act = (string)($_POST['act'] ?? '');
+        if ($act === 'terms') {
+            ops_require(billunit_can_set_job_terms(), 'You cannot change this ' . Tl('job') . "'s billing terms.");
+            [$t, $p] = billunit_terms_from_post();
+            db()->prepare("UPDATE jobs SET billing_triggers=?, billing_period=? WHERE id=?")->execute([$t, $p, $jobId]);
+            if (function_exists('act_log')) try { act_log('JOB', $jobId, 'BILLING_TERMS', 'Billing triggers: ' . ($t ?: 'as the contract / default') . ($p ? ' · ' . $p : '')); } catch (Throwable $e) {}
+            billunit_on_job_changed($jobId);
+            flash($t ? 'Billing terms saved for this ' . Tl('job') . '.' : 'This ' . Tl('job') . ' now follows its work order / contract billing terms.');
+            redirect($back);
+        }
+        if ($act === 'end') {
+            ops_require(billunit_can_end_early(), 'Only someone who may close ' . Tlp('job') . ' can end one early.');
+            $err = billunit_end_early($jobId, (string)($_POST['date'] ?? ''), (string)($_POST['kind'] ?? ''), (string)($_POST['reason'] ?? ''));
+            flash($err !== '' ? $err : 'Earning stopped on ' . fdate($_POST['date'] ?? '') . '. Everything earned up to then is due to bill now.', $err !== '' ? 'error' : 'success');
+            redirect($back);
+        }
+        if ($act === 'charge') {
+            ops_require(billunit_can_adjust(), 'Only finance can add a charge.');
+            $err = billunit_add_adjustment($jobId, $_POST['amount'] ?? 0, (string)($_POST['reason'] ?? ''));
+            flash($err !== '' ? $err : 'Charge added — it is due to bill now.', $err !== '' ? 'error' : 'success');
+            redirect($back);
+        }
+        if ($act === 'release') {
+            ops_require(billunit_can_adjust(), 'Only finance can release a unit for billing.');
+            $err = '';
+            foreach ((array)($_POST['ids'] ?? []) as $id) {
+                $u = ops_one("SELECT job_id FROM billable_events WHERE id=?", [(int)$id]);
+                if (!$u || (int)$u['job_id'] !== $jobId) continue;
+                $err = billunit_bill_now((int)$id, (string)($_POST['reason'] ?? '')); if ($err !== '') break;
+            }
+            flash($err !== '' ? $err : 'Released — those units are due to bill now.', $err !== '' ? 'error' : 'success');
+            redirect($back);
+        }
+        if ($act === 'suspension') {
+            ops_require(billunit_can_adjust(), 'Only finance can change whether a suspension is charged.');
+            $on = !empty($_POST['charge']) ? 1 : 0;
+            db()->prepare("UPDATE jobs SET billing_charge_suspension=? WHERE id=?")->execute([$on, $jobId]);
+            if (function_exists('act_log')) try { act_log('JOB', $jobId, 'BILLING_SUSPENSION', $on ? 'Suspended days are charged (per contract)' : 'Suspended days are not charged'); } catch (Throwable $e) {}
+            billunit_on_job_changed($jobId);
+            flash($on ? 'Suspended days will be charged.' : 'Suspended days will not be charged.');
+            redirect($back);
+        }
+        redirect($back);
+    }
+    // ---- A contract's billing terms ----
+    if ($route === 'contract-billing') {
+        ops_require(billunit_can_set_contract_terms(), 'You cannot change this contract\'s billing terms.');
+        $id = (int)($_POST['contract_id'] ?? 0);
+        $c = ops_one("SELECT * FROM partner_contracts WHERE id=?", [$id]);
+        if (!$c) { http_response_code(404); view('notfound'); return true; }
+        [$t, $p] = billunit_terms_from_post();
+        db()->prepare("UPDATE partner_contracts SET billing_triggers=?, billing_period=? WHERE id=?")->execute([$t, $p, $id]);
+        if (function_exists('act_log')) try { act_log('CONTRACT', $id, 'BILLING_TERMS', 'From "' . ($c['billing_triggers'] ?: 'default') . '" to "' . ($t ?: 'default') . '"' . ($p ? ' · ' . $p : '')); } catch (Throwable $e) {}
+        // Re-work out what is due on its jobs.
+        foreach (ops_all("SELECT j.id FROM jobs j LEFT JOIN calls c ON c.id=j.call_id WHERE COALESCE(NULLIF(j.contract_number,''), c.contract_number)=?", [(string)$c['contract_number']]) ?: [] as $r) billunit_on_job_changed((int)$r['id']);
+        flash('Billing terms saved for contract ' . $c['contract_number'] . '.');
+        redirect('/contract?id=' . $id . '#billing');
+    }
+    redirect('/billable-events');
+}
+
+// The billing-terms form (job or contract). $cur = ['triggers'=>csv, 'period'=>code].
+function billunit_terms_form_html($action, array $hidden, $curCsv, $curPeriod, $canEdit, $inheritNote) {
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $cur = array_flip(billunit_parse_triggers($curCsv));
+    $h = '<form method="post" action="' . $e($action) . '" class="bu-terms" style="margin:0">';
+    if (function_exists('csrf_field')) $h .= csrf_field();
+    foreach ($hidden as $k => $v) $h .= '<input type="hidden" name="' . $e($k) . '" value="' . $e($v) . '">';
+    $h .= '<p class="muted" style="margin:0 0 8px;font-size:12.5px"><b>Closing the ' . $e(Tl('job')) . ' always bills everything earned and not yet billed</b> — nothing is ever left behind. Tick below to bill <i>earlier</i> as well. Each day or month is still billed only once.</p>';
+    foreach (BILLUNIT_TRIGGERS as $k => $label) {
+        $h .= '<label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin:0 0 6px;font-size:13px"><input type="checkbox" name="triggers[]" value="' . $e($k) . '"'
+            . (isset($cur[$k]) ? ' checked' : '') . ($canEdit ? '' : ' disabled') . ' style="margin-top:2px"><span>' . $e($label) . '</span></label>';
+    }
+    $h .= '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px;font-size:13px"><span>Billing period:</span><select class="form-control" name="billing_period" style="max-width:240px"' . ($canEdit ? '' : ' disabled') . '>';
+    foreach (BILLUNIT_PERIODS as $k => $label) $h .= '<option value="' . $e($k) . '"' . ($curPeriod === $k ? ' selected' : '') . '>' . $e($label) . '</option>';
+    $h .= '</select></div>';
+    if ($inheritNote !== '') $h .= '<p class="muted" style="margin:0 0 8px;font-size:12px">' . $e($inheritNote) . '</p>';
+    if ($canEdit) $h .= '<button class="btn small" type="submit">Save billing terms</button>';
+    return $h . '</form>';
+}
+
+// Due, unbilled units not on any invoice, grouped by client (office-scoped like
+// the rest of the board) — the "Due to bill" list.
+function billunit_due_groups($limit = 400) {
+    billunit_migrate();
+    [$w, $a] = billable_scope('e.office_id');
+    try {
+        $rows = ops_all("SELECT e.*, j.job_code, COALESCE(NULLIF(p.display_name,''), p.legal_name) party_name
+                         FROM billable_events e LEFT JOIN jobs j ON j.id=e.job_id LEFT JOIN business_partners p ON p.id=e.party_id
+                         WHERE e.source_module='unit' AND e.status IN ('PENDING','APPROVED') AND COALESCE(e.due_on,'')<>'' AND e.due_on<=? AND $w
+                         ORDER BY party_name, e.contract_number, j.job_code, e.period_from LIMIT " . (int)$limit, array_merge([date('Y-m-d')], $a)) ?: [];
+    } catch (Throwable $e) { return []; }
+    $g = [];
+    foreach ($rows as $r) {
+        if (billunit_on_invoice((int)$r['id'])) continue;
+        $k = (int)$r['party_id'];
+        $g[$k] = $g[$k] ?? ['party_id' => $k, 'party_name' => $r['party_name'] ?: '—', 'total' => 0.0, 'units' => []];
+        $g[$k]['units'][] = $r; $g[$k]['total'] += (float)$r['amount'];
+    }
+    return array_values($g);
 }

@@ -1133,6 +1133,8 @@ if (function_exists('hwp_for_job')):
 <?php // Field-finding #12 — the full billing controls are contracting-office commercial. An executing-office
       // viewer on a cross-office job sees the credit capsule instead (below). ?>
 <?php if ($commView === 'FULL'): ?>
+<?php // Universal man-day / man-month billing: what this job has earned, billed and has due — and when it may bill. ?>
+<?php include __DIR__ . '/_job_billing.php'; ?>
 <?php // Phase 2 §33 — before the billing controls, the readiness verdict (reports issued, release accepted, PO, contract value). ?>
 <?php if (!empty($job['closed_flag']) && function_exists('invoice_readiness_render')) { echo '<div data-tab="Money">'; invoice_readiness_render($job); echo '</div>'; } ?>
 
@@ -1142,7 +1144,9 @@ if (function_exists('hwp_for_job')):
         // job, with the amount already filled from the quote/call — no re-keying,
         // no separate screen to start it (#4 / #5). Shown once the job is closed
         // and only when the Money module is licensed. ?>
-  <?php if (!empty($job['closed_flag']) && function_exists('books_invoice_create') && (function_exists('licence_enabled') ? (licence_enabled('money') || licence_enabled('invoicing')) : true)): ?>
+  <?php // A man-day / man-month job raises its invoice from the Billing panel above (its due units).
+        $byUnitsJ = function_exists('billunit_job') && ($bjx = billunit_job((int)$job['id'])) && billunit_basis($bjx) !== '' && !billunit_job_billed_whole((int)$job['id']); ?>
+  <?php if (!$byUnitsJ && !empty($job['closed_flag']) && function_exists('books_invoice_create') && (function_exists('licence_enabled') ? (licence_enabled('money') || licence_enabled('invoicing')) : true)): ?>
     <form method="post" action="/job-bill?id=<?= (int)$job['id'] ?>" style="margin-bottom:12px"
           onsubmit="return confirm('Raise a draft GST invoice for this <?= e(Tl('job')) ?>? The amount is filled from the <?= e(Tl('quote')) ?>.');">
       <button class="btn" type="submit">🧾 Raise GST invoice from this <?= e(Tl('job')) ?> →</button>

@@ -3476,6 +3476,7 @@ function ops_route_module_map() {
         'service-scope'=>'settings','service-formats'=>'settings',
         'deputations'=>'jobs',
         'billable-events'=>'invoicing','billable-sync'=>'invoicing','billable-approve'=>'invoicing',
+        'billable-invoice'=>'invoicing','job-billing'=>'invoicing','contract-billing'=>'invoicing',
         'billable-cancel'=>'invoicing','billable-dispute'=>'invoicing','billable-bill'=>'invoicing','billable-bill-partial'=>'invoicing',
         'call-status'=>'calls','call-attrs'=>'calls','call-override'=>'calls',
         'call-clar-new'=>'calls','call-clar-respond'=>'calls','call-clar-status'=>'calls',
@@ -4542,6 +4543,8 @@ function ops_dispatch($route, $method) {
             return ops_system_status($method);
         case $route === 'tasks':               // Phase 3 §26 — my persisted tasks
             return ops_tasks($method);
+        case $route === 'billable-invoice' || $route === 'job-billing' || $route === 'contract-billing':   // universal man-day / man-month billing
+            return ops_billunits($route, $method);
         case $route === 'billable-events' || strncmp($route, 'billable-', 9) === 0:   // Revamp P4 — Billable Event ledger
             return ops_billable($route, $method);
         case $route === 'connect-taxonomy':    // Connect K0 — marketplace industry taxonomy (read-only)

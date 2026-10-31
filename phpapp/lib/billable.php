@@ -105,7 +105,7 @@ function billable_bill_partial($id, $amount, $ref, $tol = 1.0) {
     $e = ops_one("SELECT * FROM billable_events WHERE id=?", [$id]);
     if (!$e) return [false, 'Billable event not found.'];
     if (($e['status'] ?? '') !== 'APPROVED') return [false, 'Only an approved event can be part-billed.'];
-    if (($e['source_module'] ?? '') === 'job') return [false, 'A closed-job event reconciles via its books invoice, not attestation.'];
+    if (in_array(($e['source_module'] ?? ''), ['job', 'unit'], true)) return [false, 'A closed-job event or billing unit reconciles via its books invoice, not attestation.'];
     $remaining = billable_remaining($e);
     if ($amount > $remaining + $tol) return [false, 'That exceeds the ' . number_format($remaining, 2) . ' still to bill.'];
     $newBilled = round((float)($e['billed_amount'] ?? 0) + $amount, 2);
@@ -212,7 +212,7 @@ function billable_mark_billed($id, $ref) {
     // placement). A JOB_CLOSED event must reconcile via its real books invoice
     // (books_invoices_for_job), so it stays on the unbilled board until an invoice
     // actually exists — never billed on a typed reference alone.
-    if (($e['source_module'] ?? '') === 'job') return false;
+    if (in_array(($e['source_module'] ?? ''), ['job', 'unit'], true)) return false;   // billing units bill only via a real invoice line
     // Gap-7 — a full bill also settles billed_amount to the whole amount and logs the bill,
     // so the partial-bill ledger and the "fully billed" path stay consistent.
     $amount = round((float)($e['amount'] ?? 0), 2);

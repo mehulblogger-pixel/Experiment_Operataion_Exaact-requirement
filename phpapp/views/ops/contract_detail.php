@@ -225,6 +225,15 @@
 </script>
 <?php endif; ?>
 
+<?php // Universal man-day / man-month billing — this contract's billing terms (its jobs inherit them).
+      if (function_exists('billunit_terms_form_html')): ?>
+<div class="panel" id="billing"><h3 class="tab-sub" style="margin-top:0">Billing terms</h3>
+  <?= billunit_terms_form_html('/contract-billing', ['contract_id' => (int)$c['id']], (string)($c['billing_triggers'] ?? ''), (string)(($c['billing_period'] ?? '') ?: 'MONTHLY'),
+        billunit_can_set_contract_terms(),
+        'Every ' . Tl('job') . ' under this contract follows these terms unless its work order or the ' . Tl('job') . ' sets its own. Nothing ticked: a deployment bills month by month, man-day work at closure.') ?>
+</div>
+<?php endif; ?>
+
 <?php // ---- Source quotation ---------------------------------------------- ?>
 <?php if ($quote): ?>
 <div class="panel"><h3 class="tab-sub" style="margin-top:0">Quotation</h3>

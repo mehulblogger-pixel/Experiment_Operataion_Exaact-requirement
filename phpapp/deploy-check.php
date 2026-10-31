@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '0864c057 · 2026-10-31 12:48 UTC · 702 files';
+$RELEASE = '8013bc54 · 2026-10-31 13:01 UTC · 703 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -50,10 +50,10 @@ $EXPECT  = [
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
     'lib/audits.php' => ['s'=>41605,'h'=>'f362d70e80a1632d'],
     'lib/backup.php' => ['s'=>24069,'h'=>'55dc55fb9bd907ad'],
-    'lib/billable.php' => ['s'=>31639,'h'=>'de1f0b05f0744d9c'],
+    'lib/billable.php' => ['s'=>31754,'h'=>'2dd93f8e6f584b47'],
     'lib/billing.php' => ['s'=>17267,'h'=>'9a996e5971e3994c'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
-    'lib/billunits.php' => ['s'=>48488,'h'=>'e7ccc6e4896fe988'],
+    'lib/billunits.php' => ['s'=>60628,'h'=>'832b0fe0750afa11'],
     'lib/books.php' => ['s'=>72163,'h'=>'32e036eaddd6b34d'],
     'lib/booksbridge.php' => ['s'=>26219,'h'=>'b98194d999c7b90b'],
     'lib/booksui.php' => ['s'=>24743,'h'=>'167e036aaf00240e'],
@@ -177,7 +177,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>69459,'h'=>'1fabb6c2818818ac'],
-    'lib/ops.php' => ['s'=>734860,'h'=>'956289055b717277'],
+    'lib/ops.php' => ['s'=>735159,'h'=>'97f25fc340d3ab5f'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -327,6 +327,7 @@ $EXPECT  = [
     'views/ops/_deputation_panel.php' => ['s'=>13672,'h'=>'46545d4243390803'],
     'views/ops/_glance_strip.php' => ['s'=>5257,'h'=>'ffa16f7b9f2ab7b2'],
     'views/ops/_issue_panel.php' => ['s'=>8621,'h'=>'8f7e08e2edf793d4'],
+    'views/ops/_job_billing.php' => ['s'=>11308,'h'=>'d9114039c457706c'],
     'views/ops/_ops_registers.php' => ['s'=>6510,'h'=>'403bb12d7870ae8e'],
     'views/ops/_perm_verb_grid.php' => ['s'=>5876,'h'=>'8c4af262a49e2628'],
     'views/ops/_perm_verb_grid_assets.php' => ['s'=>9794,'h'=>'6a34014ee132d672'],
@@ -357,7 +358,7 @@ $EXPECT  = [
     'views/ops/audits_list.php' => ['s'=>4123,'h'=>'be8889ef0738b867'],
     'views/ops/availability.php' => ['s'=>17528,'h'=>'37e0f573cb2082d9'],
     'views/ops/backup.php' => ['s'=>5717,'h'=>'c25db9a0eab5b54d'],
-    'views/ops/billable_events.php' => ['s'=>8005,'h'=>'8bced33ab4bff106'],
+    'views/ops/billable_events.php' => ['s'=>11383,'h'=>'244c9ff5d6bafa8b'],
     'views/ops/billing.php' => ['s'=>7987,'h'=>'2b3fb9a5b8d4236c'],
     'views/ops/billing_pay.php' => ['s'=>7127,'h'=>'2896beba2d193472'],
     'views/ops/books_bridge.php' => ['s'=>6061,'h'=>'9d89c6e1a4160652'],
@@ -421,7 +422,7 @@ $EXPECT  = [
     'views/ops/connect_taxonomy_admin.php' => ['s'=>11051,'h'=>'db0b340f99a00f89'],
     'views/ops/connect_verify.php' => ['s'=>4960,'h'=>'4645eaaf41e844ce'],
     'views/ops/consents.php' => ['s'=>3523,'h'=>'5dd8e9b08a104408'],
-    'views/ops/contract_detail.php' => ['s'=>23427,'h'=>'a49166fa9b97d9a7'],
+    'views/ops/contract_detail.php' => ['s'=>24145,'h'=>'3d774ffc4f42337d'],
     'views/ops/contract_openings.php' => ['s'=>5102,'h'=>'98769400b4ef5772'],
     'views/ops/contract_overrides.php' => ['s'=>8886,'h'=>'e22fdf59af73f743'],
     'views/ops/cost_reconciliation.php' => ['s'=>5547,'h'=>'3c2d6f2dcd59c0a8'],
@@ -513,7 +514,7 @@ $EXPECT  = [
     'views/ops/invoicing.php' => ['s'=>4380,'h'=>'01efe77afde56500'],
     'views/ops/issues.php' => ['s'=>5267,'h'=>'dcb81bc09ecdf357'],
     'views/ops/job_close.php' => ['s'=>6149,'h'=>'ee8cf863f4f975de'],
-    'views/ops/job_detail.php' => ['s'=>89348,'h'=>'a76671ed24b8ed9f'],
+    'views/ops/job_detail.php' => ['s'=>89810,'h'=>'2d8a9ad46e2fe2e6'],
     'views/ops/job_form.php' => ['s'=>58267,'h'=>'fc27fcee363d06e0'],
     'views/ops/jobs.php' => ['s'=>7058,'h'=>'54c963c415ee7600'],
     'views/ops/lead_convert.php' => ['s'=>2983,'h'=>'36d24e0b5dfc08ab'],
