@@ -1468,6 +1468,7 @@ function ops_saas_subscription($route, $method) {
             'order' => $ord, 'cfg' => billing_config(),
             'verify_action' => '/subscription-verify', 'back' => '/subscription',
             'extra' => [],
+            'review' => ($kind === 'plan' && $quote && function_exists('saas_plan_review')) ? saas_plan_review($quote) : null,
         ]);
         return true;
     };

@@ -57,7 +57,7 @@ $forSale = $seatM > 0 && array_filter($pb['modules'] ?? [], fn($m) => (int) $m['
 
   <?php include __DIR__ . '/_billto.php'; ?>
   <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--soft,#f6f8fb);border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:12px 14px">
-    <div><span class="sub" style="font-size:12px">Plan price</span><br>
+    <div><span class="sub" style="font-size:12px"><?= $mode === 'paid' ? 'Full price of this plan — the next screen shows what you pay today, after the credit for unused days' : 'Plan price' ?></span><br>
       <span id="pl-total" style="font-size:22px;font-weight:700"><?= $e($sym) ?>0</span>
       <span class="sub" id="pl-period-lab" style="font-size:12px">/ month</span><?php if ($gstNote !== ''): ?><span class="sub" style="font-size:12px"><?= $e($gstNote) ?></span><?php endif; ?></div>
     <button class="btn" type="submit"><?= $mode === 'paid' ? 'Change or renew →' : 'Choose this plan & pay →' ?></button>

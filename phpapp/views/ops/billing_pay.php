@@ -11,6 +11,22 @@
   <p class="sub" style="margin:2px 0 0"><?= (int)$amt['seats'] ?> <?= (int)$amt['seats']===1?'person':'people' ?>,
     <?= e($amt['period']==='year'?'annual':'monthly') ?> — <strong><?= e($sym . number_format((int)$amt['major'])) ?></strong>.</p></div></div>
 
+<?php $rv = $review ?? null; if (is_array($rv)): ?>
+<div class="panel" style="max-width:520px">
+  <h3 style="margin:0 0 4px;font-size:16px"><?= e($rv['head']) ?></h3>
+  <p style="font-size:13.5px;margin:0 0 10px"><?= e($rv['when']) ?></p>
+  <table style="width:100%;font-size:14px;border-collapse:collapse">
+    <?php foreach ($rv['lines'] as $ln): ?>
+      <tr><td style="padding:4px 0"><?= e($ln['label']) ?></td><td style="text-align:right"><?= e($sym . number_format((int) $ln['amount'])) ?> / <?= e($rv['period']) ?></td></tr>
+    <?php endforeach; ?>
+    <tr style="border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">Full price of this plan</td><td style="text-align:right"><?= e($sym . number_format($rv['list'])) ?></td></tr>
+    <?php if ($rv['credit'] > 0): ?>
+      <tr><td style="padding:4px 0">Less: unused part of your current plan</td><td style="text-align:right">− <?= e($sym . number_format($rv['credit'])) ?></td></tr>
+    <?php endif; ?>
+    <tr style="font-weight:700;border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">To pay now<?= (is_array($amt['tax'] ?? null) && !empty($amt['tax']['on'])) ? ' (before GST)' : '' ?></td><td style="text-align:right"><?= e($sym . number_format($rv['price'])) ?></td></tr>
+  </table>
+</div>
+<?php endif; ?>
 <?php $tx = $amt['tax'] ?? null; if (is_array($tx) && !empty($tx['on'])): ?>
 <div class="panel" style="max-width:520px">
   <table style="width:100%;font-size:14px;border-collapse:collapse">
@@ -28,7 +44,7 @@
 </div>
 <?php endif; ?>
 <div class="panel" style="max-width:520px;text-align:center">
-  <p class="sub">The secure Razorpay window should open automatically. If it does not, use the button below.</p>
+  <p class="sub"><?= is_array($rv) ? 'Check the figures above, then press Pay to open the secure Razorpay window.' : 'The secure Razorpay window should open automatically. If it does not, use the button below.' ?></p>
   <button class="btn" id="paybtn" type="button">Pay <?= e($sym . number_format($amtMajor)) ?></button>
   <a class="btn secondary" href="<?= e($back) ?>" style="margin-left:8px">Cancel</a>
   <p class="muted" style="margin-top:14px;font-size:12.5px">Your card details go straight to Razorpay — this application never sees them.
@@ -67,6 +83,7 @@
   };
   function open(){ try { (new Razorpay(opts)).open(); } catch(e){ alert('Could not open the payment window. Please reload.'); } }
   document.getElementById('paybtn').addEventListener('click', open);
-  window.addEventListener('load', function(){ setTimeout(open, 300); });
+  // With a review to read (a plan change), the window waits for the Pay button.
+  <?php if (!is_array($rv)): ?>window.addEventListener('load', function(){ setTimeout(open, 300); });<?php endif; ?>
 })();
 </script>

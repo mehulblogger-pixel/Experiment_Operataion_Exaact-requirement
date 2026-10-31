@@ -785,7 +785,7 @@ function saas_plan_change_quote(array $mods, $seats, $period, $today = null, $pa
     $isNext = $next && saas_same_selection($mods, $seats, (array) $next['mods'], (int) $next['seats'], $packs, (int) ($next['packs'] ?? 0)) && $period === ($next['period'] ?? '');
     $starts = date('Y-m-d', strtotime($cur['until'] . ' +1 day'));
     if ($isCurrent || $isNext) {
-        return ['type' => 'RENEW', 'starts' => $starts, 'expires' => $end($starts)] + $out;
+        return ['type' => 'RENEW', 'starts' => $starts, 'expires' => $end($starts), 'cur_until' => $cur['until']] + $out;
     }
     $newVal = saas_monthly_value($mods, $seats, $period, $packs);
     $curVal = saas_monthly_value($cur['mods'], $cur['seats'], $cur['period'], $cur['packs']);
@@ -802,12 +802,37 @@ function saas_plan_change_quote(array $mods, $seats, $period, $today = null, $pa
             $days = max(1, (int) round((strtotime($end($today)) - strtotime($today)) / 86400));
             $extra = (int) floor(($credit - $list) / ($list / $days));
         }
-        return ['type' => 'UPGRADE', 'price' => $price, 'credit' => $credit, 'extra_days' => $extra,
-                'expires' => date('Y-m-d', strtotime($end($today) . ' +' . $extra . ' days'))] + $out;
+        return ['type' => 'UPGRADE', 'price' => $price, 'credit' => $credit, 'extra_days' => $extra, 'left_days' => (int) round($left),
+                'cur_until' => $cur['until'], 'expires' => date('Y-m-d', strtotime($end($today) . ' +' . $extra . ' days'))] + $out;
     }
     return ['type' => 'DOWNGRADE', 'price' => 0, 'starts' => $starts, 'expires' => $end($starts),
             'msg' => 'Your smaller plan starts on ' . (function_exists('fdate') ? fdate($starts) : $starts)
                    . ', when the current one ends. Nothing is charged now.'] + $out;
+}
+
+// What the customer reads BEFORE paying (owner, test book ONB-051 / ONB-049):
+// every line of the plan, the credit for the unused part of the plan running
+// now, the amount due today, and the one end date the whole plan then has.
+// Without it the payment page showed a single figure, which read as being
+// charged again for modules already paid for.
+function saas_plan_review(array $q) {
+    $fd = fn($d) => function_exists('fdate') ? fdate($d) : $d;
+    $per = ($q['period'] ?? 'month') === 'year' ? 'year' : 'month';
+    $quote = function_exists('saas_company_quote') ? saas_company_quote((array) ($q['mods'] ?? []), (int) ($q['seats'] ?? 0), $per, (int) ($q['packs'] ?? 0)) : ['lines' => []];
+    $type = (string) ($q['type'] ?? 'NEW');
+    $head = ['NEW' => 'Your plan', 'UPGRADE' => 'Adding to your plan', 'RENEW' => 'Renewing your plan in advance'][$type] ?? 'Your plan';
+    $when = '';
+    if ($type === 'UPGRADE')
+        $when = 'Your whole plan — what you already have and what you are adding — starts again today and runs until '
+              . $fd($q['expires']) . '. Everything ends on that one day; the ' . (int) ($q['left_days'] ?? 0)
+              . ' unused days of your current plan (until ' . $fd($q['cur_until'] ?? '') . ') are taken off the price below.';
+    elseif ($type === 'RENEW')
+        $when = 'Your plan already runs until ' . $fd($q['cur_until'] ?? '') . '. This payment adds the next ' . ($per === 'year' ? 'year' : 'month')
+              . ': from ' . $fd($q['starts']) . ' until ' . $fd($q['expires']) . '. Nothing changes before then.';
+    else
+        $when = 'Your plan starts today and runs until ' . $fd($q['expires']) . '.';
+    return ['head' => $head, 'period' => $per, 'lines' => (array) ($quote['lines'] ?? []), 'list' => (int) ($q['list'] ?? 0),
+            'credit' => (int) ($q['credit'] ?? 0), 'price' => (int) ($q['price'] ?? 0), 'when' => $when, 'type' => $type];
 }
 
 // Switch exactly these modules and logins on now.
