@@ -900,6 +900,11 @@ if ($route === 'login') {
         // skips all of this and behaves exactly as before.
         $loginId = trim((string)($_POST['username'] ?? ''));
         if (function_exists('saas_leave_tenant')) saas_leave_tenant();
+        // Re-take the connection: $pdo was opened at the top of the request, and
+        // if the browser was last inside a company workspace it still points at
+        // THAT company's database — the password was then checked against the
+        // wrong users table and refused ("Invalid username or password").
+        $pdo = db();
         // On the Super Admin address nobody is routed into a company.
         $onAdminHost = function_exists('on_superadmin_host') && on_superadmin_host();
         if (!$onAdminHost && $loginId !== '' && strpos($loginId, '@') !== false && function_exists('saas_login_lookup')) {
