@@ -310,6 +310,7 @@ try {
     require __DIR__ . '/lib/tmplpreview.php';      // Phase 3 §8 — report-template persona preview
     require __DIR__ . '/lib/entity360.php';        // Phase 3 §49 — uniform Entity-360 shell
     require __DIR__ . '/lib/billable.php';          // Revamp P4 — the Billable Event ledger (operational→commercial bridge)
+    require __DIR__ . '/lib/billunits.php';         // Universal man-day / man-month billing units (owner spec, 31 Oct 2026)
     require __DIR__ . '/lib/attendreview.php';     // Phase 3 §35 — attendance review (anomaly + send-back)
     require __DIR__ . '/lib/connect_taxonomy.php'; // Connect K0 — manpower-marketplace industry taxonomy (additive masters)
     require __DIR__ . '/lib/connect_qualtax.php';  // Connect K13 / #2 — qualification & role taxonomy (ITI→MBA ladder, additive masters)

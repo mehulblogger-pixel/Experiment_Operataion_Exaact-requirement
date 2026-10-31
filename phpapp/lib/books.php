@@ -651,6 +651,11 @@ function books_line_add($invoiceId, array $b) {
             return TH('job') . ' ' . $j['job_code'] . ' is not closed yet — bill it once the inspection is completed on its last day. '
                  . '(A finance user or admin can override to bill in between.)';
         }
+        // A job billed by its man-days / man-month periods is billed unit by unit
+        // (lib/billunits.php), so no unit can be billed twice; a whole-job line
+        // beside those units would bill the same days again.
+        if (function_exists('billunit_job_has_units') && billunit_job_has_units($job))
+            return TH('job') . ' ' . $j['job_code'] . ' is billed by its man-days / man-month periods — add its due units instead (Money → Billable events, or "Raise invoice" on the ' . Tl('job') . ').';
         if (books_job_invoiced($job, (int)$invoiceId)) return TH('job') . ' ' . $j['job_code'] . ' is already on another invoice.';
         $callId = $j['call_id'] ? (int)$j['call_id'] : null;
         if ($desc === '') $desc = 'Inspection services — ' . $j['job_code'];
@@ -760,6 +765,9 @@ function books_issue($invoiceId) {
         }
     }
     books_mirror_to_jobs($invoiceId);
+    // The invoice decides BILLED for every billing unit on it, at once (not on
+    // the next manual sync).
+    if (function_exists('billunit_after_invoice_change')) try { billunit_after_invoice_change((int)$invoiceId); } catch (Throwable $e) {}
     // If the customer has connected MGH Books, the issued invoice is the billable
     // event that flows across. A no-op when not connected — the ERP keeps its own.
     if (function_exists('books_bridge_on_invoice_issued')) try { books_bridge_on_invoice_issued((int)$invoiceId); } catch (Throwable $e) {}
@@ -783,6 +791,9 @@ function books_cancel($invoiceId, $reason) {
     db()->prepare("UPDATE invoices SET status='CANCELLED', cancelled_at=?, cancelled_by=?, cancel_reason=?, updated_at=? WHERE id=?")
        ->execute([date('c'), $u ? user_name($u) : '', substr(trim((string)$reason), 0, 400), date('c'), (int)$invoiceId]);
     books_unmirror_jobs($invoiceId);
+    // Controlled reversal: what this invoice billed goes back to be billed, so a
+    // cancelled invoice never makes earned work disappear.
+    if (function_exists('billunit_after_invoice_change')) try { billunit_after_invoice_change((int)$invoiceId); } catch (Throwable $e) {}
     if (function_exists('act_log')) act_log('INVOICE', (int)$invoiceId, 'CANCELLED', 'Cancelled: ' . $reason);
     return '';
 }
@@ -794,29 +805,45 @@ function books_cancel($invoiceId, $reason) {
 function books_mirror_to_jobs($invoiceId) {
     $inv = books_invoice($invoiceId);
     if (!$inv || $inv['status'] === 'DRAFT') return;
-    $s = books_settled($invoiceId);
-    $paid = $s['outstanding'] <= 1.0;
-    foreach (books_lines($invoiceId) as $ln) {
-        if (empty($ln['job_id'])) continue;
-        books_try(fn() => db()->prepare(
-            "UPDATE jobs SET invoice_raised=1, invoice_number=?, invoice_date=?, invoice_due_date=?,
-             invoice_amount=?, payment_received=?, payment_amount=?, payment_date=? WHERE id=?")
-           ->execute([(string)$inv['invoice_no'], (string)$inv['invoice_date'], (string)$inv['due_date'],
-                      (float)$ln['line_total'], $paid ? 1 : 0,
-                      $paid ? (float)$ln['line_total'] : 0.0,
-                      $paid ? (string)books_last_receipt_date($invoiceId) : '',
-                      (int)$ln['job_id']]), null);
-    }
+    foreach (books_lines($invoiceId) as $ln) if (!empty($ln['job_id'])) books_job_remirror((int)$ln['job_id']);
 }
 
 function books_unmirror_jobs($invoiceId) {
-    foreach (books_lines($invoiceId) as $ln) {
-        if (empty($ln['job_id'])) continue;
+    foreach (books_lines($invoiceId) as $ln) if (!empty($ln['job_id'])) books_job_remirror((int)$ln['job_id']);
+}
+
+// One job's invoice columns, recomputed from EVERY issued (not cancelled) invoice
+// line it has. A job billed month by month has several invoices: the columns hold
+// their sum and the latest number, never just whichever invoice was touched last
+// (which made October's bill vanish from profit the moment November's was issued).
+// A job with one invoice gets exactly the figures it always did.
+function books_job_remirror($jobId) {
+    $rows = books_try(fn() => ops_all(
+        "SELECT l.line_total, i.id inv_id, i.invoice_no, i.invoice_date, i.due_date
+         FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id
+         WHERE l.job_id=? AND i.status NOT IN ('DRAFT','CANCELLED') ORDER BY i.id", [(int)$jobId]), []) ?: [];
+    if (!$rows) {
         books_try(fn() => db()->prepare(
             "UPDATE jobs SET invoice_raised=0, invoice_number='', invoice_date='', invoice_due_date='',
              invoice_amount=0, payment_received=0, payment_amount=0, payment_date='' WHERE id=?")
-           ->execute([(int)$ln['job_id']]), null);
+           ->execute([(int)$jobId]), null);
+        return;
     }
+    $total = 0.0; $paidAmt = 0.0; $allPaid = true; $lastPaid = ''; $settled = [];
+    foreach ($rows as $r) {
+        $total += (float)$r['line_total'];
+        $iid = (int)$r['inv_id'];
+        if (!isset($settled[$iid])) { $st = books_settled($iid); $settled[$iid] = $st['outstanding'] <= 1.0; }
+        if ($settled[$iid]) { $paidAmt += (float)$r['line_total']; $d = (string)books_last_receipt_date($iid); if ($d > $lastPaid) $lastPaid = $d; }
+        else $allPaid = false;
+    }
+    $last = end($rows);
+    books_try(fn() => db()->prepare(
+        "UPDATE jobs SET invoice_raised=1, invoice_number=?, invoice_date=?, invoice_due_date=?,
+         invoice_amount=?, payment_received=?, payment_amount=?, payment_date=? WHERE id=?")
+       ->execute([(string)$last['invoice_no'], (string)$last['invoice_date'], (string)$last['due_date'],
+                  round($total, 2), $allPaid ? 1 : 0, round($paidAmt, 2), $allPaid ? $lastPaid : '',
+                  (int)$jobId]), null);
 }
 
 function books_last_receipt_date($invoiceId) {

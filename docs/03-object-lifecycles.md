@@ -462,9 +462,35 @@ stateDiagram-v2
   APPROVED --> BILLED : (job source) reconciliation — the source job becomes invoiced (books_invoices_for_job); amount taken from the invoice
   PENDING --> BILLED : (job source) reconciliation, if invoiced before review
   APPROVED --> BILLED : (non-job source) billable-bill — finance attests the invoice number (bill_ref); P4c
-  BILLED --> [*] : terminal, linked to invoice_id (reconciled) or bill_ref (attested)
+  APPROVED --> BILLED : (billing unit) the invoice holding the unit is ISSUED — billunit_reconcile_invoice()
+  PENDING --> BILLED : (billing unit) same, if invoiced before review
+  BILLED --> APPROVED : CONTROLLED REVERSAL — the invoice that billed it is CANCELLED (billunit_reverse(); negative bill-log row + audit)
+  BILLED --> [*] : otherwise final, linked to invoice_id (reconciled) or bill_ref (attested)
   CANCELLED --> [*] : terminal
 ```
+
+- **Billing units (owner's universal man-day / man-month billing rule, 31 Oct 2026;
+  `lib/billunits.php`).** A unit is a billable event with a unique `unit_key`
+  (`MD|job|inspector|date` one man-day, `MM|job|YYYY-MM` one man-month period,
+  `MS|…` a document milestone, `AD|…` an adjustment); `source_module='unit'`,
+  `source_kind` = MANDAY / MANMONTH / MILESTONE / ADJUSTMENT. An invoice line carries
+  `billable_event_id`, and a unit may sit on **only one invoice that is not
+  cancelled** — the "billed exactly once" guarantee. `due_on` records when the
+  contract's billing trigger lets the unit be billed; earned-but-not-due is visible
+  and never lost (it is a date, **not a new status**). A job that has units cannot
+  also be billed as a whole (`books_line_add` refuses), and a job already billed as
+  a whole cannot have its units billed.
+- **The one reversal (owner: "if an invoice is cancelled or credited, update its
+  financial status through controlled reversal").** When the invoice that billed a
+  unit — or a `JOB_CLOSED` event — is cancelled, the event returns BILLED → APPROVED
+  with the reason, a negative `billable_bills` row and an audit entry, so the earned
+  amount is billable again and never disappears. BILLED is still never set by hand.
+- **Reconciliation is immediate:** issuing an invoice marks its units and any
+  `JOB_CLOSED` events on it BILLED at once (`billunit_after_invoice_change()` from
+  `books_issue`), not on the next manual sync.
+- **Job invoice columns** (`jobs.invoice_amount` …) are now recomputed from every
+  issued, not-cancelled invoice of the job (`books_job_remirror()`), so a job billed
+  month by month shows the sum — a single-invoice job reads exactly as before.
 
 - **BILLED for a job source is never a manual transition** (`billable_allowed_next()`
   excludes it); it is set by `billable_events_sync()` when `books_invoices_for_job()`
@@ -485,9 +511,9 @@ stateDiagram-v2
 - **Idempotent:** re-running the sync refreshes only the derived fields while an
   event is still PENDING; a human decision (APPROVED/BILLED/CANCELLED/DISPUTED) is
   never overwritten.
-- **P4a scope:** only the `JOB_CLOSED` source is wired, populated by the sync
-  pass. Inline hooks at job-close / report-issue / timesheet-approval and more
-  sources are P4b.
+- **Wired sources:** `JOB_CLOSED` (inline hook at job close + sync),
+  `TIMESHEET_APPROVED` (hook), `PLACEMENT_FEE` (sync), `MARKETPLACE_AWARD`
+  (`connect_bridge.php`), and the billing units above.
 
 ---
 

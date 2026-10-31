@@ -35,6 +35,13 @@ const BILLABLE_SOURCES = [
     'JOB_CLOSED'         => 'Closed job',
     'TIMESHEET_APPROVED' => 'Approved deputation timesheet',
     'PLACEMENT_FEE'      => 'Confirmed placement fee',
+    'MARKETPLACE_AWARD'  => 'Marketplace award',
+    // Billing units (lib/billunits.php) — one row per man-day, man-month period,
+    // milestone or adjustment, each with its own unique unit_key.
+    'MANDAY'             => 'Man-day',
+    'MANMONTH'           => 'Man-month period',
+    'MILESTONE'          => 'Milestone',
+    'ADJUSTMENT'         => 'Adjustment',
 ];
 
 function billable_migrate() {

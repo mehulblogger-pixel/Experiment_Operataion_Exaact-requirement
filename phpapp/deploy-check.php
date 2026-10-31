@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '05365d03 · 2026-10-31 12:21 UTC · 701 files';
+$RELEASE = '8d6e81e1 · 2026-10-31 12:30 UTC · 702 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
     'cron.php' => ['s'=>25218,'h'=>'d31a80db09206902'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>131718,'h'=>'8dba7c4bd7d1873e'],
+    'index.php' => ['s'=>131843,'h'=>'5f872f9434482b9e'],
     'lib/access.php' => ['s'=>131202,'h'=>'359ad3b528a4471c'],
     'lib/access_state.php' => ['s'=>10685,'h'=>'4c7da7d6d793745e'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
@@ -50,10 +50,11 @@ $EXPECT  = [
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
     'lib/audits.php' => ['s'=>41605,'h'=>'f362d70e80a1632d'],
     'lib/backup.php' => ['s'=>24069,'h'=>'55dc55fb9bd907ad'],
-    'lib/billable.php' => ['s'=>30388,'h'=>'915abaabd09e5c9a'],
+    'lib/billable.php' => ['s'=>30758,'h'=>'606c1053f97b6432'],
     'lib/billing.php' => ['s'=>17267,'h'=>'9a996e5971e3994c'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
-    'lib/books.php' => ['s'=>70004,'h'=>'50ed5b2dc1b11f82'],
+    'lib/billunits.php' => ['s'=>20505,'h'=>'681d409675e9e866'],
+    'lib/books.php' => ['s'=>72162,'h'=>'5c0dcec8e569dc98'],
     'lib/booksbridge.php' => ['s'=>26219,'h'=>'b98194d999c7b90b'],
     'lib/booksui.php' => ['s'=>24743,'h'=>'167e036aaf00240e'],
     'lib/bulk.php' => ['s'=>2157,'h'=>'ca3be826f9a4414c'],
