@@ -40,6 +40,9 @@ CHANGE = {  # (test id, step number) -> new fields
     # Owner, 31 Oct (ONB-050): a trial's storage could not be filled by hand — set a tiny limit for this company.
     ('ONB-050', 2):  {'do': 'Super Admin → Companies → the trial company → Manage → "Trial storage limit (MB)" = 1 → "Save trial date". Then, in that company, attach any file (e.g. a client document).',
                       'expect': '"Your free-trial storage is full, so this file was not added. Choose a plan to add more files — nothing else you typed has been lost." Records still save. Afterwards set the limit back (or 0 for no limit).'},
+    # Owner, 31 Oct (PLT-005): the pack price moved to Pricing.
+    ('PLT-005', 9):  {'do': 'Companies → 💾 Storage allowance and 🚀 Self sign-up; then Pricing → the "Extra storage pack" row.',
+                      'expect': 'The same "Suggested: … · why" under each box (10 GB, 2 GB per login, 50 GB pack size; 30 days, 10 logins, 2048 MB) and "Fill in the suggested values". The pack price (suggested ₹399 a month) is on Pricing with every other price; Storage allowance shows it with "set on Pricing".'},
     # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
     ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
     # One choice instead of two switches (owner: "switch is off but still I can generate the account from /start").
