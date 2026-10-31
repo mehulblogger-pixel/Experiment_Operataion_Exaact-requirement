@@ -66,6 +66,10 @@ function billunit_migrate() {
     }
     ensure_column('jobs', 'billing_stop_on', "VARCHAR(10) DEFAULT ''");
     ensure_column('jobs', 'billing_stop_reason', "VARCHAR(400) DEFAULT ''");
+    ensure_column('jobs', 'billing_stop_kind', "VARCHAR(20) DEFAULT ''");
+    // Whether the contract charges for a suspended deployment (default: no — the
+    // suspended days are not earned). Set per job by finance / the coordinator.
+    ensure_column('jobs', 'billing_charge_suspension', "INT DEFAULT 0");
     try { db()->exec("CREATE INDEX ix_invoice_lines_event ON invoice_lines (billable_event_id)"); } catch (Throwable $e) {}
 }
 
@@ -628,4 +632,128 @@ function billunit_reconcile_all() {
     } catch (Throwable $e) { return 0; }
     foreach ($ids as $r) $n += billunit_reconcile_invoice((int)$r['invoice_id']);
     return $n;
+}
+
+// ===========================================================================
+//  Stage 4 — termination, early completion, suspension, adjustments
+// ===========================================================================
+const BILLUNIT_STOP_KINDS = [
+    'TERMINATED'      => 'Terminated by the client / contract',
+    'COMPLETED_EARLY' => 'Completed early',
+    'DEMOBILIZED'     => 'Demobilised / withdrawn',
+];
+
+// May this person end a job's billing early? The same right that closes a job.
+function billunit_can_end_early() {
+    return is_master() || (function_exists('can') && can('ops.job.close'));
+}
+// May this person add a charge (termination / notice / demobilisation)? Money —
+// the finance reconcile right (D1), the same as approving billable events.
+function billunit_can_adjust() {
+    return function_exists('billable_can_manage') && billable_can_manage();
+}
+
+// The days a deployment was SUSPENDED and is not charged for — from the
+// deputation status history (dep_status_events): from the day it became
+// SUSPENDED to the day it left that state. Empty when the contract charges for
+// suspension (jobs.billing_charge_suspension = 1) or there is no history.
+function billunit_suspension_days($job) {
+    if (!empty($job['billing_charge_suspension'])) return [];
+    try { $ev = ops_all("SELECT new_status, at FROM dep_status_events WHERE job_id=? ORDER BY at, id", [(int)$job['id']]) ?: []; }
+    catch (Throwable $e) { return []; }
+    $out = []; $from = null;
+    $mark = function ($a, $b) use (&$out) { for ($t = strtotime($a); $t < strtotime($b); $t += 86400) $out[date('Y-m-d', $t)] = true; };
+    foreach ($ev as $r) {
+        $d = substr((string)$r['at'], 0, 10);
+        if (strtoupper((string)$r['new_status']) === 'SUSPENDED') { if ($from === null) $from = $d; }
+        elseif ($from !== null) { $mark($from, $d); $from = null; }
+    }
+    if ($from !== null) $mark($from, date('Y-m-d', strtotime('+1 day')));
+    return $out;
+}
+
+// End a job's earning on a date: terminated, completed early or demobilised. All
+// earned work up to that date becomes due at once (a part month is pro-rated);
+// anything unbilled dated after it is cancelled with the reason. Already billed
+// amounts are never touched. Returns '' or the reason it was refused.
+function billunit_end_early($jobId, $date, $kind, $reason) {
+    billunit_migrate();
+    $job = billunit_job($jobId);
+    if (!$job) return 'That ' . Tl('job') . ' no longer exists.';
+    if (!empty($job['closed_flag'])) return 'This ' . Tl('job') . ' is already closed — closing it already billed everything earned.';
+    $date = substr(trim((string)$date), 0, 10);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !strtotime($date)) return 'Give the date the work ended.';
+    $start = substr((string)($job['inspection_start_date'] ?? ''), 0, 10);
+    if ($start !== '' && $date < $start) return 'The end date cannot be before the ' . Tl('job') . ' started (' . $start . ').';
+    if (!isset(BILLUNIT_STOP_KINDS[$kind])) return 'Say whether it was terminated, completed early or demobilised.';
+    $reason = trim((string)$reason);
+    if ($reason === '') return 'Say why — this is the record of the early end.';
+    db()->prepare("UPDATE jobs SET billing_stop_on=?, billing_stop_kind=?, billing_stop_reason=? WHERE id=?")
+        ->execute([$date, $kind, substr($reason, 0, 400), (int)$jobId]);
+    // Unbilled units dated after the end are no longer earned.
+    foreach (ops_all("SELECT * FROM billable_events WHERE source_module='unit' AND job_id=? AND source_kind IN ('MANDAY','MANMONTH')
+                      AND status IN ('PENDING','APPROVED','DISPUTED') AND period_from>?", [(int)$jobId, $date]) ?: [] as $u) {
+        if (billunit_on_invoice((int)$u['id'])) continue;
+        db()->prepare("UPDATE billable_events SET status='CANCELLED', status_reason=?, updated_at=? WHERE id=?")
+            ->execute(['After the ' . Tl('job') . ' ended on ' . $date . ' — not earned.', date('c'), (int)$u['id']]);
+    }
+    billunit_on_job_changed($jobId);
+    if (function_exists('act_log')) try { act_log('JOB', (int)$jobId, 'BILLING_ENDED', BILLUNIT_STOP_KINDS[$kind] . ' on ' . $date . ': ' . $reason); } catch (Throwable $e) {}
+    return '';
+}
+
+// A charge the contract provides for — termination, notice period, minimum
+// commitment, demobilisation, a milestone fee. Entered by finance with its
+// reason; never invented by the system. Billed once like any unit, due now.
+function billunit_add_adjustment($jobId, $amount, $reason) {
+    billunit_migrate();
+    $job = billunit_job($jobId);
+    if (!$job) return 'That ' . Tl('job') . ' no longer exists.';
+    $amount = round((float)$amount, 2);
+    if ($amount <= 0) return 'Enter the charge amount. (To reduce a bill, raise a credit note against the invoice.)';
+    $reason = trim((string)$reason);
+    if ($reason === '') return 'Say what the charge is and where the contract provides for it.';
+    $n = (int)ops_val("SELECT COUNT(*) FROM billable_events WHERE source_module='unit' AND source_kind='ADJUSTMENT' AND job_id=?", [(int)$jobId]) + 1;
+    $id = billunit_upsert('ADJUSTMENT', 'AD|' . (int)$jobId . '|' . $n . '|' . date('YmdHis'), billunit_common($job) + [
+        'qty' => 1, 'unit' => 'charge', 'rate' => $amount, 'amount' => $amount,
+        'period_from' => date('Y-m-d'), 'period_to' => date('Y-m-d'), 'calc_rule' => 'Entered by finance', 'evidence' => substr($reason, 0, 400),
+    ]);
+    if (!$id) return 'The charge could not be recorded.';
+    billunit_mark_due($id, date('Y-m-d'), 'Charge entered by finance');
+    if (function_exists('act_log')) try { act_log('JOB', (int)$jobId, 'BILLING_CHARGE', number_format($amount, 2) . ' — ' . $reason); } catch (Throwable $e) {}
+    return '';
+}
+
+// ===========================================================================
+//  The reconciliation — every earned unit, and where it stands
+// ===========================================================================
+// For one job: what was earned, what is billed, what is due and not billed, what
+// is earned but not yet due, what is disputed, plus the work-order value it can
+// be compared against. Shown on the job and before closing it.
+function billunit_reconciliation($jobId) {
+    billunit_migrate();
+    $job = billunit_job($jobId);
+    $out = ['basis' => $job ? billunit_basis($job) : '', 'mandays' => 0.0, 'months' => 0.0, 'earned' => 0.0, 'billed' => 0.0,
+            'due' => 0.0, 'not_due' => 0.0, 'disputed' => 0.0, 'adjust' => 0.0, 'cancelled' => 0.0, 'order_value' => 0.0, 'units' => [],
+            'triggers' => $job ? billunit_triggers($job) : null, 'stop' => $job ? billunit_stop_date($job) : ''];
+    if (!$job) return $out;
+    $out['order_value'] = (float)($job['billable_value'] ?? 0);
+    $today = date('Y-m-d');
+    foreach (ops_all("SELECT * FROM billable_events WHERE source_module='unit' AND job_id=? ORDER BY period_from, id", [(int)$jobId]) ?: [] as $u) {
+        $a = (float)$u['amount'];
+        $u['invoice_no'] = (int)$u['invoice_id'] ? (string)ops_val("SELECT invoice_no FROM invoices WHERE id=?", [(int)$u['invoice_id']]) : '';
+        $u['on_draft'] = $u['status'] !== 'BILLED' ? billunit_on_invoice((int)$u['id']) : 0;
+        $out['units'][] = $u;
+        if ($u['status'] === 'CANCELLED') { $out['cancelled'] += $a; continue; }
+        $out['earned'] += $a;
+        if ($u['source_kind'] === 'MANDAY')   $out['mandays'] += (float)$u['qty'];
+        if ($u['source_kind'] === 'MANMONTH') $out['months']  += (float)$u['qty'];
+        if ($u['source_kind'] === 'ADJUSTMENT') $out['adjust'] += $a;
+        if ($u['status'] === 'BILLED') { $out['billed'] += (float)$u['billed_amount']; continue; }
+        if ($u['status'] === 'DISPUTED') { $out['disputed'] += $a; continue; }
+        if (($u['due_on'] ?? '') !== '' && $u['due_on'] <= $today) $out['due'] += $a; else $out['not_due'] += $a;
+    }
+    foreach (['mandays','months','earned','billed','due','not_due','disputed','adjust','cancelled'] as $k) $out[$k] = round($out[$k], 4);
+    $out['outstanding'] = round($out['earned'] - $out['billed'], 2);
+    return $out;
 }

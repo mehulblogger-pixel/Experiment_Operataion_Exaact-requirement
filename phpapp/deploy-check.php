@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'ac460fb5 · 2026-10-31 12:45 UTC · 702 files';
+$RELEASE = '0864c057 · 2026-10-31 12:48 UTC · 702 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -53,7 +53,7 @@ $EXPECT  = [
     'lib/billable.php' => ['s'=>31639,'h'=>'de1f0b05f0744d9c'],
     'lib/billing.php' => ['s'=>17267,'h'=>'9a996e5971e3994c'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
-    'lib/billunits.php' => ['s'=>40035,'h'=>'73db0b434621f530'],
+    'lib/billunits.php' => ['s'=>48488,'h'=>'e7ccc6e4896fe988'],
     'lib/books.php' => ['s'=>72163,'h'=>'32e036eaddd6b34d'],
     'lib/booksbridge.php' => ['s'=>26219,'h'=>'b98194d999c7b90b'],
     'lib/booksui.php' => ['s'=>24743,'h'=>'167e036aaf00240e'],

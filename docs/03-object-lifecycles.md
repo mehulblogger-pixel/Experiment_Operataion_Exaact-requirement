@@ -511,6 +511,21 @@ stateDiagram-v2
   (closure) for man-day work — the business's practice before the engine. A unit is
   due at the earliest applicable trigger and is still billed once; a due date never
   moves later.
+- **Early end, suspension, charges (stage 4).** *End early* (`billunit_end_early()`,
+  the job-close right `ops.job.close` / master; reason required; job must be open)
+  records `jobs.billing_stop_on` with TERMINATED / COMPLETED_EARLY / DEMOBILIZED:
+  earning stops on that date, a part month is pro-rated, everything earned becomes
+  due at once, and unbilled units dated after it are CANCELLED with the reason
+  (already billed units are never touched). It is **not a job status** and does not
+  close the job (the existing close gates are unchanged). *Suspension:* days a
+  deputation was SUSPENDED (`dep_status_events`) are not earned unless
+  `jobs.billing_charge_suspension` says the contract charges for them. *Charges*
+  (termination, notice period, minimum commitment, demobilisation, milestone fee):
+  `billunit_add_adjustment()`, finance only (`finance.reconcile`, D1), amount and
+  reason entered — never invented by the system; billed once like any unit.
+- **Reconciliation** (`billunit_reconciliation()`): per job — man-days, man-months,
+  earned, billed, due and unbilled, earned but not yet due, disputed, charges,
+  cancelled, outstanding, against the work-order value.
 - **Raising the invoice.** "Raise invoice" on a job (`job-bill`) and adding a job to
   an invoice (`books_line_add`) put the job's **due, unbilled units** on it, one line
   each; an open job can be billed for what is already due. Nothing due → the draft is
