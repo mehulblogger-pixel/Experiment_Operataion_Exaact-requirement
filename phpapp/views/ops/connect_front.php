@@ -134,10 +134,14 @@ $freeLaunch = true; // platform is free during launch
   <div class="sec-label" id="signin">Already have an account</div>
   <div class="signin">
     <h3>Welcome back</h3>
-    <p>Choose how you use the marketplace.</p>
+    <p>Choose how you use <?= e($appName) ?>.</p>
     <div class="btns">
       <a class="btn primary" href="/pro/login">Sign in as a professional</a>
       <a class="btn ghost" href="/portal/login">Sign in as a company or agency</a>
+      <?php // The header's "Sign in" lands here; a company's own staff had only the
+            // small footer link, so it read as "takes me to the same page" (owner,
+            // test book ONB-000). ?>
+      <a class="btn ghost" href="/login">Sign in to your company workspace (staff)</a>
     </div>
   </div>
 
