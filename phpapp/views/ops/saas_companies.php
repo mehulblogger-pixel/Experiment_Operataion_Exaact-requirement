@@ -124,7 +124,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     <tr><th>Company</th><th>Plan</th><th>Seats</th><th>Modules</th><th>Storage</th><th>Last used</th><th>Status</th><th></th></tr>
     <?php foreach ($companies as $c): $k = $e($c['tenant_key']);
       $active = ($c['status'] ?? 'active') !== 'suspended' && ($c['route_status'] ?? '') !== 'suspended'; ?>
-    <tr>
+    <tr<?= ($sel && ($sel['tenant_key'] ?? '') === $c['tenant_key']) ? ' style="background:var(--soft,#eef4ff);outline:2px solid var(--brand,#1e40af)"' : '' ?>>
       <td><div class="sc-co"><?= $e($c['company'] ?: $c['tenant_key']) ?></div>
           <div class="sc-key"><?= $k ?><?= $base_domain ? ' · ' . $e($c['owner_email'] ?? '') : '' ?></div></td>
       <td><?= $c['plan'] === 'TRIAL' ? 'Free trial' : ($c['plan'] === 'CUSTOM' ? 'Own choice' : $e($plans[$c['plan']]['label'] ?? $c['plan'])) ?>
@@ -147,7 +147,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
         <?php if (!empty($c['delete_on'])): ?><div class="sc-meta" style="color:#b45309">deleted <?= $e(fdate($c['delete_on'])) ?> if unused<?= (int) ($c['inactive_notices'] ?? 0) ? ' · ' . (int) $c['inactive_notices'] . ' warning' . ((int) $c['inactive_notices'] === 1 ? '' : 's') . ' sent' : '' ?></div><?php endif; ?></td>
       <td><?= $active ? '<span class="pill on">Active</span>' : '<span class="pill off">Suspended</span>' ?></td>
       <td><div class="sc-actions">
-        <a class="btn xs ghost" href="/companies?key=<?= $k ?>">Manage</a>
+        <a class="btn xs ghost" href="/companies?key=<?= $k ?>#manage">Manage</a>
         <form method="post" style="display:inline"><input type="hidden" name="do" value="company_login_as"><input type="hidden" name="key" value="<?= $k ?>"><input type="hidden" name="company" value="<?= $e($c['company']) ?>"><button class="btn xs">Log in as ›</button></form>
         <form method="post" style="display:inline" onsubmit="return confirm('<?= $active ? 'Suspend' : 'Reactivate' ?> <?= $e($c['company']) ?>?')"><input type="hidden" name="do" value="company_status"><input type="hidden" name="key" value="<?= $k ?>"><input type="hidden" name="status" value="<?= $active ? 'suspended' : 'active' ?>"><button class="btn xs ghost" style="color:<?= $active ? '#dc2626' : '#047857' ?>"><?= $active ? 'Suspend' : 'Activate' ?></button></form>
         <form method="post" style="display:inline" onsubmit="return confirm('PERMANENTLY REMOVE “<?= $e($c['company']) ?>”?\n\nThis deletes its workspace and all its data and cannot be undone. Its owner email will be free to use again.\n\nTip: use Suspend instead if you only want to block sign-in for now.')"><input type="hidden" name="do" value="company_remove"><input type="hidden" name="key" value="<?= $k ?>"><button class="btn xs ghost" style="color:#b91c1c" title="Permanently remove this company and its data">Remove</button></form>
@@ -160,8 +160,19 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
 <?php endif; ?>
 
 <?php if ($sel): $sk = $e($sel['tenant_key']); $selMods = json_decode((string) ($sel['enabled_modules'] ?? '[]'), true) ?: []; ?>
-<div class="sc-card">
-  <h2>Manage — <?= $e($sel['company'] ?: $sel['tenant_key']) ?></h2>
+<div class="sc-card" id="manage" style="scroll-margin-top:70px">
+  <h2>Manage — <?= $e($sel['company'] ?: $sel['tenant_key']) ?> <a class="btn xs ghost" href="/companies" style="float:right">Close</a></h2>
+
+  <?php if (($sel['source'] ?? '') === 'self'): $tu = (string) ($sel['trial_until'] ?? ''); ?>
+  <form method="post">
+    <input type="hidden" name="do" value="company_trial"><input type="hidden" name="key" value="<?= $sk ?>">
+    <div class="sc-edit" style="border-bottom:1px solid var(--line,#eef1f5)">
+      <div class="ff"><label>Free trial ends on</label><input name="trial_until" type="date" value="<?= $e($tu) ?>" required>
+        <div class="sc-note">Extend a trial for a customer, or end it: yesterday's date ends it now. A company that has not paid then becomes view-only (it can still open, print and export, and choose a plan); a paid plan is not affected.</div></div>
+      <div class="ff" style="justify-content:flex-end"><div><button class="btn">Save trial date</button></div></div>
+    </div>
+  </form>
+  <?php endif; ?>
 
   <form method="post">
     <input type="hidden" name="do" value="company_plan"><input type="hidden" name="key" value="<?= $sk ?>">

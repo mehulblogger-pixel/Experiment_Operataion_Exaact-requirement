@@ -1336,6 +1336,24 @@ function ops_saas_admin($route, $method) {
             }
             redirect($back);
         }
+        // The free-trial end date of a company that signed itself up (owner, test
+        // book ONB-048: "to test this we need to expire the trial"). Written into
+        // the company's own workspace, which is what decides trial / view-only.
+        if ($do === 'company_trial' && $key !== '') {
+            $tu = trim((string) ($_POST['trial_until'] ?? ''));
+            if (!(preg_match('/^\d{4}-\d{2}-\d{2}$/', $tu) && strtotime($tu) !== false)) {
+                flash('"Free trial ends on" must be a date written YYYY-MM-DD. Nothing was saved.', 'error');
+                redirect($back);
+            }
+            $t = saas_tenant_get($key);
+            if (($t['source'] ?? '') !== 'self') { flash('Only a company that signed itself up has a free trial.', 'error'); redirect($back); }
+            saas_tenant_upsert($key, ['trial_until' => $tu]);
+            $ok = function_exists('pricing_push_to_tenant') && pricing_push_to_tenant($key, ['saas_trial_until' => $tu]);
+            flash(($tu < date('Y-m-d') ? 'The free trial of ' . $key . ' has ended (' . (function_exists('fdate') ? fdate($tu) : $tu) . '). Without a paid plan it is now view-only.'
+                                       : 'The free trial of ' . $key . ' now runs until ' . (function_exists('fdate') ? fdate($tu) : $tu) . '.')
+                . ($ok ? '' : ' (Saved here; it reaches their workspace on the next sync.)'), $ok ? 'success' : 'warning');
+            redirect($back);
+        }
         if ($do === 'company_seats' && $key !== '') {
             // Set an absolute purchased-seat count (over the plan base).
             $want = max(0, (int) ($_POST['extra_user_seats'] ?? 0));
@@ -1430,6 +1448,7 @@ function ops_saas_admin($route, $method) {
 
     $sel = strtolower(trim((string) ($_GET['key'] ?? '')));
     $selRow = $sel !== '' ? saas_tenant_get($sel) : null;
+    if ($sel !== '' && !$selRow) flash('No company "' . $sel . '" is on this console — it may have been removed.', 'warning');
     view('ops/saas_companies', [
         'companies' => saas_console_companies(),
         'plans'     => saas_console_plans(),
