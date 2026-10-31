@@ -3988,7 +3988,8 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
             $reasons .= '</ul>';
             $steps[] = ['key'=>'release', 'label'=>'Release Note — not yet', 'state'=>'blocked',
                 'line'=>'A Release Note cannot be raised yet:' . $reasons
-                    . '<div style="margin-top:6px">Once these are cleared (reissuing the report as a revision if needed), the button becomes clickable.</div>'];
+                    . '<div style="margin-top:6px">Close each one where it lives (links below). Once all are cleared, the button becomes clickable.</div>',
+                'links'=>idems_rn_blocker_links($doc)];
         } else {
             $steps[] = ['key'=>'release', 'label'=>'Create the Release Note', 'state'=>'now',
                 'line'=>'This report is issued (accepted) and clear. Create its Release / Discrepancy Note in one click — the client, vendor, PO, item table and outcome carry over automatically, under a new number. Review the wording, then issue it.',
@@ -4049,6 +4050,28 @@ function idems_rn_blockers($doc) {
         $b[] = 'Client acceptance is pending — the client has not yet accepted this report.';
     return $b;
 }
+// Where each Release Note blocker is closed — one link per kind of blocker that
+// stands, so "close them first" always says where. (MOD-MON, 31 Oct: the owner
+// could not find how to close the hold points / deviations on an issued report.)
+// Returns [['label'=>…, 'href'=>…], …]; empty when nothing is blocking.
+function idems_rn_blocker_links($doc) {
+    $out = [];
+    $docId = (int)($doc['id'] ?? 0);
+    $jobId = (int)($doc['job_id'] ?? 0);
+    if (empty($doc['rn_to_issue']) && $docId)
+        $out[] = ['label' => 'Reissue as a new revision (then tick “Release Note to be issued”)', 'post' => '/document-revise', 'id' => $docId,
+                  'confirm' => 'Create a new revision of this report? The original stays on file, unchanged.'];
+    if ($jobId && function_exists('hwp_open_count') && (int)hwp_open_count($jobId) > 0)
+        $out[] = ['label' => 'Clear the open hold / witness points (on the job)', 'href' => '/job?id=' . $jobId . '#holdpoints'];
+    $ncrOpen = 0;
+    try {
+        $ncrOpen = (int) ops_val("SELECT COUNT(*) FROM nonconformities WHERE status<>'CLOSED' AND (report_doc_id=? " . ($jobId ? "OR job_id=?" : "") . ")",
+            $jobId ? [$docId, $jobId] : [$docId]);
+    } catch (Throwable $e) { $ncrOpen = 0; }
+    if ($ncrOpen > 0)
+        $out[] = ['label' => 'Close the open deviations / nonconformities', 'href' => $jobId ? '/ncr?job=' . $jobId : '/ncr?report=' . $docId];
+    return $out;
+}
 // Render the playbook card. Supports link CTAs and POST-button CTAs.
 function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) {
     if (!$doc) return;
@@ -4086,6 +4109,11 @@ function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) 
             <?php elseif (!empty($s['href']) && !empty($s['cta'])): ?>
               <a class="btn small secondary" href="<?= $esc($s['href']) ?>"><?= $esc($s['cta']) ?></a>
             <?php endif; ?>
+            <?php if (!empty($s['links'])): ?>
+              <div class="pb-links" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+                <?php foreach ($s['links'] as $lk): ?><?php if (!empty($lk['post'])): ?><form method="post" action="<?= $esc($lk['post']) ?>" style="margin:0" onsubmit="return confirm('<?= $esc($lk['confirm'] ?? 'Continue?') ?>')"><?php if (function_exists('csrf_field')) echo csrf_field(); ?><input type="hidden" name="id" value="<?= (int)$lk['id'] ?>"><button class="btn small secondary" type="submit"><?= $esc($lk['label']) ?></button></form><?php else: ?><a class="btn small secondary" href="<?= $esc($lk['href']) ?>"><?= $esc($lk['label']) ?> →</a><?php endif; ?><?php endforeach; ?>
+              </div>
+            <?php endif; ?>
           </div>
         <?php endforeach; ?>
       <?php else: ?>
@@ -4100,6 +4128,11 @@ function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) 
                 <?php elseif ($st === 'done'): ?><span class="pb-tag t-done">Done</span><?php endif; ?>
               </div>
               <div class="pb-line"><?= $s['line'] /* trusted: built above with escaping */ ?></div>
+              <?php if (!empty($s['links'])): ?>
+                <div class="pb-links" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+                  <?php foreach ($s['links'] as $lk): ?><?php if (!empty($lk['post'])): ?><form method="post" action="<?= $esc($lk['post']) ?>" style="margin:0" onsubmit="return confirm('<?= $esc($lk['confirm'] ?? 'Continue?') ?>')"><?php if (function_exists('csrf_field')) echo csrf_field(); ?><input type="hidden" name="id" value="<?= (int)$lk['id'] ?>"><button class="btn small secondary" type="submit"><?= $esc($lk['label']) ?></button></form><?php else: ?><a class="btn small secondary" href="<?= $esc($lk['href']) ?>"><?= $esc($lk['label']) ?> →</a><?php endif; ?><?php endforeach; ?>
+                </div>
+              <?php endif; ?>
               <?php if (!empty($s['approve'])): ?>
                 <form method="post" action="/document-approve" style="margin-top:9px">
                   <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
