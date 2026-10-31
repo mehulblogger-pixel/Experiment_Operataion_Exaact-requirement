@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '5603c284 · 2026-10-31 06:54 UTC · 701 files';
+$RELEASE = 'ef15438e · 2026-10-31 06:56 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -241,7 +241,7 @@ $EXPECT  = [
     'lib/settingmeta.php' => ['s'=>12701,'h'=>'092392a858cc10d8'],
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
     'lib/setup.php' => ['s'=>23072,'h'=>'7af387096568ab14'],
-    'lib/setup_cockpit.php' => ['s'=>31506,'h'=>'3a3770c84a89f262'],
+    'lib/setup_cockpit.php' => ['s'=>31679,'h'=>'1e3496fd3f3881e5'],
     'lib/setupqa.php' => ['s'=>18966,'h'=>'a6785961911ec434'],
     'lib/stagegate.php' => ['s'=>23612,'h'=>'47e075112915aafc'],
     'lib/superadmin.php' => ['s'=>22099,'h'=>'f3e910a1caa81d54'],

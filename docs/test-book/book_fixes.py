@@ -34,6 +34,8 @@ CHANGE = {  # (test id, step number) -> new fields
     ('MOD-ADM', 2):  {'do': 'Admin → Masters → "Records you keep" → "Offices & branches": your branches.'},
     ('MOD-ADM', 3):  {'do': 'Admin → Masters → "Dropdown lists" → "Business Unit": edit the values to your business units.',
                       'expect': 'The list is there in every company that has Operations or Sales (it used to exist only on the platform owner\'s own site). Your values appear in every "Business unit" choice.'},
+    # Owner, 31 Oct (ONB-030/000): Fix opens the add-person form; the front page offers staff sign-in.
+    ('ONB-030', 9):  {'expect': 'Each opens the screen that fixes it: "You are the only user — add your colleagues…" → the Add a person form; "No dropdown options yet…" → Masters; "Tell us what your company does…" → Your company.'},
     # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
     ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
     # One choice instead of two switches (owner: "switch is off but still I can generate the account from /start").

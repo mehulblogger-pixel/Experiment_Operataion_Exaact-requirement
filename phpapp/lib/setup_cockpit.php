@@ -383,7 +383,9 @@ function cockpit_health() {
     if ($hr) {
         $recruiters = _ck_count("SELECT COUNT(*) FROM users WHERE COALESCE(is_active,1)=1");
         if ($recruiters <= 1)
-            $out[] = $warn('roles', 'You are the only user — add your recruiters so work can be shared.', '/users');
+            // Fix opens the add-a-person form itself, not the list above it (owner,
+            // test book ONB-030 step 9: "each opens the screen that fixes it").
+            $out[] = $warn('roles', 'You are the only user — add your colleagues so the work can be shared.', '/user-new');
         else
             $out[] = $ok('roles', 'Your team is set up.');
     }

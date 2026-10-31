@@ -124,3 +124,8 @@ t_ok(cockpit_can_use_feature('admin') === true, 'cockpit_can_use_feature() deleg
 // restore capabilities to their pre-test state so later tests see a clean DB.
 cockpit_capabilities_set($saved);
 unset($_SESSION['uid']); current_user(true); if (function_exists('ua')) ua(true);
+
+// Owner, 31 Oct 2026 (test book ONB-030 step 9): "Fix" opens the screen that fixes it.
+$ckSrc = (string) file_get_contents(__DIR__ . '/../lib/setup_cockpit.php');
+t_ok(strpos($ckSrc, "add your colleagues so the work can be shared.', '/user-new')") !== false,
+     '"You are the only user" → Fix opens the add-a-person form, and does not speak of recruiters to every company');
