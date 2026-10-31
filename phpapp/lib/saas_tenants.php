@@ -1359,7 +1359,13 @@ function ops_saas_admin($route, $method) {
             $t = saas_tenant_get($key);
             if (($t['source'] ?? '') !== 'self') { flash('Only a company that signed itself up has a free trial.', 'error'); redirect($back); }
             saas_tenant_upsert($key, ['trial_until' => $tu]);
-            $ok = function_exists('pricing_push_to_tenant') && pricing_push_to_tenant($key, ['saas_trial_until' => $tu]);
+            $push = ['saas_trial_until' => $tu];
+            // The trial storage limit is copied into a company once, at sign-up;
+            // this sets it for this company (owner, test book ONB-050: "it cannot
+            // be tested" — a trial had about 14 GB).
+            $mbIn = trim((string) ($_POST['trial_storage_mb'] ?? ''));
+            if ($mbIn !== '') $push['saas_storage_limit_mb'] = (string) max(0, (int) $mbIn);
+            $ok = function_exists('pricing_push_to_tenant') && pricing_push_to_tenant($key, $push);
             flash(($tu < date('Y-m-d') ? 'The free trial of ' . $key . ' has ended (' . (function_exists('fdate') ? fdate($tu) : $tu) . '). Without a paid plan it is now view-only.'
                                        : 'The free trial of ' . $key . ' now runs until ' . (function_exists('fdate') ? fdate($tu) : $tu) . '.')
                 . ($ok ? '' : ' (Saved here; it reaches their workspace on the next sync.)'), $ok ? 'success' : 'warning');

@@ -194,6 +194,8 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     <div class="sc-edit" style="border-bottom:1px solid var(--line,#eef1f5)">
       <div class="ff"><label>Free trial ends on</label><input name="trial_until" type="date" value="<?= $e($tu) ?>" required>
         <div class="sc-note">Extend a trial for a customer, or end it: yesterday's date ends it now. A company that has not paid then becomes view-only (it can still open, print and export, and choose a plan); a paid plan is not affected.</div></div>
+      <div class="ff"><label>Trial storage limit (MB)</label><input name="trial_storage_mb" type="number" min="0" placeholder="leave as it is">
+        <div class="sc-note">Only for this company's trial (0 = no limit). A very small number, e.g. 1, fills it at once — the way to try the "storage is full" message.</div></div>
       <div class="ff" style="justify-content:flex-end"><div><button class="btn">Save trial date</button></div></div>
     </div>
   </form>

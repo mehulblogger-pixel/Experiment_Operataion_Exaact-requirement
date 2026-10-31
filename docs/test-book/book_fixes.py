@@ -37,6 +37,9 @@ CHANGE = {  # (test id, step number) -> new fields
     # Owner, 31 Oct (ONB-030/000): Fix opens the add-person form; the front page offers staff sign-in.
     ('ONB-030', 9):  {'expect': 'Each opens the screen that fixes it: "You are the only user — add your colleagues…" → the Add a person form; "No dropdown options yet…" → Masters; "Tell us what your company does…" → Your company.'},
     ('ONB-041', 3):  {'expect': 'Each shows a page "<module> — not available": "<module> isn\u2019t included in your current subscription." with a "Review your subscription" button — not an error page, not the screen itself.'},
+    # Owner, 31 Oct (ONB-050): a trial's storage could not be filled by hand — set a tiny limit for this company.
+    ('ONB-050', 2):  {'do': 'Super Admin → Companies → the trial company → Manage → "Trial storage limit (MB)" = 1 → "Save trial date". Then, in that company, attach any file (e.g. a client document).',
+                      'expect': '"Your free-trial storage is full, so this file was not added. Choose a plan to add more files — nothing else you typed has been lost." Records still save. Afterwards set the limit back (or 0 for no limit).'},
     # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
     ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
     # One choice instead of two switches (owner: "switch is off but still I can generate the account from /start").

@@ -11,7 +11,9 @@ t_ok(strpos($v, 'outline:2px solid var(--brand') !== false, 'the chosen company 
 t_ok(strpos($v, 'name="do" value="company_trial"') !== false && strpos($v, "(\$sel['source'] ?? '') === 'self'") !== false,
      'a self sign-up company has a "Free trial ends on" date');
 $h = (string) file_get_contents(__DIR__ . '/../lib/saas_tenants.php');
-$i = strpos($h, "if (\$do === 'company_trial'"); $blk = substr($h, $i, 1800);
-t_ok($i !== false && strpos($blk, "pricing_push_to_tenant(\$key, ['saas_trial_until' => \$tu])") !== false, 'the date is written into the company, which decides trial or view-only');
+$i = strpos($h, "if (\$do === 'company_trial'"); $blk = substr($h, $i, 2800);
+t_ok($i !== false && strpos($blk, "\$push = ['saas_trial_until' => \$tu];") !== false && strpos($blk, 'pricing_push_to_tenant($key, $push)') !== false, 'the date is written into the company, which decides trial or view-only');
 t_ok(strpos($blk, "!== 'self'") !== false && strpos($blk, 'must be a date written YYYY-MM-DD') !== false, 'only self sign-up companies; a bad date is refused');
 t_ok(strpos($h, 'is on this console — it may have been removed') !== false, 'an unknown company in the address says so instead of showing nothing');
+t_ok(strpos($v, 'name="trial_storage_mb"') !== false && strpos($blk, "\$push['saas_storage_limit_mb']") !== false,
+     "ONB-050: this company's trial storage limit can be set from Manage (a tiny one tries the \"storage is full\" message)");
