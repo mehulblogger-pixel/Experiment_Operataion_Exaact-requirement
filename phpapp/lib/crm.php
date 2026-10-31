@@ -1411,9 +1411,16 @@ function crm_quote_costing_problem($q) {
     if (!(int) ops_val("SELECT COUNT(*) FROM quote_lines WHERE quote_id=? AND unit='MANMONTH'", [(int)$q['id']])) return '';
     $pc = crm_quote_costing($q);
     if ($pc && (string)$pc['status'] === 'APPROVED') return '';
-    return 'A man-month ' . Tl('quote') . ' goes forward only from an approved project costing — '
-         . ($pc ? 'costing ' . $pc['code'] . ' is ' . strtolower(PC_STATUS[$pc['status']] ?? $pc['status']) . '; have it approved first.'
-                 : 'make one for it (Project costing), have it approved, and link it to this ' . Tl('quote') . '.');
+    //  Say what to do next, in order (owner, test book MOD-SAL: the costing WAS
+    //  linked, and the old sentence read as "attach a costing").
+    if ($pc) {
+        $st = (string)$pc['status'];
+        $next = $st === 'SUBMITTED' ? 'it is waiting for its approval levels — once it is approved, submit this ' . Tl('quote') . ' again.'
+              : ($st === 'REJECTED' ? 'it was sent back — open it, correct it and submit it for approval again.'
+              : 'it is still a draft — open it, fill in the cost heads and press "Submit for approval"; once it is approved, submit this ' . Tl('quote') . ' again.');
+        return 'A man-month ' . Tl('quote') . ' goes forward only once its project costing is approved. Costing ' . $pc['code'] . ' is linked, but ' . $next;
+    }
+    return 'A man-month ' . Tl('quote') . ' goes forward only from an approved project costing — make one for it (Project costing), have it approved, and link it to this ' . Tl('quote') . '.';
 }
 // The priced lines of a quotation, as a comparable list: what is offered at
 // what price. Used to tell when a costing-based quotation's prices change.

@@ -472,6 +472,34 @@ function pc_locked($h) { return in_array((string)($h['status'] ?? 'DRAFT'), ['SU
 function pc_unit($basis) { return $basis === 'DAILY' ? 'MANDAY' : ($basis === 'FIXED' ? 'LOT' : 'MANMONTH'); }
 function pc_req_basis($basis) { return $basis === 'DAILY' ? 'MANDAY' : ($basis === 'FIXED' ? 'FIXED' : 'MONTHLY'); }
 
+// A costing started FROM a quotation begins with that quotation's man-month (or
+// man-day) lines: the same description, quantity and — as the fixed sell rate —
+// the price already quoted, with no negotiation buffer on top. The person then
+// adds each role's cost heads and sees the real margin AT THAT PRICE (owner, test
+// book MOD-SAL: "I have provided 1,20,000 per man-month in the quotation … I got
+// rate as 1,23,418 which is not as per the quotation"). An empty costing used to
+// work out its own rate from cost + target margin, and its own quantity.
+// Returns the number of lines copied.
+function pc_seed_from_quote($costingId, $quoteId) {
+    $costingId = (int)$costingId; $quoteId = (int)$quoteId;
+    if (!$costingId || !$quoteId) return 0;
+    if ((int)ops_val("SELECT COUNT(*) FROM project_costing_lines WHERE costing_id=?", [$costingId])) return 0;   // never over a costing already filled
+    $ql = ops_all("SELECT description, qty, unit, rate FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [$quoteId]) ?: [];
+    $units = array_map(fn($l) => strtoupper((string)$l['unit']), $ql);
+    $unit = in_array('MANMONTH', $units, true) ? 'MANMONTH' : (in_array('MANDAY', $units, true) ? 'MANDAY' : '');
+    if ($unit === '') return 0;
+    db()->prepare("UPDATE project_costings SET basis=?, negotiation_pct=0, updated_at=? WHERE id=?")
+        ->execute([$unit === 'MANDAY' ? 'DAILY' : 'LONG', date('c'), $costingId]);
+    $ins = db()->prepare("INSERT INTO project_costing_lines (costing_id,seq,group_label,role_label,heads,boq_qty,target_margin,rate_manual,oneoff,created_at) VALUES (?,?,'',?,'{}',?,0,?,0,?)");
+    $n = 0;
+    foreach ($ql as $l) {
+        if (strtoupper((string)$l['unit']) !== $unit) continue;
+        $ins->execute([$costingId, ++$n, mb_substr(trim((string)$l['description']) ?: 'Role', 0, 160), (float)$l['qty'], (float)$l['rate'], date('c')]);
+    }
+    if ($n) pc_restamp($costingId);
+    return $n;
+}
+
 // Draft a quotation from a costing: one quote line per role, priced at the
 // proposed rate × BOQ. Links the quote back to the costing. Returns ['id','no'].
 function pc_make_quote($roll) {
@@ -606,7 +634,9 @@ function ops_projcosting($route, $method) {
         $sbu = trim((string)($_POST['sbu'] ?? '')) ?: (string)($src['sbu'] ?? '');
         $pdo->prepare("UPDATE project_costings SET inquiry_id=?, lead_id=?, sbu=? WHERE id=?")
             ->execute([$inq ?: null, ($lead ?: (int)($src['lead_id'] ?? 0)) ?: null, substr($sbu, 0, 20), $id]);
-        flash("$code created — add the team roles and their cost heads.");
+        $seeded = (int)($_POST['quote_id'] ?? 0) ? pc_seed_from_quote($id, (int)$_POST['quote_id']) : 0;
+        flash($seeded ? "$code created from the quotation — its $seeded line" . ($seeded === 1 ? '' : 's') . " are in, at the quoted rate and quantity. Add each role's cost heads to see the margin at that price."
+                      : "$code created — add the team roles and their cost heads.");
         redirect('/project-costing?id=' . $id);
     }
 

@@ -89,7 +89,7 @@ $drive($MM, 'project-costing-reopen', 'POST', [], ['id' => $cid]);
 t_eq([$pc($cid)['status'], $pc($cid)['approved_by']], ['DRAFT', ''], 'reopening an approved costing withdraws its approval');
 $r = $drive($MM, 'quote-status', 'POST', ['id' => $qid], ['to' => 'SENT']);
 t_eq($st($qid), 'DRAFT', 'a man-month quotation whose costing is no longer approved cannot go to the customer');
-t_ok(strpos($said($r), 'approved project costing') !== false, '…and the person is told why: ' . $said($r));
+t_ok((strpos($said($r), 'approved project costing') !== false || strpos($said($r), 'project costing is approved') !== false), '…and the person is told why: ' . $said($r));
 $drive($MM, 'project-costing-submit', 'POST', [], ['id' => $cid]);
 $drive($BD, 'project-costing-approve', 'POST', [], ['id' => $cid]);
 $drive($MM, 'quote-status', 'POST', ['id' => $qid], ['to' => 'SENT']);
