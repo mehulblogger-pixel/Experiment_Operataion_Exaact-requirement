@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '7a8225dd · 2026-10-31 11:59 UTC · 701 files';
+$RELEASE = '05365d03 · 2026-10-31 12:21 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -139,7 +139,7 @@ $EXPECT  = [
     'lib/helpers.php' => ['s'=>28344,'h'=>'cc8dd4f170d5e1b1'],
     'lib/hiringreq.php' => ['s'=>129366,'h'=>'b5896066637f54e9'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
-    'lib/idems.php' => ['s'=>793235,'h'=>'61b6dc8e452e11ec'],
+    'lib/idems.php' => ['s'=>793479,'h'=>'a2253ab93eb5c853'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
     'lib/identity.php' => ['s'=>45233,'h'=>'4267d813af8001e8'],
     'lib/impartiality.php' => ['s'=>18224,'h'=>'70a0c7b051724178'],

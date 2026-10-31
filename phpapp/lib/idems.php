@@ -6233,6 +6233,9 @@ function idems_sod_issue_can_change() {
     // settings.manage ("Change system settings — Administrators only"), not the
     // management band: that band includes Operations and Branch managers, who are
     // usually the approvers this rule binds.
+    // And only where reports are actually bought: a workspace without the
+    // Reporting module has no report rule to change (M10 entitlement guard).
+    if (function_exists('licence_enabled') && !licence_enabled('reporting')) return false;
     return is_master() || (function_exists('can') && can('settings.manage'));
 }
 // Is the signed-in person stopped from issuing this report because they approved it?
