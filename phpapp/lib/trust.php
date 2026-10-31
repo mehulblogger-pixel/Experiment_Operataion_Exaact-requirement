@@ -442,6 +442,14 @@ function punch_today_jobs($inspectorId = 0, $day = null) {
 // The bar rendered at the top of every page for a field engineer. Self-contained
 // (its own form, styles inline, and script), so it can be dropped into the
 // layout without touching anything else.
+// Pages that already carry the full Site check-in panel: the top bar would repeat it.
+function punch_bar_page_has_own_panel($path) {
+    return in_array(rtrim((string)$path, '/'), ['/job'], true);
+}
+// The screens a field engineer starts the day on — where "no visit today" is news.
+function punch_bar_is_home($path) {
+    return in_array(rtrim((string)$path, '/'), ['', '/my-work', '/dashboard', '/home'], true);
+}
 function punch_bar() {
     if (!function_exists('site_checkin')) return '';
     $insp = punch_user_inspector_id();
@@ -455,6 +463,15 @@ function punch_bar() {
     $back = (string)($_SERVER['REQUEST_URI'] ?? '/');
     if ($back === '' || $back[0] !== '/') $back = '/';
     $csrf = function_exists('csrf_token') ? csrf_token() : '';
+    // MOD-MON (owner, 31 Oct): "Site check-ins and check-outs are showing many
+    // times here and there." The bar was on top of EVERY page — even with no visit
+    // today, where it only said so — and on a job page it sat above that page's own
+    // Site check-in panel. Now: the job page keeps its panel alone; the "nothing
+    // today" note appears only on the home screens; elsewhere the bar shows only
+    // when there is actually a visit to punch.
+    $path = (string)(parse_url($back, PHP_URL_PATH) ?: '/');
+    if (punch_bar_page_has_own_panel($path)) return '';
+    if (!$jobs && !punch_bar_is_home($path)) return '';
 
     ob_start();
     if (!$jobs) {
