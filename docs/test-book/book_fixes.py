@@ -45,8 +45,10 @@ CHANGE = {  # (test id, step number) -> new fields
                       'expect': 'It lands on "Start your free trial" — the company creates its own workspace without waiting.'},
     ('ONB-006', 2):  {'do': 'Choose "Companies sign themselves up at /start" on Cloud workspaces (or tick "Companies can sign themselves up" here) → Save.'},
     ('ONB-006', 5):  {'expect': 'Self sign-up is off. The note beside the tick says what happens instead: /start goes to the application form if applications are on, or is closed if you chose "Only you add companies" on Cloud workspaces.'},
-    ('ONB-010', 1):  {'do': 'Owner home → "Cloud workspaces & requests" → panel "Workspace requests".'},
-    ('ONB-012', 1):  {'do': 'Owner home → "Cloud workspaces & requests" → the request → "Decline".'},
+    ('ONB-010', 1):  {'do': 'Owner home: look at the card "Cloud workspaces & requests" → open it.',
+                      'expect': 'The card is outlined in amber with "1 waiting for you". It opens straight on the "Workspace requests" panel: a "1 new" pill and the row with TB Test Inspections, e-mail, phone, note and an editable workspace name "tbtest".'},
+    ('ONB-012', 1):  {'do': 'Owner home → "Cloud workspaces & requests" → the request → "Decline" → type a reason (or leave it empty) → OK.',
+                      'expect': '"Request declined. The applicant (<e-mail>) has been e-mailed." It shows as declined. The applicant\'s e-mail (on the test copy: your test inbox) says the request was not approved, with your reason. Companies → "Workspace requests" lists it as Declined, with the date, who and the reason.'},
     # The escalating chain (owner's decision, 24 Oct 2026): a quotation is signed by the
     # level its value falls in AND every level below it; a shared boundary is the lower level's.
     ('SAL-003', 4):  {'expect': 'Card "Level 2"; summary line "Level 2 — above ₹5,00,000 to ₹25,00,000 before tax: Marketing Manager."'},
