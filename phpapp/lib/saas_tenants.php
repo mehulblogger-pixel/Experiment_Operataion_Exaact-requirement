@@ -1315,8 +1315,25 @@ function ops_saas_admin($route, $method) {
             redirect('/companies');
         }
         if ($do === 'company_plan' && $key !== '') {
-            saas_tenant_set_plan($key, (string) ($_POST['plan'] ?? ''), trim((string) ($_POST['plan_expiry'] ?? '')) ?: null);
+            $exp = trim((string) ($_POST['plan_expiry'] ?? ''));
+            if ($exp !== '' && !(preg_match('/^\d{4}-\d{2}-\d{2}$/', $exp) && strtotime($exp) !== false)) {
+                flash('"Plan valid until" must be a date written YYYY-MM-DD, e.g. 2027-03-31. Nothing was saved.', 'error');
+                redirect($back);
+            }
+            saas_tenant_set_plan($key, (string) ($_POST['plan'] ?? ''), $exp !== '' ? $exp : null);
             $pushed($key, 'Plan');
+            // The date the platform owner sets IS the company's "Active until"
+            // (owner, test book PLT-005: "when from admin panel I change the date
+            // of validity it did not reflect in the user panel"). It used to stay
+            // on this console only. A date in the past ends the paid period: a
+            // self-serve company then becomes view-only, never locked out.
+            if ($exp !== '') {
+                saas_tenant_upsert($key, ['paid_until' => $exp]);
+                $ok = function_exists('pricing_push_to_tenant') && pricing_push_to_tenant($key, ['billing_paid_until' => $exp]);
+                flash('The company now sees its plan active until ' . (function_exists('fdate') ? fdate($exp) : $exp) . '.'
+                    . ($exp < date('Y-m-d') ? ' That date has passed, so its paid period has ended.' : '')
+                    . ($ok ? '' : ' (Saved here; it reaches their workspace on the next sync.)'), $ok ? 'success' : 'warning');
+            }
             redirect($back);
         }
         if ($do === 'company_seats' && $key !== '') {

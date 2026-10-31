@@ -168,9 +168,10 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     <div class="sc-edit" style="border-bottom:1px solid var(--line,#eef1f5)">
       <div class="ff"><label>Plan</label>
         <select name="plan"><?php foreach ($plans as $pk => $p): ?><option value="<?= $e($pk) ?>" <?= ($sel['plan'] ?? '') === $pk ? 'selected' : '' ?>><?= $e($p['label']) ?> — <?= (int) $p['base'] ?> base logins</option><?php endforeach; ?></select>
-        <div class="sc-note">Sets which modules this company gets and its base seat count. (Applies to the company's live database in the next increment.)</div>
+        <div class="sc-note">Sets which modules this company gets and its base seat count. Applied to the company's workspace when you save.</div>
       </div>
-      <div class="ff"><label>Plan valid until (optional)</label><input name="plan_expiry" value="<?= $e($sel['plan_expiry'] ?? '') ?>" placeholder="YYYY-MM-DD">
+      <div class="ff"><label>Plan valid until (optional)</label><input name="plan_expiry" type="date" value="<?= $e($sel['plan_expiry'] ?? '') ?>" placeholder="YYYY-MM-DD">
+        <div class="sc-note">The company sees this as "Active until". A past date ends its paid period (a self sign-up company becomes view-only). Blank leaves its date as it is.</div>
         <div style="margin-top:8px"><button class="btn">Save plan</button></div></div>
     </div>
   </form>
@@ -180,7 +181,7 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     <div class="sc-edit" style="border-bottom:1px solid var(--line,#eef1f5)">
       <div class="ff"><label>Purchased seats (over the plan base)</label>
         <input type="number" name="extra_user_seats" min="0" value="<?= (int) ($sel['extra_user_seats'] ?? 0) ?>">
-        <div class="sc-note">Total logins allowed = plan base (<?= (int) saas_plan_logins($sel['plan'] ?? '') ?>) + purchased. Enforcement at sign-in lands in Increment 4.</div></div>
+        <div class="sc-note">Total logins allowed = plan base (<?= (int) saas_plan_logins($sel['plan'] ?? '') ?>) + purchased. The company cannot add a login beyond that.</div></div>
       <div class="ff" style="justify-content:flex-end"><div><button class="btn">Save seats</button></div></div>
     </div>
   </form>
