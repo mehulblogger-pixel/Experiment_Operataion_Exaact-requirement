@@ -1,7 +1,7 @@
 <?php // Report-type registry — admin adds unlimited types ?>
 <div class="master-head"><div><h1><?= e(TH('report')) ?> types</h1>
   <p class="sub" style="margin:2px 0 0">The catalogue of report types. Built-in TPIA types are seeded; add your own with no coding.</p></div>
-  <div><a class="btn small secondary" href="/vetting-checklist">☑ Vetting checklist</a></div></div>
+  <div><a class="btn small secondary" href="/vetting-checklist">☑ Review &amp; issue rules</a></div></div>
 
 <form method="post" action="/report-types" class="panel">
   <?php if ($edit): ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>"><?php endif; ?>

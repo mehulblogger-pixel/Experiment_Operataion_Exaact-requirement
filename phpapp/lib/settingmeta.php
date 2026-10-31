@@ -15,6 +15,7 @@ function setting_meta_all() {
         'issue_gate_strict'          => ['Strict issuance gate', 'Turns the report issuance readiness checks (vetting, completeness, competence, impartiality, open NCRs, client acceptance) from advisory into a hard block.', ['Report issue (Module 08)'], 'live', 'high'],
         'vetting_gate_required'      => ['Vetting required before approval', 'Whether technical vetting is a mandatory step before a report can be approved.', ['Report vetting (Module 07)'], 'forward', 'high'],
         'vetting_checklist_require'  => ['Vetting checklist mandatory', 'Whether the vetting checklist must be completed, not just present.', ['Report vetting (Module 07)'], 'forward', 'medium'],
+        'idems_sod_issue'            => ['Approver may not issue (segregation)', 'ON by default: the person who approved a report cannot also finalise & issue it. Off lets the approver issue; each such issue is recorded as SAME_PERSON_ISSUE. Only an administrator (settings.manage) may change it — Report types → Review & issue rules.', ['Report issue (Module 08)'], 'live', 'high'],
         'rn_require_client_acceptance' => ['Release needs client acceptance', 'Whether a Release/IRN requires recorded client acceptance before issue.', ['Report issue (Module 08)'], 'forward', 'high'],
         'invoice_gate_strict'        => ['Strict invoice gate', 'Turns the invoice-readiness checks (reports issued, release accepted, contract value) from advisory into a hard block on raising the invoice.', ['Invoicing / billing (Module 33)'], 'live', 'high'],
         'finance_truth_unified'      => ['Unified financial truth (§28)', 'Makes the MIS dashboard, the SBU-P&L contract table and the owner/boss view all read the one canonical job_profit engine instead of their own partial formulas. Now the shipped DEFAULT (ON) — every screen shows the true figure (overhead/vouchers/contingency/recovered included). Set to 0 to revert to the legacy partial dashboards.', ['Management dashboard (Module 34)', 'SBU P&L (Module 32)', 'Owner/boss profitability'], 'live', 'high'],
@@ -58,6 +59,7 @@ function setting_meta_module_map() {
     return [
         'issue_gate_strict' => 'operations', 'vetting_gate_required' => 'operations',
         'vetting_checklist_require' => 'operations', 'rn_require_client_acceptance' => 'operations',
+        'idems_sod_issue' => 'operations',
         'report_escalate_days' => 'operations', 'tat_threshold_days' => 'operations',
         'vendor_requal_months' => 'operations', 'geofence_on' => 'operations',
         'checkin_entry_exit_required' => 'operations', 'checkin_photo_required' => 'operations',

@@ -389,7 +389,13 @@ stateDiagram-v2
 ```
 
 - **Segregation (new, this codebase):** at finalize, if the current user approved this
-  report, issue is refused — approver ≠ issuer (`idems.php:4458-4463`), master excepted.
+  report, issue is refused — approver ≠ issuer (`idems_issue_blocked_for_approver()`), master excepted.
+  **Owner's decision (31 Oct 2026):** this is a company switch, `idems_sod_issue`, **ON by
+  default**. Only a holder of `settings.manage` (an administrator) may turn it off — on
+  Report types → *Review & issue rules* (`/vetting-checklist#issue-rule`), also listed on the
+  *All approvals* setup screen and linked from the refusal. When off, the approver may issue;
+  every such issue is written to the report's audit history as `SAME_PERSON_ISSUE`. No status
+  or transition is added — APPROVED → ISSUED is unchanged.
   Finalize also needs full chain approval, a completeness gate, an AI-QA critical gate
   (`4473-4487`) and a calibration/authorisation gate (`4497-4503`).
 - Editable only in '', DRAFT, REJECTED (`idems_status_allows_edit`, `idems.php:3463-3466`).

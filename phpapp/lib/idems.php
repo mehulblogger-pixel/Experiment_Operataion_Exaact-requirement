@@ -3827,7 +3827,7 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
     // The approver may not also issue: whoever approved this report cannot finalise
     // it (master/admin excepted). Keeps the button off the approver's own screen so
     // the UI matches the server rule below.
-    $approverSelf = !is_master() && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0));
+    $approverSelf = idems_issue_blocked_for_approver($doc);
     $canFinal = is_master() || (function_exists('can') && can('idems.finalize') && !$approverSelf);
 
     $anyApproved = false; $anyPending = false; $names = [];
@@ -3963,7 +3963,7 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
     } else {
         $line = 'Once approved, a manager finalises and issues the report — the signature is stamped on automatically here.';
         if ($approved && $approverSelf)
-            $line = 'You approved this ' . (function_exists('Tl') ? Tl('report') : 'report') . ', so a <b>different</b> person must finalise &amp; issue it — the approver and the issuer cannot be the same (segregation of duties).';
+            $line = 'You approved this ' . (function_exists('Tl') ? Tl('report') : 'report') . ', so a <b>different</b> person must finalise &amp; issue it — the approver and the issuer cannot be the same (segregation of duties).' . idems_sod_issue_link_html();
         $steps[] = ['key'=>'issue', 'label'=>'Finalise & issue', 'state'=>'todo', 'line'=>$line];
     }
 
@@ -4886,8 +4886,9 @@ function ops_idems_documents($route, $method) {
         if ($doc['finalized']) { flash('This report is already finalized.', 'warning'); redirect('/document?id=' . $doc['id']); }
         // Segregation of duties: the person who approved this report must not also
         // issue it. Master/admin is the standing exception for a one-person office.
-        if (!is_master() && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0))) {
-            flash('You approved this ' . Tl('report') . ', so it must be finalised & issued by a different person — the approver and the issuer cannot be the same (segregation of duties).', 'error');
+        if (idems_issue_blocked_for_approver($doc)) {
+            flash('You approved this ' . Tl('report') . ', so it must be finalised & issued by a different person — the approver and the issuer cannot be the same (segregation of duties).'
+                . (idems_sod_issue_can_change() ? ' You can change this rule under Report types → Review & issue rules.' : ' An administrator can change this rule.'), 'error');
             redirect('/document?id=' . $doc['id']);
         }
         // If an approval chain exists, the report must be fully approved first (master may override).
@@ -4985,6 +4986,8 @@ function ops_idems_documents($route, $method) {
         // an issued report is the best source of "how we actually word things"
         if (function_exists('learn_from_report')) { try { learn_from_report(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {} }
         idems_log('report_doc', $doc['id'], 'FINALIZE', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'ISSUED']);
+        if (!idems_sod_issue_on() && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0)))
+            idems_log('report_doc', $doc['id'], 'SAME_PERSON_ISSUE', ['irn'=>$doc['irn'], 'field'=>'segregation', 'reason'=>'Approved and issued by the same person (the approver ≠ issuer rule is switched off).']);
         // P2 — tell the client it is ready. A report they can see on the portal
         // but are never told about might as well not be there. Never blocks issue.
         $notified = 0;
@@ -6219,6 +6222,30 @@ function idems_build_approval_chain($doc) {
 function idems_report_approvals($docId) {
     return ops_all("SELECT a.*, u.first_name, u.last_name, u.username FROM report_approvals a LEFT JOIN users u ON u.id=a.resolved_user_id WHERE a.report_doc_id=? ORDER BY a.level, a.id", [(int)$docId]);
 }
+// Approver ≠ issuer is a company rule, ON unless an administrator turns it off
+// (owner, 31 Oct: "go with your recommendation, but the switch shall be easily
+// accessible"). Off is meant for a small office where nobody else could issue.
+function idems_sod_issue_on() {
+    return !function_exists('setting_get') || (string)setting_get('idems_sod_issue', '1') !== '0';
+}
+// Only an administrator may change it — never the approver it binds.
+function idems_sod_issue_can_change() {
+    // settings.manage ("Change system settings — Administrators only"), not the
+    // management band: that band includes Operations and Branch managers, who are
+    // usually the approvers this rule binds.
+    return is_master() || (function_exists('can') && can('settings.manage'));
+}
+// Is the signed-in person stopped from issuing this report because they approved it?
+// The one question every screen and the issue handler ask.
+function idems_issue_blocked_for_approver($doc) {
+    if (!idems_sod_issue_on() || is_master()) return false;
+    return idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0));
+}
+// Where an administrator changes the rule, as a short link for the refusal text.
+function idems_sod_issue_link_html() {
+    return idems_sod_issue_can_change() ? ' <a href="/vetting-checklist#issue-rule">Change this rule →</a>' : ' An administrator can change this rule.';
+}
+
 // Segregation of duties: did THIS user give (one of) the report's approvals? The
 // person who approved a report must not also be the one who finalises & issues it.
 // Master/admin is the standing exception — a one-person office where nobody else
@@ -6437,7 +6464,7 @@ function idems_issue_readiness($doc) {
     else                            $add('Approval', 'block', 'Still going through the approval chain.');
 
     // 2. Segregation — the viewer must not issue a report they approved (master exempt).
-    if (!is_master() && function_exists('idems_user_approved_doc') && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0)))
+    if (idems_issue_blocked_for_approver($doc))
         $add('Segregation of duties', 'block', 'You approved this report — a different person must issue it.');
 
     // 3. QA auditor — a critical finding blocks (fail-open on any engine error).
@@ -6777,6 +6804,13 @@ function ops_idems_vetting_checklist($method) {
         $on  = !empty($_POST['enabled']) ? '1' : '';
         $req = !empty($_POST['require_all']) ? '1' : '';
         $gate = !empty($_POST['gate_required']) ? '1' : '';
+        if (idems_sod_issue_can_change()) {
+            $sod = !empty($_POST['sod_issue']) ? '1' : '0';
+            if ($sod !== (idems_sod_issue_on() ? '1' : '0')) {
+                setting_set('idems_sod_issue', $sod);
+                idems_log('setting', 0, 'SOD_ISSUE', ['field'=>'approver ≠ issuer', 'new'=>$sod === '1' ? 'on' : 'off']);
+            }
+        }
         // Normalise the items: trim, drop blanks, cap length, keep order.
         $items = [];
         foreach (preg_split('/\r?\n/', (string)($_POST['items'] ?? '')) as $ln) { $ln = trim($ln); if ($ln !== '') $items[] = substr($ln, 0, 300); }
@@ -6785,7 +6819,7 @@ function ops_idems_vetting_checklist($method) {
         setting_set('vetting_gate_required', $gate);
         setting_set('vetting_checklist_items', implode("\n", $items));
         idems_log('setting', 0, 'VETTING_CHECKLIST', ['field'=>'vetting checklist', 'new'=>'checklist ' . ($on ? 'on' : 'off') . ', gate ' . ($gate ? 'on' : 'off') . ', ' . count($items) . ' item(s)']);
-        flash('Vetting settings saved.');
+        flash('Review & issue rules saved.');
         redirect('/vetting-checklist');
     }
     $items = (string)setting_get('vetting_checklist_items', '');
@@ -6794,6 +6828,8 @@ function ops_idems_vetting_checklist($method) {
         'enabled' => idems_vetting_checklist_enabled(),
         'require_all' => idems_vetting_checklist_require_all(),
         'gate_required' => idems_vetting_gate_on(),
+        'sod_issue' => idems_sod_issue_on(),
+        'sod_can_change' => idems_sod_issue_can_change(),
         'items' => $items,
     ]);
     return true;

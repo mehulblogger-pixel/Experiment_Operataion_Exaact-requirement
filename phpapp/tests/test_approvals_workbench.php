@@ -27,11 +27,13 @@ t_ok(function_exists('apsetup_open'),  'and which of them this viewer may open')
 t_ok(function_exists('apsetup_strip'), 'and can draw the shared tab strip');
 t_ok(function_exists('ops_approvals_setup'), 'the workbench screen exists');
 
-// ---- it offers the four, and only the four -------------------------------
+// ---- it offers the five, and only the five -------------------------------
+//  The fifth, "Review & issue rules", joined on 31 Oct 2026 (MOD-MON): the owner
+//  asked where the approver ≠ issuer switch is and wanted it easy to reach.
 $areas = apsetup_areas();
-t_eq(count($areas), 4, 'four approval areas, which is how many the product has');
+t_eq(count($areas), 5, 'five approval areas, which is how many the product has');
 $keys = array_map(fn($a) => $a['key'], $areas);
-foreach (['recruitment','quotes','approvermap','delegation'] as $k)
+foreach (['recruitment','quotes','approvermap','issuerules','delegation'] as $k)
     t_ok(in_array($k, $keys, true), "the workbench knows about '$k'");
 
 //  Every area points at the screen that already existed. The workbench is a

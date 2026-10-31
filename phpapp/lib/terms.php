@@ -326,6 +326,10 @@ function term_lower($s) {
 }
 function Tl($key)  { return term_lower(T($key)); }
 function Tlp($key) { return term_lower(TP($key)); }
+// "a report" / "an inspection report": the term with its article, so a renamed
+// term never reads "a inspection report". Vowel sound by first letter, which is
+// right for the terms this app ships and for nearly any a customer would choose.
+function Tla($key) { $t = Tl($key); return (preg_match('/^[aeiou]/i', $t) ? 'an ' : 'a ') . $t; }
 // Sentence-case, for the start of a heading or a nav label: "Inspection engineer".
 function TH($key)  { return term_head(T($key)); }
 function THP($key) { return term_head(TP($key)); }

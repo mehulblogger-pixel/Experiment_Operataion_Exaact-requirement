@@ -1,6 +1,7 @@
 <?php // Configure the vetting authority's checklist — fully editable, on/off. ?>
-<div class="master-head"><div><h1>Vetting checklist</h1>
-  <p class="sub" style="margin:2px 0 0">The check points the vetting authority ticks before clearing a <?= e(Tl('report')) ?>. Fully editable, and you can switch it on or off — nothing is fixed by the system.</p></div></div>
+<div class="master-head"><div><h1>Review &amp; issue rules</h1>
+  <p class="sub" style="margin:2px 0 0">Who checks <?= e(Tla('report')) ?> before it goes out: vetting, the vetting checklist, and whether the approver may also issue it.</p></div></div>
+<?php if (function_exists('apsetup_strip')) echo apsetup_strip('issuerules'); ?>
 
 <form method="post" action="/vetting-checklist" class="panel" style="max-width:760px">
   <div style="border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:11px 13px;margin-bottom:14px;background:var(--soft,#f8fafc)">
@@ -11,6 +12,16 @@
     <p class="muted" style="margin:0;font-size:12.5px">When on, a submitted inspection report goes to the <b>vetting authority first</b>; once vetted it is forwarded to the approver <b>automatically</b>. Release notes skip vetting and go straight to the approver. When off, a submitted report goes directly to the approval chain (the original behaviour).</p>
   </div>
 
+  <div id="issue-rule" style="border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:11px 13px;margin-bottom:14px;background:var(--soft,#f8fafc)">
+    <label class="chk" style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <input type="checkbox" name="sod_issue" value="1" <?= !empty($sod_issue) ? 'checked' : '' ?> <?= empty($sod_can_change) ? 'disabled' : '' ?>>
+      <b>A different person must issue <?= e(Tla('report')) ?> than the one who approved it</b> (recommended)
+    </label>
+    <p class="muted" style="margin:0;font-size:12.5px">Keeps the review independent, as accreditation bodies (ISO/IEC 17020) expect. Turn it off only if nobody else in your office can issue. When off, the approver may also issue, and every such <?= e(Tl('report')) ?> is recorded in its history as <i>approved and issued by the same person</i>.<?= empty($sod_can_change) ? ' <b>Only an administrator can change this.</b>' : '' ?></p>
+    <?php if (empty($sod_can_change)): ?><input type="hidden" name="sod_issue" value="<?= !empty($sod_issue) ? '1' : '' ?>"><?php endif; ?>
+  </div>
+
+  <h3 class="tab-sub">Vetting checklist</h3>
   <label class="chk" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
     <input type="checkbox" name="enabled" value="1" <?= $enabled ? 'checked' : '' ?>>
     <b>Show the vetting checklist</b> during vetting
@@ -29,6 +40,6 @@
     <small class="muted">Edit freely — add, remove or reword any line. These are suggestions to get you started; make them your own.</small>
   </div>
 
-  <div style="margin-top:14px"><button class="btn" type="submit">Save vetting checklist</button>
+  <div style="margin-top:14px"><button class="btn" type="submit">Save rules</button>
     <a class="btn secondary" href="/report-types">Back to report types</a></div>
 </form>

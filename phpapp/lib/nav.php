@@ -139,6 +139,7 @@ function nav_screen_label($route) {
         'my-work'               => 'My Work',
         'my-approvals'          => 'My approvals',
         'report-types'          => 'Report types',
+        'vetting-checklist'     => 'Review & issue rules',
         //  Named as their own headings name them, because title-casing the
         //  route produced "Billing" for a screen headed "Users & billing" and
         //  "Recruitment cc" for one headed "Recruitment Command Centre".

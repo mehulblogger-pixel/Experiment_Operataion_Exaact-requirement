@@ -89,6 +89,15 @@ function apsetup_areas() {
             'can'   => (bool) $approverMap,
         ],
         [
+            'key'   => 'issuerules',
+            'label' => 'Review & issue rules',
+            'url'   => '/vetting-checklist',
+            'icon'  => '☑',
+            'what'  => 'Whether reports are vetted before approval, the vetting checklist, and whether '
+                     . 'the approver may also issue the report (segregation of duties).',
+            'can'   => (bool) ($reporting && ($can('idems.type.manage') || $can('idems.finalize') || $master())),
+        ],
+        [
             'key'   => 'delegation',
             'label' => 'Delegation',
             'url'   => '/approval-delegations',

@@ -75,6 +75,12 @@ BEFORE = {  # test id -> the "Before" line
     'ONB-003': 'Same as ONB-002: the APPLICATION form (/get-started), which has the "Preferred workspace name" box. While self sign-up is on, /get-started jumps to the free-trial form (/start), which has no workspace-name box — its name is made from the company name. Signed out.',
 }
 ADD = {  # test id -> steps appended at the end
+    'REP-016': [
+        {'do': 'Still signed in as the approver: read the line under "Finalise & issue" on the card "How to get this report issued".', 'expect': '"…the approver and the issuer cannot be the same (segregation of duties). An administrator can change this rule." (An administrator sees a link "Change this rule →" instead.)'},
+        {'do': 'Sign in as the administrator → Admin → Quote & report approvals → tab "☑ Review & issue rules" (also: Report types → "☑ Review & issue rules"). Untick "A different person must issue an inspection report than the one who approved it" → Save rules.', 'expect': '"Review & issue rules saved." The box stays unticked after reload. A non-administrator (e.g. Operations Manager) sees the box greyed out: "Only an administrator can change this."'},
+        {'do': 'Sign in as the approver again → open the approved report.', 'expect': '"Finalise & issue" is now offered. Issue it → Audit tab shows "SAME_PERSON_ISSUE — Approved and issued by the same person".'},
+        {'do': 'As administrator tick the box again → Save rules.', 'expect': 'The approver is stopped again (as in step 2). Leave it ON — it is the recommended setting.'},
+    ],
     'MOD-ADM': [
         {'do': 'A client with two sites: open the client → "Addresses" tab → on each site address press "📍 Set this site’s location (for on-site check-in)" → paste its Google Maps link (or "lat, long") and a radius in metres → Save.',
          'expect': '"Site location saved." for each site. A work order raised for one site makes the inspector check in against THAT site\'s location (then the client\'s main location if the site has none). An inspector standing at a site can also save the phone\'s location as the site\'s position.'},

@@ -448,8 +448,8 @@
     <p class="next">This <?= e(Tl('report')) ?> has gone to the <?= e(Tl('client')) ?> and can no longer be changed. You can still download the PDF or the client format above.</p>
   <?php elseif ($rSt === 'APPROVED'): ?>
     <div class="step">Approved — ready to issue.</div>
-    <?php if (!$doc['finalized'] && function_exists('idems_user_approved_doc') && !is_master() && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0))): ?>
-      <p class="next"><b>You approved this report</b>, so a <b>different person</b> must finalize &amp; issue it — the approver and the issuer cannot be the same (segregation of duties).</p>
+    <?php if (!$doc['finalized'] && function_exists('idems_issue_blocked_for_approver') && idems_issue_blocked_for_approver($doc)): ?>
+      <p class="next"><b>You approved this report</b>, so a <b>different person</b> must finalize &amp; issue it — the approver and the issuer cannot be the same (segregation of duties).<?= idems_sod_issue_link_html() ?></p>
     <?php else: ?>
       <p class="next"><b>Next:</b> press <b>Finalize &amp; issue</b> above to send it and lock it. After that nothing on it can change.</p>
     <?php endif; ?>
