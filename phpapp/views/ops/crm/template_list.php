@@ -27,14 +27,16 @@
   <h3 class="tab-sub" id="signature" style="margin-top:0">Signature for client PDFs</h3>
   <p class="sub">The <?= e(Tl('client')) ?> receives the <?= e(Tl('quote')) ?> as a <strong>PDF</strong>; this signature image + name are stamped on it.</p>
   <form method="post" action="/crm-signature" enctype="multipart/form-data">
+    <?php $sd = (array) ($_SESSION['crm_sig_draft'] ?? []); unset($_SESSION['crm_sig_draft']);
+          if (isset($sd['name'])) $sigName = $sd['name']; if (isset($sd['desig'])) $sigDesig = $sd['desig']; ?>
     <div class="form-grid">
-      <div class="ff"><label>Signature image (PNG / JPG) <?= !empty($sigSet)?'<span class="pill p-ok">on file</span>':'' ?></label><input class="form-control" type="file" name="sig" accept=".png,.jpg,.jpeg"></div>
-      <div class="ff"><label>Signatory name</label><input class="form-control" name="sig_name" value="<?= e($sigName ?? '') ?>" placeholder="e.g. R. Sharma"></div>
-      <div class="ff"><label>Designation</label><input class="form-control" name="sig_desig" value="<?= e($sigDesig ?? '') ?>" placeholder="e.g. Marketing Manager"></div>
+      <div class="ff"><label>Signature image (PNG / JPG) *<?= !empty($sigSet)?' <span class="pill p-ok">on file</span>':'' ?></label><input class="form-control" type="file" name="sig" accept=".png,.jpg,.jpeg"<?= empty($sigSet) ? ' required' : '' ?>></div>
+      <div class="ff"><label>Signatory name *</label><input class="form-control" name="sig_name" required value="<?= e($sigName ?? '') ?>" placeholder="e.g. R. Sharma"></div>
+      <div class="ff"><label>Designation *</label><input class="form-control" name="sig_desig" required value="<?= e($sigDesig ?? '') ?>" placeholder="e.g. Marketing Manager"></div>
     </div>
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
       <button class="btn" type="submit">Save signature</button>
-      <?php if (!empty($sigSet)): ?><label class="chk"><input type="checkbox" name="clear_sig" value="1"> Remove current image</label><?php endif; ?>
+      <?php if (!empty($sigSet)): ?><button class="btn ghost" type="submit" name="clear_sig" value="1" formnovalidate onclick="return confirm('Remove the company signature from quote PDFs?')">Remove the company signature</button><?php endif; ?>
     </div>
   </form>
 </div>

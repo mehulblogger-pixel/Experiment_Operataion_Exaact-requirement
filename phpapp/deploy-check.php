@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'a96e8621 · 2026-10-31 06:31 UTC · 701 files';
+$RELEASE = '80be623e · 2026-10-31 06:36 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -116,7 +116,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>299889,'h'=>'f541b6495f080497'],
+    'lib/crm.php' => ['s'=>301349,'h'=>'44978b732a876886'],
     'lib/crmdash.php' => ['s'=>14427,'h'=>'f124694bf443bc02'],
     'lib/customer360.php' => ['s'=>24402,'h'=>'f1d98328a475561b'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -139,7 +139,7 @@ $EXPECT  = [
     'lib/helpers.php' => ['s'=>28344,'h'=>'cc8dd4f170d5e1b1'],
     'lib/hiringreq.php' => ['s'=>129366,'h'=>'b5896066637f54e9'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
-    'lib/idems.php' => ['s'=>786654,'h'=>'ac696b399296a300'],
+    'lib/idems.php' => ['s'=>787093,'h'=>'66c3eea32e541f8f'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
     'lib/identity.php' => ['s'=>45233,'h'=>'4267d813af8001e8'],
     'lib/impartiality.php' => ['s'=>18224,'h'=>'70a0c7b051724178'],
@@ -432,11 +432,11 @@ $EXPECT  = [
     'views/ops/crm/inquiry_list.php' => ['s'=>4792,'h'=>'365e128c3e1ccef2'],
     'views/ops/crm/quote_detail.php' => ['s'=>73255,'h'=>'1597151ed35535e7'],
     'views/ops/crm/quote_external.php' => ['s'=>8907,'h'=>'7aa7bd1259a0c79d'],
-    'views/ops/crm/quote_form.php' => ['s'=>43623,'h'=>'b7756e7eae7cf4b2'],
+    'views/ops/crm/quote_form.php' => ['s'=>44958,'h'=>'2a7c293cf3b67a35'],
     'views/ops/crm/quote_list.php' => ['s'=>8038,'h'=>'36be301c9d7ffe37'],
     'views/ops/crm/reports.php' => ['s'=>3263,'h'=>'f9d0840a7994e767'],
     'views/ops/crm/template_form.php' => ['s'=>3958,'h'=>'3671a20d6c01c474'],
-    'views/ops/crm/template_list.php' => ['s'=>5237,'h'=>'b674d99c8347e839'],
+    'views/ops/crm/template_list.php' => ['s'=>5603,'h'=>'c6e94a7237796aa5'],
     'views/ops/crm_dashboard.php' => ['s'=>13276,'h'=>'6bdd49395543c605'],
     'views/ops/custom_fields.php' => ['s'=>4958,'h'=>'f2f969e3c56dfed4'],
     'views/ops/customer360.php' => ['s'=>29931,'h'=>'2197023e362e8e81'],

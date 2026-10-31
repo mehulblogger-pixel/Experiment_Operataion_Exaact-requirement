@@ -205,12 +205,29 @@
         <?php elseif (!$mineOnFile): ?>
           Yours is not on file yet.
         <?php endif; ?>
-        <a href="/my-signature" target="_blank" rel="noopener">Upload or draw your signature →</a>
+        <?php // Opens on top of this quotation, so nothing typed is lost; on save the
+              // popup closes and "Signed by" picks the new signature (owner, test book
+              // MOD-SAL: "it saves but does not return to the quote"). ?>
+        <a href="/my-signature" data-embed="/my-signature" data-embed-title="Your signature" data-embed-keep id="q-mysig">Upload or draw your signature →</a>
         <?php if (can('crm.template.manage') || is_master()): ?>
           · <a href="/crm-templates#signature">company signature</a>
         <?php endif; ?>
       </small></div>
   </div>
+  <script>
+  document.addEventListener('embed:done', function (ev) {
+    var u = (ev.detail && ev.detail.url) || '';
+    if (u.indexOf('/my-signature') !== 0) return;
+    var sel = document.querySelector('select[name="signatory_user_id"]'); if (!sel) return;
+    var me = <?= json_encode((string) $meId) ?>, name = <?= json_encode(trim((current_user()['first_name'] ?? '') . ' ' . (current_user()['last_name'] ?? '')) ?: (string) (current_user()['username'] ?? 'You')) ?>;
+    var opt = sel.querySelector('option[value="' + me + '"]');
+    if (!opt) { opt = document.createElement('option'); opt.value = me; opt.textContent = name + ' (you)'; sel.appendChild(opt); }
+    sel.value = me;
+    try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+    var a = document.getElementById('q-mysig');
+    if (a) { var n = document.createElement('span'); n.textContent = ' ✓ Your signature is saved and selected.'; n.style.color = '#047857'; a.parentNode.insertBefore(n, a.nextSibling); }
+  });
+  </script>
 
 </section>
 <section class="fs-pane" data-tab="Line items">

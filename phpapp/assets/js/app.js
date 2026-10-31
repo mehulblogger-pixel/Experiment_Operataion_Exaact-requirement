@@ -1466,10 +1466,19 @@
       var t = e.target.closest ? e.target.closest('[data-embed]') : null;
       if (!t) return;
       e.preventDefault();
+      // data-embed-keep: the host page holds unsaved typing (a quotation being
+      // written), so a save in the popup must NOT reload it. The host is told
+      // instead, with an 'embed:done' event, and updates itself.
+      window.__embedKeep = t.getAttribute('data-embed-keep') !== null;
       openEmbed(t.getAttribute('data-embed'), t.getAttribute('data-embed-title') || t.textContent.trim());
     });
     window.addEventListener('message', function (ev) {
-      if (ev.data && ev.data.embedDone) closeEmbed(true);
+      if (ev.data && ev.data.embedDone) {
+        if (window.__embedKeep) {
+          closeEmbed(false);
+          try { document.dispatchEvent(new CustomEvent('embed:done', { detail: ev.data })); } catch (_) {}
+        } else closeEmbed(true);
+      }
     });
   }
   function openEmbed(url, title) {

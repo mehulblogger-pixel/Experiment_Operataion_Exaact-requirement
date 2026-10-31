@@ -4228,14 +4228,36 @@ function ops_crm_templates($route, $method) {
     ops_require(can('crm.template.manage') || is_master(), 'You cannot manage CRM templates.');
     $pdo = db();
     if ($route === 'crm-signature' && $method === 'POST') {
+        $name  = trim((string) ($_POST['sig_name'] ?? ''));
+        $desig = trim((string) ($_POST['sig_desig'] ?? ''));
+        // Removing the company signature is its own deliberate choice.
+        if (!empty($_POST['clear_sig'])) {
+            setting_set('quote_sig_img', ''); setting_set('quote_sig_name', ''); setting_set('quote_sig_desig', '');
+            flash('The company signature is removed. Quote PDFs now carry only the signature of the person who signs each quote.');
+            redirect('/crm-templates#signature');
+        }
+        $newJpg = null;
         if (!empty($_FILES['sig']['tmp_name']) && (int)$_FILES['sig']['error'] === 0) {
             [$jpg, $err] = signature_to_jpeg(file_get_contents($_FILES['sig']['tmp_name']));
-            if ($err) { flash('Signature: ' . $err, 'error'); redirect('/crm-templates'); }
-            setting_set('quote_sig_img', base64_encode($jpg));
+            if ($err) { $_SESSION['crm_sig_draft'] = ['name' => $name, 'desig' => $desig]; flash('Signature: ' . $err, 'error'); redirect('/crm-templates#signature'); }
+            $newJpg = $jpg;
         }
-        if (!empty($_POST['clear_sig'])) setting_set('quote_sig_img', '');
-        setting_set('quote_sig_name', trim($_POST['sig_name'] ?? ''));
-        setting_set('quote_sig_desig', trim($_POST['sig_desig'] ?? ''));
+        // The block printed under every quote needs all three (owner, test book
+        // MOD-SAL: "even when signature, signatory name and designation is blank
+        // it allows to save it"). Nothing is saved until it is complete.
+        $miss = [];
+        if ($newJpg === null && (string) setting_get('quote_sig_img', '') === '') $miss[] = 'the signature image';
+        if ($name === '')  $miss[] = "the signatory's name";
+        if ($desig === '') $miss[] = 'the designation';
+        if ($miss) {
+            $_SESSION['crm_sig_draft'] = ['name' => $name, 'desig' => $desig];
+            $list = count($miss) > 1 ? implode(', ', array_slice($miss, 0, -1)) . ' and ' . end($miss) : $miss[0];
+            flash('Please add ' . $list . ' — it is printed under every ' . Tl('quote') . '. Nothing was saved.', 'error');
+            redirect('/crm-templates#signature');
+        }
+        if ($newJpg !== null) setting_set('quote_sig_img', base64_encode($newJpg));
+        setting_set('quote_sig_name', $name);
+        setting_set('quote_sig_desig', $desig);
         flash('Signature settings saved — they will appear on generated quote PDFs.');
         redirect('/crm-templates');
     }

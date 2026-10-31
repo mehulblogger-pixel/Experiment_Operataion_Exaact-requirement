@@ -6880,7 +6880,16 @@ function ops_idems_my_signature($method) {
             if (!empty($u['inspector_id'])) db()->prepare("UPDATE inspectors SET signature=? WHERE id=?")->execute([$sig, (int)$u['inspector_id']]);
             idems_log('user', $u['id'], 'SIGNATURE_SET', ['field'=>'own signature']);
             flash('Your signature has been saved. It will be added automatically to reports you sign or approve.');
-        } else flash('No signature captured — draw in the box or upload an image.', 'error');
+        } else {
+            // Inside a popup a redirect closes it; keep it open so the person
+            // can try again, with the reason shown.
+            if (function_exists('is_embed') && is_embed()) {
+                flash('No signature captured — draw in the box or upload an image.', 'error');
+                view('ops/idems/my_signature', ['sig' => $u['signature'] ?? '']);
+                return true;
+            }
+            flash('No signature captured — draw in the box or upload an image.', 'error');
+        }
         redirect('/my-signature');
     }
     view('ops/idems/my_signature', ['sig'=>$u['signature'] ?? '']);

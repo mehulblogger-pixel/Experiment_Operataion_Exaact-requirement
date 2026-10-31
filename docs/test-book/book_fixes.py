@@ -57,6 +57,14 @@ BEFORE = {  # test id -> the "Before" line
     'ONB-003': 'Same as ONB-002: the APPLICATION form (/get-started), which has the "Preferred workspace name" box. While self sign-up is on, /get-started jumps to the free-trial form (/start), which has no workspace-name box — its name is made from the company name. Signed out.',
 }
 ADD = {  # test id -> steps appended at the end
+    'MOD-SAL': [
+        {'do': 'Sales → Quote templates → "Signature for client PDFs": leave the image, name and designation empty → "Save signature". Then fill only the name → Save.',
+         'expect': 'Refused each time: "Please add the signature image, the signatory\'s name and the designation — it is printed under every quote. Nothing was saved." What you typed stays in the boxes.'},
+        {'do': 'Start a new quotation, type a subject, open the "Commercials" tab → "Upload or draw your signature →". Draw it in the box that opens on top → "Save signature".',
+         'expect': 'The box closes and you are still on your quotation with everything you typed. "Signed by" now shows your name "(you)", with "✓ Your signature is saved and selected."'},
+        {'do': 'Save the quotation and open its PDF.',
+         'expect': 'The item table shows Qty, Unit, Rate and Amount in separate columns; nothing printed on top of anything else.'},
+    ],
     'ONB-047': [
         {'do': 'After paying, open Admin → "Your subscription".',
          'expect': 'Trail "Home › Admin › Your subscription". A "Logins" box: "<n> of <limit> used" and "<n> left". A blue line "Your plan: <modules> + Administration, <n> logins, paid yearly/monthly, from <date> until <date>. Every module in it ends on that same day."'},
