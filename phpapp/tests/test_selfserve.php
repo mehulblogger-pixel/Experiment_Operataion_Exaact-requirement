@@ -171,7 +171,8 @@ t_eq($q['type'], 'RENEW', 'the same plan again is a renewal');
 t_eq($q['starts'], date('Y-m-d', strtotime($applied['expires'] . ' +1 day')), 'a renewal starts the day after the current plan ends');
 $more = array_slice(selfserve_all_modules(), 0, 3);
 $q = saas_plan_change_quote($more, 2, 'month', $today);
-t_ok($q['type'] === 'UPGRADE' && $q['credit'] > 0 && $q['price'] < $q['list'], 'adding a module is an upgrade that starts today, with credit for unused days');
+t_ok($q['type'] === 'UPGRADE' && !empty($q['coterm']) && $q['price'] < $q['list'] && $q['expires'] === $applied['expires'],
+     'adding a module starts today, charges only the difference for the days left, and keeps the renewal date (owner, 31 Oct)');
 $q = saas_plan_change_quote(array_slice($mods, 0, 1), 1, 'month', $today);
 t_ok($q['type'] === 'DOWNGRADE' && $q['price'] === 0, 'a smaller plan is a downgrade: nothing is charged now');
 saas_plan_change_apply($q);

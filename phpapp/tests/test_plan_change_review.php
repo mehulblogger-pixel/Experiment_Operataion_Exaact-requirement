@@ -23,18 +23,22 @@ try {
     setting_set('saas_storage_packs', '0'); setting_set('saas_next_plan', '');
 
     $q = saas_plan_change_quote($four, 2, 'year', $today);
+    $until = date('Y-m-d', strtotime($from . ' +1 year'));
     t_eq($q['type'], 'UPGRADE', 'adding a fourth module is an upgrade');
-    t_eq($q['list'], 4 * 10000 + 2 * 5000, 'the full price of the new plan is all four modules + 2 logins for a year (₹50,000)');
-    t_ok($q['credit'] > 39000 && $q['credit'] < 40000, 'the unused 359 days of the old plan (₹40,000) are credited: ₹' . $q['credit']);
-    t_ok($q['price'] > 10000 && $q['price'] < 11000, 'so what is charged is about the price of the one added module (₹10,000) plus six days used: ₹' . $q['price']);
-    t_eq($q['expires'], date('Y-m-d', strtotime($today . ' +1 year')), 'ONB-049: the whole plan then ends on ONE day, a year from today');
+    // Owner's decision, 31 Oct 2026 — the Zoho way: only the difference, for the days left; the renewal date stays.
+    t_ok(!empty($q['coterm']) && $q['expires'] === $until, 'ONB-049: the renewal date does not move — everything still ends on ' . $until);
+    t_eq([$q['cur_list'], $q['diff']], [3 * 10000 + 2 * 5000, 10000], 'the difference is the added module\'s yearly price (₹10,000)');
+    $left = (int) round((strtotime($until) - strtotime($today)) / 86400); $tot = (int) round((strtotime($until) - strtotime($from)) / 86400);
+    t_eq($q['price'], (int) round(10000 * $left / $tot), 'and only for the ' . $left . ' days left: ₹' . $q['price']);
 
     $r = saas_plan_review($q);
     t_eq($r['head'], 'Adding to your plan', 'the review says what this payment is');
     t_eq(count(array_filter($r['lines'], fn($l) => strpos($l['label'], 'seat') === false)), 4, 'it lists each of the four modules');
-    t_ok($r['credit'] === $q['credit'] && $r['price'] === $q['price'], 'it shows the credit and the amount due now');
-    t_ok(strpos($r['when'], 'Everything ends on that one day') !== false && strpos($r['when'], '359 unused days') !== false,
-         'and says the whole plan ends on one day, with the unused days credited');
+    t_ok($r['price'] === $q['price'] && count($r['rows']) === 4 && $r['rows'][1][1] === -40000, 'it shows the new plan, minus the current plan (already paid), the difference and the days left');
+    t_ok(strpos($r['when'], 'keeps its renewal date') !== false && strpos($r['when'], 'everything ends on that day') !== false,
+         'and says the renewal date stays and everything ends on that day');
+    $q2y = saas_plan_change_quote($four, 2, 'month', $today);
+    t_ok(empty($q2y['coterm']), 'switching yearly → monthly is not an addition to the same period (a new period, as Zoho does)');
 
     // Paying again for the same plan is a renewal from the current end date.
     $q2 = saas_plan_change_quote($three, 2, 'year', $today);

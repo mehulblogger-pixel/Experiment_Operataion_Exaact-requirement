@@ -1542,7 +1542,7 @@ function ops_saas_subscription($route, $method) {
             }
             if ((int) $q['price'] <= 0) {
                 saas_plan_change_apply($q);
-                flash('Done — the unused value of your current plan covers this change. Your plan now runs until '
+                flash((!empty($q['coterm']) ? 'Done — nothing to pay for the days left. ' : 'Done — the unused value of your current plan covers this change. ') . 'Your plan now runs until '
                     . (function_exists('fdate') ? fdate($q['expires']) : $q['expires']) . '.', 'success');
                 redirect('/subscription');
             }

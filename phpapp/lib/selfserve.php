@@ -793,6 +793,21 @@ function saas_plan_change_quote(array $mods, $seats, $period, $today = null, $pa
     }
     $newVal = saas_monthly_value($mods, $seats, $period, $packs);
     $curVal = saas_monthly_value($cur['mods'], $cur['seats'], $cur['period'], $cur['packs']);
+    // ADDING TO THE PLAN, SAME BILLING PERIOD — the way Zoho, Microsoft 365, Adobe
+    // and Freshworks bill it (owner's decision, 31 Oct 2026, test book ONB-049):
+    // only the difference is charged, for the days left, and the renewal date does
+    // not move. Everything still ends on the one date the company already has.
+    // (Changing monthly ↔ yearly starts a new period, as those products do.)
+    if ($newVal > $curVal + 0.005 && $period === $cur['period']) {
+        $curList = (int) saas_company_quote($cur['mods'], $cur['seats'], $cur['period'], $cur['packs'])['total'];
+        $from  = $cur['from'] !== '' ? $cur['from'] : date('Y-m-d', strtotime($cur['until'] . ($cur['period'] === 'year' ? ' -1 year' : ' -1 month')));
+        $total = max(1, (int) round((strtotime($cur['until']) - strtotime($from)) / 86400));
+        $left  = max(0, (int) round((strtotime($cur['until']) - strtotime($today)) / 86400));
+        $diff  = max(0, $list - $curList);
+        $price = (int) round($diff * min(1, $left / $total));
+        return ['type' => 'UPGRADE', 'coterm' => true, 'price' => $price, 'credit' => 0, 'cur_list' => $curList, 'diff' => $diff,
+                'left_days' => $left, 'total_days' => $total, 'cur_until' => $cur['until'], 'expires' => $cur['until']] + $out;
+    }
     if ($newVal > $curVal + 0.005) {
         // Unused value of what is running now, at its list price.
         $worth = (int) saas_company_quote($cur['mods'], $cur['seats'], $cur['period'], $cur['packs'])['total'];
@@ -825,8 +840,14 @@ function saas_plan_review(array $q) {
     $quote = function_exists('saas_company_quote') ? saas_company_quote((array) ($q['mods'] ?? []), (int) ($q['seats'] ?? 0), $per, (int) ($q['packs'] ?? 0)) : ['lines' => []];
     $type = (string) ($q['type'] ?? 'NEW');
     $head = ['NEW' => 'Your plan', 'UPGRADE' => 'Adding to your plan', 'RENEW' => 'Renewing your plan in advance'][$type] ?? 'Your plan';
-    $when = '';
-    if ($type === 'UPGRADE')
+    $when = ''; $rows = null;
+    if ($type === 'UPGRADE' && !empty($q['coterm'])) {
+        $when = 'What you add starts today. Your plan keeps its renewal date, ' . $fd($q['expires'])
+              . ' — everything ends on that day. You pay only the difference, for the ' . (int) $q['left_days'] . ' days left.';
+        $rows = [['Full price of the new plan', (int) $q['list'], false], ['Less: your current plan (already paid)', -(int) $q['cur_list'], false],
+                 ['Difference for a full ' . $per, (int) $q['diff'], false],
+                 ['For the ' . (int) $q['left_days'] . ' of ' . (int) $q['total_days'] . ' days left', (int) $q['price'], true]];
+    } elseif ($type === 'UPGRADE')
         $when = 'Your whole plan — what you already have and what you are adding — starts again today and runs until '
               . $fd($q['expires']) . '. Everything ends on that one day; the ' . (int) ($q['left_days'] ?? 0)
               . ' unused days of your current plan (until ' . $fd($q['cur_until'] ?? '') . ') are taken off the price below.';
@@ -836,7 +857,7 @@ function saas_plan_review(array $q) {
     else
         $when = 'Your plan starts today and runs until ' . $fd($q['expires']) . '.';
     return ['head' => $head, 'period' => $per, 'lines' => (array) ($quote['lines'] ?? []), 'list' => (int) ($q['list'] ?? 0),
-            'credit' => (int) ($q['credit'] ?? 0), 'price' => (int) ($q['price'] ?? 0), 'when' => $when, 'type' => $type];
+            'credit' => (int) ($q['credit'] ?? 0), 'price' => (int) ($q['price'] ?? 0), 'when' => $when, 'type' => $type, 'rows' => $rows];
 }
 
 // Switch exactly these modules and logins on now.
@@ -860,7 +881,11 @@ function saas_plan_change_apply(array $q, $paymentId = '', $orderId = '') {
         setting_set('saas_converted_at', date('c'));
         $q['converted'] = true;
     }
-    if ($q['type'] === 'NEW' || $q['type'] === 'UPGRADE') {
+    if ($q['type'] === 'UPGRADE' && !empty($q['coterm'])) {
+        // Added to the running plan: on now, same period, same renewal date. A
+        // smaller plan already booked for the renewal is kept as it is.
+        saas_plan_switch_to($q['mods'], $q['seats'], (int) ($q['packs'] ?? 0));
+    } elseif ($q['type'] === 'NEW' || $q['type'] === 'UPGRADE') {
         saas_plan_switch_to($q['mods'], $q['seats'], (int) ($q['packs'] ?? 0));
         setting_set('saas_paid_period', $q['period']);
         setting_set('saas_paid_from', $q['starts']);

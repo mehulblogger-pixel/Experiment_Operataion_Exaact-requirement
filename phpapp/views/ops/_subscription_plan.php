@@ -63,7 +63,7 @@ $forSale = $seatM > 0 && array_filter($pb['modules'] ?? [], fn($m) => (int) $m['
     <button class="btn" type="submit"><?= $mode === 'paid' ? 'Change or renew →' : 'Choose this plan & pay →' ?></button>
   </div>
   <?php if ($mode === 'paid'): ?>
-    <p class="sub" style="margin:8px 0 0;font-size:12.5px">Adding modules or people starts today, and the unused part of your current plan is taken off the price.
+    <p class="sub" style="margin:8px 0 0;font-size:12.5px">Adding modules or people starts today and keeps your renewal date: you pay only the difference, for the days left.
       The same plan again renews from <?= $e(fdate(date('Y-m-d', strtotime(($current['until'] ?? date('Y-m-d')) . ' +1 day')))) ?>.
       A smaller plan starts then too, and nothing is charged now.</p>
   <?php endif; ?>

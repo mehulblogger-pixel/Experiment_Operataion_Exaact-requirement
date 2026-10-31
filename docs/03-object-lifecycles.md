@@ -1157,9 +1157,14 @@ Companies console is not affected.
   (trial MB, or the paid allowance in GB) cannot add new files and can do
   everything else; freeing space or adding storage lifts it at once.
 - `PAID` — exactly the modules and logins bought, until the paid-until date.
-  Plan changes follow the owner's Q-L rule: an **upgrade** starts today with credit
-  for the unused days; a **renewal** starts the day after the current period ends; a
-  **downgrade** is booked for that day and nothing is charged now.
+  Plan changes follow the owner's Q-L rule as revised on 31 Oct 2026 (the way Zoho,
+  Microsoft 365, Adobe and Freshworks bill): **adding** modules, logins or storage
+  packs on the same billing period starts today and keeps the renewal date — only
+  the difference is charged, for the days left, and everything ends on one date;
+  switching **monthly ↔ yearly** starts a new period today with credit for the
+  unused days; a **renewal** starts the day after the current period ends; a
+  **smaller plan** is booked for that day, nothing is charged or refunded now, and
+  everything paid for stays usable until then.
 - `VIEW-ONLY` — the trial or paid period has ended. Everything opens, prints and
   exports; nothing new can be saved except paying for a plan. Never locked out.
 - `DELETED` — only a company that has **never paid**, after no one has signed in for

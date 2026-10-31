@@ -19,11 +19,14 @@
     <?php foreach ($rv['lines'] as $ln): ?>
       <tr><td style="padding:4px 0"><?= e($ln['label']) ?></td><td style="text-align:right"><?= e($sym . number_format((int) $ln['amount'])) ?> / <?= e($rv['period']) ?></td></tr>
     <?php endforeach; ?>
+    <?php if (!empty($rv['rows'])): $first = true; foreach ($rv['rows'] as [$lbl, $amt, $last]): if ($last) continue; ?>
+      <tr<?= $first ? ' style="border-top:1px solid var(--line,#e5e7eb)"' : '' ?>><td style="padding:4px 0"><?= e($lbl) ?></td><td style="text-align:right"><?= $amt < 0 ? '− ' : '' ?><?= e($sym . number_format(abs((int) $amt))) ?></td></tr>
+    <?php $first = false; endforeach; else: ?>
     <tr style="border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">Full price of this plan</td><td style="text-align:right"><?= e($sym . number_format($rv['list'])) ?></td></tr>
     <?php if ($rv['credit'] > 0): ?>
       <tr><td style="padding:4px 0">Less: unused part of your current plan</td><td style="text-align:right">− <?= e($sym . number_format($rv['credit'])) ?></td></tr>
-    <?php endif; ?>
-    <tr style="font-weight:700;border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">To pay now<?= (is_array($amt['tax'] ?? null) && !empty($amt['tax']['on'])) ? ' (before GST)' : '' ?></td><td style="text-align:right"><?= e($sym . number_format($rv['price'])) ?></td></tr>
+    <?php endif; endif; ?>
+    <tr style="font-weight:700;border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">To pay now<?= !empty($rv['rows']) ? ' — ' . e(end($rv['rows'])[0]) : '' ?><?= (is_array($amt['tax'] ?? null) && !empty($amt['tax']['on'])) ? ' (before GST)' : '' ?></td><td style="text-align:right"><?= e($sym . number_format($rv['price'])) ?></td></tr>
   </table>
 </div>
 <?php endif; ?>
