@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '3f2166bc · 2026-10-31 06:27 UTC · 701 files';
+$RELEASE = 'a96e8621 · 2026-10-31 06:31 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -183,7 +183,7 @@ $EXPECT  = [
     'lib/packs.php' => ['s'=>14404,'h'=>'2c631d79aea60e49'],
     'lib/partnerimport.php' => ['s'=>23742,'h'=>'bc507ebf2a770c8f'],
     'lib/party.php' => ['s'=>11622,'h'=>'55ad01fbf381e780'],
-    'lib/pdf.php' => ['s'=>26663,'h'=>'356a367da31c40a6'],
+    'lib/pdf.php' => ['s'=>26926,'h'=>'e2f7cd9e46b207d2'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
     'lib/platform_mail.php' => ['s'=>21094,'h'=>'66567f017e4febf2'],

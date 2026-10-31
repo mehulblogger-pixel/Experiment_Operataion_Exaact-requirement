@@ -347,7 +347,10 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $p->gap(4);
     // ---- line-item table ----
     $x0 = $ml; $x2 = $right; $tw = $x2 - $x0;
-    $cols = [$x0, $x0 + 26, $x0 + $tw * 0.50, $x0 + $tw * 0.60, $x0 + $tw * 0.74, $x2];  // Sr | Desc | Qty | Unit | Rate | Amount(right)
+    //  Six columns need SEVEN edges. With six, Rate and Amount both ended at the
+    //  right margin and were printed on top of each other (owner, test book
+    //  MOD-SAL: "the amount and other things are bleeding on each other").
+    $cols = [$x0, $x0 + 26, $x0 + $tw * 0.46, $x0 + $tw * 0.55, $x0 + $tw * 0.66, $x0 + $tw * 0.82, $x2];  // edges: Sr | Desc | Qty | Unit | Rate | Amount
     $hy = $p->y; $rowH = 18;
     $p->rectFill($x0, $hy, $tw, $rowH, [30, 64, 175]);
     $p->y = $hy + 4;
@@ -356,7 +359,7 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $p->text($cols[2] + 3, 'Qty', 9, true, [255, 255, 255], $cols[3] - 3, 'R');
     $p->text($cols[3] + 3, 'Unit', 9, true, [255, 255, 255]);
     $p->text($cols[4] + 3, 'Rate', 9, true, [255, 255, 255], $cols[5] - 3, 'R');
-    $p->text($cols[4] + 3, 'Amount', 9, true, [255, 255, 255], $x2 - 3, 'R');
+    $p->text($cols[5] + 3, 'Amount', 9, true, [255, 255, 255], $cols[6] - 6, 'R');
     $p->y = $hy + $rowH;
     $sr = 0;
     foreach ($lines as $l) {
@@ -372,7 +375,7 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
         $p->text($cols[2] + 3, rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.'), 9, false, null, $cols[3] - 3, 'R');
         $p->text($cols[3] + 3, lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'], 9);
         $p->text($cols[4] + 3, number_format((float)$l['rate'], 0), 9, false, null, $cols[5] - 3, 'R');
-        $p->text($cols[4] + 3, number_format((float)$l['amount'], 0), 9, false, null, $x2 - 3, 'R');
+        $p->text($cols[5] + 3, number_format((float)$l['amount'], 0), 9, false, null, $cols[6] - 3, 'R');
         // wrapped description lines
         $dy = $top + 3;
         foreach ($wrapped as $wl) { $p->y = $dy; $p->text($cols[1] + 3, $wl, 9); $dy += 12; }
