@@ -4105,6 +4105,15 @@ function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) 
                   <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
                   <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
                   <input class="form-control" name="remarks" placeholder="Remarks (required to send back / reject)" style="margin-bottom:8px;max-width:520px">
+                  <?php // The same self-review tick as the Approvals tab: without it the
+                        // preparer was told to "tick the acknowledgement" that this
+                        // card never showed. ?>
+                  <?php if (idems_is_self_review($doc)): ?>
+                    <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:12.5px;color:var(--bad);max-width:520px">
+                      <input type="checkbox" name="self_ack" value="1" style="margin-top:2px">
+                      <span>I prepared this <?= e(Tl('report')) ?>. I confirm I am approving my own work deliberately — segregation of duties.</span>
+                    </label>
+                  <?php endif; ?>
                   <div style="display:flex;gap:6px;flex-wrap:wrap">
                     <button class="btn small" type="submit" name="decision" value="approve">✓ Approve &amp; move forward</button>
                     <button class="btn small secondary" type="submit" name="decision" value="sendback">↩ Send back for changes</button>
@@ -6523,7 +6532,7 @@ function ops_idems_approve($method) {
     // and preserves the master/one-person-office exception — it just makes self-review
     // a deliberate, recorded choice instead of a silent one.
     if ($decision === 'approve' && idems_is_self_review($doc) && empty($_POST['self_ack'])) {
-        flash('You prepared this report. Approving your own work breaks segregation of duties — tick the acknowledgement to confirm you are doing so deliberately, then approve again.', 'error');
+        flash('You prepared this report. Approving your own work breaks segregation of duties — tick the box "I prepared this report. I confirm I am approving my own work deliberately" just above the Approve button, then approve again.', 'error');
         redirect('/document?id=' . $doc['id']);
     }
     if ($decision === 'approve') {
@@ -6642,7 +6651,7 @@ function ops_idems_vet($method) {
     if ($action === 'RETURNED' && $note === '') { flash('A note is mandatory when returning a report for correction.', 'error'); redirect('/document?id=' . $doc['id']); }
     // Soft segregation acknowledgement on clearing your own report at vetting (never blocks).
     if ($action === 'VETTED' && idems_is_self_review($doc) && empty($_POST['self_ack'])) {
-        flash('You prepared this report. Vetting your own work breaks segregation of duties — tick the acknowledgement to confirm you are doing so deliberately, then vet it again.', 'error');
+        flash('You prepared this report. Vetting your own work breaks segregation of duties — tick the box "I prepared this report. I confirm I am vetting my own work deliberately" just above the Vet button, then vet it again.', 'error');
         redirect('/document?id=' . $doc['id']);
     }
     $pdo = db();

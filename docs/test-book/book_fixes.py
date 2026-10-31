@@ -4,6 +4,8 @@ are stored by test id and step number, so a step is only ever CHANGED in place
 or ADDED at the end of its test — never inserted or removed."""
 
 CHANGE = {  # (test id, step number) -> new fields
+    ('REP-014', 1):  {'do': 'Sign in as the inspector who prepared it. Open it → on the card "How to get this report issued" (or the Approvals tab) press "✓ Approve" WITHOUT ticking the red box "I prepared this report. I confirm I am approving my own work deliberately".', 'expect': 'Refused: "You prepared this report. Approving your own work breaks segregation of duties — tick the box … just above the Approve button, then approve again." The red tick box is visible on both the card and the Approvals tab.'},
+    ('REP-014', 2):  {'do': 'Tick the red box → "✓ Approve".', 'expect': 'Approved. Screenshot.'},
     ('SAL-000', 7):  {'expect': 'Sales, Insights (the Sales dashboard only) and Directory. Not Operations, Money or Quality & Accreditation.'},
     ('SAL-000', 8):  {'expect': 'Sales, Insights and Directory. No Operations, no Money, no Quality & Accreditation.'},
     ('SAL-000', 9):  {'expect': 'Sales, Money (profitability), Insights, Directory. Sales home shows the "Set up Sales" and "Document templates" tiles. No Admin, no Quality & Accreditation.'},
