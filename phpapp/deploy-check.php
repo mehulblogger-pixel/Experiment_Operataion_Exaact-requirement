@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'df1a2960 · 2026-10-31 06:49 UTC · 701 files';
+$RELEASE = '1908cd9a · 2026-10-31 06:52 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -218,7 +218,7 @@ $EXPECT  = [
     'lib/risks.php' => ['s'=>10571,'h'=>'83a96e16878654a2'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>98392,'h'=>'728e672b457811e0'],
+    'lib/saas_tenants.php' => ['s'=>98486,'h'=>'cd42c3de365a4e9a'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
@@ -252,7 +252,7 @@ $EXPECT  = [
     'lib/tapi_score.php' => ['s'=>14322,'h'=>'e2256ab85fab255c'],
     'lib/tasks.php' => ['s'=>11239,'h'=>'82c11af4ebccd03c'],
     'lib/tenant_migrate.php' => ['s'=>20675,'h'=>'3a8be680c3200403'],
-    'lib/tenant_signup.php' => ['s'=>15976,'h'=>'8466996f3fff1e7e'],
+    'lib/tenant_signup.php' => ['s'=>17074,'h'=>'8cff333a3b2b95ec'],
     'lib/tenants.php' => ['s'=>23379,'h'=>'8bb1d9d0ef7cc82e'],
     'lib/terms.php' => ['s'=>29013,'h'=>'ea265ce51729491b'],
     'lib/timesheet.php' => ['s'=>9615,'h'=>'0850f4b87638e4a5'],
@@ -552,7 +552,7 @@ $EXPECT  = [
     'views/ops/opportunity_detail.php' => ['s'=>34405,'h'=>'269e269b4520d38b'],
     'views/ops/opportunity_form.php' => ['s'=>6508,'h'=>'cb05777e648dc213'],
     'views/ops/ops_desk.php' => ['s'=>5950,'h'=>'50cc74a4ae6338bb'],
-    'views/ops/owner_home.php' => ['s'=>7162,'h'=>'92ce62ea31d0a041'],
+    'views/ops/owner_home.php' => ['s'=>7691,'h'=>'8e61fa4c5f6aa9f0'],
     'views/ops/partner_import.php' => ['s'=>6405,'h'=>'dd873e0e376783b1'],
     'views/ops/person_erase.php' => ['s'=>2748,'h'=>'790e73d880be6d75'],
     'views/ops/pipeline_edit.php' => ['s'=>7169,'h'=>'d72f4149566ccc5e'],
@@ -599,7 +599,7 @@ $EXPECT  = [
     'views/ops/risk_form.php' => ['s'=>3356,'h'=>'f43057f55e88ff02'],
     'views/ops/risks_list.php' => ['s'=>2204,'h'=>'93906156b7d808ab'],
     'views/ops/role_workspaces.php' => ['s'=>4048,'h'=>'66938f5a5139889f'],
-    'views/ops/saas_companies.php' => ['s'=>36076,'h'=>'d786b424fb8aca1f'],
+    'views/ops/saas_companies.php' => ['s'=>37744,'h'=>'533751e7839e3006'],
     'views/ops/sample_detail.php' => ['s'=>4311,'h'=>'4529a1888c336f30'],
     'views/ops/sample_form.php' => ['s'=>4129,'h'=>'dfabaedae75c6f9f'],
     'views/ops/samples_list.php' => ['s'=>2173,'h'=>'18bdce8f8a7621a9'],
@@ -633,7 +633,7 @@ $EXPECT  = [
     'views/ops/tapi_scorecard.php' => ['s'=>2166,'h'=>'c547d85711e404f9'],
     'views/ops/tapi_snapshot.php' => ['s'=>2775,'h'=>'74aad9f368ad107f'],
     'views/ops/tasks.php' => ['s'=>4329,'h'=>'0c2ffedf67f10633'],
-    'views/ops/tenants.php' => ['s'=>20635,'h'=>'4b19e396151d1479'],
+    'views/ops/tenants.php' => ['s'=>20840,'h'=>'a9ca05fa224fc775'],
     'views/ops/terminology.php' => ['s'=>4401,'h'=>'984504c0b825174e'],
     'views/ops/timesheet.php' => ['s'=>5962,'h'=>'bef076d2397f0133'],
     'views/ops/to_bill.php' => ['s'=>7030,'h'=>'c2399620b3458380'],

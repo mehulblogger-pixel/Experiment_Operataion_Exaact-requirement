@@ -236,8 +236,21 @@ function tenant_request_reject($id, $note = '') {
     if (!$r) return [false, 'That request no longer exists.'];
     if (in_array($r['status'], ['PROVISIONED'], true))
         return [false, 'That workspace is already set up — it cannot be declined.'];
+    $note = trim((string)$note);
     tenant_request_mark($id, 'REJECTED', (string)$r['tenant_sub'], $note !== '' ? $note : 'Declined.');
-    return [true, 'Request declined.'];
+    // Tell the applicant (owner, test book ONB-010: "if the workspace application
+    // is declined it does not provide any email of decline confirmation").
+    $mailed = false;
+    $to = trim((string)($r['email'] ?? ''));
+    if ($to !== '' && function_exists('ops_mail')) {
+        $from = function_exists('app_name') ? app_name() : 'the platform';
+        $body = "Hello " . trim((string)($r['contact_name'] ?? '')) . ",\n\n"
+              . "Thank you for applying for a workspace for " . (string)$r['company'] . " on " . $from . ".\n"
+              . "We are sorry — your request was not approved." . ($note !== '' ? "\n\nReason: " . $note : '') . "\n\n"
+              . "If you think this is a mistake, or your details have changed, please reply to this e-mail.\n";
+        $mailed = (bool) ops_mail($to, 'Your workspace request for ' . (string)$r['company'], $body, '', 'workspace_request');
+    }
+    return [true, 'Request declined.' . ($mailed ? ' The applicant (' . $to . ') has been e-mailed.' : ' E-mail is not set up, so the applicant was not told — please let them know yourself.')];
 }
 
 /** The public onboarding page (dispatched before require_login). Always exits.

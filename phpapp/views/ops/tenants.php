@@ -73,7 +73,7 @@
     return '<span class="pill p-mut">' . e($s) . '</span>';
   };
 ?>
-<div class="panel">
+<div class="panel" id="requests" style="scroll-margin-top:70px">
   <div class="ctitle" style="margin-top:0"><h3>Workspace requests
       <?php if ($pending): ?><span class="pill p-warn"><?= count($pending) ?> new</span><?php else: ?><span class="muted">(<?= count($requests) ?>)</span><?php endif; ?></h3>
   </div>
@@ -115,8 +115,8 @@
                      aria-label="Workspace name">
               <button class="btn small" type="submit">Approve</button></form>
             <form method="post" action="/tenant-request-reject" style="display:inline"
-                  onsubmit="return confirm('Decline this request?')">
-              <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                  onsubmit="var n=prompt('Decline this request? The applicant is e-mailed. Reason to include (optional):',''); if(n===null) return false; this.note.value=n; return true;">
+              <input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="note" value="">
               <button class="btn small danger" type="submit">Decline</button></form>
           <?php elseif ($st === 'APPROVED'): ?>
             <form method="post" action="/tenant-request-provisioned" style="display:inline">

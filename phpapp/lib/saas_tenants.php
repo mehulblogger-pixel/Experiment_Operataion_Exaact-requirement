@@ -1465,6 +1465,7 @@ function ops_saas_admin($route, $method) {
         'plans'     => saas_console_plans(),
         'modules'   => defined('PRODUCT_MODULES') ? PRODUCT_MODULES : [],
         'sel'       => $selRow,
+        'requests'  => function_exists('tenant_requests_list') ? tenant_requests_list() : [],
         'price_book' => saas_price_book(),
         'quote'     => $selRow ? saas_company_quote(saas_tenant_modules($sel), saas_tenant_seat_limit($sel), 'month') : null,
         'base_domain' => function_exists('tenant_base_domain') ? tenant_base_domain() : '',

@@ -160,6 +160,30 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
 </div>
 <?php endif; ?>
 
+<?php // Workspace requests here too (owner, test book ONB-012: "the control panel
+      // does not show the workspaces requested by the user — only the ones created
+      // directly"). Acting on one stays on Cloud workspaces, where the switch is.
+      $requests = $requests ?? []; if ($requests):
+      $rqLab = function_exists('tenant_request_statuses') ? tenant_request_statuses() : [];
+      $rqPend = count(array_filter($requests, fn($r) => ($r['status'] ?? '') === 'PENDING')); ?>
+<div class="sc-card">
+  <h2>Workspace requests <?= $rqPend ? '<span class="pill off" style="background:#fef3c7;color:#92400e">' . $rqPend . ' waiting</span>' : '' ?>
+    <a class="btn xs ghost" href="/tenants#requests" style="float:right"><?= $rqPend ? 'Approve or decline →' : 'Open requests →' ?></a></h2>
+  <div class="sc-scroll"><table class="sc">
+    <tr><th>Company</th><th>Contact</th><th>Wants</th><th>State</th><th>Decided</th></tr>
+    <?php foreach (array_slice($requests, 0, 15) as $r): ?>
+    <tr>
+      <td><div class="sc-co"><?= $e($r['company'] ?? '') ?></div></td>
+      <td><?= $e($r['contact_name'] ?? '') ?><div class="sc-key"><?= $e($r['email'] ?? '') ?></div></td>
+      <td><span class="sc-key"><?= $e($r['tenant_sub'] ?? '') ?></span></td>
+      <td><?= $e($rqLab[$r['status'] ?? ''] ?? ($r['status'] ?? '')) ?></td>
+      <td class="sc-meta"><?= ($r['decided_at'] ?? '') !== '' ? $e(fdate(substr((string) $r['decided_at'], 0, 10))) . ' · ' . $e($r['decided_by'] ?? '') . (($r['admin_note'] ?? '') !== '' ? '<div>' . $e($r['admin_note']) . '</div>' : '') : '—' ?></td>
+    </tr>
+    <?php endforeach; ?>
+  </table></div>
+</div>
+<?php endif; ?>
+
 <?php if ($sel): $sk = $e($sel['tenant_key']); $selMods = json_decode((string) ($sel['enabled_modules'] ?? '[]'), true) ?: []; ?>
 <div class="sc-card" id="manage" style="scroll-margin-top:70px">
   <h2>Manage — <?= $e($sel['company'] ?: $sel['tenant_key']) ?> <a class="btn xs ghost" href="/companies" style="float:right">Close</a></h2>

@@ -60,9 +60,11 @@ $app = function_exists('app_name') ? app_name() : 'your platform';
   </a>
   <?php // Was reachable only by a small link inside Advanced settings (owner, test book
         // ONB-001: "guide where exactly to find this switch"). ?>
-  <a class="oh-card" href="/tenants">
+  <?php $ohPend = function_exists('tenant_requests_pending_count') ? tenant_requests_pending_count() : 0; ?>
+  <a class="oh-card" href="/tenants#requests"<?= $ohPend ? ' style="border-color:#d97706;box-shadow:0 0 0 2px #fde68a"' : '' ?>>
     <span class="oh-ic">🌐</span>
-    <span><h3>Cloud workspaces &amp; requests</h3><p>Your base address, companies' requests for a workspace, and the "Online registration" switch.</p></span>
+    <span><h3>Cloud workspaces &amp; requests<?= $ohPend ? ' <span class="pill" style="background:#fef3c7;color:#92400e;border-radius:999px;padding:2px 9px;font-size:12px">' . (int) $ohPend . ' waiting for you</span>' : '' ?></h3>
+      <p><?= $ohPend ? (int) $ohPend . ' compan' . ($ohPend === 1 ? 'y has' : 'ies have') . ' applied for a workspace — approve or decline. ' : '' ?>Your base address, companies' requests for a workspace, and the "Online registration" switch.</p></span>
   </a>
   <a class="oh-card" href="/users">
     <span class="oh-ic">👥</span>
