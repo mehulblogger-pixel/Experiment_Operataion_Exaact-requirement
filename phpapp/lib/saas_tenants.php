@@ -515,6 +515,8 @@ function saas_apply_modules_list(array $mods) {
     setting_set('modules_off', implode(',', $off));
     setting_set('product_package', 'CUSTOM');
     if (function_exists('licence_disabled')) licence_disabled(true);
+    // A module bought later brings its dropdown lists now, not at the next upgrade.
+    if (function_exists('lk_register_module_lists')) { try { lk_register_module_lists(); } catch (Throwable $e) {} }
 }
 
 // ---------------------------------------------------------------------------

@@ -340,9 +340,17 @@ function lk_register_module_lists() {
         // back-fill values added to the shipped list after this install was set up
         lk_ensure_values_from_map($key, $map);
     }
+    // BUSINESS UNIT. A company workspace never got this list — only the control
+    // install's first seed made it — so Masters had no "Business Unit" to edit
+    // even in a company that bought Operations (owner, test book MOD-ADM step 3),
+    // while every form quietly fell back to the built-in values. Sales uses it
+    // too (approval levels per business unit), so either module brings it.
+    $opsOn = !function_exists('licence_enabled') || licence_enabled('operations');
+    if (!$tenant || $opsOn || (function_exists('licence_enabled') && licence_enabled('sales')))
+        lk_ensure_type_map('sbu', 'Business Unit', OPS_SBUS, $opsOn ? 'Operations' : 'Sales');
     // Lists that already existed get their module tag too, so nothing is unfiled.
     foreach ([
-        'sbu'=>'Operations', 'region'=>'Operations', 'product'=>'Operations', 'product_category'=>'Operations',
+        'sbu'=>($opsOn ? 'Operations' : 'Sales'), 'region'=>'Operations', 'product'=>'Operations', 'product_category'=>'Operations',
         'inspection_type'=>'Operations', 'engagement_pattern'=>'Operations',
         'activity'=>'Operations', 'credit_type'=>'Money', 'credit_direction'=>'Money',
         'expense_heading'=>'Money', 'reporting_frequency'=>'Operations', 'avail_status'=>'Operations',

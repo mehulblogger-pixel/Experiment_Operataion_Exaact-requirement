@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '670e3455 · 2026-10-31 06:42 UTC · 701 files';
+$RELEASE = 'df1a2960 · 2026-10-31 06:49 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -154,7 +154,7 @@ $EXPECT  = [
     'lib/licenceissue.php' => ['s'=>33709,'h'=>'583595aeb2561596'],
     'lib/licencekey.php' => ['s'=>29242,'h'=>'c42b2078fe80352f'],
     'lib/licencesync.php' => ['s'=>10254,'h'=>'c17cfa585e721f62'],
-    'lib/lookups.php' => ['s'=>82905,'h'=>'4e2a5de12ffd0ba8'],
+    'lib/lookups.php' => ['s'=>83604,'h'=>'d94f5b8948c09001'],
     'lib/methods.php' => ['s'=>13959,'h'=>'14969626618c15f8'],
     'lib/mghsso.php' => ['s'=>10002,'h'=>'80f043e73ff44d13'],
     'lib/mis.php' => ['s'=>27303,'h'=>'f859e061e1d0af78'],
@@ -218,7 +218,7 @@ $EXPECT  = [
     'lib/risks.php' => ['s'=>10571,'h'=>'83a96e16878654a2'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>98190,'h'=>'5f2afdaf82ef93f6'],
+    'lib/saas_tenants.php' => ['s'=>98392,'h'=>'728e672b457811e0'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],

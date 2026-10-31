@@ -30,6 +30,10 @@ CHANGE = {  # (test id, step number) -> new fields
     ('ONB-049', 2):  {'expect': 'A box "Renewing your plan in advance": "Your plan already runs until <date>. This payment adds the next year/month: from <date> until <date>." Nothing changes before then.'},
     # Owner, 31 Oct (PLT-004): a refused Add company kept nothing.
     ('PLT-004', 10): {'expect': 'Workspace key "admin": refused with "That workspace key is already taken — pick another. "admin-2" is free." Everything you typed (name, owner, e-mail, plan) is still in the form and the key box is outlined in red. With the key box left empty, the company simply gets the name admin-2.'},
+    # Owner, 31 Oct (MOD-ADM): Offices live under Masters; Business Unit is now a list there in every company.
+    ('MOD-ADM', 2):  {'do': 'Admin → Masters → "Records you keep" → "Offices & branches": your branches.'},
+    ('MOD-ADM', 3):  {'do': 'Admin → Masters → "Dropdown lists" → "Business Unit": edit the values to your business units.',
+                      'expect': 'The list is there in every company that has Operations or Sales (it used to exist only on the platform owner\'s own site). Your values appear in every "Business unit" choice.'},
     # Cloud workspaces had no menu entry (owner: "guide exactly where to find this switch").
     ('ONB-001', 1):  {'do': 'Owner home → card "Cloud workspaces & requests" (also Admin → Super admin → "Cloud workspaces & requests"). Super Admin locked to its own address? Do this at https://opstest-admin.mghaiapps.com. Before the 24 Oct update: Admin → Control panel → panel "Tenant workspaces" → "Manage ›", or type /tenants after the address.'},
     # One choice instead of two switches (owner: "switch is off but still I can generate the account from /start").
@@ -57,6 +61,10 @@ BEFORE = {  # test id -> the "Before" line
     'ONB-003': 'Same as ONB-002: the APPLICATION form (/get-started), which has the "Preferred workspace name" box. While self sign-up is on, /get-started jumps to the free-trial form (/start), which has no workspace-name box — its name is made from the company name. Signed out.',
 }
 ADD = {  # test id -> steps appended at the end
+    'MOD-ADM': [
+        {'do': 'A client with two sites: open the client → "Addresses" tab → on each site address press "📍 Set this site’s location (for on-site check-in)" → paste its Google Maps link (or "lat, long") and a radius in metres → Save.',
+         'expect': '"Site location saved." for each site. A work order raised for one site makes the inspector check in against THAT site\'s location (then the client\'s main location if the site has none). An inspector standing at a site can also save the phone\'s location as the site\'s position.'},
+    ],
     'MOD-SAL': [
         {'do': 'Sales → Quote templates → "Signature for client PDFs": leave the image, name and designation empty → "Save signature". Then fill only the name → Save.',
          'expect': 'Refused each time: "Please add the signature image, the signatory\'s name and the designation — it is printed under every quote. Nothing was saved." What you typed stays in the boxes.'},
