@@ -262,6 +262,9 @@ function nav_route_area($route) {
             //  and Back went to the dashboard. It is reached from System
             //  settings → "Users & billing", and it is Admin's.
             'billing' => 'Admin',
+            //  Test book ONB-046: "Home › Subscription … no way to access the
+            //  subscription directly". It is Admin → Your subscription.
+            'subscription' => 'Admin',
         ] as $r => $a) { if (!isset($cache[$r])) $cache[$r] = $a; }
     }
     if (isset($cache[$route])) return $cache[$route];

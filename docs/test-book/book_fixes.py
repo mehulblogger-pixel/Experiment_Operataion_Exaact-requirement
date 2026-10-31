@@ -55,6 +55,10 @@ BEFORE = {  # test id -> the "Before" line
     'ONB-003': 'Same as ONB-002: the APPLICATION form (/get-started), which has the "Preferred workspace name" box. While self sign-up is on, /get-started jumps to the free-trial form (/start), which has no workspace-name box — its name is made from the company name. Signed out.',
 }
 ADD = {  # test id -> steps appended at the end
+    'ONB-047': [
+        {'do': 'After paying, open Admin → "Your subscription".',
+         'expect': 'Trail "Home › Admin › Your subscription". A "Logins" box: "<n> of <limit> used" and "<n> left". A blue line "Your plan: <modules> + Administration, <n> logins, paid yearly/monthly, from <date> until <date>. Every module in it ends on that same day."'},
+    ],
     'ONB-041': [
         {'do': 'Press the 🧭 "Go to…" button at the top (or Ctrl/⌘-K) and scroll the whole list; then type "quality", "invoice" and "asset".',
          'expect': 'The list holds only Home, Me, Sales, Insights, Directory and Admin screens — the same areas as the left menu. Typing finds nothing from Quality & Accreditation, Reporting, Money, Operations, Recruitment, Marketplace, Asset issuance or Analytics & performance.'},

@@ -397,9 +397,13 @@ function ops_area_def($area) {
             // Product licence is a platform-owner concern — never shown inside a
             // client company (its entitlement comes from its plan/subscription).
             $t($fx('superadmin_can') && superadmin_can() && $fx('lk_can_manage') && lk_can_manage(), '📜', 'Licence', '/licence', 'The product licence and its state.');
-            // A cloud (metered) company's own self-service plan: buy modules / seats online.
-            $t($fx('billing_can_manage') && billing_can_manage() && $fx('setting_get') && (int) setting_get('saas_seat_limit', 0) > 0,
-                '💳', 'Subscription', '/subscription', 'Your plan — add modules or seats and pay online. You pay only for what you use.');
+            // A cloud company's own plan: what it has, and buying modules / seats
+            // online. A company on its free trial has no seat limit yet, and the
+            // tile used to need one — so a trial company had no way in at all
+            // (owner, test book ONB-046).
+            $t($fx('billing_can_manage') && billing_can_manage() && $fx('setting_get')
+                && ((int) setting_get('saas_seat_limit', 0) > 0 || ($fx('saas_is_selfserve') && saas_is_selfserve())),
+                '💳', 'Your subscription', '/subscription', 'Your plan, its modules and logins, until when it runs — and changing it or paying online.');
             $t((can('settings.manage') || is_master()) && $fx('books_licensed') && books_licensed(), '📗', 'MGH Books', '/books-bridge', 'The accounts bridge.',
                 $num(fn() => $fx('books_outbox_counts') ? (books_outbox_counts()['stuck'] ?? 0) : 0), 'red');
 

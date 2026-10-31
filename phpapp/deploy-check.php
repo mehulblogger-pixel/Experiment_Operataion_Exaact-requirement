@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '14a610bc · 2026-10-31 06:19 UTC · 701 files';
+$RELEASE = '002e67b1 · 2026-10-31 06:25 UTC · 701 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -44,7 +44,7 @@ $EXPECT  = [
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
     'lib/approvals_hub.php' => ['s'=>8916,'h'=>'920310fe3ad7ba19'],
     'lib/approvals_setup.php' => ['s'=>6622,'h'=>'8b679264ad47f3de'],
-    'lib/areas.php' => ['s'=>43179,'h'=>'7b0dc058ed79a3dd'],
+    'lib/areas.php' => ['s'=>43460,'h'=>'6cd0ce8b23150fb5'],
     'lib/assets.php' => ['s'=>14725,'h'=>'53927f92ca350c91'],
     'lib/attend.php' => ['s'=>13919,'h'=>'695a4eae1fd9e2a9'],
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
@@ -168,7 +168,7 @@ $EXPECT  = [
     'lib/mkt_plans.php' => ['s'=>10874,'h'=>'c47b9e64a348f146'],
     'lib/mkt_rules.php' => ['s'=>12129,'h'=>'f541702a11884133'],
     'lib/mkt_subs.php' => ['s'=>10951,'h'=>'4e6d28aa7ffc7f07'],
-    'lib/nav.php' => ['s'=>29086,'h'=>'50b525286919f1d6'],
+    'lib/nav.php' => ['s'=>29283,'h'=>'38944f5074e14c6a'],
     'lib/navindex.php' => ['s'=>15556,'h'=>'be00130955977f8d'],
     'lib/ncdca.php' => ['s'=>44960,'h'=>'d64c2c2e6eddc5e1'],
     'lib/ncr.php' => ['s'=>34655,'h'=>'237efa97105bfe03'],
@@ -618,7 +618,7 @@ $EXPECT  = [
     'views/ops/sla_targets.php' => ['s'=>2640,'h'=>'e78061dbc1d27d5e'],
     'views/ops/sso.php' => ['s'=>5411,'h'=>'7e627345af817c60'],
     'views/ops/stage_gates.php' => ['s'=>10644,'h'=>'da76be3329606d2a'],
-    'views/ops/subscription.php' => ['s'=>11729,'h'=>'e2ae42b345190335'],
+    'views/ops/subscription.php' => ['s'=>13073,'h'=>'5f6bffacde8a9eed'],
     'views/ops/subscription_invoice.php' => ['s'=>6967,'h'=>'39607f380196f537'],
     'views/ops/super_admin.php' => ['s'=>25600,'h'=>'f4d5a83d44fb7a8b'],
     'views/ops/system_status.php' => ['s'=>2399,'h'=>'90287c341b6166f4'],

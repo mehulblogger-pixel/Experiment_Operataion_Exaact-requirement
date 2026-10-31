@@ -25,7 +25,19 @@ $fmt = fn($n) => $sym . number_format((int) $n);
     <div class="kpi"><span class="k-lab"><?= $st === 'locked' ? 'Ended on' : 'Until' ?></span>
       <span class="k-val" style="font-size:18px"><?= $access['until'] !== '' ? $e(fdate($access['until'])) : '—' ?></span></div>
     <?php if ($st !== 'locked'): ?><div class="kpi"><span class="k-lab">Days left</span><span class="k-val"><?= (int) $access['days_left'] ?></span></div><?php endif; ?>
+    <?php // Logins: allowed, in use, left (owner, ONB-047: "this company has only this
+          // many users, this many are created and this many are left").
+          $lim = (int) ($sub['seat_limit'] ?? 0); $used = (int) ($sub['seats_used'] ?? 0); ?>
+    <div class="kpi <?= $lim && $used >= $lim ? 'tone-bad' : '' ?>"><span class="k-lab">Logins</span>
+      <span class="k-val" style="font-size:18px"><?= $lim ? $used . ' of ' . $lim . ' used' : $used . ' in use' ?></span>
+      <span class="sub" style="font-size:12px"><?= $lim ? max(0, $lim - $used) . ' left' : 'no limit during the trial' ?></span></div>
   </div>
+  <?php if ($st === 'paid' && $current): ?>
+    <div class="msg msg-info" style="margin-top:8px">Your plan: <b><?= $e(implode(', ', array_map($modLabel, (array) $current['mods']))) ?></b> + Administration,
+      <?= (int) $current['seats'] ?> <?= (int) $current['seats'] === 1 ? 'login' : 'logins' ?><?= (int) ($current['packs'] ?? 0) ? ', ' . (int) $current['packs'] . ' extra storage pack' . ((int) $current['packs'] === 1 ? '' : 's') : '' ?>,
+      paid <?= ($current['period'] ?? 'month') === 'year' ? 'yearly' : 'monthly' ?><?= ($current['from'] ?? '') !== '' ? ', from ' . $e(fdate($current['from'])) : '' ?> until <?= $e(fdate($current['until'])) ?>.
+      Every module in it ends on that same day.</div>
+  <?php endif; ?>
   <?php if ($st === 'locked'): ?>
     <div class="msg msg-error" style="margin-top:8px">Your <?= ($access['was'] ?? '') === 'paid' ? 'plan' : 'free trial' ?> has ended, so your workspace is view-only.
       Everything you recorded is safe and can be opened, printed and exported. Choose a plan below to carry on saving new work.</div>
