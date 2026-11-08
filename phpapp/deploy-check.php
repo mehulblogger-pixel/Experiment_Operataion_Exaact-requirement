@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '6d1409b · 2026-11-08 04:00 UTC · 703 files';
+$RELEASE = '8930b03 · 2026-11-08 04:05 UTC · 703 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -187,7 +187,7 @@ $EXPECT  = [
     'lib/pdf.php' => ['s'=>26926,'h'=>'e2f7cd9e46b207d2'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
-    'lib/platform_mail.php' => ['s'=>21094,'h'=>'66567f017e4febf2'],
+    'lib/platform_mail.php' => ['s'=>21367,'h'=>'f5951ecfaeb501d7'],
     'lib/portal.php' => ['s'=>123446,'h'=>'bdb7a9fc58350701'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],

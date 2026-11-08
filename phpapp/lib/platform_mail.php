@@ -188,7 +188,11 @@ function platform_checklist() {
         ['key' => 'trial', 'label' => 'Trial storage and trial logins are set', 'ok' => $set('saas_trial_storage_mb') && $set('saas_trial_seats'),
          'how' => 'Companies → 🚀 Self sign-up & free trial.', 'link' => '/companies'],
         ['key' => 'cron', 'label' => 'The nightly job is running', 'ok' => $cron !== '' && strtotime($cron) > time() - 2 * 86400,
-         'how' => $cron !== '' ? 'Last run ' . substr($cron, 0, 16) . '.' : 'Not run yet. In your hosting panel (cPanel → Cron Jobs) add, once a day: php ' . dirname(__DIR__) . '/cron.php', 'link' => ''],
+         // The exact line is shown whenever the job is not running — also when it
+         // ran once and then stopped — so it can be copied from here as it is.
+         'how' => ($cron !== '' ? 'Last run ' . substr($cron, 0, 16) . '. ' : 'Not run yet. ')
+                . ($cron !== '' && strtotime($cron) > time() - 2 * 86400 ? ''
+                   : 'In your hosting panel (cPanel → Cron Jobs) add, once a day: php ' . dirname(__DIR__) . '/cron.php'), 'link' => ''],
         ['key' => 'admin', 'label' => 'Super Admin has its own address, and is locked to it', 'ok' => function_exists('superadmin_locked') && superadmin_locked(),
          'how' => function_exists('superadmin_host') && superadmin_host() !== '' ? 'Address: ' . superadmin_host() . '. Open it, sign in, and press "Lock Super Admin to this address".' : 'Below, under "Super Admin address".', 'link' => '#admin'],
         ['key' => 'signup', 'label' => 'Self sign-up is switched on', 'ok' => function_exists('selfserve_enabled') && selfserve_enabled(),

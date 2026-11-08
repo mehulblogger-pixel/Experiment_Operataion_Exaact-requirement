@@ -94,3 +94,11 @@ t_ok($items['mail'] === true && $items['mail_acct'] === true, 'with the platform
 if ($had && $bak !== null) { file_put_contents($f, $bak); @chmod($f, 0600); }
 if (function_exists('opcache_invalidate')) @opcache_invalidate($f, true);
 setting_set('smtp_host', $ownHost);
+
+t_section('the checklist always shows the nightly-job line when the job is not running');
+$src = (string) file_get_contents(__DIR__ . '/../lib/platform_mail.php');
+$i = strpos($src, "['key' => 'cron'");
+$blk = substr($src, $i, 900);
+t_ok(strpos($blk, "'Not run yet. '") !== false && strpos($blk, "'In your hosting panel (cPanel → Cron Jobs) add, once a day: php ' . dirname(__DIR__) . '/cron.php'") !== false,
+     'the exact line to paste is given');
+t_ok(strpos($blk, "strtotime(\$cron) > time() - 2 * 86400 ? ''") !== false, 'and it is given again when the job ran once and then stopped');
