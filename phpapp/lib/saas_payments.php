@@ -267,6 +267,10 @@ function saas_payments_check_all(array $cfg = null) {
 // is always read back from Razorpay with the platform's keys, so a forged or
 // replayed notice can change nothing.
 function rzp_webhook_url() {
+    // The main address (the one companies use), never the Super Admin address
+    // the platform owner happens to be reading this on.
+    $main = function_exists('superadmin_main_address') ? superadmin_main_address() : '';
+    if ($main !== '') return $main . '/razorpay-webhook';
     $host = (string) ($_SERVER['HTTP_HOST'] ?? '');
     return $host !== '' ? 'https://' . $host . '/razorpay-webhook' : '/razorpay-webhook';
 }

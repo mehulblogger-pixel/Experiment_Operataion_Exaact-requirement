@@ -220,6 +220,9 @@ $src = fn($f) => (string) file_get_contents($root . '/' . $f);
 foreach (['lib/saas_tenants.php', 'lib/pricing_admin.php', 'lib/billing.php', 'lib/licenceissue.php', 'lib/mkt_pay.php'] as $f)
     t_ok(stripos(preg_replace('#//.*#', '', $src($f)), 'refunded automatically') === false, $f . ' no longer promises an automatic refund');
 t_ok(strpos($src('index.php'), "\$route === 'razorpay-webhook'") < strpos($src('index.php'), 'require_login();'), 'the notice address is public (in front of the sign-in)');
+t_ok(strpos($src('index.php'), "\$route === 'razorpay-webhook'") < strpos($src('index.php'), 'superadmin_address_gate($route);'),
+     'and is accepted even on the Super Admin address (whose gate turns away every other page)');
+t_ok(strpos($src('lib/saas_payments.php'), "superadmin_main_address()") !== false, 'Platform setup shows the main address to give Razorpay');
 t_ok(strpos($src('cron.php'), 'saas_payments_check_all()') !== false, 'the nightly job checks every company\'s payments');
 t_ok(strpos($src('lib/platform_mail.php'), "'key' => 'webhook'") !== false, 'the go-live checklist asks for the webhook');
 t_ok(strpos($src('views/ops/billing_pay.php'), 'saas_refund_policy_text()') !== false, 'the refund rule is shown before paying');

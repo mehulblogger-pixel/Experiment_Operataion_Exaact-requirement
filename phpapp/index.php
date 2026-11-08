@@ -841,6 +841,15 @@ if ($route === 'sw.js' || $route === 'manifest.php' || strpos($route, 'assets/')
 
 // Super Admin's own address (lib/superadmin.php): only the platform owner's
 // sign-in exists there, and once locked the Super Admin screens open nowhere else.
+// Razorpay's payment notice (webhook). Public — Razorpay has no account here —
+// and checked by its signature; it only says which order to look at, and what
+// is applied is read back from Razorpay itself (lib/saas_payments.php).
+// Ahead of the Super Admin address gate, which turns away every page but the
+// sign-in there — a notice must be accepted on whichever address it is sent to.
+if ($route === 'razorpay-webhook' && $method === 'POST' && function_exists('rzp_webhook_route')) {
+    rzp_webhook_route();   // always exits
+}
+
 if (function_exists('superadmin_address_gate')) superadmin_address_gate($route);
 
 // --- Public routes ---
@@ -1034,13 +1043,6 @@ if ($route === 'verify-pdf') {
     if (function_exists('ops_verify_pdf')) ops_verify_pdf();
     else { http_response_code(404); echo 'Not available.'; }
     exit;
-}
-
-// Razorpay's payment notice (webhook). Public — Razorpay has no account here —
-// and checked by its signature; it only says which order to look at, and what
-// is applied is read back from Razorpay itself (lib/saas_payments.php).
-if ($route === 'razorpay-webhook' && $method === 'POST' && function_exists('rzp_webhook_route')) {
-    rzp_webhook_route();   // always exits
 }
 
 // Self-hosted self-service: a customer on their own server pays for users on

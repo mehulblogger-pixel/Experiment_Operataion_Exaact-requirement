@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'ef04bb4 · 2026-11-08 05:37 UTC · 706 files';
+$RELEASE = '4958e83 · 2026-11-08 06:17 UTC · 706 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
     'cron.php' => ['s'=>25906,'h'=>'57d3e4f75031ad1d'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>132804,'h'=>'4a09dadccb9e16cc'],
+    'index.php' => ['s'=>132965,'h'=>'5c3812b11b91b514'],
     'lib/access.php' => ['s'=>131202,'h'=>'359ad3b528a4471c'],
     'lib/access_state.php' => ['s'=>10685,'h'=>'4c7da7d6d793745e'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
@@ -217,7 +217,7 @@ $EXPECT  = [
     'lib/retention.php' => ['s'=>6587,'h'=>'deb6a6d4a270fa36'],
     'lib/revrecon.php' => ['s'=>13441,'h'=>'eb8777d1398cdada'],
     'lib/risks.php' => ['s'=>10571,'h'=>'83a96e16878654a2'],
-    'lib/saas_payments.php' => ['s'=>43836,'h'=>'2c3625b3def14076'],
+    'lib/saas_payments.php' => ['s'=>44119,'h'=>'259727b16a733fae'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
     'lib/saas_tenants.php' => ['s'=>106268,'h'=>'5beabca42bb4c80f'],
