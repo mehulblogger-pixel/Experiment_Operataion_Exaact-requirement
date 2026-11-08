@@ -836,6 +836,7 @@ function run_schema($withSeeds = true) {
     // and the super-admin console. Additive; empty on a single-company install.
     if (function_exists('saas_tenants_migrate')) saas_tenants_migrate();
     if (function_exists('selfserve_migrate')) selfserve_migrate();      // self-serve trial facts, sign-up codes, orders, deletions log
+    if (function_exists('saas_payments_migrate')) saas_payments_migrate();   // company payments: refunds, second payments, order columns (lib/saas_payments.php)
     //  Batch 3 · Q26 — the queue a public sign-up lands in when the organisation
     //  is already ours. Built here rather than on first use, so a workspace that
     //  has never had such a sign-up still has somewhere to put the first one.

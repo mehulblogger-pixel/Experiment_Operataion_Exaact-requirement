@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '055479a · 2026-11-08 05:24 UTC · 706 files';
+$RELEASE = 'e80aae5 · 2026-11-08 05:27 UTC · 706 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -124,7 +124,7 @@ $EXPECT  = [
     'lib/cvp.php' => ['s'=>63763,'h'=>'f330370e06946d93'],
     'lib/datacontrol.php' => ['s'=>37664,'h'=>'1206a5a742cd1266'],
     'lib/datatable.php' => ['s'=>15699,'h'=>'dfea30bbc69ccef3'],
-    'lib/db.php' => ['s'=>58882,'h'=>'ed3fdda0bb89cc1d'],
+    'lib/db.php' => ['s'=>59044,'h'=>'d05c4f070c18c2c3'],
     'lib/decisionrules.php' => ['s'=>12116,'h'=>'7f7d5a9cd6e144ef'],
     'lib/dedupe.php' => ['s'=>12027,'h'=>'de5bdc1c0769610b'],
     'lib/deptorg.php' => ['s'=>35388,'h'=>'6517b0f59b23fe0e'],

@@ -22,7 +22,7 @@ $ivCand = (int) db()->lastInsertId();
 t_ok($ivCand > 0, 'ARMING · a test candidate exists');
 
 // ---- (b) A ROUND CANNOT BE BOOKED TWICE WHILE ONE IS STILL OPEN -----------
-$p = ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => '2026-11-02T10:00', 'panel_users' => [1]];
+$p = ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('Y-m-d', strtotime('+2 days')) . 'T10:00'   /* always ahead: a fixed date went stale on 3 Nov 2026 */, 'panel_users' => [1]];
 $iv1 = iv_schedule($ivCand, $p);
 t_ok($iv1 > 0, 'the first L1 is scheduled');
 
@@ -30,7 +30,7 @@ $iv2 = iv_schedule($ivCand, $p);
 t_eq($iv2, 0, '*** a second L1 is REFUSED while the first has no outcome');
 t_ok(strpos(iv_last_error(), 'already scheduled') !== false,
     '*** and the refusal says so, naming the one that exists');
-t_ok(strpos(iv_last_error(), '2026-11-02T10:00') !== false,
+t_ok(strpos(iv_last_error(), $p['scheduled_at']) !== false,
     '*** including when it is, so the person can go and change that one instead');
 
 // ---- a finished round MAY be repeated, but only deliberately --------------
@@ -50,7 +50,7 @@ $r1 = iv_get($iv1);
 t_eq((string) $r1['result'], 'FAIL', '*** and the first outcome is still there, unchanged');
 
 //  A DIFFERENT round is never blocked by this.
-$l2 = iv_schedule($ivCand, ['round' => 'L2', 'scheduled_at' => '2026-11-05T10:00', 'panel_users' => [1]]);
+$l2 = iv_schedule($ivCand, ['round' => 'L2', 'scheduled_at' => date('Y-m-d', strtotime('+5 days')) . 'T10:00', 'panel_users' => [1]]);
 t_ok($l2 > 0, '*** a different round is unaffected — this is not a lock on scheduling');
 
 // ---- (c) WHO IS ON THE PANEL IS STORED AS IDS ------------------------------
