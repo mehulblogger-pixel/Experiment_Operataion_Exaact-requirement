@@ -499,8 +499,14 @@
     $setTile('/industry', '🧭', 'Your industry', 'Now: ' . e($indLbl));
   }
   if (function_exists('billing_can_manage') && billing_can_manage()) {
-    $bcfg = (function_exists('billing_configured') && billing_configured());
-    $setTile('/billing', '💳', 'Users &amp; billing', $bcfg ? 'Add or renew seats online' : 'Set price &amp; keys to switch on');
+    // A company's cloud workspace buys logins with its plan ("Your subscription");
+    // the per-person screen is for the platform's own install only.
+    if (function_exists('current_tenant') && current_tenant() !== '') {
+      $setTile('/subscription', '💳', 'Your subscription', 'Your plan, its logins and modules — add or renew online');
+    } else {
+      $bcfg = (function_exists('billing_configured') && billing_configured());
+      $setTile('/billing', '💳', 'Users &amp; billing', $bcfg ? 'Add or renew seats online' : 'Set price &amp; keys to switch on');
+    }
   }
   $setTile('/access', '🔐', 'Roles &amp; access', 'Who can view or edit what');
   $setTile('/terminology', '🔤', 'Terminology', 'Rename the words the app uses');

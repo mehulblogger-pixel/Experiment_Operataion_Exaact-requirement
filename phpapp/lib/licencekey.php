@@ -513,6 +513,16 @@ function licence_run_reminders($today = null) {
 function ops_licence($route, $method) {
     ops_require(lk_can_manage(), 'You cannot see the licence.');
 
+    // A licence key is for a copy of the product installed on a customer's own
+    // server. A company in our cloud has no key: its modules and logins are its
+    // plan's. Shown inside a workspace, this screen said "Valid to —", asked for
+    // a key, and listed modules the company HAS as "not bought" (owner, 8 Nov
+    // 2026). The company's real entitlement is on "Your subscription".
+    if (function_exists('current_tenant') && current_tenant() !== '') {
+        flash('Your modules and logins come with your plan — they are shown here, on Your subscription.', 'info');
+        redirect('/subscription');
+    }
+
     // The provider's public key — pasted once on a customer install so it can
     // verify the keys the provider signs for it. (Not needed where the provider
     // ships it as LICENCE_PUBKEY, or on the provider's own licence server.)

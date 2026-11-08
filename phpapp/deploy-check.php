@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '82d539d · 2026-11-08 03:24 UTC · 703 files';
+$RELEASE = '6d1409b · 2026-11-08 04:00 UTC · 703 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -51,7 +51,7 @@ $EXPECT  = [
     'lib/audits.php' => ['s'=>41605,'h'=>'f362d70e80a1632d'],
     'lib/backup.php' => ['s'=>24069,'h'=>'55dc55fb9bd907ad'],
     'lib/billable.php' => ['s'=>31754,'h'=>'2dd93f8e6f584b47'],
-    'lib/billing.php' => ['s'=>17267,'h'=>'9a996e5971e3994c'],
+    'lib/billing.php' => ['s'=>18719,'h'=>'1294b1e7f9a61d09'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
     'lib/billunits.php' => ['s'=>60628,'h'=>'832b0fe0750afa11'],
     'lib/books.php' => ['s'=>72163,'h'=>'32e036eaddd6b34d'],
@@ -153,7 +153,7 @@ $EXPECT  = [
     'lib/leads.php' => ['s'=>92002,'h'=>'7e8eace66476261a'],
     'lib/licence.php' => ['s'=>31138,'h'=>'ae1f563479d4009c'],
     'lib/licenceissue.php' => ['s'=>33709,'h'=>'583595aeb2561596'],
-    'lib/licencekey.php' => ['s'=>29242,'h'=>'c42b2078fe80352f'],
+    'lib/licencekey.php' => ['s'=>29869,'h'=>'db9ba00546be996a'],
     'lib/licencesync.php' => ['s'=>10254,'h'=>'c17cfa585e721f62'],
     'lib/lookups.php' => ['s'=>83604,'h'=>'d94f5b8948c09001'],
     'lib/methods.php' => ['s'=>13959,'h'=>'14969626618c15f8'],
@@ -219,7 +219,7 @@ $EXPECT  = [
     'lib/risks.php' => ['s'=>10571,'h'=>'83a96e16878654a2'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>99240,'h'=>'6827d5f9f5b1c98f'],
+    'lib/saas_tenants.php' => ['s'=>101544,'h'=>'9d7b2692cf1d3ad1'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
@@ -237,7 +237,7 @@ $EXPECT  = [
     'lib/seed_scenario_s04.php' => ['s'=>15797,'h'=>'afbaeeaef614756d'],
     'lib/seed_scenario_s05.php' => ['s'=>10982,'h'=>'77ae3daf8c427816'],
     'lib/seed_scenario_s06.php' => ['s'=>13472,'h'=>'7e7c02ab15233f58'],
-    'lib/selfserve.php' => ['s'=>74274,'h'=>'c61b45b230e50cf7'],
+    'lib/selfserve.php' => ['s'=>74625,'h'=>'91e19e4d4acfbe56'],
     'lib/services.php' => ['s'=>28431,'h'=>'6fc99ee80df3ff34'],
     'lib/settingmeta.php' => ['s'=>13132,'h'=>'b6974b55eac391fe'],
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
@@ -359,7 +359,7 @@ $EXPECT  = [
     'views/ops/availability.php' => ['s'=>17528,'h'=>'37e0f573cb2082d9'],
     'views/ops/backup.php' => ['s'=>5717,'h'=>'c25db9a0eab5b54d'],
     'views/ops/billable_events.php' => ['s'=>11383,'h'=>'244c9ff5d6bafa8b'],
-    'views/ops/billing.php' => ['s'=>7987,'h'=>'2b3fb9a5b8d4236c'],
+    'views/ops/billing.php' => ['s'=>8078,'h'=>'150d20d0525d1062'],
     'views/ops/billing_pay.php' => ['s'=>7127,'h'=>'2896beba2d193472'],
     'views/ops/books_bridge.php' => ['s'=>6061,'h'=>'9d89c6e1a4160652'],
     'views/ops/call_detail.php' => ['s'=>28235,'h'=>'0e139ddb0e2b7556'],
@@ -601,7 +601,7 @@ $EXPECT  = [
     'views/ops/risk_form.php' => ['s'=>3356,'h'=>'f43057f55e88ff02'],
     'views/ops/risks_list.php' => ['s'=>2204,'h'=>'93906156b7d808ab'],
     'views/ops/role_workspaces.php' => ['s'=>4048,'h'=>'66938f5a5139889f'],
-    'views/ops/saas_companies.php' => ['s'=>37757,'h'=>'9702f7608a5191dc'],
+    'views/ops/saas_companies.php' => ['s'=>40071,'h'=>'4b89b51606221088'],
     'views/ops/sample_detail.php' => ['s'=>4311,'h'=>'4529a1888c336f30'],
     'views/ops/sample_form.php' => ['s'=>4129,'h'=>'dfabaedae75c6f9f'],
     'views/ops/samples_list.php' => ['s'=>2173,'h'=>'18bdce8f8a7621a9'],
@@ -613,7 +613,7 @@ $EXPECT  = [
     'views/ops/search.php' => ['s'=>5732,'h'=>'18f633a71a6d1d13'],
     'views/ops/service_formats.php' => ['s'=>2923,'h'=>'0da7c4881ffb154c'],
     'views/ops/service_scope.php' => ['s'=>8596,'h'=>'580a7c044d31aa3c'],
-    'views/ops/settings.php' => ['s'=>73282,'h'=>'03b075282b56e2d4'],
+    'views/ops/settings.php' => ['s'=>73653,'h'=>'35c12f9315912169'],
     'views/ops/setup.php' => ['s'=>5595,'h'=>'e4bcbe1609aa72c5'],
     'views/ops/setup_questions.php' => ['s'=>2854,'h'=>'a6feb3e000f62701'],
     'views/ops/site_docs.php' => ['s'=>4927,'h'=>'f03c1d9c89e53436'],

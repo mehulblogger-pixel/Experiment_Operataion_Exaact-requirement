@@ -15,7 +15,7 @@
   <div><h1>Users &amp; billing</h1>
     <p class="sub" style="margin:2px 0 0">Pay per person. Add or renew seats online — the moment a payment clears, the
       new seat count is live.</p></div>
-  <a class="btn secondary" href="/licence">Licence details</a>
+  <?php if (!function_exists('current_tenant') || current_tenant() === ''): ?><a class="btn secondary" href="/licence">Licence details</a><?php endif; ?>
 </div>
 
 <div class="kpi-row" style="margin-top:14px">

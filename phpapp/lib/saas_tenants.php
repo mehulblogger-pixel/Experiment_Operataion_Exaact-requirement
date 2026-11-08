@@ -193,7 +193,12 @@ function saas_login_index_clear_tenant($key) {
     catch (Throwable $e) { return false; }
 }
 function saas_tenant_set_plan($key, $plan, $expiry = null) {
-    $d = ['plan' => strtoupper((string) $plan), 'enabled_modules' => saas_plan_modules($plan)];
+    $plan = strtoupper((string) $plan);
+    $d = ['plan' => $plan];
+    // Only a plan from the console's own list brings its preset modules. A
+    // company on its own choice (CUSTOM) or a free trial keeps exactly the
+    // modules it has — saving its date must never strip what it bought.
+    if (array_key_exists($plan, saas_console_plans())) $d['enabled_modules'] = saas_plan_modules($plan);
     if ($expiry !== null) $d['plan_expiry'] = (string) $expiry;
     return saas_tenant_upsert($key, $d);
 }
@@ -1038,6 +1043,12 @@ function saas_push_to_tenant_inproc($key, $t = null) {
     if ($key === '' || !function_exists('saas_enter_tenant')) return false;
     if ($t === null) $t = saas_tenant_get($key);
     if (!$t) return false;
+    // Read what to push from the CONSOLE's own records, before switching. Once
+    // inside the company the database is the company's, which has no copy of
+    // the console's directory — read there, the seat limit came back as 0
+    // ("no limit") and the module list as empty (owner, 8 Nov 2026).
+    $limit = saas_tenant_seat_limit($key);
+    $mods  = saas_tenant_modules($key);
     $prev = $_SESSION['saas_tenant'] ?? null;             // remember where the operator was
     $prevWs = $_SESSION['uid_ws'] ?? null;                 // M13 — and which workspace their identity belongs to
     $ok = false;
@@ -1049,10 +1060,14 @@ function saas_push_to_tenant_inproc($key, $t = null) {
         try { db(); $rt = $GLOBALS['__tenant'] ?? []; } catch (Throwable $e) {}
         if (strtolower((string) ($rt['key'] ?? '')) === $key && ($rt['error'] ?? '') === '') {
             if (function_exists('saas_tenant_ensure_ready')) saas_tenant_ensure_ready($key);   // build + stamp if brand new
-            $mods = saas_tenant_modules($key);
             if ($mods && function_exists('saas_apply_modules_list')) saas_apply_modules_list($mods);
             elseif (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules((string) ($t['plan'] ?? 'RECRUITMENT'));
-            if (function_exists('setting_set')) setting_set('saas_seat_limit', (string) saas_tenant_seat_limit($key));
+            // Never below what the company has paid for itself — the same rule as
+            // the command-line push (lib/saas_sync_cli.php). Without it, a console
+            // number that was out of date cut a company's bought logins on hosts
+            // where exec() is off and this path is the one that runs.
+            if (function_exists('saas_paid_seat_floor')) $limit = max($limit, saas_paid_seat_floor());
+            if (function_exists('setting_set')) setting_set('saas_seat_limit', (string) $limit);
             $ok = true;
         }
     } catch (Throwable $e) { $ok = false; }
@@ -1333,7 +1348,14 @@ function ops_saas_admin($route, $method) {
                 flash('"Plan valid until" must be a date written YYYY-MM-DD, e.g. 2027-03-31. Nothing was saved.', 'error');
                 redirect($back);
             }
-            saas_tenant_set_plan($key, (string) ($_POST['plan'] ?? ''), $exp !== '' ? $exp : null);
+            $want = strtoupper(trim((string) ($_POST['plan'] ?? '')));
+            $curT = saas_tenant_get($key);
+            $cur  = strtoupper((string) ($curT['plan'] ?? ''));
+            if (!array_key_exists($want, saas_console_plans()) && $want !== $cur) {
+                flash('Choose a plan from the list. Nothing was saved.', 'error');
+                redirect($back);
+            }
+            saas_tenant_set_plan($key, $want, $exp !== '' ? $exp : null);
             $pushed($key, 'Plan');
             // The date the platform owner sets IS the company's "Active until"
             // (owner, test book PLT-005: "when from admin panel I change the date
@@ -1466,7 +1488,23 @@ function ops_saas_admin($route, $method) {
     }
 
     $sel = strtolower(trim((string) ($_GET['key'] ?? '')));
+    // The console's copy of a company is refreshed only by the nightly job, so
+    // it can be days old (owner, 8 Nov: "2 bought" on the console while the
+    // company really had 15 logins). Before the platform owner edits a company,
+    // bring that one company up to date from its own workspace — read-only
+    // there, no e-mail, nothing deleted (the "Check now" sweep, for one company).
+    $selFacts = null;
+    if ($sel !== '' && function_exists('selfserve_sweep')) {
+        try {
+            $sw = selfserve_sweep(['dry' => true, 'only' => $sel]);
+            $selFacts = $sw['facts'][$sel] ?? null;
+        } catch (Throwable $e) { $selFacts = null; }
+    }
     $selRow = $sel !== '' ? saas_tenant_get($sel) : null;
+    if ($selRow && $selFacts && !empty($selFacts['ok'])) {
+        $selRow['live_seats_used'] = (int) ($selFacts['seats_used'] ?? 0);
+        $selRow['live_seat_limit'] = (int) ($selFacts['seat_limit'] ?? 0);
+    }
     if ($sel !== '' && !$selRow) flash('No company "' . $sel . '" is on this console — it may have been removed.', 'warning');
     view('ops/saas_companies', [
         'companies' => saas_console_companies(),

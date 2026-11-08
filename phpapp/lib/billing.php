@@ -133,6 +133,13 @@ function billing_self_managed() {
 // self-hosted licensed install, where the signed key is the only authority.
 function billing_grant() {
     if (!billing_self_managed()) return ['active' => false, 'seats' => 0, 'until' => '', 'managed' => false];
+    // Inside a company's cloud workspace the PLAN decides logins and dates
+    // ("Your subscription": saas_seat_limit, billing_paid_until). A per-person
+    // grant left there by the old screen became a second, hidden login cap
+    // through the licence check — a company that raised its plan to 20 logins
+    // was still stopped at the 15 of an old payment (owner, 8 Nov 2026).
+    if (function_exists('current_tenant') && current_tenant() !== '')
+        return ['active' => false, 'seats' => (int) setting_get('billing_seats', 0), 'until' => (string) setting_get('billing_paid_until', ''), 'managed' => false];
     $until = (string) setting_get('billing_paid_until', '');
     $seats = (int) setting_get('billing_seats', 0);
     return ['active' => $until !== '' && $until >= date('Y-m-d') && $seats > 0, 'seats' => $seats, 'until' => $until, 'managed' => true];
@@ -206,6 +213,18 @@ function billing_history($limit = 20) {
 // ---- The screen ------------------------------------------------------------
 function ops_billing($route, $method) {
     ops_require(billing_can_manage(), 'You cannot manage billing.');
+
+    // Inside a company's cloud workspace the logins are its PLAN's — bought and
+    // changed on "Your subscription" (saas_seat_limit, which is what lets a new
+    // login in or not). This older per-person screen keeps a number of its own
+    // that blocks nothing: a company that already had 15 logins on its plan and
+    // paid here for 5 more was told "only 5 seats are paid for" and still could
+    // not add anyone (owner, 8 Nov 2026). So in a workspace it hands over to the
+    // one real screen. A payment already under way still finishes (verify).
+    if (function_exists('current_tenant') && current_tenant() !== '' && $route !== 'billing-verify') {
+        flash('Logins are part of your plan. Add logins or renew on this page — it is the one that counts.', 'info');
+        redirect('/subscription');
+    }
 
     if ($route === 'billing-config' && $method === 'POST') {
         $why = billing_keys_refusal();

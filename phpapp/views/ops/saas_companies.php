@@ -205,10 +205,24 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     <input type="hidden" name="do" value="company_plan"><input type="hidden" name="key" value="<?= $sk ?>">
     <div class="sc-edit" style="border-bottom:1px solid var(--line,#eef1f5)">
       <div class="ff"><label>Plan</label>
-        <select name="plan"><?php foreach ($plans as $pk => $p): ?><option value="<?= $e($pk) ?>" <?= ($sel['plan'] ?? '') === $pk ? 'selected' : '' ?>><?= $e($p['label']) ?> — <?= (int) $p['base'] ?> base logins</option><?php endforeach; ?></select>
-        <div class="sc-note">Sets which modules this company gets and its base seat count. Applied to the company's workspace when you save.</div>
+        <?php // A company on its own choice (it picked and paid for its modules and
+              // logins in the app) or on a free trial is on no plan from this list.
+              // It is shown as what it is and selected — never silently as the first
+              // plan in the list, which "Save plan" would then have switched it to.
+              $curPlan = strtoupper((string) ($sel['plan'] ?? ''));
+              $offList = $curPlan !== '' && !isset($plans[$curPlan]); ?>
+        <select name="plan">
+          <?php if ($offList): ?><option value="<?= $e($curPlan) ?>" selected><?= $curPlan === 'CUSTOM' ? 'Own choice — chosen and paid for in the app (keep)' : ($curPlan === 'TRIAL' ? 'Free trial (keep)' : $e($curPlan) . ' (keep)') ?></option><?php endif; ?>
+          <?php foreach ($plans as $pk => $p): ?><option value="<?= $e($pk) ?>" <?= $curPlan === $pk ? 'selected' : '' ?>><?= $e($p['label']) ?> — <?= (int) $p['base'] ?> base logins</option><?php endforeach; ?></select>
+        <div class="sc-note"><?= $offList
+            ? 'This company chose its own modules and logins. Keep this choice to change only the date. Picking a plan from the list replaces its modules with that plan\'s.'
+            : 'Sets which modules this company gets and its base seat count. Applied to the company\'s workspace when you save.' ?></div>
       </div>
-      <div class="ff"><label>Plan valid until (optional)</label><input name="plan_expiry" type="date" value="<?= $e($sel['plan_expiry'] ?? '') ?>" placeholder="YYYY-MM-DD">
+      <?php // A company that pays for itself: the date it is really paid until (read
+            // from its workspace), not an older date typed on this console.
+            $expShown = !empty($sel['source']) && $sel['source'] === 'self' && (string) ($sel['paid_until'] ?? '') !== ''
+                ? (string) $sel['paid_until'] : (string) ($sel['plan_expiry'] ?? ''); ?>
+      <div class="ff"><label>Plan valid until (optional)</label><input name="plan_expiry" type="date" value="<?= $e($expShown) ?>" placeholder="YYYY-MM-DD">
         <div class="sc-note">The company sees this as "Active until". A past date ends its paid period (a self sign-up company becomes view-only). Blank leaves its date as it is.</div>
         <div style="margin-top:8px"><button class="btn">Save plan</button></div></div>
     </div>
@@ -217,9 +231,19 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
   <form method="post">
     <input type="hidden" name="do" value="company_seats"><input type="hidden" name="key" value="<?= $sk ?>">
     <div class="sc-edit" style="border-bottom:1px solid var(--line,#eef1f5)">
-      <div class="ff"><label>Purchased seats (over the plan base)</label>
+      <?php $isOwn = strtoupper((string) ($sel['plan'] ?? '')) === 'CUSTOM';
+            $liveUsed = isset($sel['live_seats_used']) ? (int) $sel['live_seats_used'] : null;
+            $liveCap  = isset($sel['live_seat_limit']) ? (int) $sel['live_seat_limit'] : null; ?>
+      <div class="ff"><label><?= $isOwn ? 'Logins this company has (total)' : 'Purchased seats (over the plan base)' ?></label>
         <input type="number" name="extra_user_seats" min="0" value="<?= (int) ($sel['extra_user_seats'] ?? 0) ?>">
-        <div class="sc-note">Total logins allowed = plan base (<?= (int) saas_plan_logins($sel['plan'] ?? '') ?>) + purchased. The company cannot add a login beyond that.</div></div>
+        <?php if ($liveUsed !== null): ?>
+        <div class="sc-note" style="font-weight:600;color:var(--ink,#1f2937)">In use now: <?= $liveUsed ?> of <?= $liveCap > 0 ? $liveCap : 'no limit' ?> logins<?= $liveCap > 0 && $liveUsed >= $liveCap ? ' — full: the company cannot add another login until this number is raised.' : '.' ?></div>
+        <?php else: ?>
+        <div class="sc-note">Its workspace could not be read just now, so this number may be out of date.</div>
+        <?php endif; ?>
+        <div class="sc-note"><?= $isOwn
+            ? 'This company chose its own plan, so this number is its total (no plan base). It can never be set below the logins it paid for itself.'
+            : 'Total logins allowed = plan base (' . (int) saas_plan_logins($sel['plan'] ?? '') . ') + purchased. The company cannot add a login beyond that.' ?></div></div>
       <div class="ff" style="justify-content:flex-end"><div><button class="btn">Save seats</button></div></div>
     </div>
   </form>

@@ -979,6 +979,8 @@ function selfserve_read_tenant($key, array $sell = null, array $storage = null) 
                 $row['trial_until'] = (string) setting_get('saas_trial_until', '');
                 $row['modules']     = function_exists('saas_current_modules') ? saas_current_modules() : [];
                 $row['seat_limit']  = (int) setting_get('saas_seat_limit', 0);
+                $row['seats_used']  = 0;
+                try { $row['seats_used'] = (int) ops_val("SELECT COUNT(*) FROM users WHERE COALESCE(is_active,1)=1"); } catch (Throwable $e) {}
                 $row['converted_at'] = (string) setting_get('saas_converted_at', '');
                 if ($sell) foreach ($sell as $sk => $sv) { try { setting_set($sk, $sv); } catch (Throwable $e) {} }
                 if ($storage) foreach ($storage as $sk => $sv) { try { setting_set($sk, $sv); } catch (Throwable $e) {} }
@@ -1026,13 +1028,16 @@ function selfserve_sweep(array $opts = []) {
     $storeSet = selfserve_storage_settings();
     try { $rows = ops_all("SELECT * FROM saas_tenants ORDER BY tenant_key"); }
     catch (Throwable $e) { return $out; }
+    $only = strtolower(trim((string) ($opts['only'] ?? '')));
     foreach ((array) $rows as $t) {
         $key = (string) $t['tenant_key'];
+        if ($only !== '' && strtolower($key) !== $only) continue;
         $isSelf = ($t['source'] ?? '') === 'self';
         if (strtolower((string) ($t['status'] ?? 'active')) === 'suspended') continue;
         $out['checked']++;
         $facts = $read($key, $isSelf ? $sell : null, $storeSet + ['saas_storage_extra_gb' => (string) ($t['storage_extra_gb'] ?? '')]);
         if (empty($facts['ok'])) { $out['lines'][] = $key . ': could not be opened — left alone'; continue; }
+        $out['facts'][$key] = $facts;
         // Storage, for every company: record it for the console, and tell the
         // owner once as each warning level is crossed.
         if (($facts['storage_used'] ?? null) !== null) {
